@@ -27,7 +27,8 @@ import { NodeConnectObjectOptionsSchema, NodeCreateObjectOptionsSchema } from "@
 import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
-import { drpObjectChangesHandler, handleMessage } from "./handlers.js";
+import { clearSyncRecoveryEpisodes, drpObjectChangesHandler, handleMessage } from "./handlers.js";
+import { createDRPIntervalSync } from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
@@ -38,6 +39,7 @@ const DISCOVERY_MESSAGE_TYPES = [
 ];
 
 const DISCOVERY_QUEUE_ID = "discovery";
+const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `interval:${type}::${id}`;
 
 /**
  * A DRP node.
@@ -50,6 +52,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 
 	#objectStore: DRPObjectStore;
 	private _intervals: Map<string, IntervalRunnerMap[keyof IntervalRunnerMap]> = new Map();
+	private _subscribedNetworkNode?: DRPNetworkNode;
 
 	/**
 	 * Create a new DRP node.
@@ -71,6 +74,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			interval_discovery_options: {
 				...config?.interval_discovery_options,
 			},
+			interval_sync_options: {
+				...config?.interval_sync_options,
+			},
 		};
 		this.messageQueueManager = new MessageQueueManager<Message>({
 			logConfig: this.config.log_config,
@@ -83,27 +89,33 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	async start(): Promise<void> {
 		await this.keychain.start();
 		await this.networkNode.start(this.keychain.secp256k1PrivateKey);
-		this._intervals.set(
-			"interval::reconnect",
-			createDRPReconnectBootstrap({
-				...this.config.interval_reconnect_options,
-				id: this.networkNode.peerId.toString(),
-				networkNode: this.networkNode,
-				logConfig: this.config.log_config,
-			})
-		);
-		this.networkNode.subscribeToMessageQueue(this.dispatchMessage.bind(this));
-		this.messageQueueManager.subscribe(DISCOVERY_QUEUE_ID, (msg) => handleMessage(this, msg));
-		this._intervals.forEach((interval) => interval.start());
+		this.messageQueueManager.startAll();
+		const reconnectInterval = createDRPReconnectBootstrap({
+			...this.config.interval_reconnect_options,
+			id: this.networkNode.peerId.toString(),
+			networkNode: this.networkNode,
+			logConfig: this.config.log_config,
+		});
+		this._intervals.set("interval::reconnect", reconnectInterval);
+		if (this._subscribedNetworkNode !== this.networkNode) {
+			this.networkNode.subscribeToMessageQueue(this.dispatchMessage.bind(this));
+			this._subscribedNetworkNode = this.networkNode;
+		}
+		if (!this.messageQueueManager.hasQueue(DISCOVERY_QUEUE_ID)) {
+			this.messageQueueManager.subscribe(DISCOVERY_QUEUE_ID, (msg) => handleMessage(this, msg));
+		}
+		reconnectInterval.start();
+		this.restoreSubscriptions();
 	}
 
 	/**
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
+		this._intervals.forEach((interval) => interval.stop());
+		this._intervals.clear();
 		await this.networkNode.stop();
 		void this.messageQueueManager.closeAll();
-		this._intervals.forEach((interval) => interval.stop());
 	}
 
 	/**
@@ -112,7 +124,6 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	async restart(): Promise<void> {
 		await this.stop();
 
-		// reassign the network node ? I think we might not need to do this
 		this.networkNode = new DRPNetworkNode(this.config?.network_config);
 
 		await this.start();
@@ -230,8 +241,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (options.sync?.enabled) {
 			await operations.syncObject(this, object.id, options.sync.peerId);
 		}
-		// create the interval discovery
-		this._createIntervalDiscovery(object.id);
+		this._createObjectIntervals(object.id);
 		return object;
 	}
 
@@ -261,8 +271,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 
 		this.subscribeObject(object);
 
-		// start the interval discovery
-		this._createIntervalDiscovery(options.id);
+		this._createObjectIntervals(options.id);
 		await operations.fetchState(this, options.id, options.sync?.peerId);
 		const { signal, cleanup } = timeoutSignal(5000);
 		try {
@@ -300,12 +309,15 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param object - The object to subscribe to.
 	 */
 	subscribeObject<T extends IDRP>(object: IDRPObject<T>): void {
-		// subscribe to the object
-		object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
-		// subscribe to the topic in gossipsub
-		this.networkNode.subscribe(object.id);
-		// subscribe the the message Queue
+		// Reserve queue capacity before installing callbacks or gossip subscriptions.
 		this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
+		try {
+			object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
+			this.networkNode.subscribe(object.id);
+		} catch (error) {
+			this.messageQueueManager.close(object.id);
+			throw error;
+		}
 	}
 
 	/**
@@ -314,6 +326,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param purge - Whether to purge the object.
 	 */
 	unsubscribeObject(id: string, purge?: boolean): void {
+		this._stopObjectIntervals(id);
+		clearSyncRecoveryEpisodes(this, id);
 		this.networkNode.unsubscribe(id);
 		if (purge) this.#objectStore.remove(id);
 		this.networkNode.removeTopicScoreParams(id);
@@ -329,8 +343,20 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		await operations.syncObject(this, id, peerId);
 	}
 
+	/** Restore queue and gossip subscriptions plus intervals for stored objects. */
+	private restoreSubscriptions(): void {
+		for (const object of this.#objectStore.values()) {
+			if (!this.messageQueueManager.hasQueue(object.id)) {
+				this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
+			}
+			this.networkNode.subscribe(object.id);
+			this._createObjectIntervals(object.id);
+		}
+	}
+
 	private _createIntervalDiscovery(id: string): void {
-		const existingInterval = this._intervals.get(id);
+		const key = objectIntervalKey("discovery", id);
+		const existingInterval = this._intervals.get(key);
 		existingInterval?.stop(); // Stop only if it exists
 
 		const interval =
@@ -342,8 +368,39 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				logConfig: this.config.log_config,
 			});
 
-		this._intervals.set(id, interval);
+		this._intervals.set(key, interval);
 		interval.start();
+	}
+
+	private _createIntervalSync(id: string): void {
+		const key = objectIntervalKey("sync", id);
+		const existingInterval = this._intervals.get(key);
+		existingInterval?.stop();
+
+		const interval =
+			existingInterval ??
+			createDRPIntervalSync({
+				...this.config.interval_sync_options,
+				id,
+				node: this,
+				logConfig: this.config.log_config,
+			});
+
+		this._intervals.set(key, interval);
+		interval.start();
+	}
+
+	private _createObjectIntervals(id: string): void {
+		this._createIntervalDiscovery(id);
+		this._createIntervalSync(id);
+	}
+
+	private _stopObjectIntervals(id: string): void {
+		for (const type of ["discovery", "sync"] as const) {
+			const key = objectIntervalKey(type, id);
+			this._intervals.get(key)?.stop();
+			this._intervals.delete(key);
+		}
 	}
 
 	/**
@@ -354,7 +411,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	async handleDiscoveryResponse(sender: string, message: Message): Promise<void> {
 		const response = DRPDiscoveryResponse.decode(message.data);
 		const objectId = message.objectId;
-		const interval = this._intervals.get(objectId);
+		const interval = this._intervals.get(objectIntervalKey("discovery", objectId));
 		if (!interval) {
 			log.error("::handleDiscoveryResponse: Object not found");
 			return;
@@ -366,3 +423,5 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		await interval.handleDiscoveryResponse(sender, response.subscribers);
 	}
 }
+
+export { createDRPIntervalSync, DRPIntervalSync, type DRPIntervalSyncOptions } from "./interval-sync.js";

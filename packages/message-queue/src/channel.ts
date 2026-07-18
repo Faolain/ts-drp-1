@@ -6,6 +6,15 @@ export interface ChannelOptions {
 	logOptions?: LoggerOptions;
 }
 
+/** Error raised when an operation cannot complete because its channel closed. */
+export class ChannelClosedError extends Error {
+	/** Create a channel-closure error. */
+	constructor() {
+		super("Channel is closed");
+		this.name = "ChannelClosedError";
+	}
+}
+
 /**
  * Channel is a class that implements a simple message queue.
  * It provides methods to send and receive messages.
@@ -39,7 +48,7 @@ export class Channel<T> {
 	 */
 	async send(value: T): Promise<void> {
 		if (this.isClosed) {
-			throw new Error("Channel is closed");
+			throw new ChannelClosedError();
 		}
 
 		if (value === undefined) {
@@ -72,9 +81,8 @@ export class Channel<T> {
 	 * @returns The value received from the channel
 	 */
 	async receive(): Promise<T> {
-		// if channel is closed and no more messages, throw
-		if (this.isClosed && this.values.length === 0 && this.sends.length === 0) {
-			throw new Error("Channel is closed");
+		if (this.isClosed) {
+			throw new ChannelClosedError();
 		}
 
 		// if there are values in the buffer, return the first one
@@ -96,11 +104,6 @@ export class Channel<T> {
 			}
 		}
 
-		// if channel is closed and we got here, it means no more messages
-		if (this.isClosed) {
-			throw new Error("Channel is closed");
-		}
-
 		// if there are no values or pending sends, wait for a send
 		const signal = new Deferred<T>();
 		this.receives.push(signal);
@@ -112,23 +115,26 @@ export class Channel<T> {
 	 */
 	close(): void {
 		this.isClosed = true;
-		// Reject all pending receives
+		this.values.splice(0);
+		while (this.sends.length > 0) {
+			this.sends.shift()?.signal.reject(new ChannelClosedError());
+		}
 		while (this.receives.length > 0) {
-			const recv = this.receives.shift();
-			if (recv) {
-				recv.reject(new Error("Channel is closed"));
-			}
+			this.receives.shift()?.reject(new ChannelClosedError());
 		}
 	}
 
 	/**
-	 * Start the channel
+	 * Reopen the channel with no buffered values or pending operations.
 	 */
 	start(): void {
-		if (this.isClosed) {
-			this.logger.warn("Channel is closed");
+		if (!this.isClosed) {
+			this.logger.warn("Channel is already started");
 			return;
 		}
-		this.isClosed = true;
+		this.values.splice(0);
+		this.sends.splice(0);
+		this.receives.splice(0);
+		this.isClosed = false;
 	}
 }

@@ -135,7 +135,7 @@ describe("MessageQueueManager", () => {
 			smallManager.closeAll();
 		});
 
-		it("should log error when enqueueing to non-existent queue", async () => {
+		it("should reject and log when enqueueing to non-existent queue", async () => {
 			const smallManager = new MessageQueueManager<string>({ maxQueues: 2 });
 			const queue1Id = "queue1";
 			const queue2Id = "queue2";
@@ -149,7 +149,7 @@ describe("MessageQueueManager", () => {
 			smallManager.subscribe(queue2Id, vi.fn());
 
 			// Try to enqueue to a third queue that doesn't exist
-			await smallManager.enqueue(queue3Id, "test3");
+			await expect(smallManager.enqueue(queue3Id, "test3")).rejects.toThrow(`Queue ${queue3Id} not found`);
 
 			// Verify logger was called with appropriate message
 			expect(loggerSpy).toHaveBeenCalledWith(`queue manager::enqueue: queue ${queue3Id} not found`);
