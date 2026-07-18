@@ -1,5 +1,5 @@
-import { type GossipSub, type MeshPeer } from "@chainsafe/libp2p-gossipsub";
-import { type Connection, type IdentifyResult, type Libp2p, type SubscriptionChangeData } from "@libp2p/interface";
+import { type GossipSub, type MeshPeer, type SubscriptionChangeData } from "@libp2p/gossipsub";
+import { type Connection, type IdentifyResult, type Libp2p } from "@libp2p/interface";
 import { type DRPNetworkNodeConfig, type DRPNodeConfig, type LoggerOptions, Message } from "@ts-drp/types";
 import { raceEvent } from "race-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";

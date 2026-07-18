@@ -1,4 +1,4 @@
-import { type TopicScoreParams } from "@chainsafe/libp2p-gossipsub/score";
+import { type TopicScoreParams } from "@libp2p/gossipsub/score";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { type MultiaddrInput } from "@multiformats/multiaddr";
 

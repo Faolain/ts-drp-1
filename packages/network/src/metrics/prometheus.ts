@@ -6,7 +6,7 @@ import {
 	type Histogram,
 	type HistogramConfig,
 	type MetricsRegister,
-} from "@chainsafe/libp2p-gossipsub/metrics";
+} from "@libp2p/gossipsub/metrics";
 import {
 	type Gauge as TypePromGauge,
 	type Histogram as TypePromHistogram,

@@ -19,9 +19,7 @@
 // THE SOFTWARE.
 
 import type { Stream } from "@libp2p/interface";
-import * as lp from "it-length-prefixed";
-import map from "it-map";
-import { pipe } from "it-pipe";
+import { lpStream } from "@libp2p/utils";
 
 /**
  * Convert a Uint8Array to a stream.
@@ -29,7 +27,9 @@ import { pipe } from "it-pipe";
  * @param input - The Uint8Array to write.
  */
 export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Promise<void> {
-	await pipe(input, (source) => lp.encode([source]), stream.sink);
+	const lp = lpStream(stream);
+	await lp.write(input);
+	await lp.unwrap().close();
 }
 
 /**
@@ -38,16 +38,7 @@ export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Pro
  * @returns The Uint8Array.
  */
 export async function streamToUint8Array(stream: Stream): Promise<Uint8Array> {
-	return pipe(
-		stream.source,
-		(source) => lp.decode(source),
-		(source) => map(source, (buf) => buf.subarray()),
-		async (source) => {
-			const output: Uint8Array[] = [];
-			for await (const msg of source) {
-				output.push(msg);
-			}
-			return output[0];
-		}
-	);
+	return lpStream(stream)
+		.read()
+		.then((data) => data.subarray());
 }

@@ -1,4 +1,4 @@
-import { type GossipSub, type MeshPeer } from "@chainsafe/libp2p-gossipsub";
+import { type GossipSub, type MeshPeer } from "@libp2p/gossipsub";
 import { MapDRP } from "@ts-drp/blueprints";
 import { DRPNode } from "@ts-drp/node";
 import { DRP_INTERVAL_DISCOVERY_TOPIC, type DRPNodeConfig, type LoggerOptions } from "@ts-drp/types";

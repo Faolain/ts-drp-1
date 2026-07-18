@@ -1,18 +1,19 @@
-import { type GossipSub, gossipsub, type GossipsubOpts } from "@chainsafe/libp2p-gossipsub";
-import {
-	createPeerScoreParams,
-	createTopicScoreParams,
-	type PeerScoreParams,
-	type TopicScoreParams,
-} from "@chainsafe/libp2p-gossipsub/score";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
+import { inspectorMetrics } from "@ipshipyard/libp2p-inspector-metrics";
 import { autoNAT } from "@libp2p/autonat";
 import { bootstrap, type BootstrapComponents } from "@libp2p/bootstrap";
 import { circuitRelayServer, circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { dcutr } from "@libp2p/dcutr";
-import { devToolsMetrics } from "@libp2p/devtools-metrics";
+import { type GossipSub, gossipsub, type GossipsubOpts } from "@libp2p/gossipsub";
+import {
+	createPeerScoreParams,
+	createTopicScoreParams,
+	type PeerScore,
+	type PeerScoreParams,
+	type TopicScoreParams,
+} from "@libp2p/gossipsub/score";
 import { identify, identifyPush } from "@libp2p/identify";
 import { type Address, type Connection, type PeerDiscovery, type PeerId, type Stream } from "@libp2p/interface";
 import { peerIdFromString } from "@libp2p/peer-id";
@@ -20,7 +21,6 @@ import { ping } from "@libp2p/ping";
 import { pubsubPeerDiscovery, type PubSubPeerDiscoveryComponents } from "@libp2p/pubsub-peer-discovery";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import * as filters from "@libp2p/websockets/filters";
 import { type Multiaddr, multiaddr, type MultiaddrInput } from "@multiformats/multiaddr";
 import { WebRTC } from "@multiformats/multiaddr-matcher";
 import { Logger } from "@ts-drp/logger";
@@ -53,6 +53,11 @@ type PeerDiscoveryFunction =
 	| ((components: PubSubPeerDiscoveryComponents) => PeerDiscovery)
 	| ((components: BootstrapComponents) => PeerDiscovery);
 
+type ConfigurableGossipSub = GossipSub & {
+	score: PeerScore;
+	streamsOutbound: Map<string, unknown>;
+};
+
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
  * It handles the creation and management of the libp2p node, pubsub, and message queue.
@@ -60,7 +65,7 @@ type PeerDiscoveryFunction =
 export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _config?: DRPNetworkNodeConfig;
 	private _node?: Libp2p;
-	private _pubsub?: GossipSub;
+	private _pubsub?: ConfigurableGossipSub;
 	private _messageQueue: MessageQueue<Message>;
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapNodesList: string[];
@@ -109,7 +114,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				})
 			);
 			for (const addr of this._bootstrapNodesList) {
-				const peerId = multiaddr(addr).getPeerId();
+				const peerId = this.getPeerId(multiaddr(addr));
 				if (!peerId) continue;
 				_bootstrapPeerID.push(peerId);
 			}
@@ -152,17 +157,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					return false;
 				},
 			},
-			metrics: this._config?.browser_metrics ? devToolsMetrics() : undefined,
+			metrics: this._config?.browser_metrics ? inspectorMetrics() : undefined,
 			peerDiscovery: _peerDiscovery,
 			services: this._config?.bootstrap ? _bootstrap_services : _node_services,
 			streamMuxers: [yamux()],
-			transports: [
-				circuitRelayTransport(),
-				webRTC(),
-				webSockets({
-					filter: filters.all,
-				}),
-			],
+			transports: [circuitRelayTransport(), webRTC(), webSockets()],
 		});
 		log.info(
 			"::start: running on:",
@@ -179,7 +178,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}
 		}
 
-		this._pubsub = this._node.services.pubsub as GossipSub;
+		this._pubsub = this._node.services.pubsub as ConfigurableGossipSub;
 		this.peerId = this._node.peerId.toString();
 
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
@@ -259,6 +258,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (aWebrtc && !bWebrtc) return -1;
 		if (!aWebrtc && bWebrtc) return 1;
 		return 0;
+	}
+
+	private getPeerId(addr: Multiaddr): string | undefined {
+		return addr.getComponents().find((component) => component.name === "p2p")?.value;
 	}
 
 	private getGossipSubConfig(bootstapNodeList: string[]): Partial<GossipsubOpts> {
@@ -361,7 +364,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		const addrs: Record<string, Multiaddr[]> = {};
 		for (const peerId of peerIds) {
 			const ma: Multiaddr = typeof peerId === "string" ? multiaddr(peerId) : peerId;
-			const currentPeerId = ma.getPeerId()?.toString();
+			const currentPeerId = this.getPeerId(ma);
 			if (!currentPeerId) continue;
 			addrs[currentPeerId] = [...(addrs[currentPeerId] ?? []), ma];
 		}
@@ -404,7 +407,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async connect(addr: MultiaddrInput | MultiaddrInput[]): Promise<void> {
 		try {
-			const multiaddrs = Array.isArray(addr) ? addr.map(multiaddr) : [multiaddr(addr)];
+			const isComponentArray =
+				Array.isArray(addr) &&
+				addr.length > 0 &&
+				addr.every((value) => typeof value === "object" && value !== null && "code" in value && "name" in value);
+			const multiaddrs =
+				Array.isArray(addr) && !isComponentArray
+					? (addr as MultiaddrInput[]).map((value) => multiaddr(value))
+					: [multiaddr(addr as MultiaddrInput)];
 			await this.safeDial(multiaddrs);
 			log.debug("::connect: Successfully dialed", addr);
 		} catch (e) {
@@ -491,11 +501,23 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	async broadcastMessage(topic: string, message: Message): Promise<void> {
 		try {
 			const messageBuffer = Message.encode(message).finish();
+			await this.waitForSubscriber(topic);
 			await this._pubsub?.publish(topic, messageBuffer);
 
 			log.debug("::broadcastMessage: Successfuly broadcasted message to topic", topic);
 		} catch (e) {
 			log.error("::broadcastMessage:", e);
+		}
+	}
+
+	private async waitForSubscriber(topic: string, timeout = 1000): Promise<void> {
+		const deadline = Date.now() + timeout;
+		while (Date.now() < deadline) {
+			const isReady = this._pubsub
+				?.getSubscribers(topic)
+				.some((peerId) => this._pubsub?.streamsOutbound.has(peerId.toString()));
+			if (isReady) return;
+			await new Promise((resolve) => setTimeout(resolve, 25));
 		}
 	}
 
@@ -540,7 +562,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (e.detail.msg.topic === DRP_DISCOVERY_TOPIC) return;
 			this.handleGossipsubMessage(e.detail.msg.data);
 		});
-		await this._node?.handle(DRP_MESSAGE_PROTOCOL, ({ stream }) => void this.handleStream(stream));
+		await this._node?.handle(DRP_MESSAGE_PROTOCOL, (stream) => this.handleStream(stream));
 	}
 
 	private handleGossipsubMessage(data: Uint8Array): void {

@@ -31,7 +31,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
-		"@libp2p/opentelemetry-metrics": "^1.0.0",
+		"@libp2p/opentelemetry-metrics": "^2.0.24",
 		"@opentelemetry/api": "^1.9.0",
 		"@opentelemetry/context-async-hooks": "^2.0.0",
 		"@opentelemetry/context-zone": "^2.0.0",
@@ -40,8 +40,8 @@
 		"@opentelemetry/resources": "^2.0.0",
 		"@opentelemetry/sdk-trace-web": "^2.0.0",
 		"@opentelemetry/semantic-conventions": "1.28.0",
-		"@ts-drp/utils": "^0.11.0",
 		"@ts-drp/types": "^0.11.0",
+		"@ts-drp/utils": "^0.11.0",
 		"loglevel": "^1.9.2",
 		"loglevel-plugin-prefix": "^0.8.4",
 		"object-inspect": "^1.13.3"

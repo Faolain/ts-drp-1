@@ -1,4 +1,4 @@
-import { type GossipSub, type GossipsubMessage } from "@chainsafe/libp2p-gossipsub";
+import { type GossipSub, type GossipsubMessage } from "@libp2p/gossipsub";
 import { type Libp2p, type Libp2pEvents } from "@libp2p/interface";
 import { AddMulDRP } from "@ts-drp/blueprints";
 import { createACL } from "@ts-drp/object";
