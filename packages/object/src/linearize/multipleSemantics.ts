@@ -1,5 +1,6 @@
 import { ActionType, type Hash, type Vertex } from "@ts-drp/types";
 
+import { LegacyCausalityMatrix } from "./legacyCausality.js";
 import { type HashGraph } from "../hashgraph/index.js";
 
 /**
@@ -10,11 +11,17 @@ import { type HashGraph } from "../hashgraph/index.js";
  * @returns The linearized vertices.
  */
 export function linearizeMultipleSemantics(hashGraph: HashGraph, origin: Hash, subgraph: Set<string>): Vertex[] {
-	const order = hashGraph.topologicalSort(true, origin, subgraph);
+	// The checkpoint origin is already represented by the supplied base state.
+	// Skip it by hash identity rather than assuming it occupies position zero.
+	const order = hashGraph.dfsTopologicalSortIterative(origin, subgraph);
 	const result: Vertex[] = [];
-	// if there is no resolveConflicts function, we can just return the operations in topological order
-	if (!hashGraph.resolveConflictsACL && !hashGraph.resolveConflictsDRP) {
-		for (let i = 1; i < order.length; i++) {
+	const needsConflictResolution = order.some((hash) => {
+		if (hash === origin) return false;
+		return hashGraph.hasCustomConflictResolver(hashGraph.vertices.get(hash)?.operation?.drpType);
+	});
+	if (!needsConflictResolution) {
+		for (let i = 0; i < order.length; i++) {
+			if (order[i] === origin) continue;
 			const vertex = hashGraph.vertices.get(order[i]);
 			if (vertex) {
 				result.push(vertex);
@@ -22,12 +29,16 @@ export function linearizeMultipleSemantics(hashGraph: HashGraph, origin: Hash, s
 		}
 		return result;
 	}
+	const causality = new LegacyCausalityMatrix(hashGraph, order);
 	const dropped = new Array(order.length).fill(false);
 	const indices: Map<Hash, number> = new Map();
-	// always remove the first operation
-	let i = 1;
+	let i = 0;
 
 	while (i < order.length) {
+		if (order[i] === origin) {
+			i++;
+			continue;
+		}
 		if (dropped[i]) {
 			i++;
 			continue;
@@ -36,7 +47,7 @@ export function linearizeMultipleSemantics(hashGraph: HashGraph, origin: Hash, s
 		let j = i + 1;
 
 		while (j < order.length) {
-			if (hashGraph.areCausallyRelatedUsingBitsets(anchor, order[j]) || dropped[j]) {
+			if (causality.areRelated(anchor, order[j]) || dropped[j]) {
 				j++;
 				continue;
 			}
@@ -57,7 +68,7 @@ export function linearizeMultipleSemantics(hashGraph: HashGraph, origin: Hash, s
 
 				let add = true;
 				for (const hash of concurrentOps) {
-					if (hashGraph.areCausallyRelatedUsingBitsets(hash, order[k])) {
+					if (causality.areRelated(hash, order[k])) {
 						add = false;
 						break;
 					}
