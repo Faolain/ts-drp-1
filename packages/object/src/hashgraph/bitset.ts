@@ -18,7 +18,16 @@ export class BitSet {
 		if (data === undefined) {
 			this.data = new Uint32Array(size);
 		} else {
-			this.data = new Uint32Array(data.slice().buffer, 0, size);
+			const byteLength = size * Uint32Array.BYTES_PER_ELEMENT;
+			if (data.byteLength !== byteLength) {
+				throw new RangeError(`Expected ${byteLength} bytes, received ${data.byteLength}`);
+			}
+
+			this.data = new Uint32Array(size);
+			const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+			for (let i = 0; i < size; i++) {
+				this.data[i] = view.getUint32(i * Uint32Array.BYTES_PER_ELEMENT, true);
+			}
 		}
 	}
 
@@ -27,8 +36,12 @@ export class BitSet {
 	 * @returns The Uint8Array representation of the BitSet.
 	 */
 	toBytes(): Uint8Array {
-		const data = new Uint8Array(this.data.buffer, this.data.byteOffset, this.data.byteLength);
-		return data.slice();
+		const bytes = new Uint8Array(this.data.byteLength);
+		const view = new DataView(bytes.buffer);
+		for (let i = 0; i < this.data.length; i++) {
+			view.setUint32(i * Uint32Array.BYTES_PER_ELEMENT, this.data[i], true);
+		}
+		return bytes;
 	}
 
 	/**

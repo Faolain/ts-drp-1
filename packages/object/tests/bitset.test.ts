@@ -94,3 +94,50 @@ describe("BitSet Test Data not undefined", () => {
 		expect(bitset).not.toBe(undefined);
 	});
 });
+
+describe("BitSet byte round-trip properties", () => {
+	const sizes = [31, 32, 33, 63, 64, 65, 129];
+
+	const random = (seed: number): (() => number) => {
+		let state = seed >>> 0;
+		return () => {
+			state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+			return state;
+		};
+	};
+
+	test.each(["Buffer.subarray", "Uint8Array.subarray"] as const)(
+		"round-trips random bits across word boundaries from %s",
+		(viewKind) => {
+			for (const bits of sizes) {
+				for (let seed = 1; seed <= 32; seed++) {
+					const next = random(seed * 131 + bits);
+					const original = new BitSet(bits);
+					for (let index = 0; index < bits; index++) {
+						original.set(index, next() >>> 31 === 1);
+					}
+
+					const fixture = original.toBytes();
+					const offset = (next() % 23) + 1;
+					const suffix = (next() % 17) + 1;
+					let embedded: Uint8Array;
+					if (viewKind === "Buffer.subarray") {
+						const larger = Buffer.alloc(offset + fixture.byteLength + suffix, 0xa5);
+						larger.set(fixture, offset);
+						embedded = larger.subarray(offset, offset + fixture.byteLength);
+					} else {
+						const larger = new Uint8Array(offset + fixture.byteLength + suffix).fill(0xa5);
+						larger.set(fixture, offset);
+						embedded = larger.subarray(offset, offset + fixture.byteLength);
+					}
+
+					const restored = new BitSet(bits, embedded);
+					expect(restored.toBytes()).toEqual(fixture);
+					for (let index = 0; index < bits; index++) {
+						expect(restored.get(index)).toBe(original.get(index));
+					}
+				}
+			}
+		}
+	);
+});
