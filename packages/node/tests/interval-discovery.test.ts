@@ -141,7 +141,7 @@ describe("DRP Interval Discovery integration test", () => {
 		vi.advanceTimersByTime(1000);
 
 		// Access internal logger safely with proper type assertion
-		const interval = node1["_intervals"].get(id);
+		const interval = node1["_intervals"].get(`interval:discovery::${id}`);
 		type LoggerType = { error(message: string): void };
 
 		// First cast to unknown, then to the specific type

@@ -12,6 +12,7 @@ import {
 	type Update,
 	type Vertex,
 } from "./index.js";
+import { type IntervalRunnerOptions } from "./interval-runner.js";
 import { type KeychainOptions } from "./keychain.js";
 import { type LoggerOptions } from "./logger.js";
 import { type IMetrics } from "./metrics.js";
@@ -22,6 +23,7 @@ export interface DRPNodeConfig {
 	network_config?: DRPNetworkNodeConfig;
 	keychain_config?: KeychainOptions;
 	interval_discovery_options?: Omit<DRPIntervalDiscoveryOptions, "id" | "networkNode">;
+	interval_sync_options?: Omit<IntervalRunnerOptions, "fn" | "id">;
 	interval_reconnect_options?: Omit<DRPIntervalReconnectOptions, "id" | "networkNode">;
 }
 
@@ -59,6 +61,14 @@ export interface ObjectId {
 	 * The identifier of the object
 	 */
 	id: string;
+}
+
+export interface SyncRejectedEvent extends ObjectId {
+	/** The peer involved in the exhausted recovery episode */
+	peerId: string;
+
+	/** Number of recovery retries attempted before giving up */
+	retries: number;
 }
 
 export interface FetchStateEvent extends ObjectId {
@@ -121,14 +131,14 @@ export interface NodeEvents {
 	[NodeEventName.DRP_SYNC_MISSING]: CustomEvent<RequestSyncEvent>;
 
 	/**
-	 * Emitted when a peer accepts a sync message
+	 * Emitted after a sync accept merges at least one vertex with no dependencies left missing
 	 */
 	[NodeEventName.DRP_SYNC_ACCEPTED]: CustomEvent<ObjectId>;
 
 	/**
-	 * Emitted when a peer rejects a sync message
+	 * Emitted when a peer rejects sync or local missing-dependency recovery exhausts its retry budget
 	 */
-	[NodeEventName.DRP_SYNC_REJECTED]: CustomEvent<ObjectId>;
+	[NodeEventName.DRP_SYNC_REJECTED]: CustomEvent<SyncRejectedEvent>;
 
 	/**
 	 * Emitted when a peer receives an update attestation message

@@ -4,6 +4,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import { Signature } from "@noble/secp256k1";
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
 import { HashGraph } from "@ts-drp/object";
+import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type AggregatedAttestation,
 	Attestation,
@@ -27,6 +28,8 @@ import { MessageSchema } from "@ts-drp/validation/message";
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
 
+const metrics = new OpentelemetryMetrics("@ts-drp/node/handlers");
+
 interface HandleParams {
 	node: DRPNode;
 	message: Message;
@@ -34,6 +37,69 @@ interface HandleParams {
 
 interface IHandlerStrategy {
 	(handleParams: HandleParams): Promise<void> | void;
+}
+
+const MAX_SYNC_RECOVERY_RETRIES = 3;
+export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
+
+interface SyncRecoveryEpisode {
+	retries?: number;
+	cooldownUntil?: number;
+}
+
+// SYNC/SYNC_ACCEPT have no correlation id, so stale accepts from the same peer
+// necessarily share the current (objectId, sender) recovery episode budget.
+const syncRecoveryEpisodes = new WeakMap<DRPNode, Map<string, SyncRecoveryEpisode>>();
+
+function recoveryKey(objectId: string, sender: string): string {
+	return JSON.stringify([objectId, sender]);
+}
+
+/**
+ * Clear all recovery episodes associated with one object subscription.
+ * @param node - Node whose recovery state should be cleared
+ * @param objectId - Object subscription being removed
+ */
+export function clearSyncRecoveryEpisodes(node: DRPNode, objectId: string): void {
+	const episodes = syncRecoveryEpisodes.get(node);
+	if (!episodes) return;
+
+	for (const key of episodes.keys()) {
+		const [episodeObjectId] = JSON.parse(key) as [string, string];
+		if (episodeObjectId === objectId) episodes.delete(key);
+	}
+	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+}
+
+async function recoverMissingSync(node: DRPNode, objectId: string, sender: string, missing: string[]): Promise<void> {
+	const key = recoveryKey(objectId, sender);
+	const episodes = syncRecoveryEpisodes.get(node) ?? new Map<string, SyncRecoveryEpisode>();
+	const episode = episodes.get(key);
+
+	if (missing.length === 0) {
+		episodes.delete(key);
+		if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+		return;
+	}
+
+	if (episode?.cooldownUntil !== undefined) {
+		if (Date.now() < episode.cooldownUntil) return;
+		episodes.delete(key);
+	}
+
+	const retryCount = episodes.get(key)?.retries ?? 0;
+	if (retryCount >= MAX_SYNC_RECOVERY_RETRIES) {
+		episodes.set(key, { cooldownUntil: Date.now() + SYNC_RECOVERY_COOLDOWN_MS });
+		syncRecoveryEpisodes.set(node, episodes);
+		node.safeDispatchEvent(NodeEventName.DRP_SYNC_REJECTED, {
+			detail: { id: objectId, peerId: sender, retries: retryCount },
+		});
+		return;
+	}
+
+	episodes.set(key, { retries: retryCount + 1 });
+	syncRecoveryEpisodes.set(node, episodes);
+	await node.syncObject(objectId, sender);
 }
 
 const messageHandlers: Record<MessageType, IHandlerStrategy | undefined> = {
@@ -88,8 +154,10 @@ function fetchStateHandler({ node, message }: HandleParams): ReturnType<IHandler
 	const [aclState, drpState] = drpObject.getStates(fetchState.vertexHash);
 	const response = FetchStateResponse.create({
 		vertexHash: fetchState.vertexHash,
-		aclState: serializeDRPState(aclState),
-		drpState: serializeDRPState(drpState),
+		// Preserve an explicit protobuf miss for pruned/nonexistent snapshots.
+		// Serializing undefined would manufacture a present-but-empty state.
+		aclState: aclState === undefined ? undefined : serializeDRPState(aclState),
+		drpState: drpState === undefined ? undefined : serializeDRPState(drpState),
 	});
 
 	const messageFetchStateResponse = Message.create({
@@ -179,6 +247,19 @@ function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<I
   operations array doesn't contain the full remote operations array
 */
 async function updateHandler({ node, message }: HandleParams): Promise<void> {
+	if (!isTracingEnabled()) return updateHandlerUntraced({ node, message });
+
+	return metrics.traceFunc(
+		"node.updateHandler",
+		(params: HandleParams) => updateHandlerUntraced(params),
+		(span, { message: candidate }) => {
+			span.setAttribute("drp.object.id", candidate.objectId);
+			span.setAttribute("drp.message.sender", candidate.sender);
+		}
+	)({ node, message });
+}
+
+async function updateHandlerUntraced({ node, message }: HandleParams): Promise<void> {
 	const { sender, data } = message;
 
 	const updateMessage = Update.decode(data);
@@ -195,16 +276,16 @@ async function updateHandler({ node, message }: HandleParams): Promise<void> {
 		verifiedVertices = verifyACLIncomingVertices(updateMessage.vertices);
 	}
 
-	const [merged, _] = await object.merge(verifiedVertices);
+	const [, missing] = await object.merge(verifiedVertices);
+	const presentHashes = new Set(object.vertices.map((vertex) => vertex.hash));
+	const appliedVertices = verifiedVertices.filter((vertex) => presentHashes.has(vertex.hash));
 
-	if (!merged) {
-		await node.syncObject(message.objectId, sender);
-	} else {
+	if (appliedVertices.length !== 0) {
 		// add their signatures
 		object.finalityStore.addSignatures(sender, updateMessage.attestations);
 
 		// add my signatures
-		const attestations = signFinalityVertices(node, object, verifiedVertices);
+		const attestations = signFinalityVertices(node, object, appliedVertices);
 
 		if (attestations.length !== 0) {
 			// broadcast the attestations
@@ -223,6 +304,10 @@ async function updateHandler({ node, message }: HandleParams): Promise<void> {
 				log.error("::updateHandler: Error broadcasting message", e);
 			});
 		}
+	}
+
+	if (missing.length !== 0) {
+		await recoverMissingSync(node, message.objectId, sender, missing);
 	}
 
 	node.put(object.id, object);
@@ -309,6 +394,19 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
   operations array contain the full remote operations array
 */
 async function syncAcceptHandler({ node, message }: HandleParams): Promise<void> {
+	if (!isTracingEnabled()) return syncAcceptHandlerUntraced({ node, message });
+
+	return metrics.traceFunc(
+		"node.syncAcceptHandler",
+		(params: HandleParams) => syncAcceptHandlerUntraced(params),
+		(span, { message: candidate }) => {
+			span.setAttribute("drp.object.id", candidate.objectId);
+			span.setAttribute("drp.message.sender", candidate.sender);
+		}
+	)({ node, message });
+}
+
+async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promise<void> {
 	const { data, sender } = message;
 	const syncAcceptMessage = SyncAccept.decode(data);
 	const object = node.get(message.objectId);
@@ -324,18 +422,23 @@ async function syncAcceptHandler({ node, message }: HandleParams): Promise<void>
 		verifiedVertices = verifyACLIncomingVertices(syncAcceptMessage.requested);
 	}
 
-	if (verifiedVertices.length !== 0) {
-		await object.merge(verifiedVertices);
+	const mergeRan = verifiedVertices.length !== 0;
+	let missing: string[] = [];
+	if (mergeRan) {
+		[, missing] = await object.merge(verifiedVertices);
 		object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		node.put(object.id, object);
+		await recoverMissingSync(node, object.id, sender, missing);
 	}
 
 	await signGeneratedVertices(node, object.vertices);
 	signFinalityVertices(node, object, object.vertices);
 
-	node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
-		detail: { id: object.id },
-	});
+	if (mergeRan && missing.length === 0) {
+		node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
+			detail: { id: object.id },
+		});
+	}
 
 	// send missing vertices
 	const requested: Vertex[] = [];

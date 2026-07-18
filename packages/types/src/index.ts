@@ -65,4 +65,9 @@ export interface IntervalRunnerMap {
 	 * The interval runner for the interval discovery
 	 */
 	"interval:discovery": IDRPIntervalDiscovery;
+
+	/**
+	 * The interval runner for periodic object sync
+	 */
+	"interval:sync": IIntervalRunner<"interval:sync">;
 }
