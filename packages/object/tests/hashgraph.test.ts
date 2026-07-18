@@ -149,6 +149,28 @@ describe("HashGraph construction tests", () => {
 		}).toThrowError("Graph contains a cycle!");
 	});
 
+	test("throws instead of emitting padded slots for members unreachable from the origin", () => {
+		const hashGraph = new HashGraph("peer", undefined, undefined, SemanticsType.pair);
+		const left = createVertex(
+			"peer",
+			Operation.create({ opType: "left", drpType: DrpType.DRP }),
+			[HashGraph.rootHash],
+			1
+		);
+		const right = createVertex(
+			"peer",
+			Operation.create({ opType: "right", drpType: DrpType.DRP }),
+			[HashGraph.rootHash],
+			2
+		);
+		hashGraph.addVertex(left);
+		hashGraph.addVertex(right);
+
+		expect(() => hashGraph.dfsTopologicalSortIterative(left.hash, new Set([left.hash, right.hash]))).toThrow(
+			/unreachable from origin/
+		);
+	});
+
 	test("Hash graph should be DAG compatible", () => {
 		const drp1 = obj1.drp as SetDRP<number>;
 		drp1.add(1);

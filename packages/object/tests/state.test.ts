@@ -1,11 +1,12 @@
 import { SetDRP } from "@ts-drp/blueprints";
-import { ACLGroup, SemanticsType } from "@ts-drp/types";
+import { ACLGroup, type IACL, SemanticsType } from "@ts-drp/types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { createACL } from "../src/acl/index.js";
 import { createDRPVertexApplier } from "../src/drp-applier.js";
 import { createHashGraph, HashGraph } from "../src/hashgraph/index.js";
 import { DRPObject } from "../src/index.js";
+import { DRPObjectStateManager } from "../src/state.js";
 
 describe("HashGraph construction tests", () => {
 	beforeEach(() => {
@@ -68,5 +69,37 @@ describe("HashGraph construction tests", () => {
 		expect(drpState3?.state.filter((e) => e.key === "_set")[0].value.has(1)).toBe(true);
 		expect(drpState3?.state.filter((e) => e.key === "_set")[0].value.has(2)).toBe(true);
 		expect(drpState3?.state.filter((e) => e.key === "_set")[0].value.has(3)).toBe(true);
+	});
+});
+
+describe("DRPObjectStateManager ACL reconstruction", () => {
+	function createStoredACL(): { acl: IACL; admin: string; writer: string } {
+		const admin = "adminPeer";
+		const writer = "writerPeer";
+		const acl = createACL({ admins: [admin] });
+		acl.context = { caller: admin };
+		acl.grant(writer, ACLGroup.Writer);
+		return { acl, admin, writer };
+	}
+
+	test("fromHashACL preserves authorized admins and writers", () => {
+		const { acl, admin, writer } = createStoredACL();
+		const manager = new DRPObjectStateManager(acl);
+		const reconstructed = manager.fromHashACL(HashGraph.rootHash);
+
+		expect(() => {
+			expect(reconstructed.query_isAdmin(admin)).toBe(true);
+			expect(reconstructed.query_isWriter(admin)).toBe(true);
+			expect(reconstructed.query_isWriter(writer)).toBe(true);
+		}).not.toThrow();
+	});
+
+	test("fromHashACL matches the ACL reconstructed by fromHash for the same hash", () => {
+		const { acl } = createStoredACL();
+		const manager = new DRPObjectStateManager(acl);
+		const reconstructed = manager.fromHashACL(HashGraph.rootHash);
+		const [, reconstructedByFromHash] = manager.fromHash(HashGraph.rootHash);
+
+		expect(reconstructed).toEqual(reconstructedByFromHash);
 	});
 });

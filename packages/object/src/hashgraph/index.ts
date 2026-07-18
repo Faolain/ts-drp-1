@@ -1,4 +1,5 @@
 import { Logger } from "@ts-drp/logger";
+import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	ActionType,
 	type Hash,
@@ -17,6 +18,8 @@ import { computeHash } from "@ts-drp/utils/hash";
 import { BitSet } from "./bitset.js";
 import { linearizeMultipleSemantics } from "../linearize/multipleSemantics.js";
 import { linearizePairSemantics } from "../linearize/pairSemantics.js";
+
+const metrics = new OpentelemetryMetrics("@ts-drp/object/hashgraph");
 
 export enum OperationType {
 	// TODO: rename this and make it part of action type this is the init action for the object
@@ -97,9 +100,16 @@ export class HashGraph implements IHashGraph {
 	*/
 	static readonly rootHash: Hash = "425d2b1f5243dbf23c685078034b06fbfa71dc31dcce30f614e28023f140ff13";
 	private arePredecessorsFresh = false;
+	// Scoped bitset caches are linearizer-private. Public causality queries may
+	// reuse them only when both requested hashes are inside that exact scope.
+	private arePredecessorsScoped = false;
 	private reachablePredecessors: Map<Hash, BitSet> = new Map();
 	private topoSortedIndex: Map<Hash, number> = new Map();
 	private vertexDistances: Map<Hash, VertexDistance> = new Map();
+	private _resolveConflictsACL: ResolveConflictFn;
+	private _resolveConflictsDRP: ResolveConflictFn;
+	private hasCustomResolverACL: boolean;
+	private hasCustomResolverDRP: boolean;
 	// We start with a bitset of size 1, and double it every time we reach the limit
 	private currentBitsetSize = 1;
 
@@ -113,8 +123,8 @@ export class HashGraph implements IHashGraph {
 	 */
 	constructor(
 		peerId: string,
-		resolveConflictsACL: ResolveConflictFn = this.resolveConflictsACL,
-		resolveConflictsDRP: ResolveConflictFn = this.resolveConflictsDRP,
+		resolveConflictsACL?: ResolveConflictFn,
+		resolveConflictsDRP?: ResolveConflictFn,
 		semanticsTypeDRP?: SemanticsType,
 		logConfig?: LoggerOptions
 	) {
@@ -130,8 +140,10 @@ export class HashGraph implements IHashGraph {
 		this.log = new Logger("drp::hashgraph", logConfig);
 		this.peerId = peerId;
 		this.semanticsTypeDRP = semanticsTypeDRP;
-		this.resolveConflictsACL = resolveConflictsACL;
-		this.resolveConflictsDRP = resolveConflictsDRP;
+		this.hasCustomResolverACL = resolveConflictsACL !== undefined;
+		this.hasCustomResolverDRP = resolveConflictsDRP !== undefined;
+		this._resolveConflictsACL = resolveConflictsACL ?? HashGraph.resolveNoConflicts;
+		this._resolveConflictsDRP = resolveConflictsDRP ?? HashGraph.resolveNoConflicts;
 		this.vertices.set(HashGraph.rootHash, rootVertex);
 		this.frontier.push(HashGraph.rootHash);
 		this.forwardEdges.set(HashGraph.rootHash, []);
@@ -143,16 +155,51 @@ export class HashGraph implements IHashGraph {
 	 * @param _ - The vertices to resolve conflicts between.
 	 * @returns The resolve conflicts type.
 	 */
-	resolveConflictsDRP(_: Vertex[]): ResolveConflictsType {
+	private static resolveNoConflicts(_: Vertex[]): ResolveConflictsType {
 		return { action: ActionType.Nop };
 	}
+
 	/**
-	 * Resolves conflicts between two vertices.
-	 * @param _ - The vertices to resolve conflicts between.
-	 * @returns The resolve conflicts type.
+	 * Gets the DRP conflict resolver.
+	 * @returns The configured resolver.
 	 */
-	resolveConflictsACL(_: Vertex[]): ResolveConflictsType {
-		return { action: ActionType.Nop };
+	get resolveConflictsDRP(): ResolveConflictFn {
+		return this._resolveConflictsDRP;
+	}
+
+	/**
+	 * Replaces the DRP conflict resolver.
+	 * @param resolver - The resolver to use.
+	 */
+	set resolveConflictsDRP(resolver: ResolveConflictFn) {
+		this._resolveConflictsDRP = resolver;
+		this.hasCustomResolverDRP = true;
+	}
+
+	/**
+	 * Gets the ACL conflict resolver.
+	 * @returns The configured resolver.
+	 */
+	get resolveConflictsACL(): ResolveConflictFn {
+		return this._resolveConflictsACL;
+	}
+
+	/**
+	 * Replaces the ACL conflict resolver.
+	 * @param resolver - The resolver to use.
+	 */
+	set resolveConflictsACL(resolver: ResolveConflictFn) {
+		this._resolveConflictsACL = resolver;
+		this.hasCustomResolverACL = true;
+	}
+
+	/**
+	 * Reports whether a vertex type has an explicitly supplied resolver.
+	 * @param drpType - The operation type to inspect.
+	 * @returns True when conflict resolution is required for that type.
+	 */
+	hasCustomConflictResolver(drpType: string | undefined): boolean {
+		return drpType === "ACL" ? this.hasCustomResolverACL : this.hasCustomResolverDRP;
 	}
 
 	/**
@@ -215,6 +262,7 @@ export class HashGraph implements IHashGraph {
 		const depsSet = new Set(vertex.dependencies);
 		this.frontier = this.frontier.filter((hash) => !depsSet.has(hash));
 		this.arePredecessorsFresh = false;
+		this.arePredecessorsScoped = false;
 	}
 
 	/**
@@ -224,17 +272,39 @@ export class HashGraph implements IHashGraph {
 	 * @returns The topologically sorted vertices.
 	 */
 	dfsTopologicalSortIterative(origin: Hash, subgraph: Set<Hash>): Hash[] {
+		if (!subgraph.has(origin)) throw new Error(`Topological subgraph does not contain origin ${origin}`);
+
+		// Validate reachability before allocating the legacy back-filled order.
+		// Otherwise unreachable members leave undefined slots at the front.
+		const reachable = new ObjectSet<Hash>();
+		const reachabilityStack = [origin];
+		while (reachabilityStack.length > 0) {
+			const node = reachabilityStack.pop();
+			if (node === undefined || reachable.has(node)) continue;
+			reachable.add(node);
+			for (const neighbor of this.forwardEdges.get(node) ?? []) {
+				if (subgraph.has(neighbor)) reachabilityStack.push(neighbor);
+			}
+		}
+		const unreachable = [...subgraph].filter((hash) => !reachable.has(hash));
+		if (unreachable.length !== 0) {
+			throw new Error(
+				`Topological subgraph contains ${unreachable.length} member(s) unreachable from origin ${origin}: ${unreachable
+					.slice(0, 3)
+					.join(", ")}`
+			);
+		}
+
 		const visited = new ObjectSet<Hash>();
+		const processing = new ObjectSet<Hash>();
 		const result: Hash[] = Array(subgraph.size);
 		const stack: Hash[] = Array(subgraph.size);
-		const processing = new ObjectSet<Hash>();
 		let resultIndex = subgraph.size - 1;
 		let stackIndex = 0;
 		stack[stackIndex] = origin;
 
 		while (resultIndex >= 0) {
 			const node = stack[stackIndex];
-
 			if (visited.has(node)) {
 				result[resultIndex] = node;
 				stackIndex--;
@@ -245,18 +315,18 @@ export class HashGraph implements IHashGraph {
 
 			processing.add(node);
 			visited.add(node);
-
-			const neighbors = this.forwardEdges.get(node);
-			if (neighbors) {
-				for (const neighbor of neighbors.sort()) {
-					if (processing.has(neighbor)) throw new Error("Graph contains a cycle!");
-					if (subgraph.has(neighbor) && !visited.has(neighbor)) {
-						stackIndex++;
-						stack[stackIndex] = neighbor;
-					}
+			for (const neighbor of (this.forwardEdges.get(node) ?? []).sort()) {
+				if (processing.has(neighbor)) throw new Error("Graph contains a cycle!");
+				if (subgraph.has(neighbor) && !visited.has(neighbor)) {
+					stackIndex++;
+					stack[stackIndex] = neighbor;
 				}
 			}
 		}
+		// Shared descendants can make the legacy stack schedule a vertex twice and
+		// displace the origin. Keep the established relative order while making the
+		// already-applied origin explicit for identity-based linearizer filtering.
+		if (!result.includes(origin)) result[0] = origin;
 
 		return result;
 	}
@@ -275,6 +345,7 @@ export class HashGraph implements IHashGraph {
 	): Hash[] {
 		const result = this.dfsTopologicalSortIterative(origin, subgraph);
 		if (!updateBitsets) return result;
+		const isFullGraph = result.length === this.vertices.size && result.every((hash) => this.vertices.has(hash));
 		this.reachablePredecessors.clear();
 		this.topoSortedIndex.clear();
 
@@ -286,15 +357,19 @@ export class HashGraph implements IHashGraph {
 			this.reachablePredecessors.set(result[i], new BitSet(this.currentBitsetSize));
 			for (const dep of this.vertices.get(result[i])?.dependencies || []) {
 				const depReachable = this.reachablePredecessors.get(dep);
-				depReachable?.set(this.topoSortedIndex.get(dep) || 0, true);
-				if (depReachable) {
+				const depIndex = this.topoSortedIndex.get(dep);
+				if (depReachable && depIndex !== undefined) {
+					depReachable.set(depIndex, true);
 					const reachable = this.reachablePredecessors.get(result[i]);
-					this.reachablePredecessors.set(result[i], reachable?.or(depReachable) || depReachable);
+					if (reachable) {
+						this.reachablePredecessors.set(result[i], reachable.or(depReachable));
+					}
 				}
 			}
 		}
 
-		this.arePredecessorsFresh = true;
+		this.arePredecessorsFresh = isFullGraph;
+		this.arePredecessorsScoped = !isFullGraph;
 		return result;
 	}
 
@@ -323,6 +398,21 @@ export class HashGraph implements IHashGraph {
 		origin: Hash = HashGraph.rootHash,
 		subgraph: Set<string> = new ObjectSet(this.vertices.keys())
 	): Vertex[] {
+		if (!isTracingEnabled()) return this.linearizeVerticesUntraced(origin, subgraph);
+
+		return metrics.traceFunc(
+			"hashgraph.linearize",
+			(candidateOrigin: Hash, candidateSubgraph: Set<string>) =>
+				this.linearizeVerticesUntraced(candidateOrigin, candidateSubgraph),
+			(span, candidateOrigin, candidateSubgraph) => {
+				span.setAttribute("drp.replay.suffix_size", Math.max(0, candidateSubgraph.size - 1));
+				// Here, a hit only means linearization uses a non-root origin; no replay-state lookup occurs.
+				span.setAttribute("drp.checkpoint.hit", candidateOrigin !== HashGraph.rootHash);
+			}
+		)(origin, subgraph);
+	}
+
+	private linearizeVerticesUntraced(origin: Hash, subgraph: Set<string>): Vertex[] {
 		switch (this.semanticsTypeDRP) {
 			case SemanticsType.pair:
 				return linearizePairSemantics(this, origin, subgraph);
@@ -428,11 +518,28 @@ export class HashGraph implements IHashGraph {
 	 * @returns True if the vertices are causally related, false otherwise.
 	 */
 	areCausallyRelatedUsingBitsets(hash1: Hash, hash2: Hash): boolean {
-		if (!this.arePredecessorsFresh) {
+		if (hash1 === hash2) return true;
+
+		const scopedCacheContainsPair =
+			this.arePredecessorsScoped &&
+			this.reachablePredecessors.has(hash1) &&
+			this.reachablePredecessors.has(hash2) &&
+			this.topoSortedIndex.has(hash1) &&
+			this.topoSortedIndex.has(hash2);
+		if (!this.arePredecessorsFresh && !scopedCacheContainsPair) {
 			this.topologicalSort(true);
 		}
-		const test1 = this.reachablePredecessors.get(hash1)?.get(this.topoSortedIndex.get(hash2) || 0) || false;
-		const test2 = this.reachablePredecessors.get(hash2)?.get(this.topoSortedIndex.get(hash1) || 0) || false;
+
+		const reachable1 = this.reachablePredecessors.get(hash1);
+		const reachable2 = this.reachablePredecessors.get(hash2);
+		const index1 = this.topoSortedIndex.get(hash1);
+		const index2 = this.topoSortedIndex.get(hash2);
+		if (!reachable1 || !reachable2 || index1 === undefined || index2 === undefined) {
+			return this.areCausallyRelatedUsingBFS(hash1, hash2);
+		}
+
+		const test1 = reachable1.get(index2);
+		const test2 = reachable2.get(index1);
 		return test1 || test2;
 	}
 
@@ -488,6 +595,7 @@ export class HashGraph implements IHashGraph {
 	 * @returns True if the vertices are causally related, false otherwise.
 	 */
 	areCausallyRelatedUsingBFS(hash1: Hash, hash2: Hash): boolean {
+		if (hash1 === hash2) return true;
 		return this._areCausallyRelatedUsingBFS(hash1, hash2) || this._areCausallyRelatedUsingBFS(hash2, hash1);
 	}
 
