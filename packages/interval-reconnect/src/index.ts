@@ -76,9 +76,19 @@ export class DRPIntervalReconnectBootstrap implements IDRPIntervalReconnectBoots
 	}
 
 	private async _runDRPReconnect(): Promise<boolean> {
-		const multiaddrs = this.networkNode.getMultiaddrs();
-		if (multiaddrs !== undefined && multiaddrs.length > 0) {
-			this._logger.trace("Still have an address, skipping reconnect");
+		const peers = this.networkNode.getAllPeers();
+		const bootstrapPeerIds = new Set(
+			this.networkNode
+				.getBootstrapNodes()
+				.map((addr) => {
+					const components = addr.split("/");
+					const p2pIndex = components.lastIndexOf("p2p");
+					return p2pIndex === -1 ? undefined : components[p2pIndex + 1];
+				})
+				.filter((peerId): peerId is string => peerId !== undefined)
+		);
+		if (peers.some((peerId) => bootstrapPeerIds.has(peerId))) {
+			this._logger.trace("Still connected to a bootstrap peer, skipping reconnect");
 			return true;
 		}
 		await this.networkNode.connectToBootstraps();
