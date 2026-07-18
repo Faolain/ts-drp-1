@@ -46,9 +46,21 @@ export const disableTracing = (): void => {
 	exporter = undefined;
 };
 
-async function wrapPromise<T>(promise: Promise<T>, span: Span): Promise<T> {
+/**
+ * Reports whether tracing is currently active.
+ * Hot-path callers can use this to avoid wrapper allocation when disabled.
+ * @returns True when a tracer provider is enabled.
+ */
+export const isTracingEnabled = (): boolean => enabled && provider !== undefined;
+
+async function wrapPromise<T>(
+	promise: Promise<T>,
+	span: Span,
+	setResultAttributes?: (span: Span, result: T) => void
+): Promise<T> {
 	return promise
 		.then((res) => {
+			setResultAttributes?.(span, res);
 			span.setStatus({ code: SpanStatusCode.OK });
 			return res;
 		})
@@ -145,14 +157,15 @@ function wrapAsyncGenerator<T>(gen: AsyncGenerator<T>, span: Span): AsyncGenerat
  */
 export class OpentelemetryMetrics implements IMetrics {
 	private tracer: OtTracer | undefined;
+	private tracerProvider: WebTracerProvider | undefined;
+	private readonly tracerName: string;
 
 	/**
 	 * Creates a new OpentelemetryMetrics instance.
 	 * @param tracerName - The name of the tracer.
 	 */
 	constructor(tracerName: string) {
-		if (!provider) return;
-		this.tracer = provider.getTracer(tracerName);
+		this.tracerName = tracerName;
 	}
 
 	/**
@@ -160,16 +173,22 @@ export class OpentelemetryMetrics implements IMetrics {
 	 * @param name - The name of the function.
 	 * @param fn - The function to trace.
 	 * @param setAttributes - The attributes to set on the span.
+	 * @param setResultAttributes
 	 * @returns - The traced function.
 	 */
 	public traceFunc<Args extends unknown[], Return>(
 		name: string,
 		fn: (...args: Args) => Return,
-		setAttributes?: (span: Span, ...args: Args) => void
+		setAttributes?: (span: Span, ...args: Args) => void,
+		setResultAttributes?: (span: Span, result: Awaited<Return>) => void
 	): (...args: Args) => Return {
 		return (...args: Args): Return => {
-			if (!this.tracer || !enabled) {
+			if (!enabled || !provider) {
 				return fn(...args);
+			}
+			if (!this.tracer || this.tracerProvider !== provider) {
+				this.tracer = provider.getTracer(this.tracerName);
+				this.tracerProvider = provider;
 			}
 			const parentContext = context.active();
 			const span = this.tracer.startSpan(name, {}, parentContext);
@@ -194,7 +213,11 @@ export class OpentelemetryMetrics implements IMetrics {
 			}
 
 			if (isPromise<unknown>(result)) {
-				return wrapPromise(result, span) as Return;
+				return wrapPromise(
+					result,
+					span,
+					setResultAttributes as ((span: Span, result: unknown) => void) | undefined
+				) as Return;
 			}
 			if (isGenerator(result)) {
 				return wrapGenerator(result, span) as Return;
@@ -203,6 +226,7 @@ export class OpentelemetryMetrics implements IMetrics {
 				return wrapAsyncGenerator(result, span) as Return;
 			}
 
+			setResultAttributes?.(span, result as Awaited<Return>);
 			span.setStatus({ code: SpanStatusCode.OK });
 			span.end();
 			return result;
