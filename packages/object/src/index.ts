@@ -175,8 +175,8 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @returns The result of the merge.
 	 */
 	async merge(vertices: Vertex[]): Promise<MergeResult> {
-		const { applied, missing } = await this._applier.applyVertices(vertices);
-		return [applied, missing];
+		const { applied, missing, invalid } = await this._applier.applyVertices(vertices);
+		return [applied, missing, invalid];
 	}
 
 	/**

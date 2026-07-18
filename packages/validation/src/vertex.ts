@@ -3,9 +3,15 @@ import { computeHash } from "@ts-drp/utils/hash";
 
 import { InvalidDependenciesError, InvalidHashError, InvalidTimestampError } from "./errors.js";
 
+export const DRP_VERTEX_FUTURE_TOLERANCE_MS = 60_000;
+
 export interface ValidationResult {
 	success: boolean;
 	error?: Error;
+}
+
+export interface VertexValidationOptions {
+	skipHashValidation?: boolean;
 }
 
 function validateVertexHash({ hash, peerId, operation, dependencies, timestamp }: Vertex): void {
@@ -29,9 +35,10 @@ function validateVertexDependencies({ hash, dependencies, timestamp }: Vertex, h
 }
 
 function validateVertexTimestamp(a: number, b: number, hash: string): void {
-	const maxTimeDiff = 100;
-	if (a - b > maxTimeDiff) {
-		throw new InvalidTimestampError(`Vertex ${hash} has invalid timestamp ${a} - ${b} = ${a - b} > ${maxTimeDiff}`);
+	if (a - b > DRP_VERTEX_FUTURE_TOLERANCE_MS) {
+		throw new InvalidTimestampError(
+			`Vertex ${hash} has invalid timestamp ${a} - ${b} = ${a - b} > ${DRP_VERTEX_FUTURE_TOLERANCE_MS}`
+		);
 	}
 }
 
@@ -43,11 +50,17 @@ function validateVertexTimestamp(a: number, b: number, hash: string): void {
  * @param vertex - The vertex to validate
  * @param hashGraph - The hash graph
  * @param currentTimeStamp - The current timestamp
+ * @param options - Validation controls for trusted local pipeline stages.
  * @returns The validation result
  */
-export function validateVertex(vertex: Vertex, hashGraph: IHashGraph, currentTimeStamp: number): ValidationResult {
+export function validateVertex(
+	vertex: Vertex,
+	hashGraph: IHashGraph,
+	currentTimeStamp: number,
+	options: VertexValidationOptions = {}
+): ValidationResult {
 	try {
-		validateVertexHash(vertex);
+		if (!options.skipHashValidation) validateVertexHash(vertex);
 		validateVertexDependencies(vertex, hashGraph);
 		validateVertexTimestamp(vertex.timestamp, currentTimeStamp, vertex.hash);
 		return { success: true };

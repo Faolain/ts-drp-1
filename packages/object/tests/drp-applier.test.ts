@@ -84,9 +84,10 @@ describe("DRPVertexApplier", () => {
 				console.log(result);
 				expect(result.applied).toBe(true);
 				expect(result.missing).toHaveLength(0);
+				expect(result.invalid).toHaveLength(0);
 			});
 
-			it("should handle missing vertices", async () => {
+			it("should classify non-dependency validation failures as invalid", async () => {
 				const vertex = Vertex.create({
 					hash: "test-hash",
 					peerId: "test-peer",
@@ -102,7 +103,37 @@ describe("DRPVertexApplier", () => {
 
 				const result = await applier.applyVertices([vertex]);
 				expect(result.applied).toBe(false);
-				expect(result.missing).toContain("test-hash");
+				expect(result.missing).toHaveLength(0);
+				expect(result.invalid).toContain("test-hash");
+			});
+
+			it("should classify a valid vertex with an absent dependency as missing", async () => {
+				const operation = Operation.create({ opType: "test", value: [], drpType: DrpType.DRP });
+				const dependencies = ["not-present"];
+				const timestamp = Date.now();
+				const hash = computeHash(peerId, operation, dependencies, timestamp);
+				const vertex = Vertex.create({ hash, peerId, dependencies, operation, timestamp });
+
+				const result = await applier.applyVertices([vertex]);
+				expect(result.applied).toBe(false);
+				expect(result.missing).toEqual([hash]);
+				expect(result.invalid).toHaveLength(0);
+			});
+
+			it("should classify a bad-hash vertex with an absent dependency as invalid", async () => {
+				const operation = Operation.create({ opType: "test", value: [], drpType: DrpType.DRP });
+				const vertex = Vertex.create({
+					hash: "bad-hash",
+					peerId,
+					dependencies: ["not-present"],
+					operation,
+					timestamp: Date.now(),
+				});
+
+				const result = await applier.applyVertices([vertex]);
+				expect(result.applied).toBe(false);
+				expect(result.missing).toHaveLength(0);
+				expect(result.invalid).toEqual([vertex.hash]);
 			});
 		});
 
