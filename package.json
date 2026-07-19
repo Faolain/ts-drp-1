@@ -29,7 +29,7 @@
 		"flamegraph": "pnpm tsx packages/object/tests/hashgraph.flamegraph.ts",
 		"lint": "eslint .",
 		"lint:fix": "prettier --write '**/package.json' && eslint . --fix",
-		"postinstall": "pnpm build:packages",
+		"postinstall": "node scripts/ensure-native-deps.mjs && pnpm build:packages",
 		"proto-gen": "pnpm proto-gen:types",
 		"proto-gen:types": "buf generate packages/types/src/proto -o packages/types/src/proto",
 		"release": "release-it",
