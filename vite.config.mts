@@ -6,6 +6,8 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/network": path.resolve(__dirname, "packages/network/src/index.ts"),
+			"@ts-drp/object": path.resolve(__dirname, "packages/object/src/index.ts"),
 			"@ts-drp/test-utils": path.resolve(__dirname, "packages/test-utils/src/index.ts"),
 			"@ts-drp/utils/serialization": path.resolve(__dirname, "packages/utils/src/serialization/index.ts"),
 			"@ts-drp/validation/message": path.resolve(__dirname, "packages/validation/src/schemas/message.ts"),

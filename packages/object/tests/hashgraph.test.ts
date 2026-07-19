@@ -149,6 +149,50 @@ describe("HashGraph construction tests", () => {
 		}).toThrowError("Graph contains a cycle!");
 	});
 
+	test("routes replacement resolvers and exposes graph state without leaking mutable dependency arrays", () => {
+		const hashGraph = new HashGraph("peer", undefined, undefined, SemanticsType.pair);
+		const drpResolver = vi.fn(() => ({ action: ActionType.Nop }));
+		const aclResolver = vi.fn(() => ({ action: ActionType.Nop }));
+		const drpVertex = createVertex(
+			"peer",
+			Operation.create({ opType: "add", value: [1], drpType: DrpType.DRP }),
+			[HashGraph.rootHash],
+			1
+		);
+		const aclVertex = createVertex(
+			"peer",
+			Operation.create({ opType: "grant", value: ["peer"], drpType: DrpType.ACL }),
+			[HashGraph.rootHash],
+			2
+		);
+
+		expect(hashGraph.hasCustomConflictResolver(DrpType.DRP)).toBe(false);
+		expect(hashGraph.hasCustomConflictResolver(DrpType.ACL)).toBe(false);
+		hashGraph.resolveConflictsDRP = drpResolver;
+		hashGraph.resolveConflictsACL = aclResolver;
+
+		expect(hashGraph.resolveConflictsDRP).toBe(drpResolver);
+		expect(hashGraph.resolveConflictsACL).toBe(aclResolver);
+		expect(hashGraph.hasCustomConflictResolver(DrpType.DRP)).toBe(true);
+		expect(hashGraph.hasCustomConflictResolver(DrpType.ACL)).toBe(true);
+		hashGraph.resolveConflicts([drpVertex]);
+		hashGraph.resolveConflicts([aclVertex]);
+		expect(drpResolver).toHaveBeenCalledWith([drpVertex]);
+		expect(aclResolver).toHaveBeenCalledWith([aclVertex]);
+
+		hashGraph.addVertex(drpVertex);
+		hashGraph.addVertex(aclVertex);
+		expect(hashGraph.getVertex(drpVertex.hash)).toBe(drpVertex);
+		expect(hashGraph.getVertex("missing")).toBeUndefined();
+		const dependencies = hashGraph.getDependencies(drpVertex.hash);
+		dependencies.length = 0;
+		expect(hashGraph.getDependencies(drpVertex.hash)).toEqual([HashGraph.rootHash]);
+		expect(hashGraph.getDependencies("missing")).toEqual([]);
+
+		expect(hashGraph.areCausallyRelatedUsingBitsets(HashGraph.rootHash, drpVertex.hash)).toBe(true);
+		expect(hashGraph.getCurrentBitsetSize()).toBeGreaterThanOrEqual(hashGraph.getAllVertices().length);
+	});
+
 	test("throws instead of emitting padded slots for members unreachable from the origin", () => {
 		const hashGraph = new HashGraph("peer", undefined, undefined, SemanticsType.pair);
 		const left = createVertex(
