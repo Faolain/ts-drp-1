@@ -4,6 +4,7 @@
  * Legacy field 4 below models the vulnerable rootAclState SYNC_ACCEPT payload;
  * GREEN removes that field and ignores it as unknown protobuf data.
  */
+import { DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	ActionType,
 	DRPStateOtherTheWire,
@@ -18,8 +19,6 @@ import {
 } from "@ts-drp/types";
 import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { afterEach, describe, expect, test, vi } from "vitest";
-
-import { DRPObject, HashGraph } from "@ts-drp/object";
 
 import { handleMessage } from "../src/handlers.js";
 import { DRPNode } from "../src/index.js";
@@ -52,7 +51,11 @@ async function makeNode(seed: string, intervalSync?: number): Promise<DRPNode> {
 	return node;
 }
 
-/** Encode the removed rootAclState field as legacy protobuf field 4. */
+/**
+ * Encode the removed rootAclState field as legacy protobuf field 4.
+ * @param rootACLState Serialized legacy ACL state.
+ * @returns The encoded legacy sync-accept payload.
+ */
 function maliciousSyncAccept(rootACLState: ReturnType<typeof serializeDRPState>): Uint8Array {
 	const writer = SyncAccept.encode(
 		SyncAccept.create({
@@ -94,15 +97,12 @@ describe("connectObject creator-bound genesis", () => {
 		});
 		joiner.put(joinedObject.id, joinedObject);
 
-		await handleMessage(
-			joiner,
-			{
-				sender: attacker.networkNode.peerId,
-				type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
-				data: maliciousSyncAccept(serializeDRPState(attackerRootACL)),
-				objectId: creatorObject.id,
-			} as Message
-		);
+		await handleMessage(joiner, {
+			sender: attacker.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
+			data: maliciousSyncAccept(serializeDRPState(attackerRootACL)),
+			objectId: creatorObject.id,
+		} as Message);
 
 		expect(joinedObject.acl.query_isAdmin(attacker.networkNode.peerId)).toBe(false);
 		expect(joinedObject.acl.query_isFinalitySigner(attacker.networkNode.peerId)).toBe(false);

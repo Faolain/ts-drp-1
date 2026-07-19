@@ -7,8 +7,9 @@ import { type DRPNode } from "../src/index.js";
 describe("fetch-state snapshot misses", () => {
 	test("returns absent optional states for a pruned non-root hash", async () => {
 		const sent: Message[] = [];
-		const sendMessage = vi.fn(async (_recipient: string, message: Message) => {
+		const sendMessage = vi.fn((_recipient: string, message: Message) => {
 			sent.push(message);
+			return Promise.resolve();
 		});
 		const object = { id: "object", getStates: vi.fn(() => [undefined, undefined]) };
 		const node = {

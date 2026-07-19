@@ -70,12 +70,7 @@ describe("DRPObject validation-error classification", () => {
 		vi.useFakeTimers({ now: BASE_TIME });
 		const acl = createACL({ admins: ["receiver", "sender"] });
 		const receiver = new DRPObject({ peerId: "receiver", acl, drp: new SetDRP<number>() });
-		const invalidParent = makeAddVertex(
-			"sender",
-			1,
-			[HashGraph.rootHash],
-			BASE_TIME + FUTURE_TOLERANCE_MS + 1
-		);
+		const invalidParent = makeAddVertex("sender", 1, [HashGraph.rootHash], BASE_TIME + FUTURE_TOLERANCE_MS + 1);
 		const child = makeAddVertex("sender", 2, [invalidParent.hash], invalidParent.timestamp + 1);
 
 		const result = (await receiver.merge([child, invalidParent])) as unknown as ExtendedMergeResult;

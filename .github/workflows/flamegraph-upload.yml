@@ -8,14 +8,13 @@ jobs:
   flamegraph-upload:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions: 
-      issues: write
-      pull-requests: write
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10.24.0
           run_install: false
       - uses: actions/setup-node@v4
         with:
@@ -30,8 +29,9 @@ jobs:
         run: |
           pnpm run flamegraph
 
-      - uses: pyroscope-io/flamegraph.com-github-action@main
+      - name: Upload flamegraph profile
+        uses: actions/upload-artifact@v4
         with:
-          file: flamegraph.pprof
-          postInPR: false
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: flamegraph-profile
+          path: flamegraph.pprof
+          if-no-files-found: error
