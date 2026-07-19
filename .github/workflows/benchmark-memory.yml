@@ -1,0 +1,81 @@
+name: Memory Performance
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memory-performance
+  cancel-in-progress: true
+
+jobs:
+  memory:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: object
+            label: Object memory
+            package: object
+            timeout: 4m
+          - id: node
+            label: Node memory
+            package: node
+            timeout: 5m
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Restore memory benchmark baseline
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ runner.os }}-${{ matrix.id }}-memory-${{ github.run_id }}
+          path: ./cache/${{ matrix.id }}-memory
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.id }}-memory-
+
+      - name: Run bounded memory benchmark
+        run: timeout ${{ matrix.timeout }} pnpm --silent --dir packages/${{ matrix.package }} run benchmark:memory > ${{ matrix.id }}-memory.json
+
+      - name: Compare memory benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: ${{ matrix.label }}
+          tool: customSmallerIsBetter
+          output-file-path: ${{ matrix.id }}-memory.json
+          external-data-json-path: ./cache/${{ matrix.id }}-memory/benchmark-data.json
+          save-data-file: ${{ github.ref == 'refs/heads/main' }}
+          alert-threshold: "130%"
+          fail-on-alert: false
+          summary-always: true
+
+      - name: Save memory benchmark baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ runner.os }}-${{ matrix.id }}-memory-${{ github.run_id }}
+          path: ./cache/${{ matrix.id }}-memory
+
+      - name: Upload raw memory benchmark output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.id }}-memory
+          path: ${{ matrix.id }}-memory.json
+          if-no-files-found: warn
+          retention-days: 14

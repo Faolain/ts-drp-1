@@ -1,0 +1,71 @@
+name: Network Performance
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-performance
+  cancel-in-progress: true
+
+jobs:
+  node-throughput:
+    name: Node throughput
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Restore network benchmark baseline
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ runner.os }}-node-throughput-${{ github.run_id }}
+          path: ./cache/node-throughput
+          restore-keys: |
+            ${{ runner.os }}-node-throughput-
+
+      - name: Run bounded node benchmarks
+        run: |
+          set -o pipefail
+          timeout 5m pnpm --dir packages/node run benchmark:throughput | tee node-throughput.txt
+
+      - name: Compare node benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Node throughput
+          tool: benchmarkjs
+          output-file-path: node-throughput.txt
+          external-data-json-path: ./cache/node-throughput/benchmark-data.json
+          save-data-file: ${{ github.ref == 'refs/heads/main' }}
+          alert-threshold: "150%"
+          fail-on-alert: false
+          summary-always: true
+
+      - name: Save network benchmark baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ runner.os }}-node-throughput-${{ github.run_id }}
+          path: ./cache/node-throughput
+
+      - name: Upload raw network benchmark output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-throughput
+          path: node-throughput.txt
+          if-no-files-found: warn
+          retention-days: 14

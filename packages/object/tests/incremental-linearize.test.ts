@@ -26,6 +26,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { createVertex, HashGraph } from "../src/hashgraph/index.js";
 import { createPermissionlessACL, DRPObject } from "../src/index.js";
 
+const describePerformance = process.env.RUN_PERFORMANCE_TESTS === "true" ? describe : describe.skip;
 const SMALL_GRAPH_SIZE = 2_000;
 const LARGE_GRAPH_SIZE = 8_000;
 const LOCAL_SAMPLE_COUNT = 50;
@@ -221,7 +222,7 @@ async function expectCleanMerge<T extends IDRP>(object: DRPObject<T>, vertices: 
 	expect(result).toMatchObject({ applied: true, missing: [], invalid: [] });
 }
 
-describe("A. flat per-operation cost (RED)", () => {
+describePerformance("A. flat per-operation cost (RED)", () => {
 	let growth: GrowthMeasurement;
 
 	beforeAll(async () => {

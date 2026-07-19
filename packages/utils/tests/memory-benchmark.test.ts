@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { formatOutput } from "../src/memory-benchmark/index.js";
+import { createMemoryBenchmarkResult, formatOutput } from "../src/memory-benchmark/index.js";
 
 describe("Memory benchmark util tests", () => {
+	describe("createMemoryBenchmarkResult", () => {
+		it("returns a customSmallerIsBetter-compatible result", () => {
+			expect(createMemoryBenchmarkResult("Peak RSS", [1024, 2048, 3072], "MB", 1024)).toEqual({
+				name: "Peak RSS",
+				value: 2,
+				unit: "MB",
+				range: "±40.82%",
+				extra: "3 runs sampled",
+			});
+		});
+
+		it("rejects an empty observation set", () => {
+			expect(() => createMemoryBenchmarkResult("Peak RSS", [], "MB")).toThrow(
+				'Memory benchmark "Peak RSS" produced no observations'
+			);
+		});
+	});
+
 	describe("formatOutput", () => {
 		it("should correctly format output with default normalizing factor", () => {
 			const observations = [100, 200, 300];

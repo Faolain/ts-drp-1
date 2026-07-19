@@ -15,22 +15,28 @@ For starting, you can install it using:
 pnpm install @ts-drp/object
 ```
 
-## Flamegraph
+## CPU profiling
 
 ### Prerequisites
 
-- `Golang` and `pprof` install
+- Go's `pprof` tooling
+- Graphviz when rendering an SVG
 
 ### How to run
 
-```
-pnpm run flamegraph
+```bash
+# One object growing to 1,000 vertices
+pnpm run flamegraph -- 1 1000 false flamegraph-growth.pprof
+
+# Two 500-vertex objects merged in both directions
+pnpm run flamegraph -- 2 500 true flamegraph-merge.pprof
 ```
 
 ### Visualize Profile
 
+```bash
+go tool pprof -http=:8080 flamegraph-growth.pprof
 ```
-pprof -http=:8080 flamegraph.pb.gz
-```
-and preview in browser at `http://localhost:8080`
 
+Open `http://localhost:8080` and select the flame-graph view. The scheduled
+CPU-profile workflow also uploads the raw profiles and rendered SVG call graphs.

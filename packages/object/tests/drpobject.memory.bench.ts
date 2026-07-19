@@ -1,4 +1,4 @@
-import { formatOutput } from "@ts-drp/utils/memory-benchmark";
+import { createMemoryBenchmarkResult, type MemoryBenchmarkResult } from "@ts-drp/utils/memory-benchmark";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -45,20 +45,29 @@ async function runProcessMemoryScript(numTests: number, programName: string, siz
 	for (let i = 0; i < numTests; i++) {
 		memoryResults.push(
 			await new Promise((resolve, reject) => {
-				const test = spawn("command", ["time", "-f", "%M", "tsx", programName, size.toString()], {
-					shell: true,
+				const test = spawn("tsx", [programName, size.toString()], {
 					stdio: "pipe",
 				});
-				let result = "";
+				let stdout = "";
+				let stderr = "";
+				test.stdout.on("data", (data) => {
+					stdout += data.toString();
+				});
 				test.stderr.on("data", (data) => {
-					result = data.toString();
+					stderr += data.toString();
 				});
 
 				test.on("close", (code) => {
 					if (code !== 0) {
-						reject(new Error(`Program ${programName} exited with code ${code}`));
+						reject(new Error(`Program ${programName} exited with code ${code}: ${stderr.trim()}`));
+						return;
 					}
-					resolve(parseInt(result.trim(), 10));
+					const match = stdout.match(/MAX_RSS_KB=(\d+)/);
+					if (!match) {
+						reject(new Error(`Program ${programName} did not report MAX_RSS_KB`));
+						return;
+					}
+					resolve(Number.parseInt(match[1], 10));
 				});
 			})
 		);
@@ -67,6 +76,7 @@ async function runProcessMemoryScript(numTests: number, programName: string, siz
 }
 
 async function main(): Promise<void> {
+	const benchmarkResults: MemoryBenchmarkResult[] = [];
 	setTestSizes("SetDRP-object", [100, 1000, 3000]);
 	setTestSizes("grid-object", [100, 1000, 3000]);
 
@@ -79,8 +89,8 @@ async function main(): Promise<void> {
 			);
 
 			if (memoryResults.length > 0) {
-				console.log(
-					formatOutput(
+				benchmarkResults.push(
+					createMemoryBenchmarkResult(
 						`${trimTestFilePath(testFile)} with ${testSize} vertices memory usage`,
 						memoryResults,
 						"MB",
@@ -88,10 +98,15 @@ async function main(): Promise<void> {
 					)
 				);
 			} else {
-				console.log("No results received from script");
+				throw new Error(`No memory results received for ${trimTestFilePath(testFile)} at size ${testSize}`);
 			}
 		}
 	}
+
+	process.stdout.write(`${JSON.stringify(benchmarkResults)}\n`);
 }
 
-void main();
+main().catch((error: unknown) => {
+	console.error(error);
+	process.exitCode = 1;
+});

@@ -1,15 +1,35 @@
-name: Flamegraph Upload
+name: CPU Profiles
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpu-profiles
+  cancel-in-progress: true
+
 jobs:
-  flamegraph-upload:
+  profile:
+    name: ${{ matrix.label }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: growth
+            label: Single-object growth profile
+            objects: 1
+            vertices: 1000
+            merge: false
+          - id: merge
+            label: Multi-writer merge profile
+            objects: 2
+            vertices: 500
+            merge: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,18 +40,47 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
 
-      - shell: bash
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install profile renderer
+        run: sudo apt-get update && sudo apt-get install --yes graphviz
+
+      - name: Capture CPU profile
+        run: >-
+          timeout 5m pnpm run flamegraph --
+          ${{ matrix.objects }}
+          ${{ matrix.vertices }}
+          ${{ matrix.merge }}
+          flamegraph-${{ matrix.id }}.pprof
+
+      - name: Render SVG call graph
+        run: >-
+          go tool pprof
+          -svg
+          -output flamegraph-${{ matrix.id }}.svg
+          flamegraph-${{ matrix.id }}.pprof
+
+      - name: Summarize profile
         run: |
-          pnpm install --no-frozen-lockfile
+          {
+            echo "### ${{ matrix.label }}"
+            echo
+            echo "- DRP objects: ${{ matrix.objects }}"
+            echo "- Vertices per object: ${{ matrix.vertices }}"
+            echo "- Merge enabled: ${{ matrix.merge }}"
+            echo "- Download the artifact for the raw pprof data and rendered SVG call graph."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - shell: bash
-        run: |
-          pnpm run flamegraph
-
-      - name: Upload flamegraph profile
+      - name: Upload CPU profile
         uses: actions/upload-artifact@v4
         with:
-          name: flamegraph-profile
-          path: flamegraph.pprof
+          name: cpu-profile-${{ matrix.id }}
+          path: |
+            flamegraph-${{ matrix.id }}.pprof
+            flamegraph-${{ matrix.id }}.svg
           if-no-files-found: error
+          retention-days: 14
