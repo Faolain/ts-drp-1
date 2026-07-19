@@ -292,7 +292,9 @@ export class DRPVertexApplier<T extends IDRP> {
 		return {
 			stop: false,
 			result: {
-				vertex: this.hashGraph.createVertex({ drpType, opType, value }),
+				// Vertex payloads are immutable history. Detach them from caller-owned
+				// objects before hashing and storing the operation.
+				vertex: this.hashGraph.createVertex({ drpType, opType, value: cloneDeep(value) }),
 				isACL: drpType === DrpType.ACL,
 				isLocal: true,
 			},
@@ -383,10 +385,9 @@ export class DRPVertexApplier<T extends IDRP> {
 		applyVertices(acl, aclVertices);
 
 		if (!drp) {
-			// we need to clone deep is the current op is ACL cause the state of this object could change
 			return {
 				stop: false,
-				result: { ...operation, acl, currentDRP: isACL ? cloneDeep(acl) : undefined },
+				result: { ...operation, acl, currentDRP: isACL ? acl : undefined },
 			};
 		}
 
@@ -398,7 +399,9 @@ export class DRPVertexApplier<T extends IDRP> {
 					...operation,
 					drp,
 					acl,
-					currentDRP: isACL ? cloneDeep(acl) : cloneDeep(drp),
+					// Reconstructed replay instances are already detached from live
+					// state and snapshots, so they are safe mutation staging areas.
+					currentDRP: isACL ? acl : drp,
 				},
 			};
 		});
@@ -649,7 +652,9 @@ export function createDRPVertexApplier<T extends IDRP>(
 function callDRP<T extends IDRP>(drp: T, caller: string, method: string, args: unknown[]): unknown | Promise<unknown> {
 	if (drp.context) drp.context.caller = caller;
 
-	return drp[method](...args);
+	// A DRP may retain or mutate an argument. Never let application state alias
+	// the immutable operation payload that will be replayed by other replicas.
+	return drp[method](...cloneDeep(args));
 }
 
 function applyVertex<T extends IDRP>(drp: T, vertex: Vertex): unknown | Promise<unknown> {

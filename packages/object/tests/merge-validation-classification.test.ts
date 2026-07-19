@@ -88,9 +88,10 @@ describe("DRPObject transient application failures", () => {
 			semanticsType = SemanticsType.pair;
 			log: string[] = [];
 
-			add(value: string): void {
-				if (throwsRemaining-- > 0) throw new Error("transient application failure");
+			async add(value: string): Promise<void> {
 				this.log.push(value);
+				await Promise.resolve();
+				if (throwsRemaining-- > 0) throw new Error("transient application failure");
 			}
 
 			query_log(): string[] {
@@ -108,6 +109,7 @@ describe("DRPObject transient application failures", () => {
 		);
 
 		await expect(receiver.applyVertices([vertex])).rejects.toThrow("transient application failure");
+		expect(receiver.drp?.query_log()).toEqual([]);
 		expect(receiver.vertices.some((candidate) => candidate.hash === vertex.hash)).toBe(false);
 		expect(receiver["_applier"]["knownInvalidVertexHashes"].has(vertex.hash)).toBe(false);
 

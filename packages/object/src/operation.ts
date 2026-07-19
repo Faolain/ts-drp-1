@@ -40,7 +40,7 @@ export interface Operation<T extends IDRP> extends PostSplitOperation {
 	drp?: T;
 
 	/**
-	 * the current state of the drp this is cloned from the drp if we are treating a drp operation
+	 * Detached state used to stage the current operation before it is committed.
 	 */
 	currentDRP?: T | IACL;
 }

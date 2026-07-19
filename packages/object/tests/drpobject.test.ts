@@ -11,7 +11,7 @@ import {
 } from "@ts-drp/types";
 import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
 
-import { createACL } from "../src/acl/index.js";
+import { createACL, ObjectACL } from "../src/acl/index.js";
 import { createObject, DRPObject } from "../src/index.js";
 
 const acl = createACL({ admins: ["peer1", "peer2", "peer3"] });
@@ -323,6 +323,17 @@ class ThrowingDRP extends SetDRP<number> {
 	throw(): void {
 		throw new Error("Not implemented");
 	}
+
+	addThenThrow(value: number): void {
+		this.add(value);
+		throw new Error("Not implemented");
+	}
+
+	async addThenReject(value: number): Promise<void> {
+		this.add(value);
+		await Promise.resolve();
+		throw new Error("Not implemented");
+	}
 }
 
 describe("Throwing DRP", () => {
@@ -334,6 +345,41 @@ describe("Throwing DRP", () => {
 
 	test("throw", () => {
 		expect(() => drpObject.drp?.throw()).toThrowError("Not implemented");
+	});
+
+	test("does not commit mutations made before a local operation throws", () => {
+		expect(() => drpObject.drp?.addThenThrow(1)).toThrowError("Not implemented");
+
+		expect(drpObject.drp?.query_has(1)).toBe(false);
+		expect(drpObject.vertices).toHaveLength(1);
+	});
+
+	test("does not commit mutations made before a local operation rejects", async () => {
+		await expect(drpObject.drp?.addThenReject(1)).rejects.toThrowError("Not implemented");
+
+		expect(drpObject.drp?.query_has(1)).toBe(false);
+		expect(drpObject.vertices).toHaveLength(1);
+	});
+});
+
+class ThrowingACL extends ObjectACL {
+	grantThenThrow(peerId: string): void {
+		this.grant(peerId, ACLGroup.Admin);
+		throw new Error("Not implemented");
+	}
+}
+
+describe("Throwing ACL", () => {
+	test("does not commit ACL mutations made before a local operation throws", () => {
+		const object = new DRPObject({
+			peerId: "peer1",
+			acl: new ThrowingACL({ admins: ["peer1"] }),
+			drp: new SetDRP<number>(),
+		});
+
+		expect(() => (object.acl as ThrowingACL).grantThenThrow("peer2")).toThrowError("Not implemented");
+		expect(object.acl.query_isAdmin("peer2")).toBe(false);
+		expect(object.vertices).toHaveLength(1);
 	});
 });
 
