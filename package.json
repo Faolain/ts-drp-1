@@ -35,7 +35,8 @@
 		"release": "release-it",
 		"test": "vitest",
 		"typecheck": "pnpm --parallel typecheck",
-		"watch": "pnpm --parallel --filter '@ts-drp/*' watch"
+		"watch": "pnpm --parallel --filter '@ts-drp/*' watch",
+		"pretest": "node scripts/ensure-native-deps.mjs"
 	},
 	"dependencies": {
 		"@esbuild-plugins/node-globals-polyfill": "^0.2.3",
