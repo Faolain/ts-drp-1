@@ -1,5 +1,6 @@
 import { bls } from "@chainsafe/bls/herumi";
 import { Logger } from "@ts-drp/logger";
+import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	AggregatedAttestation,
 	type Attestation,
@@ -14,6 +15,12 @@ import { fromString as uint8ArrayFromString } from "uint8arrays/from-string";
 import { BitSet } from "../hashgraph/bitset.js";
 
 const DEFAULT_FINALITY_THRESHOLD = 0.51;
+const metrics = new OpentelemetryMetrics("@ts-drp/object/finality");
+
+interface MergeSignatureStats {
+	accepted: number;
+	discarded: number;
+}
 
 /**
  * FinalityState is a class that implements the IFinalityState interface.
@@ -95,16 +102,14 @@ export class FinalityState implements IFinalityState {
 		if (this.data !== attestation.data) {
 			throw new Error("Hash mismatch");
 		}
-
-		if (this.signature) {
-			return;
+		const aggregationBits = new BitSet(this.signerCredentials.length, attestation.aggregationBits);
+		for (let i = this.signerCredentials.length; i < attestation.aggregationBits.byteLength * 8; i++) {
+			aggregationBits.set(i, false);
 		}
-
-		const aggregation_bits = new BitSet(this.signerCredentials.length, attestation.aggregationBits);
 
 		// public keys of signers who signed
 		const publicKeys = this.signerCredentials
-			.filter((_, i) => aggregation_bits.get(i))
+			.filter((_, i) => aggregationBits.get(i))
 			.map((signer) => uint8ArrayFromString(signer, "base64"));
 		const data = uint8ArrayFromString(this.data);
 
@@ -113,9 +118,37 @@ export class FinalityState implements IFinalityState {
 			throw new Error("Invalid signature");
 		}
 
-		this.aggregation_bits = aggregation_bits;
-		this.signature = attestation.signature;
-		this.numberOfSignatures = publicKeys.length;
+		const remoteCount = publicKeys.length;
+		if (!this.signature) {
+			this.aggregation_bits = aggregationBits;
+			this.signature = attestation.signature;
+			this.numberOfSignatures = remoteCount;
+			return;
+		}
+
+		let overlapCount = 0;
+		for (let i = 0; i < this.signerCredentials.length; i++) {
+			if (this.aggregation_bits.get(i) && aggregationBits.get(i)) overlapCount++;
+		}
+
+		if (overlapCount === 0) {
+			this.aggregation_bits = this.aggregation_bits.or(aggregationBits);
+			this.signature = bls.aggregateSignatures([this.signature, attestation.signature]);
+			this.numberOfSignatures += remoteCount;
+			return;
+		}
+
+		// An aggregate signature cannot be split to remove overlapping signers. A
+		// verified superset is safe to adopt; for partial overlap, retain whichever
+		// verified aggregate covers more distinct signers rather than double-counting.
+		if (
+			overlapCount === this.numberOfSignatures ||
+			(overlapCount < remoteCount && remoteCount > this.numberOfSignatures)
+		) {
+			this.aggregation_bits = aggregationBits;
+			this.signature = attestation.signature;
+			this.numberOfSignatures = remoteCount;
+		}
 	}
 }
 
@@ -253,12 +286,44 @@ export class FinalityStore implements IFinalityStore {
 	 * @param attestations - The attestations to merge.
 	 */
 	mergeSignatures(attestations: AggregatedAttestation[]): void {
+		if (!isTracingEnabled()) {
+			this.mergeSignaturesUntraced(attestations);
+			return;
+		}
+
+		metrics.traceFunc(
+			"finality.mergeSignatures",
+			(batch: AggregatedAttestation[]) => this.mergeSignaturesUntraced(batch),
+			(span, batch) => {
+				span.setAttribute("drp.attestation.count", batch.length);
+			},
+			(span, result) => {
+				span.setAttribute("drp.attestation.accepted_count", result.accepted);
+				span.setAttribute("drp.attestation.discarded_count", result.discarded);
+			}
+		)(attestations);
+	}
+
+	private mergeSignaturesUntraced(attestations: AggregatedAttestation[]): MergeSignatureStats {
+		let accepted = 0;
+		let discarded = 0;
 		for (const attestation of attestations) {
+			const state = this.states.get(attestation.data);
+			if (!state) {
+				discarded++;
+				continue;
+			}
 			try {
-				this.states.get(attestation.data)?.merge(attestation);
+				state.merge(attestation);
+				accepted++;
 			} catch (e) {
-				this.log.warn("::finality::mergeSignatures", e);
+				discarded++;
+				this.log.warn("::finality::mergeSignatures", {
+					hash: attestation.data,
+					errorName: e instanceof Error ? e.name : "UnknownError",
+				});
 			}
 		}
+		return { accepted, discarded };
 	}
 }

@@ -26,6 +26,14 @@ export class DRPObjectStore<T extends IDRP = any> {
 	}
 
 	/**
+	 * Iterate over all stored objects.
+	 * @returns An iterator over the stored objects.
+	 */
+	values(): IterableIterator<IDRPObject<T>> {
+		return this._store.values();
+	}
+
+	/**
 	 * Put an object into the store.
 	 * @param objectId - The ID of the object to put.
 	 * @param object - The object to put.

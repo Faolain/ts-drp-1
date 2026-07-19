@@ -29,13 +29,14 @@
 		"flamegraph": "pnpm tsx packages/object/tests/hashgraph.flamegraph.ts",
 		"lint": "eslint .",
 		"lint:fix": "prettier --write '**/package.json' && eslint . --fix",
-		"postinstall": "pnpm build:packages",
+		"postinstall": "node scripts/ensure-native-deps.mjs && pnpm build:packages",
 		"proto-gen": "pnpm proto-gen:types",
 		"proto-gen:types": "buf generate packages/types/src/proto -o packages/types/src/proto",
 		"release": "release-it",
 		"test": "vitest",
 		"typecheck": "pnpm --parallel typecheck",
-		"watch": "pnpm --parallel --filter '@ts-drp/*' watch"
+		"watch": "pnpm --parallel --filter '@ts-drp/*' watch",
+		"pretest": "node scripts/ensure-native-deps.mjs"
 	},
 	"dependencies": {
 		"@esbuild-plugins/node-globals-polyfill": "^0.2.3",
@@ -98,6 +99,9 @@
 			"node-datachannel",
 			"pprof",
 			"protobufjs"
-		]
+		],
+		"patchedDependencies": {
+			"@libp2p/webrtc@6.0.26": "patches/@libp2p__webrtc@6.0.26.patch"
+		}
 	}
 }

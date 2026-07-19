@@ -1,4 +1,4 @@
-import { type GossipSub, type MeshPeer, type SubscriptionChangeData } from "@libp2p/gossipsub";
+import { type GossipSub, type SubscriptionChangeData } from "@libp2p/gossipsub";
 import { type Connection, type IdentifyResult, type Libp2p } from "@libp2p/interface";
 import { type DRPNetworkNodeConfig, type DRPNodeConfig, type LoggerOptions, Message } from "@ts-drp/types";
 import { raceEvent } from "race-event";
@@ -12,6 +12,7 @@ describe("DRPNetworkNode can connect & send messages", () => {
 	let node1: DRPNetworkNode;
 	let node2: DRPNetworkNode;
 	let libp2pNode1: Libp2p;
+	let libp2pNode2: Libp2p;
 	let bootstrapNode: DRPNetworkNode;
 	let pubsubNode1: GossipSub;
 
@@ -39,6 +40,9 @@ describe("DRPNetworkNode can connect & send messages", () => {
 		const config: DRPNodeConfig = rawConfig;
 		const bootstrapConfig: DRPNetworkNodeConfig = {
 			...config.network_config,
+			// Ephemeral ports: the fixed 50000/50001 from local-bootstrap.json collide with
+			// lingering processes from previous runs and fail beforeAll (tests then skip).
+			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws", "/ip4/0.0.0.0/tcp/0"],
 			log_config: { level: "silent" },
 		};
 		bootstrapNode = new DRPNetworkNode(bootstrapConfig);
@@ -71,6 +75,7 @@ describe("DRPNetworkNode can connect & send messages", () => {
 
 		await node2.start();
 		expect(await isDialable(node2)).toBe(true);
+		libp2pNode2 = node2["_node"] as Libp2p;
 		pubsubNode1 = node1["_pubsub"] as GossipSub;
 	});
 
@@ -78,10 +83,16 @@ describe("DRPNetworkNode can connect & send messages", () => {
 		const data = "Hello World!";
 		let boolean = false;
 
-		await raceEvent(libp2pNode1, "connection:open", controller.signal, {
-			filter: (event: CustomEvent<Connection>) =>
-				event.detail.remotePeer.toString() === node2.peerId && event.detail.limits === undefined,
-		});
+		await Promise.all([
+			raceEvent(libp2pNode1, "connection:open", controller.signal, {
+				filter: (event: CustomEvent<Connection>) =>
+					event.detail.remotePeer.toString() === node2.peerId && event.detail.limits === undefined,
+			}),
+			raceEvent(libp2pNode2, "connection:open", controller.signal, {
+				filter: (event: CustomEvent<Connection>) =>
+					event.detail.remotePeer.toString() === node1.peerId && event.detail.limits === undefined,
+			}),
+		]);
 
 		const messageProcessed = new Promise((resolve) => {
 			node2.subscribeToMessageQueue(async () => {
@@ -105,10 +116,6 @@ describe("DRPNetworkNode can connect & send messages", () => {
 		const group = "test";
 		let boolean = false;
 
-		const graftPromise = raceEvent(pubsubNode1, "gossipsub:graft", controller.signal, {
-			filter: (event: CustomEvent<MeshPeer>) => event.detail.peerId === node2.peerId,
-		});
-
 		const subscriptionChange = new Promise((resolve) => {
 			raceEvent(pubsubNode1, "subscription-change", controller.signal, {
 				filter: (event: CustomEvent<SubscriptionChangeData>) =>
@@ -127,7 +134,7 @@ describe("DRPNetworkNode can connect & send messages", () => {
 			});
 		});
 
-		await Promise.all([graftPromise, subscriptionChange]);
+		await subscriptionChange;
 		await node1.broadcastMessage(
 			group,
 			Message.create({ sender: "", type: 0, data: new Uint8Array(Buffer.from(data)), objectId: "" })

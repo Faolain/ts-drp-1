@@ -3,7 +3,7 @@ import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { sha256 } from "@noble/hashes/sha2";
 import { Signature } from "@noble/secp256k1";
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
-import { HashGraph } from "@ts-drp/object";
+import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type AggregatedAttestation,
 	Attestation,
@@ -21,11 +21,13 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { isPromise } from "@ts-drp/utils";
-import { deserializeDRPState, serializeDRPState } from "@ts-drp/utils/serialization";
+import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { MessageSchema } from "@ts-drp/validation/message";
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
+
+const metrics = new OpentelemetryMetrics("@ts-drp/node/handlers");
 
 interface HandleParams {
 	node: DRPNode;
@@ -34,6 +36,69 @@ interface HandleParams {
 
 interface IHandlerStrategy {
 	(handleParams: HandleParams): Promise<void> | void;
+}
+
+const MAX_SYNC_RECOVERY_RETRIES = 3;
+export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
+
+interface SyncRecoveryEpisode {
+	retries?: number;
+	cooldownUntil?: number;
+}
+
+// SYNC/SYNC_ACCEPT have no correlation id, so stale accepts from the same peer
+// necessarily share the current (objectId, sender) recovery episode budget.
+const syncRecoveryEpisodes = new WeakMap<DRPNode, Map<string, SyncRecoveryEpisode>>();
+
+function recoveryKey(objectId: string, sender: string): string {
+	return JSON.stringify([objectId, sender]);
+}
+
+/**
+ * Clear all recovery episodes associated with one object subscription.
+ * @param node - Node whose recovery state should be cleared
+ * @param objectId - Object subscription being removed
+ */
+export function clearSyncRecoveryEpisodes(node: DRPNode, objectId: string): void {
+	const episodes = syncRecoveryEpisodes.get(node);
+	if (!episodes) return;
+
+	for (const key of episodes.keys()) {
+		const [episodeObjectId] = JSON.parse(key) as [string, string];
+		if (episodeObjectId === objectId) episodes.delete(key);
+	}
+	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+}
+
+async function recoverMissingSync(node: DRPNode, objectId: string, sender: string, missing: string[]): Promise<void> {
+	const key = recoveryKey(objectId, sender);
+	const episodes = syncRecoveryEpisodes.get(node) ?? new Map<string, SyncRecoveryEpisode>();
+	const episode = episodes.get(key);
+
+	if (missing.length === 0) {
+		episodes.delete(key);
+		if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+		return;
+	}
+
+	if (episode?.cooldownUntil !== undefined) {
+		if (Date.now() < episode.cooldownUntil) return;
+		episodes.delete(key);
+	}
+
+	const retryCount = episodes.get(key)?.retries ?? 0;
+	if (retryCount >= MAX_SYNC_RECOVERY_RETRIES) {
+		episodes.set(key, { cooldownUntil: Date.now() + SYNC_RECOVERY_COOLDOWN_MS });
+		syncRecoveryEpisodes.set(node, episodes);
+		node.safeDispatchEvent(NodeEventName.DRP_SYNC_REJECTED, {
+			detail: { id: objectId, peerId: sender, retries: retryCount },
+		});
+		return;
+	}
+
+	episodes.set(key, { retries: retryCount + 1 });
+	syncRecoveryEpisodes.set(node, episodes);
+	await node.syncObject(objectId, sender);
 }
 
 const messageHandlers: Record<MessageType, IHandlerStrategy | undefined> = {
@@ -88,8 +153,10 @@ function fetchStateHandler({ node, message }: HandleParams): ReturnType<IHandler
 	const [aclState, drpState] = drpObject.getStates(fetchState.vertexHash);
 	const response = FetchStateResponse.create({
 		vertexHash: fetchState.vertexHash,
-		aclState: serializeDRPState(aclState),
-		drpState: serializeDRPState(drpState),
+		// Preserve an explicit protobuf miss for pruned/nonexistent snapshots.
+		// Serializing undefined would manufacture a present-but-empty state.
+		aclState: aclState === undefined ? undefined : serializeDRPState(aclState),
+		drpState: drpState === undefined ? undefined : serializeDRPState(drpState),
 	});
 
 	const messageFetchStateResponse = Message.create({
@@ -126,33 +193,20 @@ function fetchStateResponseHandler({ node, message }: HandleParams): ReturnType<
 		return;
 	}
 
-	try {
-		const aclState = deserializeDRPState(fetchStateResponse.aclState);
-		const drpState = deserializeDRPState(fetchStateResponse.drpState);
-		if (fetchStateResponse.vertexHash === HashGraph.rootHash) {
-			const state = aclState;
-			object.setACLState(fetchStateResponse.vertexHash, state);
-			for (const e of state.state) {
-				object.acl[e.key] = e.value;
-			}
-			node.put(object.id, object);
-			return;
-		}
-
-		if (fetchStateResponse.aclState) {
-			object.setACLState(fetchStateResponse.vertexHash, aclState);
-		}
-		if (fetchStateResponse.drpState) {
-			object.setDRPState(fetchStateResponse.vertexHash, drpState);
-		}
-	} finally {
-		node.safeDispatchEvent(NodeEventName.DRP_FETCH_STATE_RESPONSE, {
-			detail: {
-				id: object.id,
-				fetchStateResponse,
-			},
-		});
-	}
+	// Network-provided ACL/DRP state snapshots are never adopted. Under id-binding,
+	// authority and DRP state are derived locally by applying signed vertices, never
+	// copied from an unauthenticated, unsolicited response. Honest `fetchState`
+	// (operations.ts) only ever requests the root hash, so a non-root snapshot
+	// is never legitimate, and a root snapshot would overwrite genesis authority that
+	// is derived from the creator-bound object id. Either way the state is dropped;
+	// convergence still occurs because joiners derive genesis locally and then sync
+	// the signed vertices. The event below only signals that a responder exists.
+	node.safeDispatchEvent(NodeEventName.DRP_FETCH_STATE_RESPONSE, {
+		detail: {
+			id: object.id,
+			fetchStateResponse,
+		},
+	});
 }
 
 function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<IHandlerStrategy> {
@@ -179,6 +233,19 @@ function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<I
   operations array doesn't contain the full remote operations array
 */
 async function updateHandler({ node, message }: HandleParams): Promise<void> {
+	if (!isTracingEnabled()) return updateHandlerUntraced({ node, message });
+
+	return metrics.traceFunc(
+		"node.updateHandler",
+		(params: HandleParams) => updateHandlerUntraced(params),
+		(span, { message: candidate }) => {
+			span.setAttribute("drp.object.id", candidate.objectId);
+			span.setAttribute("drp.message.sender", candidate.sender);
+		}
+	)({ node, message });
+}
+
+async function updateHandlerUntraced({ node, message }: HandleParams): Promise<void> {
 	const { sender, data } = message;
 
 	const updateMessage = Update.decode(data);
@@ -188,23 +255,23 @@ async function updateHandler({ node, message }: HandleParams): Promise<void> {
 		return;
 	}
 
-	let verifiedVertices: Vertex[] = [];
-	if (object.acl.permissionless) {
-		verifiedVertices = updateMessage.vertices;
-	} else {
-		verifiedVertices = verifyACLIncomingVertices(updateMessage.vertices);
-	}
+	const verifiedVertices = authenticateIncomingVertices(object, updateMessage.vertices);
 
-	const [merged, _] = await object.merge(verifiedVertices);
+	const [, missing] = await object.merge(verifiedVertices);
+	const presentHashes = new Set(object.vertices.map((vertex) => vertex.hash));
+	const appliedVertices = verifiedVertices.filter((vertex) => presentHashes.has(vertex.hash));
 
-	if (!merged) {
-		await node.syncObject(message.objectId, sender);
-	} else {
-		// add their signatures
-		object.finalityStore.addSignatures(sender, updateMessage.attestations);
+	if (appliedVertices.length !== 0) {
+		// add their signatures — only if the sender is a finality signer on the LIVE
+		// ACL. Mirrors attestationUpdateHandler; without this gate a non-signer could
+		// piggyback forged attestations on an UPDATE and have them counted toward
+		// finality (finality-integrity bypass).
+		if (object.acl.query_isFinalitySigner(sender)) {
+			object.finalityStore.addSignatures(sender, updateMessage.attestations);
+		}
 
 		// add my signatures
-		const attestations = signFinalityVertices(node, object, verifiedVertices);
+		const attestations = signFinalityVertices(node, object, appliedVertices);
 
 		if (attestations.length !== 0) {
 			// broadcast the attestations
@@ -223,6 +290,10 @@ async function updateHandler({ node, message }: HandleParams): Promise<void> {
 				log.error("::updateHandler: Error broadcasting message", e);
 			});
 		}
+	}
+
+	if (missing.length !== 0) {
+		await recoverMissingSync(node, message.objectId, sender, missing);
 	}
 
 	node.put(object.id, object);
@@ -309,6 +380,19 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
   operations array contain the full remote operations array
 */
 async function syncAcceptHandler({ node, message }: HandleParams): Promise<void> {
+	if (!isTracingEnabled()) return syncAcceptHandlerUntraced({ node, message });
+
+	return metrics.traceFunc(
+		"node.syncAcceptHandler",
+		(params: HandleParams) => syncAcceptHandlerUntraced(params),
+		(span, { message: candidate }) => {
+			span.setAttribute("drp.object.id", candidate.objectId);
+			span.setAttribute("drp.message.sender", candidate.sender);
+		}
+	)({ node, message });
+}
+
+async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promise<void> {
 	const { data, sender } = message;
 	const syncAcceptMessage = SyncAccept.decode(data);
 	const object = node.get(message.objectId);
@@ -317,25 +401,39 @@ async function syncAcceptHandler({ node, message }: HandleParams): Promise<void>
 		return;
 	}
 
-	let verifiedVertices: Vertex[] = [];
-	if (object.acl.permissionless) {
-		verifiedVertices = syncAcceptMessage.requested;
-	} else {
-		verifiedVertices = verifyACLIncomingVertices(syncAcceptMessage.requested);
-	}
+	const verifiedVertices = authenticateIncomingVertices(object, syncAcceptMessage.requested);
 
-	if (verifiedVertices.length !== 0) {
-		await object.merge(verifiedVertices);
+	const mergeRan = verifiedVertices.length !== 0;
+	let missing: string[] = [];
+	if (mergeRan) {
+		[, missing] = await object.merge(verifiedVertices);
 		object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		node.put(object.id, object);
+		await recoverMissingSync(node, object.id, sender, missing);
 	}
 
 	await signGeneratedVertices(node, object.vertices);
-	signFinalityVertices(node, object, object.vertices);
+	const addedAttestations = signFinalityVertices(node, object, object.vertices);
+	if (addedAttestations.length !== 0) {
+		// Vertices learned through sync must still propagate our finality
+		// signatures; otherwise a sync that front-runs the gossip UPDATE would
+		// strand these attestations on this replica.
+		const attestationUpdate = Message.create({
+			sender: node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
+			data: AttestationUpdate.encode(AttestationUpdate.create({ attestations: addedAttestations })).finish(),
+			objectId: object.id,
+		});
+		node.networkNode.broadcastMessage(object.id, attestationUpdate).catch((e) => {
+			log.error("::syncAcceptHandler: Error broadcasting attestations", e);
+		});
+	}
 
-	node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
-		detail: { id: object.id },
-	});
+	if (mergeRan && missing.length === 0) {
+		node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
+			detail: { id: object.id },
+		});
+	}
 
 	// send missing vertices
 	const requested: Vertex[] = [];
@@ -494,6 +592,30 @@ function getAttestations<T extends IDRP>(object: IDRPObject<T>, vertices: Vertex
 			.map((v) => object.finalityStore.getAttestation(v.hash))
 			.filter((a): a is AggregatedAttestation => a !== undefined) ?? []
 	);
+}
+
+/**
+ * Authenticate incoming vertices before they are merged.
+ *
+ * Author authentication (the signature must recover to the claimed peerId) is
+ * ALWAYS enforced for EVERY vertex, regardless of `permissionless` and
+ * regardless of DRP-vs-ACL type. Both ACL ops (grant/revoke/setKey, which run
+ * with `context.caller = vertex.peerId` and decide authority) and DRP ops (which
+ * apply with `context.caller = vertex.peerId`, e.g. "move peer X's piece") derive
+ * their effect from the claimed author, so a forgeable author would let any peer
+ * impersonate another. The `permissionless` flag relaxes ONLY the writer-permission
+ * gate — enforced in the ACL layer via `query_isWriter` — never author identity;
+ * a permissionless writer still authors as themselves with a valid signature.
+ * @param _object - The object the vertices are being merged into (unused: identity
+ * authentication is object-independent; kept for a stable call-site signature)
+ * @param incomingVertices - The incoming vertices to authenticate
+ * @returns The vertices that are safe to merge, in their original order
+ */
+export function authenticateIncomingVertices<T extends IDRP>(
+	_object: IDRPObject<T>,
+	incomingVertices: Vertex[]
+): Vertex[] {
+	return verifyACLIncomingVertices(incomingVertices);
 }
 
 /**

@@ -58,6 +58,14 @@ type ConfigurableGossipSub = GossipSub & {
 	streamsOutbound: Map<string, unknown>;
 };
 
+export interface GroupPeerChange {
+	peerId: string;
+	subscribed: boolean;
+	topic: string;
+}
+
+export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
+
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
  * It handles the creation and management of the libp2p node, pubsub, and message queue.
@@ -69,6 +77,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _messageQueue: MessageQueue<Message>;
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapNodesList: string[];
+	private _bootstrapRetryController?: AbortController;
+	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
 
 	peerId = "";
 
@@ -169,12 +179,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		);
 
 		if (!this._config?.bootstrap) {
-			for (const addr of this._config?.bootstrap_peers || []) {
-				try {
-					await this.safeDial(multiaddr(addr));
-				} catch (e) {
-					log.error("::start::dial::error", e);
-				}
+			this._bootstrapRetryController?.abort();
+			this._bootstrapRetryController = new AbortController();
+			for (const addr of this._bootstrapNodesList) {
+				void this._dialBootstrapWithRetry(multiaddr(addr), this._node, this._bootstrapRetryController.signal);
 			}
 		}
 
@@ -189,7 +197,23 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 		this._node.addEventListener("peer:identify", (e) => log.info("::start::peer::identify", e.detail));
 
-		this._pubsub.addEventListener("gossipsub:graft", (e) => log.info("::start::gossipsub::graft", e.detail));
+		this._pubsub.addEventListener("subscription-change", (event) => {
+			for (const subscription of event.detail.subscriptions) {
+				this.notifyGroupPeerChange({
+					peerId: event.detail.peerId.toString(),
+					subscribed: subscription.subscribe,
+					topic: subscription.topic,
+				});
+			}
+		});
+		this._pubsub.addEventListener("gossipsub:graft", (event) => {
+			log.info("::start::gossipsub::graft", event.detail);
+			this.notifyGroupPeerChange({
+				peerId: event.detail.peerId,
+				subscribed: true,
+				topic: event.detail.topic,
+			});
+		});
 
 		// needed as I've disabled the pubsubPeerDiscovery
 		this._pubsub?.subscribe(DRP_DISCOVERY_TOPIC);
@@ -201,11 +225,50 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		this._messageQueue.start();
 	}
 
+	private async _dialBootstrapWithRetry(addr: Multiaddr, node: Libp2p, signal: AbortSignal): Promise<void> {
+		const retryDelays = [1_000, 2_000, 4_000, 8_000];
+
+		for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+			if (signal.aborted || this._node !== node || node.status === "stopping" || node.status === "stopped") return;
+
+			try {
+				await this.safeDial(addr, node);
+				return;
+			} catch (e) {
+				log.error("::start::dial::error", e);
+			}
+
+			const retryDelay = retryDelays[attempt];
+			if (retryDelay === undefined) return;
+			await this._waitForBootstrapRetry(retryDelay, signal);
+		}
+	}
+
+	private _waitForBootstrapRetry(delay: number, signal: AbortSignal): Promise<void> {
+		if (signal.aborted) return Promise.resolve();
+
+		return new Promise((resolve) => {
+			const finish = (): void => {
+				signal.removeEventListener("abort", onAbort);
+				resolve();
+			};
+			const onAbort = (): void => {
+				clearTimeout(timeout);
+				finish();
+			};
+			const timeout = setTimeout(finish, delay);
+			(timeout as ReturnType<typeof setTimeout> & { unref?(): void }).unref?.();
+			signal.addEventListener("abort", onAbort, { once: true });
+		});
+	}
+
 	/**
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
+		this._bootstrapRetryController?.abort();
+		this._bootstrapRetryController = undefined;
 		await this._node?.stop();
 		this._messageQueue.close();
 		this._metrics?.stop();
@@ -375,18 +438,22 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * Dial a peer with a peerId, multiaddr or array of multiaddrs it also handles the case where the caller
 	 * do something bad like passing multiaddrs that as different PeerIds
 	 * @param peerId - The peerId, multiaddr or array of multiaddrs to dial
+	 * @param node - The libp2p instance to dial with
 	 * @returns The connection or undefined if no connection was made
 	 */
-	async safeDial(peerId: string[] | string | PeerId | Multiaddr | Multiaddr[]): Promise<Connection | undefined> {
+	async safeDial(
+		peerId: string[] | string | PeerId | Multiaddr | Multiaddr[],
+		node: Libp2p | undefined = this._node
+	): Promise<Connection | undefined> {
 		const isArray = Array.isArray(peerId);
 		if (!isArray) {
 			const addr =
 				typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
-			return this._node?.dial(addr);
+			return node?.dial(addr);
 		}
 
 		const addrsPerPeerId = this.addrsPerPeerId(peerId);
-		return Promise.race(Object.values(addrsPerPeerId).map((addrs) => this._node?.dial(addrs)));
+		return Promise.race(Object.values(addrsPerPeerId).map((addrs) => node?.dial(addrs)));
 	}
 
 	/**
@@ -555,6 +622,20 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		} catch (e) {
 			log.error("::sendGroupMessageRandomPeer:", e);
 		}
+	}
+
+	/**
+	 * Subscribe to remote group-peer subscription and mesh changes.
+	 * @param handler - Handler invoked when a remote peer appears or disappears on a topic
+	 * @returns A function that removes the handler
+	 */
+	subscribeToGroupPeerChanges(handler: GroupPeerChangeHandler): () => void {
+		this._groupPeerChangeHandlers.add(handler);
+		return () => this._groupPeerChangeHandlers.delete(handler);
+	}
+
+	private notifyGroupPeerChange(change: GroupPeerChange): void {
+		for (const handler of this._groupPeerChangeHandlers) handler(change);
 	}
 
 	private async startEnqueueMessages(): Promise<void> {

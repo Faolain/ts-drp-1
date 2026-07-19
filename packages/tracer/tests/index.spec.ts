@@ -4,7 +4,7 @@ import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 import { type IMetrics } from "@ts-drp/types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { disableTracing, enableTracing, flush, OpentelemetryMetrics } from "../src/index.js";
+import { disableTracing, enableTracing, flush, isTracingEnabled, OpentelemetryMetrics } from "../src/index.js";
 
 // Mock OpenTelemetry dependencies
 vi.mock("@opentelemetry/api", () => {
@@ -118,17 +118,20 @@ describe("tracing lifecycle", () => {
 	let metrics: IMetrics;
 
 	beforeEach(() => {
+		disableTracing();
 		vi.clearAllMocks();
 		metrics = new OpentelemetryMetrics("metric");
 	});
 
 	test("should enable and disable tracing", () => {
+		expect(isTracingEnabled()).toBe(false);
 		enableTracing({
 			provider: {
 				serviceName: "test",
 				exporterUrl: "http://localhost:9999",
 			},
 		});
+		expect(isTracingEnabled()).toBe(true);
 
 		// Check if the tracer provider was initialized correctly
 		expect(WebTracerProvider).toHaveBeenCalled();
@@ -141,10 +144,20 @@ describe("tracing lifecycle", () => {
 		expect(fn(1)).toBe(2);
 
 		disableTracing();
+		expect(isTracingEnabled()).toBe(false);
 
 		// Should still work when disabled, just without tracing
 		const result = fn(1);
 		expect(result).toBe(2);
+	});
+
+	test("metrics created while disabled acquire a tracer lazily after enablement", () => {
+		const fn = metrics.traceFunc("lazy", (value: number) => value + 1);
+		enableTracing();
+
+		expect(fn(1)).toBe(2);
+		const mockProvider = vi.mocked(WebTracerProvider).mock.results[0].value;
+		expect(mockProvider.getTracer).toHaveBeenCalledWith("metric");
 	});
 
 	test("should allow flushing traces", async () => {
@@ -205,6 +218,10 @@ describe("tracing lifecycle", () => {
 				throw new Error("test error");
 			});
 			expect(() => fn()).toThrow("test error");
+			const mockProvider = vi.mocked(WebTracerProvider).mock.results[0].value;
+			const mockTracer = vi.mocked(mockProvider.getTracer).mock.results[0].value;
+			const mockSpan = vi.mocked(mockTracer.startSpan).mock.results[0].value;
+			expect(mockSpan.end).toHaveBeenCalledOnce();
 		});
 
 		test("should handle errors in async functions", async () => {
@@ -213,6 +230,10 @@ describe("tracing lifecycle", () => {
 				throw new Error("test error");
 			});
 			await expect(fn()).rejects.toThrow("test error");
+			const mockProvider = vi.mocked(WebTracerProvider).mock.results[0].value;
+			const mockTracer = vi.mocked(mockProvider.getTracer).mock.results[0].value;
+			const mockSpan = vi.mocked(mockTracer.startSpan).mock.results[0].value;
+			expect(mockSpan.end).toHaveBeenCalledOnce();
 		});
 
 		test("should apply custom attributes", () => {
@@ -224,6 +245,19 @@ describe("tracing lifecycle", () => {
 				}
 			);
 			expect(fn(1)).toBe(2);
+		});
+
+		test("should apply result-derived attributes", async () => {
+			const setResultAttributes = vi.fn();
+			const fn = metrics.traceFunc(
+				"result-attributes",
+				async (a: number) => Promise.resolve(a + 1),
+				undefined,
+				setResultAttributes
+			);
+
+			expect(await fn(1)).toBe(2);
+			expect(setResultAttributes).toHaveBeenCalledWith(expect.anything(), 2);
 		});
 
 		test("should trace functions that return promises", async () => {

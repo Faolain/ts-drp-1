@@ -3,7 +3,8 @@ import { SetDRP } from "@ts-drp/blueprints";
 import { Keychain } from "@ts-drp/keychain";
 import { AggregatedAttestation, type Attestation } from "@ts-drp/types";
 import { toString as uint8ArrayToString } from "uint8arrays";
-import { beforeEach, describe, expect, test } from "vitest";
+import { fromString as uint8ArrayFromString } from "uint8arrays/from-string";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { FinalityState, FinalityStore } from "../src/finality/index.js";
 import { BitSet } from "../src/hashgraph/bitset.js";
@@ -78,6 +79,88 @@ describe("Tests for FinalityState", () => {
 	});
 });
 
+describe("FinalityState aggregate merge policy", () => {
+	const hash = "aggregate-merge-policy";
+	const peerIds = ["peer-a", "peer-b", "peer-c", "peer-d", "peer-e"];
+	let keychains: Keychain[];
+	let signers: Map<string, string>;
+
+	beforeEach(async () => {
+		keychains = peerIds.map(() => new Keychain());
+		await Promise.all(keychains.map((keychain) => keychain.start()));
+		signers = new Map(peerIds.map((peerId, index) => [peerId, keychains[index].blsPublicKey]));
+	});
+
+	const aggregate = (indices: number[]): AggregatedAttestation => {
+		const bits = new BitSet(peerIds.length);
+		const signatures = indices.map((index) => {
+			bits.set(index, true);
+			return keychains[index].signWithBls(hash);
+		});
+		return AggregatedAttestation.create({
+			data: hash,
+			signature: bls.aggregateSignatures(signatures),
+			aggregationBits: bits.toBytes(),
+		});
+	};
+
+	const expectExactAggregate = (state: FinalityState, indices: number[]): void => {
+		const publicKeys = indices.map((index) => uint8ArrayFromString(state.signerCredentials[index], "base64"));
+		expect(state.numberOfSignatures).toBe(indices.length);
+		expect(Array.from({ length: peerIds.length }, (_, index) => state.aggregation_bits.get(index))).toEqual(
+			peerIds.map((_, index) => indices.includes(index))
+		);
+		expect(state.signature).toBeDefined();
+		if (!state.signature) throw new Error("aggregate signature is missing");
+		expect(bls.verifyAggregate(publicKeys, uint8ArrayFromString(hash), state.signature)).toBe(true);
+	};
+
+	test("a relay unions repeated pure aggregates, adopts a superset, and ignores a subset", () => {
+		const relay = new FinalityState(hash, signers);
+		relay.merge(aggregate([0, 1]));
+		relay.merge(aggregate([2, 3]));
+		expectExactAggregate(relay, [0, 1, 2, 3]);
+
+		relay.merge(aggregate([0, 1, 2, 3, 4]));
+		expectExactAggregate(relay, [0, 1, 2, 3, 4]);
+
+		const adoptedSignature = relay.signature;
+		relay.merge(aggregate([0, 1]));
+		expectExactAggregate(relay, [0, 1, 2, 3, 4]);
+		expect(relay.signature).toEqual(adoptedSignature);
+	});
+
+	test.each([
+		{ name: "superset adopt", local: [0, 1], remote: [0, 1, 2], expected: [0, 1, 2], adopts: true },
+		{ name: "subset keep", local: [0, 1, 2], remote: [0, 1], expected: [0, 1, 2], adopts: false },
+		{ name: "incomparable equal-size keep", local: [0, 1], remote: [1, 2], expected: [0, 1], adopts: false },
+		{ name: "larger partial adopt", local: [0, 1], remote: [1, 2, 3], expected: [1, 2, 3], adopts: true },
+	])("partial-overlap branch: $name", ({ local, remote, expected, adopts }) => {
+		const state = new FinalityState(hash, signers);
+		for (const index of local) {
+			state.addSignature(peerIds[index], keychains[index].signWithBls(hash));
+		}
+		const remoteAttestation = aggregate(remote);
+		const localSignature = state.signature;
+		state.merge(remoteAttestation);
+
+		expectExactAggregate(state, expected);
+		expect(state.signature).toEqual(adopts ? remoteAttestation.signature : localSignature);
+	});
+
+	test("masks remote aggregation bits outside the signer range", () => {
+		const state = new FinalityState(hash, signers);
+		const remote = aggregate([0]);
+		remote.aggregationBits[3] |= 0x80;
+
+		state.merge(remote);
+
+		expect(state.aggregation_bits.get(31)).toBe(false);
+		expect(state.aggregation_bits.toBytes()[3] & 0x80).toBe(0);
+		expectExactAggregate(state, [0]);
+	});
+});
+
 describe("Tests for FinalityStore", () => {
 	const N = 1000;
 	let finalityStore: FinalityStore;
@@ -132,6 +215,8 @@ describe("Tests for FinalityStore", () => {
 
 	test("mergeSignatures: Merge signatures for multiple vertices", () => {
 		const attestations: AggregatedAttestation[] = [];
+		const warn = vi.fn();
+		(finalityStore as unknown as { log: { warn: typeof warn } }).log.warn = warn;
 
 		// signatures for vertex1
 		for (let i = 0; i < 10; i++) {
@@ -176,11 +261,14 @@ describe("Tests for FinalityStore", () => {
 
 		finalityStore.mergeSignatures(attestations);
 
-		// the merge function only accepts the first merge
-		expect(finalityStore.getNumberOfSignatures("vertex1")).toEqual(1);
+		expect(finalityStore.getNumberOfSignatures("vertex1")).toEqual(10);
 		expect(finalityStore.getNumberOfSignatures("vertex2")).toEqual(50);
 		expect(finalityStore.getAttestation("vertex2")?.signature).toEqual(aggregatedSignature);
 		expect(finalityStore.getNumberOfSignatures("vertex3")).toEqual(0);
+		expect(warn).toHaveBeenCalledWith("::finality::mergeSignatures", {
+			hash: "vertex3",
+			errorName: "Error",
+		});
 	});
 
 	test("Quorum test", () => {

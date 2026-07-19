@@ -74,4 +74,9 @@ export interface IMessageQueueManager<T> {
 	 * Close all queues
 	 */
 	closeAll(): void;
+
+	/**
+	 * Start all queues.
+	 */
+	startAll(): void;
 }

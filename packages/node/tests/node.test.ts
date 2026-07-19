@@ -3,7 +3,7 @@ import { type Connection, type IdentifyResult, type Libp2p } from "@libp2p/inter
 import { SetDRP } from "@ts-drp/blueprints";
 import { Logger } from "@ts-drp/logger";
 import { DRPNetworkNode } from "@ts-drp/network";
-import { createACL, DRPObject, ObjectACL } from "@ts-drp/object";
+import { createACL, DRPObject } from "@ts-drp/object";
 import { ACLGroup, type DRPNetworkNodeConfig, DrpType, Operation, Vertex } from "@ts-drp/types";
 import { raceEvent } from "race-event";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -348,13 +348,13 @@ describe("DRPObject connection tests", () => {
 	});
 
 	test("Node should able to connect object and fetch states", async () => {
+		// Genesis authority is derived locally from the creator-bound object id;
+		// additional authority propagates only through signed ACL vertices.
 		const obj1 = await node1.createObject({
 			drp: new SetDRP<number>(),
-			acl: new ObjectACL({
-				admins: [node1.networkNode.peerId, "fake-peer"],
-			}),
 		});
 		expect(obj1.acl.query_isAdmin(node1.networkNode.peerId)).toBe(true);
+		obj1.acl.grant("fake-peer", ACLGroup.Admin);
 
 		const obj2 = await node2.connectObject({
 			id: obj1.id,
@@ -364,7 +364,7 @@ describe("DRPObject connection tests", () => {
 		});
 		expect(obj2.acl).toBeDefined();
 		expect(obj2.acl.query_isAdmin(node1.networkNode.peerId)).toBe(true);
-		expect(obj2.acl.query_isAdmin("fake-peer")).toBe(true);
+		await vi.waitFor(() => expect(obj2.acl.query_isAdmin("fake-peer")).toBe(true), { timeout: 15_000 });
 		expect(obj2.acl.query_isAdmin(node2.networkNode.peerId)).toBe(false);
 	}, 20_000);
 

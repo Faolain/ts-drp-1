@@ -1,6 +1,7 @@
 import { type IACL } from "./acl.js";
 import { type IDRP } from "./drp.js";
 import { type FinalityConfig, type IFinalityStore } from "./finality.js";
+import { type Hash } from "./hashgraph.js";
 import { type LoggerOptions } from "./logger.js";
 import { type IMetrics } from "./metrics.js";
 import { type DRPObjectBase, type DRPState, type Vertex } from "./proto/drp/v1/object_pb.js";
@@ -25,11 +26,12 @@ export interface DRPObjectOptions<T extends IDRP> {
 	metrics?: IMetrics;
 }
 
-export type MergeResult = [merged: boolean, missing: string[]];
+export type MergeResult = [merged: boolean, missing: Hash[], invalid: Hash[]];
 
 export interface ApplyResult {
 	applied: boolean;
-	missing: string[];
+	missing: Hash[];
+	invalid: Hash[];
 }
 
 export type DRPObjectCallback<T extends IDRP> = (object: IDRPObject<T>, origin: string, vertices: Vertex[]) => void;

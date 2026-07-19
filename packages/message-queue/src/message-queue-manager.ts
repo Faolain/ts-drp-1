@@ -28,7 +28,8 @@ export class MessageQueueManager<T> implements IMessageQueueManager<T> {
 
 	private getOptions(options: IMessageQueueManagerOptions): Required<IMessageQueueManagerOptions> {
 		return {
-			maxQueues: (options.maxQueues ?? 100) + 1, // +1 for the general queue
+			// The default admits 101 object queues plus discovery; general is added here.
+			maxQueues: (options.maxQueues ?? 102) + 1,
 			maxQueueSize: options.maxQueueSize ?? 1000,
 			logConfig: options.logConfig ?? { level: "info" },
 		};
@@ -45,6 +46,15 @@ export class MessageQueueManager<T> implements IMessageQueueManager<T> {
 	}
 
 	/**
+	 * Check whether a queue currently exists.
+	 * @param queueId - The queue identifier.
+	 * @returns Whether the queue exists.
+	 */
+	hasQueue(queueId: string): boolean {
+		return this.queues.has(queueId === "" ? GENERAL_QUEUE_ID : queueId);
+	}
+
+	/**
 	 * Enqueue a message to a specific queue
 	 * @param queueId - The id of the queue to enqueue the message to
 	 * @param message - The message to enqueue
@@ -56,7 +66,7 @@ export class MessageQueueManager<T> implements IMessageQueueManager<T> {
 		const queue = this.queues.get(queueId);
 		if (!queue) {
 			this.logger.error(`queue manager::enqueue: queue ${queueId} not found`);
-			return;
+			throw new Error(`Queue ${queueId} not found`);
 		}
 		await queue.enqueue(message);
 		this.logger.trace(`queue manager::enqueued message ${message} to ${queueId}`);
@@ -95,6 +105,7 @@ export class MessageQueueManager<T> implements IMessageQueueManager<T> {
 			return;
 		}
 		queue.close();
+		this.queues.delete(queueId);
 	}
 
 	/**
@@ -103,6 +114,15 @@ export class MessageQueueManager<T> implements IMessageQueueManager<T> {
 	closeAll(): void {
 		for (const queue of this.queues.values()) {
 			queue.close();
+		}
+	}
+
+	/**
+	 * Start all queues.
+	 */
+	startAll(): void {
+		for (const queue of this.queues.values()) {
+			queue.start();
 		}
 	}
 }

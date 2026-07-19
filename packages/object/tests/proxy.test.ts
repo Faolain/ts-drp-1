@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { type PostOperation } from "../src/operation.js";
 import { createPipeline } from "../src/pipeline/pipeline.js";
-import { DRPProxy, type DRPProxyChainArgs } from "../src/proxy.js";
+import { DRPProxy, type DRPProxyChainArgs, trackMutations } from "../src/proxy.js";
 
 describe("DRPProxy", () => {
 	// Mock types and interfaces
@@ -123,5 +123,17 @@ describe("DRPProxy", () => {
 		const proxy = new DRPProxy(mockDRP, errorPipeline, "drp" as DrpType);
 
 		expect(() => proxy.proxy.testMethod("value")).toThrow("Pipeline error");
+	});
+});
+
+describe("trackMutations", () => {
+	it("tracks nested collection values reached through iteration", () => {
+		const state = { items: new Map([["item", { value: 1 }]]) };
+		const tracked = trackMutations(state);
+
+		for (const item of tracked.proxy.items.values()) item.value = 2;
+
+		expect(tracked.hasChanges()).toBe(true);
+		expect(state.items.get("item")?.value).toBe(2);
 	});
 });

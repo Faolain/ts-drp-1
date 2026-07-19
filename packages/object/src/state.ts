@@ -1,7 +1,10 @@
+import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
 import { cloneDeep } from "es-toolkit";
 
 import { HashGraph } from "./hashgraph/index.js";
+
+const metrics = new OpentelemetryMetrics("@ts-drp/object/states");
 
 /**
  * A custom error class for when a state is not found
@@ -87,9 +90,22 @@ export class DRPObjectStateManager<T extends IDRP> {
 	/**
 	 * Get the DRP and ACL for a given hash
 	 * @param hash - The hash of the state to get
+	 * @param replayDepth
 	 * @returns The DRP and ACL for the given hash
 	 */
-	fromHash(hash: Hash): [T | undefined, IACL] {
+	fromHash(hash: Hash, replayDepth = 0): [T | undefined, IACL] {
+		if (!isTracingEnabled()) return this.fromHashUntraced(hash);
+
+		return metrics.traceFunc(
+			"states.fromHash",
+			(candidateHash: Hash) => this.fromHashUntraced(candidateHash),
+			(span) => {
+				span.setAttribute("drp.replay.depth", replayDepth);
+			}
+		)(hash);
+	}
+
+	private fromHashUntraced(hash: Hash): [T | undefined, IACL] {
 		if (!this.aclConstructor) {
 			throw new Error("ACL constructor not set");
 		}
@@ -100,6 +116,17 @@ export class DRPObjectStateManager<T extends IDRP> {
 			throw new StateNotFoundError(`State ${hash} not found`);
 		}
 
+		return this.fromStates(drpState, aclState);
+	}
+
+	/**
+	 * Reconstruct an object pair from explicit snapshots. Checkpoints use this
+	 * because a merged frontier state does not necessarily belong to one hash.
+	 * @param drpState - DRP snapshot at the causal cut
+	 * @param aclState - ACL snapshot at the causal cut
+	 * @returns Reconstructed DRP and ACL instances
+	 */
+	fromStates(drpState: DRPState, aclState: DRPState): [T | undefined, IACL] {
 		const acl = Object.create(this.aclConstructor.prototype);
 		this.applyState(acl, aclState);
 
@@ -113,6 +140,20 @@ export class DRPObjectStateManager<T extends IDRP> {
 	}
 
 	/**
+	 * Retain only snapshots that can still seed incremental replay or are in the
+	 * current replay suffix.
+	 * @param hashes - Snapshot hashes to retain
+	 */
+	prune(hashes: ReadonlySet<Hash>): void {
+		for (const hash of this.drpStates.keys()) {
+			if (!hashes.has(hash)) this.drpStates.delete(hash);
+		}
+		for (const hash of this.aclStates.keys()) {
+			if (!hashes.has(hash)) this.aclStates.delete(hash);
+		}
+	}
+
+	/**
 	 * Get the ACL for a given hash
 	 * @param hash - The hash of the state to get
 	 * @returns The ACL for the given hash
@@ -122,7 +163,9 @@ export class DRPObjectStateManager<T extends IDRP> {
 		if (!state) {
 			throw new StateNotFoundError(`State ${hash} not found`);
 		}
-		return Object.create(this.aclConstructor.prototype);
+		const acl = Object.create(this.aclConstructor.prototype);
+		this.applyState(acl, state);
+		return acl;
 	}
 
 	private applyState(instance: T | IACL, state: DRPState): void {

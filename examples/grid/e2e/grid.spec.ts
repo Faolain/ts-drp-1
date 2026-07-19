@@ -6,6 +6,8 @@ const peersSelector = "#peers";
 const peerIdSelector = "#peerIdExpanded";
 const DRPIdInputSelector = "#gridInput";
 const joinGridButtonSelector = "#joinGrid";
+const createGridButtonSelector = "#createGrid";
+const gridIdSelector = "#gridId";
 const objectPeersSelector = "#objectPeers";
 
 /**
@@ -171,5 +173,31 @@ test.describe("grid", () => {
 		const glowingPeer1 = await getGlowingPeer(page1, peerID1);
 		const glowingPeer2 = await getGlowingPeer(page1, peerID2);
 		expect(Math.abs(glowingPeer1.top - glowingPeer2.top)).toBe(100);
+	});
+
+	test("create then join preserves the creator's dot and later moves", async () => {
+		const peerID1 = await getPeerID(page1);
+
+		await page1.click(createGridButtonSelector);
+		await expect(page1.locator(gridIdSelector)).not.toBeEmpty({ timeout: 10000 });
+		const gridId = (await page1.locator(gridIdSelector).textContent())?.trim();
+		if (!gridId) throw new Error("created grid id is not defined");
+
+		await page2.fill(DRPIdInputSelector, gridId);
+		await page2.click(joinGridButtonSelector);
+		await expect(page2.locator(DRPIdInputSelector)).toHaveValue(gridId);
+
+		await page1.keyboard.press("w");
+		await page1.keyboard.press("d");
+
+		const creatorDot = page2.locator(`div[data-glowing-peer-id="${peerID1}"]`);
+		await expect(creatorDot).toBeVisible({ timeout: 10000 });
+		await expect(creatorDot).toHaveAttribute("style", /left: [0-9]+px; top: [0-9]+px;/);
+		const firstPosition = await getGlowingPeer(page2, peerID1);
+
+		await page1.keyboard.press("d");
+		await expect
+			.poll(async () => (await getGlowingPeer(page2, peerID1)).left, { timeout: 10000 })
+			.toBe(firstPosition.left + 50);
 	});
 });

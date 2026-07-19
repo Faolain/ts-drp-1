@@ -94,6 +94,20 @@ describe("Drp Object should be able to change state value", () => {
 	});
 });
 
+describe("No-op local operations", () => {
+	test("does not add a vertex when a MapDRP set preserves the existing value", () => {
+		const drp = new MapDRP<string, number>();
+		drp.set("same", 1);
+		const object = new DRPObject({ peerId: "peer1", acl, drp });
+
+		expect(object.vertices).toHaveLength(1);
+		object.drp?.set("same", 1);
+
+		expect(object.drp?.query_get("same")).toBe(1);
+		expect(object.vertices).toHaveLength(1);
+	});
+});
+
 describe("Test for duplicate call issue", () => {
 	let counter = 0;
 
@@ -153,6 +167,7 @@ describe("Merging vertices tests", () => {
 		expect(await obj2.merge([vertex])).toEqual([
 			false,
 			["e5ef52c6186abe51635619df8bc8676c19f5a6519e40f47072683437255f026a"],
+			[],
 		]);
 	});
 });
@@ -190,6 +205,7 @@ describe("Merging vertices tests", () => {
 		expect(await obj2.applyVertices([vertex3])).toEqual({
 			applied: false,
 			missing: ["e5ef52c6186abe51635619df8bc8676c19f5a6519e40f47072683437255f026a"],
+			invalid: [],
 		});
 	});
 });
@@ -486,9 +502,9 @@ describe("ACL admin permission tests", () => {
 		obj2.acl.grant("peer3", ACLGroup.Writer);
 		expect(obj2.acl.query_isWriter("peer3")).toBe(true);
 
-		await obj1.merge(obj2.vertices);
+		await expect(obj1.merge(obj2.vertices)).rejects.toThrow("Only admin peers can grant permissions.");
 		expect(obj1.acl.query_isWriter("peer3")).toBe(false);
-		await obj3.merge(obj2.vertices);
+		await expect(obj3.merge(obj2.vertices)).rejects.toThrow("Only admin peers can grant permissions.");
 		expect(obj3.acl.query_isWriter("peer3")).toBe(false);
 	});
 
@@ -506,7 +522,7 @@ describe("ACL admin permission tests", () => {
 		obj2.acl.revoke("peer3", ACLGroup.Writer);
 		expect(obj2.acl.query_isWriter("peer3")).toBe(false);
 
-		await obj3.merge(obj2.vertices);
+		await expect(obj3.merge(obj2.vertices)).rejects.toThrow("Only admin peers can revoke permissions.");
 		expect(obj3.acl.query_isWriter("peer3")).toBe(true);
 	});
 

@@ -1,6 +1,11 @@
 import { SetDRP } from "@ts-drp/blueprints";
 import { DrpType, Operation } from "@ts-drp/types";
-import { InvalidDependenciesError, InvalidTimestampError, validateVertex } from "@ts-drp/validation";
+import {
+	DRP_VERTEX_FUTURE_TOLERANCE_MS,
+	InvalidDependenciesError,
+	InvalidTimestampError,
+	validateVertex,
+} from "@ts-drp/validation";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { createACL, createVertex, DRPObject } from "../src/index.js";
@@ -63,7 +68,9 @@ describe("Vertex validation tests", () => {
 		);
 		expect(validateVertex(vertex, obj1["hashGraph"], Date.now())).toStrictEqual({
 			success: false,
-			error: new InvalidTimestampError(`Vertex ${vertex.hash} has invalid timestamp Infinity - 0 = Infinity > 100`),
+			error: new InvalidTimestampError(
+				`Vertex ${vertex.hash} has invalid timestamp Infinity - 0 = Infinity > ${DRP_VERTEX_FUTURE_TOLERANCE_MS}`
+			),
 		});
 	});
 
@@ -80,7 +87,7 @@ describe("Vertex validation tests", () => {
 		const drp2 = obj2.drp as SetDRP<number>;
 		const drp3 = obj2.drp as SetDRP<number>;
 
-		vi.advanceTimersByTime(1000);
+		vi.advanceTimersByTime(DRP_VERTEX_FUTURE_TOLERANCE_MS + 2);
 		drp1.add(1);
 		drp2.add(2);
 		drp3.add(3);
@@ -97,7 +104,9 @@ describe("Vertex validation tests", () => {
 		);
 		expect(validateVertex(vertex, obj1["hashGraph"], Date.now())).toStrictEqual({
 			success: false,
-			error: new InvalidTimestampError(`Vertex ${vertex.hash} has invalid timestamp 1000 - 1 = 999 > 100`),
+			error: new InvalidTimestampError(
+				`Vertex ${vertex.hash} has invalid timestamp ${DRP_VERTEX_FUTURE_TOLERANCE_MS + 2} - 1 = ${DRP_VERTEX_FUTURE_TOLERANCE_MS + 1} > ${DRP_VERTEX_FUTURE_TOLERANCE_MS}`
+			),
 		});
 	});
 });

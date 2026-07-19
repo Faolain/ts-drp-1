@@ -1,0 +1,58 @@
+diff --git a/dist/src/muxer.js b/dist/src/muxer.js
+index 9b2a11f62b7a70c13fb73f87fe86e9837a592fc1..76b7a44dd67f5b1995d0bc682ea697f793fdef71 100644
+--- a/dist/src/muxer.js
++++ b/dist/src/muxer.js
+@@ -20,7 +20,17 @@ export class DataChannelMuxerFactory {
+         this.earlyDataChannels = [];
+     }
+     onEarlyDataChannel(evt) {
+-        this.earlyDataChannels.push(evt.channel);
++        // backport of libp2p/js-libp2p#3576: buffer incoming messages until the
++        // muxer adopts the channel, otherwise data sent by the remote before the
++        // connection upgrade completes is silently dropped
++        const early = {
++            channel: evt.channel,
++            messages: []
++        };
++        evt.channel.onmessage = (messageEvent) => {
++            early.messages.push(messageEvent);
++        };
++        this.earlyDataChannels.push(early);
+     }
+     createStreamMuxer(maConn) {
+         this.peerConnection.removeEventListener('datachannel', this.onEarlyDataChannel);
+@@ -58,17 +68,17 @@ export class DataChannelMuxer extends AbstractStreamMuxer {
+         };
+         queueMicrotask(() => {
+             if (this.status !== 'open') {
+-                init.earlyDataChannels.forEach(channel => {
++                init.earlyDataChannels.forEach(({ channel }) => {
+                     channel.close();
+                 });
+                 return;
+             }
+-            init.earlyDataChannels.forEach(channel => {
+-                this.onDataChannel(channel);
++            init.earlyDataChannels.forEach(({ channel, messages }) => {
++                this.onDataChannel(channel, messages);
+             });
+         });
+     }
+-    onDataChannel(channel) {
++    onDataChannel(channel, earlyMessages) {
+         this.log('incoming datachannel with channel id %d, protocol %s and status %s', channel.id, channel.protocol, channel.readyState);
+         // 'init' channel is only used during connection establishment, it is
+         // closed by the initiator
+@@ -84,6 +94,12 @@ export class DataChannelMuxer extends AbstractStreamMuxer {
+             direction: 'inbound',
+             log: this.log
+         });
++        // replay any messages that arrived before the muxer was created - the
++        // stream has just attached its message handler so this preserves
++        // ordering with any messages that arrive later
++        earlyMessages?.forEach(messageEvent => {
++            channel.onmessage?.(messageEvent);
++        });
+         this.onRemoteStream(stream);
+     }
+     async onCreateStream(options) {

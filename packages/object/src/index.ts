@@ -1,5 +1,4 @@
-import { sha256 } from "@noble/hashes/sha256";
-import { bytesToHex } from "@noble/hashes/utils";
+import { bytesToHex, randomBytes } from "@noble/hashes/utils";
 import { Logger } from "@ts-drp/logger";
 import {
 	type ApplyResult,
@@ -24,14 +23,49 @@ import { type DRPObjectStateManager } from "./state.js";
 export * from "./acl/index.js";
 export * from "./hashgraph/index.js";
 
+/**
+ * Object ids are creator-bound: `<creatorPeerId>:<randomHexSalt>`.
+ *
+ * The prefix commits the id to the peer that created the object, so every
+ * replica can derive the identical genesis ACL (the creator as sole admin and
+ * finality signer) locally from the id alone, with zero network trust. The
+ * salt keeps independently created objects distinct. libp2p peer ids are
+ * base58btc/base32 strings and never contain the separator, so the creator is
+ * recovered unambiguously as the prefix before the last separator.
+ */
+const OBJECT_ID_SEPARATOR = ":";
+const OBJECT_ID_SALT_BYTES = 16;
+
 function defaultIDFromPeerID(peerId: string): string {
-	return bytesToHex(
-		sha256
-			.create()
-			.update(peerId)
-			.update(Math.floor(Math.random() * Number.MAX_VALUE).toString())
-			.digest()
-	);
+	return `${peerId}${OBJECT_ID_SEPARATOR}${bytesToHex(randomBytes(OBJECT_ID_SALT_BYTES))}`;
+}
+
+/**
+ * Recover the creator peer id committed into a creator-bound object id.
+ * @param id - The object id.
+ * @returns The creator peer id, or undefined when the id carries no creator commitment.
+ */
+export function creatorFromObjectID(id: string): string | undefined {
+	const separatorIndex = id.lastIndexOf(OBJECT_ID_SEPARATOR);
+	if (separatorIndex <= 0) return undefined;
+	return id.slice(0, separatorIndex);
+}
+
+/**
+ * Derive the genesis ACL every replica computes locally.
+ *
+ * Creators (no id supplied) start as their own sole admin and finality signer.
+ * Joiners (known id) recover the creator from the id and derive the identical
+ * genesis. A malformed id without a creator commitment fails safe: the genesis
+ * grants authority to nobody, and no network message can ever install one.
+ * @param peerId - The local peer id.
+ * @param id - The known object id, if joining.
+ * @returns The locally derived genesis ACL.
+ */
+function genesisACL(peerId: string, id: string | undefined): IACL {
+	if (id === undefined) return createPermissionlessACL(peerId);
+	const creator = creatorFromObjectID(id);
+	return creator === undefined ? createPermissionlessACL() : createPermissionlessACL(creator);
 }
 
 /**
@@ -40,7 +74,7 @@ function defaultIDFromPeerID(peerId: string): string {
  * @returns The DRPObject.
  */
 export function createObject<T extends IDRP>(options: CreateObjectOptions<T>): IDRPObject<T> {
-	const acl = createPermissionlessACL();
+	const acl = createPermissionlessACL(options.peerId);
 
 	const object = new DRPObject<T>({ ...options, config: { log_config: options.log_config }, acl });
 	return object;
@@ -70,14 +104,15 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @param options.drp - The DRP of the DRPObject.
 	 * @param options.config - The config of the DRPObject.
 	 */
-	constructor({
-		peerId,
-		id = defaultIDFromPeerID(peerId),
-		acl = createPermissionlessACL(peerId),
-		drp,
-		config,
-		//metrics,
-	}: DRPObjectOptions<T>) {
+	constructor(options: DRPObjectOptions<T>) {
+		const {
+			peerId,
+			id = defaultIDFromPeerID(peerId),
+			acl = genesisACL(peerId, options.id),
+			drp,
+			config,
+			//metrics,
+		} = options;
 		this.id = id;
 		this.log = new Logger(`drp::object::${this.id}`, config?.log_config);
 
@@ -85,7 +120,10 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			peerId,
 			acl.resolveConflicts?.bind(acl),
 			drp?.resolveConflicts?.bind(drp),
-			drp?.semanticsType
+			// DRP-less replicas must still linearize ACL history: without a
+			// semantics type the hashgraph refuses to linearize and remotely
+			// merged ACL vertices would never replay into the live ACL.
+			drp?.semanticsType ?? acl.semanticsType
 		);
 
 		this._finalityStore = new FinalityStore(config?.finality_config, config?.log_config);
@@ -147,6 +185,11 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @param aclState - The ACL state of the vertex.
 	 */
 	setACLState(vertexHash: string, aclState: DRPState): void {
+		if (vertexHash === HashGraph.rootHash) {
+			// Genesis authority is derived locally from the creator-bound object id
+			// and is never adopted from the network or overwritten after creation.
+			throw new Error("Refusing to overwrite the root ACL state: genesis is derived from the object id");
+		}
 		this._states.setACLState(vertexHash, aclState);
 	}
 
@@ -172,11 +215,17 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @deprecated Use applyVertices instead
 	 * Merges a list of vertices to the DRPObject.
 	 * @param vertices - The vertices to merge.
+	 * @param rootACLState - Rejected. Root ACL adoption was removed: genesis is derived from the object id.
 	 * @returns The result of the merge.
 	 */
-	async merge(vertices: Vertex[]): Promise<MergeResult> {
-		const { applied, missing } = await this._applier.applyVertices(vertices);
-		return [applied, missing];
+	async merge(vertices: Vertex[], rootACLState?: DRPState): Promise<MergeResult> {
+		if (rootACLState !== undefined) {
+			// Genesis authority is derived locally from the creator-bound object id;
+			// a root ACL supplied through sync is an attempted authority takeover.
+			throw new Error("Refusing to adopt a root ACL from the network: genesis is derived from the object id");
+		}
+		const { applied, missing, invalid } = await this._applier.applyVertices(vertices);
+		return [applied, missing, invalid];
 	}
 
 	/**
