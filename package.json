@@ -98,6 +98,9 @@
 			"node-datachannel",
 			"pprof",
 			"protobufjs"
-		]
+		],
+		"patchedDependencies": {
+			"@libp2p/webrtc@6.0.26": "patches/@libp2p__webrtc@6.0.26.patch"
+		}
 	}
 }
