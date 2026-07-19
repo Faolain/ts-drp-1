@@ -25,3 +25,5 @@ for (let i = 0; i < VERTICES; i++) {
 		object.drp?.delete(i);
 	}
 }
+
+process.stdout.write(`MAX_RSS_KB=${process.resourceUsage().maxRSS}\n`);

@@ -102,6 +102,7 @@ async function runNode(): Promise<void> {
 
 	setTimeout(() => {
 		runner.stop();
+		process.stdout.write(`MAX_RSS_KB=${process.resourceUsage().maxRSS}\n`);
 		process.exit(0);
 	}, stop_time - 10000);
 }

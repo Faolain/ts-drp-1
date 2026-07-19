@@ -5,7 +5,7 @@ import Benchmark from "benchmark";
 function createNestedObject(depth: number, breadth: number): any {
 	if (depth <= 0) {
 		return {
-			num: Math.random(),
+			num: 42.5,
 			str: "test",
 			date: new Date(),
 			set: new Set([1, 2, 3]),
@@ -26,65 +26,34 @@ function createNestedObject(depth: number, breadth: number): any {
 
 const suite = new Benchmark.Suite();
 function benchmarkSerializeValue(depth: number, breadth: number): Benchmark.Suite {
+	const deepObject = createNestedObject(depth, breadth);
+	for (let i = 0; i < 3; i++) {
+		serializeValue(deepObject);
+	}
+
 	return suite.add(`Serialize ${depth} depth ${breadth} breadth`, () => {
-		// Create a deeply nested structure
-		// Create test data with depth=5 and breadth=3
-		// This creates 3^5 = 243 leaf nodes, each with 7 complex properties
-		const deepObject = createNestedObject(depth, breadth);
-		// Warm up
-		for (let i = 0; i < 3; i++) {
-			serializeValue(deepObject);
-		}
-		// Benchmark
+		// A depth-5, breadth-5 object contains 5^5 = 3,125 leaf nodes.
 		const iterations = 100;
-		//const start = performance.now();
 		for (let i = 0; i < iterations; i++) {
 			serializeValue(deepObject);
 		}
-		//const end = performance.now();
-		//const avgMs = (end - start) / iterations;
-		//const leaf = Math.pow(depth, breadth);
-		//	console.log(`Average serialization time: ${avgMs.toFixed(2)}ms`);
-		//	console.log(`Object stats:
-		//		- Depth: ${depth}
-		//		- Breadth: ${breadth}
-		//		- Leaf nodes: ${leaf}
-		//		- Complex properties per leaf: 7
-		//		- Total complex values: ${leaf * 7}
-		// `);
 	});
 }
 
 benchmarkSerializeValue(5, 5);
 
 function benchmarkDeserializeValue(depth: number, breadth: number): Benchmark.Suite {
+	const deepObject = createNestedObject(depth, breadth);
+	const serialized = serializeValue(deepObject);
+	for (let i = 0; i < 3; i++) {
+		deserializeValue(serialized);
+	}
+
 	return suite.add(`Deserialize ${depth} depth ${breadth} breadth`, () => {
-		// Create a deeply nested structure
-		// Create test data with depth=5 and breadth=3
-		// This creates 3^5 = 243 leaf nodes, each with 7 complex properties
-		const deepObject = createNestedObject(depth, breadth);
-		const serialized = serializeValue(deepObject);
-		// Warm up
-		for (let i = 0; i < 3; i++) {
-			deserializeValue(serialized);
-		}
-		// Benchmark
 		const iterations = 100;
-		//const start = performance.now();
 		for (let i = 0; i < iterations; i++) {
 			deserializeValue(serialized);
 		}
-		//	const end = performance.now();
-		//	const avgMs = (end - start) / iterations;
-		//	const leaf = Math.pow(depth, breadth);
-		//	console.log(`Average deserialization time: ${avgMs.toFixed(2)}ms`);
-		//	console.log(`Object stats:
-		//		- Depth: ${depth}
-		//		- Breadth: ${breadth}
-		//		- Leaf nodes: ${leaf}
-		//		- Complex properties per leaf: 7
-		//		- Total complex values: ${leaf * 7}
-		// `);
 	});
 }
 

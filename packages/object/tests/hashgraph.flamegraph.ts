@@ -1,25 +1,22 @@
 import { SetDRP } from "@ts-drp/blueprints";
-import { ACLGroup } from "@ts-drp/types/dist/src/acl.js";
-import fs from "fs";
+import { writeFile } from "fs/promises";
 import * as pprof from "pprof";
 
 import { createACL, DRPObject } from "../src/index.js";
 
-const acl = createACL({ admins: ["peer1_0"] });
 type DRPManipulationStrategy = (drp: SetDRP<number>, value: number) => void;
 
 const createWithStrategy = (
-	nPID: number,
+	peerId: string,
+	admins: string[],
 	verticesPerDRP: number,
 	strategy: DRPManipulationStrategy
 ): DRPObject<SetDRP<number>> => {
-	const peerId = `peer1_${nPID}`;
 	const obj = new DRPObject({
 		peerId,
-		acl,
+		acl: createACL({ admins }),
 		drp: new SetDRP<number>(),
 	});
-	obj.acl.grant(peerId, ACLGroup.Writer);
 
 	if (!obj.drp) throw new Error("DRP is undefined");
 
@@ -42,8 +39,9 @@ const manipulationStrategies: DRPManipulationStrategy[] = [
 ];
 
 function createDRPObjects(numDRPs: number, verticesPerDRP: number): DRPObject<SetDRP<number>>[] {
-	return Array.from({ length: numDRPs }, (_, peerId) =>
-		createWithStrategy(peerId, verticesPerDRP, manipulationStrategies[peerId % 3])
+	const admins = Array.from({ length: numDRPs }, (_, peerIndex) => `peer1_${peerIndex}`);
+	return admins.map((peerId, peerIndex) =>
+		createWithStrategy(peerId, admins, verticesPerDRP, manipulationStrategies[peerIndex % 3])
 	);
 }
 
@@ -57,7 +55,12 @@ async function mergeObjects(objects: DRPObject<SetDRP<number>>[]): Promise<void>
 	}
 }
 
-async function flamegraphForSetDRP(numDRPs: number, verticesPerDRP: number, mergeFn: boolean): Promise<void> {
+async function flamegraphForSetDRP(
+	numDRPs: number,
+	verticesPerDRP: number,
+	mergeFn: boolean,
+	outputPath: string
+): Promise<void> {
 	console.log("start to profile >>>");
 	const stopFn = pprof.time.start();
 	const objects = createDRPObjects(numDRPs, verticesPerDRP);
@@ -68,12 +71,29 @@ async function flamegraphForSetDRP(numDRPs: number, verticesPerDRP: number, merg
 
 	const profile = stopFn();
 	const buf = await pprof.encode(profile);
-	fs.writeFile("flamegraph.pprof", buf, (err) => {
-		if (err) {
-			throw err;
-		}
-	});
-	console.log("<<< finished to profile");
+	await writeFile(outputPath, buf);
+	console.log(`<<< finished profiling ${numDRPs} DRP object(s) × ${verticesPerDRP} vertices to ${outputPath}`);
 }
 
-flamegraphForSetDRP(1, 1000, false).catch(console.error);
+function positiveInteger(value: string | undefined, fallback: number, name: string): number {
+	const parsed = Number.parseInt(value ?? "", 10);
+	if (Number.isNaN(parsed)) return fallback;
+	if (parsed <= 0) throw new Error(`${name} must be a positive integer`);
+	return parsed;
+}
+
+const profileArgs = process.argv.slice(2);
+if (profileArgs[0] === "--") profileArgs.shift();
+const [numDRPsArg, verticesPerDRPArg, mergeArg, outputPath = "flamegraph.pprof"] = profileArgs;
+const numDRPs = positiveInteger(numDRPsArg, 1, "numDRPs");
+const verticesPerDRP = positiveInteger(verticesPerDRPArg, 1000, "verticesPerDRP");
+const mergeFn = mergeArg === undefined ? false : mergeArg === "true";
+
+if (mergeArg !== undefined && mergeArg !== "true" && mergeArg !== "false") {
+	throw new Error("merge must be either true or false");
+}
+
+flamegraphForSetDRP(numDRPs, verticesPerDRP, mergeFn, outputPath).catch((error: unknown) => {
+	console.error(error);
+	process.exitCode = 1;
+});

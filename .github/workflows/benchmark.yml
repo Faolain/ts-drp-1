@@ -1,76 +1,105 @@
-name: Benchmark
+name: Object Performance
 on:
   push:
     branches: [main]
+    paths:
+      - ".github/workflows/benchmark.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "packages/blueprints/**"
+      - "packages/logger/**"
+      - "packages/object/**"
+      - "packages/tracer/**"
+      - "packages/types/**"
+      - "packages/utils/**"
+      - "packages/validation/**"
   pull_request:
     branches: [main]
+    paths:
+      - ".github/workflows/benchmark.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "packages/blueprints/**"
+      - "packages/logger/**"
+      - "packages/object/**"
+      - "packages/tracer/**"
+      - "packages/types/**"
+      - "packages/utils/**"
+      - "packages/validation/**"
+  workflow_dispatch:
 
 permissions:
-  pages: write
-  id-token: write
-  contents: write
+  contents: read
+
+concurrency:
+  group: object-performance-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  benchmark:
-    name: Run benchmark
+  object-throughput:
+    name: Object throughput (report only)
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
-      - shell: bash
-        run: |
-          pnpm install --no-frozen-lockfile
+          version: 10.24.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
 
-      - shell: bash
-        run: |
-          cd packages/object
-          pnpm run benchmark
+      - run: pnpm install --frozen-lockfile
 
-      - shell: bash
-        run: |
-          cd packages/node
-          pnpm run benchmark
-
-      - name: Restore cached benchmark data
-        id: restore-benchmark-data
+      - name: Restore object benchmark baseline
         uses: actions/cache/restore@v4
         with:
-          key: ${{ runner.os }}-benchmark-${{ github.run_id }}
-          path: ./cache
+          key: ${{ runner.os }}-object-throughput-${{ github.run_id }}
+          path: ./cache/object-throughput
           restore-keys: |
-            ${{ runner.os }}-benchmark-
+            ${{ runner.os }}-object-throughput-
 
-      - name: Store benchmark result
+      - name: Run bounded object benchmarks
+        run: |
+          set -o pipefail
+          timeout 3m pnpm --dir packages/object run benchmark:throughput | tee object-throughput.txt
+
+      - name: Run performance invariants
+        run: >-
+          RUN_PERFORMANCE_TESTS=true
+          pnpm exec vitest --run
+          packages/object/tests/incremental-linearize.test.ts
+          --coverage.enabled=false
+
+      - name: Compare object benchmark results
         uses: benchmark-action/github-action-benchmark@v1
         with:
-          name: Benchmark.js Benchmark
-          tool: "benchmarkjs"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          output-file-path: packages/benchmark-output.txt
+          name: Object throughput
+          tool: benchmarkjs
+          output-file-path: object-throughput.txt
+          external-data-json-path: ./cache/object-throughput/benchmark-data.json
+          save-data-file: ${{ github.event_name != 'pull_request' }}
           alert-threshold: "130%"
-          fail-on-alert: ${{ github.event_name != 'push' }}
-          comment-on-alert: ${{ github.event_name == 'push' }}
+          fail-on-alert: false
           summary-always: true
-          gh-pages-branch: main
-          skip-fetch-gh-pages: ${{ github.event_name == 'push' }}
-          benchmark-data-dir-path: ./cache/benchmarks
 
-      - name: Store benchmark data
-        uses: actions/cache/save@v4
+      - name: Save object benchmark baseline
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
         with:
-          key: ${{ steps.restore-benchmark-data.outputs.cache-primary-key }}
-          path: ./cache
+          key: ${{ runner.os }}-object-throughput-${{ github.run_id }}
+          path: ./cache/object-throughput
 
-  docs:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    name: Release docs
-    permissions:
-      pages: write
-      id-token: write
-    needs:
-      - benchmark
-    uses: ./.github/workflows/docs.yml
+      - name: Upload raw object benchmark output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: object-throughput
+          path: object-throughput.txt
+          if-no-files-found: warn
+          retention-days: 14
