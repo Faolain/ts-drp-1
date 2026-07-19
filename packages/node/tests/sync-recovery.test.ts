@@ -18,7 +18,7 @@ import {
 } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { handleMessage, SYNC_RECOVERY_COOLDOWN_MS } from "../src/handlers.js";
+import { handleMessage, signGeneratedVertices, SYNC_RECOVERY_COOLDOWN_MS } from "../src/handlers.js";
 import { DRPNode } from "../src/index.js";
 
 class CounterDRP implements IDRP {
@@ -71,6 +71,12 @@ async function makeIncompleteAccept(sender: DRPNode, objectId: string): Promise<
 	const object = await sender.createObject({ id: objectId, drp: new CounterDRP() });
 	object.drp?.increment();
 	object.drp?.increment();
+
+	// The genuine SYNC_ACCEPT flow signs vertices before sending them
+	// (syncHandler/syncAcceptHandler await signGeneratedVertices). `increment`
+	// signs asynchronously, so sign explicitly here to mirror the wire fixture;
+	// otherwise the receiver rejects unsigned vertices at authentication.
+	await signGeneratedVertices(sender, object.vertices);
 
 	const leaf = object.vertices.at(-1);
 	if (!leaf || leaf.dependencies.length === 0) {

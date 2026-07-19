@@ -3,7 +3,6 @@ import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { sha256 } from "@noble/hashes/sha2";
 import { Signature } from "@noble/secp256k1";
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
-import { HashGraph } from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type AggregatedAttestation,
@@ -22,7 +21,7 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { isPromise } from "@ts-drp/utils";
-import { deserializeDRPState, serializeDRPState } from "@ts-drp/utils/serialization";
+import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { MessageSchema } from "@ts-drp/validation/message";
 
 import { type DRPNode } from "./index.js";
@@ -194,33 +193,20 @@ function fetchStateResponseHandler({ node, message }: HandleParams): ReturnType<
 		return;
 	}
 
-	try {
-		const aclState = deserializeDRPState(fetchStateResponse.aclState);
-		const drpState = deserializeDRPState(fetchStateResponse.drpState);
-		if (fetchStateResponse.vertexHash === HashGraph.rootHash) {
-			const state = aclState;
-			object.setACLState(fetchStateResponse.vertexHash, state);
-			for (const e of state.state) {
-				object.acl[e.key] = e.value;
-			}
-			node.put(object.id, object);
-			return;
-		}
-
-		if (fetchStateResponse.aclState) {
-			object.setACLState(fetchStateResponse.vertexHash, aclState);
-		}
-		if (fetchStateResponse.drpState) {
-			object.setDRPState(fetchStateResponse.vertexHash, drpState);
-		}
-	} finally {
-		node.safeDispatchEvent(NodeEventName.DRP_FETCH_STATE_RESPONSE, {
-			detail: {
-				id: object.id,
-				fetchStateResponse,
-			},
-		});
-	}
+	// Network-provided ACL/DRP state snapshots are never adopted. Under id-binding,
+	// authority and DRP state are derived locally by applying signed vertices, never
+	// copied from an unauthenticated, unsolicited response. Honest `fetchState`
+	// (operations.ts) only ever requests the root hash, so a non-root snapshot
+	// is never legitimate, and a root snapshot would overwrite genesis authority that
+	// is derived from the creator-bound object id. Either way the state is dropped;
+	// convergence still occurs because joiners derive genesis locally and then sync
+	// the signed vertices. The event below only signals that a responder exists.
+	node.safeDispatchEvent(NodeEventName.DRP_FETCH_STATE_RESPONSE, {
+		detail: {
+			id: object.id,
+			fetchStateResponse,
+		},
+	});
 }
 
 function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<IHandlerStrategy> {
@@ -269,20 +255,20 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 		return;
 	}
 
-	let verifiedVertices: Vertex[] = [];
-	if (object.acl.permissionless) {
-		verifiedVertices = updateMessage.vertices;
-	} else {
-		verifiedVertices = verifyACLIncomingVertices(updateMessage.vertices);
-	}
+	const verifiedVertices = authenticateIncomingVertices(object, updateMessage.vertices);
 
 	const [, missing] = await object.merge(verifiedVertices);
 	const presentHashes = new Set(object.vertices.map((vertex) => vertex.hash));
 	const appliedVertices = verifiedVertices.filter((vertex) => presentHashes.has(vertex.hash));
 
 	if (appliedVertices.length !== 0) {
-		// add their signatures
-		object.finalityStore.addSignatures(sender, updateMessage.attestations);
+		// add their signatures — only if the sender is a finality signer on the LIVE
+		// ACL. Mirrors attestationUpdateHandler; without this gate a non-signer could
+		// piggyback forged attestations on an UPDATE and have them counted toward
+		// finality (finality-integrity bypass).
+		if (object.acl.query_isFinalitySigner(sender)) {
+			object.finalityStore.addSignatures(sender, updateMessage.attestations);
+		}
 
 		// add my signatures
 		const attestations = signFinalityVertices(node, object, appliedVertices);
@@ -415,12 +401,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		return;
 	}
 
-	let verifiedVertices: Vertex[] = [];
-	if (object.acl.permissionless) {
-		verifiedVertices = syncAcceptMessage.requested;
-	} else {
-		verifiedVertices = verifyACLIncomingVertices(syncAcceptMessage.requested);
-	}
+	const verifiedVertices = authenticateIncomingVertices(object, syncAcceptMessage.requested);
 
 	const mergeRan = verifiedVertices.length !== 0;
 	let missing: string[] = [];
@@ -432,7 +413,21 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	}
 
 	await signGeneratedVertices(node, object.vertices);
-	signFinalityVertices(node, object, object.vertices);
+	const addedAttestations = signFinalityVertices(node, object, object.vertices);
+	if (addedAttestations.length !== 0) {
+		// Vertices learned through sync must still propagate our finality
+		// signatures; otherwise a sync that front-runs the gossip UPDATE would
+		// strand these attestations on this replica.
+		const attestationUpdate = Message.create({
+			sender: node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
+			data: AttestationUpdate.encode(AttestationUpdate.create({ attestations: addedAttestations })).finish(),
+			objectId: object.id,
+		});
+		node.networkNode.broadcastMessage(object.id, attestationUpdate).catch((e) => {
+			log.error("::syncAcceptHandler: Error broadcasting attestations", e);
+		});
+	}
 
 	if (mergeRan && missing.length === 0) {
 		node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
@@ -597,6 +592,30 @@ function getAttestations<T extends IDRP>(object: IDRPObject<T>, vertices: Vertex
 			.map((v) => object.finalityStore.getAttestation(v.hash))
 			.filter((a): a is AggregatedAttestation => a !== undefined) ?? []
 	);
+}
+
+/**
+ * Authenticate incoming vertices before they are merged.
+ *
+ * Author authentication (the signature must recover to the claimed peerId) is
+ * ALWAYS enforced for EVERY vertex, regardless of `permissionless` and
+ * regardless of DRP-vs-ACL type. Both ACL ops (grant/revoke/setKey, which run
+ * with `context.caller = vertex.peerId` and decide authority) and DRP ops (which
+ * apply with `context.caller = vertex.peerId`, e.g. "move peer X's piece") derive
+ * their effect from the claimed author, so a forgeable author would let any peer
+ * impersonate another. The `permissionless` flag relaxes ONLY the writer-permission
+ * gate — enforced in the ACL layer via `query_isWriter` — never author identity;
+ * a permissionless writer still authors as themselves with a valid signature.
+ * @param _object - The object the vertices are being merged into (unused: identity
+ * authentication is object-independent; kept for a stable call-site signature)
+ * @param incomingVertices - The incoming vertices to authenticate
+ * @returns The vertices that are safe to merge, in their original order
+ */
+export function authenticateIncomingVertices<T extends IDRP>(
+	_object: IDRPObject<T>,
+	incomingVertices: Vertex[]
+): Vertex[] {
+	return verifyACLIncomingVertices(incomingVertices);
 }
 
 /**

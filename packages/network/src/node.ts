@@ -58,6 +58,14 @@ type ConfigurableGossipSub = GossipSub & {
 	streamsOutbound: Map<string, unknown>;
 };
 
+export interface GroupPeerChange {
+	peerId: string;
+	subscribed: boolean;
+	topic: string;
+}
+
+export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
+
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
  * It handles the creation and management of the libp2p node, pubsub, and message queue.
@@ -70,6 +78,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapNodesList: string[];
 	private _bootstrapRetryController?: AbortController;
+	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
 
 	peerId = "";
 
@@ -188,7 +197,23 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 		this._node.addEventListener("peer:identify", (e) => log.info("::start::peer::identify", e.detail));
 
-		this._pubsub.addEventListener("gossipsub:graft", (e) => log.info("::start::gossipsub::graft", e.detail));
+		this._pubsub.addEventListener("subscription-change", (event) => {
+			for (const subscription of event.detail.subscriptions) {
+				this.notifyGroupPeerChange({
+					peerId: event.detail.peerId.toString(),
+					subscribed: subscription.subscribe,
+					topic: subscription.topic,
+				});
+			}
+		});
+		this._pubsub.addEventListener("gossipsub:graft", (event) => {
+			log.info("::start::gossipsub::graft", event.detail);
+			this.notifyGroupPeerChange({
+				peerId: event.detail.peerId,
+				subscribed: true,
+				topic: event.detail.topic,
+			});
+		});
 
 		// needed as I've disabled the pubsubPeerDiscovery
 		this._pubsub?.subscribe(DRP_DISCOVERY_TOPIC);
@@ -597,6 +622,20 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		} catch (e) {
 			log.error("::sendGroupMessageRandomPeer:", e);
 		}
+	}
+
+	/**
+	 * Subscribe to remote group-peer subscription and mesh changes.
+	 * @param handler - Handler invoked when a remote peer appears or disappears on a topic
+	 * @returns A function that removes the handler
+	 */
+	subscribeToGroupPeerChanges(handler: GroupPeerChangeHandler): () => void {
+		this._groupPeerChangeHandlers.add(handler);
+		return () => this._groupPeerChangeHandlers.delete(handler);
+	}
+
+	private notifyGroupPeerChange(change: GroupPeerChange): void {
+		for (const handler of this._groupPeerChangeHandlers) handler(change);
 	}
 
 	private async startEnqueueMessages(): Promise<void> {

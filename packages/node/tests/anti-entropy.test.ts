@@ -6,6 +6,9 @@
  * exchange one SYNC probe, but the receiver must answer with no SYNC_ACCEPT and
  * therefore send no vertices/full-state traffic.
  */
+import { type GossipSub } from "@libp2p/gossipsub";
+import { peerIdFromString } from "@libp2p/peer-id";
+import { createObject } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -157,6 +160,63 @@ describe("periodic anti-entropy", () => {
 			1
 		);
 		nodes.splice(nodes.indexOf(node), 1);
+	}, 20_000);
+
+	test("a joined object derives creator genesis locally and still probes its first peer once", async () => {
+		// Creator-bound id contract: the joiner derives the creator's genesis ACL
+		// from the id alone, so "unsynced" can no longer mean "zero finality
+		// signers" — the creator is a finality signer at genesis. The joiner is
+		// unsynced because it has no non-root history yet, and must still probe
+		// the first peer that appears.
+		const creatorPeerId = "anti-entropy-first-peer-creator";
+		const creatorObject = createObject({ peerId: creatorPeerId, drp: new CounterDRP() });
+		const objectId = creatorObject.id;
+		const node = await makeNode("anti-entropy-first-peer");
+		nodes.push(node);
+		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
+		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
+		vi.useFakeTimers();
+
+		const connecting = node.connectObject({ id: objectId, drp: new CounterDRP() });
+		await vi.advanceTimersByTimeAsync(5_000);
+		const object = await connecting;
+		// Genesis authority exists locally before any peer answered anything.
+		expect(object.acl.query_isFinalitySigner(creatorPeerId)).toBe(true);
+		expect(sendMessage).not.toHaveBeenCalled();
+
+		const firstPeer = node.networkNode.peerId;
+		groupPeers.mockReturnValue([firstPeer]);
+		const pubsub = node.networkNode["_pubsub"] as GossipSub;
+		pubsub.safeDispatchEvent("subscription-change", {
+			detail: {
+				peerId: peerIdFromString(firstPeer),
+				subscriptions: [{ topic: objectId, subscribe: true }],
+			},
+		});
+		await vi.advanceTimersByTimeAsync(0);
+
+		const initialSyncs = sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC);
+		expect(initialSyncs).toHaveLength(1);
+		expect(initialSyncs[0]?.[0]).toBe(firstPeer);
+		expect(initialSyncs[0]?.[1].objectId).toBe(objectId);
+
+		// Once real history has been merged the object is synced; later peers are
+		// left to periodic anti-entropy instead of an immediate probe.
+		creatorObject.drp?.increment();
+		await object.merge(creatorObject.vertices);
+		const secondPeer = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
+		groupPeers.mockReturnValue([firstPeer, secondPeer]);
+		pubsub.safeDispatchEvent("subscription-change", {
+			detail: {
+				peerId: peerIdFromString(secondPeer),
+				subscriptions: [{ topic: objectId, subscribe: true }],
+			},
+		});
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
+			1
+		);
 	}, 20_000);
 
 	test("unsubscribeObject stops and deletes both per-object intervals", async () => {
