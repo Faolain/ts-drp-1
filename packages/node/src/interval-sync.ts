@@ -35,6 +35,7 @@ export class DRPIntervalSync {
 	// faster than the anti-entropy interval itself.
 	private readonly initialSyncRunner?: IntervalRunner;
 	private initialSyncWarmedUp = false;
+	private peerCursor?: number;
 
 	/**
 	 * Current interval runner state.
@@ -108,10 +109,8 @@ export class DRPIntervalSync {
 			return true;
 		}
 		try {
-			const peers = this.node.networkNode.getGroupPeers(this.id);
-			if (peers.length === 0) return true;
-
-			const peer = peers[Math.floor(Math.random() * peers.length)];
+			const peer = this.nextPeer();
+			if (peer === undefined) return true;
 			await this.node.syncObject(this.id, peer);
 		} catch (error) {
 			log.error("::initialSync: Fast retry failed", error);
@@ -121,15 +120,30 @@ export class DRPIntervalSync {
 
 	private async run(): Promise<boolean> {
 		try {
-			const peers = this.node.networkNode.getGroupPeers(this.id);
-			if (peers.length === 0) return true;
-
-			const peer = peers[Math.floor(Math.random() * peers.length)];
+			const peer = this.nextPeer();
+			if (peer === undefined) return true;
 			await this.node.syncObject(this.id, peer);
 		} catch (error) {
 			log.error("::intervalSync: Probe failed", error);
 		}
 		return true;
+	}
+
+	/**
+	 * For a stable membership set, rotate through every peer before repeating
+	 * one. A randomized starting offset prevents nodes created together from
+	 * concentrating each tick on the same lexicographically first peer.
+	 */
+	private nextPeer(): string | undefined {
+		const peers = this.node.networkNode.getGroupPeers(this.id).sort();
+		if (peers.length === 0) return undefined;
+
+		this.peerCursor ??= Math.floor(Math.random() * peers.length);
+		const peer = peers[this.peerCursor % peers.length];
+		// Advance before sending so one unreachable peer cannot stall the cycle;
+		// a failed peer is retried after the remaining peers have been probed.
+		this.peerCursor = (this.peerCursor + 1) % peers.length;
+		return peer;
 	}
 }
 

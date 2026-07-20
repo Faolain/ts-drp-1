@@ -252,6 +252,41 @@ describe("periodic anti-entropy", () => {
 		expect(syncObject).toHaveBeenCalledTimes(2);
 	});
 
+	test("rotates through every peer in a stable membership set before repeating", async () => {
+		const intervalMs = 1_000;
+		const node = await makeNode("anti-entropy-peer-rotation");
+		nodes.push(node);
+		vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue(["peer-c", "peer-a", "peer-b"]);
+		vi.spyOn(Math, "random").mockReturnValue(0.9);
+		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
+		vi.useFakeTimers();
+		const interval = createDRPIntervalSync({ id: "peer-rotation-object", node, interval: intervalMs });
+		intervals.push(interval);
+
+		interval.start();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(intervalMs * 3);
+
+		expect(syncObject.mock.calls.map(([, peer]) => peer)).toEqual(["peer-c", "peer-a", "peer-b", "peer-c"]);
+	});
+
+	test("the default cadence completes a five-node peer cycle in 30 seconds", async () => {
+		const node = await makeNode("anti-entropy-default-peer-cycle");
+		nodes.push(node);
+		vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue(["peer-d", "peer-b", "peer-a", "peer-c"]);
+		vi.spyOn(Math, "random").mockReturnValue(0);
+		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
+		vi.useFakeTimers();
+		const interval = createDRPIntervalSync({ id: "default-peer-cycle-object", node });
+		intervals.push(interval);
+
+		expect(interval.interval).toBe(10_000);
+		interval.start();
+		await vi.advanceTimersByTimeAsync(30_000);
+
+		expect(syncObject.mock.calls.map(([, peer]) => peer)).toEqual(["peer-a", "peer-b", "peer-c", "peer-d"]);
+	});
+
 	test("matching inventories answer a tick probe with no SYNC_ACCEPT traffic", async () => {
 		const objectId = "anti-entropy-equal-frontier-object";
 		const intervalMs = 1_000;

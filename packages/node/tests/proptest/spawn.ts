@@ -55,6 +55,11 @@ export interface Cluster {
 	stop(): Promise<void>;
 }
 
+export interface SpawnClusterOptions {
+	objectId?: string;
+	syncIntervalMs?: number;
+}
+
 export async function waitFor(
 	cond: () => boolean,
 	timeoutMs: number,
@@ -99,9 +104,10 @@ function buildACL(peers: { peerId: string; blsPublicKey: string }[]): IACL {
 
 let spawnCounter = 0;
 
-export async function spawnCluster(n: number, objectId = "proptest-multinode"): Promise<Cluster> {
+export async function spawnCluster(n: number, options: SpawnClusterOptions = {}): Promise<Cluster> {
 	const t0 = performance.now();
 	const silent = { level: "silent" as const };
+	const objectId = options.objectId ?? "proptest-multinode";
 	// unique keychain seeds per cluster: reusing seeds (= reusing libp2p peer
 	// ids) across sequential clusters in one process makes redials flaky
 	const clusterTag = `cluster${spawnCounter++}`;
@@ -127,6 +133,7 @@ export async function spawnCluster(n: number, objectId = "proptest-multinode"): 
 					log_config: silent,
 				},
 				keychain_config: { private_key_seed: `proptest-${clusterTag}-node-${i}` },
+				interval_sync_options: options.syncIntervalMs === undefined ? undefined : { interval: options.syncIntervalMs },
 				log_config: silent,
 			})
 	);

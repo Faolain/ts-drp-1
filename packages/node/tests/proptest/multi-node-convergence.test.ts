@@ -31,12 +31,16 @@ const N = Number(process.env.PROPTEST_NODES ?? 5);
 const ROUNDS = Number(process.env.PROPTEST_ROUNDS ?? 4);
 const SEED = Number(process.env.PROPTEST_SEED ?? 42);
 const CONVERGE_TIMEOUT_MS = 20_000;
+// The production default remains 10s. This real-network convergence test uses
+// an accelerated cadence so two complete five-node peer rotations fit inside
+// its fixed 20s liveness bound even when gossip drops the final leaf updates.
+const SYNC_INTERVAL_MS = 1_000;
 
 describe(`multi-node convergence: ${N} real DRPNodes, ${ROUNDS} rounds (seed=${SEED})`, () => {
 	let cluster: Cluster;
 
 	beforeAll(async () => {
-		cluster = await spawnCluster(N);
+		cluster = await spawnCluster(N, { syncIntervalMs: SYNC_INTERVAL_MS });
 		const t = cluster.timings;
 		console.log(
 			`[spawn] N=${N} total=${t.totalMs.toFixed(0)}ms ` +
