@@ -166,8 +166,8 @@ describe("periodic anti-entropy", () => {
 		// Creator-bound id contract: the joiner derives the creator's genesis ACL
 		// from the id alone, so "unsynced" can no longer mean "zero finality
 		// signers" — the creator is a finality signer at genesis. The joiner is
-		// unsynced because it has no non-root history yet, and must still probe
-		// the first peer that appears.
+		// unsynced because it has no remotely authored history yet, and must
+		// still probe the first peer that appears.
 		const creatorPeerId = "anti-entropy-first-peer-creator";
 		const creatorObject = createObject({ peerId: creatorPeerId, drp: new CounterDRP() });
 		const objectId = creatorObject.id;
@@ -184,6 +184,9 @@ describe("periodic anti-entropy", () => {
 		expect(object.acl.query_isFinalitySigner(creatorPeerId)).toBe(true);
 		expect(sendMessage).not.toHaveBeenCalled();
 
+		// Local history does not prove that synchronization reached a peer and
+		// must not suppress the immediate probe when the first peer appears.
+		object.drp?.increment();
 		const firstPeer = node.networkNode.peerId;
 		groupPeers.mockReturnValue([firstPeer]);
 		const pubsub = node.networkNode["_pubsub"] as GossipSub;

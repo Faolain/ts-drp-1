@@ -1,11 +1,12 @@
 /**
- * Contract: while a subscribed object has no non-root history yet, the node
+ * Contract: while a subscribed object has no remotely authored history yet,
+ * the node
  * must not depend on catching a single gossipsub subscription-change event to
  * perform its first sync. Whenever at least one group peer is present, SYNC is
- * retried on a short interval (INITIAL_SYNC_RETRY_INTERVAL_MS) until the first
- * non-root vertex is merged; afterwards the fast retry stops and periodic
- * anti-entropy remains the only repair path. With no group peers, no SYNC is
- * attempted.
+ * retried on a short interval (INITIAL_SYNC_RETRY_INTERVAL_MS) until remote
+ * history is merged or a bounded retry budget is exhausted; afterwards
+ * periodic anti-entropy remains the repair path. With no group peers, no SYNC
+ * is attempted.
  */
 import { createObject } from "@ts-drp/object";
 import {
@@ -76,6 +77,10 @@ describe("initial fast sync retry", () => {
 		const object = await connecting;
 		sendMessage.mockClear();
 
+		// A local operation after connect() returns must not masquerade as
+		// remotely synchronized history and stop the fast retry.
+		object.drp?.increment();
+
 		// A group peer holding the object is connected, but no subscription-change
 		// event is ever observed: the retry must fire from the interval alone.
 		const peer = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
@@ -89,7 +94,7 @@ describe("initial fast sync retry", () => {
 			expect(message.objectId).toBe(creatorObject.id);
 		}
 
-		// Real history arrives; the object is no longer unsynced, so the fast
+		// Remote history arrives; the object is no longer unsynced, so the fast
 		// retry must stop and leave further repair to periodic anti-entropy.
 		creatorObject.drp?.increment();
 		await object.merge(creatorObject.vertices);
@@ -98,6 +103,43 @@ describe("initial fast sync retry", () => {
 
 		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
 			0
+		);
+	}, 20_000);
+
+	test("an empty remote object exhausts the fast retry budget instead of probing forever", async () => {
+		const creatorObject = createObject({ peerId: "initial-sync-empty-creator", drp: new CounterDRP() });
+		const node = await makeNode("initial-sync-empty-joiner");
+		nodes.push(node);
+		const peer = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
+		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
+		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
+		vi.spyOn(node.networkNode, "sendGroupMessageRandomPeer").mockResolvedValue();
+		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
+		vi.useFakeTimers();
+
+		const connecting = node.connectObject({ id: creatorObject.id, drp: new CounterDRP() });
+		await vi.advanceTimersByTimeAsync(5_000);
+		const object = await connecting;
+		sendMessage.mockClear();
+
+		object.drp?.increment();
+		groupPeers.mockReturnValue([peer]);
+		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 10);
+
+		const attemptsAfterBudget = sendMessage.mock.calls.filter(
+			([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC
+		).length;
+		expect(attemptsAfterBudget).toBe(5);
+
+		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 5);
+		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
+			attemptsAfterBudget
+		);
+
+		// Capping the fast path must not stop the independent periodic repair path.
+		await vi.advanceTimersByTimeAsync(ANTI_ENTROPY_INTERVAL_MS);
+		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
+			attemptsAfterBudget + 1
 		);
 	}, 20_000);
 
