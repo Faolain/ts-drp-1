@@ -38,10 +38,8 @@ export default defineConfig({
 			name: "chromium",
 			use: { ...devices["Desktop Chrome"] },
 		},
-		// for the moment firefox is not working in github actions
-		// https://bugzilla.mozilla.org/show_bug.cgi?id=1659672
-		// https://github.com/libp2p/js-libp2p/issues/2047#issuecomment-2585764533
-		// https://github.com/libp2p/js-libp2p/issues/2572
+		// Firefox passes focused local validation but is not yet part of the
+		// default GitHub Actions matrix. See docs/cross-browser-testing.md.
 		//{
 		//	name: "firefox",
 		//	use: {

@@ -36,6 +36,12 @@ pnpm install
 
 The postinstall script will build all the packages. In case you have errors, please manually build every package inside the folder `packages`.
 
+# Testing
+
+Cross-browser expectations, WebRTC evidence, and test-lifecycle constraints for
+the grid example are documented in
+[Cross-browser grid testing](docs/cross-browser-testing.md).
+
 # Known Issues
 
 - Peers won't be able to connect with each other if either one of them is behind a VPN.
