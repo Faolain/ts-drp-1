@@ -30,17 +30,20 @@ import {
 	DRP_INTERVAL_DISCOVERY_TOPIC,
 	type DRPNetworkNodeConfig,
 	type DRPNetworkNode as DRPNetworkNodeInterface,
+	type GroupPeerChange,
+	type GroupPeerChangeHandler,
 	type IMessageQueueHandler,
 	IntervalRunnerState,
 	Message,
 } from "@ts-drp/types";
-import { createLibp2p, type Libp2p, type ServiceFactoryMap } from "libp2p";
+import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
 import { isBrowser, isWebWorker } from "wherearewe";
 
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
 
 export * from "./stream.js";
+export type { GroupPeerChange, GroupPeerChangeHandler } from "@ts-drp/types";
 
 export const DRP_MESSAGE_PROTOCOL = "/drp/message/0.0.1";
 export const BOOTSTRAP_NODES = [
@@ -58,13 +61,77 @@ type ConfigurableGossipSub = GossipSub & {
 	streamsOutbound: Map<string, unknown>;
 };
 
-export interface GroupPeerChange {
-	peerId: string;
-	subscribed: boolean;
-	topic: string;
+/**
+ * Additive libp2p control-plane modules accepted by the production host
+ * builder. DRP owns the core services and rejects attempts to replace them.
+ */
+export interface DRPNetworkHostExtensions {
+	contentRouters?: NonNullable<Libp2pOptions["contentRouters"]>;
+	peerDiscovery?: NonNullable<Libp2pOptions["peerDiscovery"]>;
+	peerRouters?: NonNullable<Libp2pOptions["peerRouters"]>;
+	services?: ServiceFactoryMap & {
+		autonat?: never;
+		dcutr?: never;
+		identify?: never;
+		identifyPush?: never;
+		ping?: never;
+		pubsub?: never;
+		relay?: never;
+	};
+	transports?: NonNullable<Libp2pOptions["transports"]>;
 }
 
-export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
+export interface DRPNetworkHostFactoryContext {
+	/**
+	 * Build the one host owned by this DRPNetworkNode. Extensions are additive;
+	 * reserved DRP services such as GossipSub cannot be replaced.
+	 */
+	createHost(extensions?: DRPNetworkHostExtensions): Promise<Libp2p>;
+	/**
+	 * Immutable evidence of the production options applied before extensions.
+	 * Control-plane factories can fail closed when an isolation invariant is absent.
+	 */
+	readonly snapshot: DRPNetworkHostConfigSnapshot;
+}
+
+export type DRPNetworkHostFactory = (context: DRPNetworkHostFactoryContext) => Promise<Libp2p>;
+
+type DenyDialMultiaddr = NonNullable<NonNullable<Libp2pOptions["connectionGater"]>["denyDialMultiaddr"]>;
+
+export interface DRPNetworkHostPolicy {
+	/**
+	 * Production defaults to bootstrap discovery. Isolated control planes disable
+	 * it and supply routing-backed discovery through host extensions instead.
+	 */
+	readonly bootstrapDiscovery?: boolean;
+	/**
+	 * Production defaults to cold-start pubsub peer discovery. Isolated control
+	 * planes enable it only after an authenticated rendezvous connection exists.
+	 */
+	readonly coldStartPubsubDiscovery?: boolean;
+	/** Production defaults to GossipSub peer exchange. */
+	readonly gossipSubPeerExchange?: boolean;
+	/** Delegates the real libp2p outbound multiaddr gate to the control plane. */
+	readonly denyDialMultiaddr?: DenyDialMultiaddr;
+}
+
+export interface DRPNetworkHostConfigSnapshot {
+	readonly bootstrapDiscovery: boolean;
+	readonly bootstrapPeerCount: number;
+	readonly coldStartPubsubDiscovery: boolean;
+	readonly gossipSubPeerExchange: boolean;
+	readonly outboundAddressPolicy: "allow-all" | "injected";
+	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
+}
+
+export interface DRPNetworkNodeDependencies {
+	hostFactory?: DRPNetworkHostFactory;
+	hostPolicy?: DRPNetworkHostPolicy;
+}
+
+const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
+
+const defaultHostFactory: DRPNetworkHostFactory = (context) => context.createHost();
 
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
@@ -78,19 +145,24 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapRetryController?: AbortController;
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
+	private readonly _hostFactory: DRPNetworkHostFactory;
+	private readonly _hostPolicy: DRPNetworkHostPolicy;
 
 	peerId = "";
 
 	/**
 	 * Constructor for the DRPNetworkNode class.
 	 * @param config - The configuration for the node.
+	 * @param dependencies - Injectable host construction dependencies
 	 */
-	constructor(config?: DRPNetworkNodeConfig) {
+	constructor(config?: DRPNetworkNodeConfig, dependencies: DRPNetworkNodeDependencies = {}) {
 		if (config?.browser_metrics && !isBrowser && !isWebWorker) {
 			throw new Error("Browser metrics are only supported in a browser or web worker");
 		}
 
 		this._config = config;
+		this._hostFactory = dependencies.hostFactory ?? defaultHostFactory;
+		this._hostPolicy = dependencies.hostPolicy ?? {};
 		log = new Logger("drp::network", config?.log_config);
 		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
 	}
@@ -107,16 +179,22 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			privateKey = privateKeyFromRaw(rawPrivateKey);
 		}
 
-		const _peerDiscovery: Array<PeerDiscoveryFunction> = [
-			pubsubPeerDiscovery({
-				topics: [DRP_DISCOVERY_TOPIC],
-				interval: this._config?.pubsub?.peer_discovery_interval || 5000,
-			}),
-		];
+		const bootstrapDiscovery = this._hostPolicy.bootstrapDiscovery ?? true;
+		const coldStartPubsubDiscovery = this._hostPolicy.coldStartPubsubDiscovery ?? true;
+		const gossipSubPeerExchange = this._hostPolicy.gossipSubPeerExchange ?? true;
+		const _peerDiscovery: Array<PeerDiscoveryFunction> = [];
+		if (coldStartPubsubDiscovery) {
+			_peerDiscovery.push(
+				pubsubPeerDiscovery({
+					topics: [DRP_DISCOVERY_TOPIC],
+					interval: this._config?.pubsub?.peer_discovery_interval || 5000,
+				})
+			);
+		}
 
 		const bootstrapNodes = this.getBootstrapNodes();
 		const _bootstrapPeerID: string[] = [];
-		if (bootstrapNodes.length) {
+		if (bootstrapDiscovery && bootstrapNodes.length) {
 			_peerDiscovery.push(
 				bootstrap({
 					list: bootstrapNodes,
@@ -134,23 +212,30 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			dcutr: dcutr(),
 			identify: identify(),
 			identifyPush: identifyPush(),
-			pubsub: gossipsub(this.getGossipSubConfig(_bootstrapPeerID)),
+			pubsub: gossipsub(this.getGossipSubConfig(_bootstrapPeerID, gossipSubPeerExchange)),
 		};
 
-		if (this._config?.bootstrap) {
+		if (this._config?.bootstrap || this._config?.autonat) {
 			_node_services = { ..._node_services, autonat: autoNAT() };
 		}
 
+		const maxRelayReservations = this._config?.relay?.max_reservations ?? Number.POSITIVE_INFINITY;
+		if (
+			maxRelayReservations !== Number.POSITIVE_INFINITY &&
+			(!Number.isSafeInteger(maxRelayReservations) || maxRelayReservations < 0)
+		) {
+			throw new Error("relay.max_reservations must be a non-negative safe integer");
+		}
 		const _bootstrap_services = {
 			..._node_services,
 			relay: circuitRelayServer({
 				reservations: {
-					maxReservations: Number.POSITIVE_INFINITY,
+					maxReservations: maxRelayReservations,
 				},
 			}),
 		};
 
-		this._node = await createLibp2p({
+		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
 				listen: this._config?.listen_addresses ? this._config.listen_addresses : ["/p2p-circuit", "/webrtc"],
@@ -162,22 +247,73 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			connectionEncrypters: [noise()],
 			connectionGater: {
-				denyDialMultiaddr: () => {
-					return false;
-				},
+				denyDialMultiaddr: this._hostPolicy.denyDialMultiaddr ?? ((): false => false),
 			},
 			metrics: this._config?.browser_metrics ? inspectorMetrics() : undefined,
 			peerDiscovery: _peerDiscovery,
 			services: this._config?.bootstrap ? _bootstrap_services : _node_services,
 			streamMuxers: [yamux()],
 			transports: [circuitRelayTransport(), webRTC(), webSockets()],
+		};
+		const snapshot: DRPNetworkHostConfigSnapshot = Object.freeze({
+			bootstrapDiscovery,
+			bootstrapPeerCount: bootstrapDiscovery ? bootstrapNodes.length : 0,
+			coldStartPubsubDiscovery,
+			gossipSubPeerExchange,
+			outboundAddressPolicy: this._hostPolicy.denyDialMultiaddr === undefined ? "allow-all" : "injected",
+			peerDiscoveryModules: Object.freeze([
+				...(coldStartPubsubDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
+				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
+			]),
 		});
+		let builtHost: Libp2p | undefined;
+		let hostBuild: Promise<Libp2p> | undefined;
+		const createHost = async (extensions: DRPNetworkHostExtensions = {}): Promise<Libp2p> => {
+			if (hostBuild) throw new Error("DRP network host factory may build only one host per start");
+			for (const serviceName of Object.keys(extensions.services ?? {})) {
+				if (CORE_SERVICE_NAMES.has(serviceName)) {
+					throw new Error(`DRP network host extension cannot replace reserved service "${serviceName}"`);
+				}
+			}
+			hostBuild = createLibp2p({
+				...baseOptions,
+				contentRouters: [...(baseOptions.contentRouters ?? []), ...(extensions.contentRouters ?? [])],
+				peerDiscovery: [...(baseOptions.peerDiscovery ?? []), ...(extensions.peerDiscovery ?? [])],
+				peerRouters: [...(baseOptions.peerRouters ?? []), ...(extensions.peerRouters ?? [])],
+				services: { ...baseOptions.services, ...extensions.services },
+				transports: [...(baseOptions.transports ?? []), ...(extensions.transports ?? [])],
+			});
+			builtHost = await hostBuild;
+			return builtHost;
+		};
+		try {
+			const host = await this._hostFactory({ createHost, snapshot });
+			if (!builtHost) throw new Error("DRP network host factory must build its host through createHost()");
+			if (host !== builtHost) throw new Error("DRP network host factory must return the host built by createHost()");
+			this._node = host;
+		} catch (error) {
+			if (!builtHost && hostBuild) {
+				try {
+					builtHost = await hostBuild;
+				} catch {
+					// The original rejection is already carried by error.
+				}
+			}
+			try {
+				await builtHost?.stop();
+			} catch (cleanupError) {
+				throw new AggregateError([error, cleanupError], "DRP network host factory failed and cleanup also failed", {
+					cause: error,
+				});
+			}
+			throw error;
+		}
 		log.info(
 			"::start: running on:",
 			this._node.getMultiaddrs().map((addr) => addr.toString())
 		);
 
-		if (!this._config?.bootstrap) {
+		if (!this._config?.bootstrap && bootstrapDiscovery) {
 			this._bootstrapRetryController?.abort();
 			this._bootstrapRetryController = new AbortController();
 			for (const addr of bootstrapNodes) {
@@ -326,9 +462,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return addr.getComponents().find((component) => component.name === "p2p")?.value;
 	}
 
-	private getGossipSubConfig(bootstapNodeList: string[]): Partial<GossipsubOpts> {
+	private getGossipSubConfig(bootstapNodeList: string[], doPX = true): Partial<GossipsubOpts> {
 		const baseConfig: Partial<GossipsubOpts> = {
-			doPX: true,
+			doPX,
 			fallbackToFloodsub: false,
 			allowPublishToZeroTopicPeers: true,
 			scoreParams: this.getGossipSubPeerScoreParams(bootstapNodeList),

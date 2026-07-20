@@ -6,12 +6,25 @@ import { type LoggerOptions } from "./logger.js";
 import { type IMessageQueueHandler } from "./message-queue.js";
 import { type Message } from "./proto/drp/v1/messages_pb.js";
 
+export interface GroupPeerChange {
+	/** Remote peer whose topic membership changed */
+	peerId: string;
+	/** Whether the remote peer joined or left the topic */
+	subscribed: boolean;
+	/** Topic whose remote membership changed */
+	topic: string;
+}
+
+export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
+
 /**
  * Configuration interface for DRP Network Node
  */
 export interface DRPNetworkNodeConfig {
 	/** List of addresses to announce to the network */
 	announce_addresses?: string[];
+	/** Whether to enable AutoNAT address verification independently of bootstrap-server mode */
+	autonat?: boolean;
 	/** Whether this node is a bootstrap node */
 	bootstrap?: boolean;
 	/** List of bootstrap peers to connect to */
@@ -30,6 +43,11 @@ export interface DRPNetworkNodeConfig {
 		prometheus_metrics?: boolean;
 		/** URL of the pushgateway to send metrics to */
 		pushgateway_url?: string;
+	};
+	/** Circuit Relay v2 server configuration. */
+	relay?: {
+		/** Maximum simultaneous reservations accepted by a bootstrap relay. */
+		max_reservations?: number;
 	};
 }
 
@@ -187,4 +205,11 @@ export interface DRPNetworkNode {
 	 * @param handler - The handler to subscribe to the message queue
 	 */
 	subscribeToMessageQueue(handler: IMessageQueueHandler<Message>): void;
+
+	/**
+	 * Subscribes to remote group membership and GossipSub mesh changes.
+	 * @param handler - Handler invoked when a remote peer appears or disappears on a topic
+	 * @returns A function that removes the handler
+	 */
+	subscribeToGroupPeerChanges(handler: GroupPeerChangeHandler): () => void;
 }

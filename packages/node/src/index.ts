@@ -4,14 +4,17 @@ import { createDRPReconnectBootstrap } from "@ts-drp/interval-reconnect";
 import { Keychain } from "@ts-drp/keychain";
 import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
-import { DRPNetworkNode, type GroupPeerChange } from "@ts-drp/network";
+import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
 import { createPermissionlessACL, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	DRPDiscoveryResponse,
+	type DRPNetworkNode,
 	type DRPNodeConfig,
 	type DRPObjectSubscribeCallback,
 	type FetchStateResponseEvent,
+	type GroupPeerChange,
 	type IDRP,
+	type IDRPIntervalReconnectBootstrap,
 	type IDRPNode,
 	type IDRPObject,
 	type IntervalRunnerMap,
@@ -40,6 +43,13 @@ const DISCOVERY_MESSAGE_TYPES = [
 const DISCOVERY_QUEUE_ID = "discovery";
 const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `interval:${type}::${id}`;
 
+export interface DRPNodeDependencies {
+	/** Existing network implementation to use instead of the production default */
+	networkNode?: DRPNetworkNode;
+	/** Existing reconnect owner, or false when an external coordinator owns recovery */
+	reconnect?: IDRPIntervalReconnectBootstrap | false;
+}
+
 /**
  * A DRP node.
  */
@@ -54,12 +64,15 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _subscribedNetworkNode?: DRPNetworkNode;
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
+	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
+	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
 
 	/**
 	 * Create a new DRP node.
 	 * @param config - The configuration for the node.
+	 * @param dependencies - Existing lifecycle owners to inject
 	 */
-	constructor(config?: DRPNodeConfig) {
+	constructor(config?: DRPNodeConfig, dependencies: DRPNodeDependencies = {}) {
 		super();
 		const newLogger = new Logger("drp::node", config?.log_config);
 		log.trace = newLogger.trace;
@@ -67,7 +80,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		log.info = newLogger.info;
 		log.warn = newLogger.warn;
 		log.error = newLogger.error;
-		this.networkNode = new DRPNetworkNode(config?.network_config);
+		this.networkNode = dependencies.networkNode ?? new DefaultDRPNetworkNode(config?.network_config);
+		if (dependencies.reconnect && dependencies.reconnect.networkNode !== this.networkNode) {
+			throw new Error("Injected reconnect policy must own the injected DRP network node");
+		}
+		this._reconnectDependency = dependencies.reconnect;
 		this.#objectStore = new DRPObjectStore();
 		this.keychain = new Keychain(config?.keychain_config);
 		this.config = {
@@ -91,13 +108,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		await this.keychain.start();
 		await this.networkNode.start(this.keychain.secp256k1PrivateKey);
 		this.messageQueueManager.startAll();
-		const reconnectInterval = createDRPReconnectBootstrap({
-			...this.config.interval_reconnect_options,
-			id: this.networkNode.peerId.toString(),
-			networkNode: this.networkNode,
-			logConfig: this.config.log_config,
-		});
-		this._intervals.set("interval::reconnect", reconnectInterval);
+		const reconnectInterval = this.getReconnectInterval();
+		if (reconnectInterval) this._intervals.set("interval::reconnect", reconnectInterval);
 		if (this._subscribedNetworkNode !== this.networkNode) {
 			this.networkNode.subscribeToMessageQueue(this.dispatchMessage.bind(this));
 			this.networkNode.subscribeToGroupPeerChanges(this.handleGroupPeerChange.bind(this));
@@ -106,7 +118,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!this.messageQueueManager.hasQueue(DISCOVERY_QUEUE_ID)) {
 			this.messageQueueManager.subscribe(DISCOVERY_QUEUE_ID, (msg) => handleMessage(this, msg));
 		}
-		reconnectInterval.start();
+		reconnectInterval?.start();
 		this.restoreSubscriptions();
 	}
 
@@ -128,11 +140,21 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 */
 	async restart(): Promise<void> {
 		await this.stop();
-
-		this.networkNode = new DRPNetworkNode(this.config?.network_config);
-
 		await this.start();
 		log.info("::restart: Node restarted");
+	}
+
+	private getReconnectInterval(): IDRPIntervalReconnectBootstrap | undefined {
+		if (this._reconnectDependency === false) return undefined;
+		this._reconnectInterval ??=
+			this._reconnectDependency ??
+			createDRPReconnectBootstrap({
+				...this.config.interval_reconnect_options,
+				id: this.networkNode.peerId.toString(),
+				networkNode: this.networkNode,
+				logConfig: this.config.log_config,
+			});
+		return this._reconnectInterval;
 	}
 
 	/**

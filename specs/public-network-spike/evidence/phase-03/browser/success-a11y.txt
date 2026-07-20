@@ -1,0 +1,226 @@
+uid=1_0 RootWebArea "Network Spike · Evidence Ledger" url="http://127.0.0.1:4174/delegated?fixture=success&operation=peer"
+  uid=1_1 ignored
+    uid=1_2 ignored
+      uid=1_3 main live="polite" relevant="additions text"
+        uid=1_4 sectionheader
+          uid=1_5 ignored
+            uid=1_6 ignored
+              uid=1_7 StaticText "03"
+                uid=1_8 InlineTextBox "03"
+            uid=1_9 ignored
+              uid=1_10 StaticText "TS—DRP / DELEGATED ROUTING"
+                uid=1_8 InlineTextBox "TS—DRP / DELEGATED ROUTING"
+          uid=1_11 ignored
+            uid=1_12 ignored
+              uid=1_13 StaticText "CHROMIUM · FIREFOX · WEBKIT"
+                uid=1_8 InlineTextBox "CHROMIUM · FIREFOX · WEBKIT"
+            uid=1_14 ignored
+              uid=1_15 generic
+              uid=1_16 StaticText "LOCAL FIXTURE"
+                uid=1_8 InlineTextBox "LOCAL FIXTURE"
+        uid=1_17 main
+          uid=1_18 generic
+            uid=1_19 ignored
+              uid=1_20 paragraph
+                uid=1_21 StaticText "BROWSER ROUTING / PHASE 03 / SEPARATE-ORIGIN FIXTURE"
+                  uid=1_8 InlineTextBox "BROWSER ROUTING / PHASE 03 / SEPARATE-ORIGIN FIXTURE"
+              uid=1_22 heading "HTTP ROUTING, under glass." level="1"
+                uid=1_23 StaticText "HTTP ROUTING,"
+                  uid=1_8 InlineTextBox "HTTP ROUTING,"
+                uid=1_24 LineBreak "
+"
+                  uid=1_8 InlineTextBox "
+"
+                uid=1_25 emphasis
+                  uid=1_26 StaticText "under glass."
+                    uid=1_8 InlineTextBox "under glass."
+              uid=1_27 paragraph
+                uid=1_28 StaticText "Every endpoint attempt is bounded, every address is classified, and publication is absent by construction."
+                  uid=1_8 InlineTextBox "Every endpoint attempt is bounded, every address is classified, and "
+                  uid=1_8 InlineTextBox "publication is absent by construction."
+            uid=1_29 ignored
+          uid=1_30 region "Delegated routing controls"
+            uid=1_31 LabelText
+              uid=1_32 StaticText "FIXTURE"
+                uid=1_8 InlineTextBox "FIXTURE"
+              uid=1_33 combobox "FIXTURE" expandable haspopup="menu" value="SUCCESS"
+                uid=1_34 MenuListPopup
+                  uid=1_35 ignored
+                    uid=1_36 option "success" selectable selected value="success"
+                    uid=1_37 option "cors" selectable value="cors"
+                    uid=1_38 option "cache" selectable value="cache"
+                    uid=1_39 option "cache-disabled" selectable value="cache-disabled"
+                    uid=1_40 option "timeout" selectable value="timeout"
+                    uid=1_41 option "abort" selectable value="abort"
+                    uid=1_42 option "empty" selectable value="empty"
+                    uid=1_43 option "404" selectable value="404"
+                    uid=1_44 option "malformed" selectable value="malformed"
+                    uid=1_45 option "oversized" selectable value="oversized"
+                    uid=1_46 option "poisoned" selectable value="poisoned"
+                    uid=1_47 option "stale" selectable value="stale"
+                    uid=1_48 option "rate-limit" selectable value="rate-limit"
+                    uid=1_49 option "outage" selectable value="outage"
+                    uid=1_50 option "failover" selectable value="failover"
+            uid=1_51 LabelText
+              uid=1_52 StaticText "OPERATION"
+                uid=1_8 InlineTextBox "OPERATION"
+              uid=1_53 combobox "OPERATION" expandable haspopup="menu" value="PEER"
+                uid=1_54 MenuListPopup
+                  uid=1_55 ignored
+                    uid=1_56 option "peer" selectable selected value="peer"
+                    uid=1_57 option "providers" selectable value="providers"
+                    uid=1_58 option "closest" selectable value="closest"
+            uid=1_59 button "RUN BOUNDED QUERY ↗"
+              uid=1_60 StaticText "RUN BOUNDED QUERY"
+                uid=1_8 InlineTextBox "RUN BOUNDED QUERY"
+              uid=1_61 ignored
+                uid=1_62 StaticText "↗"
+                  uid=1_8 InlineTextBox "↗"
+          uid=1_63 generic
+            uid=1_64 ignored
+              uid=1_65 ignored
+                uid=1_66 StaticText "TERMINAL / PEER"
+                  uid=1_8 InlineTextBox "TERMINAL / PEER"
+              uid=1_67 strong
+                uid=1_68 StaticText "SUCCESS"
+                  uid=1_8 InlineTextBox "SUCCESS"
+              uid=1_69 generic
+                uid=1_70 StaticText "1 BROWSER-DIALABLE PEER"
+                  uid=1_8 InlineTextBox "1 BROWSER-DIALABLE PEER"
+            uid=1_71 ignored
+              uid=1_72 ignored
+                uid=1_73 ignored
+                  uid=1_74 StaticText "SCENARIO"
+                    uid=1_8 InlineTextBox "SCENARIO"
+                uid=1_75 strong
+                  uid=1_76 StaticText "success"
+                    uid=1_8 InlineTextBox "success"
+                uid=1_77 generic
+                  uid=1_78 StaticText "FIXTURE CELL"
+                    uid=1_8 InlineTextBox "FIXTURE CELL"
+              uid=1_79 ignored
+                uid=1_80 ignored
+                  uid=1_81 StaticText "CACHE"
+                    uid=1_8 InlineTextBox "CACHE"
+                uid=1_82 strong
+                  uid=1_83 StaticText "miss"
+                    uid=1_8 InlineTextBox "miss"
+                uid=1_84 generic
+                  uid=1_85 StaticText "1 QUERY TRACE"
+                    uid=1_8 InlineTextBox "1 QUERY TRACE"
+              uid=1_86 ignored
+                uid=1_87 ignored
+                  uid=1_88 StaticText "ATTEMPTS"
+                    uid=1_8 InlineTextBox "ATTEMPTS"
+                uid=1_89 strong
+                  uid=1_90 StaticText "1"
+                    uid=1_8 InlineTextBox "1"
+                uid=1_91 generic
+                  uid=1_92 StaticText "ORDERED ENDPOINTS"
+                    uid=1_8 InlineTextBox "ORDERED ENDPOINTS"
+              uid=1_93 ignored
+                uid=1_94 ignored
+                  uid=1_95 StaticText "DURATION"
+                    uid=1_8 InlineTextBox "DURATION"
+                uid=1_96 strong
+                  uid=1_97 StaticText "49 ms"
+                    uid=1_8 InlineTextBox "49 ms"
+                uid=1_98 generic
+                  uid=1_99 StaticText "WALL CLOCK"
+                    uid=1_8 InlineTextBox "WALL CLOCK"
+            uid=1_100 ignored
+              uid=1_101 generic
+                uid=1_102 paragraph
+                  uid=1_103 StaticText "01 / ENDPOINT LEDGER"
+                    uid=1_8 InlineTextBox "01 / ENDPOINT LEDGER"
+                uid=1_104 heading "Attempt by attempt" level="2"
+                  uid=1_105 StaticText "Attempt by attempt"
+                    uid=1_8 InlineTextBox "Attempt by attempt"
+                uid=1_106 ignored
+                  uid=1_107 article
+                    uid=1_108 sectionheader
+                      uid=1_109 ignored
+                        uid=1_110 StaticText "QUERY 1"
+                          uid=1_8 InlineTextBox "QUERY 1"
+                      uid=1_111 strong
+                        uid=1_112 StaticText "MISS"
+                          uid=1_8 InlineTextBox "MISS"
+                    uid=1_113 ignored
+                      uid=1_114 ignored
+                        uid=1_115 StaticText "01"
+                          uid=1_8 InlineTextBox "01"
+                      uid=1_116 strong
+                        uid=1_117 StaticText "primary"
+                          uid=1_8 InlineTextBox "primary"
+                      uid=1_118 emphasis
+                        uid=1_119 StaticText "SUCCESS"
+                          uid=1_8 InlineTextBox "SUCCESS"
+                      uid=1_120 generic
+                        uid=1_121 StaticText "200 · 49 ms"
+                          uid=1_8 InlineTextBox "200 · 49 ms"
+              uid=1_122 generic
+                uid=1_123 paragraph
+                  uid=1_124 StaticText "02 / ADDRESS ACCEPTANCE"
+                    uid=1_8 InlineTextBox "02 / ADDRESS ACCEPTANCE"
+                uid=1_125 heading "Raw → dialable" level="2"
+                  uid=1_126 StaticText "Raw → dialable"
+                    uid=1_8 InlineTextBox "Raw → dialable"
+                uid=1_127 ignored
+                  uid=1_128 article
+                    uid=1_129 sectionheader
+                      uid=1_130 ignored
+                        uid=1_131 StaticText "PEER"
+                          uid=1_8 InlineTextBox "PEER"
+                      uid=1_132 code
+                        uid=1_133 StaticText "QmNnooDu7bfj…ezGAJN"
+                          uid=1_8 InlineTextBox "QmNnooDu7bfj…ezGAJN"
+                    uid=1_134 ignored
+                      uid=1_135 ignored
+                        uid=1_136 StaticText "ACCEPT"
+                          uid=1_8 InlineTextBox "ACCEPT"
+                      uid=1_137 code
+                        uid=1_138 StaticText "/dns4/relay.example/tcp/443/tls/ws"
+                          uid=1_8 InlineTextBox "/dns4/relay.example/tcp/443/tls/ws"
+                      uid=1_139 generic
+                        uid=1_140 StaticText "WSS"
+                          uid=1_8 InlineTextBox "WSS"
+                    uid=1_141 ignored
+                      uid=1_142 ignored
+                        uid=1_143 StaticText "ACCEPT"
+                          uid=1_8 InlineTextBox "ACCEPT"
+                      uid=1_144 code
+                        uid=1_145 StaticText "/ip4/8.8.8.8/udp/443/quic-v1/webtransport"
+                          uid=1_8 InlineTextBox "/ip4/8.8.8.8/udp/443/quic-v1/webtransport"
+                      uid=1_146 generic
+                        uid=1_147 StaticText "WEBTRANSPORT"
+                          uid=1_8 InlineTextBox "WEBTRANSPORT"
+                    uid=1_148 ignored
+                      uid=1_149 ignored
+                        uid=1_150 StaticText "REJECT"
+                          uid=1_8 InlineTextBox "REJECT"
+                      uid=1_151 code
+                        uid=1_152 StaticText "/ip4/8.8.4.4/tcp/4001"
+                          uid=1_8 InlineTextBox "/ip4/8.8.4.4/tcp/4001"
+                      uid=1_153 generic
+                        uid=1_154 StaticText "NODE-ONLY-TRANSPORT"
+                          uid=1_8 InlineTextBox "NODE-ONLY-TRANSPORT"
+                    uid=1_155 ignored
+                      uid=1_156 ignored
+                        uid=1_157 StaticText "REJECT"
+                          uid=1_8 InlineTextBox "REJECT"
+                      uid=1_158 code
+                        uid=1_159 StaticText "/ip4/127.0.0.1/tcp/443/tls/ws"
+                          uid=1_8 InlineTextBox "/ip4/127.0.0.1/tcp/443/tls/ws"
+                      uid=1_160 generic
+                        uid=1_161 StaticText "SCOPE-LOOPBACK"
+                          uid=1_8 InlineTextBox "SCOPE-LOOPBACK"
+            uid=1_162 ignored
+              uid=1_163 ignored
+                uid=1_164 StaticText "PUBLICATION SURFACE"
+                  uid=1_8 InlineTextBox "PUBLICATION SURFACE"
+              uid=1_165 strong
+                uid=1_166 StaticText "ABSENT"
+                  uid=1_8 InlineTextBox "ABSENT"
+              uid=1_167 code
+                uid=1_168 StaticText "canProvide: false"
+                  uid=1_8 InlineTextBox "canProvide: false"

@@ -1,0 +1,13 @@
+{
+	"network_config": {
+		"listen_addresses": ["/ip4/0.0.0.0/tcp/50006/ws"],
+		"bootstrap": true,
+		"bootstrap_peers": [],
+		"relay": {
+			"max_reservations": 0
+		}
+	},
+	"keychain_config": {
+		"private_key_seed": "refusal-b"
+	}
+}

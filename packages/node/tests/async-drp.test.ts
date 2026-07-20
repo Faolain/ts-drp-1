@@ -1,10 +1,11 @@
-import { type Connection, type IdentifyResult, type Libp2p } from "@libp2p/interface";
+import { type Connection, type IdentifyResult } from "@libp2p/interface";
 import { DRPNetworkNode } from "@ts-drp/network";
 import { AsyncCounterDRP } from "@ts-drp/test-utils";
 import { type DRPNodeConfig, NodeEventName, type ObjectId } from "@ts-drp/types";
 import { raceEvent } from "race-event";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
+import { libp2pOf } from "./default-network.js";
 import { DRPNode } from "../src/index.js";
 
 describe("Async DRP", () => {
@@ -39,7 +40,7 @@ describe("Async DRP", () => {
 		await node1.start();
 		await node2.start();
 
-		const btNodeLibp2p = btNode["_node"] as Libp2p;
+		const btNodeLibp2p = libp2pOf(btNode);
 
 		const getFilter =
 			(peerId: string) =>
@@ -55,13 +56,15 @@ describe("Async DRP", () => {
 			}),
 		]);
 
+		const node1Host = libp2pOf(node1.networkNode);
+		const node2Host = libp2pOf(node2.networkNode);
 		await Promise.all([
-			node1.networkNode.connect(node2.networkNode["_node"]?.getMultiaddrs()),
-			raceEvent(node1.networkNode["_node"] as Libp2p, "connection:open", undefined, {
+			node1.networkNode.connect(node2Host.getMultiaddrs()),
+			raceEvent(node1Host, "connection:open", undefined, {
 				filter: (event: CustomEvent<Connection>) =>
 					event.detail.remotePeer.toString() === node2.networkNode.peerId && event.detail.limits === undefined,
 			}),
-			raceEvent(node2.networkNode["_node"] as Libp2p, "connection:open", undefined, {
+			raceEvent(node2Host, "connection:open", undefined, {
 				filter: (event: CustomEvent<Connection>) =>
 					event.detail.remotePeer.toString() === node1.networkNode.peerId && event.detail.limits === undefined,
 			}),

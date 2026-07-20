@@ -6,6 +6,7 @@ import { type DRPNetworkNodeConfig, DrpType, NodeEventName, type ObjectId, Opera
 import { raceEvent } from "race-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { defaultNetworkOf, libp2pOf } from "./default-network.js";
 import { DRPNode } from "../src/index.js";
 
 describe("Handle message correctly", () => {
@@ -70,21 +71,21 @@ describe("Handle message correctly", () => {
 		node2 = createNewNode("node2");
 
 		await node2.start();
-		const btLibp2pNode1 = bootstrapNode["_node"] as Libp2p;
-		libp2pNode2 = node2.networkNode["_node"] as Libp2p;
+		const btLibp2pNode1 = libp2pOf(bootstrapNode);
+		libp2pNode2 = libp2pOf(node2.networkNode);
 
 		await Promise.all([
 			raceEvent(btLibp2pNode1, "peer:identify", controller.signal, {
 				filter: (event: CustomEvent<IdentifyResult>) =>
 					event.detail.peerId.equals(libp2pNode2.peerId) && event.detail.listenAddrs.length > 0,
 			}),
-			isDialable(node2.networkNode),
+			isDialable(defaultNetworkOf(node2.networkNode)),
 		]);
 
 		await node1.start();
-		expect(await isDialable(node1.networkNode)).toBe(true);
+		expect(await isDialable(defaultNetworkOf(node1.networkNode))).toBe(true);
 
-		libp2pNode1 = node1.networkNode["_node"] as Libp2p;
+		libp2pNode1 = libp2pOf(node1.networkNode);
 
 		await Promise.all([
 			raceEvent(libp2pNode2, "connection:open", controller.signal, {
@@ -161,7 +162,7 @@ describe("Handle message correctly", () => {
 		const node3 = createNewNode("node3");
 
 		await node3.start();
-		const libp2pNode3 = node3.networkNode["_node"] as Libp2p;
+		const libp2pNode3 = libp2pOf(node3.networkNode);
 		await raceEvent(libp2pNode3, "connection:open", controller.signal, {
 			filter: (event: CustomEvent<Connection>) =>
 				event.detail.remotePeer.toString() === node2.networkNode.peerId && event.detail.limits === undefined,

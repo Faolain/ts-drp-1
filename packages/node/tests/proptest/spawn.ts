@@ -23,6 +23,7 @@ import { BoxGame2D } from "@ts-drp/test-utils";
 import { type IACL, NodeEventName } from "@ts-drp/types";
 
 import { DRPNode } from "../../src/index.js";
+import { libp2pOf as productionLibp2pOf } from "../default-network.js";
 
 /* ------------------------------------------------------------------ */
 /* Cluster                                                             */
@@ -77,7 +78,7 @@ export async function waitFor(
 }
 
 function libp2pOf(node: DRPNode): Libp2p {
-	return node.networkNode["_node"] as Libp2p;
+	return productionLibp2pOf(node.networkNode);
 }
 
 function trackEvents(entry: ClusterNode): void {
