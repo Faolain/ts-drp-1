@@ -16,6 +16,7 @@ import {
 	type SendCustomMessageRequest,
 	type SendGroupMessageRequest,
 	type SubscribeDRPRequest,
+	type SyncDRPObjectRequest,
 	type UnsubscribeDRPRequest,
 } from "../proto/drp/node/v1/rpc_pb.js";
 
@@ -89,12 +90,12 @@ export function init(node: DRPNode, port: number = 6969): void {
 	}
 
 	async function syncDRPObject(
-		call: ServerUnaryCall<SubscribeDRPRequest, GenericRespone>,
+		call: ServerUnaryCall<SyncDRPObjectRequest, GenericRespone>,
 		callback: sendUnaryData<GenericRespone>
 	): Promise<void> {
 		let returnCode = 0;
 		try {
-			await node.syncObject(call.request.drpId);
+			await node.syncObject(call.request.drpId, call.request.peerId || undefined);
 		} catch (e) {
 			log.error("::rpc::syncDRPObject: Error", e);
 			returnCode = 1;
@@ -180,7 +181,11 @@ export function init(node: DRPNode, port: number = 6969): void {
 		sendGroupMessage,
 		addCustomGroup,
 	});
-	server.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (_error, _port) => {
-		log.info("::rpc::init: running grpc in port:", _port);
+	server.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
+		if (error) {
+			log.error("::rpc::init: Error binding grpc server", error);
+			return;
+		}
+		log.info("::rpc::init: running grpc in port:", boundPort);
 	});
 }

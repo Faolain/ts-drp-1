@@ -76,6 +76,7 @@ export class DRPObjectStore<T extends IDRP = any> {
 	 */
 	remove(objectId: string): void {
 		this._store.delete(objectId);
+		this._subscriptions.delete(objectId);
 	}
 
 	private _notifySubscribers(objectId: string, object: IDRPObject<T>): void {

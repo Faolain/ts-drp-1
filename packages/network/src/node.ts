@@ -76,7 +76,6 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _pubsub?: ConfigurableGossipSub;
 	private _messageQueue: MessageQueue<Message>;
 	private _metrics?: PrometheusMetricsRegister;
-	private _bootstrapNodesList: string[];
 	private _bootstrapRetryController?: AbortController;
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
 
@@ -94,7 +93,6 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		this._config = config;
 		log = new Logger("drp::network", config?.log_config);
 		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
-		this._bootstrapNodesList = this._config?.bootstrap_peers ? this._config.bootstrap_peers : BOOTSTRAP_NODES;
 	}
 
 	/**
@@ -116,14 +114,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}),
 		];
 
+		const bootstrapNodes = this.getBootstrapNodes();
 		const _bootstrapPeerID: string[] = [];
-		if (this._bootstrapNodesList.length) {
+		if (bootstrapNodes.length) {
 			_peerDiscovery.push(
 				bootstrap({
-					list: this._bootstrapNodesList,
+					list: bootstrapNodes,
 				})
 			);
-			for (const addr of this._bootstrapNodesList) {
+			for (const addr of bootstrapNodes) {
 				const peerId = this.getPeerId(multiaddr(addr));
 				if (!peerId) continue;
 				_bootstrapPeerID.push(peerId);
@@ -181,7 +180,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (!this._config?.bootstrap) {
 			this._bootstrapRetryController?.abort();
 			this._bootstrapRetryController = new AbortController();
-			for (const addr of this._bootstrapNodesList) {
+			for (const addr of bootstrapNodes) {
 				void this._dialBootstrapWithRetry(multiaddr(addr), this._node, this._bootstrapRetryController.signal);
 			}
 		}
@@ -461,7 +460,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async connectToBootstraps(): Promise<void> {
 		try {
-			await this.safeDial(this._bootstrapNodesList);
+			await this.safeDial(this.getBootstrapNodes());
 			log.debug("::connectToBootstraps: Successfully connected to bootstrap nodes");
 		} catch (e) {
 			log.error("::connectToBootstraps:", e);
@@ -520,7 +519,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @returns The bootstrap nodes.
 	 */
 	getBootstrapNodes(): string[] {
-		return this._bootstrapNodesList;
+		return this._config?.bootstrap_peers ?? BOOTSTRAP_NODES;
 	}
 
 	/**

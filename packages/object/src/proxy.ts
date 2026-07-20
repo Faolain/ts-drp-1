@@ -179,7 +179,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					return (...args: unknown[]): unknown => {
 						const before = date.getTime();
 						const result = (member as (...values: unknown[]) => unknown).apply(date, args);
-						if (!ignored && property.toString().startsWith("set") && date.getTime() !== before) changed = true;
+						if (!ignored && property.toString().startsWith("set") && !Object.is(date.getTime(), before)) changed = true;
 						return result;
 					};
 				},

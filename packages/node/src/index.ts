@@ -27,7 +27,7 @@ import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
 import { clearSyncRecoveryEpisodes, drpObjectChangesHandler, handleMessage } from "./handlers.js";
-import { createDRPIntervalSync } from "./interval-sync.js";
+import { createDRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
@@ -384,10 +384,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	}
 
 	/**
-	 * Probe each newly appeared peer once while a joined object has no history
-	 * yet. Genesis authority is derived locally from the creator-bound object
-	 * id, so "unsynced" means the hashgraph still holds nothing beyond the root
-	 * vertex. Periodic anti-entropy remains responsible for retries.
+	 * Probe each newly appeared peer once while a joined object has no remotely
+	 * authored history yet. A local operation does not prove that initial sync
+	 * reached another replica. Periodic anti-entropy remains responsible for
+	 * later retries.
 	 * @param change - Remote gossipsub topic membership change
 	 */
 	private handleGroupPeerChange(change: GroupPeerChange): void {
@@ -398,7 +398,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 
 		const object = this.get(change.topic);
-		if (!object || object.vertices.some((vertex) => vertex.hash !== HashGraph.rootHash)) return;
+		if (!object || hasRemoteSyncHistory(object.vertices, this.networkNode.peerId)) return;
 		if (!this.networkNode.getSubscribedTopics().includes(change.topic)) return;
 		if (!this.networkNode.getGroupPeers(change.topic).includes(change.peerId)) return;
 

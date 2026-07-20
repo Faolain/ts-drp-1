@@ -18,7 +18,10 @@ describe("spawn scaling of real DRPNode clusters", () => {
 	test(`cluster sizes ${NS.join(", ")}: spawn timings and one convergence round`, async () => {
 		const results: string[] = [];
 		for (const n of NS) {
-			const cluster = await spawnCluster(n, `scaling-object-${n}`);
+			const cluster = await spawnCluster(n, {
+				objectId: `scaling-object-${n}`,
+				syncIntervalMs: 1_000,
+			});
 			try {
 				const t = cluster.timings;
 				// one round of concurrent ops on every node

@@ -44,3 +44,7 @@ pnpm vitest run packages/node/tests/proptest/multi-node-convergence.test.ts --co
 # Grid browser end-to-end on Chromium + WebKit (starts its own relay + server)
 pnpm e2e-test
 ```
+
+See [Cross-browser grid testing](../../docs/cross-browser-testing.md) for the
+Firefox and WebKit validation evidence, relay-readiness contract, and guidance
+for interpreting repeated-run failures.
