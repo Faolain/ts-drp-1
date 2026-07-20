@@ -98,11 +98,13 @@ function getPeerIDRegex(peerID: string): RegExp {
 test.describe("grid", () => {
 	let page1: Page;
 	let page2: Page;
+	const pages: Page[] = [];
 
 	test.beforeEach(async ({ browser }) => {
 		await clearLogFile();
 
 		page1 = await browser.newPage();
+		pages.push(page1);
 		let peerID1 = "";
 		await Promise.all([
 			(async (): Promise<void> => {
@@ -114,8 +116,13 @@ test.describe("grid", () => {
 		]);
 
 		page2 = await browser.newPage();
+		pages.push(page2);
 		await page2.goto("/");
 		await page2.waitForSelector("#loadingMessage", { state: "hidden" });
+	});
+
+	test.afterEach(async () => {
+		await Promise.all(pages.splice(0).map((page) => page.close()));
 	});
 
 	test("check peerID", async () => {
@@ -177,6 +184,7 @@ test.describe("grid", () => {
 
 	test("create then join preserves the creator's dot and later moves", async () => {
 		const peerID1 = await getPeerID(page1);
+		const peerID2 = await getPeerID(page2);
 
 		await page1.click(createGridButtonSelector);
 		await expect(page1.locator(gridIdSelector)).not.toBeEmpty({ timeout: 10000 });
@@ -187,17 +195,36 @@ test.describe("grid", () => {
 		await page2.click(joinGridButtonSelector);
 		await expect(page2.locator(DRPIdInputSelector)).toHaveValue(gridId);
 
-		await page1.keyboard.press("w");
-		await page1.keyboard.press("d");
+		await expect(page1.locator(objectPeersSelector)).toContainText(peerID2, {
+			timeout: 10000,
+		});
+		await expect(page2.locator(objectPeersSelector)).toContainText(peerID1, {
+			timeout: 10000,
+		});
 
 		const creatorDot = page2.locator(`div[data-glowing-peer-id="${peerID1}"]`);
 		await expect(creatorDot).toBeVisible({ timeout: 10000 });
 		await expect(creatorDot).toHaveAttribute("style", /left: [0-9]+px; top: [0-9]+px;/);
-		const firstPosition = await getGlowingPeer(page2, peerID1);
+		const initialPosition = await getGlowingPeer(page2, peerID1);
+
+		await page1.keyboard.press("w");
+		await page1.keyboard.press("d");
+		await expect
+			.poll(
+				async () => {
+					const position = await getGlowingPeer(page2, peerID1);
+					return { left: position.left, top: position.top };
+				},
+				{ timeout: 10000 }
+			)
+			.toEqual({
+				left: initialPosition.left + 50,
+				top: initialPosition.top - 50,
+			});
 
 		await page1.keyboard.press("d");
 		await expect
 			.poll(async () => (await getGlowingPeer(page2, peerID1)).left, { timeout: 10000 })
-			.toBe(firstPosition.left + 50);
+			.toBe(initialPosition.left + 100);
 	});
 });
