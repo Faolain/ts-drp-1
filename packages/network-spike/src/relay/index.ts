@@ -1,20 +1,11 @@
 import { multiaddr } from "@multiformats/multiaddr";
 
+import { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
 import type { BrowserRouting, BrowserRoutingPeer } from "../browser-routing/index.js";
 import type { NodeRouting, RoutingPeer } from "../node-routing/index.js";
 
-export const CIRCUIT_RELAY_V2_HOP_PROTOCOL = "/libp2p/circuit/relay/0.2.0/hop";
-
-export const RELAY_RESERVATION_STATUS = {
-	CONNECTION_FAILED: 203,
-	MALFORMED_MESSAGE: 400,
-	NO_RESERVATION: 204,
-	OK: 100,
-	PERMISSION_DENIED: 202,
-	RESERVATION_REFUSED: 200,
-	RESOURCE_LIMIT_EXCEEDED: 201,
-	UNEXPECTED_MESSAGE: 401,
-} as const;
+export { decodeHopReservationResponse, Libp2pRelayClient, type Libp2pRelayClientOptions } from "./libp2p-client.js";
+export { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
 
 export type RelayTransport = "wss" | "webtransport" | "webrtc-direct";
 export type RelayCandidateOrigin = "browser-closest-peers" | "node-closest-peers";

@@ -6,8 +6,10 @@ import { createRelayFixture } from "../src/relay/fixture.js";
 import {
 	BrowserRoutingClosestPeersSource,
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
+	decodeHopReservationResponse,
 	decodeRelayReservationResponse,
 	type DnsaddrFallback,
+	Libp2pRelayClient,
 	NodeRoutingClosestPeersSource,
 	RELAY_RESERVATION_STATUS,
 	RELAY_TRANSPORT_PROFILES,
@@ -108,6 +110,54 @@ describe("relay closest-peer adapters", () => {
 });
 
 describe("Circuit Relay v2 reservation decoding", () => {
+	it("distinguishes Identify without HOP support from a reservation result", async () => {
+		const client = relayClientWith({ connection: true, protocols: ["/ipfs/id/1.0.0"] });
+		await expect(client.inspect(validRelayCandidate(), "ignored", signal())).resolves.toMatchObject({
+			hopAdvertised: false,
+			outcome: "connected",
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+	});
+
+	it("returns a typed inspection timeout when no connection appears", async () => {
+		const client = relayClientWith({ connection: false, protocols: [] });
+		await expect(client.inspect(validRelayCandidate(), "ignored", signal())).resolves.toMatchObject({
+			hopAdvertised: false,
+			outcome: "timeout",
+			protocols: [],
+		});
+	});
+
+	it("decodes an actual HOP RESERVE response with expiry and limits", () => {
+		const expire = BigInt(Math.floor((NOW + 60_000) / 1_000));
+		const response = decodeHopReservationResponse(
+			protobufMessage(
+				protobufBytes(3, protobufVarint(1, expire)),
+				protobufBytes(4, protobufMessage(protobufVarint(1, BigInt(60)), protobufVarint(2, BigInt(1_024)))),
+				protobufVarint(5, BigInt(RELAY_RESERVATION_STATUS.OK))
+			)
+		);
+		expect(response).toEqual({
+			limit: { data: BigInt(1_024), duration: 60 },
+			reservation: { expire },
+			status: RELAY_RESERVATION_STATUS.OK,
+		});
+	});
+
+	it("keeps an explicit reservation refusal distinct from HOP advertisement", () => {
+		expect(
+			decodeHopReservationResponse(protobufVarint(5, BigInt(RELAY_RESERVATION_STATUS.RESERVATION_REFUSED)))
+		).toEqual({ status: RELAY_RESERVATION_STATUS.RESERVATION_REFUSED });
+	});
+
+	it.each([
+		new Uint8Array(),
+		protobufMessage(protobufVarint(5, BigInt(100)), protobufVarint(5, BigInt(100))),
+		Uint8Array.of(26, 5, 8),
+	])("rejects malformed HOP response %#", (bytes) => {
+		expect(() => decodeHopReservationResponse(bytes)).toThrow();
+	});
+
 	it("accepts only OK with a live reservation and preserves resource limits", () => {
 		expect(
 			decodeRelayReservationResponse(
@@ -737,4 +787,58 @@ function webrtc(peerId: string): string {
 
 function signal(): AbortSignal {
 	return AbortSignal.timeout(2_000);
+}
+
+function validRelayCandidate(): RelayCandidate {
+	return candidate(
+		"QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+		"fixture",
+		"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN"
+	);
+}
+
+function relayClientWith(options: { readonly connection: boolean; readonly protocols: string[] }): Libp2pRelayClient {
+	return new Libp2pRelayClient({
+		connect: (): Promise<void> => Promise.resolve(),
+		disconnect: (): Promise<void> => Promise.resolve(),
+		host: {
+			components: { transportManager: { getListeners: () => [], listen: () => Promise.resolve() } },
+			getConnections: () => (options.connection ? [{ id: "connection-1" }] : []),
+			getMultiaddrs: () => [],
+			peerStore: { get: () => Promise.resolve({ protocols: options.protocols }) },
+		} as never,
+		identifyTimeoutMs: 1,
+		reservationTimeoutMs: 1,
+	});
+}
+
+function protobufMessage(...fields: Uint8Array[]): Uint8Array {
+	const length = fields.reduce((total, field) => total + field.byteLength, 0);
+	const output = new Uint8Array(length);
+	let offset = 0;
+	for (const field of fields) {
+		output.set(field, offset);
+		offset += field.byteLength;
+	}
+	return output;
+}
+
+function protobufBytes(field: number, value: Uint8Array): Uint8Array {
+	return protobufMessage(encodeVarint(BigInt((field << 3) | 2)), encodeVarint(BigInt(value.byteLength)), value);
+}
+
+function protobufVarint(field: number, value: bigint): Uint8Array {
+	return protobufMessage(encodeVarint(BigInt(field << 3)), encodeVarint(value));
+}
+
+function encodeVarint(input: bigint): Uint8Array {
+	const bytes: number[] = [];
+	let value = input;
+	do {
+		let byte = Number(value & BigInt(0x7f));
+		value >>= BigInt(7);
+		if (value > BigInt(0)) byte |= 0x80;
+		bytes.push(byte);
+	} while (value > BigInt(0));
+	return Uint8Array.from(bytes);
 }

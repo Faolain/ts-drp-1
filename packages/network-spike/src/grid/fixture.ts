@@ -1,6 +1,5 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { peerIdFromString } from "@libp2p/peer-id";
-import { lpStream } from "@libp2p/utils";
 import { multiaddr, type Multiaddr } from "@multiformats/multiaddr";
 import {
 	BOOTSTRAP_NODES,
@@ -33,14 +32,11 @@ import {
 import { RegistryClient } from "../registry/index.js";
 import {
 	BrowserRoutingClosestPeersSource,
-	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
+	Libp2pRelayClient,
 	RELAY_RESERVATION_STATUS,
-	type RelayCandidate,
-	type RelayInspection,
 	RelayPolicy,
 	type RelayPolicyResult,
 	type RelayReplacementResult,
-	type RelayReservationWireResponse,
 } from "../relay/index.js";
 
 const PRIMARY_RELAY = {
@@ -346,6 +342,7 @@ export async function createGridBrowserFixture(options: GridBrowserFixtureOption
 interface CircuitListenHost extends Libp2p {
 	readonly components: {
 		readonly transportManager: {
+			getListeners(): Array<{ close(): Promise<void>; getAddrs(): Multiaddr[] }>;
 			listen(addresses: Multiaddr[]): Promise<void>;
 		};
 	};
@@ -548,6 +545,15 @@ function createRelayPort(
 	const source = new BrowserRoutingClosestPeersSource(routing, (peer) => {
 		return RELAY_FIXTURES.find((fixture) => fixture.peerId === peer.peerId)?.operatorGroup ?? "unknown";
 	});
+	const relayClient = new Libp2pRelayClient({
+		connect: async (address, signal): Promise<void> => {
+			signal.throwIfAborted();
+			await runtime.connect(address);
+			signal.throwIfAborted();
+		},
+		disconnect: (peerId): Promise<void> => runtime.network.disconnect(peerId),
+		host: runtime.host,
+	});
 	const policy: RelayPolicy = new RelayPolicy({
 		allowInsecureWebSocketFixture: true,
 		fallback: {
@@ -557,33 +563,7 @@ function createRelayPort(
 				return Promise.resolve({ status: "empty" });
 			},
 		},
-		inspector: {
-			inspect: async (candidate, address, signal): Promise<RelayInspection> => {
-				const started = performance.now();
-				await runtime.connect(address);
-				const connection = await waitForValue(
-					() => runtime.host.getConnections(peerIdFromString(candidate.peerId))[0],
-					3_000,
-					"routing-backed relay connection"
-				);
-				signal.throwIfAborted();
-				const peer = await waitForValue(
-					async () => {
-						const value = await runtime.host.peerStore.get(peerIdFromString(candidate.peerId));
-						return value.protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL) ? value : undefined;
-					},
-					3_000,
-					"relay HOP identify protocol"
-				);
-				return {
-					connectionId: connection.id,
-					hopAdvertised: peer.protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL),
-					latencyMs: performance.now() - started,
-					outcome: "connected" as const,
-					protocols: [...peer.protocols],
-				};
-			},
-		},
+		inspector: relayClient,
 		limits: {
 			maxCandidates: 2,
 			maxConcurrentReservations: 1,
@@ -595,11 +575,7 @@ function createRelayPort(
 			requiredReservations: 1,
 			totalDeadlineMs: 4_500,
 		},
-		reservationClient: {
-			refresh: async (candidate, signal): Promise<RelayReservationWireResponse> => reserve(candidate, signal),
-			release: async (candidate) => runtime.network.disconnect(candidate.peerId),
-			reserve,
-		},
+		reservationClient: relayClient,
 		source,
 	});
 	const state: ReturnType<typeof createRelayPort> = {
@@ -633,116 +609,10 @@ function createRelayPort(
 			},
 		},
 		stop: async () => {
-			await Promise.allSettled([policy.stop(), routing.stop()]);
+			await Promise.allSettled([policy.stop(), relayClient.stop(), routing.stop()]);
 		},
 	};
 	return state;
-
-	async function reserve(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse> {
-		const relayAddress = candidate.addresses[0] ?? "";
-		await runtime.connect(relayAddress);
-		const wireResponse = await requestRelayReservation(runtime, candidate, signal);
-		if (wireResponse.status !== RELAY_RESERVATION_STATUS.OK) return wireResponse;
-		const circuitAddress = multiaddr(`${relayAddress}/p2p-circuit`);
-		if (!runtime.network.getMultiaddrs().some((address) => address.includes(`/p2p/${candidate.peerId}/p2p-circuit`))) {
-			await runtime.host.components.transportManager.listen([circuitAddress]);
-		}
-		await waitForValue(
-			() => runtime.network.getMultiaddrs().find((address) => address.includes(`/p2p/${candidate.peerId}/p2p-circuit`)),
-			3_000,
-			"actual Circuit Relay v2 reservation"
-		);
-		signal.throwIfAborted();
-		return wireResponse;
-	}
-}
-
-async function requestRelayReservation(
-	runtime: ProductionRuntime,
-	candidate: RelayCandidate,
-	signal: AbortSignal
-): Promise<RelayReservationWireResponse> {
-	const connection = await waitForValue(
-		() => runtime.host.getConnections(peerIdFromString(candidate.peerId))[0],
-		3_000,
-		"connected relay for HOP RESERVE"
-	);
-	const stream = await connection.newStream(CIRCUIT_RELAY_V2_HOP_PROTOCOL, { signal });
-	const framed = lpStream(stream, { maxDataLength: 4_096 });
-	try {
-		// HopMessage { type: RESERVE }. The response is decoded below rather
-		// than inferred from an engine-specific listener error string.
-		await framed.write(Uint8Array.of(8, 0), { signal });
-		const response = await framed.read({ signal });
-		return decodeHopReservationResponse(response.subarray());
-	} finally {
-		if (stream.status !== "closed") await stream.close().catch(() => undefined);
-	}
-}
-
-function decodeHopReservationResponse(bytes: Uint8Array): RelayReservationWireResponse {
-	const fields = decodeProtobufFields(bytes);
-	const statusValue = fields.find(({ field, wire }) => field === 5 && wire === 0)?.value;
-	if (typeof statusValue !== "bigint" || statusValue > BigInt(Number.MAX_SAFE_INTEGER)) {
-		throw new Error("Circuit Relay v2 HOP response omitted a safe status enum");
-	}
-	const reservationValue = fields.find(({ field, wire }) => field === 3 && wire === 2)?.value;
-	const limitValue = fields.find(({ field, wire }) => field === 4 && wire === 2)?.value;
-	const reservationFields = reservationValue instanceof Uint8Array ? decodeProtobufFields(reservationValue) : [];
-	const limitFields = limitValue instanceof Uint8Array ? decodeProtobufFields(limitValue) : [];
-	const expire = reservationFields.find(({ field, wire }) => field === 1 && wire === 0)?.value;
-	const duration = limitFields.find(({ field, wire }) => field === 1 && wire === 0)?.value;
-	const data = limitFields.find(({ field, wire }) => field === 2 && wire === 0)?.value;
-	return {
-		...(typeof expire === "bigint" ? { reservation: { expire } } : {}),
-		...(typeof duration === "bigint" || typeof data === "bigint"
-			? {
-					limit: {
-						...(typeof data === "bigint" ? { data } : {}),
-						...(typeof duration === "bigint" ? { duration: Number(duration) } : {}),
-					},
-				}
-			: {}),
-		status: Number(statusValue),
-	};
-}
-
-function decodeProtobufFields(
-	bytes: Uint8Array
-): Array<{ readonly field: number; readonly value: bigint | Uint8Array; readonly wire: 0 | 2 }> {
-	const fields: Array<{ field: number; value: bigint | Uint8Array; wire: 0 | 2 }> = [];
-	let offset = 0;
-	while (offset < bytes.byteLength) {
-		const tag = readVarint(bytes, offset);
-		offset = tag.next;
-		const field = Number(tag.value >> BigInt(3));
-		const wire = Number(tag.value & BigInt(7));
-		if (field < 1 || (wire !== 0 && wire !== 2)) throw new Error("unsupported Relay v2 protobuf field");
-		if (wire === 0) {
-			const scalar = readVarint(bytes, offset);
-			offset = scalar.next;
-			fields.push({ field, value: scalar.value, wire });
-			continue;
-		}
-		const length = readVarint(bytes, offset);
-		if (length.value > BigInt(bytes.byteLength)) throw new Error("invalid Relay v2 protobuf length");
-		offset = length.next;
-		const end = offset + Number(length.value);
-		if (end > bytes.byteLength) throw new Error("truncated Relay v2 protobuf field");
-		fields.push({ field, value: bytes.slice(offset, end), wire });
-		offset = end;
-	}
-	return fields;
-}
-
-function readVarint(bytes: Uint8Array, offset: number): { readonly next: number; readonly value: bigint } {
-	let value = BigInt(0);
-	for (let shift = BigInt(0); shift <= BigInt(63) && offset < bytes.byteLength; shift += BigInt(7)) {
-		const byte = bytes[offset++] ?? 0;
-		value |= BigInt(byte & 0x7f) << shift;
-		if ((byte & 0x80) === 0) return { next: offset, value };
-	}
-	throw new Error("invalid Relay v2 protobuf varint");
 }
 
 async function inspectDirectProof(
