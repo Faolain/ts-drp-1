@@ -53,6 +53,7 @@ export * from "./probe/index.js";
 export * from "./grid/index.js";
 export * from "./failure-campaign/index.js";
 export * from "./public-campaign/index.js";
+export * from "./public-only/index.js";
 export * from "./record/index.js";
 export * from "./registry/index.js";
 export * from "./relay/index.js";

@@ -18,14 +18,10 @@ import process from "node:process";
 
 import { RequestBudget } from "../evidence.js";
 import { type AddressDecision, AddressPolicy, type AddressScope, type Resolver } from "../probe/address-policy.js";
+export { OFFICIAL_AMINO_BOOTSTRAPPERS } from "../public-infrastructure.js";
 
 export const AMINO_DHT_PROTOCOL = "/ipfs/kad/1.0.0";
 export const PUBLIC_NETWORK_ACKNOWLEDGEMENT = "I_ACKNOWLEDGE_PUBLIC_NETWORK_TRAFFIC";
-export const OFFICIAL_AMINO_BOOTSTRAPPERS = [
-	"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
-	"/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
-] as const;
-
 const DEFAULT_LIMITS: NodeRoutingLimits = {
 	maxAddressesPerPeer: 16,
 	maxNetworkRequests: 128,

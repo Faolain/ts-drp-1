@@ -209,6 +209,15 @@ function classifyScope(family: AddressFamily, value: string | undefined): Addres
 	return "unknown";
 }
 
+/**
+ * Classifies a literal IP address using the same scope rules as multiaddr dialing.
+ * @param value - IPv4 or IPv6 literal returned by a resolver.
+ * @returns Its public/private/reserved scope, or unknown for malformed input.
+ */
+export function classifyIpAddressScope(value: string): AddressScope {
+	return classifyScope(value.includes(":") ? "ipv6" : "ipv4", value);
+}
+
 function classifyIpv4(value: string): AddressScope {
 	const octets = value.split(".").map(Number);
 	if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {

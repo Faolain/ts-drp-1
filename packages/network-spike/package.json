@@ -68,6 +68,10 @@
 		"./public-campaign": {
 			"types": "./dist/src/public-campaign/index.d.ts",
 			"import": "./dist/src/public-campaign/index.js"
+		},
+		"./public-only": {
+			"types": "./dist/src/public-only/index.d.ts",
+			"import": "./dist/src/public-only/index.js"
 		}
 	},
 	"scripts": {
@@ -76,6 +80,7 @@
 		"grid:relay": "tsx src/grid-relay-fixture-cli.ts",
 		"failure-campaign": "tsx src/failure-campaign-cli.ts",
 		"public-campaign": "tsx src/public-campaign-cli.ts",
+		"public-only": "tsx src/public-only-cli.ts",
 		"bundle:browser-dht": "node scripts/browser-dht-bundle.mjs",
 		"clean": "rm -rf dist/ node_modules/",
 		"manifest": "tsx src/cli.ts",
