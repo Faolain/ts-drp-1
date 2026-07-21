@@ -21,11 +21,20 @@ import { ping } from "@libp2p/ping";
 import { pubsubPeerDiscovery, type PubSubPeerDiscoveryComponents } from "@libp2p/pubsub-peer-discovery";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
+import { dns, RecordType } from "@multiformats/dns";
 import { type Multiaddr, multiaddr, type MultiaddrInput } from "@multiformats/multiaddr";
 import { WebRTC } from "@multiformats/multiaddr-matcher";
 import { Logger } from "@ts-drp/logger";
+import { AllowlistVerifier, InviteVerifier, type MembershipVerifier } from "@ts-drp/membership";
 import { MessageQueue } from "@ts-drp/message-queue";
+import { type AddressDecision, AddressPolicy, classifyIpAddressScope, type Resolver } from "@ts-drp/rendezvous";
 import {
+	type ControlPlaneAddressFamily,
+	type ControlPlaneAddressReason,
+	type ControlPlaneAddressScope,
+	type ControlPlaneEvent,
+	type ControlPlaneMembershipConfig,
+	type ControlPlaneTransport,
 	DRP_DISCOVERY_TOPIC,
 	DRP_INTERVAL_DISCOVERY_TOPIC,
 	type DRPNetworkNodeConfig,
@@ -120,7 +129,7 @@ export interface DRPNetworkHostConfigSnapshot {
 	readonly bootstrapPeerCount: number;
 	readonly coldStartPubsubDiscovery: boolean;
 	readonly gossipSubPeerExchange: boolean;
-	readonly outboundAddressPolicy: "allow-all" | "injected";
+	readonly outboundAddressPolicy: "address-policy" | "allow-all" | "injected";
 	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
 }
 
@@ -132,6 +141,128 @@ export interface DRPNetworkNodeDependencies {
 const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
 
 const defaultHostFactory: DRPNetworkHostFactory = (context) => context.createHost();
+
+/**
+ * The `@multiformats/dns` package uses the operating system's dns/promises resolver in Node. Its browser bundle uses
+ * DNS-over-HTTPS resolvers for Cloudflare and Google, shuffled before lookup, which discloses queried hostnames to
+ * those providers. The address gate sets cached:false below to enforce the frozen dial-time DNS recheck rule. This
+ * same gate is also reached through libp2p's peerStore addressFilter, so stored candidates receive the same check.
+ */
+const outboundDns = dns();
+const outboundDnsResolver: Resolver = {
+	async resolve(hostname, signal, family): Promise<string[]> {
+		const types =
+			family === "ipv4" ? [RecordType.A] : family === "ipv6" ? [RecordType.AAAA] : [RecordType.A, RecordType.AAAA];
+		const results = await Promise.allSettled(
+			types.map(async (recordType) => {
+				const response = await outboundDns.query(hostname, {
+					cached: false,
+					signal,
+					types: [recordType],
+				});
+				return response.Answer.filter(({ type }) => isAddressRecordType(type, recordType)).map(({ data }) => data);
+			})
+		);
+		const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+		if (failures.length === results.length) {
+			throw new AggregateError(
+				failures.map(({ reason }) => reason),
+				`DNS address lookup failed for ${hostname}`
+			);
+		}
+		return results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+	},
+};
+
+function isAddressRecordType(type: unknown, requestedType: RecordType): boolean {
+	return requestedType === RecordType.A
+		? type === RecordType.A || type === "A"
+		: type === RecordType.AAAA || type === "AAAA";
+}
+
+function createMembershipVerifier(config: ControlPlaneMembershipConfig | undefined): MembershipVerifier | undefined {
+	if (config === undefined) return undefined;
+	const runtimeConfig = config as {
+		allowlist?: { allowedPeerIds?: unknown };
+		invite?: { inviteToken?: unknown };
+		mode?: unknown;
+	};
+	if (runtimeConfig.mode === "invite") {
+		if (typeof runtimeConfig.invite?.inviteToken !== "string" || runtimeConfig.invite.inviteToken.length === 0) {
+			throw new Error("control_plane.membership invite mode requires invite.inviteToken");
+		}
+		return new InviteVerifier({ inviteToken: runtimeConfig.invite.inviteToken });
+	}
+	if (runtimeConfig.mode === "allowlist") {
+		if (
+			!Array.isArray(runtimeConfig.allowlist?.allowedPeerIds) ||
+			runtimeConfig.allowlist.allowedPeerIds.length === 0 ||
+			!runtimeConfig.allowlist.allowedPeerIds.every((peerId) => typeof peerId === "string")
+		) {
+			throw new Error("control_plane.membership allowlist mode requires a non-empty allowlist.allowedPeerIds");
+		}
+		return new AllowlistVerifier({ allowedPeerIds: runtimeConfig.allowlist.allowedPeerIds });
+	}
+	throw new Error("control_plane.membership.mode must be one of: invite, allowlist");
+}
+
+function boundedAddressReason(decision: AddressDecision): ControlPlaneAddressReason {
+	const [reason] = decision.reasons;
+	if (
+		reason === "browser-oriented-transport" ||
+		reason === "dns-empty" ||
+		reason === "dns-family-mismatch" ||
+		reason === "dns-rebinding-risk" ||
+		reason === "insecure-websocket" ||
+		reason === "missing-dns-name" ||
+		reason === "node-only-transport" ||
+		reason === "unsupported-transport" ||
+		reason?.startsWith("scope-") === true
+	) {
+		return reason as ControlPlaneAddressReason;
+	}
+	return decision.dialable ? "accepted" : "address-policy";
+}
+
+function sanitizedAddressFields(address: Multiaddr): {
+	family: ControlPlaneAddressFamily;
+	scope: ControlPlaneAddressScope;
+	transport: ControlPlaneTransport;
+} {
+	const components = address.getComponents();
+	const names = components.map(({ name }) => name);
+	const host = components.find(({ name }) => ["ip4", "ip6", "dns", "dns4", "dns6", "dnsaddr"].includes(name));
+	const family: ControlPlaneAddressFamily =
+		host?.name === "ip4"
+			? "ipv4"
+			: host?.name === "ip6"
+				? "ipv6"
+				: host?.name === "dns" || host?.name === "dns4" || host?.name === "dns6" || host?.name === "dnsaddr"
+					? "dns"
+					: "unknown";
+	const scope: ControlPlaneAddressScope =
+		family === "ipv4" || family === "ipv6"
+			? classifyIpAddressScope(host?.value ?? "")
+			: family === "dns"
+				? "unresolved"
+				: "unknown";
+	const transport: ControlPlaneTransport = names.includes("p2p-circuit")
+		? "relay"
+		: names.includes("webrtc-direct") || names.includes("webrtc")
+			? "webrtc-direct"
+			: names.includes("webtransport")
+				? "webtransport"
+				: names.includes("wss") || (names.includes("ws") && names.includes("tls"))
+					? "wss"
+					: names.includes("ws")
+						? "ws"
+						: names.includes("quic-v1")
+							? "quic-v1"
+							: names.includes("tcp")
+								? "tcp"
+								: "unknown";
+	return { family, scope, transport };
+}
 
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
@@ -147,6 +278,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
 	private readonly _hostFactory: DRPNetworkHostFactory;
 	private readonly _hostPolicy: DRPNetworkHostPolicy;
+	private _membershipVerifier?: MembershipVerifier;
+	private _outboundAddressPolicy: DRPNetworkHostConfigSnapshot["outboundAddressPolicy"] = "allow-all";
 
 	peerId = "";
 
@@ -163,8 +296,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		this._config = config;
 		this._hostFactory = dependencies.hostFactory ?? defaultHostFactory;
 		this._hostPolicy = dependencies.hostPolicy ?? {};
+		this._membershipVerifier = createMembershipVerifier(config?.control_plane?.membership);
 		log = new Logger("drp::network", config?.log_config);
 		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
+	}
+
+	/**
+	 * Verifier selected by the configured control-plane membership owner. This seam is constructed and exposed but is
+	 * not yet enforced on any connection path; enforcement arrives with rendezvous integration.
+	 * @returns The configured verifier, or undefined when membership is not configured.
+	 */
+	get membershipVerifier(): MembershipVerifier | undefined {
+		return this._membershipVerifier;
 	}
 
 	/**
@@ -215,18 +358,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			pubsub: gossipsub(this.getGossipSubConfig(_bootstrapPeerID, gossipSubPeerExchange)),
 		};
 
-		if (this._config?.bootstrap || this._config?.autonat) {
+		if (this._config?.autonat) {
 			_node_services = { ..._node_services, autonat: autoNAT() };
 		}
 
-		const maxRelayReservations = this._config?.relay?.max_reservations ?? Number.POSITIVE_INFINITY;
+		const maxRelayReservations = this._config?.relay_service?.max_reservations ?? Number.POSITIVE_INFINITY;
 		if (
 			maxRelayReservations !== Number.POSITIVE_INFINITY &&
 			(!Number.isSafeInteger(maxRelayReservations) || maxRelayReservations < 0)
 		) {
-			throw new Error("relay.max_reservations must be a non-negative safe integer");
+			throw new Error("relay_service.max_reservations must be a non-negative safe integer");
 		}
-		const _bootstrap_services = {
+		const _relayServices = {
 			..._node_services,
 			relay: circuitRelayServer({
 				reservations: {
@@ -235,6 +378,54 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}),
 		};
 
+		const configuredAddressPolicy = this._config?.control_plane?.address_policy;
+		const addressPolicy =
+			this._config?.control_plane === undefined
+				? undefined
+				: new AddressPolicy({
+						allowInsecureWebSocket: configuredAddressPolicy?.allowInsecureWebSocket,
+						allowLoopback: configuredAddressPolicy?.allowLoopback,
+						allowPrivate: configuredAddressPolicy?.allowPrivate,
+						target: configuredAddressPolicy?.target ?? (isBrowser || isWebWorker ? "browser" : "node"),
+					});
+		const addressResolver = configuredAddressPolicy?.resolver ?? outboundDnsResolver;
+		const addressPolicyGate: DenyDialMultiaddr | undefined =
+			addressPolicy === undefined
+				? undefined
+				: async (address): Promise<boolean> => {
+						try {
+							const decision = await addressPolicy.evaluate(
+								address.toString(),
+								addressResolver,
+								AbortSignal.timeout(2_000)
+							);
+							this._emitControlPlaneEvent({
+								family: decision.family,
+								kind: "address-admission",
+								outcome: decision.dialable ? "accepted" : "denied",
+								reason: boundedAddressReason(decision),
+								scope: decision.scope,
+								transport: decision.transports[0] ?? "unknown",
+							});
+							return !decision.dialable;
+						} catch {
+							this._emitControlPlaneEvent({
+								...sanitizedAddressFields(address),
+								kind: "address-admission",
+								outcome: "denied",
+								reason: "address-policy",
+							});
+							return true;
+						}
+					};
+		const outboundAddressPolicy =
+			this._hostPolicy.denyDialMultiaddr !== undefined
+				? "injected"
+				: addressPolicyGate !== undefined
+					? "address-policy"
+					: "allow-all";
+		this._outboundAddressPolicy = outboundAddressPolicy;
+		const activeAddressPolicyGate = this._hostPolicy.denyDialMultiaddr === undefined ? addressPolicyGate : undefined;
 		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
@@ -247,11 +438,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			connectionEncrypters: [noise()],
 			connectionGater: {
-				denyDialMultiaddr: this._hostPolicy.denyDialMultiaddr ?? ((): false => false),
+				denyDialMultiaddr: this._hostPolicy.denyDialMultiaddr ?? activeAddressPolicyGate ?? ((): false => false),
+				...(activeAddressPolicyGate === undefined
+					? {}
+					: {
+							filterMultiaddrForPeer: async (_peer, address): Promise<boolean> =>
+								!(await activeAddressPolicyGate(address)),
+						}),
 			},
 			metrics: this._config?.browser_metrics ? inspectorMetrics() : undefined,
+			...(activeAddressPolicyGate === undefined ? {} : { dns: outboundDns }),
 			peerDiscovery: _peerDiscovery,
-			services: this._config?.bootstrap ? _bootstrap_services : _node_services,
+			services: this._config?.relay_service?.enabled === true ? _relayServices : _node_services,
 			streamMuxers: [yamux()],
 			transports: [circuitRelayTransport(), webRTC(), webSockets()],
 		};
@@ -260,7 +458,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			bootstrapPeerCount: bootstrapDiscovery ? bootstrapNodes.length : 0,
 			coldStartPubsubDiscovery,
 			gossipSubPeerExchange,
-			outboundAddressPolicy: this._hostPolicy.denyDialMultiaddr === undefined ? "allow-all" : "injected",
+			outboundAddressPolicy,
 			peerDiscoveryModules: Object.freeze([
 				...(coldStartPubsubDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
 				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
@@ -292,6 +490,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (host !== builtHost) throw new Error("DRP network host factory must return the host built by createHost()");
 			this._node = host;
 		} catch (error) {
+			this._emitControlPlaneEvent({ kind: "listen-readiness", outcome: "failed", transport: "unknown" });
 			if (!builtHost && hostBuild) {
 				try {
 					builtHost = await hostBuild;
@@ -312,8 +511,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			"::start: running on:",
 			this._node.getMultiaddrs().map((addr) => addr.toString())
 		);
+		const [listenAddress] = this._node.getMultiaddrs();
+		this._emitControlPlaneEvent({
+			kind: "listen-readiness",
+			outcome: "ready",
+			transport: listenAddress === undefined ? "unknown" : sanitizedAddressFields(listenAddress).transport,
+		});
 
-		if (!this._config?.bootstrap && bootstrapDiscovery) {
+		if (!this._config?.seed && bootstrapDiscovery) {
 			this._bootstrapRetryController?.abort();
 			this._bootstrapRetryController = new AbortController();
 			for (const addr of bootstrapNodes) {
@@ -416,7 +621,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async restart(config?: DRPNetworkNodeConfig, rawPrivateKey?: Uint8Array): Promise<void> {
 		await this.stop();
-		if (config) this._config = config;
+		if (config) {
+			this._config = config;
+			this._membershipVerifier = createMembershipVerifier(config.control_plane?.membership);
+		}
 		await this.start(rawPrivateKey);
 	}
 
@@ -470,7 +678,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			scoreParams: this.getGossipSubPeerScoreParams(bootstapNodeList),
 		};
 
-		if (this._config?.bootstrap) {
+		if (this._config?.seed) {
 			baseConfig.D = 0;
 			baseConfig.Dlo = 0;
 			baseConfig.Dhi = 0;
@@ -488,7 +696,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	}
 
 	private getGossipSubPeerScoreParams(bootstapNodeList: string[]): PeerScoreParams {
-		if (this._config?.bootstrap) {
+		if (this._config?.seed) {
 			return createPeerScoreParams({ topicScoreCap: 50, IPColocationFactorWeight: 0 });
 		}
 
@@ -569,6 +777,48 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return addrs;
 	}
 
+	private _emitControlPlaneEvent(event: ControlPlaneEvent): void {
+		const sink = this._config?.control_plane?.observability?.sink;
+		if (sink === undefined) return;
+		try {
+			sink(event);
+		} catch {
+			// Telemetry is best-effort and must never affect network behavior.
+		}
+	}
+
+	private _firstDialAddress(peer: string[] | string | PeerId | Multiaddr | Multiaddr[]): Multiaddr | undefined {
+		const candidate = Array.isArray(peer) ? peer[0] : peer;
+		if (typeof candidate !== "string") {
+			return candidate !== undefined && "getComponents" in candidate ? candidate : undefined;
+		}
+		if (!candidate.includes("/")) return undefined;
+		try {
+			return multiaddr(candidate);
+		} catch {
+			return undefined;
+		}
+	}
+
+	private _emitDialOutcome(address: Multiaddr | undefined, outcome: "denied" | "failed" | "ok"): void {
+		if (this._config?.control_plane?.observability?.sink === undefined) return;
+		this._emitControlPlaneEvent({
+			...(address === undefined
+				? ({ family: "unknown", scope: "unknown", transport: "unknown" } as const)
+				: sanitizedAddressFields(address)),
+			kind: "dial-attempt",
+			outcome,
+			reason:
+				outcome === "ok"
+					? "connected"
+					: outcome === "denied" && this._outboundAddressPolicy === "injected"
+						? "injected-policy"
+						: outcome === "denied"
+							? "address-policy"
+							: "dial-failed",
+		});
+	}
+
 	/**
 	 * Dial a peer with a peerId, multiaddr or array of multiaddrs it also handles the case where the caller
 	 * do something bad like passing multiaddrs that as different PeerIds
@@ -580,15 +830,27 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		peerId: string[] | string | PeerId | Multiaddr | Multiaddr[],
 		node: Libp2p | undefined = this._node
 	): Promise<Connection | undefined> {
-		const isArray = Array.isArray(peerId);
-		if (!isArray) {
-			const addr =
-				typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
-			return node?.dial(addr);
+		const eventAddress = this._firstDialAddress(peerId);
+		try {
+			const isArray = Array.isArray(peerId);
+			let connection: Connection | undefined;
+			if (!isArray) {
+				const addr =
+					typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
+				connection = await node?.dial(addr);
+			} else {
+				const addrsPerPeerId = this.addrsPerPeerId(peerId);
+				connection = await Promise.race(Object.values(addrsPerPeerId).map((addrs) => node?.dial(addrs)));
+			}
+			this._emitDialOutcome(eventAddress, connection === undefined ? "failed" : "ok");
+			return connection;
+		} catch (error) {
+			this._emitDialOutcome(
+				eventAddress,
+				error instanceof Error && error.name === "DialDeniedError" ? "denied" : "failed"
+			);
+			throw error;
 		}
-
-		const addrsPerPeerId = this.addrsPerPeerId(peerId);
-		return Promise.race(Object.values(addrsPerPeerId).map((addrs) => node?.dial(addrs)));
 	}
 
 	/**

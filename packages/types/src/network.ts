@@ -17,16 +17,129 @@ export interface GroupPeerChange {
 
 export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
 
+export type ControlPlaneAddressFamily = "ipv4" | "ipv6" | "dns" | "unknown";
+
+export type ControlPlaneAddressScope =
+	| "public"
+	| "private"
+	| "loopback"
+	| "link-local"
+	| "multicast"
+	| "reserved"
+	| "unresolved"
+	| "unknown";
+
+export type ControlPlaneTransport =
+	| "ws"
+	| "wss"
+	| "webtransport"
+	| "webrtc-direct"
+	| "relay"
+	| "tcp"
+	| "quic-v1"
+	| "unknown";
+
+export type ControlPlaneAddressReason =
+	| "accepted"
+	| "address-policy"
+	| "browser-oriented-transport"
+	| "dns-empty"
+	| "dns-family-mismatch"
+	| "dns-rebinding-risk"
+	| "insecure-websocket"
+	| "injected-policy"
+	| "missing-dns-name"
+	| "node-only-transport"
+	| `scope-${ControlPlaneAddressScope}`
+	| "unsupported-transport";
+
+export type ControlPlaneDialReason = ControlPlaneAddressReason | "aborted" | "connected" | "dial-failed";
+
+export type ControlPlaneResolverAddressFamily = "ipv4" | "ipv6" | undefined;
+
+/** Structural DNS seam used by the dial-time address policy. */
+export interface ControlPlaneAddressResolver {
+	resolve(hostname: string, signal: AbortSignal, family: ControlPlaneResolverAddressFamily): Promise<string[]>;
+}
+
+interface ControlPlaneAddressEventFields {
+	readonly family: ControlPlaneAddressFamily;
+	readonly scope: ControlPlaneAddressScope;
+	readonly transport: ControlPlaneTransport;
+}
+
+/** Sanitized, bounded control-plane telemetry. Raw locators and identities are intentionally absent. */
+export type ControlPlaneEvent =
+	| (ControlPlaneAddressEventFields & {
+			readonly kind: "address-admission";
+			readonly outcome: "accepted" | "denied";
+			readonly reason: ControlPlaneAddressReason;
+	  })
+	| (ControlPlaneAddressEventFields & {
+			readonly kind: "dial-attempt";
+			readonly outcome: "ok" | "denied" | "failed";
+			readonly reason: ControlPlaneDialReason;
+	  })
+	| {
+			readonly kind: "listen-readiness";
+			readonly outcome: "ready" | "failed";
+			readonly transport: ControlPlaneTransport;
+	  }
+	| {
+			readonly kind: "relay-reservation";
+			readonly outcome: "acquired" | "expired" | "failed" | "refused" | "released" | "replaced";
+			readonly relayIdHash?: string;
+	  }
+	| { readonly kind: "first-authenticated-peer"; readonly peerIdHash: string }
+	| { readonly kind: "terminal"; readonly reason: "aborted" | "deadline" | "failed" | "stopped" | "succeeded" }
+	| { readonly kind: "cleanup"; readonly outcome: "complete" | "failed" };
+
+export interface ControlPlaneAddressPolicyConfig {
+	readonly allowInsecureWebSocket?: boolean;
+	readonly allowLoopback?: boolean;
+	readonly allowPrivate?: boolean;
+	readonly resolver?: ControlPlaneAddressResolver;
+	readonly target: "browser" | "node";
+}
+
+export type ControlPlaneMembershipConfig =
+	| {
+			readonly allowlist: { readonly allowedPeerIds: readonly string[] };
+			readonly mode: "allowlist";
+	  }
+	| {
+			readonly invite: { readonly inviteToken: string };
+			readonly mode: "invite";
+	  };
+
+/** Phase 2 structural owners; later phases add runtime implementations behind these sections. */
+export interface ControlPlaneConfig {
+	readonly address_policy?: ControlPlaneAddressPolicyConfig;
+	readonly membership?: ControlPlaneMembershipConfig;
+	readonly observability?: {
+		sink(event: ControlPlaneEvent): void;
+	};
+	readonly relay_policy?: {
+		readonly target_reservations?: number;
+	};
+	readonly rendezvous?: {
+		readonly endpoints?: readonly string[];
+		readonly namespace?: string;
+	};
+	readonly routing?: {
+		readonly browser?: { readonly endpoints?: readonly string[] };
+		readonly node?: { readonly enabled?: boolean };
+	};
+}
+
 /**
  * Configuration interface for DRP Network Node
  */
 export interface DRPNetworkNodeConfig {
 	/** List of addresses to announce to the network */
 	announce_addresses?: string[];
-	/** Whether to enable AutoNAT address verification independently of bootstrap-server mode */
+	/** Whether to enable AutoNAT address verification independently of local node roles. */
 	autonat?: boolean;
-	/** Whether this node is a bootstrap node */
-	bootstrap?: boolean;
 	/** List of bootstrap peers to connect to */
 	bootstrap_peers?: string[];
 	/** Whether to enable browser metrics */
@@ -35,6 +148,8 @@ export interface DRPNetworkNodeConfig {
 	listen_addresses?: string[];
 	/** Logger configuration options */
 	log_config?: LoggerOptions;
+	/** Independently owned routing, rendezvous, relay-client, admission, and telemetry policy. */
+	control_plane?: ControlPlaneConfig;
 	/** Pubsub configuration */
 	pubsub?: {
 		/** Interval in milliseconds between peer discovery attempts */
@@ -44,11 +159,24 @@ export interface DRPNetworkNodeConfig {
 		/** URL of the pushgateway to send metrics to */
 		pushgateway_url?: string;
 	};
-	/** Circuit Relay v2 server configuration. */
-	relay?: {
-		/** Maximum simultaneous reservations accepted by a bootstrap relay. */
+	/** Optional local Circuit Relay v2 service capacity, independent of seed behavior. */
+	relay_service?: {
+		/** Whether this node serves relay reservations. */
+		enabled: boolean;
+		/** Maximum simultaneous reservations accepted by the relay service. */
 		max_reservations?: number;
 	};
+	/** Whether this node is a forward-only fixed rendezvous seed. */
+	seed?: boolean;
+}
+
+/** Minimal structural membership verifier exposed without importing the membership package. */
+export interface DRPNetworkMembershipVerifier {
+	verify(request: {
+		readonly credential?: unknown;
+		readonly peerId: string;
+		readonly signal: AbortSignal;
+	}): Promise<unknown>;
 }
 
 /**
@@ -59,6 +187,9 @@ export interface DRPNetworkNode {
 	 * The unique identifier of this node in the network
 	 */
 	peerId: string;
+
+	/** Constructed membership verifier seam; connection-path enforcement is not active until rendezvous integration. */
+	readonly membershipVerifier: DRPNetworkMembershipVerifier | undefined;
 
 	/**
 	 * Starts the network node and begins listening for connections

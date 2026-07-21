@@ -550,7 +550,6 @@ export async function createNodeRouting(options: NodeRoutingOptions = {}): Promi
 	const networkNode = new DRPNetworkNode(
 		{
 			autonat: true,
-			bootstrap: false,
 			bootstrap_peers: [...(options.bootstrapPeers ?? [])],
 			listen_addresses: [...(options.listenAddresses ?? ["/ip4/127.0.0.1/tcp/0"])],
 			log_config: { level: "silent" },

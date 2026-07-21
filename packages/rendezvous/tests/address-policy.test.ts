@@ -1,5 +1,5 @@
 import { type AddressCandidate, AddressPolicy, type Resolver } from "@ts-drp/rendezvous";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const signal = new AbortController().signal;
 const publicResolver: Resolver = {
@@ -55,6 +55,36 @@ describe("AddressPolicy", () => {
 			dialable: true,
 			transports: ["quic-v1"],
 		});
+		await expect(
+			new AddressPolicy({ allowInsecureWebSocket: true, target: "node" }).evaluate(
+				"/ip4/8.8.8.8/tcp/80/ws",
+				publicResolver,
+				signal
+			)
+		).resolves.toMatchObject({ dialable: true, transports: ["ws"] });
+	});
+
+	it("passes DNS family intent to the resolver and preserves explicit-family mismatch rejection", async () => {
+		const policy = new AddressPolicy({ target: "node" });
+		const resolve = vi.fn((_hostname: string, _signal: AbortSignal, family: "ipv4" | "ipv6" | undefined) =>
+			Promise.resolve(family === "ipv6" ? ["8.8.8.8"] : ["8.8.8.8", "2001:4860:4860::8888"])
+		);
+		const resolver: Resolver = { resolve };
+
+		await expect(policy.evaluate("/dns4/v4.example/tcp/443", resolver, signal)).resolves.toMatchObject({
+			dialable: false,
+			reasons: expect.arrayContaining(["dns-family-mismatch"]),
+		});
+		expect(resolve).toHaveBeenLastCalledWith("v4.example", signal, "ipv4");
+
+		await expect(policy.evaluate("/dns6/v6.example/tcp/443", resolver, signal)).resolves.toMatchObject({
+			dialable: false,
+			reasons: expect.arrayContaining(["dns-family-mismatch"]),
+		});
+		expect(resolve).toHaveBeenLastCalledWith("v6.example", signal, "ipv6");
+
+		await policy.evaluate("/dns/dual.example/tcp/443", resolver, signal);
+		expect(resolve).toHaveBeenLastCalledWith("dual.example", signal, undefined);
 	});
 
 	it("rejects private/local addresses, insecure WebSockets, and DNS rebinding", async () => {

@@ -10,10 +10,20 @@ export type AddressScope =
 	| "reserved"
 	| "unresolved"
 	| "unknown";
-export type AddressTransport = "wss" | "webtransport" | "webrtc-direct" | "relay" | "tcp" | "quic-v1" | "unknown";
+export type AddressTransport =
+	| "ws"
+	| "wss"
+	| "webtransport"
+	| "webrtc-direct"
+	| "relay"
+	| "tcp"
+	| "quic-v1"
+	| "unknown";
+
+export type ResolverAddressFamily = "ipv4" | "ipv6" | undefined;
 
 export interface Resolver {
-	resolve(hostname: string, signal: AbortSignal): Promise<string[]>;
+	resolve(hostname: string, signal: AbortSignal, family: ResolverAddressFamily): Promise<string[]>;
 }
 
 export interface AddressDecision {
@@ -80,10 +90,10 @@ export class AddressPolicy {
 		const components = address.getComponents();
 		const names = components.map((component) => component.name);
 		const host = components.find((component) => {
-			return ["ip4", "ip6", "dns", "dns4", "dns6"].includes(component.name);
+			return ["ip4", "ip6", "dns", "dns4", "dns6", "dnsaddr"].includes(component.name);
 		});
 		const family = classifyFamily(host?.name);
-		const transports = classifyTransports(names, this.#options.allowInsecureWebSocket === true);
+		const transports = classifyTransports(names);
 		const reasons: string[] = [];
 		let scope = classifyScope(family, host?.value);
 		let resolvedScopes: AddressScope[] = [];
@@ -92,13 +102,14 @@ export class AddressPolicy {
 			if (host?.value === undefined) {
 				reasons.push("missing-dns-name");
 			} else {
-				const resolved = await resolver.resolve(host.value, signal);
+				const requestedFamily = resolverFamily(host.name);
+				const resolved = await resolver.resolve(host.value, signal, requestedFamily);
 				resolvedScopes = resolved.map((value) => classifyScope(value.includes(":") ? "ipv6" : "ipv4", value));
 				if (resolved.length === 0) {
 					reasons.push("dns-empty");
 				} else if (
-					(host.name === "dns4" && resolved.some((value) => value.includes(":"))) ||
-					(host.name === "dns6" && resolved.some((value) => !value.includes(":")))
+					(requestedFamily === "ipv4" && resolved.some((value) => value.includes(":"))) ||
+					(requestedFamily === "ipv6" && resolved.some((value) => !value.includes(":")))
 				) {
 					reasons.push("dns-family-mismatch");
 				} else if (resolvedScopes.some((value) => value !== "public")) {
@@ -182,19 +193,33 @@ export class AddressPolicy {
 function classifyFamily(protocolName: string | undefined): AddressFamily {
 	if (protocolName === "ip4") return "ipv4";
 	if (protocolName === "ip6") return "ipv6";
-	if (protocolName === "dns" || protocolName === "dns4" || protocolName === "dns6") return "dns";
+	if (protocolName === "dns" || protocolName === "dns4" || protocolName === "dns6" || protocolName === "dnsaddr") {
+		return "dns";
+	}
 	return "unknown";
 }
 
-function classifyTransports(names: string[], allowInsecureWebSocket = false): AddressTransport[] {
+function resolverFamily(protocolName: string): ResolverAddressFamily {
+	if (protocolName === "dns4") return "ipv4";
+	if (protocolName === "dns6") return "ipv6";
+	return undefined;
+}
+
+function classifyTransports(names: string[]): AddressTransport[] {
 	const transports: AddressTransport[] = [];
 	if (names.includes("p2p-circuit")) transports.push("relay");
 	if (names.includes("webrtc-direct")) transports.push("webrtc-direct");
 	if (names.includes("webtransport")) transports.push("webtransport");
-	if (names.includes("wss") || (names.includes("ws") && (names.includes("tls") || allowInsecureWebSocket))) {
-		transports.push("wss");
+	if (names.includes("wss") || (names.includes("ws") && names.includes("tls"))) transports.push("wss");
+	else if (names.includes("ws")) transports.push("ws");
+	if (
+		names.includes("tcp") &&
+		!transports.includes("ws") &&
+		!transports.includes("wss") &&
+		!transports.includes("relay")
+	) {
+		transports.push("tcp");
 	}
-	if (names.includes("tcp") && !transports.includes("wss") && !transports.includes("relay")) transports.push("tcp");
 	if (names.includes("quic-v1") && !transports.includes("webtransport") && !transports.includes("relay")) {
 		transports.push("quic-v1");
 	}

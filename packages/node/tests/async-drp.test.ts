@@ -15,9 +15,10 @@ describe("Async DRP", () => {
 
 	beforeEach(async () => {
 		btNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws"],
 			bootstrap_peers: [],
+			relay_service: { enabled: true },
+			seed: true,
 			log_config: {
 				level: "silent",
 			},

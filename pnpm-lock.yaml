@@ -424,6 +424,9 @@ importers:
       '@libp2p/webtransport':
         specifier: ^6.0.31
         version: 6.0.31
+      '@multiformats/dns':
+        specifier: ^1.0.15
+        version: 1.0.15
       '@multiformats/multiaddr':
         specifier: ^13.0.3
         version: 13.0.3
@@ -433,9 +436,15 @@ importers:
       '@ts-drp/logger':
         specifier: ^0.11.0
         version: link:../logger
+      '@ts-drp/membership':
+        specifier: workspace:*
+        version: link:../membership
       '@ts-drp/message-queue':
         specifier: 0.11.0
         version: link:../message-queue
+      '@ts-drp/rendezvous':
+        specifier: workspace:*
+        version: link:../rendezvous
       '@ts-drp/types':
         specifier: ^0.11.0
         version: link:../types

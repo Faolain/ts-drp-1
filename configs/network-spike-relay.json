@@ -1,8 +1,10 @@
 {
 	"network_config": {
+		"autonat": true,
 		"listen_addresses": ["/ip4/0.0.0.0/tcp/50000/ws"],
-		"bootstrap": true,
-		"bootstrap_peers": []
+		"bootstrap_peers": [],
+		"relay_service": { "enabled": true },
+		"seed": true
 	},
 	"keychain_config": {
 		"private_key_seed": "bootstrap"

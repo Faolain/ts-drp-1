@@ -50,10 +50,11 @@ async function getBootstrapNode(): Promise<DRPNode> {
 async function getNetworkConfiguration(logConfig: LoggerOptions, isBootstrap = false): Promise<DRPNetworkNodeConfig> {
 	if (isBootstrap) {
 		return {
-			bootstrap: isBootstrap,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws", "/ip4/0.0.0.0/tcp/0"],
 			bootstrap_peers: [],
 			log_config: logConfig,
+			relay_service: { enabled: true },
+			seed: true,
 			pubsub: {
 				peer_discovery_interval: 30_000,
 			},

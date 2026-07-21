@@ -95,7 +95,12 @@ it("proves one real DRP identity owns local Amino publication, a real relay list
 	const dhtServer = await createNodeRouting({ allowInsecureWebSocketFixture: true, mode: "server", network: "local" });
 	const relayNode = new DRPNode({
 		keychain_config: { private_key_seed: "public-only-publisher-relay" },
-		network_config: { bootstrap: true, bootstrap_peers: [], listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"] },
+		network_config: {
+			bootstrap_peers: [],
+			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+			relay_service: { enabled: true },
+			seed: true,
+		},
 	});
 	let host: Libp2p | undefined;
 	const hostFactory: DRPNetworkHostFactory = async (context) => {
@@ -103,7 +108,6 @@ it("proves one real DRP identity owns local Amino publication, a real relay list
 		return host;
 	};
 	const networkConfig = {
-		bootstrap: false,
 		bootstrap_peers: [],
 		listen_addresses: ["/ip4/127.0.0.1/tcp/0"],
 		log_config: { level: "silent" as const },

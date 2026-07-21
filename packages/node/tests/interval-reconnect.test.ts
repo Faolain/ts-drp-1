@@ -35,9 +35,10 @@ describe("Reconnect test", () => {
 		});
 		await keychain.start();
 		bootstrapNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws"],
 			bootstrap_peers: [],
+			relay_service: { enabled: true },
+			seed: true,
 		});
 		await bootstrapNode.start(keychain.secp256k1PrivateKey);
 		const bootstrapMultiaddrs = bootstrapNode.getMultiaddrs();

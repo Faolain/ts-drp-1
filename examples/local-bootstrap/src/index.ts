@@ -73,7 +73,6 @@ function main(): void {
 					bootstrap_peers: [
 						`/${select_address_type.value}/${bootstrap_node_addr.value}/tcp/${bootstrap_node_port.value}/${ws_protocl}/p2p/${bootstrap_node_peer_id.value}`,
 					],
-					bootstrap: false,
 				},
 			});
 

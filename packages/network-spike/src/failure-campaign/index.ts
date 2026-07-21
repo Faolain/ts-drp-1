@@ -858,7 +858,7 @@ async function runComposedOutage(
 	childBudgets.push(
 		await runChildBudget(context, resources, "owned-fallback", CHILD_BUDGETS.ownedFallbackMs, async (signal, ready) => {
 			try {
-				await context.resolver.resolve("owned-fallback.invalid", signal);
+				await context.resolver.resolve("owned-fallback.invalid", signal, undefined);
 			} catch {
 				// The injected resolver outage is the observed fallback failure.
 			}

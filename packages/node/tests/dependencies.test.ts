@@ -29,6 +29,7 @@ function createFakeNetwork(): FakeNetworkControls {
 	});
 	const stop = vi.fn(() => Promise.resolve());
 	const networkNode = {
+		membershipVerifier: undefined,
 		peerId: "",
 		start,
 		stop,

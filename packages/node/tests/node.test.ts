@@ -304,9 +304,10 @@ describe("DRPObject connection tests", () => {
 
 	beforeEach(async () => {
 		bootstrapNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws"],
 			bootstrap_peers: [],
+			relay_service: { enabled: true },
+			seed: true,
 		});
 		await bootstrapNode.start();
 

@@ -80,10 +80,11 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 		vi.spyOn(Date, "now").mockImplementation(() => realNow() + skewMs);
 
 		bootstrapNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 			bootstrap_peers: [],
 			log_config: { level: "silent" },
+			relay_service: { enabled: true },
+			seed: true,
 		});
 		await bootstrapNode.start();
 		const btLibp2p = bootstrapNode["_node"] as Libp2p;

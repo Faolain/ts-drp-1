@@ -6,7 +6,7 @@
  *
  * Cheapest working pattern found in this repo (derived from
  * packages/node/tests/handlers.test.ts and async-drp.test.ts):
- *   - bootstrap: DRPNetworkNode({ bootstrap: true, listen /ip4/.../tcp/0/ws })
+ *   - bootstrap: DRPNetworkNode({ seed: true, relay_service: { enabled: true }, listen /ip4/.../tcp/0/ws })
  *   - each node: explicit ws listen address (default listen is
  *     /p2p-circuit + /webrtc, which is NOT directly dialable in-process
  *     without relay round-trips) + bootstrap_peers -> the local bootstrap
@@ -115,10 +115,11 @@ export async function spawnCluster(n: number, options: SpawnClusterOptions = {})
 
 	// 1. bootstrap/relay node
 	const bootstrap = new DRPNetworkNode({
-		bootstrap: true,
 		listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 		bootstrap_peers: [],
 		log_config: silent,
+		relay_service: { enabled: true },
+		seed: true,
 	});
 	await bootstrap.start();
 	const tBootstrap = performance.now();
