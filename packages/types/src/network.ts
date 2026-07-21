@@ -92,6 +92,14 @@ export type ControlPlaneEvent =
 			readonly outcome: "accepted" | "failed" | "partial";
 	  }
 	| {
+			readonly kind: "rendezvous-cache";
+			readonly outcome: "hit" | "write";
+	  }
+	| {
+			readonly kind: "rendezvous-invite";
+			readonly outcome: "accepted" | "failed";
+	  }
+	| {
 			readonly kind: "relay-reservation";
 			readonly outcome: "acquired" | "expired" | "failed" | "refused" | "released" | "replaced";
 			readonly relayIdHash?: string;
@@ -139,10 +147,30 @@ export interface ControlPlaneNodeRoutingConfig {
 	readonly public_network_acknowledgement?: string;
 }
 
+interface ControlPlanePeerCacheBaseConfig {
+	readonly enabled: boolean;
+	readonly max: number;
+}
+
+export type ControlPlanePeerCacheConfig =
+	| (ControlPlanePeerCacheBaseConfig & {
+			readonly persistence: "memory";
+	  })
+	| (ControlPlanePeerCacheBaseConfig & {
+			readonly key: string;
+			readonly persistence: "browser-local";
+	  })
+	| (ControlPlanePeerCacheBaseConfig & {
+			readonly path: string;
+			readonly persistence: "node-fs";
+	  });
+
 export interface ControlPlaneRendezvousConfig {
 	/** Test-only permission for plaintext loopback registry URLs. */
 	readonly allow_insecure_loopback_fixture?: boolean;
+	readonly cache?: ControlPlanePeerCacheConfig;
 	readonly endpoints?: readonly string[];
+	readonly invite?: string;
 	readonly namespace?: string;
 	readonly publish?: boolean;
 	readonly record_ttl_ms?: number;

@@ -233,6 +233,13 @@ describe("signed rendezvous records", () => {
 		);
 	});
 
+	it("rejects an address without any p2p component", async () => {
+		const { signer, peerId } = await fixtureSigner(82);
+		const record = await signer.sign(fixtureInput(peerId, { addresses: ["/ip4/93.184.216.34/tcp/443/wss"] }));
+
+		await expectRejected(record, "invalid-address");
+	});
+
 	it("re-resolves DNS immediately before dial and rejects a rebinding result", async () => {
 		const { signer, peerId } = await fixtureSigner(9);
 		let resolutions = 0;

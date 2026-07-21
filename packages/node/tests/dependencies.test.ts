@@ -186,6 +186,34 @@ describe("DRPNode dependencies", () => {
 		}
 	});
 
+	test("treats an invalid invite as inert when no other rendezvous source is configured", async () => {
+		const fake = createFakeNetwork();
+		const events: Array<{ readonly kind: string; readonly outcome?: string }> = [];
+		const node = new DRPNode(
+			{
+				keychain_config: { private_key_seed: "invalid-invite-inert" },
+				log_config: { level: "silent" },
+				network_config: {
+					bootstrap_peers: [],
+					control_plane: {
+						observability: { sink: (event): void => void events.push(event) },
+						rendezvous: {
+							invite: "not-a-valid-invite",
+							namespace: `drp-network:v1:${"a".repeat(43)}`,
+							publish: false,
+						},
+					},
+				},
+			} as DRPNodeConfig,
+			{ networkNode: fake.networkNode, reconnect: false }
+		);
+
+		await expect(node.start()).resolves.toBeUndefined();
+		expect(node.rendezvous).toBeUndefined();
+		expect(events).toContainEqual({ kind: "rendezvous-invite", outcome: "failed" });
+		await expect(node.stop()).resolves.toBeUndefined();
+	});
+
 	test("defaults Node rendezvous discovery to node-dialable addresses", async () => {
 		const fake = createFakeNetwork();
 		const record = await nodeOnlyRecord();

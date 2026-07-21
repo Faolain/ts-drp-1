@@ -12,19 +12,28 @@ import {
 	AddressPolicy,
 	createDnsResolver,
 	createHttpRegistryEndpoint,
+	createPeerCache,
 	createRecordProducer,
 	createRendezvousEnsemble,
+	decodeInvite,
 	type DrpCapability,
+	InMemoryPeerCacheStore,
 	InMemorySequenceStore,
+	InviteDirectory,
+	LocalStoragePeerCacheStore,
+	type PeerCache,
+	type PeerCacheStore,
 	RecordSigner,
 	RecordValidator,
 	RegistryClient,
 	RegistryExhaustedError,
 	type RendezvousDirectory,
+	type RendezvousEnsemble,
 } from "@ts-drp/rendezvous";
 import { type BrowserRouting, type BrowserRoutingEndpoint, createBrowserRouting } from "@ts-drp/routing-browser";
 import {
 	type ControlPlaneEvent,
+	type ControlPlanePeerCacheConfig,
 	DRPDiscoveryResponse,
 	type DRPNetworkNode,
 	type DRPNodeConfig,
@@ -52,6 +61,10 @@ import { createDRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js"
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
+
+interface NodePeerCacheModule {
+	createFsPeerCacheStore(path: string): Promise<PeerCacheStore>;
+}
 
 const DISCOVERY_MESSAGE_TYPES = [
 	MessageType.MESSAGE_TYPE_DRP_DISCOVERY,
@@ -81,7 +94,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	keychain: Keychain;
 	messageQueueManager: MessageQueueManager<Message>;
 	private _routing: BrowserRouting | undefined;
-	private _rendezvous: RendezvousDirectory | undefined;
+	private _rendezvous: RendezvousEnsemble | undefined;
+	private _rendezvousCache: PeerCache | undefined;
 
 	#objectStore: DRPObjectStore;
 	private _intervals: Map<string, IntervalRunnerMap[keyof IntervalRunnerMap]> = new Map();
@@ -91,6 +105,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
 	private _rendezvousRegistrationController: AbortController | undefined;
 	private _rendezvousRegistration: Promise<boolean> | undefined;
+	private _rendezvousBootstrapController: AbortController | undefined;
+	private _rendezvousBootstrap: Promise<void> | undefined;
 	private readonly _beforeRestart: (() => Promise<void> | void) | undefined;
 	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
 	private readonly _stopNetwork: () => Promise<void>;
@@ -140,7 +156,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._routing ??= createConfiguredBrowserRouting(this.config);
 		await this.keychain.start();
 		await this.networkNode.start(this.keychain.secp256k1PrivateKey);
-		this._startRendezvous();
+		await this._startRendezvous();
 		this.messageQueueManager.startAll();
 		const reconnectInterval = this.getReconnectInterval();
 		if (reconnectInterval) this._intervals.set("interval::reconnect", reconnectInterval);
@@ -161,6 +177,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 */
 	async stop(): Promise<void> {
 		this._rendezvousRegistrationController?.abort(new Error("DRPNode stopped"));
+		this._rendezvousBootstrapController?.abort(new Error("DRPNode stopped"));
 		this._connectFetchControllers.forEach((controller) => controller.abort());
 		this._connectFetchControllers.clear();
 		this._initialSyncPeers.clear();
@@ -169,11 +186,14 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const routing = this._routing;
 		this._routing = undefined;
 		const rendezvousRegistration = this._rendezvousRegistration;
+		const rendezvousBootstrap = this._rendezvousBootstrap;
 		this._rendezvousRegistration = undefined;
 		this._rendezvousRegistrationController = undefined;
+		this._rendezvousBootstrap = undefined;
+		this._rendezvousBootstrapController = undefined;
 		this._rendezvous = undefined;
 		try {
-			await Promise.all([routing?.stop(), rendezvousRegistration, this._stopNetwork()]);
+			await Promise.all([routing?.stop(), rendezvousBootstrap, rendezvousRegistration, this._stopNetwork()]);
 		} finally {
 			this.messageQueueManager.closeAll();
 		}
@@ -188,17 +208,23 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	}
 
 	/** @returns The configured Node rendezvous ensemble, or undefined when inactive. */
-	get rendezvous(): RendezvousDirectory | undefined {
+	get rendezvous(): RendezvousEnsemble | undefined {
 		return this._rendezvous;
 	}
 
-	private _startRendezvous(): void {
+	/** @returns The configured authenticated-peer cache, or undefined when inactive. */
+	get rendezvousCache(): PeerCache | undefined {
+		return this._rendezvousCache;
+	}
+
+	private async _startRendezvous(): Promise<void> {
 		const rendezvousConfig = this.config.network_config?.control_plane?.rendezvous;
-		// Phase 3 accepted a structural placeholder. Phase 4 activation is the
-		// explicit publish/discover policy switch so that placeholder stays inert.
-		if (typeof rendezvousConfig?.publish !== "boolean") return;
-		const endpoints = rendezvousConfig.endpoints ?? [];
-		if (!rendezvousConfig.publish || endpoints.length === 0) return;
+		if (rendezvousConfig === undefined) return;
+		const cacheEnabled = rendezvousConfig.cache?.enabled === true;
+		const hasInvite = rendezvousConfig.invite !== undefined;
+		// Preserve the Phase 4a activation contract unless a Phase 4b source is explicitly enabled.
+		const hasConfiguredRegistry = rendezvousConfig.publish === true && (rendezvousConfig.endpoints?.length ?? 0) > 0;
+		if (!hasConfiguredRegistry && !cacheEnabled && !hasInvite) return;
 		const namespace = rendezvousConfig.namespace;
 		if (namespace === undefined) throw new Error("configured rendezvous requires a namespace");
 		const addressConfig = this.config.network_config?.control_plane?.address_policy;
@@ -212,32 +238,66 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				},
 				resolver,
 			});
-		const registryClient = new RegistryClient({
-			clientId: this.networkNode.peerId,
-			endpoints: endpoints.map((url, index) =>
-				createHttpRegistryEndpoint({
+		if (cacheEnabled && this._rendezvousCache === undefined) {
+			this._rendezvousCache = await this._createRendezvousCache(rendezvousConfig.cache, validatorFactory);
+		}
+		let inviteDirectory: InviteDirectory | undefined;
+		let inviteEndpoints: readonly string[] = [];
+		if (rendezvousConfig.invite !== undefined) {
+			try {
+				const invite = await decodeInvite(rendezvousConfig.invite, {
 					allow_insecure_loopback_fixture: rendezvousConfig.allow_insecure_loopback_fixture,
-					id: `registry-${index + 1}`,
-					url,
-				})
-			),
-			timeoutMs: 4_000,
-			validatorFactory,
-		});
+					validatorFactory,
+				});
+				if (invite.namespace !== namespace) throw new Error("invite namespace mismatch");
+				inviteDirectory = new InviteDirectory({ invite, validatorFactory });
+				inviteEndpoints = invite.registryEndpoints;
+				this._emitRendezvousEvent({ kind: "rendezvous-invite", outcome: "accepted" });
+			} catch {
+				this._emitRendezvousEvent({ kind: "rendezvous-invite", outcome: "failed" });
+			}
+		}
+		const endpoints = [...new Set([...(rendezvousConfig.endpoints ?? []), ...inviteEndpoints])];
+		const registryClient =
+			endpoints.length === 0
+				? undefined
+				: new RegistryClient({
+						clientId: this.networkNode.peerId,
+						endpoints: endpoints.map((url, index) =>
+							createHttpRegistryEndpoint({
+								allow_insecure_loopback_fixture: rendezvousConfig.allow_insecure_loopback_fixture,
+								id: `registry-${index + 1}`,
+								url,
+							})
+						),
+						timeoutMs: 4_000,
+						validatorFactory,
+					});
+		if (registryClient === undefined && this._rendezvousCache === undefined && inviteDirectory === undefined) return;
 		const directory = createRendezvousEnsemble({
 			addressPolicy: {
 				policy: new AddressPolicy({
 					allowInsecureWebSocket: addressConfig?.allowInsecureWebSocket,
 					allowLoopback: addressConfig?.allowLoopback,
 					allowPrivate: addressConfig?.allowPrivate,
-					target: "node",
+					target: addressConfig?.target ?? "node",
 				}),
 				resolver,
 			},
+			cache: this._rendezvousCache,
+			invite: inviteDirectory,
 			registries: registryClient,
 			validatorFactory,
 		});
 		this._rendezvous = directory;
+		const bootstrapController = new AbortController();
+		this._rendezvousBootstrapController = bootstrapController;
+		const bootstrap = this._warmRendezvous(directory, namespace, bootstrapController.signal).finally(() => {
+			if (this._rendezvousBootstrap === bootstrap) this._rendezvousBootstrap = undefined;
+		});
+		this._rendezvousBootstrap = bootstrap;
+
+		if (!rendezvousConfig.publish || registryClient === undefined) return;
 
 		const ttlMs = rendezvousConfig.record_ttl_ms ?? 60_000;
 		const refreshIntervalMs = rendezvousConfig.refresh_interval_ms ?? Math.floor(ttlMs / 2);
@@ -285,6 +345,50 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		});
 		this._intervals.set("interval::rendezvous", runner);
 		runner.start();
+	}
+
+	private async _createRendezvousCache(
+		config: ControlPlanePeerCacheConfig,
+		validatorFactory: () => RecordValidator
+	): Promise<PeerCache> {
+		let store: PeerCacheStore;
+		switch (config.persistence) {
+			case "memory":
+				store = new InMemoryPeerCacheStore();
+				break;
+			case "browser-local":
+				store = new LocalStoragePeerCacheStore({ key: config.key });
+				break;
+			case "node-fs": {
+				const modulePath = "./rendezvous-cache.node.js";
+				const { createFsPeerCacheStore } = (await import(/* @vite-ignore */ modulePath)) as NodePeerCacheModule;
+				store = await createFsPeerCacheStore(config.path);
+				break;
+			}
+		}
+		const cache = createPeerCache({ max: config.max, store, validatorFactory });
+		return {
+			list: async (namespace, signal): Promise<Awaited<ReturnType<PeerCache["list"]>>> => {
+				const records = await cache.list(namespace, signal);
+				if (records.length > 0) this._emitRendezvousEvent({ kind: "rendezvous-cache", outcome: "hit" });
+				return records;
+			},
+			prune: () => cache.prune(),
+			put: async (record): Promise<void> => {
+				await cache.put(record);
+				this._emitRendezvousEvent({ kind: "rendezvous-cache", outcome: "write" });
+			},
+		};
+	}
+
+	private async _warmRendezvous(directory: RendezvousEnsemble, namespace: string, signal: AbortSignal): Promise<void> {
+		try {
+			for await (const _record of directory.bootstrap(namespace, signal)) {
+				// Iteration performs bounded validation and cache write-back.
+			}
+		} catch {
+			// Background bootstrap failure is represented by the ensemble trace and must not fail node startup.
+		}
 	}
 
 	private async _registerRendezvousRecord(

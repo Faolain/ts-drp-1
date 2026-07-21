@@ -22,6 +22,10 @@
 		"./service": {
 			"import": "./dist/src/service.js",
 			"types": "./dist/src/service.d.ts"
+		},
+		"./node": {
+			"import": "./dist/src/node.js",
+			"types": "./dist/src/node.d.ts"
 		}
 	},
 	"scripts": {

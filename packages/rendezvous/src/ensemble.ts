@@ -1,4 +1,5 @@
 import { type AddressPolicy, type Resolver } from "./address-policy.js";
+import { type PeerCache } from "./peer-cache.js";
 import { reconcileValidatedRecords } from "./reconciliation.js";
 import { type AdmissionMode, RecordValidator, type SignedDrpRecordV1 } from "./record.js";
 import {
@@ -31,12 +32,19 @@ export interface RendezvousEnsembleLimits {
 	readonly timeoutMs?: number;
 }
 
+export interface BootstrapDirectory {
+	discover(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]>;
+}
+
 export interface RendezvousEnsembleOptions {
 	readonly addressPolicy: { readonly policy: AddressPolicy; readonly resolver: Resolver };
 	readonly anchors?: { readonly resolver: AnchorRecordResolver };
+	readonly cache?: PeerCache;
+	readonly invite?: BootstrapDirectory;
 	readonly limits?: RendezvousEnsembleLimits;
+	readonly peerExchange?: BootstrapDirectory;
 	readonly registries?: RendezvousDirectory | readonly RegistryEndpoint[];
-	/** Creates identically configured validators for registry and untrusted anchor ingress. */
+	/** Creates identically configured validators for every untrusted bootstrap ingress. */
 	validatorFactory?(): RecordValidator;
 }
 
@@ -48,25 +56,28 @@ export interface RendezvousEnsembleTrace {
 	readonly policyRejectedAddressCount: number;
 	readonly recordRejectedCount: number;
 	readonly sources: ReadonlyArray<{
-		readonly id: "dht-anchor" | "registries";
+		readonly id: BootstrapSourceId;
 		readonly status: "empty" | "failed" | "succeeded";
 	}>;
 }
 
 export interface RendezvousEnsemble extends RendezvousDirectory {
+	bootstrap(namespace: string, signal: AbortSignal): AsyncIterable<AddressFilteredDrpRecord>;
 	readonly lastTrace: RendezvousEnsembleTrace | undefined;
 }
 
+export type BootstrapSourceId = "cache" | "dht-anchor" | "invite" | "peer-exchange" | "registries";
+
 /** Typed terminal for an ensemble operation with no healthy source. */
 export class RendezvousExhaustedError extends Error {
-	readonly failedSourceIds: readonly ("dht-anchor" | "registries")[];
-	readonly operation: "discover" | "register";
+	readonly failedSourceIds: readonly BootstrapSourceId[];
+	readonly operation: "bootstrap" | "discover" | "register";
 
 	/**
 	 * @param operation - Exhausted ensemble operation.
 	 * @param failedSourceIds - Sanitized source categories.
 	 */
-	constructor(operation: "discover" | "register", failedSourceIds: readonly ("dht-anchor" | "registries")[]) {
+	constructor(operation: "bootstrap" | "discover" | "register", failedSourceIds: readonly BootstrapSourceId[]) {
 		super(`all rendezvous sources failed ${operation}`);
 		this.name = "RendezvousExhaustedError";
 		this.operation = operation;
@@ -86,12 +97,97 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 		options.validatorFactory ??
 		((): RecordValidator => new RecordValidator({ resolver: options.addressPolicy.resolver }));
 	const registries = normalizeRegistries(options.registries, maximum, timeoutMs, validatorFactory);
-	if (registries === undefined && options.anchors === undefined) {
+	if (
+		registries === undefined &&
+		options.anchors === undefined &&
+		options.cache === undefined &&
+		options.invite === undefined &&
+		options.peerExchange === undefined
+	) {
 		throw new Error("rendezvous ensemble requires at least one source");
 	}
 	let lastTrace: RendezvousEnsembleTrace | undefined;
 
 	return {
+		bootstrap: async function* (namespace: string, signal: AbortSignal): AsyncIterable<AddressFilteredDrpRecord> {
+			const deadline = operationDeadline(signal, timeoutMs);
+			try {
+				const initialTasks: Array<Promise<SourceResult>> = [];
+				if (registries !== undefined) {
+					initialTasks.push(
+						runValidatedDirectorySource("registries", registries, namespace, maximum, deadline.signal, validatorFactory)
+					);
+				}
+				if (options.anchors !== undefined) {
+					initialTasks.push(
+						runAnchorSource(options.anchors.resolver, namespace, maximum, deadline.signal, validatorFactory)
+					);
+				}
+				if (options.invite !== undefined) {
+					initialTasks.push(
+						runValidatedDirectorySource("invite", options.invite, namespace, maximum, deadline.signal, validatorFactory)
+					);
+				}
+
+				const results: SourceResult[] = [];
+				const emitted = new Map<string, number>();
+				if (options.cache !== undefined) {
+					const cached = await runCacheSource(options.cache, namespace, maximum, deadline.signal);
+					results.push(cached);
+					const filtered = await filterAddresses(
+						reconcileValidatedRecords([cached.records], { maxRecords: maximum }),
+						options.addressPolicy,
+						deadline.signal
+					);
+					for (const candidate of filtered.records) {
+						emitted.set(candidate.record.peerId, candidate.record.sequence);
+						yield candidate;
+					}
+				}
+
+				results.push(...(await Promise.all(initialTasks)));
+				if (options.peerExchange !== undefined) {
+					results.push(
+						await runValidatedDirectorySource(
+							"peer-exchange",
+							options.peerExchange,
+							namespace,
+							maximum,
+							deadline.signal,
+							validatorFactory
+						)
+					);
+				}
+
+				const nonCacheResults = results.filter(({ id }) => id !== "cache");
+				const failedSourceIds = nonCacheResults.filter(({ status }) => status === "failed").map(({ id }) => id);
+				const networkRecords = reconcileValidatedRecords(
+					nonCacheResults.filter(({ status }) => status !== "failed").map(({ records }) => records),
+					{ maxRecords: maximum }
+				);
+				const filtered = await filterAddresses(networkRecords, options.addressPolicy, deadline.signal);
+				for (const candidate of filtered.records) {
+					if (options.cache !== undefined) {
+						try {
+							await raceWithSignal(options.cache.put(candidate), deadline.signal);
+						} catch {
+							// Persistence is an availability optimization and cannot suppress a valid bootstrap result.
+						}
+					}
+					const priorSequence = emitted.get(candidate.record.peerId);
+					if (priorSequence !== undefined && priorSequence >= candidate.record.sequence) continue;
+					emitted.set(candidate.record.peerId, candidate.record.sequence);
+					yield candidate;
+				}
+
+				lastTrace = traceFor(results, filtered.policyRejectedAddressCount);
+				if (emitted.size === 0 && nonCacheResults.length > 0 && failedSourceIds.length === nonCacheResults.length) {
+					throw new RendezvousExhaustedError("bootstrap", failedSourceIds);
+				}
+			} finally {
+				deadline.cleanup();
+			}
+		},
 		get lastTrace(): RendezvousEnsembleTrace | undefined {
 			return lastTrace;
 		},
@@ -132,30 +228,14 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 					results.filter(({ status }) => status !== "failed").map(({ records }) => records)
 				);
 				let policyRejectedAddressCount = 0;
-				const filtered: AddressFilteredDrpRecord[] = [];
-				for (const candidate of reconciled) {
-					const acceptedAddresses: string[] = [];
-					for (const address of candidate.record.addresses) {
-						try {
-							const decision = await options.addressPolicy.policy.evaluate(
-								address,
-								options.addressPolicy.resolver,
-								deadline.signal
-							);
-							if (decision.dialable) acceptedAddresses.push(address);
-							else policyRejectedAddressCount += 1;
-						} catch {
-							policyRejectedAddressCount += 1;
-						}
-					}
-					if (acceptedAddresses.length > 0) filtered.push({ ...candidate, acceptedAddresses });
-				}
+				const filtered = await filterAddresses(reconciled, options.addressPolicy, deadline.signal);
+				policyRejectedAddressCount = filtered.policyRejectedAddressCount;
 				lastTrace = Object.freeze({
 					policyRejectedAddressCount,
 					recordRejectedCount: results.reduce((count, result) => count + result.recordRejectedCount, 0),
 					sources: Object.freeze(sources),
 				});
-				return filtered;
+				return filtered.records;
 			} finally {
 				deadline.cleanup();
 			}
@@ -164,10 +244,61 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 }
 
 interface SourceResult {
-	readonly id: "dht-anchor" | "registries";
+	readonly id: BootstrapSourceId;
 	readonly records: readonly ValidatedDrpRecord[];
 	readonly recordRejectedCount: number;
 	readonly status: "empty" | "failed" | "succeeded";
+}
+
+async function runCacheSource(
+	cache: PeerCache,
+	namespace: string,
+	maximum: number,
+	signal: AbortSignal
+): Promise<SourceResult> {
+	try {
+		const records = await raceWithSignal(cache.list(namespace, signal), signal);
+		if (records.length > maximum) throw new Error("source record cap exceeded");
+		return sourceResult("cache", records, 0);
+	} catch {
+		return { id: "cache", records: [], recordRejectedCount: 0, status: "failed" };
+	}
+}
+
+async function runValidatedDirectorySource(
+	id: Extract<BootstrapSourceId, "invite" | "peer-exchange" | "registries">,
+	directory: BootstrapDirectory,
+	namespace: string,
+	maximum: number,
+	signal: AbortSignal,
+	validatorFactory: () => RecordValidator
+): Promise<SourceResult> {
+	try {
+		const candidates = await raceWithSignal(directory.discover(namespace, signal), signal);
+		if (candidates.length > maximum) throw new Error("source record cap exceeded");
+		const validator = validatorFactory();
+		const records: ValidatedDrpRecord[] = [];
+		let recordRejectedCount = 0;
+		for (const candidate of candidates) {
+			const checked = await validator.validate(candidate.record, {
+				admission: { accepted: true, mode: candidate.admissionMode },
+				expectedNamespace: namespace,
+				signal,
+			});
+			if (!checked.accepted) {
+				recordRejectedCount += 1;
+				continue;
+			}
+			records.push({
+				admissionMode: checked.admissionMode,
+				record: checked.record,
+				sourceEndpointId: candidate.sourceEndpointId,
+			});
+		}
+		return sourceResult(id, records, recordRejectedCount);
+	} catch {
+		return { id, records: [], recordRejectedCount: 0, status: "failed" };
+	}
 }
 
 async function runSource(
@@ -177,7 +308,7 @@ async function runSource(
 	operation: () => Promise<readonly ValidatedDrpRecord[]>
 ): Promise<SourceResult> {
 	try {
-		const records = await Promise.race([operation(), aborted(signal)]);
+		const records = await raceWithSignal(operation(), signal);
 		if (records.length > maximum) throw new Error("source record cap exceeded");
 		return { id, records, recordRejectedCount: 0, status: records.length === 0 ? "empty" : "succeeded" };
 	} catch {
@@ -193,7 +324,7 @@ async function runAnchorSource(
 	validatorFactory: () => RecordValidator
 ): Promise<SourceResult> {
 	try {
-		const resolution = await Promise.race([resolver.resolve(namespace, signal, maximum), aborted(signal)]);
+		const resolution = await raceWithSignal(resolver.resolve(namespace, signal, maximum), signal);
 		if (resolution.records.length > maximum) throw new Error("source record cap exceeded");
 		const validator = validatorFactory();
 		const records: ValidatedDrpRecord[] = [];
@@ -228,6 +359,50 @@ async function runAnchorSource(
 	} catch {
 		return { id: "dht-anchor", records: [], recordRejectedCount: 0, status: "failed" };
 	}
+}
+
+function sourceResult(
+	id: BootstrapSourceId,
+	records: readonly ValidatedDrpRecord[],
+	recordRejectedCount: number
+): SourceResult {
+	return {
+		id,
+		records,
+		recordRejectedCount,
+		status: records.length === 0 ? "empty" : "succeeded",
+	};
+}
+
+async function filterAddresses(
+	records: readonly ValidatedDrpRecord[],
+	addressPolicy: RendezvousEnsembleOptions["addressPolicy"],
+	signal: AbortSignal
+): Promise<{ readonly policyRejectedAddressCount: number; readonly records: readonly AddressFilteredDrpRecord[] }> {
+	let policyRejectedAddressCount = 0;
+	const filtered: AddressFilteredDrpRecord[] = [];
+	for (const candidate of records) {
+		const acceptedAddresses: string[] = [];
+		for (const address of candidate.record.addresses) {
+			try {
+				const decision = await addressPolicy.policy.evaluate(address, addressPolicy.resolver, signal);
+				if (decision.dialable) acceptedAddresses.push(address);
+				else policyRejectedAddressCount += 1;
+			} catch {
+				policyRejectedAddressCount += 1;
+			}
+		}
+		if (acceptedAddresses.length > 0) filtered.push({ ...candidate, acceptedAddresses });
+	}
+	return { policyRejectedAddressCount, records: filtered };
+}
+
+function traceFor(results: readonly SourceResult[], policyRejectedAddressCount: number): RendezvousEnsembleTrace {
+	return Object.freeze({
+		policyRejectedAddressCount,
+		recordRejectedCount: results.reduce((count, result) => count + result.recordRejectedCount, 0),
+		sources: Object.freeze(results.map(({ id, status }) => ({ id, status }))),
+	});
 }
 
 function parseAnchorEnvelope(
@@ -279,16 +454,21 @@ function operationDeadline(parent: AbortSignal, timeoutMs: number): OperationDea
 		cleanup: (): void => {
 			clearTimeout(timeout);
 			parent.removeEventListener("abort", abortFromParent);
+			if (!controller.signal.aborted) controller.abort(new Error("rendezvous operation complete"));
 		},
 		signal: controller.signal,
 	};
 }
 
-function aborted(signal: AbortSignal): Promise<never> {
-	return new Promise((_resolve, reject) => {
+function raceWithSignal<Value>(operation: Promise<Value>, signal: AbortSignal): Promise<Value> {
+	return new Promise((resolve, reject) => {
 		const fail = (): void => reject(signal.reason ?? new Error("rendezvous operation aborted"));
+		if (signal.aborted) {
+			fail();
+			return;
+		}
 		signal.addEventListener("abort", fail, { once: true });
-		if (signal.aborted) fail();
+		operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", fail));
 	});
 }
 
