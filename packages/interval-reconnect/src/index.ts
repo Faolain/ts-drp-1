@@ -1,5 +1,4 @@
 import { IntervalRunner } from "@ts-drp/interval-runner";
-import { Logger } from "@ts-drp/logger";
 import {
 	type DRPIntervalReconnectOptions,
 	type DRPNetworkNode,
@@ -18,9 +17,6 @@ export class DRPIntervalReconnectBootstrap implements IDRPIntervalReconnectBoots
 
 	/** Delegate to handle the actual interval running */
 	private _intervalRunner: IntervalRunner;
-
-	/** Logger instance with reconnect-specific prefix */
-	private _logger: Logger;
 
 	/**
 	 * Get the id of the interval runner
@@ -51,7 +47,6 @@ export class DRPIntervalReconnectBootstrap implements IDRPIntervalReconnectBoots
 	 * @param opts - The configuration for the reconnect bootstrap
 	 */
 	constructor(opts: DRPIntervalReconnectOptions) {
-		this._logger = new Logger(`drp::reconnect::${opts.id}`, opts.logConfig);
 		this._intervalRunner = new IntervalRunner({
 			...opts,
 			fn: this._runDRPReconnect.bind(this),
@@ -76,21 +71,6 @@ export class DRPIntervalReconnectBootstrap implements IDRPIntervalReconnectBoots
 	}
 
 	private async _runDRPReconnect(): Promise<boolean> {
-		const peers = this.networkNode.getAllPeers();
-		const bootstrapPeerIds = new Set(
-			this.networkNode
-				.getBootstrapNodes()
-				.map((addr) => {
-					const components = addr.split("/");
-					const p2pIndex = components.lastIndexOf("p2p");
-					return p2pIndex === -1 ? undefined : components[p2pIndex + 1];
-				})
-				.filter((peerId): peerId is string => peerId !== undefined)
-		);
-		if (peers.some((peerId) => bootstrapPeerIds.has(peerId))) {
-			this._logger.trace("Still connected to a bootstrap peer, skipping reconnect");
-			return true;
-		}
 		await this.networkNode.connectToBootstraps();
 		return true;
 	}

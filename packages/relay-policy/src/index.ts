@@ -336,13 +336,7 @@ export class CompositeRelayCandidateSource implements RelayCandidateSource {
 				} catch (error) {
 					if (isAbortError(error, signal)) throw error;
 				} finally {
-					if (!finished) {
-						try {
-							await iterator.return?.();
-						} catch (error) {
-							if (isAbortError(error, signal)) throw error;
-						}
-					}
+					if (!finished) await closeCandidateIterator(iterator, signal);
 				}
 			}
 		};
@@ -394,6 +388,7 @@ export class RegistryRelayRecordSource implements RelayCandidateSource {
 	 * @param options - Authenticated directory and network namespace.
 	 * @param options.directory - Authenticated relay record directory.
 	 * @param options.networkId - Opaque network identifier.
+	 * @param options.now
 	 */
 	constructor(options: { readonly directory: RelayRecordDirectory; readonly networkId: string; now?(): number }) {
 		this.#directory = options.directory;
@@ -430,6 +425,7 @@ export class CachedSuccessfulRelaySource implements RelayCandidateSource {
 	 * @param options - Authenticated peer cache and network namespace.
 	 * @param options.cache - Authenticated successful-relay cache.
 	 * @param options.networkId - Opaque network identifier.
+	 * @param options.now
 	 */
 	constructor(options: { readonly cache: RelayRecordCache; readonly networkId: string; now?(): number }) {
 		this.#cache = options.cache;
@@ -788,19 +784,28 @@ export class RelayPolicy {
 	 * @param peerId - Lost or expired reserved relay.
 	 * @param reason - Lifecycle signal that caused replacement.
 	 * @param signal - Caller-owned cancellation signal.
+	 * @param excludedOperatorGroup
 	 * @returns Replacement outcome with the triggering reason.
 	 */
 	replace(
 		peerId: string,
 		reason: RelayReplacementResult["reason"],
-		signal: AbortSignal
+		signal: AbortSignal,
+		excludedOperatorGroup?: string
 	): Promise<RelayReplacementResult> {
 		return this.#enqueue(async () => {
 			this.#assertRunning();
 			const startedAtMs = this.#now();
 			const startedAtMonotonicMs = monotonicNow();
 			await this.#drop(peerId);
-			const result = await this.#acquireFromPool(signal, [], startedAtMs, startedAtMonotonicMs, peerId);
+			const result = await this.#acquireFromPool(
+				signal,
+				[],
+				startedAtMs,
+				startedAtMonotonicMs,
+				peerId,
+				excludedOperatorGroup
+			);
 			return { ...result, reason, replacedPeerId: peerId };
 		});
 	}
@@ -833,7 +838,8 @@ export class RelayPolicy {
 		initialAttempts: RelayAttempt[] = [],
 		startedAtMs = this.#now(),
 		startedAtMonotonicMs = monotonicNow(),
-		replacedPeerId?: string
+		replacedPeerId?: string,
+		excludedOperatorGroup?: string
 	): Promise<RelayPolicyResult> {
 		const attempts = initialAttempts;
 		const totalController = new AbortController();
@@ -855,7 +861,13 @@ export class RelayPolicy {
 				while (!boundedSignal.aborted && cursor < pending.length && !this.#requirementsMet()) {
 					const candidate = pending[cursor++];
 					if (candidate === undefined) return;
-					const attempt = await this.#attemptCandidate(candidate, boundedSignal, signal, replacedPeerId);
+					const attempt = await this.#attemptCandidate(
+						candidate,
+						boundedSignal,
+						signal,
+						replacedPeerId,
+						excludedOperatorGroup
+					);
 					attempts.push(attempt);
 				}
 			});
@@ -877,11 +889,15 @@ export class RelayPolicy {
 		candidate: RelayCandidate,
 		signal: AbortSignal,
 		callerSignal: AbortSignal,
-		replacedPeerId?: string
+		replacedPeerId?: string,
+		excludedOperatorGroup?: string
 	): Promise<RelayAttempt> {
 		const startedAtMs = this.#now();
 		this.#attemptedPeerIds.add(candidate.peerId);
 		if (this.#active.has(candidate.peerId)) return baseAttempt(candidate, startedAtMs, this.#now(), "duplicate");
+		if (excludedOperatorGroup !== undefined && candidate.operatorGroup === excludedOperatorGroup) {
+			return baseAttempt(candidate, startedAtMs, this.#now(), "operator-limit");
+		}
 		const operatorCount = [...this.#active.values()].filter(
 			(reservation) => reservation.candidate.operatorGroup === candidate.operatorGroup
 		).length;
@@ -1093,8 +1109,7 @@ export class RelayPolicy {
 				[...this.#active.values()]
 					.map(({ candidate }) => candidate.operatorGroup)
 					.filter((operatorGroup) => operatorGroup !== "unknown")
-			).size >=
-			this.#limits.requiredOperatorGroups
+			).size >= this.#limits.requiredOperatorGroups
 		);
 	}
 
@@ -1235,15 +1250,17 @@ async function collectCandidates(
 		const observedAtMs = now();
 		attempts.push(baseAttempt(syntheticCandidate(queryKey), observedAtMs, now(), "source-failed"));
 	} finally {
-		if (!finished) {
-			try {
-				await iterator.return?.();
-			} catch (error) {
-				if (isAbortError(error, signal)) throw error;
-			}
-		}
+		if (!finished) await closeCandidateIterator(iterator, signal);
 	}
 	return { attempts, candidates };
+}
+
+async function closeCandidateIterator(iterator: AsyncIterator<RelayCandidate>, signal: AbortSignal): Promise<void> {
+	try {
+		await iterator.return?.();
+	} catch (error) {
+		if (isAbortError(error, signal)) throw error;
+	}
 }
 
 async function withDeadline<T>(
@@ -1462,8 +1479,7 @@ function verifiedOperatorGroup(candidate: RelayCandidate): string | undefined {
 
 function isAbortError(error: unknown, signal: AbortSignal): boolean {
 	return (
-		signal.aborted ||
-		(error !== null && typeof error === "object" && "name" in error && error.name === "AbortError")
+		signal.aborted || (error !== null && typeof error === "object" && "name" in error && error.name === "AbortError")
 	);
 }
 

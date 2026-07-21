@@ -30,6 +30,7 @@ import { Logger } from "@ts-drp/logger";
 import { AllowlistVerifier, InviteVerifier, type MembershipVerifier } from "@ts-drp/membership";
 import { MessageQueue } from "@ts-drp/message-queue";
 import {
+	type ActiveRelayReservation,
 	CompositeRelayCandidateSource,
 	DEFAULT_RELAY_POLICY_LIMITS,
 	type DnsaddrFallback,
@@ -171,12 +172,14 @@ export interface RelayPolicyFactoryOptions {
 }
 
 export interface RelayPolicyDriver {
+	readonly activeReservations?: readonly ActiveRelayReservation[];
 	acquire(queryKey: Uint8Array, signal: AbortSignal): Promise<RelayPolicyResult>;
 	refresh(signal: AbortSignal): Promise<RelayPolicyResult>;
 	replace(
 		peerId: string,
 		reason: RelayReplacementResult["reason"],
-		signal: AbortSignal
+		signal: AbortSignal,
+		excludedOperatorGroup?: string
 	): Promise<RelayReplacementResult>;
 	stop(): Promise<void>;
 }
@@ -588,10 +591,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		void this.startEnqueueMessages();
 		this._metrics?.start(`drp-network-${this.peerId}`, 10_000);
 		this._messageQueue.start();
-		await this._startRelayPolicy();
+		this._startRelayPolicy();
 	}
 
-	private async _startRelayPolicy(): Promise<void> {
+	private _startRelayPolicy(): void {
 		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
 		const configuredSources = relayPolicyConfig?.sources;
 		const injectedSources = this._relayCandidateSources;
@@ -705,7 +708,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		) {
 			missing.push("configured_fallback");
 		}
-		if (configuredSources.cached_successful_relays?.enabled === true && injected?.cachedSuccessfulRelays === undefined) {
+		if (
+			configuredSources.cached_successful_relays?.enabled === true &&
+			injected?.cachedSuccessfulRelays === undefined
+		) {
 			missing.push("cached_successful_relays");
 		}
 		if (configuredSources.registry_relay_records?.enabled === true && injected?.registryRelayRecords === undefined) {
@@ -830,9 +836,13 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			source: options.source,
 		});
 		return {
+			get activeReservations(): readonly ActiveRelayReservation[] {
+				return policy.activeReservations;
+			},
 			acquire: (queryKey, signal) => policy.acquire(queryKey, signal),
 			refresh: (signal) => policy.refresh(signal),
-			replace: (peerId, reason, signal) => policy.replace(peerId, reason, signal),
+			replace: (peerId, reason, signal, excludedOperatorGroup) =>
+				policy.replace(peerId, reason, signal, excludedOperatorGroup),
 			stop: async (): Promise<void> => {
 				await policy.stop();
 				await client.stop();
@@ -1112,11 +1122,13 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * do something bad like passing multiaddrs that as different PeerIds
 	 * @param peerId - The peerId, multiaddr or array of multiaddrs to dial
 	 * @param node - The libp2p instance to dial with
+	 * @param signal
 	 * @returns The connection or undefined if no connection was made
 	 */
 	async safeDial(
 		peerId: string[] | string | PeerId | Multiaddr | Multiaddr[],
-		node: Libp2p | undefined = this._node
+		node: Libp2p | undefined = this._node,
+		signal?: AbortSignal
 	): Promise<Connection | undefined> {
 		if (Array.isArray(peerId) && peerId.length === 0) return undefined;
 		const eventAddress = this._firstDialAddress(peerId);
@@ -1126,10 +1138,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (!isArray) {
 				const addr =
 					typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
-				connection = await node?.dial(addr);
+				connection = await node?.dial(addr, { signal });
 			} else {
 				const candidates = this.dialCandidates(peerId);
-				connection = await Promise.any(candidates.map((addresses) => node?.dial(addresses)));
+				connection = await Promise.any(candidates.map((addresses) => node?.dial(addresses, { signal })));
 			}
 			this._emitDialOutcome(eventAddress, connection === undefined ? "failed" : "ok");
 			return connection;
@@ -1146,12 +1158,88 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * Connect to the bootstrap nodes.
 	 */
 	async connectToBootstraps(): Promise<void> {
+		await this.redialBootstraps(new AbortController().signal);
+	}
+
+	/** @param signal - Recovery ownership signal. @returns Whether bootstrap redial connected. */
+	async redialBootstraps(signal: AbortSignal): Promise<boolean> {
 		try {
-			await this.safeDial(this.getBootstrapNodes());
+			const connection = await this.safeDial(this.getBootstrapNodes(), this._node, signal);
 			log.debug("::connectToBootstraps: Successfully connected to bootstrap nodes");
+			return connection !== undefined;
 		} catch (e) {
 			log.error("::connectToBootstraps:", e);
+			return false;
 		}
+	}
+
+	/** @returns Sanitized current libp2p connection evidence. */
+	getControlPlaneConnections(): readonly {
+		readonly multiaddr: string;
+		readonly peerId: string;
+		readonly transport: ControlPlaneTransport;
+	}[] {
+		return (
+			this._node?.getConnections().map((connection) => {
+				const multiaddrValue = connection.remoteAddr.toString();
+				return {
+					multiaddr: multiaddrValue,
+					peerId: connection.remotePeer.toString(),
+					transport: sanitizedAddressFields(connection.remoteAddr).transport,
+				};
+			}) ?? []
+		);
+	}
+
+	/** @returns Defensive snapshots owned by the active relay policy. */
+	getActiveRelayReservations(): readonly {
+		readonly expiresAtMs: number;
+		readonly operatorGroup: string;
+		readonly peerId: string;
+	}[] {
+		return (
+			this._relayPolicy?.activeReservations?.map(({ candidate, expiresAtMs }) => ({
+				expiresAtMs,
+				operatorGroup: candidate.operatorGroup,
+				peerId: candidate.peerId,
+			})) ?? []
+		);
+	}
+
+	/**
+	 * Delegates replacement/acquisition to the relay-policy owner.
+	 * @param request
+	 * @param request.excludedOperatorGroup
+	 * @param request.relayId
+	 * @param signal
+	 */
+	async replaceRelay(
+		request: { readonly excludedOperatorGroup?: string; readonly relayId?: string },
+		signal: AbortSignal
+	): Promise<boolean> {
+		const policy = this._relayPolicy;
+		if (policy === undefined) return false;
+		const result =
+			request.relayId === undefined
+				? await policy.acquire(new TextEncoder().encode(this.peerId), signal)
+				: await policy.replace(request.relayId, "relay-disconnected", signal, request.excludedOperatorGroup);
+		return result.terminal === "reserved" || result.terminal === "owned-fallback";
+	}
+
+	/** @param signal - Recovery ownership signal. @returns Whether an attached routing owner refreshed. */
+	async refreshRouting(signal: AbortSignal): Promise<boolean> {
+		const services = this._node?.services as Record<string, unknown> | undefined;
+		const routing = services?.aminoDHT;
+		if (
+			typeof routing !== "object" ||
+			routing === null ||
+			!("refreshRoutingTable" in routing) ||
+			typeof routing.refreshRoutingTable !== "function"
+		) {
+			return false;
+		}
+		await routing.refreshRoutingTable({ signal });
+		return true;
 	}
 
 	/**

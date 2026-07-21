@@ -2,9 +2,9 @@ import type { ControlPlaneConfig, DRPNetworkNodeConfig } from "@ts-drp/types";
 
 const configuredRelayPolicy: ControlPlaneConfig = {
 	relay_policy: {
-			sources: {
-				cached_successful_relays: { enabled: true },
-				configured_fallback: { enabled: true },
+		sources: {
+			cached_successful_relays: { enabled: true },
+			configured_fallback: { enabled: true },
 			delegated_closest_peers: { enabled: false },
 			dht_relay_providers: { enabled: false },
 			node_closest_peers: { enabled: false },
@@ -16,9 +16,9 @@ const configuredRelayPolicy: ControlPlaneConfig = {
 
 const publicSourcesOmittedForDisabledDefaults: DRPNetworkNodeConfig = {
 	control_plane: {
-			relay_policy: {
-				sources: {
-					configured_fallback: {},
+		relay_policy: {
+			sources: {
+				configured_fallback: {},
 			},
 		},
 	},

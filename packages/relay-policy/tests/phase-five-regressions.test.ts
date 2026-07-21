@@ -32,7 +32,7 @@ describe("Phase 5 relay-policy regressions", () => {
 						async *getCandidates(): AsyncIterable<RelayCandidate> {
 							try {
 								await Promise.resolve();
-								throw new Error("registry unavailable");
+								yield await Promise.reject<RelayCandidate>(new Error("registry unavailable"));
 							} finally {
 								throwingIteratorClosed = true;
 							}
@@ -67,7 +67,7 @@ describe("Phase 5 relay-policy regressions", () => {
 						async *getCandidates(): AsyncIterable<RelayCandidate> {
 							try {
 								await Promise.resolve();
-								throw new DOMException("cancelled", "AbortError");
+								yield await Promise.reject<RelayCandidate>(new DOMException("cancelled", "AbortError"));
 							} finally {
 								closed = true;
 							}
@@ -106,7 +106,7 @@ describe("Phase 5 relay-policy regressions", () => {
 			...Array.from({ length: 50 }, (_, index) => candidate(`registry-${index}`, "unknown", "registry-relay-record")),
 		];
 		const classifier = new EvidenceDerivedOperatorGroupClassifier({
-			verify: () => Promise.resolve({ verified: false }),
+			verify: (): Promise<{ verified: false }> => Promise.resolve({ verified: false }),
 		});
 		const policy = createPolicy(sourceOf(candidates), {
 			maxCandidates: 64,
@@ -302,8 +302,15 @@ function candidate(
 	};
 }
 
-function configuredEntry(peerId: string, operatorGroup: string): {
-	readonly operatorEvidence: { readonly credentialDigest: string; readonly operatorGroup: string; readonly verified: true };
+function configuredEntry(
+	peerId: string,
+	operatorGroup: string
+): {
+	readonly operatorEvidence: {
+		readonly credentialDigest: string;
+		readonly operatorGroup: string;
+		readonly verified: true;
+	};
 	readonly record: SignedDrpRecordV1;
 } {
 	return {

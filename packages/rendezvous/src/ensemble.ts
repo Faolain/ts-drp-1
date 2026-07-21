@@ -5,6 +5,7 @@ import { type AdmissionMode, RecordValidator, type SignedDrpRecordV1 } from "./r
 import {
 	type AdmissionCredential,
 	type ClientRegistrationReceipt,
+	type RegistryBackendSelection,
 	RegistryClient,
 	type RegistryEndpoint,
 	type RendezvousDirectory,
@@ -33,7 +34,11 @@ export interface RendezvousEnsembleLimits {
 }
 
 export interface BootstrapDirectory {
-	discover(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]>;
+	discover(
+		namespace: string,
+		signal: AbortSignal,
+		selection?: RegistryBackendSelection
+	): Promise<readonly ValidatedDrpRecord[]>;
 }
 
 export interface RendezvousEnsembleOptions {
@@ -42,6 +47,7 @@ export interface RendezvousEnsembleOptions {
 	readonly cache?: PeerCache;
 	readonly invite?: BootstrapDirectory;
 	readonly limits?: RendezvousEnsembleLimits;
+	now?(): number;
 	readonly peerExchange?: BootstrapDirectory;
 	readonly registries?: RendezvousDirectory | readonly RegistryEndpoint[];
 	/** Creates identically configured validators for every untrusted bootstrap ingress. */
@@ -53,6 +59,7 @@ export interface AddressFilteredDrpRecord extends ValidatedDrpRecord {
 }
 
 export interface RendezvousEnsembleTrace {
+	readonly observedAtMs?: number;
 	readonly policyRejectedAddressCount: number;
 	readonly recordRejectedCount: number;
 	readonly sources: ReadonlyArray<{
@@ -62,8 +69,16 @@ export interface RendezvousEnsembleTrace {
 }
 
 export interface RendezvousEnsemble extends RendezvousDirectory {
-	bootstrap(namespace: string, signal: AbortSignal): AsyncIterable<AddressFilteredDrpRecord>;
+	bootstrap(
+		namespace: string,
+		signal: AbortSignal,
+		selection?: RendezvousBootstrapSelection
+	): AsyncIterable<AddressFilteredDrpRecord>;
 	readonly lastTrace: RendezvousEnsembleTrace | undefined;
+}
+
+export interface RendezvousBootstrapSelection extends RegistryBackendSelection {
+	readonly sources?: readonly BootstrapSourceId[];
 }
 
 export type BootstrapSourceId = "cache" | "dht-anchor" | "invite" | "peer-exchange" | "registries";
@@ -93,6 +108,7 @@ export class RendezvousExhaustedError extends Error {
 export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): RendezvousEnsemble {
 	const maximum = boundedInteger(options.limits?.maxRecordsPerSource ?? 64, 1, 256, "maxRecordsPerSource");
 	const timeoutMs = boundedInteger(options.limits?.timeoutMs ?? 4_000, 1, 30_000, "timeoutMs");
+	const now = options.now ?? Date.now;
 	const validatorFactory =
 		options.validatorFactory ??
 		((): RecordValidator => new RecordValidator({ resolver: options.addressPolicy.resolver }));
@@ -109,21 +125,36 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 	let lastTrace: RendezvousEnsembleTrace | undefined;
 
 	return {
-		bootstrap: async function* (namespace: string, signal: AbortSignal): AsyncIterable<AddressFilteredDrpRecord> {
+		bootstrap: async function* (
+			namespace: string,
+			signal: AbortSignal,
+			selection: RendezvousBootstrapSelection = {}
+		): AsyncIterable<AddressFilteredDrpRecord> {
 			const deadline = operationDeadline(signal, timeoutMs);
 			try {
+				const selectedSources = new Set<BootstrapSourceId>(
+					selection.sources ?? ["cache", "dht-anchor", "invite", "peer-exchange", "registries"]
+				);
 				const initialTasks: Array<Promise<SourceResult>> = [];
-				if (registries !== undefined) {
+				if (registries !== undefined && selectedSources.has("registries")) {
 					initialTasks.push(
-						runValidatedDirectorySource("registries", registries, namespace, maximum, deadline.signal, validatorFactory)
+						runValidatedDirectorySource(
+							"registries",
+							registries,
+							namespace,
+							maximum,
+							deadline.signal,
+							validatorFactory,
+							selection
+						)
 					);
 				}
-				if (options.anchors !== undefined) {
+				if (options.anchors !== undefined && selectedSources.has("dht-anchor")) {
 					initialTasks.push(
 						runAnchorSource(options.anchors.resolver, namespace, maximum, deadline.signal, validatorFactory)
 					);
 				}
-				if (options.invite !== undefined) {
+				if (options.invite !== undefined && selectedSources.has("invite")) {
 					initialTasks.push(
 						runValidatedDirectorySource("invite", options.invite, namespace, maximum, deadline.signal, validatorFactory)
 					);
@@ -131,7 +162,7 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 
 				const results: SourceResult[] = [];
 				const emitted = new Map<string, number>();
-				if (options.cache !== undefined) {
+				if (options.cache !== undefined && selectedSources.has("cache")) {
 					const cached = await runCacheSource(options.cache, namespace, maximum, deadline.signal);
 					results.push(cached);
 					const filtered = await filterAddresses(
@@ -146,7 +177,7 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 				}
 
 				results.push(...(await Promise.all(initialTasks)));
-				if (options.peerExchange !== undefined) {
+				if (options.peerExchange !== undefined && selectedSources.has("peer-exchange")) {
 					results.push(
 						await runValidatedDirectorySource(
 							"peer-exchange",
@@ -180,7 +211,7 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 					yield candidate;
 				}
 
-				lastTrace = traceFor(results, filtered.policyRejectedAddressCount);
+				lastTrace = traceFor(results, filtered.policyRejectedAddressCount, now());
 				if (emitted.size === 0 && nonCacheResults.length > 0 && failedSourceIds.length === nonCacheResults.length) {
 					throw new RendezvousExhaustedError("bootstrap", failedSourceIds);
 				}
@@ -218,6 +249,7 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 				const failedSourceIds = results.filter(({ status }) => status === "failed").map(({ id }) => id);
 				if (failedSourceIds.length === results.length) {
 					lastTrace = Object.freeze({
+						observedAtMs: now(),
 						policyRejectedAddressCount: 0,
 						recordRejectedCount: results.reduce((count, result) => count + result.recordRejectedCount, 0),
 						sources: Object.freeze(sources),
@@ -231,6 +263,7 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 				const filtered = await filterAddresses(reconciled, options.addressPolicy, deadline.signal);
 				policyRejectedAddressCount = filtered.policyRejectedAddressCount;
 				lastTrace = Object.freeze({
+					observedAtMs: now(),
 					policyRejectedAddressCount,
 					recordRejectedCount: results.reduce((count, result) => count + result.recordRejectedCount, 0),
 					sources: Object.freeze(sources),
@@ -271,10 +304,11 @@ async function runValidatedDirectorySource(
 	namespace: string,
 	maximum: number,
 	signal: AbortSignal,
-	validatorFactory: () => RecordValidator
+	validatorFactory: () => RecordValidator,
+	selection?: RegistryBackendSelection
 ): Promise<SourceResult> {
 	try {
-		const candidates = await raceWithSignal(directory.discover(namespace, signal), signal);
+		const candidates = await raceWithSignal(directory.discover(namespace, signal, selection), signal);
 		if (candidates.length > maximum) throw new Error("source record cap exceeded");
 		const validator = validatorFactory();
 		const records: ValidatedDrpRecord[] = [];
@@ -397,8 +431,13 @@ async function filterAddresses(
 	return { policyRejectedAddressCount, records: filtered };
 }
 
-function traceFor(results: readonly SourceResult[], policyRejectedAddressCount: number): RendezvousEnsembleTrace {
+function traceFor(
+	results: readonly SourceResult[],
+	policyRejectedAddressCount: number,
+	observedAtMs: number
+): RendezvousEnsembleTrace {
 	return Object.freeze({
+		observedAtMs,
 		policyRejectedAddressCount,
 		recordRejectedCount: results.reduce((count, result) => count + result.recordRejectedCount, 0),
 		sources: Object.freeze(results.map(({ id, status }) => ({ id, status }))),

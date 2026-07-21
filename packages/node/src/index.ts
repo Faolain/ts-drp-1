@@ -1,5 +1,15 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { TypedEventEmitter } from "@libp2p/interface";
+import {
+	ControlPlaneCoordinator,
+	ControlPlaneHealthAggregator,
+	type ControlPlaneHealthSnapshot,
+	type ControlPlaneMechanismPorts,
+	type ControlPlanePhaseSixEvent,
+	type ControlPlaneRecoveryConfig,
+	type ControlPlaneScheduler,
+	SystemControlPlaneScheduler,
+} from "@ts-drp/control-plane";
 import { createDRPDiscovery } from "@ts-drp/interval-discovery";
 import { createDRPReconnectBootstrap } from "@ts-drp/interval-reconnect";
 import { IntervalRunner } from "@ts-drp/interval-runner";
@@ -7,7 +17,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
-import { createPermissionlessACL, DRPObject, HashGraph } from "@ts-drp/object";
+import { createPermissionlessACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	AddressPolicy,
 	createDnsResolver,
@@ -57,7 +67,7 @@ import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
 import { clearSyncRecoveryEpisodes, drpObjectChangesHandler, handleMessage } from "./handlers.js";
-import { createDRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
+import { createDRPIntervalSync, DRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
@@ -77,12 +87,35 @@ const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `i
 export interface DRPNodeDependencies {
 	/** Optional fail-closed lifecycle check run before restart begins */
 	beforeRestart?(): Promise<void> | void;
+	/** Factory override for the health-based recovery lifecycle owner. */
+	controlPlaneCoordinatorFactory?(
+		options: DRPNodeControlPlaneCoordinatorFactoryOptions
+	): Pick<ControlPlaneCoordinator, "failedRecoveryAttempts" | "start" | "stop">;
+	/** Existing rendezvous, relay, routing, and synchronization mechanisms to orchestrate. */
+	readonly controlPlaneMechanisms?: ControlPlaneMechanismPorts;
+	/** Deterministic scheduler for health recovery tests and embedded runtimes. */
+	readonly controlPlaneScheduler?: ControlPlaneScheduler;
 	/** Existing network implementation to use instead of the production default */
 	networkNode?: DRPNetworkNode;
 	/** Network shutdown owner when an attached control-plane adapter shares the host */
 	networkStop?(): Promise<void>;
 	/** Existing reconnect owner, or false when an external coordinator owns recovery */
 	reconnect?: IDRPIntervalReconnectBootstrap | false;
+}
+
+export interface DRPNodeControlPlaneCoordinatorFactoryOptions {
+	readonly accessors: {
+		getConnectedPeerIds(): readonly string[];
+		getRendezvous(): RendezvousEnsemble | undefined;
+		getRendezvousCache(): PeerCache | undefined;
+	};
+	readonly config: ControlPlaneRecoveryConfig;
+	getLocalState(): ReadonlyMap<string, unknown>;
+	readonly ports: ControlPlaneMechanismPorts;
+	readStatus(): ControlPlaneHealthSnapshot;
+	readonly scheduler: ControlPlaneScheduler;
+	sink(event: ControlPlanePhaseSixEvent): void;
+	subscribeStatus(listener: (status: ControlPlaneHealthSnapshot) => void): () => void;
 }
 
 /**
@@ -107,7 +140,22 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _rendezvousRegistration: Promise<boolean> | undefined;
 	private _rendezvousBootstrapController: AbortController | undefined;
 	private _rendezvousBootstrap: Promise<void> | undefined;
+	private _rendezvousBackendStates: readonly {
+		readonly id: string;
+		readonly status: "empty" | "failed" | "succeeded";
+	}[] = [];
+	private _rendezvousObservedAtMs = 0;
 	private readonly _beforeRestart: (() => Promise<void> | void) | undefined;
+	private _controlPlaneCoordinator:
+		| Pick<ControlPlaneCoordinator, "failedRecoveryAttempts" | "start" | "stop">
+		| undefined;
+	private readonly _controlPlaneCoordinatorFactory: DRPNodeDependencies["controlPlaneCoordinatorFactory"];
+	private readonly _controlPlaneMechanisms: ControlPlaneMechanismPorts | undefined;
+	private readonly _controlPlaneScheduler: ControlPlaneScheduler | undefined;
+	private _authenticatedDrpPeerIds = new Set<string>();
+	private _lastHealthAuthenticatedPeerIds = new Set<string>();
+	private _lastDirectConnectionPeerIds = new Set<string>();
+	private _preservedControlPlaneState: ReadonlyMap<string, unknown> | undefined;
 	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
 	private readonly _stopNetwork: () => Promise<void>;
 	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
@@ -130,6 +178,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			throw new Error("Injected reconnect policy must own the injected DRP network node");
 		}
 		this._beforeRestart = dependencies.beforeRestart;
+		this._controlPlaneCoordinatorFactory = dependencies.controlPlaneCoordinatorFactory;
+		this._controlPlaneMechanisms = dependencies.controlPlaneMechanisms;
+		this._controlPlaneScheduler = dependencies.controlPlaneScheduler;
 		this._reconnectDependency = dependencies.reconnect;
 		this._stopNetwork = dependencies.networkStop ?? ((): Promise<void> => this.networkNode.stop());
 		this._routing = createConfiguredBrowserRouting(config);
@@ -170,12 +221,20 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 		reconnectInterval?.start();
 		this.restoreSubscriptions();
+		this._startControlPlaneRecovery();
 	}
 
 	/**
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
+		const controlPlaneCoordinator = this._controlPlaneCoordinator;
+		this._controlPlaneCoordinator = undefined;
+		try {
+			await controlPlaneCoordinator?.stop();
+		} catch (error) {
+			log.error("::controlPlaneRecovery: Failed to stop coordinator", error);
+		}
 		this._rendezvousRegistrationController?.abort(new Error("DRPNode stopped"));
 		this._rendezvousBootstrapController?.abort(new Error("DRPNode stopped"));
 		this._connectFetchControllers.forEach((controller) => controller.abort());
@@ -388,6 +447,12 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 		} catch {
 			// Background bootstrap failure is represented by the ensemble trace and must not fail node startup.
+		} finally {
+			const trace = directory.lastTrace;
+			if (trace !== undefined) {
+				this._rendezvousBackendStates = trace.sources.map(({ id, status }) => ({ id, status }));
+				this._rendezvousObservedAtMs = trace.observedAtMs ?? Date.now();
+			}
 		}
 	}
 
@@ -406,6 +471,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			if (lifecycleSignal.aborted) return false;
 			const acceptedSourceCount = receipt.acceptedEndpointIds.length;
 			const failedSourceCount = receipt.attempts.length - acceptedSourceCount;
+			this._rendezvousBackendStates = receipt.attempts.map(({ endpointId, status }) => ({
+				id: endpointId,
+				status: status === "accepted" ? "succeeded" : "failed",
+			}));
+			this._rendezvousObservedAtMs = Date.now();
 			this._emitRendezvousEvent({
 				acceptedSourceCount,
 				failedSourceCount,
@@ -415,6 +485,14 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		} catch (error) {
 			if (lifecycleSignal.aborted) return false;
 			const attempts = error instanceof RegistryExhaustedError ? error.attempts.length : endpointCount;
+			this._rendezvousBackendStates =
+				error instanceof RegistryExhaustedError
+					? error.attempts.map(({ endpointId }) => ({ id: endpointId, status: "failed" as const }))
+					: Array.from({ length: endpointCount }, (_, index) => ({
+							id: `registry-${index + 1}`,
+							status: "failed" as const,
+						}));
+			this._rendezvousObservedAtMs = Date.now();
 			this._emitRendezvousEvent({
 				acceptedSourceCount: 0,
 				failedSourceCount: Math.min(endpointCount, attempts),
@@ -433,6 +511,280 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 	}
 
+	private _startControlPlaneRecovery(): void {
+		const recoveryConfig = this.config.network_config?.control_plane?.recovery;
+		if (recoveryConfig === undefined || this._controlPlaneCoordinator !== undefined) return;
+		if (this._controlPlaneMechanisms === undefined && this.networkNode.redialBootstraps === undefined) {
+			throw new Error("control_plane.recovery requires network redial support or injected controlPlaneMechanisms");
+		}
+		if (
+			this._controlPlaneMechanisms === undefined &&
+			this.config.network_config?.control_plane?.relay_policy !== undefined &&
+			this.networkNode.replaceRelay === undefined
+		) {
+			throw new Error("control_plane.recovery requires relay replacement support for configured relay policy");
+		}
+		if (
+			this._controlPlaneMechanisms === undefined &&
+			this.config.network_config?.control_plane?.routing?.node?.enabled === true &&
+			this.networkNode.refreshRouting === undefined
+		) {
+			throw new Error("control_plane.recovery requires routing refresh support for configured Node routing");
+		}
+		const scheduler = this._controlPlaneScheduler ?? new SystemControlPlaneScheduler();
+		const health = new ControlPlaneHealthAggregator({ now: (): number => scheduler.now() });
+		const readStatus = (): ControlPlaneHealthSnapshot => this._readControlPlaneHealth(health);
+		const ports = this._controlPlaneMechanisms ?? this._createDefaultControlPlaneMechanisms();
+		const getLocalState = (): ReadonlyMap<string, unknown> =>
+			new Map([...this.#objectStore.values()].map((object) => [object.id, object]));
+		const factoryOptions: DRPNodeControlPlaneCoordinatorFactoryOptions = {
+			accessors: {
+				getConnectedPeerIds: (): readonly string[] => this.networkNode.getAllPeers(),
+				getRendezvous: (): RendezvousEnsemble | undefined => this.rendezvous,
+				getRendezvousCache: (): PeerCache | undefined => this.rendezvousCache,
+			},
+			config: recoveryConfig,
+			getLocalState,
+			ports,
+			readStatus,
+			scheduler,
+			sink: (event): void => this._emitRendezvousEvent(event),
+			subscribeStatus: (listener): (() => void) => {
+				let active = true;
+				const refresh = (): void => {
+					void this._refreshAuthenticatedDrpPeers().then((): void => {
+						if (!active) return;
+						try {
+							listener(readStatus());
+						} catch {
+							// Health observation must not interfere with network membership events.
+						}
+					});
+				};
+				const unsubscribe = this.networkNode.subscribeToGroupPeerChanges(refresh);
+				refresh();
+				return (): void => {
+					active = false;
+					unsubscribe();
+				};
+			},
+		};
+		this._controlPlaneCoordinator =
+			this._controlPlaneCoordinatorFactory?.(factoryOptions) ??
+			new ControlPlaneCoordinator({
+				config: recoveryConfig,
+				getLocalState,
+				ports,
+				readStatus,
+				scheduler,
+				sink: factoryOptions.sink,
+				subscribeStatus: factoryOptions.subscribeStatus,
+			});
+		this._controlPlaneCoordinator.start();
+	}
+
+	private _readControlPlaneHealth(health: ControlPlaneHealthAggregator): ControlPlaneHealthSnapshot {
+		const authenticatedDrpPeerIds = [...this._authenticatedDrpPeerIds].sort();
+		const lostAuthenticatedPeerIds = [...this._lastHealthAuthenticatedPeerIds].filter(
+			(peerId) => !this._authenticatedDrpPeerIds.has(peerId)
+		);
+		this._lastHealthAuthenticatedPeerIds = new Set(authenticatedDrpPeerIds);
+		const trace = this._rendezvous?.lastTrace;
+		const backendStates =
+			this._rendezvousBackendStates.length > 0
+				? this._rendezvousBackendStates
+				: (trace?.sources.map(({ id, status }) => ({ id, status })) ?? []);
+		const healthyBackendCount = backendStates.filter(({ status }) => status !== "failed").length;
+		const nowMs = this._controlPlaneScheduler?.now() ?? Date.now();
+		const rendezvousObservedAtMs = this._rendezvousObservedAtMs || trace?.observedAtMs || 0;
+		const freshnessWindowMs = Math.max(
+			1_000,
+			(this.config.network_config?.control_plane?.rendezvous?.refresh_interval_ms ?? 30_000) * 2
+		);
+		const rendezvousFresh =
+			rendezvousObservedAtMs > 0 &&
+			nowMs >= rendezvousObservedAtMs &&
+			nowMs - rendezvousObservedAtMs <= freshnessWindowMs &&
+			healthyBackendCount > 0;
+		const connectionEvidence = this.networkNode.getControlPlaneConnections?.() ?? [];
+		const authenticatedConnections = connectionEvidence.filter(({ peerId }) =>
+			this._authenticatedDrpPeerIds.has(peerId)
+		);
+		const directConnectionPeerIds = new Set(
+			authenticatedConnections
+				.filter(({ multiaddr, transport }) => transport !== "relay" && !multiaddr.includes("/p2p-circuit"))
+				.map(({ peerId }) => peerId)
+		);
+		const relayedConnectionPeerIds = new Set(
+			authenticatedConnections
+				.filter(({ multiaddr, transport }) => transport === "relay" || multiaddr.includes("/p2p-circuit"))
+				.map(({ peerId }) => peerId)
+		);
+		const directConnectionFailedPeerIds = [...this._lastDirectConnectionPeerIds].filter(
+			(peerId) => !directConnectionPeerIds.has(peerId) && relayedConnectionPeerIds.has(peerId)
+		);
+		this._lastDirectConnectionPeerIds = directConnectionPeerIds;
+		const liveReservations = (this.networkNode.getActiveRelayReservations?.() ?? [])
+			.filter(({ expiresAtMs }) => expiresAtMs > nowMs)
+			.map(({ operatorGroup, peerId }) => ({ operatorGroup, relayId: peerId }));
+		const objects = [...this.#objectStore.values()];
+		const synchronizationStates = objects.map((object): "behind" | "synchronized" | "unknown" => {
+			if (hasRemoteSyncHistory(object.vertices, this.networkNode.peerId)) return "synchronized";
+			if (creatorFromObjectID(object.id) === this.networkNode.peerId) return "synchronized";
+			const interval = this._intervals.get(objectIntervalKey("sync", object.id));
+			return interval instanceof DRPIntervalSync ? interval.initialSynchronizationState : "unknown";
+		});
+		const objectSynchronization = synchronizationStates.includes("behind")
+			? "behind"
+			: synchronizationStates.length > 0 && synchronizationStates.every((state) => state === "synchronized")
+				? "synchronized"
+				: "unknown";
+		const bootstrapPeerIds = new Set(
+			this.networkNode
+				.getBootstrapNodes()
+				.map((address) => address.split("/p2p/")[1])
+				.filter((peerId): peerId is string => peerId !== undefined)
+		);
+		const connectedBootstrapPeerIds = this.networkNode.getAllPeers().filter((peerId) => bootstrapPeerIds.has(peerId));
+		const failedRouterIds =
+			this._routing?.lastTrace?.attempts
+				.filter(({ status }) => status === "failure")
+				.map(({ endpointId }) => endpointId) ?? [];
+		return health.aggregate({
+			authenticatedDrpPeerIds,
+			connectedBootstrapPeerIds,
+			directConnectionFailedPeerIds,
+			failedRecoveryAttempts: this._controlPlaneCoordinator?.failedRecoveryAttempts ?? [],
+			healthyBackendCount,
+			liveReservations,
+			lostAuthenticatedPeerIds,
+			meshDiversity: {
+				authenticatedPeerCount: authenticatedDrpPeerIds.length,
+				operatorGroupCount: new Set(
+					liveReservations.map(({ operatorGroup }) => operatorGroup).filter((group) => group !== "unknown")
+				).size,
+				transportCount: new Set(
+					authenticatedConnections.map(({ transport }) => transport).filter((transport) => transport !== "unknown")
+				).size,
+			},
+			objectSynchronization,
+			rendezvous: {
+				backends: backendStates,
+				fresh: rendezvousFresh,
+				replicaAvailability:
+					healthyBackendCount === 0
+						? "unavailable"
+						: healthyBackendCount === backendStates.length
+							? "available"
+							: "partial",
+				replicaCount: healthyBackendCount,
+			},
+			routing: { failedRouterIds },
+			traffic: {
+				directConnections: authenticatedConnections.filter(
+					({ multiaddr, transport }) => transport !== "relay" && !multiaddr.includes("/p2p-circuit")
+				).length,
+				relayedConnections: authenticatedConnections.filter(
+					({ multiaddr, transport }) => transport === "relay" || multiaddr.includes("/p2p-circuit")
+				).length,
+			},
+		});
+	}
+
+	private async _refreshAuthenticatedDrpPeers(): Promise<void> {
+		const groupPeers = new Set<string>();
+		for (const object of this.#objectStore.values()) {
+			for (const peerId of this.networkNode.getGroupPeers(object.id)) groupPeers.add(peerId);
+		}
+		const verifier = this.networkNode.membershipVerifier;
+		const membershipMode = this.config.network_config?.control_plane?.membership?.mode;
+		if (verifier === undefined || membershipMode !== "allowlist") {
+			this._authenticatedDrpPeerIds = groupPeers;
+			return;
+		}
+		const decisions = await Promise.all(
+			[...groupPeers].map(async (peerId): Promise<readonly [string, boolean]> => {
+				try {
+					const decision = await verifier.verify({ peerId, signal: new AbortController().signal });
+					return [peerId, isAcceptedMembershipDecision(decision)] as const;
+				} catch {
+					return [peerId, false] as const;
+				}
+			})
+		);
+		this._authenticatedDrpPeerIds = new Set(decisions.filter(([, accepted]) => accepted).map(([peerId]) => peerId));
+	}
+
+	private _createDefaultControlPlaneMechanisms(): ControlPlaneMechanismPorts {
+		return {
+			continueRelayed: (): Promise<{ terminal: "succeeded" }> => Promise.resolve({ terminal: "succeeded" }),
+			disconnectPeer: (peerId): Promise<void> => this.networkNode.disconnect(peerId),
+			preserveLocalState: (snapshot): Promise<{ terminal: "succeeded" }> => {
+				this._preservedControlPlaneState = new Map(snapshot);
+				return Promise.resolve({ terminal: "succeeded" });
+			},
+			registryCooldown: (): void => {},
+			relayReplace: async (request, _reason, signal): Promise<{ terminal: "failed" | "succeeded" }> => ({
+				terminal: (await this.networkNode.replaceRelay?.(request, signal)) === true ? "succeeded" : "failed",
+			}),
+			rendezvousBootstrap: async (request, signal): Promise<{ terminal: "failed" | "succeeded" }> => {
+				let connected = false;
+				const directory = this._rendezvous;
+				const namespace = this.config.network_config?.control_plane?.rendezvous?.namespace;
+				if (directory !== undefined && namespace !== undefined) {
+					try {
+						const sources = request.sources.map((source) =>
+							source === "signed-invite" ? ("invite" as const) : source
+						);
+						for await (const record of directory.bootstrap(namespace, signal, {
+							excludeBackendIds: request.excludeBackendIds,
+							preferredRegistryIds: request.preferredRegistryIds,
+							sources,
+						})) {
+							signal.throwIfAborted();
+							await this.networkNode.connect([...record.acceptedAddresses]);
+							connected = true;
+						}
+					} catch {
+						if (signal.aborted) throw signal.reason;
+					} finally {
+						const latestTrace = directory.lastTrace;
+						if (latestTrace !== undefined) {
+							this._rendezvousBackendStates = latestTrace.sources.map(({ id, status }) => ({ id, status }));
+							this._rendezvousObservedAtMs = latestTrace.observedAtMs ?? Date.now();
+						}
+					}
+				}
+				const bootstrapConnected = (await this.networkNode.redialBootstraps?.(signal)) ?? false;
+				return { terminal: connected || bootstrapConnected ? "succeeded" : "failed" };
+			},
+			routerFallback: async (_request, signal): Promise<{ terminal: "failed" | "succeeded" }> => {
+				const routing = this._routing;
+				if (routing !== undefined) {
+					try {
+						for await (const _peer of routing.getClosestPeers(
+							new TextEncoder().encode(this.networkNode.peerId),
+							signal
+						)) {
+							return { terminal: "succeeded" };
+						}
+					} catch {
+						if (signal.aborted) throw signal.reason;
+					}
+				}
+				return { terminal: (await this.networkNode.refreshRouting?.(signal)) === true ? "succeeded" : "failed" };
+			},
+			syncFromDifferentPeer: async ({ candidates }): Promise<{ terminal: "failed" | "succeeded" }> => {
+				const peerId = candidates[0];
+				if (peerId === undefined) return { terminal: "failed" };
+				const objects = [...this.#objectStore.values()];
+				if (objects.length === 0) return { terminal: "failed" };
+				await Promise.all(objects.map((object) => this.syncObject(object.id, peerId)));
+				return { terminal: "succeeded" };
+			},
+		};
+	}
+
 	/**
 	 * Restart the node.
 	 */
@@ -444,6 +796,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	}
 
 	private getReconnectInterval(): IDRPIntervalReconnectBootstrap | undefined {
+		if (this.config.network_config?.control_plane?.recovery !== undefined) return undefined;
 		if (this._reconnectDependency === false) return undefined;
 		this._reconnectInterval ??=
 			this._reconnectDependency ??
@@ -856,6 +1209,10 @@ function deriveRendezvousCapabilities(config: DRPNodeConfig): readonly DrpCapabi
 function registrationCredential(config: DRPNodeConfig): Parameters<RendezvousDirectory["register"]>[2] {
 	const membership = config.network_config?.control_plane?.membership;
 	return membership?.mode === "invite" ? { kind: "invite", token: membership.invite.inviteToken } : undefined;
+}
+
+function isAcceptedMembershipDecision(value: unknown): boolean {
+	return typeof value === "object" && value !== null && "accepted" in value && value.accepted === true;
 }
 
 export {

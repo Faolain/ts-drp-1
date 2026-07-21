@@ -25,6 +25,19 @@ const INVITE = "fixture-invite-token-32-characters";
 const resolver = { resolve: (): Promise<string[]> => Promise.resolve(["93.184.216.34"]) };
 
 describe("two-endpoint registry", () => {
+	it("honors recovery cooldown exclusions and preferred backend order", async () => {
+		const primary = endpoint("primary");
+		const secondary = endpoint("secondary");
+		const client = registryClient([primary, secondary]);
+
+		await client.discover(namespace(30), signal(), {
+			excludeBackendIds: ["primary"],
+			preferredRegistryIds: ["secondary"],
+		});
+
+		expect(client.lastAttempts.map(({ endpointId }) => endpointId)).toEqual(["secondary"]);
+	});
+
 	it("replicates to two independent endpoints and discovers through ordered failover", async () => {
 		const record = await signedRecord(1);
 		const primary = endpoint("primary");

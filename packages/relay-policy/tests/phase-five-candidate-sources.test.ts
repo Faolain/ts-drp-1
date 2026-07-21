@@ -127,7 +127,7 @@ describe("Phase 5 relay candidate sources", () => {
 					? { directory: { discover: (): Promise<readonly ValidatedRelayRecord[]> => Promise.resolve(records) } }
 					: { cache: { list: (): Promise<readonly ValidatedRelayRecord[]> => Promise.resolve(records) } }),
 				networkId: NETWORK_ID,
-				now: () => 100,
+				now: (): number => 100,
 			});
 
 			await expect(collect(source)).resolves.toMatchObject([{ peerId: "live-relay" }]);

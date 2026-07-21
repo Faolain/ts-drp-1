@@ -55,6 +55,18 @@ export type ControlPlaneAddressReason =
 
 export type ControlPlaneDialReason = ControlPlaneAddressReason | "aborted" | "connected" | "dial-failed";
 
+export type ControlPlaneHealthState = "degraded" | "healthy" | "recovering";
+
+export type ControlPlaneRecoveryAction =
+	| "continue-registries"
+	| "fallback-rendezvous"
+	| "fallback-router"
+	| "replace-relay"
+	| "retain-relayed"
+	| "retain-registries"
+	| "sync-another-peer"
+	| "bounded-retry";
+
 export type ControlPlaneResolverAddressFamily = "ipv4" | "ipv6" | undefined;
 
 /** Structural DNS seam used by the dial-time address policy. */
@@ -105,7 +117,17 @@ export type ControlPlaneEvent =
 			readonly relayIdHash?: string;
 	  }
 	| { readonly kind: "first-authenticated-peer"; readonly peerIdHash: string }
-	| { readonly kind: "terminal"; readonly reason: "aborted" | "deadline" | "failed" | "stopped" | "succeeded" }
+	| { readonly kind: "health"; readonly state: ControlPlaneHealthState }
+	| {
+			readonly attempt: number;
+			readonly kind: "recovery";
+			readonly outcome: "attempt" | "failed" | "succeeded";
+			readonly recovery: ControlPlaneRecoveryAction;
+	  }
+	| {
+			readonly kind: "terminal";
+			readonly reason: "aborted" | "deadline" | "exhausted" | "failed" | "stopped" | "succeeded";
+	  }
 	| { readonly kind: "cleanup"; readonly outcome: "complete" | "failed" };
 
 export interface ControlPlaneAddressPolicyConfig {
@@ -196,6 +218,28 @@ export interface ControlPlaneRelayPolicyConfig {
 	readonly target_reservations?: number;
 }
 
+export interface ControlPlaneRecoveryConfig {
+	readonly backend_cooldown_ms: number;
+	readonly health_poll_interval_ms?: number;
+	readonly max_attempts: number;
+	readonly parent_deadline_ms: number;
+	readonly recovery_backoff_ms?: number;
+	readonly retry_delays_ms?: readonly number[];
+	readonly startup_grace_ms?: number;
+}
+
+export interface ControlPlaneConnectionEvidence {
+	readonly multiaddr: string;
+	readonly peerId: string;
+	readonly transport: ControlPlaneTransport;
+}
+
+export interface ControlPlaneRelayReservationEvidence {
+	readonly expiresAtMs: number;
+	readonly operatorGroup: string;
+	readonly peerId: string;
+}
+
 /** Phase 2 structural owners; later phases add runtime implementations behind these sections. */
 export interface ControlPlaneConfig {
 	readonly address_policy?: ControlPlaneAddressPolicyConfig;
@@ -203,6 +247,7 @@ export interface ControlPlaneConfig {
 	readonly observability?: {
 		sink(event: ControlPlaneEvent): void;
 	};
+	readonly recovery?: ControlPlaneRecoveryConfig;
 	readonly relay_policy?: ControlPlaneRelayPolicyConfig;
 	readonly rendezvous?: ControlPlaneRendezvousConfig;
 	readonly routing?: {
@@ -333,6 +378,9 @@ export interface DRPNetworkNode {
 	 */
 	connectToBootstraps(): Promise<void>;
 
+	/** Redials configured bootstrap addresses and reports whether a connection was established. */
+	redialBootstraps?(signal: AbortSignal): Promise<boolean>;
+
 	/**
 	 * Connects to one or more peer addresses
 	 * @param addr - The address(es) to connect to
@@ -377,6 +425,21 @@ export interface DRPNetworkNode {
 	 * @returns Array of peer IDs
 	 */
 	getAllPeers(): string[];
+
+	/** Sanitized live connection evidence for health aggregation. */
+	getControlPlaneConnections?(): readonly ControlPlaneConnectionEvidence[];
+
+	/** Defensive snapshots of the relay policy's current live reservations. */
+	getActiveRelayReservations?(): readonly ControlPlaneRelayReservationEvidence[];
+
+	/** Delegates a health-recovery relay replacement to the relay-policy owner. */
+	replaceRelay?(
+		request: { readonly excludedOperatorGroup?: string; readonly relayId?: string },
+		signal: AbortSignal
+	): Promise<boolean>;
+
+	/** Forces the attached routing owner to refresh/fail over when available. */
+	refreshRouting?(signal: AbortSignal): Promise<boolean>;
 
 	/**
 	 * Gets all peers subscribed to a specific group/topic

@@ -73,12 +73,14 @@ describe("Phase 5 DRPNetworkNode relay-policy wiring", () => {
 			return result("reserved");
 		});
 		const stop = vi.fn(() => Promise.resolve());
-		const relayPolicyFactory = vi.fn((_options: RelayPolicyFactoryOptions): RelayPolicyDriver => ({
-			acquire,
-			refresh: () => Promise.resolve(result("reserved")),
-			replace: () => Promise.resolve(result("reserved")),
-			stop,
-		}));
+		const relayPolicyFactory = vi.fn(
+			(_options: RelayPolicyFactoryOptions): RelayPolicyDriver => ({
+				acquire,
+				refresh: () => Promise.resolve(result("reserved")),
+				replace: () => Promise.resolve(result("reserved")),
+				stop,
+			})
+		);
 		const node = nodeWith(
 			{
 				...relayConfig(),
@@ -211,17 +213,10 @@ describe("Phase 5 DRPNetworkNode relay-policy wiring", () => {
 
 	it("refreshes before expiry, replaces disconnected reservations, and cleans up maintenance ownership", async () => {
 		const relayListeners = new Set<(event: CustomEvent<{ toString(): string }>) => void>();
-		const acquire = vi.fn(() =>
-			Promise.resolve(result("reserved", [reservation("relay-a", Date.now() + 30_020)]))
-		);
-		const refresh = vi.fn(() =>
-			Promise.resolve(result("reserved", [reservation("relay-a", Date.now() + 60_000)]))
-		);
-		const replace = vi.fn(() =>
-			Promise.resolve(result("reserved", [reservation("relay-c", Date.now() + 60_000)]))
-		);
+		const acquire = vi.fn(() => Promise.resolve(result("reserved", [reservation("relay-a", Date.now() + 30_020)])));
+		const refresh = vi.fn(() => Promise.resolve(result("reserved", [reservation("relay-a", Date.now() + 60_000)])));
+		const replace = vi.fn(() => Promise.resolve(result("reserved", [reservation("relay-c", Date.now() + 60_000)])));
 		const stop = vi.fn(() => Promise.resolve());
-		let node!: DRPNetworkNode;
 		const relayPolicyFactory = vi.fn((): RelayPolicyDriver => {
 			const host = node["_node"];
 			if (host === undefined) throw new Error("host must exist before relay policy construction");
@@ -240,7 +235,7 @@ describe("Phase 5 DRPNetworkNode relay-policy wiring", () => {
 			}) as typeof host.removeEventListener;
 			return { acquire, refresh, replace, stop };
 		});
-		node = nodeWith(relayConfig(), {
+		const node = nodeWith(relayConfig(), {
 			relayCandidateSources: {
 				configuredFallback: sourceOf([candidate("relay-a", "verified:owned", "configured-fallback")]),
 			},
@@ -253,7 +248,7 @@ describe("Phase 5 DRPNetworkNode relay-policy wiring", () => {
 		expect(relayListeners).toHaveLength(1);
 		const listener = [...relayListeners][0];
 		if (listener === undefined) throw new Error("relay disconnect listener was not installed");
-		listener(new CustomEvent("peer:disconnect", { detail: { toString: () => "relay-a" } }));
+		listener(new CustomEvent("peer:disconnect", { detail: { toString: (): string => "relay-a" } }));
 		await vi.waitFor(() =>
 			expect(replace).toHaveBeenCalledWith("relay-a", "relay-disconnected", expect.any(AbortSignal))
 		);
@@ -314,16 +309,14 @@ describe("Phase 5 DRPNetworkNode relay-policy wiring", () => {
 		).resolves.toBe("started");
 		expect(finishAcquire).toBeTypeOf("function");
 		finishAcquire?.(result("exhausted"));
-		await vi.waitFor(() =>
-			expect(events).toContainEqual({ kind: "relay-reservation", outcome: "failed" })
-		);
+		await vi.waitFor(() => expect(events).toContainEqual({ kind: "relay-reservation", outcome: "failed" }));
 	});
 
 	it("can stop while initial acquisition is pending without masking the abort", async () => {
 		let acquisitionSignal: AbortSignal | undefined;
 		const relayPolicyFactory = vi.fn(
 			(): RelayPolicyDriver => ({
-				acquire: (_queryKey, signal) => {
+				acquire: (_queryKey, signal): Promise<DriverResult> => {
 					acquisitionSignal = signal;
 					return new Promise<DriverResult>((resolve) => {
 						signal.addEventListener("abort", () => resolve(result("aborted")), { once: true });

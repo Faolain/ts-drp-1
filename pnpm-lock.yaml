@@ -242,6 +242,19 @@ importers:
         specifier: 0.11.0
         version: link:../types
 
+  packages/control-plane:
+    dependencies:
+      '@ts-drp/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      esbuild:
+        specifier: 0.25.3
+        version: 0.25.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
   packages/interval-discovery:
     dependencies:
       '@ts-drp/interval-runner':
@@ -269,9 +282,6 @@ importers:
       '@ts-drp/interval-runner':
         specifier: 0.11.0
         version: link:../interval-runner
-      '@ts-drp/logger':
-        specifier: 0.11.0
-        version: link:../logger
       '@ts-drp/types':
         specifier: 0.11.0
         version: link:../types
@@ -591,6 +601,9 @@ importers:
       '@ts-drp/blueprints':
         specifier: 0.11.0
         version: link:../blueprints
+      '@ts-drp/control-plane':
+        specifier: workspace:*
+        version: link:../control-plane
       '@ts-drp/interval-discovery':
         specifier: 0.11.0
         version: link:../interval-discovery

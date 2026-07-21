@@ -632,12 +632,21 @@ export interface ValidatedDrpRecord {
 
 /** Minimal discovery seam shared by registry-backed rendezvous implementations. */
 export interface RendezvousDirectory {
-	discover(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]>;
+	discover(
+		namespace: string,
+		signal: AbortSignal,
+		selection?: RegistryBackendSelection
+	): Promise<readonly ValidatedDrpRecord[]>;
 	register(
 		record: SignedDrpRecordV1,
 		signal: AbortSignal,
 		credential?: AdmissionCredential
 	): Promise<ClientRegistrationReceipt>;
+}
+
+export interface RegistryBackendSelection {
+	readonly excludeBackendIds?: readonly string[];
+	readonly preferredRegistryIds?: readonly string[];
 }
 
 /**
@@ -738,13 +747,19 @@ export class RegistryClient implements RendezvousDirectory {
 	 * highest signed sequence for each publisher.
 	 * @param namespace - Expected opaque namespace.
 	 * @param signal - Parent operation signal.
+	 * @param selection
 	 * @returns Fresh, signature-validated records.
 	 */
-	async discover(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]> {
+	async discover(
+		namespace: string,
+		signal: AbortSignal,
+		selection: RegistryBackendSelection = {}
+	): Promise<readonly ValidatedDrpRecord[]> {
 		const attempts: RegistryAttempt[] = [];
 		const acceptedRecordSets: ValidatedDrpRecord[][] = [];
 		let healthyDirectoryCount = 0;
-		for (const [index, endpoint] of this.#endpoints.entries()) {
+		const endpoints = selectedRegistryEndpoints(this.#endpoints, selection);
+		for (const [index, endpoint] of endpoints.entries()) {
 			signal.throwIfAborted();
 			if (index > 0 && this.#backoffMs > 0) await this.#sleep(this.#backoffMs, signal);
 			let result: RegistryDiscoveryReceipt | RegistryRejection;
@@ -833,6 +848,20 @@ export class RegistryClient implements RendezvousDirectory {
 		}
 		throw new RegistryExhaustedError("discover", attempts);
 	}
+}
+
+function selectedRegistryEndpoints(
+	endpoints: readonly RegistryEndpoint[],
+	selection: RegistryBackendSelection
+): readonly RegistryEndpoint[] {
+	const excluded = new Set(selection.excludeBackendIds ?? []);
+	const available = endpoints.filter(({ id }) => !excluded.has(id));
+	const preferredOrder = new Map((selection.preferredRegistryIds ?? []).map((id, index) => [id, index]));
+	return available.sort((left, right) => {
+		const leftOrder = preferredOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+		const rightOrder = preferredOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+		return leftOrder - rightOrder;
+	});
 }
 
 /**

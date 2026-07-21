@@ -13,15 +13,12 @@ describe("DRPIntervalReconnect Unit Tests", () => {
 	let mockNetworkNode: MockedDRPNetworkNode;
 	let reconnectInstance: DRPIntervalReconnectBootstrap;
 	const testId = "test-reconnect";
-	const bootstrapPeerId = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
-	const nonBootstrapPeerId = "16Uiu2HAmGjAVQyzgTCumpB9TuojKT4LZTBC5HRiZyuwGG9VHodLC";
-	const bootstrapAddr = `/dns4/bootstrap.test/tcp/443/wss/p2p/${bootstrapPeerId}`;
 
 	beforeEach(() => {
 		mockNetworkNode = {
 			peerId: { toString: () => "test-peer-id" },
 			getAllPeers: vi.fn().mockReturnValue([]),
-			getBootstrapNodes: vi.fn().mockReturnValue([bootstrapAddr]),
+			getBootstrapNodes: vi.fn().mockReturnValue([]),
 			getGroupPeers: vi.fn().mockReturnValue([]),
 			broadcastMessage: vi.fn(),
 			connect: vi.fn(),
@@ -61,27 +58,11 @@ describe("DRPIntervalReconnect Unit Tests", () => {
 	});
 
 	describe("Reconnect Process", () => {
-		/*
-		 * getAllPeers() is the public DRPNetworkNode accessor backed by libp2p.getPeers(),
-		 * so it describes active peer connections. getMultiaddrs() describes only this
-		 * node's listen addresses and can remain populated while the node is isolated.
-		 */
-		test("skips redial when connected to a bootstrap peer", async () => {
-			mockNetworkNode.getAllPeers.mockReturnValue([bootstrapPeerId]);
-			await reconnectInstance["_runDRPReconnect"]();
-			expect(mockNetworkNode.connectToBootstraps).not.toHaveBeenCalled();
-		});
-
-		test("redials when connected only to a non-bootstrap peer", async () => {
-			mockNetworkNode.getAllPeers.mockReturnValue([nonBootstrapPeerId]);
+		test("delegates an interval tick to the bootstrap redial mechanism without identity classification", async () => {
 			await reconnectInstance["_runDRPReconnect"]();
 			expect(mockNetworkNode.connectToBootstraps).toHaveBeenCalledOnce();
-		});
-
-		test("redials when no peers are connected", async () => {
-			mockNetworkNode.getAllPeers.mockReturnValue([]);
-			await reconnectInstance["_runDRPReconnect"]();
-			expect(mockNetworkNode.connectToBootstraps).toHaveBeenCalledOnce();
+			expect(mockNetworkNode.getAllPeers).not.toHaveBeenCalled();
+			expect(mockNetworkNode.getBootstrapNodes).not.toHaveBeenCalled();
 		});
 	});
 });
