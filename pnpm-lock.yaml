@@ -163,12 +163,24 @@ importers:
 
   examples/grid:
     dependencies:
+      '@ts-drp/network':
+        specifier: 0.11.0
+        version: link:../../packages/network
       '@ts-drp/node':
         specifier: 0.11.0
         version: link:../../packages/node
       '@ts-drp/object':
         specifier: 0.11.0
         version: link:../../packages/object
+      '@ts-drp/relay-policy':
+        specifier: 0.11.0
+        version: link:../../packages/relay-policy
+      '@ts-drp/rendezvous':
+        specifier: 0.11.0
+        version: link:../../packages/rendezvous
+      '@ts-drp/routing-browser':
+        specifier: 0.11.0
+        version: link:../../packages/routing-browser
       '@ts-drp/tracer':
         specifier: ^0.11.0
         version: link:../../packages/tracer

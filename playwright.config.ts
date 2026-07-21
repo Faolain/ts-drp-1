@@ -13,6 +13,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
 	testDir: "./examples/grid/e2e",
+	/* The modular gate-7 spec runs only via examples/grid/playwright.modular.config.ts (its own fixtures). */
+	testIgnore: "**/grid-modular.spec.ts",
 	/* Run tests in files in parallel */
 	fullyParallel: true,
 	/* Fail the build on CI if you accidentally left test.only in the source code. */

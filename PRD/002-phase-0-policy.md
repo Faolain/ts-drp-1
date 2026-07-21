@@ -56,6 +56,16 @@ Each item blocks Phase 0 exit; none is decidable from the codebase.
 | Privacy notice and telemetry retention | Security/privacy owners | Gate 5 of PRD 001 §5 |
 | Authorized public campaign run | Ops + security | Separately reviewed ref; frozen thresholds; two registries, two egress conditions |
 
+### Gate 7 implementation status
+
+- **Code-half: DONE.** `examples/grid` now has a modular configuration seam and a
+  local-fixture modular Playwright specification covering rendezvous, runtime
+  routing, relay policy, and health recovery with no fixed bootstrap peers.
+- **Deployment-half: OPEN.** Final acceptance still requires at least two
+  independent registry operators, at least two permitted delegated endpoints,
+  operator-diverse owned relays, the full browser/Node publisher deployment run,
+  and authorized public-campaign sign-off against the OPEN decisions above.
+
 ## Migration and boundary notes
 
 - **No live data migrates.** Any record or namespace minted under the spike's

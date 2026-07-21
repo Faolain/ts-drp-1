@@ -33,7 +33,6 @@ export default defineConfig({
 			),
 		},
 	},
-	// @ts-expect-error -- test is a valid property
 	test: {
 		exclude: ["**/node_modules", "**/e2e"],
 	},

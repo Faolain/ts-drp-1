@@ -3,6 +3,8 @@ import { enableTracing, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { type DRPNodeConfig, type IMetrics } from "@ts-drp/types";
 
 import { env } from "./env";
+import { createModularGridNetwork, type ModularGridNetworkSession } from "./modular-network";
+import { isModularNetworkEnv, getNetworkConfigFromEnv as selectNetworkConfigFromEnv } from "./network-config";
 import { Grid } from "./objects/grid";
 import { enableUIControls, render, renderInfo } from "./render";
 import { gridState } from "./state";
@@ -13,49 +15,7 @@ import { getColorForPeerId } from "./util/color";
  * @returns The network config
  */
 export function getNetworkConfigFromEnv(): DRPNodeConfig {
-	const { bootstrapPeers, discoveryInterval, enablePrometheusMetrics } = env;
-
-	const hasEnv = bootstrapPeers || discoveryInterval || enablePrometheusMetrics;
-
-	const config: DRPNodeConfig = {
-		network_config: {
-			browser_metrics: true,
-		},
-	};
-
-	if (!hasEnv) {
-		return config;
-	}
-
-	if (bootstrapPeers) {
-		config.network_config = {
-			...config.network_config,
-			bootstrap_peers: env.bootstrapPeers.split(","),
-		};
-	}
-
-	if (discoveryInterval) {
-		config.network_config = {
-			...config.network_config,
-			pubsub: {
-				...config.network_config?.pubsub,
-				peer_discovery_interval: env.discoveryInterval,
-			},
-		};
-	}
-
-	if (enablePrometheusMetrics) {
-		config.network_config = {
-			...config.network_config,
-			pubsub: {
-				...config.network_config?.pubsub,
-				prometheus_metrics: true,
-				pushgateway_url: window.location.origin,
-			},
-		};
-	}
-
-	return config;
+	return selectNetworkConfigFromEnv(env, window.location.origin);
 }
 
 function addUser(): void {
@@ -192,16 +152,25 @@ async function main(): Promise<void> {
 	let hasRun = false;
 
 	const networkConfig = getNetworkConfigFromEnv();
-	gridState.node = new DRPNode(networkConfig);
+	const modularSession = isModularNetworkEnv(env) ? createModularGridNetwork(networkConfig, env) : undefined;
+	gridState.node = modularSession?.node ?? new DRPNode(networkConfig);
 	await gridState.node.start();
 	await gridState.node.networkNode.isDialable(() => {
 		console.log("Started node", import.meta.env);
 		if (hasRun) return;
 		hasRun = true;
 		run(metrics);
+		if (modularSession !== undefined) exposeModularSession(modularSession);
 	});
 
 	if (!hasRun) setInterval(renderInfo, import.meta.env.VITE_RENDER_INFO_INTERVAL);
+}
+
+function exposeModularSession(session: ModularGridNetworkSession): void {
+	const target = window as typeof window & { __TS_DRP_GRID_SESSION__?: ModularGridNetworkSession };
+	target.__TS_DRP_GRID_SESSION__ = session;
+	window.addEventListener("beforeunload", () => void session.stop(), { once: true });
+	window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: session.snapshot() }));
 }
 
 void main();

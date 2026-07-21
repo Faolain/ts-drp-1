@@ -5,6 +5,7 @@ const HOST = "127.0.0.1";
 const PORT = 4175;
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
 const PUBLIC_ONLY_PROVIDER_ID = "16Uiu2HAmGQfUVeXqZJvyELMmJyLLBaPCUYbrz3LCkYZcwKuvLha5";
+const GRID_INVITE_TOKEN = "grid-local-fixture-invite-0123456789";
 const PUBLIC_ONLY_PROVIDER = {
 	Addrs: [
 		`/ip4/127.0.0.1/tcp/50000/ws/p2p/16Uiu2HAmTY71bbCHtmYD3nvVKUGbk7NWqLBbPFNng4jhaXJHi3W5/p2p-circuit/p2p/${PUBLIC_ONLY_PROVIDER_ID}`,
@@ -25,6 +26,10 @@ const GRID_RELAYS = {
 };
 const state = new Map();
 const gridRecords = new Map();
+const gridRegistryAvailable = new Map([
+	["primary", true],
+	["secondary", true],
+]);
 
 const server = createServer((request, response) => {
 	void handleRequest(request, response);
@@ -32,6 +37,10 @@ const server = createServer((request, response) => {
 
 async function handleRequest(request, response) {
 	const url = new URL(request.url ?? "/", `http://${HOST}:${PORT}`);
+	if (url.pathname.startsWith("/grid-control/registry/")) {
+		handleGridRegistryControl(request, response, url);
+		return;
+	}
 	if (url.pathname.startsWith("/grid-registry/")) {
 		await handleGridRegistry(request, response, url);
 		return;
@@ -121,14 +130,22 @@ async function handleGridRegistry(request, response, url) {
 		response.end();
 		return;
 	}
-	const match = /^\/grid-registry\/(primary|secondary)\/(register|discover)$/u.exec(url.pathname);
+	const match = /^\/grid-registry\/(primary|secondary)\/(v1\/)?(register|discover)$/u.exec(url.pathname);
 	if (match === null) {
 		writeJson(response, 404, { error: "grid registry route not found" });
 		return;
 	}
-	const [, endpoint, operation] = match;
+	const [, endpoint, version, operation] = match;
+	if (gridRegistryAvailable.get(endpoint) !== true) {
+		writeJson(response, 503, { accepted: false, code: "endpoint-unavailable" });
+		return;
+	}
 	if (operation === "register" && request.method === "POST") {
 		const body = await readJson(request, 12_000);
+		if (version === "v1/" && (body?.credential?.kind !== "invite" || body.credential.token !== GRID_INVITE_TOKEN)) {
+			writeJson(response, 403, { accepted: false, code: "admission-denied" });
+			return;
+		}
 		const record = body?.record;
 		if (
 			typeof record?.namespace !== "string" ||
@@ -150,9 +167,10 @@ async function handleGridRegistry(request, response, url) {
 		});
 		return;
 	}
-	if (operation === "discover" && request.method === "GET") {
-		const namespace = url.searchParams.get("namespace");
-		if (namespace === null || namespace.length > 256) {
+	if (operation === "discover" && (request.method === "GET" || request.method === "POST")) {
+		const body = request.method === "POST" ? await readJson(request, 2_000) : undefined;
+		const namespace = request.method === "POST" ? body?.namespace : url.searchParams.get("namespace");
+		if (typeof namespace !== "string" || namespace.length > 256) {
 			writeJson(response, 400, { code: "record-rejected" });
 			return;
 		}
@@ -167,6 +185,32 @@ async function handleGridRegistry(request, response, url) {
 			if (key.startsWith(prefix)) records.push({ admissionMode: "invite", record });
 		}
 		writeJson(response, 200, { endpointId: `grid-${endpoint}`, records: records.slice(0, 64) });
+		return;
+	}
+	writeJson(response, 405, { error: "method not allowed" });
+}
+
+function handleGridRegistryControl(request, response, url) {
+	response.setHeader("access-control-allow-origin", "*");
+	response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+	if (request.method === "OPTIONS") {
+		response.statusCode = 204;
+		response.end();
+		return;
+	}
+	const match = /^\/grid-control\/registry\/(primary|secondary)\/(up|down|status)$/u.exec(url.pathname);
+	if (match === null) {
+		writeJson(response, 404, { error: "grid registry control route not found" });
+		return;
+	}
+	const [, endpoint, action] = match;
+	if (action === "status" && request.method === "GET") {
+		writeJson(response, 200, { endpoint, running: gridRegistryAvailable.get(endpoint) === true });
+		return;
+	}
+	if ((action === "up" || action === "down") && request.method === "POST") {
+		gridRegistryAvailable.set(endpoint, action === "up");
+		writeJson(response, 200, { endpoint, running: action === "up" });
 		return;
 	}
 	writeJson(response, 405, { error: "method not allowed" });
