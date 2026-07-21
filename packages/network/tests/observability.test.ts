@@ -132,4 +132,30 @@ describe("Phase 2 sanitized observability", () => {
 
 		await expect(sender.safeDial(multiaddr(receiverAddress))).resolves.toBeDefined();
 	});
+
+	test("does not report a dial attempt for an empty candidate list", async () => {
+		const events: ControlPlaneEvent[] = [];
+		const node = createNode({
+			...baseConfig,
+			control_plane: { observability: { sink: (event): void => void events.push(event) } },
+		});
+		const dial = vi.fn();
+
+		await expect(node.safeDial([], { dial } as unknown as Libp2p)).resolves.toBeUndefined();
+		expect(dial).not.toHaveBeenCalled();
+		expect(events.filter(({ kind }) => kind === "dial-attempt")).toEqual([]);
+	});
+
+	test("keeps peer-id-less addresses in separate dial candidate groups", async () => {
+		const node = createNode(baseConfig);
+		const dial = vi.fn().mockResolvedValue({});
+		const first = multiaddr("/ip4/127.0.0.1/tcp/4101");
+		const second = multiaddr("/ip4/127.0.0.1/tcp/4102");
+
+		await expect(node.safeDial([first, second], { dial } as unknown as Libp2p)).resolves.toBeDefined();
+		expect(dial).toHaveBeenCalledTimes(2);
+		expect(
+			dial.mock.calls.map(([addresses]) => (addresses as (typeof first)[]).map((address) => address.toString()))
+		).toEqual([[first.toString()], [second.toString()]]);
+	});
 });

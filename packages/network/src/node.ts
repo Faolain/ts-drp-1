@@ -21,13 +21,13 @@ import { ping } from "@libp2p/ping";
 import { pubsubPeerDiscovery, type PubSubPeerDiscoveryComponents } from "@libp2p/pubsub-peer-discovery";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import { dns, RecordType } from "@multiformats/dns";
+import { dns } from "@multiformats/dns";
 import { type Multiaddr, multiaddr, type MultiaddrInput } from "@multiformats/multiaddr";
 import { WebRTC } from "@multiformats/multiaddr-matcher";
 import { Logger } from "@ts-drp/logger";
 import { AllowlistVerifier, InviteVerifier, type MembershipVerifier } from "@ts-drp/membership";
 import { MessageQueue } from "@ts-drp/message-queue";
-import { type AddressDecision, AddressPolicy, classifyIpAddressScope, type Resolver } from "@ts-drp/rendezvous";
+import { type AddressDecision, AddressPolicy, classifyIpAddressScope, createDnsResolver } from "@ts-drp/rendezvous";
 import {
 	type ControlPlaneAddressFamily,
 	type ControlPlaneAddressReason,
@@ -142,43 +142,8 @@ const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush",
 
 const defaultHostFactory: DRPNetworkHostFactory = (context) => context.createHost();
 
-/**
- * The `@multiformats/dns` package uses the operating system's dns/promises resolver in Node. Its browser bundle uses
- * DNS-over-HTTPS resolvers for Cloudflare and Google, shuffled before lookup, which discloses queried hostnames to
- * those providers. The address gate sets cached:false below to enforce the frozen dial-time DNS recheck rule. This
- * same gate is also reached through libp2p's peerStore addressFilter, so stored candidates receive the same check.
- */
 const outboundDns = dns();
-const outboundDnsResolver: Resolver = {
-	async resolve(hostname, signal, family): Promise<string[]> {
-		const types =
-			family === "ipv4" ? [RecordType.A] : family === "ipv6" ? [RecordType.AAAA] : [RecordType.A, RecordType.AAAA];
-		const results = await Promise.allSettled(
-			types.map(async (recordType) => {
-				const response = await outboundDns.query(hostname, {
-					cached: false,
-					signal,
-					types: [recordType],
-				});
-				return response.Answer.filter(({ type }) => isAddressRecordType(type, recordType)).map(({ data }) => data);
-			})
-		);
-		const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-		if (failures.length === results.length) {
-			throw new AggregateError(
-				failures.map(({ reason }) => reason),
-				`DNS address lookup failed for ${hostname}`
-			);
-		}
-		return results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-	},
-};
-
-function isAddressRecordType(type: unknown, requestedType: RecordType): boolean {
-	return requestedType === RecordType.A
-		? type === RecordType.A || type === "A"
-		: type === RecordType.AAAA || type === "AAAA";
-}
+const outboundDnsResolver = createDnsResolver({ client: outboundDns });
 
 function createMembershipVerifier(config: ControlPlaneMembershipConfig | undefined): MembershipVerifier | undefined {
 	if (config === undefined) return undefined;
@@ -766,15 +731,19 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		}
 	}
 
-	private addrsPerPeerId(peerIds: string[] | Multiaddr[]): Record<string, Multiaddr[]> {
-		const addrs: Record<string, Multiaddr[]> = {};
-		for (const peerId of peerIds) {
-			const ma: Multiaddr = typeof peerId === "string" ? multiaddr(peerId) : peerId;
-			const currentPeerId = this.getPeerId(ma);
-			if (!currentPeerId) continue;
-			addrs[currentPeerId] = [...(addrs[currentPeerId] ?? []), ma];
+	private dialCandidates(addresses: string[] | Multiaddr[]): Multiaddr[][] {
+		const identified = new Map<string, Multiaddr[]>();
+		const unidentified: Multiaddr[][] = [];
+		for (const address of addresses) {
+			const ma = typeof address === "string" ? multiaddr(address) : address;
+			const peerId = this.getPeerId(ma);
+			if (peerId === undefined) {
+				unidentified.push([ma]);
+				continue;
+			}
+			identified.set(peerId, [...(identified.get(peerId) ?? []), ma]);
 		}
-		return addrs;
+		return [...identified.values(), ...unidentified];
 	}
 
 	private _emitControlPlaneEvent(event: ControlPlaneEvent): void {
@@ -830,6 +799,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		peerId: string[] | string | PeerId | Multiaddr | Multiaddr[],
 		node: Libp2p | undefined = this._node
 	): Promise<Connection | undefined> {
+		if (Array.isArray(peerId) && peerId.length === 0) return undefined;
 		const eventAddress = this._firstDialAddress(peerId);
 		try {
 			const isArray = Array.isArray(peerId);
@@ -839,8 +809,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
 				connection = await node?.dial(addr);
 			} else {
-				const addrsPerPeerId = this.addrsPerPeerId(peerId);
-				connection = await Promise.race(Object.values(addrsPerPeerId).map((addrs) => node?.dial(addrs)));
+				const candidates = this.dialCandidates(peerId);
+				connection = await Promise.any(candidates.map((addresses) => node?.dial(addresses)));
 			}
 			this._emitDialOutcome(eventAddress, connection === undefined ? "failed" : "ok");
 			return connection;

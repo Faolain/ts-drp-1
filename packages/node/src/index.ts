@@ -6,6 +6,8 @@ import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
 import { createPermissionlessACL, DRPObject, HashGraph } from "@ts-drp/object";
+import { createDnsResolver } from "@ts-drp/rendezvous";
+import { type BrowserRouting, type BrowserRoutingEndpoint, createBrowserRouting } from "@ts-drp/routing-browser";
 import {
 	DRPDiscoveryResponse,
 	type DRPNetworkNode,
@@ -44,8 +46,12 @@ const DISCOVERY_QUEUE_ID = "discovery";
 const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `interval:${type}::${id}`;
 
 export interface DRPNodeDependencies {
+	/** Optional fail-closed lifecycle check run before restart begins */
+	beforeRestart?(): Promise<void> | void;
 	/** Existing network implementation to use instead of the production default */
 	networkNode?: DRPNetworkNode;
+	/** Network shutdown owner when an attached control-plane adapter shares the host */
+	networkStop?(): Promise<void>;
 	/** Existing reconnect owner, or false when an external coordinator owns recovery */
 	reconnect?: IDRPIntervalReconnectBootstrap | false;
 }
@@ -58,13 +64,16 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	networkNode: DRPNetworkNode;
 	keychain: Keychain;
 	messageQueueManager: MessageQueueManager<Message>;
+	private _routing: BrowserRouting | undefined;
 
 	#objectStore: DRPObjectStore;
 	private _intervals: Map<string, IntervalRunnerMap[keyof IntervalRunnerMap]> = new Map();
 	private _subscribedNetworkNode?: DRPNetworkNode;
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
+	private readonly _beforeRestart: (() => Promise<void> | void) | undefined;
 	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
+	private readonly _stopNetwork: () => Promise<void>;
 	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
 
 	/**
@@ -84,7 +93,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (dependencies.reconnect && dependencies.reconnect.networkNode !== this.networkNode) {
 			throw new Error("Injected reconnect policy must own the injected DRP network node");
 		}
+		this._beforeRestart = dependencies.beforeRestart;
 		this._reconnectDependency = dependencies.reconnect;
+		this._stopNetwork = dependencies.networkStop ?? ((): Promise<void> => this.networkNode.stop());
+		this._routing = createConfiguredBrowserRouting(config);
 		this.#objectStore = new DRPObjectStore();
 		this.keychain = new Keychain(config?.keychain_config);
 		this.config = {
@@ -105,6 +117,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * Start the node.
 	 */
 	async start(): Promise<void> {
+		this._routing ??= createConfiguredBrowserRouting(this.config);
 		await this.keychain.start();
 		await this.networkNode.start(this.keychain.secp256k1PrivateKey);
 		this.messageQueueManager.startAll();
@@ -131,14 +144,28 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._initialSyncPeers.clear();
 		this._intervals.forEach((interval) => interval.stop());
 		this._intervals.clear();
-		await this.networkNode.stop();
-		void this.messageQueueManager.closeAll();
+		const routing = this._routing;
+		this._routing = undefined;
+		try {
+			await Promise.all([routing?.stop(), this._stopNetwork()]);
+		} finally {
+			this.messageQueueManager.closeAll();
+		}
+	}
+
+	/**
+	 * Browser-safe delegated routing selected by the main-entry configuration.
+	 * @returns The configured adapter, or undefined when browser routing is inactive.
+	 */
+	get routing(): BrowserRouting | undefined {
+		return this._routing;
 	}
 
 	/**
 	 * Restart the node.
 	 */
 	async restart(): Promise<void> {
+		await this._beforeRestart?.();
 		await this.stop();
 		await this.start();
 		log.info("::restart: Node restarted");
@@ -512,6 +539,34 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 		await interval.handleDiscoveryResponse(sender, response.subscribers);
 	}
+}
+
+function createConfiguredBrowserRouting(config: DRPNodeConfig | undefined): BrowserRouting | undefined {
+	const routing = config?.network_config?.control_plane?.routing?.browser;
+	if (routing?.endpoints === undefined) return undefined;
+	const endpointUrls = routing.endpoints;
+	if (endpointUrls.length === 0) {
+		throw new Error("Browser routing requires at least one delegated endpoint, even for a single-endpoint fixture");
+	}
+	const parsedEndpoints = endpointUrls.map((url, index) => {
+		try {
+			return { id: `endpoint-${index + 1}`, url, origin: new URL(url).origin };
+		} catch (error) {
+			throw new Error(`Browser routing endpoint ${index + 1} is not a valid URL: "${url}"`, { cause: error });
+		}
+	});
+	const allowedOrigins = [...new Set(parsedEndpoints.map(({ origin }) => origin))];
+	if (allowedOrigins.length < 2 && routing.allow_single_endpoint_fixture !== true) {
+		throw new Error("Browser routing requires at least two distinct endpoint origins");
+	}
+	const endpoints: BrowserRoutingEndpoint[] = parsedEndpoints.map(({ id, url }) => ({ id, url }));
+	return createBrowserRouting({
+		allowInsecureLoopback: routing.allow_insecure_loopback_fixture,
+		allowedOrigins,
+		endpoints,
+		limits: routing.limits,
+		resolver: createDnsResolver(),
+	});
 }
 
 export {

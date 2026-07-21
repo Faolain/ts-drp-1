@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./runtime": {
+			"types": "./dist/src/runtime.d.ts",
+			"import": "./dist/src/runtime.js"
 		}
 	},
 	"scripts": {
@@ -62,6 +66,9 @@
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",
 		"@ts-drp/object": "0.11.0",
+		"@ts-drp/rendezvous": "workspace:*",
+		"@ts-drp/routing-browser": "workspace:*",
+		"@ts-drp/routing-node": "workspace:*",
 		"@ts-drp/tracer": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"@ts-drp/utils": "0.11.0",

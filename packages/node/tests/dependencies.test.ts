@@ -141,6 +141,17 @@ describe("DRPNode dependencies", () => {
 		).toThrow("Injected reconnect policy must own the injected DRP network node");
 	});
 
+	test("closes every message queue even when network shutdown rejects", async () => {
+		const fake = createFakeNetwork();
+		const node = new DRPNode({ log_config: { level: "silent" } }, { networkNode: fake.networkNode, reconnect: false });
+		await node.start();
+		const closeAll = vi.spyOn(node.messageQueueManager, "closeAll");
+		fake.stop.mockRejectedValueOnce(new Error("network shutdown failed"));
+
+		await expect(node.stop()).rejects.toThrow("network shutdown failed");
+		expect(closeAll).toHaveBeenCalledOnce();
+	});
+
 	test("keeps the production network as the default", () => {
 		const node = new DRPNode({ network_config: { bootstrap_peers: [] } });
 		expect(node.networkNode).toBeInstanceOf(DefaultDRPNetworkNode);

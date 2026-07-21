@@ -112,6 +112,27 @@ export type ControlPlaneMembershipConfig =
 			readonly mode: "invite";
 	  };
 
+export interface ControlPlaneBrowserRoutingLimits {
+	readonly maxAddressesPerPeer?: number;
+	readonly maxEndpoints?: number;
+	readonly maxResponseBytes?: number;
+	readonly maxResults?: number;
+}
+
+export interface ControlPlaneBrowserRoutingConfig {
+	readonly allow_insecure_loopback_fixture?: boolean;
+	readonly allow_single_endpoint_fixture?: boolean;
+	readonly endpoints?: readonly string[];
+	readonly limits?: ControlPlaneBrowserRoutingLimits;
+}
+
+export interface ControlPlaneNodeRoutingConfig {
+	readonly bootstrappers?: readonly string[];
+	readonly enabled?: boolean;
+	readonly network?: "local" | "public";
+	readonly public_network_acknowledgement?: string;
+}
+
 /** Phase 2 structural owners; later phases add runtime implementations behind these sections. */
 export interface ControlPlaneConfig {
 	readonly address_policy?: ControlPlaneAddressPolicyConfig;
@@ -127,8 +148,8 @@ export interface ControlPlaneConfig {
 		readonly namespace?: string;
 	};
 	readonly routing?: {
-		readonly browser?: { readonly endpoints?: readonly string[] };
-		readonly node?: { readonly enabled?: boolean };
+		readonly browser?: ControlPlaneBrowserRoutingConfig;
+		readonly node?: ControlPlaneNodeRoutingConfig;
 	};
 }
 

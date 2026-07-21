@@ -1,5 +1,5 @@
 import { createOpaqueNamespaceV1, DhtAnchorPublisher, namespaceAnchorCid } from "@ts-drp/rendezvous";
-import { createNodeRouting } from "@ts-drp/routing-node";
+import { createNodeRouting, type NodeRouting } from "@ts-drp/routing-node";
 import { describe, expect, it } from "vitest";
 
 describe("DHT anchor publication", () => {
@@ -24,8 +24,7 @@ describe("DHT anchor publication", () => {
 			const anchor = new DhtAnchorPublisher(publisher);
 			const namespace = createOpaqueNamespaceV1(Uint8Array.from({ length: 32 }, (_, offset) => 19 + offset));
 			const publication = await anchor.publish(namespace, signal);
-			const providers: string[] = [];
-			for await (const provider of server.findProviders(publication.cid, signal)) providers.push(provider.peerId);
+			const providers = await waitForProvider(server, publication.cid, publisher.peerId, AbortSignal.timeout(5_000));
 			expect(publication.cid).toBe(await namespaceAnchorCid(namespace));
 			expect(providers).toContain(publisher.peerId);
 			await anchor.stop(namespace, signal);
@@ -33,5 +32,38 @@ describe("DHT anchor publication", () => {
 		} finally {
 			await Promise.allSettled([publisher.stop(), server.stop()]);
 		}
-	}, 10_000);
+	}, 20_000);
 });
+
+async function waitForProvider(
+	routing: NodeRouting,
+	cid: string,
+	peerId: string,
+	signal: AbortSignal
+): Promise<string[]> {
+	while (true) {
+		signal.throwIfAborted();
+		const providers: string[] = [];
+		for await (const provider of routing.findProviders(cid, signal)) providers.push(provider.peerId);
+		if (providers.includes(peerId)) return providers;
+		await abortableDelay(100, signal);
+	}
+}
+
+function abortableDelay(durationMs: number, signal: AbortSignal): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (signal.aborted) {
+			reject(signal.reason);
+			return;
+		}
+		const onAbort = (): void => {
+			clearTimeout(timeout);
+			reject(signal.reason);
+		};
+		const timeout = setTimeout(() => {
+			signal.removeEventListener("abort", onAbort);
+			resolve();
+		}, durationMs);
+		signal.addEventListener("abort", onAbort, { once: true });
+	});
+}
