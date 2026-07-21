@@ -1,9 +1,9 @@
+import { AddressPolicy } from "@ts-drp/rendezvous";
+import { createNodeRouting, namespaceCid, type NodeRouting, type RoutingMeasurement } from "@ts-drp/routing-node";
 import type { CID } from "multiformats/cid";
 import { createHash } from "node:crypto";
 import process from "node:process";
 
-import { createNodeRouting, namespaceCid, type NodeRouting, type RoutingMeasurement } from "./index.js";
-import { AddressPolicy } from "../probe/address-policy.js";
 import { type ProbeEvent, probeEventToJsonLine } from "../probe/events.js";
 import {
 	type Probe,

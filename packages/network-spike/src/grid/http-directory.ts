@@ -5,7 +5,7 @@ import type {
 	RegistryEndpoint,
 	RegistryRegistrationRequest,
 	RegistryRejection,
-} from "../registry/index.js";
+} from "@ts-drp/rendezvous";
 
 const MAX_RESPONSE_BYTES = 64 * 1024;
 

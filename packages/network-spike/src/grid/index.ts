@@ -1,10 +1,13 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
 import type { DRPNetworkHostConfigSnapshot, DRPNetworkHostFactory, DRPNetworkHostPolicy } from "@ts-drp/network";
-
-import { type AddressPolicy, type Resolver } from "../probe/address-policy.js";
-import type { SignedDrpRecordV1 } from "../record/index.js";
-import type { RendezvousDirectory, ValidatedDrpRecord } from "../registry/index.js";
-import type { RelayPolicyResult } from "../relay/index.js";
+import type { RelayPolicyResult } from "@ts-drp/relay-policy";
+import type {
+	AddressPolicy,
+	RendezvousDirectory,
+	Resolver,
+	SignedDrpRecordV1,
+	ValidatedDrpRecord,
+} from "@ts-drp/rendezvous";
 
 const encoder = new TextEncoder();
 

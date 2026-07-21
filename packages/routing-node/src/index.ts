@@ -9,16 +9,21 @@ import { peerIdFromString } from "@libp2p/peer-id";
 import { tcp } from "@libp2p/tcp";
 import { multiaddr } from "@multiformats/multiaddr";
 import { type DRPNetworkHostExtensions, type DRPNetworkHostFactory, DRPNetworkNode } from "@ts-drp/network";
+import {
+	type AddressDecision,
+	AddressPolicy,
+	type AddressScope,
+	RequestBudget,
+	type Resolver,
+} from "@ts-drp/rendezvous";
 import type { Libp2p } from "libp2p";
 import { CID } from "multiformats/cid";
 import { lookup } from "node:dns/promises";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 
-import { RequestBudget } from "../evidence.js";
-import { type AddressDecision, AddressPolicy, type AddressScope, type Resolver } from "../probe/address-policy.js";
-export { OFFICIAL_AMINO_BOOTSTRAPPERS } from "../public-infrastructure.js";
-export { namespaceCid } from "../namespace.js";
+export { OFFICIAL_AMINO_BOOTSTRAPPERS } from "./constants.js";
+export { namespaceCid } from "@ts-drp/rendezvous";
 
 export const AMINO_DHT_PROTOCOL = "/ipfs/kad/1.0.0";
 export const PUBLIC_NETWORK_ACKNOWLEDGEMENT = "I_ACKNOWLEDGE_PUBLIC_NETWORK_TRAFFIC";
@@ -154,6 +159,7 @@ export class NodeRouting {
 	 * @param options.limits - Operation, request, result, and address caps
 	 * @param options.network - Whether public-only address filtering is required
 	 * @param options.resolver - DNS resolver used by the address policy
+	 * @param options.allowInsecureWebSocketFixture
 	 */
 	constructor(
 		networkNode: DRPNetworkNode,

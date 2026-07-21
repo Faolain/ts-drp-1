@@ -4,12 +4,13 @@ import { peerIdFromPublicKey, peerIdFromString } from "@libp2p/peer-id";
 import { multiaddr } from "@multiformats/multiaddr";
 import { base64url } from "multiformats/bases/base64";
 
-import { AddressPolicy, type AddressPolicyOptions, type Resolver } from "../probe/address-policy.js";
+import { AddressPolicy, type AddressPolicyOptions, type Resolver } from "./address-policy.js";
+import { PEER_NAMESPACE_PREFIX, peerNamespace } from "./namespace.js";
 
 const encoder = new TextEncoder();
 const RECORD_KIND = "ts-drp-rendezvous-record";
-const NAMESPACE_PATTERN = /^drp-rendezvous:v1:[A-Za-z0-9_-]{22,86}$/u;
-const SUPPORTED_CAPABILITIES = ["drp-gossipsub", "webrtc", "circuit-relay"] as const;
+const NAMESPACE_PATTERN = new RegExp(`^${PEER_NAMESPACE_PREFIX}[A-Za-z0-9_-]{22,86}$`, "u");
+const SUPPORTED_CAPABILITIES = ["drp-gossipsub", "webrtc", "relay-client", "relay-hop-v2-service"] as const;
 
 export type DrpCapability = (typeof SUPPORTED_CAPABILITIES)[number];
 export type AdmissionMode = "open" | "invite" | "allowlist" | "proof-of-work";
@@ -107,7 +108,7 @@ export interface RecordLimits {
 
 export const DEFAULT_RECORD_LIMITS: Readonly<RecordLimits> = Object.freeze({
 	maxAddresses: 8,
-	maxCapabilities: 3,
+	maxCapabilities: 4,
 	maxClockSkewMs: 30_000,
 	maxRecordBytes: 8_192,
 	maxReplayEntries: 4_096,
@@ -386,7 +387,7 @@ export function createOpaqueNamespaceV1(bytes: Uint8Array): string {
 	if (bytes.byteLength < 16 || bytes.byteLength > 64) {
 		throw new Error("opaque namespace entropy must be 16..64 bytes");
 	}
-	return `drp-rendezvous:v1:${base64url.baseEncode(bytes)}`;
+	return peerNamespace(base64url.baseEncode(bytes));
 }
 
 /**

@@ -1,23 +1,23 @@
 import type { DRPNetworkHostFactory } from "@ts-drp/network";
 import { DRPNetworkNode } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
-import { ActionType, type IDRP, type ResolveConflictsType, SemanticsType, type Vertex } from "@ts-drp/types";
-import type { Libp2p } from "libp2p";
-import { describe, expect, it } from "vitest";
-
-import { attachNodeRouting, createAminoHostExtensions, createNodeRouting } from "../src/node-routing/index.js";
-import {
-	PublicOnlyNodePublisher,
-	type PublicOnlyNodePublisherError,
-	type PublicOnlyNodePublisherOptions,
-} from "../src/public-only/node.js";
 import {
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
 	Libp2pRelayClient,
 	type RelayCandidate,
 	RelayPolicy,
 	type RelayPolicyResult,
-} from "../src/relay/index.js";
+} from "@ts-drp/relay-policy";
+import { attachNodeRouting, createAminoHostExtensions, createNodeRouting } from "@ts-drp/routing-node";
+import { ActionType, type IDRP, type ResolveConflictsType, SemanticsType, type Vertex } from "@ts-drp/types";
+import type { Libp2p } from "libp2p";
+import { describe, expect, it } from "vitest";
+
+import {
+	PublicOnlyNodePublisher,
+	type PublicOnlyNodePublisherError,
+	type PublicOnlyNodePublisherOptions,
+} from "../src/public-only/node.js";
 
 const SELF = "12D3KooWPublisherIdentity";
 const CIRCUIT = `/dns4/relay.example/tcp/443/wss/p2p/12D3KooWRelay/p2p-circuit/p2p/${SELF}`;

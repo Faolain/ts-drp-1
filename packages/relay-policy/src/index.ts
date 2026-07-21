@@ -1,70 +1,50 @@
 import { multiaddr } from "@multiformats/multiaddr";
 
 import { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
-import type { BrowserRouting, BrowserRoutingPeer } from "../browser-routing/index.js";
-import type { NodeRouting, RoutingPeer } from "../node-routing/index.js";
+import type {
+	RelayCandidate,
+	RelayInspection,
+	RelayInspector,
+	RelayReservationClient,
+	RelayReservationFailure,
+	RelayReservationWireResponse,
+} from "./types.js";
 
 export { decodeHopReservationResponse, Libp2pRelayClient, type Libp2pRelayClientOptions } from "./libp2p-client.js";
 export { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
+export type {
+	RelayCandidate,
+	RelayCandidateOrigin,
+	RelayInspection,
+	RelayInspector,
+	RelayReservationClient,
+	RelayReservationFailure,
+	RelayReservationWireResponse,
+} from "./types.js";
 
 export type RelayTransport = "wss" | "webtransport" | "webrtc-direct";
-export type RelayCandidateOrigin = "browser-closest-peers" | "node-closest-peers";
-export type RelayReservationFailure =
-	| "aborted"
-	| "connection-failed"
-	| "malformed-response"
-	| "no-reservation"
-	| "permission-denied"
-	| "refused"
-	| "resource-limit"
-	| "timeout"
-	| "unexpected-response";
-
-export interface RelayCandidate {
-	readonly addresses: readonly string[];
-	readonly operatorGroup: string;
-	readonly peerId: string;
-	readonly protocols: readonly string[];
-	readonly provenance: {
-		readonly origin: RelayCandidateOrigin;
-		readonly queryDigest: string;
-		readonly resultIndex: number;
-		readonly routingSource: "delegated-routing" | "public-dht";
-	};
-}
 
 export interface RelayCandidateSource {
 	getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate>;
 }
 
-export interface RelayInspection {
-	readonly connectionId?: string;
-	readonly hopAdvertised: boolean;
-	readonly latencyMs: number;
-	readonly outcome: "aborted" | "connected" | "refused" | "timeout";
+export interface NodeRoutingPeerCandidate {
+	readonly addresses: readonly string[];
+	readonly peerId: string;
+}
+
+export interface BrowserRoutingPeerCandidate {
+	readonly acceptedAddresses: readonly string[];
+	readonly peerId: string;
 	readonly protocols: readonly string[];
 }
 
-export interface RelayInspector {
-	inspect(candidate: RelayCandidate, address: string, signal: AbortSignal): Promise<RelayInspection>;
+export interface NodeClosestPeerRouting {
+	getClosestPeers(queryKey: Uint8Array, signal?: AbortSignal): AsyncIterable<NodeRoutingPeerCandidate>;
 }
 
-export interface RelayReservationWireResponse {
-	readonly expire?: bigint | number;
-	readonly limit?: {
-		readonly data?: bigint | number;
-		readonly duration?: number;
-	};
-	readonly reservation?: {
-		readonly expire: bigint | number;
-	};
-	readonly status: number;
-}
-
-export interface RelayReservationClient {
-	refresh(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse>;
-	release(candidate: RelayCandidate): Promise<void>;
-	reserve(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse>;
+export interface BrowserClosestPeerRouting {
+	getClosestPeers(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<BrowserRoutingPeerCandidate>;
 }
 
 export interface DnsaddrFallbackResult {
@@ -195,16 +175,16 @@ const MAX_QUEUED_OPERATIONS = 32;
  * relay candidates.
  */
 export class NodeRoutingClosestPeersSource implements RelayCandidateSource {
-	readonly #operatorGroup: (peer: RoutingPeer) => string;
-	readonly #routing: Pick<NodeRouting, "getClosestPeers">;
+	readonly #operatorGroup: (peer: NodeRoutingPeerCandidate) => string;
+	readonly #routing: NodeClosestPeerRouting;
 
 	/**
 	 * @param routing - Phase 02 Node closest-peer seam.
 	 * @param operatorGroup - Campaign-owned coarse operator classifier.
 	 */
 	constructor(
-		routing: Pick<NodeRouting, "getClosestPeers">,
-		operatorGroup: (peer: RoutingPeer) => string = () => "unknown"
+		routing: NodeClosestPeerRouting,
+		operatorGroup: (peer: NodeRoutingPeerCandidate) => string = () => "unknown"
 	) {
 		this.#routing = routing;
 		this.#operatorGroup = operatorGroup;
@@ -240,16 +220,16 @@ export class NodeRoutingClosestPeersSource implements RelayCandidateSource {
  * query and result provenance consumed by the relay policy.
  */
 export class BrowserRoutingClosestPeersSource implements RelayCandidateSource {
-	readonly #operatorGroup: (peer: BrowserRoutingPeer) => string;
-	readonly #routing: Pick<BrowserRouting, "getClosestPeers">;
+	readonly #operatorGroup: (peer: BrowserRoutingPeerCandidate) => string;
+	readonly #routing: BrowserClosestPeerRouting;
 
 	/**
 	 * @param routing - Phase 03 browser closest-peer seam.
 	 * @param operatorGroup - Campaign-owned coarse operator classifier.
 	 */
 	constructor(
-		routing: Pick<BrowserRouting, "getClosestPeers">,
-		operatorGroup: (peer: BrowserRoutingPeer) => string = () => "unknown"
+		routing: BrowserClosestPeerRouting,
+		operatorGroup: (peer: BrowserRoutingPeerCandidate) => string = () => "unknown"
 	) {
 		this.#routing = routing;
 		this.#operatorGroup = operatorGroup;

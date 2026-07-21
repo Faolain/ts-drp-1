@@ -1,8 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
-
-import type { BrowserRoutingPeer } from "../src/browser-routing/index.js";
-import type { RoutingPeer } from "../src/node-routing/index.js";
-import { createRelayFixture } from "../src/relay/fixture.js";
 import {
 	BrowserRoutingClosestPeersSource,
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
@@ -22,7 +17,10 @@ import {
 	type RelayReservationClient,
 	type RelayReservationWireResponse,
 	RelayTransportRateLimitError,
-} from "../src/relay/index.js";
+} from "@ts-drp/relay-policy";
+import type { BrowserRoutingPeer } from "@ts-drp/routing-browser";
+import type { RoutingPeer } from "@ts-drp/routing-node";
+import { describe, expect, it, vi } from "vitest";
 
 const NOW = 1_750_000_000_000;
 const QUERY = Uint8Array.from([1, 2, 3, 4]);
@@ -661,22 +659,6 @@ describe("bounded relay policy", () => {
 				transportProfile: { allowed: ["wss", "webtransport"], name: "wss-only" },
 			})
 		).toThrow("wss-only");
-	});
-});
-
-describe("relay browser fixture", () => {
-	it.each([
-		["mixed", "broad-browser", "reserved", 2],
-		["mixed", "wss-only", "exhausted", 1],
-		["all-refused", "broad-browser", "owned-fallback", 0],
-		["stale-fallback", "broad-browser", "exhausted", 0],
-	] as const)("matches %s / %s deterministic evidence", async (scenario, profile, terminal, reservationCount) => {
-		const result = await createRelayFixture(
-			scenario,
-			profile === "wss-only" ? RELAY_TRANSPORT_PROFILES.wssOnly : RELAY_TRANSPORT_PROFILES.broadBrowser
-		);
-		expect(result.assertions.filter(({ passed }) => !passed)).toEqual([]);
-		expect(result).toMatchObject({ privateIdentifierFields: 0, reservationCount, terminal });
 	});
 });
 

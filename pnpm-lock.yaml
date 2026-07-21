@@ -213,6 +213,12 @@ importers:
       '@ts-drp/network-spike':
         specifier: workspace:*
         version: link:../../packages/network-spike
+      '@ts-drp/relay-policy':
+        specifier: workspace:*
+        version: link:../../packages/relay-policy
+      '@ts-drp/routing-browser':
+        specifier: workspace:*
+        version: link:../../packages/routing-browser
     devDependencies:
       '@playwright/test':
         specifier: ^1.49.1
@@ -338,6 +344,15 @@ importers:
         specifier: ^0.8.4
         version: 0.8.4
 
+  packages/membership:
+    devDependencies:
+      esbuild:
+        specifier: 0.25.3
+        version: 0.25.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
   packages/message-queue:
     dependencies:
       '@ts-drp/logger':
@@ -455,9 +470,6 @@ importers:
       '@chainsafe/libp2p-yamux':
         specifier: 8.0.1
         version: 8.0.1
-      '@helia/delegated-routing-v1-http-api-client':
-        specifier: 8.0.1
-        version: 8.0.1
       '@libp2p/crypto':
         specifier: 5.1.21
         version: 5.1.21
@@ -470,33 +482,39 @@ importers:
       '@libp2p/kad-dht':
         specifier: 16.3.4
         version: 16.3.4
-      '@libp2p/logger':
-        specifier: 6.2.7
-        version: 6.2.7
       '@libp2p/peer-id':
         specifier: 6.0.12
         version: 6.0.12
       '@libp2p/ping':
         specifier: 3.1.8
         version: 3.1.8
-      '@libp2p/tcp':
-        specifier: 11.0.23
-        version: 11.0.23
-      '@libp2p/utils':
-        specifier: 7.2.4
-        version: 7.2.4
       '@libp2p/websockets':
         specifier: 10.1.16
         version: 10.1.16
       '@multiformats/multiaddr':
         specifier: ^13.0.3
         version: 13.0.3
+      '@ts-drp/membership':
+        specifier: workspace:*
+        version: link:../membership
       '@ts-drp/network':
         specifier: workspace:*
         version: link:../network
       '@ts-drp/node':
         specifier: workspace:*
         version: link:../node
+      '@ts-drp/relay-policy':
+        specifier: workspace:*
+        version: link:../relay-policy
+      '@ts-drp/rendezvous':
+        specifier: workspace:*
+        version: link:../rendezvous
+      '@ts-drp/routing-browser':
+        specifier: workspace:*
+        version: link:../routing-browser
+      '@ts-drp/routing-node':
+        specifier: workspace:*
+        version: link:../routing-node
       '@ts-drp/types':
         specifier: workspace:*
         version: link:../types
@@ -689,6 +707,124 @@ importers:
       tsx:
         specifier: 4.19.1
         version: 4.19.1
+
+  packages/relay-policy:
+    dependencies:
+      '@libp2p/interface':
+        specifier: 3.2.5
+        version: 3.2.5
+      '@libp2p/peer-id':
+        specifier: 6.0.12
+        version: 6.0.12
+      '@libp2p/utils':
+        specifier: 7.2.4
+        version: 7.2.4
+      '@multiformats/multiaddr':
+        specifier: ^13.0.3
+        version: 13.0.3
+      libp2p:
+        specifier: 3.3.5
+        version: 3.3.5
+    devDependencies:
+      '@ts-drp/routing-browser':
+        specifier: workspace:*
+        version: link:../routing-browser
+      '@ts-drp/routing-node':
+        specifier: workspace:*
+        version: link:../routing-node
+      esbuild:
+        specifier: 0.25.3
+        version: 0.25.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
+  packages/rendezvous:
+    dependencies:
+      '@libp2p/crypto':
+        specifier: 5.1.21
+        version: 5.1.21
+      '@libp2p/interface':
+        specifier: 3.2.5
+        version: 3.2.5
+      '@libp2p/peer-id':
+        specifier: 6.0.12
+        version: 6.0.12
+      '@multiformats/multiaddr':
+        specifier: ^13.0.3
+        version: 13.0.3
+      '@ts-drp/membership':
+        specifier: workspace:*
+        version: link:../membership
+      multiformats:
+        specifier: 14.0.0
+        version: 14.0.0
+    devDependencies:
+      esbuild:
+        specifier: 0.25.3
+        version: 0.25.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
+  packages/routing-browser:
+    dependencies:
+      '@helia/delegated-routing-v1-http-api-client':
+        specifier: 8.0.1
+        version: 8.0.1
+      '@libp2p/interface':
+        specifier: 3.2.5
+        version: 3.2.5
+      '@libp2p/logger':
+        specifier: 6.2.7
+        version: 6.2.7
+      '@libp2p/peer-id':
+        specifier: 6.0.12
+        version: 6.0.12
+      '@ts-drp/rendezvous':
+        specifier: workspace:*
+        version: link:../rendezvous
+      multiformats:
+        specifier: 14.0.0
+        version: 14.0.0
+    devDependencies:
+      esbuild:
+        specifier: 0.25.3
+        version: 0.25.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
+  packages/routing-node:
+    dependencies:
+      '@libp2p/kad-dht':
+        specifier: 16.3.4
+        version: 16.3.4
+      '@libp2p/peer-id':
+        specifier: 6.0.12
+        version: 6.0.12
+      '@libp2p/tcp':
+        specifier: 11.0.23
+        version: 11.0.23
+      '@multiformats/multiaddr':
+        specifier: ^13.0.3
+        version: 13.0.3
+      '@ts-drp/network':
+        specifier: workspace:*
+        version: link:../network
+      '@ts-drp/rendezvous':
+        specifier: workspace:*
+        version: link:../rendezvous
+      libp2p:
+        specifier: 3.3.5
+        version: 3.3.5
+      multiformats:
+        specifier: 14.0.0
+        version: 14.0.0
+    devDependencies:
+      vitest:
+        specifier: ^3.0.5
+        version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
 
   packages/test-utils:
     dependencies:

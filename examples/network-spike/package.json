@@ -14,7 +14,9 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@ts-drp/network-spike": "workspace:*"
+		"@ts-drp/network-spike": "workspace:*",
+		"@ts-drp/relay-policy": "workspace:*",
+		"@ts-drp/routing-browser": "workspace:*"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",

@@ -1,7 +1,6 @@
+import type { RelayPolicyResult } from "@ts-drp/relay-policy";
+import { namespaceCid } from "@ts-drp/rendezvous";
 import type { CID } from "multiformats/cid";
-
-import { namespaceCid } from "../node-routing/index.js";
-import type { RelayPolicyResult } from "../relay/index.js";
 
 export interface PublicOnlyPublisherNode {
 	createGrid(objectId: string): Promise<void>;
@@ -68,15 +67,28 @@ export class PublicOnlyNodePublisher {
 	#startPromise?: Promise<PublicOnlyNodePublisherResult>;
 	#stopPromise?: Promise<void>;
 
+	/**
+	 *
+	 * @param options
+	 */
 	constructor(options: PublicOnlyNodePublisherOptions) {
 		this.#options = options;
 	}
 
+	/**
+	 *
+	 * @param namespace
+	 * @param objectId
+	 * @param signal
+	 */
 	start(namespace: string, objectId: string, signal: AbortSignal): Promise<PublicOnlyNodePublisherResult> {
 		this.#startPromise ??= this.#start(namespace, objectId, signal);
 		return this.#startPromise;
 	}
 
+	/**
+	 *
+	 */
 	async stop(): Promise<void> {
 		this.#stopPromise ??= this.#stop();
 		return this.#stopPromise;
@@ -152,9 +164,16 @@ export class PublicOnlyNodePublisher {
 	}
 }
 
+/**
+ *
+ */
 export class PublicOnlyNodePublisherError extends Error {
 	readonly terminal: "identity-mismatch" | "provider-address-omitted" | "relay-exhausted";
 
+	/**
+	 *
+	 * @param terminal
+	 */
 	constructor(terminal: PublicOnlyNodePublisherError["terminal"]) {
 		super(terminal);
 		this.name = "PublicOnlyNodePublisherError";

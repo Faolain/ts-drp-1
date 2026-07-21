@@ -1,0 +1,43 @@
+{
+	"name": "@ts-drp/rendezvous",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"test": "pnpm --dir ../.. exec vitest run packages/rendezvous/tests",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@libp2p/crypto": "5.1.21",
+		"@libp2p/interface": "3.2.5",
+		"@libp2p/peer-id": "6.0.12",
+		"@multiformats/multiaddr": "^13.0.3",
+		"@ts-drp/membership": "workspace:*",
+		"multiformats": "14.0.0"
+	},
+	"devDependencies": {
+		"esbuild": "0.25.3",
+		"vitest": "^3.0.5"
+	}
+}

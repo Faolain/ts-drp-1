@@ -1,13 +1,9 @@
+import type { ActiveRelayReservation, RelayPolicy, RelayPolicyResult } from "@ts-drp/relay-policy";
+import { namespaceCid } from "@ts-drp/rendezvous";
+import { type BrowserRoutingPeer, type BrowserRoutingTrace, DelegatedBrowserRouting } from "@ts-drp/routing-browser";
 import { describe, expect, it } from "vitest";
 
-import {
-	type BrowserRoutingPeer,
-	type BrowserRoutingTrace,
-	DelegatedBrowserRouting,
-} from "../src/browser-routing/index.js";
-import { namespaceCid } from "../src/namespace.js";
 import { PublicOnlyBrowserPeer, PublicProviderLocator } from "../src/public-only/browser.js";
-import type { ActiveRelayReservation, RelayPolicy, RelayPolicyResult } from "../src/relay/index.js";
 
 describe("PublicProviderLocator", () => {
 	it("derives the CID locally and labels only delegated provider results as untrusted", async () => {

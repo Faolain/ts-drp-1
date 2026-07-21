@@ -1,4 +1,25 @@
 import {
+	BrowserRoutingClosestPeersSource,
+	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
+	RELAY_RESERVATION_STATUS,
+	type RelayAttempt,
+	type RelayCandidate,
+	RelayConnectionLostError,
+	type RelayInspection,
+	RelayPolicy,
+	type RelayPolicyResult,
+	type RelayReservationClient,
+	type RelayReservationWireResponse,
+} from "@ts-drp/relay-policy";
+import {
+	AddressPolicy,
+	peerNamespace,
+	type RendezvousDirectory,
+	type SignedDrpRecordV1,
+	type ValidatedDrpRecord,
+} from "@ts-drp/rendezvous";
+
+import {
 	type EndpointOwnerResult,
 	runRecordFailure,
 	runRegistryFailure,
@@ -12,7 +33,6 @@ import {
 	type GridObjectPort,
 	type GridRelayPolicyPort,
 } from "../grid/index.js";
-import { AddressPolicy } from "../probe/address-policy.js";
 import { type ProbeEvent, type ProbeEventKind } from "../probe/events.js";
 import {
 	type FetchResponse,
@@ -24,26 +44,11 @@ import {
 	SeededRandom,
 } from "../probe/kernel.js";
 import { ManualClock } from "../probe/manual-clock.js";
-import type { SignedDrpRecordV1 } from "../record/index.js";
-import type { RendezvousDirectory, ValidatedDrpRecord } from "../registry/index.js";
-import {
-	BrowserRoutingClosestPeersSource,
-	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
-	RELAY_RESERVATION_STATUS,
-	type RelayAttempt,
-	type RelayCandidate,
-	RelayConnectionLostError,
-	type RelayInspection,
-	RelayPolicy,
-	type RelayPolicyResult,
-	type RelayReservationClient,
-	type RelayReservationWireResponse,
-} from "../relay/index.js";
 
 export const FAILURE_CAMPAIGN_SCHEMA_VERSION = "1.0.0";
 
 const FIXTURE_NOW_MS = 1_750_000_000_000;
-const NAMESPACE = "drp-rendezvous:v1:failurecampaign01";
+const NAMESPACE = peerNamespace("failurecampaign0000001");
 const CREATOR_PEER_ID = "creator-fixture";
 const JOINER_PEER_ID = "joiner-fixture";
 const RELAY_PEER_ID = "relay-fixture";
@@ -1739,7 +1744,7 @@ function validatedRecord(): ValidatedDrpRecord {
 function signedRecord(): SignedDrpRecordV1 {
 	return {
 		addresses: [`/dns4/relay.example/tcp/443/wss/p2p/${RELAY_PEER_ID}/p2p-circuit/webrtc/p2p/${CREATOR_PEER_ID}`],
-		capabilities: ["circuit-relay", "drp-gossipsub", "webrtc"],
+		capabilities: ["drp-gossipsub", "relay-client", "webrtc"],
 		expiresAtMs: FIXTURE_NOW_MS + 60_000,
 		issuedAtMs: FIXTURE_NOW_MS,
 		kind: "ts-drp-rendezvous-record",

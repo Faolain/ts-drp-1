@@ -1,8 +1,5 @@
 import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { base64url } from "multiformats/bases/base64";
-import { sha256 } from "multiformats/hashes/sha2";
-
 import {
 	createOpaqueNamespaceV1,
 	type RecordRejectionCode,
@@ -10,7 +7,9 @@ import {
 	type RecordValidationResult,
 	RecordValidator,
 	type SignedDrpRecordV1,
-} from "./index.js";
+} from "@ts-drp/rendezvous";
+import { base64url } from "multiformats/bases/base64";
+import { sha256 } from "multiformats/hashes/sha2";
 
 export const RECORD_FIXTURE_NOW_MS = 1_750_000_000_000;
 

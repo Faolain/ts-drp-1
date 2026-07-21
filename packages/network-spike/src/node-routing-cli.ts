@@ -1,12 +1,12 @@
-import { randomBytes } from "node:crypto";
-
-import { runLocalAminoFixture } from "./node-routing/fixture.js";
 import {
 	createNodeRouting,
 	namespaceCid,
 	OFFICIAL_AMINO_BOOTSTRAPPERS,
 	PUBLIC_NETWORK_ACKNOWLEDGEMENT,
-} from "./node-routing/index.js";
+} from "@ts-drp/routing-node";
+import { randomBytes } from "node:crypto";
+
+import { runLocalAminoFixture } from "./node-routing/fixture.js";
 import {
 	assertSanitizedEvidenceOutputRoot,
 	createPublicCanaryArtifacts,

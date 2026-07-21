@@ -1,4 +1,6 @@
 import type { DRPNetworkHostConfigSnapshot } from "@ts-drp/network";
+import type { RelayCandidate, RelayPolicyResult } from "@ts-drp/relay-policy";
+import type { RendezvousDirectory, SignedDrpRecordV1, ValidatedDrpRecord } from "@ts-drp/rendezvous";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -11,11 +13,8 @@ import {
 	type GridRelayPolicyPort,
 	isValidDirectProof,
 } from "../src/grid/index.js";
-import type { SignedDrpRecordV1 } from "../src/record/index.js";
-import type { RendezvousDirectory, ValidatedDrpRecord } from "../src/registry/index.js";
-import type { RelayCandidate, RelayPolicyResult } from "../src/relay/index.js";
 
-const NAMESPACE = "drp-rendezvous:v1:abcdefghijklmnopqrstuv";
+const NAMESPACE = "drp-network:v1:abcdefghijklmnopqrstuv";
 const CREATOR = "creator-peer";
 const JOINER = "joiner-peer";
 const RELAY = "relay-peer";
@@ -263,7 +262,7 @@ function relayResult(terminal: RelayPolicyResult["terminal"], durationMs: number
 function signedRecord(): SignedDrpRecordV1 {
 	return {
 		addresses: [`/dns4/relay.example/tcp/443/wss/p2p/${RELAY}/p2p-circuit/webrtc/p2p/${CREATOR}`],
-		capabilities: ["circuit-relay", "drp-gossipsub", "webrtc"],
+		capabilities: ["drp-gossipsub", "relay-client", "webrtc"],
 		expiresAtMs: 1_750_000_060_000,
 		issuedAtMs: 1_750_000_000_000,
 		kind: "ts-drp-rendezvous-record",

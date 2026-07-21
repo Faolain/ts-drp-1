@@ -1,24 +1,24 @@
 import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { describe, expect, it } from "vitest";
-
-import type { BrowserRoutingPeer } from "../src/browser-routing/index.js";
-import { createNodeRouting } from "../src/node-routing/index.js";
-import { createOpaqueNamespaceV1, RecordSigner, RecordValidator, type SignedDrpRecordV1 } from "../src/record/index.js";
-import { createRegistryFixture } from "../src/registry/fixture.js";
 import {
 	AdmissionPolicy,
 	AnchorAdvertisementError,
+	type AnchorProviderPeer,
+	createOpaqueNamespaceV1,
 	DhtAnchorPublisher,
 	DhtAnchorResolver,
 	FixtureRegistryEndpoint,
 	namespaceAnchorCid,
 	type ProofOfWorkChallengeV1,
+	RecordSigner,
+	RecordValidator,
 	RegistryClient,
 	type RegistryRegistrationRequest,
 	RegistryServer,
+	type SignedDrpRecordV1,
 	solveProofOfWork,
-} from "../src/registry/index.js";
+} from "@ts-drp/rendezvous";
+import { describe, expect, it } from "vitest";
 
 const NOW = 1_750_000_000_000;
 const INVITE = "fixture-invite-token-32-characters";
@@ -348,6 +348,28 @@ describe("two-endpoint registry", () => {
 });
 
 describe("runtime admission policies", () => {
+	it("returns invite and allowlist decisions for an already-aborted signal", async () => {
+		const record = await signedRecord(99);
+		const controller = new AbortController();
+		controller.abort(new Error("stop-admission"));
+
+		await expect(
+			new AdmissionPolicy({ inviteToken: INVITE }).evaluate({
+				clientId: "a",
+				credential: { kind: "invite", token: INVITE },
+				record,
+				signal: controller.signal,
+			})
+		).resolves.toEqual({ accepted: true, mode: "invite" });
+		await expect(
+			new AdmissionPolicy({ allowedPeerIds: [record.peerId], mode: "allowlist" }).evaluate({
+				clientId: "a",
+				record,
+				signal: controller.signal,
+			})
+		).resolves.toEqual({ accepted: true, mode: "allowlist" });
+	});
+
 	it("makes invite the safe default, allowlists exact peers, and gates Sybil-unsafe open mode", async () => {
 		expect(() => new AdmissionPolicy({ inviteToken: "too-short" })).toThrow("at least 16");
 		expect(() => new AdmissionPolicy({ mode: "open" } as never)).toThrow();
@@ -483,39 +505,6 @@ describe("runtime admission policies", () => {
 });
 
 describe("DHT anchor comparison", () => {
-	it("publishes the versioned anchor CID through the real local Node DHT lifecycle", async () => {
-		const server = await createNodeRouting({
-			limits: { maxResults: 2 },
-			mode: "server",
-			network: "local",
-		});
-		const publisher = await createNodeRouting({
-			bootstrapPeers: [],
-			mode: "client",
-			network: "local",
-		});
-		try {
-			const status = await server.status(signal());
-			const address = status.addresses.find(({ decision }) => decision.dialable)?.address;
-			if (address === undefined) throw new Error("local anchor server has no dialable address");
-			await publisher.connect(address.includes("/p2p/") ? address : `${address}/p2p/${server.peerId}`, signal());
-			await publisher.waitForRoutingTable(1, signal());
-			const anchor = new DhtAnchorPublisher(publisher);
-			const opaqueNamespace = namespace(19);
-			const publication = await anchor.publish(opaqueNamespace, signal());
-			const providers: string[] = [];
-			for await (const provider of server.findProviders(publication.cid, signal())) {
-				providers.push(provider.peerId);
-			}
-			expect(publication.cid).toBe(await namespaceAnchorCid(opaqueNamespace));
-			expect(providers).toContain(publisher.peerId);
-			await anchor.stop(opaqueNamespace, signal());
-			expect(publisher.measurements.some(({ operation }) => operation === "cancelReprovide")).toBe(true);
-		} finally {
-			await Promise.allSettled([publisher.stop(), server.stop()]);
-		}
-	}, 10_000);
-
 	it("derives a stable versioned CID and refuses to advertise a browser peer", async () => {
 		const opaqueNamespace = namespace(20);
 		expect(await namespaceAnchorCid(opaqueNamespace)).toBe(await namespaceAnchorCid(opaqueNamespace));
@@ -554,7 +543,7 @@ describe("DHT anchor comparison", () => {
 		];
 		const resolver = new DhtAnchorResolver(
 			{
-				async *findProviders(): AsyncIterable<BrowserRoutingPeer> {
+				async *findProviders(): AsyncIterable<AnchorProviderPeer> {
 					await Promise.resolve();
 					yield* peers;
 				},
@@ -564,27 +553,6 @@ describe("DHT anchor comparison", () => {
 		const result = await resolver.resolve(namespace(22), signal(), 2);
 		expect(result.semantics).toBe("configured-node-anchor-only");
 		expect(result.providers.map(({ peerId }) => peerId)).toEqual(["anchor-a", "anchor-b"]);
-	});
-});
-
-describe("registry comparison fixture", () => {
-	it("matches every deterministic oracle and emits no credential fields", async () => {
-		const fixture = await createRegistryFixture();
-		expect(fixture.cases).toHaveLength(10);
-		expect(fixture.cases.every(({ passed }) => passed)).toBe(true);
-		expect(fixture.admission.map(({ mode, registrationResult }) => [mode, registrationResult])).toEqual([
-			["invite", "accepted"],
-			["allowlist", "accepted"],
-			["open", "accepted"],
-			["proof-of-work", "accepted"],
-		]);
-		expect(fixture.privateCredentialFields).toBe(0);
-		expect(fixture.comparison.every(({ dependencyHops, operationMs }) => dependencyHops > 0 && operationMs >= 0)).toBe(
-			true
-		);
-		expect(JSON.stringify(fixture)).not.toContain(INVITE);
-		expect(fixture.comparison).toHaveLength(2);
-		expect(fixture.digest).toMatch(/^sha256:[A-Za-z0-9_-]{16}$/u);
 	});
 });
 
@@ -658,7 +626,7 @@ function isChallenge(value: ProofOfWorkChallengeV1 | { accepted: false }): value
 	return "kind" in value && value.kind === "ts-drp-registry-proof";
 }
 
-function routingPeer(peerId: string): BrowserRoutingPeer {
+function routingPeer(peerId: string): AnchorProviderPeer {
 	return {
 		acceptedAddresses: [],
 		addressDecisions: [],

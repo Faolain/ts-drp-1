@@ -1,15 +1,4 @@
 export {
-	AddressPolicy,
-	type AddressCandidate,
-	type AddressDecision,
-	type AddressFamily,
-	type AddressPolicyOptions,
-	type AddressScope,
-	type AddressTransport,
-	type CandidatePlan,
-	type Resolver,
-} from "./address-policy.js";
-export {
 	parseProbeEvent,
 	parseProbeJsonLines,
 	probeEventToJsonLine,

@@ -1,4 +1,4 @@
-import type { BrowserRouting } from "../src/browser-routing/index.js";
+import type { BrowserRouting } from "@ts-drp/routing-browser";
 
 declare const routing: BrowserRouting;
 declare const signal: AbortSignal;

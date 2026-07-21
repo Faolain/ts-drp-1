@@ -7,11 +7,9 @@ import { peerIdFromString } from "@libp2p/peer-id";
 import { ping, type Ping } from "@libp2p/ping";
 import { webSockets } from "@libp2p/websockets";
 import { multiaddr } from "@multiformats/multiaddr";
+import { namespaceCid } from "@ts-drp/rendezvous";
 import { createLibp2p, type Libp2p } from "libp2p";
-import { CID } from "multiformats/cid";
-import { sha256 } from "multiformats/hashes/sha2";
 
-const RAW_CODEC = 0x55;
 const DEFAULT_TIMEOUT_MS = 8_000;
 const DHT_PROTOCOL = "/ipfs/kad/1.0.0";
 
@@ -394,10 +392,6 @@ async function queryHasFinalPeer(events: AsyncIterable<QueryEvent>): Promise<boo
 		if (event.name === "FINAL_PEER") return true;
 	}
 	return false;
-}
-
-async function namespaceCid(namespace: string): Promise<CID> {
-	return CID.createV1(RAW_CODEC, await sha256.digest(new TextEncoder().encode(namespace)));
 }
 
 function isBrowserDialableAddress(address: string): boolean {

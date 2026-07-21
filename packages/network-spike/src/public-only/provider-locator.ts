@@ -1,10 +1,10 @@
+import { namespaceCid } from "@ts-drp/rendezvous";
 import {
 	type BrowserRouting,
 	BrowserRoutingExhaustedError,
 	type BrowserRoutingPeer,
 	type BrowserRoutingTrace,
-} from "../browser-routing/index.js";
-import { namespaceCid } from "../namespace.js";
+} from "@ts-drp/routing-browser";
 
 export interface UntrustedPublicProvider {
 	readonly addresses: readonly string[];

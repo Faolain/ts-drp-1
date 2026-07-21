@@ -1,13 +1,12 @@
-import { build } from "esbuild";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
-
 import {
 	BrowserRoutingExhaustedError,
 	BrowserRoutingNotFoundError,
 	type BrowserRoutingOptions,
 	DelegatedBrowserRouting,
-} from "../src/browser-routing/index.js";
+} from "@ts-drp/routing-browser";
+import { build } from "esbuild";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it, vi } from "vitest";
 
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
 const TEST_CID = "bafkreigh2akiscaildcuxp5g4t5s6xrk5g3w7i7xvq5y5u5h5gj5f3f6aa";
@@ -394,7 +393,7 @@ describe("DelegatedBrowserRouting", () => {
 	it("bundles the adapter for browsers without Node routing or builtin modules", async () => {
 		const bundle = await build({
 			bundle: true,
-			entryPoints: [fileURLToPath(new URL("../src/browser-routing/index.ts", import.meta.url))],
+			entryPoints: [fileURLToPath(new URL("../src/index.ts", import.meta.url))],
 			format: "esm",
 			metafile: true,
 			platform: "browser",

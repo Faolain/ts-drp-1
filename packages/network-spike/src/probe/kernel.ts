@@ -1,4 +1,5 @@
-import type { AddressPolicy, Resolver } from "./address-policy.js";
+import type { AddressPolicy, Resolver } from "@ts-drp/rendezvous";
+
 import {
 	parseProbeEvent,
 	PROBE_EVENT_SCHEMA_VERSION,

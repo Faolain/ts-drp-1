@@ -1,10 +1,10 @@
-import { RELAY_TRANSPORT_PROFILES } from "@ts-drp/network-spike/relay";
 import {
 	createRelayFixture,
 	type RelayFixtureAttempt,
 	type RelayFixtureResult,
 	type RelayFixtureScenario,
 } from "@ts-drp/network-spike/relay/fixture";
+import { RELAY_TRANSPORT_PROFILES } from "@ts-drp/relay-policy";
 
 const SCENARIOS: ReadonlyArray<{ label: string; value: RelayFixtureScenario }> = [
 	{ label: "Mixed field", value: "mixed" },

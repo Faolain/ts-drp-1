@@ -1,27 +1,25 @@
 import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
-
-import type { FailureTerminal, FaultKind } from "./index.js";
-import { type BrowserRoutingTrace, DelegatedBrowserRouting, type EndpointAttempt } from "../browser-routing/index.js";
-import type { ProbeContext } from "../probe/kernel.js";
-import { ManualClock } from "../probe/manual-clock.js";
 import {
+	AdmissionPolicy,
 	createOpaqueNamespaceV1,
+	FixtureRegistryEndpoint,
 	type RecordRejectionCode,
 	RecordSigner,
 	RecordValidator,
-	type SignedDrpRecordV1,
-} from "../record/index.js";
-import {
-	AdmissionPolicy,
-	FixtureRegistryEndpoint,
 	type RegistrationReceipt,
 	type RegistryAttempt,
 	RegistryClient,
 	type RegistryRejection,
 	type RegistryRejectionCode,
 	RegistryServer,
-} from "../registry/index.js";
+	type SignedDrpRecordV1,
+} from "@ts-drp/rendezvous";
+import { type BrowserRoutingTrace, DelegatedBrowserRouting, type EndpointAttempt } from "@ts-drp/routing-browser";
+
+import type { FailureTerminal, FaultKind } from "./index.js";
+import type { ProbeContext } from "../probe/kernel.js";
+import { ManualClock } from "../probe/manual-clock.js";
 
 const FIXTURE_NOW_MS = 1_750_000_000_000;
 const INVITE_TOKEN = "failure-campaign-invite-token-v1";

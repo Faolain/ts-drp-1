@@ -4,14 +4,14 @@ import { lpStream } from "@libp2p/utils";
 import { multiaddr, type Multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p } from "libp2p";
 
+import { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
 import type {
 	RelayCandidate,
 	RelayInspection,
 	RelayInspector,
 	RelayReservationClient,
 	RelayReservationWireResponse,
-} from "./index.js";
-import { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
+} from "./types.js";
 
 interface CircuitRelayHost
 	extends Pick<Libp2p, "addEventListener" | "getConnections" | "getMultiaddrs" | "peerStore" | "removeEventListener"> {
@@ -55,6 +55,10 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	readonly #inspectedAddresses = new Map<string, string>();
 	readonly #reservationTimeoutMs: number;
 
+	/**
+	 *
+	 * @param options
+	 */
 	constructor(options: Libp2pRelayClientOptions) {
 		this.#host = options.host;
 		this.#connect = options.connect;
@@ -68,6 +72,12 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 		return [...this.#active.values()].map(({ address }) => address);
 	}
 
+	/**
+	 *
+	 * @param candidate
+	 * @param address
+	 * @param signal
+	 */
 	async inspect(candidate: RelayCandidate, address: string, signal: AbortSignal): Promise<RelayInspection> {
 		const startedAt = performance.now();
 		const identification = observeIdentify(this.#host, candidate.peerId, signal);
@@ -106,6 +116,11 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 		}
 	}
 
+	/**
+	 *
+	 * @param candidate
+	 * @param signal
+	 */
 	async reserve(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse> {
 		const relayAddress = this.#inspectedAddresses.get(candidate.peerId) ?? candidate.addresses[0];
 		if (relayAddress === undefined) return { status: RELAY_RESERVATION_STATUS.CONNECTION_FAILED };
@@ -142,10 +157,19 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 		}
 	}
 
+	/**
+	 *
+	 * @param candidate
+	 * @param signal
+	 */
 	refresh(candidate: RelayCandidate, signal: AbortSignal): Promise<RelayReservationWireResponse> {
 		return this.reserve(candidate, signal);
 	}
 
+	/**
+	 *
+	 * @param candidate
+	 */
 	async release(candidate: RelayCandidate): Promise<void> {
 		const active = this.#active.get(candidate.peerId);
 		const failures: unknown[] = [];
@@ -229,7 +253,10 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 	}
 }
 
-/** Decodes a length-delimited Relay v2 HopMessage response. */
+/**
+ * Decodes a length-delimited Relay v2 HopMessage response.
+ * @param bytes
+ */
 export function decodeHopReservationResponse(bytes: Uint8Array): RelayReservationWireResponse {
 	const fields = decodeProtobufFields(bytes);
 	const statuses = fields.filter(({ field, wire }) => field === 5 && wire === 0);

@@ -1,3 +1,4 @@
+import type { ReachabilityObservation, RoutingMeasurement } from "@ts-drp/routing-node";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -10,7 +11,6 @@ import { fingerprint, parseExperimentManifest } from "../evidence.js";
 import { createFixtureManifest } from "../fixture.js";
 import { assessRedaction, sensitiveValueDigest } from "../redaction.js";
 import { EVIDENCE_SCHEMA_VERSION, type ExperimentManifest } from "../schemas.js";
-import type { ReachabilityObservation, RoutingMeasurement } from "./index.js";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const SANITIZED_EVIDENCE_ROOT = "specs/done/public-network-spike/evidence";

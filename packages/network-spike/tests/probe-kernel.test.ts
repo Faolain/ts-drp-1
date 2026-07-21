@@ -1,7 +1,7 @@
+import { AddressPolicy } from "@ts-drp/rendezvous";
 import { describe, expect, it } from "vitest";
 
 import {
-	AddressPolicy,
 	ManualClock,
 	parseProbeJsonLines,
 	type Probe,

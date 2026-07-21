@@ -6,11 +6,10 @@ import {
 import type { ComponentLogger, Logger } from "@libp2p/interface";
 import { defaultLogger } from "@libp2p/logger";
 import { peerIdFromCID, peerIdFromString } from "@libp2p/peer-id";
+import { type AddressDecision, AddressPolicy, type Resolver } from "@ts-drp/rendezvous";
 import { CID } from "multiformats/cid";
 import * as raw from "multiformats/codecs/raw";
 import { identity } from "multiformats/hashes/identity";
-
-import { type AddressDecision, AddressPolicy, type Resolver } from "../probe/address-policy.js";
 
 export const PUBLIC_DELEGATED_ROUTING_ACKNOWLEDGEMENT = "I_ACKNOWLEDGE_PUBLIC_DELEGATED_ROUTING";
 

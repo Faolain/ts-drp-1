@@ -1,21 +1,19 @@
 import { generateKeyPairFromSeed, publicKeyToProtobuf } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { base64url } from "multiformats/bases/base64";
-import { describe, expect, it } from "vitest";
-
 import {
 	canonicalPayloadBytes,
-	createOpaqueNamespaceV1,
 	type DrpCapability,
 	RecordSigner,
 	type RecordValidationContext,
 	RecordValidator,
 	type SignedDrpRecordV1,
 	type UnsignedDrpRecordV1,
-} from "../src/record/index.js";
+} from "@ts-drp/rendezvous";
+import { base64url } from "multiformats/bases/base64";
+import { describe, expect, it } from "vitest";
 
 const NOW = 1_750_000_000_000;
-const namespace = createOpaqueNamespaceV1(Uint8Array.from({ length: 32 }, (_, index) => index + 1));
+const namespace = `drp-network:v1:${"a".repeat(43)}`;
 const admission = { accepted: true, mode: "invite" } as const;
 
 describe("signed rendezvous records", () => {
@@ -57,7 +55,7 @@ describe("signed rendezvous records", () => {
 	it("enforces namespace, canonical ordering, capabilities, and shape", async () => {
 		const record = await signedFixture(4);
 		await expectRejected(record, "namespace-mismatch", {
-			expectedNamespace: createOpaqueNamespaceV1(seed(44)),
+			expectedNamespace: `drp-network:v1:${"b".repeat(43)}`,
 		});
 		await expectRejected(copy(record, { namespace: "public-room-name" }), "invalid-namespace");
 		await expectRejected(copy(record, { version: 2 as 1 }), "unsupported-version");
@@ -68,6 +66,48 @@ describe("signed rendezvous records", () => {
 		);
 		await expectRejected(copy(record, { capabilities: ["webrtc"] }), "unsupported-capability");
 		await expectRejected({ ...record, unexpected: true }, "invalid-shape");
+	});
+
+	it("accepts the frozen drp-network namespace and rejects the legacy drp-rendezvous namespace", async () => {
+		const { signer, peerId } = await fixtureSigner(41);
+		await expectAccepted(await signer.sign(fixtureInput(peerId)));
+
+		const legacyNamespace = `drp-rendezvous:v1:${base64url.baseEncode(seed(41))}`;
+		const legacyRecord = await signer.sign(fixtureInput(peerId, { namespace: legacyNamespace }));
+		await expectRejected(legacyRecord, "invalid-namespace", { expectedNamespace: legacyNamespace });
+	});
+
+	it.each([
+		["relay keyspace", `drp-relays:v1:${"a".repeat(43)}`],
+		["leading junk", `evil drp-network:v1:${"a".repeat(43)}`],
+		["trailing junk", `drp-network:v1:${"a".repeat(43)} evil`],
+	])("rejects a namespace from the %s", async (_case, invalidNamespace) => {
+		const { signer, peerId } = await fixtureSigner(44);
+		const record = await signer.sign(fixtureInput(peerId, { namespace: invalidNamespace }));
+
+		await expectRejected(record, "invalid-namespace", { expectedNamespace: invalidNamespace });
+	});
+
+	it("accepts exactly the frozen relay capability names", async () => {
+		const { signer, peerId } = await fixtureSigner(42);
+		for (const capabilities of [
+			["drp-gossipsub", "relay-client"],
+			["drp-gossipsub", "relay-hop-v2-service"],
+			["drp-gossipsub", "relay-client", "relay-hop-v2-service"],
+		] as const) {
+			await expectAccepted(
+				await signer.sign(fixtureInput(peerId, { capabilities: capabilities as readonly DrpCapability[] }))
+			);
+		}
+	});
+
+	it("rejects the removed circuit-relay capability", async () => {
+		const { signer, peerId } = await fixtureSigner(43);
+		const record = await signer.sign(
+			fixtureInput(peerId, { capabilities: ["circuit-relay" as DrpCapability, "drp-gossipsub"] })
+		);
+
+		await expectRejected(record, "unsupported-capability");
 	});
 
 	it("enforces monotonic sequences without burning a rejected sequence", async () => {
@@ -159,11 +199,14 @@ describe("signed rendezvous records", () => {
 			),
 			"too-many-addresses"
 		);
-		await expectRejected(
-			copy(record, {
-				capabilities: ["circuit-relay", "drp-gossipsub", "webrtc", "drp-gossipsub"],
-			}),
-			"too-many-capabilities"
+		const fullCapabilityRecord = await signer.sign(
+			fixtureInput(peerId, {
+				capabilities: ["drp-gossipsub", "webrtc", "relay-client", "relay-hop-v2-service"],
+			})
+		);
+		await expectAccepted(fullCapabilityRecord);
+		expect(await fixtureValidator(undefined, { maxCapabilities: 3 }).validate(fullCapabilityRecord, context())).toEqual(
+			{ accepted: false, code: "too-many-capabilities", detail: "4/3" }
 		);
 
 		const results = await fixtureValidator().validateResponse(

@@ -1,5 +1,6 @@
+import { RELAY_TRANSPORT_PROFILES } from "@ts-drp/relay-policy";
+
 import { createRelayFixture, type RelayFixtureScenario } from "./relay/fixture.js";
-import { RELAY_TRANSPORT_PROFILES } from "./relay/index.js";
 
 const scenario = (process.argv[2] ?? "mixed") as RelayFixtureScenario;
 const profile =

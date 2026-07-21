@@ -5,7 +5,7 @@ import {
 	type BrowserRoutingTrace,
 	createBrowserRouting,
 	PUBLIC_DELEGATED_ROUTING_ACKNOWLEDGEMENT,
-} from "@ts-drp/network-spike/browser-routing";
+} from "@ts-drp/routing-browser";
 
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
 const TEST_CID = "bafkreigh2akiscaildcuxp5g4t5s6xrk5g3w7i7xvq5y5u5h5gj5f3f6aa";

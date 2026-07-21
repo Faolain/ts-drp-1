@@ -15,8 +15,8 @@ import {
 	type RelayReservationClient,
 	type RelayReservationWireResponse,
 	type RelayTransportProfile,
-} from "./index.js";
-import type { BrowserRoutingPeer } from "../browser-routing/index.js";
+} from "@ts-drp/relay-policy";
+import type { BrowserRoutingPeer } from "@ts-drp/routing-browser";
 
 const FIXTURE_NOW = 1_750_000_000_000;
 const QUERY_KEY = new TextEncoder().encode("drp-relay-fixture-v1");

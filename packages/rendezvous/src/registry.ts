@@ -1,16 +1,16 @@
+import {
+	AllowlistVerifier,
+	constantTimeEqual,
+	InviteVerifier,
+	type InviteCredential as MembershipInviteCredential,
+} from "@ts-drp/membership";
 import { base64url } from "multiformats/bases/base64";
 import { CID } from "multiformats/cid";
 import * as raw from "multiformats/codecs/raw";
 import { sha256 } from "multiformats/hashes/sha2";
 
-import type { BrowserRouting, BrowserRoutingPeer } from "../browser-routing/index.js";
-import type { NodeRouting, PublicationReceipt } from "../node-routing/index.js";
-import {
-	type AdmissionDecision,
-	type AdmissionMode,
-	type RecordValidator,
-	type SignedDrpRecordV1,
-} from "../record/index.js";
+import type { AddressDecision } from "./address-policy.js";
+import { type AdmissionDecision, type AdmissionMode, type RecordValidator, type SignedDrpRecordV1 } from "./record.js";
 
 const encoder = new TextEncoder();
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -54,10 +54,7 @@ export const DEFAULT_REGISTRY_LIMITS: Readonly<RegistryLimits> = Object.freeze({
 	requestWindowMs: 60_000,
 });
 
-export interface InviteCredential {
-	readonly kind: "invite";
-	readonly token: string;
-}
+export type InviteCredential = MembershipInviteCredential;
 
 export interface ProofOfWorkCredential {
 	readonly challenge: ProofOfWorkChallengeV1;
@@ -127,8 +124,8 @@ interface StoredChallenge {
  */
 export class AdmissionPolicy {
 	readonly mode: AdmissionMode;
-	readonly #allowlist: ReadonlySet<string>;
-	readonly #inviteToken: string | undefined;
+	readonly #allowlistVerifier: AllowlistVerifier | undefined;
+	readonly #inviteVerifier: InviteVerifier | undefined;
 	readonly #now: () => number;
 	readonly #nonce: () => Uint8Array;
 	readonly #proofChallenges = new Map<string, StoredChallenge>();
@@ -142,8 +139,12 @@ export class AdmissionPolicy {
 	constructor(options: AdmissionPolicyOptions, now: () => number = Date.now) {
 		this.mode = options.mode ?? "invite";
 		this.#now = now;
-		this.#allowlist = new Set(options.mode === "allowlist" ? options.allowedPeerIds : []);
-		this.#inviteToken = options.mode === undefined || options.mode === "invite" ? options.inviteToken : undefined;
+		this.#allowlistVerifier =
+			options.mode === "allowlist" ? new AllowlistVerifier({ allowedPeerIds: options.allowedPeerIds }) : undefined;
+		this.#inviteVerifier =
+			options.mode === undefined || options.mode === "invite"
+				? new InviteVerifier({ inviteToken: options.inviteToken })
+				: undefined;
 		this.#secret = options.mode === "proof-of-work" ? new Uint8Array(options.secret) : undefined;
 		this.#nonce =
 			options.mode === "proof-of-work" && options.nonce !== undefined
@@ -153,9 +154,6 @@ export class AdmissionPolicy {
 			...DEFAULT_PROOF_OF_WORK_LIMITS,
 			...(options.mode === "proof-of-work" ? options.limits : undefined),
 		});
-		if (this.mode === "invite" && (this.#inviteToken === undefined || this.#inviteToken.length < 16)) {
-			throw new Error("invite token must contain at least 16 characters");
-		}
 		if (this.mode === "open" && (!("allowUnsafeOpen" in options) || options.allowUnsafeOpen !== true)) {
 			throw new Error("open admission requires explicit opt-in");
 		}
@@ -228,19 +226,25 @@ export class AdmissionPolicy {
 	 * @returns Explicit decision consumed by `RecordValidator`.
 	 */
 	async evaluate(request: AdmissionRequest): Promise<AdmissionDecision> {
-		request.signal.throwIfAborted();
 		switch (this.mode) {
-			case "open":
+			case "open": {
+				request.signal.throwIfAborted();
 				return { accepted: true, mode: "open", reason: "explicit-sybil-unsafe-canary" };
-			case "allowlist":
-				return this.#allowlist.has(request.record.peerId)
-					? { accepted: true, mode: "allowlist" }
-					: { accepted: false, mode: "allowlist", reason: "peer-not-allowlisted" };
-			case "invite":
-				return request.credential?.kind === "invite" && safeEqual(request.credential.token, this.#inviteToken ?? "")
-					? { accepted: true, mode: "invite" }
-					: { accepted: false, mode: "invite", reason: "invite-invalid" };
+			}
+			case "allowlist": {
+				if (this.#allowlistVerifier === undefined) throw new Error("allowlist verifier is not configured");
+				return this.#allowlistVerifier.verify({ peerId: request.record.peerId, signal: request.signal });
+			}
+			case "invite": {
+				if (this.#inviteVerifier === undefined) throw new Error("invite verifier is not configured");
+				return this.#inviteVerifier.verify({
+					credential: request.credential?.kind === "invite" ? request.credential : undefined,
+					peerId: request.record.peerId,
+					signal: request.signal,
+				});
+			}
 			case "proof-of-work":
+				request.signal.throwIfAborted();
 				return this.#verifyProof(request);
 		}
 	}
@@ -275,7 +279,7 @@ export class AdmissionPolicy {
 		}
 		const { tag: _tag, ...unsignedChallenge } = stored.challenge;
 		const expectedTag = await hmacBase64Url(this.#secret, encoder.encode(JSON.stringify(unsignedChallenge)));
-		if (!safeEqual(stored.challenge.tag, expectedTag)) {
+		if (!constantTimeEqual(stored.challenge.tag, expectedTag)) {
 			return { accepted: false, mode: "proof-of-work", reason: "proof-challenge-invalid" };
 		}
 		const proofBytes = encoder.encode(`${JSON.stringify(stored.challenge)}:${credential.counter}`);
@@ -866,10 +870,34 @@ export class RegistryExhaustedError extends Error {
 	}
 }
 
+export interface AnchorPublicationReceipt {
+	readonly cid: string;
+}
+
+export interface NodeAnchorRouting {
+	readonly peerId: string;
+	cancelReprovide(cid: string, signal?: AbortSignal): Promise<void>;
+	provide(cid: string, signal?: AbortSignal): Promise<AnchorPublicationReceipt>;
+}
+
+export interface AnchorProviderPeer {
+	readonly acceptedAddresses: readonly string[];
+	readonly addressDecisions: Array<{ address: string; decision: AddressDecision }>;
+	readonly inputAddressCount: number;
+	readonly peerId: string;
+	readonly protocols: readonly string[];
+	readonly rawAddresses: readonly string[];
+	readonly truncatedAddressCount: number;
+}
+
+export interface BrowserProviderRouting {
+	findProviders(cid: string, signal: AbortSignal): AsyncIterable<AnchorProviderPeer>;
+}
+
 export interface DhtAnchorPublication {
 	readonly anchorPeerId: string;
 	readonly cid: string;
-	readonly receipt: PublicationReceipt;
+	readonly receipt: AnchorPublicationReceipt;
 }
 
 /**
@@ -889,12 +917,12 @@ export class AnchorAdvertisementError extends Error {
  * explicit and testable.
  */
 export class DhtAnchorPublisher {
-	readonly #anchor: Pick<NodeRouting, "cancelReprovide" | "peerId" | "provide">;
+	readonly #anchor: NodeAnchorRouting;
 
 	/**
 	 * @param anchor - Node routing owner whose own Peer ID is published.
 	 */
-	constructor(anchor: Pick<NodeRouting, "cancelReprovide" | "peerId" | "provide">) {
+	constructor(anchor: NodeAnchorRouting) {
 		this.#anchor = anchor;
 	}
 
@@ -927,7 +955,7 @@ export class DhtAnchorPublisher {
 
 export interface DhtAnchorResolution {
 	readonly cid: string;
-	readonly providers: readonly BrowserRoutingPeer[];
+	readonly providers: readonly AnchorProviderPeer[];
 	readonly semantics: "configured-node-anchor-only";
 }
 
@@ -937,13 +965,13 @@ export interface DhtAnchorResolution {
  */
 export class DhtAnchorResolver {
 	readonly #allowedAnchorPeerIds: ReadonlySet<string>;
-	readonly #routing: Pick<BrowserRouting, "findProviders">;
+	readonly #routing: BrowserProviderRouting;
 
 	/**
 	 * @param routing - Browser delegated provider lookup owner.
 	 * @param allowedAnchorPeerIds - Explicit Node anchor identities for the namespace.
 	 */
-	constructor(routing: Pick<BrowserRouting, "findProviders">, allowedAnchorPeerIds: readonly string[]) {
+	constructor(routing: BrowserProviderRouting, allowedAnchorPeerIds: readonly string[]) {
 		if (allowedAnchorPeerIds.length < 1 || allowedAnchorPeerIds.length > 32) {
 			throw new Error("DHT anchor resolver requires 1..32 configured Node anchors");
 		}
@@ -962,7 +990,7 @@ export class DhtAnchorResolver {
 			throw new Error("maxProviders must be between 1 and 32");
 		}
 		const cid = await namespaceAnchorCid(namespace);
-		const providers: BrowserRoutingPeer[] = [];
+		const providers: AnchorProviderPeer[] = [];
 		for await (const provider of this.#routing.findProviders(cid, signal)) {
 			if (!this.#allowedAnchorPeerIds.has(provider.peerId)) continue;
 			providers.push(provider);
@@ -1026,17 +1054,6 @@ function validateProofLimits(limits: ProofOfWorkLimits): Readonly<ProofOfWorkLim
 		throw new Error("pressureStep cannot exceed maxOutstandingChallenges");
 	}
 	return Object.freeze({ ...limits });
-}
-
-function safeEqual(left: string, right: string): boolean {
-	const leftBytes = encoder.encode(left);
-	const rightBytes = encoder.encode(right);
-	let difference = leftBytes.byteLength ^ rightBytes.byteLength;
-	const length = Math.max(leftBytes.byteLength, rightBytes.byteLength);
-	for (let index = 0; index < length; index += 1) {
-		difference |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0);
-	}
-	return difference === 0;
 }
 
 async function hmacBase64Url(secret: Uint8Array, value: Uint8Array): Promise<string> {

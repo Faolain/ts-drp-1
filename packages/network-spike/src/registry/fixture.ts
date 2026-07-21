@@ -1,21 +1,23 @@
 import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { base64url } from "multiformats/bases/base64";
-import { sha256 } from "multiformats/hashes/sha2";
-
 import {
 	AdmissionPolicy,
+	createOpaqueNamespaceV1,
 	DhtAnchorPublisher,
 	DhtAnchorResolver,
 	FixtureRegistryEndpoint,
 	namespaceAnchorCid,
 	type ProofOfWorkChallengeV1,
+	RecordSigner,
+	RecordValidator,
 	RegistryClient,
 	RegistryServer,
+	type SignedDrpRecordV1,
 	solveProofOfWork,
-} from "./index.js";
-import type { BrowserRoutingPeer } from "../browser-routing/index.js";
-import { createOpaqueNamespaceV1, RecordSigner, RecordValidator, type SignedDrpRecordV1 } from "../record/index.js";
+} from "@ts-drp/rendezvous";
+import type { BrowserRoutingPeer } from "@ts-drp/routing-browser";
+import { base64url } from "multiformats/bases/base64";
+import { sha256 } from "multiformats/hashes/sha2";
 
 const FIXTURE_NOW = 1_750_000_000_000;
 const INVITE_TOKEN = "fixture-invite-token-32-characters";

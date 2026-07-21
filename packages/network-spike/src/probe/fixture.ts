@@ -1,4 +1,5 @@
-import { AddressPolicy } from "./address-policy.js";
+import { AddressPolicy } from "@ts-drp/rendezvous";
+
 import { type ProbeEvent, probeEventToJsonLine } from "./events.js";
 import {
 	type Probe,

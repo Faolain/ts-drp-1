@@ -1,7 +1,7 @@
+import type { RelayPolicy, RelayPolicyResult } from "@ts-drp/relay-policy";
 import { CID } from "multiformats/cid";
 
 import type { PublicProviderLocator, PublicProviderLookupResult } from "./provider-locator.js";
-import type { RelayPolicy, RelayPolicyResult } from "../relay/index.js";
 
 export interface PublicOnlyBrowserBootstrapResult {
 	readonly providerLookup: PublicProviderLookupResult;

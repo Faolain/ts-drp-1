@@ -8,6 +8,24 @@ import {
 	DRPNetworkNode,
 } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
+import {
+	BrowserRoutingClosestPeersSource,
+	Libp2pRelayClient,
+	RELAY_RESERVATION_STATUS,
+	RelayPolicy,
+	type RelayPolicyResult,
+	type RelayReplacementResult,
+} from "@ts-drp/relay-policy";
+import {
+	AddressPolicy,
+	createOpaqueNamespaceV1,
+	RecordSigner,
+	type RecordValidationResult,
+	RecordValidator,
+	RegistryClient,
+	type SignedDrpRecordV1,
+} from "@ts-drp/rendezvous";
+import { type BrowserRouting, type BrowserRoutingTrace, createBrowserRouting } from "@ts-drp/routing-browser";
 import { ActionType, type IDRP, type ResolveConflictsType, SemanticsType, type Vertex } from "@ts-drp/types";
 import type { Libp2p } from "libp2p";
 
@@ -20,24 +38,6 @@ import {
 	type GridObjectPort,
 	isValidDirectProof,
 } from "./index.js";
-import { type BrowserRouting, type BrowserRoutingTrace, createBrowserRouting } from "../browser-routing/index.js";
-import { AddressPolicy } from "../probe/address-policy.js";
-import {
-	createOpaqueNamespaceV1,
-	RecordSigner,
-	type RecordValidationResult,
-	RecordValidator,
-	type SignedDrpRecordV1,
-} from "../record/index.js";
-import { RegistryClient } from "../registry/index.js";
-import {
-	BrowserRoutingClosestPeersSource,
-	Libp2pRelayClient,
-	RELAY_RESERVATION_STATUS,
-	RelayPolicy,
-	type RelayPolicyResult,
-	type RelayReplacementResult,
-} from "../relay/index.js";
 
 const PRIMARY_RELAY = {
 	address: "/ip4/127.0.0.1/tcp/50000/ws/p2p/16Uiu2HAmTY71bbCHtmYD3nvVKUGbk7NWqLBbPFNng4jhaXJHi3W5",
@@ -181,7 +181,7 @@ export async function createGridBrowserPeer(options: GridBrowserFixtureOptions):
 				const signer = new RecordSigner(privateKeyFromRaw(runtime.node.keychain.secp256k1PrivateKey));
 				return signer.sign({
 					addresses: [address],
-					capabilities: ["circuit-relay", "drp-gossipsub", "webrtc"],
+					capabilities: ["drp-gossipsub", "relay-client", "webrtc"],
 					expiresAtMs: nowMs + 60_000,
 					issuedAtMs: nowMs,
 					namespace,

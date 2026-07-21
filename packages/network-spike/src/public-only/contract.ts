@@ -1,9 +1,10 @@
+import { classifyIpAddressScope } from "@ts-drp/rendezvous";
+import { OFFICIAL_AMINO_BOOTSTRAPPERS } from "@ts-drp/routing-node/constants";
 import { z } from "zod";
 
 import { RequestBudget } from "../campaign-primitives.js";
-import { classifyIpAddressScope } from "../probe/address-policy.js";
 import { PUBLIC_CAMPAIGN_ACKNOWLEDGEMENT } from "../public-campaign/config.js";
-import { OFFICIAL_AMINO_BOOTSTRAPPERS, REVIEWED_DELEGATED_ROUTING_ENDPOINTS } from "../public-infrastructure.js";
+import { REVIEWED_DELEGATED_ROUTING_ENDPOINTS } from "../public-infrastructure.js";
 
 export const PUBLIC_ONLY_SCHEMA_VERSION = "1.0.0";
 export const PUBLIC_ONLY_ACKNOWLEDGEMENT = PUBLIC_CAMPAIGN_ACKNOWLEDGEMENT;

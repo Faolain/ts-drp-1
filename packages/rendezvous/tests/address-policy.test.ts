@@ -1,6 +1,5 @@
+import { type AddressCandidate, AddressPolicy, type Resolver } from "@ts-drp/rendezvous";
 import { describe, expect, it } from "vitest";
-
-import { type AddressCandidate, AddressPolicy, type Resolver } from "../src/probe/index.js";
 
 const signal = new AbortController().signal;
 const publicResolver: Resolver = {

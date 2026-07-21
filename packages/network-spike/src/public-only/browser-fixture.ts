@@ -1,19 +1,19 @@
 import type { DRPNetworkHostConfigSnapshot, DRPNetworkHostFactory } from "@ts-drp/network";
 import { DRPNetworkNode } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
-import type { Libp2p } from "libp2p";
-
-import { type PublicOnlyBrowserBootstrapResult, PublicOnlyBrowserPeer } from "./browser-peer.js";
-import { PublicProviderLocator } from "./provider-locator.js";
-import { type BrowserRoutingTrace, createBrowserRouting } from "../browser-routing/index.js";
-import { ControlPlaneHostFactory } from "../grid/index.js";
-import { AddressPolicy } from "../probe/address-policy.js";
 import {
 	BrowserRoutingClosestPeersSource,
 	Libp2pRelayClient,
 	RelayPolicy,
 	type RelayPolicyResult,
-} from "../relay/index.js";
+} from "@ts-drp/relay-policy";
+import { AddressPolicy } from "@ts-drp/rendezvous";
+import { type BrowserRoutingTrace, createBrowserRouting } from "@ts-drp/routing-browser";
+import type { Libp2p } from "libp2p";
+
+import { type PublicOnlyBrowserBootstrapResult, PublicOnlyBrowserPeer } from "./browser-peer.js";
+import { PublicProviderLocator } from "./provider-locator.js";
+import { ControlPlaneHostFactory } from "../grid/index.js";
 
 const FIXTURE_ORIGIN = "http://127.0.0.1:4175";
 
