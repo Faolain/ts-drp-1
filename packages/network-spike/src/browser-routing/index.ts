@@ -107,6 +107,12 @@ interface EndpointState {
 interface CacheEntry {
 	expiresAtMs: number;
 	peers: BrowserRoutingPeer[];
+	rawAddressCount: number;
+}
+
+interface SanitizedRecords {
+	peers: BrowserRoutingPeer[];
+	rawAddressCount: number;
 }
 
 interface AttemptDiagnostics {
@@ -315,7 +321,15 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 			if (cached.expiresAtMs > startedAtMs) {
 				cache = "hit";
 				const peers = clonePeers(cached.peers);
-				this.#recordTrace(operation, cache, attempts, startedAtMs, peers, peers.length === 0 ? "empty" : "success");
+				this.#recordTrace(
+					operation,
+					cache,
+					attempts,
+					startedAtMs,
+					peers,
+					peers.length === 0 ? "empty" : "success",
+					cached.rawAddressCount
+				);
 				return peers;
 			}
 			cache = "stale";
@@ -369,7 +383,8 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 				) {
 					throw diagnostics.errors[0] ?? new Error(`delegated endpoint returned HTTP ${diagnostics.httpStatus}`);
 				}
-				const peers = await this.#sanitizeRecords(records, signal);
+				const sanitized = await this.#sanitizeRecords(records, signal);
+				const { peers } = sanitized;
 				state.failures = 0;
 				state.retryAtMs = 0;
 				attempts.push({
@@ -383,9 +398,18 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 					this.#cache.set(cacheKey, {
 						expiresAtMs: this.#now() + this.#cacheTTLms,
 						peers: clonePeers(peers),
+						rawAddressCount: sanitized.rawAddressCount,
 					});
 				}
-				this.#recordTrace(operation, cache, attempts, startedAtMs, peers, peers.length === 0 ? "empty" : "success");
+				this.#recordTrace(
+					operation,
+					cache,
+					attempts,
+					startedAtMs,
+					peers,
+					peers.length === 0 ? "empty" : "success",
+					sanitized.rawAddressCount
+				);
 				return peers;
 			} catch (error) {
 				if (signal.aborted) {
@@ -421,13 +445,15 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 		throw new BrowserRoutingExhaustedError(trace);
 	}
 
-	async #sanitizeRecords(records: PeerRecord[], signal: AbortSignal): Promise<BrowserRoutingPeer[]> {
+	async #sanitizeRecords(records: PeerRecord[], signal: AbortSignal): Promise<SanitizedRecords> {
 		const peers: BrowserRoutingPeer[] = [];
+		let rawAddressCount = 0;
 		for (const record of records) {
 			throwIfAborted(signal);
 			const peerId = peerIdFromCID(record.ID).toString();
 			const inputAddresses = (record.Addrs ?? []).map((address) => address.toString());
 			const rawAddresses = inputAddresses.slice(0, this.#limits.maxAddressesPerPeer);
+			rawAddressCount += rawAddresses.length;
 			const plan = await this.#policy.plan(
 				rawAddresses.map((address, index) => ({
 					address,
@@ -454,7 +480,7 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 				truncatedAddressCount: Math.max(0, inputAddresses.length - rawAddresses.length),
 			});
 		}
-		return peers;
+		return { peers, rawAddressCount };
 	}
 
 	#recordTrace(
@@ -463,7 +489,8 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 		attempts: EndpointAttempt[],
 		startedAtMs: number,
 		peers: BrowserRoutingPeer[],
-		terminal: BrowserRoutingTerminal
+		terminal: BrowserRoutingTerminal,
+		rawAddressCount = peers.reduce((total, peer) => total + peer.rawAddresses.length, 0)
 	): BrowserRoutingTrace {
 		const finishedAtMs = this.#now();
 		const trace: BrowserRoutingTrace = {
@@ -473,7 +500,7 @@ export class DelegatedBrowserRouting implements BrowserRouting {
 			durationMs: Math.max(0, finishedAtMs - startedAtMs),
 			finishedAtMs,
 			operation,
-			rawAddressCount: peers.reduce((total, peer) => total + peer.rawAddresses.length, 0),
+			rawAddressCount,
 			resultCount: peers.length,
 			startedAtMs,
 			terminal,

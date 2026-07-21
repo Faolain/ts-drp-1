@@ -76,6 +76,14 @@
 		"./public-only/node": {
 			"types": "./dist/src/public-only/node.d.ts",
 			"import": "./dist/src/public-only/node.js"
+		},
+		"./public-only/browser": {
+			"types": "./dist/src/public-only/browser.d.ts",
+			"import": "./dist/src/public-only/browser.js"
+		},
+		"./public-only/browser-fixture": {
+			"types": "./dist/src/public-only/browser-fixture.d.ts",
+			"import": "./dist/src/public-only/browser-fixture.js"
 		}
 	},
 	"scripts": {

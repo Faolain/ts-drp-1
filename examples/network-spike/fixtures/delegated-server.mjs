@@ -4,6 +4,15 @@ import { createServer } from "node:http";
 const HOST = "127.0.0.1";
 const PORT = 4175;
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
+const PUBLIC_ONLY_PROVIDER_ID = "16Uiu2HAmGQfUVeXqZJvyELMmJyLLBaPCUYbrz3LCkYZcwKuvLha5";
+const PUBLIC_ONLY_PROVIDER = {
+	Addrs: [
+		`/ip4/127.0.0.1/tcp/50000/ws/p2p/16Uiu2HAmTY71bbCHtmYD3nvVKUGbk7NWqLBbPFNng4jhaXJHi3W5/p2p-circuit/p2p/${PUBLIC_ONLY_PROVIDER_ID}`,
+	],
+	ID: PUBLIC_ONLY_PROVIDER_ID,
+	Protocols: ["/meshsub/1.1.0"],
+	Schema: "peer",
+};
 const GRID_RELAYS = {
 	exhaustion: [
 		gridRelay("16Uiu2HAm4WvcWKEkvP1pX5tqyQogncus5EwZHrxvShSGm2EywxS8", 50004),
@@ -47,6 +56,14 @@ async function handleRequest(request, response) {
 	if (scenario === "grid-relays-success" || scenario === "grid-relays-exhaustion") {
 		const mode = scenario === "grid-relays-success" ? "success" : "exhaustion";
 		writeJson(response, 200, collection(route, GRID_RELAYS[mode]));
+		return;
+	}
+	if (scenario === "public-only-browser") {
+		writeJson(
+			response,
+			200,
+			collection(route, route.startsWith("providers/") ? [PUBLIC_ONLY_PROVIDER] : GRID_RELAYS.success)
+		);
 		return;
 	}
 

@@ -10,6 +10,7 @@ import { renderDelegatedWorkbench } from "./delegated-workbench.js";
 import { renderFailureWorkbench } from "./failure-workbench.js";
 import { renderGridWorkbench } from "./grid-workbench.js";
 import { renderPublicCampaignWorkbench } from "./public-campaign-workbench.js";
+import { renderPublicOnlyBrowserWorkbench } from "./public-only-browser-workbench.js";
 import { renderRecordWorkbench } from "./record-workbench.js";
 import { renderRegistryWorkbench } from "./registry-workbench.js";
 import { renderRelayWorkbench } from "./relay-workbench.js";
@@ -26,6 +27,12 @@ void boot();
 
 async function boot(): Promise<void> {
 	const parameters = new URLSearchParams(window.location.search);
+	if (window.location.pathname === "/public-only-browser") {
+		await renderPublicOnlyBrowserWorkbench(app);
+		performance.mark("evidence-render-end");
+		performance.measure("evidence-first-render", "evidence-load-start", "evidence-render-end");
+		return;
+	}
 	if (window.location.pathname === "/public-campaign") {
 		renderPublicCampaignWorkbench(app);
 		performance.mark("evidence-render-end");

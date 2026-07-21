@@ -4,11 +4,12 @@ Issue: [Faolain/ts-drp-1#5](https://github.com/Faolain/ts-drp-1/issues/5)
 
 ## Next Agent Prompt
 
-Status: Slices 00-02 complete; Slice 03 is next. Last updated: 2026-07-20.
+Status: Slices 00-02 complete. Slice 03's implementation and loopback browser
+proof are complete; its public-network acceptance gate is waiting for the exact
+operator acknowledgement. Last updated: 2026-07-21.
 
-Start with [Slice 03](slices/03-browser-public-routing.md). Preserve the existing
-Phase 09 registry-shaped campaign unchanged. Do not send public traffic until
-the user supplies the exact acknowledgement
+Do not claim Slice 03 complete or start the public canary until the user supplies
+the exact acknowledgement
 `I_ACKNOWLEDGE_ISSUE_5_PUBLIC_NETWORK_TRAFFIC_AND_OPERATOR_TERMS`. Update this
 section before ending a pass.
 
@@ -17,7 +18,8 @@ Global checklist:
 - [x] [Freeze the public-only and anti-cheat contract](slices/00-public-only-contract.md).
 - [x] [Extract one reusable live Relay v2 client](slices/01-live-relay-client.md).
 - [x] [Make one DRP Node the Amino provider and grid creator](slices/02-node-publisher.md).
-- [ ] [Discover the provider and reserve a relay from a real browser](slices/03-browser-public-routing.md).
+- [ ] [Discover the provider and reserve a relay from a real browser](slices/03-browser-public-routing.md)
+  (implementation and loopback proof complete; public acceptance pending consent).
 - [ ] [Prove or falsify the composed grid path](slices/04-public-only-grid.md).
 - [ ] [Measure across browsers and two network conditions](slices/05-public-campaign.md).
 

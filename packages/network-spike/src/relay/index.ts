@@ -166,7 +166,7 @@ export interface RelayPolicyOptions {
 	 * profile so the same bounded policy can exercise a non-TLS local relay.
 	 */
 	readonly allowInsecureWebSocketFixture?: boolean;
-	readonly fallback: DnsaddrFallback;
+	readonly fallback?: DnsaddrFallback;
 	readonly inspector: RelayInspector;
 	readonly limits?: Partial<RelayPolicyLimits>;
 	now?(): number;
@@ -326,7 +326,7 @@ export function decodeRelayReservationResponse(
  */
 export class RelayPolicy {
 	readonly #allowInsecureWebSocketFixture: boolean;
-	readonly #fallback: DnsaddrFallback;
+	readonly #fallback?: DnsaddrFallback;
 	readonly #inspector: RelayInspector;
 	readonly #limits: Readonly<RelayPolicyLimits>;
 	readonly #now: () => number;
@@ -362,6 +362,11 @@ export class RelayPolicy {
 		return [...this.#active.values()].map(cloneReservation);
 	}
 
+	/** @returns Whether this policy owns a configured DNSADDR fallback. */
+	get hasOwnedFallback(): boolean {
+		return this.#fallback !== undefined;
+	}
+
 	/**
 	 * @param queryKey - Opaque closest-peer routing key.
 	 * @param signal - Caller-owned cancellation signal.
@@ -374,7 +379,8 @@ export class RelayPolicy {
 			const startedAtMonotonicMs = monotonicNow();
 			this.#attemptedPeerIds.clear();
 			const attempts: RelayAttempt[] = [];
-			const publicCollectionBudgetMs = Math.max(1, this.#limits.totalDeadlineMs - this.#limits.ownedFallbackDeadlineMs);
+			const fallbackBudgetMs = this.#fallback === undefined ? 0 : this.#limits.ownedFallbackDeadlineMs;
+			const publicCollectionBudgetMs = Math.max(1, this.#limits.totalDeadlineMs - fallbackBudgetMs);
 			try {
 				const collected = await withDeadline(
 					(collectionSignal) => collectCandidates(this.#source, queryKey, collectionSignal, this.#limits, this.#now),
@@ -511,10 +517,8 @@ export class RelayPolicy {
 		const attempts = initialAttempts;
 		const totalController = new AbortController();
 		const elapsedMs = Math.max(0, monotonicNow() - startedAtMonotonicMs);
-		const remainingPublicMs = Math.max(
-			1,
-			this.#limits.totalDeadlineMs - elapsedMs - this.#limits.ownedFallbackDeadlineMs
-		);
+		const fallbackBudgetMs = this.#fallback === undefined ? 0 : this.#limits.ownedFallbackDeadlineMs;
+		const remainingPublicMs = Math.max(1, this.#limits.totalDeadlineMs - elapsedMs - fallbackBudgetMs);
 		const totalTimer = setTimeout(
 			() => totalController.abort(new RelayDeadlineError("total relay deadline exceeded")),
 			remainingPublicMs
@@ -537,6 +541,7 @@ export class RelayPolicy {
 			await Promise.all(workers);
 			if (this.#requirementsMet()) return this.#result("reserved", attempts, startedAtMs);
 			if (signal.aborted) return this.#result("aborted", attempts, startedAtMs);
+			if (this.#fallback === undefined) return this.#result("exhausted", attempts, startedAtMs);
 			const remainingTotalMs = Math.max(0, this.#limits.totalDeadlineMs - (monotonicNow() - startedAtMonotonicMs));
 			const fallback = await this.#tryFallback(signal, remainingTotalMs);
 			if (fallback.status === "aborted") return this.#result("aborted", attempts, startedAtMs, fallback);
@@ -729,11 +734,13 @@ export class RelayPolicy {
 	}
 
 	async #tryFallback(signal: AbortSignal, remainingTotalMs: number): Promise<DnsaddrFallbackResult> {
+		const fallback = this.#fallback;
+		if (fallback === undefined) return { status: "empty" };
 		if (signal.aborted) return { status: "aborted" };
 		if (remainingTotalMs < 1) return { status: "timeout" };
 		try {
 			const result = await withDeadline(
-				(attemptSignal) => this.#fallback.acquire(attemptSignal),
+				(attemptSignal) => fallback.acquire(attemptSignal),
 				signal,
 				Math.max(1, Math.min(this.#limits.ownedFallbackDeadlineMs, Math.floor(remainingTotalMs)))
 			);

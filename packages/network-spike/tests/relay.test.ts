@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { BrowserRoutingPeer } from "../src/browser-routing/index.js";
 import type { RoutingPeer } from "../src/node-routing/index.js";
@@ -117,6 +117,64 @@ describe("Circuit Relay v2 reservation decoding", () => {
 			outcome: "connected",
 			protocols: ["/ipfs/id/1.0.0"],
 		});
+	});
+
+	it("uses the completed Identify event instead of a partially populated peer store", async () => {
+		const client = relayClientWith({
+			connection: true,
+			identifyProtocols: ["/ipfs/id/1.0.0", CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+		await expect(client.inspect(validRelayCandidate(), "ignored", signal())).resolves.toMatchObject({
+			hopAdvertised: true,
+			outcome: "connected",
+			protocols: ["/ipfs/id/1.0.0", CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+		});
+	});
+
+	it("starts the Identify timeout after a slow connection is established", async () => {
+		const client = relayClientWith({
+			connectDelayMs: 10,
+			identificationDelayMs: 1,
+			identifyProtocols: ["/ipfs/id/1.0.0", CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			identifyTimeoutMs: 5,
+			connection: true,
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+		await expect(client.inspect(validRelayCandidate(), "ignored", signal())).resolves.toMatchObject({
+			hopAdvertised: true,
+			outcome: "connected",
+		});
+	});
+
+	it("reports abort while waiting for Identify instead of a connected partial peer store", async () => {
+		const controller = new AbortController();
+		const client = relayClientWith({ connection: true, identifyTimeoutMs: 100, protocols: ["/ipfs/id/1.0.0"] });
+		setTimeout(() => controller.abort(new DOMException("cancelled", "AbortError")), 1);
+		await expect(client.inspect(validRelayCandidate(), "ignored", controller.signal)).resolves.toMatchObject({
+			hopAdvertised: false,
+			outcome: "aborted",
+			protocols: [],
+		});
+	});
+
+	it("does not arm an Identify timer after observation already completed during connect", async () => {
+		vi.useFakeTimers();
+		try {
+			const client = relayClientWith({
+				connection: true,
+				identifyDuringConnect: true,
+				identifyProtocols: ["/ipfs/id/1.0.0", CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+				identifyTimeoutMs: 30_000,
+				protocols: ["/ipfs/id/1.0.0"],
+			});
+			await expect(
+				client.inspect(validRelayCandidate(), "ignored", new AbortController().signal)
+			).resolves.toMatchObject({ hopAdvertised: true });
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("returns a typed inspection timeout when no connection appears", async () => {
@@ -500,6 +558,19 @@ describe("bounded relay policy", () => {
 		expect(result).toMatchObject({ fallback: { status: "aborted" }, terminal: "aborted" });
 	});
 
+	it("supports a public-only policy with no fallback owner or fallback evidence", async () => {
+		const { policy } = harness({
+			fallback: null,
+			reservationClient: scriptedReservation({
+				a: { status: RELAY_RESERVATION_STATUS.RESERVATION_REFUSED },
+				b: { status: RELAY_RESERVATION_STATUS.RESERVATION_REFUSED },
+			}),
+		});
+		const result = await policy.acquire(QUERY, signal());
+		expect(result).toMatchObject({ terminal: "exhausted" });
+		expect(result.fallback).toBeUndefined();
+	});
+
 	it("rejects stale DNSADDR fallback evidence and terminates exhausted", async () => {
 		const { policy } = harness({
 			fallback: {
@@ -611,7 +682,7 @@ describe("relay browser fixture", () => {
 
 function harness(
 	options: {
-		fallback?: DnsaddrFallback;
+		fallback?: DnsaddrFallback | null;
 		inspector?: RelayInspector;
 		limits?: ConstructorParameters<typeof RelayPolicy>[0]["limits"];
 		reservationClient?: ScriptedReservationClient;
@@ -620,9 +691,17 @@ function harness(
 	} = {}
 ): { policy: RelayPolicy; reservationClient: ScriptedReservationClient } {
 	const reservationClient = options.reservationClient ?? scriptedReservation({});
+	const fallback =
+		options.fallback === null
+			? {}
+			: {
+					fallback: options.fallback ?? {
+						acquire: (): Promise<{ status: "empty" }> => Promise.resolve({ status: "empty" }),
+					},
+				};
 	return {
 		policy: new RelayPolicy({
-			fallback: options.fallback ?? { acquire: () => Promise.resolve({ status: "empty" }) },
+			...fallback,
 			inspector: options.inspector ?? scriptedInspector({}),
 			limits: {
 				maxCandidates: 32,
@@ -797,17 +876,48 @@ function validRelayCandidate(): RelayCandidate {
 	);
 }
 
-function relayClientWith(options: { readonly connection: boolean; readonly protocols: string[] }): Libp2pRelayClient {
+function relayClientWith(options: {
+	readonly connectDelayMs?: number;
+	readonly connection: boolean;
+	readonly identificationDelayMs?: number;
+	readonly identifyDuringConnect?: boolean;
+	readonly identifyProtocols?: string[];
+	readonly identifyTimeoutMs?: number;
+	readonly protocols: string[];
+}): Libp2pRelayClient {
+	const events = new EventTarget();
 	return new Libp2pRelayClient({
-		connect: (): Promise<void> => Promise.resolve(),
+		connect: async (): Promise<void> => {
+			if (options.connectDelayMs !== undefined) {
+				await new Promise((resolve) => setTimeout(resolve, options.connectDelayMs));
+			}
+			if (options.identifyProtocols !== undefined) {
+				const dispatchIdentify = (): boolean =>
+					events.dispatchEvent(
+						new CustomEvent("peer:identify", {
+							detail: {
+								peerId: { toString: (): string => validRelayCandidate().peerId },
+								protocols: options.identifyProtocols,
+							},
+						})
+					);
+				if (options.identifyDuringConnect === true) {
+					dispatchIdentify();
+					return;
+				}
+				setTimeout(dispatchIdentify, options.identificationDelayMs ?? 0);
+			}
+		},
 		disconnect: (): Promise<void> => Promise.resolve(),
 		host: {
+			addEventListener: events.addEventListener.bind(events),
 			components: { transportManager: { getListeners: () => [], listen: () => Promise.resolve() } },
 			getConnections: () => (options.connection ? [{ id: "connection-1" }] : []),
 			getMultiaddrs: () => [],
 			peerStore: { get: () => Promise.resolve({ protocols: options.protocols }) },
+			removeEventListener: events.removeEventListener.bind(events),
 		} as never,
-		identifyTimeoutMs: 1,
+		identifyTimeoutMs: options.identifyTimeoutMs ?? 1,
 		reservationTimeoutMs: 1,
 	});
 }

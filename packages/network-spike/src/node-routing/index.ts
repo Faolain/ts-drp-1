@@ -11,7 +11,6 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { type DRPNetworkHostExtensions, type DRPNetworkHostFactory, DRPNetworkNode } from "@ts-drp/network";
 import type { Libp2p } from "libp2p";
 import { CID } from "multiformats/cid";
-import { sha256 } from "multiformats/hashes/sha2";
 import { lookup } from "node:dns/promises";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
@@ -19,6 +18,7 @@ import process from "node:process";
 import { RequestBudget } from "../evidence.js";
 import { type AddressDecision, AddressPolicy, type AddressScope, type Resolver } from "../probe/address-policy.js";
 export { OFFICIAL_AMINO_BOOTSTRAPPERS } from "../public-infrastructure.js";
+export { namespaceCid } from "../namespace.js";
 
 export const AMINO_DHT_PROTOCOL = "/ipfs/kad/1.0.0";
 export const PUBLIC_NETWORK_ACKNOWLEDGEMENT = "I_ACKNOWLEDGE_PUBLIC_NETWORK_TRAFFIC";
@@ -30,7 +30,6 @@ const DEFAULT_LIMITS: NodeRoutingLimits = {
 };
 const MAX_LIMIT = 128;
 const OPERATION_TIMEOUT_MS = 10_000;
-const RAW_CODEC = 0x55;
 
 export interface NodeRoutingLimits {
 	maxAddressesPerPeer: number;
@@ -631,19 +630,6 @@ export async function attachNodeRouting(
 	if ((options.mode ?? "client") === "server") await host.services.aminoDHT.setMode("server", { force: true });
 	await routing.initialize();
 	return routing;
-}
-
-/**
- * Derives a deterministic raw-codec CID without publishing the namespace text.
- * @param namespace - Namespace label containing 1..256 non-whitespace characters
- * @returns CID whose multihash is the SHA-256 digest of the trimmed namespace
- */
-export async function namespaceCid(namespace: string): Promise<CID> {
-	const value = namespace.trim();
-	if (value.length < 1 || value.length > 256) {
-		throw new Error("namespace must contain 1..256 characters");
-	}
-	return CID.createV1(RAW_CODEC, await sha256.digest(new TextEncoder().encode(value)));
 }
 
 function assertRoutingHost(host: Libp2p): asserts host is RoutingHost {

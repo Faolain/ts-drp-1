@@ -80,6 +80,36 @@ describe("DelegatedBrowserRouting", () => {
 		});
 	});
 
+	it("preserves rejected address counts when every provider address is undialable", async () => {
+		const routing = new DelegatedBrowserRouting(
+			options({
+				fetch: () =>
+					Promise.resolve(
+						jsonResponse({
+							Providers: [
+								{
+									Addrs: [REJECTED_TCP, REJECTED_LOOPBACK],
+									ID: TEST_PEER_ID,
+									Protocols: [],
+									Schema: "peer",
+								},
+							],
+						})
+					),
+			})
+		);
+
+		await expect(collect(routing.findProviders(TEST_CID, AbortSignal.timeout(100)))).resolves.toEqual([]);
+		expect(routing.lastTrace).toMatchObject({
+			acceptedAddressCount: 0,
+			rawAddressCount: 2,
+			resultCount: 0,
+			terminal: "empty",
+		});
+		await expect(collect(routing.findProviders(TEST_CID, AbortSignal.timeout(100)))).resolves.toEqual([]);
+		expect(routing.lastTrace).toMatchObject({ cache: "hit", rawAddressCount: 2 });
+	});
+
 	it.each([
 		{
 			name: "malformed",

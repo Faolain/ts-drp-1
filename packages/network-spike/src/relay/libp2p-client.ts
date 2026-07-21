@@ -1,3 +1,4 @@
+import type { IdentifyResult } from "@libp2p/interface";
 import { peerIdFromString } from "@libp2p/peer-id";
 import { lpStream } from "@libp2p/utils";
 import { multiaddr, type Multiaddr } from "@multiformats/multiaddr";
@@ -12,7 +13,8 @@ import type {
 } from "./index.js";
 import { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
 
-interface CircuitRelayHost extends Pick<Libp2p, "getConnections" | "getMultiaddrs" | "peerStore"> {
+interface CircuitRelayHost
+	extends Pick<Libp2p, "addEventListener" | "getConnections" | "getMultiaddrs" | "peerStore" | "removeEventListener"> {
 	readonly components: {
 		readonly transportManager: {
 			getListeners(): Array<{ close(): Promise<void>; getAddrs(): Multiaddr[] }>;
@@ -68,29 +70,29 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 
 	async inspect(candidate: RelayCandidate, address: string, signal: AbortSignal): Promise<RelayInspection> {
 		const startedAt = performance.now();
+		const identification = observeIdentify(this.#host, candidate.peerId, signal);
 		try {
 			const peerId = peerIdFromString(candidate.peerId);
 			await this.#connect(address, signal);
+			identification.startTimeout(this.#identifyTimeoutMs);
 			const connection = await waitForValue(
 				() => this.#host.getConnections(peerId)[0],
 				this.#identifyTimeoutMs,
 				signal
 			);
-			const peer = await waitForValue(
-				async () => {
-					const current = await this.#host.peerStore.get(peerId);
-					return current.protocols.length > 0 ? current : undefined;
-				},
-				this.#identifyTimeoutMs,
-				signal
-			);
+			let protocols = [...(await this.#host.peerStore.get(peerId)).protocols];
+			if (!protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL)) {
+				const observed = await identification.result;
+				signal.throwIfAborted();
+				protocols = observed ?? [...(await this.#host.peerStore.get(peerId)).protocols];
+			}
 			this.#inspectedAddresses.set(candidate.peerId, address);
 			return {
 				connectionId: connection.id,
-				hopAdvertised: peer.protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL),
+				hopAdvertised: protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL),
 				latencyMs: performance.now() - startedAt,
 				outcome: "connected",
-				protocols: [...peer.protocols],
+				protocols,
 			};
 		} catch (error) {
 			return {
@@ -99,6 +101,8 @@ export class Libp2pRelayClient implements RelayInspector, RelayReservationClient
 				outcome: signal.aborted ? "aborted" : error instanceof RelayClientTimeoutError ? "timeout" : "refused",
 				protocols: [],
 			};
+		} finally {
+			identification.cancel();
 		}
 	}
 
@@ -293,6 +297,42 @@ function readVarint(bytes: Uint8Array, offset: number): { readonly next: number;
 		if ((byte & 0x80) === 0) return { next: offset, value };
 	}
 	throw new Error("invalid Relay v2 protobuf varint");
+}
+
+function observeIdentify(
+	host: CircuitRelayHost,
+	peerId: string,
+	signal: AbortSignal
+): { cancel(): void; readonly result: Promise<string[] | undefined>; startTimeout(timeoutMs: number): void } {
+	const target = host as unknown as EventTarget;
+	let finish = (_protocols: string[] | undefined): void => undefined;
+	let settled = false;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const result = new Promise<string[] | undefined>((resolve) => {
+		const listener = (event: Event): void => {
+			const detail = (event as CustomEvent<Pick<IdentifyResult, "peerId" | "protocols">>).detail;
+			if (detail.peerId.toString() === peerId) finish([...detail.protocols]);
+		};
+		const onAbort = (): void => finish(undefined);
+		finish = (protocols): void => {
+			if (settled) return;
+			settled = true;
+			if (timer !== undefined) clearTimeout(timer);
+			target.removeEventListener("peer:identify", listener);
+			signal.removeEventListener("abort", onAbort);
+			resolve(protocols);
+		};
+		target.addEventListener("peer:identify", listener);
+		signal.addEventListener("abort", onAbort, { once: true });
+		if (signal.aborted) finish(undefined);
+	});
+	return {
+		cancel: (): void => finish(undefined),
+		result,
+		startTimeout: (timeoutMs): void => {
+			if (!settled && timer === undefined) timer = setTimeout(() => finish(undefined), timeoutMs);
+		},
+	};
 }
 
 async function waitForValue<T>(
