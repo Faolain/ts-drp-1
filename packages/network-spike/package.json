@@ -72,6 +72,10 @@
 		"./public-only": {
 			"types": "./dist/src/public-only/index.d.ts",
 			"import": "./dist/src/public-only/index.js"
+		},
+		"./public-only/node": {
+			"types": "./dist/src/public-only/node.d.ts",
+			"import": "./dist/src/public-only/node.js"
 		}
 	},
 	"scripts": {

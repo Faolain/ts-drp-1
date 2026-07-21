@@ -8,7 +8,7 @@ import {
 import { peerIdFromString } from "@libp2p/peer-id";
 import { tcp } from "@libp2p/tcp";
 import { multiaddr } from "@multiformats/multiaddr";
-import { type DRPNetworkHostFactory, DRPNetworkNode } from "@ts-drp/network";
+import { type DRPNetworkHostExtensions, type DRPNetworkHostFactory, DRPNetworkNode } from "@ts-drp/network";
 import type { Libp2p } from "libp2p";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
@@ -40,12 +40,21 @@ export interface NodeRoutingLimits {
 }
 
 export interface NodeRoutingOptions {
+	readonly allowInsecureWebSocketFixture?: boolean;
 	bootstrapPeers?: readonly string[];
 	limits?: Partial<NodeRoutingLimits>;
 	listenAddresses?: readonly string[];
 	mode?: "client" | "server";
 	network?: "local" | "public";
 	resolver?: Resolver;
+}
+
+export interface AminoAttachmentOptions {
+	readonly allowInsecureWebSocketFixture?: boolean;
+	readonly limits?: Partial<NodeRoutingLimits>;
+	readonly mode?: "client" | "server";
+	readonly network?: "local" | "public";
+	readonly resolver?: Resolver;
 }
 
 export interface RoutingPeer {
@@ -151,6 +160,7 @@ export class NodeRouting {
 		networkNode: DRPNetworkNode,
 		host: RoutingHost,
 		options: {
+			allowInsecureWebSocketFixture?: boolean;
 			limits: NodeRoutingLimits;
 			network: "local" | "public";
 			resolver: Resolver;
@@ -163,6 +173,7 @@ export class NodeRouting {
 		this.#resolver = options.resolver;
 		this.#requestBudget = new RequestBudget(options.limits.maxNetworkRequests);
 		this.#policy = new AddressPolicy({
+			allowInsecureWebSocket: options.allowInsecureWebSocketFixture,
 			allowLoopback: options.network === "local",
 			allowPrivate: options.network === "local",
 			target: "node",
@@ -524,38 +535,9 @@ export class NodeRouting {
  */
 export async function createNodeRouting(options: NodeRoutingOptions = {}): Promise<NodeRouting> {
 	const network = options.network ?? "local";
-	const mode = options.mode ?? "client";
-	const limits = parseLimits(options.limits);
-	const resolver = options.resolver ?? systemResolver;
 	let host: RoutingHost | undefined;
-	const aminoDhtFactory = kadDHT({
-		alpha: network === "public" ? 1 : undefined,
-		allowQueryWithZeroPeers: true,
-		clientMode: mode === "client",
-		datastorePrefix: `/drp-amino-${network}`,
-		logPrefix: `drp:amino:${network}`,
-		metricsPrefix: `drp_amino_${network}`,
-		disjointPaths: network === "public" ? 1 : undefined,
-		initialQuerySelfInterval: network === "public" ? 24 * 60 * 60 * 1_000 : undefined,
-		peerInfoMapper: network === "public" ? removePrivateAddressesMapper : passthroughMapper,
-		protocol: AMINO_DHT_PROTOCOL,
-		querySelfInterval: network === "public" ? 24 * 60 * 60 * 1_000 : undefined,
-		reprovide: {
-			concurrency: 1,
-			interval: 60 * 60 * 1_000,
-			maxQueueSize: 64,
-		},
-	});
 	const hostFactory: DRPNetworkHostFactory = async (context) => {
-		const built = await context.createHost({
-			services: {
-				aminoDHT: (components) => {
-					assertKadDHTComponents(components);
-					return aminoDhtFactory(components);
-				},
-			},
-			transports: [tcp()],
-		});
+		const built = await context.createHost(createAminoHostExtensions({ mode: options.mode, network }));
 		assertRoutingHost(built);
 		host = built;
 		return built;
@@ -575,12 +557,7 @@ export async function createNodeRouting(options: NodeRoutingOptions = {}): Promi
 		await networkNode.start();
 		networkStarted = true;
 		if (host === undefined) throw new Error("production host factory did not expose the routing host");
-		const routing = new NodeRouting(networkNode, host, { limits, network, resolver });
-		if (mode === "server") {
-			await host.services.aminoDHT.setMode("server", { force: true });
-		}
-		await routing.initialize();
-		return routing;
+		return await attachNodeRouting(networkNode, host, options);
 	} catch (error) {
 		try {
 			if (networkStarted) {
@@ -595,6 +572,65 @@ export async function createNodeRouting(options: NodeRoutingOptions = {}): Promi
 		}
 		throw error;
 	}
+}
+
+/**
+ * Builds the additive Amino DHT and TCP extension for an existing production DRP host factory.
+ * @param options - Local/public mapper and client/server DHT mode.
+ * @returns Additive extensions that do not replace any DRP-owned service.
+ */
+export function createAminoHostExtensions(
+	options: Pick<AminoAttachmentOptions, "mode" | "network"> = {}
+): DRPNetworkHostExtensions {
+	const network = options.network ?? "local";
+	const mode = options.mode ?? "client";
+	const aminoDhtFactory = kadDHT({
+		alpha: network === "public" ? 1 : undefined,
+		allowQueryWithZeroPeers: true,
+		clientMode: mode === "client",
+		datastorePrefix: `/drp-amino-${network}`,
+		disjointPaths: network === "public" ? 1 : undefined,
+		initialQuerySelfInterval: network === "public" ? 24 * 60 * 60 * 1_000 : undefined,
+		logPrefix: `drp:amino:${network}`,
+		metricsPrefix: `drp_amino_${network}`,
+		peerInfoMapper: network === "public" ? removePrivateAddressesMapper : passthroughMapper,
+		protocol: AMINO_DHT_PROTOCOL,
+		querySelfInterval: network === "public" ? 24 * 60 * 60 * 1_000 : undefined,
+		reprovide: { concurrency: 1, interval: 60 * 60 * 1_000, maxQueueSize: 64 },
+	});
+	return {
+		services: {
+			aminoDHT: (components): ReturnType<typeof aminoDhtFactory> => {
+				assertKadDHTComponents(components);
+				return aminoDhtFactory(components);
+			},
+		},
+		transports: [tcp()],
+	};
+}
+
+/**
+ * Attaches the bounded routing adapter to the exact already-started DRP host.
+ * @param networkNode - DRP network owner sharing the host identity.
+ * @param host - Host created by the DRP production extension seam.
+ * @param options - Routing limits, network policy, resolver, and DHT mode.
+ * @returns Initialized routing adapter whose peer ID equals the DRP host peer ID.
+ */
+export async function attachNodeRouting(
+	networkNode: DRPNetworkNode,
+	host: Libp2p,
+	options: AminoAttachmentOptions = {}
+): Promise<NodeRouting> {
+	assertRoutingHost(host);
+	const routing = new NodeRouting(networkNode, host, {
+		allowInsecureWebSocketFixture: options.allowInsecureWebSocketFixture,
+		limits: parseLimits(options.limits),
+		network: options.network ?? "local",
+		resolver: options.resolver ?? systemResolver,
+	});
+	if ((options.mode ?? "client") === "server") await host.services.aminoDHT.setMode("server", { force: true });
+	await routing.initialize();
+	return routing;
 }
 
 /**
