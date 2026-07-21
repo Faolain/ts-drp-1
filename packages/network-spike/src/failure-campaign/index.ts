@@ -107,7 +107,7 @@ export type FailureTerminal =
 export type ControlPlaneHealthState = "degraded" | "healthy" | "reconnecting" | "recovered" | "terminal";
 
 export interface ControlPlaneHealthSnapshot {
-	readonly productionReconnectRedesignDeferredToPhase10: true;
+	readonly productionReconnectRedesignUnshipped: true;
 	readonly reason?: "dependency-outage";
 	readonly reconnectAttempts: number;
 	readonly state: ControlPlaneHealthState;
@@ -314,7 +314,7 @@ class CampaignResources {
 	}
 }
 
-/** Spike-only typed health adapter; production reconnect redesign remains Phase 10. */
+/** Spike-only typed health adapter; production reconnect redesign is unshipped. */
 export class FailureControlPlaneHealthAdapter {
 	readonly #maxReconnectAttempts: number;
 	#reason?: ControlPlaneHealthSnapshot["reason"];
@@ -363,7 +363,7 @@ export class FailureControlPlaneHealthAdapter {
 	/** @returns Immutable typed health evidence. */
 	get snapshot(): ControlPlaneHealthSnapshot {
 		return {
-			productionReconnectRedesignDeferredToPhase10: true,
+			productionReconnectRedesignUnshipped: true,
 			...(this.#reason === undefined ? {} : { reason: this.#reason }),
 			reconnectAttempts: this.#reconnectAttempts,
 			state: this.#state,

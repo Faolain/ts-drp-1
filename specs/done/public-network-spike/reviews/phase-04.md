@@ -2,7 +2,7 @@
 
 Phase 04 implements the canonical signed-record seam and the `/record`
 evidence workbench described by
-[slice 04](../slices/04-signed-rendezvous-record.md). A successful validation
+[closed decision record](../README.md). A successful validation
 proves control of the record's Peer ID and compliance with the record contract.
 It does not prove DRP authorization, namespace membership, or permission to
 join an object.

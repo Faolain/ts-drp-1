@@ -2,7 +2,7 @@
 
 Phase 03b implements the isolated browser Amino DHT experiment and
 `/browser-dht` evidence view described by
-[slice 03b](../slices/03b-browser-full-dht-feasibility.md). Its verdict is
+[closed decision record](../README.md). Its verdict is
 `rejected` for the tested browser-host shape: an outbound WebSocket browser can
 construct the DHT, identify and query a routing peer, and complete an
 `ADD_PROVIDER` exchange, but a host with `listen: []` has no dialable address to

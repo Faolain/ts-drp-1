@@ -28,7 +28,7 @@ test("Phase 08 deterministic campaign renders every bounded terminal without pub
 			{ abortObserved: true, budgetMs: 12_000, outcome: "timed-out", owner: "owned-fallback" },
 		],
 		controlPlaneHealth: {
-			productionReconnectRedesignDeferredToPhase10: true,
+			productionReconnectRedesignUnshipped: true,
 			reconnectAttempts: 1,
 			state: "terminal",
 		},

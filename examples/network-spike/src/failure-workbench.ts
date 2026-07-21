@@ -76,7 +76,7 @@ export async function renderFailureWorkbench(app: HTMLElement): Promise<void> {
 			<section class="failure-lab__telemetry">
 				<header><span>02</span><h2>Observed vocabulary</h2></header>
 				<div>${report.telemetryCoverage.map((kind) => `<code>${kind}</code>`).join("")}</div>
-				<p>${phaseTenDisclosure(report)}</p>
+				<p>${productionReconnectDisclosure(report)}</p>
 			</section>
 			<output data-failure-json hidden>${escapeHtml(JSON.stringify(report))}</output>
 		</main>`;
@@ -184,13 +184,11 @@ function formatInteger(value: number): string {
 	return new Intl.NumberFormat("en-US").format(value).replaceAll(",", " ");
 }
 
-function phaseTenDisclosure(report: FailureCampaignReport): string {
-	if (
-		!report.scenarios.every(({ controlPlaneHealth }) => controlPlaneHealth.productionReconnectRedesignDeferredToPhase10)
-	) {
+function productionReconnectDisclosure(report: FailureCampaignReport): string {
+	if (!report.scenarios.every(({ controlPlaneHealth }) => controlPlaneHealth.productionReconnectRedesignUnshipped)) {
 		throw new Error("production reconnect ownership disclosure missing");
 	}
-	return "Spike-only typed reconnect adapter. Production reconnect ownership remains a Phase 10 design deliverable.";
+	return "Spike-only typed reconnect adapter. Production reconnect redesign remains unshipped; see the archived production follow-up plan.";
 }
 
 function escapeHtml(value: string): string {

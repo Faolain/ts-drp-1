@@ -170,7 +170,7 @@ describe("Phase 09 opt-in public campaign", () => {
 	it("keeps the committed sanitized artifact byte-for-data aligned with the report owner", () => {
 		const artifact = JSON.parse(
 			readFileSync(
-				new URL("../../../specs/public-network-spike/evidence/phase-09-environment-blocked.json", import.meta.url),
+				new URL("../../../specs/done/public-network-spike/evidence/phase-09-environment-blocked.json", import.meta.url),
 				"utf8"
 			)
 		) as unknown;

@@ -1,7 +1,7 @@
 # Phase 02 Review: Node Amino DHT Harness
 
 Phase 02 implements the private Node-only Amino DHT harness described by
-[slice 02](../slices/02-node-amino-dht.md). `NodeRouting` owns bounded peer
+[closed decision record](../README.md). `NodeRouting` owns bounded peer
 lookup, closest-peer traversal, provider publication, reprovide cancellation,
 routing-table status, and clean shutdown. It constructs its single libp2p host
 through the Phase 01b production seam, so the existing DRP data plane remains

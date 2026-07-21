@@ -2,7 +2,7 @@
 
 Phase 05 implements the spike-local `RendezvousDirectory`, bounded registry,
 runtime admission policies, and configured Node-anchor comparison described by
-[slice 05](../slices/05-registry-and-anchor.md). Every returned record remains
+[closed decision record](../README.md). Every returned record remains
 an untrusted dial candidate. Neither registry admission nor DHT provider
 discovery proves DRP authorization or object membership.
 

@@ -1,7 +1,7 @@
 # Phase 08 Review: Deterministic Failure Campaign
 
 Phase 08 implements the owner-driven failure matrix described by
-[slice 08](../slices/08-failure-campaign.md). The fixture command produces
+[closed decision record](../README.md). The fixture command produces
 sanitized JSON, Markdown, and HTML for 24 unique scenarios without contacting a
 public network. Every row reaches its registered recovery or terminal state
 under the Phase 01 probe lifecycle and exercises the Phase 07 coordinator where
@@ -57,7 +57,7 @@ addresses, credential URLs, and the run-specific sentinel before any report is
 rendered. The browser test and capture listener observed no request outside
 loopback. The report UI derives totals, budgets, attempt/backoff counts, cleanup,
 and final resources from the live report, labels itself `LOCAL FIXTURE ONLY`,
-and enforces the Phase 10 production-reconnect disclosure.
+and enforces the unshipped production-reconnect disclosure.
 
 ## Browser, profiler, and visual evidence
 

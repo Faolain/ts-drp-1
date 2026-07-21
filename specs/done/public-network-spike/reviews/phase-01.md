@@ -2,7 +2,7 @@
 
 Phase 01 adds the private probe runtime, strict telemetry contract, address
 policy, deterministic all-refused relay fixture, CLI replay, and browser
-evidence workbench described by [slice 01](../slices/01-probe-kernel.md).
+evidence workbench preserved by the [closed decision record](../README.md).
 Ordinary verification remained offline.
 
 ## Adversarial review

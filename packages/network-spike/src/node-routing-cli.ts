@@ -44,7 +44,7 @@ async function main(argv: string[]): Promise<void> {
 		return;
 	}
 	throw new Error(
-		"usage: node-routing --fixture | node-routing --public --ack I_ACKNOWLEDGE_PUBLIC_NETWORK_TRAFFIC --max-requests <1..8> --duration-ms <1..30000> --output-directory specs/public-network-spike/evidence"
+		"usage: node-routing --fixture | node-routing --public --ack I_ACKNOWLEDGE_PUBLIC_NETWORK_TRAFFIC --max-requests <1..8> --duration-ms <1..30000> --output-directory specs/done/public-network-spike/evidence"
 	);
 }
 

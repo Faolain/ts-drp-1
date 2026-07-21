@@ -62,7 +62,7 @@ describe("Phase 08 deterministic failure campaign", () => {
 	it("keeps reconnect ownership typed, capped, and spike-local", () => {
 		const health = new FailureControlPlaneHealthAdapter(1);
 		expect(health.snapshot).toEqual({
-			productionReconnectRedesignDeferredToPhase10: true,
+			productionReconnectRedesignUnshipped: true,
 			reconnectAttempts: 0,
 			state: "healthy",
 		});
@@ -71,7 +71,7 @@ describe("Phase 08 deterministic failure campaign", () => {
 		expect(() => health.beginReconnect()).toThrow("cannot reconnect");
 		health.recover();
 		expect(health.snapshot).toEqual({
-			productionReconnectRedesignDeferredToPhase10: true,
+			productionReconnectRedesignUnshipped: true,
 			reason: "dependency-outage",
 			reconnectAttempts: 1,
 			state: "recovered",
@@ -103,7 +103,7 @@ describe("Phase 08 deterministic failure campaign", () => {
 			});
 			expect(scenario.events.filter(({ kind }) => kind === "terminal")).toHaveLength(1);
 			expect(scenario.coordinator.stopped).toBe(true);
-			expect(scenario.controlPlaneHealth.productionReconnectRedesignDeferredToPhase10).toBe(true);
+			expect(scenario.controlPlaneHealth.productionReconnectRedesignUnshipped).toBe(true);
 		}
 	});
 
@@ -296,7 +296,7 @@ describe("Phase 08 deterministic failure campaign", () => {
 		const result = await runFailureScenario(scenario);
 
 		expect(result.controlPlaneHealth).toEqual({
-			productionReconnectRedesignDeferredToPhase10: true,
+			productionReconnectRedesignUnshipped: true,
 			reason: "dependency-outage",
 			reconnectAttempts: 1,
 			state: "recovered",

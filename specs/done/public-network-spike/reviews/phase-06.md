@@ -1,7 +1,7 @@
 # Phase 06 Review: Opportunistic Relay Policy
 
 Phase 06 implements the routing-backed relay policy and `/relay` decision lab
-described by [slice 06](../slices/06-opportunistic-relay-policy.md). Public
+preserved by the [closed decision record](../README.md). Public
 relays remain optional overflow candidates. The owned DNSADDR relay remains the
 ordinary fallback, and inability to obtain reservations from at least two
 coarse operator groups is an explicit no-go for treating public relays as a

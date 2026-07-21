@@ -1,7 +1,7 @@
 # Phase 09 Review: Opt-In Public Campaign
 
 Phase 09 implements the fail-closed public-campaign control plane described by
-[slice 09](../slices/09-public-campaign.md). No public trial was authorized or
+[closed decision record](../README.md). No public trial was authorized or
 executed. The committed result is therefore an honest `environment-blocked`
 artifact with zero observations, zero requests, and the issue criterion left
 unsatisfied.

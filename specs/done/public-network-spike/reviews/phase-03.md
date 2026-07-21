@@ -1,7 +1,7 @@
 # Phase 03 Review: Browser Delegated-Routing Lab
 
 Phase 03 implements the lookup-only browser Routing V1 adapter and `/delegated`
-workbench described by [slice 03](../slices/03-browser-delegated-routing.md).
+workbench preserved by the [closed decision record](../README.md).
 `BrowserRouting` owns endpoint validation, ordered failover, bounded backoff,
 cache policy, response limits, exact operational diagnostics, and browser
 address filtering. Its public type has `canProvide: false` and no `provide`

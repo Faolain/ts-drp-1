@@ -1,7 +1,7 @@
 # Phase 07 Review: Disconnected-Joiner Grid Demonstration
 
 Phase 07 implements the two-browser grid proof described by
-[slice 07](../slices/07-grid-demonstration.md). A creator and joiner run as
+[closed decision record](../README.md). A creator and joiner run as
 independent libp2p/DRP peers in separate browser pages. The join URL contains
 only the opaque rendezvous namespace and grid object ID; it contains no creator
 Peer ID, signed record, relay address, or bootstrap address.

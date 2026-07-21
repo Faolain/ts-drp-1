@@ -13,7 +13,7 @@ import { EVIDENCE_SCHEMA_VERSION, type ExperimentManifest } from "../schemas.js"
 import type { ReachabilityObservation, RoutingMeasurement } from "./index.js";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
-const SANITIZED_EVIDENCE_ROOT = "specs/public-network-spike/evidence";
+const SANITIZED_EVIDENCE_ROOT = "specs/done/public-network-spike/evidence";
 const EVIDENCE_FILENAME = "node-routing-evidence.json";
 const MANIFEST_FILENAME = "manifest.json";
 

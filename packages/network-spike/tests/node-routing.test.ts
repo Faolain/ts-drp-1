@@ -181,8 +181,8 @@ describe("NodeRouting", () => {
 		expect(JSON.stringify(artifacts)).not.toContain(TEST_PEER_ID);
 		expect(() => assertSanitizedEvidenceOutputRoot("../evidence")).toThrow(/must remain beneath/u);
 		expect(() => assertSanitizedEvidenceOutputRoot("/tmp/evidence")).toThrow(/must remain beneath/u);
-		expect(assertSanitizedEvidenceOutputRoot("specs/public-network-spike/evidence")).toMatch(
-			/specs\/public-network-spike\/evidence$/u
+		expect(assertSanitizedEvidenceOutputRoot("specs/done/public-network-spike/evidence")).toMatch(
+			/specs\/done\/public-network-spike\/evidence$/u
 		);
 	});
 });

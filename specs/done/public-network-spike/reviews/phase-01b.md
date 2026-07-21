@@ -1,7 +1,7 @@
 # Phase 01b Review: Injectable DRP Network Seam
 
 Phase 01b implements the default-preserving production seam described by
-[slice 01b](../slices/01b-injectable-network-seam.md). `DRPNode` now consumes
+[closed decision record](../README.md). `DRPNode` now consumes
 the authoritative structural network interface and accepts existing network
 and reconnect owners. `DRPNetworkNode` accepts a host factory through a
 production-owned builder while retaining its message queue, GossipSub,

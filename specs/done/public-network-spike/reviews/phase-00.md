@@ -3,7 +3,7 @@
 Phase 00 establishes the evidence boundary before any public-network probe is
 allowed to run. The private package owns schema validation, pre-registered
 decision rules, campaign coverage, redaction, bounded request accounting, and
-the fixture manifest described by [slice 00](../slices/00-evidence-contract.md).
+the fixture manifest preserved by the [closed decision record](../README.md).
 
 ## Adversarial review
 
