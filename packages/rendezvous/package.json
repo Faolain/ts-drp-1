@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./service": {
+			"import": "./dist/src/service.js",
+			"types": "./dist/src/service.d.ts"
 		}
 	},
 	"scripts": {

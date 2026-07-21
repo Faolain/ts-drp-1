@@ -1,7 +1,11 @@
+import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
+import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
+import { RecordSigner, type SignedDrpRecordV1 } from "@ts-drp/rendezvous";
 import {
 	type DRPNetworkNode,
+	type DRPNodeConfig,
 	type GroupPeerChangeHandler,
 	type IDRPIntervalReconnectBootstrap,
 	IntervalRunnerState,
@@ -156,4 +160,104 @@ describe("DRPNode dependencies", () => {
 		const node = new DRPNode({ network_config: { bootstrap_peers: [] } });
 		expect(node.networkNode).toBeInstanceOf(DefaultDRPNetworkNode);
 	});
+
+	test.each([
+		["publish disabled", { endpoints: ["https://registry.example/"], publish: false }],
+		["no endpoints", { publish: true }],
+	] as const)("keeps rendezvous inert when %s", async (_name, rendezvous) => {
+		const fake = createFakeNetwork();
+		const fetchImpl = vi.fn<typeof globalThis.fetch>();
+		vi.stubGlobal("fetch", fetchImpl);
+		const node = new DRPNode(
+			{
+				keychain_config: { private_key_seed: `rendezvous-inert-${_name}` },
+				log_config: { level: "silent" },
+				network_config: { bootstrap_peers: [], control_plane: { rendezvous } },
+			} as DRPNodeConfig,
+			{ networkNode: fake.networkNode, reconnect: false }
+		);
+		try {
+			await expect(node.start()).resolves.toBeUndefined();
+			expect(node.rendezvous).toBeUndefined();
+			await expect(node.stop()).resolves.toBeUndefined();
+			expect(fetchImpl).not.toHaveBeenCalled();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	test("defaults Node rendezvous discovery to node-dialable addresses", async () => {
+		const fake = createFakeNetwork();
+		const record = await nodeOnlyRecord();
+		const fetchImpl = vi.fn<typeof globalThis.fetch>((input) => {
+			const path = new URL(String(input)).pathname;
+			if (path.endsWith("/v1/discover")) {
+				return Promise.resolve(
+					new Response(
+						JSON.stringify({
+							endpointId: path.startsWith("/first/") ? "registry-1" : "registry-2",
+							records: [{ admissionMode: "invite", record }],
+						}),
+						{ headers: { "content-type": "application/json" }, status: 200 }
+					)
+				);
+			}
+			return Promise.resolve(
+				new Response(
+					JSON.stringify({
+						accepted: true,
+						admissionMode: "invite",
+						endpointId: path.startsWith("/first/") ? "registry-1" : "registry-2",
+						expiresAtMs: record.expiresAtMs,
+						refreshed: false,
+						sequence: record.sequence,
+					}),
+					{ headers: { "content-type": "application/json" }, status: 200 }
+				)
+			);
+		});
+		vi.stubGlobal("fetch", fetchImpl);
+		const node = new DRPNode(
+			{
+				keychain_config: { private_key_seed: "rendezvous-node-target" },
+				log_config: { level: "silent" },
+				network_config: {
+					bootstrap_peers: [],
+					control_plane: {
+						rendezvous: {
+							endpoints: ["https://registry.example/first/", "https://registry.example/second/"],
+							namespace: record.namespace,
+							publish: true,
+						},
+					},
+				},
+			} as DRPNodeConfig,
+			{ networkNode: fake.networkNode, reconnect: false }
+		);
+		try {
+			await node.start();
+			expect(node.rendezvous).toBeDefined();
+			if (node.rendezvous === undefined) return;
+			await expect(node.rendezvous.discover(record.namespace, AbortSignal.timeout(500))).resolves.toMatchObject([
+				{ acceptedAddresses: record.addresses, record: { peerId: record.peerId } },
+			]);
+		} finally {
+			await node.stop();
+			vi.unstubAllGlobals();
+		}
+	});
 });
+
+async function nodeOnlyRecord(): Promise<SignedDrpRecordV1> {
+	const key = await generateKeyPairFromSeed("Ed25519", new Uint8Array(32).fill(91));
+	const peerId = peerIdFromPublicKey(key.publicKey).toString();
+	const issuedAtMs = Date.now();
+	return new RecordSigner(key).sign({
+		addresses: [`/ip4/93.184.216.34/tcp/4100/p2p/${peerId}`],
+		capabilities: ["drp-gossipsub"],
+		expiresAtMs: issuedAtMs + 60_000,
+		issuedAtMs,
+		namespace: `drp-network:v1:${"n".repeat(43)}`,
+		sequence: 1,
+	});
+}

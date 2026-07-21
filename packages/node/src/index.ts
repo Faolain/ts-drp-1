@@ -1,14 +1,30 @@
+import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { TypedEventEmitter } from "@libp2p/interface";
 import { createDRPDiscovery } from "@ts-drp/interval-discovery";
 import { createDRPReconnectBootstrap } from "@ts-drp/interval-reconnect";
+import { IntervalRunner } from "@ts-drp/interval-runner";
 import { Keychain } from "@ts-drp/keychain";
 import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
 import { createPermissionlessACL, DRPObject, HashGraph } from "@ts-drp/object";
-import { createDnsResolver } from "@ts-drp/rendezvous";
+import {
+	AddressPolicy,
+	createDnsResolver,
+	createHttpRegistryEndpoint,
+	createRecordProducer,
+	createRendezvousEnsemble,
+	type DrpCapability,
+	InMemorySequenceStore,
+	RecordSigner,
+	RecordValidator,
+	RegistryClient,
+	RegistryExhaustedError,
+	type RendezvousDirectory,
+} from "@ts-drp/rendezvous";
 import { type BrowserRouting, type BrowserRoutingEndpoint, createBrowserRouting } from "@ts-drp/routing-browser";
 import {
+	type ControlPlaneEvent,
 	DRPDiscoveryResponse,
 	type DRPNetworkNode,
 	type DRPNodeConfig,
@@ -65,12 +81,16 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	keychain: Keychain;
 	messageQueueManager: MessageQueueManager<Message>;
 	private _routing: BrowserRouting | undefined;
+	private _rendezvous: RendezvousDirectory | undefined;
 
 	#objectStore: DRPObjectStore;
 	private _intervals: Map<string, IntervalRunnerMap[keyof IntervalRunnerMap]> = new Map();
 	private _subscribedNetworkNode?: DRPNetworkNode;
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
+	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
+	private _rendezvousRegistrationController: AbortController | undefined;
+	private _rendezvousRegistration: Promise<boolean> | undefined;
 	private readonly _beforeRestart: (() => Promise<void> | void) | undefined;
 	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
 	private readonly _stopNetwork: () => Promise<void>;
@@ -120,6 +140,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._routing ??= createConfiguredBrowserRouting(this.config);
 		await this.keychain.start();
 		await this.networkNode.start(this.keychain.secp256k1PrivateKey);
+		this._startRendezvous();
 		this.messageQueueManager.startAll();
 		const reconnectInterval = this.getReconnectInterval();
 		if (reconnectInterval) this._intervals.set("interval::reconnect", reconnectInterval);
@@ -139,6 +160,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
+		this._rendezvousRegistrationController?.abort(new Error("DRPNode stopped"));
 		this._connectFetchControllers.forEach((controller) => controller.abort());
 		this._connectFetchControllers.clear();
 		this._initialSyncPeers.clear();
@@ -146,8 +168,12 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._intervals.clear();
 		const routing = this._routing;
 		this._routing = undefined;
+		const rendezvousRegistration = this._rendezvousRegistration;
+		this._rendezvousRegistration = undefined;
+		this._rendezvousRegistrationController = undefined;
+		this._rendezvous = undefined;
 		try {
-			await Promise.all([routing?.stop(), this._stopNetwork()]);
+			await Promise.all([routing?.stop(), rendezvousRegistration, this._stopNetwork()]);
 		} finally {
 			this.messageQueueManager.closeAll();
 		}
@@ -159,6 +185,148 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 */
 	get routing(): BrowserRouting | undefined {
 		return this._routing;
+	}
+
+	/** @returns The configured Node rendezvous ensemble, or undefined when inactive. */
+	get rendezvous(): RendezvousDirectory | undefined {
+		return this._rendezvous;
+	}
+
+	private _startRendezvous(): void {
+		const rendezvousConfig = this.config.network_config?.control_plane?.rendezvous;
+		// Phase 3 accepted a structural placeholder. Phase 4 activation is the
+		// explicit publish/discover policy switch so that placeholder stays inert.
+		if (typeof rendezvousConfig?.publish !== "boolean") return;
+		const endpoints = rendezvousConfig.endpoints ?? [];
+		if (!rendezvousConfig.publish || endpoints.length === 0) return;
+		const namespace = rendezvousConfig.namespace;
+		if (namespace === undefined) throw new Error("configured rendezvous requires a namespace");
+		const addressConfig = this.config.network_config?.control_plane?.address_policy;
+		const resolver = addressConfig?.resolver ?? createDnsResolver();
+		const validatorFactory = (): RecordValidator =>
+			new RecordValidator({
+				addressPolicyOptions: {
+					allowInsecureWebSocket: addressConfig?.allowInsecureWebSocket,
+					allowLoopback: addressConfig?.allowLoopback,
+					allowPrivate: addressConfig?.allowPrivate,
+				},
+				resolver,
+			});
+		const registryClient = new RegistryClient({
+			clientId: this.networkNode.peerId,
+			endpoints: endpoints.map((url, index) =>
+				createHttpRegistryEndpoint({
+					allow_insecure_loopback_fixture: rendezvousConfig.allow_insecure_loopback_fixture,
+					id: `registry-${index + 1}`,
+					url,
+				})
+			),
+			timeoutMs: 4_000,
+			validatorFactory,
+		});
+		const directory = createRendezvousEnsemble({
+			addressPolicy: {
+				policy: new AddressPolicy({
+					allowInsecureWebSocket: addressConfig?.allowInsecureWebSocket,
+					allowLoopback: addressConfig?.allowLoopback,
+					allowPrivate: addressConfig?.allowPrivate,
+					target: "node",
+				}),
+				resolver,
+			},
+			registries: registryClient,
+			validatorFactory,
+		});
+		this._rendezvous = directory;
+
+		const ttlMs = rendezvousConfig.record_ttl_ms ?? 60_000;
+		const refreshIntervalMs = rendezvousConfig.refresh_interval_ms ?? Math.floor(ttlMs / 2);
+		if (
+			!Number.isSafeInteger(refreshIntervalMs) ||
+			refreshIntervalMs < 250 ||
+			refreshIntervalMs >= ttlMs ||
+			refreshIntervalMs > 300_000
+		) {
+			throw new Error("rendezvous refresh_interval_ms must be within 250..300000 inclusive and below record_ttl_ms");
+		}
+		const privateKey = privateKeyFromRaw(this.keychain.secp256k1PrivateKey);
+		const producer = createRecordProducer({
+			addressSource: () => this.networkNode.getMultiaddrs() ?? [],
+			capabilitySource: () => deriveRendezvousCapabilities(this.config),
+			namespace,
+			peerId: this.networkNode.peerId,
+			sequenceStore: this._rendezvousSequenceStore,
+			signer: new RecordSigner(privateKey),
+			ttlMs,
+		});
+		const credential = registrationCredential(this.config);
+		const controller = new AbortController();
+		this._rendezvousRegistrationController = controller;
+		const runner = new IntervalRunner({
+			fn: (): Promise<boolean> => {
+				const registration = this._registerRendezvousRecord(
+					producer,
+					directory,
+					credential,
+					endpoints.length,
+					controller.signal,
+					refreshIntervalMs
+				);
+				const tracked = registration.finally(() => {
+					if (this._rendezvousRegistration === tracked) this._rendezvousRegistration = undefined;
+				});
+				this._rendezvousRegistration = tracked;
+				return tracked;
+			},
+			id: "rendezvous-registration",
+			interval: refreshIntervalMs,
+			logConfig: this.config.log_config,
+			throwOnStop: false,
+		});
+		this._intervals.set("interval::rendezvous", runner);
+		runner.start();
+	}
+
+	private async _registerRendezvousRecord(
+		producer: ReturnType<typeof createRecordProducer>,
+		directory: RendezvousDirectory,
+		credential: Parameters<RendezvousDirectory["register"]>[2],
+		endpointCount: number,
+		lifecycleSignal: AbortSignal,
+		deadlineMs: number
+	): Promise<boolean> {
+		const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(Math.min(deadlineMs, 30_000))]);
+		try {
+			const record = await producer.refresh();
+			const receipt = await directory.register(record, signal, credential);
+			if (lifecycleSignal.aborted) return false;
+			const acceptedSourceCount = receipt.acceptedEndpointIds.length;
+			const failedSourceCount = receipt.attempts.length - acceptedSourceCount;
+			this._emitRendezvousEvent({
+				acceptedSourceCount,
+				failedSourceCount,
+				kind: "rendezvous-registration",
+				outcome: failedSourceCount === 0 ? "accepted" : "partial",
+			});
+		} catch (error) {
+			if (lifecycleSignal.aborted) return false;
+			const attempts = error instanceof RegistryExhaustedError ? error.attempts.length : endpointCount;
+			this._emitRendezvousEvent({
+				acceptedSourceCount: 0,
+				failedSourceCount: Math.min(endpointCount, attempts),
+				kind: "rendezvous-registration",
+				outcome: "failed",
+			});
+		}
+		return !lifecycleSignal.aborted;
+	}
+
+	private _emitRendezvousEvent(event: ControlPlaneEvent): void {
+		try {
+			this.config.network_config?.control_plane?.observability?.sink(event);
+		} catch {
+			// Observability must not change control-plane behavior.
+		}
 	}
 
 	/**
@@ -567,6 +735,23 @@ function createConfiguredBrowserRouting(config: DRPNodeConfig | undefined): Brow
 		limits: routing.limits,
 		resolver: createDnsResolver(),
 	});
+}
+
+function deriveRendezvousCapabilities(config: DRPNodeConfig): readonly DrpCapability[] {
+	const capabilities: DrpCapability[] = ["drp-gossipsub"];
+	// Inspecting live transports instead of declarations is deferred to a future phase.
+	const listenAddresses = config.network_config?.listen_addresses ?? ["/p2p-circuit", "/webrtc"];
+	if (listenAddresses.some((address) => address.includes("/webrtc"))) capabilities.push("webrtc");
+	// The production host installs circuitRelayTransport independently of whether
+	// this node also opts into serving reservations.
+	capabilities.push("relay-client");
+	if (config.network_config?.relay_service?.enabled === true) capabilities.push("relay-hop-v2-service");
+	return capabilities;
+}
+
+function registrationCredential(config: DRPNodeConfig): Parameters<RendezvousDirectory["register"]>[2] {
+	const membership = config.network_config?.control_plane?.membership;
+	return membership?.mode === "invite" ? { kind: "invite", token: membership.invite.inviteToken } : undefined;
 }
 
 export {

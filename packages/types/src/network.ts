@@ -86,6 +86,12 @@ export type ControlPlaneEvent =
 			readonly transport: ControlPlaneTransport;
 	  }
 	| {
+			readonly acceptedSourceCount: number;
+			readonly failedSourceCount: number;
+			readonly kind: "rendezvous-registration";
+			readonly outcome: "accepted" | "failed" | "partial";
+	  }
+	| {
 			readonly kind: "relay-reservation";
 			readonly outcome: "acquired" | "expired" | "failed" | "refused" | "released" | "replaced";
 			readonly relayIdHash?: string;
@@ -133,6 +139,16 @@ export interface ControlPlaneNodeRoutingConfig {
 	readonly public_network_acknowledgement?: string;
 }
 
+export interface ControlPlaneRendezvousConfig {
+	/** Test-only permission for plaintext loopback registry URLs. */
+	readonly allow_insecure_loopback_fixture?: boolean;
+	readonly endpoints?: readonly string[];
+	readonly namespace?: string;
+	readonly publish?: boolean;
+	readonly record_ttl_ms?: number;
+	readonly refresh_interval_ms?: number;
+}
+
 /** Phase 2 structural owners; later phases add runtime implementations behind these sections. */
 export interface ControlPlaneConfig {
 	readonly address_policy?: ControlPlaneAddressPolicyConfig;
@@ -143,10 +159,7 @@ export interface ControlPlaneConfig {
 	readonly relay_policy?: {
 		readonly target_reservations?: number;
 	};
-	readonly rendezvous?: {
-		readonly endpoints?: readonly string[];
-		readonly namespace?: string;
-	};
+	readonly rendezvous?: ControlPlaneRendezvousConfig;
 	readonly routing?: {
 		readonly browser?: ControlPlaneBrowserRoutingConfig;
 		readonly node?: ControlPlaneNodeRoutingConfig;

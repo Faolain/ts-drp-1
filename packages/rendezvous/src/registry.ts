@@ -10,6 +10,7 @@ import * as raw from "multiformats/codecs/raw";
 import { sha256 } from "multiformats/hashes/sha2";
 
 import type { AddressDecision } from "./address-policy.js";
+import { reconcileValidatedRecords, ReconciliationCapacityError } from "./reconciliation.js";
 import { type AdmissionDecision, type AdmissionMode, type RecordValidator, type SignedDrpRecordV1 } from "./record.js";
 
 const encoder = new TextEncoder();
@@ -440,6 +441,9 @@ export class RegistryServer implements RegistryEndpoint {
 		this.#sweepExpired();
 		const namespaceRecords = this.#records.get(request.record.namespace);
 		const existing = namespaceRecords?.get(request.record.peerId);
+		if (existing !== undefined && request.record.sequence <= existing.record.sequence) {
+			return rejection("record-rejected", "replayed-sequence");
+		}
 		if (existing === undefined) {
 			if (namespaceRecords === undefined && this.#records.size >= this.#limits.maxNamespaces) {
 				return rejection("namespace-capacity-exceeded");
@@ -738,8 +742,7 @@ export class RegistryClient implements RendezvousDirectory {
 	 */
 	async discover(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]> {
 		const attempts: RegistryAttempt[] = [];
-		const candidates = new Map<string, ValidatedDrpRecord>();
-		const conflictedPeerIds = new Set<string>();
+		const acceptedRecordSets: ValidatedDrpRecord[][] = [];
 		let healthyDirectoryCount = 0;
 		for (const [index, endpoint] of this.#endpoints.entries()) {
 			signal.throwIfAborted();
@@ -798,36 +801,13 @@ export class RegistryClient implements RendezvousDirectory {
 				});
 				continue;
 			}
-			const candidatesBeforeEndpoint = new Map(candidates);
-			const conflictsBeforeEndpoint = new Set(conflictedPeerIds);
-			for (const candidate of validated) {
-				if (conflictedPeerIds.has(candidate.record.peerId)) continue;
-				const existing = candidates.get(candidate.record.peerId);
-				if (existing === undefined) {
-					if (candidates.size >= this.#maxResponseRecords) {
-						validationFailed = true;
-						break;
-					}
-					candidates.set(candidate.record.peerId, candidate);
-					continue;
-				}
-				if (candidate.record.sequence > existing.record.sequence) {
-					candidates.set(candidate.record.peerId, candidate);
-					continue;
-				}
-				if (
-					candidate.record.sequence === existing.record.sequence &&
-					JSON.stringify(candidate.record) !== JSON.stringify(existing.record)
-				) {
-					candidates.delete(candidate.record.peerId);
-					conflictedPeerIds.add(candidate.record.peerId);
-				}
-			}
-			if (validationFailed) {
-				candidates.clear();
-				for (const [peerId, candidate] of candidatesBeforeEndpoint) candidates.set(peerId, candidate);
-				conflictedPeerIds.clear();
-				for (const peerId of conflictsBeforeEndpoint) conflictedPeerIds.add(peerId);
+			try {
+				reconcileValidatedRecords([...acceptedRecordSets, validated], {
+					maxRecords: this.#maxResponseRecords,
+					now: Number.NEGATIVE_INFINITY,
+				});
+			} catch (error) {
+				if (!(error instanceof ReconciliationCapacityError)) throw error;
 				attempts.push({
 					code: "response-cap-exceeded",
 					endpointId: endpoint.id,
@@ -836,6 +816,7 @@ export class RegistryClient implements RendezvousDirectory {
 				});
 				continue;
 			}
+			acceptedRecordSets.push(validated);
 			healthyDirectoryCount += 1;
 			attempts.push({
 				endpointId: endpoint.id,
@@ -845,7 +826,10 @@ export class RegistryClient implements RendezvousDirectory {
 		}
 		this.#lastAttempts = Object.freeze(attempts);
 		if (healthyDirectoryCount > 0) {
-			return [...candidates.values()].sort((left, right) => left.record.peerId.localeCompare(right.record.peerId));
+			return reconcileValidatedRecords(acceptedRecordSets, {
+				maxRecords: this.#maxResponseRecords,
+				now: Number.NEGATIVE_INFINITY,
+			});
 		}
 		throw new RegistryExhaustedError("discover", attempts);
 	}

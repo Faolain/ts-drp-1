@@ -107,6 +107,39 @@ describe("two-endpoint registry", () => {
 		});
 	});
 
+	it("keeps registry storage monotonic and makes exact retries non-mutating", async () => {
+		const server = registryServer("primary");
+		const older = await signedRecord(24);
+		const newer = await signedRecord(24, {
+			expiresAtMs: NOW + 70_000,
+			issuedAtMs: NOW + 10_000,
+			sequence: 2,
+		});
+		const register = (record: SignedDrpRecordV1): ReturnType<RegistryServer["register"]> =>
+			server.register({
+				clientId: record.peerId,
+				credential: { kind: "invite", token: INVITE },
+				record,
+				signal: signal(),
+			});
+
+		expect(await register(older)).toMatchObject({ accepted: true, refreshed: false, sequence: 1 });
+		expect(await register(older)).toMatchObject({
+			accepted: false,
+			code: "record-rejected",
+			detail: "replayed-sequence",
+		});
+		expect(await register(newer)).toMatchObject({ accepted: true, refreshed: true, sequence: 2 });
+		expect(await register(older)).toMatchObject({
+			accepted: false,
+			code: "record-rejected",
+			detail: "replayed-sequence",
+		});
+		expect(
+			await server.discover({ clientId: "monotonic-reader", namespace: newer.namespace, signal: signal() })
+		).toMatchObject({ records: [{ record: { sequence: 2 } }] });
+	});
+
 	it("rejects forged, oversized, future, and wrong-invite records without storing them", async () => {
 		const record = await signedRecord(3);
 		const server = registryServer("primary");

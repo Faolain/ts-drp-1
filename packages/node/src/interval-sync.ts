@@ -17,6 +17,8 @@ const INITIAL_SYNC_MAX_ATTEMPTS = 5;
 /**
  * Whether an object has received history from another replica. Local operations
  * do not prove that the joiner's initial synchronization reached a peer.
+ * @param vertices
+ * @param localPeerId
  */
 export function hasRemoteSyncHistory(vertices: readonly Vertex[], localPeerId: string): boolean {
 	return vertices.some((vertex) => vertex.hash !== HashGraph.rootHash && vertex.peerId !== localPeerId);

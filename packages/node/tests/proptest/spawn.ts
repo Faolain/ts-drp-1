@@ -61,6 +61,14 @@ export interface SpawnClusterOptions {
 	syncIntervalMs?: number;
 }
 
+/**
+ *
+ * @param cond
+ * @param timeoutMs
+ * @param what
+ * @param pollMs
+ * @param detail
+ */
 export async function waitFor(
 	cond: () => boolean,
 	timeoutMs: number,
@@ -105,6 +113,11 @@ function buildACL(peers: { peerId: string; blsPublicKey: string }[]): IACL {
 
 let spawnCounter = 0;
 
+/**
+ *
+ * @param n
+ * @param options
+ */
 export async function spawnCluster(n: number, options: SpawnClusterOptions = {}): Promise<Cluster> {
 	const t0 = performance.now();
 	const silent = { level: "silent" as const };
@@ -272,24 +285,44 @@ export async function spawnCluster(n: number, options: SpawnClusterOptions = {})
 /* Convergence checks & diagnostics                                    */
 /* ------------------------------------------------------------------ */
 
+/**
+ *
+ * @param c
+ */
 export function hashGraphOf(c: ClusterNode): HashGraph {
 	return c.obj["hashGraph"] as unknown as HashGraph;
 }
 
+/**
+ *
+ * @param c
+ */
 export function stateFingerprint(c: ClusterNode): string {
 	const drp = c.obj.drp;
 	if (!drp) return "null";
 	return JSON.stringify({ positions: drp.query_positions(), log: drp.query_log() });
 }
 
+/**
+ *
+ * @param c
+ */
 export function sortedFrontier(c: ClusterNode): string[] {
 	return hashGraphOf(c).getFrontier().sort();
 }
 
+/**
+ *
+ * @param c
+ */
 export function vertexHashes(c: ClusterNode): string[] {
 	return c.obj.vertices.map((v) => v.hash).sort();
 }
 
+/**
+ *
+ * @param nodes
+ */
 export function clusterConverged(nodes: ClusterNode[]): boolean {
 	const ref = nodes[0];
 	const refState = stateFingerprint(ref);
@@ -305,6 +338,10 @@ export function clusterConverged(nodes: ClusterNode[]): boolean {
 
 const short = (h: string): string => h.slice(0, 8);
 
+/**
+ *
+ * @param nodes
+ */
 export function clusterReport(nodes: ClusterNode[]): string {
 	const union = new Set<string>();
 	for (const c of nodes) for (const h of vertexHashes(c)) union.add(h);
