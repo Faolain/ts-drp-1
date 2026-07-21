@@ -13,6 +13,18 @@ without abusing public utilities or leaking raw identities in committed data.
 label, trial/request budget, concurrency, cooldown, and raw-output location.
 `CoverageValidator` refuses incomplete reports.
 
+The repository-owned task driver is the only production campaign driver. It
+submits typed DHT, delegated, registry, relay, and grid attempts to the request
+gate without receiving an arbitrary I/O callback. The environment-blocked ref
+intentionally contains no usable public executor. Before any authorized run, a
+protected executor must be checked into
+`packages/network-spike/src/public-campaign-executors/` on that separately
+reviewed execution ref; its absence keeps this ref fail-closed. The gate invokes
+it once per frozen top-level attempt, passes a
+task deadline signal, and rejects retry or redirect metadata. Dynamic relay
+multiaddrs remain executor-private: the durable ledger records only the
+configured relay accounting owner and aggregate outcomes.
+
 Each public cell declares its rendezvous substrate:
 
 - browser creator/joiner cells use two explicitly allowlisted, independently
@@ -48,6 +60,8 @@ An opt-in local command and `workflow_dispatch`-only workflow collect:
   tests run in ordinary CI.
 - Public trials are serialized/low-concurrency and stop on rate-limit or terms
   concerns.
+- Every task has a configured deadline. A hung executor becomes a typed
+  `task-timeout` partial result rather than waiting for the workflow job limit.
 - The manifest computes a hard endpoint-request ceiling before consent. The
   runner includes registry registration/refresh/discovery and DHT
   provide/reprovide in that ceiling, refuses any request after it, and records a
@@ -55,7 +69,9 @@ An opt-in local command and `workflow_dispatch`-only workflow collect:
 - Each run records exact package/browser/source versions and anonymized network
   descriptors.
 - Raw addresses/Peer IDs stay in `.network-spike-raw/`; committed evidence uses
-  per-run salted pseudonyms and aggregate-only operator/ASN groups.
+  per-run salted pseudonyms and aggregate-only operator/ASN groups. Authorized
+  result artifacts persist only counts and pre-registered decision-cell
+  aggregates, never per-trial observation rows.
 - Report coverage is at least 100 trials per required cell.
 - Capture the sanitized report and run screenshot-critique.
 - Run the every-phase review and quality gate.

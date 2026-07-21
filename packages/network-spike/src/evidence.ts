@@ -1,6 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
+import { summarizePublicCampaign, wilson95 } from "./campaign-primitives.js";
+export {
+	RequestBudget,
+	summarizePublicCampaign,
+	wilson95,
+	type PlannedMatrixSummary,
+	type WilsonInterval,
+} from "./campaign-primitives.js";
 import { PUBLIC_DECISION_RULES } from "./contract.js";
 import { assertRawOutputPath, assessRedaction, isRawOutputIgnored } from "./redaction.js";
 import {
@@ -9,7 +17,6 @@ import {
 	type EvidenceReport,
 	EvidenceReportSchema,
 	ExperimentManifestSchema,
-	type PublicCampaignPlan,
 	type ThresholdSet,
 	type TrialResult,
 } from "./schemas.js";
@@ -23,72 +30,6 @@ export interface ContractIssue {
 export interface CoverageAssessment {
 	complete: boolean;
 	issues: ContractIssue[];
-}
-
-export interface PlannedMatrixSummary {
-	browserTrials: number;
-	hardRequestCap: number;
-	nodeTrials: number;
-	requiredTrialCount: number;
-	rows: Array<{
-		browser?: string;
-		condition: string;
-		identities: number;
-		target: "browser" | "node";
-		transportProfile?: string;
-	}>;
-}
-
-export interface WilsonInterval {
-	lower: number;
-	upper: number;
-}
-
-/** A bounded counter used by public probes before each endpoint request. */
-export class RequestBudget {
-	readonly limit: number;
-	#consumed = 0;
-
-	/**
-	 * Creates a request budget.
-	 * @param limit - Maximum requests allowed for the bounded operation.
-	 */
-	constructor(limit: number) {
-		if (!Number.isSafeInteger(limit) || limit <= 0) {
-			throw new Error("request budget limit must be a positive safe integer");
-		}
-		this.limit = limit;
-	}
-
-	/**
-	 * Reports requests already consumed.
-	 * @returns The consumed request count.
-	 */
-	get consumed(): number {
-		return this.#consumed;
-	}
-
-	/**
-	 * Reports requests still available.
-	 * @returns The remaining request count.
-	 */
-	get remaining(): number {
-		return this.limit - this.#consumed;
-	}
-
-	/**
-	 * Reserves capacity before requests are started.
-	 * @param count - Number of requests about to be made.
-	 */
-	consume(count = 1): void {
-		if (!Number.isSafeInteger(count) || count <= 0) {
-			throw new Error("request count must be a positive safe integer");
-		}
-		if (this.#consumed + count > this.limit) {
-			throw new Error(`public request cap exhausted (${this.#consumed}/${this.limit})`);
-		}
-		this.#consumed += count;
-	}
 }
 
 /**
@@ -112,52 +53,6 @@ export function parseExperimentManifest(value: unknown): ReturnType<typeof Exper
 		throw new Error(issues.map((issue) => issue.message).join("\n"));
 	}
 	return manifest;
-}
-
-/**
- * Computes the exact public trial matrix and endpoint-call ceiling.
- * @param plan - Pre-registered public campaign plan.
- * @returns Exact cell rows, trial counts, and request ceiling.
- */
-export function summarizePublicCampaign(plan: PublicCampaignPlan): PlannedMatrixSummary {
-	const rows: PlannedMatrixSummary["rows"] = [];
-	for (const condition of plan.conditions) {
-		rows.push({
-			condition,
-			identities: plan.nodeIdentitiesPerCondition,
-			target: "node",
-		});
-		for (const browser of plan.browsers) {
-			for (const [transportProfile, identities] of Object.entries(plan.transportProfileSplit)) {
-				rows.push({
-					browser,
-					condition,
-					identities,
-					target: "browser",
-					transportProfile,
-				});
-			}
-		}
-	}
-
-	const nodeTrials = plan.conditions.length * plan.nodeIdentitiesPerCondition;
-	const browserTrials = plan.conditions.length * plan.browsers.length * plan.browserIdentitiesPerBrowserCondition;
-	const browserCallsPerIdentity =
-		plan.endpointCallCaps.delegatedPerBrowserIdentity +
-		plan.endpointCallCaps.registryPerBrowserIdentity +
-		plan.endpointCallCaps.relayPerBrowserIdentity;
-	const hardRequestCap =
-		nodeTrials * plan.endpointCallCaps.nodeRoutingPerIdentity +
-		browserTrials * browserCallsPerIdentity +
-		plan.conditions.length * plan.browsers.length * plan.endpointCallCaps.gridCanaryPerBrowserCondition;
-
-	return {
-		browserTrials,
-		hardRequestCap,
-		nodeTrials,
-		requiredTrialCount: nodeTrials + browserTrials,
-		rows,
-	};
 }
 
 /**
@@ -733,35 +628,6 @@ function sortJson(value: unknown): unknown {
  */
 export function thresholdSetFingerprint(thresholdSet: ThresholdSet): string {
 	return fingerprint(thresholdSet);
-}
-
-/**
- * Computes the Wilson score interval used by public observed-rate rules.
- * @param successes - Verified successful-trial count.
- * @param sampleCount - Verified usable-trial count.
- * @returns Wilson 95% lower and upper bounds.
- */
-export function wilson95(successes: number, sampleCount: number): WilsonInterval {
-	if (
-		!Number.isSafeInteger(successes) ||
-		!Number.isSafeInteger(sampleCount) ||
-		successes < 0 ||
-		successes > sampleCount
-	) {
-		throw new Error("Wilson interval counts are invalid");
-	}
-	if (sampleCount === 0) {
-		return { lower: 0, upper: 0 };
-	}
-	const z = 1.959963984540054;
-	const observed = successes / sampleCount;
-	const denominator = 1 + (z * z) / sampleCount;
-	const center = observed + (z * z) / (2 * sampleCount);
-	const margin = z * Math.sqrt((observed * (1 - observed)) / sampleCount + (z * z) / (4 * sampleCount * sampleCount));
-	return {
-		lower: Math.max(0, (center - margin) / denominator),
-		upper: Math.min(1, (center + margin) / denominator),
-	};
 }
 
 /**

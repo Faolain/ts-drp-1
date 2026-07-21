@@ -52,7 +52,8 @@ describe("Phase 00 evidence contract", () => {
 			nodeTrials: 200,
 			requiredTrialCount: 800,
 		});
-		expect(payload.plannedMatrix.rows).toHaveLength(14);
+		expect(payload.plannedMatrix.rows).toHaveLength(20);
+		expect(payload.plannedMatrix.rows.filter(({ target }) => target === "grid-canary")).toHaveLength(6);
 		expect(payload.thresholdSet.rules).toHaveLength(10);
 	});
 

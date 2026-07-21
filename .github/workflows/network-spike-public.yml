@@ -1,0 +1,75 @@
+name: Network spike public campaign
+
+on:
+  workflow_dispatch:
+    inputs:
+      acknowledgement:
+        description: Exact public campaign acknowledgement phrase
+        required: true
+        type: string
+      executor_name:
+        description: Reviewed protocol executor module name under packages/network-spike/src/public-campaign-executors
+        required: true
+        type: string
+
+concurrency:
+  group: network-spike-public-campaign
+  cancel-in-progress: false
+
+jobs:
+  public-campaign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    environment: public-network-campaign
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: Refuse missing protected configuration
+        env:
+          ACKNOWLEDGEMENT: ${{ inputs.acknowledgement }}
+          CONFIG_B64: ${{ secrets.PUBLIC_CAMPAIGN_CONFIG_B64 }}
+          EXECUTOR_NAME: ${{ inputs.executor_name }}
+        run: |
+          test "$ACKNOWLEDGEMENT" = "I_ACKNOWLEDGE_ISSUE_5_PUBLIC_NETWORK_TRAFFIC_AND_OPERATOR_TERMS"
+          test -n "$CONFIG_B64"
+          case "$EXECUTOR_NAME" in
+            *[!A-Za-z0-9_-]*.ts|*/*|*..*) exit 2 ;;
+            [A-Za-z0-9_-]*.ts) ;;
+            *) exit 2 ;;
+          esac
+          test -f "packages/network-spike/src/public-campaign-executors/$EXECUTOR_NAME"
+          printf '%s' "$CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/public-campaign.json"
+      - run: pnpm install --frozen-lockfile
+      - name: Preflight frozen matrix before execution
+        env:
+          ACKNOWLEDGEMENT: ${{ inputs.acknowledgement }}
+        run: >-
+          pnpm --filter @ts-drp/network-spike public-campaign --
+          --config "$RUNNER_TEMP/public-campaign.json"
+          --acknowledge "$ACKNOWLEDGEMENT"
+          > "$RUNNER_TEMP/public-campaign-preflight.json"
+      - name: Run serialized public campaign
+        env:
+          ACKNOWLEDGEMENT: ${{ inputs.acknowledgement }}
+          EXECUTOR_NAME: ${{ inputs.executor_name }}
+        run: >-
+          pnpm --filter @ts-drp/network-spike public-campaign --
+          --execute
+          --config "$RUNNER_TEMP/public-campaign.json"
+          --executor "$EXECUTOR_NAME"
+          --acknowledge "$ACKNOWLEDGEMENT"
+          > "$RUNNER_TEMP/public-campaign-sanitized.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-campaign-sanitized
+          path: |
+            ${{ runner.temp }}/public-campaign-preflight.json
+            ${{ runner.temp }}/public-campaign-sanitized.json
+          retention-days: 30

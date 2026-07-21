@@ -5,26 +5,21 @@ Issue: [Faolain/ts-drp-1#5](https://github.com/Faolain/ts-drp-1/issues/5)
 ## Next Agent Prompt
 
 Current status (2026-07-20): Phases 00, 01, 01b, 02, 03, 03b, 04, 05, 06, 07,
-and 08 are complete. Phase 08 exercises 24 owner-driven routing, registry,
-record, relay, signaling, control-health, and composed-outage rows. Its corrected
-relay-loss paths distinguish signaling-time acquire rotation, post-reservation
-creator-dial loss followed by coordinator recovery/policy replacement, and
-post-direct replacement with the direct proof retained. Findings and
-dispositions live in [the Phase 08 review](reviews/phase-08.md). Grok, Kimi, and
-the fresh visual gate returned final `ACCEPT`. The full example browser matrix
-passed 111/111, and the repository gate passed 93 files and 755 tests with 2
-existing environment-gated skips. Repository typecheck and lint pass; lint has 0
-errors and 80 documentation-rule warnings.
+and 08 are complete. Phase 09 is complete. The opt-in control plane
+precomputes 806 tasks and a 12,920-request cap, serializes every endpoint owner
+behind one cooldown/allowlist ledger, fixes task composition in-repository,
+enforces per-task deadlines, emits only pre-registered decision-cell
+aggregates, binds evidence to scheduled tasks, emits typed partial cells, and
+rejects incomplete or privacy-unsafe reports.
+[The Phase 09 review](reviews/phase-09.md) records the initial reviewer
+rejections, tested dispositions, and final Grok/Kimi `ACCEPT` verdicts.
 
-Implement the opt-in public campaign control plane in
-[slice 09](slices/09-public-campaign.md). Public execution is currently
-`environment-blocked`: no exact consent string, two independently configured
-signed-registry endpoints, or authorized materially distinct second egress has
-been supplied. Build and test the manifest parser, pre-consent cap computation,
-request ledger, serialization/cooldown/rate-limit stops, randomized balanced
-matrix, redaction, aggregation, partial report, local command, and
-`workflow_dispatch`-only workflow. Do not synthesize a second condition or make
-public requests.
+Public execution remains honestly `environment-blocked`: no exact operator
+authorization, two independently operated signed-registry endpoints, or
+authorized materially distinct second egress was supplied. The committed
+artifact contains zero public requests and no synthetic trials. Implement the
+decision package in
+[slice 10](slices/10-decision-package.md).
 
 - [x] Phase 00: evidence contract and thresholds
 - [x] Phase 01: deterministic probe kernel
@@ -37,7 +32,7 @@ public requests.
 - [x] Phase 06: opportunistic relay policy
 - [x] Phase 07: disconnected-joiner grid demonstration
 - [x] Phase 08: deterministic failure campaign
-- [ ] Phase 09: opt-in public protocol and relay campaign
+- [x] Phase 09: opt-in public protocol and relay campaign
 - [ ] Phase 10: ADR, security/privacy analysis, and implementation plan
 
 Before ending a pass, update this section with the exact last completed gate,
@@ -174,18 +169,18 @@ interpretation. Missing coverage is a failed evidence requirement, not a
 zero-valued measurement. Public rates are observed-rate decisions with Wilson
 95% confidence intervals, never availability SLAs.
 
-| Decision | Evidence source and sample | Threshold / interpretation |
-| --- | --- | --- |
-| Node DHT cold bootstrap | Phase 09, 100 fresh Node identities per real condition | observed success at least 95%; p95 at most 30 s; report Wilson interval |
-| Delegated first valid DRP peer | Phase 09, 100 fresh identities per browser/condition, balanced across transport profiles | observed success at least 95%; p95 at most 20 s; report Wilson interval |
-| GossipSub mesh and first synchronized object | Phase 07, 5 deterministic repetitions per browser | every repetition passes; p95 at most 30 s; demonstration SLO, not public rate |
-| Public relay as supported baseline | Phase 09, 100 fresh identities per browser/condition total, 50 per randomized transport profile | observed reservation success at least 95% and p95 at most 20 s per profile; report Wilson interval |
-| Public relay as optional overflow | Same Phase 09 cells | observed reservation success at least 50% per profile; exhaustion delays owned fallback at most 5 s |
-| Public relay diversity for baseline | Phase 09 aggregate reservation cells | at least two coarse operator/ASN groups with accepted reservations; otherwise baseline is no-go, overflow remains independently decidable |
-| Controlled direct WebRTC upgrade | Phase 07, 5 deterministic repetitions per browser | every repetition passes within 20 s with correlated non-relay ICE/libp2p proof and nonzero bytes both ways |
-| Public direct WebRTC upgrade | Phase 09 public grid canary, one run per browser/condition | report-only with outcome and latency; Phase 10 chooses an SLO, no fleet claim |
-| Relay/registry loss recovery | Phase 08 deterministic matrix and Phase 07 repetitions | every deterministic scenario reaches its specified recovery/fallback within 60 s |
-| Total outage | Phase 08 composed worst-case fixture | terminal diagnostic within 30 s, capped attempts, no leaked work |
+| Decision                                     | Evidence source and sample                                                                      | Threshold / interpretation                                                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Node DHT cold bootstrap                      | Phase 09, 100 fresh Node identities per real condition                                          | observed success at least 95%; p95 at most 30 s; report Wilson interval                                                                   |
+| Delegated first valid DRP peer               | Phase 09, 100 fresh identities per browser/condition, balanced across transport profiles        | observed success at least 95%; p95 at most 20 s; report Wilson interval                                                                   |
+| GossipSub mesh and first synchronized object | Phase 07, 5 deterministic repetitions per browser                                               | every repetition passes; p95 at most 30 s; demonstration SLO, not public rate                                                             |
+| Public relay as supported baseline           | Phase 09, 100 fresh identities per browser/condition total, 50 per randomized transport profile | observed reservation success at least 95% and p95 at most 20 s per profile; report Wilson interval                                        |
+| Public relay as optional overflow            | Same Phase 09 cells                                                                             | observed reservation success at least 50% per profile; exhaustion delays owned fallback at most 5 s                                       |
+| Public relay diversity for baseline          | Phase 09 aggregate reservation cells                                                            | at least two coarse operator/ASN groups with accepted reservations; otherwise baseline is no-go, overflow remains independently decidable |
+| Controlled direct WebRTC upgrade             | Phase 07, 5 deterministic repetitions per browser                                               | every repetition passes within 20 s with correlated non-relay ICE/libp2p proof and nonzero bytes both ways                                |
+| Public direct WebRTC upgrade                 | Phase 09 public grid canary, one run per browser/condition                                      | report-only with outcome and latency; Phase 10 chooses an SLO, no fleet claim                                                             |
+| Relay/registry loss recovery                 | Phase 08 deterministic matrix and Phase 07 repetitions                                          | every deterministic scenario reaches its specified recovery/fallback within 60 s                                                          |
+| Total outage                                 | Phase 08 composed worst-case fixture                                                            | terminal diagnostic within 30 s, capped attempts, no leaked work                                                                          |
 
 The 100 browser trials satisfy the issue's per-browser/per-condition minimum;
 the two transport profiles are balanced within that budget rather than

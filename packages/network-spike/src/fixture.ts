@@ -1,3 +1,4 @@
+import { frozenPublicCampaign } from "./campaign-plan.js";
 import { PUBLIC_DECISION_RULES } from "./contract.js";
 import { fingerprint, summarizePublicCampaign } from "./evidence.js";
 import { sensitiveValueDigest } from "./redaction.js";
@@ -17,23 +18,7 @@ export const fixtureThresholdSet: ThresholdSet = {
 	version: 1,
 };
 
-export const fixturePublicCampaign: PublicCampaignPlan = {
-	browserIdentitiesPerBrowserCondition: 100,
-	browsers: ["chromium", "firefox", "webkit"],
-	conditions: ["primary-home-nat", "authorized-secondary-egress"],
-	endpointCallCaps: {
-		delegatedPerBrowserIdentity: 4,
-		gridCanaryPerBrowserCondition: 20,
-		nodeRoutingPerIdentity: 4,
-		registryPerBrowserIdentity: 4,
-		relayPerBrowserIdentity: 12,
-	},
-	nodeIdentitiesPerCondition: 100,
-	transportProfileSplit: {
-		"wss-only": 50,
-		"wss-wt-webrtc-direct": 50,
-	},
-};
+export const fixturePublicCampaign: PublicCampaignPlan = frozenPublicCampaign;
 
 /**
  * Creates the deterministic, schema-valid Phase 00 CLI fixture.

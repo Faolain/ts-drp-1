@@ -1,0 +1,168 @@
+{
+	"schemaVersion": "1.0.0",
+	"runId": "phase-09-environment-blocked",
+	"status": "environment-blocked",
+	"criterionSatisfied": false,
+	"publicRequests": 0,
+	"requestBudget": {
+		"consumed": 0,
+		"hardCap": 12920
+	},
+	"plannedMatrix": {
+		"nodeTrials": 200,
+		"browserTrials": 600,
+		"requiredTrialCount": 800,
+		"hardRequestCap": 12920,
+		"rows": [
+			{
+				"condition": "primary-home-nat",
+				"identities": 100,
+				"target": "node"
+			},
+			{
+				"browser": "chromium",
+				"condition": "primary-home-nat",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-only"
+			},
+			{
+				"browser": "chromium",
+				"condition": "primary-home-nat",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-wt-webrtc-direct"
+			},
+			{
+				"browser": "chromium",
+				"condition": "primary-home-nat",
+				"identities": 1,
+				"target": "grid-canary"
+			},
+			{
+				"browser": "firefox",
+				"condition": "primary-home-nat",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-only"
+			},
+			{
+				"browser": "firefox",
+				"condition": "primary-home-nat",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-wt-webrtc-direct"
+			},
+			{
+				"browser": "firefox",
+				"condition": "primary-home-nat",
+				"identities": 1,
+				"target": "grid-canary"
+			},
+			{
+				"browser": "webkit",
+				"condition": "primary-home-nat",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-only"
+			},
+			{
+				"browser": "webkit",
+				"condition": "primary-home-nat",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-wt-webrtc-direct"
+			},
+			{
+				"browser": "webkit",
+				"condition": "primary-home-nat",
+				"identities": 1,
+				"target": "grid-canary"
+			},
+			{
+				"condition": "authorized-secondary-egress",
+				"identities": 100,
+				"target": "node"
+			},
+			{
+				"browser": "chromium",
+				"condition": "authorized-secondary-egress",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-only"
+			},
+			{
+				"browser": "chromium",
+				"condition": "authorized-secondary-egress",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-wt-webrtc-direct"
+			},
+			{
+				"browser": "chromium",
+				"condition": "authorized-secondary-egress",
+				"identities": 1,
+				"target": "grid-canary"
+			},
+			{
+				"browser": "firefox",
+				"condition": "authorized-secondary-egress",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-only"
+			},
+			{
+				"browser": "firefox",
+				"condition": "authorized-secondary-egress",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-wt-webrtc-direct"
+			},
+			{
+				"browser": "firefox",
+				"condition": "authorized-secondary-egress",
+				"identities": 1,
+				"target": "grid-canary"
+			},
+			{
+				"browser": "webkit",
+				"condition": "authorized-secondary-egress",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-only"
+			},
+			{
+				"browser": "webkit",
+				"condition": "authorized-secondary-egress",
+				"identities": 50,
+				"target": "browser",
+				"transportProfile": "wss-wt-webrtc-direct"
+			},
+			{
+				"browser": "webkit",
+				"condition": "authorized-secondary-egress",
+				"identities": 1,
+				"target": "grid-canary"
+			}
+		]
+	},
+	"requiredInputs": [
+		{
+			"code": "explicit-consent",
+			"message": "Exact public-network consent and terms review were not supplied.",
+			"satisfied": false
+		},
+		{
+			"code": "independent-registries",
+			"message": "Two independently operated signed-registry endpoints were not supplied.",
+			"satisfied": false
+		},
+		{
+			"code": "second-real-egress",
+			"message": "A second materially distinct authorized real egress/NAT was not supplied.",
+			"satisfied": false
+		}
+	],
+	"observations": [],
+	"note": "No trial rows were synthesized. Public execution requires operator authorization and distinct real egress."
+}

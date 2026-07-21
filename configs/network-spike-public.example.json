@@ -1,0 +1,96 @@
+{
+	"schemaVersion": "1.0.0",
+	"runId": "replace-with-authorized-run-id",
+	"consent": {
+		"acknowledgement": "REPLACE_WITH_EXACT_ACKNOWLEDGEMENT",
+		"grantedAt": "2026-07-20T08:00:00.000Z",
+		"grantedBy": "replace-with-operator",
+		"operatorTermsReviewedAt": "2026-07-20T08:00:00.000Z"
+	},
+	"plan": {
+		"conditions": ["primary-home-nat", "authorized-secondary-egress"],
+		"browsers": ["chromium", "firefox", "webkit"],
+		"nodeIdentitiesPerCondition": 100,
+		"browserIdentitiesPerBrowserCondition": 100,
+		"transportProfileSplit": {
+			"wss-only": 50,
+			"wss-wt-webrtc-direct": 50
+		},
+		"endpointCallCaps": {
+			"nodeRoutingPerIdentity": 4,
+			"delegatedPerBrowserIdentity": 4,
+			"registryPerBrowserIdentity": 4,
+			"relayPerBrowserIdentity": 12,
+			"gridCanaryPerBrowserCondition": 20
+		}
+	},
+	"endpointAllowlist": [
+		"https://replace-registry-a.invalid",
+		"https://replace-registry-b.invalid",
+		"https://replace-delegated.invalid",
+		"https://replace-relay.invalid"
+	],
+	"endpoints": {
+		"delegatedRouting": ["https://replace-delegated.invalid/routing/v1"],
+		"publicDhtBootstrap": ["/dns4/replace-bootstrap.invalid/tcp/443/wss/p2p/replace-peer"],
+		"registries": [
+			{
+				"operatorPseudonym": "operator_111111111111",
+				"url": "https://replace-registry-a.invalid/v1"
+			},
+			{
+				"operatorPseudonym": "operator_222222222222",
+				"url": "https://replace-registry-b.invalid/v1"
+			}
+		],
+		"relays": ["https://replace-relay.invalid/reservations"]
+	},
+	"conditions": [
+		{
+			"authorizationReference": "replace-primary-authorization",
+			"descriptorPseudonym": "network_111111111111",
+			"egressPseudonym": "egress_111111111111",
+			"kind": "real-egress",
+			"label": "primary-home-nat",
+			"natClass": "unknown"
+		},
+		{
+			"authorizationReference": "replace-secondary-authorization",
+			"descriptorPseudonym": "network_222222222222",
+			"egressPseudonym": "egress_222222222222",
+			"kind": "real-egress",
+			"label": "authorized-secondary-egress",
+			"natClass": "unknown"
+		}
+	],
+	"trialBudget": 806,
+	"requestBudget": {
+		"hardCap": 12920
+	},
+	"maxConcurrency": 1,
+	"cooldownMs": 1000,
+	"taskTimeoutMs": 30000,
+	"rawOutputDirectory": ".network-spike-raw/replace-with-authorized-run-id",
+	"stopPolicy": {
+		"onOperatorTermsConcern": true,
+		"onRateLimit": true
+	},
+	"versions": {
+		"browsers": {
+			"chromium": "replace",
+			"firefox": "replace",
+			"webkit": "replace"
+		},
+		"node": "replace",
+		"os": "replace",
+		"packages": {
+			"@libp2p/kad-dht": "replace",
+			"libp2p": "replace"
+		},
+		"pnpm": "replace",
+		"sources": {
+			"delegated-routing-api": "replace",
+			"issue-5-registry": "replace"
+		}
+	}
+}
