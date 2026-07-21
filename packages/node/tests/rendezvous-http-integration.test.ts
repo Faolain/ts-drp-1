@@ -147,6 +147,7 @@ function nodeConfig(
 				},
 				membership: { invite: { inviteToken: INVITE }, mode: "invite" },
 				observability: { sink: (event: ControlPlaneEvent): void => void events.push(event) },
+				rollout: { public_components: { public_rendezvous: { enabled: true } } },
 				rendezvous: {
 					allow_insecure_loopback_fixture: true,
 					endpoints: endpointOverride ?? services.map(({ url }) => url),

@@ -10,6 +10,8 @@ import { type GossipSub, gossipsub, type GossipsubOpts } from "@libp2p/gossipsub
 import {
 	createPeerScoreParams,
 	createTopicScoreParams,
+	defaultPeerScoreParams,
+	defaultPeerScoreThresholds,
 	type PeerScore,
 	type PeerScoreParams,
 	type TopicScoreParams,
@@ -147,9 +149,33 @@ export interface DRPNetworkHostConfigSnapshot {
 	readonly gossipSubPeerExchange: boolean;
 	readonly outboundAddressPolicy: "address-policy" | "allow-all" | "injected";
 	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
+	readonly rollout: {
+		readonly ownedFallback: {
+			readonly configuredRelays: true;
+			readonly localRouting: true;
+			readonly ownedRendezvous: true;
+		};
+		readonly publicComponents: {
+			readonly delegatedRouting: boolean;
+			readonly publicRelayOverflow: boolean;
+			readonly publicRendezvous: boolean;
+			readonly pubsubBehaviorRewards: boolean;
+		};
+	};
+}
+
+export interface ObservedPeerBehavior {
+	readonly authenticated: boolean;
+	readonly diversityScore: number;
+	readonly validBehaviorScore: number;
+}
+
+export interface AuthenticatedPeerBehaviorProvider {
+	getObservedPeerBehavior(peerId: string): ObservedPeerBehavior | undefined;
 }
 
 export interface DRPNetworkNodeDependencies {
+	authenticatedPeerBehaviorProvider?: AuthenticatedPeerBehaviorProvider;
 	hostFactory?: DRPNetworkHostFactory;
 	hostPolicy?: DRPNetworkHostPolicy;
 	relayCandidateSources?: {
@@ -185,6 +211,9 @@ export interface RelayPolicyDriver {
 }
 
 const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
+
+const APP_SPECIFIC_WEIGHT = defaultPeerScoreParams.appSpecificWeight;
+const ACCEPT_PX_THRESHOLD = defaultPeerScoreThresholds.acceptPXThreshold;
 
 const defaultHostFactory: DRPNetworkHostFactory = (context) => context.createHost();
 
@@ -299,6 +328,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
 	private readonly _hostFactory: DRPNetworkHostFactory;
 	private readonly _hostPolicy: DRPNetworkHostPolicy;
+	private readonly _authenticatedPeerBehaviorProvider: DRPNetworkNodeDependencies["authenticatedPeerBehaviorProvider"];
 	private readonly _relayCandidateSources: DRPNetworkNodeDependencies["relayCandidateSources"];
 	private readonly _relayFallback: DRPNetworkNodeDependencies["relayFallback"];
 	private readonly _relayPolicyFactory: DRPNetworkNodeDependencies["relayPolicyFactory"];
@@ -318,6 +348,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		}
 
 		this._config = config;
+		this._authenticatedPeerBehaviorProvider = dependencies.authenticatedPeerBehaviorProvider;
 		this._hostFactory = dependencies.hostFactory ?? defaultHostFactory;
 		this._hostPolicy = dependencies.hostPolicy ?? {};
 		this._relayCandidateSources = dependencies.relayCandidateSources;
@@ -344,6 +375,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	async start(rawPrivateKey?: Uint8Array): Promise<void> {
 		if (this._node?.status === "started") throw new Error("Node already started");
 		this._validateRelayPolicyConfiguration();
+		this._validatePhaseSevenConfiguration();
 
 		let privateKey = undefined;
 		if (rawPrivateKey) {
@@ -364,18 +396,12 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		}
 
 		const bootstrapNodes = this.getBootstrapNodes();
-		const _bootstrapPeerID: string[] = [];
 		if (bootstrapDiscovery && bootstrapNodes.length) {
 			_peerDiscovery.push(
 				bootstrap({
 					list: bootstrapNodes,
 				})
 			);
-			for (const addr of bootstrapNodes) {
-				const peerId = this.getPeerId(multiaddr(addr));
-				if (!peerId) continue;
-				_bootstrapPeerID.push(peerId);
-			}
 		}
 
 		let _node_services: ServiceFactoryMap = {
@@ -383,7 +409,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			dcutr: dcutr(),
 			identify: identify(),
 			identifyPush: identifyPush(),
-			pubsub: gossipsub(this.getGossipSubConfig(_bootstrapPeerID, gossipSubPeerExchange)),
+			pubsub: gossipsub(this.getGossipSubConfig(gossipSubPeerExchange)),
 		};
 
 		if (this._config?.autonat) {
@@ -481,6 +507,20 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			streamMuxers: [yamux()],
 			transports: [circuitRelayTransport(), webRTC(), webSockets()],
 		};
+		const publicComponents = this._config?.control_plane?.rollout?.public_components;
+		const rollout = Object.freeze({
+			ownedFallback: Object.freeze({
+				configuredRelays: true as const,
+				localRouting: true as const,
+				ownedRendezvous: true as const,
+			}),
+			publicComponents: Object.freeze({
+				delegatedRouting: publicComponents?.delegated_routing?.enabled === true,
+				publicRelayOverflow: publicComponents?.public_relay_overflow?.enabled === true,
+				publicRendezvous: publicComponents?.public_rendezvous?.enabled === true,
+				pubsubBehaviorRewards: publicComponents?.pubsub_behavior_rewards?.enabled === true,
+			}),
+		});
 		const snapshot: DRPNetworkHostConfigSnapshot = Object.freeze({
 			bootstrapDiscovery,
 			bootstrapPeerCount: bootstrapDiscovery ? bootstrapNodes.length : 0,
@@ -491,6 +531,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				...(coldStartPubsubDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
 				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
 			]),
+			rollout,
 		});
 		let builtHost: Libp2p | undefined;
 		let hostBuild: Promise<Libp2p> | undefined;
@@ -599,6 +640,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		const configuredSources = relayPolicyConfig?.sources;
 		const injectedSources = this._relayCandidateSources;
 		if (relayPolicyConfig === undefined || configuredSources === undefined || injectedSources === undefined) return;
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
 
 		const targetReservations =
 			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
@@ -633,6 +676,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			{
 				enabled:
+					publicRelayOverflowEnabled &&
 					configuredSources.delegated_closest_peers?.enabled === true &&
 					injectedSources.delegatedClosestPeers !== undefined,
 				name: "delegated-closest-peers",
@@ -648,7 +692,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			{
 				enabled:
-					configuredSources.dht_relay_providers?.enabled === true && injectedSources.dhtRelayProviders !== undefined,
+					publicRelayOverflowEnabled &&
+					configuredSources.dht_relay_providers?.enabled === true &&
+					injectedSources.dhtRelayProviders !== undefined,
 				name: "dht-relay-providers",
 				priority: "overflow" as const,
 				source: injectedSources.dhtRelayProviders,
@@ -700,6 +746,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			throw new Error("control_plane.relay_policy.target_reservations must be an integer within 1..8");
 		}
 		const injected = this._relayCandidateSources;
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
 		const missing: string[] = [];
 		if (
 			configuredSources.configured_fallback !== undefined &&
@@ -717,19 +765,70 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (configuredSources.registry_relay_records?.enabled === true && injected?.registryRelayRecords === undefined) {
 			missing.push("registry_relay_records");
 		}
-		if (configuredSources.delegated_closest_peers?.enabled === true && injected?.delegatedClosestPeers === undefined) {
+		if (
+			publicRelayOverflowEnabled &&
+			configuredSources.delegated_closest_peers?.enabled === true &&
+			injected?.delegatedClosestPeers === undefined
+		) {
 			missing.push("delegated_closest_peers");
 		}
 		if (configuredSources.node_closest_peers?.enabled === true && injected?.nodeClosestPeers === undefined) {
 			missing.push("node_closest_peers");
 		}
-		if (configuredSources.dht_relay_providers?.enabled === true && injected?.dhtRelayProviders === undefined) {
+		if (
+			publicRelayOverflowEnabled &&
+			configuredSources.dht_relay_providers?.enabled === true &&
+			injected?.dhtRelayProviders === undefined
+		) {
 			missing.push("dht_relay_providers");
 		}
 		if (missing.length > 0) {
 			throw new Error(
 				`control_plane.relay_policy enabled sources require injected implementations: ${missing.join(", ")}`
 			);
+		}
+	}
+
+	private _validatePhaseSevenConfiguration(): void {
+		const ipColocation = this._config?.control_plane?.pubsub_scoring?.ip_colocation;
+		if (ipColocation?.enabled === true) {
+			if (!Number.isFinite(ipColocation.weight) || ipColocation.weight > 0) {
+				throw new Error("control_plane.pubsub_scoring IP-colocation weight must be finite and no greater than 0");
+			}
+			if (!Number.isFinite(ipColocation.threshold) || ipColocation.threshold < 1) {
+				throw new Error("control_plane.pubsub_scoring IP-colocation threshold must be finite and at least 1");
+			}
+			const whitelist: unknown = ipColocation.whitelist;
+			if (
+				whitelist !== undefined &&
+				(!Array.isArray(whitelist) || !whitelist.every((address) => typeof address === "string" && address.length > 0))
+			) {
+				throw new Error("control_plane.pubsub_scoring IP-colocation whitelist must be an array of non-empty strings");
+			}
+		}
+
+		const observedBehaviorReward = this._config?.control_plane?.pubsub_scoring?.observed_behavior_reward;
+		if (
+			observedBehaviorReward?.enabled === true &&
+			(!Number.isFinite(observedBehaviorReward.max_application_score) ||
+				observedBehaviorReward.max_application_score <= 0 ||
+				observedBehaviorReward.max_application_score * APP_SPECIFIC_WEIGHT >= ACCEPT_PX_THRESHOLD)
+		) {
+			throw new Error(
+				"control_plane.pubsub_scoring.observed_behavior_reward.max_application_score must be finite, greater than 0, and keep its weighted contribution below the GossipSub accept-PX threshold"
+			);
+		}
+
+		const ownedFallback = this._config?.control_plane?.rollout?.owned_fallback;
+		const ownedFallbackToggles: readonly [string, unknown][] = [
+			["configured_relays", ownedFallback?.configured_relays?.enabled],
+			["local_routing", ownedFallback?.local_routing?.enabled],
+			["owned_rendezvous", ownedFallback?.owned_rendezvous?.enabled],
+		];
+		for (const [name, enabled] of ownedFallbackToggles) {
+			if (enabled !== undefined && enabled !== true) {
+				throw new Error(`control_plane.rollout owned fallback ${name} cannot be disabled`);
+			}
 		}
 	}
 
@@ -964,12 +1063,12 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return addr.getComponents().find((component) => component.name === "p2p")?.value;
 	}
 
-	private getGossipSubConfig(bootstapNodeList: string[], doPX = true): Partial<GossipsubOpts> {
+	private getGossipSubConfig(doPX = true): Partial<GossipsubOpts> {
 		const baseConfig: Partial<GossipsubOpts> = {
 			doPX,
 			fallbackToFloodsub: false,
 			allowPublishToZeroTopicPeers: true,
-			scoreParams: this.getGossipSubPeerScoreParams(bootstapNodeList),
+			scoreParams: this.getGossipSubPeerScoreParams(),
 		};
 
 		if (this._config?.seed) {
@@ -989,18 +1088,63 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return baseConfig;
 	}
 
-	private getGossipSubPeerScoreParams(bootstapNodeList: string[]): PeerScoreParams {
+	private getGossipSubPeerScoreParams(): PeerScoreParams {
+		const ipColocation = this._config?.control_plane?.pubsub_scoring?.ip_colocation;
+		const ipColocationParams: Partial<PeerScoreParams> =
+			ipColocation?.enabled === true
+				? {
+						IPColocationFactorThreshold: ipColocation.threshold,
+						IPColocationFactorWeight: ipColocation.weight,
+						IPColocationFactorWhitelist: new Set(ipColocation.whitelist ?? []),
+					}
+				: { IPColocationFactorWeight: 0 };
+		const observedBehaviorReward = this._config?.control_plane?.pubsub_scoring?.observed_behavior_reward;
+		const publicComponents = this._config?.control_plane?.rollout?.public_components;
+		const behaviorProvider = this._authenticatedPeerBehaviorProvider;
+		const rewardEnabled =
+			observedBehaviorReward?.enabled === true && publicComponents?.pubsub_behavior_rewards?.enabled === true;
+		let providerFailureLogged = false;
+		const neutralProviderFailure = (error: unknown): 0 => {
+			if (!providerFailureLogged) {
+				providerFailureLogged = true;
+				log.warn("::gossipsub::observed-peer-behavior:error", error);
+			}
+			return 0;
+		};
+		const appSpecificScore = (peerId: string): number => {
+			if (!rewardEnabled || behaviorProvider === undefined) return 0;
+			try {
+				const observation = behaviorProvider.getObservedPeerBehavior(peerId);
+				if (observation === undefined || observation.authenticated !== true) return 0;
+				if (
+					typeof observation.diversityScore !== "number" ||
+					typeof observation.validBehaviorScore !== "number" ||
+					!Number.isFinite(observation.diversityScore) ||
+					!Number.isFinite(observation.validBehaviorScore)
+				) {
+					return neutralProviderFailure(new Error("observed peer behavior provider returned an invalid score"));
+				}
+				const observedScore = Math.max(0, observation.diversityScore) + Math.max(0, observation.validBehaviorScore);
+				if (observedScore <= 0) return 0;
+				return Math.min(observedScore, observedBehaviorReward.max_application_score);
+			} catch (error) {
+				return neutralProviderFailure(error);
+			}
+		};
+
 		if (this._config?.seed) {
-			return createPeerScoreParams({ topicScoreCap: 50, IPColocationFactorWeight: 0 });
+			return createPeerScoreParams({
+				...ipColocationParams,
+				appSpecificScore,
+				appSpecificWeight: APP_SPECIFIC_WEIGHT,
+				topicScoreCap: 50,
+			});
 		}
 
 		return createPeerScoreParams({
-			IPColocationFactorWeight: 0,
-			appSpecificScore: (peerId: string) => {
-				if (bootstapNodeList.some((node) => node.includes(peerId))) return 1000;
-
-				return 0;
-			},
+			...ipColocationParams,
+			appSpecificScore,
+			appSpecificWeight: APP_SPECIFIC_WEIGHT,
 			topics: { [DRP_DISCOVERY_TOPIC]: createTopicScoreParams({ topicWeight: 1 }) },
 		});
 	}

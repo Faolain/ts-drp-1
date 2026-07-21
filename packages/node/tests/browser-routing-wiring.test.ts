@@ -57,6 +57,11 @@ afterEach(() => {
 });
 
 describe("DRPNode browser routing wiring", () => {
+	it("does not construct delegated browser routing while its public rollout canary is off", () => {
+		const node = createNode({ endpoints: [PRIMARY, SECONDARY] }, false);
+		expect(node.routing).toBeUndefined();
+	});
+
 	it("rejects fewer than two configured endpoints outside the explicit fixture escape hatch", () => {
 		expect(() => createNode({ endpoints: [PRIMARY] })).toThrow(/at least two|two.*endpoint|endpoint.*2/iu);
 	});
@@ -138,12 +143,17 @@ describe("DRPNode browser routing wiring", () => {
 	});
 });
 
-function createNode(browser: PhaseThreeBrowserConfig): RoutedNode {
+function createNode(browser: PhaseThreeBrowserConfig, delegatedRoutingEnabled = true): RoutedNode {
 	const config = {
 		log_config: { level: "silent" as const },
 		network_config: {
 			bootstrap_peers: [],
-			control_plane: { routing: { browser } },
+			control_plane: {
+				rollout: {
+					public_components: { delegated_routing: { enabled: delegatedRoutingEnabled } },
+				},
+				routing: { browser },
+			},
 		},
 	} as unknown as DRPNodeConfig;
 	return new DRPNode(config) as RoutedNode;

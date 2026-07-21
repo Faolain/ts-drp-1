@@ -252,6 +252,7 @@ describe("DRPNode dependencies", () => {
 				network_config: {
 					bootstrap_peers: [],
 					control_plane: {
+						rollout: { public_components: { public_rendezvous: { enabled: true } } },
 						rendezvous: {
 							endpoints: ["https://registry.example/first/", "https://registry.example/second/"],
 							namespace: record.namespace,

@@ -279,10 +279,13 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private async _startRendezvous(): Promise<void> {
 		const rendezvousConfig = this.config.network_config?.control_plane?.rendezvous;
 		if (rendezvousConfig === undefined) return;
+		const publicRendezvousEnabled =
+			this.config.network_config?.control_plane?.rollout?.public_components?.public_rendezvous?.enabled === true;
 		const cacheEnabled = rendezvousConfig.cache?.enabled === true;
 		const hasInvite = rendezvousConfig.invite !== undefined;
 		// Preserve the Phase 4a activation contract unless a Phase 4b source is explicitly enabled.
-		const hasConfiguredRegistry = rendezvousConfig.publish === true && (rendezvousConfig.endpoints?.length ?? 0) > 0;
+		const hasConfiguredRegistry =
+			publicRendezvousEnabled && rendezvousConfig.publish === true && (rendezvousConfig.endpoints?.length ?? 0) > 0;
 		if (!hasConfiguredRegistry && !cacheEnabled && !hasInvite) return;
 		const namespace = rendezvousConfig.namespace;
 		if (namespace === undefined) throw new Error("configured rendezvous requires a namespace");
@@ -316,7 +319,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				this._emitRendezvousEvent({ kind: "rendezvous-invite", outcome: "failed" });
 			}
 		}
-		const endpoints = [...new Set([...(rendezvousConfig.endpoints ?? []), ...inviteEndpoints])];
+		const endpoints = publicRendezvousEnabled
+			? [...new Set([...(rendezvousConfig.endpoints ?? []), ...inviteEndpoints])]
+			: [];
 		const registryClient =
 			endpoints.length === 0
 				? undefined
@@ -1169,6 +1174,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 function createConfiguredBrowserRouting(config: DRPNodeConfig | undefined): BrowserRouting | undefined {
 	const routing = config?.network_config?.control_plane?.routing?.browser;
 	if (routing?.endpoints === undefined) return undefined;
+	if (config?.network_config?.control_plane?.rollout?.public_components?.delegated_routing?.enabled !== true) {
+		return undefined;
+	}
 	const endpointUrls = routing.endpoints;
 	if (endpointUrls.length === 0) {
 		throw new Error("Browser routing requires at least one delegated endpoint, even for a single-endpoint fixture");

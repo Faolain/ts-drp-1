@@ -155,6 +155,8 @@ describe("Phase 4b DRPNode rendezvous restart integration", () => {
 			issuer
 		);
 		const events: ControlPlaneEvent[] = [];
+		const fetchImpl = vi.fn<typeof globalThis.fetch>();
+		vi.stubGlobal("fetch", fetchImpl);
 		const node = new DRPNode(
 			nodeConfig(
 				"invite-reader",
@@ -166,18 +168,24 @@ describe("Phase 4b DRPNode rendezvous restart integration", () => {
 					max: 8,
 					persistence: "memory",
 				},
-				invite
+				invite,
+				false
 			)
 		) as PhaseFourNode;
 		try {
 			await node.start();
 			expect(await firstBootstrapRecord(node)).toMatchObject({ record: { peerId: contact.peerId } });
+			expect(
+				fetchImpl,
+				"public registry rendezvous must remain off while signed invite fallback stays live"
+			).not.toHaveBeenCalled();
 			expect(events).toEqual(
 				expect.arrayContaining([expect.objectContaining({ kind: "rendezvous-invite", outcome: "accepted" })])
 			);
 			assertSanitized(events, contact.peerId);
 		} finally {
 			await node.stop();
+			vi.unstubAllGlobals();
 		}
 	}, 20_000);
 });
@@ -208,7 +216,8 @@ function nodeConfig(
 	events: ControlPlaneEvent[],
 	publish: boolean,
 	cache: Record<string, unknown> = { enabled: false, max: 16, persistence: "memory" },
-	invite?: string
+	invite?: string,
+	publicRendezvousEnabled = true
 ): DRPNodeConfig {
 	return {
 		interval_reconnect_options: { interval: 60_000 },
@@ -224,6 +233,9 @@ function nodeConfig(
 				},
 				membership: { invite: { inviteToken: INVITE_TOKEN }, mode: "invite" },
 				observability: { sink: (event: ControlPlaneEvent): void => void events.push(event) },
+				rollout: {
+					public_components: { public_rendezvous: { enabled: publicRendezvousEnabled } },
+				},
 				rendezvous: {
 					allow_insecure_loopback_fixture: true,
 					cache,

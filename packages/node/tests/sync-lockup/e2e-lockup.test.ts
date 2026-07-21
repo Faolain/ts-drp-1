@@ -101,8 +101,13 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 			await node.start();
 			await identified;
 		}
+		await Promise.all([
+			node1.networkNode.connect(node2.networkNode.getMultiaddrs() ?? []),
+			node1.networkNode.connect(node3.networkNode.getMultiaddrs() ?? []),
+			node2.networkNode.connect(node3.networkNode.getMultiaddrs() ?? []),
+		]);
 
-		// wait for a full mesh between the three nodes (pubsub peer discovery)
+		// Wait for the explicitly connected full mesh between the three nodes.
 		const peerIds = [node1, node2, node3].map((n) => n.networkNode.peerId);
 		await vi.waitFor(
 			() => {

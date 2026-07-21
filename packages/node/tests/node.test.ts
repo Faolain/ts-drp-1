@@ -331,7 +331,7 @@ describe("DRPObject connection tests", () => {
 
 		libp2pNode1 = libp2pOf(node1.networkNode);
 
-		await Promise.all([
+		const connected = Promise.all([
 			raceEvent(libp2pNode2, "connection:open", controller.signal, {
 				filter: (event: CustomEvent<Connection>) =>
 					event.detail.remotePeer.toString() === node1.networkNode.peerId && event.detail.limits === undefined,
@@ -341,6 +341,8 @@ describe("DRPObject connection tests", () => {
 					event.detail.remotePeer.toString() === node2.networkNode.peerId && event.detail.limits === undefined,
 			}),
 		]);
+		await node1.networkNode.connect(node2.networkNode.getMultiaddrs() ?? []);
+		await connected;
 	});
 
 	afterAll(async () => {

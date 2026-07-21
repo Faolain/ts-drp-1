@@ -63,6 +63,15 @@ describe("DRPNetworkNode host factory", () => {
 			gossipSubPeerExchange: true,
 			outboundAddressPolicy: "allow-all",
 			peerDiscoveryModules: ["@libp2p/pubsub-peer-discovery"],
+			rollout: {
+				ownedFallback: { configuredRelays: true, localRouting: true, ownedRendezvous: true },
+				publicComponents: {
+					delegatedRouting: false,
+					publicRelayOverflow: false,
+					publicRendezvous: false,
+					pubsubBehaviorRewards: false,
+				},
+			},
 		});
 		expect(Object.isFrozen(observedSnapshot)).toBe(true);
 		expect(Object.isFrozen(observedSnapshot?.peerDiscoveryModules)).toBe(true);
@@ -93,6 +102,15 @@ describe("DRPNetworkNode host factory", () => {
 			gossipSubPeerExchange: false,
 			outboundAddressPolicy: "injected",
 			peerDiscoveryModules: [],
+			rollout: {
+				ownedFallback: { configuredRelays: true, localRouting: true, ownedRendezvous: true },
+				publicComponents: {
+					delegatedRouting: false,
+					publicRelayOverflow: false,
+					publicRendezvous: false,
+					pubsubBehaviorRewards: false,
+				},
+			},
 		});
 
 		const deniedAddress = multiaddr(

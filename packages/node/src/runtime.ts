@@ -59,6 +59,12 @@ export function resolveNodeRoutingRuntimeConfig(config: DRPNodeConfig): Resolved
 	const routingConfig = config.network_config?.control_plane?.routing?.node;
 	if (routingConfig?.enabled !== true) return undefined;
 	const network = routingConfig.network ?? "local";
+	if (
+		network === "public" &&
+		config.network_config?.control_plane?.rollout?.public_components?.delegated_routing?.enabled !== true
+	) {
+		return undefined;
+	}
 	if (network === "public" && routingConfig.public_network_acknowledgement !== PUBLIC_NETWORK_ACKNOWLEDGEMENT) {
 		throw new PublicNetworkAcknowledgementError();
 	}

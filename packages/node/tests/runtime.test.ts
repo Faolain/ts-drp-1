@@ -146,6 +146,7 @@ describe("@ts-drp/node/runtime", () => {
 			network_config: {
 				bootstrap_peers: [],
 				control_plane: {
+					rollout: { public_components: { delegated_routing: { enabled: true } } },
 					routing: {
 						node: {
 							enabled: true,
@@ -166,10 +167,53 @@ describe("@ts-drp/node/runtime", () => {
 		await expect(
 			createNodeRuntime({
 				network_config: {
-					control_plane: { routing: { node: { enabled: true, network: "public" } } },
+					control_plane: {
+						rollout: { public_components: { delegated_routing: { enabled: true } } },
+						routing: { node: { enabled: true, network: "public" } },
+					},
 				},
 			} as DRPNodeConfig)
 		).rejects.toBeInstanceOf(PublicNetworkAcknowledgementError);
+	});
+
+	it("keeps the public Amino host extension absent while delegated routing rollout is off", async () => {
+		const { createNodeRuntime } = await loadRuntime();
+		const { PUBLIC_NETWORK_ACKNOWLEDGEMENT } = await loadNodeRouting();
+		let host: Awaited<ReturnType<DRPNetworkHostFactory>> | undefined;
+		const hostFactory: DRPNetworkHostFactory = async (context) => {
+			host = await context.createHost();
+			return host;
+		};
+		const runtime = await createNodeRuntime(
+			{
+				keychain_config: { private_key_seed: "phase-seven-public-routing-off" },
+				log_config: { level: "silent" },
+				network_config: {
+					bootstrap_peers: [],
+					control_plane: {
+						rollout: { public_components: { delegated_routing: { enabled: false } } },
+						routing: {
+							node: {
+								enabled: true,
+								network: "public",
+								public_network_acknowledgement: PUBLIC_NETWORK_ACKNOWLEDGEMENT,
+							},
+						},
+					},
+					listen_addresses: [],
+					log_config: { level: "silent" },
+				},
+			} as DRPNodeConfig,
+			{ network: { hostFactory } }
+		);
+
+		try {
+			if (host === undefined) throw new Error("runtime host was not captured");
+			expect(runtime.routing).toBeUndefined();
+			expect(Reflect.get(host.services, "aminoDHT")).toBeUndefined();
+		} finally {
+			await runtime.node.stop();
+		}
 	});
 
 	it("rejects restart before replacing the routed host and later stops that current host", async () => {

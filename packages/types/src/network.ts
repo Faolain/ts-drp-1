@@ -218,6 +218,52 @@ export interface ControlPlaneRelayPolicyConfig {
 	readonly target_reservations?: number;
 }
 
+export interface ControlPlaneToggleConfig {
+	readonly enabled: boolean;
+}
+
+export type ControlPlaneIpColocationConfig =
+	| {
+			readonly enabled: false;
+	  }
+	| {
+			readonly enabled: true;
+			readonly threshold: number;
+			readonly weight: number;
+			readonly whitelist?: readonly string[];
+	  };
+
+export interface ControlPlanePubsubScoringConfig {
+	readonly ip_colocation?: ControlPlaneIpColocationConfig;
+	readonly observed_behavior_reward?: {
+		readonly enabled: boolean;
+		/**
+		 * Unweighted application-score cap. GossipSub multiplies this by its
+		 * application-specific weight (10); the result must remain strictly below
+		 * its accept-PX threshold (10), so values greater than or equal to 1 fail closed.
+		 */
+		readonly max_application_score: number;
+	};
+}
+
+export interface ControlPlaneOwnedFallbackToggleConfig {
+	readonly enabled?: true;
+}
+
+export interface ControlPlaneRolloutConfig {
+	readonly owned_fallback?: {
+		readonly configured_relays?: ControlPlaneOwnedFallbackToggleConfig;
+		readonly local_routing?: ControlPlaneOwnedFallbackToggleConfig;
+		readonly owned_rendezvous?: ControlPlaneOwnedFallbackToggleConfig;
+	};
+	readonly public_components?: {
+		readonly delegated_routing?: ControlPlaneToggleConfig;
+		readonly public_relay_overflow?: ControlPlaneToggleConfig;
+		readonly public_rendezvous?: ControlPlaneToggleConfig;
+		readonly pubsub_behavior_rewards?: ControlPlaneToggleConfig;
+	};
+}
+
 export interface ControlPlaneRecoveryConfig {
 	readonly backend_cooldown_ms: number;
 	readonly health_poll_interval_ms?: number;
@@ -247,9 +293,11 @@ export interface ControlPlaneConfig {
 	readonly observability?: {
 		sink(event: ControlPlaneEvent): void;
 	};
+	readonly pubsub_scoring?: ControlPlanePubsubScoringConfig;
 	readonly recovery?: ControlPlaneRecoveryConfig;
 	readonly relay_policy?: ControlPlaneRelayPolicyConfig;
 	readonly rendezvous?: ControlPlaneRendezvousConfig;
+	readonly rollout?: ControlPlaneRolloutConfig;
 	readonly routing?: {
 		readonly browser?: ControlPlaneBrowserRoutingConfig;
 		readonly node?: ControlPlaneNodeRoutingConfig;

@@ -301,5 +301,14 @@ function isolatedSnapshot(): DRPNetworkHostConfigSnapshot {
 		gossipSubPeerExchange: false,
 		outboundAddressPolicy: "injected",
 		peerDiscoveryModules: [],
+		rollout: {
+			ownedFallback: { configuredRelays: true, localRouting: true, ownedRendezvous: true },
+			publicComponents: {
+				delegatedRouting: false,
+				publicRelayOverflow: false,
+				publicRendezvous: false,
+				pubsubBehaviorRewards: false,
+			},
+		},
 	};
 }
