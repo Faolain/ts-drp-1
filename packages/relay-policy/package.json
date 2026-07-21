@@ -33,6 +33,7 @@
 		"@libp2p/peer-id": "6.0.12",
 		"@libp2p/utils": "7.2.4",
 		"@multiformats/multiaddr": "^13.0.3",
+		"@ts-drp/rendezvous": "workspace:*",
 		"libp2p": "3.3.5"
 	},
 	"devDependencies": {

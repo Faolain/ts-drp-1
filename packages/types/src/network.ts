@@ -177,6 +177,25 @@ export interface ControlPlaneRendezvousConfig {
 	readonly refresh_interval_ms?: number;
 }
 
+export interface ControlPlaneRelaySourceToggle {
+	readonly enabled?: boolean;
+}
+
+export interface ControlPlaneRelayPolicySourcesConfig {
+	readonly cached_successful_relays?: ControlPlaneRelaySourceToggle;
+	/** Configured fallback records are verified and supplied through the network node's dependency injection seam. */
+	readonly configured_fallback?: ControlPlaneRelaySourceToggle;
+	readonly delegated_closest_peers?: ControlPlaneRelaySourceToggle;
+	readonly dht_relay_providers?: ControlPlaneRelaySourceToggle;
+	readonly node_closest_peers?: ControlPlaneRelaySourceToggle;
+	readonly registry_relay_records?: ControlPlaneRelaySourceToggle;
+}
+
+export interface ControlPlaneRelayPolicyConfig {
+	readonly sources?: ControlPlaneRelayPolicySourcesConfig;
+	readonly target_reservations?: number;
+}
+
 /** Phase 2 structural owners; later phases add runtime implementations behind these sections. */
 export interface ControlPlaneConfig {
 	readonly address_policy?: ControlPlaneAddressPolicyConfig;
@@ -184,9 +203,7 @@ export interface ControlPlaneConfig {
 	readonly observability?: {
 		sink(event: ControlPlaneEvent): void;
 	};
-	readonly relay_policy?: {
-		readonly target_reservations?: number;
-	};
+	readonly relay_policy?: ControlPlaneRelayPolicyConfig;
 	readonly rendezvous?: ControlPlaneRendezvousConfig;
 	readonly routing?: {
 		readonly browser?: ControlPlaneBrowserRoutingConfig;

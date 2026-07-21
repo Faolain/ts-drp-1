@@ -1,4 +1,12 @@
-export type RelayCandidateOrigin = "browser-closest-peers" | "node-closest-peers";
+export type RelayCandidateOrigin =
+	| "browser-closest-peers"
+	| "cached-relay"
+	| "configured-fallback"
+	| "dht-relay-provider"
+	| "node-closest-peers"
+	| "registry-relay-record";
+
+export type RelayCandidateRoutingSource = "configured" | "delegated-routing" | "peer-cache" | "public-dht" | "registry";
 
 export type RelayReservationFailure =
 	| "aborted"
@@ -11,8 +19,22 @@ export type RelayReservationFailure =
 	| "timeout"
 	| "unexpected-response";
 
+export interface RelayOperatorEvidence {
+	readonly credential: string;
+	readonly signedRecordDigest: string;
+}
+
+export interface VerifiedRelayOperatorEvidence {
+	readonly credentialDigest: string;
+	readonly operatorGroup: string;
+	readonly verified: true;
+}
+
+export type RelayCandidateOperatorEvidence = RelayOperatorEvidence | VerifiedRelayOperatorEvidence;
+
 export interface RelayCandidate {
 	readonly addresses: readonly string[];
+	readonly operatorEvidence?: RelayCandidateOperatorEvidence;
 	readonly operatorGroup: string;
 	readonly peerId: string;
 	readonly protocols: readonly string[];
@@ -20,7 +42,7 @@ export interface RelayCandidate {
 		readonly origin: RelayCandidateOrigin;
 		readonly queryDigest: string;
 		readonly resultIndex: number;
-		readonly routingSource: "delegated-routing" | "public-dht";
+		readonly routingSource: RelayCandidateRoutingSource;
 	};
 }
 

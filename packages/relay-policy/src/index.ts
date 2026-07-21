@@ -1,13 +1,16 @@
 import { multiaddr } from "@multiformats/multiaddr";
+import { relayNamespace, relayNamespaceCid, type SignedDrpRecordV1, type ValidatedDrpRecord } from "@ts-drp/rendezvous";
 
 import { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./protocol.js";
 import type {
 	RelayCandidate,
 	RelayInspection,
 	RelayInspector,
+	RelayOperatorEvidence,
 	RelayReservationClient,
 	RelayReservationFailure,
 	RelayReservationWireResponse,
+	VerifiedRelayOperatorEvidence,
 } from "./types.js";
 
 export { decodeHopReservationResponse, Libp2pRelayClient, type Libp2pRelayClientOptions } from "./libp2p-client.js";
@@ -15,17 +18,30 @@ export { CIRCUIT_RELAY_V2_HOP_PROTOCOL, RELAY_RESERVATION_STATUS } from "./proto
 export type {
 	RelayCandidate,
 	RelayCandidateOrigin,
+	RelayCandidateRoutingSource,
 	RelayInspection,
 	RelayInspector,
+	RelayOperatorEvidence,
 	RelayReservationClient,
 	RelayReservationFailure,
 	RelayReservationWireResponse,
+	VerifiedRelayOperatorEvidence,
 } from "./types.js";
 
 export type RelayTransport = "wss" | "webtransport" | "webrtc-direct";
 
 export interface RelayCandidateSource {
 	getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate>;
+}
+
+export interface RelayOperatorGroupClassifier {
+	classify(candidate: RelayCandidate, signal: AbortSignal): Promise<string>;
+}
+
+export interface RelayReservationLifecycleEvent {
+	readonly outcome: "acquired" | "expired" | "refused" | "released" | "replaced";
+	readonly replacedRelayId?: string;
+	readonly relayId: string;
 }
 
 export interface NodeRoutingPeerCandidate {
@@ -150,6 +166,8 @@ export interface RelayPolicyOptions {
 	readonly inspector: RelayInspector;
 	readonly limits?: Partial<RelayPolicyLimits>;
 	now?(): number;
+	onReservationEvent?(event: RelayReservationLifecycleEvent): void;
+	readonly operatorGroupClassifier?: RelayOperatorGroupClassifier;
 	readonly reservationClient: RelayReservationClient;
 	readonly source: RelayCandidateSource;
 	readonly transportProfile?: RelayTransportProfile;
@@ -260,6 +278,312 @@ export class BrowserRoutingClosestPeersSource implements RelayCandidateSource {
 	}
 }
 
+export interface CompositeRelayCandidateSourceEntry {
+	readonly enabled: boolean;
+	readonly name: string;
+	readonly priority: "overflow" | "primary";
+	readonly source: RelayCandidateSource;
+}
+
+export interface CompositeRelayCandidateSourceOptions {
+	readonly requiredOperatorGroups: number;
+	readonly sources: readonly CompositeRelayCandidateSourceEntry[];
+}
+
+/** Ordered, lazy composition of independently switchable relay candidate sources. */
+export class CompositeRelayCandidateSource implements RelayCandidateSource {
+	readonly #requiredOperatorGroups: number;
+	readonly #sources: readonly CompositeRelayCandidateSourceEntry[];
+
+	/** @param options - Ordered sources and the diversity threshold that unlocks overflow. */
+	constructor(options: CompositeRelayCandidateSourceOptions) {
+		this.#requiredOperatorGroups = boundedInteger(options.requiredOperatorGroups, 1, 8, "requiredOperatorGroups");
+		this.#sources = [...options.sources];
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		const seenPeerIds = new Set<string>();
+		const attestedOperatorGroups = new Set<string>();
+		const requiredOperatorGroups = this.#requiredOperatorGroups;
+		const emitSources = async function* (
+			entries: readonly CompositeRelayCandidateSourceEntry[],
+			stopAtDiversity: boolean
+		): AsyncIterable<RelayCandidate> {
+			for (const entry of entries) {
+				signal.throwIfAborted();
+				const iterator = entry.source.getCandidates(queryKey, signal)[Symbol.asyncIterator]();
+				let finished = false;
+				try {
+					while (true) {
+						const next = await iterator.next();
+						if (next.done === true) {
+							finished = true;
+							break;
+						}
+						signal.throwIfAborted();
+						const candidate = next.value;
+						if (isValidCandidate(candidate) && seenPeerIds.has(candidate.peerId)) continue;
+						if (isValidCandidate(candidate)) {
+							seenPeerIds.add(candidate.peerId);
+							const attestedGroup = verifiedOperatorGroup(candidate);
+							if (attestedGroup !== undefined) attestedOperatorGroups.add(attestedGroup);
+						}
+						yield candidate;
+						signal.throwIfAborted();
+						if (stopAtDiversity && attestedOperatorGroups.size >= requiredOperatorGroups) return;
+					}
+				} catch (error) {
+					if (isAbortError(error, signal)) throw error;
+				} finally {
+					if (!finished) {
+						try {
+							await iterator.return?.();
+						} catch (error) {
+							if (isAbortError(error, signal)) throw error;
+						}
+					}
+				}
+			}
+		};
+
+		const enabled = this.#sources.filter(({ enabled }) => enabled);
+		yield* emitSources(
+			enabled.filter(({ priority }) => priority === "primary"),
+			false
+		);
+		if (attestedOperatorGroups.size >= this.#requiredOperatorGroups) return;
+		yield* emitSources(
+			enabled.filter(({ priority }) => priority === "overflow"),
+			true
+		);
+	}
+}
+
+export interface RelayRecordDirectory {
+	discover(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]>;
+}
+
+export interface RelayRecordCache {
+	list(namespace: string, signal: AbortSignal): Promise<readonly ValidatedDrpRecord[]>;
+}
+
+function recordCandidate(
+	record: SignedDrpRecordV1,
+	queryKey: Uint8Array,
+	resultIndex: number,
+	origin: "cached-relay" | "registry-relay-record",
+	routingSource: "peer-cache" | "registry"
+): RelayCandidate {
+	return {
+		addresses: [...record.addresses],
+		operatorGroup: "unknown",
+		peerId: record.peerId,
+		protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+		provenance: { origin, queryDigest: digestQueryKey(queryKey), resultIndex, routingSource },
+	};
+}
+
+/** Maps authenticated relay-service registry records into policy candidates. */
+export class RegistryRelayRecordSource implements RelayCandidateSource {
+	readonly #directory: RelayRecordDirectory;
+	readonly #namespace: string;
+	readonly #now: () => number;
+
+	/**
+	 * @param options - Authenticated directory and network namespace.
+	 * @param options.directory - Authenticated relay record directory.
+	 * @param options.networkId - Opaque network identifier.
+	 */
+	constructor(options: { readonly directory: RelayRecordDirectory; readonly networkId: string; now?(): number }) {
+		this.#directory = options.directory;
+		this.#namespace = relayNamespace(options.networkId);
+		this.#now = options.now ?? Date.now;
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		signal.throwIfAborted();
+		const records = await this.#directory.discover(this.#namespace, signal);
+		signal.throwIfAborted();
+		for (const [resultIndex, { record }] of records.entries()) {
+			if (
+				record.expiresAtMs <= this.#now() ||
+				record.namespace !== this.#namespace ||
+				!record.capabilities.includes("relay-hop-v2-service")
+			) {
+				continue;
+			}
+			yield recordCandidate(record, queryKey, resultIndex, "registry-relay-record", "registry");
+			signal.throwIfAborted();
+		}
+	}
+}
+
+/** Maps authenticated successful-relay cache records into policy candidates. */
+export class CachedSuccessfulRelaySource implements RelayCandidateSource {
+	readonly #cache: RelayRecordCache;
+	readonly #namespace: string;
+	readonly #now: () => number;
+
+	/**
+	 * @param options - Authenticated peer cache and network namespace.
+	 * @param options.cache - Authenticated successful-relay cache.
+	 * @param options.networkId - Opaque network identifier.
+	 */
+	constructor(options: { readonly cache: RelayRecordCache; readonly networkId: string; now?(): number }) {
+		this.#cache = options.cache;
+		this.#namespace = relayNamespace(options.networkId);
+		this.#now = options.now ?? Date.now;
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		signal.throwIfAborted();
+		const records = await this.#cache.list(this.#namespace, signal);
+		signal.throwIfAborted();
+		for (const [resultIndex, { record }] of records.entries()) {
+			if (
+				record.expiresAtMs <= this.#now() ||
+				record.namespace !== this.#namespace ||
+				!record.capabilities.includes("relay-hop-v2-service")
+			) {
+				continue;
+			}
+			yield recordCandidate(record, queryKey, resultIndex, "cached-relay", "peer-cache");
+			signal.throwIfAborted();
+		}
+	}
+}
+
+export interface ConfiguredFallbackRelayEntry {
+	readonly operatorEvidence: VerifiedRelayOperatorEvidence;
+	readonly record: SignedDrpRecordV1;
+}
+
+/** Maps signed, evidence-backed owned relay entries into the fallback floor. */
+export class ConfiguredFallbackRelaySource implements RelayCandidateSource {
+	readonly #entries: readonly ConfiguredFallbackRelayEntry[];
+
+	/**
+	 * @param options - Signed owned-relay records and verified operator evidence.
+	 * @param options.entries - Signed owned-relay entries.
+	 */
+	constructor(options: { readonly entries: readonly ConfiguredFallbackRelayEntry[] }) {
+		this.#entries = [...options.entries];
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		await Promise.resolve();
+		for (const [resultIndex, { operatorEvidence, record }] of this.#entries.entries()) {
+			signal.throwIfAborted();
+			if (!record.capabilities.includes("relay-hop-v2-service")) continue;
+			yield {
+				addresses: [...record.addresses],
+				operatorEvidence: { ...operatorEvidence },
+				operatorGroup:
+					operatorEvidence.verified === true && isOperatorGroup(operatorEvidence.operatorGroup)
+						? operatorEvidence.operatorGroup
+						: "unknown",
+				peerId: record.peerId,
+				protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+				provenance: {
+					origin: "configured-fallback",
+					queryDigest: digestQueryKey(queryKey),
+					resultIndex,
+					routingSource: "configured",
+				},
+			};
+			signal.throwIfAborted();
+		}
+	}
+}
+
+export interface RelayProviderRouting {
+	findProviders(
+		cid: unknown,
+		signal: AbortSignal
+	): AsyncIterable<{ readonly addresses: readonly string[]; readonly peerId: string }>;
+}
+
+/** Maps providers of the deterministic relay namespace CID into policy candidates. */
+export class DhtRelayProviderSource implements RelayCandidateSource {
+	readonly #networkId: string;
+	readonly #routing: RelayProviderRouting;
+	readonly #routingSource: "delegated-routing" | "public-dht";
+
+	/**
+	 * @param options - Provider routing seam, network namespace, and bounded routing provenance.
+	 * @param options.networkId - Opaque network identifier.
+	 * @param options.routing - Provider lookup seam.
+	 * @param options.routingSource - Bounded routing provenance.
+	 */
+	constructor(options: {
+		readonly networkId: string;
+		readonly routing: RelayProviderRouting;
+		readonly routingSource: "delegated-routing" | "public-dht";
+	}) {
+		this.#networkId = options.networkId;
+		this.#routing = options.routing;
+		this.#routingSource = options.routingSource;
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		signal.throwIfAborted();
+		const cid = await relayNamespaceCid(this.#networkId);
+		signal.throwIfAborted();
+		let resultIndex = 0;
+		for await (const provider of this.#routing.findProviders(cid, signal)) {
+			signal.throwIfAborted();
+			yield {
+				addresses: [...provider.addresses],
+				operatorGroup: "unknown",
+				peerId: provider.peerId,
+				protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+				provenance: {
+					origin: "dht-relay-provider",
+					queryDigest: digestQueryKey(queryKey),
+					resultIndex: resultIndex++,
+					routingSource: this.#routingSource,
+				},
+			};
+			signal.throwIfAborted();
+		}
+	}
+}
+
+export interface EvidenceDerivedOperatorGroupClassifierOptions {
+	verify(
+		evidence: RelayOperatorEvidence,
+		signal: AbortSignal
+	): Promise<{ readonly operatorGroup?: string; readonly verified: boolean }>;
+}
+
+/** Derives diversity identity exclusively from verifier-backed evidence. */
+export class EvidenceDerivedOperatorGroupClassifier implements RelayOperatorGroupClassifier {
+	readonly #verify: EvidenceDerivedOperatorGroupClassifierOptions["verify"];
+
+	/** @param options - Evidence verifier owned by the deployment policy. */
+	constructor(options: EvidenceDerivedOperatorGroupClassifierOptions) {
+		this.#verify = options.verify;
+	}
+
+	/** @inheritdoc */
+	async classify(candidate: RelayCandidate, signal: AbortSignal): Promise<string> {
+		const evidence = candidate.operatorEvidence;
+		if (evidence === undefined) return "unknown";
+		if ("verified" in evidence) return isOperatorGroup(evidence.operatorGroup) ? evidence.operatorGroup : "unknown";
+		signal.throwIfAborted();
+		const result = await this.#verify(evidence, signal);
+		signal.throwIfAborted();
+		return result.verified && result.operatorGroup !== undefined && isOperatorGroup(result.operatorGroup)
+			? result.operatorGroup
+			: "unknown";
+	}
+}
+
 /**
  * Decodes the actual Circuit Relay v2 reservation status. HOP advertisement is
  * deliberately absent from this function: protocol support is not acceptance.
@@ -310,6 +634,8 @@ export class RelayPolicy {
 	readonly #inspector: RelayInspector;
 	readonly #limits: Readonly<RelayPolicyLimits>;
 	readonly #now: () => number;
+	readonly #onReservationEvent?: (event: RelayReservationLifecycleEvent) => void;
+	readonly #operatorGroupClassifier?: RelayOperatorGroupClassifier;
 	readonly #reservationClient: RelayReservationClient;
 	readonly #source: RelayCandidateSource;
 	readonly #transportProfile: RelayTransportProfile;
@@ -331,6 +657,8 @@ export class RelayPolicy {
 		this.#reservationClient = options.reservationClient;
 		this.#fallback = options.fallback;
 		this.#limits = Object.freeze(parseLimits(options.limits));
+		this.#onReservationEvent = options.onReservationEvent;
+		this.#operatorGroupClassifier = options.operatorGroupClassifier;
 		this.#transportProfile = parseTransportProfile(options.transportProfile ?? RELAY_TRANSPORT_PROFILES.broadBrowser);
 		this.#now = options.now ?? Date.now;
 	}
@@ -363,7 +691,15 @@ export class RelayPolicy {
 			const publicCollectionBudgetMs = Math.max(1, this.#limits.totalDeadlineMs - fallbackBudgetMs);
 			try {
 				const collected = await withDeadline(
-					(collectionSignal) => collectCandidates(this.#source, queryKey, collectionSignal, this.#limits, this.#now),
+					(collectionSignal) =>
+						collectCandidates(
+							this.#source,
+							queryKey,
+							collectionSignal,
+							this.#limits,
+							this.#now,
+							this.#operatorGroupClassifier
+						),
 					signal,
 					publicCollectionBudgetMs
 				);
@@ -407,6 +743,9 @@ export class RelayPolicy {
 					);
 					const decoded = decodeRelayReservationResponse(response, this.#now());
 					if (!decoded.accepted) {
+						if (decoded.failure === "refused") {
+							this.#emitReservationEvent({ outcome: "refused", relayId: reservation.candidate.peerId });
+						}
 						attempts.push(
 							reservationAttempt(
 								reservation.candidate,
@@ -461,7 +800,7 @@ export class RelayPolicy {
 			const startedAtMs = this.#now();
 			const startedAtMonotonicMs = monotonicNow();
 			await this.#drop(peerId);
-			const result = await this.#acquireFromPool(signal, [], startedAtMs, startedAtMonotonicMs);
+			const result = await this.#acquireFromPool(signal, [], startedAtMs, startedAtMonotonicMs, peerId);
 			return { ...result, reason, replacedPeerId: peerId };
 		});
 	}
@@ -483,7 +822,8 @@ export class RelayPolicy {
 		];
 		this.#active.clear();
 		this.#pendingReleases.clear();
-		await Promise.allSettled(reservations.map(({ candidate }) => this.#reservationClient.release(candidate)));
+		await Promise.allSettled(reservations.map(({ candidate }) => this.#release(candidate)));
+		this.#pendingReleases.clear();
 		this.#candidatePool = [];
 		this.#attemptedPeerIds.clear();
 	}
@@ -492,7 +832,8 @@ export class RelayPolicy {
 		signal: AbortSignal,
 		initialAttempts: RelayAttempt[] = [],
 		startedAtMs = this.#now(),
-		startedAtMonotonicMs = monotonicNow()
+		startedAtMonotonicMs = monotonicNow(),
+		replacedPeerId?: string
 	): Promise<RelayPolicyResult> {
 		const attempts = initialAttempts;
 		const totalController = new AbortController();
@@ -514,7 +855,7 @@ export class RelayPolicy {
 				while (!boundedSignal.aborted && cursor < pending.length && !this.#requirementsMet()) {
 					const candidate = pending[cursor++];
 					if (candidate === undefined) return;
-					const attempt = await this.#attemptCandidate(candidate, boundedSignal, signal);
+					const attempt = await this.#attemptCandidate(candidate, boundedSignal, signal, replacedPeerId);
 					attempts.push(attempt);
 				}
 			});
@@ -535,7 +876,8 @@ export class RelayPolicy {
 	async #attemptCandidate(
 		candidate: RelayCandidate,
 		signal: AbortSignal,
-		callerSignal: AbortSignal
+		callerSignal: AbortSignal,
+		replacedPeerId?: string
 	): Promise<RelayAttempt> {
 		const startedAtMs = this.#now();
 		this.#attemptedPeerIds.add(candidate.peerId);
@@ -603,6 +945,9 @@ export class RelayPolicy {
 			);
 			const decoded = decodeRelayReservationResponse(response, this.#now());
 			if (!decoded.accepted) {
+				if (decoded.failure === "refused") {
+					this.#emitReservationEvent({ outcome: "refused", relayId: candidate.peerId });
+				}
 				return {
 					address,
 					candidate,
@@ -669,6 +1014,11 @@ export class RelayPolicy {
 				if (surplus !== undefined) await this.#drop(surplus.candidate.peerId);
 			}
 			this.#active.set(candidate.peerId, reservation);
+			this.#emitReservationEvent(
+				replacedPeerId === undefined
+					? { outcome: "acquired", relayId: candidate.peerId }
+					: { outcome: "replaced", relayId: candidate.peerId, replacedRelayId: replacedPeerId }
+			);
 			return {
 				address,
 				candidate,
@@ -739,7 +1089,11 @@ export class RelayPolicy {
 	#requirementsMet(): boolean {
 		if (this.#active.size < this.#limits.requiredReservations) return false;
 		return (
-			new Set([...this.#active.values()].map(({ candidate }) => candidate.operatorGroup)).size >=
+			new Set(
+				[...this.#active.values()]
+					.map(({ candidate }) => candidate.operatorGroup)
+					.filter((operatorGroup) => operatorGroup !== "unknown")
+			).size >=
 			this.#limits.requiredOperatorGroups
 		);
 	}
@@ -772,10 +1126,19 @@ export class RelayPolicy {
 		try {
 			await this.#reservationClient.release(candidate);
 			this.#pendingReleases.delete(candidate.peerId);
+			this.#emitReservationEvent({ outcome: "released", relayId: candidate.peerId });
 			return true;
 		} catch {
 			this.#pendingReleases.set(candidate.peerId, cloneCandidate(candidate));
 			return false;
+		}
+	}
+
+	#emitReservationEvent(event: RelayReservationLifecycleEvent): void {
+		try {
+			this.#onReservationEvent?.(event);
+		} catch {
+			// Lifecycle telemetry cannot change relay policy behavior.
 		}
 	}
 
@@ -813,32 +1176,72 @@ async function collectCandidates(
 	queryKey: Uint8Array,
 	signal: AbortSignal,
 	limits: RelayPolicyLimits,
-	now: () => number
+	now: () => number,
+	operatorGroupClassifier?: RelayOperatorGroupClassifier
 ): Promise<CandidateCollectionResult> {
 	const attempts: RelayAttempt[] = [];
 	const candidates: RelayCandidate[] = [];
 	const seen = new Set<string>();
 	let observations = 0;
 	const observationCap = Math.min(512, Math.max(limits.maxCandidates, limits.maxQueuedCandidates) * 4);
-	for await (const candidate of source.getCandidates(queryKey, signal)) {
-		observations++;
-		if (observations > observationCap) break;
-		if (candidates.length >= limits.maxCandidates || candidates.length >= limits.maxQueuedCandidates) break;
-		if (!isValidCandidate(candidate)) {
-			const observedAtMs = now();
-			attempts.push(
-				baseAttempt(
-					sanitizeInvalidCandidate(candidate, queryKey, observations - 1),
-					observedAtMs,
-					now(),
-					"invalid-candidate"
-				)
+	const iterator = source.getCandidates(queryKey, signal)[Symbol.asyncIterator]();
+	let finished = false;
+	try {
+		while (true) {
+			const next = await iterator.next();
+			if (next.done === true) {
+				finished = true;
+				break;
+			}
+			const candidate = next.value;
+			observations++;
+			if (observations > observationCap) break;
+			if (candidates.length >= limits.maxCandidates || candidates.length >= limits.maxQueuedCandidates) break;
+			if (!isValidCandidate(candidate)) {
+				const observedAtMs = now();
+				attempts.push(
+					baseAttempt(
+						sanitizeInvalidCandidate(candidate, queryKey, observations - 1),
+						observedAtMs,
+						now(),
+						"invalid-candidate"
+					)
+				);
+				continue;
+			}
+			if (seen.has(candidate.peerId)) continue;
+			seen.add(candidate.peerId);
+			if (operatorGroupClassifier === undefined) {
+				candidates.push(cloneCandidate(candidate));
+				continue;
+			}
+			let operatorGroup = "unknown";
+			try {
+				operatorGroup = await withDeadline(
+					(classifierSignal) => operatorGroupClassifier.classify(candidate, classifierSignal),
+					signal,
+					limits.perCandidateDeadlineMs
+				);
+				signal.throwIfAborted();
+			} catch (error) {
+				if (isAbortError(error, signal)) throw error;
+			}
+			candidates.push(
+				cloneCandidate({ ...candidate, operatorGroup: isOperatorGroup(operatorGroup) ? operatorGroup : "unknown" })
 			);
-			continue;
 		}
-		if (seen.has(candidate.peerId)) continue;
-		seen.add(candidate.peerId);
-		candidates.push(cloneCandidate(candidate));
+	} catch (error) {
+		if (isAbortError(error, signal)) throw error;
+		const observedAtMs = now();
+		attempts.push(baseAttempt(syntheticCandidate(queryKey), observedAtMs, now(), "source-failed"));
+	} finally {
+		if (!finished) {
+			try {
+				await iterator.return?.();
+			} catch (error) {
+				if (isAbortError(error, signal)) throw error;
+			}
+		}
 	}
 	return { attempts, candidates };
 }
@@ -960,7 +1363,12 @@ function parseTransportProfile(profile: RelayTransportProfile): RelayTransportPr
 	return { allowed, name: profile.name };
 }
 
-function isValidCandidate(candidate: unknown): candidate is RelayCandidate {
+/**
+ * Validates the bounded relay-candidate boundary without admitting unknown provenance.
+ * @param candidate - Untrusted candidate value.
+ * @returns Whether the value is a structurally valid relay candidate.
+ */
+export function isValidCandidate(candidate: unknown): candidate is RelayCandidate {
 	if (candidate === null || typeof candidate !== "object") return false;
 	const item = candidate as Partial<RelayCandidate>;
 	if (typeof item.peerId !== "string" || item.peerId.length < 1 || item.peerId.length > 128) return false;
@@ -979,20 +1387,84 @@ function isValidCandidate(candidate: unknown): candidate is RelayCandidate {
 		return false;
 	}
 	if (typeof item.operatorGroup !== "string" || !isOperatorGroup(item.operatorGroup)) return false;
+	if (item.operatorEvidence !== undefined && !isCandidateOperatorEvidence(item.operatorEvidence)) return false;
 	const provenance = item.provenance;
 	if (provenance === null || typeof provenance !== "object") return false;
 	return (
-		(provenance.origin === "browser-closest-peers" || provenance.origin === "node-closest-peers") &&
+		isCandidateProvenancePair(provenance.origin, provenance.routingSource) &&
 		typeof provenance.queryDigest === "string" &&
 		provenance.queryDigest.length <= 64 &&
 		Number.isSafeInteger(provenance.resultIndex) &&
-		provenance.resultIndex >= 0 &&
-		(provenance.routingSource === "delegated-routing" || provenance.routingSource === "public-dht")
+		provenance.resultIndex >= 0
 	);
+}
+
+function isCandidateOperatorEvidence(value: unknown): boolean {
+	if (value === null || typeof value !== "object") return false;
+	if ("verified" in value) {
+		return (
+			value.verified === true &&
+			"credentialDigest" in value &&
+			typeof value.credentialDigest === "string" &&
+			value.credentialDigest.length <= 128 &&
+			"operatorGroup" in value &&
+			typeof value.operatorGroup === "string" &&
+			isOperatorGroup(value.operatorGroup)
+		);
+	}
+	return (
+		"credential" in value &&
+		typeof value.credential === "string" &&
+		value.credential.length <= 8_192 &&
+		"signedRecordDigest" in value &&
+		typeof value.signedRecordDigest === "string" &&
+		value.signedRecordDigest.length <= 128
+	);
+}
+
+function isCandidateProvenancePair(origin: unknown, routingSource: unknown): boolean {
+	switch (origin) {
+		case "browser-closest-peers":
+			return routingSource === "delegated-routing";
+		case "cached-relay":
+			return routingSource === "peer-cache";
+		case "configured-fallback":
+			return routingSource === "configured";
+		case "dht-relay-provider":
+			return routingSource === "delegated-routing" || routingSource === "public-dht";
+		case "node-closest-peers":
+			return routingSource === "public-dht";
+		case "registry-relay-record":
+			return routingSource === "registry";
+		default:
+			return false;
+	}
 }
 
 function isOperatorGroup(value: string): boolean {
 	return /^[a-zA-Z0-9._:-]{1,64}$/u.test(value);
+}
+
+function verifiedOperatorGroup(candidate: RelayCandidate): string | undefined {
+	const evidence = candidate.operatorEvidence;
+	if (
+		evidence === undefined ||
+		typeof evidence !== "object" ||
+		!("verified" in evidence) ||
+		evidence.verified !== true ||
+		!isOperatorGroup(evidence.operatorGroup) ||
+		evidence.operatorGroup === "unknown"
+	) {
+		return undefined;
+	}
+	return evidence.operatorGroup;
+}
+
+function isAbortError(error: unknown, signal: AbortSignal): boolean {
+	return (
+		signal.aborted ||
+		(error !== null && typeof error === "object" && "name" in error && error.name === "AbortError")
+	);
 }
 
 function safeOperatorGroup(classify: () => string): string {
@@ -1101,6 +1573,7 @@ function reservationAttempt(
 function cloneCandidate(candidate: RelayCandidate): RelayCandidate {
 	return {
 		addresses: [...candidate.addresses],
+		...(candidate.operatorEvidence === undefined ? {} : { operatorEvidence: { ...candidate.operatorEvidence } }),
 		operatorGroup: candidate.operatorGroup,
 		peerId: candidate.peerId,
 		protocols: [...candidate.protocols],
