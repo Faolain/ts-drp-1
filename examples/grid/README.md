@@ -15,9 +15,27 @@ with **no fixed bootstrap seeds**. The modular configuration is built from
 `src/index.ts` wires the node via `@ts-drp/rendezvous`, `@ts-drp/relay-policy`
 and `@ts-drp/control-plane`.
 
-The end‑to‑end harness starts the whole local modular topology for you —
-two independent registry backends, a delegated‑routing fixture, and two
-operator‑diverse relay fixtures — so the easiest way to see it converge is:
+### One‑command local WebRTC demo
+
+To play it yourself — the whole modular stack on one machine, no fixed bootstrap
+seeds, real WebRTC between two browser windows:
+
+```bash
+pnpm --filter ts-drp-example-grid demo
+```
+
+This stands up two rendezvous registries + a delegated‑routing endpoint and two
+operator‑diverse relays, then serves the grid in modular mode. Open the printed
+`http://127.0.0.1:4174` in **two** windows, **CREATE** in one, **JOIN** with the
+copied grid id in the other, and move with `W`/`A`/`S`/`D`. Peers discover each
+other through rendezvous, connect through a relay, and upgrade to direct WebRTC
+where the network allows. Ctrl+C stops everything.
+
+For the full picture — how the WebRTC upgrade works, whether you need to run your
+own nodes, GossipSub node scoring/reputation, all‑in‑one setups, and how to stand
+up a real shareable deployment — see **[docs/DEPLOYING.md](../../docs/DEPLOYING.md)**.
+
+### Automated end‑to‑end
 
 ```bash
 pnpm e2e-test        # modular grid, Chromium + WebKit, no fixed bootstrap

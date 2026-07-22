@@ -6,6 +6,7 @@
 		"build": "vite build",
 		"typecheck": "tsc --noEmit",
 		"clean": "rm -rf dist/ node_modules/",
+		"demo": "node demo/serve.mjs",
 		"dev": "vite serve",
 		"start": "vite preview --host --port 5173"
 	},
