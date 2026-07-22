@@ -18,9 +18,28 @@ import {
 	type RelayReservationWireResponse,
 	RelayTransportRateLimitError,
 } from "@ts-drp/relay-policy";
-import type { BrowserRoutingPeer } from "@ts-drp/routing-browser";
-import type { RoutingPeer } from "@ts-drp/routing-node";
 import { describe, expect, it, vi } from "vitest";
+
+// Fixture shapes mirroring @ts-drp/routing-node's RoutingPeer and @ts-drp/routing-browser's
+// BrowserRoutingPeer, declared locally so relay-policy does not depend on the routing packages
+// that build ON it (relay-policy is lower-level; consuming their types would create a workspace
+// dependency cycle: network -> relay-policy -> routing-node -> network).
+interface RoutingPeer {
+	addresses: string[];
+	addressDecisions: unknown[];
+	inputAddressCount: number;
+	peerId: string;
+	truncatedAddressCount: number;
+}
+interface BrowserRoutingPeer {
+	acceptedAddresses: string[];
+	addressDecisions: unknown[];
+	inputAddressCount: number;
+	peerId: string;
+	protocols: string[];
+	rawAddresses: string[];
+	truncatedAddressCount: number;
+}
 
 const NOW = 1_750_000_000_000;
 const QUERY = Uint8Array.from([1, 2, 3, 4]);

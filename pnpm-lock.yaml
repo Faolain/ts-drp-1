@@ -640,6 +640,15 @@ importers:
       '@ts-drp/object':
         specifier: 0.11.0
         version: link:../object
+      '@ts-drp/rendezvous':
+        specifier: workspace:*
+        version: link:../rendezvous
+      '@ts-drp/routing-browser':
+        specifier: workspace:*
+        version: link:../routing-browser
+      '@ts-drp/routing-node':
+        specifier: workspace:*
+        version: link:../routing-node
       '@ts-drp/tracer':
         specifier: 0.11.0
         version: link:../tracer
@@ -769,12 +778,6 @@ importers:
         specifier: 3.3.5
         version: 3.3.5
     devDependencies:
-      '@ts-drp/routing-browser':
-        specifier: workspace:*
-        version: link:../routing-browser
-      '@ts-drp/routing-node':
-        specifier: workspace:*
-        version: link:../routing-node
       esbuild:
         specifier: 0.25.3
         version: 0.25.3
@@ -793,6 +796,9 @@ importers:
       '@libp2p/peer-id':
         specifier: 6.0.12
         version: 6.0.12
+      '@multiformats/dns':
+        specifier: ^1.0.15
+        version: 1.0.15
       '@multiformats/multiaddr':
         specifier: ^13.0.3
         version: 13.0.3
