@@ -51,6 +51,21 @@ describe("Phase 4a reconciliation owner", () => {
 		expect(reconcile([[validated(left, "registry-a")], [validated(right, "anchor-a")]])).toEqual([]);
 	});
 
+	it("deduplicates the same signed record when relays reorder embedded JSON keys", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(NOW);
+		const reconcile = await loadReconcile();
+		if (reconcile === undefined) return;
+		const record = await signedFixture(108);
+		const reordered = Object.fromEntries(Object.entries(record).reverse()) as unknown as SignedDrpRecordV1;
+
+		expect(reordered.signature).toBe(record.signature);
+		expect(JSON.stringify(reordered)).not.toBe(JSON.stringify(record));
+		expect(reconcile([[validated(record, "registry-a")], [validated(reordered, "registry-b")]])).toEqual([
+			validated(record, "registry-a"),
+		]);
+	});
+
 	it("drops records at or beyond expiry during pure reconciliation", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(NOW);

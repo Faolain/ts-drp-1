@@ -45,7 +45,7 @@ export function reconcileValidatedRecords(
 			}
 			if (
 				candidate.record.sequence === existing.record.sequence &&
-				JSON.stringify(candidate.record) !== JSON.stringify(existing.record)
+				candidate.record.signature !== existing.record.signature
 			) {
 				candidates.delete(candidate.record.peerId);
 				conflictedPeerIds.add(candidate.record.peerId);

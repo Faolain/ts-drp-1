@@ -5,6 +5,7 @@ export * from "./http-registry.js";
 export * from "./invite.js";
 export * from "./local-storage-peer-cache.js";
 export * from "./namespace.js";
+export * from "./nostr.js";
 export * from "./peer-cache.js";
 export * from "./record.js";
 export * from "./record-producer.js";

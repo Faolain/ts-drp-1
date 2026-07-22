@@ -42,6 +42,8 @@
 		"@libp2p/peer-id": "6.0.12",
 		"@multiformats/dns": "^1.0.15",
 		"@multiformats/multiaddr": "^13.0.3",
+		"@noble/curves": "2.2.0",
+		"@noble/hashes": "2.2.0",
 		"@ts-drp/membership": "workspace:*",
 		"multiformats": "14.0.0"
 	},

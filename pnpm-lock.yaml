@@ -802,6 +802,12 @@ importers:
       '@multiformats/multiaddr':
         specifier: ^13.0.3
         version: 13.0.3
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: 2.2.0
+        version: 2.2.0
       '@ts-drp/membership':
         specifier: workspace:*
         version: link:../membership
