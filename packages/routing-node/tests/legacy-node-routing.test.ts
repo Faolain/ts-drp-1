@@ -19,10 +19,22 @@ describe("NodeRouting", () => {
 		expect(first.toString()).not.toBe(different.toString());
 		expect(AMINO_DHT_PROTOCOL).toBe("/ipfs/kad/1.0.0");
 		expect(PUBLIC_NETWORK_ACKNOWLEDGEMENT).toBe("I_ACKNOWLEDGE_PUBLIC_NETWORK_TRAFFIC");
-		expect(OFFICIAL_AMINO_BOOTSTRAPPERS).toHaveLength(2);
-		expect(OFFICIAL_AMINO_BOOTSTRAPPERS.every((address) => address.startsWith("/dnsaddr/bootstrap.libp2p.io/"))).toBe(
-			true
-		);
+		// The full canonical Amino DHT bootstrap set from IPFS mainnet autoconfiguration
+		// (SystemRegistry.AminoDHT.NativeConfig.Bootstrap): 7 multiaddrs across 6 peer identities,
+		// so the node DHT seeds a large enough population for relay/overflow discovery to walk.
+		expect(OFFICIAL_AMINO_BOOTSTRAPPERS).toHaveLength(7);
+		const identities = new Set<string>();
+		for (const address of OFFICIAL_AMINO_BOOTSTRAPPERS) {
+			expect(() => multiaddr(address), `${address} must be a valid multiaddr`).not.toThrow();
+			const id = address.split("/p2p/").at(-1) ?? "";
+			expect(id, `${address} must contain a /p2p/ peer id`).not.toBe("");
+			expect(() => peerIdFromString(id), `${address} must carry a valid peer id`).not.toThrow();
+			identities.add(id);
+		}
+		expect(identities.size).toBe(6);
+		// Not only bootstrap.libp2p.io — the canonical set includes the va1 host and the Mars static node.
+		expect(OFFICIAL_AMINO_BOOTSTRAPPERS.some((address) => address.includes("va1.bootstrap.libp2p.io"))).toBe(true);
+		expect(OFFICIAL_AMINO_BOOTSTRAPPERS.some((address) => address.includes("/ip4/104.131.131.82/"))).toBe(true);
 	});
 
 	it("rejects invalid bounds before constructing a host", async () => {
