@@ -136,6 +136,35 @@ VITE_NOSTR_RELAYS="wss://relay.damus.io,wss://nos.lol" \
   pnpm exec playwright test --config examples/grid/playwright.public-infra.config.ts
 ```
 
+#### The connectivity half: why you still operate a relay
+
+Discovery runs on public infrastructure trivially because a Nostr relay is
+open — anyone can post and read. The **connectivity** half (a Circuit Relay v2
+node that brokers the browsers' first contact and WebRTC upgrade) is not so easy
+to source publicly. A browser-usable public relay must, at the same time: (1)
+expose a browser-reachable transport with a **valid** certificate
+(`/wss`, `/webtransport`, or `/webrtc-direct`); (2) run an **open HOP** service
+that actually **grants a reservation** to an arbitrary peer; and (3) have a
+stable, known Peer ID.
+
+A bounded survey of the obvious public candidates (2026-07) found **none** that
+qualify:
+
+| Candidate | Browser-reachable (valid cert)? | Grants reservation? |
+| --- | --- | --- |
+| The four `*.bootstrap.libp2p.io` IPFS nodes | Yes — valid Let's Encrypt WSS, advertise `/libp2p/circuit/relay/0.2.0/hop` | **No** — `RESERVE` returns `STATUS=200` (`RESERVATION_REFUSED`) to strangers |
+| `bootstrap{1,2}.topology.gg` | No — self-signed certificate | not reached |
+
+So the public IPFS bootstrap nodes *advertise* relay HOP but refuse to relay for
+arbitrary peers — a deliberate resource/abuse policy, i.e. an **ecosystem
+availability** limitation, not a DRP one. Until an open, browser-reachable,
+reservation-granting public relay exists, the connectivity half needs a relay
+**you** (or a willing partner) operate. The stack already supports pointing at a
+specific relay — via a signed configured-fallback relay source, or a
+delegated-routing response that returns it — the moment a qualifying one appears.
+(The *routing* that finds relays can already use public delegated routing, e.g.
+`https://delegated-ipfs.dev/routing/v1/`.)
+
 ---
 
 ## Tier 2 — A real, shareable modular deployment
