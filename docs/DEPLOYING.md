@@ -158,19 +158,33 @@ So the canonical IPFS bootstrap nodes are **discovery seeds, not relays** — th
 advertise HOP but refuse reservations to strangers (a deliberate policy). But the
 *dynamic* tier does exist: walking the Amino DHT (AutoRelay-style) surfaces
 ephemeral AutoTLS relays that **do** grant browser-usable reservations. This is
-exactly DRP's **overflow** relay tier (`NodeRoutingClosestPeersSource`,
+exactly the shape of DRP's **overflow** relay tier (`NodeRoutingClosestPeersSource`,
 `routingSource: "public-dht"`; browsers use delegated routing) — gated behind an
 operator-diversity threshold. Evidence:
 `specs/public-only-bootstrap/reviews/phase-04.md` (canonical refuse) and
 `phase-05.md` (dynamic grant).
 
-The catch is that these dynamic relays are **ephemeral** — they churn, fill their
-reservation pools, and impose limits — and are **untrusted** (could be an
-attacker's node). So they are usable as best-effort **overflow only**: loss of your
-own relays degrades to a public one rather than hard-failing, but you still run
-**≥2 relays you (or a willing partner) operate** as the dependable, operator-diverse
-floor. (Routing that finds relays can already use public delegated routing, e.g.
-`https://delegated-ipfs.dev/routing/v1/`.)
+**Important — the DRP node overflow tier is not usable as-shipped** (see
+`phase-06.md`). Two things stand in the way, both by design and both fixable:
+
+- **DHT config throttle.** DRP's public Amino DHT settings
+  (`createAminoHostExtensions`) set `alpha:1` + `disjointPaths:1` — single-path,
+  one-at-a-time queries — so a relay-discovery closest-peers walk never converges
+  within `NodeRouting`'s fixed 10 s guard (**0** candidates, even at a 60 s deadline).
+  Relax those to libp2p defaults, keeping `clientMode:true` (verified: the same walk
+  then finds ~20 peers / 17 HOP / 16 browser-usable in ~29 s). But that Amino config
+  is shared with production rendezvous-anchor queries, so it is a resource tradeoff,
+  not a free flip. And the walk takes ~29 s, so the 10 s operation guard also needs
+  raising for discovery.
+- **Unwired.** `NodeRoutingClosestPeersSource` is defined but not composed into any
+  production relay policy yet.
+
+So today the overflow tier is a **designed-but-not-enabled** capability. Regardless,
+these dynamic relays are **ephemeral** (they churn, fill reservation pools, impose
+limits) and **untrusted** (could be an attacker's node), so even once enabled they
+are best-effort **overflow only**: run **≥2 relays you (or a willing partner)
+operate** as the dependable, operator-diverse floor. (Routing that *finds* relays can
+already use public delegated routing, e.g. `https://delegated-ipfs.dev/routing/v1/`.)
 
 ---
 

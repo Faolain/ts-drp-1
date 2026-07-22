@@ -101,28 +101,47 @@ DRP's public Amino query settings but relaxing the 10-second cap. Two runs, same
 warmup (~30 s, routing table 5–6 peers), querying `peerRouting.getClosestPeers`
 toward a relay-namespace key with a **60-second** deadline:
 
-| DHT settings | Deadline | Walk result | Closest peers | HOP-advertising | Browser-usable |
-| --- | --- | --- | --- | --- | --- |
-| DRP public: `clientMode:true`, `alpha:1`, `disjointPaths:1` | 60 s | aborted (never converged) | **0** | 0 | 0 |
-| libp2p defaults: `clientMode:false`, default `alpha`/`disjointPaths` | 60 s | **completed in ~29 s** | **20** | **17** | **16** |
+Each run: same warmup (~30 s, routing table 5–6 peers), `peerRouting.getClosestPeers`
+toward a relay-namespace key, key knobs varied one factor at a time:
 
-So the closest-peers **mechanism works** — with standard libp2p query settings the
-walk surfaces 20 peers, 17 advertising `/libp2p/circuit/relay/0.2.0/hop`, 16 with
-browser-usable transports (`/tls/ws`, `/webtransport`, `/webrtc-direct`). What
-fails is the walk **under DRP's deliberately conservative public DHT
-configuration** (`createAminoHostExtensions`, `packages/routing-node/src/index.ts`):
-`clientMode:true` + `alpha:1` + `disjointPaths:1` + a 24 h `querySelfInterval`
-throttle the iterative query so hard that it yields **zero** candidates even at 6×
-`NodeRouting`'s 10-second guard. Combined with that guard, DRP's node overflow
-relay discovery does not surface candidates in practice.
+| # | `clientMode` | `alpha` / `disjointPaths` | Deadline | Walk result | Peers | HOP | Browser-usable |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: |
+| 1 | `true` (DRP public) | `1` / `1` (DRP public) | 60 s | aborted, never converged | **0** | 0 | 0 |
+| 2 | `false` (server) | defaults (`3` / …) | 60 s | completed ~29 s | 20 | 17 | 16 |
+| 3 | **`true`** (unchanged) | **defaults** | 45 s | **completed ~29 s** | **20** | **17** | **16** |
 
-This is an **actionable finding, not a code defect**: the overflow tier exists and
-the DHT contains plenty of browser-usable HOP relays, but to make DRP's
-`NodeRoutingClosestPeersSource` actually reach them, the public Amino query
-settings (query concurrency `alpha`, `disjointPaths`, and likely `clientMode`) and
-the fixed 10 s operation guard would need loosening for the relay-discovery query.
-(This concerns the **node** overflow path; browsers discover relays via delegated
-routing, a separate path.) Note the exact single knob was not isolated — three
-conservative settings were relaxed together — but the contrast (0 vs 20) is
-unambiguous, and isolating the dominant knob (`alpha`/`disjointPaths` query
-concurrency is the likely driver) is a small follow-up.
+**Isolation (row 3 is the key result):** keeping `clientMode:true` — DRP stays a DHT
+*client*, does **not** become a server — but using default query concurrency yields
+the same 20 peers / 17 HOP / 16 browser-usable in ~29 s. So the dominant blockers
+are the **`alpha:1` + `disjointPaths:1`** overrides (single-path, one-at-a-time
+iterative queries), **not** `clientMode`. `clientMode` is a node-only switch anyway
+(a browser can never be a DHT server, and browsers do not run this DHT path at all —
+they discover relays via delegated routing); it correctly stays `true`.
+
+So the closest-peers **mechanism works**; what fails is the walk **under DRP's
+deliberately conservative public DHT configuration**
+(`createAminoHostExtensions`, `packages/routing-node/src/index.ts`): the
+`alpha:1` + `disjointPaths:1` overrides throttle the iterative query below any
+usable latency (≥29 s), and `NodeRouting`'s fixed `OPERATION_TIMEOUT_MS = 10_000`
+guard then aborts it — zero candidates even at 6× that guard.
+
+**What it would take to actually enable the node overflow tier** (a deliberate,
+multi-part change — none made here):
+
+1. **Config (shared):** in `createAminoHostExtensions`, drop the public
+   `alpha:1` / `disjointPaths:1` overrides (use libp2p defaults). Note this same
+   Amino host config is used by the production node (`packages/node/src/runtime.ts`)
+   for **rendezvous-anchor** DHT queries too, so it raises query concurrency for
+   those as well — a real resource tradeoff to weigh, not a free win.
+2. **Timeout:** `NodeRouting`'s fixed 10 s `OPERATION_TIMEOUT_MS` is shorter than a
+   real public-DHT discovery (~29 s); the relay-discovery query needs a longer bound
+   (raise the guard, or make it per-operation configurable).
+3. **Wiring:** `NodeRoutingClosestPeersSource` is currently **defined but not
+   instantiated anywhere in production** — the node overflow relay tier is unwired.
+   Enabling it means composing this source into the node's relay policy, not only
+   loosening the DHT config.
+
+This is an **actionable finding, not a code defect**: the tier exists in code and the
+public DHT is full of browser-usable HOP relays, but three deliberate steps stand
+between the current state and a working node overflow path. Browsers are unaffected
+(delegated-routing path).
