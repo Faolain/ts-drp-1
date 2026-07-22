@@ -650,8 +650,15 @@ export class ControlPlaneCoordinator {
 			case "registry-failed":
 				return this.#registryFailurePlan(fault);
 			case "all-registries-failed":
+				// A point-in-time "all registries failed" observation (often a transient or aborted
+				// discover trace) must still RE-ATTEMPT registries — they recover, and a peer whose only
+				// discovery path is registries would otherwise be stranded — alongside the fallbacks.
+				// Cooled-down backends remain excluded by #registryRequest.
 				return singleOperationPlan("fallback-rendezvous", "registries", false, (signal) =>
-					this.#ports.rendezvousBootstrap(this.#registryRequest(["dht-anchor", "cache", "signed-invite"]), signal)
+					this.#ports.rendezvousBootstrap(
+						this.#registryRequest(["registries", "dht-anchor", "cache", "signed-invite"]),
+						signal
+					)
 				);
 			case "delegated-router-failed":
 				if (typeof fault.routerId !== "string") return undefined;

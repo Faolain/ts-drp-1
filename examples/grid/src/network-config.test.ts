@@ -64,6 +64,7 @@ describe("grid network configuration", () => {
 
 		expect(controlPlane?.address_policy).not.toHaveProperty("allowInsecureWebSocket");
 		expect(controlPlane?.address_policy).not.toHaveProperty("allowLoopback");
+		expect(controlPlane?.address_policy).not.toHaveProperty("allowPrivate");
 		expect(controlPlane?.rendezvous).not.toHaveProperty("allow_insecure_loopback_fixture");
 		expect(controlPlane?.routing?.browser).not.toHaveProperty("allow_insecure_loopback_fixture");
 		expect(controlPlane?.routing?.browser).not.toHaveProperty("allow_single_endpoint_fixture");
@@ -78,6 +79,9 @@ describe("grid network configuration", () => {
 		expect(controlPlane?.address_policy).toMatchObject({
 			allowInsecureWebSocket: true,
 			allowLoopback: true,
+			// Local fixtures advertise private-LAN circuit addresses (the relay binds to the host LAN IP);
+			// without allowPrivate the whole rendezvous record is rejected as scope-private.
+			allowPrivate: true,
 		});
 		expect(controlPlane?.rendezvous?.allow_insecure_loopback_fixture).toBe(true);
 		expect(controlPlane?.routing?.browser).toMatchObject({

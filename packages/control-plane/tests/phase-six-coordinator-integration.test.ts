@@ -98,7 +98,7 @@ describe("Phase 6 coordinator integration", () => {
 		{
 			assert: (ports: RecoveryHarnessPorts): void =>
 				expect(ports.rendezvousBootstrap).toHaveBeenCalledWith(
-					{ sources: ["dht-anchor", "cache", "signed-invite"] },
+					{ sources: ["registries", "dht-anchor", "cache", "signed-invite"] },
 					expect.any(AbortSignal)
 				),
 			name: "all-registries-failed",

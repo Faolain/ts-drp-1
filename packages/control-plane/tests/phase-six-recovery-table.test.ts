@@ -45,12 +45,14 @@ describe("Phase 6 failure-to-recovery table", () => {
 		expect(controller.signal.aborted).toBe(false);
 	});
 
-	it("falls back through the rendezvous ensemble when all registries fail", async () => {
+	it("re-attempts registries alongside the fallbacks when all registries fail", async () => {
 		const { coordinator, controller, harness, result } = await run({ kind: "all-registries-failed" });
 
 		expect(coordinator).toBeInstanceOf(ControlPlaneCoordinator);
+		// "All registries failed" is a point-in-time observation; recovery must still re-attempt the
+		// registries (they recover) rather than permanently stranding a registry-only peer.
 		expect(harness.ports.rendezvousBootstrap).toHaveBeenCalledWith(
-			{ sources: ["dht-anchor", "cache", "signed-invite"] },
+			{ sources: ["registries", "dht-anchor", "cache", "signed-invite"] },
 			expect.any(AbortSignal)
 		);
 		expect(result.terminal).toBe(RecoveryTerminal.Succeeded);

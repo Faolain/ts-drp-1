@@ -57,7 +57,10 @@ export function buildModularNetworkConfig(environment: GridNetworkEnv): DRPNodeC
 			control_plane: {
 				address_policy: {
 					target: "browser",
-					...(allowInsecureFixture ? { allowInsecureWebSocket: true, allowLoopback: true } : {}),
+					// Local fixtures advertise loopback AND private-LAN circuit addresses (the relay binds
+					// to 127.0.0.1 and the host LAN IP), so the fixture must opt into all three; production
+					// keeps them rejected. A record is dropped whole if ANY address is unsafe.
+					...(allowInsecureFixture ? { allowInsecureWebSocket: true, allowLoopback: true, allowPrivate: true } : {}),
 				},
 				membership: {
 					invite: { inviteToken: membershipInvite },
