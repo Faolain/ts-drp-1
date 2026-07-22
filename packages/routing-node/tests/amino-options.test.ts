@@ -25,9 +25,18 @@ describe("Amino DHT query tuning", () => {
 		createAminoHostExtensions({ mode: "client", network: "public" });
 
 		expect(capturedDhtOptions).toHaveLength(1);
-		expect(capturedDhtOptions[0]).toMatchObject({ clientMode: true });
+		expect(capturedDhtOptions[0]).toMatchObject({ allowQueryWithZeroPeers: false, clientMode: true });
 		expect(capturedDhtOptions[0]?.alpha).toBe(1);
 		expect(capturedDhtOptions[0]?.disjointPaths).toBe(1);
+		expect(capturedDhtOptions[0]?.initialQuerySelfInterval).toBeUndefined();
+		expect(capturedDhtOptions[0]?.querySelfInterval).toBe(24 * 60 * 60 * 1_000);
+	});
+
+	it("does not arm an instantly-empty zero-peer query loop on a cold local host either", () => {
+		createAminoHostExtensions({ mode: "client", network: "local" });
+
+		expect(capturedDhtOptions).toHaveLength(1);
+		expect(capturedDhtOptions[0]?.allowQueryWithZeroPeers).toBe(false);
 	});
 
 	it("forwards explicitly bounded concurrency for an overflow-discovery routing instance", async () => {

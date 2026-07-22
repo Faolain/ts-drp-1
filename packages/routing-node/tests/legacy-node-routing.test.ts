@@ -46,7 +46,7 @@ describe("NodeRouting", () => {
 		);
 	});
 
-	it("returns an empty isolated result, propagates abort, caps operations, and stops idempotently", async () => {
+	it("parks an isolated zero-peer query until abort, caps operations, and stops idempotently", async () => {
 		const routing = await createNodeRouting({
 			bootstrapPeers: [],
 			limits: { maxOperations: 2 },
@@ -54,9 +54,11 @@ describe("NodeRouting", () => {
 			network: "local",
 		});
 		try {
-			const empty = [];
-			for await (const peer of routing.getClosestPeers(new Uint8Array([1, 2, 3]))) empty.push(peer);
-			expect(empty).toEqual([]);
+			await expect(async () => {
+				for await (const _peer of routing.getClosestPeers(new Uint8Array([1, 2, 3]), AbortSignal.timeout(50))) {
+					// A zero-peer query waits for routing-table progress and must not yield.
+				}
+			}).rejects.toThrow();
 
 			const controller = new AbortController();
 			controller.abort(new Error("fixture abort"));

@@ -736,11 +736,11 @@ export function createAminoHostExtensions(
 	);
 	const aminoDhtFactory = kadDHT({
 		alpha,
-		allowQueryWithZeroPeers: true,
+		allowQueryWithZeroPeers: false,
 		clientMode: mode === "client",
 		datastorePrefix: `/drp-amino-${network}`,
 		disjointPaths,
-		initialQuerySelfInterval: network === "public" ? 24 * 60 * 60 * 1_000 : undefined,
+		initialQuerySelfInterval: undefined,
 		logPrefix: `drp:amino:${network}`,
 		metricsPrefix: `drp_amino_${network}`,
 		peerInfoMapper: network === "public" ? removePrivateAddressesMapper : passthroughMapper,

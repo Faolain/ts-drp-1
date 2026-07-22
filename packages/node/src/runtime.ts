@@ -5,7 +5,7 @@ import {
 	DRPNetworkNode,
 	type DRPNetworkNodeDependencies,
 } from "@ts-drp/network";
-import { type NodeClosestPeerRouting, NodeRoutingClosestPeersSource } from "@ts-drp/relay-policy";
+import { type ConnectedHopRelayHost, ConnectedHopRelaySource } from "@ts-drp/relay-policy";
 import {
 	createAminoHostExtensions,
 	attachNodeRouting as defaultAttachNodeRouting,
@@ -117,11 +117,18 @@ export async function createNodeRuntime(
 	const nodeClosestPeersEnabled =
 		network === "public" &&
 		runtimeConfig.network_config?.control_plane?.relay_policy?.sources?.node_closest_peers?.enabled === true;
-	const deferredNodeRouting = nodeClosestPeersEnabled
-		? new DeferredNodeClosestPeerRouting(() => attachedRouting)
+	const connectedHopHost: ConnectedHopRelayHost = {
+		getConnections: () => routingHost?.getConnections() ?? [],
+		peerStore: {
+			get: (peerId, options) => {
+				if (routingHost === undefined) return Promise.reject(new Error("Node routing host is not available"));
+				return routingHost.peerStore.get(peerId, options);
+			},
+		},
+	};
+	const nodeClosestPeersSource = nodeClosestPeersEnabled
+		? new ConnectedHopRelaySource({ host: connectedHopHost })
 		: undefined;
-	const nodeClosestPeersSource =
-		deferredNodeRouting === undefined ? undefined : new NodeRoutingClosestPeersSource(deferredNodeRouting);
 	const relayCandidateSources =
 		nodeClosestPeersSource === undefined
 			? dependencies.network?.relayCandidateSources
@@ -158,7 +165,7 @@ export async function createNodeRuntime(
 			mode: "client",
 			network,
 		});
-		if (deferredNodeRouting !== undefined) {
+		if (nodeClosestPeersEnabled) {
 			void networkNode.retryRelayPolicyAcquisition();
 		}
 		return { node, routing: attachedRouting };
@@ -173,26 +180,6 @@ export async function createNodeRuntime(
 			}
 		}
 		throw error;
-	}
-}
-
-class DeferredNodeClosestPeerRouting implements NodeClosestPeerRouting {
-	readonly #routing: () => NodeRouting | undefined;
-
-	constructor(routing: () => NodeRouting | undefined) {
-		this.#routing = routing;
-	}
-
-	async *getClosestPeers(
-		queryKey: Uint8Array,
-		signal?: AbortSignal
-	): AsyncIterable<{
-		readonly addresses: readonly string[];
-		readonly peerId: string;
-	}> {
-		const routing = this.#routing();
-		if (routing === undefined) return;
-		yield* routing.getClosestPeers(queryKey, signal);
 	}
 }
 

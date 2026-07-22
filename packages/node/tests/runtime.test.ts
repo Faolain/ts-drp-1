@@ -222,7 +222,7 @@ describe("@ts-drp/node/runtime", () => {
 		expect(resolved?.bootstrappers).toEqual([...OFFICIAL_AMINO_BOOTSTRAPPERS]);
 	});
 
-	it("composes configured public node closest peers as deferred overflow candidates", async () => {
+	it("composes configured primary relays with warm node overflow without a cold routing walk", async () => {
 		const { createNodeRuntime } = await loadRuntime();
 		const { PUBLIC_NETWORK_ACKNOWLEDGEMENT } = await loadNodeRouting();
 		const primary = runtimeCandidate("configured-primary", "configured-fallback", "configured");
@@ -246,10 +246,11 @@ describe("@ts-drp/node/runtime", () => {
 				stop: (): Promise<void> => Promise.resolve(),
 			};
 		});
-		const fakeRouting = runtimeNodeRouting([
-			{ addresses: ["/ip4/8.8.8.8/tcp/4001"], peerId: "node-relay-a" },
-			{ addresses: ["/ip4/9.9.9.9/tcp/4001"], peerId: "node-relay-b" },
-		]);
+		const coldWalk = vi.fn(async function* (): AsyncIterable<NodeRoutingPeer> {
+			await Promise.resolve();
+			yield { addresses: ["/ip4/8.8.8.8/tcp/4001"], peerId: "must-not-surface" };
+		});
+		const fakeRouting = runtimeNodeRouting([], coldWalk);
 		let finishAttachment: ((routing: NodeRouting) => void) | undefined;
 		let attachmentStarted: (() => void) | undefined;
 		const attachmentStartedPromise = new Promise<void>((resolve) => {
@@ -287,11 +288,8 @@ describe("@ts-drp/node/runtime", () => {
 			expect(relayTotalDeadlineMs).toBe(55_000);
 			expect(relayTransportProfileName).toBe("node");
 			const candidates = acquisitions[1] ?? [];
-			expect(candidates.map(({ peerId }) => peerId)).toEqual(["configured-primary", "node-relay-a", "node-relay-b"]);
-			expect(candidates.slice(1)).toMatchObject([
-				{ provenance: { origin: "node-closest-peers", routingSource: "public-dht" } },
-				{ provenance: { origin: "node-closest-peers", routingSource: "public-dht" } },
-			]);
+			expect(candidates.map(({ peerId }) => peerId)).toEqual(["configured-primary"]);
+			expect(coldWalk).not.toHaveBeenCalled();
 		} finally {
 			if (finishAttachment !== undefined && runtime === undefined) finishAttachment(fakeRouting);
 			await Promise.allSettled([runtimePromise.then(({ node }) => node.stop())]);
@@ -349,7 +347,7 @@ describe("@ts-drp/node/runtime", () => {
 		}
 	});
 
-	it("retries an empty post-attachment walk until degraded reservations actually satisfy the target", async () => {
+	it("retries warm overflow after routing attachment without starting a cold walk", async () => {
 		const { createNodeRuntime } = await loadRuntime();
 		const { PUBLIC_NETWORK_ACKNOWLEDGEMENT } = await loadNodeRouting();
 		const fakeRouting = runtimeNodeRouting([
@@ -394,7 +392,7 @@ describe("@ts-drp/node/runtime", () => {
 		});
 		try {
 			await vi.waitFor(() => expect(postAttachAcquire).toHaveBeenCalledTimes(2));
-			await vi.waitFor(() => expect(postAttachRoutingWalk).toHaveBeenCalledTimes(2));
+			expect(postAttachRoutingWalk).not.toHaveBeenCalled();
 		} finally {
 			await postAttachRuntime.node.stop();
 		}
@@ -434,7 +432,7 @@ describe("@ts-drp/node/runtime", () => {
 		);
 		try {
 			await vi.waitFor(() => expect(insufficientAcquire).toHaveBeenCalledTimes(2));
-			await vi.waitFor(() => expect(routingWalkAfterRetry).toHaveBeenCalledOnce());
+			expect(routingWalkAfterRetry).not.toHaveBeenCalled();
 		} finally {
 			await insufficientRuntime.node.stop();
 		}

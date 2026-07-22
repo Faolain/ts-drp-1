@@ -17,6 +17,35 @@ const NOW = 1_750_000_000_000;
 const QUERY = Uint8Array.from([9, 8, 7, 6]);
 
 describe("node relay overflow RED contracts", () => {
+	it.each([
+		["node-connected-hop", "connected-peers"],
+		["configured-relay", "configured"],
+	] as const)("preserves %s provenance when sanitizing an invalid candidate", async (origin, routingSource) => {
+		const malformed = {
+			addresses: Array.from({ length: 33 }, () => "/bad"),
+			operatorGroup: "unknown",
+			peerId: "malformed",
+			protocols: [],
+			provenance: { origin, queryDigest: "untrusted", resultIndex: 99, routingSource },
+		} as unknown as RelayCandidate;
+		const policy = createPolicy(sourceOf([malformed]), {
+			requiredOperatorGroups: 1,
+			requiredReservations: 1,
+		});
+
+		try {
+			const result = await policy.acquire(QUERY, AbortSignal.timeout(1_000));
+			expect(result.attempts).toContainEqual(
+				expect.objectContaining({
+					candidate: expect.objectContaining({ provenance: expect.objectContaining({ origin, routingSource }) }),
+					status: "invalid-candidate",
+				})
+			);
+		} finally {
+			await policy.stop();
+		}
+	});
+
 	it("accepts the 60s total deadline needed by a public Amino walk", async () => {
 		const policy = createPolicy(sourceOf([]), { totalDeadlineMs: 60_000 });
 		await policy.stop();

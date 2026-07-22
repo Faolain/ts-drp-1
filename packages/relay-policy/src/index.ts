@@ -1,3 +1,5 @@
+import type { Connection, PeerStore } from "@libp2p/interface";
+import { peerIdFromString } from "@libp2p/peer-id";
 import { multiaddr } from "@multiformats/multiaddr";
 import { relayNamespace, relayNamespaceCid, type SignedDrpRecordV1, type ValidatedDrpRecord } from "@ts-drp/rendezvous";
 
@@ -57,6 +59,15 @@ export interface BrowserRoutingPeerCandidate {
 
 export interface NodeClosestPeerRouting {
 	getClosestPeers(queryKey: Uint8Array, signal?: AbortSignal): AsyncIterable<NodeRoutingPeerCandidate>;
+}
+
+/** Minimal warm-peer seam required by connected-HOP relay discovery. */
+export interface ConnectedHopRelayHost {
+	getConnections(): readonly {
+		readonly remoteAddr?: Connection["remoteAddr"];
+		readonly remotePeer: Connection["remotePeer"];
+	}[];
+	readonly peerStore: Pick<PeerStore, "get">;
 }
 
 export interface BrowserClosestPeerRouting {
@@ -239,6 +250,132 @@ export class NodeRoutingClosestPeersSource implements RelayCandidateSource {
 	}
 }
 
+/** Harvests relay candidates exclusively from the host's live connected peer set. */
+export class ConnectedHopRelaySource implements RelayCandidateSource {
+	readonly #host: ConnectedHopRelayHost;
+	readonly #maxCandidates: number;
+
+	/**
+	 * @param options - Warm libp2p host seam and candidate bound.
+	 * @param options.host - Host whose current connections and Identify data are inspected.
+	 * @param options.maxCandidates - Maximum connected HOP peers yielded per harvest.
+	 */
+	constructor(options: { readonly host: ConnectedHopRelayHost; readonly maxCandidates?: number }) {
+		this.#host = options.host;
+		this.#maxCandidates = boundedInteger(options.maxCandidates ?? 32, 1, 32, "maxCandidates");
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		const queryDigest = digestQueryKey(queryKey);
+		const seenPeerIds = new Set<string>();
+		let resultIndex = 0;
+		for (const { remoteAddr, remotePeer } of this.#host.getConnections()) {
+			signal.throwIfAborted();
+			const peerId = remotePeer.toString();
+			if (seenPeerIds.has(peerId)) continue;
+			seenPeerIds.add(peerId);
+			let peer: Awaited<ReturnType<PeerStore["get"]>>;
+			try {
+				peer = await this.#host.peerStore.get(remotePeer, { signal });
+			} catch {
+				signal.throwIfAborted();
+				continue;
+			}
+			signal.throwIfAborted();
+			if (!peer.protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL)) continue;
+			let protocols = peer.protocols.slice(0, 64);
+			if (!protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL)) {
+				protocols = [...peer.protocols.slice(0, 63), CIRCUIT_RELAY_V2_HOP_PROTOCOL];
+			}
+			const addresses = [
+				...(remoteAddr === undefined ? [] : [remoteAddr.toString()]),
+				...peer.addresses.map(({ multiaddr: address }) => address.toString()),
+			];
+			const dialableAddresses = [...new Set(addresses)].slice(0, 32);
+			if (dialableAddresses.length === 0) continue;
+			yield {
+				addresses: dialableAddresses,
+				operatorGroup: "unknown",
+				peerId,
+				protocols,
+				provenance: {
+					origin: "node-connected-hop",
+					queryDigest,
+					resultIndex: resultIndex++,
+					routingSource: "connected-peers",
+				},
+			};
+			signal.throwIfAborted();
+			if (resultIndex >= this.#maxCandidates) return;
+		}
+	}
+}
+
+/** Raised when an operator-supplied public relay address cannot be admitted. */
+export class ConfiguredRelayValidationError extends Error {
+	/**
+	 * @param message - Safe configuration failure description.
+	 * @param options
+	 */
+	constructor(message: string, options?: ErrorOptions) {
+		super(message, options);
+		this.name = "ConfiguredRelayValidationError";
+	}
+}
+
+/** Parses configured public relay addresses into discovery-free primary candidates. */
+export class ConfiguredPublicRelaySource implements RelayCandidateSource {
+	readonly #relays: readonly { readonly addresses: readonly string[]; readonly peerId: string }[];
+
+	/**
+	 * @param options - Configured public relay multiaddrs.
+	 * @param options.multiaddrs - Supported transport addresses ending in `/p2p/<peerId>`.
+	 */
+	constructor(options: { readonly multiaddrs: readonly string[] }) {
+		const relays = new Map<string, string[]>();
+		for (const address of options.multiaddrs) {
+			const peerId = configuredRelayPeerId(address);
+			const addresses = relays.get(peerId) ?? [];
+			if (addresses.length >= 32) {
+				throw new ConfiguredRelayValidationError(`configured relay ${peerId} exceeds 32 addresses`);
+			}
+			addresses.push(address);
+			relays.set(peerId, addresses);
+		}
+		if (relays.size > 32) throw new ConfiguredRelayValidationError("configured public relays exceed 32 peers");
+		this.#relays = [...relays].map(([peerId, addresses]) => ({ addresses, peerId }));
+	}
+
+	/** @inheritdoc */
+	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		await Promise.resolve();
+		const queryDigest = digestQueryKey(queryKey);
+		for (const [resultIndex, relay] of this.#relays.entries()) {
+			signal.throwIfAborted();
+			const operatorGroup = `configured:${resultIndex}`;
+			yield {
+				addresses: [...relay.addresses],
+				operatorEvidence: {
+					credentialDigest: relay.peerId,
+					operatorGroup,
+					verified: true,
+				},
+				operatorGroup,
+				peerId: relay.peerId,
+				protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+				provenance: {
+					origin: "configured-relay",
+					queryDigest,
+					resultIndex,
+					routingSource: "configured",
+				},
+			};
+			signal.throwIfAborted();
+		}
+	}
+}
+
 /**
  * Adapts the Phase 03 delegated closest-peer seam while retaining the exact
  * query and result provenance consumed by the relay policy.
@@ -381,6 +518,7 @@ export class CompositeRelayCandidateSource implements RelayCandidateSource {
 	 * Yields only overflow sources after primary reservation attempts prove insufficient.
 	 * @param queryKey
 	 * @param signal
+	 * @param onCandidate
 	 */
 	getOverflowCandidates(
 		queryKey: Uint8Array,
@@ -1690,11 +1828,14 @@ function isCandidateProvenancePair(origin: unknown, routingSource: unknown): boo
 		case "cached-relay":
 			return routingSource === "peer-cache";
 		case "configured-fallback":
+		case "configured-relay":
 			return routingSource === "configured";
 		case "dht-relay-provider":
 			return routingSource === "delegated-routing" || routingSource === "public-dht";
 		case "node-closest-peers":
 			return routingSource === "public-dht";
+		case "node-connected-hop":
+			return routingSource === "connected-peers";
 		case "registry-relay-record":
 			return routingSource === "registry";
 		default:
@@ -1763,13 +1904,50 @@ function addressTransport(address: string, allowInsecureWebSocketFixture = false
 	} catch {
 		return "unsupported";
 	}
-	if (names.includes("wss")) return "wss";
+	if (names.includes("dnsaddr")) return "wss";
+	if (names.includes("wss") || (names.includes("tls") && names.includes("ws"))) return "wss";
 	if (allowInsecureWebSocketFixture && names.includes("ws") && !names.includes("tls")) return "wss";
 	if (names.includes("webtransport")) return "webtransport";
 	if (names.includes("webrtc-direct")) return "webrtc-direct";
 	if (names.includes("quic-v1")) return "quic-v1";
 	if (names.includes("tcp")) return "tcp";
 	return "unsupported";
+}
+
+function configuredRelayPeerId(address: string): string {
+	let components: ReturnType<ReturnType<typeof multiaddr>["getComponents"]>;
+	try {
+		components = multiaddr(address).getComponents();
+	} catch (error) {
+		throw new ConfiguredRelayValidationError(`invalid configured public relay multiaddr: ${address}`, { cause: error });
+	}
+	const names = components.map(({ name }) => name);
+	const supported =
+		names.includes("dnsaddr") ||
+		names.includes("wss") ||
+		(names.includes("tls") && names.includes("ws")) ||
+		names.includes("webtransport") ||
+		names.includes("webrtc-direct") ||
+		names.includes("tcp") ||
+		names.includes("quic-v1");
+	const peerComponent = components.at(-1);
+	if (
+		!supported ||
+		names.includes("p2p-circuit") ||
+		peerComponent?.name !== "p2p" ||
+		typeof peerComponent.value !== "string"
+	) {
+		throw new ConfiguredRelayValidationError(
+			`configured public relay requires a direct supported transport and terminal /p2p peer ID: ${address}`
+		);
+	}
+	try {
+		return peerIdFromString(peerComponent.value).toString();
+	} catch (error) {
+		throw new ConfiguredRelayValidationError(`configured public relay has an invalid peer ID: ${address}`, {
+			cause: error,
+		});
+	}
 }
 
 function statusFailure(status: number): RelayReservationFailure {
@@ -1894,7 +2072,20 @@ function sanitizeInvalidCandidate(candidate: unknown, queryKey: Uint8Array, resu
 		value.provenance !== null && typeof value.provenance === "object"
 			? (value.provenance as Partial<RelayCandidate["provenance"]>)
 			: {};
-	const origin = provenance.origin === "node-closest-peers" ? "node-closest-peers" : ("browser-closest-peers" as const);
+	const origin =
+		provenance.origin === "node-closest-peers" ||
+		provenance.origin === "node-connected-hop" ||
+		provenance.origin === "configured-relay"
+			? provenance.origin
+			: ("browser-closest-peers" as const);
+	const routingSource =
+		origin === "node-closest-peers"
+			? "public-dht"
+			: origin === "node-connected-hop"
+				? "connected-peers"
+				: origin === "configured-relay"
+					? "configured"
+					: "delegated-routing";
 	return {
 		addresses: [],
 		operatorGroup: "unknown",
@@ -1904,7 +2095,7 @@ function sanitizeInvalidCandidate(candidate: unknown, queryKey: Uint8Array, resu
 			origin,
 			queryDigest: digestQueryKey(queryKey),
 			resultIndex,
-			routingSource: origin === "node-closest-peers" ? "public-dht" : "delegated-routing",
+			routingSource,
 		},
 	};
 }

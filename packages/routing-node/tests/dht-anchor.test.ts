@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 describe("DHT anchor publication", () => {
 	it("publishes the versioned anchor CID through the real local Node DHT lifecycle", async () => {
 		const server = await createNodeRouting({
-			limits: { maxResults: 2 },
+			limits: { maxResults: 1 },
 			mode: "server",
 			network: "local",
 		});

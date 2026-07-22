@@ -1,6 +1,10 @@
+import type { Connection, IdentifyResult, Peer } from "@libp2p/interface";
+import { peerIdFromString } from "@libp2p/peer-id";
+import { multiaddr } from "@multiformats/multiaddr";
 import {
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
 	CompositeRelayCandidateSource,
+	ConnectedHopRelaySource,
 	EvidenceDerivedOperatorGroupClassifier,
 	RELAY_TRANSPORT_PROFILES,
 	type RelayCandidate,
@@ -43,6 +47,164 @@ describe("DRPNetworkNode node-overflow RED contracts", () => {
 		await vi.waitFor(() => expect(overflowConsulted).toHaveBeenCalledOnce());
 	});
 
+	it("re-arms bounded warm acquisition on Identify, then stops after reservation and node stop", async () => {
+		const peerId = peerIdFromString(TEST_PEER_ID);
+		const address = multiaddr(`/dns4/warm-relay.example.test/tcp/443/wss/p2p/${TEST_PEER_ID}`);
+		const peer: Peer = {
+			addresses: [{ isCertified: false, multiaddr: address }],
+			id: peerId,
+			metadata: new Map(),
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL, "/ipfs/id/1.0.0"],
+			tags: new Map(),
+		};
+		const connection = { remoteAddr: address, remotePeer: peerId } as Connection;
+		let connected = false;
+		const warmSource = new ConnectedHopRelaySource({
+			host: {
+				getConnections: (): readonly Pick<Connection, "remotePeer">[] => (connected ? [connection] : []),
+				peerStore: { get: (): Promise<Peer> => Promise.resolve(peer) },
+			},
+		});
+		const harvest = vi.spyOn(warmSource, "getCandidates");
+		const reserve = vi.fn((_candidate: RelayCandidate, signal: AbortSignal) => reservation(signal));
+		const relayPolicyFactory = (options: RelayPolicyFactoryOptions): RelayPolicyDriver =>
+			deterministicWarmPolicy(options, reserve);
+		const node = new DRPNetworkNode(nodeOverflowConfig(), {
+			relayCandidateSources: { nodeClosestPeers: warmSource },
+			relayPolicyFactory,
+		});
+		startedNodes.push(node);
+
+		await node.start();
+		await node["_relayPolicyAcquirePromise"];
+		expect(node["_lastRelayPolicyResult"]?.terminal).toBe("exhausted");
+		expect(harvest).toHaveBeenCalledOnce();
+		expect(reserve).not.toHaveBeenCalled();
+
+		const host = node["_node"];
+		if (host === undefined) throw new Error("node host did not start");
+		node["_warmRelayRetryAttempts"] = 8;
+		host.dispatchEvent(
+			new CustomEvent<IdentifyResult>("peer:identify", {
+				detail: { connection, listenAddrs: [address], peerId, protocols: [...peer.protocols] },
+			})
+		);
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(harvest, "the bounded retry budget must stop event-driven acquisition").toHaveBeenCalledOnce();
+		node["_warmRelayRetryAttempts"] = 0;
+
+		connected = true;
+		host.dispatchEvent(
+			new CustomEvent<IdentifyResult>("peer:identify", {
+				detail: { connection, listenAddrs: [address], peerId, protocols: [...peer.protocols] },
+			})
+		);
+		await vi.waitFor(() => expect(node["_lastRelayPolicyResult"]?.terminal).toBe("reserved"));
+		expect(reserve).toHaveBeenCalledOnce();
+		expect(node["_lastRelayPolicyResult"]?.reservations).toHaveLength(1);
+		expect(harvest).toHaveBeenCalledTimes(2);
+
+		host.dispatchEvent(
+			new CustomEvent<IdentifyResult>("peer:identify", {
+				detail: { connection, listenAddrs: [address], peerId, protocols: [...peer.protocols] },
+			})
+		);
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(harvest).toHaveBeenCalledTimes(2);
+
+		await node.stop();
+		host.dispatchEvent(
+			new CustomEvent<IdentifyResult>("peer:identify", {
+				detail: { connection, listenAddrs: [address], peerId, protocols: [...peer.protocols] },
+			})
+		);
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(harvest).toHaveBeenCalledTimes(2);
+	}, 12_000);
+
+	it("ignores non-HOP Identify events so the warm retry budget survives a cold start into non-relay peers", async () => {
+		const peerId = peerIdFromString(TEST_PEER_ID);
+		const address = multiaddr(`/dns4/warm-relay.example.test/tcp/443/wss/p2p/${TEST_PEER_ID}`);
+		const peer: Peer = {
+			addresses: [{ isCertified: false, multiaddr: address }],
+			id: peerId,
+			metadata: new Map(),
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL, "/ipfs/id/1.0.0"],
+			tags: new Map(),
+		};
+		const connection = { remoteAddr: address, remotePeer: peerId } as Connection;
+		let connected = false;
+		const warmSource = new ConnectedHopRelaySource({
+			host: {
+				getConnections: (): readonly Pick<Connection, "remotePeer">[] => (connected ? [connection] : []),
+				peerStore: { get: (): Promise<Peer> => Promise.resolve(peer) },
+			},
+		});
+		const harvest = vi.spyOn(warmSource, "getCandidates");
+		const reserve = vi.fn((_candidate: RelayCandidate, signal: AbortSignal) => reservation(signal));
+		const node = new DRPNetworkNode(nodeOverflowConfig(), {
+			relayCandidateSources: { nodeClosestPeers: warmSource },
+			relayPolicyFactory: (options: RelayPolicyFactoryOptions): RelayPolicyDriver =>
+				deterministicWarmPolicy(options, reserve),
+		});
+		startedNodes.push(node);
+
+		await node.start();
+		await node["_relayPolicyAcquirePromise"];
+		expect(harvest).toHaveBeenCalledOnce();
+
+		const host = node["_node"];
+		if (host === undefined) throw new Error("node host did not start");
+		// Fire more non-HOP identifies than the attempt cap — none may re-arm or consume the budget.
+		for (let index = 0; index < 12; index += 1) {
+			host.dispatchEvent(
+				new CustomEvent<IdentifyResult>("peer:identify", {
+					detail: { connection, listenAddrs: [address], peerId, protocols: ["/ipfs/id/1.0.0", "/meshsub/1.1.0"] },
+				})
+			);
+		}
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		expect(node["_warmRelayRetryAttempts"]).toBe(0);
+		expect(harvest, "non-HOP identifies must not re-arm warm acquisition").toHaveBeenCalledOnce();
+
+		// A HOP peer finally connects; the unspent budget re-arms and reserves.
+		connected = true;
+		host.dispatchEvent(
+			new CustomEvent<IdentifyResult>("peer:identify", {
+				detail: { connection, listenAddrs: [address], peerId, protocols: [...peer.protocols] },
+			})
+		);
+		await vi.waitFor(() => expect(node["_lastRelayPolicyResult"]?.terminal).toBe("reserved"));
+		expect(reserve).toHaveBeenCalledOnce();
+	}, 12_000);
+
+	it("clears the relay-policy failure flag on stop so a parked warm re-arm cannot resurrect the policy", async () => {
+		const node = new DRPNetworkNode(nodeOverflowConfig(), {
+			relayCandidateSources: {
+				nodeClosestPeers: new ConnectedHopRelaySource({
+					host: {
+						getConnections: (): readonly Pick<Connection, "remotePeer">[] => [],
+						peerStore: { get: (): Promise<Peer> => Promise.reject(new Error("no peer")) },
+					},
+				}),
+			},
+			relayPolicyFactory: (options: RelayPolicyFactoryOptions): RelayPolicyDriver =>
+				deterministicWarmPolicy(
+					options,
+					vi.fn((_candidate: RelayCandidate, signal: AbortSignal) => reservation(signal))
+				),
+		});
+		startedNodes.push(node);
+
+		await node.start();
+		await node["_relayPolicyAcquirePromise"];
+		node["_relayPolicyFailed"] = true;
+
+		await node.stop();
+
+		expect(node["_relayPolicyFailed"]).toBe(false);
+	});
+
 	it.each([
 		["local routing", { network: "local" as const, routingEnabled: true, rolloutEnabled: true }],
 		["disabled routing", { network: "public" as const, routingEnabled: false, rolloutEnabled: true }],
@@ -53,6 +215,7 @@ describe("DRPNetworkNode node-overflow RED contracts", () => {
 
 		await expect(node.start()).resolves.toBeUndefined();
 		expect(node["_relayPolicy"]).toBeUndefined();
+		expect(node["_warmRelayIdentifyListener"]).toBeUndefined();
 	});
 
 	it("defaults the real factory to browser-safe transports and enables TCP/QUIC only for explicit node overflow", async () => {
@@ -371,6 +534,50 @@ function deterministicRealPolicy(source: RelayCandidateSource): RelayPolicy {
 		}),
 		reservationClient,
 		source,
+	});
+}
+
+function deterministicWarmPolicy(
+	options: RelayPolicyFactoryOptions,
+	reserve: RelayReservationClient["reserve"]
+): RelayPolicy {
+	const inspector: RelayInspector = {
+		inspect: (): Promise<RelayInspection> =>
+			Promise.resolve({
+				connectionId: "warm-connection",
+				hopAdvertised: true,
+				latencyMs: 1,
+				outcome: "connected",
+				protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			}),
+	};
+	const reservationClient: RelayReservationClient = {
+		refresh: (_candidate, signal): Promise<RelayReservationWireResponse> => reservation(signal),
+		release: (): Promise<void> => Promise.resolve(),
+		reserve,
+	};
+	return new RelayPolicy({
+		inspector,
+		limits: {
+			maxCandidates: 4,
+			maxConcurrentReservations: 1,
+			maxPerOperatorGroup: 1,
+			maxQueuedCandidates: 4,
+			ownedFallbackDeadlineMs: 10,
+			perCandidateDeadlineMs: 50,
+			refreshBeforeExpiryMs: 30_000,
+			requiredOperatorGroups: options.targetReservations,
+			requiredReservations: options.targetReservations,
+			totalDeadlineMs: 500,
+		},
+		now: (): number => 1_750_000_000_000,
+		operatorGroupClassifier: new EvidenceDerivedOperatorGroupClassifier({
+			verify: (): Promise<{ readonly verified: false }> => Promise.resolve({ verified: false }),
+		}),
+		onReservationEvent: options.onReservationEvent,
+		reservationClient,
+		source: options.source,
+		transportProfile: options.transportProfile,
 	});
 }
 

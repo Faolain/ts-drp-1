@@ -2,11 +2,19 @@ export type RelayCandidateOrigin =
 	| "browser-closest-peers"
 	| "cached-relay"
 	| "configured-fallback"
+	| "configured-relay"
 	| "dht-relay-provider"
+	| "node-connected-hop"
 	| "node-closest-peers"
 	| "registry-relay-record";
 
-export type RelayCandidateRoutingSource = "configured" | "delegated-routing" | "peer-cache" | "public-dht" | "registry";
+export type RelayCandidateRoutingSource =
+	| "configured"
+	| "connected-peers"
+	| "delegated-routing"
+	| "peer-cache"
+	| "public-dht"
+	| "registry";
 
 export type RelayReservationFailure =
 	| "aborted"

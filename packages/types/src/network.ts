@@ -213,6 +213,8 @@ export interface ControlPlaneRelayPolicySourcesConfig {
 	readonly cached_successful_relays?: ControlPlaneRelaySourceToggle;
 	/** Configured fallback records are verified and supplied through the network node's dependency injection seam. */
 	readonly configured_fallback?: ControlPlaneRelaySourceToggle;
+	/** Public relay multiaddrs used directly as primary reservation candidates. */
+	readonly configured_relays?: readonly string[];
 	readonly delegated_closest_peers?: ControlPlaneRelaySourceToggle;
 	readonly dht_relay_providers?: ControlPlaneRelaySourceToggle;
 	readonly node_closest_peers?: ControlPlaneRelaySourceToggle;
