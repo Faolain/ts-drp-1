@@ -25,8 +25,14 @@ const rendezvous: ControlPlaneRendezvousConfig = {
 	endpoints: ["https://registry.example/v1"],
 	invite: "signed-invite-envelope",
 	namespace: `drp-network:v1:${"a".repeat(43)}`,
+	nostr: {
+		relays: ["wss://relay-one.example", "wss://relay-two.example"],
+	},
 	publish: false,
 };
+
+const nostrRelays: readonly string[] | undefined = rendezvous.nostr?.relays;
+const nostrSecretKey: string | undefined = rendezvous.nostr?.secret_key;
 const controlPlane: ControlPlaneConfig = { rendezvous };
 const config: DRPNetworkNodeConfig = { control_plane: controlPlane };
 
@@ -38,6 +44,8 @@ const inviteFailed: ControlPlaneEvent = { kind: "rendezvous-invite", outcome: "f
 void memoryCache;
 void localStorageCache;
 void config;
+void nostrRelays;
+void nostrSecretKey;
 void cacheHit;
 void cacheWrite;
 void inviteAccepted;

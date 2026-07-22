@@ -1,4 +1,5 @@
 export * from "./address-policy.js";
+export * from "./composite-directory.js";
 export * from "./dns-resolver.js";
 export * from "./ensemble.js";
 export * from "./http-registry.js";

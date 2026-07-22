@@ -29,13 +29,13 @@ describe("Nostr WebSocket transport", () => {
 
 		for (const event of events) socket.message(JSON.stringify(["EVENT", subscriptionId, event]));
 		socket.message(JSON.stringify(["EOSE", subscriptionId]));
-		expect(socket.sentFrames).toContainEqual(["CLOSE", subscriptionId]);
+		expect(socket.sentFrames.filter((frame) => frame[0] === "CLOSE")).toHaveLength(1);
 
 		expect(await first).toEqual({ done: false, value: events[0] });
 		expect(await iterator.next()).toEqual({ done: false, value: events[1] });
 		expect(await iterator.next()).toEqual({ done: false, value: events[2] });
 		expect(await iterator.next()).toEqual({ done: true, value: undefined });
-		expect(socket.sentFrames).toContainEqual(["CLOSE", subscriptionId]);
+		expect(socket.sentFrames.filter((frame) => frame[0] === "CLOSE")).toHaveLength(1);
 
 		await connection.close();
 		expect(socket.listenerCount).toBe(0);
@@ -61,6 +61,24 @@ describe("Nostr WebSocket transport", () => {
 		await connection.close();
 	});
 
+	it("drains an EOSE-completed query after the connection closes", async () => {
+		const { connection, socket } = await openConnection();
+		const iterator = connection.query({}, signal())[Symbol.asyncIterator]();
+		const first = iterator.next();
+		const subscriptionId = reqSubscriptionId(socket, {});
+		const events = [nostrEvent(40), nostrEvent(41)];
+
+		for (const event of events) socket.message(JSON.stringify(["EVENT", subscriptionId, event]));
+		socket.message(JSON.stringify(["EOSE", subscriptionId]));
+		await expect(first).resolves.toEqual({ done: false, value: events[0] });
+
+		await connection.close();
+
+		await expect(iterator.next()).resolves.toEqual({ done: false, value: events[1] });
+		await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });
+		expect(socket.listenerCount).toBe(0);
+	});
+
 	it("skips malformed, wrong-shape, and mismatched-subscription frames", async () => {
 		const { connection, socket } = await openConnection();
 		const iterator = connection.query({}, signal())[Symbol.asyncIterator]();
@@ -80,23 +98,73 @@ describe("Nostr WebSocket transport", () => {
 		await connection.close();
 	});
 
-	it("stops an aborted query promptly and sends CLOSE", async () => {
+	it("treats relay CLOSED as a subscription failure without replying CLOSE", async () => {
 		const { connection, socket } = await openConnection();
 		const controller = new AbortController();
+		const removeAbortListener = vi.spyOn(controller.signal, "removeEventListener");
+		const iterator = connection.query({}, controller.signal)[Symbol.asyncIterator]();
+		const pending = iterator.next();
+		const subscriptionId = reqSubscriptionId(socket, {});
+
+		socket.message(JSON.stringify(["CLOSED", subscriptionId, "auth-required: sign in"]));
+
+		await expect(pending).rejects.toMatchObject({
+			message: expect.stringContaining("auth-required: sign in"),
+			name: "NostrWebSocketTransportError",
+		});
+		expect(socket.sentFrames.filter((frame) => frame[0] === "CLOSE")).toHaveLength(0);
+		expect(removeAbortListener).toHaveBeenCalledWith("abort", expect.any(Function));
+		await connection.close();
+		expect(socket.listenerCount).toBe(0);
+	});
+
+	it("throws the abort reason after one event and cleans up the subscription", async () => {
+		const { connection, socket } = await openConnection();
+		const controller = new AbortController();
+		const removeAbortListener = vi.spyOn(controller.signal, "removeEventListener");
 		const iterator = connection.query({}, controller.signal)[Symbol.asyncIterator]();
 		const first = iterator.next();
 		const subscriptionId = reqSubscriptionId(socket, {});
 		const event = nostrEvent(9);
+		const reason = new Error("caller stopped query");
 		socket.message(JSON.stringify(["EVENT", subscriptionId, event]));
 
 		await expect(first).resolves.toEqual({ done: false, value: event });
 		const pending = iterator.next();
-		controller.abort(new Error("caller stopped query"));
+		controller.abort(reason);
 
-		await expect(pending).resolves.toEqual({ done: true, value: undefined });
-		expect(socket.sentFrames).toContainEqual(["CLOSE", subscriptionId]);
+		await expect(pending).rejects.toBe(reason);
+		expect(socket.sentFrames.filter((frame) => frame[0] === "CLOSE")).toHaveLength(1);
+		expect(removeAbortListener).toHaveBeenCalledWith("abort", expect.any(Function));
 		await connection.close();
 		expect(socket.listenerCount).toBe(0);
+	});
+
+	it("early iterator return closes exactly once, detaches abort, and leaves the socket usable", async () => {
+		const { connection, socket } = await openConnection();
+		const controller = new AbortController();
+		const removeAbortListener = vi.spyOn(controller.signal, "removeEventListener");
+		const iterator = connection.query({}, controller.signal)[Symbol.asyncIterator]();
+		const first = iterator.next();
+		const subscriptionId = reqSubscriptionId(socket, {});
+		const events = [nostrEvent(50), nostrEvent(51), nostrEvent(52)];
+
+		for (const event of events) socket.message(JSON.stringify(["EVENT", subscriptionId, event]));
+		await expect(first).resolves.toEqual({ done: false, value: events[0] });
+		if (iterator.return === undefined) throw new Error("expected async iterator return");
+
+		await expect(iterator.return()).resolves.toEqual({ done: true, value: undefined });
+		expect(socket.sentFrames.filter((frame) => frame[0] === "CLOSE")).toHaveLength(1);
+		expect(removeAbortListener).toHaveBeenCalledWith("abort", expect.any(Function));
+
+		const publishedEvent = nostrEvent(53);
+		const published = connection.publish(publishedEvent, signal());
+		socket.message(JSON.stringify(["OK", publishedEvent.id, true, "still open"]));
+		await expect(published).resolves.toEqual({ accepted: true, message: "still open" });
+		await connection.close();
+		expect(socket.listenerCount).toBe(0);
+		expect(socket.closeCalls).toBe(1);
+		expect(socket.sentFrames.filter((frame) => frame[0] === "CLOSE")).toHaveLength(1);
 	});
 
 	it("detaches query abort handling when close occurs while the generator is paused", async () => {
@@ -146,6 +214,53 @@ describe("Nostr WebSocket transport", () => {
 		await expect(rejected).resolves.toEqual({ accepted: false, message: "blocked" });
 		await connection.close();
 		expect(socket.listenerCount).toBe(0);
+	});
+
+	it("accepts an OK frame whose optional message is omitted", async () => {
+		const { connection, socket } = await openConnection({ publishTimeoutMs: 5 });
+		const event = nostrEvent(42);
+		const published = connection.publish(event, signal());
+
+		socket.message(JSON.stringify(["OK", event.id, true]));
+
+		await expect(published).resolves.toEqual({ accepted: true, message: "" });
+		await connection.close();
+	});
+
+	it("resolves concurrent publishes of the same event id FIFO and reuses the evicted queue", async () => {
+		const { connection, socket } = await openConnection();
+		const event = nostrEvent(60);
+		const first = connection.publish(event, signal());
+		const second = connection.publish(event, signal());
+
+		socket.message(JSON.stringify(["OK", event.id, true, "first reply"]));
+		socket.message(JSON.stringify(["OK", event.id, false, "second reply"]));
+
+		await expect(Promise.all([first, second])).resolves.toEqual([
+			{ accepted: true, message: "first reply" },
+			{ accepted: false, message: "second reply" },
+		]);
+
+		expect(() => socket.message(JSON.stringify(["OK", event.id, true, "late reply"]))).not.toThrow();
+		const third = connection.publish(event, signal());
+		socket.message(JSON.stringify(["OK", event.id, true, "fresh queue"]));
+		await expect(third).resolves.toEqual({ accepted: true, message: "fresh queue" });
+		await connection.close();
+	});
+
+	it("ignores OK frames after a publish has resolved or timed out", async () => {
+		const { connection, socket } = await openConnection({ publishTimeoutMs: 5 });
+		const resolvedEvent = nostrEvent(61);
+		const resolved = connection.publish(resolvedEvent, signal());
+		socket.message(JSON.stringify(["OK", resolvedEvent.id, true, "stored"]));
+		await expect(resolved).resolves.toEqual({ accepted: true, message: "stored" });
+
+		expect(() => socket.message(JSON.stringify(["OK", resolvedEvent.id, true, "late"]))).not.toThrow();
+
+		const timedOutEvent = nostrEvent(62);
+		await expect(connection.publish(timedOutEvent, signal())).rejects.toThrow(/timed out/iu);
+		expect(() => socket.message(JSON.stringify(["OK", timedOutEvent.id, true, "too late"]))).not.toThrow();
+		await connection.close();
 	});
 
 	it("rejects publish timeout, caller abort, and close-before-OK without leaks", async () => {
@@ -203,6 +318,14 @@ describe("Nostr WebSocket transport", () => {
 
 		expect(() => createNostrWebSocketRelayFactory()).toThrow(NostrWebSocketTransportError);
 		expect(() => createNostrWebSocketRelayFactory()).toThrow(/WebSocket.*available/iu);
+	});
+
+	it.each([
+		["openTimeoutMs", { openTimeoutMs: 0 }],
+		["publishTimeoutMs", { publishTimeoutMs: 0 }],
+	] as const)("throws a typed configuration error for invalid %s", (name, options) => {
+		expect(() => createFactory(options)).toThrow(NostrWebSocketTransportError);
+		expect(() => createFactory(options)).toThrow(`${name} must be a positive integer`);
 	});
 
 	it("closes idempotently, removes listeners, and rejects operations after close", async () => {

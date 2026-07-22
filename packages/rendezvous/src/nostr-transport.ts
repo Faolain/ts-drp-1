@@ -195,7 +195,7 @@ class WebSocketRelayConnection implements NostrRelayConnection {
 		try {
 			this.#socket.send(JSON.stringify(["REQ", subscriptionId, filter]));
 			while (true) {
-				if (state.aborted) return;
+				if (state.aborted) throw signal.reason;
 				const event = state.events.shift();
 				if (event !== undefined) {
 					yield event;
@@ -209,6 +209,7 @@ class WebSocketRelayConnection implements NostrRelayConnection {
 				state.wake = undefined;
 			}
 		} catch (error) {
+			if (state.aborted) throw signal.reason;
 			if (error instanceof NostrWebSocketTransportError) throw error;
 			throw new NostrWebSocketTransportError("Failed to send or receive Nostr subscription frames");
 		} finally {
@@ -236,7 +237,7 @@ class WebSocketRelayConnection implements NostrRelayConnection {
 			state.wake?.();
 			return;
 		}
-		if (frame[0] === "EOSE" || frame[0] === "CLOSED") {
+		if (frame[0] === "EOSE") {
 			const subscriptionId = frame[1];
 			if (typeof subscriptionId !== "string") return;
 			const state = this.#subscriptions.get(subscriptionId);
@@ -246,11 +247,23 @@ class WebSocketRelayConnection implements NostrRelayConnection {
 			state.wake?.();
 			return;
 		}
+		if (frame[0] === "CLOSED") {
+			const subscriptionId = frame[1];
+			if (typeof subscriptionId !== "string") return;
+			const state = this.#subscriptions.get(subscriptionId);
+			if (state === undefined) return;
+			const detail = typeof frame[2] === "string" ? `: ${frame[2]}` : "";
+			state.error = new NostrWebSocketTransportError(`Nostr relay closed subscription ${subscriptionId}${detail}`);
+			state.wireClosed = true;
+			this.#subscriptions.delete(subscriptionId);
+			state.wake?.();
+			return;
+		}
 		if (frame[0] !== "OK") return;
 		const eventId = frame[1];
 		const accepted = frame[2];
-		const message = frame[3];
-		if (typeof eventId !== "string" || typeof accepted !== "boolean" || typeof message !== "string") return;
+		if (typeof eventId !== "string" || typeof accepted !== "boolean") return;
+		const message = typeof frame[3] === "string" ? frame[3] : "";
 		const pending = this.#publishes.get(eventId)?.values().next().value;
 		pending?.resolve({ accepted, message });
 	}
@@ -292,8 +305,10 @@ class WebSocketRelayConnection implements NostrRelayConnection {
 		}
 		this.#publishes.clear();
 		for (const state of [...this.#queries]) {
-			state.events.length = 0;
-			state.error = error;
+			if (!state.complete) {
+				state.events.length = 0;
+				state.error = error;
+			}
 			this.#releaseQuery(state);
 			state.wake?.();
 		}
@@ -347,7 +362,6 @@ async function waitForOpen(
 		closeSocket(socket);
 		throw new NostrWebSocketTransportError(`Nostr relay ${relayId} socket closed before opening`);
 	}
-	signal.throwIfAborted();
 
 	await new Promise<void>((resolve, reject) => {
 		let settled = false;
@@ -398,6 +412,8 @@ function closeSocket(socket: NostrWebSocket): void {
 }
 
 function positiveInteger(value: number, name: string): number {
-	if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
+	if (!Number.isSafeInteger(value) || value < 1) {
+		throw new NostrWebSocketTransportError(`${name} must be a positive integer`);
+	}
 	return value;
 }

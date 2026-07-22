@@ -194,6 +194,11 @@ export interface ControlPlaneRendezvousConfig {
 	readonly endpoints?: readonly string[];
 	readonly invite?: string;
 	readonly namespace?: string;
+	readonly nostr?: {
+		readonly publish?: boolean;
+		readonly relays?: readonly string[];
+		readonly secret_key?: string;
+	};
 	readonly publish?: boolean;
 	readonly record_ttl_ms?: number;
 	readonly refresh_interval_ms?: number;

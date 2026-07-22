@@ -1,5 +1,7 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { TypedEventEmitter } from "@libp2p/interface";
+import { sha256 } from "@noble/hashes/sha2";
+import { concatBytes, hexToBytes } from "@noble/hashes/utils";
 import {
 	ControlPlaneCoordinator,
 	ControlPlaneHealthAggregator,
@@ -20,8 +22,12 @@ import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
 import { createPermissionlessACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	AddressPolicy,
+	createCompositeRendezvousDirectory,
 	createDnsResolver,
 	createHttpRegistryEndpoint,
+	createNostrRelayDirectory,
+	createNostrSignerFromSecretKey,
+	createNostrWebSocketRelayFactory,
 	createPeerCache,
 	createRecordProducer,
 	createRendezvousEnsemble,
@@ -31,6 +37,8 @@ import {
 	InMemorySequenceStore,
 	InviteDirectory,
 	LocalStoragePeerCacheStore,
+	type NostrRelayConnectionFactory,
+	type NostrSigner,
 	type PeerCache,
 	type PeerCacheStore,
 	RecordSigner,
@@ -44,6 +52,7 @@ import { type BrowserRouting, type BrowserRoutingEndpoint, createBrowserRouting 
 import {
 	type ControlPlaneEvent,
 	type ControlPlanePeerCacheConfig,
+	type ControlPlaneRendezvousConfig,
 	DRPDiscoveryResponse,
 	type DRPNetworkNode,
 	type DRPNodeConfig,
@@ -82,7 +91,96 @@ const DISCOVERY_MESSAGE_TYPES = [
 ];
 
 const DISCOVERY_QUEUE_ID = "discovery";
+const NOSTR_SECRET_KEY_PATTERN = /^[0-9a-f]{64}$/u;
+const NOSTR_TRANSPORT_KEY_DOMAIN = new TextEncoder().encode("ts-drp-nostr-transport-v1");
 const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `interval:${type}::${id}`;
+
+/** Dependencies and resolved policy for config-driven rendezvous directories. */
+export interface CreateConfiguredRendezvousRegistriesParams {
+	readonly clientId: string;
+	readonly nostrConnectionFactory?: NostrRelayConnectionFactory;
+	now?(): number;
+	readonly publicRendezvousEnabled: boolean;
+	/** Resolved HTTP endpoints, including invite-provided endpoints when applicable. */
+	readonly registryEndpoints?: readonly string[];
+	readonly rendezvousConfig: ControlPlaneRendezvousConfig;
+	readonly secp256k1PrivateKey: Uint8Array;
+	validatorFactory(): RecordValidator;
+}
+
+/** Typed terminal for invalid config-driven Nostr rendezvous settings. */
+export class NostrRendezvousConfigurationError extends Error {
+	/** @param message - Stable caller-facing configuration detail. */
+	constructor(message: string) {
+		super(message);
+		this.name = "NostrRendezvousConfigurationError";
+	}
+}
+
+/**
+ * Builds the public rendezvous directory selected by resolved node policy.
+ * @param params - Resolved configuration, identity material, and injectable transport dependencies.
+ * @returns HTTP, Nostr, a composite of both, or undefined when public rendezvous is inactive.
+ */
+export function createConfiguredRendezvousRegistries(
+	params: CreateConfiguredRendezvousRegistriesParams
+): RendezvousDirectory | undefined {
+	const { rendezvousConfig } = params;
+	if (!params.publicRendezvousEnabled) return undefined;
+	const directories: RendezvousDirectory[] = [];
+	const registryEndpoints = params.registryEndpoints ?? rendezvousConfig.endpoints ?? [];
+	if (registryEndpoints.length >= 2) {
+		directories.push(
+			new RegistryClient({
+				clientId: params.clientId,
+				endpoints: registryEndpoints.map((url, index) =>
+					createHttpRegistryEndpoint({
+						allow_insecure_loopback_fixture: rendezvousConfig.allow_insecure_loopback_fixture,
+						id: `registry-${index + 1}`,
+						url,
+					})
+				),
+				timeoutMs: 4_000,
+				validatorFactory: params.validatorFactory,
+			})
+		);
+	}
+
+	const nostr = rendezvousConfig.nostr;
+	if ((nostr?.relays?.length ?? 0) >= 1) {
+		const nostrSigner = configuredNostrSigner(nostr?.secret_key, params.secp256k1PrivateKey);
+		directories.push(
+			createNostrRelayDirectory({
+				allow_insecure_loopback_fixture: rendezvousConfig.allow_insecure_loopback_fixture,
+				connectionFactory: params.nostrConnectionFactory ?? createNostrWebSocketRelayFactory(),
+				nostrSigner,
+				now: params.now ?? Date.now,
+				relays: (nostr?.relays ?? []).map((url, index) => ({ id: `nostr-${index + 1}`, url })),
+				validatorFactory: params.validatorFactory,
+			})
+		);
+	}
+
+	if (directories.length === 0) return undefined;
+	return directories.length === 1 ? directories[0] : createCompositeRendezvousDirectory(directories);
+}
+
+function configuredNostrSigner(secretKey: string | undefined, identityKey: Uint8Array): NostrSigner {
+	if (secretKey !== undefined && !NOSTR_SECRET_KEY_PATTERN.test(secretKey)) {
+		throw new NostrRendezvousConfigurationError(
+			"control_plane.rendezvous.nostr.secret_key must be exactly 64 lowercase hexadecimal characters"
+		);
+	}
+	const transportKey =
+		secretKey === undefined ? sha256(concatBytes(identityKey, NOSTR_TRANSPORT_KEY_DOMAIN)) : hexToBytes(secretKey);
+	try {
+		return createNostrSignerFromSecretKey(transportKey);
+	} catch {
+		throw new NostrRendezvousConfigurationError(
+			"control_plane.rendezvous.nostr.secret_key must encode a valid 32-byte Nostr transport key"
+		);
+	}
+}
 
 export interface DRPNodeDependencies {
 	/** Optional fail-closed lifecycle check run before restart begins */
@@ -285,7 +383,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const hasInvite = rendezvousConfig.invite !== undefined;
 		// Preserve the Phase 4a activation contract unless a Phase 4b source is explicitly enabled.
 		const hasConfiguredRegistry =
-			publicRendezvousEnabled && rendezvousConfig.publish === true && (rendezvousConfig.endpoints?.length ?? 0) > 0;
+			publicRendezvousEnabled &&
+			rendezvousConfig.publish === true &&
+			((rendezvousConfig.endpoints?.length ?? 0) >= 2 ||
+				((rendezvousConfig.nostr?.publish ?? rendezvousConfig.publish) === true &&
+					(rendezvousConfig.nostr?.relays?.length ?? 0) >= 1));
 		if (!hasConfiguredRegistry && !cacheEnabled && !hasInvite) return;
 		const namespace = rendezvousConfig.namespace;
 		if (namespace === undefined) throw new Error("configured rendezvous requires a namespace");
@@ -322,22 +424,15 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const endpoints = publicRendezvousEnabled
 			? [...new Set([...(rendezvousConfig.endpoints ?? []), ...inviteEndpoints])]
 			: [];
-		const registryClient =
-			endpoints.length === 0
-				? undefined
-				: new RegistryClient({
-						clientId: this.networkNode.peerId,
-						endpoints: endpoints.map((url, index) =>
-							createHttpRegistryEndpoint({
-								allow_insecure_loopback_fixture: rendezvousConfig.allow_insecure_loopback_fixture,
-								id: `registry-${index + 1}`,
-								url,
-							})
-						),
-						timeoutMs: 4_000,
-						validatorFactory,
-					});
-		if (registryClient === undefined && this._rendezvousCache === undefined && inviteDirectory === undefined) return;
+		const registries = createConfiguredRendezvousRegistries({
+			clientId: this.networkNode.peerId,
+			publicRendezvousEnabled,
+			registryEndpoints: endpoints,
+			rendezvousConfig,
+			secp256k1PrivateKey: this.keychain.secp256k1PrivateKey,
+			validatorFactory,
+		});
+		if (registries === undefined && this._rendezvousCache === undefined && inviteDirectory === undefined) return;
 		const directory = createRendezvousEnsemble({
 			addressPolicy: {
 				policy: new AddressPolicy({
@@ -350,7 +445,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			},
 			cache: this._rendezvousCache,
 			invite: inviteDirectory,
-			registries: registryClient,
+			registries,
 			validatorFactory,
 		});
 		this._rendezvous = directory;
@@ -361,7 +456,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		});
 		this._rendezvousBootstrap = bootstrap;
 
-		if (!rendezvousConfig.publish || registryClient === undefined) return;
+		if (!rendezvousConfig.publish || registries === undefined) return;
 
 		const ttlMs = rendezvousConfig.record_ttl_ms ?? 60_000;
 		const refreshIntervalMs = rendezvousConfig.refresh_interval_ms ?? Math.floor(ttlMs / 2);
@@ -392,7 +487,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 					producer,
 					directory,
 					credential,
-					endpoints.length,
+					(endpoints.length >= 2 ? endpoints.length : 0) +
+						((rendezvousConfig.nostr?.publish ?? rendezvousConfig.publish) === true
+							? (rendezvousConfig.nostr?.relays?.length ?? 0)
+							: 0),
 					controller.signal,
 					refreshIntervalMs
 				);
