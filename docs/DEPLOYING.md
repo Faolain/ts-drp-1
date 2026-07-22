@@ -95,6 +95,30 @@ This is exactly the stack the modular E2E (`pnpm e2e-test`) exercises, run
 interactively. It uses local‑fixture allowances (loopback / plaintext WebSocket)
 that are **demo‑only** and never emitted by a production config.
 
+### Infra-independent discovery via Nostr
+
+The Nostr profile replaces the HTTP registry with an open-admission Nostr
+rendezvous transport while retaining local delegated routing and two
+operator-diverse relays for browser connectivity:
+
+```bash
+pnpm --filter ts-drp-example-grid demo:public-infra
+```
+
+By default it starts the local Nostr fixture. To exercise best-effort public
+discovery, override the relay list; the demo then drops the local Nostr fixture:
+
+```bash
+VITE_NOSTR_RELAYS="wss://relay.damus.io,wss://nos.lol" \
+  pnpm --filter ts-drp-example-grid demo:public-infra
+```
+
+For a deployed grid, set the same variable during the build and omit the local
+fixture processes. Live public operation is operator-gated and best-effort:
+public relays are open-admission, untrusted transport, and DRP signatures are the
+authority. Nostr supplies discovery, not connectivity; browsers still need a
+real WebRTC/relay path.
+
 ---
 
 ## Tier 2 — A real, shareable modular deployment

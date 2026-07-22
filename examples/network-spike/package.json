@@ -9,6 +9,7 @@
 		"dev": "vite serve",
 		"e2e": "pnpm --dir ../.. exec playwright test --config examples/network-spike/playwright.config.ts",
 		"fixtures:dht": "pnpm --filter @ts-drp/network-spike browser-dht:fixture",
+		"fixtures:nostr": "node fixtures/nostr-relay.mjs",
 		"fixtures": "node fixtures/delegated-server.mjs",
 		"start": "vite preview --host --port 4174",
 		"typecheck": "tsc --noEmit"
@@ -22,6 +23,7 @@
 		"@playwright/test": "^1.49.1",
 		"typescript": "^5.5.4",
 		"vite": "^6.2.7",
-		"vite-plugin-node-polyfills": "^0.22.0"
+		"vite-plugin-node-polyfills": "^0.22.0",
+		"ws": "^8.21.0"
 	}
 }

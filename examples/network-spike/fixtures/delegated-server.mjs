@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 
 const HOST = "127.0.0.1";
 const PORT = 4175;
+const ROUTING_ONLY = process.argv.includes("--routing-only");
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
 const PUBLIC_ONLY_PROVIDER_ID = "16Uiu2HAmGQfUVeXqZJvyELMmJyLLBaPCUYbrz3LCkYZcwKuvLha5";
 const GRID_INVITE_TOKEN = "grid-local-fixture-invite-0123456789";
@@ -38,10 +39,18 @@ const server = createServer((request, response) => {
 async function handleRequest(request, response) {
 	const url = new URL(request.url ?? "/", `http://${HOST}:${PORT}`);
 	if (url.pathname.startsWith("/grid-control/registry/")) {
+		if (ROUTING_ONLY) {
+			writeJson(response, 404, { error: "HTTP registry disabled in routing-only mode" });
+			return;
+		}
 		handleGridRegistryControl(request, response, url);
 		return;
 	}
 	if (url.pathname.startsWith("/grid-registry/")) {
+		if (ROUTING_ONLY) {
+			writeJson(response, 404, { error: "HTTP registry disabled in routing-only mode" });
+			return;
+		}
 		await handleGridRegistry(request, response, url);
 		return;
 	}

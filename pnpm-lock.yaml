@@ -244,6 +244,9 @@ importers:
       vite-plugin-node-polyfills:
         specifier: ^0.22.0
         version: 0.22.0(rollup@4.40.1)(vite@6.3.4(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0))
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.0
 
   packages/blueprints:
     dependencies:

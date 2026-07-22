@@ -7,6 +7,8 @@ export interface GridNetworkEnv {
 	readonly enablePrometheusMetrics: boolean;
 	readonly membershipInvite?: string;
 	readonly networkMode?: string;
+	readonly nostrRelays?: readonly string[];
+	readonly nostrSecretKey?: string;
 	readonly relayOperatorGroups?: string;
 	readonly rendezvousEndpoints?: string;
 	readonly rendezvousInvite?: string;
@@ -15,15 +17,19 @@ export interface GridNetworkEnv {
 }
 
 /**
- * @param environment
+ * @param environment - Parsed grid environment.
  * @returns Whether the grid should use the modular network control plane.
  */
 export function isModularNetworkEnv(environment: GridNetworkEnv): boolean {
-	return environment.networkMode === "modular" || splitList(environment.rendezvousEndpoints).length > 0;
+	return (
+		environment.networkMode === "modular" ||
+		splitList(environment.rendezvousEndpoints).length > 0 ||
+		normalizeList(environment.nostrRelays).length > 0
+	);
 }
 
 /**
- * @param environment
+ * @param environment - Parsed grid environment.
  * @returns Whether explicit local-fixture security allowances are enabled.
  */
 export function allowsInsecureNetworkFixture(environment: GridNetworkEnv): boolean {
@@ -37,14 +43,15 @@ export function allowsInsecureNetworkFixture(environment: GridNetworkEnv): boole
  * @returns A fail-closed modular DRP node configuration.
  */
 export function buildModularNetworkConfig(environment: GridNetworkEnv): DRPNodeConfig {
-	const rendezvousEndpoints = requiredList(environment.rendezvousEndpoints, "VITE_RENDEZVOUS_ENDPOINTS");
+	const rendezvousEndpoints = splitList(environment.rendezvousEndpoints);
+	const nostrRelays = normalizeList(environment.nostrRelays);
 	const routingEndpoints = requiredList(environment.routingEndpoints, "VITE_ROUTING_ENDPOINTS");
 	const namespace = requiredValue(environment.rendezvousNamespace, "VITE_RENDEZVOUS_NAMESPACE");
 	const membershipInvite = requiredValue(environment.membershipInvite, "VITE_MEMBERSHIP_INVITE");
 	const allowInsecureFixture = allowsInsecureNetworkFixture(environment);
 
-	if (rendezvousEndpoints.length < 2) {
-		throw new Error("VITE_RENDEZVOUS_ENDPOINTS must contain at least two registry endpoints");
+	if (rendezvousEndpoints.length < 2 && nostrRelays.length === 0) {
+		throw new Error("modular rendezvous requires at least two VITE_RENDEZVOUS_ENDPOINTS or one VITE_NOSTR_RELAYS URL");
 	}
 	if (membershipInvite.length < 16) {
 		throw new Error("VITE_MEMBERSHIP_INVITE must contain at least 16 characters");
@@ -88,6 +95,16 @@ export function buildModularNetworkConfig(environment: GridNetworkEnv): DRPNodeC
 					},
 					endpoints: rendezvousEndpoints,
 					namespace,
+					...(nostrRelays.length === 0
+						? {}
+						: {
+								nostr: {
+									relays: nostrRelays,
+									...(environment.nostrSecretKey === undefined || environment.nostrSecretKey.trim() === ""
+										? {}
+										: { secret_key: environment.nostrSecretKey.trim() }),
+								},
+							}),
 					publish: true,
 					record_ttl_ms: 60_000,
 					refresh_interval_ms: 1_000,
@@ -176,7 +193,7 @@ export function getNetworkConfigFromEnv(environment: GridNetworkEnv, metricsOrig
 }
 
 /**
- * @param value
+ * @param value - Comma-separated relay operator assignments.
  * @returns Fixture relay operator groups keyed by peer ID.
  */
 export function parseRelayOperatorGroups(value: string | undefined): ReadonlyMap<string, string> {
@@ -214,4 +231,8 @@ function splitList(value: string | undefined): string[] {
 			.map((entry) => entry.trim())
 			.filter((entry) => entry.length > 0) ?? []
 	);
+}
+
+function normalizeList(value: readonly string[] | undefined): string[] {
+	return value?.map((entry) => entry.trim()).filter((entry) => entry.length > 0) ?? [];
 }

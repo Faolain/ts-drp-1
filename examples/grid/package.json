@@ -7,6 +7,7 @@
 		"typecheck": "tsc --noEmit",
 		"clean": "rm -rf dist/ node_modules/",
 		"demo": "node demo/serve.mjs",
+		"demo:public-infra": "GRID_DEMO_PROFILE=public-infra node demo/serve.mjs",
 		"dev": "vite serve",
 		"start": "vite preview --host --port 5173"
 	},

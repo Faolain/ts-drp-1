@@ -19,6 +19,14 @@ function getNumberFromEnv(key: keyof ImportMetaEnv): number {
 	return Number(value);
 }
 
+function getListFromEnv(value: string | undefined): readonly string[] | undefined {
+	const values = value
+		?.split(",")
+		.map((entry) => entry.trim())
+		.filter((entry) => entry.length > 0);
+	return values === undefined || values.length === 0 ? undefined : values;
+}
+
 export const env: EnvConfig = {
 	allowInsecureFixture: import.meta.env.VITE_ALLOW_INSECURE_FIXTURE,
 	bootstrapPeers: import.meta.env.VITE_BOOTSTRAP_PEERS,
@@ -29,6 +37,8 @@ export const env: EnvConfig = {
 	membershipInvite: import.meta.env.VITE_MEMBERSHIP_INVITE,
 	mode: import.meta.env.MODE,
 	networkMode: import.meta.env.VITE_NETWORK_MODE,
+	nostrRelays: getListFromEnv(import.meta.env.VITE_NOSTR_RELAYS),
+	nostrSecretKey: import.meta.env.VITE_NOSTR_SECRET_KEY,
 	relayOperatorGroups: import.meta.env.VITE_RELAY_OPERATOR_GROUPS,
 	rendezvousEndpoints: import.meta.env.VITE_RENDEZVOUS_ENDPOINTS,
 	rendezvousInvite: import.meta.env.VITE_RENDEZVOUS_INVITE,

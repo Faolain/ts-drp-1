@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildModularNetworkConfig, getNetworkConfigFromEnv, type GridNetworkEnv } from "./network-config";
+import {
+	buildModularNetworkConfig,
+	getNetworkConfigFromEnv,
+	type GridNetworkEnv,
+	isModularNetworkEnv,
+} from "./network-config";
 
 const modularEnvironment: GridNetworkEnv = {
 	allowInsecureFixture: undefined,
@@ -16,6 +21,51 @@ const modularEnvironment: GridNetworkEnv = {
 };
 
 describe("grid network configuration", () => {
+	it("builds a Nostr-only modular control plane", () => {
+		const environment = {
+			...modularEnvironment,
+			networkMode: undefined,
+			nostrRelays: ["wss://relay.example"],
+			rendezvousEndpoints: undefined,
+		};
+
+		expect(isModularNetworkEnv(environment)).toBe(true);
+		const config = buildModularNetworkConfig(environment);
+
+		expect(config.network_config?.control_plane?.rendezvous?.nostr?.relays).toEqual(["wss://relay.example"]);
+		expect(config.network_config?.control_plane?.rendezvous?.endpoints).toEqual([]);
+		expect(config.network_config?.control_plane?.rollout?.public_components?.public_rendezvous).toEqual({
+			enabled: true,
+		});
+	});
+
+	it("includes an explicit Nostr transport secret key", () => {
+		const secretKey = "ab".repeat(32);
+		const config = buildModularNetworkConfig({
+			...modularEnvironment,
+			nostrRelays: ["wss://relay.example"],
+			nostrSecretKey: secretKey,
+			rendezvousEndpoints: undefined,
+		});
+
+		expect(config.network_config?.control_plane?.rendezvous?.nostr).toEqual({
+			relays: ["wss://relay.example"],
+			secret_key: secretKey,
+		});
+	});
+
+	it("composes HTTP registries and Nostr relays", () => {
+		const config = buildModularNetworkConfig({
+			...modularEnvironment,
+			nostrRelays: ["wss://relay.example"],
+		});
+
+		expect(config.network_config?.control_plane?.rendezvous).toMatchObject({
+			endpoints: ["https://registry-a.example", "https://registry-b.example"],
+			nostr: { relays: ["wss://relay.example"] },
+		});
+	});
+
 	it("builds the complete no-seed modular control plane", () => {
 		const config = buildModularNetworkConfig(modularEnvironment);
 

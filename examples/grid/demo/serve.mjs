@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-// One-command local WebRTC grid demo.
+// One-command local WebRTC grid demos.
 //
 // Stands up the full MODULAR network stack on a single host — two independent
 // rendezvous registries + a delegated-routing endpoint (co-located in one small
@@ -10,12 +10,19 @@
 // (falling back to relayed otherwise).
 //
 // Usage (from the repo root):  pnpm --filter ts-drp-example-grid demo
+// Nostr discovery profile:     pnpm --filter ts-drp-example-grid demo:public-infra
 // Stop with Ctrl+C.
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const profile = process.env.GRID_DEMO_PROFILE ?? "default";
+if (profile !== "default" && profile !== "public-infra") {
+	throw new Error(`Unknown GRID_DEMO_PROFILE: ${profile}`);
+}
+const publicInfra = profile === "public-infra";
+const useLocalNostrFixture = publicInfra && process.env.VITE_NOSTR_RELAYS === undefined;
 
 // Deterministic relay peer ids come from the relay configs' private_key_seed, so the
 // routing endpoint, the operator-group map, and the running relays all agree.
@@ -31,10 +38,17 @@ const gridEnv = {
 	VITE_NETWORK_MODE: "modular",
 	VITE_MEMBERSHIP_INVITE: "grid-local-demo-invite-0123456789",
 	VITE_RENDEZVOUS_NAMESPACE: "drp-network:v1:Z2F0ZS03LWxvY2FsLWZpeHR1cmU",
-	VITE_RENDEZVOUS_ENDPOINTS: [
-		"http://127.0.0.1:4175/grid-registry/primary",
-		"http://127.0.0.1:4175/grid-registry/secondary",
-	].join(","),
+	...(publicInfra
+		? {
+				VITE_NOSTR_RELAYS: process.env.VITE_NOSTR_RELAYS ?? "ws://127.0.0.1:4180",
+				VITE_RENDEZVOUS_ENDPOINTS: "",
+			}
+		: {
+				VITE_RENDEZVOUS_ENDPOINTS: [
+					"http://127.0.0.1:4175/grid-registry/primary",
+					"http://127.0.0.1:4175/grid-registry/secondary",
+				].join(","),
+			}),
 	VITE_ROUTING_ENDPOINTS: [
 		"http://127.0.0.1:4175/fixture/grid-relays-success/primary/",
 		"http://127.0.0.1:4175/fixture/grid-relays-success/secondary/",
@@ -43,8 +57,17 @@ const gridEnv = {
 	VITE_RENDER_INFO_INTERVAL: "250",
 };
 
+const discoveryProcesses = publicInfra
+	? [
+			{ name: "routing", command: "node examples/network-spike/fixtures/delegated-server.mjs --routing-only" },
+			...(useLocalNostrFixture
+				? [{ name: "nostr-relay", command: "node examples/network-spike/fixtures/nostr-relay.mjs 4180" }]
+				: []),
+		]
+	: [{ name: "registries+routing", command: "pnpm --filter ts-drp-example-network-spike fixtures" }];
+
 const processes = [
-	{ name: "registries+routing", command: "pnpm --filter ts-drp-example-network-spike fixtures" },
+	...discoveryProcesses,
 	{
 		name: "relay-a",
 		command: "pnpm --filter @ts-drp/network-spike grid:relay ../../configs/network-spike-relay.json 51000",
@@ -96,14 +119,18 @@ setTimeout(() => {
 		[
 			"",
 			"────────────────────────────────────────────────────────────",
-			"  DRP modular grid demo is starting (no fixed bootstrap seeds).",
+			publicInfra
+				? "  DRP public-infra grid demo is starting (Nostr discovery; no HTTP registry)."
+				: "  DRP modular grid demo is starting (no fixed bootstrap seeds).",
 			"  Once vite prints its URL, open it in TWO browser windows:",
 			"",
 			"      http://127.0.0.1:4174",
 			"",
 			"  In one window click CREATE and copy the grid id; in the other",
 			"  paste it into GRID ID and click JOIN. Move with W/A/S/D.",
-			"  Peers discover each other via rendezvous, connect through a relay,",
+			publicInfra
+				? "  Peers discover each other via Nostr, connect through a relay,"
+				: "  Peers discover each other via HTTP rendezvous, connect through a relay,",
 			"  and upgrade to direct WebRTC where the network allows.",
 			"  Ctrl+C to stop everything.",
 			"────────────────────────────────────────────────────────────",
