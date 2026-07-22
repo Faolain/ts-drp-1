@@ -10,6 +10,7 @@
 		"e2e": "pnpm --dir ../.. exec playwright test --config examples/network-spike/playwright.config.ts",
 		"fixtures:dht": "pnpm --filter @ts-drp/network-spike browser-dht:fixture",
 		"fixtures:nostr": "node fixtures/nostr-relay.mjs",
+		"fixtures:routing-only": "node fixtures/delegated-server.mjs --routing-only",
 		"fixtures": "node fixtures/delegated-server.mjs",
 		"start": "vite preview --host --port 4174",
 		"typecheck": "tsc --noEmit"

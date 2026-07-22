@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
+import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 
 const HOST = "127.0.0.1";
@@ -9,7 +10,13 @@ if (!Number.isSafeInteger(requestedPort) || requestedPort < 0 || requestedPort >
 
 const storedEvents = new Map();
 const subscriptions = new WeakMap();
-const relay = new WebSocketServer({ host: HOST, port: requestedPort });
+// A plain HTTP GET returns 200 so orchestration/readiness probes (Playwright webServer,
+// demo scripts) have a health endpoint; WebSocket upgrades are served on the same port.
+const httpServer = createServer((_request, response) => {
+	response.writeHead(200, { "content-type": "text/plain" });
+	response.end("nostr relay fixture ok\n");
+});
+const relay = new WebSocketServer({ server: httpServer });
 
 relay.on("connection", (socket) => {
 	subscriptions.set(socket, new Set());
@@ -22,13 +29,13 @@ relay.on("connection", (socket) => {
 	});
 });
 
-relay.on("listening", () => {
-	const address = relay.address();
+httpServer.listen(requestedPort, HOST, () => {
+	const address = httpServer.address();
 	if (address === null || typeof address === "string") throw new Error("Nostr relay fixture has no TCP address");
 	process.stdout.write(`nostr relay fixture listening on ws://${HOST}:${address.port}\n`);
 });
 
-relay.on("error", (error) => {
+httpServer.on("error", (error) => {
 	process.stderr.write(`nostr relay fixture error: ${error.message}\n`);
 	process.exitCode = 1;
 });
@@ -122,7 +129,7 @@ function shutdown() {
 	if (shuttingDown) return;
 	shuttingDown = true;
 	for (const socket of relay.clients) socket.close(1001, "fixture shutdown");
-	relay.close(() => process.exit(0));
+	relay.close(() => httpServer.close(() => process.exit(0)));
 }
 
 process.on("SIGINT", shutdown);
