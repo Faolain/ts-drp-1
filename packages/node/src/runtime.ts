@@ -5,9 +5,10 @@ import {
 	DRPNetworkNode,
 	type DRPNetworkNodeDependencies,
 } from "@ts-drp/network";
+import { type NodeClosestPeerRouting, NodeRoutingClosestPeersSource } from "@ts-drp/relay-policy";
 import {
-	attachNodeRouting,
 	createAminoHostExtensions,
+	attachNodeRouting as defaultAttachNodeRouting,
 	type NodeRouting,
 	OFFICIAL_AMINO_BOOTSTRAPPERS,
 	PUBLIC_NETWORK_ACKNOWLEDGEMENT,
@@ -17,9 +18,13 @@ import type { DRPNodeConfig } from "@ts-drp/types";
 import { DRPNode, type DRPNodeDependencies } from "./index.js";
 
 export interface NodeRuntimeDependencies {
+	readonly attachNodeRouting?: typeof defaultAttachNodeRouting;
 	readonly network?: DRPNetworkNodeDependencies;
 	readonly node?: DRPNodeDependencies;
 }
+
+const NODE_CLOSEST_PEERS_TIMEOUT_MS = 45_000;
+const DEFAULT_CLOSEST_PEERS_TIMEOUT_MS = 10_000;
 
 export interface NodeRuntime {
 	readonly node: DRPNode;
@@ -108,6 +113,22 @@ export async function createNodeRuntime(
 	const { config: runtimeConfig, network } = resolved;
 	let routingHost: Awaited<ReturnType<DRPNetworkHostFactory>> | undefined;
 	let networkStarted = false;
+	let attachedRouting: NodeRouting | undefined;
+	const nodeClosestPeersEnabled =
+		network === "public" &&
+		runtimeConfig.network_config?.control_plane?.relay_policy?.sources?.node_closest_peers?.enabled === true;
+	const deferredNodeRouting = nodeClosestPeersEnabled
+		? new DeferredNodeClosestPeerRouting(() => attachedRouting)
+		: undefined;
+	const nodeClosestPeersSource =
+		deferredNodeRouting === undefined ? undefined : new NodeRoutingClosestPeersSource(deferredNodeRouting);
+	const relayCandidateSources =
+		nodeClosestPeersSource === undefined
+			? dependencies.network?.relayCandidateSources
+			: {
+					...dependencies.network?.relayCandidateSources,
+					nodeClosestPeers: nodeClosestPeersSource,
+				};
 	const hostFactory = createRoutingHostFactory(
 		createAminoHostExtensions({ mode: "client", network }),
 		dependencies.network?.hostFactory,
@@ -118,9 +139,9 @@ export async function createNodeRuntime(
 	);
 	const networkNode = new DRPNetworkNode(runtimeConfig.network_config, {
 		...dependencies.network,
+		...(relayCandidateSources === undefined ? {} : { relayCandidateSources }),
 		hostFactory,
 	});
-	let attachedRouting: NodeRouting | undefined;
 	const node = new DRPNode(runtimeConfig, {
 		...dependencies.node,
 		beforeRestart: (): never => {
@@ -132,7 +153,14 @@ export async function createNodeRuntime(
 	try {
 		await node.start();
 		if (routingHost === undefined) throw new Error("Node routing host was not exposed by the production host factory");
-		attachedRouting = await attachNodeRouting(networkNode, routingHost, { mode: "client", network });
+		attachedRouting = await (dependencies.attachNodeRouting ?? defaultAttachNodeRouting)(networkNode, routingHost, {
+			closestPeersTimeoutMs: nodeClosestPeersEnabled ? NODE_CLOSEST_PEERS_TIMEOUT_MS : DEFAULT_CLOSEST_PEERS_TIMEOUT_MS,
+			mode: "client",
+			network,
+		});
+		if (deferredNodeRouting !== undefined) {
+			void networkNode.retryRelayPolicyAcquisition();
+		}
 		return { node, routing: attachedRouting };
 	} catch (error) {
 		if (networkStarted) {
@@ -145,6 +173,26 @@ export async function createNodeRuntime(
 			}
 		}
 		throw error;
+	}
+}
+
+class DeferredNodeClosestPeerRouting implements NodeClosestPeerRouting {
+	readonly #routing: () => NodeRouting | undefined;
+
+	constructor(routing: () => NodeRouting | undefined) {
+		this.#routing = routing;
+	}
+
+	async *getClosestPeers(
+		queryKey: Uint8Array,
+		signal?: AbortSignal
+	): AsyncIterable<{
+		readonly addresses: readonly string[];
+		readonly peerId: string;
+	}> {
+		const routing = this.#routing();
+		if (routing === undefined) return;
+		yield* routing.getClosestPeers(queryKey, signal);
 	}
 }
 

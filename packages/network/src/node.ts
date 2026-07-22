@@ -39,11 +39,13 @@ import {
 	EvidenceDerivedOperatorGroupClassifier,
 	Libp2pRelayClient,
 	type Libp2pRelayClientOptions,
+	RELAY_TRANSPORT_PROFILES,
 	type RelayCandidateSource,
 	RelayPolicy,
 	type RelayPolicyResult,
 	type RelayReplacementResult,
 	type RelayReservationLifecycleEvent,
+	type RelayTransportProfile,
 } from "@ts-drp/relay-policy";
 import { type AddressDecision, AddressPolicy, classifyIpAddressScope, createDnsResolver } from "@ts-drp/rendezvous";
 import {
@@ -195,6 +197,8 @@ export interface RelayPolicyFactoryOptions {
 	onReservationEvent(event: RelayReservationLifecycleEvent): void;
 	readonly source: RelayCandidateSource;
 	readonly targetReservations: number;
+	readonly totalDeadlineMs: number;
+	readonly transportProfile?: RelayTransportProfile;
 }
 
 export interface RelayPolicyDriver {
@@ -211,6 +215,7 @@ export interface RelayPolicyDriver {
 }
 
 const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
+const NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS = 55_000;
 
 const APP_SPECIFIC_WEIGHT = defaultPeerScoreParams.appSpecificWeight;
 const ACCEPT_PX_THRESHOLD = defaultPeerScoreThresholds.acceptPXThreshold;
@@ -321,6 +326,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _bootstrapRetryController?: AbortController;
 	private _relayPolicyController?: AbortController;
 	private _relayPolicy?: RelayPolicyDriver;
+	private _relayPolicyAcquirePromise: Promise<void> = Promise.resolve();
+	private _lastRelayPolicyResult?: RelayPolicyResult;
+	private _relayPolicyFailed = false;
 	private _relayDisconnectListener?: (event: CustomEvent<PeerId>) => void;
 	private _relayMaintenanceTail: Promise<void> = Promise.resolve();
 	private _relayRefreshTimer?: ReturnType<typeof setTimeout>;
@@ -642,6 +650,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (relayPolicyConfig === undefined || configuredSources === undefined || injectedSources === undefined) return;
 		const publicRelayOverflowEnabled =
 			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
 
 		const targetReservations =
 			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
@@ -684,8 +693,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				source: injectedSources.delegatedClosestPeers,
 			},
 			{
-				enabled:
-					configuredSources.node_closest_peers?.enabled === true && injectedSources.nodeClosestPeers !== undefined,
+				degradedOverflowEligible: true,
+				enabled: nodeClosestPeersEnabled && injectedSources.nodeClosestPeers !== undefined,
 				name: "node-closest-peers",
 				priority: "overflow" as const,
 				source: injectedSources.nodeClosestPeers,
@@ -717,6 +726,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			source,
 			targetReservations,
+			totalDeadlineMs: nodeClosestPeersEnabled
+				? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
+				: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs,
+			transportProfile: nodeClosestPeersEnabled ? RELAY_TRANSPORT_PROFILES.node : RELAY_TRANSPORT_PROFILES.broadBrowser,
 		});
 		this._relayPolicyController?.abort();
 		const controller = new AbortController();
@@ -733,7 +746,38 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			});
 		};
 		host.addEventListener("peer:disconnect", this._relayDisconnectListener);
-		void this._runInitialRelayAcquire(policy, controller);
+		this._lastRelayPolicyResult = undefined;
+		this._relayPolicyFailed = false;
+		this._relayPolicyAcquirePromise = this._runInitialRelayAcquire(policy, controller);
+	}
+
+	/** Re-runs relay acquisition after a post-start candidate source becomes ready. */
+	async retryRelayPolicyAcquisition(): Promise<void> {
+		await this._relayPolicyAcquirePromise;
+		if (this._lastRelayPolicyResult?.terminal === "reserved") return;
+		const policy = this._relayPolicy;
+		const controller = this._relayPolicyController;
+		if (policy === undefined || controller === undefined) {
+			// Rebuild only after a genuine acquire-failure teardown, and never on a stopped node:
+			// stop()/restart() also null these fields (without setting _relayPolicyFailed), and a
+			// parked retry must not resurrect the policy on a dead host.
+			if (!this._relayPolicyFailed || this._node?.status === IntervalRunnerState.Stopped) return;
+			this._startRelayPolicy();
+			await this._relayPolicyAcquirePromise;
+			return;
+		}
+		this._relayPolicyAcquirePromise = this._runInitialRelayAcquire(policy, controller);
+		await this._relayPolicyAcquirePromise;
+	}
+
+	private _nodeClosestPeersEnabled(): boolean {
+		const controlPlane = this._config?.control_plane;
+		return (
+			controlPlane?.relay_policy?.sources?.node_closest_peers?.enabled === true &&
+			controlPlane.routing?.node?.enabled === true &&
+			controlPlane.routing.node.network === "public" &&
+			controlPlane.rollout?.public_components?.delegated_routing?.enabled === true
+		);
 	}
 
 	private _validateRelayPolicyConfiguration(): void {
@@ -772,7 +816,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		) {
 			missing.push("delegated_closest_peers");
 		}
-		if (configuredSources.node_closest_peers?.enabled === true && injected?.nodeClosestPeers === undefined) {
+		if (this._nodeClosestPeersEnabled() && injected?.nodeClosestPeers === undefined) {
 			missing.push("node_closest_peers");
 		}
 		if (
@@ -838,7 +882,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			this._handleRelayPolicyResult(result, policy, controller);
 		} catch (error) {
 			if (controller.signal.aborted || this._relayPolicy !== policy) return;
-			this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+			if (!this._relayPolicyFailed) {
+				this._emitControlPlaneEvent({
+					failure: "acquire-threw",
+					kind: "relay-reservation",
+					outcome: "failed",
+				});
+			}
+			this._relayPolicyFailed = true;
 			controller.abort(error);
 			this._clearRelayMaintenance();
 			try {
@@ -858,9 +909,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		controller: AbortController
 	): void {
 		if (controller.signal.aborted || this._relayPolicy !== policy) return;
+		this._lastRelayPolicyResult = result;
 		this._reservedRelayPeerIds = new Set(result.reservations.map(({ candidate }) => candidate.peerId));
 		if (result.terminal !== "reserved") {
-			this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+			if (!this._relayPolicyFailed) {
+				this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+			}
+			this._relayPolicyFailed = true;
+		} else {
+			this._relayPolicyFailed = false;
 		}
 		this._scheduleRelayRefresh(result, policy, controller);
 	}
@@ -894,7 +951,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			})
 			.catch((error: unknown): void => {
 				if (controller?.signal.aborted === true) return;
-				this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+				if (!this._relayPolicyFailed) {
+					this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+				}
+				this._relayPolicyFailed = true;
 				log.error("::relay-policy::maintenance:error", error);
 			});
 	}
@@ -926,6 +986,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			limits: {
 				requiredOperatorGroups: options.targetReservations,
 				requiredReservations: options.targetReservations,
+				totalDeadlineMs: options.totalDeadlineMs,
 			},
 			onReservationEvent: options.onReservationEvent,
 			operatorGroupClassifier: new EvidenceDerivedOperatorGroupClassifier({
@@ -933,6 +994,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}),
 			reservationClient: client,
 			source: options.source,
+			transportProfile: options.transportProfile ?? RELAY_TRANSPORT_PROFILES.broadBrowser,
 		});
 		return {
 			get activeReservations(): readonly ActiveRelayReservation[] {

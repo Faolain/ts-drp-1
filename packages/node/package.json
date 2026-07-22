@@ -67,6 +67,7 @@
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",
 		"@ts-drp/object": "0.11.0",
+		"@ts-drp/relay-policy": "workspace:*",
 		"@ts-drp/rendezvous": "workspace:*",
 		"@ts-drp/routing-browser": "workspace:*",
 		"@ts-drp/routing-node": "workspace:*",

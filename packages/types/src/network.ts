@@ -112,6 +112,7 @@ export type ControlPlaneEvent =
 			readonly outcome: "accepted" | "failed";
 	  }
 	| {
+			readonly failure?: "acquire-threw";
 			readonly kind: "relay-reservation";
 			readonly outcome: "acquired" | "expired" | "failed" | "refused" | "released" | "replaced";
 			readonly relayIdHash?: string;

@@ -643,6 +643,9 @@ importers:
       '@ts-drp/object':
         specifier: 0.11.0
         version: link:../object
+      '@ts-drp/relay-policy':
+        specifier: workspace:*
+        version: link:../relay-policy
       '@ts-drp/rendezvous':
         specifier: workspace:*
         version: link:../rendezvous

@@ -28,7 +28,7 @@ export type {
 	VerifiedRelayOperatorEvidence,
 } from "./types.js";
 
-export type RelayTransport = "wss" | "webtransport" | "webrtc-direct";
+export type RelayTransport = "quic-v1" | "tcp" | "wss" | "webtransport" | "webrtc-direct";
 
 export interface RelayCandidateSource {
 	getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate>;
@@ -75,7 +75,7 @@ export interface DnsaddrFallback {
 
 export interface RelayTransportProfile {
 	readonly allowed: readonly RelayTransport[];
-	readonly name: "broad-browser" | "wss-only";
+	readonly name: "broad-browser" | "node" | "wss-only";
 }
 
 export const RELAY_TRANSPORT_PROFILES = {
@@ -83,11 +83,17 @@ export const RELAY_TRANSPORT_PROFILES = {
 		allowed: ["wss", "webtransport", "webrtc-direct"],
 		name: "broad-browser",
 	},
+	node: {
+		allowed: ["wss", "webtransport", "webrtc-direct", "tcp", "quic-v1"],
+		name: "node",
+	},
 	wssOnly: {
 		allowed: ["wss"],
 		name: "wss-only",
 	},
 } as const satisfies Record<string, RelayTransportProfile>;
+
+const NODE_OVERFLOW_PRIMARY_PHASE_DEADLINE_MS = 5_000;
 
 export interface RelayPolicyLimits {
 	readonly maxCandidates: number;
@@ -279,6 +285,7 @@ export class BrowserRoutingClosestPeersSource implements RelayCandidateSource {
 }
 
 export interface CompositeRelayCandidateSourceEntry {
+	readonly degradedOverflowEligible?: boolean;
 	readonly enabled: boolean;
 	readonly name: string;
 	readonly priority: "overflow" | "primary";
@@ -299,6 +306,14 @@ export class CompositeRelayCandidateSource implements RelayCandidateSource {
 	constructor(options: CompositeRelayCandidateSourceOptions) {
 		this.#requiredOperatorGroups = boundedInteger(options.requiredOperatorGroups, 1, 8, "requiredOperatorGroups");
 		this.#sources = [...options.sources];
+	}
+
+	/** @returns Whether an explicitly degraded-eligible overflow tier is enabled. */
+	get hasDegradedOverflow(): boolean {
+		return this.#sources.some(
+			({ degradedOverflowEligible, enabled, priority }) =>
+				enabled && priority === "overflow" && degradedOverflowEligible === true
+		);
 	}
 
 	/** @inheritdoc */
@@ -351,6 +366,66 @@ export class CompositeRelayCandidateSource implements RelayCandidateSource {
 			enabled.filter(({ priority }) => priority === "overflow"),
 			true
 		);
+	}
+
+	/**
+	 * Yields only primary sources so reservation outcomes can decide whether overflow is needed.
+	 * @param queryKey
+	 * @param signal
+	 */
+	getPrimaryCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
+		return this.#getCandidatesForPriority("primary", queryKey, signal);
+	}
+
+	/**
+	 * Yields only overflow sources after primary reservation attempts prove insufficient.
+	 * @param queryKey
+	 * @param signal
+	 */
+	getOverflowCandidates(
+		queryKey: Uint8Array,
+		signal: AbortSignal,
+		onCandidate?: (candidate: RelayCandidate, degradedOverflowEligible: boolean) => void
+	): AsyncIterable<RelayCandidate> {
+		return this.#getCandidatesForPriority("overflow", queryKey, signal, onCandidate);
+	}
+
+	async *#getCandidatesForPriority(
+		priority: CompositeRelayCandidateSourceEntry["priority"],
+		queryKey: Uint8Array,
+		signal: AbortSignal,
+		onCandidate?: (candidate: RelayCandidate, degradedOverflowEligible: boolean) => void
+	): AsyncIterable<RelayCandidate> {
+		const seenPeerIds = new Set<string>();
+		for (const entry of this.#sources.filter(
+			({ enabled, priority: sourcePriority }) => enabled && sourcePriority === priority
+		)) {
+			signal.throwIfAborted();
+			const iterator = entry.source.getCandidates(queryKey, signal)[Symbol.asyncIterator]();
+			let finished = false;
+			try {
+				while (true) {
+					const next = await iterator.next();
+					if (next.done === true) {
+						finished = true;
+						break;
+					}
+					signal.throwIfAborted();
+					const candidate = next.value;
+					if (isValidCandidate(candidate) && seenPeerIds.has(candidate.peerId)) continue;
+					if (isValidCandidate(candidate)) {
+						seenPeerIds.add(candidate.peerId);
+						onCandidate?.(candidate, entry.degradedOverflowEligible === true);
+					}
+					yield candidate;
+					signal.throwIfAborted();
+				}
+			} catch (error) {
+				if (isAbortError(error, signal)) throw error;
+			} finally {
+				if (!finished) await closeCandidateIterator(iterator, signal);
+			}
+		}
 	}
 }
 
@@ -638,6 +713,10 @@ export class RelayPolicy {
 	#active = new Map<string, ActiveRelayReservation>();
 	#attemptedPeerIds = new Set<string>();
 	#candidatePool: RelayCandidate[] = [];
+	#candidatesObserved = 0;
+	#lastQueryKey?: Uint8Array;
+	#degradedOverflowEligiblePeerIds = new Set<string>();
+	#degradedOverflowPeerIds = new Set<string>();
 	#pendingReleases = new Map<string, RelayCandidate>();
 	#queuedOperations = 0;
 	#stopped = false;
@@ -682,38 +761,9 @@ export class RelayPolicy {
 			const startedAtMs = this.#now();
 			const startedAtMonotonicMs = monotonicNow();
 			this.#attemptedPeerIds.clear();
-			const attempts: RelayAttempt[] = [];
-			const fallbackBudgetMs = this.#fallback === undefined ? 0 : this.#limits.ownedFallbackDeadlineMs;
-			const publicCollectionBudgetMs = Math.max(1, this.#limits.totalDeadlineMs - fallbackBudgetMs);
-			try {
-				const collected = await withDeadline(
-					(collectionSignal) =>
-						collectCandidates(
-							this.#source,
-							queryKey,
-							collectionSignal,
-							this.#limits,
-							this.#now,
-							this.#operatorGroupClassifier
-						),
-					signal,
-					publicCollectionBudgetMs
-				);
-				this.#candidatePool = collected.candidates;
-				attempts.push(...collected.attempts);
-			} catch (error) {
-				this.#candidatePool = [];
-				if (signal.aborted) return this.#result("aborted", attempts, startedAtMs);
-				attempts.push(
-					baseAttempt(
-						syntheticCandidate(queryKey),
-						startedAtMs,
-						this.#now(),
-						error instanceof RelayDeadlineError ? "source-timeout" : "source-failed"
-					)
-				);
-			}
-			return this.#acquireFromPool(signal, attempts, startedAtMs, startedAtMonotonicMs);
+			this.#candidatesObserved = 0;
+			this.#lastQueryKey = new Uint8Array(queryKey);
+			return this.#collectAndAcquire(queryKey, signal, startedAtMs, startedAtMonotonicMs);
 		});
 	}
 
@@ -727,6 +777,7 @@ export class RelayPolicy {
 			const startedAtMs = this.#now();
 			const startedAtMonotonicMs = monotonicNow();
 			const attempts: RelayAttempt[] = [];
+			this.#candidatesObserved = 0;
 			const failures: Array<{ peerId: string; reason: RelayReplacementResult["reason"] }> = [];
 			for (const reservation of this.#active.values()) {
 				if (reservation.expiresAtMs - this.#now() > this.#limits.refreshBeforeExpiryMs) continue;
@@ -773,7 +824,18 @@ export class RelayPolicy {
 			}
 			for (const failure of failures) await this.#drop(failure.peerId);
 			if (failures.length > 0) {
-				const replacement = await this.#acquireFromPool(signal, attempts, startedAtMs, startedAtMonotonicMs);
+				this.#attemptedPeerIds.clear();
+				for (const { peerId } of failures) this.#attemptedPeerIds.add(peerId);
+				const queryKey = this.#lastQueryKey ?? new TextEncoder().encode(failures[0]?.peerId ?? "relay-refresh");
+				const replacement = await this.#collectAndAcquire(
+					queryKey,
+					signal,
+					startedAtMs,
+					startedAtMonotonicMs,
+					undefined,
+					undefined,
+					attempts
+				);
 				return replacement;
 			}
 			return this.#result("reserved", attempts, startedAtMs);
@@ -798,9 +860,13 @@ export class RelayPolicy {
 			const startedAtMs = this.#now();
 			const startedAtMonotonicMs = monotonicNow();
 			await this.#drop(peerId);
-			const result = await this.#acquireFromPool(
+			this.#attemptedPeerIds.clear();
+			this.#candidatesObserved = 0;
+			this.#attemptedPeerIds.add(peerId);
+			const queryKey = this.#lastQueryKey ?? new TextEncoder().encode(peerId);
+			const result = await this.#collectAndAcquire(
+				queryKey,
 				signal,
-				[],
 				startedAtMs,
 				startedAtMonotonicMs,
 				peerId,
@@ -830,7 +896,148 @@ export class RelayPolicy {
 		await Promise.allSettled(reservations.map(({ candidate }) => this.#release(candidate)));
 		this.#pendingReleases.clear();
 		this.#candidatePool = [];
+		this.#candidatesObserved = 0;
+		this.#degradedOverflowEligiblePeerIds.clear();
+		this.#degradedOverflowPeerIds.clear();
+		this.#lastQueryKey = undefined;
 		this.#attemptedPeerIds.clear();
+	}
+
+	async #collectAndAcquire(
+		queryKey: Uint8Array,
+		signal: AbortSignal,
+		startedAtMs: number,
+		startedAtMonotonicMs: number,
+		replacedPeerId?: string,
+		excludedOperatorGroup?: string,
+		initialAttempts: RelayAttempt[] = []
+	): Promise<RelayPolicyResult> {
+		const attempts = initialAttempts;
+		if (this.#source instanceof CompositeRelayCandidateSource && this.#source.hasDegradedOverflow) {
+			if (signal.aborted) return this.#result("aborted", attempts, startedAtMs);
+			if (this.#requirementsMet(true)) return this.#result("reserved", attempts, startedAtMs);
+			const compositeSource = this.#source;
+			await this.#collectCandidateSource(
+				{
+					getCandidates: (key, collectionSignal) => compositeSource.getPrimaryCandidates(key, collectionSignal),
+				},
+				queryKey,
+				signal,
+				attempts,
+				startedAtMonotonicMs,
+				true,
+				NODE_OVERFLOW_PRIMARY_PHASE_DEADLINE_MS
+			);
+			const primaryResult = await this.#acquireFromPool(
+				signal,
+				attempts,
+				startedAtMs,
+				startedAtMonotonicMs,
+				replacedPeerId,
+				excludedOperatorGroup,
+				false,
+				false
+			);
+			if (this.#requirementsMet(false) || signal.aborted) return primaryResult;
+			this.#degradedOverflowEligiblePeerIds.clear();
+			await this.#collectCandidateSource(
+				{
+					getCandidates: (key, collectionSignal) =>
+						compositeSource.getOverflowCandidates(key, collectionSignal, (candidate, degradedOverflowEligible) => {
+							if (degradedOverflowEligible) this.#degradedOverflowEligiblePeerIds.add(candidate.peerId);
+						}),
+				},
+				queryKey,
+				signal,
+				attempts,
+				startedAtMonotonicMs,
+				true
+			);
+			return this.#acquireFromPool(
+				signal,
+				attempts,
+				startedAtMs,
+				startedAtMonotonicMs,
+				replacedPeerId,
+				excludedOperatorGroup,
+				true,
+				true
+			);
+		}
+
+		await this.#collectCandidateSource(this.#source, queryKey, signal, attempts, startedAtMonotonicMs, false);
+		return this.#acquireFromPool(
+			signal,
+			attempts,
+			startedAtMs,
+			startedAtMonotonicMs,
+			replacedPeerId,
+			excludedOperatorGroup,
+			true,
+			false
+		);
+	}
+
+	async #collectCandidateSource(
+		source: RelayCandidateSource,
+		queryKey: Uint8Array,
+		signal: AbortSignal,
+		attempts: RelayAttempt[],
+		startedAtMonotonicMs: number,
+		reserveForAcquisition: boolean,
+		maxCollectionBudgetMs?: number
+	): Promise<void> {
+		this.#candidatePool = [];
+		try {
+			const collected = await withDeadline(
+				(collectionSignal) =>
+					collectCandidates(
+						source,
+						queryKey,
+						collectionSignal,
+						this.#limits,
+						this.#now,
+						this.#operatorGroupClassifier,
+						(candidate) => {
+							this.#candidatePool.push(candidate);
+							this.#candidatesObserved += 1;
+						}
+					),
+				signal,
+				this.#collectionBudgetMs(startedAtMonotonicMs, reserveForAcquisition, maxCollectionBudgetMs)
+			);
+			this.#candidatePool = collected.candidates;
+			attempts.push(...collected.attempts);
+		} catch (error) {
+			if (signal.aborted) return;
+			attempts.push(
+				baseAttempt(
+					syntheticCandidate(queryKey),
+					this.#now(),
+					this.#now(),
+					error instanceof RelayDeadlineError ? "source-timeout" : "source-failed"
+				)
+			);
+		}
+	}
+
+	#collectionBudgetMs(
+		startedAtMonotonicMs: number,
+		reserveForAcquisition: boolean,
+		maxCollectionBudgetMs?: number
+	): number {
+		const elapsedMs = Math.max(0, monotonicNow() - startedAtMonotonicMs);
+		const fallbackBudgetMs = this.#fallback === undefined ? 0 : this.#limits.ownedFallbackDeadlineMs;
+		const remainingPublicMs = Math.max(1, Math.floor(this.#limits.totalDeadlineMs - elapsedMs - fallbackBudgetMs));
+		if (!reserveForAcquisition) return remainingPublicMs;
+		const reservationBudgetMs = Math.min(
+			Math.max(0, remainingPublicMs - 1),
+			this.#limits.perCandidateDeadlineMs * Math.max(1, this.#limits.requiredReservations - this.#active.size)
+		);
+		const collectionBudgetMs = Math.max(1, remainingPublicMs - reservationBudgetMs);
+		return maxCollectionBudgetMs === undefined
+			? collectionBudgetMs
+			: Math.min(collectionBudgetMs, maxCollectionBudgetMs);
 	}
 
 	async #acquireFromPool(
@@ -839,7 +1046,9 @@ export class RelayPolicy {
 		startedAtMs = this.#now(),
 		startedAtMonotonicMs = monotonicNow(),
 		replacedPeerId?: string,
-		excludedOperatorGroup?: string
+		excludedOperatorGroup?: string,
+		allowFallback = true,
+		allowDegradedOverflow = false
 	): Promise<RelayPolicyResult> {
 		const attempts = initialAttempts;
 		const totalController = new AbortController();
@@ -858,7 +1067,7 @@ export class RelayPolicy {
 			let cursor = 0;
 			const workerCount = Math.min(this.#limits.maxConcurrentReservations, pending.length);
 			const workers = Array.from({ length: workerCount }, async () => {
-				while (!boundedSignal.aborted && cursor < pending.length && !this.#requirementsMet()) {
+				while (!boundedSignal.aborted && cursor < pending.length && !this.#requirementsMet(allowDegradedOverflow)) {
 					const candidate = pending[cursor++];
 					if (candidate === undefined) return;
 					const attempt = await this.#attemptCandidate(
@@ -866,15 +1075,16 @@ export class RelayPolicy {
 						boundedSignal,
 						signal,
 						replacedPeerId,
-						excludedOperatorGroup
+						excludedOperatorGroup,
+						allowDegradedOverflow
 					);
 					attempts.push(attempt);
 				}
 			});
 			await Promise.all(workers);
-			if (this.#requirementsMet()) return this.#result("reserved", attempts, startedAtMs);
+			if (this.#requirementsMet(allowDegradedOverflow)) return this.#result("reserved", attempts, startedAtMs);
 			if (signal.aborted) return this.#result("aborted", attempts, startedAtMs);
-			if (this.#fallback === undefined) return this.#result("exhausted", attempts, startedAtMs);
+			if (!allowFallback || this.#fallback === undefined) return this.#result("exhausted", attempts, startedAtMs);
 			const remainingTotalMs = Math.max(0, this.#limits.totalDeadlineMs - (monotonicNow() - startedAtMonotonicMs));
 			const fallback = await this.#tryFallback(signal, remainingTotalMs);
 			if (fallback.status === "aborted") return this.#result("aborted", attempts, startedAtMs, fallback);
@@ -890,7 +1100,8 @@ export class RelayPolicy {
 		signal: AbortSignal,
 		callerSignal: AbortSignal,
 		replacedPeerId?: string,
-		excludedOperatorGroup?: string
+		excludedOperatorGroup?: string,
+		allowDegradedOverflow = false
 	): Promise<RelayAttempt> {
 		const startedAtMs = this.#now();
 		this.#attemptedPeerIds.add(candidate.peerId);
@@ -901,7 +1112,13 @@ export class RelayPolicy {
 		const operatorCount = [...this.#active.values()].filter(
 			(reservation) => reservation.candidate.operatorGroup === candidate.operatorGroup
 		).length;
-		if (operatorCount >= this.#limits.maxPerOperatorGroup) {
+		if (
+			operatorCount >= this.#limits.maxPerOperatorGroup &&
+			!isAnonymousOverflowCandidate(
+				candidate,
+				allowDegradedOverflow && this.#degradedOverflowEligiblePeerIds.has(candidate.peerId)
+			)
+		) {
 			return baseAttempt(candidate, startedAtMs, this.#now(), "operator-limit");
 		}
 		const address = selectAddress(
@@ -1003,7 +1220,14 @@ export class RelayPolicy {
 			const groupCount = [...this.#active.values()].filter(
 				(active) => active.candidate.operatorGroup === candidate.operatorGroup
 			).length;
-			if (groupCount >= this.#limits.maxPerOperatorGroup || this.#requirementsMet()) {
+			if (
+				(groupCount >= this.#limits.maxPerOperatorGroup &&
+					!isAnonymousOverflowCandidate(
+						candidate,
+						allowDegradedOverflow && this.#degradedOverflowEligiblePeerIds.has(candidate.peerId)
+					)) ||
+				this.#requirementsMet(allowDegradedOverflow)
+			) {
 				const released = await this.#release(candidate);
 				return {
 					address,
@@ -1030,6 +1254,14 @@ export class RelayPolicy {
 				if (surplus !== undefined) await this.#drop(surplus.candidate.peerId);
 			}
 			this.#active.set(candidate.peerId, reservation);
+			if (
+				isAnonymousOverflowCandidate(
+					candidate,
+					allowDegradedOverflow && this.#degradedOverflowEligiblePeerIds.has(candidate.peerId)
+				)
+			) {
+				this.#degradedOverflowPeerIds.add(candidate.peerId);
+			}
 			this.#emitReservationEvent(
 				replacedPeerId === undefined
 					? { outcome: "acquired", relayId: candidate.peerId }
@@ -1102,14 +1334,17 @@ export class RelayPolicy {
 		}
 	}
 
-	#requirementsMet(): boolean {
+	#requirementsMet(allowDegradedOverflow: boolean): boolean {
 		if (this.#active.size < this.#limits.requiredReservations) return false;
-		return (
+		const verifiedRequirementsMet =
 			new Set(
 				[...this.#active.values()]
 					.map(({ candidate }) => candidate.operatorGroup)
 					.filter((operatorGroup) => operatorGroup !== "unknown")
-			).size >= this.#limits.requiredOperatorGroups
+			).size >= this.#limits.requiredOperatorGroups;
+		return (
+			verifiedRequirementsMet ||
+			(allowDegradedOverflow && [...this.#degradedOverflowPeerIds].some((peerId) => this.#active.has(peerId)))
 		);
 	}
 
@@ -1121,7 +1356,7 @@ export class RelayPolicy {
 	): RelayPolicyResult {
 		return {
 			attempts: attempts.map(cloneAttempt),
-			candidatesObserved: this.#candidatePool.length,
+			candidatesObserved: this.#candidatesObserved,
 			durationMs: Math.max(0, this.#now() - startedAtMs),
 			...(fallback === undefined ? {} : { fallback: { ...fallback } }),
 			operatorGroups: [...new Set([...this.#active.values()].map(({ candidate }) => candidate.operatorGroup))].sort(),
@@ -1134,6 +1369,7 @@ export class RelayPolicy {
 		const reservation = this.#active.get(peerId);
 		if (reservation === undefined) return;
 		this.#active.delete(peerId);
+		this.#degradedOverflowPeerIds.delete(peerId);
 		await this.#release(reservation.candidate);
 	}
 
@@ -1192,7 +1428,8 @@ async function collectCandidates(
 	signal: AbortSignal,
 	limits: RelayPolicyLimits,
 	now: () => number,
-	operatorGroupClassifier?: RelayOperatorGroupClassifier
+	operatorGroupClassifier?: RelayOperatorGroupClassifier,
+	onCandidate?: (candidate: RelayCandidate) => void
 ): Promise<CandidateCollectionResult> {
 	const attempts: RelayAttempt[] = [];
 	const candidates: RelayCandidate[] = [];
@@ -1227,7 +1464,9 @@ async function collectCandidates(
 			if (seen.has(candidate.peerId)) continue;
 			seen.add(candidate.peerId);
 			if (operatorGroupClassifier === undefined) {
-				candidates.push(cloneCandidate(candidate));
+				const collectedCandidate = cloneCandidate(candidate);
+				candidates.push(collectedCandidate);
+				onCandidate?.(cloneCandidate(collectedCandidate));
 				continue;
 			}
 			let operatorGroup = "unknown";
@@ -1241,9 +1480,12 @@ async function collectCandidates(
 			} catch (error) {
 				if (isAbortError(error, signal)) throw error;
 			}
-			candidates.push(
-				cloneCandidate({ ...candidate, operatorGroup: isOperatorGroup(operatorGroup) ? operatorGroup : "unknown" })
-			);
+			const collectedCandidate = cloneCandidate({
+				...candidate,
+				operatorGroup: isOperatorGroup(operatorGroup) ? operatorGroup : "unknown",
+			});
+			candidates.push(collectedCandidate);
+			onCandidate?.(cloneCandidate(collectedCandidate));
 		}
 	} catch (error) {
 		if (isAbortError(error, signal)) throw error;
@@ -1352,7 +1594,7 @@ function parseLimits(input: Partial<RelayPolicyLimits> | undefined): RelayPolicy
 	boundedInteger(limits.refreshBeforeExpiryMs, 1, 300_000, "refreshBeforeExpiryMs");
 	boundedInteger(limits.requiredOperatorGroups, 1, 8, "requiredOperatorGroups");
 	boundedInteger(limits.requiredReservations, 1, 8, "requiredReservations");
-	boundedInteger(limits.totalDeadlineMs, 1, 30_000, "totalDeadlineMs");
+	boundedInteger(limits.totalDeadlineMs, 1, 120_000, "totalDeadlineMs");
 	if (limits.requiredReservations > limits.maxCandidates) {
 		throw new Error("requiredReservations must not exceed maxCandidates");
 	}
@@ -1369,7 +1611,9 @@ function parseLimits(input: Partial<RelayPolicyLimits> | undefined): RelayPolicy
 }
 
 function parseTransportProfile(profile: RelayTransportProfile): RelayTransportProfile {
-	if (profile.name !== "wss-only" && profile.name !== "broad-browser") throw new Error("unknown transport profile");
+	if (profile.name !== "wss-only" && profile.name !== "broad-browser" && profile.name !== "node") {
+		throw new Error("unknown transport profile");
+	}
 	const allowed = [...new Set(profile.allowed)];
 	if (allowed.length === 0 || allowed.some((transport) => !isRelayTransport(transport))) {
 		throw new Error("transport profile must contain supported relay transports");
@@ -1477,6 +1721,10 @@ function verifiedOperatorGroup(candidate: RelayCandidate): string | undefined {
 	return evidence.operatorGroup;
 }
 
+function isAnonymousOverflowCandidate(candidate: RelayCandidate, degradedOverflowEligible: boolean): boolean {
+	return degradedOverflowEligible && candidate.operatorGroup === "unknown" && candidate.operatorEvidence === undefined;
+}
+
 function isAbortError(error: unknown, signal: AbortSignal): boolean {
 	return (
 		signal.aborted || (error !== null && typeof error === "object" && "name" in error && error.name === "AbortError")
@@ -1519,6 +1767,8 @@ function addressTransport(address: string, allowInsecureWebSocketFixture = false
 	if (allowInsecureWebSocketFixture && names.includes("ws") && !names.includes("tls")) return "wss";
 	if (names.includes("webtransport")) return "webtransport";
 	if (names.includes("webrtc-direct")) return "webrtc-direct";
+	if (names.includes("quic-v1")) return "quic-v1";
+	if (names.includes("tcp")) return "tcp";
 	return "unsupported";
 }
 
@@ -1681,5 +1931,7 @@ function safeNumber(value: bigint | number): number {
 }
 
 function isRelayTransport(value: string): value is RelayTransport {
-	return value === "wss" || value === "webtransport" || value === "webrtc-direct";
+	return (
+		value === "quic-v1" || value === "tcp" || value === "wss" || value === "webtransport" || value === "webrtc-direct"
+	);
 }

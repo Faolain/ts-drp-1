@@ -35,6 +35,10 @@ const DEFAULT_LIMITS: NodeRoutingLimits = {
 };
 const MAX_LIMIT = 128;
 const OPERATION_TIMEOUT_MS = 10_000;
+const MAX_OPERATION_TIMEOUT_MS = 120_000;
+const DEFAULT_CLOSEST_PEERS_MAX_NETWORK_REQUESTS = 512;
+const MAX_CLOSEST_PEERS_NETWORK_REQUESTS = 4_096;
+const MAX_AMINO_CONCURRENCY = 8;
 
 export interface NodeRoutingLimits {
 	maxAddressesPerPeer: number;
@@ -45,7 +49,11 @@ export interface NodeRoutingLimits {
 
 export interface NodeRoutingOptions {
 	readonly allowInsecureWebSocketFixture?: boolean;
+	readonly alpha?: number;
 	bootstrapPeers?: readonly string[];
+	readonly closestPeersMaxNetworkRequests?: number;
+	readonly closestPeersTimeoutMs?: number;
+	readonly disjointPaths?: number;
 	limits?: Partial<NodeRoutingLimits>;
 	listenAddresses?: readonly string[];
 	mode?: "client" | "server";
@@ -55,6 +63,8 @@ export interface NodeRoutingOptions {
 
 export interface AminoAttachmentOptions {
 	readonly allowInsecureWebSocketFixture?: boolean;
+	readonly closestPeersMaxNetworkRequests?: number;
+	readonly closestPeersTimeoutMs?: number;
 	readonly limits?: Partial<NodeRoutingLimits>;
 	readonly mode?: "client" | "server";
 	readonly network?: "local" | "public";
@@ -133,7 +143,10 @@ type RoutingHost = Libp2p<RoutingHostServices>;
  */
 export class NodeRouting {
 	readonly #dht: SingleKadDHT;
+	readonly #closestPeersMaxNetworkRequests: number;
+	readonly #closestPeersTimeoutMs: number;
 	readonly #host: RoutingHost;
+	readonly #isolatedClosestPeersBudgets: boolean;
 	readonly #limits: Readonly<NodeRoutingLimits>;
 	readonly #networkNode: DRPNetworkNode;
 	readonly #policy: AddressPolicy;
@@ -160,12 +173,16 @@ export class NodeRouting {
 	 * @param options.network - Whether public-only address filtering is required
 	 * @param options.resolver - DNS resolver used by the address policy
 	 * @param options.allowInsecureWebSocketFixture
+	 * @param options.closestPeersTimeoutMs - Dedicated bound for public DHT walks
+	 * @param options.closestPeersMaxNetworkRequests
 	 */
 	constructor(
 		networkNode: DRPNetworkNode,
 		host: RoutingHost,
 		options: {
 			allowInsecureWebSocketFixture?: boolean;
+			closestPeersMaxNetworkRequests?: number;
+			closestPeersTimeoutMs?: number;
 			limits: NodeRoutingLimits;
 			network: "local" | "public";
 			resolver: Resolver;
@@ -174,7 +191,10 @@ export class NodeRouting {
 		this.#networkNode = networkNode;
 		this.#host = host;
 		this.#dht = host.services.aminoDHT;
+		this.#closestPeersMaxNetworkRequests = parseClosestPeersMaxNetworkRequests(options.closestPeersMaxNetworkRequests);
+		this.#closestPeersTimeoutMs = parseOperationTimeoutMs(options.closestPeersTimeoutMs);
 		this.#limits = Object.freeze({ ...options.limits });
+		this.#isolatedClosestPeersBudgets = options.network === "public";
 		this.#resolver = options.resolver;
 		this.#requestBudget = new RequestBudget(options.limits.maxNetworkRequests);
 		this.#policy = new AddressPolicy({
@@ -274,18 +294,20 @@ export class NodeRouting {
 	 * @yields Policy-filtered peers up to the configured result cap
 	 */
 	async *getClosestPeers(key: Uint8Array, signal?: AbortSignal): AsyncIterable<RoutingPeer> {
-		const peers = await this.#measure("getClosestPeers", key.byteLength, signal, async (boundedSignal) => {
-			const peers: RoutingPeer[] = [];
-			for await (const peer of this.#host.peerRouting.getClosestPeers(key, {
-				onProgress: (event) => this.#recordNetworkRequest(event.type),
-				signal: boundedSignal,
-			})) {
-				peers.push(await this.#sanitizePeer(peer.id.toString(), peer.multiaddrs.map(String), boundedSignal));
-				if (peers.length >= this.#limits.maxResults) break;
+		const requestBudget = this.#isolatedClosestPeersBudgets
+			? new RequestBudget(this.#closestPeersMaxNetworkRequests)
+			: this.#requestBudget;
+		yield* this.#measureStream(
+			"getClosestPeers",
+			key.byteLength,
+			signal,
+			(boundedSignal) => this.#walkClosestPeers(key, boundedSignal, requestBudget),
+			{
+				countTowardsOperationLimit: !this.#isolatedClosestPeersBudgets,
+				requestBudget,
+				timeoutMs: this.#closestPeersTimeoutMs,
 			}
-			return peers;
-		});
-		yield* peers;
+		);
 	}
 
 	/**
@@ -409,7 +431,8 @@ export class NodeRouting {
 		operationName: RoutingMeasurement["operation"],
 		logicalSentBytes: number,
 		callerSignal: AbortSignal | undefined,
-		operation: (signal: AbortSignal) => Promise<Value>
+		operation: (signal: AbortSignal) => Promise<Value>,
+		timeoutMs = OPERATION_TIMEOUT_MS
 	): Promise<Value> {
 		this.#assertRunning();
 		this.#operations += 1;
@@ -419,31 +442,142 @@ export class NodeRouting {
 		const startedAt = performance.now();
 		const cpuBefore = process.cpuUsage();
 		const rssBeforeBytes = process.memoryUsage.rss();
-		const guard = operationGuard(callerSignal);
+		const guard = operationGuard(callerSignal, timeoutMs);
 		try {
 			const value = await operation(guard.signal);
-			const cpu = process.cpuUsage(cpuBefore);
-			const rssAfterBytes = process.memoryUsage.rss();
-			this.#measurements.push({
-				connectionCount: this.#host.getConnections().length,
-				cpuSystemMicros: cpu.system,
-				cpuUserMicros: cpu.user,
-				durationMs: Math.max(0, performance.now() - startedAt),
-				logicalReceivedBytes: logicalSize(value),
+			this.#recordMeasurement(
+				operationName,
 				logicalSentBytes,
-				networkRequestsConsumed: this.#requestBudget.consumed,
-				operation: operationName,
-				rssAfterBytes,
-				rssBeforeBytes,
-				transportBytes: {
-					reason: "not-exposed-by-libp2p-public-api",
-					status: "unavailable",
-				},
-			});
+				value,
+				this.#requestBudget,
+				startedAt,
+				cpuBefore,
+				rssBeforeBytes
+			);
 			return value;
 		} finally {
 			guard.dispose();
 		}
+	}
+
+	async *#measureStream<Value>(
+		operationName: RoutingMeasurement["operation"],
+		logicalSentBytes: number,
+		callerSignal: AbortSignal | undefined,
+		operation: (signal: AbortSignal) => AsyncIterable<Value>,
+		options: {
+			readonly countTowardsOperationLimit: boolean;
+			readonly requestBudget: RequestBudget;
+			readonly timeoutMs: number;
+		}
+	): AsyncIterable<Value> {
+		this.#assertRunning();
+		if (options.countTowardsOperationLimit) {
+			this.#operations += 1;
+			if (this.#operations > this.#limits.maxOperations) {
+				throw new Error(`node routing operation cap exceeded (${this.#limits.maxOperations})`);
+			}
+		}
+		const startedAt = performance.now();
+		const cpuBefore = process.cpuUsage();
+		const rssBeforeBytes = process.memoryUsage.rss();
+		const guard = operationGuard(callerSignal, options.timeoutMs);
+		const values: Value[] = [];
+		try {
+			for await (const value of operation(guard.signal)) {
+				values.push(value);
+				yield value;
+			}
+		} finally {
+			try {
+				this.#recordMeasurement(
+					operationName,
+					logicalSentBytes,
+					values,
+					options.requestBudget,
+					startedAt,
+					cpuBefore,
+					rssBeforeBytes
+				);
+			} finally {
+				guard.dispose();
+			}
+		}
+	}
+
+	async *#walkClosestPeers(
+		key: Uint8Array,
+		boundedSignal: AbortSignal,
+		requestBudget: RequestBudget
+	): AsyncIterable<RoutingPeer> {
+		const windowController = new AbortController();
+		const walkSignal = AbortSignal.any([boundedSignal, windowController.signal]);
+		let resultCount = 0;
+		try {
+			for await (const peer of this.#host.peerRouting.getClosestPeers(key, {
+				onProgress: (event) => {
+					if (
+						this.#isolatedClosestPeersBudgets &&
+						event.type === "kad-dht:query:send-query" &&
+						requestBudget.remaining === 0
+					) {
+						windowController.abort(
+							new Error(`public request cap exhausted (${requestBudget.consumed}/${requestBudget.limit})`)
+						);
+						return;
+					}
+					this.#recordNetworkRequest(event.type, requestBudget);
+					if (
+						this.#isolatedClosestPeersBudgets &&
+						event.type === "kad-dht:query:send-query" &&
+						requestBudget.remaining === 0
+					) {
+						windowController.abort(
+							new Error(`public request cap exhausted (${requestBudget.consumed}/${requestBudget.limit})`)
+						);
+					}
+				},
+				signal: walkSignal,
+			})) {
+				const sanitized = await this.#sanitizePeer(peer.id.toString(), peer.multiaddrs.map(String), walkSignal);
+				yield sanitized;
+				resultCount += 1;
+				if (resultCount >= this.#limits.maxResults) break;
+			}
+		} catch (error) {
+			if (windowController.signal.aborted && !boundedSignal.aborted) return;
+			throw error;
+		} finally {
+			windowController.abort(new Error("closest-peers walk closed"));
+		}
+	}
+
+	#recordMeasurement(
+		operation: RoutingMeasurement["operation"],
+		logicalSentBytes: number,
+		value: unknown,
+		requestBudget: RequestBudget,
+		startedAt: number,
+		cpuBefore: ReturnType<typeof process.cpuUsage>,
+		rssBeforeBytes: number
+	): void {
+		const cpu = process.cpuUsage(cpuBefore);
+		this.#measurements.push({
+			connectionCount: this.#host.getConnections().length,
+			cpuSystemMicros: cpu.system,
+			cpuUserMicros: cpu.user,
+			durationMs: Math.max(0, performance.now() - startedAt),
+			logicalReceivedBytes: logicalSize(value),
+			logicalSentBytes,
+			networkRequestsConsumed: requestBudget.consumed,
+			operation,
+			rssAfterBytes: process.memoryUsage.rss(),
+			rssBeforeBytes,
+			transportBytes: {
+				reason: "not-exposed-by-libp2p-public-api",
+				status: "unavailable",
+			},
+		});
 	}
 
 	async #sanitizePeer(peerId: string, addresses: string[], signal: AbortSignal): Promise<RoutingPeer> {
@@ -526,9 +660,9 @@ export class NodeRouting {
 		}
 	}
 
-	#recordNetworkRequest(eventType: string): void {
+	#recordNetworkRequest(eventType: string, budget = this.#requestBudget): void {
 		if (eventType === "kad-dht:query:send-query") {
-			this.#requestBudget.consume();
+			budget.consume();
 		}
 	}
 }
@@ -542,7 +676,14 @@ export async function createNodeRouting(options: NodeRoutingOptions = {}): Promi
 	const network = options.network ?? "local";
 	let host: RoutingHost | undefined;
 	const hostFactory: DRPNetworkHostFactory = async (context) => {
-		const built = await context.createHost(createAminoHostExtensions({ mode: options.mode, network }));
+		const built = await context.createHost(
+			createAminoHostExtensions({
+				alpha: options.alpha,
+				disjointPaths: options.disjointPaths,
+				mode: options.mode,
+				network,
+			})
+		);
 		assertRoutingHost(built);
 		host = built;
 		return built;
@@ -584,16 +725,21 @@ export async function createNodeRouting(options: NodeRoutingOptions = {}): Promi
  * @returns Additive extensions that do not replace any DRP-owned service.
  */
 export function createAminoHostExtensions(
-	options: Pick<AminoAttachmentOptions, "mode" | "network"> = {}
+	options: Pick<NodeRoutingOptions, "alpha" | "disjointPaths" | "mode" | "network"> = {}
 ): DRPNetworkHostExtensions {
 	const network = options.network ?? "local";
 	const mode = options.mode ?? "client";
+	const alpha = parseAminoConcurrency(options.alpha ?? (network === "public" ? 1 : undefined), "alpha");
+	const disjointPaths = parseAminoConcurrency(
+		options.disjointPaths ?? (network === "public" ? 1 : undefined),
+		"disjointPaths"
+	);
 	const aminoDhtFactory = kadDHT({
-		alpha: network === "public" ? 1 : undefined,
+		alpha,
 		allowQueryWithZeroPeers: true,
 		clientMode: mode === "client",
 		datastorePrefix: `/drp-amino-${network}`,
-		disjointPaths: network === "public" ? 1 : undefined,
+		disjointPaths,
 		initialQuerySelfInterval: network === "public" ? 24 * 60 * 60 * 1_000 : undefined,
 		logPrefix: `drp:amino:${network}`,
 		metricsPrefix: `drp_amino_${network}`,
@@ -628,6 +774,8 @@ export async function attachNodeRouting(
 	assertRoutingHost(host);
 	const routing = new NodeRouting(networkNode, host, {
 		allowInsecureWebSocketFixture: options.allowInsecureWebSocketFixture,
+		closestPeersMaxNetworkRequests: options.closestPeersMaxNetworkRequests,
+		closestPeersTimeoutMs: options.closestPeersTimeoutMs,
 		limits: parseLimits(options.limits),
 		network: options.network ?? "local",
 		resolver: options.resolver ?? systemResolver,
@@ -676,6 +824,29 @@ function parseLimits(input: Partial<NodeRoutingLimits> | undefined): NodeRouting
 	return limits;
 }
 
+function parseAminoConcurrency(value: number | undefined, name: "alpha" | "disjointPaths"): number | undefined {
+	if (value !== undefined && (!Number.isSafeInteger(value) || value < 1 || value > MAX_AMINO_CONCURRENCY)) {
+		throw new Error(`${name} must be an integer within 1..${MAX_AMINO_CONCURRENCY}`);
+	}
+	return value;
+}
+
+function parseOperationTimeoutMs(value = OPERATION_TIMEOUT_MS): number {
+	if (!Number.isSafeInteger(value) || value < 1 || value > MAX_OPERATION_TIMEOUT_MS) {
+		throw new Error(`closestPeersTimeoutMs must be an integer within 1..${MAX_OPERATION_TIMEOUT_MS}`);
+	}
+	return value;
+}
+
+function parseClosestPeersMaxNetworkRequests(value = DEFAULT_CLOSEST_PEERS_MAX_NETWORK_REQUESTS): number {
+	if (!Number.isSafeInteger(value) || value < 1 || value > MAX_CLOSEST_PEERS_NETWORK_REQUESTS) {
+		throw new Error(
+			`closestPeersMaxNetworkRequests must be an integer within 1..${MAX_CLOSEST_PEERS_NETWORK_REQUESTS}`
+		);
+	}
+	return value;
+}
+
 const systemResolver: Resolver = {
 	async resolve(hostname, signal): Promise<string[]> {
 		if (signal.aborted) throw signal.reason;
@@ -699,7 +870,10 @@ function logicalSize(value: unknown): number {
 	return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
-function operationGuard(callerSignal?: AbortSignal): {
+function operationGuard(
+	callerSignal?: AbortSignal,
+	timeoutMs = OPERATION_TIMEOUT_MS
+): {
 	dispose(): void;
 	signal: AbortSignal;
 } {
@@ -708,8 +882,8 @@ function operationGuard(callerSignal?: AbortSignal): {
 	callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
 	if (callerSignal?.aborted === true) onCallerAbort();
 	const timeout = setTimeout(
-		() => controller.abort(new Error(`node routing operation exceeded ${OPERATION_TIMEOUT_MS}ms`)),
-		OPERATION_TIMEOUT_MS
+		() => controller.abort(new Error(`node routing operation exceeded ${timeoutMs}ms`)),
+		timeoutMs
 	);
 	timeout.unref();
 	return {

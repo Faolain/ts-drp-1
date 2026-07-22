@@ -8,7 +8,7 @@ import {
 	OFFICIAL_AMINO_BOOTSTRAPPERS,
 	PUBLIC_NETWORK_ACKNOWLEDGEMENT,
 } from "@ts-drp/routing-node";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("NodeRouting", () => {
 	it("derives stable namespace CIDs and freezes the explicit public-network contract", async () => {
@@ -113,6 +113,108 @@ describe("NodeRouting", () => {
 		await expect(exhausted.findPeer(TEST_PEER_ID)).rejects.toThrow(/request cap exhausted/u);
 		await exhausted.stop();
 	});
+
+	it("isolates recurring high-breadth walks from shared anchor request and operation budgets", async () => {
+		const routing = fakeHighBreadthClosestPeersRouting(100);
+		try {
+			for (let walk = 0; walk < 5; walk += 1) {
+				await expect(collect(routing.getClosestPeers(new Uint8Array([7, 8, walk])))).resolves.toMatchObject([
+					{ peerId: TEST_PEER_ID },
+				]);
+			}
+			await expect(routing.findPeer(TEST_PEER_ID)).resolves.toMatchObject({ peerId: TEST_PEER_ID });
+		} finally {
+			await routing.stop();
+		}
+	});
+
+	it("streams peers found before a closest-peers deadline aborts the unfinished walk", async () => {
+		const routing = fakeStreamingClosestPeersRouting(25);
+		const observed: string[] = [];
+		try {
+			try {
+				for await (const peer of routing.getClosestPeers(new Uint8Array([3, 2, 1]))) {
+					observed.push(peer.peerId);
+				}
+			} catch {
+				// A deadline may remain observable after the already-yielded prefix.
+			}
+			expect(observed).toEqual([TEST_PEER_ID, TEST_PEER_ID, TEST_PEER_ID]);
+		} finally {
+			await routing.stop();
+		}
+	});
+
+	it("aborts an unbounded walk as soon as its isolated request window is consumed", async () => {
+		const fixture = fakeUnboundedClosestPeersRouting(3);
+		try {
+			await collect(fixture.routing.getClosestPeers(new Uint8Array([6, 6, 6]))).catch(() => []);
+			expect(fixture.progressEvents()).toBe(3);
+			expect(fixture.walkSignal()?.aborted).toBe(true);
+			expect(fixture.routing.measurements.at(-1)).toMatchObject({
+				networkRequestsConsumed: 3,
+				operation: "getClosestPeers",
+			});
+		} finally {
+			await fixture.routing.stop();
+		}
+	});
+
+	it("cleanly aborts when concurrent progress events race past the walk request cap", async () => {
+		const fixture = fakeConcurrentOverCapClosestPeersRouting(2);
+		try {
+			await expect(collect(fixture.routing.getClosestPeers(new Uint8Array([6, 7, 8])))).resolves.toMatchObject([
+				{ peerId: TEST_PEER_ID },
+			]);
+			expect(fixture.progressEvents()).toBe(4);
+			expect(fixture.walkSignal()?.aborted).toBe(true);
+			expect(fixture.routing.measurements.at(-1)).toMatchObject({ networkRequestsConsumed: 2 });
+		} finally {
+			await fixture.routing.stop();
+		}
+	});
+
+	it("aborts the underlying DHT walk when the closest-peers iterator closes early", async () => {
+		const fixture = fakeEarlyCloseClosestPeersRouting();
+		try {
+			const iterator = fixture.routing.getClosestPeers(new Uint8Array([8, 7, 6]))[Symbol.asyncIterator]();
+			await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { peerId: TEST_PEER_ID } });
+			await iterator.return?.();
+			expect(fixture.walkSignal()?.aborted).toBe(true);
+			expect(fixture.closed()).toBe(true);
+		} finally {
+			await fixture.routing.stop();
+		}
+	});
+
+	it("gives closest-peer walks a dedicated longer bound while ordinary operations keep the 10s guard", async () => {
+		vi.useFakeTimers();
+		const slowClosestPeers = fakeTimedNodeRouting({ closestPeerDelayMs: 15_000, closestPeersTimeoutMs: 20_000 });
+		const boundedClosestPeers = fakeTimedNodeRouting({ closestPeerDelayMs: 25_000, closestPeersTimeoutMs: 20_000 });
+		const ordinaryOperation = fakeTimedNodeRouting({ closestPeerDelayMs: 0 });
+		try {
+			const slowQuery = collect(slowClosestPeers.getClosestPeers(new Uint8Array([1])));
+			const slowSettled = vi.fn();
+			void slowQuery.then(slowSettled, slowSettled);
+			await vi.advanceTimersByTimeAsync(10_001);
+			expect(slowSettled).not.toHaveBeenCalled();
+			await vi.advanceTimersByTimeAsync(4_999);
+			await expect(slowQuery).resolves.toMatchObject([{ peerId: TEST_PEER_ID }]);
+
+			const boundedQuery = collect(boundedClosestPeers.getClosestPeers(new Uint8Array([2])));
+			const boundedAssertion = expect(boundedQuery).rejects.toThrow("node routing operation exceeded 20000ms");
+			await vi.advanceTimersByTimeAsync(20_000);
+			await boundedAssertion;
+
+			const findPeer = ordinaryOperation.findPeer(TEST_PEER_ID);
+			const ordinaryAssertion = expect(findPeer).rejects.toThrow("node routing operation exceeded 10000ms");
+			await vi.advanceTimersByTimeAsync(10_000);
+			await ordinaryAssertion;
+		} finally {
+			await Promise.all([slowClosestPeers.stop(), boundedClosestPeers.stop(), ordinaryOperation.stop()]);
+			vi.useRealTimers();
+		}
+	});
 });
 
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
@@ -156,4 +258,332 @@ function fakeNodeRouting(addresses: string[], progressEvents = 0): NodeRouting {
 		network: "public",
 		resolver: { resolve: (): Promise<string[]> => Promise.resolve([]) },
 	});
+}
+
+function fakeTimedNodeRouting(options: {
+	readonly closestPeerDelayMs: number;
+	readonly closestPeersTimeoutMs?: number;
+}): NodeRouting {
+	const peerId = peerIdFromString(TEST_PEER_ID);
+	const host = {
+		addEventListener: (): void => undefined,
+		getConnections: (): never[] => [],
+		getMultiaddrs: (): never[] => [],
+		getProtocols: (): string[] => [AMINO_DHT_PROTOCOL],
+		isDialable: (): Promise<boolean> => Promise.resolve(false),
+		peerId,
+		peerRouting: {
+			findPeer: (_peerId: unknown, callOptions: { signal: AbortSignal }): Promise<never> =>
+				waitForAbort(callOptions.signal),
+
+			async *getClosestPeers(
+				_key: Uint8Array,
+				callOptions: { signal: AbortSignal }
+			): AsyncIterable<{ id: typeof peerId; multiaddrs: never[] }> {
+				await abortableFixtureDelay(options.closestPeerDelayMs, callOptions.signal);
+				yield { id: peerId, multiaddrs: [] };
+			},
+		},
+		removeEventListener: (): void => undefined,
+		services: {
+			aminoDHT: {
+				getMode: (): "client" => "client",
+				routingTable: { size: 1 },
+			},
+		},
+		status: "started",
+	};
+	return new NodeRouting({ stop: (): Promise<void> => Promise.resolve() } as never, host as never, {
+		closestPeersTimeoutMs: options.closestPeersTimeoutMs,
+		limits: {
+			maxAddressesPerPeer: 16,
+			maxNetworkRequests: 8,
+			maxOperations: 4,
+			maxResults: 16,
+		},
+		network: "public",
+		resolver: { resolve: (): Promise<string[]> => Promise.resolve([]) },
+	});
+}
+
+function fakeHighBreadthClosestPeersRouting(progressEvents: number): NodeRouting {
+	const peerId = peerIdFromString(TEST_PEER_ID);
+	const address = multiaddr("/ip4/8.8.8.8/tcp/4001");
+	const host = {
+		addEventListener: (): void => undefined,
+		getConnections: (): never[] => [],
+		getMultiaddrs: (): never[] => [],
+		getProtocols: (): string[] => [AMINO_DHT_PROTOCOL],
+		isDialable: (): Promise<boolean> => Promise.resolve(false),
+		peerId,
+		peerRouting: {
+			findPeer: (
+				_peerId: unknown,
+				options: { onProgress?(event: { type: string }): void }
+			): Promise<{ id: typeof peerId; multiaddrs: ReturnType<typeof multiaddr>[] }> => {
+				options.onProgress?.({ type: "kad-dht:query:send-query" });
+				return Promise.resolve({ id: peerId, multiaddrs: [address] });
+			},
+
+			async *getClosestPeers(
+				_key: Uint8Array,
+				options: { onProgress?(event: { type: string }): void }
+			): AsyncIterable<{ id: typeof peerId; multiaddrs: ReturnType<typeof multiaddr>[] }> {
+				await Promise.resolve();
+				for (let index = 0; index < progressEvents; index += 1) {
+					options.onProgress?.({ type: "kad-dht:query:send-query" });
+				}
+				yield { id: peerId, multiaddrs: [address] };
+			},
+		},
+		removeEventListener: (): void => undefined,
+		services: {
+			aminoDHT: {
+				getMode: (): "client" => "client",
+				routingTable: { size: 1 },
+			},
+		},
+		status: "started",
+	};
+	return new NodeRouting({ stop: (): Promise<void> => Promise.resolve() } as never, host as never, {
+		limits: {
+			maxAddressesPerPeer: 16,
+			maxNetworkRequests: 1,
+			maxOperations: 2,
+			maxResults: 16,
+		},
+		network: "public",
+		resolver: { resolve: (): Promise<string[]> => Promise.resolve([]) },
+	});
+}
+
+function fakeStreamingClosestPeersRouting(closestPeersTimeoutMs: number): NodeRouting {
+	const peerId = peerIdFromString(TEST_PEER_ID);
+	const host = {
+		addEventListener: (): void => undefined,
+		getConnections: (): never[] => [],
+		getMultiaddrs: (): never[] => [],
+		getProtocols: (): string[] => [AMINO_DHT_PROTOCOL],
+		isDialable: (): Promise<boolean> => Promise.resolve(false),
+		peerId,
+		peerRouting: {
+			async *getClosestPeers(
+				_key: Uint8Array,
+				options: { signal: AbortSignal }
+			): AsyncIterable<{ id: typeof peerId; multiaddrs: never[] }> {
+				for (let index = 0; index < 3; index += 1) {
+					yield { id: peerId, multiaddrs: [] };
+				}
+				await waitForAbort(options.signal);
+			},
+		},
+		removeEventListener: (): void => undefined,
+		services: {
+			aminoDHT: {
+				getMode: (): "client" => "client",
+				routingTable: { size: 1 },
+			},
+		},
+		status: "started",
+	};
+	return new NodeRouting({ stop: (): Promise<void> => Promise.resolve() } as never, host as never, {
+		closestPeersTimeoutMs,
+		limits: {
+			maxAddressesPerPeer: 16,
+			maxNetworkRequests: 8,
+			maxOperations: 4,
+			maxResults: 16,
+		},
+		network: "public",
+		resolver: { resolve: (): Promise<string[]> => Promise.resolve([]) },
+	});
+}
+
+function fakeUnboundedClosestPeersRouting(maxRequests: number): {
+	progressEvents(): number;
+	readonly routing: NodeRouting;
+	walkSignal(): AbortSignal | undefined;
+} {
+	const peerId = peerIdFromString(TEST_PEER_ID);
+	let observedSignal: AbortSignal | undefined;
+	let progressEvents = 0;
+	const host = {
+		addEventListener: (): void => undefined,
+		getConnections: (): never[] => [],
+		getMultiaddrs: (): never[] => [],
+		getProtocols: (): string[] => [AMINO_DHT_PROTOCOL],
+		isDialable: (): Promise<boolean> => Promise.resolve(false),
+		peerId,
+		peerRouting: {
+			async *getClosestPeers(
+				_key: Uint8Array,
+				options: { onProgress?(event: { type: string }): void; signal: AbortSignal }
+			): AsyncIterable<never> {
+				observedSignal = options.signal;
+				while (!options.signal.aborted) {
+					progressEvents += 1;
+					options.onProgress?.({ type: "kad-dht:query:send-query" });
+					await Promise.resolve();
+				}
+				yield* [];
+			},
+		},
+		removeEventListener: (): void => undefined,
+		services: {
+			aminoDHT: {
+				getMode: (): "client" => "client",
+				routingTable: { size: 1 },
+			},
+		},
+		status: "started",
+	};
+	const routing = new NodeRouting({ stop: (): Promise<void> => Promise.resolve() } as never, host as never, {
+		closestPeersMaxNetworkRequests: maxRequests,
+		closestPeersTimeoutMs: 1_000,
+		limits: {
+			maxAddressesPerPeer: 16,
+			maxNetworkRequests: 1,
+			maxOperations: 4,
+			maxResults: 16,
+		},
+		network: "public",
+		resolver: { resolve: (): Promise<string[]> => Promise.resolve([]) },
+	});
+	return {
+		progressEvents: (): number => progressEvents,
+		routing,
+		walkSignal: (): AbortSignal | undefined => observedSignal,
+	};
+}
+
+function fakeConcurrentOverCapClosestPeersRouting(maxRequests: number): {
+	progressEvents(): number;
+	readonly routing: NodeRouting;
+	walkSignal(): AbortSignal | undefined;
+} {
+	const peerId = peerIdFromString(TEST_PEER_ID);
+	let observedSignal: AbortSignal | undefined;
+	let progressEvents = 0;
+	const host = {
+		addEventListener: (): void => undefined,
+		getConnections: (): never[] => [],
+		getMultiaddrs: (): never[] => [],
+		getProtocols: (): string[] => [AMINO_DHT_PROTOCOL],
+		isDialable: (): Promise<boolean> => Promise.resolve(false),
+		peerId,
+		peerRouting: {
+			// eslint-disable-next-line @typescript-eslint/require-await -- interface-required async generator
+			async *getClosestPeers(
+				_key: Uint8Array,
+				options: { onProgress?(event: { type: string }): void; signal: AbortSignal }
+			): AsyncIterable<{ id: typeof peerId; multiaddrs: never[] }> {
+				observedSignal = options.signal;
+				yield { id: peerId, multiaddrs: [] };
+				for (let index = 0; index < maxRequests + 2; index += 1) {
+					progressEvents += 1;
+					options.onProgress?.({ type: "kad-dht:query:send-query" });
+				}
+				options.signal.throwIfAborted();
+			},
+		},
+		removeEventListener: (): void => undefined,
+		services: {
+			aminoDHT: {
+				getMode: (): "client" => "client",
+				routingTable: { size: 1 },
+			},
+		},
+		status: "started",
+	};
+	const routing = routingWithWalkHost(host, maxRequests);
+	return {
+		progressEvents: (): number => progressEvents,
+		routing,
+		walkSignal: (): AbortSignal | undefined => observedSignal,
+	};
+}
+
+function fakeEarlyCloseClosestPeersRouting(): {
+	closed(): boolean;
+	readonly routing: NodeRouting;
+	walkSignal(): AbortSignal | undefined;
+} {
+	const peerId = peerIdFromString(TEST_PEER_ID);
+	let observedSignal: AbortSignal | undefined;
+	let iteratorClosed = false;
+	const host = {
+		addEventListener: (): void => undefined,
+		getConnections: (): never[] => [],
+		getMultiaddrs: (): never[] => [],
+		getProtocols: (): string[] => [AMINO_DHT_PROTOCOL],
+		isDialable: (): Promise<boolean> => Promise.resolve(false),
+		peerId,
+		peerRouting: {
+			// eslint-disable-next-line @typescript-eslint/require-await -- interface-required async generator
+			async *getClosestPeers(
+				_key: Uint8Array,
+				options: { signal: AbortSignal }
+			): AsyncIterable<{ id: typeof peerId; multiaddrs: never[] }> {
+				observedSignal = options.signal;
+				try {
+					yield { id: peerId, multiaddrs: [] };
+					yield { id: peerId, multiaddrs: [] };
+				} finally {
+					iteratorClosed = true;
+				}
+			},
+		},
+		removeEventListener: (): void => undefined,
+		services: {
+			aminoDHT: {
+				getMode: (): "client" => "client",
+				routingTable: { size: 1 },
+			},
+		},
+		status: "started",
+	};
+	const routing = routingWithWalkHost(host, 8);
+	return {
+		closed: (): boolean => iteratorClosed,
+		routing,
+		walkSignal: (): AbortSignal | undefined => observedSignal,
+	};
+}
+
+function routingWithWalkHost(host: object, maxRequests: number): NodeRouting {
+	return new NodeRouting({ stop: (): Promise<void> => Promise.resolve() } as never, host as never, {
+		closestPeersMaxNetworkRequests: maxRequests,
+		closestPeersTimeoutMs: 1_000,
+		limits: {
+			maxAddressesPerPeer: 16,
+			maxNetworkRequests: 1,
+			maxOperations: 4,
+			maxResults: 16,
+		},
+		network: "public",
+		resolver: { resolve: (): Promise<string[]> => Promise.resolve([]) },
+	});
+}
+
+async function abortableFixtureDelay(durationMs: number, signal: AbortSignal): Promise<void> {
+	await new Promise<void>((resolve, reject) => {
+		const timeout = setTimeout(resolve, durationMs);
+		const onAbort = (): void => {
+			clearTimeout(timeout);
+			reject(signal.reason);
+		};
+		signal.addEventListener("abort", onAbort, { once: true });
+	});
+}
+
+async function waitForAbort(signal: AbortSignal): Promise<never> {
+	return new Promise<never>((_resolve, reject) => {
+		signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+	});
+}
+
+async function collect<Value>(source: AsyncIterable<Value>): Promise<Value[]> {
+	const values: Value[] = [];
+	for await (const value of source) values.push(value);
+	return values;
 }
