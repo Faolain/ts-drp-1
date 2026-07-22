@@ -34,19 +34,16 @@ interface ModularSnapshot {
 
 test.beforeEach(async ({ request }, testInfo) => {
 	test.skip(testInfo.config.metadata.gridNetworkMode !== "modular", "requires the dedicated modular grid harness");
-	await Promise.all([
-		request.post("http://127.0.0.1:4175/grid-control/registry/primary/up"),
-		request.post("http://127.0.0.1:4175/grid-control/registry/secondary/up"),
-		request.post("http://127.0.0.1:51000/start"),
-		request.post("http://127.0.0.1:51002/start"),
-	]);
+	// Clear any records left by a prior run (browser projects share these fixtures) so a joiner never
+	// discovers a previous run's stale, higher-sequence creator record. reset also marks both registries up.
+	await request.post("http://127.0.0.1:4175/grid-control/registry/reset");
+	await Promise.all([request.post("http://127.0.0.1:51000/start"), request.post("http://127.0.0.1:51002/start")]);
 });
 
 test.afterEach(async ({ request }, testInfo) => {
 	if (testInfo.config.metadata.gridNetworkMode !== "modular") return;
 	await Promise.allSettled([
-		request.post("http://127.0.0.1:4175/grid-control/registry/primary/up"),
-		request.post("http://127.0.0.1:4175/grid-control/registry/secondary/up"),
+		request.post("http://127.0.0.1:4175/grid-control/registry/reset"),
 		request.post("http://127.0.0.1:51000/start"),
 		request.post("http://127.0.0.1:51002/start"),
 	]);

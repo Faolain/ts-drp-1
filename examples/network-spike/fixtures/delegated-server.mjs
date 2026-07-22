@@ -198,6 +198,15 @@ function handleGridRegistryControl(request, response, url) {
 		response.end();
 		return;
 	}
+	if (url.pathname === "/grid-control/registry/reset" && request.method === "POST") {
+		// Clear all published records so sequential test runs (e.g. one browser project after another,
+		// sharing this fixture) start from a clean registry and never discover a prior run's stale peer.
+		gridRecords.clear();
+		gridRegistryAvailable.set("primary", true);
+		gridRegistryAvailable.set("secondary", true);
+		writeJson(response, 200, { records: 0, reset: true });
+		return;
+	}
 	const match = /^\/grid-control\/registry\/(primary|secondary)\/(up|down|status)$/u.exec(url.pathname);
 	if (match === null) {
 		writeJson(response, 404, { error: "grid registry control route not found" });

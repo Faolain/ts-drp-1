@@ -7,7 +7,7 @@ const browserDevices = {
 } as const;
 type BrowserName = keyof typeof browserDevices;
 
-const requestedBrowsers = (process.env.GRID_E2E_BROWSERS ?? "chromium")
+const requestedBrowsers = (process.env.GRID_E2E_BROWSERS ?? "chromium,webkit")
 	.split(",")
 	.map((name) => name.trim())
 	.filter((name): name is BrowserName => name in browserDevices);
