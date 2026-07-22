@@ -119,6 +119,23 @@ public relays are open-admission, untrusted transport, and DRP signatures are th
 authority. Nostr supplies discovery, not connectivity; browsers still need a
 real WebRTC/relay path.
 
+This path is proven end to end: the `grid-public-infra` Playwright E2E has two
+real browsers discover each other over Nostr (no HTTP registry) and converge grid
+state, across **Chromium, Firefox, and WebKit**, both against the local fixture and
+against **real public relays** (`relay.damus.io`, `nos.lol`):
+
+```bash
+# All three engines, local fixture:
+GRID_E2E_BROWSERS=chromium,firefox,webkit \
+  pnpm exec playwright test --config examples/grid/playwright.public-infra.config.ts
+
+# Against real public relays (use a unique namespace to isolate the run):
+VITE_NOSTR_RELAYS="wss://relay.damus.io,wss://nos.lol" \
+  VITE_RENDEZVOUS_NAMESPACE="drp-network:v1:<unique-base64url>" \
+  GRID_E2E_BROWSERS=chromium,firefox,webkit \
+  pnpm exec playwright test --config examples/grid/playwright.public-infra.config.ts
+```
+
 ---
 
 ## Tier 2 — A real, shareable modular deployment
