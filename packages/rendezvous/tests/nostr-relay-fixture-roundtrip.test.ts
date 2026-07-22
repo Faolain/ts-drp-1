@@ -52,6 +52,29 @@ describe("local Nostr relay fixture", () => {
 		await stopFixture(fixture);
 		expect(activeFixtures).toHaveLength(0);
 	});
+
+	it("clears stored records when reset over HTTP so cross-run state does not leak", async () => {
+		const fixture = spawn(process.execPath, [fixturePath, "0"], { stdio: ["pipe", "pipe", "pipe"] });
+		activeFixtures.add(fixture);
+		const relayUrl = await readyUrl(fixture);
+		const resetUrl = `${relayUrl.replace(/^ws:/u, "http:")}/reset`;
+		const directory = createNostrRelayDirectory({
+			allow_insecure_loopback_fixture: true,
+			connectionFactory: createNostrWebSocketRelayFactory(),
+			nostrSigner: createNostrSignerFromSecretKey(Uint8Array.from({ length: 32 }, (_value, index) => index + 1)),
+			now: (): number => NOW,
+			relays: [{ id: "local-fixture", url: relayUrl }],
+			validatorFactory: (): RecordValidator => validator(),
+		});
+		await directory.register(await signedFixture(804), signal());
+		expect(await directory.discover(NAMESPACE, signal())).toHaveLength(1);
+
+		const response = await fetch(resetUrl, { method: "POST" });
+		expect(response.status).toBe(200);
+
+		expect(await directory.discover(NAMESPACE, signal())).toHaveLength(0);
+		await stopFixture(fixture);
+	});
 });
 
 function signal(): AbortSignal {

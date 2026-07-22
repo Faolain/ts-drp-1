@@ -12,7 +12,15 @@ const storedEvents = new Map();
 const subscriptions = new WeakMap();
 // A plain HTTP GET returns 200 so orchestration/readiness probes (Playwright webServer,
 // demo scripts) have a health endpoint; WebSocket upgrades are served on the same port.
-const httpServer = createServer((_request, response) => {
+const httpServer = createServer((request, response) => {
+	// POST /reset clears stored events so sequential Playwright browser projects (and repeat
+	// demo runs) never discover a previous run's stale records. GET is a health probe.
+	if (request.method === "POST" && request.url === "/reset") {
+		storedEvents.clear();
+		response.writeHead(200, { "content-type": "text/plain" });
+		response.end("reset\n");
+		return;
+	}
 	response.writeHead(200, { "content-type": "text/plain" });
 	response.end("nostr relay fixture ok\n");
 });

@@ -1,4 +1,4 @@
-import { defineConfig, devices, type Project } from "@playwright/test";
+import { defineConfig, devices, type PlaywrightTestConfig, type Project } from "@playwright/test";
 
 const browserDevices = {
 	chromium: devices["Desktop Chrome"],
@@ -16,8 +16,26 @@ const projects: Project[] = requestedBrowsers.map((name) => ({ name, use: { ...b
 const RELAY_A = "16Uiu2HAmTY71bbCHtmYD3nvVKUGbk7NWqLBbPFNng4jhaXJHi3W5";
 const RELAY_B = "16Uiu2HAmT72TapomemeWskZbmzd4hZcakAzYnTwLtbdsvdaSUvXU";
 
-// Public-infra profile: discovery is Nostr-only (VITE_RENDEZVOUS_ENDPOINTS is empty, so
-// no HTTP registry exists). A local `ws` Nostr relay fixture stands in for a public relay.
+// Public-infra profile: discovery is Nostr-only (VITE_RENDEZVOUS_ENDPOINTS is empty, so no
+// HTTP registry exists). By default a local `ws` Nostr relay fixture stands in for a public
+// relay; set VITE_NOSTR_RELAYS to real relays (e.g. wss://relay.damus.io,wss://nos.lol) to run
+// discovery against actual public infrastructure — the local fixture is then not started.
+// VITE_RENDEZVOUS_NAMESPACE can be overridden to isolate a public run from stale records.
+const publicNostrRelays = process.env.VITE_NOSTR_RELAYS;
+const nostrRelays = publicNostrRelays ?? "ws://127.0.0.1:4180";
+const namespace = process.env.VITE_RENDEZVOUS_NAMESPACE ?? "drp-network:v1:Z2F0ZS03LWxvY2FsLWZpeHR1cmU";
+
+const localNostrFixture: NonNullable<PlaywrightTestConfig["webServer"]> = publicNostrRelays
+	? []
+	: [
+			{
+				command: "pnpm --filter ts-drp-example-network-spike fixtures:nostr 4180",
+				reuseExistingServer: !process.env.CI,
+				timeout: 120_000,
+				url: "http://127.0.0.1:4180/health",
+			},
+		];
+
 export default defineConfig({
 	expect: { timeout: 15_000 },
 	forbidOnly: Boolean(process.env.CI),
@@ -40,12 +58,7 @@ export default defineConfig({
 			timeout: 120_000,
 			url: "http://127.0.0.1:4175/fixture/grid-relays-success/primary/routing/v1/peers/test",
 		},
-		{
-			command: "pnpm --filter ts-drp-example-network-spike fixtures:nostr 4180",
-			reuseExistingServer: !process.env.CI,
-			timeout: 120_000,
-			url: "http://127.0.0.1:4180/health",
-		},
+		...localNostrFixture,
 		{
 			command: "pnpm --filter @ts-drp/network-spike grid:relay ../../configs/network-spike-relay.json 51000",
 			reuseExistingServer: !process.env.CI,
@@ -66,11 +79,11 @@ export default defineConfig({
 				VITE_BOOTSTRAP_PEERS: "",
 				VITE_MEMBERSHIP_INVITE: "grid-local-demo-invite-0123456789",
 				VITE_NETWORK_MODE: "modular",
-				VITE_NOSTR_RELAYS: "ws://127.0.0.1:4180",
+				VITE_NOSTR_RELAYS: nostrRelays,
 				VITE_RELAY_OPERATOR_GROUPS: [`${RELAY_A}=demo-operator-a`, `${RELAY_B}=demo-operator-b`].join(","),
 				VITE_RENDER_INFO_INTERVAL: "250",
 				VITE_RENDEZVOUS_ENDPOINTS: "",
-				VITE_RENDEZVOUS_NAMESPACE: "drp-network:v1:Z2F0ZS03LWxvY2FsLWZpeHR1cmU",
+				VITE_RENDEZVOUS_NAMESPACE: namespace,
 				VITE_ROUTING_ENDPOINTS: [
 					"http://127.0.0.1:4175/fixture/grid-relays-success/primary/",
 					"http://127.0.0.1:4175/fixture/grid-relays-success/secondary/",

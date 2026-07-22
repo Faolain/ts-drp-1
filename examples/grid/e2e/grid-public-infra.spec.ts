@@ -22,6 +22,14 @@ interface PublicInfraSnapshot {
 test.beforeEach(async ({ request }, testInfo) => {
 	test.skip(testInfo.config.metadata.gridNetworkMode !== "public-infra", "requires the public-infra grid harness");
 	await Promise.all([request.post("http://127.0.0.1:51000/start"), request.post("http://127.0.0.1:51002/start")]);
+	// Clear the local Nostr fixture so sequential browser projects (chromium→firefox→webkit) never
+	// discover a prior project's stale records. Best-effort: a no-op against real public relays.
+	await request.post("http://127.0.0.1:4180/reset").catch(() => undefined);
+});
+
+test.afterEach(async ({ request }, testInfo) => {
+	if (testInfo.config.metadata.gridNetworkMode !== "public-infra") return;
+	await request.post("http://127.0.0.1:4180/reset").catch(() => undefined);
 });
 
 test("two browsers discover each other over Nostr and converge with no HTTP registry", async ({ browser }) => {
