@@ -21,6 +21,7 @@ const PEER = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
 const PRIMARY = "https://primary.routing.example/v1/";
 const SECONDARY = "https://secondary.routing.example/v1/";
 const ACCEPTED_DNS_WSS = "/dns4/relay.example/tcp/443/tls/ws";
+const LOOPBACK_WS_RELAY = "/ip4/127.0.0.1/tcp/50000/ws";
 
 interface PhaseThreeBrowserConfig {
 	readonly allow_insecure_loopback_fixture?: boolean;
@@ -107,6 +108,42 @@ describe("DRPNode browser routing wiring", () => {
 		}
 	});
 
+	it("accepts a loopback WebSocket relay address only when the insecure-loopback fixture flag is set", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn<typeof globalThis.fetch>(() => Promise.resolve(loopbackProviderResponse()))
+		);
+		const enabled = createNode({
+			allow_insecure_loopback_fixture: true,
+			endpoints: [PRIMARY, SECONDARY],
+		});
+		try {
+			if (enabled.routing === undefined) throw new Error("DRPNode.routing is missing");
+			const providers = await collect(enabled.routing.findProviders(CID, AbortSignal.timeout(2_000)));
+			// Regression: config-driven routing must relax the loopback WebSocket + loopback-address
+			// allowances together (not only allowInsecureLoopback), or fixture relay addresses are dropped.
+			expect(providers).toHaveLength(1);
+			expect(providers[0]?.acceptedAddresses).toEqual([LOOPBACK_WS_RELAY]);
+		} finally {
+			await enabled.routing?.stop();
+		}
+	});
+
+	it("drops a loopback WebSocket relay address without the insecure-loopback fixture flag", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn<typeof globalThis.fetch>(() => Promise.resolve(loopbackProviderResponse()))
+		);
+		const secured = createNode({ endpoints: [PRIMARY, SECONDARY] });
+		try {
+			if (secured.routing === undefined) throw new Error("DRPNode.routing is missing");
+			const providers = await collect(secured.routing.findProviders(CID, AbortSignal.timeout(2_000)));
+			expect(providers.every((provider) => provider.acceptedAddresses.length === 0)).toBe(true);
+		} finally {
+			await secured.routing?.stop();
+		}
+	});
+
 	it("exposes ordered failover, derived origins, the shared resolver, and configured limits", async () => {
 		const fetch = vi.fn<typeof globalThis.fetch>((input) => {
 			const url = new URL(String(input));
@@ -157,6 +194,15 @@ function createNode(browser: PhaseThreeBrowserConfig, delegatedRoutingEnabled = 
 		},
 	} as unknown as DRPNodeConfig;
 	return new DRPNode(config) as RoutedNode;
+}
+
+function loopbackProviderResponse(): Response {
+	return new Response(
+		JSON.stringify({
+			Providers: [{ Addrs: [LOOPBACK_WS_RELAY], ID: PEER, Protocols: ["transport-bitswap"], Schema: "peer" }],
+		}),
+		{ headers: { "content-type": "application/json" }, status: 200 }
+	);
 }
 
 function providerResponse(): Response {

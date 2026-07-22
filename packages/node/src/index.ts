@@ -1194,7 +1194,12 @@ function createConfiguredBrowserRouting(config: DRPNodeConfig | undefined): Brow
 	}
 	const endpoints: BrowserRoutingEndpoint[] = parsedEndpoints.map(({ id, url }) => ({ id, url }));
 	return createBrowserRouting({
+		// A single fixture flag relaxes every loopback/insecure-WebSocket allowance together, so
+		// config-driven routing accepts local-fixture relay addresses the same way an explicitly
+		// constructed BrowserRouting does. Never enabled outside an explicit fixture opt-in.
 		allowInsecureLoopback: routing.allow_insecure_loopback_fixture,
+		allowInsecureWebSocketFixture: routing.allow_insecure_loopback_fixture,
+		allowLoopbackAddressFixture: routing.allow_insecure_loopback_fixture,
 		allowedOrigins,
 		endpoints,
 		limits: routing.limits,
