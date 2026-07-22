@@ -147,22 +147,29 @@ expose a browser-reachable transport with a **valid** certificate
 that actually **grants a reservation** to an arbitrary peer; and (3) have a
 stable, known Peer ID.
 
-A bounded survey of the obvious public candidates (2026-07) found **none** that
-qualify:
+A bounded survey (2026-07) found two distinct tiers:
 
-| Candidate | Browser-reachable (valid cert)? | Grants reservation? |
+| Candidate tier | Browser-reachable (valid cert)? | Grants reservation? |
 | --- | --- | --- |
-| The four `*.bootstrap.libp2p.io` IPFS nodes | Yes — valid Let's Encrypt WSS, advertise `/libp2p/circuit/relay/0.2.0/hop` | **No** — `RESERVE` returns `STATUS=200` (`RESERVATION_REFUSED`) to strangers |
-| `bootstrap{1,2}.topology.gg` | No — self-signed certificate | not reached |
+| The `*.bootstrap.libp2p.io` IPFS nodes (canonical/static) | Yes — valid Let's Encrypt WSS, advertise `/libp2p/circuit/relay/0.2.0/hop` | **No** — `RESERVE` returns `STATUS=200` (`RESERVATION_REFUSED`) to strangers |
+| DHT-discovered **AutoTLS `*.libp2p.direct`** relays (dynamic) | Yes — AutoTLS-issued valid cert over `/tls/ws` (some also `/webrtc-direct`, `/webtransport`) | **Yes** — verified live reservations with DRP's pinned libp2p stack |
 
-So the public IPFS bootstrap nodes *advertise* relay HOP but refuse to relay for
-arbitrary peers — a deliberate resource/abuse policy, i.e. an **ecosystem
-availability** limitation, not a DRP one. Until an open, browser-reachable,
-reservation-granting public relay exists, the connectivity half needs a relay
-**you** (or a willing partner) operate. The stack already supports pointing at a
-specific relay — via a signed configured-fallback relay source, or a
-delegated-routing response that returns it — the moment a qualifying one appears.
-(The *routing* that finds relays can already use public delegated routing, e.g.
+So the canonical IPFS bootstrap nodes are **discovery seeds, not relays** — they
+advertise HOP but refuse reservations to strangers (a deliberate policy). But the
+*dynamic* tier does exist: walking the Amino DHT (AutoRelay-style) surfaces
+ephemeral AutoTLS relays that **do** grant browser-usable reservations. This is
+exactly DRP's **overflow** relay tier (`NodeRoutingClosestPeersSource`,
+`routingSource: "public-dht"`; browsers use delegated routing) — gated behind an
+operator-diversity threshold. Evidence:
+`specs/public-only-bootstrap/reviews/phase-04.md` (canonical refuse) and
+`phase-05.md` (dynamic grant).
+
+The catch is that these dynamic relays are **ephemeral** — they churn, fill their
+reservation pools, and impose limits — and are **untrusted** (could be an
+attacker's node). So they are usable as best-effort **overflow only**: loss of your
+own relays degrades to a public one rather than hard-failing, but you still run
+**≥2 relays you (or a willing partner) operate** as the dependable, operator-diverse
+floor. (Routing that finds relays can already use public delegated routing, e.g.
 `https://delegated-ipfs.dev/routing/v1/`.)
 
 ---
