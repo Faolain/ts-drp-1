@@ -93,3 +93,36 @@ also does not falsify the Phase 05 observation that dynamic, browser-usable HOP
 relays exist and may grant reservations; candidate inspection never became
 possible here. The honest Phase 06 result is a reproducible bounded discovery
 failure at the production closest-peers deadline.
+
+## Follow-up (first-party, root-caused): it is a DHT-config problem, not the mechanism
+
+A second, temporary harness (removed after the run) isolated *why* by mirroring
+DRP's public Amino query settings but relaxing the 10-second cap. Two runs, same
+warmup (~30 s, routing table 5–6 peers), querying `peerRouting.getClosestPeers`
+toward a relay-namespace key with a **60-second** deadline:
+
+| DHT settings | Deadline | Walk result | Closest peers | HOP-advertising | Browser-usable |
+| --- | --- | --- | --- | --- | --- |
+| DRP public: `clientMode:true`, `alpha:1`, `disjointPaths:1` | 60 s | aborted (never converged) | **0** | 0 | 0 |
+| libp2p defaults: `clientMode:false`, default `alpha`/`disjointPaths` | 60 s | **completed in ~29 s** | **20** | **17** | **16** |
+
+So the closest-peers **mechanism works** — with standard libp2p query settings the
+walk surfaces 20 peers, 17 advertising `/libp2p/circuit/relay/0.2.0/hop`, 16 with
+browser-usable transports (`/tls/ws`, `/webtransport`, `/webrtc-direct`). What
+fails is the walk **under DRP's deliberately conservative public DHT
+configuration** (`createAminoHostExtensions`, `packages/routing-node/src/index.ts`):
+`clientMode:true` + `alpha:1` + `disjointPaths:1` + a 24 h `querySelfInterval`
+throttle the iterative query so hard that it yields **zero** candidates even at 6×
+`NodeRouting`'s 10-second guard. Combined with that guard, DRP's node overflow
+relay discovery does not surface candidates in practice.
+
+This is an **actionable finding, not a code defect**: the overflow tier exists and
+the DHT contains plenty of browser-usable HOP relays, but to make DRP's
+`NodeRoutingClosestPeersSource` actually reach them, the public Amino query
+settings (query concurrency `alpha`, `disjointPaths`, and likely `clientMode`) and
+the fixed 10 s operation guard would need loosening for the relay-discovery query.
+(This concerns the **node** overflow path; browsers discover relays via delegated
+routing, a separate path.) Note the exact single knob was not isolated — three
+conservative settings were relaxed together — but the contrast (0 vs 20) is
+unambiguous, and isolating the dominant knob (`alpha`/`disjointPaths` query
+concurrency is the likely driver) is a small follow-up.
