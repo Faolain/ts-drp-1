@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 test.beforeEach(async ({ request }) => {
 	const response = await request.post("http://127.0.0.1:4175/grid-control/registry/reset");
@@ -44,7 +44,7 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 	}
 });
 
-async function waitForRelayReservation(page: import("@playwright/test").Page): Promise<void> {
+async function waitForRelayReservation(page: Page): Promise<void> {
 	await page.waitForFunction(() => {
 		const session = (
 			window as typeof window & {

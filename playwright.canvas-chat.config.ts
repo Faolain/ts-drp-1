@@ -28,7 +28,7 @@ export default defineConfig({
 	reporter: "line",
 	retries: 0,
 	testDir: "./examples",
-	testMatch: /(?:canvas|chat)\/e2e\/.*\.spec\.ts/u,
+	testMatch: /(?:canvas|chat)\/e2e\/.*\.pw\.ts/u,
 	timeout: 45_000,
 	use: { trace: "retain-on-failure" },
 	webServer: [
