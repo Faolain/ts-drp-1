@@ -4,6 +4,12 @@ import { createServer } from "node:http";
 const HOST = "127.0.0.1";
 const PORT = 4175;
 const ROUTING_ONLY = process.argv.includes("--routing-only");
+const ALLOWED_ORIGINS = new Set(
+	(process.env.DRP_FIXTURE_ALLOWED_ORIGINS ?? "http://127.0.0.1:4174")
+		.split(",")
+		.map((origin) => origin.trim())
+		.filter(Boolean)
+);
 const TEST_PEER_ID = "QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN";
 const PUBLIC_ONLY_PROVIDER_ID = "16Uiu2HAmGQfUVeXqZJvyELMmJyLLBaPCUYbrz3LCkYZcwKuvLha5";
 const GRID_INVITE_TOKEN = "grid-local-fixture-invite-0123456789";
@@ -65,7 +71,7 @@ async function handleRequest(request, response) {
 	state.set(key, count);
 
 	if (!(scenario === "cors" && endpoint === "primary")) {
-		response.setHeader("access-control-allow-origin", "http://127.0.0.1:4174");
+		setFixtureAccessControlOrigin(request, response);
 		response.setHeader("access-control-expose-headers", "content-length,retry-after,x-fixture-count");
 	}
 	response.setHeader("cache-control", "no-store");
@@ -130,7 +136,7 @@ async function handleRequest(request, response) {
 }
 
 async function handleGridRegistry(request, response, url) {
-	response.setHeader("access-control-allow-origin", "http://127.0.0.1:4174");
+	setFixtureAccessControlOrigin(request, response);
 	response.setHeader("access-control-allow-headers", "content-type");
 	response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
 	response.setHeader("cache-control", "no-store");
@@ -197,6 +203,14 @@ async function handleGridRegistry(request, response, url) {
 		return;
 	}
 	writeJson(response, 405, { error: "method not allowed" });
+}
+
+function setFixtureAccessControlOrigin(request, response) {
+	const origin = request.headers.origin;
+	if (typeof origin === "string" && ALLOWED_ORIGINS.has(origin)) {
+		response.setHeader("access-control-allow-origin", origin);
+		response.setHeader("vary", "Origin");
+	}
 }
 
 function handleGridRegistryControl(request, response, url) {

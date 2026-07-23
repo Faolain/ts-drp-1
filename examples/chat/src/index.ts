@@ -1,3 +1,10 @@
+import {
+	createModularBrowserNetwork,
+	getNetworkConfigFromEnv,
+	isModularNetworkEnv,
+	type ModularBrowserNetworkSession,
+	readBrowserNetworkEnv,
+} from "@ts-drp/example-browser-network";
 import { DRPNode } from "@ts-drp/node";
 import type { IDRPObject } from "@ts-drp/types";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
@@ -47,8 +54,8 @@ class ChatStateManager {
 	_node: DRPNode;
 	_drpObject: IDRPObject<Chat> | undefined = undefined;
 
-	constructor() {
-		this._node = new DRPNode();
+	constructor(node: DRPNode) {
+		this._node = node;
 	}
 
 	hasChat(): boolean {
@@ -267,9 +274,7 @@ const button_send = <HTMLButtonElement>document.getElementById("sendMessage");
 const room_input: HTMLInputElement = <HTMLInputElement>document.getElementById("roomInput");
 const message_input: HTMLInputElement = <HTMLInputElement>document.getElementById("messageInput");
 
-async function main(): Promise<void> {
-	const chatState = new ChatStateManager();
-	await chatState.node.start();
+function run(chatState: ChatStateManager): void {
 	initializeToastContainer();
 	setupCopyButton();
 	setupCollapsibleSections(); // Initialize collapsible sections
@@ -347,6 +352,33 @@ async function main(): Promise<void> {
 		if (!chatState.hasChat()) return;
 		render(chatState);
 	}, 10_000);
+}
+
+async function main(): Promise<void> {
+	const environment = readBrowserNetworkEnv(import.meta.env);
+	const networkConfig = getNetworkConfigFromEnv(environment, window.location.origin);
+	const modularSession = isModularNetworkEnv(environment)
+		? createModularBrowserNetwork(networkConfig, environment)
+		: undefined;
+	const chatState = new ChatStateManager(modularSession?.node ?? new DRPNode(networkConfig));
+
+	let hasRun = false;
+	await chatState.node.start();
+	if (modularSession !== undefined) exposeModularSession(modularSession);
+	await chatState.node.networkNode.isDialable(() => {
+		if (hasRun) return;
+		hasRun = true;
+		run(chatState);
+	});
+}
+
+function exposeModularSession(session: ModularBrowserNetworkSession): void {
+	const target = window as typeof window & {
+		__TS_DRP_CHAT_SESSION__?: ModularBrowserNetworkSession;
+	};
+	target.__TS_DRP_CHAT_SESSION__ = session;
+	window.addEventListener("beforeunload", () => void session.stop(), { once: true });
+	window.dispatchEvent(new CustomEvent("ts-drp:chat-ready", { detail: session.snapshot() }));
 }
 
 void main();

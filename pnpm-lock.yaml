@@ -108,8 +108,36 @@ importers:
         specifier: ^3.0.5
         version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
 
+  examples/browser-network:
+    dependencies:
+      '@ts-drp/network':
+        specifier: 0.11.0
+        version: link:../../packages/network
+      '@ts-drp/node':
+        specifier: 0.11.0
+        version: link:../../packages/node
+      '@ts-drp/relay-policy':
+        specifier: 0.11.0
+        version: link:../../packages/relay-policy
+      '@ts-drp/rendezvous':
+        specifier: 0.11.0
+        version: link:../../packages/rendezvous
+      '@ts-drp/routing-browser':
+        specifier: 0.11.0
+        version: link:../../packages/routing-browser
+      '@ts-drp/types':
+        specifier: 0.11.0
+        version: link:../../packages/types
+    devDependencies:
+      typescript:
+        specifier: ^5.5.4
+        version: 5.8.2
+
   examples/canvas:
     dependencies:
+      '@ts-drp/example-browser-network':
+        specifier: workspace:*
+        version: link:../browser-network
       '@ts-drp/node':
         specifier: 0.11.0
         version: link:../../packages/node
@@ -135,6 +163,9 @@ importers:
 
   examples/chat:
     dependencies:
+      '@ts-drp/example-browser-network':
+        specifier: workspace:*
+        version: link:../browser-network
       '@ts-drp/node':
         specifier: 0.11.0
         version: link:../../packages/node
@@ -163,6 +194,9 @@ importers:
 
   examples/grid:
     dependencies:
+      '@ts-drp/example-browser-network':
+        specifier: workspace:*
+        version: link:../browser-network
       '@ts-drp/network':
         specifier: 0.11.0
         version: link:../../packages/network

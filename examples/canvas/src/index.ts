@@ -1,11 +1,22 @@
+import {
+	createModularBrowserNetwork,
+	getNetworkConfigFromEnv,
+	isModularNetworkEnv,
+	type ModularBrowserNetworkSession,
+	readBrowserNetworkEnv,
+} from "@ts-drp/example-browser-network";
 import { DRPNode } from "@ts-drp/node";
-import type { DRPObject } from "@ts-drp/object";
-import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
+import { DRP_DISCOVERY_TOPIC, type IDRPObject } from "@ts-drp/types";
 
 import { Canvas } from "./objects/canvas";
 
-const node = new DRPNode();
-let drpObject: DRPObject<Canvas>;
+const environment = readBrowserNetworkEnv(import.meta.env);
+const networkConfig = getNetworkConfigFromEnv(environment, window.location.origin);
+const modularSession = isModularNetworkEnv(environment)
+	? createModularBrowserNetwork(networkConfig, environment)
+	: undefined;
+const node = modularSession?.node ?? new DRPNode(networkConfig);
+let drpObject: IDRPObject<Canvas>;
 let peers: string[] = [];
 let discoveryPeers: string[] = [];
 let objectPeers: string[] = [];
@@ -21,7 +32,7 @@ const render = (): void => {
 	object_element.innerHTML = `[${objectPeers.join(", ")}]`;
 	(<HTMLSpanElement>document.getElementById("canvasId")).innerText = drpObject?.id;
 
-	if (!drpObject.drp) return;
+	if (!drpObject?.drp) return;
 	const canvas = drpObject.drp.canvas;
 	for (let x = 0; x < canvas.length; x++) {
 		for (let y = 0; y < canvas[x].length; y++) {
@@ -53,8 +64,7 @@ function createConnectHandlers(): void {
 	});
 }
 
-async function init(): Promise<void> {
-	await node.start();
+function run(): void {
 	render();
 
 	const canvas_element = <HTMLDivElement>document.getElementById("canvas");
@@ -100,7 +110,7 @@ async function init(): Promise<void> {
 	const connect = async (): Promise<void> => {
 		const drpId = canvasIdInput.value;
 		try {
-			drpObject = await node.createObject({
+			drpObject = await node.connectObject({
 				id: drpId,
 				drp: new Canvas(5, 10),
 			});
@@ -116,4 +126,24 @@ async function init(): Promise<void> {
 	connect_button.addEventListener("click", () => void connect());
 }
 
-void init();
+async function main(): Promise<void> {
+	let hasRun = false;
+	await node.start();
+	if (modularSession !== undefined) exposeModularSession(modularSession);
+	await node.networkNode.isDialable(() => {
+		if (hasRun) return;
+		hasRun = true;
+		run();
+	});
+}
+
+function exposeModularSession(session: ModularBrowserNetworkSession): void {
+	const target = window as typeof window & {
+		__TS_DRP_CANVAS_SESSION__?: ModularBrowserNetworkSession;
+	};
+	target.__TS_DRP_CANVAS_SESSION__ = session;
+	window.addEventListener("beforeunload", () => void session.stop(), { once: true });
+	window.dispatchEvent(new CustomEvent("ts-drp:canvas-ready", { detail: session.snapshot() }));
+}
+
+void main();

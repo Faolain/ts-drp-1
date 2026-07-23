@@ -13,6 +13,7 @@
 		"start": "vite preview --host --port 5173"
 	},
 	"dependencies": {
+		"@ts-drp/example-browser-network": "workspace:*",
 		"@ts-drp/network": "0.11.0",
 		"@ts-drp/node": "0.11.0",
 		"@ts-drp/object": "0.11.0",

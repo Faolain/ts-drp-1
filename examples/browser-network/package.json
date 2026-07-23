@@ -1,0 +1,42 @@
+{
+	"name": "@ts-drp/example-browser-network",
+	"version": "0.11.0",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"module": "./src/index.ts",
+	"types": "./src/index.ts",
+	"typesVersions": {
+		"*": {
+			"config": [
+				"./src/config.ts"
+			],
+			"env": [
+				"./src/env.ts"
+			],
+			"session": [
+				"./src/session.ts"
+			]
+		}
+	},
+	"exports": {
+		".": "./src/index.ts",
+		"./config": "./src/config.ts",
+		"./env": "./src/env.ts",
+		"./session": "./src/session.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@ts-drp/network": "0.11.0",
+		"@ts-drp/node": "0.11.0",
+		"@ts-drp/relay-policy": "0.11.0",
+		"@ts-drp/rendezvous": "0.11.0",
+		"@ts-drp/routing-browser": "0.11.0",
+		"@ts-drp/types": "0.11.0"
+	},
+	"devDependencies": {
+		"typescript": "^5.5.4"
+	}
+}
