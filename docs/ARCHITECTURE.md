@@ -286,6 +286,22 @@ it leaves the data path; where NAT is hostile, staying relayed beats
 disconnection (see DEPLOYING.md "How browser-to-browser WebRTC actually
 works").
 
+> **Relayed connections are "limited" — DRP sync waits for the WebRTC upgrade.**
+> A Circuit Relay v2 reservation caps each relayed connection (default **128 KB /
+> 2 min**, `@libp2p/circuit-relay-v2` `constants.js`), applied by *both* public
+> relays and DRP's own `circuitRelayServer` (it sets only `maxReservations`, so the
+> library's `applyDefaultLimit` stays on). libp2p flags such connections `limited`
+> and runs no application protocol on them unless it opts in with
+> `runOnLimitedConnection: true`. DRP's sync protocol (`/drp/message/0.0.1`) does
+> **not** opt in (`newStream`/`handle`, `node.ts:1672,1692,1719`), so direct
+> reconciliation (`syncObject`) runs only over the upgraded **WebRTC** link, not the
+> relay — the relay is first-contact/signalling. Live updates travel the **GossipSub**
+> data plane, so relayed-only peers still converge through the mesh via connected
+> peers (whether GossipSub itself traverses a *limited* relay is unconfirmed). Loosening
+> this (relayed sync when WebRTC can't hole-punch) is a deliberate, unmade decision:
+> a full hash-graph sync can exceed 128 KB / 2 min and be force-closed mid-stream, and
+> it burdens free public relays — see the `relay-limited-connection-sync` note.
+
 ### Candidate sources
 
 Everything implements `RelayCandidateSource`
