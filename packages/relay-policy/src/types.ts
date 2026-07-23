@@ -5,7 +5,6 @@ export type RelayCandidateOrigin =
 	| "configured-relay"
 	| "dht-relay-provider"
 	| "node-connected-hop"
-	| "node-closest-peers"
 	| "registry-relay-record";
 
 export type RelayCandidateRoutingSource =

@@ -5,7 +5,6 @@ import {
 	decodeRelayReservationResponse,
 	type DnsaddrFallback,
 	Libp2pRelayClient,
-	NodeRoutingClosestPeersSource,
 	RELAY_RESERVATION_STATUS,
 	RELAY_TRANSPORT_PROFILES,
 	type RelayCandidate,
@@ -20,17 +19,8 @@ import {
 } from "@ts-drp/relay-policy";
 import { describe, expect, it, vi } from "vitest";
 
-// Fixture shapes mirroring @ts-drp/routing-node's RoutingPeer and @ts-drp/routing-browser's
-// BrowserRoutingPeer, declared locally so relay-policy does not depend on the routing packages
-// that build ON it (relay-policy is lower-level; consuming their types would create a workspace
-// dependency cycle: network -> relay-policy -> routing-node -> network).
-interface RoutingPeer {
-	addresses: string[];
-	addressDecisions: unknown[];
-	inputAddressCount: number;
-	peerId: string;
-	truncatedAddressCount: number;
-}
+// Fixture shape mirroring @ts-drp/routing-browser's BrowserRoutingPeer, declared locally so
+// relay-policy does not depend on the routing package that builds ON it.
 interface BrowserRoutingPeer {
 	acceptedAddresses: string[];
 	addressDecisions: unknown[];
@@ -45,37 +35,6 @@ const NOW = 1_750_000_000_000;
 const QUERY = Uint8Array.from([1, 2, 3, 4]);
 
 describe("relay closest-peer adapters", () => {
-	it("preserves Node query and result provenance through the only Node adapter", async () => {
-		const peers = [nodePeer("node-a"), nodePeer("node-b")];
-		const source = new NodeRoutingClosestPeersSource(
-			{
-				async *getClosestPeers(key): AsyncIterable<RoutingPeer> {
-					await Promise.resolve();
-					expect(key).toEqual(QUERY);
-					yield* peers;
-				},
-			},
-			(peer) => `asn:${peer.peerId}`
-		);
-		const output = await collect(source);
-		expect(output).toMatchObject([
-			{
-				operatorGroup: "asn:node-a",
-				peerId: "node-a",
-				provenance: {
-					origin: "node-closest-peers",
-					queryDigest: "query_5734a87d",
-					resultIndex: 0,
-					routingSource: "public-dht",
-				},
-			},
-			{
-				peerId: "node-b",
-				provenance: { resultIndex: 1 },
-			},
-		]);
-	});
-
 	it("preserves delegated endpoint result provenance through the browser adapter", async () => {
 		const source = new BrowserRoutingClosestPeersSource(
 			{
@@ -108,21 +67,6 @@ describe("relay closest-peer adapters", () => {
 		const result = await policy.acquire(QUERY, signal());
 		expect(result.candidatesObserved).toBe(2);
 		expect(result.terminal).toBe("reserved");
-	});
-
-	it("uses a conservative unknown group when an operator classifier throws", async () => {
-		const source = new NodeRoutingClosestPeersSource(
-			{
-				async *getClosestPeers(): AsyncIterable<RoutingPeer> {
-					await Promise.resolve();
-					yield nodePeer("node-a");
-				},
-			},
-			() => {
-				throw new Error("classifier failed");
-			}
-		);
-		await expect(collect(source)).resolves.toMatchObject([{ operatorGroup: "unknown" }]);
 	});
 });
 
@@ -828,16 +772,6 @@ function candidate(peerId: string, operatorGroup: string, address = wss(peerId))
 			resultIndex: Number(peerId.replace(/\D/gu, "")) || 0,
 			routingSource: "delegated-routing",
 		},
-	};
-}
-
-function nodePeer(peerId: string): RoutingPeer {
-	return {
-		addresses: [wss(peerId)],
-		addressDecisions: [],
-		inputAddressCount: 1,
-		peerId,
-		truncatedAddressCount: 0,
 	};
 }
 

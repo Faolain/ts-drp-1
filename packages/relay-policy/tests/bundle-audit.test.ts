@@ -1,6 +1,13 @@
+import * as relayPolicy from "@ts-drp/relay-policy";
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
+describe("relay-policy public surface", () => {
+	it("does not export the retired cold Node closest-peer relay source", () => {
+		expect("NodeRoutingClosestPeersSource" in relayPolicy).toBe(false);
+	});
+});
 
 describe("relay-policy browser bundle", () => {
 	it("resolves no node:* builtin from the package entry", async () => {

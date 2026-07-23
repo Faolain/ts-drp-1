@@ -301,7 +301,12 @@ typed provenance (`packages/relay-policy/src/types.ts:43`). The sources:
 | `ConnectedHopRelaySource` (`index.ts:254`) | `node-connected-hop`/`connected-peers` | overflow, **degraded-eligible** | **Warm discovery**: harvests already-connected peers whose Identify shows `/libp2p/circuit/relay/0.2.0/hop` — no DHT walk at all (§8 finding) |
 | `BrowserRoutingClosestPeersSource` (`index.ts:383`) | `browser-closest-peers`/`delegated-routing` | overflow | Delegated Routing V1 closest-peers for browsers |
 | `DhtRelayProviderSource` (`index.ts:720`) | `dht-relay-provider` | overflow | Providers of the deterministic relay-namespace CID |
-| `NodeRoutingClosestPeersSource` (`index.ts:212`) | `node-closest-peers`/`public-dht` | — | **Exported but not wired into any production relay policy.** The cold `getClosestPeers` DHT walk it performs was measured at ~0 results under DRP's conservative Amino tuning (phase-06); production replaced it with the warm source above |
+
+> A cold `getClosestPeers` DHT-walk source (`NodeRoutingClosestPeersSource`) once
+> existed here but was **removed** — it was exported yet never wired into any
+> production policy, and its walk measured ~0 results under DRP's conservative
+> Amino tuning (phase-06). The warm `ConnectedHopRelaySource` above replaced it
+> (phase-08); `NodeRouting.getClosestPeers` remains as a general DHT primitive.
 
 All discovery-derived sources stamp `operatorGroup: "unknown"`. **Only
 operator-configured sources ever carry verified evidence** — that is what makes
@@ -432,11 +437,20 @@ attempts) — so relays discovered *after* startup are picked up. The Amino DHT
 request budget for public walks, `runtime.ts:26`,
 `packages/routing-node/src/index.ts:296`) supplies the *population* of
 connected public peers for the harvest to find. The libp2p-native
-`circuitRelayTransport` is installed with zero options and the default listen
-set includes `/p2p-circuit` (`packages/network/src/node.ts:532,510`), so native
-discovery machinery is technically armed — but DRP's own policy is the
-authoritative reservation path; the native transport is not how DRP acquires
-relays.
+`circuitRelayTransport` (installed with zero options,
+`packages/network/src/node.ts:532`) arms one native auto-reservation per generic
+`/p2p-circuit` listen address (verified against `@libp2p/circuit-relay-v2@4.2.8`,
+phase-09). To make DRP's `RelayPolicy` the *sole initiator* of reservations, the
+default listen set drops the generic `/p2p-circuit` — using `["/webrtc"]` — **when
+a relay policy is configured** (`node.ts:510`, gated on the same
+`_assembleRelayPolicySources()` predicate that decides whether the policy runs);
+`Libp2pRelayClient.reserve()` then adds the *specific* `<relay>/p2p-circuit`
+listen itself, and `@libp2p/webrtc` derives `/webrtc` reachability from any
+circuit listener, so relay + webrtc reachability is preserved while the native
+"discovered" race that bypassed the policy's diversity rules is quiesced.
+Policy-less configs keep the legacy `["/p2p-circuit", "/webrtc"]` default so they
+retain native serendipitous reachability. An explicit `listen_addresses` is
+always respected verbatim.
 
 **The degraded-diversity relaxation (phase-07 decision).** Public
 DHT/warm-discovered relays are anonymous — the classifier returns `"unknown"`

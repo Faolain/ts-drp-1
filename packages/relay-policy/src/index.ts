@@ -46,19 +46,10 @@ export interface RelayReservationLifecycleEvent {
 	readonly relayId: string;
 }
 
-export interface NodeRoutingPeerCandidate {
-	readonly addresses: readonly string[];
-	readonly peerId: string;
-}
-
 export interface BrowserRoutingPeerCandidate {
 	readonly acceptedAddresses: readonly string[];
 	readonly peerId: string;
 	readonly protocols: readonly string[];
-}
-
-export interface NodeClosestPeerRouting {
-	getClosestPeers(queryKey: Uint8Array, signal?: AbortSignal): AsyncIterable<NodeRoutingPeerCandidate>;
 }
 
 /** Minimal warm-peer seam required by connected-HOP relay discovery. */
@@ -204,51 +195,6 @@ export const DEFAULT_RELAY_POLICY_LIMITS: Readonly<RelayPolicyLimits> = Object.f
 });
 
 const MAX_QUEUED_OPERATIONS = 32;
-
-/**
- * Adapts the Phase 02 closest-peer seam without inventing a second source of
- * relay candidates.
- */
-export class NodeRoutingClosestPeersSource implements RelayCandidateSource {
-	readonly #operatorGroup: (peer: NodeRoutingPeerCandidate) => string;
-	readonly #routing: NodeClosestPeerRouting;
-
-	/**
-	 * @param routing - Phase 02 Node closest-peer seam.
-	 * @param operatorGroup - Campaign-owned coarse operator classifier.
-	 */
-	constructor(
-		routing: NodeClosestPeerRouting,
-		operatorGroup: (peer: NodeRoutingPeerCandidate) => string = () => "unknown"
-	) {
-		this.#routing = routing;
-		this.#operatorGroup = operatorGroup;
-	}
-
-	/**
-	 * @param queryKey - Opaque routing query key.
-	 * @param signal - Caller-owned cancellation signal.
-	 * @yields Bounded Node candidates with query/result provenance.
-	 */
-	async *getCandidates(queryKey: Uint8Array, signal: AbortSignal): AsyncIterable<RelayCandidate> {
-		const queryDigest = digestQueryKey(queryKey);
-		let resultIndex = 0;
-		for await (const peer of this.#routing.getClosestPeers(queryKey, signal)) {
-			yield {
-				addresses: [...peer.addresses],
-				operatorGroup: safeOperatorGroup(() => this.#operatorGroup(peer)),
-				peerId: peer.peerId,
-				protocols: [],
-				provenance: {
-					origin: "node-closest-peers",
-					queryDigest,
-					resultIndex: resultIndex++,
-					routingSource: "public-dht",
-				},
-			};
-		}
-	}
-}
 
 /** Harvests relay candidates exclusively from the host's live connected peer set. */
 export class ConnectedHopRelaySource implements RelayCandidateSource {
@@ -1832,8 +1778,6 @@ function isCandidateProvenancePair(origin: unknown, routingSource: unknown): boo
 			return routingSource === "configured";
 		case "dht-relay-provider":
 			return routingSource === "delegated-routing" || routingSource === "public-dht";
-		case "node-closest-peers":
-			return routingSource === "public-dht";
 		case "node-connected-hop":
 			return routingSource === "connected-peers";
 		case "registry-relay-record":
@@ -2073,19 +2017,15 @@ function sanitizeInvalidCandidate(candidate: unknown, queryKey: Uint8Array, resu
 			? (value.provenance as Partial<RelayCandidate["provenance"]>)
 			: {};
 	const origin =
-		provenance.origin === "node-closest-peers" ||
-		provenance.origin === "node-connected-hop" ||
-		provenance.origin === "configured-relay"
+		provenance.origin === "node-connected-hop" || provenance.origin === "configured-relay"
 			? provenance.origin
 			: ("browser-closest-peers" as const);
 	const routingSource =
-		origin === "node-closest-peers"
-			? "public-dht"
-			: origin === "node-connected-hop"
-				? "connected-peers"
-				: origin === "configured-relay"
-					? "configured"
-					: "delegated-routing";
+		origin === "node-connected-hop"
+			? "connected-peers"
+			: origin === "configured-relay"
+				? "configured"
+				: "delegated-routing";
 	return {
 		addresses: [],
 		operatorGroup: "unknown",

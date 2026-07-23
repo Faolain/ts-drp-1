@@ -596,10 +596,10 @@ function candidate(peerId: string, addresses: readonly string[]): RelayCandidate
 		peerId,
 		protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
 		provenance: {
-			origin: "node-closest-peers",
+			origin: "node-connected-hop",
 			queryDigest: "query_5734a87d",
 			resultIndex: 0,
-			routingSource: "public-dht",
+			routingSource: "connected-peers",
 		},
 	};
 }

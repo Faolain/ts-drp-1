@@ -106,8 +106,8 @@ describe("node relay overflow RED contracts", () => {
 					name: "node-closest-peers",
 					priority: "overflow",
 					source: trackedSource(overflowStarted, [
-						attested("node-a", "verified:node-a", "node-closest-peers"),
-						attested("node-b", "verified:node-b", "node-closest-peers"),
+						attested("node-a", "verified:node-a", "node-connected-hop"),
+						attested("node-b", "verified:node-b", "node-connected-hop"),
 					]),
 				},
 			],
@@ -143,7 +143,7 @@ describe("node relay overflow RED contracts", () => {
 					enabled: true,
 					name: "node-closest-peers",
 					priority: "overflow",
-					source: trackedSource(healthyOverflowStarted, [candidate("must-not-walk", "unknown", "node-closest-peers")]),
+					source: trackedSource(healthyOverflowStarted, [candidate("must-not-walk", "unknown", "node-connected-hop")]),
 				},
 			],
 		});
@@ -173,8 +173,8 @@ describe("node relay overflow RED contracts", () => {
 					name: "node-closest-peers",
 					priority: "overflow",
 					source: trackedSource(degradedOverflowStarted, [
-						candidate("anonymous-overflow-a", "unknown", "node-closest-peers"),
-						candidate("anonymous-overflow-b", "unknown", "node-closest-peers"),
+						candidate("anonymous-overflow-a", "unknown", "node-connected-hop"),
+						candidate("anonymous-overflow-b", "unknown", "node-connected-hop"),
 					]),
 				},
 			],
@@ -207,8 +207,8 @@ describe("node relay overflow RED contracts", () => {
 					name: "node-closest-peers",
 					priority: "overflow",
 					source: sourceOf([
-						candidate("abort-existing-a", "unknown", "node-closest-peers"),
-						candidate("abort-existing-b", "unknown", "node-closest-peers"),
+						candidate("abort-existing-a", "unknown", "node-connected-hop"),
+						candidate("abort-existing-b", "unknown", "node-connected-hop"),
 					]),
 				},
 			],
@@ -235,8 +235,8 @@ describe("node relay overflow RED contracts", () => {
 					name: "configured",
 					priority: "primary",
 					source: sourceOf([
-						candidate("anonymous-primary-a", "unknown", "node-closest-peers"),
-						candidate("anonymous-primary-b", "unknown", "node-closest-peers"),
+						candidate("anonymous-primary-a", "unknown", "node-connected-hop"),
+						candidate("anonymous-primary-b", "unknown", "node-connected-hop"),
 					]),
 				},
 				{
@@ -244,7 +244,7 @@ describe("node relay overflow RED contracts", () => {
 					enabled: true,
 					name: "node-closest-peers",
 					priority: "overflow",
-					source: trackedSource(overflowStarted, [candidate("anonymous-overflow", "unknown", "node-closest-peers")]),
+					source: trackedSource(overflowStarted, [candidate("anonymous-overflow", "unknown", "node-connected-hop")]),
 				},
 			],
 		});
@@ -289,8 +289,8 @@ describe("node relay overflow RED contracts", () => {
 					name: "node-closest-peers",
 					priority: "overflow",
 					source: sourceOf([
-						candidate("node-eligible-a", "unknown", "node-closest-peers"),
-						candidate("node-eligible-b", "unknown", "node-closest-peers"),
+						candidate("node-eligible-a", "unknown", "node-connected-hop"),
+						candidate("node-eligible-b", "unknown", "node-connected-hop"),
 					]),
 				},
 			],
@@ -347,7 +347,7 @@ describe("node relay overflow RED contracts", () => {
 
 	it("does not degrade overflow candidates carrying unverifiable operator evidence", async () => {
 		const spoofed = (peerId: string): RelayCandidate => ({
-			...candidate(peerId, "claimed:operator", "node-closest-peers"),
+			...candidate(peerId, "claimed:operator", "node-connected-hop"),
 			operatorEvidence: {
 				credential: `spoofed-${peerId}`,
 				signedRecordDigest: `sha256:spoofed-${peerId}`,
@@ -399,7 +399,7 @@ describe("node relay overflow RED contracts", () => {
 					enabled: true,
 					name: "node-closest-peers",
 					priority: "overflow",
-					source: trackedSource(overflowStarted, [attested("node-after-cap", "verified:node", "node-closest-peers")]),
+					source: trackedSource(overflowStarted, [attested("node-after-cap", "verified:node", "node-connected-hop")]),
 				},
 			],
 		});
@@ -432,7 +432,7 @@ describe("node relay overflow RED contracts", () => {
 					yield attested("initial-b", "verified:b", "configured-fallback");
 					return;
 				}
-				yield attested("replacement-c", "verified:c", "node-closest-peers");
+				yield attested("replacement-c", "verified:c", "node-connected-hop");
 			},
 		};
 		const policy = createPolicy(changingSource);
@@ -465,7 +465,7 @@ describe("node relay overflow RED contracts", () => {
 					yield attested("refresh-b", "verified:b", "configured-fallback");
 					return;
 				}
-				yield attested("refresh-c", "verified:c", "node-closest-peers");
+				yield attested("refresh-c", "verified:c", "node-connected-hop");
 			},
 		};
 		const policy = createPolicy(changingSource, { refreshBeforeExpiryMs: 120_000 }, undefined, responses);
@@ -556,8 +556,8 @@ describe("node relay overflow RED contracts", () => {
 							overflowStarted();
 							overflowStartedAtMs = Date.now();
 							await new Promise<void>((resolve) => setTimeout(resolve, 45_000));
-							yield candidate("walk-a", "unknown", "node-closest-peers");
-							yield candidate("walk-b", "unknown", "node-closest-peers");
+							yield candidate("walk-a", "unknown", "node-connected-hop");
+							yield candidate("walk-b", "unknown", "node-connected-hop");
 						},
 					},
 				},
@@ -685,7 +685,7 @@ function candidate(
 					? "configured"
 					: origin === "browser-closest-peers"
 						? "delegated-routing"
-						: "public-dht",
+						: "connected-peers",
 		},
 	};
 }

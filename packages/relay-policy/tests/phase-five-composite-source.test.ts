@@ -8,7 +8,6 @@ type PhaseFiveOrigin =
 	| "cached-relay"
 	| "configured-fallback"
 	| "dht-relay-provider"
-	| "node-closest-peers"
 	| "registry-relay-record";
 
 type PhaseFiveRoutingSource = "configured" | "delegated-routing" | "peer-cache" | "public-dht" | "registry";

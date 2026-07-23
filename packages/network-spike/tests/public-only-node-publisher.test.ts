@@ -285,10 +285,10 @@ function localRelayCandidate(peerId: string, address: string): RelayCandidate {
 		peerId,
 		protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
 		provenance: {
-			origin: "node-closest-peers",
+			origin: "node-connected-hop",
 			queryDigest: "local-fixture",
 			resultIndex: 0,
-			routingSource: "public-dht",
+			routingSource: "connected-peers",
 		},
 	};
 }
