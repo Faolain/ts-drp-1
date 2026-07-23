@@ -30,12 +30,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
-		"@ts-drp/types": "0.11.0"
-	},
-	"peerDependencies": {
-		"vitest": "^3.0.5"
-	},
-	"devDependencies": {
+		"@ts-drp/types": "0.11.0",
 		"vitest": "^3.0.5"
 	}
 }
