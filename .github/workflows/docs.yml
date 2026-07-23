@@ -42,7 +42,7 @@ jobs:
           VITE_RENDEZVOUS_ENDPOINTS: ""
           VITE_ROUTING_ENDPOINTS: https://delegated-ipfs.dev/,https://cid.contact/
         run: |
-          pnpm run docs
+          pnpm exec typedoc --out ./pages
           VITE_BASE_PATH="${PAGES_BASE_PATH}/examples/grid/" \
             VITE_MEMBERSHIP_INVITE=ts-drp-pages-grid-public-demo-v1 \
             VITE_RENDEZVOUS_NAMESPACE=drp-network:v1:dHMtZHJwLXBhZ2VzLWdyaWQtdjE \
@@ -55,26 +55,27 @@ jobs:
             VITE_MEMBERSHIP_INVITE=ts-drp-pages-chat-public-demo-v1 \
             VITE_RENDEZVOUS_NAMESPACE=drp-network:v1:dHMtZHJwLXBhZ2VzLWNoYXQtdjE \
             pnpm --filter ts-drp-example-chat build
-          mkdir -p ./docs/examples
-          cp ./site/examples/index.html ./docs/examples/index.html
-          cp ./site/examples/styles.css ./docs/examples/styles.css
-          cp -r ./examples/grid/dist ./docs/examples/grid
-          cp -r ./examples/canvas/dist ./docs/examples/canvas
-          cp -r ./examples/chat/dist ./docs/examples/chat
+          mkdir -p ./pages/examples
+          cp ./site/examples/index.html ./pages/examples/index.html
+          cp ./site/examples/styles.css ./pages/examples/styles.css
+          cp -r ./examples/grid/dist ./pages/examples/grid
+          cp -r ./examples/canvas/dist ./pages/examples/canvas
+          cp -r ./examples/chat/dist ./pages/examples/chat
 
       - name: Verify Pages artifact
         run: |
-          test -f ./docs/examples/index.html
-          test -f ./docs/examples/styles.css
+          test -f ./pages/index.html
+          test -f ./pages/examples/index.html
+          test -f ./pages/examples/styles.css
           for example in grid canvas chat; do
-            test -f "./docs/examples/${example}/index.html"
-            grep -q "${PAGES_BASE_PATH}/examples/${example}/assets/" "./docs/examples/${example}/index.html"
+            test -f "./pages/examples/${example}/index.html"
+            grep -q "${PAGES_BASE_PATH}/examples/${example}/assets/" "./pages/examples/${example}/index.html"
           done
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ./docs
+          path: ./pages
 
   deploy:
     name: Deploy documentation
