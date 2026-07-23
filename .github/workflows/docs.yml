@@ -1,7 +1,7 @@
 name: Documentation
 on:
   push:
-    branches: [main, codex/validate-canvas-chat]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
