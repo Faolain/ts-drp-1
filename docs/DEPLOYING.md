@@ -165,6 +165,21 @@ threshold. Evidence:
 `specs/public-only-bootstrap/reviews/phase-04.md` (canonical refuse) and
 `phase-05.md` (dynamic grant).
 
+**A browser can reach a granting public relay too — verified live (2026-07).** An
+earlier assumption that browsers cannot source public relays (because they use
+delegated routing, not the DHT walk) was **wrong**. In a real Chromium run against
+public infra: (1) **delegated routing** — `delegated-ipfs.dev/routing/v1` returned
+AutoTLS `*.libp2p.direct` `/tls/ws` relays and DRP's own `RelayPolicy` reserved one
+(`reservationStatus:100`, `status:"reserved"`); and (2) **native harvest** — fed the
+canonical `*.bootstrap.libp2p.io` wss bootstrappers, the browser saw
+`RESERVATION_REFUSED` from the canonical nodes (as expected) but an AutoTLS relay
+**granted** ~1.3s after boot. Two caveats: browser reservation needs a
+WAN-appropriate `control_plane.relay_policy.per_candidate_deadline_ms` (the 1s
+fixture default times out cold `wss` dials — now config-exposable), and full
+two-browser fully-public convergence is **not yet demonstrated** — the remaining
+blocker is discovery-side (a browser Nostr-publish failure under the no-fixture
+profile; the `rendezvous-registration` event now carries a `reason` to diagnose it).
+
 **The DRP node overflow tier is wired and works** (see `phase-08.md`). An earlier
 cold `getClosestPeers` DHT-walk source (`NodeRoutingClosestPeersSource`) was
 throttled to **0** candidates by DRP's conservative public Amino tuning

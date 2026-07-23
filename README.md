@@ -56,9 +56,10 @@ pnpm e2e-test:public-infra
 Caveats: this **sends traffic to third-party relays**, is **not** a CI gate, and
 is inherently flakier than the local run. In this run only **discovery** is
 public; **connectivity** (circuit relays) still uses local operator-diverse
-relays, because browser-usable _public_ circuit relays that grant reservations to
-strangers cannot be reliably sourced. Override `VITE_NOSTR_RELAYS` to point
-elsewhere and `VITE_RENDEZVOUS_NAMESPACE` to isolate a run. See
+relays — a browser _can_ reserve a public relay (see below), but this test keeps
+connectivity local for reliability and reproducibility. Override
+`VITE_NOSTR_RELAYS` to point elsewhere and `VITE_RENDEZVOUS_NAMESPACE` to isolate a
+run. See
 [docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr) for
 the full public-infra story and the connectivity-half constraints.
 
@@ -82,9 +83,18 @@ shared grid object to identical state.
 Both are opt-in (`RUN_PUBLIC_LIVE=true`), skipped in the normal suite, **send real
 traffic to public infrastructure**, and are **not** CI gates. The relay checks do
 not assert the granted relay is browser-usable (the native store takes the first
-HOP grant, often node-only tcp/quic). The equivalent for a **browser** — which
-sources relays via delegated routing / connected-peer harvest rather than the DHT
-walk a node uses — is a separate, open question tracked in
+HOP grant, often node-only tcp/quic).
+
+A **browser** was separately verified (live) to reserve a _granting_ public relay
+too — via **both** paths: public delegated routing (`delegated-ipfs.dev` surfaces
+AutoTLS `*.libp2p.direct` `/tls/ws` relays that DRP's RelayPolicy reserved) **and**
+the native connected-peer HOP harvest from public bootstrappers (canonical
+`*.bootstrap.libp2p.io` refuse, but an AutoTLS relay granted). So browser
+connectivity over public infra is real, not the blocker — it just needs a
+WAN-appropriate `control_plane.relay_policy.per_candidate_deadline_ms` (the 1s
+fixture default times out cold `wss` dials). Full two-browser fully-public
+convergence is **not** yet demonstrated: the open piece is discovery-side (a
+browser Nostr-publish issue under the no-fixture profile). See
 [docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr).
 
 # Known Issues
