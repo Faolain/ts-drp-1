@@ -5,11 +5,26 @@
 		<meta http-equiv="X-UA-Compatible" content="ie=edge" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>DRP - Canvas</title>
+		<link rel="stylesheet" href="/styles.css" />
 	</head>
 
-	<body>
-		<div style="margin-bottom: 10px">
-			<p>Connected to <span id="canvasId"></span></p>
+	<body class="canvas-app">
+		<div class="controls">
+			<div id="canvasIdentity" class="canvas-identity" hidden>
+				<span class="canvas-identity__label">Connected canvas</span>
+				<button
+					id="copyCanvasId"
+					class="canvas-identity__copy"
+					type="button"
+					aria-describedby="copyCanvasStatus"
+					disabled
+				>
+					<span class="visually-hidden">Copy canvas ID: </span>
+					<code id="canvasId"></code>
+					<span class="canvas-identity__action" aria-hidden="true">Copy</span>
+				</button>
+				<p id="copyCanvasStatus" class="canvas-identity__status" role="status" aria-live="polite"></p>
+			</div>
 			<p>peers: <span id="peers"></span></p>
 			<p>discovery_peers: <span id="discovery_peers"></span></p>
 			<p>object_peers: <span id="object_peers"></span></p>

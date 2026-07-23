@@ -20,6 +20,7 @@ let drpObject: IDRPObject<Canvas>;
 let peers: string[] = [];
 let discoveryPeers: string[] = [];
 let objectPeers: string[] = [];
+let renderedCanvasId: string | undefined;
 
 const render = (): void => {
 	const peers_element = <HTMLDivElement>document.getElementById("peers");
@@ -30,7 +31,7 @@ const render = (): void => {
 
 	const object_element = <HTMLDivElement>document.getElementById("object_peers");
 	object_element.innerHTML = `[${objectPeers.join(", ")}]`;
-	(<HTMLSpanElement>document.getElementById("canvasId")).innerText = drpObject?.id;
+	renderCanvasIdentity(drpObject?.id);
 
 	if (!drpObject?.drp) return;
 	const canvas = drpObject.drp.canvas;
@@ -42,6 +43,41 @@ const render = (): void => {
 		}
 	}
 };
+
+function renderCanvasIdentity(canvasId: string | undefined): void {
+	const identity = <HTMLDivElement>document.getElementById("canvasIdentity");
+	const idElement = <HTMLElement>document.getElementById("canvasId");
+	const copyButton = <HTMLButtonElement>document.getElementById("copyCanvasId");
+	const status = <HTMLParagraphElement>document.getElementById("copyCanvasStatus");
+	const hasCanvasId = canvasId !== undefined && canvasId.length > 0;
+
+	if (canvasId === renderedCanvasId) return;
+	identity.hidden = !hasCanvasId;
+	copyButton.disabled = !hasCanvasId;
+	idElement.textContent = canvasId ?? "";
+	status.textContent = "";
+	status.removeAttribute("data-state");
+	renderedCanvasId = canvasId;
+}
+
+async function copyCanvasId(): Promise<void> {
+	const canvasId = drpObject?.id;
+	const status = <HTMLParagraphElement>document.getElementById("copyCanvasStatus");
+	if (canvasId === undefined || canvasId.length === 0) return;
+
+	try {
+		if (navigator.clipboard === undefined) throw new Error("Clipboard API unavailable");
+		await navigator.clipboard.writeText(canvasId);
+		if (drpObject?.id !== canvasId) return;
+		status.dataset.state = "success";
+		status.textContent = "Canvas ID copied.";
+	} catch (error) {
+		console.error("Failed to copy canvas ID", error);
+		if (drpObject?.id !== canvasId) return;
+		status.dataset.state = "error";
+		status.textContent = "Could not copy the canvas ID. The ID remains visible for manual copying.";
+	}
+}
 
 const random_int = (max: number): number => Math.floor(Math.random() * max);
 
@@ -66,6 +102,8 @@ function createConnectHandlers(): void {
 
 function run(): void {
 	render();
+	const copyButton = <HTMLButtonElement>document.getElementById("copyCanvasId");
+	copyButton.addEventListener("click", () => void copyCanvasId());
 
 	const canvas_element = <HTMLDivElement>document.getElementById("canvas");
 	canvas_element.innerHTML = "";

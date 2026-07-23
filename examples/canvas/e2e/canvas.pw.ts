@@ -44,6 +44,84 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 	}
 });
 
+test("created canvas ID is visibly copyable with accessible feedback", async ({ browser }) => {
+	const context = await browser.newContext();
+	await context.addInitScript(() => {
+		const target = window as typeof window & { __CANVAS_CLIPBOARD_WRITES__?: string[] };
+		target.__CANVAS_CLIPBOARD_WRITES__ = [];
+		Object.defineProperty(navigator, "clipboard", {
+			configurable: true,
+			value: {
+				writeText: (value: string): Promise<void> => {
+					target.__CANVAS_CLIPBOARD_WRITES__?.push(value);
+					return Promise.resolve();
+				},
+			},
+		});
+	});
+	const page = await context.newPage();
+
+	try {
+		await page.goto("http://127.0.0.1:4180/");
+		await waitForRelayReservation(page);
+		await expect(page.locator("#canvas > div")).toHaveCount(50);
+		await expect(page.locator("#copyCanvasId")).toBeHidden();
+		await expect(page.locator("#copyCanvasId")).toBeDisabled();
+		await page.locator("#create").click();
+		await expect(page.locator("#canvasId")).not.toBeEmpty();
+		const canvasId = (await page.locator("#canvasId").textContent())?.trim();
+		if (canvasId === undefined || canvasId === "") throw new Error("creator did not expose a canvas ID");
+
+		const copyableId = page.getByRole("button", { name: /copy canvas id/iu });
+		await expect(copyableId).toBeVisible();
+		await expect(copyableId).toContainText(canvasId);
+		await expect(copyableId).toHaveAccessibleName(`Copy canvas ID: ${canvasId}`);
+		await copyableId.click();
+
+		await expect
+			.poll(() =>
+				page.evaluate(
+					() => (window as typeof window & { __CANVAS_CLIPBOARD_WRITES__?: string[] }).__CANVAS_CLIPBOARD_WRITES__
+				)
+			)
+			.toEqual([canvasId]);
+		await expect(page.getByRole("status")).toContainText(/copied/iu);
+	} finally {
+		await context.close();
+	}
+});
+
+test("clipboard rejection keeps the canvas ID visible and announces an error", async ({ browser }) => {
+	const context = await browser.newContext();
+	await context.addInitScript(() => {
+		Object.defineProperty(navigator, "clipboard", {
+			configurable: true,
+			value: {
+				writeText: (): Promise<void> => Promise.reject(new Error("Clipboard permission denied")),
+			},
+		});
+	});
+	const page = await context.newPage();
+
+	try {
+		await page.goto("http://127.0.0.1:4180/");
+		await waitForRelayReservation(page);
+		await expect(page.locator("#canvas > div")).toHaveCount(50);
+		await page.locator("#create").click();
+		await expect(page.locator("#canvasId")).not.toBeEmpty();
+		const canvasId = (await page.locator("#canvasId").textContent())?.trim();
+		if (canvasId === undefined || canvasId === "") throw new Error("creator did not expose a canvas ID");
+
+		const copyableId = page.getByRole("button", { name: /copy canvas id/iu });
+		await copyableId.click();
+		await expect(page.getByRole("status")).toContainText(/could not copy/iu);
+		await expect(copyableId).toContainText(canvasId);
+		await expect(copyableId).toBeVisible();
+	} finally {
+		await context.close();
+	}
+});
+
 async function waitForRelayReservation(page: Page): Promise<void> {
 	await page.waitForFunction(() => {
 		const session = (
