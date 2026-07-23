@@ -208,6 +208,7 @@ export interface DRPNetworkNodeDependencies {
 
 export interface RelayPolicyFactoryOptions {
 	onReservationEvent(event: RelayReservationLifecycleEvent): void;
+	readonly perCandidateDeadlineMs: number;
 	readonly source: RelayCandidateSource;
 	readonly targetReservations: number;
 	readonly totalDeadlineMs: number;
@@ -381,6 +382,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		this._membershipVerifier = createMembershipVerifier(config?.control_plane?.membership);
 		log = new Logger("drp::network", config?.log_config);
 		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
+		this._validateRelayPolicyConfiguration(false);
 	}
 
 	/**
@@ -756,11 +758,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					relayIdHash: sanitizedRelayIdHash(event.relayId),
 				});
 			},
+			perCandidateDeadlineMs:
+				relayPolicyConfig.per_candidate_deadline_ms ?? DEFAULT_RELAY_POLICY_LIMITS.perCandidateDeadlineMs,
 			source,
 			targetReservations,
-			totalDeadlineMs: nodeClosestPeersEnabled
-				? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
-				: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs,
+			totalDeadlineMs:
+				relayPolicyConfig.total_deadline_ms ??
+				(nodeClosestPeersEnabled
+					? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
+					: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs),
 			transportProfile: nodeTransportProfileEnabled
 				? RELAY_TRANSPORT_PROFILES.node
 				: RELAY_TRANSPORT_PROFILES.broadBrowser,
@@ -854,10 +860,40 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		);
 	}
 
-	private _validateRelayPolicyConfiguration(): void {
+	private _validateRelayPolicyConfiguration(validateSources = true): void {
 		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
+		if (relayPolicyConfig === undefined) return;
+		const perCandidateDeadlineMs =
+			relayPolicyConfig.per_candidate_deadline_ms ?? DEFAULT_RELAY_POLICY_LIMITS.perCandidateDeadlineMs;
+		if (
+			!Number.isSafeInteger(perCandidateDeadlineMs) ||
+			perCandidateDeadlineMs < 1 ||
+			perCandidateDeadlineMs > 10_000
+		) {
+			throw new Error("control_plane.relay_policy.per_candidate_deadline_ms must be an integer within 1..10000");
+		}
+		const totalDeadlineMs =
+			relayPolicyConfig.total_deadline_ms ??
+			(this._nodeClosestPeersEnabled()
+				? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
+				: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs);
+		if (relayPolicyConfig.total_deadline_ms === undefined && totalDeadlineMs < perCandidateDeadlineMs) {
+			throw new Error(
+				`control_plane.relay_policy.per_candidate_deadline_ms (${perCandidateDeadlineMs}) exceeds the effective default total deadline (${totalDeadlineMs}); set control_plane.relay_policy.total_deadline_ms to raise the total deadline`
+			);
+		}
+		if (
+			!Number.isSafeInteger(totalDeadlineMs) ||
+			totalDeadlineMs < perCandidateDeadlineMs ||
+			totalDeadlineMs > 120_000
+		) {
+			throw new Error(
+				"control_plane.relay_policy.total_deadline_ms must be an integer greater than or equal to per_candidate_deadline_ms and within 1..120000"
+			);
+		}
+		if (!validateSources) return;
 		const configuredSources = relayPolicyConfig?.sources;
-		if (relayPolicyConfig === undefined || configuredSources === undefined) return;
+		if (configuredSources === undefined) return;
 		const targetReservations =
 			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
 		if (!Number.isSafeInteger(targetReservations) || targetReservations < 1 || targetReservations > 8) {
@@ -1074,6 +1110,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			fallback: this._relayFallback,
 			inspector: client,
 			limits: {
+				perCandidateDeadlineMs: options.perCandidateDeadlineMs,
 				requiredOperatorGroups: options.targetReservations,
 				requiredReservations: options.targetReservations,
 				totalDeadlineMs: options.totalDeadlineMs,

@@ -102,6 +102,7 @@ export type ControlPlaneEvent =
 			readonly failedSourceCount: number;
 			readonly kind: "rendezvous-registration";
 			readonly outcome: "accepted" | "failed" | "partial";
+			readonly reason?: string;
 	  }
 	| {
 			readonly kind: "rendezvous-cache";
@@ -222,8 +223,18 @@ export interface ControlPlaneRelayPolicySourcesConfig {
 }
 
 export interface ControlPlaneRelayPolicyConfig {
+	/**
+	 * Deadline in milliseconds for each relay candidate. Must be an integer from 1 through 10,000.
+	 */
+	readonly per_candidate_deadline_ms?: number;
 	readonly sources?: ControlPlaneRelayPolicySourcesConfig;
 	readonly target_reservations?: number;
+	/**
+	 * Total relay-policy deadline in milliseconds. Must be an integer greater than or equal to
+	 * `per_candidate_deadline_ms` and no greater than 120,000. An explicit value overrides the
+	 * 55,000 ms node-overflow heuristic.
+	 */
+	readonly total_deadline_ms?: number;
 }
 
 export interface ControlPlaneToggleConfig {

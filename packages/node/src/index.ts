@@ -43,6 +43,7 @@ import {
 	type PeerCacheStore,
 	RecordSigner,
 	RecordValidator,
+	type RegistryAttempt,
 	RegistryClient,
 	RegistryExhaustedError,
 	type RendezvousDirectory,
@@ -93,7 +94,58 @@ const DISCOVERY_MESSAGE_TYPES = [
 const DISCOVERY_QUEUE_ID = "discovery";
 const NOSTR_SECRET_KEY_PATTERN = /^[0-9a-f]{64}$/u;
 const NOSTR_TRANSPORT_KEY_DOMAIN = new TextEncoder().encode("ts-drp-nostr-transport-v1");
+const RENDEZVOUS_REGISTRATION_REASON_MAX_LENGTH = 160;
 const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `interval:${type}::${id}`;
+
+function sanitizedRendezvousRegistrationReason(attempts: readonly RegistryAttempt[]): string | undefined {
+	const rejectionCodes = new Set<string>();
+	for (const attempt of attempts) {
+		if (attempt.status === "accepted") continue;
+		const code = sanitizedRegistryRejectionCode(attempt.code);
+		if (code !== undefined) rejectionCodes.add(code);
+	}
+	if (rejectionCodes.size === 0) return undefined;
+	return `rejected: ${[...rejectionCodes].join(", ")}`.slice(0, RENDEZVOUS_REGISTRATION_REASON_MAX_LENGTH);
+}
+
+function sanitizedRendezvousRegistrationFailureReason(
+	error: unknown,
+	lifecycleSignal: AbortSignal,
+	timeoutSignal: AbortSignal
+): string {
+	const reason = lifecycleSignal.aborted
+		? "aborted"
+		: timeoutSignal.aborted || isAbortLikeError(error)
+			? "timeout"
+			: "error";
+	return reason.slice(0, RENDEZVOUS_REGISTRATION_REASON_MAX_LENGTH);
+}
+
+function isAbortLikeError(error: unknown): boolean {
+	if (typeof error !== "object" || error === null || !("name" in error)) return false;
+	return error.name === "AbortError" || error.name === "TimeoutError";
+}
+
+function sanitizedRegistryRejectionCode(code: RegistryAttempt["code"]): string | undefined {
+	switch (code) {
+		case "admission-rejected":
+		case "client-capacity-exceeded":
+		case "endpoint-unavailable":
+		case "invalid-client":
+		case "namespace-capacity-exceeded":
+		case "proof-challenge-capacity":
+		case "proof-challenge-expired":
+		case "proof-challenge-invalid":
+		case "proof-challenge-replayed":
+		case "quota-exceeded":
+		case "rate-limited":
+		case "record-rejected":
+		case "response-cap-exceeded":
+			return code;
+		default:
+			return undefined;
+	}
+}
 
 /** Dependencies and resolved policy for config-driven rendezvous directories. */
 export interface CreateConfiguredRendezvousRegistriesParams {
@@ -567,7 +619,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		lifecycleSignal: AbortSignal,
 		deadlineMs: number
 	): Promise<boolean> {
-		const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(Math.min(deadlineMs, 30_000))]);
+		const timeoutSignal = AbortSignal.timeout(Math.min(deadlineMs, 30_000));
+		const signal = AbortSignal.any([lifecycleSignal, timeoutSignal]);
 		try {
 			const record = await producer.refresh();
 			const receipt = await directory.register(record, signal, credential);
@@ -579,15 +632,20 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				status: status === "accepted" ? "succeeded" : "failed",
 			}));
 			this._rendezvousObservedAtMs = Date.now();
+			const reason = sanitizedRendezvousRegistrationReason(receipt.attempts);
 			this._emitRendezvousEvent({
 				acceptedSourceCount,
 				failedSourceCount,
 				kind: "rendezvous-registration",
 				outcome: failedSourceCount === 0 ? "accepted" : "partial",
+				...(reason === undefined ? {} : { reason }),
 			});
 		} catch (error) {
-			if (lifecycleSignal.aborted) return false;
 			const attempts = error instanceof RegistryExhaustedError ? error.attempts.length : endpointCount;
+			const reason =
+				error instanceof RegistryExhaustedError
+					? sanitizedRendezvousRegistrationReason(error.attempts)
+					: sanitizedRendezvousRegistrationFailureReason(error, lifecycleSignal, timeoutSignal);
 			this._rendezvousBackendStates =
 				error instanceof RegistryExhaustedError
 					? error.attempts.map(({ endpointId }) => ({ id: endpointId, status: "failed" as const }))
@@ -601,6 +659,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				failedSourceCount: Math.min(endpointCount, attempts),
 				kind: "rendezvous-registration",
 				outcome: "failed",
+				...(reason === undefined ? {} : { reason }),
 			});
 		}
 		return !lifecycleSignal.aborted;

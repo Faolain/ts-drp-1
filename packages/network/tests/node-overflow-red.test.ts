@@ -228,6 +228,7 @@ describe("DRPNetworkNode node-overflow RED contracts", () => {
 		const dial = vi.spyOn(host, "dial").mockRejectedValue(new Error("transport fixture reached dial"));
 		const defaultPolicy = realPolicyFactory(node)({
 			onReservationEvent: (): void => undefined,
+			perCandidateDeadlineMs: 1_000,
 			source: sourceOf([
 				candidate(TEST_PEER_ID, [
 					`/ip4/1.2.3.4/tcp/4001/p2p/${TEST_PEER_ID}`,
@@ -245,6 +246,7 @@ describe("DRPNetworkNode node-overflow RED contracts", () => {
 
 			const nodePolicy = realPolicyFactory(node)({
 				onReservationEvent: (): void => undefined,
+				perCandidateDeadlineMs: 1_000,
 				source: sourceOf([
 					candidate(TEST_PEER_ID, [
 						`/ip4/1.2.3.4/tcp/4001/p2p/${TEST_PEER_ID}`,
