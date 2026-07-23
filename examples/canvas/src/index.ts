@@ -10,6 +10,7 @@ import { DRP_DISCOVERY_TOPIC, type IDRPObject } from "@ts-drp/types";
 
 import { Canvas } from "./objects/canvas";
 
+const CANVAS_SIDE = 10;
 const environment = readBrowserNetworkEnv(import.meta.env);
 const networkConfig = getNetworkConfigFromEnv(environment, window.location.origin);
 const modularSession = isModularNetworkEnv(environment)
@@ -36,10 +37,14 @@ const render = (): void => {
 	if (!drpObject?.drp) return;
 	const canvas = drpObject.drp.canvas;
 	for (let x = 0; x < canvas.length; x++) {
-		for (let y = 0; y < canvas[x].length; y++) {
+		const row = canvas[x];
+		if (row === undefined) continue;
+		for (let y = 0; y < row.length; y++) {
 			const pixel = document.getElementById(`${x}-${y}`);
-			if (!pixel) continue;
-			pixel.style.backgroundColor = `rgb(${canvas[x][y].color()[0]}, ${canvas[x][y].color()[1]}, ${canvas[x][y].color()[2]})`;
+			const canvasPixel = row[y];
+			if (pixel === null || canvasPixel === undefined) continue;
+			const [red, green, blue] = canvasPixel.color();
+			pixel.style.backgroundColor = `rgb(${red}, ${green}, ${blue})`;
 		}
 	}
 };
@@ -106,18 +111,14 @@ function run(): void {
 	copyButton.addEventListener("click", () => void copyCanvasId());
 
 	const canvas_element = <HTMLDivElement>document.getElementById("canvas");
+	const dimensions = <HTMLSpanElement>document.getElementById("canvasDimensions");
+	canvas_element.style.setProperty("--canvas-side", String(CANVAS_SIDE));
+	dimensions.textContent = `${CANVAS_SIDE} × ${CANVAS_SIDE} live field`;
 	canvas_element.innerHTML = "";
-	canvas_element.style.display = "inline-grid";
-
-	canvas_element.style.gridTemplateColumns = Array(5).fill("1fr").join(" ");
-	for (let x = 0; x < 5; x++) {
-		for (let y = 0; y < 10; y++) {
+	for (let x = 0; x < CANVAS_SIDE; x++) {
+		for (let y = 0; y < CANVAS_SIDE; y++) {
 			const pixel = document.createElement("div");
 			pixel.id = `${x}-${y}`;
-			pixel.style.width = "25px";
-			pixel.style.height = "25px";
-			pixel.style.backgroundColor = "rgb(0, 0, 0)";
-			pixel.style.cursor = "pointer";
 			pixel.addEventListener("click", () => paint_pixel(pixel));
 			canvas_element.appendChild(pixel);
 		}
@@ -131,7 +132,7 @@ function run(): void {
 
 	const create_button = <HTMLButtonElement>document.getElementById("create");
 	const create = async (): Promise<void> => {
-		drpObject = await node.createObject({ drp: new Canvas(5, 10) });
+		drpObject = await node.createObject({ drp: new Canvas(CANVAS_SIDE, CANVAS_SIDE) });
 
 		createConnectHandlers();
 
@@ -150,7 +151,7 @@ function run(): void {
 		try {
 			drpObject = await node.connectObject({
 				id: drpId,
-				drp: new Canvas(5, 10),
+				drp: new Canvas(CANVAS_SIDE, CANVAS_SIDE),
 			});
 
 			createConnectHandlers();

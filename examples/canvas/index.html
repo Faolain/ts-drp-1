@@ -32,7 +32,13 @@
 			<button id="connect">Connect</button>
 			<button id="create">Create Canvas</button>
 		</div>
-		<div id="canvas"></div>
+		<section class="canvas-stage" data-testid="canvas-stage" aria-labelledby="canvasStageTitle">
+			<header class="canvas-stage__header">
+				<h1 id="canvasStageTitle">Shared canvas</h1>
+				<span id="canvasDimensions"></span>
+			</header>
+			<div id="canvas" role="group" aria-label="Collaborative pixel canvas"></div>
+		</section>
 		<script type="module" src="/src/index.ts"></script>
 	</body>
 </html>

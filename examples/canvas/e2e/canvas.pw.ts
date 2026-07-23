@@ -17,8 +17,8 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 	try {
 		await Promise.all([creator.goto("http://127.0.0.1:4180/"), joiner.goto("http://127.0.0.1:4180/")]);
 		await Promise.all([waitForRelayReservation(creator), waitForRelayReservation(joiner)]);
-		await expect(creator.locator("#canvas > div")).toHaveCount(50);
-		await expect(joiner.locator("#canvas > div")).toHaveCount(50);
+		await expect(creator.locator("#canvas > div")).toHaveCount(100);
+		await expect(joiner.locator("#canvas > div")).toHaveCount(100);
 		expect(pageErrors).toEqual([]);
 
 		await creator.locator("#create").click();
@@ -32,8 +32,8 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 		await expect(creator.locator("#object_peers")).not.toHaveText("[]");
 		await expect(joiner.locator("#object_peers")).not.toHaveText("[]");
 
-		const creatorPixel = creator.locator("#canvas > div").first();
-		const joinerPixel = joiner.locator("#canvas > div").first();
+		const creatorPixel = creator.locator('[id="9-9"]');
+		const joinerPixel = joiner.locator('[id="9-9"]');
 		await expect(creatorPixel).toHaveCSS("background-color", "rgb(0, 0, 0)");
 		await creatorPixel.click();
 		await expect(creatorPixel).not.toHaveCSS("background-color", "rgb(0, 0, 0)");
@@ -42,6 +42,66 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 	} finally {
 		await Promise.allSettled([creatorContext.close(), joinerContext.close()]);
 	}
+});
+
+test("live canvas is a large centered 10 by 10 square", async ({ page }) => {
+	await page.goto("http://127.0.0.1:4180/");
+	await waitForRelayReservation(page);
+
+	const canvas = page.locator("#canvas");
+	await expect(canvas.locator(":scope > div")).toHaveCount(100);
+
+	const canvasBox = await canvas.boundingBox();
+	if (canvasBox === null) throw new Error("canvas is not visible");
+	const stage = page.getByTestId("canvas-stage");
+	await expect(stage).toBeVisible();
+	const stageBox = await stage.boundingBox();
+	if (stageBox === null) throw new Error("canvas stage is not visible");
+
+	expect(canvasBox.width, "canvas width").toBeGreaterThanOrEqual(320);
+	expect(canvasBox.height, "canvas height").toBeGreaterThanOrEqual(320);
+	expect(Math.abs(canvasBox.width - canvasBox.height), "square aspect-ratio delta").toBeLessThanOrEqual(2);
+
+	const canvasCenter = canvasBox.x + canvasBox.width / 2;
+	const stageCenter = stageBox.x + stageBox.width / 2;
+	expect(Math.abs(canvasCenter - stageCenter), "horizontal centering delta").toBeLessThanOrEqual(4);
+
+	const geometry = await canvas.evaluate((element) => {
+		const style = getComputedStyle(element);
+		const firstCell = element.firstElementChild?.getBoundingClientRect();
+		return {
+			cellHeight: firstCell?.height ?? 0,
+			cellWidth: firstCell?.width ?? 0,
+			columnCount: style.gridTemplateColumns.split(" ").filter(Boolean).length,
+			rowCount: style.gridTemplateRows.split(" ").filter(Boolean).length,
+		};
+	});
+	expect(geometry.columnCount).toBe(10);
+	expect(geometry.rowCount).toBe(10);
+	expect(geometry.cellWidth).toBeGreaterThan(0);
+	expect(Math.abs(geometry.cellWidth - geometry.cellHeight), "cell square delta").toBeLessThanOrEqual(1);
+});
+
+test("canvas remains square and centered without horizontal overflow on a narrow viewport", async ({ page }) => {
+	await page.setViewportSize({ height: 844, width: 390 });
+	await page.goto("http://127.0.0.1:4180/");
+	await waitForRelayReservation(page);
+
+	const canvas = page.locator("#canvas");
+	const stage = page.getByTestId("canvas-stage");
+	await expect(canvas.locator(":scope > div")).toHaveCount(100);
+	await expect(stage).toBeVisible();
+	const canvasBox = await canvas.boundingBox();
+	const stageBox = await stage.boundingBox();
+	if (canvasBox === null || stageBox === null) throw new Error("mobile canvas layout is not visible");
+
+	expect(canvasBox.width).toBeGreaterThanOrEqual(280);
+	expect(Math.abs(canvasBox.width - canvasBox.height), "mobile square delta").toBeLessThanOrEqual(2);
+	expect(
+		Math.abs(canvasBox.x + canvasBox.width / 2 - (stageBox.x + stageBox.width / 2)),
+		"mobile centering delta"
+	).toBeLessThanOrEqual(4);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test("created canvas ID is visibly copyable with accessible feedback", async ({ browser }) => {
@@ -64,7 +124,7 @@ test("created canvas ID is visibly copyable with accessible feedback", async ({ 
 	try {
 		await page.goto("http://127.0.0.1:4180/");
 		await waitForRelayReservation(page);
-		await expect(page.locator("#canvas > div")).toHaveCount(50);
+		await expect(page.locator("#canvas > div")).toHaveCount(100);
 		await expect(page.locator("#copyCanvasId")).toBeHidden();
 		await expect(page.locator("#copyCanvasId")).toBeDisabled();
 		await page.locator("#create").click();
@@ -106,7 +166,7 @@ test("clipboard rejection keeps the canvas ID visible and announces an error", a
 	try {
 		await page.goto("http://127.0.0.1:4180/");
 		await waitForRelayReservation(page);
-		await expect(page.locator("#canvas > div")).toHaveCount(50);
+		await expect(page.locator("#canvas > div")).toHaveCount(100);
 		await page.locator("#create").click();
 		await expect(page.locator("#canvasId")).not.toBeEmpty();
 		const canvasId = (await page.locator("#canvasId").textContent())?.trim();
