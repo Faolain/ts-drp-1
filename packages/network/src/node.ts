@@ -10,37 +10,78 @@ import { type GossipSub, gossipsub, type GossipsubOpts } from "@libp2p/gossipsub
 import {
 	createPeerScoreParams,
 	createTopicScoreParams,
+	defaultPeerScoreParams,
+	defaultPeerScoreThresholds,
 	type PeerScore,
 	type PeerScoreParams,
 	type TopicScoreParams,
 } from "@libp2p/gossipsub/score";
 import { identify, identifyPush } from "@libp2p/identify";
-import { type Address, type Connection, type PeerDiscovery, type PeerId, type Stream } from "@libp2p/interface";
+import {
+	type Address,
+	type Connection,
+	type IdentifyResult,
+	type PeerDiscovery,
+	type PeerId,
+	type Stream,
+} from "@libp2p/interface";
 import { peerIdFromString } from "@libp2p/peer-id";
 import { ping } from "@libp2p/ping";
 import { pubsubPeerDiscovery, type PubSubPeerDiscoveryComponents } from "@libp2p/pubsub-peer-discovery";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
+import { dns } from "@multiformats/dns";
 import { type Multiaddr, multiaddr, type MultiaddrInput } from "@multiformats/multiaddr";
 import { WebRTC } from "@multiformats/multiaddr-matcher";
+import { sha256 } from "@noble/hashes/sha2";
+import { bytesToHex } from "@noble/hashes/utils";
 import { Logger } from "@ts-drp/logger";
+import { AllowlistVerifier, InviteVerifier, type MembershipVerifier } from "@ts-drp/membership";
 import { MessageQueue } from "@ts-drp/message-queue";
 import {
+	type ActiveRelayReservation,
+	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
+	CompositeRelayCandidateSource,
+	ConfiguredPublicRelaySource,
+	DEFAULT_RELAY_POLICY_LIMITS,
+	type DnsaddrFallback,
+	EvidenceDerivedOperatorGroupClassifier,
+	Libp2pRelayClient,
+	type Libp2pRelayClientOptions,
+	RELAY_TRANSPORT_PROFILES,
+	type RelayCandidateSource,
+	RelayPolicy,
+	type RelayPolicyResult,
+	type RelayReplacementResult,
+	type RelayReservationLifecycleEvent,
+	type RelayTransportProfile,
+} from "@ts-drp/relay-policy";
+import { type AddressDecision, AddressPolicy, classifyIpAddressScope, createDnsResolver } from "@ts-drp/rendezvous";
+import {
+	type ControlPlaneAddressFamily,
+	type ControlPlaneAddressReason,
+	type ControlPlaneAddressScope,
+	type ControlPlaneEvent,
+	type ControlPlaneMembershipConfig,
+	type ControlPlaneTransport,
 	DRP_DISCOVERY_TOPIC,
 	DRP_INTERVAL_DISCOVERY_TOPIC,
 	type DRPNetworkNodeConfig,
 	type DRPNetworkNode as DRPNetworkNodeInterface,
+	type GroupPeerChange,
+	type GroupPeerChangeHandler,
 	type IMessageQueueHandler,
 	IntervalRunnerState,
 	Message,
 } from "@ts-drp/types";
-import { createLibp2p, type Libp2p, type ServiceFactoryMap } from "libp2p";
+import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
 import { isBrowser, isWebWorker } from "wherearewe";
 
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
 
 export * from "./stream.js";
+export type { GroupPeerChange, GroupPeerChangeHandler } from "@ts-drp/types";
 
 export const DRP_MESSAGE_PROTOCOL = "/drp/message/0.0.1";
 export const BOOTSTRAP_NODES = [
@@ -48,6 +89,10 @@ export const BOOTSTRAP_NODES = [
 	"/dns4/bootstrap2.topology.gg/tcp/443/wss/p2p/16Uiu2HAmGjAVQyzgTCumpB9TuojKT4LZTBC5HRiZyuwGG9VHodLC",
 ];
 let log: Logger;
+
+const WARM_RELAY_RETRY_BASE_DELAY_MS = 100;
+const WARM_RELAY_RETRY_MAX_DELAY_MS = 2_000;
+const WARM_RELAY_RETRY_MAX_ATTEMPTS = 8;
 
 type PeerDiscoveryFunction =
 	| ((components: PubSubPeerDiscoveryComponents) => PeerDiscovery)
@@ -58,13 +103,229 @@ type ConfigurableGossipSub = GossipSub & {
 	streamsOutbound: Map<string, unknown>;
 };
 
-export interface GroupPeerChange {
-	peerId: string;
-	subscribed: boolean;
-	topic: string;
+/**
+ * Additive libp2p control-plane modules accepted by the production host
+ * builder. DRP owns the core services and rejects attempts to replace them.
+ */
+export interface DRPNetworkHostExtensions {
+	contentRouters?: NonNullable<Libp2pOptions["contentRouters"]>;
+	peerDiscovery?: NonNullable<Libp2pOptions["peerDiscovery"]>;
+	peerRouters?: NonNullable<Libp2pOptions["peerRouters"]>;
+	services?: ServiceFactoryMap & {
+		autonat?: never;
+		dcutr?: never;
+		identify?: never;
+		identifyPush?: never;
+		ping?: never;
+		pubsub?: never;
+		relay?: never;
+	};
+	transports?: NonNullable<Libp2pOptions["transports"]>;
 }
 
-export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
+export interface DRPNetworkHostFactoryContext {
+	/**
+	 * Build the one host owned by this DRPNetworkNode. Extensions are additive;
+	 * reserved DRP services such as GossipSub cannot be replaced.
+	 */
+	createHost(extensions?: DRPNetworkHostExtensions): Promise<Libp2p>;
+	/**
+	 * Immutable evidence of the production options applied before extensions.
+	 * Control-plane factories can fail closed when an isolation invariant is absent.
+	 */
+	readonly snapshot: DRPNetworkHostConfigSnapshot;
+}
+
+export type DRPNetworkHostFactory = (context: DRPNetworkHostFactoryContext) => Promise<Libp2p>;
+
+type DenyDialMultiaddr = NonNullable<NonNullable<Libp2pOptions["connectionGater"]>["denyDialMultiaddr"]>;
+
+export interface DRPNetworkHostPolicy {
+	/**
+	 * Production defaults to bootstrap discovery. Isolated control planes disable
+	 * it and supply routing-backed discovery through host extensions instead.
+	 */
+	readonly bootstrapDiscovery?: boolean;
+	/**
+	 * Production defaults to cold-start pubsub peer discovery. Isolated control
+	 * planes enable it only after an authenticated rendezvous connection exists.
+	 */
+	readonly coldStartPubsubDiscovery?: boolean;
+	/** Production defaults to GossipSub peer exchange. */
+	readonly gossipSubPeerExchange?: boolean;
+	/** Delegates the real libp2p outbound multiaddr gate to the control plane. */
+	readonly denyDialMultiaddr?: DenyDialMultiaddr;
+}
+
+export interface DRPNetworkHostConfigSnapshot {
+	readonly bootstrapDiscovery: boolean;
+	readonly bootstrapPeerCount: number;
+	readonly coldStartPubsubDiscovery: boolean;
+	readonly gossipSubPeerExchange: boolean;
+	readonly outboundAddressPolicy: "address-policy" | "allow-all" | "injected";
+	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
+	readonly rollout: {
+		readonly ownedFallback: {
+			readonly configuredRelays: true;
+			readonly localRouting: true;
+			readonly ownedRendezvous: true;
+		};
+		readonly publicComponents: {
+			readonly delegatedRouting: boolean;
+			readonly publicRelayOverflow: boolean;
+			readonly publicRendezvous: boolean;
+			readonly pubsubBehaviorRewards: boolean;
+		};
+	};
+}
+
+export interface ObservedPeerBehavior {
+	readonly authenticated: boolean;
+	readonly diversityScore: number;
+	readonly validBehaviorScore: number;
+}
+
+export interface AuthenticatedPeerBehaviorProvider {
+	getObservedPeerBehavior(peerId: string): ObservedPeerBehavior | undefined;
+}
+
+export interface DRPNetworkNodeDependencies {
+	authenticatedPeerBehaviorProvider?: AuthenticatedPeerBehaviorProvider;
+	hostFactory?: DRPNetworkHostFactory;
+	hostPolicy?: DRPNetworkHostPolicy;
+	relayCandidateSources?: {
+		readonly cachedSuccessfulRelays?: RelayCandidateSource;
+		readonly configuredFallback?: RelayCandidateSource;
+		readonly delegatedClosestPeers?: RelayCandidateSource;
+		readonly dhtRelayProviders?: RelayCandidateSource;
+		readonly nodeClosestPeers?: RelayCandidateSource;
+		readonly registryRelayRecords?: RelayCandidateSource;
+	};
+	/** Optional bounded owned DNSADDR fallback used after candidate reservations are exhausted. */
+	relayFallback?: DnsaddrFallback;
+	relayPolicyFactory?(options: RelayPolicyFactoryOptions): RelayPolicyDriver;
+}
+
+export interface RelayPolicyFactoryOptions {
+	onReservationEvent(event: RelayReservationLifecycleEvent): void;
+	readonly perCandidateDeadlineMs: number;
+	readonly source: RelayCandidateSource;
+	readonly targetReservations: number;
+	readonly totalDeadlineMs: number;
+	readonly transportProfile?: RelayTransportProfile;
+}
+
+export interface RelayPolicyDriver {
+	readonly activeReservations?: readonly ActiveRelayReservation[];
+	acquire(queryKey: Uint8Array, signal: AbortSignal): Promise<RelayPolicyResult>;
+	refresh(signal: AbortSignal): Promise<RelayPolicyResult>;
+	replace(
+		peerId: string,
+		reason: RelayReplacementResult["reason"],
+		signal: AbortSignal,
+		excludedOperatorGroup?: string
+	): Promise<RelayReplacementResult>;
+	stop(): Promise<void>;
+}
+
+const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
+const NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS = 55_000;
+
+const APP_SPECIFIC_WEIGHT = defaultPeerScoreParams.appSpecificWeight;
+const ACCEPT_PX_THRESHOLD = defaultPeerScoreThresholds.acceptPXThreshold;
+
+const defaultHostFactory: DRPNetworkHostFactory = (context) => context.createHost();
+
+const outboundDns = dns();
+const outboundDnsResolver = createDnsResolver({ client: outboundDns });
+
+function createMembershipVerifier(config: ControlPlaneMembershipConfig | undefined): MembershipVerifier | undefined {
+	if (config === undefined) return undefined;
+	const runtimeConfig = config as {
+		allowlist?: { allowedPeerIds?: unknown };
+		invite?: { inviteToken?: unknown };
+		mode?: unknown;
+	};
+	if (runtimeConfig.mode === "invite") {
+		if (typeof runtimeConfig.invite?.inviteToken !== "string" || runtimeConfig.invite.inviteToken.length === 0) {
+			throw new Error("control_plane.membership invite mode requires invite.inviteToken");
+		}
+		return new InviteVerifier({ inviteToken: runtimeConfig.invite.inviteToken });
+	}
+	if (runtimeConfig.mode === "allowlist") {
+		if (
+			!Array.isArray(runtimeConfig.allowlist?.allowedPeerIds) ||
+			runtimeConfig.allowlist.allowedPeerIds.length === 0 ||
+			!runtimeConfig.allowlist.allowedPeerIds.every((peerId) => typeof peerId === "string")
+		) {
+			throw new Error("control_plane.membership allowlist mode requires a non-empty allowlist.allowedPeerIds");
+		}
+		return new AllowlistVerifier({ allowedPeerIds: runtimeConfig.allowlist.allowedPeerIds });
+	}
+	throw new Error("control_plane.membership.mode must be one of: invite, allowlist");
+}
+
+function boundedAddressReason(decision: AddressDecision): ControlPlaneAddressReason {
+	const [reason] = decision.reasons;
+	if (
+		reason === "browser-oriented-transport" ||
+		reason === "dns-empty" ||
+		reason === "dns-family-mismatch" ||
+		reason === "dns-rebinding-risk" ||
+		reason === "insecure-websocket" ||
+		reason === "missing-dns-name" ||
+		reason === "node-only-transport" ||
+		reason === "unsupported-transport" ||
+		reason?.startsWith("scope-") === true
+	) {
+		return reason as ControlPlaneAddressReason;
+	}
+	return decision.dialable ? "accepted" : "address-policy";
+}
+
+function sanitizedAddressFields(address: Multiaddr): {
+	family: ControlPlaneAddressFamily;
+	scope: ControlPlaneAddressScope;
+	transport: ControlPlaneTransport;
+} {
+	const components = address.getComponents();
+	const names = components.map(({ name }) => name);
+	const host = components.find(({ name }) => ["ip4", "ip6", "dns", "dns4", "dns6", "dnsaddr"].includes(name));
+	const family: ControlPlaneAddressFamily =
+		host?.name === "ip4"
+			? "ipv4"
+			: host?.name === "ip6"
+				? "ipv6"
+				: host?.name === "dns" || host?.name === "dns4" || host?.name === "dns6" || host?.name === "dnsaddr"
+					? "dns"
+					: "unknown";
+	const scope: ControlPlaneAddressScope =
+		family === "ipv4" || family === "ipv6"
+			? classifyIpAddressScope(host?.value ?? "")
+			: family === "dns"
+				? "unresolved"
+				: "unknown";
+	const transport: ControlPlaneTransport = names.includes("p2p-circuit")
+		? "relay"
+		: names.includes("webrtc-direct") || names.includes("webrtc")
+			? "webrtc-direct"
+			: names.includes("webtransport")
+				? "webtransport"
+				: names.includes("wss") || (names.includes("ws") && names.includes("tls"))
+					? "wss"
+					: names.includes("ws")
+						? "ws"
+						: names.includes("quic-v1")
+							? "quic-v1"
+							: names.includes("tcp")
+								? "tcp"
+								: "unknown";
+	return { family, scope, transport };
+}
+
+function sanitizedRelayIdHash(relayId: string): string {
+	return bytesToHex(sha256(new TextEncoder().encode(relayId))).slice(0, 16);
+}
 
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
@@ -77,22 +338,60 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _messageQueue: MessageQueue<Message>;
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapRetryController?: AbortController;
+	private _relayPolicyController?: AbortController;
+	private _relayPolicy?: RelayPolicyDriver;
+	private _relayPolicyAcquirePromise: Promise<void> = Promise.resolve();
+	private _lastRelayPolicyResult?: RelayPolicyResult;
+	private _relayPolicyFailed = false;
+	private _relayDisconnectListener?: (event: CustomEvent<PeerId>) => void;
+	private _warmRelayIdentifyListener?: (event: CustomEvent<IdentifyResult>) => void;
+	private _warmRelayRetryAttempts = 0;
+	private _warmRelayRetryTimer?: ReturnType<typeof setTimeout>;
+	private _relayMaintenanceTail: Promise<void> = Promise.resolve();
+	private _relayRefreshTimer?: ReturnType<typeof setTimeout>;
+	private _reservedRelayPeerIds = new Set<string>();
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
+	private readonly _hostFactory: DRPNetworkHostFactory;
+	private readonly _hostPolicy: DRPNetworkHostPolicy;
+	private readonly _authenticatedPeerBehaviorProvider: DRPNetworkNodeDependencies["authenticatedPeerBehaviorProvider"];
+	private readonly _relayCandidateSources: DRPNetworkNodeDependencies["relayCandidateSources"];
+	private readonly _relayFallback: DRPNetworkNodeDependencies["relayFallback"];
+	private readonly _relayPolicyFactory: DRPNetworkNodeDependencies["relayPolicyFactory"];
+	private _membershipVerifier?: MembershipVerifier;
+	private _outboundAddressPolicy: DRPNetworkHostConfigSnapshot["outboundAddressPolicy"] = "allow-all";
 
 	peerId = "";
 
 	/**
 	 * Constructor for the DRPNetworkNode class.
 	 * @param config - The configuration for the node.
+	 * @param dependencies - Injectable host construction dependencies
 	 */
-	constructor(config?: DRPNetworkNodeConfig) {
+	constructor(config?: DRPNetworkNodeConfig, dependencies: DRPNetworkNodeDependencies = {}) {
 		if (config?.browser_metrics && !isBrowser && !isWebWorker) {
 			throw new Error("Browser metrics are only supported in a browser or web worker");
 		}
 
 		this._config = config;
+		this._authenticatedPeerBehaviorProvider = dependencies.authenticatedPeerBehaviorProvider;
+		this._hostFactory = dependencies.hostFactory ?? defaultHostFactory;
+		this._hostPolicy = dependencies.hostPolicy ?? {};
+		this._relayCandidateSources = dependencies.relayCandidateSources;
+		this._relayFallback = dependencies.relayFallback;
+		this._relayPolicyFactory = dependencies.relayPolicyFactory;
+		this._membershipVerifier = createMembershipVerifier(config?.control_plane?.membership);
 		log = new Logger("drp::network", config?.log_config);
 		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
+		this._validateRelayPolicyConfiguration(false);
+	}
+
+	/**
+	 * Verifier selected by the configured control-plane membership owner. This seam is constructed and exposed but is
+	 * not yet enforced on any connection path; enforcement arrives with rendezvous integration.
+	 * @returns The configured verifier, or undefined when membership is not configured.
+	 */
+	get membershipVerifier(): MembershipVerifier | undefined {
+		return this._membershipVerifier;
 	}
 
 	/**
@@ -101,32 +400,34 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async start(rawPrivateKey?: Uint8Array): Promise<void> {
 		if (this._node?.status === "started") throw new Error("Node already started");
+		this._validateRelayPolicyConfiguration();
+		this._validatePhaseSevenConfiguration();
 
 		let privateKey = undefined;
 		if (rawPrivateKey) {
 			privateKey = privateKeyFromRaw(rawPrivateKey);
 		}
 
-		const _peerDiscovery: Array<PeerDiscoveryFunction> = [
-			pubsubPeerDiscovery({
-				topics: [DRP_DISCOVERY_TOPIC],
-				interval: this._config?.pubsub?.peer_discovery_interval || 5000,
-			}),
-		];
+		const bootstrapDiscovery = this._hostPolicy.bootstrapDiscovery ?? true;
+		const coldStartPubsubDiscovery = this._hostPolicy.coldStartPubsubDiscovery ?? true;
+		const gossipSubPeerExchange = this._hostPolicy.gossipSubPeerExchange ?? true;
+		const _peerDiscovery: Array<PeerDiscoveryFunction> = [];
+		if (coldStartPubsubDiscovery) {
+			_peerDiscovery.push(
+				pubsubPeerDiscovery({
+					topics: [DRP_DISCOVERY_TOPIC],
+					interval: this._config?.pubsub?.peer_discovery_interval || 5000,
+				})
+			);
+		}
 
 		const bootstrapNodes = this.getBootstrapNodes();
-		const _bootstrapPeerID: string[] = [];
-		if (bootstrapNodes.length) {
+		if (bootstrapDiscovery && bootstrapNodes.length) {
 			_peerDiscovery.push(
 				bootstrap({
 					list: bootstrapNodes,
 				})
 			);
-			for (const addr of bootstrapNodes) {
-				const peerId = this.getPeerId(multiaddr(addr));
-				if (!peerId) continue;
-				_bootstrapPeerID.push(peerId);
-			}
 		}
 
 		let _node_services: ServiceFactoryMap = {
@@ -134,23 +435,78 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			dcutr: dcutr(),
 			identify: identify(),
 			identifyPush: identifyPush(),
-			pubsub: gossipsub(this.getGossipSubConfig(_bootstrapPeerID)),
+			pubsub: gossipsub(this.getGossipSubConfig(gossipSubPeerExchange)),
 		};
 
-		if (this._config?.bootstrap) {
+		if (this._config?.autonat) {
 			_node_services = { ..._node_services, autonat: autoNAT() };
 		}
 
-		const _bootstrap_services = {
+		const maxRelayReservations = this._config?.relay_service?.max_reservations ?? Number.POSITIVE_INFINITY;
+		if (
+			maxRelayReservations !== Number.POSITIVE_INFINITY &&
+			(!Number.isSafeInteger(maxRelayReservations) || maxRelayReservations < 0)
+		) {
+			throw new Error("relay_service.max_reservations must be a non-negative safe integer");
+		}
+		const _relayServices = {
 			..._node_services,
 			relay: circuitRelayServer({
 				reservations: {
-					maxReservations: Number.POSITIVE_INFINITY,
+					maxReservations: maxRelayReservations,
 				},
 			}),
 		};
 
-		this._node = await createLibp2p({
+		const configuredAddressPolicy = this._config?.control_plane?.address_policy;
+		const addressPolicy =
+			this._config?.control_plane === undefined
+				? undefined
+				: new AddressPolicy({
+						allowInsecureWebSocket: configuredAddressPolicy?.allowInsecureWebSocket,
+						allowLoopback: configuredAddressPolicy?.allowLoopback,
+						allowPrivate: configuredAddressPolicy?.allowPrivate,
+						target: configuredAddressPolicy?.target ?? (isBrowser || isWebWorker ? "browser" : "node"),
+					});
+		const addressResolver = configuredAddressPolicy?.resolver ?? outboundDnsResolver;
+		const addressPolicyGate: DenyDialMultiaddr | undefined =
+			addressPolicy === undefined
+				? undefined
+				: async (address): Promise<boolean> => {
+						try {
+							const decision = await addressPolicy.evaluate(
+								address.toString(),
+								addressResolver,
+								AbortSignal.timeout(2_000)
+							);
+							this._emitControlPlaneEvent({
+								family: decision.family,
+								kind: "address-admission",
+								outcome: decision.dialable ? "accepted" : "denied",
+								reason: boundedAddressReason(decision),
+								scope: decision.scope,
+								transport: decision.transports[0] ?? "unknown",
+							});
+							return !decision.dialable;
+						} catch {
+							this._emitControlPlaneEvent({
+								...sanitizedAddressFields(address),
+								kind: "address-admission",
+								outcome: "denied",
+								reason: "address-policy",
+							});
+							return true;
+						}
+					};
+		const outboundAddressPolicy =
+			this._hostPolicy.denyDialMultiaddr !== undefined
+				? "injected"
+				: addressPolicyGate !== undefined
+					? "address-policy"
+					: "allow-all";
+		this._outboundAddressPolicy = outboundAddressPolicy;
+		const activeAddressPolicyGate = this._hostPolicy.denyDialMultiaddr === undefined ? addressPolicyGate : undefined;
+		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
 				listen: this._config?.listen_addresses ? this._config.listen_addresses : ["/p2p-circuit", "/webrtc"],
@@ -162,22 +518,102 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			connectionEncrypters: [noise()],
 			connectionGater: {
-				denyDialMultiaddr: () => {
-					return false;
-				},
+				denyDialMultiaddr: this._hostPolicy.denyDialMultiaddr ?? activeAddressPolicyGate ?? ((): false => false),
+				...(activeAddressPolicyGate === undefined
+					? {}
+					: {
+							filterMultiaddrForPeer: async (_peer, address): Promise<boolean> =>
+								!(await activeAddressPolicyGate(address)),
+						}),
 			},
 			metrics: this._config?.browser_metrics ? inspectorMetrics() : undefined,
+			...(activeAddressPolicyGate === undefined ? {} : { dns: outboundDns }),
 			peerDiscovery: _peerDiscovery,
-			services: this._config?.bootstrap ? _bootstrap_services : _node_services,
+			services: this._config?.relay_service?.enabled === true ? _relayServices : _node_services,
 			streamMuxers: [yamux()],
 			transports: [circuitRelayTransport(), webRTC(), webSockets()],
+		};
+		const publicComponents = this._config?.control_plane?.rollout?.public_components;
+		const rollout = Object.freeze({
+			ownedFallback: Object.freeze({
+				configuredRelays: true as const,
+				localRouting: true as const,
+				ownedRendezvous: true as const,
+			}),
+			publicComponents: Object.freeze({
+				delegatedRouting: publicComponents?.delegated_routing?.enabled === true,
+				publicRelayOverflow: publicComponents?.public_relay_overflow?.enabled === true,
+				publicRendezvous: publicComponents?.public_rendezvous?.enabled === true,
+				pubsubBehaviorRewards: publicComponents?.pubsub_behavior_rewards?.enabled === true,
+			}),
 		});
+		const snapshot: DRPNetworkHostConfigSnapshot = Object.freeze({
+			bootstrapDiscovery,
+			bootstrapPeerCount: bootstrapDiscovery ? bootstrapNodes.length : 0,
+			coldStartPubsubDiscovery,
+			gossipSubPeerExchange,
+			outboundAddressPolicy,
+			peerDiscoveryModules: Object.freeze([
+				...(coldStartPubsubDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
+				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
+			]),
+			rollout,
+		});
+		let builtHost: Libp2p | undefined;
+		let hostBuild: Promise<Libp2p> | undefined;
+		const createHost = async (extensions: DRPNetworkHostExtensions = {}): Promise<Libp2p> => {
+			if (hostBuild) throw new Error("DRP network host factory may build only one host per start");
+			for (const serviceName of Object.keys(extensions.services ?? {})) {
+				if (CORE_SERVICE_NAMES.has(serviceName)) {
+					throw new Error(`DRP network host extension cannot replace reserved service "${serviceName}"`);
+				}
+			}
+			hostBuild = createLibp2p({
+				...baseOptions,
+				contentRouters: [...(baseOptions.contentRouters ?? []), ...(extensions.contentRouters ?? [])],
+				peerDiscovery: [...(baseOptions.peerDiscovery ?? []), ...(extensions.peerDiscovery ?? [])],
+				peerRouters: [...(baseOptions.peerRouters ?? []), ...(extensions.peerRouters ?? [])],
+				services: { ...baseOptions.services, ...extensions.services },
+				transports: [...(baseOptions.transports ?? []), ...(extensions.transports ?? [])],
+			});
+			builtHost = await hostBuild;
+			return builtHost;
+		};
+		try {
+			const host = await this._hostFactory({ createHost, snapshot });
+			if (!builtHost) throw new Error("DRP network host factory must build its host through createHost()");
+			if (host !== builtHost) throw new Error("DRP network host factory must return the host built by createHost()");
+			this._node = host;
+		} catch (error) {
+			this._emitControlPlaneEvent({ kind: "listen-readiness", outcome: "failed", transport: "unknown" });
+			if (!builtHost && hostBuild) {
+				try {
+					builtHost = await hostBuild;
+				} catch {
+					// The original rejection is already carried by error.
+				}
+			}
+			try {
+				await builtHost?.stop();
+			} catch (cleanupError) {
+				throw new AggregateError([error, cleanupError], "DRP network host factory failed and cleanup also failed", {
+					cause: error,
+				});
+			}
+			throw error;
+		}
 		log.info(
 			"::start: running on:",
 			this._node.getMultiaddrs().map((addr) => addr.toString())
 		);
+		const [listenAddress] = this._node.getMultiaddrs();
+		this._emitControlPlaneEvent({
+			kind: "listen-readiness",
+			outcome: "ready",
+			transport: listenAddress === undefined ? "unknown" : sanitizedAddressFields(listenAddress).transport,
+		});
 
-		if (!this._config?.bootstrap) {
+		if (!this._config?.seed && bootstrapDiscovery) {
 			this._bootstrapRetryController?.abort();
 			this._bootstrapRetryController = new AbortController();
 			for (const addr of bootstrapNodes) {
@@ -222,6 +658,484 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		void this.startEnqueueMessages();
 		this._metrics?.start(`drp-network-${this.peerId}`, 10_000);
 		this._messageQueue.start();
+		this._startRelayPolicy();
+	}
+
+	private _startRelayPolicy(): void {
+		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
+		const configuredSources = relayPolicyConfig?.sources;
+		const injectedSources = this._relayCandidateSources;
+		if (relayPolicyConfig === undefined || configuredSources === undefined) return;
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
+		const configuredPublicRelays =
+			configuredSources.configured_relays === undefined
+				? undefined
+				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
+		const nodeTransportProfileEnabled =
+			nodeClosestPeersEnabled ||
+			(configuredSources.configured_relays !== undefined &&
+				configuredSources.configured_relays.length > 0 &&
+				!isBrowser &&
+				!isWebWorker);
+
+		const targetReservations =
+			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
+		if (!Number.isSafeInteger(targetReservations) || targetReservations < 1 || targetReservations > 8) {
+			throw new Error("control_plane.relay_policy.target_reservations must be an integer within 1..8");
+		}
+		const sources = [
+			{
+				enabled: configuredPublicRelays !== undefined && configuredSources.configured_relays?.length !== 0,
+				name: "configured-public-relays",
+				priority: "primary" as const,
+				source: configuredPublicRelays,
+			},
+			{
+				enabled:
+					configuredSources.configured_fallback !== undefined &&
+					configuredSources.configured_fallback.enabled !== false &&
+					injectedSources?.configuredFallback !== undefined,
+				name: "configured-fallback",
+				priority: "primary" as const,
+				source: injectedSources?.configuredFallback,
+			},
+			{
+				enabled:
+					configuredSources.cached_successful_relays?.enabled === true &&
+					injectedSources?.cachedSuccessfulRelays !== undefined,
+				name: "cached-successful-relays",
+				priority: "primary" as const,
+				source: injectedSources?.cachedSuccessfulRelays,
+			},
+			{
+				enabled:
+					configuredSources.registry_relay_records?.enabled === true &&
+					injectedSources?.registryRelayRecords !== undefined,
+				name: "registry-relay-records",
+				priority: "primary" as const,
+				source: injectedSources?.registryRelayRecords,
+			},
+			{
+				enabled:
+					publicRelayOverflowEnabled &&
+					configuredSources.delegated_closest_peers?.enabled === true &&
+					injectedSources?.delegatedClosestPeers !== undefined,
+				name: "delegated-closest-peers",
+				priority: "overflow" as const,
+				source: injectedSources?.delegatedClosestPeers,
+			},
+			{
+				degradedOverflowEligible: true,
+				enabled: nodeClosestPeersEnabled && injectedSources?.nodeClosestPeers !== undefined,
+				name: "node-overflow",
+				priority: "overflow" as const,
+				source: injectedSources?.nodeClosestPeers,
+			},
+			{
+				enabled:
+					publicRelayOverflowEnabled &&
+					configuredSources.dht_relay_providers?.enabled === true &&
+					injectedSources?.dhtRelayProviders !== undefined,
+				name: "dht-relay-providers",
+				priority: "overflow" as const,
+				source: injectedSources?.dhtRelayProviders,
+			},
+		].filter(
+			(entry): entry is typeof entry & { readonly source: RelayCandidateSource } =>
+				entry.enabled && entry.source !== undefined
+		);
+		if (sources.length === 0) return;
+
+		const source = new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources });
+		const factory = this._relayPolicyFactory ?? ((options): RelayPolicyDriver => this._createRelayPolicy(options));
+		this._relayPolicy = factory({
+			onReservationEvent: (event): void => {
+				this._emitControlPlaneEvent({
+					kind: "relay-reservation",
+					outcome: event.outcome,
+					relayIdHash: sanitizedRelayIdHash(event.relayId),
+				});
+			},
+			perCandidateDeadlineMs:
+				relayPolicyConfig.per_candidate_deadline_ms ?? DEFAULT_RELAY_POLICY_LIMITS.perCandidateDeadlineMs,
+			source,
+			targetReservations,
+			totalDeadlineMs:
+				relayPolicyConfig.total_deadline_ms ??
+				(nodeClosestPeersEnabled
+					? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
+					: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs),
+			transportProfile: nodeTransportProfileEnabled
+				? RELAY_TRANSPORT_PROFILES.node
+				: RELAY_TRANSPORT_PROFILES.broadBrowser,
+		});
+		this._relayPolicyController?.abort();
+		const controller = new AbortController();
+		this._relayPolicyController = controller;
+		const policy = this._relayPolicy;
+		const host = this._node;
+		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
+		this._relayDisconnectListener = (event): void => {
+			const peerId = event.detail.toString();
+			if (!this._reservedRelayPeerIds.delete(peerId)) return;
+			this._queueRelayMaintenance(async (): Promise<void> => {
+				const result = await policy.replace(peerId, "relay-disconnected", controller.signal);
+				this._handleRelayPolicyResult(result, policy, controller);
+			});
+		};
+		host.addEventListener("peer:disconnect", this._relayDisconnectListener);
+		this._armWarmRelayAcquisition(host, policy, controller);
+		this._lastRelayPolicyResult = undefined;
+		this._relayPolicyFailed = false;
+		this._relayPolicyAcquirePromise = this._runInitialRelayAcquire(policy, controller);
+	}
+
+	/** Re-runs relay acquisition after a post-start candidate source becomes ready. */
+	async retryRelayPolicyAcquisition(): Promise<void> {
+		await this._relayPolicyAcquirePromise;
+		if (this._lastRelayPolicyResult?.terminal === "reserved") return;
+		const policy = this._relayPolicy;
+		const controller = this._relayPolicyController;
+		if (policy === undefined || controller === undefined) {
+			// Rebuild only after a genuine acquire-failure teardown, and never on a stopped node:
+			// stop()/restart() also null these fields (without setting _relayPolicyFailed), and a
+			// parked retry must not resurrect the policy on a dead host.
+			if (!this._relayPolicyFailed || this._node?.status === IntervalRunnerState.Stopped) return;
+			this._startRelayPolicy();
+			await this._relayPolicyAcquirePromise;
+			return;
+		}
+		this._relayPolicyAcquirePromise = this._runInitialRelayAcquire(policy, controller);
+		await this._relayPolicyAcquirePromise;
+	}
+
+	private _armWarmRelayAcquisition(host: Libp2p, policy: RelayPolicyDriver, controller: AbortController): void {
+		if (!this._nodeClosestPeersEnabled()) return;
+		this._warmRelayRetryAttempts = 0;
+		this._warmRelayIdentifyListener = (event): void => {
+			// Only re-arm on peers that actually advertise HOP — otherwise a cold start into many
+			// non-relay peers would burn the attempt budget before the first relay ever connects.
+			if (!event.detail.protocols.includes(CIRCUIT_RELAY_V2_HOP_PROTOCOL)) return;
+			if (
+				controller.signal.aborted ||
+				this._relayPolicy !== policy ||
+				this._lastRelayPolicyResult?.terminal === "reserved" ||
+				this._node?.status === IntervalRunnerState.Stopped ||
+				this._warmRelayRetryAttempts >= WARM_RELAY_RETRY_MAX_ATTEMPTS ||
+				this._warmRelayRetryTimer !== undefined
+			) {
+				return;
+			}
+			const delayMs = Math.min(
+				WARM_RELAY_RETRY_BASE_DELAY_MS * 2 ** this._warmRelayRetryAttempts,
+				WARM_RELAY_RETRY_MAX_DELAY_MS
+			);
+			this._warmRelayRetryTimer = setTimeout((): void => {
+				this._warmRelayRetryTimer = undefined;
+				if (
+					controller.signal.aborted ||
+					this._relayPolicy !== policy ||
+					this._lastRelayPolicyResult?.terminal === "reserved" ||
+					this._node?.status === IntervalRunnerState.Stopped
+				) {
+					return;
+				}
+				this._warmRelayRetryAttempts++;
+				void this.retryRelayPolicyAcquisition();
+			}, delayMs);
+			(this._warmRelayRetryTimer as ReturnType<typeof setTimeout> & { unref?(): void }).unref?.();
+		};
+		host.addEventListener("peer:identify", this._warmRelayIdentifyListener);
+	}
+
+	private _nodeClosestPeersEnabled(): boolean {
+		const controlPlane = this._config?.control_plane;
+		return (
+			controlPlane?.relay_policy?.sources?.node_closest_peers?.enabled === true &&
+			controlPlane.routing?.node?.enabled === true &&
+			controlPlane.routing.node.network === "public" &&
+			controlPlane.rollout?.public_components?.delegated_routing?.enabled === true
+		);
+	}
+
+	private _validateRelayPolicyConfiguration(validateSources = true): void {
+		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
+		if (relayPolicyConfig === undefined) return;
+		const perCandidateDeadlineMs =
+			relayPolicyConfig.per_candidate_deadline_ms ?? DEFAULT_RELAY_POLICY_LIMITS.perCandidateDeadlineMs;
+		if (
+			!Number.isSafeInteger(perCandidateDeadlineMs) ||
+			perCandidateDeadlineMs < 1 ||
+			perCandidateDeadlineMs > 10_000
+		) {
+			throw new Error("control_plane.relay_policy.per_candidate_deadline_ms must be an integer within 1..10000");
+		}
+		const totalDeadlineMs =
+			relayPolicyConfig.total_deadline_ms ??
+			(this._nodeClosestPeersEnabled()
+				? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
+				: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs);
+		if (relayPolicyConfig.total_deadline_ms === undefined && totalDeadlineMs < perCandidateDeadlineMs) {
+			throw new Error(
+				`control_plane.relay_policy.per_candidate_deadline_ms (${perCandidateDeadlineMs}) exceeds the effective default total deadline (${totalDeadlineMs}); set control_plane.relay_policy.total_deadline_ms to raise the total deadline`
+			);
+		}
+		if (
+			!Number.isSafeInteger(totalDeadlineMs) ||
+			totalDeadlineMs < perCandidateDeadlineMs ||
+			totalDeadlineMs > 120_000
+		) {
+			throw new Error(
+				"control_plane.relay_policy.total_deadline_ms must be an integer greater than or equal to per_candidate_deadline_ms and within 1..120000"
+			);
+		}
+		if (!validateSources) return;
+		const configuredSources = relayPolicyConfig?.sources;
+		if (configuredSources === undefined) return;
+		const targetReservations =
+			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
+		if (!Number.isSafeInteger(targetReservations) || targetReservations < 1 || targetReservations > 8) {
+			throw new Error("control_plane.relay_policy.target_reservations must be an integer within 1..8");
+		}
+		const configuredRelays: unknown = configuredSources.configured_relays;
+		if (
+			configuredRelays !== undefined &&
+			(!Array.isArray(configuredRelays) || configuredRelays.some((address) => typeof address !== "string"))
+		) {
+			throw new Error("control_plane.relay_policy.sources.configured_relays must be an array of multiaddr strings");
+		}
+		if (Array.isArray(configuredRelays)) {
+			new ConfiguredPublicRelaySource({ multiaddrs: configuredRelays as string[] });
+		}
+		const injected = this._relayCandidateSources;
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const missing: string[] = [];
+		if (
+			configuredSources.configured_fallback !== undefined &&
+			configuredSources.configured_fallback.enabled !== false &&
+			injected?.configuredFallback === undefined
+		) {
+			missing.push("configured_fallback");
+		}
+		if (
+			configuredSources.cached_successful_relays?.enabled === true &&
+			injected?.cachedSuccessfulRelays === undefined
+		) {
+			missing.push("cached_successful_relays");
+		}
+		if (configuredSources.registry_relay_records?.enabled === true && injected?.registryRelayRecords === undefined) {
+			missing.push("registry_relay_records");
+		}
+		if (
+			publicRelayOverflowEnabled &&
+			configuredSources.delegated_closest_peers?.enabled === true &&
+			injected?.delegatedClosestPeers === undefined
+		) {
+			missing.push("delegated_closest_peers");
+		}
+		if (this._nodeClosestPeersEnabled() && injected?.nodeClosestPeers === undefined) {
+			missing.push("node_closest_peers");
+		}
+		if (
+			publicRelayOverflowEnabled &&
+			configuredSources.dht_relay_providers?.enabled === true &&
+			injected?.dhtRelayProviders === undefined
+		) {
+			missing.push("dht_relay_providers");
+		}
+		if (missing.length > 0) {
+			throw new Error(
+				`control_plane.relay_policy enabled sources require injected implementations: ${missing.join(", ")}`
+			);
+		}
+	}
+
+	private _validatePhaseSevenConfiguration(): void {
+		const ipColocation = this._config?.control_plane?.pubsub_scoring?.ip_colocation;
+		if (ipColocation?.enabled === true) {
+			if (!Number.isFinite(ipColocation.weight) || ipColocation.weight > 0) {
+				throw new Error("control_plane.pubsub_scoring IP-colocation weight must be finite and no greater than 0");
+			}
+			if (!Number.isFinite(ipColocation.threshold) || ipColocation.threshold < 1) {
+				throw new Error("control_plane.pubsub_scoring IP-colocation threshold must be finite and at least 1");
+			}
+			const whitelist: unknown = ipColocation.whitelist;
+			if (
+				whitelist !== undefined &&
+				(!Array.isArray(whitelist) || !whitelist.every((address) => typeof address === "string" && address.length > 0))
+			) {
+				throw new Error("control_plane.pubsub_scoring IP-colocation whitelist must be an array of non-empty strings");
+			}
+		}
+
+		const observedBehaviorReward = this._config?.control_plane?.pubsub_scoring?.observed_behavior_reward;
+		if (
+			observedBehaviorReward?.enabled === true &&
+			(!Number.isFinite(observedBehaviorReward.max_application_score) ||
+				observedBehaviorReward.max_application_score <= 0 ||
+				observedBehaviorReward.max_application_score * APP_SPECIFIC_WEIGHT >= ACCEPT_PX_THRESHOLD)
+		) {
+			throw new Error(
+				"control_plane.pubsub_scoring.observed_behavior_reward.max_application_score must be finite, greater than 0, and keep its weighted contribution below the GossipSub accept-PX threshold"
+			);
+		}
+
+		const ownedFallback = this._config?.control_plane?.rollout?.owned_fallback;
+		const ownedFallbackToggles: readonly [string, unknown][] = [
+			["configured_relays", ownedFallback?.configured_relays?.enabled],
+			["local_routing", ownedFallback?.local_routing?.enabled],
+			["owned_rendezvous", ownedFallback?.owned_rendezvous?.enabled],
+		];
+		for (const [name, enabled] of ownedFallbackToggles) {
+			if (enabled !== undefined && enabled !== true) {
+				throw new Error(`control_plane.rollout owned fallback ${name} cannot be disabled`);
+			}
+		}
+	}
+
+	private async _runInitialRelayAcquire(policy: RelayPolicyDriver, controller: AbortController): Promise<void> {
+		try {
+			const result = await policy.acquire(new TextEncoder().encode(this.peerId), controller.signal);
+			this._handleRelayPolicyResult(result, policy, controller);
+		} catch (error) {
+			if (controller.signal.aborted || this._relayPolicy !== policy) return;
+			if (!this._relayPolicyFailed) {
+				this._emitControlPlaneEvent({
+					failure: "acquire-threw",
+					kind: "relay-reservation",
+					outcome: "failed",
+				});
+			}
+			this._relayPolicyFailed = true;
+			controller.abort(error);
+			this._clearRelayMaintenance();
+			try {
+				await policy.stop();
+			} catch (cleanupError) {
+				log.error("::relay-policy::cleanup:error", new AggregateError([error, cleanupError]));
+			} finally {
+				if (this._relayPolicy === policy) this._relayPolicy = undefined;
+				if (this._relayPolicyController === controller) this._relayPolicyController = undefined;
+			}
+		}
+	}
+
+	private _handleRelayPolicyResult(
+		result: RelayPolicyResult,
+		policy: RelayPolicyDriver,
+		controller: AbortController
+	): void {
+		if (controller.signal.aborted || this._relayPolicy !== policy) return;
+		this._lastRelayPolicyResult = result;
+		this._reservedRelayPeerIds = new Set(result.reservations.map(({ candidate }) => candidate.peerId));
+		if (result.terminal !== "reserved") {
+			if (!this._relayPolicyFailed) {
+				this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+			}
+			this._relayPolicyFailed = true;
+		} else {
+			this._relayPolicyFailed = false;
+		}
+		this._scheduleRelayRefresh(result, policy, controller);
+	}
+
+	private _scheduleRelayRefresh(
+		result: RelayPolicyResult,
+		policy: RelayPolicyDriver,
+		controller: AbortController
+	): void {
+		if (this._relayRefreshTimer !== undefined) clearTimeout(this._relayRefreshTimer);
+		this._relayRefreshTimer = undefined;
+		const earliestExpiryMs = Math.min(...result.reservations.map(({ expiresAtMs }) => expiresAtMs));
+		if (!Number.isFinite(earliestExpiryMs)) return;
+		const delayMs = Math.max(0, earliestExpiryMs - Date.now() - DEFAULT_RELAY_POLICY_LIMITS.refreshBeforeExpiryMs);
+		this._relayRefreshTimer = setTimeout(() => {
+			this._relayRefreshTimer = undefined;
+			this._queueRelayMaintenance(async (): Promise<void> => {
+				const refreshed = await policy.refresh(controller.signal);
+				this._handleRelayPolicyResult(refreshed, policy, controller);
+			});
+		}, delayMs);
+		(this._relayRefreshTimer as ReturnType<typeof setTimeout> & { unref?(): void }).unref?.();
+	}
+
+	private _queueRelayMaintenance(operation: () => Promise<void>): void {
+		const controller = this._relayPolicyController;
+		this._relayMaintenanceTail = this._relayMaintenanceTail
+			.then(async (): Promise<void> => {
+				if (controller?.signal.aborted !== false) return;
+				await operation();
+			})
+			.catch((error: unknown): void => {
+				if (controller?.signal.aborted === true) return;
+				if (!this._relayPolicyFailed) {
+					this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
+				}
+				this._relayPolicyFailed = true;
+				log.error("::relay-policy::maintenance:error", error);
+			});
+	}
+
+	private _clearRelayMaintenance(): void {
+		if (this._relayRefreshTimer !== undefined) clearTimeout(this._relayRefreshTimer);
+		this._relayRefreshTimer = undefined;
+		this._reservedRelayPeerIds.clear();
+		const listener = this._relayDisconnectListener;
+		if (listener !== undefined) this._node?.removeEventListener("peer:disconnect", listener);
+		this._relayDisconnectListener = undefined;
+		if (this._warmRelayRetryTimer !== undefined) clearTimeout(this._warmRelayRetryTimer);
+		this._warmRelayRetryTimer = undefined;
+		const warmRelayListener = this._warmRelayIdentifyListener;
+		if (warmRelayListener !== undefined) this._node?.removeEventListener("peer:identify", warmRelayListener);
+		this._warmRelayIdentifyListener = undefined;
+		this._warmRelayRetryAttempts = 0;
+	}
+
+	private _createRelayPolicy(options: RelayPolicyFactoryOptions): RelayPolicyDriver {
+		const host = this._node;
+		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
+		const client = new Libp2pRelayClient({
+			connect: async (address, signal): Promise<void> => {
+				await host.dial(multiaddr(address), { signal });
+			},
+			disconnect: async (peerId): Promise<void> => {
+				await host.hangUp(peerIdFromString(peerId));
+			},
+			host: host as unknown as Libp2pRelayClientOptions["host"],
+		});
+		const policy = new RelayPolicy({
+			fallback: this._relayFallback,
+			inspector: client,
+			limits: {
+				perCandidateDeadlineMs: options.perCandidateDeadlineMs,
+				requiredOperatorGroups: options.targetReservations,
+				requiredReservations: options.targetReservations,
+				totalDeadlineMs: options.totalDeadlineMs,
+			},
+			onReservationEvent: options.onReservationEvent,
+			operatorGroupClassifier: new EvidenceDerivedOperatorGroupClassifier({
+				verify: (): Promise<{ readonly verified: false }> => Promise.resolve({ verified: false }),
+			}),
+			reservationClient: client,
+			source: options.source,
+			transportProfile: options.transportProfile ?? RELAY_TRANSPORT_PROFILES.broadBrowser,
+		});
+		return {
+			get activeReservations(): readonly ActiveRelayReservation[] {
+				return policy.activeReservations;
+			},
+			acquire: (queryKey, signal) => policy.acquire(queryKey, signal),
+			refresh: (signal) => policy.refresh(signal),
+			replace: (peerId, reason, signal, excludedOperatorGroup) =>
+				policy.replace(peerId, reason, signal, excludedOperatorGroup),
+			stop: async (): Promise<void> => {
+				await policy.stop();
+				await client.stop();
+			},
+		};
 	}
 
 	private async _dialBootstrapWithRetry(addr: Multiaddr, node: Libp2p, signal: AbortSignal): Promise<void> {
@@ -268,6 +1182,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
 		this._bootstrapRetryController?.abort();
 		this._bootstrapRetryController = undefined;
+		const relayPolicyController = this._relayPolicyController;
+		const relayPolicy = this._relayPolicy;
+		relayPolicyController?.abort(new DOMException("network node stopped", "AbortError"));
+		this._relayPolicyController = undefined;
+		this._relayPolicy = undefined;
+		// Clear the failure flag so a warm re-arm parked on the acquire promise cannot resurrect the
+		// policy on a stopping host (the rebuild branch of retryRelayPolicyAcquisition gates on it).
+		this._relayPolicyFailed = false;
+		this._clearRelayMaintenance();
+		await relayPolicy?.stop();
+		await this._relayMaintenanceTail;
+		this._relayMaintenanceTail = Promise.resolve();
 		await this._node?.stop();
 		this._messageQueue.close();
 		this._metrics?.stop();
@@ -280,7 +1206,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async restart(config?: DRPNetworkNodeConfig, rawPrivateKey?: Uint8Array): Promise<void> {
 		await this.stop();
-		if (config) this._config = config;
+		if (config) {
+			this._config = config;
+			this._membershipVerifier = createMembershipVerifier(config.control_plane?.membership);
+		}
 		await this.start(rawPrivateKey);
 	}
 
@@ -326,15 +1255,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return addr.getComponents().find((component) => component.name === "p2p")?.value;
 	}
 
-	private getGossipSubConfig(bootstapNodeList: string[]): Partial<GossipsubOpts> {
+	private getGossipSubConfig(doPX = true): Partial<GossipsubOpts> {
 		const baseConfig: Partial<GossipsubOpts> = {
-			doPX: true,
+			doPX,
 			fallbackToFloodsub: false,
 			allowPublishToZeroTopicPeers: true,
-			scoreParams: this.getGossipSubPeerScoreParams(bootstapNodeList),
+			scoreParams: this.getGossipSubPeerScoreParams(),
 		};
 
-		if (this._config?.bootstrap) {
+		if (this._config?.seed) {
 			baseConfig.D = 0;
 			baseConfig.Dlo = 0;
 			baseConfig.Dhi = 0;
@@ -351,18 +1280,63 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return baseConfig;
 	}
 
-	private getGossipSubPeerScoreParams(bootstapNodeList: string[]): PeerScoreParams {
-		if (this._config?.bootstrap) {
-			return createPeerScoreParams({ topicScoreCap: 50, IPColocationFactorWeight: 0 });
+	private getGossipSubPeerScoreParams(): PeerScoreParams {
+		const ipColocation = this._config?.control_plane?.pubsub_scoring?.ip_colocation;
+		const ipColocationParams: Partial<PeerScoreParams> =
+			ipColocation?.enabled === true
+				? {
+						IPColocationFactorThreshold: ipColocation.threshold,
+						IPColocationFactorWeight: ipColocation.weight,
+						IPColocationFactorWhitelist: new Set(ipColocation.whitelist ?? []),
+					}
+				: { IPColocationFactorWeight: 0 };
+		const observedBehaviorReward = this._config?.control_plane?.pubsub_scoring?.observed_behavior_reward;
+		const publicComponents = this._config?.control_plane?.rollout?.public_components;
+		const behaviorProvider = this._authenticatedPeerBehaviorProvider;
+		const rewardEnabled =
+			observedBehaviorReward?.enabled === true && publicComponents?.pubsub_behavior_rewards?.enabled === true;
+		let providerFailureLogged = false;
+		const neutralProviderFailure = (error: unknown): 0 => {
+			if (!providerFailureLogged) {
+				providerFailureLogged = true;
+				log.warn("::gossipsub::observed-peer-behavior:error", error);
+			}
+			return 0;
+		};
+		const appSpecificScore = (peerId: string): number => {
+			if (!rewardEnabled || behaviorProvider === undefined) return 0;
+			try {
+				const observation = behaviorProvider.getObservedPeerBehavior(peerId);
+				if (observation === undefined || observation.authenticated !== true) return 0;
+				if (
+					typeof observation.diversityScore !== "number" ||
+					typeof observation.validBehaviorScore !== "number" ||
+					!Number.isFinite(observation.diversityScore) ||
+					!Number.isFinite(observation.validBehaviorScore)
+				) {
+					return neutralProviderFailure(new Error("observed peer behavior provider returned an invalid score"));
+				}
+				const observedScore = Math.max(0, observation.diversityScore) + Math.max(0, observation.validBehaviorScore);
+				if (observedScore <= 0) return 0;
+				return Math.min(observedScore, observedBehaviorReward.max_application_score);
+			} catch (error) {
+				return neutralProviderFailure(error);
+			}
+		};
+
+		if (this._config?.seed) {
+			return createPeerScoreParams({
+				...ipColocationParams,
+				appSpecificScore,
+				appSpecificWeight: APP_SPECIFIC_WEIGHT,
+				topicScoreCap: 50,
+			});
 		}
 
 		return createPeerScoreParams({
-			IPColocationFactorWeight: 0,
-			appSpecificScore: (peerId: string) => {
-				if (bootstapNodeList.some((node) => node.includes(peerId))) return 1000;
-
-				return 0;
-			},
+			...ipColocationParams,
+			appSpecificScore,
+			appSpecificWeight: APP_SPECIFIC_WEIGHT,
 			topics: { [DRP_DISCOVERY_TOPIC]: createTopicScoreParams({ topicWeight: 1 }) },
 		});
 	}
@@ -422,15 +1396,61 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		}
 	}
 
-	private addrsPerPeerId(peerIds: string[] | Multiaddr[]): Record<string, Multiaddr[]> {
-		const addrs: Record<string, Multiaddr[]> = {};
-		for (const peerId of peerIds) {
-			const ma: Multiaddr = typeof peerId === "string" ? multiaddr(peerId) : peerId;
-			const currentPeerId = this.getPeerId(ma);
-			if (!currentPeerId) continue;
-			addrs[currentPeerId] = [...(addrs[currentPeerId] ?? []), ma];
+	private dialCandidates(addresses: string[] | Multiaddr[]): Multiaddr[][] {
+		const identified = new Map<string, Multiaddr[]>();
+		const unidentified: Multiaddr[][] = [];
+		for (const address of addresses) {
+			const ma = typeof address === "string" ? multiaddr(address) : address;
+			const peerId = this.getPeerId(ma);
+			if (peerId === undefined) {
+				unidentified.push([ma]);
+				continue;
+			}
+			identified.set(peerId, [...(identified.get(peerId) ?? []), ma]);
 		}
-		return addrs;
+		return [...identified.values(), ...unidentified];
+	}
+
+	private _emitControlPlaneEvent(event: ControlPlaneEvent): void {
+		const sink = this._config?.control_plane?.observability?.sink;
+		if (sink === undefined) return;
+		try {
+			sink(event);
+		} catch {
+			// Telemetry is best-effort and must never affect network behavior.
+		}
+	}
+
+	private _firstDialAddress(peer: string[] | string | PeerId | Multiaddr | Multiaddr[]): Multiaddr | undefined {
+		const candidate = Array.isArray(peer) ? peer[0] : peer;
+		if (typeof candidate !== "string") {
+			return candidate !== undefined && "getComponents" in candidate ? candidate : undefined;
+		}
+		if (!candidate.includes("/")) return undefined;
+		try {
+			return multiaddr(candidate);
+		} catch {
+			return undefined;
+		}
+	}
+
+	private _emitDialOutcome(address: Multiaddr | undefined, outcome: "denied" | "failed" | "ok"): void {
+		if (this._config?.control_plane?.observability?.sink === undefined) return;
+		this._emitControlPlaneEvent({
+			...(address === undefined
+				? ({ family: "unknown", scope: "unknown", transport: "unknown" } as const)
+				: sanitizedAddressFields(address)),
+			kind: "dial-attempt",
+			outcome,
+			reason:
+				outcome === "ok"
+					? "connected"
+					: outcome === "denied" && this._outboundAddressPolicy === "injected"
+						? "injected-policy"
+						: outcome === "denied"
+							? "address-policy"
+							: "dial-failed",
+		});
 	}
 
 	/**
@@ -438,33 +1458,124 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * do something bad like passing multiaddrs that as different PeerIds
 	 * @param peerId - The peerId, multiaddr or array of multiaddrs to dial
 	 * @param node - The libp2p instance to dial with
+	 * @param signal
 	 * @returns The connection or undefined if no connection was made
 	 */
 	async safeDial(
 		peerId: string[] | string | PeerId | Multiaddr | Multiaddr[],
-		node: Libp2p | undefined = this._node
+		node: Libp2p | undefined = this._node,
+		signal?: AbortSignal
 	): Promise<Connection | undefined> {
-		const isArray = Array.isArray(peerId);
-		if (!isArray) {
-			const addr =
-				typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
-			return node?.dial(addr);
+		if (Array.isArray(peerId) && peerId.length === 0) return undefined;
+		const eventAddress = this._firstDialAddress(peerId);
+		try {
+			const isArray = Array.isArray(peerId);
+			let connection: Connection | undefined;
+			if (!isArray) {
+				const addr =
+					typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
+				connection = await node?.dial(addr, { signal });
+			} else {
+				const candidates = this.dialCandidates(peerId);
+				connection = await Promise.any(candidates.map((addresses) => node?.dial(addresses, { signal })));
+			}
+			this._emitDialOutcome(eventAddress, connection === undefined ? "failed" : "ok");
+			return connection;
+		} catch (error) {
+			this._emitDialOutcome(
+				eventAddress,
+				error instanceof Error && error.name === "DialDeniedError" ? "denied" : "failed"
+			);
+			throw error;
 		}
-
-		const addrsPerPeerId = this.addrsPerPeerId(peerId);
-		return Promise.race(Object.values(addrsPerPeerId).map((addrs) => node?.dial(addrs)));
 	}
 
 	/**
 	 * Connect to the bootstrap nodes.
 	 */
 	async connectToBootstraps(): Promise<void> {
+		await this.redialBootstraps(new AbortController().signal);
+	}
+
+	/** @param signal - Recovery ownership signal. @returns Whether bootstrap redial connected. */
+	async redialBootstraps(signal: AbortSignal): Promise<boolean> {
 		try {
-			await this.safeDial(this.getBootstrapNodes());
+			const connection = await this.safeDial(this.getBootstrapNodes(), this._node, signal);
 			log.debug("::connectToBootstraps: Successfully connected to bootstrap nodes");
+			return connection !== undefined;
 		} catch (e) {
 			log.error("::connectToBootstraps:", e);
+			return false;
 		}
+	}
+
+	/** @returns Sanitized current libp2p connection evidence. */
+	getControlPlaneConnections(): readonly {
+		readonly multiaddr: string;
+		readonly peerId: string;
+		readonly transport: ControlPlaneTransport;
+	}[] {
+		return (
+			this._node?.getConnections().map((connection) => {
+				const multiaddrValue = connection.remoteAddr.toString();
+				return {
+					multiaddr: multiaddrValue,
+					peerId: connection.remotePeer.toString(),
+					transport: sanitizedAddressFields(connection.remoteAddr).transport,
+				};
+			}) ?? []
+		);
+	}
+
+	/** @returns Defensive snapshots owned by the active relay policy. */
+	getActiveRelayReservations(): readonly {
+		readonly expiresAtMs: number;
+		readonly operatorGroup: string;
+		readonly peerId: string;
+	}[] {
+		return (
+			this._relayPolicy?.activeReservations?.map(({ candidate, expiresAtMs }) => ({
+				expiresAtMs,
+				operatorGroup: candidate.operatorGroup,
+				peerId: candidate.peerId,
+			})) ?? []
+		);
+	}
+
+	/**
+	 * Delegates replacement/acquisition to the relay-policy owner.
+	 * @param request
+	 * @param request.excludedOperatorGroup
+	 * @param request.relayId
+	 * @param signal
+	 */
+	async replaceRelay(
+		request: { readonly excludedOperatorGroup?: string; readonly relayId?: string },
+		signal: AbortSignal
+	): Promise<boolean> {
+		const policy = this._relayPolicy;
+		if (policy === undefined) return false;
+		const result =
+			request.relayId === undefined
+				? await policy.acquire(new TextEncoder().encode(this.peerId), signal)
+				: await policy.replace(request.relayId, "relay-disconnected", signal, request.excludedOperatorGroup);
+		return result.terminal === "reserved" || result.terminal === "owned-fallback";
+	}
+
+	/** @param signal - Recovery ownership signal. @returns Whether an attached routing owner refreshed. */
+	async refreshRouting(signal: AbortSignal): Promise<boolean> {
+		const services = this._node?.services as Record<string, unknown> | undefined;
+		const routing = services?.aminoDHT;
+		if (
+			typeof routing !== "object" ||
+			routing === null ||
+			!("refreshRoutingTable" in routing) ||
+			typeof routing.refreshRoutingTable !== "function"
+		) {
+			return false;
+		}
+		await routing.refreshRoutingTable({ signal });
+		return true;
 	}
 
 	/**

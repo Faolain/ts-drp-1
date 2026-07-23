@@ -1,4 +1,4 @@
-import { type GossipSub, type GossipsubMessage } from "@libp2p/gossipsub";
+import { type GossipsubMessage } from "@libp2p/gossipsub";
 import { type Libp2p, type Libp2pEvents } from "@libp2p/interface";
 import { AddMulDRP } from "@ts-drp/blueprints";
 import { createACL } from "@ts-drp/object";
@@ -14,6 +14,7 @@ import {
 import Benchmark from "benchmark";
 import { promisify } from "util";
 
+import { gossipSubOf, libp2pOf } from "./default-network.js";
 import { DRPNode } from "../src/index.js";
 
 interface createNodeOptions {
@@ -49,10 +50,11 @@ async function getBootstrapNode(): Promise<DRPNode> {
 async function getNetworkConfiguration(logConfig: LoggerOptions, isBootstrap = false): Promise<DRPNetworkNodeConfig> {
 	if (isBootstrap) {
 		return {
-			bootstrap: isBootstrap,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws", "/ip4/0.0.0.0/tcp/0"],
 			bootstrap_peers: [],
 			log_config: logConfig,
+			relay_service: { enabled: true },
+			seed: true,
 			pubsub: {
 				peer_discovery_interval: 30_000,
 			},
@@ -92,7 +94,7 @@ async function createNode(options: createNodeOptions): Promise<DRPNode> {
 		await node.start();
 		return node;
 	}
-	const btLibp2p = (await getBootstrapNode()).networkNode["_node"] as Libp2p;
+	const btLibp2p = libp2pOf((await getBootstrapNode()).networkNode);
 	await Promise.all([
 		node.start(),
 		promisify(waitForLibp2pEvent)(
@@ -127,7 +129,7 @@ function createMessage(size: number): Uint8Array {
 
 async function setupMessageHandlers(nodes: DRPNode[], topic: string): Promise<void> {
 	for (const node of nodes) {
-		const pubsub = node.networkNode["_pubsub"] as GossipSub;
+		const pubsub = gossipSubOf(node.networkNode);
 		pubsub.subscribe(topic);
 	}
 
@@ -174,12 +176,12 @@ async function runMessageBenchmark(numberOfMessages: number, numberOfNodes: numb
 
 			// Set up message handlers
 			for (let i = 0; i < nodes.length; i++) {
-				const pubsub = nodes[i].networkNode["_pubsub"] as GossipSub;
+				const pubsub = gossipSubOf(nodes[i].networkNode);
 				pubsub.addEventListener("gossipsub:message", onMessage);
 			}
 
 			// Send messages
-			const pubsubSender = nodes[index % nodes.length].networkNode["_pubsub"] as GossipSub;
+			const pubsubSender = gossipSubOf(nodes[index % nodes.length].networkNode);
 			for (let i = 0; i < numberOfMessages; i++) {
 				await pubsubSender.publish(TOPIC, message);
 			}
@@ -187,7 +189,7 @@ async function runMessageBenchmark(numberOfMessages: number, numberOfNodes: numb
 
 			// Clean up listeners
 			for (let i = 0; i < nodes.length; i++) {
-				const pubsub = nodes[i].networkNode["_pubsub"] as GossipSub;
+				const pubsub = gossipSubOf(nodes[i].networkNode);
 				pubsub.removeEventListener("gossipsub:message", onMessage);
 			}
 			index++;

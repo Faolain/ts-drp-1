@@ -21,3 +21,9 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Public-network spike output can contain Peer IDs, IPs, and endpoint metadata.
+.network-spike-raw/
+
+# Local semantic indexes are disposable analysis caches.
+.tldr/

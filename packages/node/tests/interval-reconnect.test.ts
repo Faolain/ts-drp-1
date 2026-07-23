@@ -7,6 +7,8 @@ import { type DRPNodeConfig, type LoggerOptions } from "@ts-drp/types";
 import { promisify } from "util";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { libp2pOf } from "./default-network.js";
+
 function waitForLibp2pEvent<K extends keyof Libp2pEvents>(
 	libp2p: Libp2p,
 	type: K,
@@ -33,9 +35,10 @@ describe("Reconnect test", () => {
 		});
 		await keychain.start();
 		bootstrapNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws"],
 			bootstrap_peers: [],
+			relay_service: { enabled: true },
+			seed: true,
 		});
 		await bootstrapNode.start(keychain.secp256k1PrivateKey);
 		const bootstrapMultiaddrs = bootstrapNode.getMultiaddrs();
@@ -72,7 +75,7 @@ describe("Reconnect test", () => {
 			},
 		});
 
-		const btLibp2p = bootstrapNode["_node"] as Libp2p;
+		const btLibp2p = libp2pOf(bootstrapNode);
 		await Promise.all([
 			node.start(),
 			promisify(waitForLibp2pEvent)(
@@ -89,8 +92,8 @@ describe("Reconnect test", () => {
 	});
 
 	test("Disconnect from bootstrap", async () => {
-		const btLibp2p = bootstrapNode["_node"] as Libp2p;
-		const nodeLibp2p = node.networkNode["_node"] as Libp2p;
+		const btLibp2p = libp2pOf(bootstrapNode);
+		const nodeLibp2p = libp2pOf(node.networkNode);
 		await nodeLibp2p.peerStore.save(peerIdFromString(btLibp2p.peerId.toString()), { tags: {} });
 		await btLibp2p.peerStore.save(peerIdFromString(nodeLibp2p.peerId.toString()), { tags: {} });
 		const p = promisify(waitForLibp2pEvent);

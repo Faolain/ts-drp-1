@@ -83,7 +83,7 @@ describe("DRPNetworkNode can connect & send messages", () => {
 		const data = "Hello World!";
 		let boolean = false;
 
-		await Promise.all([
+		const connected = Promise.all([
 			raceEvent(libp2pNode1, "connection:open", controller.signal, {
 				filter: (event: CustomEvent<Connection>) =>
 					event.detail.remotePeer.toString() === node2.peerId && event.detail.limits === undefined,
@@ -93,6 +93,8 @@ describe("DRPNetworkNode can connect & send messages", () => {
 					event.detail.remotePeer.toString() === node1.peerId && event.detail.limits === undefined,
 			}),
 		]);
+		await node1.connect(node2.getMultiaddrs());
+		await connected;
 
 		const messageProcessed = new Promise((resolve) => {
 			node2.subscribeToMessageQueue(async () => {

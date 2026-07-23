@@ -23,6 +23,8 @@ const config = tsLintConfig(
 			"**/doc/*",
 			"**/bundle/*",
 			"**/coverage/*",
+			"**/.network-spike-raw/*",
+			"**/.tldr/*",
 			"**/flamegraph.*",
 			"**/tsconfig.tsbuildinfo",
 			"**/benchmark-output.txt",

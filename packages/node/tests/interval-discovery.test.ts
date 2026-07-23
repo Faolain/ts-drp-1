@@ -1,9 +1,11 @@
-import { type GossipSub, type MeshPeer } from "@libp2p/gossipsub";
+import { type MeshPeer } from "@libp2p/gossipsub";
 import { MapDRP } from "@ts-drp/blueprints";
 import { DRPNode } from "@ts-drp/node";
 import { DRP_INTERVAL_DISCOVERY_TOPIC, type DRPNodeConfig, type LoggerOptions } from "@ts-drp/types";
 import { raceEvent } from "race-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+import { gossipSubOf } from "./default-network.js";
 
 describe("DRP Interval Discovery integration test", () => {
 	let node1: DRPNode;
@@ -77,7 +79,7 @@ describe("DRP Interval Discovery integration test", () => {
 	});
 
 	test("peer 1 can discover peer 3 topic", async () => {
-		const node2GossipSub = node2.networkNode["_pubsub"] as GossipSub;
+		const node2GossipSub = gossipSubOf(node2.networkNode);
 
 		const filterGraft =
 			(topic: string, peerId: string): ((e: CustomEvent<MeshPeer>) => boolean) =>

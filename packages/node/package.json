@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./runtime": {
+			"types": "./dist/src/runtime.d.ts",
+			"import": "./dist/src/runtime.js"
 		}
 	},
 	"scripts": {
@@ -29,7 +33,7 @@
 		"cli": "tsx ./src/run.ts",
 		"prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
 		"prepack": "tsc -b",
-		"test": "vitest",
+		"test": "pnpm --dir ../.. exec vitest run packages/node/tests",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -b -w"
 	},
@@ -54,6 +58,7 @@
 		"@noble/hashes": "^1.7.1",
 		"@noble/secp256k1": "^2.2.3",
 		"@ts-drp/blueprints": "0.11.0",
+		"@ts-drp/control-plane": "workspace:*",
 		"@ts-drp/interval-discovery": "0.11.0",
 		"@ts-drp/interval-reconnect": "0.11.0",
 		"@ts-drp/interval-runner": "0.11.0",
@@ -62,6 +67,10 @@
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",
 		"@ts-drp/object": "0.11.0",
+		"@ts-drp/relay-policy": "workspace:*",
+		"@ts-drp/rendezvous": "workspace:*",
+		"@ts-drp/routing-browser": "workspace:*",
+		"@ts-drp/routing-node": "workspace:*",
 		"@ts-drp/tracer": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"@ts-drp/utils": "0.11.0",

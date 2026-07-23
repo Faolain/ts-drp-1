@@ -1,0 +1,117 @@
+{
+	"name": "@ts-drp/network-spike",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		},
+		"./probe": {
+			"types": "./dist/src/probe/index.d.ts",
+			"import": "./dist/src/probe/index.js"
+		},
+		"./browser-dht": {
+			"types": "./dist/src/browser-dht/index.d.ts",
+			"import": "./dist/src/browser-dht/index.js"
+		},
+		"./record/fixture": {
+			"types": "./dist/src/record/fixture.d.ts",
+			"import": "./dist/src/record/fixture.js"
+		},
+		"./registry/fixture": {
+			"types": "./dist/src/registry/fixture.d.ts",
+			"import": "./dist/src/registry/fixture.js"
+		},
+		"./relay/fixture": {
+			"types": "./dist/src/relay/fixture.d.ts",
+			"import": "./dist/src/relay/fixture.js"
+		},
+		"./grid": {
+			"types": "./dist/src/grid/index.d.ts",
+			"import": "./dist/src/grid/index.js"
+		},
+		"./grid/http-directory": {
+			"types": "./dist/src/grid/http-directory.d.ts",
+			"import": "./dist/src/grid/http-directory.js"
+		},
+		"./grid/fixture": {
+			"types": "./dist/src/grid/fixture.d.ts",
+			"import": "./dist/src/grid/fixture.js"
+		},
+		"./failure-campaign": {
+			"types": "./dist/src/failure-campaign/index.d.ts",
+			"import": "./dist/src/failure-campaign/index.js"
+		},
+		"./public-campaign": {
+			"types": "./dist/src/public-campaign/index.d.ts",
+			"import": "./dist/src/public-campaign/index.js"
+		},
+		"./public-only": {
+			"types": "./dist/src/public-only/index.d.ts",
+			"import": "./dist/src/public-only/index.js"
+		},
+		"./public-only/node": {
+			"types": "./dist/src/public-only/node.d.ts",
+			"import": "./dist/src/public-only/node.js"
+		},
+		"./public-only/browser": {
+			"types": "./dist/src/public-only/browser.d.ts",
+			"import": "./dist/src/public-only/browser.js"
+		},
+		"./public-only/browser-fixture": {
+			"types": "./dist/src/public-only/browser-fixture.d.ts",
+			"import": "./dist/src/public-only/browser-fixture.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"browser-dht:fixture": "tsx src/browser-dht-fixture-cli.ts",
+		"grid:relay": "tsx src/grid-relay-fixture-cli.ts",
+		"failure-campaign": "tsx src/failure-campaign-cli.ts",
+		"public-campaign": "tsx src/public-campaign-cli.ts",
+		"public-only": "tsx src/public-only-cli.ts",
+		"bundle:browser-dht": "node scripts/browser-dht-bundle.mjs",
+		"clean": "rm -rf dist/ node_modules/",
+		"manifest": "tsx src/cli.ts",
+		"node-routing": "tsx src/node-routing-cli.ts",
+		"probe": "tsx src/probe-cli.ts",
+		"profile:fixture": "node --cpu-prof --cpu-prof-dir=.network-spike-raw/profile dist/src/probe-cli.js --profile-iterations 5000",
+		"profile:node-routing": "node --cpu-prof --cpu-prof-dir=.network-spike-raw/profile dist/src/node-routing-cli.js --fixture",
+		"record": "tsx src/record-cli.ts",
+		"registry": "tsx src/registry-cli.ts",
+		"relay": "tsx src/relay-cli.ts",
+		"test": "pnpm --dir ../.. exec vitest run packages/network-spike/tests",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@chainsafe/libp2p-noise": "17.0.0",
+		"@chainsafe/libp2p-yamux": "8.0.1",
+		"@libp2p/identify": "4.1.9",
+		"@libp2p/crypto": "5.1.21",
+		"@libp2p/interface": "3.2.5",
+		"@libp2p/kad-dht": "16.3.4",
+		"@libp2p/peer-id": "6.0.12",
+		"@libp2p/ping": "3.1.8",
+		"@libp2p/websockets": "10.1.16",
+		"@multiformats/multiaddr": "^13.0.3",
+		"@ts-drp/network": "workspace:*",
+		"@ts-drp/node": "workspace:*",
+		"@ts-drp/membership": "workspace:*",
+		"@ts-drp/relay-policy": "workspace:*",
+		"@ts-drp/rendezvous": "workspace:*",
+		"@ts-drp/routing-browser": "workspace:*",
+		"@ts-drp/routing-node": "workspace:*",
+		"@ts-drp/types": "workspace:*",
+		"libp2p": "3.3.5",
+		"multiformats": "14.0.0",
+		"zod": "^3.24.2"
+	},
+	"devDependencies": {
+		"esbuild": "0.25.3",
+		"vitest": "^3.0.5"
+	}
+}

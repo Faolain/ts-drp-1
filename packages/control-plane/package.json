@@ -1,0 +1,38 @@
+{
+	"name": "@ts-drp/control-plane",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"test": "pnpm --dir ../.. exec vitest run packages/control-plane/tests",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@ts-drp/types": "workspace:*"
+	},
+	"devDependencies": {
+		"esbuild": "0.25.3",
+		"vitest": "^3.0.5"
+	}
+}

@@ -6,12 +6,19 @@
 		"build": "vite build",
 		"typecheck": "tsc --noEmit",
 		"clean": "rm -rf dist/ node_modules/",
+		"demo": "node demo/serve.mjs",
+		"demo:public-infra": "GRID_DEMO_PROFILE=public-infra node demo/serve.mjs",
+		"demo:fully-public": "VITE_NETWORK_MODE=modular VITE_NOSTR_RELAYS=wss://nos.lol,wss://relay.damus.io VITE_ROUTING_ENDPOINTS=https://delegated-ipfs.dev/,https://cid.contact/ VITE_RENDEZVOUS_ENDPOINTS= VITE_MEMBERSHIP_INVITE=grid-fully-public-invite-0123456789 VITE_RENDEZVOUS_NAMESPACE=drp-network:v1:Z3JpZC1mdWxseS1wdWJsaWMtZGVtbw vite serve --host 127.0.0.1 --port 4174",
 		"dev": "vite serve",
 		"start": "vite preview --host --port 5173"
 	},
 	"dependencies": {
+		"@ts-drp/network": "0.11.0",
 		"@ts-drp/node": "0.11.0",
 		"@ts-drp/object": "0.11.0",
+		"@ts-drp/relay-policy": "0.11.0",
+		"@ts-drp/rendezvous": "0.11.0",
+		"@ts-drp/routing-browser": "0.11.0",
 		"@ts-drp/tracer": "^0.11.0",
 		"@ts-drp/types": "^0.11.0"
 	},

@@ -80,10 +80,11 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 		vi.spyOn(Date, "now").mockImplementation(() => realNow() + skewMs);
 
 		bootstrapNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 			bootstrap_peers: [],
 			log_config: { level: "silent" },
+			relay_service: { enabled: true },
+			seed: true,
 		});
 		await bootstrapNode.start();
 		const btLibp2p = bootstrapNode["_node"] as Libp2p;
@@ -100,8 +101,13 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 			await node.start();
 			await identified;
 		}
+		await Promise.all([
+			node1.networkNode.connect(node2.networkNode.getMultiaddrs() ?? []),
+			node1.networkNode.connect(node3.networkNode.getMultiaddrs() ?? []),
+			node2.networkNode.connect(node3.networkNode.getMultiaddrs() ?? []),
+		]);
 
-		// wait for a full mesh between the three nodes (pubsub peer discovery)
+		// Wait for the explicitly connected full mesh between the three nodes.
 		const peerIds = [node1, node2, node3].map((n) => n.networkNode.peerId);
 		await vi.waitFor(
 			() => {

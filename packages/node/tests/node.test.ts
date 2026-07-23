@@ -8,6 +8,7 @@ import { ACLGroup, type DRPNetworkNodeConfig, DrpType, Operation, Vertex } from 
 import { raceEvent } from "race-event";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { defaultNetworkOf, libp2pOf } from "./default-network.js";
 import { signFinalityVertices, signGeneratedVertices, verifyACLIncomingVertices } from "../src/handlers.js";
 import { DRPNode } from "../src/index.js";
 import { log } from "../src/logger.js";
@@ -303,9 +304,10 @@ describe("DRPObject connection tests", () => {
 
 	beforeEach(async () => {
 		bootstrapNode = new DRPNetworkNode({
-			bootstrap: true,
 			listen_addresses: ["/ip4/0.0.0.0/tcp/0/ws"],
 			bootstrap_peers: [],
+			relay_service: { enabled: true },
+			seed: true,
 		});
 		await bootstrapNode.start();
 
@@ -313,23 +315,23 @@ describe("DRPObject connection tests", () => {
 		node2 = createNewNode("node2");
 
 		await node2.start();
-		const btLibp2pNode1 = bootstrapNode["_node"] as Libp2p;
-		libp2pNode2 = node2.networkNode["_node"] as Libp2p;
+		const btLibp2pNode1 = libp2pOf(bootstrapNode);
+		libp2pNode2 = libp2pOf(node2.networkNode);
 
 		await Promise.all([
 			raceEvent(btLibp2pNode1, "peer:identify", controller.signal, {
 				filter: (event: CustomEvent<IdentifyResult>) =>
 					event.detail.peerId.equals(libp2pNode2.peerId) && event.detail.listenAddrs.length > 0,
 			}),
-			isDialable(node2.networkNode),
+			isDialable(defaultNetworkOf(node2.networkNode)),
 		]);
 
 		await node1.start();
-		expect(await isDialable(node1.networkNode)).toBe(true);
+		expect(await isDialable(defaultNetworkOf(node1.networkNode))).toBe(true);
 
-		libp2pNode1 = node1.networkNode["_node"] as Libp2p;
+		libp2pNode1 = libp2pOf(node1.networkNode);
 
-		await Promise.all([
+		const connected = Promise.all([
 			raceEvent(libp2pNode2, "connection:open", controller.signal, {
 				filter: (event: CustomEvent<Connection>) =>
 					event.detail.remotePeer.toString() === node1.networkNode.peerId && event.detail.limits === undefined,
@@ -339,6 +341,8 @@ describe("DRPObject connection tests", () => {
 					event.detail.remotePeer.toString() === node2.networkNode.peerId && event.detail.limits === undefined,
 			}),
 		]);
+		await node1.networkNode.connect(node2.networkNode.getMultiaddrs() ?? []);
+		await connected;
 	});
 
 	afterAll(async () => {

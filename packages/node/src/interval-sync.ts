@@ -17,6 +17,8 @@ const INITIAL_SYNC_MAX_ATTEMPTS = 5;
 /**
  * Whether an object has received history from another replica. Local operations
  * do not prove that the joiner's initial synchronization reached a peer.
+ * @param vertices
+ * @param localPeerId
  */
 export function hasRemoteSyncHistory(vertices: readonly Vertex[], localPeerId: string): boolean {
 	return vertices.some((vertex) => vertex.hash !== HashGraph.rootHash && vertex.peerId !== localPeerId);
@@ -46,6 +48,15 @@ export class DRPIntervalSync {
 	private initialSyncWarmedUp = false;
 	private initialSyncAttempts = 0;
 	private peerCursor?: number;
+
+	/** @returns Health-facing state of the bounded initial synchronization phase. */
+	get initialSynchronizationState(): "behind" | "synchronized" | "unknown" {
+		const object = this.node.get(this.id);
+		if (object === undefined) return "unknown";
+		if (hasRemoteSyncHistory(object.vertices, this.node.networkNode.peerId)) return "synchronized";
+		if (this.initialSyncRunner === undefined) return "synchronized";
+		return this.initialSyncAttempts >= INITIAL_SYNC_MAX_ATTEMPTS ? "behind" : "unknown";
+	}
 
 	/**
 	 * Current interval runner state.

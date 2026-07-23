@@ -25,13 +25,12 @@
 		"clean": "rm -rf dist/ node_modules/",
 		"prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
 		"prepack": "tsc -b",
-		"test": "vitest",
+		"test": "pnpm --dir ../.. exec vitest run packages/interval-reconnect/tests",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
 		"@ts-drp/interval-runner": "0.11.0",
-		"@ts-drp/logger": "0.11.0",
 		"@ts-drp/types": "0.11.0"
 	},
 	"devDependencies": {

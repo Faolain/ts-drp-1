@@ -6,7 +6,7 @@
  *
  * Cheapest working pattern found in this repo (derived from
  * packages/node/tests/handlers.test.ts and async-drp.test.ts):
- *   - bootstrap: DRPNetworkNode({ bootstrap: true, listen /ip4/.../tcp/0/ws })
+ *   - bootstrap: DRPNetworkNode({ seed: true, relay_service: { enabled: true }, listen /ip4/.../tcp/0/ws })
  *   - each node: explicit ws listen address (default listen is
  *     /p2p-circuit + /webrtc, which is NOT directly dialable in-process
  *     without relay round-trips) + bootstrap_peers -> the local bootstrap
@@ -23,6 +23,7 @@ import { BoxGame2D } from "@ts-drp/test-utils";
 import { type IACL, NodeEventName } from "@ts-drp/types";
 
 import { DRPNode } from "../../src/index.js";
+import { libp2pOf as productionLibp2pOf } from "../default-network.js";
 
 /* ------------------------------------------------------------------ */
 /* Cluster                                                             */
@@ -60,6 +61,14 @@ export interface SpawnClusterOptions {
 	syncIntervalMs?: number;
 }
 
+/**
+ *
+ * @param cond
+ * @param timeoutMs
+ * @param what
+ * @param pollMs
+ * @param detail
+ */
 export async function waitFor(
 	cond: () => boolean,
 	timeoutMs: number,
@@ -77,7 +86,7 @@ export async function waitFor(
 }
 
 function libp2pOf(node: DRPNode): Libp2p {
-	return node.networkNode["_node"] as Libp2p;
+	return productionLibp2pOf(node.networkNode);
 }
 
 function trackEvents(entry: ClusterNode): void {
@@ -104,6 +113,11 @@ function buildACL(peers: { peerId: string; blsPublicKey: string }[]): IACL {
 
 let spawnCounter = 0;
 
+/**
+ *
+ * @param n
+ * @param options
+ */
 export async function spawnCluster(n: number, options: SpawnClusterOptions = {}): Promise<Cluster> {
 	const t0 = performance.now();
 	const silent = { level: "silent" as const };
@@ -114,10 +128,11 @@ export async function spawnCluster(n: number, options: SpawnClusterOptions = {})
 
 	// 1. bootstrap/relay node
 	const bootstrap = new DRPNetworkNode({
-		bootstrap: true,
 		listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 		bootstrap_peers: [],
 		log_config: silent,
+		relay_service: { enabled: true },
+		seed: true,
 	});
 	await bootstrap.start();
 	const tBootstrap = performance.now();
@@ -270,24 +285,44 @@ export async function spawnCluster(n: number, options: SpawnClusterOptions = {})
 /* Convergence checks & diagnostics                                    */
 /* ------------------------------------------------------------------ */
 
+/**
+ *
+ * @param c
+ */
 export function hashGraphOf(c: ClusterNode): HashGraph {
 	return c.obj["hashGraph"] as unknown as HashGraph;
 }
 
+/**
+ *
+ * @param c
+ */
 export function stateFingerprint(c: ClusterNode): string {
 	const drp = c.obj.drp;
 	if (!drp) return "null";
 	return JSON.stringify({ positions: drp.query_positions(), log: drp.query_log() });
 }
 
+/**
+ *
+ * @param c
+ */
 export function sortedFrontier(c: ClusterNode): string[] {
 	return hashGraphOf(c).getFrontier().sort();
 }
 
+/**
+ *
+ * @param c
+ */
 export function vertexHashes(c: ClusterNode): string[] {
 	return c.obj.vertices.map((v) => v.hash).sort();
 }
 
+/**
+ *
+ * @param nodes
+ */
 export function clusterConverged(nodes: ClusterNode[]): boolean {
 	const ref = nodes[0];
 	const refState = stateFingerprint(ref);
@@ -303,6 +338,10 @@ export function clusterConverged(nodes: ClusterNode[]): boolean {
 
 const short = (h: string): string => h.slice(0, 8);
 
+/**
+ *
+ * @param nodes
+ */
 export function clusterReport(nodes: ClusterNode[]): string {
 	const union = new Set<string>();
 	for (const c of nodes) for (const h of vertexHashes(c)) union.add(h);

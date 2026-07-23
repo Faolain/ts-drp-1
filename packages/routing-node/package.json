@@ -1,0 +1,48 @@
+{
+	"name": "@ts-drp/routing-node",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		},
+		"./constants": {
+			"types": "./dist/src/constants.d.ts",
+			"import": "./dist/src/constants.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"test": "pnpm --dir ../.. exec vitest run packages/routing-node/tests",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@libp2p/kad-dht": "16.3.4",
+		"@libp2p/peer-id": "6.0.12",
+		"@libp2p/tcp": "11.0.23",
+		"@multiformats/multiaddr": "^13.0.3",
+		"@ts-drp/network": "workspace:*",
+		"@ts-drp/rendezvous": "workspace:*",
+		"libp2p": "3.3.5",
+		"multiformats": "14.0.0"
+	},
+	"devDependencies": {
+		"vitest": "^3.0.5"
+	}
+}

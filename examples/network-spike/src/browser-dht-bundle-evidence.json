@@ -1,0 +1,8 @@
+{
+	"bytes": 625524,
+	"forbiddenInputs": [],
+	"gzipBytes": 202359,
+	"inputCount": 496,
+	"nodeTcpImported": false,
+	"verification": "esbuild browser-platform metafile"
+}

@@ -1,0 +1,15 @@
+{
+	"network_config": {
+		"autonat": true,
+		"listen_addresses": ["/ip4/0.0.0.0/tcp/50004/ws"],
+		"bootstrap_peers": [],
+		"relay_service": {
+			"enabled": true,
+			"max_reservations": 0
+		},
+		"seed": true
+	},
+	"keychain_config": {
+		"private_key_seed": "refusal-a"
+	}
+}

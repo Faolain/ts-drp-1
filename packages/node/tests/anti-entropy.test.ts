@@ -6,7 +6,6 @@
  * exchange one SYNC probe, but the receiver must answer with no SYNC_ACCEPT and
  * therefore send no vertices/full-state traffic.
  */
-import { type GossipSub } from "@libp2p/gossipsub";
 import { peerIdFromString } from "@libp2p/peer-id";
 import { createObject } from "@ts-drp/object";
 import {
@@ -20,6 +19,7 @@ import {
 } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { gossipSubOf } from "./default-network.js";
 import { handleMessage } from "../src/handlers.js";
 import { createDRPIntervalSync, DRPNode } from "../src/index.js";
 
@@ -189,7 +189,7 @@ describe("periodic anti-entropy", () => {
 		object.drp?.increment();
 		const firstPeer = node.networkNode.peerId;
 		groupPeers.mockReturnValue([firstPeer]);
-		const pubsub = node.networkNode["_pubsub"] as GossipSub;
+		const pubsub = gossipSubOf(node.networkNode);
 		pubsub.safeDispatchEvent("subscription-change", {
 			detail: {
 				peerId: peerIdFromString(firstPeer),

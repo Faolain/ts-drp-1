@@ -2,8 +2,8 @@ import { type DRPNodeConfig } from "@ts-drp/types";
 
 import { program } from "./cli/index.js";
 import { loadConfig } from "./config.js";
-import { DRPNode } from "./index.js";
 import { init as rpc_init } from "./rpc/index.js";
+import { createNodeRuntime } from "./runtime.js";
 
 /**
  * Run the DRP node.
@@ -14,8 +14,7 @@ export const run = async (port: number = 6969): Promise<void> => {
 	const opts = program.opts();
 	const config: DRPNodeConfig | undefined = loadConfig(opts.config);
 
-	const node = new DRPNode(config);
-	await node.start();
+	const { node } = await createNodeRuntime(config ?? {});
 	rpc_init(node, port);
 };
 

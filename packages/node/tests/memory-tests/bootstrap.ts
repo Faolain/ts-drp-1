@@ -26,11 +26,12 @@ if (isNaN(stop_time)) {
 const bootstrap_node = new DRPNode({
 	network_config: {
 		listen_addresses: ["/ip4/127.0.0.1/tcp/50000/ws"],
-		bootstrap: true,
 		bootstrap_peers: [],
 		log_config: {
 			template: "[%t] %l: %n",
 		},
+		relay_service: { enabled: true },
+		seed: true,
 		pubsub: {
 			peer_discovery_interval,
 		},

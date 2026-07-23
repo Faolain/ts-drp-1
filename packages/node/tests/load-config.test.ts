@@ -30,9 +30,10 @@ describe("loadConfig", () => {
 			network_config: {
 				listen_addresses: ["addr1", "addr2"],
 				announce_addresses: ["announce1"],
-				bootstrap: true,
 				bootstrap_peers: ["peer1", "peer2"],
 				browser_metrics: false,
+				relay_service: { enabled: true },
+				seed: true,
 			},
 			keychain_config: {
 				private_key_seed: "test-seed",
@@ -63,11 +64,13 @@ describe("loadConfig", () => {
 
 		const expectedConfig: DRPNodeConfig = {
 			network_config: {
+				autonat: undefined,
 				listen_addresses: ["addr1", "addr2"],
 				announce_addresses: ["announce1"],
-				bootstrap: undefined,
 				bootstrap_peers: ["peer1", "peer2"],
 				browser_metrics: false,
+				relay_service: undefined,
+				seed: undefined,
 			},
 			keychain_config: {
 				private_key_seed: "test-seed",
@@ -85,11 +88,13 @@ describe("loadConfig", () => {
 
 		const expectedConfig: DRPNodeConfig = {
 			network_config: {
+				autonat: true,
 				listen_addresses: ["addr1", "addr2"],
 				announce_addresses: undefined,
-				bootstrap: true,
 				bootstrap_peers: [],
 				browser_metrics: undefined,
+				relay_service: { enabled: true },
+				seed: true,
 			},
 			keychain_config: {
 				private_key_seed: undefined,
@@ -112,11 +117,13 @@ describe("loadConfig", () => {
 
 		const expectedConfig: DRPNodeConfig = {
 			network_config: {
+				autonat: false,
 				listen_addresses: ["addr1"],
 				announce_addresses: undefined,
-				bootstrap: false,
 				bootstrap_peers: undefined,
 				browser_metrics: false,
+				relay_service: { enabled: false },
+				seed: false,
 			},
 			keychain_config: {
 				private_key_seed: undefined,
