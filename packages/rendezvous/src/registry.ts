@@ -647,6 +647,7 @@ export interface RendezvousDirectory {
 export interface RegistryBackendSelection {
 	readonly excludeBackendIds?: readonly string[];
 	readonly preferredRegistryIds?: readonly string[];
+	readonly targetPeerId?: string;
 }
 
 /**
@@ -841,10 +842,13 @@ export class RegistryClient implements RendezvousDirectory {
 		}
 		this.#lastAttempts = Object.freeze(attempts);
 		if (healthyDirectoryCount > 0) {
-			return reconcileValidatedRecords(acceptedRecordSets, {
+			const reconciled = reconcileValidatedRecords(acceptedRecordSets, {
 				maxRecords: this.#maxResponseRecords,
 				now: Number.NEGATIVE_INFINITY,
 			});
+			return selection.targetPeerId === undefined
+				? reconciled
+				: reconciled.filter(({ record }) => record.peerId === selection.targetPeerId);
 		}
 		throw new RegistryExhaustedError("discover", attempts);
 	}

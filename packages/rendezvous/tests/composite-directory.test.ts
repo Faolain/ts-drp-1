@@ -170,6 +170,27 @@ describe("createCompositeRendezvousDirectory", () => {
 		expect(secondDiscover).toHaveBeenCalledWith(NAMESPACE, expect.any(AbortSignal), selection);
 	});
 
+	it("filters targeted results even when every child ignores the selection", async () => {
+		const targetRecord = {
+			admissionMode: "open" as const,
+			record: await signedFixture(806),
+			sourceEndpointId: "target",
+		};
+		const unrelatedRecord = {
+			admissionMode: "open" as const,
+			record: await signedFixture(807),
+			sourceEndpointId: "unrelated",
+		};
+		const leakingChild = directory({
+			discover: () => Promise.resolve([unrelatedRecord, targetRecord]),
+		});
+		const composite = createCompositeRendezvousDirectory([leakingChild, leakingChild]);
+
+		await expect(
+			composite.discover(NAMESPACE, signal(), { targetPeerId: targetRecord.record.peerId })
+		).resolves.toEqual([targetRecord, targetRecord]);
+	});
+
 	it("rejects an empty child directory list with a typed configuration error", () => {
 		expect(() => createCompositeRendezvousDirectory([])).toThrow(CompositeRendezvousConfigurationError);
 		expect(() => createCompositeRendezvousDirectory([])).toThrow(/at least one/iu);

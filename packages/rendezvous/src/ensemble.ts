@@ -171,6 +171,9 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 						deadline.signal
 					);
 					for (const candidate of filtered.records) {
+						if (selection.targetPeerId !== undefined && candidate.record.peerId !== selection.targetPeerId) {
+							continue;
+						}
 						emitted.set(candidate.record.peerId, candidate.record.sequence);
 						yield candidate;
 					}
@@ -198,6 +201,9 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 				);
 				const filtered = await filterAddresses(networkRecords, options.addressPolicy, deadline.signal);
 				for (const candidate of filtered.records) {
+					if (selection.targetPeerId !== undefined && candidate.record.peerId !== selection.targetPeerId) {
+						continue;
+					}
 					if (options.cache !== undefined) {
 						try {
 							await raceWithSignal(options.cache.put(candidate), deadline.signal);
@@ -232,13 +238,19 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 			}
 			return registries.register(record, signal, credential);
 		},
-		discover: async (namespace: string, signal: AbortSignal): Promise<readonly AddressFilteredDrpRecord[]> => {
+		discover: async (
+			namespace: string,
+			signal: AbortSignal,
+			selection: RegistryBackendSelection = {}
+		): Promise<readonly AddressFilteredDrpRecord[]> => {
 			const deadline = operationDeadline(signal, timeoutMs);
 			try {
 				const tasks: Array<Promise<SourceResult>> = [];
 				if (registries !== undefined) {
 					tasks.push(
-						runSource("registries", maximum, deadline.signal, () => registries.discover(namespace, deadline.signal))
+						runSource("registries", maximum, deadline.signal, () =>
+							registries.discover(namespace, deadline.signal, selection)
+						)
 					);
 				}
 				if (options.anchors !== undefined) {
@@ -268,7 +280,9 @@ export function createRendezvousEnsemble(options: RendezvousEnsembleOptions): Re
 					recordRejectedCount: results.reduce((count, result) => count + result.recordRejectedCount, 0),
 					sources: Object.freeze(sources),
 				});
-				return filtered.records;
+				return selection.targetPeerId === undefined
+					? filtered.records
+					: filtered.records.filter(({ record }) => record.peerId === selection.targetPeerId);
 			} finally {
 				deadline.cleanup();
 			}

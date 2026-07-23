@@ -47,7 +47,9 @@ class CompositeRendezvousDirectory implements RendezvousDirectory {
 			}
 		}
 		if (successfulChildren === 0) throw new RegistryExhaustedError("discover", attempts);
-		return records;
+		return selection?.targetPeerId === undefined
+			? records
+			: records.filter(({ record }) => record.peerId === selection.targetPeerId);
 	}
 
 	async register(

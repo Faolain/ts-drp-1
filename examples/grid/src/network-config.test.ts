@@ -104,6 +104,7 @@ describe("grid network configuration", () => {
 				},
 			},
 		});
+		expect(config.network_config?.control_plane?.rendezvous).not.toHaveProperty("refresh_interval_ms");
 	});
 
 	it("uses WAN relay deadlines only for the public modular profile", () => {

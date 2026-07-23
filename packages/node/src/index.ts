@@ -50,6 +50,7 @@ import {
 	type RegistryAttempt,
 	RegistryClient,
 	RegistryExhaustedError,
+	type RendezvousBootstrapSelection,
 	type RendezvousDirectory,
 	type RendezvousEnsemble,
 } from "@ts-drp/rendezvous";
@@ -331,6 +332,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _intervals: Map<string, IntervalRunnerMap[keyof IntervalRunnerMap]> = new Map();
 	private _subscribedNetworkNode?: DRPNetworkNode;
 	private _connectFetchControllers = new Map<string, AbortController>();
+	private _connectRendezvousControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
 	private _rendezvousRegistrationController: AbortController | undefined;
@@ -436,6 +438,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._rendezvousBootstrapController?.abort(new Error("DRPNode stopped"));
 		this._connectFetchControllers.forEach((controller) => controller.abort());
 		this._connectFetchControllers.clear();
+		this._connectRendezvousControllers.forEach((controller) => controller.abort());
+		this._connectRendezvousControllers.clear();
 		this._initialSyncPeers.clear();
 		this._intervals.forEach((interval) => interval.stop());
 		this._intervals.clear();
@@ -572,6 +576,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		) {
 			throw new Error("rendezvous refresh_interval_ms must be within 250..300000 inclusive and below record_ttl_ms");
 		}
+		const registrationDeadlineMs = Math.min(refreshIntervalMs, Math.max(1_000, Math.floor(ttlMs / 4)));
 		const privateKey = privateKeyFromRaw(this.keychain.secp256k1PrivateKey);
 		const producer = createRecordProducer({
 			addressSource: (): readonly string[] => prioritizedRendezvousAddresses(this.networkNode.getMultiaddrs() ?? []),
@@ -596,7 +601,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 							? (rendezvousConfig.nostr?.relays?.length ?? 0)
 							: 0),
 					controller.signal,
-					refreshIntervalMs
+					registrationDeadlineMs
 				);
 				const tracked = registration.finally(() => {
 					if (this._rendezvousRegistration === tracked) this._rendezvousRegistration = undefined;
@@ -1168,6 +1173,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		// Anti-entropy must remain active even when the initial fetch sees no peer,
 		// so a later SYNC can deliver the object's history.
 		this._createObjectIntervals(options.id);
+		void this._connectObjectCreator(options.id);
 		const previousFetch = this._connectFetchControllers.get(object.id);
 		previousFetch?.abort();
 		const fetchController = new AbortController();
@@ -1230,6 +1236,55 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	}
 
 	/**
+	 * Uses a creator-bound object id to discover and dial its creator without
+	 * delaying or failing the object connection flow.
+	 * @param id - Object id carrying an optional creator commitment.
+	 */
+	private async _connectObjectCreator(id: string): Promise<void> {
+		this._connectRendezvousControllers.get(id)?.abort();
+		this._connectRendezvousControllers.delete(id);
+
+		const creator = creatorFromObjectID(id);
+		if (creator === undefined || creator === this.networkNode.peerId) return;
+		if (this.networkNode.getAllPeers().includes(creator)) return;
+		const directory = this._rendezvous;
+		const namespace = this.config.network_config?.control_plane?.rendezvous?.namespace;
+		if (directory === undefined || namespace === undefined) return;
+
+		const controller = new AbortController();
+		// No await occurs before this registration, and stop() clears _rendezvous,
+		// so shutdown cannot interleave here and re-arm an orphaned controller.
+		this._connectRendezvousControllers.set(id, controller);
+		try {
+			// Creator-offline lookup through room-scoped replicas is intentionally deferred.
+			const selection: RendezvousBootstrapSelection & { readonly targetPeerId: string } = {
+				targetPeerId: creator,
+			};
+			const dialedAddressSets = new Set<string>();
+			for await (const record of directory.bootstrap(namespace, controller.signal, selection)) {
+				if (record.record.peerId !== creator) continue;
+				const acceptedAddresses = [...record.acceptedAddresses];
+				const addressSetKey = JSON.stringify([...acceptedAddresses].sort());
+				if (dialedAddressSets.has(addressSetKey)) continue;
+				controller.signal.throwIfAborted();
+				dialedAddressSets.add(addressSetKey);
+				await this.networkNode.connect(acceptedAddresses);
+				controller.signal.throwIfAborted();
+			}
+		} catch (error) {
+			if (controller.signal.aborted) {
+				log.info("::connectObject: Targeted creator rendezvous cancelled");
+			} else {
+				log.error("::connectObject: Targeted creator rendezvous failed", error);
+			}
+		} finally {
+			if (this._connectRendezvousControllers.get(id) === controller) {
+				this._connectRendezvousControllers.delete(id);
+			}
+		}
+	}
+
+	/**
 	 * Subscribe to an object.
 	 * @param object - The object to subscribe to.
 	 */
@@ -1253,6 +1308,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	unsubscribeObject(id: string, purge?: boolean): void {
 		this._connectFetchControllers.get(id)?.abort();
 		this._connectFetchControllers.delete(id);
+		this._connectRendezvousControllers.get(id)?.abort();
+		this._connectRendezvousControllers.delete(id);
 		this._stopObjectIntervals(id);
 		clearSyncRecoveryEpisodes(this, id);
 		this._initialSyncPeers.delete(id);

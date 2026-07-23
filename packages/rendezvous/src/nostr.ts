@@ -277,7 +277,7 @@ export class NostrRelayDirectory implements RendezvousDirectory {
 	): Promise<readonly ValidatedDrpRecord[]> {
 		signal.throwIfAborted();
 		const relays = selectedRelays(this.#relays, selection);
-		const results = await Promise.all(relays.map((relay) => this.#queryRelay(relay, namespace, signal)));
+		const results = await Promise.all(relays.map((relay) => this.#queryRelay(relay, namespace, signal, selection)));
 		signal.throwIfAborted();
 
 		const attempts: RegistryAttempt[] = [];
@@ -359,18 +359,26 @@ export class NostrRelayDirectory implements RendezvousDirectory {
 	async #queryRelay(
 		relay: NostrRelayEndpoint,
 		namespace: string,
-		parentSignal: AbortSignal
+		parentSignal: AbortSignal,
+		selection: RegistryBackendSelection
 	): Promise<RelayDiscoveryResult> {
 		try {
 			const records = await this.#withConnection(relay, parentSignal, async (connection, signal) => {
 				let receivedBytes = 0;
 				const validator = this.#validatorFactory();
 				const validated: ValidatedDrpRecord[] = [];
-				const filter: NostrFilter = {
-					"#n": [namespace],
-					"kinds": [ADDRESSABLE_EVENT_KIND],
-					"limit": this.#maxResponseRecords + 1,
-				};
+				const filter: NostrFilter =
+					selection.targetPeerId === undefined
+						? {
+								"#n": [namespace],
+								"kinds": [ADDRESSABLE_EVENT_KIND],
+								"limit": this.#maxResponseRecords + 1,
+							}
+						: {
+								"#d": [replacementKey(namespace, selection.targetPeerId)],
+								"kinds": [ADDRESSABLE_EVENT_KIND],
+								"limit": this.#maxResponseRecords + 1,
+							};
 				for await (const event of connection.query(filter, signal)) {
 					signal.throwIfAborted();
 					const eventBytes = serializedByteLength(event);
@@ -385,6 +393,9 @@ export class NostrRelayDirectory implements RendezvousDirectory {
 						signal,
 					});
 					if (!checked.accepted) continue;
+					if (selection.targetPeerId !== undefined && checked.record.peerId !== selection.targetPeerId) {
+						continue;
+					}
 					validated.push({
 						admissionMode: "open",
 						record: checked.record,
