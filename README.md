@@ -54,13 +54,29 @@ pnpm e2e-test:public-infra
 ```
 
 Caveats: this **sends traffic to third-party relays**, is **not** a CI gate, and
-is inherently flakier than the local run. **Connectivity** (circuit relays) still
-uses local operator-diverse relays — browser-usable _public_ circuit relays that
-grant reservations to strangers cannot be reliably sourced, so there is no
-fully-public-infra run. Override `VITE_NOSTR_RELAYS` to point elsewhere and
-`VITE_RENDEZVOUS_NAMESPACE` to isolate a run. See
+is inherently flakier than the local run. In this run only **discovery** is
+public; **connectivity** (circuit relays) still uses local operator-diverse
+relays, because browser-usable _public_ circuit relays that grant reservations to
+strangers cannot be reliably sourced. Override `VITE_NOSTR_RELAYS` to point
+elsewhere and `VITE_RENDEZVOUS_NAMESPACE` to isolate a run. See
 [docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr) for
 the full public-infra story and the connectivity-half constraints.
+
+The **connectivity** half _can_ be exercised fully-publicly at the **node** level
+(a node, unlike a browser, can harvest a relay from its own connected peers):
+
+```bash
+pnpm test:public-relay-live
+```
+
+This opt-in check boots a DRP node against the canonical public Amino
+bootstrappers and asserts it reserves a **real public Circuit Relay v2** node via
+the warm connected-peer HOP harvest (typically 2–5 s). It is skipped in the normal
+suite, **sends real traffic to public infrastructure**, is **not** a CI gate, and
+does not assert the granted relay is browser-usable (the native store takes the
+first HOP grant, often a node-only tcp/quic relay). There is no equivalent
+_fully-public browser_ run — browsers must source relays via delegated routing,
+which does not reliably surface reservation-granting relays.
 
 # Known Issues
 
