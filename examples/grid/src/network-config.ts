@@ -83,6 +83,12 @@ export function buildModularNetworkConfig(environment: GridNetworkEnv): DRPNodeC
 					startup_grace_ms: 1_500,
 				},
 				relay_policy: {
+					...(allowInsecureFixture
+						? {}
+						: {
+								per_candidate_deadline_ms: 8_000,
+								total_deadline_ms: 30_000,
+							}),
 					sources: { delegated_closest_peers: { enabled: true } },
 					target_reservations: 1,
 				},

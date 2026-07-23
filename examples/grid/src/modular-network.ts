@@ -114,8 +114,10 @@ export function createModularGridNetwork(
 			limits: {
 				maxConcurrentReservations: 1,
 				maxPerOperatorGroup: 1,
+				perCandidateDeadlineMs: options.perCandidateDeadlineMs,
 				requiredOperatorGroups: options.targetReservations,
 				requiredReservations: options.targetReservations,
+				totalDeadlineMs: options.totalDeadlineMs,
 			},
 			onReservationEvent: options.onReservationEvent,
 			reservationClient: client,

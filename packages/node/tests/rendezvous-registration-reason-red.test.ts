@@ -5,6 +5,7 @@ import type {
 	SignedDrpRecordV1,
 	ValidatedDrpRecord,
 } from "@ts-drp/rendezvous";
+import { NostrRecordValidationError } from "@ts-drp/rendezvous";
 import type { ControlPlaneEvent, DRPNodeConfig } from "@ts-drp/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -117,6 +118,51 @@ describe("rendezvous-registration failure reason RED contract", () => {
 			await node.stop();
 		}
 	}, 8_000);
+
+	it("surfaces an allowlisted Nostr validation code without leaking attacker-controlled codes", async () => {
+		const events: ControlPlaneEvent[] = [];
+		const node = new DRPNode(nodeConfig(events));
+
+		await expect(
+			node["_registerRendezvousRecord"](
+				resolvedProducer(),
+				rejectingDirectory(new NostrRecordValidationError("too-many-addresses")),
+				undefined,
+				1,
+				new AbortController().signal,
+				1_000
+			)
+		).resolves.toBe(true);
+
+		const failedRegistration = events.find(
+			(event) => event.kind === "rendezvous-registration" && event.outcome === "failed"
+		);
+		expect.soft(eventReason(failedRegistration)).toBe("validation: too-many-addresses");
+		expect(reasonLength(failedRegistration)).toBeLessThanOrEqual(160);
+
+		const attackerEvents: ControlPlaneEvent[] = [];
+		const attackerNode = new DRPNode(nodeConfig(attackerEvents));
+		const attackerCode = "attacker-code:https://secret.example.test/private";
+		const validationError = new NostrRecordValidationError("too-many-addresses");
+		Object.defineProperty(validationError, "code", { value: attackerCode });
+
+		await expect(
+			attackerNode["_registerRendezvousRecord"](
+				resolvedProducer(),
+				rejectingDirectory(validationError),
+				undefined,
+				1,
+				new AbortController().signal,
+				1_000
+			)
+		).resolves.toBe(true);
+
+		const attackerRegistration = attackerEvents.find(
+			(event) => event.kind === "rendezvous-registration" && event.outcome === "failed"
+		);
+		expect(eventReason(attackerRegistration)).toBe("error");
+		expect(JSON.stringify(attackerRegistration)).not.toContain(attackerCode);
+	});
 });
 
 function eventReason(event: ControlPlaneEvent | undefined): unknown {
@@ -127,6 +173,21 @@ function eventReason(event: ControlPlaneEvent | undefined): unknown {
 function reasonLength(event: ControlPlaneEvent | undefined): number {
 	const reason = eventReason(event);
 	return typeof reason === "string" ? reason.length : Number.POSITIVE_INFINITY;
+}
+
+function resolvedProducer(): RecordProducer {
+	const record = {} as SignedDrpRecordV1;
+	return {
+		current: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
+		refresh: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
+	};
+}
+
+function rejectingDirectory(error: Error): RendezvousDirectory {
+	return {
+		discover: (): Promise<readonly ValidatedDrpRecord[]> => Promise.resolve([]),
+		register: (): Promise<ClientRegistrationReceipt> => Promise.reject(error),
+	};
 }
 
 function stubRegistryFetch(registrationResponse: (url: string) => unknown): void {

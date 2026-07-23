@@ -32,15 +32,19 @@ import {
 	createRecordProducer,
 	createRendezvousEnsemble,
 	decodeInvite,
+	DEFAULT_RECORD_LIMITS,
 	type DrpCapability,
 	InMemoryPeerCacheStore,
 	InMemorySequenceStore,
 	InviteDirectory,
+	isValidRendezvousNamespace,
 	LocalStoragePeerCacheStore,
+	NostrRecordValidationError,
 	type NostrRelayConnectionFactory,
 	type NostrSigner,
 	type PeerCache,
 	type PeerCacheStore,
+	type RecordRejectionCode,
 	RecordSigner,
 	RecordValidator,
 	type RegistryAttempt,
@@ -113,6 +117,12 @@ function sanitizedRendezvousRegistrationFailureReason(
 	lifecycleSignal: AbortSignal,
 	timeoutSignal: AbortSignal
 ): string {
+	if (error instanceof NostrRecordValidationError) {
+		const code = sanitizedNostrRecordValidationCode(error.code);
+		if (code !== undefined) {
+			return `validation: ${code}`.slice(0, RENDEZVOUS_REGISTRATION_REASON_MAX_LENGTH);
+		}
+	}
 	const reason = lifecycleSignal.aborted
 		? "aborted"
 		: timeoutSignal.aborted || isAbortLikeError(error)
@@ -124,6 +134,43 @@ function sanitizedRendezvousRegistrationFailureReason(
 function isAbortLikeError(error: unknown): boolean {
 	if (typeof error !== "object" || error === null || !("name" in error)) return false;
 	return error.name === "AbortError" || error.name === "TimeoutError";
+}
+
+function sanitizedNostrRecordValidationCode(code: RecordRejectionCode): RecordRejectionCode | undefined {
+	switch (code) {
+		case "admission-rejected":
+		case "admission-required":
+		case "expired":
+		case "invalid-address":
+		case "invalid-namespace":
+		case "invalid-peer-id":
+		case "invalid-public-key":
+		case "invalid-sequence":
+		case "invalid-shape":
+		case "invalid-signature":
+		case "invalid-time":
+		case "issued-in-future":
+		case "namespace-mismatch":
+		case "non-canonical":
+		case "oversized":
+		case "peer-id-mismatch":
+		case "replay-capacity-exceeded":
+		case "replayed-sequence":
+		case "response-cap-exceeded":
+		case "ttl-out-of-range":
+		case "too-many-addresses":
+		case "too-many-capabilities":
+		case "unsafe-address":
+		case "unsupported-capability":
+		case "unsupported-version":
+			return code;
+		default:
+			return dropUnexpectedValidationCode(code);
+	}
+}
+
+function dropUnexpectedValidationCode(_code: never): undefined {
+	return undefined;
 }
 
 function sanitizedRegistryRejectionCode(code: RegistryAttempt["code"]): string | undefined {
@@ -443,6 +490,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!hasConfiguredRegistry && !cacheEnabled && !hasInvite) return;
 		const namespace = rendezvousConfig.namespace;
 		if (namespace === undefined) throw new Error("configured rendezvous requires a namespace");
+		if (!isValidRendezvousNamespace(namespace)) {
+			throw new Error(
+				"network_config.control_plane.rendezvous.namespace must use drp-network:v1: followed by 22..86 base64url characters"
+			);
+		}
 		const addressConfig = this.config.network_config?.control_plane?.address_policy;
 		const resolver = addressConfig?.resolver ?? createDnsResolver();
 		const validatorFactory = (): RecordValidator =>
@@ -522,7 +574,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 		const privateKey = privateKeyFromRaw(this.keychain.secp256k1PrivateKey);
 		const producer = createRecordProducer({
-			addressSource: () => this.networkNode.getMultiaddrs() ?? [],
+			addressSource: (): readonly string[] => prioritizedRendezvousAddresses(this.networkNode.getMultiaddrs() ?? []),
 			capabilitySource: () => deriveRendezvousCapabilities(this.config),
 			namespace,
 			peerId: this.networkNode.peerId,
@@ -1326,6 +1378,35 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 		await interval.handleDiscoveryResponse(sender, response.subscribers);
 	}
+}
+
+function prioritizedRendezvousAddresses(addresses: readonly string[]): readonly string[] {
+	const uniqueAddresses = [...new Set(addresses)];
+	if (uniqueAddresses.length <= DEFAULT_RECORD_LIMITS.maxAddresses) return uniqueAddresses;
+
+	const webrtcAddresses: string[] = [];
+	const plainCircuitAddresses: string[] = [];
+	const otherAddresses: string[] = [];
+	for (const address of uniqueAddresses) {
+		if (address.includes("/webrtc")) {
+			webrtcAddresses.push(address);
+		} else if (address.includes("/p2p-circuit")) {
+			plainCircuitAddresses.push(address);
+		} else {
+			otherAddresses.push(address);
+		}
+	}
+
+	const reachabilityAddresses: string[] = [];
+	const reachabilityClassSize = Math.max(webrtcAddresses.length, plainCircuitAddresses.length);
+	for (let index = 0; index < reachabilityClassSize; index += 1) {
+		const webrtcAddress = webrtcAddresses[index];
+		if (webrtcAddress !== undefined) reachabilityAddresses.push(webrtcAddress);
+		const plainCircuitAddress = plainCircuitAddresses[index];
+		if (plainCircuitAddress !== undefined) reachabilityAddresses.push(plainCircuitAddress);
+	}
+
+	return [...reachabilityAddresses, ...otherAddresses].slice(0, DEFAULT_RECORD_LIMITS.maxAddresses);
 }
 
 function createConfiguredBrowserRouting(config: DRPNodeConfig | undefined): BrowserRouting | undefined {

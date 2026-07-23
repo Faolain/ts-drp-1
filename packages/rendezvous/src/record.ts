@@ -15,6 +15,15 @@ const SUPPORTED_CAPABILITIES = ["drp-gossipsub", "webrtc", "relay-client", "rela
 export type DrpCapability = (typeof SUPPORTED_CAPABILITIES)[number];
 export type AdmissionMode = "open" | "invite" | "allowlist" | "proof-of-work";
 
+/**
+ * Checks whether a value is a versioned opaque peer-rendezvous namespace.
+ * @param namespace - Candidate namespace.
+ * @returns Whether the namespace has the required prefix and base64url entropy.
+ */
+export function isValidRendezvousNamespace(namespace: string): boolean {
+	return NAMESPACE_PATTERN.test(namespace);
+}
+
 export interface SignedDrpRecordPayloadV1 {
 	readonly kind: typeof RECORD_KIND;
 	readonly version: 1;
@@ -206,7 +215,7 @@ export class RecordValidator {
 			return reject("oversized", `${serializedBytes}/${this.#limits.maxRecordBytes} bytes`);
 		}
 		if (record.kind !== RECORD_KIND || record.version !== 1) return reject("unsupported-version");
-		if (!NAMESPACE_PATTERN.test(record.namespace)) return reject("invalid-namespace");
+		if (!isValidRendezvousNamespace(record.namespace)) return reject("invalid-namespace");
 		if (record.namespace !== context.expectedNamespace) return reject("namespace-mismatch");
 		if (record.addresses.length > this.#limits.maxAddresses) {
 			return reject("too-many-addresses", `${record.addresses.length}/${this.#limits.maxAddresses}`);

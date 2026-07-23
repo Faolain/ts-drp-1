@@ -106,6 +106,21 @@ describe("grid network configuration", () => {
 		});
 	});
 
+	it("uses WAN relay deadlines only for the public modular profile", () => {
+		const publicRelayPolicy = buildModularNetworkConfig(modularEnvironment).network_config?.control_plane?.relay_policy;
+		const fixtureRelayPolicy = buildModularNetworkConfig({
+			...modularEnvironment,
+			allowInsecureFixture: "true",
+		}).network_config?.control_plane?.relay_policy;
+
+		expect.soft(publicRelayPolicy).toMatchObject({
+			per_candidate_deadline_ms: 8_000,
+			total_deadline_ms: 30_000,
+		});
+		expect(fixtureRelayPolicy?.per_candidate_deadline_ms ?? 1_000).toBe(1_000);
+		expect(fixtureRelayPolicy?.total_deadline_ms ?? 5_000).toBe(5_000);
+	});
+
 	it.each([undefined, "", "false", "0"])("keeps fixture allowances off for %j", (flag) => {
 		const controlPlane = buildModularNetworkConfig({
 			...modularEnvironment,
