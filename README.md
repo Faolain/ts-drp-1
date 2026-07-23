@@ -85,16 +85,21 @@ traffic to public infrastructure**, and are **not** CI gates. The relay checks d
 not assert the granted relay is browser-usable (the native store takes the first
 HOP grant, often node-only tcp/quic).
 
-A **browser** was separately verified (live) to reserve a _granting_ public relay
-too — via **both** paths: public delegated routing (`delegated-ipfs.dev` surfaces
-AutoTLS `*.libp2p.direct` `/tls/ws` relays that DRP's RelayPolicy reserved) **and**
-the native connected-peer HOP harvest from public bootstrappers (canonical
-`*.bootstrap.libp2p.io` refuse, but an AutoTLS relay granted). So browser
-connectivity over public infra is real, not the blocker — it just needs a
-WAN-appropriate `control_plane.relay_policy.per_candidate_deadline_ms` (the 1s
-fixture default times out cold `wss` dials). Full two-browser fully-public
-convergence is **not** yet demonstrated: the open piece is discovery-side (a
-browser Nostr-publish issue under the no-fixture profile). See
+**Two browsers now converge fully-publicly** — discovery over real public Nostr,
+connectivity via a real public relay found through public delegated routing
+(`delegated-ipfs.dev` surfaces AutoTLS `*.libp2p.direct` relays that DRP's
+RelayPolicy reserves), **no DRP-operated infra at all**:
+
+```bash
+pnpm e2e-test:fully-public
+```
+
+Like the other public runs it's **opt-in**, **not** a CI gate, and inherently
+flakier (live third-party Nostr + ephemeral AutoTLS relays). Getting here fixed a
+real bug — DRP published its raw unbounded address set, so a many-addressed public
+relay blew the record's address limit and registration failed forever; the record
+is now address-bounded (keeping the WebRTC dial path) and public relay reservation
+uses WAN-appropriate deadlines. See
 [docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr).
 
 # Known Issues

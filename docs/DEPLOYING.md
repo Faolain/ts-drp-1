@@ -173,12 +173,18 @@ AutoTLS `*.libp2p.direct` `/tls/ws` relays and DRP's own `RelayPolicy` reserved 
 (`reservationStatus:100`, `status:"reserved"`); and (2) **native harvest** — fed the
 canonical `*.bootstrap.libp2p.io` wss bootstrappers, the browser saw
 `RESERVATION_REFUSED` from the canonical nodes (as expected) but an AutoTLS relay
-**granted** ~1.3s after boot. Two caveats: browser reservation needs a
-WAN-appropriate `control_plane.relay_policy.per_candidate_deadline_ms` (the 1s
-fixture default times out cold `wss` dials — now config-exposable), and full
-two-browser fully-public convergence is **not yet demonstrated** — the remaining
-blocker is discovery-side (a browser Nostr-publish failure under the no-fixture
-profile; the `rendezvous-registration` event now carries a `reason` to diagnose it).
+**granted** ~1.3s after boot. **Full two-browser fully-public convergence is now
+demonstrated** (`pnpm e2e-test:fully-public`, ~18s): two browsers discover over
+public Nostr, reserve a real public relay via public delegated routing, connect,
+and sync a grid object — no DRP-operated infra. Getting there fixed a real bug:
+DRP published its raw unbounded `getMultiaddrs()`, so a many-addressed public
+AutoTLS relay exceeded the record's 8-address limit and the whole record was
+rejected on every refresh (registration failed forever); the published set is now
+bounded and prioritized (the browser's `/p2p-circuit/webrtc` dial path always
+survives the cap), an invalid namespace fails fast at start, the
+`rendezvous-registration` event surfaces the validation code, and the grid public
+profile uses a WAN-appropriate `per_candidate_deadline_ms`. The run is opt-in and
+flaky (live third-party Nostr + ephemeral AutoTLS relays), not a CI gate.
 
 **The DRP node overflow tier is wired and works** (see `phase-08.md`). An earlier
 cold `getClosestPeers` DHT-walk source (`NodeRoutingClosestPeersSource`) was
