@@ -28,5 +28,7 @@ describe("browser network rendezvous refresh configuration", () => {
 			record_ttl_ms: 60_000,
 			refresh_interval_ms: 1_000,
 		});
+		expect.soft(production?.room_presence).toEqual({ enabled: true });
+		expect.soft(fixture?.room_presence).toEqual({ enabled: true });
 	});
 });

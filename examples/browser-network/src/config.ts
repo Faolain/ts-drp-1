@@ -113,6 +113,7 @@ export function buildModularNetworkConfig(environment: BrowserNetworkEnv): DRPNo
 							}),
 					publish: true,
 					record_ttl_ms: 60_000,
+					room_presence: { enabled: true },
 					...(allowInsecureFixture ? { refresh_interval_ms: 1_000 } : {}),
 					...(environment.rendezvousInvite === undefined || environment.rendezvousInvite.trim() === ""
 						? {}

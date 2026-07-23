@@ -12,6 +12,7 @@ import {
 	RegistryClient,
 	RegistryServer,
 	type RendezvousEnsemble,
+	roomNamespace,
 	type SignedDrpRecordV1,
 } from "@ts-drp/rendezvous";
 import type { DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
@@ -27,6 +28,7 @@ interface DirectoryFixture {
 	readonly endpoints: readonly [FixtureRegistryEndpoint, FixtureRegistryEndpoint];
 	readonly ensemble: RendezvousEnsemble;
 	readonly other: SignedDrpRecordV1;
+	readonly registries: RegistryClient;
 	readonly target: SignedDrpRecordV1;
 }
 
@@ -97,10 +99,15 @@ describe("connectObject targeted creator rendezvous", () => {
 		const fixture = await startedNode(directory.ensemble);
 		nodes.push(fixture.node);
 		const discoverSpies = directory.endpoints.map((endpoint) => vi.spyOn(endpoint, "discover"));
+		const registryDiscover = vi.spyOn(directory.registries, "discover");
 
 		pending.push(fixture.node.connectObject({ id: "legacy-object-without-creator" }));
 		await flushMicrotasks();
-		expect(discoverSpies.every((discover) => discover.mock.calls.length === 0)).toBe(true);
+		expect(discoverSpies.flatMap((discover) => discover.mock.calls).map(([request]) => request.namespace)).toEqual([
+			roomNamespace("legacy-object-without-creator"),
+			roomNamespace("legacy-object-without-creator"),
+		]);
+		expect(registryDiscover.mock.calls.every(([, , selection]) => selection?.targetPeerId === undefined)).toBe(true);
 		expect(fixture.connect).not.toHaveBeenCalled();
 
 		pending.push(fixture.node.connectObject({ id: objectId(directory.target, "bound-control") }));
@@ -347,7 +354,7 @@ async function directoryFixture(): Promise<DirectoryFixture> {
 		registries,
 		validatorFactory: () => validator(now),
 	});
-	return { endpoints, ensemble, other, target };
+	return { endpoints, ensemble, other, registries, target };
 }
 
 async function startedNode(ensemble: RendezvousEnsemble): Promise<NodeFixture> {

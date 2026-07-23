@@ -42,6 +42,7 @@ import {
 	NostrRecordValidationError,
 	type NostrRelayConnectionFactory,
 	type NostrSigner,
+	PEER_NAMESPACE_PREFIX,
 	type PeerCache,
 	type PeerCacheStore,
 	type RecordRejectionCode,
@@ -53,6 +54,7 @@ import {
 	type RendezvousBootstrapSelection,
 	type RendezvousDirectory,
 	type RendezvousEnsemble,
+	roomNamespace,
 } from "@ts-drp/rendezvous";
 import { type BrowserRouting, type BrowserRoutingEndpoint, createBrowserRouting } from "@ts-drp/routing-browser";
 import {
@@ -100,7 +102,20 @@ const DISCOVERY_QUEUE_ID = "discovery";
 const NOSTR_SECRET_KEY_PATTERN = /^[0-9a-f]{64}$/u;
 const NOSTR_TRANSPORT_KEY_DOMAIN = new TextEncoder().encode("ts-drp-nostr-transport-v1");
 const RENDEZVOUS_REGISTRATION_REASON_MAX_LENGTH = 160;
+const DEFAULT_ROOM_PRESENCE_MAX_ROOMS = 7;
+const MAX_ROOM_PRESENCE_ROOMS = 32;
+const MAX_ROOM_RENDEZVOUS_DIALS = 8;
 const objectIntervalKey = (type: "discovery" | "sync", id: string): string => `interval:${type}::${id}`;
+
+function configuredRoomPresenceMaxRooms(config: ControlPlaneRendezvousConfig): number | undefined {
+	const roomPresence = config.room_presence;
+	if (roomPresence === undefined || !roomPresence.enabled) return undefined;
+	const maxRooms = roomPresence.max_rooms ?? DEFAULT_ROOM_PRESENCE_MAX_ROOMS;
+	if (!Number.isSafeInteger(maxRooms) || maxRooms < 1 || maxRooms > MAX_ROOM_PRESENCE_ROOMS) {
+		throw new Error(`rendezvous room_presence.max_rooms must be an integer within 1..${MAX_ROOM_PRESENCE_ROOMS}`);
+	}
+	return maxRooms;
+}
 
 function sanitizedRendezvousRegistrationReason(attempts: readonly RegistryAttempt[]): string | undefined {
 	const rejectionCodes = new Set<string>();
@@ -335,6 +350,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _connectRendezvousControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
+	private readonly _roomRendezvousProducers = new Map<string, ReturnType<typeof createRecordProducer>>();
+	private readonly _roomRendezvousCapacityLogged = new Set<string>();
+	private _roomRendezvousProducerFactory: ((objectId: string) => ReturnType<typeof createRecordProducer>) | undefined;
+	private _roomRendezvousMaxRooms = 0;
+	private _roomRendezvousRegistrationOffset = 0;
 	private _rendezvousRegistrationController: AbortController | undefined;
 	private _rendezvousRegistration: Promise<boolean> | undefined;
 	private _rendezvousBootstrapController: AbortController | undefined;
@@ -441,6 +461,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._connectRendezvousControllers.forEach((controller) => controller.abort());
 		this._connectRendezvousControllers.clear();
 		this._initialSyncPeers.clear();
+		this._roomRendezvousProducers.clear();
+		this._roomRendezvousCapacityLogged.clear();
+		this._roomRendezvousProducerFactory = undefined;
+		this._roomRendezvousMaxRooms = 0;
+		this._roomRendezvousRegistrationOffset = 0;
 		this._intervals.forEach((interval) => interval.stop());
 		this._intervals.clear();
 		const routing = this._routing;
@@ -480,6 +505,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private async _startRendezvous(): Promise<void> {
 		const rendezvousConfig = this.config.network_config?.control_plane?.rendezvous;
 		if (rendezvousConfig === undefined) return;
+		const roomPresenceMaxRooms = configuredRoomPresenceMaxRooms(rendezvousConfig);
 		const publicRendezvousEnabled =
 			this.config.network_config?.control_plane?.rollout?.public_components?.public_rendezvous?.enabled === true;
 		const cacheEnabled = rendezvousConfig.cache?.enabled === true;
@@ -494,7 +520,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!hasConfiguredRegistry && !cacheEnabled && !hasInvite) return;
 		const namespace = rendezvousConfig.namespace;
 		if (namespace === undefined) throw new Error("configured rendezvous requires a namespace");
-		if (!isValidRendezvousNamespace(namespace)) {
+		if (!namespace.startsWith(PEER_NAMESPACE_PREFIX) || !isValidRendezvousNamespace(namespace)) {
 			throw new Error(
 				"network_config.control_plane.rendezvous.namespace must use drp-network:v1: followed by 22..86 base64url characters"
 			);
@@ -578,21 +604,38 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 		const registrationDeadlineMs = Math.min(refreshIntervalMs, Math.max(1_000, Math.floor(ttlMs / 4)));
 		const privateKey = privateKeyFromRaw(this.keychain.secp256k1PrivateKey);
+		const addressSource = (): readonly string[] =>
+			prioritizedRendezvousAddresses(this.networkNode.getMultiaddrs() ?? []);
+		const capabilitySource = (): readonly DrpCapability[] => deriveRendezvousCapabilities(this.config);
+		const signer = new RecordSigner(privateKey);
 		const producer = createRecordProducer({
-			addressSource: (): readonly string[] => prioritizedRendezvousAddresses(this.networkNode.getMultiaddrs() ?? []),
-			capabilitySource: () => deriveRendezvousCapabilities(this.config),
+			addressSource,
+			capabilitySource,
 			namespace,
 			peerId: this.networkNode.peerId,
 			sequenceStore: this._rendezvousSequenceStore,
-			signer: new RecordSigner(privateKey),
+			signer,
 			ttlMs,
 		});
+		if (roomPresenceMaxRooms !== undefined) {
+			this._roomRendezvousMaxRooms = roomPresenceMaxRooms;
+			this._roomRendezvousProducerFactory = (objectId): ReturnType<typeof createRecordProducer> =>
+				createRecordProducer({
+					addressSource,
+					capabilitySource,
+					namespace: roomNamespace(objectId),
+					peerId: this.networkNode.peerId,
+					sequenceStore: new InMemorySequenceStore(Date.now()),
+					signer,
+					ttlMs,
+				});
+		}
 		const credential = registrationCredential(this.config);
 		const controller = new AbortController();
 		this._rendezvousRegistrationController = controller;
 		const runner = new IntervalRunner({
 			fn: (): Promise<boolean> => {
-				const registration = this._registerRendezvousRecord(
+				const registration = this._registerRendezvousRecords(
 					producer,
 					directory,
 					credential,
@@ -616,6 +659,66 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		});
 		this._intervals.set("interval::rendezvous", runner);
 		runner.start();
+	}
+
+	private async _registerRendezvousRecords(
+		producer: ReturnType<typeof createRecordProducer>,
+		directory: RendezvousDirectory,
+		credential: Parameters<RendezvousDirectory["register"]>[2],
+		endpointCount: number,
+		lifecycleSignal: AbortSignal,
+		deadlineMs: number
+	): Promise<boolean> {
+		this._backfillRoomRendezvousProducers();
+		const deadlineAtMs = Date.now() + deadlineMs;
+		await this._registerRendezvousRecord(producer, directory, credential, endpointCount, lifecycleSignal, deadlineMs);
+		if (lifecycleSignal.aborted) return false;
+
+		const roomEntries = [...this._roomRendezvousProducers.entries()];
+		const roomCount = roomEntries.length;
+		const startOffset = roomCount === 0 ? 0 : this._roomRendezvousRegistrationOffset % roomCount;
+		if (roomCount > 0) this._roomRendezvousRegistrationOffset = (startOffset + 1) % roomCount;
+		const orderedRoomEntries = [...roomEntries.slice(startOffset), ...roomEntries.slice(0, startOffset)];
+		let failedRoomCount = 0;
+		for (const [objectId, roomProducer] of orderedRoomEntries) {
+			if (lifecycleSignal.aborted) return false;
+			if (this._roomRendezvousProducers.get(objectId) !== roomProducer) continue;
+			const remainingMs = deadlineAtMs - Date.now();
+			if (remainingMs <= 0) {
+				failedRoomCount += 1;
+				continue;
+			}
+			const registered = await this._registerRoomRendezvousRecord(
+				roomProducer,
+				directory,
+				credential,
+				lifecycleSignal,
+				remainingMs
+			);
+			if (!registered && !lifecycleSignal.aborted) failedRoomCount += 1;
+		}
+		if (failedRoomCount > 0) {
+			log.warn("::rendezvous: Room presence registration failures", { failedRoomCount });
+		}
+		return !lifecycleSignal.aborted;
+	}
+
+	private async _registerRoomRendezvousRecord(
+		producer: ReturnType<typeof createRecordProducer>,
+		directory: RendezvousDirectory,
+		credential: Parameters<RendezvousDirectory["register"]>[2],
+		lifecycleSignal: AbortSignal,
+		deadlineMs: number
+	): Promise<boolean> {
+		const timeoutSignal = AbortSignal.timeout(Math.min(deadlineMs, 30_000));
+		const signal = AbortSignal.any([lifecycleSignal, timeoutSignal]);
+		try {
+			const record = await producer.refresh();
+			await directory.register(record, signal, credential);
+			return !lifecycleSignal.aborted;
+		} catch {
+			return false;
+		}
 	}
 
 	private async _createRendezvousCache(
@@ -1236,8 +1339,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	}
 
 	/**
-	 * Uses a creator-bound object id to discover and dial its creator without
-	 * delaying or failing the object connection flow.
+	 * Discovers a creator or room replica without delaying or failing the
+	 * object connection flow.
 	 * @param id - Object id carrying an optional creator commitment.
 	 */
 	private async _connectObjectCreator(id: string): Promise<void> {
@@ -1245,37 +1348,68 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._connectRendezvousControllers.delete(id);
 
 		const creator = creatorFromObjectID(id);
-		if (creator === undefined || creator === this.networkNode.peerId) return;
-		if (this.networkNode.getAllPeers().includes(creator)) return;
+		const creatorIsSelf = creator === this.networkNode.peerId;
+		if (creator !== undefined && !creatorIsSelf && this.networkNode.getAllPeers().includes(creator)) return;
 		const directory = this._rendezvous;
 		const namespace = this.config.network_config?.control_plane?.rendezvous?.namespace;
-		if (directory === undefined || namespace === undefined) return;
+		if (directory === undefined) return;
 
 		const controller = new AbortController();
 		// No await occurs before this registration, and stop() clears _rendezvous,
 		// so shutdown cannot interleave here and re-arm an orphaned controller.
 		this._connectRendezvousControllers.set(id, controller);
+		const dialedAddressSets = new Set<string>();
 		try {
-			// Creator-offline lookup through room-scoped replicas is intentionally deferred.
-			const selection: RendezvousBootstrapSelection & { readonly targetPeerId: string } = {
-				targetPeerId: creator,
-			};
-			const dialedAddressSets = new Set<string>();
-			for await (const record of directory.bootstrap(namespace, controller.signal, selection)) {
-				if (record.record.peerId !== creator) continue;
-				const acceptedAddresses = [...record.acceptedAddresses];
-				const addressSetKey = JSON.stringify([...acceptedAddresses].sort());
-				if (dialedAddressSets.has(addressSetKey)) continue;
-				controller.signal.throwIfAborted();
-				dialedAddressSets.add(addressSetKey);
-				await this.networkNode.connect(acceptedAddresses);
-				controller.signal.throwIfAborted();
+			if (creator !== undefined && !creatorIsSelf && namespace !== undefined) {
+				const selection: RendezvousBootstrapSelection = { targetPeerId: creator };
+				try {
+					for await (const record of directory.bootstrap(namespace, controller.signal, selection)) {
+						const acceptedAddresses = [...record.acceptedAddresses];
+						const addressSetKey = JSON.stringify([...acceptedAddresses].sort());
+						// A source that violates targeted selection cannot make the same
+						// address set dialable later through this invocation's fallback.
+						if (record.record.peerId !== creator) {
+							dialedAddressSets.add(addressSetKey);
+							continue;
+						}
+						if (dialedAddressSets.has(addressSetKey)) continue;
+						controller.signal.throwIfAborted();
+						dialedAddressSets.add(addressSetKey);
+						await this.networkNode.connect(acceptedAddresses);
+						controller.signal.throwIfAborted();
+					}
+				} catch (error) {
+					if (controller.signal.aborted) {
+						log.info("::connectObject: Targeted creator rendezvous cancelled");
+					} else {
+						log.error("::connectObject: Targeted creator rendezvous failed", error);
+					}
+				}
 			}
-		} catch (error) {
-			if (controller.signal.aborted) {
-				log.info("::connectObject: Targeted creator rendezvous cancelled");
-			} else {
-				log.error("::connectObject: Targeted creator rendezvous failed", error);
+			if (controller.signal.aborted) return;
+			if (creator !== undefined && !creatorIsSelf && this.networkNode.getAllPeers().includes(creator)) return;
+
+			let fallbackDialCount = 0;
+			try {
+				// Any validated replica is acceptable by design; room admission is communal.
+				for await (const record of directory.bootstrap(roomNamespace(id), controller.signal)) {
+					if (fallbackDialCount >= MAX_ROOM_RENDEZVOUS_DIALS) break;
+					if (record.record.peerId === this.networkNode.peerId) continue;
+					const acceptedAddresses = [...record.acceptedAddresses];
+					const addressSetKey = JSON.stringify([...acceptedAddresses].sort());
+					if (dialedAddressSets.has(addressSetKey)) continue;
+					controller.signal.throwIfAborted();
+					dialedAddressSets.add(addressSetKey);
+					fallbackDialCount += 1;
+					await this.networkNode.connect(acceptedAddresses);
+					controller.signal.throwIfAborted();
+				}
+			} catch (error) {
+				if (controller.signal.aborted) {
+					log.info("::connectObject: Room replica rendezvous cancelled");
+				} else {
+					log.error("::connectObject: Room replica rendezvous failed", error);
+				}
 			}
 		} finally {
 			if (this._connectRendezvousControllers.get(id) === controller) {
@@ -1294,6 +1428,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		try {
 			object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
 			this.networkNode.subscribe(object.id);
+			this._addRoomRendezvousProducer(object.id);
 		} catch (error) {
 			this.messageQueueManager.close(object.id);
 			throw error;
@@ -1310,6 +1445,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._connectFetchControllers.delete(id);
 		this._connectRendezvousControllers.get(id)?.abort();
 		this._connectRendezvousControllers.delete(id);
+		// There is no active retraction; the last published room record lapses by TTL.
+		this._roomRendezvousProducers.delete(id);
+		this._roomRendezvousCapacityLogged.delete(id);
 		this._stopObjectIntervals(id);
 		clearSyncRecoveryEpisodes(this, id);
 		this._initialSyncPeers.delete(id);
@@ -1363,7 +1501,31 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
 			}
 			this.networkNode.subscribe(object.id);
+			this._addRoomRendezvousProducer(object.id);
 			this._createObjectIntervals(object.id);
+		}
+	}
+
+	private _addRoomRendezvousProducer(objectId: string): void {
+		if (this.networkNode.peerId === "" || this._roomRendezvousProducers.has(objectId)) return;
+		const producerFactory = this._roomRendezvousProducerFactory;
+		if (producerFactory === undefined) return;
+		if (this._roomRendezvousProducers.size >= this._roomRendezvousMaxRooms) {
+			if (!this._roomRendezvousCapacityLogged.has(objectId)) {
+				this._roomRendezvousCapacityLogged.add(objectId);
+				log.info("::rendezvous: Room presence capacity reached", objectId);
+			}
+			return;
+		}
+		this._roomRendezvousProducers.set(objectId, producerFactory(objectId));
+		this._roomRendezvousCapacityLogged.delete(objectId);
+	}
+
+	private _backfillRoomRendezvousProducers(): void {
+		for (const object of this.#objectStore.values()) {
+			if (this._roomRendezvousProducers.size >= this._roomRendezvousMaxRooms) return;
+			if (!this.messageQueueManager.hasQueue(object.id)) continue;
+			this._addRoomRendezvousProducer(object.id);
 		}
 	}
 
