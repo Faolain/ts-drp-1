@@ -119,6 +119,24 @@ public relays are open-admission, untrusted transport, and DRP signatures are th
 authority. Nostr supplies discovery, not connectivity; browsers still need a
 real WebRTC/relay path.
 
+#### Fully public — no local infrastructure at all
+
+To play the grid over **only** public infrastructure — discovery via public Nostr
+**and** connectivity via a public relay auto-discovered through public delegated
+routing (`delegated-ipfs.dev` → AutoTLS relays), with **no DRP-operated infra**:
+
+```bash
+pnpm --filter ts-drp-example-grid demo:fully-public
+```
+
+Open the printed `http://127.0.0.1:4174` in two windows and play as above. First
+connection takes ~10–30s (relay reservation → Nostr publish → discovery → WebRTC
+upgrade) and it is the **flakiest** path — it depends on live third-party Nostr
+relays and *ephemeral* AutoTLS relays, so refresh and retry if a run stalls. This
+is the same topology the `pnpm e2e-test:fully-public` E2E asserts. All defaults
+(`VITE_NOSTR_RELAYS`, `VITE_ROUTING_ENDPOINTS`, `VITE_RENDEZVOUS_NAMESPACE`) are
+env-overridable.
+
 This path is proven end to end: the `grid-public-infra` Playwright E2E has two
 real browsers discover each other over Nostr (no HTTP registry) and converge grid
 state, across **Chromium, Firefox, and WebKit**, both against the local fixture and

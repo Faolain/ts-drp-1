@@ -31,6 +31,19 @@ copied grid id in the other, and move with `W`/`A`/`S`/`D`. Peers discover each
 other through rendezvous, connect through a relay, and upgrade to direct WebRTC
 where the network allows. Ctrl+C stops everything.
 
+For a **fully-public** interactive demo — **no local infrastructure at all**,
+discovery via public Nostr and connectivity via a public relay auto-discovered
+through public delegated routing:
+
+```bash
+pnpm --filter ts-drp-example-grid demo:fully-public
+```
+
+Same two-window flow. First connection takes ~10–30s and it is the flakiest path
+(live third-party Nostr + ephemeral AutoTLS relays) — refresh and retry if a run
+stalls. (`demo:public-infra` uses public Nostr for discovery but local relays for
+connectivity, which is less flaky.)
+
 For the full picture — how the WebRTC upgrade works, whether you need to run your
 own nodes, GossipSub node scoring/reputation, all‑in‑one setups, and how to stand
 up a real shareable deployment — see **[docs/DEPLOYING.md](../../docs/DEPLOYING.md)**.
