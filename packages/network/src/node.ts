@@ -42,7 +42,6 @@ import {
 	type ActiveRelayReservation,
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
 	CompositeRelayCandidateSource,
-	type CompositeRelayCandidateSourceEntry,
 	ConfiguredPublicRelaySource,
 	DEFAULT_RELAY_POLICY_LIMITS,
 	type DnsaddrFallback,
@@ -508,9 +507,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
-				listen:
-					this._config?.listen_addresses ??
-					(this._assembleRelayPolicySources().length > 0 ? ["/webrtc"] : ["/p2p-circuit", "/webrtc"]),
+				listen: this._config?.listen_addresses ? this._config.listen_addresses : ["/p2p-circuit", "/webrtc"],
 				...(this._config?.announce_addresses ? { announce: this._config.announce_addresses } : {}),
 			},
 			connectionManager: {
@@ -665,11 +662,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _startRelayPolicy(): void {
 		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
 		const configuredSources = relayPolicyConfig?.sources;
+		const injectedSources = this._relayCandidateSources;
 		if (relayPolicyConfig === undefined || configuredSources === undefined) return;
-		const sources = this._assembleRelayPolicySources();
-		if (sources.length === 0) return;
-
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
 		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
+		const configuredPublicRelays =
+			configuredSources.configured_relays === undefined
+				? undefined
+				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
 		const nodeTransportProfileEnabled =
 			nodeClosestPeersEnabled ||
 			(configuredSources.configured_relays !== undefined &&
@@ -682,69 +683,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (!Number.isSafeInteger(targetReservations) || targetReservations < 1 || targetReservations > 8) {
 			throw new Error("control_plane.relay_policy.target_reservations must be an integer within 1..8");
 		}
-
-		const source = new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources });
-		const factory = this._relayPolicyFactory ?? ((options): RelayPolicyDriver => this._createRelayPolicy(options));
-		this._relayPolicy = factory({
-			onReservationEvent: (event): void => {
-				this._emitControlPlaneEvent({
-					kind: "relay-reservation",
-					outcome: event.outcome,
-					relayIdHash: sanitizedRelayIdHash(event.relayId),
-				});
-			},
-			source,
-			targetReservations,
-			totalDeadlineMs: nodeClosestPeersEnabled
-				? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
-				: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs,
-			transportProfile: nodeTransportProfileEnabled
-				? RELAY_TRANSPORT_PROFILES.node
-				: RELAY_TRANSPORT_PROFILES.broadBrowser,
-		});
-		this._relayPolicyController?.abort();
-		const controller = new AbortController();
-		this._relayPolicyController = controller;
-		const policy = this._relayPolicy;
-		const host = this._node;
-		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
-		this._relayDisconnectListener = (event): void => {
-			const peerId = event.detail.toString();
-			if (!this._reservedRelayPeerIds.delete(peerId)) return;
-			this._queueRelayMaintenance(async (): Promise<void> => {
-				const result = await policy.replace(peerId, "relay-disconnected", controller.signal);
-				this._handleRelayPolicyResult(result, policy, controller);
-			});
-		};
-		host.addEventListener("peer:disconnect", this._relayDisconnectListener);
-		this._armWarmRelayAcquisition(host, policy, controller);
-		this._lastRelayPolicyResult = undefined;
-		this._relayPolicyFailed = false;
-		this._relayPolicyAcquirePromise = this._runInitialRelayAcquire(policy, controller);
-	}
-
-	/**
-	 * Single source of truth for which relay candidate sources are enabled.
-	 *
-	 * Both the default-listen selection (whether to drop the generic
-	 * `/p2p-circuit` listen so RelayPolicy is the sole reservation initiator) and
-	 * `_startRelayPolicy()` (whether the policy runs and with which sources)
-	 * derive from this one method, so the listen decision and the policy-start
-	 * decision can never disagree. A non-empty result means the policy will run.
-	 * @returns The enabled sources that have a defined candidate source, in priority order.
-	 */
-	private _assembleRelayPolicySources(): readonly CompositeRelayCandidateSourceEntry[] {
-		const configuredSources = this._config?.control_plane?.relay_policy?.sources;
-		if (configuredSources === undefined) return [];
-		const injectedSources = this._relayCandidateSources;
-		const publicRelayOverflowEnabled =
-			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
-		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
-		const configuredPublicRelays =
-			configuredSources.configured_relays === undefined
-				? undefined
-				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
-		return [
+		const sources = [
 			{
 				enabled: configuredPublicRelays !== undefined && configuredSources.configured_relays?.length !== 0,
 				name: "configured-public-relays",
@@ -805,6 +744,46 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			(entry): entry is typeof entry & { readonly source: RelayCandidateSource } =>
 				entry.enabled && entry.source !== undefined
 		);
+		if (sources.length === 0) return;
+
+		const source = new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources });
+		const factory = this._relayPolicyFactory ?? ((options): RelayPolicyDriver => this._createRelayPolicy(options));
+		this._relayPolicy = factory({
+			onReservationEvent: (event): void => {
+				this._emitControlPlaneEvent({
+					kind: "relay-reservation",
+					outcome: event.outcome,
+					relayIdHash: sanitizedRelayIdHash(event.relayId),
+				});
+			},
+			source,
+			targetReservations,
+			totalDeadlineMs: nodeClosestPeersEnabled
+				? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
+				: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs,
+			transportProfile: nodeTransportProfileEnabled
+				? RELAY_TRANSPORT_PROFILES.node
+				: RELAY_TRANSPORT_PROFILES.broadBrowser,
+		});
+		this._relayPolicyController?.abort();
+		const controller = new AbortController();
+		this._relayPolicyController = controller;
+		const policy = this._relayPolicy;
+		const host = this._node;
+		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
+		this._relayDisconnectListener = (event): void => {
+			const peerId = event.detail.toString();
+			if (!this._reservedRelayPeerIds.delete(peerId)) return;
+			this._queueRelayMaintenance(async (): Promise<void> => {
+				const result = await policy.replace(peerId, "relay-disconnected", controller.signal);
+				this._handleRelayPolicyResult(result, policy, controller);
+			});
+		};
+		host.addEventListener("peer:disconnect", this._relayDisconnectListener);
+		this._armWarmRelayAcquisition(host, policy, controller);
+		this._lastRelayPolicyResult = undefined;
+		this._relayPolicyFailed = false;
+		this._relayPolicyAcquirePromise = this._runInitialRelayAcquire(policy, controller);
 	}
 
 	/** Re-runs relay acquisition after a post-start candidate source becomes ready. */

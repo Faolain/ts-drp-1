@@ -237,3 +237,47 @@ Pinning tests:
 5. **Policy-less config keeps legacy behavior** (if the conditional default is
    chosen): node without `relay_policy` still auto-reserves on a connected DRP
    relay.
+
+---
+
+## Addendum (post-implementation) — the quiesce was IMPLEMENTED, broke the grid E2E, and was REVERTED
+
+The §5 recommendation ("quiesce via option (a), conditionally") was shipped in
+`62aad89` and then **reverted**. What the code-trace above missed:
+
+- **Empirical result:** the `examples/grid` modular Playwright E2E (`playwright.yml`)
+  was green for **11 consecutive CI runs**, then failed **2/2** (`Timeout 10000ms
+  exceeded while waiting on the predicate`) *deterministically* on the quiesce
+  commit — not a flake.
+- **Root cause:** the grid browser config uses an **overflow-only** relay policy
+  (`sources: { delegated_closest_peers }` + `public_relay_overflow`, no explicit
+  `listen_addresses`). `_assembleRelayPolicySources()` is non-empty there, so the
+  quiesce dropped the generic `/p2p-circuit` listen. But DRP's `delegated_closest_peers`
+  overflow source does **not** reliably reserve a usable relay in the fixture, so
+  no specific `<relay>/p2p-circuit` listen ever gets added — and with the generic
+  one gone the browser has **no circuit listen at all** → no relayed path → no
+  WebRTC signalling → convergence timeout.
+- **Correction to §3/§4a:** the native "discovered" reservation is **NOT merely a
+  redundant off-policy race** for these configs — it is the browser's actual
+  working relay path. The two mechanisms *cooperate*; the native one is
+  **load-bearing** whenever DRP's own policy is overflow-only/best-effort. The §4a
+  "policy-configured-but-exhausted → stranded, intended trade-off" verdict was
+  wrong for the primary grid path.
+- **Decision:** do **not** quiesce. The default listen stays
+  `["/p2p-circuit", "/webrtc"]` unconditionally. The dead-code removal of
+  `NodeRoutingClosestPeersSource` (the other half of `62aad89`) was kept. A future
+  *narrow* quiesce (only when a **primary** configured-relay source exists, never
+  for overflow-only configs) is possible but unneeded and must be validated in CI
+  (the grid E2E cannot be reproduced on local macOS — it fails there regardless of
+  commit, an environment artifact).
+
+## Separately discovered during this investigation — a real DHT regression from `4f71c25`
+
+`4f71c25` set `allowQueryWithZeroPeers: false` **unconditionally** in
+`createAminoHostExtensions` (all networks, including `local`). This deterministically
+breaks `packages/network-spike/tests/public-only-node-publisher.test.ts` (the real
+local-Amino provide/lookup) with `node routing operation exceeded 10000ms` —
+confirmed by toggle (`true` → passes in ~320ms; `false` → 10s timeout) and by the
+`test.yml` CI regressing success→failure exactly on `4f71c25`. This is tracked/fixed
+separately; the busy-loop rationale for `false` is being verified before choosing
+the fix (gate-to-public vs. revert-to-true).

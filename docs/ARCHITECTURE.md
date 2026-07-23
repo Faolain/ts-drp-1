@@ -438,19 +438,21 @@ request budget for public walks, `runtime.ts:26`,
 `packages/routing-node/src/index.ts:296`) supplies the *population* of
 connected public peers for the harvest to find. The libp2p-native
 `circuitRelayTransport` (installed with zero options,
-`packages/network/src/node.ts:532`) arms one native auto-reservation per generic
-`/p2p-circuit` listen address (verified against `@libp2p/circuit-relay-v2@4.2.8`,
-phase-09). To make DRP's `RelayPolicy` the *sole initiator* of reservations, the
-default listen set drops the generic `/p2p-circuit` — using `["/webrtc"]` — **when
-a relay policy is configured** (`node.ts:510`, gated on the same
-`_assembleRelayPolicySources()` predicate that decides whether the policy runs);
-`Libp2pRelayClient.reserve()` then adds the *specific* `<relay>/p2p-circuit`
-listen itself, and `@libp2p/webrtc` derives `/webrtc` reachability from any
-circuit listener, so relay + webrtc reachability is preserved while the native
-"discovered" race that bypassed the policy's diversity rules is quiesced.
-Policy-less configs keep the legacy `["/p2p-circuit", "/webrtc"]` default so they
-retain native serendipitous reachability. An explicit `listen_addresses` is
-always respected verbatim.
+`packages/network/src/node.ts:532`) also arms one native auto-reservation per
+generic `/p2p-circuit` listen address (verified against
+`@libp2p/circuit-relay-v2@4.2.8`, phase-09). DRP's `RelayPolicy` and this native
+mechanism **cooperate rather than conflict**: a policy reservation via
+`Libp2pRelayClient.reserve()` adds a *specific* `<relay>/p2p-circuit` listen that
+the native store then owns/refreshes. We investigated *quiescing* the native
+"discovered" path (dropping the generic `/p2p-circuit` listen when a policy is
+configured) so the policy would be the sole reservation initiator — but that
+**broke the grid E2E** and was reverted (phase-09 addendum): for overflow-only /
+delegated-routing configs (like the grid browser), DRP's own policy does not
+reliably reserve in the fixture, so the **native reservation is load-bearing**,
+not redundant. The default listen therefore stays `["/p2p-circuit", "/webrtc"]`;
+DRP's policy remains the *authoritative, operator-diverse* path, and the native
+path is a best-effort fallback that keeps browsers reachable when the policy's
+overflow sources come up empty.
 
 **The degraded-diversity relaxation (phase-07 decision).** Public
 DHT/warm-discovered relays are anonymous — the classifier returns `"unknown"`
