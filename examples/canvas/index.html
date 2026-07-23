@@ -23,16 +23,35 @@
 					<code id="canvasId"></code>
 					<span class="canvas-identity__action" aria-hidden="true">Copy</span>
 				</button>
-				<p id="copyCanvasStatus" class="canvas-identity__status" role="status" aria-live="polite"></p>
 			</div>
+			<p id="copyCanvasStatus" class="canvas-identity__status" role="status" aria-live="polite"></p>
 			<p>peers: <span id="peers"></span></p>
 			<p>discovery_peers: <span id="discovery_peers"></span></p>
 			<p>object_peers: <span id="object_peers"></span></p>
 			<input id="canvasIdInput" type="text" placeholder="Insert canvas ID" />
-			<button id="connect">Connect</button>
-			<button id="create">Create Canvas</button>
+			<button id="connect" disabled>Connect</button>
+			<button id="create" disabled>Create Canvas</button>
 		</div>
-		<section class="canvas-stage" data-testid="canvas-stage" aria-labelledby="canvasStageTitle">
+		<section
+			id="canvasEmptyState"
+			class="canvas-empty-state"
+			data-testid="canvas-empty-state"
+			aria-labelledby="canvasEmptyStateTitle"
+		>
+			<span class="canvas-empty-state__marker" aria-hidden="true">+</span>
+			<div>
+				<h1 id="canvasEmptyStateTitle">Create or join a canvas</h1>
+				<p>Start a new shared field or enter an existing canvas ID above.</p>
+				<p id="canvasConnectionStatus" class="canvas-connection-status" role="status" aria-live="polite"></p>
+			</div>
+		</section>
+		<section
+			id="canvasStage"
+			class="canvas-stage"
+			data-testid="canvas-stage"
+			aria-labelledby="canvasStageTitle"
+			hidden
+		>
 			<header class="canvas-stage__header">
 				<h1 id="canvasStageTitle">Shared canvas</h1>
 				<span id="canvasDimensions"></span>

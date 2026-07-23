@@ -32,7 +32,7 @@ const render = (): void => {
 
 	const object_element = <HTMLDivElement>document.getElementById("object_peers");
 	object_element.innerHTML = `[${objectPeers.join(", ")}]`;
-	renderCanvasIdentity(drpObject?.id);
+	renderCanvasLifecycle(drpObject?.id);
 
 	if (!drpObject?.drp) return;
 	const canvas = drpObject.drp.canvas;
@@ -49,16 +49,20 @@ const render = (): void => {
 	}
 };
 
-function renderCanvasIdentity(canvasId: string | undefined): void {
+function renderCanvasLifecycle(canvasId: string | undefined): void {
 	const identity = <HTMLDivElement>document.getElementById("canvasIdentity");
+	const emptyState = <HTMLElement>document.getElementById("canvasEmptyState");
+	const stage = <HTMLElement>document.getElementById("canvasStage");
 	const idElement = <HTMLElement>document.getElementById("canvasId");
 	const copyButton = <HTMLButtonElement>document.getElementById("copyCanvasId");
 	const status = <HTMLParagraphElement>document.getElementById("copyCanvasStatus");
 	const hasCanvasId = canvasId !== undefined && canvasId.length > 0;
 
-	if (canvasId === renderedCanvasId) return;
 	identity.hidden = !hasCanvasId;
+	emptyState.hidden = hasCanvasId;
+	stage.hidden = !hasCanvasId;
 	copyButton.disabled = !hasCanvasId;
+	if (canvasId === renderedCanvasId) return;
 	idElement.textContent = canvasId ?? "";
 	status.textContent = "";
 	status.removeAttribute("data-state");
@@ -146,8 +150,12 @@ function run(): void {
 	create_button.addEventListener("click", () => void create());
 
 	const canvasIdInput = <HTMLInputElement>document.getElementById("canvasIdInput");
+	const connectionStatus = <HTMLParagraphElement>document.getElementById("canvasConnectionStatus");
 	const connect = async (): Promise<void> => {
 		const drpId = canvasIdInput.value;
+		connectionStatus.dataset.state = "joining";
+		connectionStatus.textContent = "Joining canvas…";
+		connect_button.disabled = true;
 		try {
 			drpObject = await node.connectObject({
 				id: drpId,
@@ -156,13 +164,21 @@ function run(): void {
 
 			createConnectHandlers();
 			render();
+			connectionStatus.textContent = "";
+			connectionStatus.removeAttribute("data-state");
 		} catch (e) {
 			console.error("Error while connecting with DRP", drpId, e);
+			connectionStatus.dataset.state = "error";
+			connectionStatus.textContent = "Could not join that canvas. Check the ID and try again.";
+		} finally {
+			connect_button.disabled = false;
 		}
 	};
 
 	const connect_button = <HTMLButtonElement>document.getElementById("connect");
 	connect_button.addEventListener("click", () => void connect());
+	create_button.disabled = false;
+	connect_button.disabled = false;
 }
 
 async function main(): Promise<void> {

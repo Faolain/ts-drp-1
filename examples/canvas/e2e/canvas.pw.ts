@@ -17,18 +17,28 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 	try {
 		await Promise.all([creator.goto("http://127.0.0.1:4180/"), joiner.goto("http://127.0.0.1:4180/")]);
 		await Promise.all([waitForRelayReservation(creator), waitForRelayReservation(joiner)]);
-		await expect(creator.locator("#canvas > div")).toHaveCount(100);
-		await expect(joiner.locator("#canvas > div")).toHaveCount(100);
+		await Promise.all([waitForCanvasControls(creator), waitForCanvasControls(joiner)]);
+		await expect(creator.getByTestId("canvas-stage")).toBeHidden();
+		await expect(joiner.getByTestId("canvas-stage")).toBeHidden();
+		await expect(creator.getByTestId("canvas-empty-state")).toContainText(/create or join a canvas/iu);
+		await expect(joiner.getByTestId("canvas-empty-state")).toContainText(/create or join a canvas/iu);
 		expect(pageErrors).toEqual([]);
 
 		await creator.locator("#create").click();
+		await expect(creator.getByTestId("canvas-empty-state")).toBeHidden();
+		await expect(creator.getByTestId("canvas-stage")).toBeVisible();
+		await expect(creator.locator("#canvas > div")).toHaveCount(100);
 		await expect(creator.locator("#canvasId")).not.toBeEmpty();
 		const canvasId = (await creator.locator("#canvasId").textContent())?.trim();
 		if (canvasId === undefined || canvasId === "") throw new Error("creator did not expose a canvas ID");
 
 		await joiner.locator("#canvasIdInput").fill(canvasId);
+		await expect(joiner.locator("#connect")).toBeEnabled();
 		await joiner.locator("#connect").click();
 		await expect(joiner.locator("#canvasId")).toHaveText(canvasId);
+		await expect(joiner.getByTestId("canvas-empty-state")).toBeHidden();
+		await expect(joiner.getByTestId("canvas-stage")).toBeVisible();
+		await expect(joiner.locator("#canvas > div")).toHaveCount(100);
 		await expect(creator.locator("#object_peers")).not.toHaveText("[]");
 		await expect(joiner.locator("#object_peers")).not.toHaveText("[]");
 
@@ -44,11 +54,39 @@ test("two modular peers join a canvas and converge on a painted pixel", async ({
 	}
 });
 
+test("canvas stage stays hidden behind an actionable empty state until create", async ({ page }) => {
+	await page.goto("http://127.0.0.1:4180/");
+	await waitForRelayReservation(page);
+	await waitForCanvasControls(page);
+
+	const stage = page.getByTestId("canvas-stage");
+	const emptyState = page.getByTestId("canvas-empty-state");
+	await expect(stage).toBeHidden();
+	await expect(emptyState).toContainText(/create or join a canvas/iu);
+
+	await expect(page.locator("#create")).toBeEnabled();
+	await page.locator("#create").click();
+	await expect(emptyState).toBeHidden();
+	await expect(stage).toBeVisible();
+	await expect(page.locator("#canvas > div")).toHaveCount(100);
+	await expect(page.getByRole("button", { name: /copy canvas id/iu })).toBeVisible();
+
+	const canvasBox = await page.locator("#canvas").boundingBox();
+	const stageBox = await stage.boundingBox();
+	if (canvasBox === null || stageBox === null) throw new Error("created canvas layout is not visible");
+	expect(canvasBox.width).toBeGreaterThanOrEqual(320);
+	expect(Math.abs(canvasBox.width - canvasBox.height)).toBeLessThanOrEqual(2);
+	expect(Math.abs(canvasBox.x + canvasBox.width / 2 - (stageBox.x + stageBox.width / 2))).toBeLessThanOrEqual(4);
+});
+
 test("live canvas is a large centered 10 by 10 square", async ({ page }) => {
 	await page.goto("http://127.0.0.1:4180/");
 	await waitForRelayReservation(page);
+	await waitForCanvasControls(page);
+	await page.locator("#create").click();
 
 	const canvas = page.locator("#canvas");
+	await expect(page.getByTestId("canvas-stage")).toBeVisible();
 	await expect(canvas.locator(":scope > div")).toHaveCount(100);
 
 	const canvasBox = await canvas.boundingBox();
@@ -86,11 +124,13 @@ test("canvas remains square and centered without horizontal overflow on a narrow
 	await page.setViewportSize({ height: 844, width: 390 });
 	await page.goto("http://127.0.0.1:4180/");
 	await waitForRelayReservation(page);
+	await waitForCanvasControls(page);
+	await page.locator("#create").click();
 
 	const canvas = page.locator("#canvas");
 	const stage = page.getByTestId("canvas-stage");
-	await expect(canvas.locator(":scope > div")).toHaveCount(100);
 	await expect(stage).toBeVisible();
+	await expect(canvas.locator(":scope > div")).toHaveCount(100);
 	const canvasBox = await canvas.boundingBox();
 	const stageBox = await stage.boundingBox();
 	if (canvasBox === null || stageBox === null) throw new Error("mobile canvas layout is not visible");
@@ -124,11 +164,15 @@ test("created canvas ID is visibly copyable with accessible feedback", async ({ 
 	try {
 		await page.goto("http://127.0.0.1:4180/");
 		await waitForRelayReservation(page);
-		await expect(page.locator("#canvas > div")).toHaveCount(100);
+		await waitForCanvasControls(page);
+		await expect(page.getByTestId("canvas-stage")).toBeHidden();
+		await expect(page.getByTestId("canvas-empty-state")).toContainText(/create or join a canvas/iu);
 		await expect(page.locator("#copyCanvasId")).toBeHidden();
 		await expect(page.locator("#copyCanvasId")).toBeDisabled();
 		await page.locator("#create").click();
+		await expect(page.getByTestId("canvas-stage")).toBeVisible();
 		await expect(page.locator("#canvasId")).not.toBeEmpty();
+		await expect(page.locator("#canvas > div")).toHaveCount(100);
 		const canvasId = (await page.locator("#canvasId").textContent())?.trim();
 		if (canvasId === undefined || canvasId === "") throw new Error("creator did not expose a canvas ID");
 
@@ -166,9 +210,13 @@ test("clipboard rejection keeps the canvas ID visible and announces an error", a
 	try {
 		await page.goto("http://127.0.0.1:4180/");
 		await waitForRelayReservation(page);
-		await expect(page.locator("#canvas > div")).toHaveCount(100);
+		await waitForCanvasControls(page);
+		await expect(page.getByTestId("canvas-stage")).toBeHidden();
+		await expect(page.getByTestId("canvas-empty-state")).toContainText(/create or join a canvas/iu);
 		await page.locator("#create").click();
+		await expect(page.getByTestId("canvas-stage")).toBeVisible();
 		await expect(page.locator("#canvasId")).not.toBeEmpty();
+		await expect(page.locator("#canvas > div")).toHaveCount(100);
 		const canvasId = (await page.locator("#canvasId").textContent())?.trim();
 		if (canvasId === undefined || canvasId === "") throw new Error("creator did not expose a canvas ID");
 
@@ -191,4 +239,9 @@ async function waitForRelayReservation(page: Page): Promise<void> {
 		).__TS_DRP_CANVAS_SESSION__;
 		return (session?.snapshot().relayReservations.length ?? 0) >= 1;
 	});
+}
+
+async function waitForCanvasControls(page: Page): Promise<void> {
+	await expect(page.locator("#create")).toBeEnabled();
+	await expect(page.locator("#connect")).toBeEnabled();
 }
