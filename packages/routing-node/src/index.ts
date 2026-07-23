@@ -736,7 +736,14 @@ export function createAminoHostExtensions(
 	);
 	const aminoDhtFactory = kadDHT({
 		alpha,
-		allowQueryWithZeroPeers: false,
+		// public: false — park empty-table queries so the circuit-relay RandomWalk
+		// (libp2p random-walk.js `while (walkers > 0)`, no backoff) cannot spin on
+		// instantly-empty getClosestPeers at cold start (phase-08: event-loop starvation).
+		// local/private: true — a DHT server whose only neighbours are kad clients has a
+		// permanently empty routing table, so parking turns locally-answerable
+		// provide/findProviders into guard timeouts (phase-09 addendum; the RandomWalk
+		// spin is not armed on local topologies, which use explicit listen_addresses).
+		allowQueryWithZeroPeers: network !== "public",
 		clientMode: mode === "client",
 		datastorePrefix: `/drp-amino-${network}`,
 		disjointPaths,

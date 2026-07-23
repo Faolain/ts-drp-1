@@ -32,11 +32,19 @@ describe("Amino DHT query tuning", () => {
 		expect(capturedDhtOptions[0]?.querySelfInterval).toBe(24 * 60 * 60 * 1_000);
 	});
 
-	it("does not arm an instantly-empty zero-peer query loop on a cold local host either", () => {
+	it("lets a cold local host answer zero-peer queries immediately instead of parking forever", () => {
+		// On the PUBLIC path allowQueryWithZeroPeers:false parks empty-table queries so the
+		// circuit-relay RandomWalk (libp2p random-walk.js `while (walkers > 0)`, no backoff) cannot
+		// spin on instantly-empty getClosestPeers at cold start (phase-08: event-loop starvation).
+		// On LOCAL/PRIVATE it must be true: a DHT server whose only neighbours are kad clients has a
+		// permanently empty routing table (clients are never added to routing tables), so parking would
+		// turn locally-answerable provide/findProviders into guard timeouts — the exact hang that broke
+		// public-only-node-publisher.test.ts (phase-09 addendum). The busy-loop is not armed on the
+		// local test topologies (they pass explicit listen_addresses, no `/p2p-circuit`).
 		createAminoHostExtensions({ mode: "client", network: "local" });
 
 		expect(capturedDhtOptions).toHaveLength(1);
-		expect(capturedDhtOptions[0]?.allowQueryWithZeroPeers).toBe(false);
+		expect(capturedDhtOptions[0]?.allowQueryWithZeroPeers).toBe(true);
 	});
 
 	it("forwards explicitly bounded concurrency for an overflow-discovery routing instance", async () => {

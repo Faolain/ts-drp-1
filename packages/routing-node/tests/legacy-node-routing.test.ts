@@ -46,7 +46,12 @@ describe("NodeRouting", () => {
 		);
 	});
 
-	it("parks an isolated zero-peer query until abort, caps operations, and stops idempotently", async () => {
+	it("returns empty at once on a cold local zero-peer query, caps operations, and stops idempotently", async () => {
+		// network: "local" uses allowQueryWithZeroPeers:true, so an empty-table query returns
+		// immediately (no yield) instead of parking — the fix for the public-only publisher hang
+		// (phase-09 addendum). Public parking is pinned in amino-options.test.ts
+		// (allowQueryWithZeroPeers:false). Local getClosestPeers counts toward maxOperations
+		// (isolated budgets are public-only), which is what makes the operation-cap assertion below work.
 		const routing = await createNodeRouting({
 			bootstrapPeers: [],
 			limits: { maxOperations: 2 },
@@ -54,11 +59,11 @@ describe("NodeRouting", () => {
 			network: "local",
 		});
 		try {
-			await expect(async () => {
-				for await (const _peer of routing.getClosestPeers(new Uint8Array([1, 2, 3]), AbortSignal.timeout(50))) {
-					// A zero-peer query waits for routing-table progress and must not yield.
-				}
-			}).rejects.toThrow();
+			const firstYields: unknown[] = [];
+			for await (const peer of routing.getClosestPeers(new Uint8Array([1, 2, 3]), AbortSignal.timeout(500))) {
+				firstYields.push(peer);
+			}
+			expect(firstYields).toEqual([]); // operation 1: returned empty without parking
 
 			const controller = new AbortController();
 			controller.abort(new Error("fixture abort"));
@@ -66,8 +71,8 @@ describe("NodeRouting", () => {
 				for await (const _peer of routing.getClosestPeers(new Uint8Array([4, 5, 6]), controller.signal)) {
 					// The pre-aborted query must never yield.
 				}
-			}).rejects.toThrow();
-			await expect(routing.refresh()).rejects.toThrow(/operation cap/u);
+			}).rejects.toThrow(); // operation 2: pre-aborted throws
+			await expect(routing.refresh()).rejects.toThrow(/operation cap/u); // operation 3 > cap of 2
 		} finally {
 			const firstStop = routing.stop();
 			const secondStop = routing.stop();
