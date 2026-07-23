@@ -53,10 +53,20 @@ pnpm e2e-test:public-infra   # Chromium/Firefox/WebKit; discovery via wss://rela
 This runs `playwright.public-infra.config.ts`. Only **discovery** goes
 public — it **sends traffic to third‑party Nostr relays**, is **not** a CI gate,
 and is flakier than the local run. **Connectivity** still uses local
-operator‑diverse circuit relays (browser‑usable _public_ circuit relays that grant
-reservations to strangers cannot be reliably sourced, so there is no
-fully‑public‑infra run). Override `VITE_NOSTR_RELAYS` / `VITE_RENDEZVOUS_NAMESPACE`
-to retarget or isolate a run; full context in
+operator‑diverse circuit relays, purely for reproducibility. Override
+`VITE_NOSTR_RELAYS` / `VITE_RENDEZVOUS_NAMESPACE` to retarget or isolate a run.
+
+**Fully public — discovery AND connectivity (manual, not CI):**
+
+```bash
+pnpm e2e-test:fully-public   # two browsers converge on ONLY public infra, no DRP-operated infra
+```
+
+This runs `playwright.fully-public.config.ts`: two browsers discover over public
+Nostr and reserve a **real public relay** found via public delegated routing
+(`delegated-ipfs.dev` → AutoTLS relays), then converge a grid — verified live
+(~18 s). It's the flakiest run (live Nostr + ephemeral AutoTLS relays); full
+context in
 [docs/DEPLOYING.md](../../docs/DEPLOYING.md#infra-independent-discovery-via-nostr).
 
 ### Legacy fixed‑bootstrap dev loop (optional)
