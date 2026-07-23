@@ -37,6 +37,7 @@
 		"release": "release-it",
 		"test": "vitest",
 		"test:public-relay-live": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-relay-live.test.ts",
+		"test:public-convergence": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-convergence-live.test.ts",
 		"typecheck": "pnpm --parallel typecheck",
 		"watch": "pnpm --parallel --filter '@ts-drp/*' watch",
 		"pretest": "node scripts/ensure-native-deps.mjs"

@@ -62,21 +62,30 @@ elsewhere and `VITE_RENDEZVOUS_NAMESPACE` to isolate a run. See
 [docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr) for
 the full public-infra story and the connectivity-half constraints.
 
-The **connectivity** half _can_ be exercised fully-publicly at the **node** level
-(a node, unlike a browser, can harvest a relay from its own connected peers):
+The full "boot on public infra with no DRP-operated relay" story can be exercised
+fully-publicly at the **node** level (a node, unlike a browser, can harvest a relay
+from its own connected peers):
 
 ```bash
-pnpm test:public-relay-live
+pnpm test:public-relay-live    # one node reserves a real public relay (~2–5 s)
+pnpm test:public-convergence   # two nodes converge a grid object, fully public (~6–12 s)
 ```
 
-This opt-in check boots a DRP node against the canonical public Amino
+`test:public-relay-live` boots a DRP node against the canonical public Amino
 bootstrappers and asserts it reserves a **real public Circuit Relay v2** node via
-the warm connected-peer HOP harvest (typically 2–5 s). It is skipped in the normal
-suite, **sends real traffic to public infrastructure**, is **not** a CI gate, and
-does not assert the granted relay is browser-usable (the native store takes the
-first HOP grant, often a node-only tcp/quic relay). There is no equivalent
-_fully-public browser_ run — browsers must source relays via delegated routing,
-which does not reliably surface reservation-granting relays.
+the warm connected-peer HOP harvest. `test:public-convergence` goes end to end:
+**two** DRP nodes each reserve a public relay, publish to and discover each other
+over **public Nostr**, connect through a public relay (upgrading to WebRTC — the
+relayed link is _limited_ and DRP's sync will not run on it directly), and sync a
+shared grid object to identical state.
+
+Both are opt-in (`RUN_PUBLIC_LIVE=true`), skipped in the normal suite, **send real
+traffic to public infrastructure**, and are **not** CI gates. The relay checks do
+not assert the granted relay is browser-usable (the native store takes the first
+HOP grant, often node-only tcp/quic). The equivalent for a **browser** — which
+sources relays via delegated routing / connected-peer harvest rather than the DHT
+walk a node uses — is a separate, open question tracked in
+[docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr).
 
 # Known Issues
 
