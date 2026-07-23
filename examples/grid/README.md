@@ -42,7 +42,22 @@ pnpm e2e-test        # modular grid, Chromium + WebKit, no fixed bootstrap
 ```
 
 (That command runs `examples/grid/playwright.modular.config.ts`, which boots the
-grid app in modular mode plus its local fixtures.)
+grid app in modular mode plus its local fixtures. This is the CI‑gated run.)
+
+**Discovery over real public Nostr relays (manual, not CI):**
+
+```bash
+pnpm e2e-test:public-infra   # Chromium/Firefox/WebKit; discovery via wss://relay.damus.io + wss://nos.lol
+```
+
+This runs `playwright.public-infra.config.ts`. Only **discovery** goes
+public — it **sends traffic to third‑party Nostr relays**, is **not** a CI gate,
+and is flakier than the local run. **Connectivity** still uses local
+operator‑diverse circuit relays (browser‑usable _public_ circuit relays that grant
+reservations to strangers cannot be reliably sourced, so there is no
+fully‑public‑infra run). Override `VITE_NOSTR_RELAYS` / `VITE_RENDEZVOUS_NAMESPACE`
+to retarget or isolate a run; full context in
+[docs/DEPLOYING.md](../../docs/DEPLOYING.md#infra-independent-discovery-via-nostr).
 
 ### Legacy fixed‑bootstrap dev loop (optional)
 

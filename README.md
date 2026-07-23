@@ -42,6 +42,26 @@ Cross-browser expectations, WebRTC evidence, and test-lifecycle constraints for
 the grid example are documented in
 [Cross-browser grid testing](docs/cross-browser-testing.md).
 
+`pnpm e2e-test` runs the grid browser end-to-end against **local fixtures**
+(local rendezvous registries + delegated routing + circuit relays) and is the
+CI-gated run.
+
+For an on-demand run whose **discovery** goes over real public **Nostr** relays
+(`wss://relay.damus.io`, `wss://nos.lol`) across Chromium/Firefox/WebKit:
+
+```bash
+pnpm e2e-test:public-infra
+```
+
+Caveats: this **sends traffic to third-party relays**, is **not** a CI gate, and
+is inherently flakier than the local run. **Connectivity** (circuit relays) still
+uses local operator-diverse relays — browser-usable _public_ circuit relays that
+grant reservations to strangers cannot be reliably sourced, so there is no
+fully-public-infra run. Override `VITE_NOSTR_RELAYS` to point elsewhere and
+`VITE_RENDEZVOUS_NAMESPACE` to isolate a run. See
+[docs/DEPLOYING.md](docs/DEPLOYING.md#infra-independent-discovery-via-nostr) for
+the full public-infra story and the connectivity-half constraints.
+
 # Known Issues
 
 - Peers won't be able to connect with each other if either one of them is behind a VPN.

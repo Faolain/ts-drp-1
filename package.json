@@ -27,6 +27,7 @@
 		"coverage": "pnpm tsx scripts/coverage.ts",
 		"docs": "typedoc",
 		"e2e-test": "pnpm exec playwright test --config examples/grid/playwright.modular.config.ts --fail-on-flaky-tests",
+		"e2e-test:public-infra": "GRID_E2E_BROWSERS=chromium,firefox,webkit VITE_NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol pnpm exec playwright test --config examples/grid/playwright.public-infra.config.ts",
 		"flamegraph": "pnpm tsx packages/object/tests/hashgraph.flamegraph.ts",
 		"lint": "eslint .",
 		"lint:fix": "prettier --write '**/package.json' && eslint . --fix",
