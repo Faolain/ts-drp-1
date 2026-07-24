@@ -191,16 +191,37 @@ ops signed and disputable):
 Add to this the finding that **no local-only algorithm can distinguish first signer installation from
 complete origin-storage eviction** (§Phase 5) — so browser tabs cannot be **seal voters** by default.
 Signing is unaffected (every vertex, ACL op and trade is signed in-browser today); the constraint is the
-never-vote-twice slot obligation, and the one profile that does let a browser vote — a **fate-shared
-non-extractable key** co-evicted with the vote log (§Phase 5, profile 3) — converts eviction from a safety
-hole into a liveness event, which is why an always-on signer remains in the picture as a **liveness
-backstop, not a trust requirement**.
+never-vote-twice slot obligation, and two routes let a browser hold it anyway: at `q = 1`, a recoverable
+seed-derived key plus a mandatory re-learn-from-peers rule (§Phase 5, slice 5e — safe because every vote at
+`q = 1` *is* a QC and lives on in the network); at `k ≥ 2`, a **fate-shared non-extractable key** co-evicted
+with the vote log (§Phase 5, profile 3), which converts eviction from a safety hole into a liveness event.
+That liveness cost is why an always-on signer remains in the picture as a **liveness backstop, not a trust
+requirement**.
+
+**Optional desktop clients are the P2P route to a durable tier.** If the product ships an **Electron
+build alongside the web app** — optional, opt-in, never required — any participant running it is
+durable-class by construction: no ITP, no 7-day clock, storage in the app's own data directory rather than
+a browser profile competing with a thousand origins. One such participant collapses **two of the three
+operator roles onto a peer**: signer (durable vote log) and mirror (it has a disk). Only **relay** does not
+follow, since a home machine behind NAT is usually not reachable. Two consequences: the fate-shared-key
+problem largely dissolves (key and vote log share an app-data directory, or the OS keychain), and
+tray-resident / launch-on-login — normal for a desktop app, impossible for a tab — is what converts
+*durable* into *durable and usually online*. Treat that as a deliberate product decision, not a side
+effect. It does **not** auto-enroll anyone: the signer set is still pinned in the anchor and changed only
+by handoff (§Phase 5, 5e2), so a desktop user is a *good* delegate, not automatically *a* delegate.
 
 **What the operator node concretely is:** not a new service — the same `DRPNode`, long-lived, in Node.js
 (`pnpm cli` → `packages/node/src/run.ts`). The relay role already exists as config
 (`configs/bootstrap.json`: `"relay_service": { "enabled": true }`); mirror and signer land as two more
 role flags on that same process. Train C requires none of them beyond the signaling broker every
 browser-to-browser system needs — which may be public infrastructure (§0.5, zero-deploy) or self-run.
+
+**P2P-first is a design rule, not a preference.** "Durable-class" (§Phase 5) is a storage property, not an
+ownership property — a friend's always-on desktop running `pnpm cli` qualifies exactly as a company-run
+mirror does. Every trust profile has a working zero-infrastructure configuration (§1, principle 11); an
+operator-run mirror/relay MAY additionally enroll as an attestor later, but operator participation is
+opt-in and additive — never load-bearing for correctness, and never a precondition for any profile to
+exist.
 
 **Therefore:** reachable target is zone-instanced multiplayer (≤ 64 durable writers/zone, 20–30 Hz
 ephemeral, operator relay spine) and Discord-scale guilds (per-channel objects, ≤ 1k–5k online/channel,
@@ -241,6 +262,11 @@ Product decision already recorded: build without mirrors now, design assuming op
    `failure-campaign` harness. A gate that does not run in CI will rot.
 10. **Scale is stated as per-object ceilings, in a profile table, bound to a named harness.** Anything not
     in a profile table is not a supported scale claim.
+11. **P2P-first: every trust profile has a working zero-infrastructure configuration.** Operator-run nodes
+    (relay / mirror / signer, and optionally attestor later) are opt-in and additive — one way to obtain
+    durability or fanout, never the definition of either and never a requirement. A slice that makes any
+    profile depend on operator infrastructure to *exist* is a regression against this principle (the
+    zero-deploy invariant, §0.5, is the Train-C instance of the same rule).
 
 ---
 
@@ -261,6 +287,7 @@ packages/storage/         runtime-neutral durable-store contract, state machine,
 packages/storage-browser/ IndexedDB backend: schema, migrations, immutable exact-byte CAS,
                           staged generations, vote slots, kill-point injection subpath
 packages/storage-node/    SQLite backend: composite keys, WAL, full synchronous durability,
+                          also the backend for optional Electron clients (main process) — never storage-browser,
                           SIGKILL crash tests
 packages/seal/            round-free CutValue, proposals, votes, QCs, locks, pacemaker,
                           authority handoff                     (separate from FinalityStore)
@@ -456,7 +483,7 @@ flowchart TB
     P2["Phase 2<br/>Durable substrate + Worker<br/>+ hard-kill driver + browser gate"]
     P3["Phase 3<br/>v2 namespace: genesis, anchor,<br/>admission, latched ACL, roots"]
     P4["Phase 4<br/>Shadow cuts + snapshots<br/>(no trust, no pruning)"]
-    P5["Phase 5<br/>Seal: creator-certified →<br/>round-free → attested"]
+    P5["Phase 5<br/>Seal: creator-certified →<br/>round-free → delegated → attested"]
     FM["Formal model (Quint+Apalache)<br/>STARTS AT PHASE −1"]
     P6["Phase 6<br/>Verified adoption<br/>+ bounded pruning"]
     P7["Phase 7<br/>Archive / Discord profile"]
@@ -521,7 +548,7 @@ unpinned porting.
 | 7 | Quorum | Registry pins `q(n) = ⌈2n/3⌉`, `f = ⌊(n−1)/3⌋`; **no caller-supplied `maxByzantine` on the consensus path** | `seal.js:13-19`'s `⌊(n+f)/2⌋+1` is *identical* to `⌈2n/3⌉` for `f = ⌊(n−1)/3⌋` across n=4..100,000 (verified by execution), but the reference lets a caller pass `maxByzantine` and break the equivalence. |
 | 8 | Sort rule | All protocol sorts are UTF-8 byte order (`sortRule: "codepoint"`); `signerId` charset excludes control characters | D1. Also closes NUL key-smuggling in the vote key. |
 | 9 | Conflict action set | Freeze **five** actions (repo `ActionType` incl. `Drop`), not the reference's four (`linearize.js:157-162`); amend spec §7.2 | Existing blueprints use drop-both. |
-| 10 | Trust profile | `profileDigest` + `cryptoSuiteId` are **explicit signed fields** in genesis and every anchor; profiles are exactly `creator-trusted-v1` and `attested-bft-v1` | Today the creator-trusted profile is inferred from an empty signer array (`protocol.js:143-145`) — a verifier cannot distinguish "creator-trusted by policy" from "signer set omitted by mistake". |
+| 10 | Trust profile | `profileDigest` + `cryptoSuiteId` are **explicit signed fields** in genesis and every anchor; profiles are exactly `creator-trusted-v1`, `delegated-trusted-v1` (n delegates, explicit quorum `k ≥ 2` — not BFT, honestly labelled "k of these n must agree") and `attested-bft-v1`. **Key custody differs by quorum and must not be unified** (§Phase 5): `q = 1` uses a recoverable seed-derived key plus the network re-learn rule; `k ≥ 2` uses fate-shared non-extractable keys (profile 3) | Today the creator-trusted profile is inferred from an empty signer array (`protocol.js:143-145`) — a verifier cannot distinguish "creator-trusted by policy" from "signer set omitted by mistake". |
 | 11 | Naming | `protocolMajor: 2`, domains `ts-drp/*/v2`, package `protocol-v2` are the only identifiers in code. "AHE v4" survives solely as the spec document title. | Round 1 correctly flagged the v2/v4 naming mess. |
 
 ### Exit gate (Phase −1)
@@ -607,8 +634,8 @@ codec → vectors already frozen and now provably correct.
 | **0g** | Per-object local mutation queue + authenticated author sequence | local-safe | sliceable | Two un-awaited concurrent DRP calls yield a **chained** pair: assert the second vertex's `deps` **contain the first vertex's hash** (dep linkage, not completion order) **and** per-`(objectId,author)` signed sequence numbers are gapless across a randomized-interleaving run. *A global mutex passes the naive version without any author-sequence authentication.* |
 | **0h** | Blueprint/resolver exceptions: **legacy** → bounded-retry quarantine (non-semantic, never in a shared invalid set); **v2** → terminal per §7.2's fail-the-close rule. Isolate per-vertex application so one poison vertex cannot discard unrelated vertices in a batch. | **split** legacy/v2 | sliceable | A validly-signed op whose method always throws is dropped after bounded handling and cannot wedge other vertices in the same `applyVertices` call or across redeliveries |
 | **0i** | Remote-op ABI allowlist. **Legacy half is narrower than round 1 stated:** `callDRP` dispatches `drp[method](...)` (`drp-applier.ts:652-658`) with no `equal` stop-step in the pipeline (`:132-140`), so `opType: "hasOwnProperty"` **executes without throwing and is admitted to the graph today**. Making it terminal on the legacy plane means patched peers permanently exclude a vertex unpatched peers include → **fork within the legacy plane**. So: legacy keeps currently-succeeding own-prototype junk **admitted as a no-op**, pinned by a parity test; only currently-throwing opTypes become terminal (equal exclusion both sides). Full allowlist is **v2-only**. | **split** legacy/v2 | sliceable | Adversarial `opType ∈ {constructor, hasOwnProperty, __proto__, query_isAdmin, resolveConflicts, nonexistent}` → v2 terminal without aborting the batch; legacy parity pinned |
-| **0j** | **Blueprint determinism contract** — moved from round 1's Phase 8. Sync reducers, no ambient APIs (time/random/IO/DOM/Promise/module globals), `blueprintDigest` fail-fast at admission. `eslint-plugin-ts-drp` rule `drp/no-ambient-in-reducer`; cross-engine differential replay (Node/Chromium/Firefox/WebKit). **Plus numeric determinism (below)** — ambient-API bans are necessary but not sufficient. | consensus-v2 (digest) + local-safe (lint) | sliceable | A fixture blueprint calling `Date.now()` inside a reducer **fails lint AND fails the cross-engine digest test**; a mismatched-blueprint peer is rejected at admission |
-| **0n** | **Numeric determinism.** ECMAScript leaves `Math.sin/cos/tan/asin/acos/atan/atan2/pow/exp/log/log2/log10/cbrt/sinh/…` **implementation-defined** — V8, SpiderMonkey and JavaScriptCore legitimately return different last-bit results for the same input. IEEE-754 `+ − × ÷ √` and `Math.fround` are exact and safe. A reducer doing physics or distance checks with transcendentals is a **silent cross-engine fork**, and `blueprintDigest` will not catch it because both peers run the *same* blueprint. Ban transcendentals in reducers by lint; supply a deterministic `@ts-drp/math` (fixed-point or a pinned software implementation) for blueprints that need them. Also ban `toLocaleString`/`Intl`/locale-sensitive `sort` comparators in reducers (the same class of bug that D1 found in the reference itself). | consensus-v2 | sliceable | `numeric-determinism.test.ts`: a fixture reducer calling `Math.sin` **fails lint**; the cross-engine differential over a seeded corpus of 10⁶ transcendental inputs demonstrates the divergence exists (proving the rule is load-bearing, not cargo-cult), and the `@ts-drp/math` replacement is byte-identical across Node/Chromium/Firefox/WebKit |
+| **0j** | **Blueprint determinism contract** — moved from round 1's Phase 8. Sync reducers, no ambient APIs (time/random/IO/DOM/Promise/module globals), `blueprintDigest` fail-fast at admission. `eslint-plugin-ts-drp` rule `drp/no-ambient-in-reducer`; cross-engine differential replay (Node/Chromium/Firefox/WebKit **and any shipped Electron build — it pins its own V8, so a stale desktop client and a current browser are genuinely different engines**). **Plus numeric determinism (below)** — ambient-API bans are necessary but not sufficient. | consensus-v2 (digest) + local-safe (lint) | sliceable | A fixture blueprint calling `Date.now()` inside a reducer **fails lint AND fails the cross-engine digest test**; a mismatched-blueprint peer is rejected at admission |
+| **0n** | **Numeric determinism.** ECMAScript leaves `Math.sin/cos/tan/asin/acos/atan/atan2/pow/exp/log/log2/log10/cbrt/sinh/…` **implementation-defined** — V8, SpiderMonkey and JavaScriptCore legitimately return different last-bit results for the same input. IEEE-754 `+ − × ÷ √` and `Math.fround` are exact and safe. A reducer doing physics or distance checks with transcendentals is a **silent cross-engine fork**, and `blueprintDigest` will not catch it because both peers run the *same* blueprint. Ban transcendentals in reducers by lint; supply a deterministic `@ts-drp/math` (fixed-point or a pinned software implementation) for blueprints that need them. Also ban `toLocaleString`/`Intl`/locale-sensitive `sort` comparators in reducers (the same class of bug that D1 found in the reference itself). | consensus-v2 | sliceable | `numeric-determinism.test.ts`: a fixture reducer calling `Math.sin` **fails lint**; the cross-engine differential over a seeded corpus of 10⁶ transcendental inputs demonstrates the divergence exists (proving the rule is load-bearing, not cargo-cult), and the `@ts-drp/math` replacement is byte-identical across Node/Chromium/Firefox/WebKit **and every shipped Electron version still in the wild** — the version-skew case is the realistic one: two friends, same blueprint, different pinned V8, different last-bit results, silent fork |
 | **0o** | **Same-author equivocation policy** (remote). 0g serializes *local* writes; this defines what a replica does when it observes two vertices by the same author from the same causal state — the "same-author branching" shape the source analysis flags as the BFT-literature equivocation problem. **Decision: admit both, resolve deterministically, record evidence, rate-limit — never reject.** Rejection would make admission depend on the *arrival order of the competing fork*, violating the envelope-purity invariant Phase 3 proves. Deliver: per-`(objectId, author)` authenticated sequence numbers; a detector that flags two distinct vertices with the same `(author, seq)`; a persisted, gossipable **equivocation proof** (the two signed envelopes); an explicit **descendant rule** — descendants of an equivocating vertex remain valid (they are causally well-formed and their authors are not at fault); and a per-author rate limit + ACL-visible reputation signal so the room can revoke a proven equivocator through the normal ACL path. | consensus-v2 | atomic (the seq-number scheme) | `equivocation.test.ts`: two vertices with identical `(author, seq)` and different content → **both admitted**, an equivocation proof is emitted exactly once, it verifies standalone, and every honest replica reaches the **same** final state regardless of which fork it saw first. Descendants of both forks still apply. A replica that *rejects* one fork must fail the envelope-purity property |
 | **0p** | **Per-operation work budget.** Admission classifies *validity*, not *cost*: a validly-signed op whose reducer is `O(state²)` but terminating is a CPU DoS no classifier catches. Without a deterministic runtime we cannot meter instructions, so bound the inputs instead: max argument bytes per op, max collection size a single op may touch, and a wall-clock **execution ceiling per vertex with a deterministic outcome** — exceeding it classifies the vertex **terminal by a replicated rule** (the budget is in `parametersDigest`, so every replica agrees), never "slow on my machine." Real metering waits for the deferred VM; state this as the residual risk. | consensus-v2 (budget is anchored) | sliceable | `work-budget.test.ts`: a reducer exceeding the anchored budget is terminal **identically on a fast and a 20×-throttled replica** (fake-timer / instrumented step counter, not raw wall clock); the same op under the budget applies on both |
 | **0k** | Bound legacy `FinalityStore.states` | local-safe | sliceable | After 10⁴ vertices, `expect(finalityStore.states.size).toBeLessThanOrEqual(bound)` |
@@ -726,7 +753,7 @@ under one `objectId` are forbidden), but the **rollout** is sliced: new rooms on
 | Slice | Change | Class | Atomic? | RED test → GREEN |
 |---|---|---|---|---|
 | **3a** | v2 vertex + anchor envelopes over the frozen registry; new object namespace + pubsub topic; `bytes canonical_preimage` wire rule (§2.7) | consensus-v2 | atomic per preimage | Cross-room, cross-epoch, cross-anchor, cross-protocol replay all **terminal**. **Active cross-injection** legacy-interop test: publish v2 envelopes onto the legacy topic *and* legacy vertices onto the v2 topic, assert terminal rejection **in both directions** — "v2 traffic is invisible to legacy" passes trivially if the v2 topic is simply unused |
-| **3b** | **Trust profile + genesis certificate.** `profileDigest`/`cryptoSuiteId` in genesis and every anchor. A new room defaults to `creator-trusted-v1`, quorum 1, and the UI/API status **must** read "Creator-trusted; not Byzantine-fault-tolerant." An attested genesis requires n≥4, unique accepted seal keys, PoP/acceptance from every signer, and a `q=⌈2n/3⌉` genesis certificate — **a lone creator cannot advertise attested mode.** Capability negotiation happens only at create/join; an existing anchor selects exactly one tuple; **negotiation MUST NOT downgrade an existing object.** | consensus-v2 | atomic | `genesis-profile.test.ts`: one-signer `attested-bft-v1` **rejects**; one-signer creator profile succeeds and **cannot be network-downgraded or upgraded**. UI state is a **pure projection of the verified profile chain** — a copy test alone is theater, since copy can say "creator-trusted" while wire negotiation silently accepts attested evidence |
+| **3b** | **Trust profile + genesis certificate.** `profileDigest`/`cryptoSuiteId` in genesis and every anchor. A new room defaults to `creator-trusted-v1`, quorum 1, and the UI/API status **must** read "Creator-trusted; not Byzantine-fault-tolerant." A **delegated** genesis (`delegated-trusted-v1`) names n delegate signers and an explicit quorum `k ≥ 2`, with PoP/acceptance from every delegate — **1-of-n is rejected at genesis** (two delegates closing the same epoch from different sync states would mint two valid QCs for different values: a fork with everyone honest). An attested genesis requires n≥4, unique accepted seal keys, PoP/acceptance from every signer, and a `q=⌈2n/3⌉` genesis certificate — **a lone creator cannot advertise attested mode.** Capability negotiation happens only at create/join; an existing anchor selects exactly one tuple; **negotiation MUST NOT downgrade an existing object.** | consensus-v2 | atomic | `genesis-profile.test.ts`: one-signer `attested-bft-v1` **rejects**; a `delegated-trusted-v1` genesis with `k=1` **rejects**; one-signer creator profile succeeds and **cannot be network-downgraded or upgraded**. UI state is a **pure projection of the verified profile chain** — a copy test alone is theater, since copy can say "creator-trusted" while wire negotiation silently accepts attested evidence |
 | **3c** | **Latched epoch ACL** — anchor ACL authorizes the whole epoch; ACL ops stage to the next anchor; moderation triggers an early close. **The ACL fixes land here**: admin becomes **revocable** (`acl/index.ts:129-132` is a documented no-op today) and resolver keys move to `(peer, group)` (`:219-221` discriminates only on the target peer, so `grant(P,Writer)` vs `revoke(P,Finality)` collide and one is silently dropped). Under latched authority a permanent un-revocable admin is an **epoch-poisoning primitive**. | consensus-v2 | atomic | Authorization-vs-arrival-order property tests; concurrent `grant(P,Writer)` and `revoke(P,Finality)` **both** apply; compromised admin removable via handoff |
 | **3d** | Exact latched-ACL semantics as **pure functions**, defined *before* 3c implements them (round 1 sequenced 4d after 4b — implementation against undefined semantics): envelope-admission authority, application-writer authority, ACL-operation authority + method preconditions, staged mutation order, `SignerSet_(e+1)` derivation | consensus-v2 | sliceable | Exhaustive grant/revoke/admin/key-rotation **epoch-straddle** tests; independent replay produces identical ACL bytes and signer sets |
 | **3e** | **RFC 9162 history root + archive-index root (empty is valid) + mandatory close manifest** — moved from round 1's Phase 7. `historyRoot` and `archiveIndexRoot` are **mandatory fields of every cut and anchor**; Phase 6 validates history continuity, so they cannot arrive after it. §13's `closeManifestDigest` becomes **mandatory, not optional** — otherwise two signers can agree on a nominal close root while using different leaf inputs. | consensus-v2 | root profile atomic | `close-manifest-root.test.ts`: permuted arrival maps produce identical manifest and root; a changed frontier, order, hash or byte length changes or rejects the root. Exhaustive small-N consistency/inclusion + published RFC 9162 test vectors |
@@ -784,7 +811,7 @@ mechanism that accumulates weeks. Replaced by:
 
 ---
 
-## Phase 5 — Seal: creator-certified → round-free consensus → attested
+## Phase 5 — Seal: creator-certified → round-free consensus → delegated → attested
 
 **Goal:** the certification layer, as a **sidecar** (control-plane records, not DAG vertices — avoiding the
 recursion of putting the evidence that finalizes a cut inside the cut). Runs in **observation mode** until
@@ -800,9 +827,11 @@ the formal model is green. **Creator-certified ships before attested.**
 | **5b** | Seal safety core over the Phase-2 CAS: value-bound prepare/commit votes, monotone `enteredRound`, lock + change-justification, QC validation against the anchor signer set, **durable-before-gossip**, verbatim re-broadcast of the durable outbox after restart | consensus-v2 | **atomic with 5a and the vote transaction** | Crash-at-every-boundary double-vote tests over the **real** IDB vote CAS; forged/mixed QCs, duplicate signers, round rollback, lock amnesia all rejected |
 | **5c** | **The vote transaction** (§below) — the only API that can release bytes for gossip | consensus-v2 | **atomic** | `multitab-vote.spec.ts`, chromium/firefox/webkit, Web Locks **on and off** |
 | **5d** | **Pacemaker**, fully specified (§below) | consensus-v2 | atomic | Model-first: the Quint model + its trace regressions are the RED; the implementation is the GREEN |
-| **5e** | **Creator-certified profile** — ships first, with honest UI trust labelling. Exercises the whole snapshot/anchor/admission/storage stack with one signer. | consensus-v2 | sliceable | Not a copy test: **tamper test** — flip one vertex in the close set post-signing → verification fails; assert `valueDigest` recomputed from the raw close set equals the signed digest; the n=1 cut certificate passes the **same QC validator** as attested mode; vote durably slotted **before** gossip; mid-cut crash recovery resumes correctly |
+| **5e** | **Creator-certified profile** — ships first, with honest UI trust labelling. Exercises the whole snapshot/anchor/admission/storage stack with one signer. **Key custody at `q = 1` is the opposite of profile 3, deliberately:** a **recoverable seed-derived key** (the repo's existing `private_key_seed`), and fate-sharing is **forbidden at n = 1** — a fate-shared creator deadlocks the room on a *single* eviction, because the returning new identity cannot authorize its own handoff (that needs a QC from the destroyed key). Recoverability is safe here *because* `q = 1` collapses the rounds: every vote the signer casts **is** a QC, gossiped and held by peers, so the signer's sealing history is recoverable from the network — anti-equivocation state need not be local-only. **Mandatory rule:** on detected storage loss (incarnation mismatch), a `q = 1` signer MUST re-sync and query peers for the highest QC bearing its own signature **before sealing anything**. Residual risk, stated honestly: a QC gossiped to *some* peers but unreachable during re-learn — the exposure is the partial-delivery window only (a QC that reached nobody died with the storage and re-sealing is harmless; one that reached anyone reachable is re-learned). | consensus-v2 | sliceable | Not a copy test: **tamper test** — flip one vertex in the close set post-signing → verification fails; assert `valueDigest` recomputed from the raw close set equals the signed digest; the n=1 cut certificate passes the **same QC validator** as attested mode; vote durably slotted **before** gossip; mid-cut crash recovery resumes correctly. **Storage-loss re-learn test:** kill the creator's storage, restart with the seed-derived key, assert the signer **refuses to seal** until it has queried peers and re-learned its own highest QC, then assert it never emits a second, different value for an already-sealed epoch |
+| **5e2** | **Delegated-trusted profile** (`delegated-trusted-v1`): n delegate signers, explicit quorum `k ≥ 2` — the creator's answer to "who closes epochs when I'm away," installed by authority handoff **at any time while the creator can still sign** (insurance, not rescue — a handoff needs a QC from the current authority, so it cannot be arranged after the creator disappears; but it need not happen at genesis, where a room has no members to delegate to yet). Delegates may be added **or removed** by later handoffs, and an enrolled signer may be any identity that supplies an acceptance signature — including a durable-class **operator/mirror node**, opt-in and additive per principle 11. With `k ≥ 2` such a node can never seal alone: it needs a peer delegate to agree, making a third-party attestor a **liveness helper with no unilateral power** — one more reason 1-of-n is excluded. Each handoff lengthens the authority chain a joiner verifies, but that chain is proportional to *governance changes*, not messages. **No new protocol:** the same 5a–5d prepare/commit/QC machinery with smaller numbers; two delegates that disagree simply fail to reach quorum. **Not BFT** (at n=3, `n ≥ 3f+1` ⇒ f=0); the honest label is "k of these n must agree," never "BFT." **1-of-n is excluded**: two delegates closing epoch N from different sync states would mint two valid commit QCs with different `valueDigest` — a fork with everyone honest, converting a recoverable stall into an unrecoverable halt. (A deterministic per-epoch leader — `signers[epoch mod n]` with bounded fallthrough, the pacemaker's rotation applied to a trusted set — would rescue 1-of-n for staggered solo play; **deferred, not specified**.) Delegated rooms SHOULD include ≥1 durable-class delegate — the optional Electron build (§0.6) is the easiest route — SHOULD, not MUST: principle 11 governs, and a pure-browser delegate set is permitted with the stall-acceptance trust label. Ships after 5e, before 5f. | consensus-v2 | sliceable | `delegated-profile.test.ts`: `k=1` genesis **rejects**; two delegates concurrently proposing **different** close sets for the same epoch → neither reaches quorum, **zero commit QCs, no fork** — the room retries rather than halting on conflicting QCs; a 2-of-3 E2E closes an epoch with the creator offline; UI label reads "k of n must agree" and is a pure projection of the verified profile chain |
 | **5f** | **Attested profile** `q=⌈2n/3⌉, n≥4`, individual secp256k1 QCs (no BLS aggregation). Swaps the certificate producer without touching state semantics. | consensus-v2 | sliceable | Quorum-pair intersection suite **demoted to a cheap regression** (spec §21.3 itself disclaims arithmetic as sufficiency evidence); the real gate is the model + trace conformance |
 | **5g** | **Authority handoff & weak subjectivity**: handoff intent + all new-signer acceptances + old-authority QC; data-cut vs authority-cut separation (joiner cost ∝ governance changes, not messages); invite pinning (genesis + recent cut); conflicting-branch warning UX | consensus-v2 | sliceable | Profile changes only at the named next epoch; a missing new-signer acceptance or old-authority QC **rejects**. **Equivocation:** two valid-looking handoff certificates for different new sets → **loud halt + UI, never an automatic pick** |
+| **5h** | **Close barrier** (AHE §8.4, currently unsliced anywhere): before proposing, the proposer announces intent, gathers signer frontiers, reconciles missing vertices, then proposes; new local writes during the barrier go to the next-epoch outbox. An optimization that makes **first-round agreement likely** — explicitly **not a validity oracle**, and never load-bearing for safety. Without it, k-of-n delegates proposing from different sync states burn pacemaker rounds before converging: correct but wasteful, and for a 2-of-3 friend room it would look like "compaction is broken." | local-safe | sliceable | `close-barrier.test.ts`: delegates with deliberately divergent frontiers converge in **one** round with the barrier on; **disable the barrier → correctness unchanged** (same final `valueDigest`, zero conflicting QCs), only the round count rises — proving the barrier is not load-bearing for safety |
 
 ### The n=4 permanent stall this fixes (G2), as an executable schedule
 
@@ -910,8 +939,9 @@ implementation has made an *honest* signer equivocate.
 
 `navigator.storage.persist()` does not solve this; it is discretionary and cannot prevent user or ITP
 eviction. Round 1 filed this as a research gate blocking 5d/6/7. It is not a research question — it is a
-design constraint, and it **also blocks creator-certified acting mode**, because a single creator
-double-signing across an eviction is still a fork.
+design constraint, and it **also applies to creator-certified acting mode**, because a single creator
+double-signing across an eviction is still a fork — resolved at `q = 1` by the **network re-learn rule**
+(slice 5e), not by fate-sharing, which at n = 1 would deadlock the room on a single eviction.
 
 Choose one of three profiles; **profile 1 is the recommendation**:
 
@@ -921,13 +951,20 @@ Choose one of three profiles; **profile 1 is the recommendation**:
    *and vote bytes* in an independently durable witness implementing the same insert-or-return-existing CAS
    plus monotone signer state. Witness unavailable → **stop signing**. An external epoch/round high-water
    mark is **insufficient** — it cannot distinguish two values in the same round/phase.
-3. **Fate-shared non-exportable signer key** — the profile that *does* let a browser vote. Use a
+3. **Fate-shared non-exportable signer key** — the profile that lets a browser vote **in `k ≥ 2` sets
+   (delegated and attested); forbidden at n = 1**, where a single eviction would permanently deadlock the
+   room (the handoff needed to re-enroll requires a QC from the destroyed identity — `q = 1` uses the
+   recoverable-key + re-learn profile in 5e instead). Use a
    **non-extractable WebCrypto `CryptoKey`** stored in the same origin/bucket as the vote log, so eviction
    destroys the key and the log together and the old signer identity is unreconstructible. Permitted only
    with browser-specific evidence that the co-eviction really is atomic (an untested assumption today, which
    is why it is third rather than first). Loss creates a **new** signer identity requiring an authority
    handoff — which is safe, because a new identity cannot equivocate with the old one. Note this is the
-   **opposite** of the repo's current seed-derived key design: reconstructibility is the hazard.
+   **opposite** of the repo's current seed-derived key design: at `k ≥ 2`, reconstructibility is the
+   hazard, because prepare votes that never reached quorum form no QC, are held by nobody, and are
+   genuinely unrecoverable — exactly the lock-safety state that matters. At `q = 1` that state does not
+   exist (every vote is a QC), which is why the two custody rules are different and must never be
+   "simplified" into one.
 
 **The correlated-eviction handoff deadlock.** Profile 3 converts eviction from a safety event into a
 liveness event — and creates a new failure mode the other profiles do not have. Recovery from storage loss
@@ -940,9 +977,19 @@ voters evict in correlated batches (same browser fleet, same ITP window, same 7 
    handoff authorizable by fewer than `q` old signers after a timeout is an authority-hijack primitive,
    not a mitigation.
 2. **Set-composition rule (anchored in `signerSetDigest`):** an attested set containing fate-shared
-   browser voters MUST include ≥1 durable-class signer (storage-node backed, non-evictable), and SHOULD
-   keep evictable voters ≤ `n − q` per correlated failure domain (browser × origin), so no single
-   eviction wave can cross the quorum line alone.
+   browser voters MUST either include ≥1 durable-class signer **or** explicitly accept the
+   correlated-eviction stall, with that acceptance surfaced in the room's trust label — a pure-browser
+   signer set is an informed choice with a stated consequence (stall, never fork, reset path), not a
+   footgun; and SHOULD keep evictable voters ≤ `n − q` per correlated failure domain (browser × origin),
+   so no single eviction wave can cross the quorum line alone. *Worked example — the delegated instance of
+   the same rule (quorum `k`): at n = 3, k = 2, `n − k = 1`, so only **one** evictable voter is within the
+   SHOULD. Three browser delegates is two over — and two of them evicting in the same ITP window leaves one
+   surviving old identity against a handoff needing two.* **Durable-class is a storage property,
+   not an ownership property:** any signer whose vote log does not evict qualifies — a friend's
+   always-on desktop running `pnpm cli`, **a participant running an optional Electron build of the app**,
+   a self-hosted box, a Raspberry Pi, as well as a company-run
+   mirror. Third-party infrastructure is *one way* to obtain durability, never the definition of it,
+   and never required.
 3. **Proactive rotation:** signer liveness is a monitored health metric (heartbeats through the seal
    plane); when live signers decay toward `q + 1`, the room proposes an early handoff **while it still
    has quorum**. Rotation before decay, not recovery after.
@@ -953,10 +1000,32 @@ voters evict in correlated batches (same browser fleet, same ITP window, same 7 
 *Test (`correlated-eviction.spec.ts`):* enroll `n = 5` with 4 fate-shared browser voters + 1 durable
 signer; evict all 4 in one schedule → epoch stalls at the hard limit with **zero** conflicting QCs and the
 health telemetry shows the early-handoff proposal fired before the threshold; repeat with the
-set-composition rule violated (5 evictable) → the room wedges and the test asserts the wedge is the
-*specified* outcome — stall, never fork, reset path offered.
+set as a pure-browser one (5 evictable, stall-acceptance declared in the trust label) → the room wedges
+and the test asserts the wedge is the *specified* outcome — stall, never fork, reset path offered.
 
-**The browser-voter profile (profile 3, assembled).** A browser tab may hold the seal-voter role only when
+**Stall taxonomy, and what a trust reset concretely is.** "Stalls, never forks" covers two situations that
+must not be conflated, and the exit from the second has a precise shape:
+
+- **Recoverable stall** — no quorum online *right now*. Wait. Signers return, the epoch closes, nothing is
+  lost. The cost is deferred, not absent: the active epoch grows, joiners re-sync a longer tail, and at
+  `maxEpochVertices` durable writes stop until a close happens.
+- **Permanent stall** — the pinned signer set can never produce a QC again, and no handoff is possible
+  because a handoff needs that same QC. The room's **authority** is dead. **Its data is not:** every
+  vertex, the full history and the last certified snapshot remain present, signed and verifiable by
+  anyone. What died is the ability to seal *new* epochs.
+- **Trust reset =** a **new object**: new genesis anchor, a new signer set of the people actually present,
+  initial state taken from the old room's last certified state, and every participant explicitly
+  re-joining from a fresh invite. It is a **reset, not a recovery**, because nobody can authorize the
+  successor in the old room's terms — anyone could stand up a room claiming to continue yours, so
+  participants decide *out of band* which one they are continuing in. History survives as **content**; the
+  cryptographic chain restarts.
+- **UI requirement, as a gate:** the interface MUST NOT present this as continuity recovered. The failure
+  mode to test against is a UI announcing "room recovered!" when what happened is "someone made a new room
+  and asserted it is the same one." (Cross-referenced from research gate 3, which is the creator-offline
+  instance of the same exit.)
+
+**The browser-voter profile (profile 3, assembled — `k ≥ 2` sets only).** In a delegated or attested set,
+a browser tab may hold the seal-voter role only when
 **all** of the following hold — each independently testable, none a substitute for another:
 (1) a **non-extractable WebCrypto `CryptoKey`** in the same origin bucket as the vote log (fate-sharing);
 (2) `navigator.storage.persist()` **granted** — denied → the tab refuses the signer role rather than
@@ -964,12 +1033,14 @@ enrolling optimistically (persistence is no guarantee, but its *denial* is a kno
 (3) primary-tab election (2i) so the vote CAS is uncontended in the common case — correctness never
 depends on it; (4) every vote through the 5c transaction, bytes released only after `oncomplete`;
 (5) storage loss → **new identity + authority handoff**, never re-enrollment as the old signer;
-(6) the signer set satisfies the correlated-eviction composition rule above. 5e/5f gate on this list, not
-on "profile 3" as prose.
+(6) the signer set satisfies the correlated-eviction composition rule above. 5e2/5f gate on this list, not
+on "profile 3" as prose. **The `q = 1` exception:** a creator-certified browser signer uses the
+recoverable-key + network re-learn profile (5e) instead of items (1) and (5) — items (2)–(4) still apply.
 
 Signer enrollment binds `signerId` to a **storage incarnation** recorded by the external witness/authority.
 An active signer identity with no matching local continuity proof is **storage loss and must refuse** — it is
-never silently treated as empty storage.
+never silently treated as empty storage. (At `q = 1`, the refusal ends once the 5e re-learn rule is
+satisfied; at `k ≥ 2` it is permanent for that identity — re-entry is by handoff as a new signer.)
 
 **Test (`eviction-double-sign.spec.ts`):** enroll signer + witness, emit `X`, retain the identity *outside*
 the origin (modelling wallet recovery); delete the entire database, and separately inject selective deletion
@@ -1253,7 +1324,7 @@ wire and almost none for anything around them.
 | **P2 blueprint DX** | 0/1 | `eslint-plugin-ts-drp` (`drp/no-ambient-in-reducer`), blueprint conformance harness (replay an op log in Node + Chromium + WebKit, assert byte-identical state digest), authoring guide | A fixture blueprint calling `Date.now()` in a reducer fails **lint and** the cross-engine digest test |
 | **P3 observability** | 4→6 | Fork-detection event over `@ts-drp/tracer` (OTLP exporter already exists, unused by round 1); signed kill-switch (built in 1m) wired to it; version-skew coexistence suite; **named operator** | Injected divergent fold digest in the multi-node harness emits the fork event; rollback counter increments on forced mid-adoption failure |
 | **P4 security** | 3 | Threat-model doc (seed from §0.3 + the seal/authority model); **key rotation + compromise runbook** — `keychain.ts:38-44` derives both secp256k1 and BLS keys from a single seed with **no rotation API and no compromise procedure**, yet object identity keys are exactly what cross-room replay and authority handoff abuse; `pnpm audit`/SBOM in CI; **external security review booked at Phase 3** (months of lead time), report gates Phase-6 default-on | Rotation epoch-straddle test: a rotated-out key's post-rotation signature is terminal-rejected |
-| **P5 reference app** | 4→7 | AHE §23 requires availability/pruning policy visible **in room configuration and UI** and conflicting-branch warning UX — round 1 builds no app in which any UI could exist. Evolve `examples/chat` into the Discord-profile proving ground (epochs visible, trust badge, pruning-policy config, archive paging, rebase status, tombstone op); grid/canvas over the ephemeral plane as the MMORPG proving ground | Every UI-bearing gate (3b, 5g, 7c, §23) points its e2e at this app |
+| **P5 reference app** | 4→7 | AHE §23 requires availability/pruning policy visible **in room configuration and UI** and conflicting-branch warning UX — round 1 builds no app in which any UI could exist. Evolve `examples/chat` into the Discord-profile proving ground (epochs visible, trust badge, pruning-policy config, archive paging, rebase status, tombstone op; **the app prompts "who else can close epochs if you are away?" as soon as there is anyone to delegate to — a room has no members at genesis, so this fires on membership growth (e.g. ≥3 members, or ≥N closed epochs) rather than at create time, and is never a buried setting; a room left at n=1 with delegable members present is surfaced as a standing risk, because delegation is only arrangeable while the creator can still sign**); grid/canvas over the ephemeral plane as the MMORPG proving ground | Every UI-bearing gate (3b, 5g, 7c, §23) points its e2e at this app |
 | **P6 docs** | all | Promote the amended spec to `docs/protocol/` with a **versioned amendment log** (it *is* the spec under this directive); blueprint authoring guide; operator guide; trust-profile explainer; migration guide | Amendment log entry exists for every registry decision; guides gate their respective phases |
 | **P7 privacy DR** | 1 | Deletion-semantics + retention decision record (consumed by 7c and P5) | Merged before any chat-profile deployment |
 | **P8 distribution** | Track S era | `sideEffects` audit, conditional exports, per-package size budgets in CI, **BLS-WASM extraction to an optional dep** once FinalityStore is deprecated — a browser-first library should not ship WASM it no longer uses | Size check fails over budget; BLS WASM absent from the default browser graph |
@@ -1278,15 +1349,25 @@ Genuinely open, each blocking the phase named:
    under quorum loss, **or** a signer set whose composition guarantees liveness: either designated
    durable signers only (§0.6), or fate-shared browser voters (§Phase 5, profile 3) **plus ≥1
    durable-class backstop signer** — in which case the simulation must also cover the
-   correlated-eviction schedule below.
+   correlated-eviction schedule below. (A pure fate-shared set with declared stall-acceptance is
+   permitted by the composition rule but does **not** discharge this gate — it accepts the failure
+   rather than preventing it.)
 2. **Mobile throughput ceiling** — blocks Profile-M claims. Fold + digest + Merkle per close on a real phone.
    Note §2.6: the reference's numbers are async-WebCrypto artifacts and must be **re-measured against the
    sync port** before any WASM decision.
 3. **Creator-offline migration** — blocks 3h for the dominant room type. Migration needs an authority
    signature; creator-offline is a proven repo scenario. **Gate:** migration is creator-only **or** a
-   pre-pinned delegation/threshold authority. Without one pinned *before* the creator disappeared there is no
-   cryptographically honest migration — a new room may be created as an **explicit trust reset**, and it MUST
-   NOT be presented as an authenticated migration.
+   pre-pinned delegation/threshold authority — which the `delegated-trusted-v1` profile (Phase −1
+   decision 10, slice 5e2) now expresses. **The deadline is authority-reachability, not room age:**
+   installing delegates is an authority handoff needing a QC from the current authority, so it can be
+   done at any time *while the creator can still sign* — which matters, because at genesis a room has
+   no members yet and therefore nobody to delegate *to*. The risk is not a missed moment at creation
+   but a room that runs at n=1 indefinitely and then loses its creator (P5 prompts on membership
+   growth). Without a delegation pinned *before* the creator
+   disappeared there is no cryptographically honest migration — a new room may be created as an
+   **explicit trust reset**, and it MUST NOT be presented as an authenticated migration (what a reset
+   concretely is — and the recoverable-vs-permanent stall distinction — is specified in §Phase 5, "Stall
+   taxonomy").
 4. **Real-device lab ownership** — blocks the Phase-6 release matrix. Decide at Phase-2 kickoff.
 
 ---
@@ -1343,7 +1424,7 @@ Profile-scoped. Every item names an executable artifact.
 5. **Phase 2** — durable substrate; **hard-kill driver first, on a trivial payload**; browser gate standing.
 6. **Phase 3** — v2 namespace: genesis, anchor, admission, latched ACL, history + archive roots, tip-set.
 7. **Phase 4** — shadow cuts and snapshots; four-way comparison; soak ledger accumulating.
-8. **Phase 5** — seal: creator-certified → round-free → attested. **Formal model + trace conformance is a hard gate.**
+8. **Phase 5** — seal: creator-certified → round-free → delegated → attested. **Formal model + trace conformance is a hard gate.**
 9. **Phase 6** — enable verified adoption; bounded pruning; heaviest browser/device matrix.
 10. **Phase 7** — archive / Discord profile.
 11. **Tracks E/S/T/P** — throughout; Train S gates decide whether the scale claim may be made at all.
@@ -1504,7 +1585,7 @@ instrumented throughout. "Lights up" = the earliest phase at which the step beco
 | 14 | A hostile peer floods: oversized batches, dependency bombs, rotated invalid hashes, 100 Sybil keys | Honest peers stay inside fixed CPU/RAM/queue budgets; re-request rate stays bounded; no honest room is starved | 1 |
 | 15 | A user asks to delete their messages | The product does exactly what the decision record says, and the UI copy does not promise more than key-erasure can deliver | 1 (record), 7 (crypto) |
 | 16 | Operator trips the kill-switch | Compaction halts fleet-wide within N seconds; drill log emitted; rollback telemetry increments | 1, 6 |
-| 17 | Steps 1–16 on Chromium, Firefox and WebKit | Per-engine `ahe-storage-validation.json`, `missingKillPoints === []`, and real Safari/iOS + Chrome/Android rows at the release SHA | 2, 6 |
+| 17 | Steps 1–16 on Chromium, Firefox and WebKit — **plus any shipped Electron build, at each version still supported** | Per-engine `ahe-storage-validation.json`, `missingKillPoints === []`, and real Safari/iOS + Chrome/Android rows at the release SHA | 2, 6 |
 
 **Exit:** golden path 1 green on the full matrix at one SHA = the chat product is shippable, and Train C's
 claim ("production-hardened signed-command rooms with bounded history") is earned rather than asserted.
