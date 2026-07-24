@@ -204,6 +204,19 @@ export interface ControlPlaneRendezvousConfig {
 	readonly publish?: boolean;
 	readonly record_ttl_ms?: number;
 	readonly refresh_interval_ms?: number;
+	readonly room_presence?: {
+		readonly enabled: boolean;
+		/**
+		 * Max concurrently advertised rooms; integer 1..32, default 7.
+		 *
+		 * HTTP registries count the main record and every room record against
+		 * maxRecordsPerClient, so 1 + max_rooms must fit that limit. Each room
+		 * also consumes one namespace; operators must size maxNamespaces for
+		 * expected concurrent-room cardinality. Nostr relays are unaffected by
+		 * these HTTP registry limits.
+		 */
+		readonly max_rooms?: number;
+	};
 }
 
 export interface ControlPlaneRelaySourceToggle {

@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
+	base: process.env.VITE_BASE_PATH ?? "/",
 	server: {
 		proxy: {
 			"/metrics": {

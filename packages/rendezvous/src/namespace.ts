@@ -1,3 +1,5 @@
+import { sha256 as sha256Digest } from "@noble/hashes/sha2.js";
+import { base64url } from "multiformats/bases/base64";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
 
@@ -6,6 +8,24 @@ const NETWORK_ID_PATTERN = /^[A-Za-z0-9_-]{22,86}$/u;
 
 export const PEER_NAMESPACE_PREFIX = "drp-network:v1:";
 export const RELAY_NAMESPACE_PREFIX = "drp-relays:v1:";
+export const ROOM_NAMESPACE_PREFIX = "drp-room:v1:";
+
+/**
+ * Builds the opaque rendezvous namespace used to advertise room membership.
+ *
+ * Publishing this namespace reveals that a peer is a member of the room to
+ * anyone who already knows the room object ID. Hashing keeps the salted raw
+ * object ID out of relay-visible namespace text.
+ * @param objectId - Room object identifier.
+ * @returns The versioned room-rendezvous namespace.
+ */
+export function roomNamespace(objectId: string): string {
+	if (objectId.length < 1 || objectId.length > 1_024) {
+		throw new Error("objectId must contain 1..1024 characters");
+	}
+	const digest = sha256Digest(new TextEncoder().encode(objectId));
+	return `${ROOM_NAMESPACE_PREFIX}${base64url.baseEncode(digest)}`;
+}
 
 /**
  * Builds the peer-rendezvous namespace for one opaque network identifier.

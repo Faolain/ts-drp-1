@@ -15,6 +15,33 @@ afterEach((): void => {
 });
 
 describe("DRPNode rendezvous publishing RED contracts", () => {
+	it("bounds the registration attempt deadline to one quarter of the record TTL", async () => {
+		const node = new DRPNode(rendezvousConfig(NAMESPACE, 30_000), {
+			networkNode: createFakeNetwork(),
+			reconnect: false,
+		});
+		const deadlines: number[] = [];
+		node["_registerRendezvousRecord"] = (
+			_producer,
+			_directory,
+			_credential,
+			_endpointCount,
+			_lifecycleSignal,
+			deadlineMs
+		): Promise<boolean> => {
+			deadlines.push(deadlineMs);
+			return Promise.resolve(false);
+		};
+		stubEmptyRegistries();
+
+		try {
+			await node.start();
+			await vi.waitFor((): void => expect(deadlines).toEqual([15_000]));
+		} finally {
+			await node.stop();
+		}
+	});
+
 	it("bounds published addresses while retaining circuit and WebRTC reachability", async () => {
 		const networkNode = createFakeNetwork();
 		const producedRecords: SignedDrpRecordV1[] = [];
@@ -67,7 +94,7 @@ describe("DRPNode rendezvous publishing RED contracts", () => {
 	});
 });
 
-function rendezvousConfig(namespace: string): DRPNodeConfig {
+function rendezvousConfig(namespace: string, refreshIntervalMs = 1_000): DRPNodeConfig {
 	return {
 		keychain_config: { private_key_seed: "rendezvous-publishing-red" },
 		log_config: { level: "silent" },
@@ -81,7 +108,7 @@ function rendezvousConfig(namespace: string): DRPNodeConfig {
 					namespace,
 					publish: true,
 					record_ttl_ms: 60_000,
-					refresh_interval_ms: 1_000,
+					refresh_interval_ms: refreshIntervalMs,
 				},
 			},
 		},

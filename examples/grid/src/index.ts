@@ -153,12 +153,13 @@ async function main(): Promise<void> {
 
 	const networkConfig = getNetworkConfigFromEnv();
 	const modularSession = isModularNetworkEnv(env) ? createModularGridNetwork(networkConfig, env) : undefined;
-	gridState.node = modularSession?.node ?? new DRPNode(networkConfig);
-	await gridState.node.start();
+	const node = modularSession?.node ?? new DRPNode(networkConfig);
+	gridState.node = node;
+	await node.start();
 	// Expose the modular session for observation as soon as the node starts — do NOT gate it on
 	// dialability, which for a browser peer depends on later relay reservation.
 	if (modularSession !== undefined) exposeModularSession(modularSession);
-	await gridState.node.networkNode.isDialable(() => {
+	await node.networkNode.isDialable(() => {
 		console.log("Started node", import.meta.env);
 		if (hasRun) return;
 		hasRun = true;

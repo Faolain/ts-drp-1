@@ -5,19 +5,59 @@
 		<meta http-equiv="X-UA-Compatible" content="ie=edge" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>DRP - Canvas</title>
+		<link rel="stylesheet" href="/styles.css" />
 	</head>
 
-	<body>
-		<div style="margin-bottom: 10px">
-			<p>Connected to <span id="canvasId"></span></p>
+	<body class="canvas-app">
+		<div class="controls">
+			<div id="canvasIdentity" class="canvas-identity" hidden>
+				<span class="canvas-identity__label">Connected canvas</span>
+				<button
+					id="copyCanvasId"
+					class="canvas-identity__copy"
+					type="button"
+					aria-describedby="copyCanvasStatus"
+					disabled
+				>
+					<span class="visually-hidden">Copy canvas ID: </span>
+					<code id="canvasId"></code>
+					<span class="canvas-identity__action" aria-hidden="true">Copy</span>
+				</button>
+			</div>
+			<p id="copyCanvasStatus" class="canvas-identity__status" role="status" aria-live="polite"></p>
 			<p>peers: <span id="peers"></span></p>
 			<p>discovery_peers: <span id="discovery_peers"></span></p>
 			<p>object_peers: <span id="object_peers"></span></p>
 			<input id="canvasIdInput" type="text" placeholder="Insert canvas ID" />
-			<button id="connect">Connect</button>
-			<button id="create">Create Canvas</button>
+			<button id="connect" disabled>Connect</button>
+			<button id="create" disabled>Create Canvas</button>
 		</div>
-		<div id="canvas"></div>
+		<section
+			id="canvasEmptyState"
+			class="canvas-empty-state"
+			data-testid="canvas-empty-state"
+			aria-labelledby="canvasEmptyStateTitle"
+		>
+			<span class="canvas-empty-state__marker" aria-hidden="true">+</span>
+			<div>
+				<h1 id="canvasEmptyStateTitle">Create or join a canvas</h1>
+				<p>Start a new shared field or enter an existing canvas ID above.</p>
+				<p id="canvasConnectionStatus" class="canvas-connection-status" role="status" aria-live="polite"></p>
+			</div>
+		</section>
+		<section
+			id="canvasStage"
+			class="canvas-stage"
+			data-testid="canvas-stage"
+			aria-labelledby="canvasStageTitle"
+			hidden
+		>
+			<header class="canvas-stage__header">
+				<h1 id="canvasStageTitle">Shared canvas</h1>
+				<span id="canvasDimensions"></span>
+			</header>
+			<div id="canvas" role="group" aria-label="Collaborative pixel canvas"></div>
+		</section>
 		<script type="module" src="/src/index.ts"></script>
 	</body>
 </html>

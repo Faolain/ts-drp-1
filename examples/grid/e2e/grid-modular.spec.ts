@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
+import { createHash } from "node:crypto";
 
 const PRIMARY_RELAY_ID = "16Uiu2HAmTY71bbCHtmYD3nvVKUGbk7NWqLBbPFNng4jhaXJHi3W5";
 const REPLACEMENT_RELAY_ID = "16Uiu2HAmT72TapomemeWskZbmzd4hZcakAzYnTwLtbdsvdaSUvXU";
@@ -154,6 +155,84 @@ test("cold-starts, authenticates, converges, and recovers without fixed bootstra
 		await Promise.allSettled([creatorContext.close(), joinerContext.close()]);
 	}
 });
+
+test("keeps a room joinable through a surviving replica after the creator leaves", async ({ browser, request }) => {
+	const creatorContext = await browser.newContext();
+	const replicaContext = await browser.newContext();
+	const lateJoinerContext = await browser.newContext();
+	try {
+		const creatorPage = await creatorContext.newPage();
+		await openModularGrid(creatorPage);
+		await expect.poll(async () => (await readSnapshot(creatorPage)).relayReservations.length).toBe(1);
+		await expect.poll(async () => registrationOutcome(await readSnapshot(creatorPage))).toMatch(/accepted|partial/u);
+		const creatorPeerId = (await readSnapshot(creatorPage)).peerId;
+
+		await creatorPage.click("#createGrid");
+		await expect(creatorPage.locator("#gridId")).not.toBeEmpty();
+		const gridId = (await creatorPage.locator("#gridId").textContent())?.trim();
+		if (gridId === undefined || gridId === "") throw new Error("creator did not expose a grid ID");
+
+		const replicaPage = await replicaContext.newPage();
+		await openModularGrid(replicaPage);
+		await expect.poll(async () => (await readSnapshot(replicaPage)).relayReservations.length).toBe(1);
+		await expect.poll(async () => registrationOutcome(await readSnapshot(replicaPage))).toMatch(/accepted|partial/u);
+		const replicaPeerId = (await readSnapshot(replicaPage)).peerId;
+		await replicaPage.fill("#gridInput", gridId);
+		await replicaPage.click("#joinGrid");
+		await expect(creatorPage.locator("#objectPeers")).toContainText(replicaPeerId);
+		await expect(replicaPage.locator("#objectPeers")).toContainText(creatorPeerId);
+
+		// The surviving replica must be discoverable through the ROOM namespace itself
+		// before the creator leaves — in this two-node fixture the app-wide namespace
+		// would also connect a late joiner, so the room record is asserted explicitly.
+		const namespace = roomNamespaceFor(gridId);
+		await expect
+			.poll(async () => discoveredPeers(request, namespace), { intervals: [1_000], timeout: 20_000 })
+			.toContain(replicaPeerId);
+
+		// Creator leaves; its registry records stay live until TTL, so the late joiner
+		// exercises the realistic path: stale creator record first, room fallback after.
+		await creatorContext.close();
+
+		const lateJoinerPage = await lateJoinerContext.newPage();
+		await openModularGrid(lateJoinerPage);
+		await expect.poll(async () => (await readSnapshot(lateJoinerPage)).relayReservations.length).toBe(1);
+		await expect.poll(async () => registrationOutcome(await readSnapshot(lateJoinerPage))).toMatch(/accepted|partial/u);
+		const lateJoinerPeerId = (await readSnapshot(lateJoinerPage)).peerId;
+		await lateJoinerPage.fill("#gridInput", gridId);
+		await lateJoinerPage.click("#joinGrid");
+
+		await expect(lateJoinerPage.locator("#objectPeers")).toContainText(replicaPeerId, { timeout: 30_000 });
+		await expect(replicaPage.locator("#objectPeers")).toContainText(lateJoinerPeerId, { timeout: 30_000 });
+
+		// The synced history still contains the departed creator's presence, and live
+		// edits made by the surviving replica reach the late joiner.
+		await expect(lateJoinerPage.locator(`[data-glowing-peer-id="${creatorPeerId}"]`)).toBeVisible();
+		const replicaDotOnLateJoiner = lateJoinerPage.locator(`[data-glowing-peer-id="${replicaPeerId}"]`);
+		await expect(replicaDotOnLateJoiner).toBeVisible();
+		const beforeReplicaMove = await replicaDotOnLateJoiner.getAttribute("style");
+		await replicaPage.keyboard.press("d");
+		await expect.poll(async () => replicaDotOnLateJoiner.getAttribute("style")).not.toBe(beforeReplicaMove);
+	} finally {
+		await Promise.allSettled([creatorContext.close(), replicaContext.close(), lateJoinerContext.close()]);
+	}
+});
+
+function roomNamespaceFor(objectId: string): string {
+	return `drp-room:v1:${createHash("sha256").update(objectId).digest("base64url")}`;
+}
+
+async function discoveredPeers(request: APIRequestContext, namespace: string): Promise<string> {
+	// Alternate registries per call to stay under each one's per-namespace rate window.
+	const registries = ["primary", "secondary"];
+	const registry = registries[discoverPollCount++ % registries.length];
+	const response = await request.post(`http://127.0.0.1:4175/grid-registry/${registry}/v1/discover`, {
+		data: { namespace },
+	});
+	return JSON.stringify(await response.json());
+}
+
+let discoverPollCount = 0;
 
 async function openModularGrid(page: Page): Promise<void> {
 	await page.goto("/");

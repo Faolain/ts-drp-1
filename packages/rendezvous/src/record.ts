@@ -5,20 +5,23 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { base64url } from "multiformats/bases/base64";
 
 import { AddressPolicy, type AddressPolicyOptions, type Resolver } from "./address-policy.js";
-import { PEER_NAMESPACE_PREFIX, peerNamespace } from "./namespace.js";
+import { PEER_NAMESPACE_PREFIX, peerNamespace, ROOM_NAMESPACE_PREFIX } from "./namespace.js";
 
 const encoder = new TextEncoder();
 const RECORD_KIND = "ts-drp-rendezvous-record";
-const NAMESPACE_PATTERN = new RegExp(`^${PEER_NAMESPACE_PREFIX}[A-Za-z0-9_-]{22,86}$`, "u");
+const NAMESPACE_PATTERN = new RegExp(
+	`^(?:${PEER_NAMESPACE_PREFIX}|${ROOM_NAMESPACE_PREFIX})[A-Za-z0-9_-]{22,86}$`,
+	"u"
+);
 const SUPPORTED_CAPABILITIES = ["drp-gossipsub", "webrtc", "relay-client", "relay-hop-v2-service"] as const;
 
 export type DrpCapability = (typeof SUPPORTED_CAPABILITIES)[number];
 export type AdmissionMode = "open" | "invite" | "allowlist" | "proof-of-work";
 
 /**
- * Checks whether a value is a versioned opaque peer-rendezvous namespace.
+ * Checks whether a value is a supported versioned opaque rendezvous namespace.
  * @param namespace - Candidate namespace.
- * @returns Whether the namespace has the required prefix and base64url entropy.
+ * @returns Whether the namespace has a supported prefix and base64url entropy.
  */
 export function isValidRendezvousNamespace(namespace: string): boolean {
 	return NAMESPACE_PATTERN.test(namespace);
