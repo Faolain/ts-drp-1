@@ -20,7 +20,7 @@ type CurveSupport = "non-extractable" | "extractable" | "unsupported";
 /** The measured, reviewed matrix. Changing an entry is a deliberate act — see the doc comment. */
 const EXPECTED: Record<string, CurveSupport> = {
 	// Signature suite for v2 identity/vertex signatures and seal-voter keys.
-	Ed25519: "non-extractable",
+	"Ed25519": "non-extractable",
 	// Retained in cryptoSuiteId only as a fallback for pre-2025 browsers.
 	"ECDSA P-256": "non-extractable",
 	// Never available in WebCrypto on any engine; this is why the seal key cannot be secp256k1.
@@ -28,7 +28,7 @@ const EXPECTED: Record<string, CurveSupport> = {
 };
 
 const ALGORITHMS: Record<string, EcKeyGenParams | Algorithm> = {
-	Ed25519: { name: "Ed25519" },
+	"Ed25519": { name: "Ed25519" },
 	"ECDSA P-256": { name: "ECDSA", namedCurve: "P-256" },
 	"ECDSA K-256": { name: "ECDSA", namedCurve: "K-256" },
 };
@@ -59,12 +59,13 @@ test("WebCrypto curve support matches the reviewed matrix exactly", async ({ pag
 	}, ALGORITHMS);
 
 	// Equality, not a subset check: an unexpected *gain* must fail too.
-	expect(observed, `WebCrypto curve support changed on ${browserName}. Re-review the v2 signature suite before updating this matrix.`).toEqual(
-		EXPECTED
-	);
+	expect(
+		observed,
+		`WebCrypto curve support changed on ${browserName}. Re-review the v2 signature suite before updating this matrix.`
+	).toEqual(EXPECTED);
 });
 
-test("engine build is recorded for the release matrix", async ({ browser, browserName }) => {
+test("engine build is recorded for the release matrix", ({ browser, browserName }) => {
 	const version = browser.version();
 	// Not an assertion about *which* version — that belongs to the currency check. This exists so
 	// every capability result in CI carries the build that produced it.
