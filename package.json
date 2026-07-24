@@ -28,6 +28,7 @@
 		"docs": "typedoc",
 		"e2e-test": "pnpm exec playwright test --config examples/grid/playwright.modular.config.ts --fail-on-flaky-tests",
 		"e2e-test:canvas-chat": "pnpm exec playwright test --config playwright.canvas-chat.config.ts --fail-on-flaky-tests",
+		"e2e-test:platform": "pnpm exec playwright test --config playwright.platform-capability.config.ts",
 		"e2e-test:public-infra": "GRID_E2E_BROWSERS=chromium,firefox,webkit VITE_NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol pnpm exec playwright test --config examples/grid/playwright.public-infra.config.ts",
 		"e2e-test:fully-public": "pnpm exec playwright test --config examples/grid/playwright.fully-public.config.ts",
 		"flamegraph": "pnpm tsx packages/object/tests/hashgraph.flamegraph.ts",
@@ -55,7 +56,7 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.18.0",
-		"@playwright/test": "^1.49.1",
+		"@playwright/test": "1.61.1",
 		"@release-it-plugins/workspaces": "^5.0.3",
 		"@typescript-eslint/parser": "^8.21.0",
 		"@vitest/coverage-v8": "^3.0.5",
