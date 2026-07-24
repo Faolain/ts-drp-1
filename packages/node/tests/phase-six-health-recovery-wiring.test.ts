@@ -1,9 +1,22 @@
+import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import type { Address, PeerId } from "@libp2p/interface";
+import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import {
 	type ControlPlaneMechanismPorts,
 	type ControlPlaneScheduler,
 	type RecoveryMechanismResult,
 } from "@ts-drp/control-plane";
+import {
+	AddressPolicy,
+	AdmissionPolicy,
+	createRendezvousEnsemble,
+	FixtureRegistryEndpoint,
+	RecordSigner,
+	RecordValidator,
+	RegistryClient,
+	RegistryServer,
+	type RendezvousEnsemble,
+} from "@ts-drp/rendezvous";
 import type {
 	ControlPlaneConnectionEvidence,
 	ControlPlaneEvent,
@@ -20,6 +33,8 @@ import { describe, expect, it, vi } from "vitest";
 import { DRPNode } from "../src/index.js";
 
 const START_MS = 1_750_000_000_000;
+const NAMESPACE = `drp-network:v1:${"h".repeat(43)}`;
+const INVITE = "phase-six-health-recovery-fixture";
 
 describe("Phase 6 DRPNode real-coordinator wiring", () => {
 	it.each([
@@ -42,10 +57,10 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
+		const object = await node.createObject({ id: "local-object" });
 		await node.start();
 		const [firstGroupPeer] = groupPeers;
 		if (firstGroupPeer !== undefined) {
-			const object = await node.createObject({ id: "local-object" });
 			fake.emit({ peerId: firstGroupPeer, subscribed: true, topic: object.id });
 			await flushMicrotasks();
 		}
@@ -54,6 +69,50 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 
 		expect(events).not.toContainEqual({ kind: "health", state: "healthy" });
 		expect(node["_intervals"].has("interval::reconnect")).toBe(false);
+		await node.stop();
+		expect(scheduler.pendingCount()).toBe(0);
+	});
+
+	it("keeps an idle node from dialing rendezvous recovery until an object is subscribed", async () => {
+		const scheduler = new ManualNodeScheduler();
+		const fake = createFakeNetwork({ allPeers: [], groupPeers: [] });
+		const events: ControlPlaneEvent[] = [];
+		const node = new DRPNode(config(events, { health_poll_interval_ms: 100, startup_grace_ms: 0 }), {
+			controlPlaneScheduler: scheduler,
+			networkNode: fake.networkNode,
+			reconnect: false,
+		});
+		const rendezvous = await recoveryDirectory();
+		const fixtureRecords: unknown[] = [];
+		for await (const record of rendezvous.bootstrap(NAMESPACE, new AbortController().signal)) {
+			fixtureRecords.push(record);
+		}
+		if (fixtureRecords.length !== 1) {
+			throw new Error(`health recovery ensemble trace: ${JSON.stringify(rendezvous.lastTrace)}`);
+		}
+		node["_rendezvous"] = rendezvous;
+		seedFreshControlPlane(node);
+
+		await node.start();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(fake.connect).not.toHaveBeenCalled();
+
+		const object = await node.createObject({ id: "live-health-count-object" });
+		scheduler.advanceBy(100);
+		await vi.waitFor(() => expect(fake.connect).toHaveBeenCalled());
+		await flushMicrotasks();
+
+		const postUnsubscribeEventIndex = events.length;
+		node.unsubscribeObject(object.id);
+		scheduler.advanceBy(500);
+		await flushMicrotasks();
+		expect(events.slice(postUnsubscribeEventIndex)).toContainEqual({ kind: "health", state: "healthy" });
+		const idleConnectCallCount = fake.connect.mock.calls.length;
+
+		scheduler.advanceBy(2_000);
+		await flushMicrotasks();
+		expect(fake.connect).toHaveBeenCalledTimes(idleConnectCallCount);
+
 		await node.stop();
 		expect(scheduler.pendingCount()).toBe(0);
 	});
@@ -106,6 +165,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
+		await node.createObject({ id: "default-recovery-object" });
 		await node.start();
 		await vi.waitFor(() => expect(fake.redialBootstraps).toHaveBeenCalledOnce());
 
@@ -142,6 +202,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
+		await node.createObject({ id: "stop-during-recovery-object" });
 		await node.start();
 		await vi.waitFor(() => expect(ports.rendezvousBootstrap).toHaveBeenCalledOnce());
 		const stopping = node.stop();
@@ -166,6 +227,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
+		await node.createObject({ id: "failed-operation-history-object" });
 		await node.start();
 		await vi.waitFor(() => expect(events).toContainEqual({ kind: "terminal", reason: "exhausted" }));
 		scheduler.advanceBy(500);
@@ -240,11 +302,13 @@ interface FakeNetworkOptions {
 }
 
 function createFakeNetwork(options: FakeNetworkOptions): {
+	connect: ReturnType<typeof vi.fn>;
 	emit(change: GroupPeerChange): void;
 	networkNode: DRPNetworkNode;
 	redialBootstraps: ReturnType<typeof vi.fn>;
 } {
 	const groupHandlers: GroupPeerChangeHandler[] = [];
+	const connect = vi.fn((): Promise<void> => Promise.resolve());
 	const redialBootstraps = vi.fn((_signal: AbortSignal): Promise<boolean> => Promise.resolve(true));
 	const connections: readonly ControlPlaneConnectionEvidence[] = options.allPeers.map((peerId) => ({
 		multiaddr: `/dns4/peer.example/tcp/443/wss/p2p/${peerId}`,
@@ -257,7 +321,7 @@ function createFakeNetwork(options: FakeNetworkOptions): {
 	const networkNode = {
 		broadcastMessage: vi.fn(() => Promise.resolve()),
 		changeTopicScoreParams: vi.fn(),
-		connect: vi.fn(() => Promise.resolve()),
+		connect,
 		connectToBootstraps: vi.fn(() => Promise.resolve()),
 		disconnect: vi.fn(() => Promise.resolve()),
 		getActiveRelayReservations: vi.fn(() => reservations),
@@ -296,6 +360,7 @@ function createFakeNetwork(options: FakeNetworkOptions): {
 		unsubscribe: vi.fn(),
 	} satisfies DRPNetworkNode;
 	return {
+		connect,
 		emit: (change): void => groupHandlers.forEach((handler) => handler(change)),
 		networkNode,
 		redialBootstraps,
@@ -347,6 +412,10 @@ function config(
 			control_plane: {
 				membership: { allowlist: { allowedPeerIds: ["member-a"] }, mode: "allowlist" },
 				observability: { sink: (event): void => void events.push(event) },
+				rendezvous: {
+					namespace: NAMESPACE,
+					publish: false,
+				},
 				recovery: {
 					backend_cooldown_ms: 1_000,
 					max_attempts: 1,
@@ -365,6 +434,54 @@ function config(
 function seedFreshControlPlane(node: DRPNode): void {
 	node["_rendezvousBackendStates"] = [{ id: "registry-a", status: "succeeded" }];
 	node["_rendezvousObservedAtMs"] = START_MS;
+}
+
+async function recoveryDirectory(): Promise<RendezvousEnsemble> {
+	const recordNow = Date.now();
+	const key = await generateKeyPairFromSeed("Ed25519", new Uint8Array(32).fill(71));
+	const peerId = peerIdFromPublicKey(key.publicKey).toString();
+	const record = await new RecordSigner(key).sign({
+		addresses: [`/ip4/93.184.216.34/tcp/443/wss/p2p/${peerId}`],
+		capabilities: ["drp-gossipsub"],
+		expiresAtMs: recordNow + 60_000,
+		issuedAtMs: recordNow,
+		namespace: NAMESPACE,
+		sequence: 1,
+	});
+	const resolver = { resolve: (): Promise<string[]> => Promise.resolve(["93.184.216.34"]) };
+	const servers = ["health-registry-a", "health-registry-b"].map(
+		(endpointId) =>
+			new RegistryServer({
+				endpointId,
+				now: (): number => recordNow,
+				policy: new AdmissionPolicy({ inviteToken: INVITE }),
+				validator: new RecordValidator({ now: (): number => recordNow, resolver }),
+			})
+	);
+	for (const server of servers) {
+		const result = await server.register({
+			clientId: peerId,
+			credential: { kind: "invite", token: INVITE },
+			record,
+			signal: new AbortController().signal,
+		});
+		if (!result.accepted) throw new Error(`health recovery record rejected: ${result.code} ${result.detail ?? ""}`);
+	}
+	const registries = new RegistryClient({
+		backoffMs: 0,
+		clientId: "health-recovery-reader",
+		endpoints: servers.map((server) => new FixtureRegistryEndpoint(server)),
+		timeoutMs: 1_000,
+		validatorFactory: (): RecordValidator => new RecordValidator({ now: (): number => recordNow, resolver }),
+	});
+	const discovered = await registries.discover(NAMESPACE, new AbortController().signal);
+	if (discovered.length !== 1) throw new Error(`health recovery registry returned ${discovered.length} records`);
+	return createRendezvousEnsemble({
+		addressPolicy: { policy: new AddressPolicy({ target: "node" }), resolver },
+		now: (): number => START_MS,
+		registries,
+		validatorFactory: (): RecordValidator => new RecordValidator({ now: (): number => recordNow, resolver }),
+	});
 }
 
 async function flushMicrotasks(): Promise<void> {

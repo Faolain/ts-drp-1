@@ -73,7 +73,14 @@ export function createHttpRegistryEndpoint(options: HttpRegistryEndpointOptions)
 	return Object.freeze({
 		id: options.id,
 		discover: async (input: RegistryDiscoveryRequest): Promise<RegistryDiscoveryReceipt | RegistryRejection> => {
-			const value = await request("/v1/discover", { namespace: input.namespace }, input.signal);
+			const value = await request(
+				"/v1/discover",
+				{
+					namespace: input.namespace,
+					...(input.targetPeerId === undefined ? {} : { targetPeerId: input.targetPeerId }),
+				},
+				input.signal
+			);
 			return isDiscoveryResult(value) ? value : unavailable();
 		},
 		register: async (input: RegistryRegistrationRequest): Promise<RegistrationReceipt | RegistryRejection> => {

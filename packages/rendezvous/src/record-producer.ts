@@ -48,6 +48,7 @@ export interface RecordProducerOptions {
 export interface RecordProducer {
 	current(): Promise<SignedDrpRecordV1>;
 	refresh(): Promise<SignedDrpRecordV1>;
+	retire(): Promise<SignedDrpRecordV1>;
 }
 
 /**
@@ -79,7 +80,7 @@ export function createRecordProducer(options: RecordProducerOptions): RecordProd
 		return loadedSequence;
 	};
 
-	const produce = async (): Promise<SignedDrpRecordV1> => {
+	const produce = async (retiring = false): Promise<SignedDrpRecordV1> => {
 		const prior = await loadSequence();
 		const next = prior + 1;
 		validateSequence(next);
@@ -91,14 +92,16 @@ export function createRecordProducer(options: RecordProducerOptions): RecordProd
 			throw error;
 		}
 		loadedSequence = Promise.resolve(next);
-		const issuedAtMs = clock();
-		if (!Number.isSafeInteger(issuedAtMs) || !Number.isSafeInteger(issuedAtMs + options.ttlMs)) {
+		const nowMs = clock();
+		const expiresAtMs = retiring ? nowMs + 5_000 : nowMs + options.ttlMs;
+		const issuedAtMs = retiring ? expiresAtMs - DEFAULT_RECORD_LIMITS.minTtlMs : nowMs;
+		if (!Number.isSafeInteger(issuedAtMs) || !Number.isSafeInteger(expiresAtMs)) {
 			throw new Error("record clock and expiry must be safe integers");
 		}
 		const record = await options.signer.sign({
 			addresses: options.addressSource(),
 			capabilities: options.capabilitySource(),
-			expiresAtMs: issuedAtMs + options.ttlMs,
+			expiresAtMs,
 			issuedAtMs,
 			namespace: options.namespace,
 			sequence: next,
@@ -108,8 +111,11 @@ export function createRecordProducer(options: RecordProducerOptions): RecordProd
 		return record;
 	};
 
-	const serializedProduce = (): Promise<SignedDrpRecordV1> => {
-		const result = queue.then(produce, produce);
+	const serializedProduce = (retiring = false): Promise<SignedDrpRecordV1> => {
+		const result = queue.then(
+			() => produce(retiring),
+			() => produce(retiring)
+		);
 		queue = result.then(
 			() => undefined,
 			() => undefined
@@ -126,6 +132,7 @@ export function createRecordProducer(options: RecordProducerOptions): RecordProd
 			return currentPromise;
 		},
 		refresh: serializedProduce,
+		retire: (): Promise<SignedDrpRecordV1> => serializedProduce(true),
 	};
 }
 

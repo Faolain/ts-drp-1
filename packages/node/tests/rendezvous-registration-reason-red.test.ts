@@ -50,6 +50,7 @@ describe("rendezvous-registration failure reason RED contract", () => {
 		const producer: RecordProducer = {
 			current: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
 			refresh: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
+			retire: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
 		};
 		const directory: RendezvousDirectory = {
 			discover: (): Promise<readonly ValidatedDrpRecord[]> => Promise.resolve([]),
@@ -180,6 +181,7 @@ function resolvedProducer(): RecordProducer {
 	return {
 		current: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
 		refresh: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
+		retire: (): Promise<SignedDrpRecordV1> => Promise.resolve(record),
 	};
 }
 

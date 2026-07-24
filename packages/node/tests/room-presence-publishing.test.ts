@@ -4,13 +4,14 @@ import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import {
 	type AdmissionCredential,
 	AdmissionPolicy,
+	DEFAULT_RECORD_LIMITS,
 	RecordValidator,
 	RegistryServer,
 	ROOM_NAMESPACE_PREFIX,
 	roomNamespace,
 	type SignedDrpRecordV1,
 } from "@ts-drp/rendezvous";
-import type { DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
+import type { ControlPlaneEvent, DRPNetworkNode, DRPNodeConfig } from "@ts-drp/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DRPNode } from "../src/index.js";
@@ -20,11 +21,13 @@ const ENDPOINTS = ["http://127.0.0.1:18101/room-presence-a", "http://127.0.0.1:1
 
 interface CapturedRegistration {
 	readonly accepted?: boolean;
+	readonly completedAtMs?: number;
 	readonly endpoint: string;
 	readonly record: SignedDrpRecordV1;
 }
 
 interface PublishingHarness {
+	readonly events: ControlPlaneEvent[];
 	readonly node: DRPNode;
 	readonly registrations: CapturedRegistration[];
 	runCycle(): Promise<readonly CapturedRegistration[]>;
@@ -136,20 +139,34 @@ describe("room presence rendezvous publishing", () => {
 		expect(backfilledCycle.map(({ record }) => record.namespace)).toContain(roomNamespace(waitingId));
 	});
 
-	it("rotates the first room registered on successive cycles", async () => {
-		const fixture = await publishingHarness({ enabled: true, max_rooms: 3 });
+	it("registers sibling rooms concurrently and emits aggregate room-cycle telemetry", async () => {
+		const fixture = await publishingHarness(
+			{ enabled: true, max_rooms: 2 },
+			() => false,
+			installConcurrentRegistryTransport,
+			5_000
+		);
 		nodes.push(fixture.node);
-		const ids = ["rotated-room-a", "rotated-room-b", "rotated-room-c"];
+		const ids = ["slow-room-a", "fast-room-b"];
 		await Promise.all(ids.map((id) => fixture.node.createObject({ id })));
 
-		const firstCycle = await fixture.runCycle();
-		const secondCycle = await fixture.runCycle();
-		const roomNamespaces = ids.map((id) => roomNamespace(id));
-		const roomOrder = (cycle: readonly CapturedRegistration[]): string[] =>
-			cycle.map(({ record }) => record.namespace).filter((namespace) => namespace.startsWith(ROOM_NAMESPACE_PREFIX));
+		const startedAtMs = performance.now();
+		const cycle = await fixture.runCycle();
+		const slow = cycle.find(({ record }) => record.namespace === roomNamespace(ids[0] ?? ""));
+		const fast = cycle.find(({ record }) => record.namespace === roomNamespace(ids[1] ?? ""));
+		if (slow?.completedAtMs === undefined || fast?.completedAtMs === undefined) {
+			throw new Error("concurrency fixture did not capture both room completions");
+		}
 
-		expect(roomOrder(firstCycle)).toEqual(roomNamespaces);
-		expect(roomOrder(secondCycle)).toEqual([...roomNamespaces.slice(1), ...roomNamespaces.slice(0, 1)]);
+		expect.soft(fast.completedAtMs - startedAtMs).toBeLessThan(400);
+		expect.soft(slow.completedAtMs - startedAtMs).toBeGreaterThanOrEqual(700);
+		expect.soft(fast.completedAtMs).toBeLessThan(slow.completedAtMs);
+		expect.soft(fixture.events).toContainEqual({
+			failedRoomCount: 0,
+			kind: "rendezvous-room-registration",
+			outcome: "accepted",
+			roomCount: 2,
+		});
 	});
 
 	it("stops advertising an unsubscribed room on the next registration cycle", async () => {
@@ -159,16 +176,38 @@ describe("room presence rendezvous publishing", () => {
 		await fixture.node.createObject({ id });
 
 		const subscribedCycle = await fixture.runCycle();
-		const advertisedNamespace = subscribedCycle.find(({ record }) => record.namespace.startsWith(ROOM_NAMESPACE_PREFIX))
-			?.record.namespace;
-		expect(advertisedNamespace, "the subscribed-room control must publish before unsubscribe").toBeDefined();
-		expect(advertisedNamespace).toBe(roomNamespace(id));
+		const advertisedRecord = subscribedCycle.find(({ record }) =>
+			record.namespace.startsWith(ROOM_NAMESPACE_PREFIX)
+		)?.record;
+		expect(advertisedRecord, "the subscribed-room control must publish before unsubscribe").toBeDefined();
+		expect(advertisedRecord?.namespace).toBe(roomNamespace(id));
 
+		const retiredAtMs = Date.now();
+		const retirementStartIndex = fixture.registrations.length;
 		fixture.node.unsubscribeObject(id);
-		const unsubscribedCycle = await fixture.runCycle();
+		await vi.waitFor(() =>
+			expect(
+				fixture.registrations
+					.slice(retirementStartIndex)
+					.filter(({ endpoint, record }) => endpoint === ENDPOINTS[0] && record.namespace === roomNamespace(id))
+			).toHaveLength(1)
+		);
+		const [retirement] = fixture.registrations
+			.slice(retirementStartIndex)
+			.filter(({ endpoint, record }) => endpoint === ENDPOINTS[0] && record.namespace === roomNamespace(id));
+		if (retirement === undefined || advertisedRecord === undefined) {
+			throw new Error("room retirement registration was not captured");
+		}
+		expect(retirement.record.sequence).toBeGreaterThan(advertisedRecord.sequence);
+		expect(retirement.record.expiresAtMs - retirement.record.issuedAtMs).toBe(DEFAULT_RECORD_LIMITS.minTtlMs);
+		expect(retirement.record.expiresAtMs).toBeGreaterThanOrEqual(retiredAtMs + 4_900);
+		expect(retirement.record.expiresAtMs).toBeLessThanOrEqual(Date.now() + 5_100);
 
-		expect(unsubscribedCycle.map(({ record }) => record.namespace)).not.toContain(advertisedNamespace);
-		expect(unsubscribedCycle.map(({ record }) => record.namespace)).toContain(NAMESPACE);
+		const firstUnsubscribedCycle = await fixture.runCycle();
+		const secondUnsubscribedCycle = await fixture.runCycle();
+		expect(firstUnsubscribedCycle.map(({ record }) => record.namespace)).not.toContain(roomNamespace(id));
+		expect(firstUnsubscribedCycle.map(({ record }) => record.namespace)).toContain(NAMESPACE);
+		expect(secondUnsubscribedCycle.map(({ record }) => record.namespace)).not.toContain(roomNamespace(id));
 	});
 
 	it("keeps room publishing off when room_presence is absent or disabled", async () => {
@@ -254,11 +293,13 @@ describe("room presence rendezvous publishing", () => {
 async function publishingHarness(
 	roomPresence: { readonly enabled: boolean; readonly max_rooms?: number } | undefined,
 	rejectRegistration: (record: SignedDrpRecordV1) => boolean = () => false,
-	installTransport: RegistryTransportInstaller = stubRegistryTransport
+	installTransport: RegistryTransportInstaller = stubRegistryTransport,
+	refreshIntervalMs = 1_000
 ): Promise<PublishingHarness> {
 	const registrations: CapturedRegistration[] = [];
+	const events: ControlPlaneEvent[] = [];
 	installTransport(registrations, rejectRegistration);
-	const node = new DRPNode(nodeConfig(roomPresence), {
+	const node = new DRPNode(nodeConfig(roomPresence, events, refreshIntervalMs), {
 		networkNode: fakeNetwork(),
 		reconnect: false,
 	});
@@ -278,6 +319,7 @@ async function publishingHarness(
 	runner.stop();
 
 	return {
+		events,
 		node,
 		registrations,
 		runCycle: async (): Promise<readonly CapturedRegistration[]> => {
@@ -300,7 +342,9 @@ function isRegistrationRunner(value: unknown): value is RegistrationRunner {
 }
 
 function nodeConfig(
-	roomPresence: { readonly enabled: boolean; readonly max_rooms?: number } | undefined
+	roomPresence: { readonly enabled: boolean; readonly max_rooms?: number } | undefined,
+	events: ControlPlaneEvent[],
+	refreshIntervalMs: number
 ): DRPNodeConfig {
 	return {
 		keychain_config: { private_key_seed: `room-presence-${String(roomPresence?.enabled)}` },
@@ -308,6 +352,7 @@ function nodeConfig(
 		network_config: {
 			bootstrap_peers: [],
 			control_plane: {
+				observability: { sink: (event): void => void events.push(event) },
 				rollout: { public_components: { public_rendezvous: { enabled: true } } },
 				rendezvous: {
 					allow_insecure_loopback_fixture: true,
@@ -315,7 +360,7 @@ function nodeConfig(
 					namespace: NAMESPACE,
 					publish: true,
 					record_ttl_ms: 60_000,
-					refresh_interval_ms: 1_000,
+					refresh_interval_ms: refreshIntervalMs,
 					...(roomPresence === undefined ? {} : { room_presence: roomPresence }),
 				},
 			},
@@ -389,6 +434,42 @@ function stubRegistryTransport(
 					sequence: body.record.sequence,
 				})
 			);
+		})
+	);
+}
+
+function installConcurrentRegistryTransport(registrations: CapturedRegistration[]): void {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const url = new URL(input instanceof Request ? input.url : input.toString());
+			if (url.pathname.endsWith("/v1/discover")) {
+				return jsonResponse({ endpointId: url.port, records: [] });
+			}
+			if (!url.pathname.endsWith("/v1/register") || typeof init?.body !== "string") {
+				throw new Error(`unexpected registry fixture request: ${url.pathname}`);
+			}
+			const body = JSON.parse(init.body) as { readonly record?: SignedDrpRecordV1 };
+			if (body.record === undefined) throw new Error("registry fixture registration omitted its record");
+			const endpoint = ENDPOINTS.find((candidate) => new URL(candidate).port === url.port);
+			if (endpoint === undefined) throw new Error(`unknown registry fixture endpoint: ${url.port}`);
+			if (endpoint === ENDPOINTS[0] && body.record.namespace === roomNamespace("slow-room-a")) {
+				await new Promise((resolve) => setTimeout(resolve, 800));
+			}
+			registrations.push({
+				accepted: true,
+				completedAtMs: performance.now(),
+				endpoint,
+				record: body.record,
+			});
+			return jsonResponse({
+				accepted: true,
+				admissionMode: "open",
+				endpointId: url.port,
+				expiresAtMs: body.record.expiresAtMs,
+				refreshed: false,
+				sequence: body.record.sequence,
+			});
 		})
 	);
 }

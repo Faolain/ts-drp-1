@@ -118,13 +118,18 @@ async function handleRequest(
 			return sendJson(response, 200, result);
 		}
 		if (request.url === "/v1/discover") {
-			if (!isObject(body) || typeof body.namespace !== "string") {
+			if (
+				!isObject(body) ||
+				typeof body.namespace !== "string" ||
+				(body.targetPeerId !== undefined && typeof body.targetPeerId !== "string")
+			) {
 				return sendJson(response, 400, rejection("record-rejected"));
 			}
 			const result = await registry.discover({
 				clientId: transportClientId(request),
 				namespace: body.namespace,
 				signal: controller.signal,
+				...(body.targetPeerId === undefined ? {} : { targetPeerId: body.targetPeerId }),
 			});
 			return sendJson(response, 200, result);
 		}

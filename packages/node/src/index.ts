@@ -354,7 +354,6 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private readonly _roomRendezvousCapacityLogged = new Set<string>();
 	private _roomRendezvousProducerFactory: ((objectId: string) => ReturnType<typeof createRecordProducer>) | undefined;
 	private _roomRendezvousMaxRooms = 0;
-	private _roomRendezvousRegistrationOffset = 0;
 	private _rendezvousRegistrationController: AbortController | undefined;
 	private _rendezvousRegistration: Promise<boolean> | undefined;
 	private _rendezvousBootstrapController: AbortController | undefined;
@@ -461,11 +460,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._connectRendezvousControllers.forEach((controller) => controller.abort());
 		this._connectRendezvousControllers.clear();
 		this._initialSyncPeers.clear();
+		// Shutdown intentionally lets room records lapse by TTL instead of creating a retraction storm.
 		this._roomRendezvousProducers.clear();
 		this._roomRendezvousCapacityLogged.clear();
 		this._roomRendezvousProducerFactory = undefined;
 		this._roomRendezvousMaxRooms = 0;
-		this._roomRendezvousRegistrationOffset = 0;
 		this._intervals.forEach((interval) => interval.stop());
 		this._intervals.clear();
 		const routing = this._routing;
@@ -625,6 +624,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 					capabilitySource,
 					namespace: roomNamespace(objectId),
 					peerId: this.networkNode.peerId,
+					// Wall-clock seeding outruns prior records; a same-millisecond rejoin can lose one
+					// publish cycle to replay and self-heals after the roughly 5s retirement sweep.
 					sequenceStore: new InMemorySequenceStore(Date.now()),
 					signer,
 					ttlMs,
@@ -676,30 +677,31 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 
 		const roomEntries = [...this._roomRendezvousProducers.entries()];
 		const roomCount = roomEntries.length;
-		const startOffset = roomCount === 0 ? 0 : this._roomRendezvousRegistrationOffset % roomCount;
-		if (roomCount > 0) this._roomRendezvousRegistrationOffset = (startOffset + 1) % roomCount;
-		const orderedRoomEntries = [...roomEntries.slice(startOffset), ...roomEntries.slice(0, startOffset)];
-		let failedRoomCount = 0;
-		for (const [objectId, roomProducer] of orderedRoomEntries) {
-			if (lifecycleSignal.aborted) return false;
-			if (this._roomRendezvousProducers.get(objectId) !== roomProducer) continue;
-			const remainingMs = deadlineAtMs - Date.now();
-			if (remainingMs <= 0) {
-				failedRoomCount += 1;
-				continue;
-			}
-			const registered = await this._registerRoomRendezvousRecord(
-				roomProducer,
-				directory,
-				credential,
-				lifecycleSignal,
-				remainingMs
-			);
-			if (!registered && !lifecycleSignal.aborted) failedRoomCount += 1;
-		}
+		if (roomCount === 0) return !lifecycleSignal.aborted;
+		const remainingAfterMainMs = deadlineAtMs - Date.now();
+		const results = await Promise.allSettled(
+			roomEntries.map(async ([objectId, roomProducer]): Promise<boolean> => {
+				if (this._roomRendezvousProducers.get(objectId) !== roomProducer) return true;
+				if (remainingAfterMainMs <= 0) return false;
+				return this._registerRoomRendezvousRecord(
+					roomProducer,
+					directory,
+					credential,
+					lifecycleSignal,
+					Math.min(remainingAfterMainMs, 30_000)
+				);
+			})
+		);
+		const failedRoomCount = results.filter((result) => result.status === "rejected" || result.value === false).length;
 		if (failedRoomCount > 0) {
 			log.warn("::rendezvous: Room presence registration failures", { failedRoomCount });
 		}
+		this._emitRendezvousEvent({
+			failedRoomCount,
+			kind: "rendezvous-room-registration",
+			outcome: failedRoomCount === 0 ? "accepted" : failedRoomCount === roomCount ? "failed" : "partial",
+			roomCount,
+		});
 		return !lifecycleSignal.aborted;
 	}
 
@@ -1002,6 +1004,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				replicaCount: healthyBackendCount,
 			},
 			routing: { failedRouterIds },
+			subscribedObjectCount: objects.filter((object) => this.messageQueueManager.hasQueue(object.id)).length,
 			traffic: {
 				directConnections: authenticatedConnections.filter(
 					({ multiaddr, transport }) => transport !== "relay" && !multiaddr.includes("/p2p-circuit")
@@ -1375,7 +1378,13 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 						if (dialedAddressSets.has(addressSetKey)) continue;
 						controller.signal.throwIfAborted();
 						dialedAddressSets.add(addressSetKey);
-						await this.networkNode.connect(acceptedAddresses);
+						try {
+							await this.networkNode.connect(acceptedAddresses);
+						} catch (error) {
+							if (controller.signal.aborted) throw error;
+							log.info("::connectObject: Targeted creator dial failed", error);
+							continue;
+						}
 						controller.signal.throwIfAborted();
 					}
 				} catch (error) {
@@ -1401,7 +1410,13 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 					controller.signal.throwIfAborted();
 					dialedAddressSets.add(addressSetKey);
 					fallbackDialCount += 1;
-					await this.networkNode.connect(acceptedAddresses);
+					try {
+						await this.networkNode.connect(acceptedAddresses);
+					} catch (error) {
+						if (controller.signal.aborted) throw error;
+						log.info("::connectObject: Room replica dial failed", error);
+						continue;
+					}
 					controller.signal.throwIfAborted();
 				}
 			} catch (error) {
@@ -1445,8 +1460,37 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._connectFetchControllers.delete(id);
 		this._connectRendezvousControllers.get(id)?.abort();
 		this._connectRendezvousControllers.delete(id);
-		// There is no active retraction; the last published room record lapses by TTL.
+		const roomProducer = this._roomRendezvousProducers.get(id);
 		this._roomRendezvousProducers.delete(id);
+		const directory = this._rendezvous;
+		const lifecycleSignal = this._rendezvousRegistrationController?.signal;
+		if (roomProducer !== undefined && directory !== undefined && lifecycleSignal !== undefined) {
+			const registration = this._rendezvousRegistration;
+			void (async (): Promise<void> => {
+				if (registration !== undefined) {
+					const fenceSignal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
+					await Promise.race([
+						registration.then(
+							() => undefined,
+							() => undefined
+						),
+						new Promise<void>((resolve) => {
+							if (fenceSignal.aborted) {
+								resolve();
+								return;
+							}
+							fenceSignal.addEventListener("abort", () => resolve(), { once: true });
+						}),
+					]);
+				}
+				lifecycleSignal.throwIfAborted();
+				const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
+				const record = await roomProducer.retire();
+				await directory.register(record, signal, registrationCredential(this.config));
+			})().catch((error: unknown) => {
+				log.info("::rendezvous: Room presence retraction failed; record will lapse by TTL", error);
+			});
+		}
 		this._roomRendezvousCapacityLogged.delete(id);
 		this._stopObjectIntervals(id);
 		clearSyncRecoveryEpisodes(this, id);

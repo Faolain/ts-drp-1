@@ -105,6 +105,12 @@ export type ControlPlaneEvent =
 			readonly reason?: string;
 	  }
 	| {
+			readonly failedRoomCount: number;
+			readonly kind: "rendezvous-room-registration";
+			readonly outcome: "accepted" | "failed" | "partial";
+			readonly roomCount: number;
+	  }
+	| {
 			readonly kind: "rendezvous-cache";
 			readonly outcome: "hit" | "write";
 	  }

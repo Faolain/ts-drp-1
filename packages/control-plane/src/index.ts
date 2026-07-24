@@ -58,6 +58,7 @@ export interface ControlPlaneHealthInput {
 	readonly routing?: {
 		readonly failedRouterIds: readonly string[];
 	};
+	readonly subscribedObjectCount?: number;
 	readonly traffic: {
 		readonly directConnections: number;
 		readonly relayedConnections: number;
@@ -113,8 +114,9 @@ export class ControlPlaneHealthAggregator {
 				: Object.freeze({ failedRouterIds: Object.freeze([...input.routing.failedRouterIds]) });
 		const traffic = Object.freeze({ ...input.traffic });
 		const reasons: ControlPlaneHealthReason[] = [];
+		const requiresPeerHealth = input.subscribedObjectCount !== 0;
 
-		if (authenticatedDrpPeerIds.length === 0) reasons.push("no-authenticated-drp-peer");
+		if (requiresPeerHealth && authenticatedDrpPeerIds.length === 0) reasons.push("no-authenticated-drp-peer");
 		if (input.objectSynchronization === "behind") reasons.push("objects-not-synchronized");
 		if (!rendezvous.fresh) reasons.push("rendezvous-stale");
 		if (rendezvous.replicaAvailability === "unavailable" || rendezvous.replicaCount <= 0) {
@@ -122,11 +124,14 @@ export class ControlPlaneHealthAggregator {
 		}
 		if (input.healthyBackendCount <= 0) reasons.push("no-healthy-backend");
 		if (liveReservations.length === 0) reasons.push("no-live-reservation");
-		if (traffic.directConnections + traffic.relayedConnections <= 0) reasons.push("no-active-traffic");
+		if (requiresPeerHealth && traffic.directConnections + traffic.relayedConnections <= 0) {
+			reasons.push("no-active-traffic");
+		}
 		if (
-			meshDiversity.authenticatedPeerCount <= 0 ||
-			meshDiversity.operatorGroupCount <= 0 ||
-			meshDiversity.transportCount <= 0
+			requiresPeerHealth &&
+			(meshDiversity.authenticatedPeerCount <= 0 ||
+				meshDiversity.operatorGroupCount <= 0 ||
+				meshDiversity.transportCount <= 0)
 		) {
 			reasons.push("insufficient-mesh-diversity");
 		}
@@ -138,18 +143,19 @@ export class ControlPlaneHealthAggregator {
 		}
 
 		const allRequiredSignalsHealthy =
-			authenticatedDrpPeerIds.length > 0 &&
+			(!requiresPeerHealth || authenticatedDrpPeerIds.length > 0) &&
 			input.objectSynchronization !== "behind" &&
 			rendezvous.fresh &&
 			rendezvous.replicaAvailability !== "unavailable" &&
 			rendezvous.replicaCount > 0 &&
 			input.healthyBackendCount > 0 &&
 			liveReservations.length > 0 &&
-			meshDiversity.authenticatedPeerCount > 0 &&
-			meshDiversity.operatorGroupCount > 0 &&
-			meshDiversity.transportCount > 0 &&
+			(!requiresPeerHealth ||
+				(meshDiversity.authenticatedPeerCount > 0 &&
+					meshDiversity.operatorGroupCount > 0 &&
+					meshDiversity.transportCount > 0)) &&
 			(routing?.failedRouterIds.length ?? 0) === 0 &&
-			traffic.directConnections + traffic.relayedConnections > 0;
+			(!requiresPeerHealth || traffic.directConnections + traffic.relayedConnections > 0);
 		const state: ControlPlaneHealthState =
 			failedRecoveryAttempts.length > 0 ? "recovering" : allRequiredSignalsHealthy ? "healthy" : "degraded";
 
@@ -168,6 +174,7 @@ export class ControlPlaneHealthAggregator {
 			rendezvous,
 			...(routing === undefined ? {} : { routing }),
 			state,
+			...(input.subscribedObjectCount === undefined ? {} : { subscribedObjectCount: input.subscribedObjectCount }),
 			traffic,
 		});
 	}
@@ -972,6 +979,7 @@ function classifyObservedFault(
 	previous: ControlPlaneHealthSnapshot | undefined
 ): RecoveryFault | undefined {
 	const genuineTotalOutage =
+		status.subscribedObjectCount !== 0 &&
 		status.authenticatedDrpPeerIds.length === 0 &&
 		status.traffic.directConnections + status.traffic.relayedConnections === 0;
 	if (genuineTotalOutage) return { kind: "everything-unavailable" };
