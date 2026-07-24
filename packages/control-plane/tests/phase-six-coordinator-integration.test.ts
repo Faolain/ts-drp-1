@@ -321,6 +321,34 @@ describe("Phase 6 coordinator integration", () => {
 		await coordinator.stop();
 	});
 
+	it("does not classify an idle relay-only degradation as everything-unavailable", async () => {
+		const harness = createRecoveryHarness({ startup_grace_ms: 0 });
+		const status = healthSnapshot({
+			authenticatedDrpPeerIds: [],
+			liveReservations: [],
+			meshDiversity: { authenticatedPeerCount: 0, operatorGroupCount: 0, transportCount: 0 },
+			reasons: ["no-live-reservation"],
+			state: "degraded",
+			subscribedObjectCount: 0,
+			traffic: { directConnections: 0, relayedConnections: 0 },
+		});
+		const coordinator = new ControlPlaneCoordinator({
+			...harness.options,
+			readStatus: (): ControlPlaneHealthSnapshot => status,
+		});
+
+		coordinator.start();
+		await vi.waitFor(() =>
+			expect(
+				harness.ports.relayReplace.mock.calls.length + harness.ports.rendezvousBootstrap.mock.calls.length
+			).toBeGreaterThan(0)
+		);
+
+		expect.soft(harness.ports.relayReplace).toHaveBeenCalledOnce();
+		expect.soft(harness.ports.rendezvousBootstrap).not.toHaveBeenCalled();
+		await coordinator.stop();
+	});
+
 	it("does not turn an unclassified partial degradation into total-outage recovery", async () => {
 		const harness = createRecoveryHarness({ startup_grace_ms: 0 });
 		const status = healthSnapshot({

@@ -349,6 +349,7 @@ export interface RegistryDiscoveryRequest {
 	readonly clientId: string;
 	readonly namespace: string;
 	readonly signal: AbortSignal;
+	readonly targetPeerId?: string;
 }
 
 export interface RegistryRejection {
@@ -494,7 +495,9 @@ export class RegistryServer implements RegistryEndpoint {
 		const rateRejection = this.#consumeRequest(request.clientId, request.namespace);
 		if (rateRejection !== undefined) return Promise.resolve(rateRejection);
 		this.#sweepExpired();
-		const records = [...(this.#records.get(request.namespace)?.values() ?? [])];
+		const records = [...(this.#records.get(request.namespace)?.values() ?? [])].filter(
+			({ record }) => request.targetPeerId === undefined || record.peerId === request.targetPeerId
+		);
 		if (records.length > this.#limits.maxResponseRecords) {
 			return Promise.resolve(rejection("response-cap-exceeded"));
 		}
@@ -770,6 +773,7 @@ export class RegistryClient implements RendezvousDirectory {
 						clientId: this.#clientId,
 						namespace,
 						signal: attemptSignal,
+						...(selection.targetPeerId === undefined ? {} : { targetPeerId: selection.targetPeerId }),
 					})
 				);
 			} catch {

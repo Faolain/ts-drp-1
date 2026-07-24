@@ -74,6 +74,51 @@ describe("Phase 6 typed health aggregation", () => {
 		expect(snapshot.reasons).not.toContain("objects-not-synchronized");
 	});
 
+	it("keeps an idle subscriber healthy without peer-dependent degradation reasons", (): void => {
+		const aggregator = new ControlPlaneHealthAggregator({ now: (): number => NOW_MS });
+		const snapshot = aggregator.aggregate(
+			input({
+				authenticatedDrpPeerIds: [],
+				meshDiversity: { authenticatedPeerCount: 0, operatorGroupCount: 0, transportCount: 0 },
+				subscribedObjectCount: 0,
+				traffic: { directConnections: 0, relayedConnections: 0 },
+			})
+		);
+
+		expect(snapshot.state).toBe("healthy");
+		expect(snapshot.reasons).not.toContain("no-authenticated-drp-peer");
+		expect(snapshot.reasons).not.toContain("no-active-traffic");
+		expect(snapshot.reasons).not.toContain("insufficient-mesh-diversity");
+	});
+
+	it.each([
+		{ name: "an omitted subscription count", subscribedObjectCount: undefined },
+		{ name: "one subscribed object", subscribedObjectCount: 1 },
+	])("preserves peer-dependent outage reasons for $name", ({ subscribedObjectCount }): void => {
+		const aggregator = new ControlPlaneHealthAggregator({ now: (): number => NOW_MS });
+		const snapshot = aggregator.aggregate(
+			input({
+				authenticatedDrpPeerIds: [],
+				meshDiversity: { authenticatedPeerCount: 0, operatorGroupCount: 0, transportCount: 0 },
+				subscribedObjectCount,
+				traffic: { directConnections: 0, relayedConnections: 0 },
+			})
+		);
+
+		expect(snapshot.state).toBe("degraded");
+		expect(snapshot.reasons).toEqual(
+			expect.arrayContaining(["no-authenticated-drp-peer", "no-active-traffic", "insufficient-mesh-diversity"])
+		);
+	});
+
+	it("still reports a missing relay reservation for an idle subscriber", (): void => {
+		const aggregator = new ControlPlaneHealthAggregator({ now: (): number => NOW_MS });
+		const snapshot = aggregator.aggregate(input({ liveReservations: [], subscribedObjectCount: 0 }));
+
+		expect(snapshot.state).toBe("degraded");
+		expect(snapshot.reasons).toContain("no-live-reservation");
+	});
+
 	it("returns a deeply immutable typed snapshot including failed recovery-attempt identifiers", (): void => {
 		const failedRecoveryAttempts = [
 			{ action: "fallback-router", id: "router-a:attempt-2", terminal: RecoveryTerminal.Failed },
