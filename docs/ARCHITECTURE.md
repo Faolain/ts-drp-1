@@ -703,6 +703,75 @@ public components additionally need their rollout flag.
   (`packages/types/src/network.ts:83`); raw addresses and namespaces are kept
   out of durable telemetry by construction.
 
+## 12. Room-scoped rendezvous and the idle-node posture
+
+The sections above describe *network* bootstrap: one app-wide namespace that
+answers "who else runs this application?". Room membership is a different
+question with different scaling behavior, and it is served by three dedicated
+mechanisms (landed after PRD 001, in the targeted-rendezvous / room-presence /
+scale-hardening series):
+
+- **Targeted creator lookup.** Object ids are creator-bound
+  (`<creatorPeerId>:<salt>`), so a joiner resolves the creator directly with an
+  exact-match rendezvous query (`RegistryBackendSelection.targetPeerId`; on
+  Nostr this is an exact `#d` replacement-tag filter, on HTTP a server-side
+  filter applied before response-cap accounting) instead of scanning the
+  namespace. Every layer independently re-checks the returned record's peerId
+  after signature validation: backends are untrusted, and Nostr replacement is
+  per publisher key, so a hostile relay can park validly-signed records of
+  *other* peers under the target's tag. The invariant is fail-empty: a
+  poisoned targeted lookup can return nothing, never the wrong peer.
+- **Room-scoped replica presence.** Members of an open room publish a second
+  record under `drp-room:v1:<base64url(sha256(objectId))>` (config-gated:
+  `rendezvous.room_presence`). Joiners fall back from the creator to *any*
+  validated replica — self excluded, dial fan-out capped — so a room is
+  joinable while any member is online, not only its creator. The namespace is
+  a hash so the salted room id never appears in relay-visible text; the
+  accepted disclosure is that anyone who already holds a room id can enumerate
+  that room's members. Leaving a room retracts its record by re-registering a
+  backdated minimum-TTL replacement through the ordinary register path
+  (seconds to free per-client quota, no server or protocol change); a closed
+  tab cannot retract, so records also lapse by TTL.
+- **Idle nodes are healthy without peers.** Health treats "no authenticated
+  peers / no traffic / no mesh diversity" as degradation only when at least
+  one object is subscribed (`ControlPlaneHealthInput.subscribedObjectCount`;
+  `undefined` preserves the stricter legacy semantics for embedders). An idle
+  browser therefore holds a relay reservation and keeps its records fresh but
+  dials no one — previously it classified itself as a total outage and
+  persistently dialed up to a full response cap of unrelated visitors from the
+  app namespace. The count is liveness-based (subscribed objects, not object-
+  store occupancy), so leaving the last room returns a node to idle; relay-
+  reservation and registration health remain ungated.
+
+Room records share the registration refresh cycle: the main record registers
+first with the full attempt deadline, then all rooms concurrently on the
+remainder, failures isolated per record and surfaced through the
+`rendezvous-room-registration` event. The per-attempt deadline is bounded
+independently of the refresh cadence so one slow publish cannot consume a
+record's entire TTL window.
+
+**The latency trade-off, on the record.** Idle-node gating moves connection
+establishment from speculative to on-demand. In a small deployment the old
+background dialing often happened to pre-connect the peer a user later joined,
+so joins looked instant — the cost had been paid earlier, invisibly, by every
+idle tab. Now the join pays its own way: targeted lookup, circuit dial through
+the peer's relay, WebRTC upgrade, then sync — typically a few seconds
+(observable in the grid e2e's creator-offline scenario, whose budgets assume
+no pre-established connections). At scale the sign flips: random pre-dials
+almost never included the right peer, so joins are equal or faster while the
+network stops paying quadratic background dialing. Page-ready time (relay
+reservation, first record publication) is unaffected. One adjacent effect of
+the TTL-based republish default: a peer whose addresses change mid-session
+propagates the update within the refresh interval rather than immediately.
+
+Scale posture in one line: joining needs *any* live member, so the response
+cap that made "find one specific peer in a crowded namespace" unreliable makes
+"find some member of a large room" reliable — the cap returns a rotating,
+freshest-first sample of members, which also spreads join-dial load. What room
+rendezvous does not address is the data plane (GossipSub mesh size, hash-graph
+growth, sync fan-in) and room durability with zero members online; those are
+the next scaling axes, deliberately out of scope here.
+
 ## Pointers
 
 - [PRD/001-modular-architecture.md](../PRD/001-modular-architecture.md) — the
