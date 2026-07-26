@@ -297,6 +297,12 @@ importers:
         specifier: 0.11.0
         version: link:../types
 
+  packages/canonical:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^1.7.1
+        version: 1.7.1
+
   packages/control-plane:
     dependencies:
       '@ts-drp/types':
@@ -811,6 +817,9 @@ importers:
       '@noble/hashes':
         specifier: ^1.7.1
         version: 1.7.1
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
     devDependencies:
       '@stryker-mutator/core':
         specifier: 9.6.1

@@ -1,5 +1,5 @@
 {
-	"name": "@ts-drp/protocol-v2",
+	"name": "@ts-drp/canonical",
 	"version": "0.11.0",
 	"license": "MIT",
 	"repository": {
@@ -10,8 +10,6 @@
 	"types": "./dist/src/index.d.ts",
 	"files": [
 		"src",
-		"registry",
-		"docs",
 		"dist",
 		"!dist/test",
 		"!**/*.tsbuildinfo"
@@ -20,25 +18,17 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
-		},
-		"./registry/field-registry.json": "./registry/field-registry.json"
+		}
 	},
 	"scripts": {
 		"build": "tsc -b tsconfig.build.json",
 		"clean": "rm -rf dist/ node_modules/",
 		"prepack": "tsc -b",
 		"test": "vitest run",
-		"test:mutation": "cd ../.. && stryker run packages/protocol-v2/stryker.config.mjs",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
-		"@noble/curves": "2.2.0",
-		"@noble/hashes": "^1.7.1",
-		"@ts-drp/canonical": "0.11.0"
-	},
-	"devDependencies": {
-		"@stryker-mutator/core": "9.6.1",
-		"@stryker-mutator/vitest-runner": "9.6.1"
+		"@noble/hashes": "^1.7.1"
 	}
 }
