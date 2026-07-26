@@ -14,16 +14,23 @@
  *   probed below; the unreachable guards remain documented, not called killed.
  */
 import { sha256 } from "@noble/hashes/sha2";
+import { Buffer } from "node:buffer";
+import { createPrivateKey, createPublicKey, sign as nodeSign, verify as nodeVerify } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
 	type AdmissionContext,
 	admitVertex,
+	cryptoSuiteStatus,
 	encodeCanonical,
 	hashDomain,
 	makeRegistryPreimageBuilder,
+	negotiateGenesisCryptoSuite,
 	quorumSize,
+	type RegisteredSignature,
 	type RegistryDocument,
+	signIdentityDigest,
+	verifyRegisteredSignature,
 	verifyVertexHash,
 } from "../src/index.js";
 
@@ -31,6 +38,24 @@ type BuilderFactory = typeof makeRegistryPreimageBuilder;
 type DomainHasher = (domain: string, ...parts: readonly Uint8Array[]) => Uint8Array;
 type Encoder = (value: unknown) => Uint8Array;
 type Quorum = (signerCount: number, callerFaultBound?: number) => number;
+type DigestSigner = typeof signIdentityDigest;
+type SuiteClassifier = typeof cryptoSuiteStatus;
+type SuiteNegotiator = typeof negotiateGenesisCryptoSuite;
+type ScopedVerifier = typeof verifyRegisteredSignature;
+
+const PROBE_ED25519_SEED = Uint8Array.from({ length: 32 }, (_, index) => index);
+const PROBE_ED25519_PREFIX = Uint8Array.from([
+	0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+]);
+const probeEd25519PrivateKey = createPrivateKey({
+	key: Buffer.concat([PROBE_ED25519_PREFIX, PROBE_ED25519_SEED]),
+	format: "der",
+	type: "pkcs8",
+});
+const probeEd25519PublicKey = createPublicKey(probeEd25519PrivateKey);
+const probeEd25519PublicKeyBytes = new Uint8Array(
+	probeEd25519PublicKey.export({ format: "der", type: "spki" })
+).subarray(-32);
 
 function expectGateToCatch(runGate: () => void): void {
 	let caught: Error | undefined;
@@ -144,6 +169,71 @@ function quorumGate(quorum: Quorum): void {
 	if (quorum(4, 0) !== 3) throw new Error("caller-supplied fault bound changed consensus quorum");
 }
 
+function rawDigestSignatureGate(signer: DigestSigner): void {
+	const digest = sha256(new TextEncoder().encode("raw-digest-mutation-probe"));
+	const signature = signer(PROBE_ED25519_SEED, digest);
+	const hexDigest = new TextEncoder().encode(Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(""));
+	if (!nodeVerify(null, digest, probeEd25519PublicKey, signature)) {
+		throw new Error("signature was not produced over the raw registered digest");
+	}
+	if (nodeVerify(null, hexDigest, probeEd25519PublicKey, signature)) {
+		throw new Error("signature was produced over UTF8(hexDigest)");
+	}
+}
+
+function suiteEnumerationGate(classify: SuiteClassifier): void {
+	if (classify("ed25519-sha256-v1") !== "active" || classify("ed25519-seal-v1") !== "active") {
+		throw new Error("an active crypto suite was not enumerated");
+	}
+	if (classify("p256-sha256-v1") !== "reserved") {
+		throw new Error("the reserved P-256 suite became negotiable");
+	}
+	if (classify("rsa-pss-sha256-v1") !== "unknown") {
+		throw new Error("an unenumerated suite was accepted");
+	}
+}
+
+function signatureDomainGate(verify: ScopedVerifier): void {
+	const digest = hashDomain("ts-drp/vertex/v2", new TextEncoder().encode("domain-mutation-probe"));
+	const signature = new Uint8Array(nodeSign(null, digest, probeEd25519PrivateKey));
+	const valid: RegisteredSignature = {
+		expectedScope: { anchor: "a".repeat(64), domain: "ts-drp/vertex/v2" },
+		publicKey: { bytes: probeEd25519PublicKeyBytes, format: "raw" },
+		registeredDigest: { anchor: "a".repeat(64), bytes: digest, domain: "ts-drp/vertex/v2" },
+		signature,
+		suiteId: "ed25519-sha256-v1",
+	};
+	if (!verify(valid)) throw new Error("domain gate has no positive signature control");
+	if (
+		verify({
+			...valid,
+			registeredDigest: { ...valid.registeredDigest, domain: "ts-drp/seal-vote/v2" },
+		})
+	) {
+		throw new Error("signature verifier ignored the registered domain");
+	}
+}
+
+function unsupportedProfileGate(negotiate: SuiteNegotiator): void {
+	const active = negotiate({
+		namedSuiteId: "ed25519-seal-v1",
+		peerSuiteIds: ["ed25519-seal-v1"],
+	});
+	if (active !== "ed25519-seal-v1") throw new Error("genesis negotiation substituted a supported named suite");
+	try {
+		negotiate({
+			namedSuiteId: "ed25519-seal-v1",
+			peerSuiteIds: ["ed25519-sha256-v1"],
+		});
+	} catch (error) {
+		if (error !== null && typeof error === "object" && "code" in error && error.code === "UNSUPPORTED_PROFILE") {
+			return;
+		}
+		throw new Error("unsupported peer failed with the wrong protocol code");
+	}
+	throw new Error("unsupported peer silently fell back to a default suite");
+}
+
 function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
 	return left.length === right.length && left.every((byte, index) => byte === right[index]);
 }
@@ -213,5 +303,40 @@ describe("protocol-v2 standing mutation checks", () => {
 			faultBound === undefined ? Math.floor((2 * signerCount) / 3) : signerCount - faultBound;
 		expectGateToCatch(() => quorumGate(callerControlledQuorum));
 		expect(() => quorumGate((signerCount) => quorumSize(signerCount))).not.toThrow();
+	});
+
+	it("catches signing UTF8(hexDigest) instead of the raw registered digest", () => {
+		// Seeded Phase -1d defect: the v2 signer repeats keychain.ts's legacy SHA256(UTF8(hexDigest)) message shape.
+		const signHexDigest: DigestSigner = (_seed, digest) => {
+			const hexDigest = new TextEncoder().encode(
+				Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("")
+			);
+			return new Uint8Array(nodeSign(null, hexDigest, probeEd25519PrivateKey));
+		};
+		expectGateToCatch(() => rawDigestSignatureGate(signHexDigest));
+		expect(() => rawDigestSignatureGate(signIdentityDigest)).not.toThrow();
+	});
+
+	it("catches a crypto-suite check that accepts any identifier", () => {
+		// Seeded Phase -1e(i) defect: cryptoSuiteId is treated as decorative free-form metadata.
+		const acceptAnySuite: SuiteClassifier = () => "active";
+		expectGateToCatch(() => suiteEnumerationGate(acceptAnySuite));
+		expect(() => suiteEnumerationGate(cryptoSuiteStatus)).not.toThrow();
+	});
+
+	it("catches a signature verifier that ignores the domain", () => {
+		// Seeded Phase -1d defect: valid key and digest bytes bypass the registered-domain binding.
+		const ignoreDomain: ScopedVerifier = ({ registeredDigest, signature }) =>
+			nodeVerify(null, registeredDigest.bytes, probeEd25519PublicKey, signature);
+		expectGateToCatch(() => signatureDomainGate(ignoreDomain));
+		expect(() => signatureDomainGate(verifyRegisteredSignature)).not.toThrow();
+	});
+
+	it("catches UNSUPPORTED_PROFILE silently falling back to a default suite", () => {
+		// Seeded Phase -1e(i) defect: a peer missing the named suite joins under an unadvertised default.
+		const fallbackToDefault: SuiteNegotiator = ({ namedSuiteId, peerSuiteIds }) =>
+			peerSuiteIds.includes(namedSuiteId) ? (namedSuiteId as "ed25519-seal-v1") : "ed25519-sha256-v1";
+		expectGateToCatch(() => unsupportedProfileGate(fallbackToDefault));
+		expect(() => unsupportedProfileGate(negotiateGenesisCryptoSuite)).not.toThrow();
 	});
 });

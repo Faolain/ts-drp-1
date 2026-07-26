@@ -9,6 +9,7 @@ import {
 	encodeCanonical,
 	hashDomain,
 	signerSetBytes,
+	signIdentityDigest,
 	validateProtocolString,
 	type VertexInput,
 	vertexPreimage,
@@ -154,9 +155,16 @@ describe("§2.5 semantics-preserving port rules", () => {
 	});
 
 	it("rule 7 — hashDomain is sync Uint8Array and noble equals WebCrypto on exact framing", async () => {
+		const portingRules = readFileSync(new URL("../docs/porting-rules.md", import.meta.url), "utf8");
+		expect(portingRules).toMatch(/@noble\/curves\/ed25519\.js/u);
+		expect(portingRules).toMatch(/signIdentityDigest.*no Promise surface/u);
+
 		const syncTypeAssertion: Uint8Array = hashDomain("ts-drp/test/v2", Uint8Array.of(1));
+		const syncSignatureTypeAssertion: Uint8Array = signIdentityDigest(new Uint8Array(32), new Uint8Array(32));
 		expect(syncTypeAssertion).toBeInstanceOf(Uint8Array);
 		expect(syncTypeAssertion).not.toBeInstanceOf(Promise);
+		expect(syncSignatureTypeAssertion).toBeInstanceOf(Uint8Array);
+		expect(syncSignatureTypeAssertion).not.toBeInstanceOf(Promise);
 
 		const domain = "ts-drp/test/v2";
 		const parts = [Uint8Array.of(0, 1, 2), new TextEncoder().encode("peer-😀")];

@@ -9,6 +9,7 @@ export default {
 		"!tsconfig.json",
 		"!vite.config.mts",
 		"!packages/protocol-v2/conformance/ahe-reference/src/**/*.js",
+		"!packages/protocol-v2/docs/porting-rules.md",
 		"!packages/protocol-v2/package.json",
 		"!packages/protocol-v2/registry/**/*.json",
 		"!packages/protocol-v2/src/**/*.ts",

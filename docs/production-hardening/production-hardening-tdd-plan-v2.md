@@ -431,7 +431,7 @@ reference code and carries the test that catches a violation. This table lands a
 | 4 | prototypes / `Object.create(null)` | decoder returns null-proto objects (`canonical.js:309`); encoder accepts only null-proto and `Object.prototype` (`:71-74`), rejects class instances (`:178`) | decoded values typed `Record<string, CanonicalValue>`; use `Object.hasOwn`, never `.hasOwnProperty` | assert `Object.getPrototypeOf(decoded) === null`; a ts-proto message instance and a class instance both throw |
 | 5 | Map/Set iteration order | encoder sorts by encoded-key bytes (`canonical.js:157,172`) | no consumer may depend on pre-encode insertion order | seeded insertion shuffles in the differential fuzz |
 | 6 | `structuredClone` vs canonical clone | reference clones only via `deepCloneCanonical` (`canonical.js:377-379`) | consensus state cloning is `deepCloneCanonical` **only**; ESLint `no-restricted-globals: structuredClone` in consensus packages | state containing `-0`: canonical clone digests as `0`, `structuredClone` preserves `-0` — assert the lint rule exists and document the behavioural diff |
-| 7 | async WebCrypto vs sync noble | `hash.js:55-58` is async-only | sync `@noble/hashes` on all protocol paths (§2.6); WebCrypto only as a bulk Worker backend, vector-equal | noble-vs-WebCrypto differential on framed inputs; type assertion that protocol functions are not `async` |
+| 7 | async WebCrypto vs sync noble | `hash.js:55-58` is async-only | sync `@noble/hashes` on all digest paths and sync `@noble/curves/ed25519.js` on identity/signature paths (§2.6); WebCrypto only as a bulk Worker backend or for non-extractable seal-key custody | noble-vs-WebCrypto differential on framed inputs; type assertions that hashing and signing return `Uint8Array`, never `Promise` |
 | 8 | DataView endianness vs Buffer | every DataView call passes explicit `false` (BE); no `Buffer` anywhere | only DataView with an explicit endian argument; `Buffer` banned by lint; registry pins BE | golden typed-array vectors + lint gate |
 | 9 | locale-dependent sorts | D1 above | `sortRule: "codepoint"` per registry field | D1's property test vs `Buffer.compare(utf8(a), utf8(b))` |
 | 10 | string length = UTF-16 units | `assertString(value, …, maxLength)` counts UTF-16 units, not bytes (`protocol.js:17-20`) | keep unit counting; registry documents the unit per limit | astral-plane chars at the 1024/1025-unit boundary |
@@ -452,7 +452,10 @@ be used as a sizing input.
 
 *Decision:* all protocol digests are **sync**, over `@noble/hashes/sha2`, behind one
 `hashDomain(domain, ...parts): Uint8Array` in `@ts-drp/canonical`, preserving the reference's exact framing
-bytes. `worker-host` MAY provide a bulk async backend for large snapshot/archive payloads only,
+bytes. Ed25519 identity and seal signatures are likewise sync over `@noble/curves/ed25519.js`; their
+protocol functions return `Uint8Array`/`boolean` with no Promise surface. WebCrypto remains the custody
+backend for non-extractable browser seal keys, not the protocol verification backend. `worker-host` MAY
+provide a bulk async backend for large snapshot/archive payloads only,
 conformance-tested equal to the sync backend on shared vectors. Re-benchmark in-repo before deciding on WASM, if WASM is more optimal then look if there's a similar implementation already existing, if not implement with WASM.
 
 ### 2.7 Wire format: the existing proto shape cannot carry v2
@@ -536,8 +539,8 @@ unpinned porting.
 | **−1a** | `packages/protocol-v2/registry/field-registry.json` — machine-readable: `domains{}`, `kinds{fields[{name,type,constraints,required,sortRule}]}`, `framing{}`, `endianness`, `quorum{}`, `actions[]`. Every hashed structure, its domain string, exact field order and encoding. | consensus-v2 | **atomic** | `registry.test.ts`: preimage builders are constructed *from* the registry field list; `expect(cutValuePreimage({...unknownField}))` throws; every registry entry is referenced by ≥1 vector (`expect(uncoveredFields).toEqual([])`) |
 | **−1b** | Codec + framing decisions (D1–D3, §2.4 and the table below) | consensus-v2 | atomic with −1a | `canonical-adversarial.test.ts`: `ENC(Float32Array[-0]) === ENC(Float32Array[+0])` and both decode; changing the process locale cannot alter signer-set or QC bytes |
 | **−1c** | **Round-free `CutValue` / round-bearing `SealProposal` split.** This is a *preimage* decision, not a Phase-5 implementation detail. | consensus-v2 | atomic | `round-repropose.test.ts`: the same semantic value proposed in round `r` and `r+1` has an **identical `valueDigest`** and different `proposalHash` |
-| **−1d** | **Signature suite — two keys, two curves, both named in `cryptoSuiteId`.** (a) **Identity/vertex signatures: Ed25519** over the raw 32-byte registered digest. Deterministic by construction, so RFC 6979 is not needed; non-malleable, so low-S normalisation is not needed — both of those requirements existed *only* because of secp256k1. Batch verification is ~2× faster per signature, which lands directly on the 2f Worker crypto queue. libp2p Ed25519 PeerIDs embed the public key, so giving up secp256k1's pubkey-recovery costs nothing: the key is already in the `peerId` the vertex carries. (b) **Seal-voter keys: Ed25519 as well.** WebCrypto Ed25519 shipped in Chrome 137 (May 2025), Firefox 129 and Safari 17, so it is universal in the field; `p256-sha256-v1` is retained in `cryptoSuiteId` **only** as a fallback for pre-2025 browsers, and a room that does not need them never negotiates it. **secp256k1 is not an option for seal keys at all** — WebCrypto does not implement it on any engine, so a registry pinning secp256k1 for all v2 signatures would make profile 3 unimplementable. Legacy plane keeps secp256k1 untouched; v2 is a new namespace, so `keychain.ts:21-22`'s bootstrap-PeerID migration warning does not bind here. | consensus-v2 | atomic | `signature-vectors.test.ts`: fixed key+digest yields one deterministic 64-byte Ed25519 signature; wrong-domain, wrong-anchor and re-hashed-digest signatures all reject; a P-256 seal signature verifies under the seal suite and is rejected under the identity suite (and vice versa) — the suites must not be interchangeable. **v2 MUST NOT reuse** `keychain.ts:69-86`'s `SHA256(UTF8(hexDigest))` |
-| **−1e** | **`cryptoSuiteId` permitted values enumerated and negotiated at genesis only** (never downgradeable — Phase 3b). Initial set: `ed25519-sha256-v1` (identity), `p256-sha256-v1` (seal), reserving `ed25519-seal-v1` for when WebCrypto Ed25519 is universal. | consensus-v2 | atomic with −1d | `crypto-suite.test.ts`: an anchor naming an unenumerated suite **rejects**; a peer lacking a named suite rejects with `UNSUPPORTED_PROFILE` rather than silently falling back |
+| **−1d** | **Signature suite — two keys, one primitive, distinct suite identifiers.** (a) **Identity/vertex:** `ed25519-sha256-v1`, Ed25519 over the raw 32-byte registered digest. (b) **Seal voter:** `ed25519-seal-v1`, also Ed25519 over its raw registered digest. Distinct identifiers keep identity and seal independently rotatable; because the primitive is shared, the registry domains and exact `hashDomain` framing are load-bearing. Strict RFC 8032 verification (`zip215: false`) is consensus-critical. `p256-sha256-v1` is recognized but **reserved, not active**. Legacy-plane secp256k1 is untouched. | consensus-v2 | atomic | `signature-vectors.test.ts`: deterministic 64-byte Ed25519 vector; raw-digest rule; malformed length, ZIP-215-only and thrown-verifier inputs fail closed; identity-domain signatures do not verify as seal signatures or vice versa; reserved/unknown suites return exactly `false`. Scope labels are metadata: callers must recompute the registered digest from the canonical preimage under the declared registry domain. |
+| **−1e** | **`cryptoSuiteId` permitted values enumerated and negotiated at genesis only** (never downgradeable — Phase 3b). Active: `ed25519-sha256-v1` (identity) and `ed25519-seal-v1` (seal). Reserved: `p256-sha256-v1`. There is no runtime fallback or downgrade. | consensus-v2 | atomic with −1d | `crypto-suite.test.ts`: unenumerated and reserved suites reject with `UNSUPPORTED_PROFILE`; a peer lacking the genesis-named active suite rejects rather than substituting; epoch-anchor/profile enumerations must match and active/reserved sets must be disjoint |
 | **−1e** | Golden vectors minted **once** from the frozen schema; `reference.lock.json`; CODEOWNERS; silent-landing check | consensus-v2 | sliceable | `golden-vectors.test.ts`: per vector `expect(hex(encodeCanonical(v.value))).toBe(v.canonicalHex)` and digest equality, asserted **in TS and in the reference**; a PR touching `/registry/**` without bumping `registryVersion` fails CI |
 | **−1f** | Single regeneration pass of the JS reference from the amended schema, by a **different author** than the TS port. Then it freezes forever. | coordinated | atomic | Regenerated reference reproduces every vector byte-for-byte |
 | **−1g** | Spec amendments written into `docs/protocol/` with a versioned amendment log | — | sliceable | Amendment log entry exists for every registry decision below |
@@ -557,11 +560,23 @@ unpinned porting.
 | 9 | Conflict action set | Freeze **five** actions (repo `ActionType` incl. `Drop`), not the reference's four (`linearize.js:157-162`); amend spec §7.2 | Existing blueprints use drop-both. |
 | 10 | Trust profile | `profileDigest` + `cryptoSuiteId` are **explicit signed fields** in genesis and every anchor; profiles are exactly `creator-trusted-v1`, `delegated-trusted-v1` (n delegates, explicit quorum `k ≥ 2` — not BFT, honestly labelled "k of these n must agree") and `attested-bft-v1`. **Key custody differs by quorum and must not be unified** (§Phase 5): `q = 1` uses a recoverable seed-derived key plus the network re-learn rule; `k ≥ 2` uses fate-shared non-extractable keys (profile 3) | Today the creator-trusted profile is inferred from an empty signer array (`protocol.js:143-145`) — a verifier cannot distinguish "creator-trusted by policy" from "signer set omitted by mistake". |
 | 11 | Naming | `protocolMajor: 2`, domains `ts-drp/*/v2`, package `protocol-v2` are the only identifiers in code. "AHE v4" survives solely as the spec document title. | Round 1 correctly flagged the v2/v4 naming mess. |
+| 12 | Signature suites | Activate `ed25519-sha256-v1` for identity/vertex and `ed25519-seal-v1` for seal votes; reserve `p256-sha256-v1`. | One primitive with distinct suite identifiers preserves independent rotation. Keeping P-256 active would admit an ECDSA malleability/digest-identity fork for a population that cannot lawfully use profile 3 without unproduced co-eviction evidence (Appendix D.23). |
+
+### −1g amendment log — signature-suite reservation
+
+Registry version 5 records `p256-sha256-v1` as reserved and activates `ed25519-seal-v1`. A future edit that
+reactivates `p256-sha256-v1` **MUST, in that same edit**, pin low-S normalization and pin whether the
+32-byte registered digest is passed as the raw ECDSA message or prehashed again. Reactivation without both
+rules is an incomplete consensus change and must fail review.
 
 ### Exit gate (Phase −1)
 Registry merged; vectors minted once and pinned; reference regenerated once and lockfile-frozen; spec
 amendments merged with an amendment log; **formal-model variable-set sign-off recorded**; a PR that changes
-a vector without bumping `registryVersion` demonstrably fails CI.
+a vector without bumping `registryVersion` demonstrably fails CI. In addition, the freeze has an **open
+precondition**: archived runs on real iOS Safari and real Android WebView/Chrome devices at the candidate
+SHA must each report `Ed25519: non-extractable`, with device, OS and engine/build recorded. Desktop
+Playwright mobile emulation does not satisfy this precondition, so the Phase −1 freeze does not land until
+those measurements exist.
 
 ### Phase −1a–c runtime hardening boundary
 
@@ -768,7 +783,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2g** | Quota, persistence, private mode, rollback pins | coordinated | unpin rule atomic | `quota-rollback.spec.ts`: `QuotaExceededError` injected at **every** mutating request never moves the head; estimate below margin refuses a new stage **before** destructive cleanup; a forged mirror receipt can **never** unpin the last usable signer rollback (`RollbackPinned`, not success) |
 | **2h** | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**. | local-safe | sliceable | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []` |
 | **2i** | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work. | local-safe | sliceable | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled |
-| **2j** | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. | local-safe | sliceable | `crypto-capability.spec.ts` on chromium/firefox/webkit: asserts the **currently expected** matrix and fails on **any** change — improvement or regression — so a suite decision is revisited deliberately rather than by someone remembering. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json` |
+| **2j** | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite. | local-safe | sliceable | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts remain the open Phase −1 freeze precondition. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json` |
 | **2k** | **Browser-matrix currency.** `@playwright/test` is pinned `^1.49.1`, resolving to 1.51.1 with **Chromium 134.0.6998.35** — roughly 16 months behind the field, and it already produced a false negative that nearly mis-set the seal suite. Every browser gate in this plan (kill-point matrix, storage validation, golden path 1 step 17) currently runs against a browser essentially nobody uses. Add a scheduled bump and make staleness visible. | local-safe | sliceable | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover |
 
 ### Exit gate (Phase 2)
@@ -996,13 +1011,18 @@ Choose one of three profiles; **profile 1 is the recommendation**:
    forced by WebCrypto, not chosen:** measured here, `crypto.subtle.generateKey` rejects **secp256k1
    (`K-256`) with `NotSupportedError` on Chromium, Firefox and WebKit alike**, so the seal key can never be
    secp256k1 — a registry pinning secp256k1 for *all* v2 signatures would make this profile
-   unimplementable. **Ed25519 generates non-extractably** and is the seal curve; P-256 is a fallback for
-   pre-2025 browsers only.
+   unimplementable. **Ed25519 generates non-extractably** in the measured desktop engines and is the seal
+   curve. `p256-sha256-v1` is reserved, not a fallback: the only clients it would serve are obsolete
+   iOS/Android WebViews acting as profile-3 seal voters, while profile 3 itself is forbidden without
+   browser-specific evidence that key/log co-eviction is atomic. No such evidence exists for that
+   population.
 
    *Cautionary note, because it nearly drove this decision the wrong way:* the same measurement showed
    Ed25519 failing on Chromium — but that was **Playwright 1.51.1's bundled Chromium 134**, which predates
    Chrome 137 (May 2025) where Ed25519 shipped. The platform was never the constraint; **our test tooling
-   was ~16 months stale**, and it produced a false negative on a protocol decision. Hence 2j and 2k. Permitted only
+   was ~16 months stale**, and it produced a false negative on a protocol decision. The current desktop
+   result still does not answer the real-device iOS/Android question; that measurement is an open Phase −1
+   freeze precondition. Hence 2j and 2k. Permitted only
    with browser-specific evidence that the co-eviction really is atomic (an untested assumption today, which
    is why it is third rather than first). Loss creates a **new** signer identity requiring an authority
    handoff — which is safe, because a new identity cannot equivocate with the old one. Note this is the
@@ -1550,7 +1570,10 @@ Reviewers judge rigor by exactly these.
   lengths" from the negative corpus (a CBOR-only concept).
 - **AHE §2.2** "avoid adding a BLS/WASM dependency" → **stale**. `@chainsafe/bls ^8.1.0` is already a
   production dependency of `object` and `keychain`, via the `herumi` WASM backend. Keep the simplicity
-  argument for individual (non-aggregated) QCs; drop the dependency-avoidance one. Note the v2 suites are Ed25519 (identity) and P-256 (seal) per −1d, not secp256k1 — WebCrypto supports neither secp256k1 nor, on all engines yet, Ed25519 non-extractably.
+  argument for individual (non-aggregated) QCs; drop the dependency-avoidance one. Note the active v2
+  suites are Ed25519 with distinct identity/seal identifiers per −1d; P-256 is reserved. WebCrypto
+  supports neither secp256k1 nor, until the open real-device sign-off is recorded, proven non-extractable
+  Ed25519 on every required mobile engine.
 - **AHE §14.2** vote schema → `highestPrepareQC` moves to the round-change body; `round-change` gains a
   normative preimage.
 - **AHE §13** → `round` deleted from the cut; `closeManifestDigest` becomes **mandatory**;
@@ -4011,3 +4034,60 @@ ships with a hole exactly where the legacy plane already diverges.
 
 Generalised, this is the same lesson as D.19.5 from the other direction: **a number that is computed and
 printed but never asserted is not a gate.** It reads like coverage in a report and enforces nothing.
+
+---
+
+## Appendix D.23 — Signature-suite confer: unanimous `RESERVE-NOT-ACTIVE`
+
+An Opus reviewer, a clean-session Codex reviewer and kimi independently reviewed
+`p256-sha256-v1`. All three returned **`RESERVE-NOT-ACTIVE`**. This appendix records and executes that
+decision; the active suites are `ed25519-sha256-v1` for identity/vertex signatures and
+`ed25519-seal-v1` for seal votes. P-256 remains registry-recognized so a future coordinated amendment can
+name it, but it cannot be negotiated or verified now.
+
+### D.23.1 — The population P-256 would serve cannot lawfully use it
+
+The only environment P-256 helps is a pre-18.4 iOS or pre-137 Android WebView acting as a **seal voter**
+with non-extractable custody. That is profile 3. The plan permits profile 3 only after browser-specific
+evidence that the key and vote log really co-evict atomically; this remains an untested assumption, and
+nobody will produce that evidence for obsolete WebViews. The population P-256 would serve therefore cannot
+lawfully enable the profile that needs it.
+
+This does **not** exclude old browsers from the network. Identity and vertex signing use synchronous
+`@noble/curves/ed25519.js` under §2.6 and require no WebCrypto. Browsers that cannot satisfy the profile-3
+custody precondition can remain replicas, use another signer profile, or relay votes without becoming
+fate-shared seal voters.
+
+### D.23.2 — Measured ambiguity cost
+
+The proposed P-256 verifier used `lowS: false`. That accepts a valid signature and the third-party-mauled
+form `(r, n−s)`. Two independent measurements agreed on the risk; in the recorded 200-signature probe,
+WebCrypto emitted high-S **102 of 200** times, and both original and mauled forms verified **200/200**.
+Signature bytes are embedded by value in the hashed `sealQC` and
+`roundChange.highestPrepareQC` preimages. Consequently one logical QC can acquire two protocol digests.
+This is a consensus identity fork, not cosmetic ECDSA encoding variance.
+
+### D.23.3 — Why reserve beats delete and pin
+
+- **Pin active** preserves an unnecessary ECDSA acceptance path with two byte identities for one logical
+  certificate, while serving no admissible deployment profile.
+- **Delete** loses the registry tombstone and makes a future coordinated reactivation easier to misread as
+  an accidental new identifier.
+- **Reserve** is fail-closed today and retains an explicit name for a future evidence-backed amendment.
+
+Any reactivation of `p256-sha256-v1` must follow the −1g amendment-log rule: the same edit must pin low-S
+normalization and the prehash-versus-raw registered-digest message rule.
+
+### D.23.4 — Domain separation and the remaining evidence gate
+
+Identity and seal now share Ed25519, so domain separation is load-bearing. Their distinct suite identifiers
+accept only their registered domains, and tests sign the separately framed vertex and seal-vote digests
+with the same key and prove cross-suite verification fails. The verifier's scope comparison is only a
+metadata guard because it does not receive the canonical preimage; callers must recompute the 32-byte
+registered digest with `hashDomain` under the declared registry domain before calling it.
+
+The desktop Chromium/Firefox/WebKit capability matrix and its iPhone/Pixel emulation projects are useful
+regression evidence only. Mobile emulation still runs desktop WebKit/Chromium with a mobile viewport and
+user-agent; it does not reproduce real iOS Safari or Android WebView crypto. Real-device iOS and Android
+runs showing `Ed25519: non-extractable`, with device/OS/engine build and candidate SHA archived, remain an
+**open precondition**. The Phase −1 freeze does not land until both artifacts exist.

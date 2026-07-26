@@ -34,6 +34,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
+		"@noble/curves": "2.2.0",
 		"@noble/hashes": "^1.7.1"
 	},
 	"devDependencies": {

@@ -173,6 +173,33 @@ describe("B2 normative registry runtime", () => {
 		expect(() => build({ values: 0 })).toThrowError(/unknown constraint.*minimim/i);
 	});
 
+	it("requires reservedValues to be a string array", () => {
+		for (const reservedValues of ["reserved", [1]]) {
+			const document = registryWithProbe({
+				...probeField("linearized-order"),
+				type: "enum",
+				sortRule: null,
+				constraints: { reservedValues, values: ["active"] },
+			});
+			const build = makeRegistryPreimageBuilder(document, "probe");
+			expect(() => build({ values: "active" }), JSON.stringify(reservedValues)).toThrow(
+				/reservedValues must be an array of strings/i
+			);
+		}
+	});
+
+	it("requires active and reserved enum values to be disjoint", () => {
+		const document = registryWithProbe({
+			...probeField("linearized-order"),
+			type: "enum",
+			sortRule: null,
+			constraints: { reservedValues: ["reserved", "active"], values: ["active"] },
+		});
+		const build = makeRegistryPreimageBuilder(document, "probe");
+
+		expect(() => build({ values: "active" })).toThrow(/active and reserved enum values must be disjoint/i);
+	});
+
 	it("consumes domains{} by kind and fails a domain typo", async () => {
 		const runtime = (await import("../src/registry.js")) as RegistryRuntime;
 		expect(runtime.digestRegistryPreimage).toBeTypeOf("function");

@@ -13,6 +13,12 @@ import { expect, test } from "@playwright/test";
  * revisit the suite decision deliberately rather than to discover it years later. The matrix was
  * already ~15 months out of date once (Chromium 134 vs Chrome 137), and that staleness produced a
  * wrong answer about Ed25519 support.
+ *
+ * The iPhone and Pixel projects in `playwright.platform-capability.config.ts` are desktop
+ * Playwright WebKit/Chromium with a mobile viewport and user-agent. They are useful engine-regression
+ * proxies, but they do NOT exercise real iOS Safari or Android WebView engines and do NOT close the
+ * Phase -1 real-device precondition. That freeze requires separately archived iOS and Android device
+ * measurements showing `Ed25519: non-extractable`.
  */
 
 type CurveSupport = "non-extractable" | "extractable" | "unsupported";
@@ -21,7 +27,7 @@ type CurveSupport = "non-extractable" | "extractable" | "unsupported";
 const EXPECTED: Record<string, CurveSupport> = {
 	// Signature suite for v2 identity/vertex signatures and seal-voter keys.
 	"Ed25519": "non-extractable",
-	// Retained in cryptoSuiteId only as a fallback for pre-2025 browsers.
+	// Registry-recognized but reserved: it is not negotiable or accepted by the signature verifier.
 	"ECDSA P-256": "non-extractable",
 	// Never available in WebCrypto on any engine; this is why the seal key cannot be secp256k1.
 	"ECDSA K-256": "unsupported",

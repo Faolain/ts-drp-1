@@ -7,6 +7,16 @@ export {
 	encodeCanonical,
 } from "./canonical.js";
 export { type AdmissionContext, type AdmissionHooks, type AdmissionResult, admitVertex } from "./admission.js";
+export {
+	type ActiveCryptoSuiteId,
+	type CryptoSuiteId,
+	type CryptoSuiteStatus,
+	type GenesisCryptoSuiteNegotiation,
+	type ReservedCryptoSuiteId,
+	UnsupportedProfileError,
+	cryptoSuiteStatus,
+	negotiateGenesisCryptoSuite,
+} from "./crypto-suite.js";
 export { hashDomain } from "./hash.js";
 export {
 	type QcVote,
@@ -21,6 +31,14 @@ export {
 	vertexDigest,
 	vertexPreimage,
 } from "./protocol.js";
+export {
+	type RegisteredDigest,
+	type RegisteredSignature,
+	type SignaturePublicKey,
+	type SignatureScope,
+	signIdentityDigest,
+	verifyRegisteredSignature,
+} from "./signature.js";
 export {
 	type RegistryDocument,
 	type RegistryField,

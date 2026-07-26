@@ -389,7 +389,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "creator-trusted-v1",
 				signers: [],
 				quorum: 1,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).toThrow(/creator quorum 2/i);
 		expect(() =>
@@ -397,7 +397,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "delegated-trusted-v1",
 				signers: profileSigners,
 				quorum: 2,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).toThrow(/delegated minimum 3/i);
 		quorumConstraints.attestedFormula = "floor(2*n/3)";
@@ -406,7 +406,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "attested-bft-v1",
 				signers: profileSigners,
 				quorum: 3,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).toThrow(/quorum constraints are invalid/i);
 		quorumConstraints.attestedFormula = "ceil(2*n/3)";
@@ -416,7 +416,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "attested-bft-v1",
 				signers: profileSigners,
 				quorum: 3,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).toThrow(/unsupported negotiatedAt/i);
 	});
@@ -429,7 +429,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "delegated-trusted-v1",
 				signers: signers.slice(0, 2),
 				quorum: 1,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).toThrow(/delegated minimum 2/i);
 		expect(() =>
@@ -437,7 +437,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "attested-bft-v1",
 				signers,
 				quorum: 2,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).toThrow(/ceil\(2\*n\/3\)/i);
 		expect(() =>
@@ -445,7 +445,7 @@ describe("reviewer production-hardening regressions", () => {
 				profileId: "attested-bft-v1",
 				signers,
 				quorum: 3,
-				cryptoSuiteId: "suite",
+				cryptoSuiteId: "ed25519-sha256-v1",
 			})
 		).not.toThrow();
 	});
@@ -481,5 +481,6 @@ describe("reviewer production-hardening regressions", () => {
 		const source = readFileSync(new URL("../stryker.config.mjs", import.meta.url), "utf8");
 		expect(source).toMatch(/coverageAnalysis:\s*"off"/u);
 		expect(source).toMatch(/related:\s*false/u);
+		expect(source).toMatch(/!packages\/protocol-v2\/docs\/porting-rules\.md/u);
 	});
 });

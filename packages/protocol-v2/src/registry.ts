@@ -300,6 +300,7 @@ const recognizedConstraintNames = new Set([
 	"minimumItems",
 	"minimumUtf16Units",
 	"negotiatedAt",
+	"reservedValues",
 	"signerIdCharset",
 	"unique",
 	"uniqueBy",
@@ -361,6 +362,21 @@ function assertFieldConstraints(value: unknown, field: RegistryField, kind: stri
 	if (Object.hasOwn(constraints, "values")) {
 		if (!Array.isArray(constraints.values) || constraints.values.length === 0 || !constraints.values.includes(value)) {
 			throw new TypeError(`${fieldName} must be one of ${(constraints.values as readonly unknown[]).join(", ")}`);
+		}
+	}
+	if (Object.hasOwn(constraints, "reservedValues")) {
+		const activeValues = constraints.values;
+		if (
+			!Array.isArray(constraints.reservedValues) ||
+			constraints.reservedValues.some((reservedValue) => typeof reservedValue !== "string")
+		) {
+			throw new TypeError(`${fieldName} reservedValues must be an array of strings`);
+		}
+		if (
+			Array.isArray(activeValues) &&
+			constraints.reservedValues.some((reservedValue) => activeValues.includes(reservedValue))
+		) {
+			throw new TypeError(`${fieldName} active and reserved enum values must be disjoint`);
 		}
 	}
 	if (Object.hasOwn(constraints, "negotiatedAt") && constraints.negotiatedAt !== "genesis-only") {

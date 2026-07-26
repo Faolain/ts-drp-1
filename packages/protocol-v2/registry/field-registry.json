@@ -1,5 +1,5 @@
 {
-	"registryVersion": 3,
+	"registryVersion": 5,
 	"protocolMajor": 2,
 	"packageName": "protocol-v2",
 	"documentation": {
@@ -493,9 +493,13 @@
 				},
 				{
 					"name": "cryptoSuiteId",
-					"type": "string",
+					"type": "enum",
 					"const": null,
-					"constraints": { "negotiatedAt": "genesis-only" },
+					"constraints": {
+						"values": ["ed25519-sha256-v1", "ed25519-seal-v1"],
+						"reservedValues": ["p256-sha256-v1"],
+						"negotiatedAt": "genesis-only"
+					},
 					"required": true,
 					"sortRule": null
 				}
@@ -1231,9 +1235,13 @@
 				},
 				{
 					"name": "cryptoSuiteId",
-					"type": "string",
+					"type": "enum",
 					"const": null,
-					"constraints": { "negotiatedAt": "genesis-only" },
+					"constraints": {
+						"values": ["ed25519-sha256-v1", "ed25519-seal-v1"],
+						"reservedValues": ["p256-sha256-v1"],
+						"negotiatedAt": "genesis-only"
+					},
 					"required": true,
 					"sortRule": null
 				}
