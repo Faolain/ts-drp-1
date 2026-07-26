@@ -19,11 +19,12 @@ import { expect, test } from "@playwright/test";
  * proxies, but they do NOT exercise real iOS Safari or Android WebView engines, so they prove nothing
  * about mobile WebCrypto capability. Treating them as if they did would be a false assurance.
  *
- * Real-device iOS and Android measurements showing `Ed25519: non-extractable` are required at
- * **profile-3 enablement** (Phase 5, fate-shared non-extractable seal keys) — not as a Phase -1 exit
- * gate. What that evidence gates is seal *custody*: identity and vertex signing use synchronous
- * `@noble/curves` and need no WebCrypto at all, so every mobile engine participates fully as a
- * non-voter regardless of what this matrix says. See the plan's Phase -1 Exit gate section and D.23.4.
+ * Real-device iOS and Android measurements showing `Ed25519: non-extractable` are required at the
+ * **Pre-release release gate**, after the whole feature set is green end-to-end — not as a Phase -1
+ * exit gate. What that evidence gates is seal *custody*, which is a deployment-target property rather
+ * than a design input: identity and vertex signing use synchronous `@noble/curves` and never touch
+ * `crypto.subtle`, so an engine lacking non-extractable Ed25519 simply never holds a seal key while
+ * still participating fully as a non-voter. See the plan's Phase -1 Exit gate section and D.23.4.
  */
 
 type CurveSupport = "non-extractable" | "extractable" | "unsupported";

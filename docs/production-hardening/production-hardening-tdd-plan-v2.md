@@ -574,7 +574,8 @@ Registry merged; vectors minted once and pinned; reference regenerated once and 
 amendments merged with an amendment log; **formal-model variable-set sign-off recorded**; a PR that changes
 a vector without bumping `registryVersion` demonstrably fails CI.
 
-**Real-device mobile evidence is NOT a Phase −1 exit-gate item — it binds at profile-3 enablement.** An
+**Real-device mobile evidence is NOT a Phase −1 exit-gate item — it binds at the Pre-release release
+gate, after the whole feature set is green end-to-end.** An
 earlier draft of this section made archived real iOS/Android `Ed25519: non-extractable` runs a blocker on the
 freeze. That was the wrong milestone, and it is corrected here. What that evidence gates is **non-extractable
 seal custody**, which is a property of **profile 3** (`attested-bft-v1`, fate-shared keys — Phase 5), not of
@@ -593,14 +594,31 @@ the freeze. Three facts make the deferral safe:
   that evidence cannot enable the profile, so the capability measurement is subsumed by a gate that already
   exists.
 
-The requirement therefore **moves, it is not dropped**: real-device iOS and Android runs reporting
-`Ed25519: non-extractable`, with device, OS and engine/build recorded, are a **precondition of enabling
-profile 3**, and remain a named release-matrix item (see the Pre-release tier). Desktop Playwright mobile
-emulation does not satisfy it at either milestone.
+The requirement therefore **moves, it is not dropped**, and it moves to the end of the plan rather than to
+Phase 5: real-device iOS and Android runs reporting `Ed25519: non-extractable`, with device, OS and
+engine/build recorded, are part of the **Pre-release tier's existing real-device sign-off** — the release
+gate that runs after the full feature set is complete end-to-end. Desktop Playwright mobile emulation does
+not satisfy it at any milestone.
 
-**What the deferral costs, stated plainly:** if a committed release-matrix mobile engine turns out to lack
+**Why the end of the plan and not profile-3 enablement.** Mobile is a *deployment-target* question, not a
+design input. Nothing upstream of the release gate needs the answer:
+
+- If a mobile engine supports non-extractable Ed25519, profile 3 works there and nothing changes.
+- If it does not, that engine simply does not run profile 3. It still participates fully as a non-voter,
+  because identity and vertex signing never touch `crypto.subtle`. Desktop and Node seal voters are
+  unaffected.
+
+So the measurement can only ever change *which devices may hold seal keys* — never the frozen bytes, the
+registry, or any interface built between here and there. Deferring it costs no rework: by the time the
+golden paths are green, confirming mobile is either trivial or the suite decision gets revisited
+deliberately, which is exactly what the reserved identifier exists to permit.
+
+**What the deferral costs, stated plainly:** if a release-matrix mobile engine turns out to lack
 non-extractable Ed25519, profile 3 is unimplementable there — the same failure mode −1d cites against
-secp256k1 — and we discover it at Phase 5 rather than now. That is an acceptable trade because the
+secp256k1 — and we discover it at the release gate rather than now. **Reserving rather than deleting
+`p256-sha256-v1` is what makes that recoverable**: the identifier is still claimed, and reactivation is a
+documented, rule-bound edit (−1g) rather than a new protocol negotiation. That is an acceptable trade
+because the
 alternative was keeping `p256-sha256-v1` active, which was a *measured* consensus-byte defect (D.23) rather
 than a hypothetical one. Note also that this desktop matrix was wrong once for ~16 months, so the standing
 test's fail-on-any-change discipline (2j) is what protects the assumption in the meantime.
@@ -810,7 +828,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2g** | Quota, persistence, private mode, rollback pins | coordinated | unpin rule atomic | `quota-rollback.spec.ts`: `QuotaExceededError` injected at **every** mutating request never moves the head; estimate below margin refuses a new stage **before** destructive cleanup; a forged mirror receipt can **never** unpin the last usable signer rollback (`RollbackPinned`, not success) |
 | **2h** | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**. | local-safe | sliceable | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []` |
 | **2i** | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work. | local-safe | sliceable | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled |
-| **2j** | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite. | local-safe | sliceable | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at **profile-3 enablement** (Phase 5), not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json` |
+| **2j** | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite. | local-safe | sliceable | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json` |
 | **2k** | **Browser-matrix currency.** `@playwright/test` is pinned `^1.49.1`, resolving to 1.51.1 with **Chromium 134.0.6998.35** — roughly 16 months behind the field, and it already produced a false negative that nearly mis-set the seal suite. Every browser gate in this plan (kill-point matrix, storage validation, golden path 1 step 17) currently runs against a browser essentially nobody uses. Add a scheduled bump and make staleness visible. | local-safe | sliceable | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover |
 
 ### Exit gate (Phase 2)
@@ -1599,7 +1617,7 @@ Reviewers judge rigor by exactly these.
   production dependency of `object` and `keychain`, via the `herumi` WASM backend. Keep the simplicity
   argument for individual (non-aggregated) QCs; drop the dependency-avoidance one. Note the active v2
   suites are Ed25519 with distinct identity/seal identifiers per −1d; P-256 is reserved. WebCrypto
-  supports neither secp256k1 nor, until the profile-3 real-device sign-off is recorded, proven non-extractable
+  supports neither secp256k1 nor, until the Pre-release real-device sign-off is recorded, proven non-extractable
   Ed25519 on every required mobile engine.
 - **AHE §14.2** vote schema → `highestPrepareQC` moves to the round-change body; `round-change` gains a
   normative preimage.
@@ -4117,11 +4135,14 @@ The desktop Chromium/Firefox/WebKit capability matrix and its iPhone/Pixel emula
 regression evidence only. Mobile emulation still runs desktop WebKit/Chromium with a mobile viewport and
 user-agent; it does not reproduce real iOS Safari or Android WebView crypto. Real-device iOS and Android
 runs showing `Ed25519: non-extractable`, with device/OS/engine build and candidate SHA archived, are still
-required — but **at profile-3 enablement, not as a Phase −1 exit gate.** This appendix originally placed
-them on the freeze; that was the wrong milestone and the Exit gate section now carries the correction.
+required — but at the **Pre-release release gate, after the full feature set is green end-to-end**, not as
+a Phase −1 exit gate and not at profile-3 enablement. This appendix originally placed them on the freeze;
+that was the wrong milestone and the Exit gate section now carries the correction.
 
-The reasoning: what the measurement gates is non-extractable **seal custody**, which belongs to profile 3
-(Phase 5). Identity and vertex signing use synchronous `@noble/curves` and need no WebCrypto, so every
+The reasoning: what the measurement gates is non-extractable **seal custody** — a deployment-target
+property, not a design input. Nothing built between here and the release gate depends on the answer: an
+engine that supports it runs profile 3, an engine that does not simply never holds a seal key while still
+participating fully as a non-voter. Identity and vertex signing use synchronous `@noble/curves` and need no WebCrypto, so every
 mobile engine participates fully as a non-voter regardless. The gates that a byte-level freeze can actually
 be wrong about — browser↔browser convergence via the grid modular E2E, node↔browser via the canvas/chat
 E2E, and the 202/202 `packages/node` suite — are green. And profile 3 is already independently gated on
@@ -4129,7 +4150,9 @@ per-engine evidence that storage co-eviction is atomic, which no obsolete WebVie
 capability measurement is subsumed by a gate that exists.
 
 The residual risk is stated rather than hidden: if a committed release-matrix mobile engine lacks
-non-extractable Ed25519, profile 3 is unimplementable there and we learn it at Phase 5 instead of now. That
+non-extractable Ed25519, profile 3 is unimplementable there and we learn it at the release gate instead of
+now — at which point the reserved `p256-sha256-v1` identifier makes the remedy a documented, rule-bound
+reactivation (−1g) rather than a new negotiation. That
 is the accepted cost of reserving `p256-sha256-v1`, and it is a better trade than the alternative, because
 keeping P-256 active was a **measured** consensus-byte defect (102/200 high-S, both forms verifying 200/200)
 rather than a hypothetical one. The 2j standing test's fail-on-any-change rule is what guards the assumption
