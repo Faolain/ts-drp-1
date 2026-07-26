@@ -4645,14 +4645,148 @@ This slice documents the variables and their relationships, but the Phase −1 e
 an actual formal-model variable-set review is recorded. Neither green documentation nor unanimous D10
 consensus may be reported as that sign-off.
 
+---
+
+## Appendix D.27 — Phase −1 formal-model variable-set sign-off
+
+### D.27.1 — Executable boundary and RED/GREEN
+
+This dedicated slice does not infer sign-off from Phase −1g prose. The fresh Codex-high RED added
+`formal-model-variable-signoff.test.ts`, which derives the field list from registry v5 and requires three
+separate absent GREEN artifacts: a real Quint declaration source, an exact registry-to-model map, and a
+hash-bound mechanical sign-off record. RED failed **1 test / 2 skipped** for exactly those missing paths;
+24 relevant pre-existing tests, all 29 scoped workspace typechecks, targeted lint and diff checks remained
+green.
+
+Registry v5 has no generic `signed` flag, so the envelope-kind boundary is an explicit normative
+classification rather than a false registry inference:
+
+- `vertex` comes from D12's identity/vertex signature suite;
+- `epochAnchor` comes from D10's requirement that the profile and crypto-suite binding is signed in every
+  anchor;
+- `sealVote` comes from D12's seal-vote suite;
+- `roundChange` comes from D06 plus the normative pacemaker's signed round-change votes.
+
+`SealProposal` and `SealQC` remain round/value-bound proposal and certificate structures, but the frozen
+sources do not define them as independently signed envelopes. After those four kinds are selected, all
+**40 fields** and their registry indices are derived mechanically from `field-registry.json`; no hand-kept
+field list may satisfy the contract.
+
+The separate Codex-high GREEN pins project-local `@informalsystems/quint` `0.32.0` and adds:
+
+- `formal/ahe-v2-signed-envelope-variables.qnt`, with 40 unique, uncommented Quint variables in exact
+  registry order;
+- `formal/ahe-v2-variable-map.json`, which proves a one-to-one, no-extra/no-duplicate mapping and binds the
+  registry, amendment log and actual model-source hashes;
+- `formal/ahe-v2-variable-signoff.json`, which separately records the exact checker algorithm, checker
+  hash, reviewed artifact hashes and reviewed field identities.
+
+The source is parsed and typechecked by the pinned Quint CLI, not accepted by regex alone.
+`roundChange.highestPrepareQC` preserves its registry `seal-qc|null` choice as the Quint sum type
+`NoPrepareQc | PrepareQc(Digest)`. Canonical operation payload semantics are deliberately an uninterpreted
+boundary identity here; the later pacemaker model must refine them. This slice establishes the signed
+envelope variable boundary only. It does **not** discharge agreement, integrity, validity, lock safety,
+no-retroactive-vote, authority-isolation or bounded-liveness invariants, and it does not claim Apalache or
+bidirectional trace-conformance completion.
+
+GREEN passed 3/3 focused tests, 18 package test files and 135/135 tests, all 29 scoped workspace
+typechecks, root lint with zero diagnostics, direct Quint typecheck, source/JSON formatting, frozen
+lockfile installation, provenance and diff checks. Gitignored evidence is
+`phase-n1h-formal-{red,green}-*.log`.
+
+### D.27.2 — Operational findings and review state
+
+Three failed full-suite diagnostics were command/resource findings, not source failures. The first GREEN
+command incorrectly ran root Vitest over the package paths, enabling workspace-wide V8 coverage instead
+of the established package-local configuration; two existing ESLint-constructor tests exceeded their
+15-second limits. During diagnosis, two orphaned `/tmp/probe.config.mts` mutation-probe Vitest processes
+from the earlier aborted Grok review were also found consuming approximately two CPU cores after sixteen
+hours and were terminated. No timeout was widened and no unrelated test was changed. The correct
+`pnpm --filter @ts-drp/protocol-v2 test` gate passed, with those ESLint checks at approximately six
+seconds. Future external mutation probes remain confined to disposable copies and must be explicitly
+terminated and audited.
+
+Exact-tree Grok and Kimi-100 both returned `PASS` in
+`phase-n1h-formal-review-{grok,kimi}.log`, with no blocking defect. Their non-blocking findings are
+recorded rather than silently discarded:
+
+- package and lock pin Quint `0.32.0`, and the external snapshot pins both, but the mechanical sign-off's
+  own `reviewedArtifacts` does not yet bind those two files or assert the resolved CLI version;
+- the `roundChange` classification uses a documentary plan citation rather than a resolvable D06
+  machine-entry path, even though D06 plus the pacemaker's signed-vote rule support the classification;
+- the exact live contract fails closed for missing, extra, duplicate, comment-only, unmapped, stale-hash
+  and invalid-Quint states, but it does not keep named disposable negative fixtures for each mutation;
+- envelope-kind selection is necessarily a finite normative classification because registry v5 has no
+  signed flag; field enumeration inside each selected kind is mechanical, but the checker cannot derive
+  the classification from nonexistent registry metadata;
+- the sign-off record proves exact self-consistency; independent attestation comes from the separately
+  recorded Codex/Grok/Kimi/Opus reviews, not from a fabricated signer inside the JSON;
+- variable discovery is lexical, but comment stripping plus exact bijection is backstopped by the pinned
+  Quint parser/typechecker; full registry type/constraint fidelity and nested SealQC semantics are
+  deliberately deferred to the later pacemaker model;
+- the fast typecheck gate invokes the repository's `pnpm` shim and therefore assumes the repository's
+  declared package-manager environment.
+
+The self-contained final Opus-xhigh adversarial review returned `PASS` in
+`phase-n1h-formal-final-review-opus.log`. It independently recounted 9 `vertex`, 16 `epochAnchor`, 8
+`sealVote` and 7 `roundChange` fields across the registry, map, Quint declarations and sign-off; audited
+all 19 registry kinds; verified the provenance DAG has no self-hash or circular expected value; and
+confirmed that no live assertion is structurally incapable of failing. It adjudicated every finding above
+as non-blocking:
+
+- package/lock and resolved-tool binding becomes mandatory when a solver verdict carries a protocol claim,
+  not for a declaration-only variable-boundary record;
+- the soft `roundChange` citation should be made resolvable, but D06, the registered domain, phase constant
+  and signer field independently support conservative inclusion;
+- named disposable mutation fixtures belong with the later action/invariant slice; RED already proved the
+  current contract can fail and each positive assertion has independent expected/actual provenance;
+- adding a post-freeze registry `signed` flag would itself require a governed registry-version change, so
+  the explicit normative classification plus an independent all-kind audit is the sustainable boundary;
+- lexical parsing, mechanical self-consistency, the repository package-manager shim and deferred type
+  fidelity all fail closed or are explicitly outside this slice's declared claim.
+
+The review also identified non-blocking handoffs that must not disappear into a broad “formal sign-off”
+label:
+
+1. A registry-to-model bijection cannot discover a signed field that the frozen registry itself omitted.
+   The normative pacemaker prose says a new-round certificate binds `(objectId, epoch, anchor, r)`, while
+   frozen `roundChange` has no direct or obvious transitive anchor field. Phase 5/G3 must resolve whether
+   the prose is over-specific or the frozen preimage is incomplete. A conclusion that the field is
+   required would reopen registry-v5 governance; it is not authorized as a quiet map edit.
+2. The present boundary proves the ordered set of 40 declarations, but the checker does not yet derive
+   `modelVariable` names from `(envelopeKind, field)`. A consistently swapped name pair could therefore
+   preserve order, uniqueness and typechecking. Before those names carry action/invariant semantics,
+   derive and test the naming rule, including the declared `QC` → `Qc` normalization.
+3. The later model must explicitly refine today’s intentional fidelity losses: transparent aliases,
+   registry const/enum and numeric constraints, nonempty/unique dependency constraints, and nested SealQC
+   evidence. It must also resolve amendment evidence paths mechanically, bind the exact Quint/solver
+   toolchain in its review record, and add disposable negative fixtures for mutation classes.
+
+These findings do not authorize claiming more formal coverage. Subject to the final sequential repository
+gates and an intended-files-only checkpoint, this record satisfies the remaining **Phase −1 variable-set**
+exit prerequisite. It is not Phase 5, invariant checking, Apalache verification, bidirectional trace
+conformance, or proof that registry v5 contains every field a complete pacemaker model will need. The
+external branch-protection/CODEOWNERS enforcement named by the Phase −1 gate also remains an operational
+repository setting rather than something this in-repo test can prove.
+
+The post-review gates then passed sequentially: 3/3 focused sign-off tests; 18 protocol test files and
+135/135 tests; all 29 scoped workspace typechecks; root lint with zero errors and 244 pre-existing
+warnings; direct Quint typecheck; frozen-lockfile installation with the declared pnpm 10.24.0; Prettier
+for every authored artifact; and intended-diff, JSON/provenance and whitespace checks. Gitignored evidence
+is `phase-n1h-formal-final-gates-{focused,protocol-tests,typecheck,lint,quint,frozen-install,format,provenance,diff-check}.log`.
+`phase-n1h-formal-final-checkpoint-snapshot.log` hash-pins the final manifest, lock, registry, amendments,
+model, map, mechanical sign-off, executable checker and this plan. The snapshot and checkpoint exclude
+`.agents/`, `.claude/` and `skills-lock.json`.
+
 ## Next Agent Prompt
 
-After checkpointing only the Phase −1g test, two protocol documents and this plan, begin a new dedicated
-TDD slice for the still-missing formal-model variable-set sign-off required by the Phase −1 exit gate.
-Use a fresh Codex-high RED to make the sign-off criteria executable, a separate Codex-high GREEN, Grok and
-Kimi-100 read-only reviews, and final Opus-xhigh adversarial review. The sign-off must evaluate the actual
-formal-model variable set and its mapping to the frozen registry/amendments; it must not infer approval
-from Phase −1g prose, GREEN status, or D10 consensus. Hash-pin both
-`packages/protocol-v2/registry/field-registry.json` and every reviewed formal-model artifact before and
-after external review. Keep mutation probes in disposable copies and keep `.agents/`, `.claude/`, and
-`skills-lock.json` out of every checkpoint.
+After the Phase −1 variable-set checkpoint is verified, begin Phase 0a as a fresh TDD slice: first inventory
+the already-frozen codec/hash implementation and applicable registry-v5 vectors, then have a fresh
+Codex-high RED define the package boundary and conformance/adversarial failures before a separate
+Codex-high GREEN ports the reference without changing frozen bytes. Preserve the D.25 unresolved
+unsafe-integral Float64 decoder decision rather than silently selecting a behavior; if the Phase 0a
+contract requires changing that plan assumption, obtain the required Opus-xhigh, Codex-high and Kimi-100
+agreement first. Keep seeded differential/fuzz tests deterministic and quick on PRs, reserve materially
+larger corpora for an explicit nightly gate, and repeat the exact-tree Grok, Kimi-100 and final
+Opus-xhigh review sequence before checkpointing. Keep `.agents/`, `.claude/`, and `skills-lock.json` out of
+every checkpoint.
