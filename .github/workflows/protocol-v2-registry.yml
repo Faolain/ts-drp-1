@@ -1,0 +1,26 @@
+name: Protocol v2 registry change control
+
+on:
+  pull_request:
+    paths:
+      - packages/protocol-v2/registry/**
+      - packages/protocol-v2/scripts/check-registry-version.mts
+      - .github/workflows/protocol-v2-registry.yml
+
+jobs:
+  registry-version:
+    name: Require protocol-v2 registryVersion bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ts-drp/protocol-v2 check:registry-version -- "${{ github.event.pull_request.base.sha }}"

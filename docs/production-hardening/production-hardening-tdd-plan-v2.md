@@ -393,8 +393,8 @@ codepoint      → Peer-a, peer-B, peer-a, peer_a, peerä
 
 Two replicas with different default locales compute different `signerSetDigest` → different anchor hash →
 **permanent fork**, or two disjoint quorums certifying different anchors for the same cut.
-*Resolution:* all protocol sorts are byte order of UTF-8 (equivalently code-unit order), fixed per field in
-the registry as `sortRule: "codepoint"`. The registry also constrains the `signerId` charset (no control
+*Resolution:* UTF-8 byte order equals codepoint order, not UTF-16 code-unit order. All protocol sorts use
+that order, fixed per field in the registry as `sortRule: "codepoint"`. The registry also constrains the `signerId` charset (no control
 characters), which additionally closes the ` ` key-smuggling in the NUL-delimited vote key
 (`seal.js:264`, `indexeddb-store.js:37`) — replaced by native IDB array keys.
 
@@ -562,6 +562,27 @@ unpinned porting.
 Registry merged; vectors minted once and pinned; reference regenerated once and lockfile-frozen; spec
 amendments merged with an amendment log; **formal-model variable-set sign-off recorded**; a PR that changes
 a vector without bumping `registryVersion` demonstrably fails CI.
+
+### Phase −1a–c runtime hardening boundary
+
+The registry runtime strips undeclared keys from typed nested structures, matching the pinned reference's
+normalization rule. Untyped canonical values remain open by design. The checked-in registry is deeply
+immutable at runtime, every registered kind has a unique domain, and semantic constraints used by the
+current slices must affect validation rather than merely being recognized.
+
+Vertex admission owns the registered `ts-drp/vertex/v2` digest verifier. Dependency resolution is an
+ordered envelope contract: every resolved parent is hash-, object-, protocol-, epoch-, anchor- and
+logical-time-checked before antichain and grounding checks. A resolver result is never advisory.
+
+QC byte construction rejects empty or header-mixed vote sets. Signer membership, signature verification,
+and the `SUBQUORUM` decision remain Phase 5 responsibilities because they require the active signer set and
+the signature suites frozen in −1d. Genesis-only continuity enforcement for `cryptoSuiteId` remains −1e;
+the −1a runtime validates the declaration but does not simulate a prior anchor. These are explicit API
+boundaries, not permissive success paths.
+
+Protocol-v2 mutation runs use whole-suite mode (`coverageAnalysis: "off"`, Vitest related-test selection
+disabled). Module-initializer mutants that the runner cannot activate are reported separately from the
+mutation score rather than counted as behavioral survivors.
 
 ---
 
@@ -3990,4 +4011,3 @@ ships with a hole exactly where the legacy plane already diverges.
 
 Generalised, this is the same lesson as D.19.5 from the other direction: **a number that is computed and
 printed but never asserted is not a gate.** It reads like coverage in a report and enforces nothing.
-

@@ -23,6 +23,7 @@ const config = tsLintConfig(
 			"**/doc/*",
 			"**/bundle/*",
 			"**/coverage/*",
+			"packages/protocol-v2/conformance/ahe-reference/**",
 			"**/.network-spike-raw/*",
 			"**/.tldr/*",
 			"**/flamegraph.*",
@@ -138,9 +139,33 @@ const config = tsLintConfig(
 						FunctionExpression: true,
 						MethodDefinition: true,
 					},
-					publicOnly:true, 
+					publicOnly: true,
 				},
-			]
+			],
+		},
+	},
+	{
+		files: ["packages/protocol-v2/src/**/*.ts"],
+		rules: {
+			"no-restricted-globals": [
+				"error",
+				{
+					name: "structuredClone",
+					message: "Consensus state must use deepCloneCanonical.",
+				},
+				{
+					name: "Buffer",
+					message: "Consensus bytes must use Uint8Array and explicit-endian DataView operations.",
+				},
+			],
+			"no-restricted-properties": [
+				"error",
+				{
+					object: "globalThis",
+					property: "structuredClone",
+					message: "Consensus state must use deepCloneCanonical.",
+				},
+			],
 		},
 	}
 );
