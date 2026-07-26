@@ -242,14 +242,20 @@ Product decision already recorded: build without mirrors now, design assuming op
    A misclassification is a silent permanent fork — and round 1 misclassified three of its own slices (§Phase 0).
 4. **Every gate names an executable evidence artifact** — a test file, a model output, a crash-injection
    log, a browser-matrix JSON, a golden-vector file. No inherited number is a gate.
-5. **Every gate must be provably able to fail.** Each differential/oracle gate ships a **mutation probe**:
+5. **Every gate must be provably able to fail — and a RED spec is evidence only as a pair *(baseline, current)*.** Before its GREEN half begins, every new RED spec file is executed against the baseline SHA in a throwaway git worktree (**never** `git stash` — reviewers share one tree), and the pair is recorded with the text of the failing assertion; a bare count is satisfiable by a broken harness. `FAIL/FAIL` is a genuine RED contract; `PASS/FAIL` is a **regression pin**; `PASS/PASS` is **not a gate** and must be strengthened or deleted; `FAIL/PASS` is already green. *Scope qualifier:* the baseline leg binds only where the subject code exists at baseline — for `protocol-v2`, `seal`, `storage-browser` and the other new packages a baseline run fails on module resolution, and **an import error is not a RED**; there, run the spec before the implementation exists and record that it fails on the asserted contract. A regression pin must assert the **invariant**, never the baseline's behaviour: pinning the old semantics as a "positive control" makes the pin unsatisfiable alongside the slice that changes them (D.5(i)). Each differential/oracle gate additionally ships a **mutation probe**:
    a seeded defect the gate must catch. The repo already has this pattern
    (`packages/object/tests/proptest/mutation-check.test.ts`); it is the only known defense against an oracle
    drifting green.
 6. **Every zero/never assertion ships a positive control** in the same test. *"Zero durable vertices"*
    passes trivially if nothing is wired; assert in the same run that a durable command **does** create
    exactly one vertex.
-7. **Atomic vs sliceable is explicit and argued.** Atomic: the registry freeze itself; vertex preimage;
+7. **Atomic vs sliceable is explicit and argued — and every "atomic" names its observable boundary.**
+   For the legacy applier that boundary is *one vertex* across **all** of: hashgraph (vertices, forward and
+   backward edges, frontier membership **and frontier order**, which feeds default dependency order and
+   therefore signed bytes), per-hash state snapshots, the finality store, the live `drp`/`acl` proxies,
+   `checkpoints`, `knownInvalidVertexHashes`, and subscriber notification. Two invariants come with it: the
+   owner stores are never rebound (identity is stable), and nothing is published before it is committed.
+   Atomic: the registry freeze itself; vertex preimage;
    canonical-order switch; staged state-adoption semantics; **the vote slot + signer state + outbox as one
    transaction** (a half-durable vote slot is *worse* than none — it enables double-signing); the adoption
    pointer swap; latched-ACL genesis semantics.
@@ -609,7 +615,10 @@ a consensus assertion pages a human.
 
 ## Phase 0 — Determinism core (= the pure-module port) + live-bug fixes
 
-**Goal:** make replay deterministic, admission fail-closed, and state adoption replacement-correct.
+**Goal:** make replay deterministic, admission fail-closed, and state adoption replacement-correct, and make
+each vertex transition **atomic across graph, snapshots, finality, live state, checkpoints and
+notification** (0q). 0h is a hard prerequisite of shipping any staged apply; 0g's serialization half is
+required only where rollback or an unvalidated transaction spans a suspension point (D.5(f)).
 **Hard prerequisite for every snapshot-trusting feature.**
 
 **The structural change from round 1:** round 1's 0a ("write a frozen canonical codec as a new package") and
@@ -642,6 +651,7 @@ codec → vectors already frozen and now provably correct.
 | **0k** | Bound legacy `FinalityStore.states` | local-safe | sliceable | After 10⁴ vertices, `expect(finalityStore.states.size).toBeLessThanOrEqual(bound)` |
 | **0l** | Public error-code taxonomy module (codes + classes + docs) | local-safe | sliceable | Typecheck test: every public throw site uses a catalogued code |
 | **0m** | `XVER` cross-version bisimulation harness: patched engine vs HEAD-pinned legacy engine (git-worktree build) over the Gate-0 fixture corpus | gate infra | sliceable | `expect(patched.vertexHashes).toEqual(pinned.vertexHashes)` + state equality per fixture × schedule. **Required check on any PR touching the legacy applier or validation classification** |
+| **0q** | **Per-vertex atomic apply and publication (owns L3 and L6 — added by D.3(d), specified by D.5).** One vertex transitions atomically across hashgraph, state snapshots, finality, live proxies, checkpoints and notification: fully applied, or no trace. **A committed vertex is never removed** — any dependency-closed subset of a causal DAG is a valid replica state, so no failure can require removing one. Every shared-store write sits inside **one synchronous commit section after that vertex's last suspension point**, which is what makes the design exempt from 0g's serialization mandate (D.5(f)) — it MUST NOT take the `callFn` lock, whose only effect would be to make synchronous `drp.method()` calls async. Vertex-presence is **re-checked inside the commit section** (the loop-top check is TOCTOU-separated from the insert by the blueprint `await`, and `HashGraph.addVertex` blind-inserts, duplicating frontier entries and hence the `dependencies` of the next locally signed vertex). **Live-proxy adoption is the one surface that breaks with no rollback involved**: its base is captured *before* the `await`, so a plain replace-at-commit erases concurrently committed operations. Transplanting the local path's `assign` step **relocates that erase rather than removing it** — `assign` writes branch state, correct locally only because a local vertex depends on the whole frontier. Choose and record either commit-time recompute against a consistent base (await-free replay only) or frontier CAS/retry. `pruneSnapshots` must never observe uncommitted staging. `ApplyResult` gains `quarantined: Hash[]`; a transient failure is retriable and **never** enters `knownInvalidVertexHashes`. Hard prerequisite: 0h. | local-safe | **atomic per vertex** | Inverted `merge-atomicity.test.ts` per D.3(b); the four D.4.2 regression schedules; **L6 contract**: two replicas receiving the same DAG — one with a local call interleaved into a 256-append merge at the default suffix, one serial — end with equal live state, byte-equal `getStates` at every shared head, and a truthful `applied` report; **structural gate**: no shared-store mutation or journal entry is live across any `await`. All verified against baseline per D.5(h) |
 
 > **Why 0j moves to Phase 0.** Phase 4's shadow gate asserts byte-identical snapshot digests across replicas
 > and browsers. That assertion is *unattributable* unless blueprint execution is already deterministic
@@ -708,6 +718,8 @@ round 1 at all.
 | secp recover + hash recompute | ~1.3 ms/vertex measured | mobile p99 > 50 ms at ~50–150 vertices/batch | 1g + Worker (Phase 2) |
 | Full inventory wire | **O(V)** bytes | 100k vertices ≈ 6 MB of hashes per sync probe | 1n |
 | Browser mesh | — | 50–200 connections | Track T |
+| **Whole-container clone per merge** (staging-by-copy — introduced by the first L3 fix, **not** baseline; removed) | O(retained graph + snapshot bytes + finality entries) per `applyVertices` | 112 ms measured for a 1-vertex merge at V=3000; ~3.7 s at V=100k at the measured slope; 50 ms crossing near V≈1400 by interpolation, p99 not sampled | 0q — **forbidden mechanism**, see Phase 0 |
+| **`pruneSnapshots` key materialization** (`Array.from(hashGraph.vertices.keys())`, `drp-applier.ts:753`, **pre-existing at baseline**) | O(V) burst per checkpoint advance; amortized **O(V/256)** per merge | not yet measured at scale | **unowned — needs an owner before atomic apply may be called history-independent** (D.5(j)) |
 
 ### Exit gate (Phase 1)
 Probe counters flat 10k→1M; zero unauthenticated ingest paths proven **reflectively**, not by a hand list;
@@ -1475,7 +1487,7 @@ argument for "can an MMORPG-ready or chat-ready app be built on this."
 | §12.3 complete-history sync | Covered (§11.7) | |
 | §12.4 no certified snapshot / compaction | Covered (§11.8) | |
 | §12.5 in-memory storage | Covered (§11.14) | |
-| §12.6 expensive replay / cloning / conflict processing | **Covered, and this is where v2 is strongest** | Phase 1d incremental snapshots kills the 3–4×`O(stateSize)` clone per vertex (~120 MB/s at 1 MB state and 30 vertices/s) that round 1 never addressed; 1b removes the per-message `O(V)` rebuild; 0e caps causality |
+| §12.6 expensive replay / cloning / conflict processing | **Open until atomic-apply staging is history-independent** (D.5(j): `pruneSnapshots` still materializes every vertex key per checkpoint advance) | Phase 1d incremental snapshots kills the 3–4×`O(stateSize)` clone per vertex (~120 MB/s at 1 MB state and 30 vertices/s) that round 1 never addressed; 1b removes the per-message `O(V)` rebuild; 0e caps causality |
 | §12.7 equivocation / old dependencies | Covered (§11.12) | |
 | §12.8 finality ≠ BFT ordering | Covered (§11.11) | |
 | §12.9 ABI + resource controls | Covered (§11.4, §11.13) | |
@@ -1650,3 +1662,2332 @@ failure mode as an inherited number.
 - **One artifact:** `golden-path-report.json` — per step, per engine: status, assertion, measured value,
   budget, and the trace. The Definition of Done above is satisfied when both paths report zero `pending` and
   zero `fail`.
+
+---
+
+## Appendix D — Implementation log: findings and gotchas
+
+Appended as each phase is implemented. **Every entry here was verified by execution in this repository**
+— nothing is inherited from a review document. An entry that cannot name the command that produced it
+does not belong here. Slice-level detail that only concerns the legacy-plane rollout also appears in
+`ts-drp-repo-integration-plan.md` §9; this appendix is the authority for anything that touches a plan
+decision.
+
+### D.0 — Harness and infrastructure (not plan changes; prerequisites)
+
+- **This document contains a literal NUL byte at offset 31266**, inside the sentence discussing
+  NUL-delimited vote keys (§2.4 D1). `grep` and `rg` therefore classify the whole file as binary and
+  return *nothing at all* — silently, with exit code 1. Every heading grep against this plan comes back
+  empty until you pass `rg -a` / `grep -a`. Normalising the byte would change a sentence that is
+  deliberately about that byte, so the byte stays and this note is the mitigation.
+- **`codex exec` can be refused by its provider's safety filter on ordinary distributed-systems
+  vocabulary.** A prompt describing convergence testing was rejected twice with *"flagged for possible
+  cybersecurity risk"*, exiting non-zero after ~41k tokens with no work done and no file changes. The
+  trigger is wording, not intent: terms like *adversarial*, *attack*, *exploit*, *byzantine-craftable* and
+  *beat the gate* read as offensive-security framing out of context. Rewriting the same task in neutral
+  engineering language — *targeted test case*, *producible by a non-standard client*, *cases the corpus does
+  not generate* — runs normally. Symptom to recognise: a short log ending in the flag message rather than a
+  report. Check `git status` before assuming any partial work landed; in both instances nothing had.
+- **NEVER `pkill -f <pattern>` while an agent CLI is running.** `codex exec` receives its prompt as an
+  argv string, so the entire prompt text appears in its command line. A `pkill -9 -f "vitest"` intended to
+  clear stale test runs matched the *prompt* — which contained the words `pnpm vitest run packages/object`
+  — and SIGKILLed the agent mid-edit (`CODEX EXIT=137`). Kill by explicit PID, obtained from `ps`, and
+  check the PID list before firing.
+- **Orphaned test runs silently poison every subsequent measurement.** A single working session accumulated
+  **five** abandoned `pnpm vitest` runs, ~60 worker processes, the oldest running 1h52m — every one started
+  by a wait that hit the 10-minute tool ceiling and was then abandoned rather than killed. All timing taken
+  during that window is worthless, and the contention made a slow test look like a crashing one. Rules:
+  one suite run at a time; kill the previous run by PID before starting another; `ps` for strays before
+  believing any performance number; and treat *"the process died silently"* as a hypothesis to verify with
+  `ps`, not a conclusion — in this case the process was still running at 41 minutes.
+- **A detached `nohup … & disown` run is invisible to the harness**, so no completion notification arrives
+  and the only option left is polling — which is what produced the abandoned runs above. Use the harness's
+  own background mechanism instead: it survives the tool-call ceiling *and* notifies on exit.
+- **`codex exec` silently blocks on stdin when stdin is not a TTY.** Writing a prompt file with a heredoc
+  and then invoking `codex exec "$(cat prompt)"` in the same compound command leaves stdin attached to the
+  consumed heredoc; codex prints `Reading additional input from stdin...` and waits forever, producing a
+  39-byte log and no error. Always append `< /dev/null`. Symptom to watch for: a background agent whose log
+  stops growing at a few dozen bytes.
+- **`timeout(1)` is not on `PATH` on this machine** (macOS, no coreutils). Wrapping an agent CLI in
+  `timeout` produces `command not found` **and a successful exit code**, which reads exactly like "the
+  agent ran and produced no output." Run the CLIs bare and use a stall watchdog on log growth instead.
+- **The vendored AHE reference test suite was being globbed by the repo's own vitest run.**
+  `vite.config.mts`'s `test.exclude` did not cover `docs/`, so
+  `docs/production-hardening/ts-drp-ahe-review-bundle/reference-implementation/test/core.test.mjs` — a
+  `node:test` suite — ran under vitest and failed. The repo suite was therefore red for a reason with no
+  connection to `packages/`, which makes red/green TDD unusable. Fixed by adding `"docs/**"` to the
+  exclude list. Note this interacts with §2.3's plan to `git mv` the reference to
+  `packages/protocol-v2/conformance/ahe-reference/`: **that move must land together with a vitest
+  include/exclude decision for the new location**, or the same collision reappears one directory later.
+
+### D.1 — Baseline at `7f9e66a` (2026-07-24), measured
+
+| Command | Result | Log |
+|---|---|---|
+| `pnpm typecheck` | exit 0, clean | `.logs/phase0-baseline-typecheck.log` |
+| `pnpm lint` | exit 0 — **0 errors, 176 warnings** (all `jsdoc/*`) | `.logs/phase0-baseline-lint.log` |
+| `pnpm vitest run` | **6 failed / 1342 passed / 4 skipped** across 188 files | `.logs/phase0-baseline-test.log` |
+
+The 6 failures are exactly the three Phase-0 RED suites listed in D.2 and nothing else, so the red/green
+boundary for the first slice is unambiguous.
+
+#### Baseline-RED ledger (required by principle 5 / D.5(h))
+
+Every RED spec, executed against `7f9e66a` in a throwaway worktree before its GREEN half began. A spec with
+no row here has not been qualified and does not count toward any exit gate.
+
+| Spec :: test | Baseline | Current | Kind | Failing assertion |
+|---|:--:|:--:|---|---|
+| `state-adoption-replacement` :: live keys equal canonical replayed keys | FAIL | — | RED | live DRP keys must exactly equal the canonical replayed keys |
+| `state-adoption-replacement` :: byte-identical state across replicas | FAIL | — | RED | the same vertex hash must not encode replica-local caller context |
+| `merge-atomicity` (original, batch-scoped — **superseded**) | FAIL | — | RED | a rejected batch must not commit any vertex to the live hashgraph |
+| `deterministic-rejection-taxonomy` :: ×3 | FAIL | — | RED | authorization / absent method / reserved no-op are deterministic per-vertex rejections |
+| `dispatch-surface-parity` :: inherited throwing member | FAIL | FAIL | RED | an inherited throwing operation must be a repeatable per-vertex rejection |
+| `dispatch-surface-parity` :: `toString`/`hasOwnProperty` admitted | PASS | PASS | **parity pin** (deliberate — slice 0i; not a gate, it guards against over-correction) |
+| `merge-atomicity` (inverted per D.3(b)) :: quarantine a transient peer | FAIL | FAIL | RED | a transient vertex must be retriable quarantine while its valid batch peer commits on every surface |
+| `merge-concurrency` :: A reachable after a notified local child | **PASS** | FAIL | **regression pin** | rollback must not delete A after a notified local transaction commits its child |
+| `merge-concurrency` :: A reachable after a notified peer merge | **PASS** | FAIL | **regression pin** | rollback must not orphan a child committed by an overlapping peer merge |
+| `merge-concurrency` :: childless B restored to a multi-head frontier | **PASS** | FAIL | **regression pin** | a rolled-back only-B child must restore B to the frontier whenever B becomes childless |
+| `merge-concurrency` :: one complete same-hash survivor | **PASS** | FAIL | **regression pin** | the same-hash survivor must remain singular and complete after the overlapping owner rolls back |
+| `checkpoint-interleaving` :: L6 replica equivalence at the 256 suffix | FAIL | FAIL | RED (pre-existing) | an applied merge and an interleaved checkpoint must reproduce the serial replica's live state and snapshot bytes |
+| `merge-concurrency` (**round-2 version, discarded**) :: ×3 | **PASS** | FAIL | **PASS/PASS-class failure** — red only against the intermediate implementation, never against baseline; could not distinguish the fix from doing nothing. This row is why the rule exists. |
+
+*Method:* `git worktree add <tmp> 7f9e66a`, copy the spec files in, disable the worktree's
+`vitest.workspace.ts` (it references a `vite.config.mts` path that resolves against the main tree), run with
+a minimal local vitest config and the main tree's `node_modules` symlinked. Do not `git stash`.
+
+### D.2 — Phase 0, live-bug fixes L1–L5 (legacy plane): the first green was wrong
+
+Five defects, each pinned by a RED test before any production line was written:
+
+| # | Defect | Site |
+|---|---|---|
+| L1 | State adoption is a **merge, not a replacement** — `Object.assign(this.acl, acl)` / `Object.assign(this.drp, drp)` at the end of `applyVerticesUntraced`, and both `Object.assign` calls in `assign()`. A top-level key deleted by a blueprint operation survives on the live object, so the live instance disagrees with `states.getDRPState(frontier)` and with any replica that replayed from scratch. | `drp-applier.ts:271,274,579,582` |
+| L2 | **Replica-local `context` is snapshotted.** `stateFromDRP()` snapshots every non-function own property, including `context`, which `callDRP` overwrites with the *calling peer id* before every operation. Two replicas agreeing on the graph produced different `DRPState` bytes for the same vertex hash (caller byte `97` vs `98`). `proxy.ts` already treats `context` as ignorable for mutation tracking — the snapshot path was the inconsistency. | `state.ts:184-193` |
+| L3 | **Merge batches are not atomic.** The per-vertex pipeline writes straight into `hashGraph`, `states` and `finalityStore`; a transient blueprint failure on a later vertex rethrows out of `applyVertices`, leaving earlier vertices of that batch permanently committed while the caller sees only a rejected promise. | `drp-applier.ts:215` |
+| L4 | **Authorization failure is an untyped `Error`** the classifier does not recognise, so it rethrows and aborts the merge of every other vertex in the batch. One unauthorized vertex from a hostile peer is a batch-wide DoS. | `drp-applier.ts:527` |
+| L5 | **An unknown blueprint operation is an untyped `TypeError`**, same batch-wide effect. Related: a non-root vertex with reserved `opType === "-1"` was silently `continue`d — reported as neither applied, missing, nor invalid. | `drp-applier.ts:196` |
+
+*Gotcha, still binding:* L5 must be fixed by checking that the named operation exists and is callable
+**before** invoking it — a property of the blueprint — not by reclassifying a caught `TypeError` as
+deterministic. A blueprint method may legitimately throw `TypeError` from inside correct code.
+
+> **Why these are `L`n and not `D`n.** §2.4 already defines D1–D3 as defects *of the AHE reference*
+> (`localeCompare`, `Float32Array -0`, admission ordering). The repo's own legacy-plane defects are
+> therefore numbered **L1–L5** here. Slice 0d's "Reorder per D3" refers to §2.4's D3, not L3.
+
+**All five went green (1348 passed / 0 failed) and the result was still not shippable.** Four independent
+reviewers (Grok-4.5, Kimi-K3 at 100 steps, Opus-xhigh adversarial, plus this session) converged on
+DO-NOT-SHIP. This is the single most important process finding so far, and it generalises:
+
+> **A green suite is evidence about the tests, not about the change.** Every defect below was invisible to
+> a full-suite pass and was found only by a reviewer constructing an input the RED tests did not contain.
+> The plan's principle 5 ("every gate must be provably able to fail") is necessary but not sufficient —
+> the gates here *could* fail; they simply did not describe the state space.
+
+#### D.2.1 — The atomicity fix was implemented as clone-and-swap, and that is a data-loss bug
+
+The first implementation made `applyVerticesUntraced` `cloneDeep` the whole `hashGraph`, `states` and
+`finalityStore`, **rebind those three instance fields to the clones**, run the batch against the clones,
+and copy back on success. Three defects follow, all reproduced by execution:
+
+- **A local operation issued during an in-flight merge is silently lost *after being gossiped*.** Async
+  blueprint methods are a supported feature (`packages/node/tests/async-drp.test.ts`), so a merge parks on
+  `await` while the instance fields point at clones. A concurrent local `drp.method()` runs through
+  `callFnPipeline`, which is **not staged**: its vertex lands in the *staged clone*, but it mutates the
+  *live proxy* and fires `_notify("callFn")`, on which `handlers.ts:504-529` signs and broadcasts. When the
+  merge rejects, the clone is discarded — the vertex is gone from the local graph while the live DRP still
+  shows its effect, and peers hold a vertex the originator's own graph does not. Measured:
+  `finalVertexCount=1`, `values=[7]`, one broadcast for a hash present in no graph.
+  *Scope correction (confer round):* do **not** claim the vertex is permanently unreproducible. The origin
+  cannot regenerate it from its own graph, but a peer that received the signed bytes may redeliver it. The
+  confirmed harms are the torn window (live proxy shows an effect the graph lacks), the broadcast of a
+  phantom hash, and **silent unreported loss** — all three stand without the permanence claim.
+- **Two overlapping `applyVertices` calls cross-wire the staged and live references.** A fast valid merge
+  overlapping a slow failing one resolved `{applied:true}`, fired its `merge` notification, showed its
+  value on the live DRP — and its vertex was in **no** hashgraph and no state store. Separately, after two
+  concurrent merges the applier's `hashGraph`/`states`/`finalityStore` are no longer the object identities
+  the `DRPObject` holds: the identity invariant forks permanently (20/20 stress runs). The
+  `replaceEnumerableState` copy-back does **not** repair this — an overlapping merge captures the *other
+  merge's clone* as its "live" reference.
+- **Cost: the clone is O(retained graph + snapshot bytes + finality entries) per merge, and gossip
+  delivers ~1 vertex per UPDATE** (`drp-applier.ts:683` notifies a single vertex; `handlers.ts:511-519`
+  broadcasts exactly that). Measured single-vertex merge: **3.90 ms at V=200, 32.20 ms at V=1000,
+  112.18 ms at V=3000**; building 3,000 vertices one-merge-at-a-time took 117 s wall.
+  Three points and code inspection together establish the **complexity class**, not a fitted curve. At the
+  measured slope (~0.037 ms/vertex) a one-vertex batch at 100k vertices is **~3.7 s**, not the ~200 ms
+  first written here — an arithmetic error caught independently by all three confer agents, and the
+  correction makes the mechanism *worse* than originally recorded. The 50 ms crossing near V≈1400–1500 is
+  **interpolation, not a measured p99** — no latency distribution was sampled.
+  *Methodology debt:* this benchmark was run ad hoc by reviewers and no script, hardware profile or
+  distribution was committed. Before any of these numbers is used as a **gate** rather than as evidence for
+  a design decision, it must be re-run from a checked-in harness under the `perf-contracts.test.ts`
+  probe-counter pattern. Recorded as owed, not done.
+
+The last point is a **plan-level** finding, not just a code one: it adds a wall that §Phase 1's *Measured
+wall order* table does not list. Recorded in **D.3**, which is also the amendment those measurements
+produced.
+
+#### D.2.2 — The L5 pre-dispatch check walks the whole prototype chain
+
+`typeof drp[method] === "function"` is true for `Object.prototype` members. `opType: "constructor"`
+therefore passes the check, and `Reflect.apply` then throws an **untyped** `TypeError: Class constructor …
+cannot be invoked without 'new'` — not a `DeterministicRejectionError`, so the whole batch is rethrown, the
+valid vertex batched with it is lost, the hostile vertex is never marked invalid, and **every redelivery
+wedges again**. That is precisely the batch-wide DoS L5 existed to close, one word away from the tested
+input.
+
+The correction must respect slice **0i**: `toString` and `hasOwnProperty` **execute and are admitted today**
+(verified: `{applied:true}`, junk in graph), so the legacy plane must keep admitting them as no-ops or
+patched peers permanently exclude a vertex unpatched peers include. Only currently-**throwing** opTypes
+(`constructor`) may become terminal — equal exclusion on both sides, so no fork. A blanket allowlist here
+would be a legacy-plane fork disguised as hardening.
+
+#### D.2.3 — Smaller confirmed findings
+
+- The live `drp`/`acl` proxies and `checkpoints` are mutated **inside** the try block, before the three
+  stores are committed. A throw in that window (e.g. from `advanceCheckpointIfNeeded`) leaves live state
+  advanced while the stores roll back. Narrow, but the batch is then not atomic across all observable
+  surfaces — and `merge-atomicity.test.ts` asserts only `vertices` and `getStates`, so it cannot see it.
+- `REPLICA_LOCAL_STATE_KEYS = new Set(["context"])` in `state.ts` is unexported and a name compare. It is
+  applied consistently at the single snapshot funnel (`stateFromDRP`), so it is correct as far as it goes,
+  but a renamed field or a subclass alias silently reopens L2. Export and document it as the contract.
+- `replaceEnumerableState` deletes through the live proxy; a DRP with a non-configurable own accessor
+  absent from canonical state would make `delete` throw mid-adoption, after staged work and before commit
+  — a deterministic failure classified as transient, i.e. a permanent merge wedge. *(Inference, not
+  probed.)*
+- **Non-finding, so it is not re-litigated:** the `DRPProxy` has no `deleteProperty` trap, so
+  delete-then-restore adoption does **not** mint spurious vertices or trip `hasChanges()`. Vertex bytes,
+  `computeHash` and the wire format are untouched; L2's byte change is replica-local by design, and
+  `FinalityState.data` is the vertex hash, never state bytes, so attestations cannot split across versions.
+  A patched and an unpatched peer diverge on live key sets and stored `DRPState` bytes, **not** on frontier
+  membership — the graph does not fork during a rolling upgrade.
+
+#### D.2.4 — Process notes that will repeat every phase
+
+- **Three of the four reviewers wrote and executed probe programs**; the one that only read code produced
+  the weakest verdict. Budget for reviewers who run things. Probes belong in `/tmp`, never in the repo —
+  one agent left five `zzprobe-*.test.ts` files in `packages/object/tests/` mid-run, which another agent
+  then reported as suspicious activity.
+- **`pnpm vitest run` takes ~9 minutes and two concurrent runs collide** on the libp2p proptests' ports,
+  producing false failures. Reviewers must be told the verified counts up front and told not to re-run the
+  full suite; targeted `pnpm vitest run packages/object` is safe.
+- **`pnpm lint` reports 176 warnings at baseline, all `jsdoc/*`.** The summary line "N problems potentially
+  fixable with --fix" is a *subset* count, not the total — reading it as the total produces a phantom
+  regression report.
+- **When a contract is superseded, EVERY spec written under it must be re-qualified — this is now a
+  three-time failure.** Round 3's GREEN half returned BLOCKED twice, both times correctly, both times on an
+  orchestration error rather than a code problem:
+  1. The four `merge-concurrency` regression pins hard-coded baseline's *reject* behaviour as a "positive
+     control", which is unsatisfiable alongside the inverted `merge-atomicity`. **A regression pin must
+     assert the invariant, never the old semantics.** Fixed by replacing `rejects.toThrow(...)` with a
+     helper accepting either a rejection *or* a resolution reporting the vertex in `quarantined`.
+  2. `merge-rollback-completeness.test.ts`, authored in the previous cycle under the batch-scoped contract,
+     still demanded whole-batch restoration — including *forgetting a deterministic invalidity* and undoing
+     a valid ACL grant. It was never re-qualified when D.3(b) superseded that contract.
+  The rule: **when an amendment supersedes a contract, enumerate every spec authored under it and re-qualify
+  each one in the same pass.** A superseded spec is indistinguishable from a live one at read time, and it
+  will block or silently mis-steer the next slice.
+- **An agent that refuses is doing its job.** The remediation's first GREEN run returned BLOCKED rather
+  than edit an immutable test, having found that the requirement it was given (a mutex over both the merge
+  and local-call paths) contradicted the RED tests' own orchestration — and, more importantly, would make
+  synchronous local DRP calls asynchronous, a breaking API change outside the slice. The block was correct
+  and produced a strictly better design (journal into the live stores, no lock). Instruct implementation
+  agents to stop and escalate on a contradiction, and treat a BLOCKED verdict as a result, not a failure.
+
+---
+
+## Appendix D.3 — Approved plan amendments
+
+Each amendment below was put to an **Opus-high agent, a Codex-high agent and a Kimi agent at 100 reasoning
+steps** independently, per this project's standing rule that the plan changes only on unanimous agreement.
+Their replacement wordings are merged here. Where they differed, the most conservative claim wins — the
+one that asserts least about what was measured.
+
+**Vote record.** (a) Kimi AGREE, Opus AGREE-with-rewording, Codex DISAGREE-with-rewording — but Codex's
+objection is to the wording's overreach and to mandating one named mechanism, not to recording the wall
+("the wall belongs in Phase 1 because it exists in the current codebase"). The substance is unanimous and
+the merged text below adopts Codex's narrowing. (b) unanimous AGREE. (c) unanimous AGREE, with a scope
+split only Opus raised, adopted below.
+
+### D.3(a) — The staging wall, and a bound rather than a mechanism
+
+**Add to §Phase 1's *Measured wall order* table:**
+
+| Wall | Complexity | Approx. failure point | Slice |
+|---|---|---|---|
+| Whole-container clone per merge (staging-by-copy — introduced by the first L3 fix, **not** baseline) | O(retained graph + snapshot bytes + finality entries) per `applyVertices` | 112 ms measured for a 1-vertex merge at V=3000; ~3.7 s at V=100k at the measured slope; 50 ms crossing near V≈1400 by interpolation, p99 not sampled | Phase 0 staging slice — forbidden mechanism, see below |
+
+**Add as normative text to Phase 0:**
+
+> Merge staging MUST cost O(the batch's write set) — the mutations actually performed — never O(retained
+> history). **(D.7.4 correction: the original text also said "or O(stateSize)". That leg was a drafting
+> error — it condemns the unmodified baseline, whose per-vertex `fromStates`/`stateFromDRP` clones slice 1d
+> exists to remove — and is superseded by D.7.4. The O(retained-history) clause stays absolute.)** Copying any whole container (`hashGraph`, `states`, `finalityStore`) or
+> rebinding the applier's store fields to copies is forbidden in shipping code on the merge/ingest hot
+> path. The prohibition rests on two independent legs: the copy reintroduces the per-message O(V) class
+> that slices 1a/1b/1d exist to delete, and rebinding owner-store identities is independently a data-loss
+> bug under concurrent local calls (D.2.1). **The bound and the identity invariant are the requirement;
+> the mechanism is not.** A scoped write-set journal with undo, a persistent/immutable overlay, or a
+> versioned CAS transaction all satisfy it. Whole-container copies remain acceptable in tests and
+> prototypes, and per-epoch snapshot copies outside the per-message path (Phase 4) are exempt.
+> Object smallness is not an exemption: object size is monotone in room lifetime, so an exemption keyed on
+> it is exactly how the wall re-enters.
+> **Gate (principle 4):** per-merge time ratio(100k/10k) < 1.5 measured with the `perf-contracts.test.ts`
+> probe-counter pattern, plus an assertion that the store identities `DRPObject` holds are unchanged after
+> every merge.
+
+**Add as a process guard to §Phase 1:** any slice that introduces a per-message O(V) or O(stateSize) cost
+term must add a row to this table before it merges. This table implicitly assumed fixes only remove walls;
+step 1 added the largest one yet measured.
+
+### D.3(b) — Atomicity is per-vertex, not per-batch; 0h supersedes the step-1 contract
+
+> The unit of atomicity in the legacy applier is **one vertex across every observable surface** — hashgraph,
+> state snapshots, finality store, live proxy, checkpoints, and subscriber notification: fully applied, or
+> no trace. A batch is network framing chosen by the sender (`handlers.ts:248-260` passes an arbitrary
+> authenticated `Update.vertices` array to `merge`), and **any dependency-closed subset of a causal DAG is
+> a valid replica state**, so batch-scoped all-or-nothing adds no safety while handing its blast radius to
+> an untrusted peer. It also makes a valid vertex's fate depend on what it was batched with — arrival-order
+> dependence, which is precisely what 0o's envelope-purity rule forbids. The current code is already
+> internally inconsistent about this: validation failures are isolated per vertex and the loops continue
+> past them; only blueprint throws abort the batch.
+>
+> Application-code failures are classified per vertex per 0h — deterministic → `invalid`; possibly-transient
+> → bounded-retry quarantine, retriable, **never** entered into the shared remembered-invalid set (replicas
+> may legitimately disagree about transients, so sharing them is a legacy-plane fork vector) and never
+> batch-fatal. `applyVertices` resolves with an accurate per-vertex `ApplyResult`; it rejects only on
+> applier-internal invariant violations, where the staged batch rolls back wholesale as a last-resort error
+> path.
+>
+> When 0h lands, `merge-atomicity.test.ts`'s batch-level contract is **inverted**, not extended — the same
+> device the plan already uses at 0c for `drpobject.test.ts:460-521`. Its real content (a rejected vertex
+> commits nothing and leaves no state snapshots) survives inversion; only the batch scope dies. Until then,
+> abort-the-whole-batch is a live batch-wide DoS, so **0h is a hard dependency of shipping any staged-merge
+> work**, not an independent later slice.
+>
+> **Record the error plainly:** writing the batch-level contract in step 1 was a mistake. L3's actual defect
+> was the *torn report* — partial commit plus a rejected promise — not partial commit as such, and the
+> integration plan's own L4 entry had already specified a typed **per-vertex** rejection.
+
+**Consequence the plan did not state:** a rejecting `applyVertices` is itself a liveness bug. `updateHandler`
+reaches `recoverMissingSync` only when merge *resolves* (`handlers.ts:260,295-297`) and the fanout loop
+swallows handler rejections, so a rejecting merge silently disables missing-dependency recovery for that
+message — independent of atomicity semantics.
+
+### D.3(c) — 0g's serialization half is a hard prerequisite of staging
+
+> Any staged or atomic merge design requires single-object mutation serialization covering **both**
+> `applyVertices` and the local `callFn` pipeline, which share the applier's store bindings. **0g's
+> serialization half is a hard prerequisite of the staging slice; its authenticated-sequence half is not.**
+> That split matters: 0g is classed local-safe, but 0o delivers the same per-`(objectId, author)` *signed*
+> sequence numbers as consensus-v2 — a signed gapless sequence is preimage- and wire-visible and cannot
+> land on the legacy plane under principle 3, so binding staging to it would block legacy work on a v2
+> feature. Split 0g's row accordingly; the two rows contradict each other on classification today.
+>
+> Execution MAY be queued, or performed concurrently in isolated versioned transactions with CAS/retry;
+> the normative requirements are that no staged transaction rebinds owner stores or exposes a mutation
+> before commit, and that all commits and subscriber publication share one linearization point. A design
+> that holds a lock across a blueprint `await` MUST state and test its local-write latency policy; the lock
+> MUST NOT be held across network waits or 0h's quarantine backoff. With the D.3(a) journal formulation the
+> tension largely dissolves — only the synchronous commit section needs exclusion, so local-write latency
+> behind a merge shrinks from "the whole async merge" to "one O(batch) commit."
+>
+> **Gate additions to 0g:** (i) an interleaving test — a local `drp.method()` issued while a merge is parked
+> on an async blueprint `await`, exercised for both merge-commit and merge-reject — asserting *"no vertex
+> exposed to subscribers may be absent from the committed graph"*; (ii) two overlapping `applyVertices`
+> calls under randomized schedules, asserting the store identities held by `DRPObject` and by the applier
+> remain the same objects after every schedule. The existing concurrent-local-call sequence test is
+> retained but is **not** sufficient — it never exercises a local call against an in-flight merge, which is
+> the interleaving that sank step 1.
+>
+> **Record the API cost explicitly:** serializing the local path makes a currently-synchronous local call on
+> a synchronous blueprint conditionally asynchronous (`proxy.ts:269-271` returns synchronously today, and
+> `drpobject.test.ts`'s `DRP Context tests` assert on the next line). That is an API-visible decision and
+> must be taken deliberately, not as a side effect of a lock.
+
+### D.3(d) — Consequential corrections elsewhere in this plan
+
+- **No Phase 0 slice owns the staging work.** L1/L2 map to 0c and L4/L5 to 0h/0i/0l, but "merge batches are
+  not atomic" has no slice row — hence no class, no argued atomicity, and no plan-defined RED contract. That
+  vacuum is where the wrong batch-level semantics were invented. Add an explicit slice (fold into 0h or add
+  0q): class local-safe, atomic, with D.3(b)'s and D.3(c)'s contracts as its RED tests.
+- **Slice 1d's gate cannot see this class of regression.** 1d instruments state bytes only
+  (`clonedBytes < 20 × mutatedBytes`), so a whole-graph and whole-finality-store clone ships straight
+  through it. Extend 1d's instrumentation to clone bytes/calls across all three stores, or explicitly
+  delegate that to D.3(a)'s gate.
+- **Principle 7 under-specifies the atomic unit.** It names "staged state-adoption semantics" as atomic
+  without defining the observable boundary. It must include the owner-store identity invariant and the
+  publish-after-commit rule, and name every surface: graph, states, finality, live proxies, checkpoints,
+  `knownInvalidVertexHashes`.
+- **Phase 0's goal statement omits atomic publication.** Add: each vertex transition is atomic across graph,
+  snapshots, finality, live state, checkpoints and notifications; 0g's serialization half and 0h are hard
+  prerequisites of shipping legacy staging.
+- **Phase 0's exit gate has no concurrency gate.** The only tests characterising step 1's actual failure
+  mode are the reviewer-added concurrency suites. Until D.3(c)'s gate additions land, "Phase 0 green" is
+  asserted by a suite that does not exercise the defect class that sank step 1.
+- **Appendix A's "§12.6 expensive replay / cloning / conflict processing — Covered" is false** while any
+  merge copies retained stores. Change to **"Open until atomic-apply staging is history-independent"** and
+  cite 0g/0h plus 1d.
+- **The poison vertex wedges forever, and that is a separate defect from the batch abort.** On rejection the
+  `finally` restores `knownInvalidVertexHashes`, so the poison vertex is never remembered invalid and is
+  re-served indefinitely. "Discards the entire batch on every redelivery" is accurate for any batch
+  *containing* the poison vertex; a good vertex that later arrives in a clean batch does apply.
+
+---
+
+## Appendix D.4 — Round 2: the **batch-scoped rollback** is a regression, and why
+
+> **Title correction (confer round 2, unanimous):** the regression is *batch scope*, not journaling. A
+> vertex-scoped journal on live stores is exactly the shape the approved design now requires. Titling this
+> "the journal is a regression" would invite the next iteration to abandon journals and return to whole-
+> container copies, reintroducing the D.3(a) wall.
+
+The D.2.1 clone-and-swap staging was replaced with a scoped LIFO undo journal applied directly to the
+**live** stores, with `hashGraph`/`states`/`finalityStore` made `readonly`. The suite went to 1354 passed /
+0 failed. Three independent reviewers (Grok-4.5, Kimi-K3 at 100 steps, Opus-xhigh adversarial) again
+returned **DO-NOT-SHIP**, this time with an A/B against the baseline commit proving a **regression**.
+
+### D.4.1 — What the remediation did fix (verified, keep it)
+
+- **The whole-container clone wall is gone** — *not* the same as history-independence, see the residual
+  term below. Independently re-measured single-vertex merge: **flat at
+  ~0.20 ms from V=200 through V=6000**. The implementer's reported *decreasing* curve (0.51 → 0.41 → 0.27)
+  is a warm-up and checkpoint-window artifact and is not reproducible as a trend; the V-independence is
+  real on both single-dep and multi-dep paths. One residual term found: `pruneSnapshots` does
+  `Array.from(this.hashGraph.vertices.keys())` once per checkpoint advance — amortized O(V/256) per merge.
+- **The store-identity invariant of D.3(a) holds.** `readonly` fields, never rebound.
+- **Both of the round-1 blockers are closed.** A local `callFn` during an in-flight merge now retains its
+  vertex. The clone-and-swap calls are gone; the only `cloneDeep` calls remaining *in `drp-applier.ts`* are
+  payload and argument isolation. (`state.ts` still has seven, for snapshot creation and state restoration —
+  the earlier claim that only two survive repo-wide was wrong.)
+- **G4's dispatch-surface classification is correct: zero success→terminal transitions on a 23-case
+  battery.** (A finite battery, so not a universal no-fork proof.) Run against
+  *both* trees shows **zero** success→terminal transitions: `toString`, `valueOf`, `hasOwnProperty`,
+  `isPrototypeOf`, `propertyIsEnumerable`, `toLocaleString`, `__lookupGetter__` and 2-deep base-class
+  methods stay APPLIED; `constructor`, `call`, `apply`, `bind`, `__proto__`, `__defineGetter__` with junk
+  args and unknown names move from *untyped throw / batch abort* to *per-vertex invalid*; a throw from a
+  base class two levels up stays transient. Slice 0i's legacy-parity requirement is satisfied.
+
+### D.4.2 — Why it is nevertheless a regression
+
+The differentiator is **removal of already-committed vertices**, not "writes to live state" — clone-and-swap
+also wrote to live state at adoption (`Object.assign(this.drp, …)` at baseline `:271-276`). Three schedules,
+all executed, all A/B'd against
+`7f9e66a`:
+
+1. **Rollback deletes a vertex a concurrently committed transaction already built on.** Batch = `[A, B]`;
+   A commits, B parks on an async blueprint and throws; meanwhile a local call (or a second peer's merge)
+   commits a child of A and gossips it. Rollback removes A. Result: the child survives with a missing
+   parent, `forwardEdges[A]` is retained while `vertices[A]` is gone, `topologicalSort` reports members
+   unreachable from origin, and **every subsequent `applyVertices` throws `No valid linearization
+   checkpoint` forever**. At `7f9e66a` the identical schedule leaves a consistent graph and the next merge
+   resolves.
+2. **`removeVertex` restores too little.** A now-childless head is dropped from the frontier entirely when
+   both its `previous` and `next` anchors were consumed by concurrent commits and `wasFirst` is false: the
+   guard deletes the hash from `restorableDependencies` before attempting restoration, so all three
+   branches fall through and the trailing re-insert loop can no longer see it. The vertex stays in the
+   graph, childless, off the frontier, and **its operation vanishes from live state while the merge
+   reports `applied: true`.** Silent permanent divergence.
+3. **Same-hash race across overlapping batches.** The presence check (`vertices.has`) is TOCTOU across an
+   `await` and insertion is the last pipeline step, so two batches carrying the same hash as distinct
+   decoded `Vertex` instances both pass. The winner commits and notifies — at which point the node **may already have** signed and
+   broadcast a finality attestation (`signFinalityVertices` runs in `updateHandler` after merge resolves,
+   `handlers.ts:274-292`, and races the loser's rollback; the probes ran at the applier layer) — and the loser's rollback matches on its *own* instance and deletes
+   it, orphaning the state snapshot, the finality entry and the live-state effect. (A related pre-existing
+   variant double-inserts, producing duplicate frontier entries and therefore duplicate `dependencies` in
+   the next locally created vertex's signed bytes — a consensus-visible surface no test covers.)
+
+**Verdict on the trade:** strictly worse **as implemented at batch scope** — this is a verdict on scope, not
+on journaling. Clone-and-swap confined its damage to a
+discarded copy and its failure mode — a lost vertex — was recoverable by redelivery. Batch-scoped rollback
+removes already-committed vertices from the live graph, breaks the graph's own reachability invariant, and
+leaves ordinary subsequent applies **wedged until an explicit repairing delivery** — a peer redelivering the
+deleted vertex can restore reachability, but nothing in `handlers.ts` guarantees one, since
+`recoverMissingSync` fires only for `missing` and a rejecting merge never reaches it.
+
+### D.4.3 — The root cause is the batch-scoped contract this plan had already rejected
+
+**Blockers 1 and 2 are consequences of batch-scoped rollback and vanish under per-vertex atomicity — because
+there is nothing to roll back once a vertex commits.** Blocker 3 does **not** vanish: the same-hash TOCTOU
+degrades into a blind double-insert (`HashGraph.addVertex` does an unconditional `vertices.set` plus
+`frontier.push`) unless the commit section re-checks presence. Per-vertex scope kills the rollback-induced
+corruption; the TOCTOU needs an explicit commit-time re-check. D.3(b) recorded, before this code was written, that batch-scoped all-or-nothing "adds no safety
+while handing its blast radius to an untrusted peer" and that "writing the batch-level contract in step 1
+was a mistake."
+
+It was then implemented anyway, and hardened. The plan was right and the implementation did not follow it.
+That is the finding: **an approved amendment is not self-executing.** D.3(b)'s conclusion needs to become
+the RED contract of the next slice — `merge-atomicity.test.ts` inverted — rather than a paragraph the next
+implementation prompt has to remember to honour.
+
+**D.3(c)'s optimistic clause is falsified by execution.** It reads: *"with the D.3(a) journal formulation
+the tension largely dissolves — only the synchronous commit section needs exclusion."* The opposite is
+true: the journal makes the unserialized case **worse** than clone-and-swap, because rollback reaches into
+the single live copy that concurrent transactions have already built on. Striking that clause is queued for
+the three-way confer; until then treat 0g's serialization half as an unconditional prerequisite.
+
+### D.4.4 — L6: a live-correctness hole larger than L1–L5, with no owner
+
+`advanceCheckpointIfNeeded` is reachable **un-journaled** from `getLCA`'s local branch, and it bakes
+`stateFromDRP(live)` against `hashGraph.getFrontier()` — two sources that are out of sync for the entire
+duration of any merge, because `applyVertexPipeline` has no `assign` step and the live proxies stay stale
+for the whole batch. A local call during an in-flight merge therefore writes a checkpoint whose `frontier`
+includes merge-committed vertices but whose `state` is the pre-merge live state.
+
+At the **default** `TS_DRP_CHECKPOINT_SUFFIX_SIZE=256`, a 256-append batch plus one parking vertex and one
+interleaved local call produces: `MERGE-RESULT {"applied":true}`, live state length **2** against a
+reference replica's **258** — *256 applied operations silently erased, with the merge reporting success.*
+Independently reproduced by a second reviewer at suffix size 1. The same call also runs
+`pruneSnapshots(undefined)`, permanently deleting snapshots an in-flight batch staged.
+
+This reproduces identically at `7f9e66a`, so it is **pre-existing, not a regression** — but D.2 lists
+L1–L5 and no slice owned it. It has a **larger blast radius at default config than any of L1–L5's repros**
+(comparative severity across the full class was not measured). Owner assigned in D.5: slice **0q**.
+
+### D.4.5 — Process findings
+
+- **"RED" must be verified against the baseline SHA, not against the current working tree.**
+  `merge-concurrency.test.ts` — the suite written specifically to characterise the failure that sank
+  step 1 — **passes unmodified at `7f9e66a`**. It was red only against the intermediate clone-and-swap
+  code. So the one suite naming the concurrency defect class cannot distinguish the journal from doing
+  nothing, and it passes on every schedule in D.4.2. *New rule: every new RED file is executed against the
+  baseline commit in a throwaway worktree and its failure count recorded in D.1 before the GREEN half
+  starts.*
+- **A reviewer that A/B's against baseline finds regressions a reviewer that only reads the diff cannot.**
+  The "strictly worse" verdict required running the same probe on both trees. Budget for it.
+- **Reviewers must be told to use a git worktree, never `git stash`,** when they need a baseline
+  comparison — several reviewers share one working tree concurrently.
+- **D.2.3's third bullet is upgraded from inference to verified, with a correction:** the wedge is a
+  non-writable **data** property, not a non-configurable accessor (accessors adopt fine), and it is
+  pre-existing at `7f9e66a` rather than introduced by `replaceEnumerableState`.
+- **Arrow-function class fields are silently unusable as DRP operations** — own function properties never
+  survive `Object.create(prototype)` + `applyState`, because `stateFromDRP` skips functions. Pre-existing
+  and identical at baseline, but uncovered by any test and undocumented.
+
+---
+
+## Appendix D.5 — Confer round 2: approved amendments
+
+Same rule as D.3: an Opus-high agent, a Codex-high agent and a Kimi agent at 100 reasoning steps each
+answered independently; the plan changes only on agreement. Where they differed the most conservative
+claim wins.
+
+**Vote record.** (f) Opus AGREE-but-scope-it, Codex DISAGREE-scope-it, Kimi DISAGREE-scope-it — unanimous
+on the substance: *scope the clause, do not strike it.* (g) unanimous AGREE, with a shared correction to
+the question's own premise. (h) unanimous AGREE with a scope qualifier.
+
+### D.5(f) — Serialization depends on **rollback scope**, not on the data structure
+
+D.3(c)'s optimistic clause is **not** struck. It is scoped. All three agents independently reached the same
+conclusion, and the adversarial reviewer who wrote D.4 retracted its own framing: *"my 'strictly worse'
+verdict was a verdict on batch scope with dirty writes, not on journaling."*
+
+> **Executed finding (D.4.2), correctly scoped.** A rollback journal over the live stores does not dissolve
+> the serialization tension **at batch scope** — it inverts it, because the journal keeps undo authority
+> alive across a suspension point, and rollback then reaches vertices that concurrent transactions have
+> already committed on top of.
+>
+> **Any transaction whose rollback authority survives a suspension point MUST serialize, or use versioned
+> CAS/retry, across both `applyVertices` and the local `callFn` path.**
+>
+> **A per-vertex design is exempt, and the exemption is as normative as the mandate.** If every shared-store
+> write for a vertex — snapshot, finality entry, graph insert, live-proxy update, checkpoint — occurs inside
+> one synchronous commit section after that vertex's last suspension point, then it cannot roll back across
+> a suspension point; the single-threaded runtime supplies that section's exclusion for free. Such a design
+> **MUST NOT** adopt the `callFn` lock as a precaution: the lock's only effect would be to make
+> currently-synchronous `drp.method()` calls asynchronous (`proxy.ts:269-271`), an API break that buys
+> nothing. It owes two things instead:
+>   1. **A structural gate** — no journal entry and no shared-store mutation is live across any `await`.
+>   2. **Commit-time revalidation** — the vertex-presence check re-executed inside the synchronous section.
+>      The loop-top check is TOCTOU-separated from the insert by the blueprint `await`, and
+>      `HashGraph.addVertex` blind-inserts (unconditional `vertices.set` + `frontier.push`), so two
+>      overlapping batches carrying one hash both insert and duplicate the frontier — which lands in the
+>      `dependencies` of the next locally signed vertex, i.e. in consensus-visible bytes.
+>
+> If an implementation moves any shared write ahead of the last suspension point, it re-enters the mandated
+> class and the serialization requirement re-binds.
+>
+> **The live-proxy surface is the one genuine exception, and it needs no rollback to break.** Live state is
+> a function of the whole committed prefix and its adoption base is captured *before* the `await`, so a
+> plain replace-at-commit erases concurrently committed operations with no rollback involved at all. For
+> that surface the implementation MUST choose and record one of: (a) recompute adoption against a
+> commit-time-consistent base inside the synchronous section (possible only if that replay is await-free),
+> or (b) adopt by CAS/retry on the frontier. Serialization is the fallback for this one surface, not an
+> unconditional prerequisite for the design.
+
+**Consequential edit to D.3(b)** — this sentence licensed exactly what round 2 built and is replaced:
+~~"where the staged batch rolls back wholesale as a last-resort error path"~~ →
+**"where the in-flight vertex's uncommitted writes are undone as a last-resort error path; already-committed
+vertices are never removed, and the error carries the exact partial `ApplyResult`."**
+
+**Consequential edit to D.3(c)'s headline** — "Any staged or atomic merge design requires single-object
+mutation serialization…" is over-broad by the same argument, and must be conditioned on suspension-spanning
+rollback, or it silently mandates the async API break for the per-vertex slice.
+
+**Consequential edit to D.3(d)** — "0g's serialization half is a hard prerequisite" is scoped the same way.
+0h remains required for per-vertex failure isolation; serialization is required only where rollback or an
+unvalidated transaction spans a suspension.
+
+### D.5(g) — L6's owner is the per-vertex slice **0q**, and it does not dissolve for free
+
+The question's own premise — "the per-vertex slice will fix L6 for free by adding the missing `assign`
+step" — was rejected by all three agents on the code. `assign` writes `currentDRP`, the *vertex's branch
+state*, which is correct on the local path only because a locally created vertex's dependencies default to
+the entire frontier. For a remote vertex concurrent with the frontier, live state must be the frontier
+linearization. **Transplanting `assign` relocates the erase rather than removing it** — same failure shape
+at vertex granularity — and D.3(c)'s gate (i) would still pass, because it asserts graph membership rather
+than live-state equality. That is the same blind spot that kept `merge-concurrency.test.ts` green at
+baseline.
+
+L6 is therefore a named contract *inside* 0q, not a standalone slice — a standalone fix against
+batch-scoped code would be throwaway work. **The Phase 0 slice table row is added in D.5(k) below.**
+
+### D.5(h) — The baseline-RED rule, scoped
+
+Appended to §1 principle 5:
+
+> **Baseline-RED rule (D.4.5).** A RED spec is evidence only as a pair *(baseline, current)*. Before its
+> GREEN half begins, every new RED spec file is executed against the baseline SHA recorded in D.1, in a
+> throwaway git worktree (**never** `git stash` — reviewers share one working tree), and the pair is
+> recorded alongside D.1 **together with the text of the failing assertion**. A bare count is satisfiable by
+> a broken harness.
+> - `FAIL/FAIL` on the asserted contract — a genuine RED contract.
+> - `PASS/FAIL` — a **regression pin**, naming a range that must not ship.
+> - `PASS/PASS` — **not a gate**; strengthen or delete it before it counts toward any exit gate.
+> - `FAIL/PASS` — already green; not RED for this slice.
+>
+> *Scope qualifier:* the baseline leg binds only where the subject code exists at baseline (the legacy
+> plane). For code with no baseline ancestor — `protocol-v2`, `seal`, `storage-browser`, `compaction`,
+> `worker-host`, `ephemeral` — a baseline run fails on module resolution, and **an import error is not a
+> RED**. There the obligation becomes: run the spec before the implementation exists and record that it
+> fails on the asserted contract, not on a harness error. Principle 5's mutation probe is complementary,
+> not a substitute — `merge-concurrency.test.ts` had probe-able assertions and still pinned the wrong tree.
+
+### D.5(i) — Round-1 amendments that were recorded but never applied to the plan body
+
+D.4.3's finding — *"an approved amendment is not self-executing"* — turned out to apply to this document
+itself. D.3(d) ordered five body edits in confer round 1 and **none of them had been made**: no `0q` row
+existed, Appendix A still read "Covered, and this is where v2 is strongest", and Phase 0's goal statement,
+principle 7 and the Phase 1 wall table were unchanged. They are applied in D.5(k), and the process rule is:
+**an approved amendment is not closed until the body edit is in the file**, checked in the same pass that
+approves it.
+
+### D.5(j) — Residual O(V) term, and the process guard applied to ourselves
+
+D.3(a) requires that any slice introducing a per-message O(V) term add a row to the Phase 1 wall table.
+D.4.1 found such a term and did not add the row. `pruneSnapshots` does
+`Array.from(this.hashGraph.vertices.keys())` (`drp-applier.ts:753`, present verbatim at baseline) — an O(V)
+burst per checkpoint advance, amortized O(V/256) per merge. Independently confirmed by two agents. The row
+is added in D.5(k), marked pre-existing-at-baseline. **"Merge staging MUST cost O(the batch's write set)"
+is not yet met** while that scan exists; removal needs an owner before atomic apply may be called
+history-independent.
+
+### D.5(k) — The body edits (applied)
+
+1. **Phase 0 slice table** gains slice **0q** — see the table row inserted into Phase 0.
+2. **Phase 1 *Measured wall order*** gains two rows: the staging-by-copy wall (D.3(a)) and the
+   `pruneSnapshots` key-materialization burst (D.5(j)).
+3. **Appendix A**'s §12.6 entry changes to *"Open until atomic-apply staging is history-independent."*
+4. **Phase 0's goal statement** gains atomic publication.
+5. **Principle 7** gains the observable boundary of the atomic unit.
+6. **Principle 5** gains the baseline-RED rule (D.5(h)).
+7. **D.1** gains a baseline-RED ledger for per-spec `(baseline, current, failing assertion)` rows.
+
+
+---
+
+## Appendix D.6 — Round 3: the per-vertex adoption cost wall (**RESOLVED — see D.7**)
+
+Slice 0q (per-vertex atomicity) was implemented. *(Correction, confer round 3: the claim below that
+**every** safety invariant held was **wrong** — the commit cleared its journal before `_notify`, and the
+caller then awaited and notified afterwards, so another transaction could interleave at that await and a
+throwing subscriber left a vertex committed but reported as `quarantined`. Fixed in D.7 as F5.)*
+The invariants that did hold: S1 (no committed
+vertex is ever removed), S2 (all shared-store writes inside one synchronous commit section after the
+vertex's last suspension point, journal never live across an `await`), S3 (presence + frontier CAS
+re-checked inside that section), S5/S6 (`quarantined`, resolve-not-reject), and a bounded retry with a
+typed `AdoptionCommitExhaustedError`. All seven contract specs pass individually, including the L6
+checkpoint-interleaving contract (live state 258 vs 258 — the 256-operation silent erasure of D.4.4 is
+closed).
+
+It still cannot ship, on cost.
+
+### D.6.1 — The measurement
+
+Idle machine, single-vertex `applyVertices` onto a **linear** chain:
+
+| N | per-vertex |
+|---:|---:|
+| 100 | 0.114 ms |
+| 200 | 0.045 ms |
+| 400 | 0.037 ms |
+| 800 | 0.033 ms |
+
+Flat, no history scaling — the fast path works. But `packages/object/tests/incremental-linearize.test.ts`
+block **"C. late deep concurrency checkpoint parity"** never terminates (>560 s; a per-test timeout cannot
+interrupt it because the work is synchronous). That file is pre-existing and unmodified, so it is a true
+regression signal.
+
+### D.6.2 — Why: one fork makes the slow path permanent
+
+The fast path fires only when the arriving vertex depends on **every** frontier member. Test C builds a
+5,000-vertex chain, forks a branch at depth 97, then applies the remaining ~4,900 vertices. The branch tip
+stays on the frontier forever, so every later vertex fails the predicate and takes the slow path — an
+unbounded ancestor DFS plus a checkpoint replay plus a full state reconstruction, **per vertex**.
+**Ω(V³)** — corrected in D.7.6; with a custom resolver each vertex additionally runs an O(n²) pair scan
+and an O(n²/32)-word causality-matrix build over the whole-history subgraph.
+
+**One concurrent write puts the engine into the slow path for the rest of the object's life**, and
+concurrent writes are the library's entire purpose. This is also why the pre-existing code adopted once per
+*batch*: a 5,000-vertex batch cost one linearization, not 5,000.
+
+### D.6.3 — The impossibility claim, now under review
+
+Asked to make adoption incremental, the implementing agent returned BLOCKED with an argument backed by a
+probe: a concurrent arrival **reorders already-applied operations** —
+
+```
+after B:  M1 M2 M3 B
+after M4: M1 M2 M3 M4 B      ← B moved
+```
+
+— and because DRP operations are arbitrary, state-dependent, async, non-invertible JavaScript, moving `B`
+requires an inverse journal across a suspension (violates S2/D.5(f)), a state reconstruction (violates
+D.3(a)), an unbounded suffix replay (violates D.3(a)), or a live mutation before the last `await`
+(violates S2). Its conclusion: the enabling change is a **DRP-level reversible-delta / persistent-state
+contract**, which is far outside an adoption-path fix.
+
+Corroborating findings from the same run: `linearizeVerticesWith` (`hashgraph/index.ts:291`) computes
+*order*, not an applicable state delta; the linearizer's scoped bitsets cache causality only and cannot
+reorder mutable state; and enabling the "adoption hint" fast path for custom resolvers would be **incorrect**
+for `DropLeft`/`DropRight`/`Swap`, because a causal snapshot may contain operations the canonical
+linearization dropped or ordered differently.
+
+**Under three-way review (round 3).** The candidate resolution not considered by the implementer: the engine
+stores a per-vertex state snapshot for every vertex, so a **bounded replay from the nearest still-valid
+snapshot** may make the reordered suffix tiny — one vertex in test C's shape. That costs O(stateSize) for
+the snapshot restore, which D.3(a) forbids — but the baseline **already pays** that, and plan slice **1d**
+exists precisely to remove "≈3–4 × O(stateSize) deep clones per vertex". So the proposed amendment is that
+D.3(a)'s prohibition governs **staging** (copying whole containers: hashgraph, state manager, finality
+store) and must not be read as forbidding the per-vertex state reconstruction the engine already performs
+and that 1d owns; Phase 0's binding constraint is *no O(retained history)*.
+
+That amendment is plausible **and** is exactly the shape of a rationalisation after three failed attempts,
+so it is being reviewed adversarially rather than adopted. **Status: RESOLVED — see D.7.**
+
+### D.6.4 — What is already established regardless of the outcome
+
+- Per-vertex atomicity is implementable safely; the blocker is cost, not correctness.
+- The fast-path predicate "descends from the whole frontier" is the wrong predicate — it degrades to
+  never-true after a single fork. Any future design must key on whether the arrival **reorders** the
+  existing linearization, not on frontier coverage.
+- L6 (D.4.4) is closable: the interleaving contract passes under per-vertex adoption.
+- Four consecutive BLOCKED verdicts from the implementing agent were **all correct**, and three of them
+  identified orchestration errors rather than code defects. A BLOCKED verdict is a result.
+
+
+---
+
+## Appendix D.7 — Confer round 3 and the resolution of the adoption wall
+
+Three agents (Opus-xhigh, Codex-high, Kimi-K3 at 100 steps) independently evaluated the implementer's claim
+that per-vertex live adoption is impossible without a reversible-delta `IDRP` contract.
+
+### D.7.1 — The impossibility claim: correct only in its narrow form
+
+**Unanimous:** the broad claim is false and was disproved *by execution on this tree*.
+
+- With a **conflict-free** DRP on the identical failing shape, the implementer's own incremental machinery
+  already adopts incrementally: **3,919 hinted adoptions / 1 concurrent, 378 ms for 3,920 vertices at
+  V=4,000** — no inverse journal, no suspension-spanning state, no unbounded replay.
+- A/B against baseline `7f9e66a`, MapDRP, post-fork batch: **45 / 48 / 118 ms** (baseline) versus
+  **683 / 4,390 / 35,869 ms** (then-current) at 500 / 1,000 / 2,000 vertices — ~8× per doubling, i.e.
+  **Ω(V³)**.
+
+What survives is the narrow form, and it is worth keeping as a standing constraint:
+
+> Under the current arbitrary-`IDRP` contract, **no generic algorithm can guarantee per-vertex live adoption
+> in O(batch write set) independent of history.** Bounded replay is a valid optimisation where a valid
+> materialised base and a bounded canonical edit are provable; those conditions do not hold universally.
+
+### D.7.2 — The real root cause: a checkpoint fallback, not non-invertibility
+
+Two agents converged on this independently, with live instrumentation:
+
+`MapDRP` defines `resolveConflicts`, bound into the graph at `object/src/index.ts:119-127`, so
+`hasCustomResolverDRP === true` and **both** incremental adoption paths refuse to run. Every post-fork
+vertex then falls to `getReplay`, where two guards reject **every** post-fork checkpoint:
+
+1. `dependenciesCover` required each descendant to cover **all** boundary members — a two-head checkpoint
+   `[B_tip, M_j]` can never be covered by `[B_tip, M_i]`, because `B_tip`'s ancestry never contains `M_j`.
+2. `collectSuffixSubgraph`'s causal barrier required every suffix member to be forward-reachable from
+   **every** boundary head — a childless branch tip reaches nothing.
+
+Only the **root** checkpoint passed, so the replay subgraph became the entire retained history, per vertex,
+with an O(n²) resolver pair scan over it. **Both guards are verbatim at baseline**; baseline survived only
+because it paid this once per *batch*. Confirmed live: post-fork checkpoint `vertexCount=257,
+frontierSize=2` → `dependenciesCover=false`; root checkpoint `covers=true, subgraph=303` and growing.
+
+### D.7.3 — Why the obvious fix was wrong (and the implementer's guard was right)
+
+The brief proposed "restore the stored snapshot of the last vertex whose prefix is unchanged, replay the
+reordered suffix." **Two agents rejected it, and the implementer's refusal to enable the hint path for
+custom resolvers was vindicated:**
+
+- Stored per-vertex snapshots are **causal-past states**, not canonical-linearization-prefix states.
+  `assignState` stores `stateFromDRP(currentDRP)` where `currentDRP` is the LCA-branch state. Under
+  `MapDRP` the branch key collides with ~100 main vertices and `resolveConflicts` really returns
+  `DropLeft`/`DropRight`, so a causal snapshot contains operations the canonical order drops and omits
+  effects it retains. Replaying from such a base converges to **no replica's state**.
+- **Retro-drop is real:** a late concurrent arrival was observed removing an already-applied vertex from
+  canonical position **1**. The edit point is the fork depth, not a suffix — so "bounded suffix" is the
+  wrong frame for resolver-bearing DRPs.
+- The needed base is often **pruned**: `pruneSnapshots` retains only root + checkpoint frontiers + the
+  insertion-order suffix (test B pins ≤768 of 5,000), so a snapshot near a fork is evicted within a few
+  hundred vertices.
+- **Corrected for the record:** the brief's claim that "the repo stores a per-vertex state snapshot for
+  every vertex" is false at scale, and "the suffix is a single vertex in test C" was a fixture-specific
+  observation about `MapDRP`, not a general fact.
+
+### D.7.4 — D.3(a) amendment: APPROVED (unanimous), as a correction of the letter
+
+All three agreed the "never O(stateSize)" leg is **wrong as written** — it condemns the unmodified
+baseline (slice 1d records "≈3–4 × O(stateSize) deep clones **per vertex**" as a pre-existing wall) and so
+makes every Phase 0 slice unshippable by construction. A clause cannot normatively forbid what its own plan
+schedules for removal two phases later. Adopted framing: this is a **drafting error corrected openly**, not
+a reinterpretation.
+
+> Merge staging MUST cost O(the batch's write set) — the mutations actually performed — **never
+> O(retained history)**. Copying any whole container (`hashGraph`, `states`, `finalityStore`) or rebinding
+> the applier's store fields to copies is forbidden in shipping code on the merge/ingest hot path. The
+> O(stateSize) prohibition applies to **staging** — whole-container copies and per-message full-state
+> snapshots taken to make a batch revertible — and does **not** forbid the per-vertex state reconstruction
+> the baseline pipeline already performs (slice 1d's ≈3–4 × O(stateSize) per-vertex clones, a measured
+> pre-existing wall owned by Phase 1). Per-vertex live-state adoption MAY therefore cost O(stateSize); it
+> MUST NOT cost O(retained history). Phase 0 MAY reuse or replace, but MUST NOT **multiply**, those
+> materialisations: no slice may add a new full-state materialisation on the normal or retry path. Any
+> slice adding a per-message O(stateSize) multiplier beyond 1d's documented term must add a row to the
+> Phase 1 wall table before it merges. Where a worst case exceeds this bound (deep-fork arrival, resolver
+> retro-drop), cost MUST degrade to at most **one** full relinearization + replay per `applyVertices`
+> call — the baseline's own per-batch ceiling — never one per vertex.
+
+**Binding condition, insisted on by one agent and adopted:** this amendment licenses the *mechanism*, not
+any particular code. The O(retained-history) clause stays absolute.
+
+### D.7.5 — The remedy: option 1, with the mechanism corrected
+
+Opus and Kimi both chose bounded incremental adoption with a hard per-call fallback ceiling; Codex argued
+for changing `IDRP` to reversible deltas and marking Phase 0 blocked. Reconciled: **Codex's narrow
+impossibility (D.7.1) stands, and the practical requirement — never worse than baseline, incremental in the
+common case — is achievable.** The `IDRP` contract change is recorded as **v2-plane work**, out of scope
+for the legacy plane under principle 3; it also does not cheaply solve retro-drop, since you must still
+replay everything after an inverted operation unless state is persistent.
+
+Option 2 (refresh the live proxy once per batch) was rejected by two agents: between graph commits a
+synchronous local call would read stale live state while depending on the newer frontier — reintroducing
+L6 — unless local calls and publication are serialised, which is the API break D.5(f) rejects.
+
+**Delivered — implementer's self-reported table, since PARTLY REFUTED (see D.8):**
+
+| shape | claimed baseline | claimed delivered | independent re-measure (D.8) |
+|---|---:|---:|---:|
+| MapDRP V=500 | 45 ms | 38.4 ms | reproduces (parity) |
+| MapDRP V=1000 | 48 ms | 47.3 ms | reproduces (parity) |
+| MapDRP V=2000 | 118 ms | 118.5 ms | reproduces (parity) |
+| resolver-free V=4000, batch 3920 | 378 ms | 222.0 ms | **REFUTED — columns appear swapped; current ≈390 ms vs baseline ≈210 ms, i.e. ~1.8× SLOWER** |
+
+> **Process failure, recorded:** the "378 ms baseline" figure was propagated from the implementer's own
+> report without independent verification. It is actually D.7.1's measurement of the **then-current** tree,
+> not of baseline. An implementer's performance table is a claim, not evidence — every number that enters
+> this plan as a *gate* must be independently re-measured, exactly as D.5(h) already requires for RED tests.
+
+Full suite: **1356 passed / 0 failed / 4 skipped** across 192 files, typecheck clean, lint 0 errors
+(184 warnings vs 176 at baseline — 8 new `jsdoc/*`, under review).
+
+### D.7.6 — Standing corrections to earlier appendix text
+
+- **D.6.2's "O(V²)" understates it** — with a resolver the per-vertex cost is a full relinearization
+  (O(V) DFS × 32 checkpoints) plus an O(V²) pair scan, so the batch is **Ω(V³)**.
+- **D.6's "every safety invariant holds" was false** — see the inline correction; fixed as F5.
+- **D.6.4's "four consecutive BLOCKED verdicts were all correct"** needs qualifying: the fourth verdict
+  (*cannot ship*) was correct; its supporting argument was not, and it was about to become plan text.
+- **D.6.4's replacement predicate** ("key on whether the arrival reorders the linearization") is refined to:
+  *"key on whether a valid materialised base and a bounded canonical edit are available."* A boolean
+  reorder test says nothing about edit length, dropped operations, or snapshot validity.
+- `descendsFromWholeFrontier` checks **direct** dependencies, not transitive descent, so a vertex that
+  causally dominates the frontier through one head still takes the slow path.
+- **A wall-table row is owed** for the checkpoint causal-barrier collapse (every post-fork checkpoint
+  unusable while one undominated head persists, and the barrier check is itself O(V) per attempt) — under
+  D.3(a)'s own process guard.
+
+---
+
+## Appendix D.8 — Round 4 review: the checkpoint relaxation is UNSOUND (DO-NOT-SHIP)
+
+The delivered 0q implementation is fully green — **1356 passed / 0 failed** across 192 files, typecheck
+clean, lint 0 errors, and the suite terminates in seconds where it previously hung. **It must not ship.**
+Adversarial review found silent permanent replica divergence on **3-vertex DAGs under default
+configuration**, with executed counterexamples and an A/B against baseline.
+
+This is the single most important entry in this appendix: **a green suite, a closed root-cause diagnosis,
+and a plausible fix direction were all simultaneously true while the change silently broke convergence.**
+
+### D.8.1 — Blocker 1: relaxed checkpoint predicates admit a non-canonical cut
+
+F1 loosened `dependenciesCover` and the `collectSuffixSubgraph` barrier so post-fork checkpoints become
+usable. The new collective form proves only that (a) the checkpoint's vertex set lies in the target's
+causal past and (b) the suffix descends from the cut. **It never proves the cut is a prefix of the
+canonical from-root linearization** — and legacy state is an order-sensitive fold for *every* DRP, because
+the DFS interleaves concurrent branches by hash.
+
+Three-operation counterexample, **default** checkpoint suffix, singles delivery:
+
+```
+A:  add(9)    @root
+B1: delete(7) @root
+C:  add(7)    @A
+canonical order  A → C → B1   ⇒  [9]
+current tree     cut [A,B1] pinned by forceCheckpoint, then C replays on the frozen cut ⇒ [7,9]
+baseline 7f9e66a                                                                        ⇒ [9]  ✓
+```
+
+Fuzz at scale (SetDRP, seeds 40–119, 10 delivery schedules each, suffix sizes 1/2/4/default):
+**366 divergences on the current tree, 0 on baseline** — including mutual replica-vs-replica disagreement
+(three replicas at `[0,1,2,3]`, `[0,1,2]`, `[0,1]`).
+
+**The retained every-head fence is drawn one case too narrow.** It keys on *resolver presence*, but
+fold-order sensitivity is resolver-independent: `SetDRP.add/delete` diverges exactly like a resolver
+conflict. The implementer's own 3-op resolver counterexample has a resolver-free twin that shipped.
+
+**The correct constraint, for whoever attempts this next:**
+
+> A checkpoint is a valid replay base for a target **only if no suffix member precedes any cut member in
+> the canonical from-root order.** Resolver presence is irrelevant to this condition.
+
+### D.8.2 — Blocker 2: the adoption hint carries an incomplete tail across calls
+
+The hint built from a checkpoint-*suffix* replay omits pre-suffix vertices concurrent with the pending
+vertex, and F2's object-scoped cursor then carries that hint across calls; `prepareHintedAdoption` installs
+causal-past-only state as live state, erasing a concurrent branch. Four-vertex counterexample
+(`V0:add(3)@root, V1:add(0)@root, V2:delete(1)@V0, V3:delete(1)@V2`, singles): canonical `[0,3]`, current
+`[3]`. Diverges at default suffix. **None of this machinery exists at baseline** — cursor, hint and
+`forceCheckpoint` are all new in this diff.
+
+### D.8.3 — Blocker 3: L6 is reopened, and now it is permanent
+
+Both the second and third reviewers found the F3 deferred window independently. During it, a local
+synchronous `drp.method()` observes a graph containing cheaply-committed vertices whose effects are not yet
+in live state; its stored per-hash snapshot is then permanently wrong, and **re-poisons live state after
+reconciliation** when a later child takes the `descendsFromWholeFrontier` fast path. Measured: two replicas
+end at `[a, local, m]` versus `[a, b, c, local, m]` — `b` and `c` lost **permanently even though
+`reconcileCanonicalState` ran**. Baseline converges on all schedules.
+
+This is exactly the defect D.4.4 records and that this slice exists to close, arriving through the very
+mechanism D.7.5 rejected option 2 for: *"a synchronous local call would read stale live state while
+depending on the newer frontier."* **The shipped deferred path is option 2 per-call, without the
+serialization that rejection assumed.**
+
+### D.8.4 — Cost: the per-call ceiling is violated, and the headline number was wrong
+
+- `linearizeVerticesAcrossCausalCut` sorts the **entire retained graph** on every concurrent adoption — a
+  per-vertex O(retained-history) sort, violating both the slice bound and D.7.4's "at most one full
+  relinearization per `applyVertices` call". Measured, no resolver, two alternating branches:
+  **134 / 368 / 1297 ms** current versus **20 / 28 / 53 ms** baseline at 500/1000/2000 — 24× slower at 2000.
+- The resolver-free perf row was **column-swapped** (corrected in D.7.5): current ≈390 ms versus baseline
+  ≈210 ms, i.e. **~1.8× slower**, not the claimed improvement. MapDRP rows do reproduce at parity.
+
+### D.8.5 — What this round teaches, beyond the code
+
+- **A green suite plus a confirmed root cause is still not evidence of correctness.** Every existing spec
+  passed while 3-vertex convergence broke. The two in-tree parity shapes ("late deep concurrency", the
+  checkpoint-interleaving test) are benign by accident of their hashes and topology.
+- **`checkpoint-interleaving.test.ts` is theatre relative to its name**: it parks *inside* a pipeline
+  before commit, on a linear resolver-free chain, so blocker 3 passes straight through it. Rename it and
+  add a spec that parks inside the deferred cheap-commit window.
+- **The existing proptests are structurally blind to this bug class.** The convergence property harness
+  builds BoxGame DRPs, which carry **custom resolvers** (`property-harness.ts:122`) — and the resolver-free
+  incremental hint path is exactly the one that diverges. So the repo's randomized testing could never have
+  caught blockers 1–2, no matter how many seeds it ran. Any new fuzz corpus MUST sweep resolver-free DRPs
+  (`SetDRP`-shaped add/delete) as a first-class dimension, not only resolver-bearing ones.
+- **A third reviewer's independent verdict is worth recording**: the F1 predicate logic is sound *in
+  isolation* for resolver-free replay-base selection (grounded on three-head-join, nested-fork and diamond
+  parity at several suffix sizes), but "F1-as-shipped selects correct bases over corrupted states" — the
+  cut state itself is non-canonical. So the predicates are not the only thing to fix; the state baked into
+  the checkpoint is.
+- One unproven hole flagged and **not** grounded by anyone, carried forward: `checkpointAllowsCustomSuffix`
+  consults only `activeHashes`, so a previously-dropped prefix operation that *revives* through
+  retro-reversal and conflicts with a suffix member is invisible to the guard. Needs a proptest or a
+  recorded impossibility argument before any future relaxation is trusted.
+- **Differential fuzzing against baseline found in minutes what four targeted rounds missed.** The Gate-0
+  divergence-manifest oracle is supposed to be exactly this. It is not yet built, and this round is the
+  argument for building it **before** any further applier work: seeded random DAGs + delivery schedules,
+  replayed on patched and pinned engines, asserting identical order and state.
+- **An implementer's performance table is a claim, not evidence.** D.5(h)'s independent-verification rule
+  must extend from RED tests to every number that enters this plan as a gate.
+- Reviewers must clean up: a probe file (`zz-review-adversarial.test.ts`) was left in
+  `packages/object/tests/` and would have polluted the next suite count.
+
+### D.8.6 — Position, stated honestly
+
+Two states now exist, neither shippable:
+
+| | correctness | cost |
+|---|---|---|
+| pre-F1 | correct | Ω(V³); suite hangs |
+| post-F1 | **silently diverges on 3-vertex DAGs** | at/near baseline for MapDRP, worse for resolver-free |
+
+The F1 relaxation must be **reverted or made sound** against D.8.1's canonical-prefix condition, and
+blockers 2–3 fixed, before 0q can be reconsidered. The correct next move is **not** a fifth implementation
+attempt: build the differential fuzz harness first, so any candidate is measured against baseline
+convergence automatically rather than against hand-picked shapes.
+
+
+---
+
+## Appendix D.9 — The Gate-0 differential convergence harness (BUILT, and it is now the gate)
+
+Built in response to D.8.5. `packages/object/tests/proptest/convergence-differential.test.ts`.
+This is slice **G-b** of Gate 0 arriving early, because round 4 proved it was the missing gate.
+
+### D.9.1 — What it does
+
+Seeded, reproducible random DAGs × delivery schedules, asserting convergence three ways:
+**replica-vs-replica**, **replica-vs-fresh-replay**, and **replica-vs-pinned-baseline `7f9e66a`**
+(cross-engine, enabled by `TS_DRP_BASELINE_OBJECT_MODULE`; a real `git worktree`, never `git stash`).
+
+| Tier | Corpus | Schedules | Wall time |
+|---|---|---|---:|
+| Per-PR | 12 seeds × 3 kind slots × 4 suffixes = 144 DAGs | 3 each = 432 replays | **1.18 s** |
+| Nightly | 80 seeds × 3 kind slots × 4 suffixes = 960 DAGs | 10 each = 9,600 replays | **4.21 s** |
+
+Dimensions, each chosen because a known blocker lives there:
+- **Two resolver-free `SetDRP` slots for every resolver-bearing `MapDRP` slot** — directly answering
+  D.8.5's finding that the existing proptests use only resolver-bearing DRPs and are therefore blind to
+  the broken path.
+- Topologies rotate through linear, fork, fork-join, diamond, nested-fork and multi-head.
+- Checkpoint suffix swept over 1, 2, 4 **and the default** — the counterexamples reproduce at the default.
+- Biased toward **tiny** DAGs, because the real counterexamples are 3 and 4 vertices.
+- Both D.8 counterexamples pinned as an always-run fixed corpus so no seed change can lose them.
+
+### D.9.2 — It is provably able to fail, and provably measuring the right thing
+
+- **Current tree:** 3 failing tests — both fixed counterexamples reproduce exactly, plus **3/144** per-PR
+  and **114/960** nightly generated cases diverge.
+- **Baseline `7f9e66a`:** **zero** divergences in both tiers.
+
+That pairing is the whole point: it satisfies principle 5 (a gate must be provably able to fail) *and*
+proves it is not simply broken.
+
+### D.9.3 — A sharper counterexample than D.8's
+
+The harness immediately minimised a **3-vertex resolver-free fork** in which the linearized **order is
+identical** and only the folded **state** differs:
+
+```
+V0: add(0)    @root      (writer-a)
+V1: delete(0) @root      (writer-b)
+V2: add(0)    @V0        (writer-c)
+delivery: [V1], [V0], [V2]   suffix size 2
+
+order       V0 → V2 → V1   (both)
+incremental state []
+fresh replay state [0]      ← same order, different state
+```
+
+This is a strictly better bug report than D.8.1's: it isolates the defect to the **fold over a frozen cut
+state**, independent of any disagreement about linearization order. Any future fix must explain this case.
+
+### D.9.4 — Standing rule
+
+**No further applier work lands without this harness green.** It runs in ~1 s at the per-PR tier, so there
+is no cost argument for skipping it. A fifth 0q attempt is measured against baseline convergence
+automatically, rather than against hand-picked shapes — which is exactly what the previous four rounds
+lacked.
+
+*Housekeeping:* reviewers left three probe files (`zz-review-adversarial.test.ts`,
+`zz-0q-review-probes.test.ts`, `zz-0q-review-straddle.test.ts`) in `packages/object/tests/`; the latter two
+put repo lint at **61 errors**. Removed; lint back to 0 errors / 184 warnings. Reviewer prompts already say
+"probes in /tmp" — enforce it, and check `git status` before trusting any suite or lint count.
+
+
+---
+
+## Appendix D.10 — Attempt 5: predicates fixed, two NEW divergence families found (DO-NOT-SHIP)
+
+Attempt 5 reverted attempt 4's unsound relaxation and restored the strict every-head predicates, relying on
+per-call amortization for cost. **That part worked and is verified.** The differential harness went
+0/144 per-PR and 0/960 nightly, the full suite is 1359 passed / 0 failed, and cost is 0.98–1.22× baseline.
+
+Two of three reviewers said SHIP. The adversarial review found **two independent permanent-divergence
+families**, one of which fires on an **honest, well-formed 5-vertex DAG at default configuration** where
+baseline converges. Both are invisible to the harness for **structural** reasons, not seed count.
+
+### D.10.1 — Verified good (keep)
+
+- **The predicates are byte-equivalent in logic to baseline** under normalised comparison
+  (`dependenciesCover` → `dependenciesCoverEveryHead` is a rename; the `pendingVertex` overlay is symmetric
+  and evaluates the same predicate against graph ∪ {N}). **D.8.1 is not reopened by the predicates.** All of
+  attempt 4's relaxations are gone: no `activeHashes`, no resolver discriminator, no across-cut sorter, no
+  object-scoped cursor.
+- **D.8.1, D.8.2 and D.8.3 are all closed**, re-probed directly at suffix 1/2/4/default, singles and batch.
+  The L6 loss `[a,local,m]` vs `[a,b,c,local,m]` does not reproduce.
+- S1/S2/S3/S5/S6 hold on every path, including the amortized one. Consensus bytes untouched. The lint delta
+  is genuine surface shrinkage — `eslint-disable` counts are unchanged versus baseline in all five changed
+  files and no ESLint config appears in the diff.
+
+### D.10.2 — CRITICAL 1: the resolver fence is per-**type**, but conflict resolution is per-**subgraph**
+
+`prepareConcurrentTailAdoption`, `canUseAdoptionHint` and the `nextHint` gate all test
+`hasCustomConflictResolver(drpType)` for **the pending vertex's own type**. But `linearizePairSemantics`
+enables the pair-conflict scan when **any** vertex in the replay subgraph carries a resolver — and
+**`ObjectACL` always carries one**. `HashGraph.resolveConflicts` dispatches on `vertices[0].drpType`, so an
+**ACL** vertex can `DropRight` a concurrent **DRP** vertex. With a resolver-free `SetDRP`,
+`hasCustomConflictResolver("DRP")` is `false`, the incremental path is taken, and **the drop never happens**.
+
+Honest input — single dependencies only, no transitive edges, default suffix, no byzantine peer:
+
+```
+G: ACL grant(w, Writer)    @root   by adm
+R: ACL revoke(w, Finality) @G      by adm     (timestamp chosen so hash(R) < hash(P))
+P: DRP add("seed")         @G      by w       (concurrent with R)
+M: DRP add("w")            @P      by w
+v: DRP add("z")            @M      by w
+
+canonical (both engines):  G > R > P > v      — M is dropped
+current    live = ["seed","w","z"]     ← M reinstated
+canonical         ["seed","z"]
+baseline 7f9e66a  ["seed","z"]  on all four schedules
+```
+
+Divergence is **replica-vs-replica within the current engine**, so it needs no oracle argument. Honest-only
+fuzz: **current 3/400 seeds diverged, baseline 0/400**; mixed fuzz with 2-dep vertices: **4/1000 vs 0/1000**.
+
+**An ACL revocation's effect is silently bypassed.** That is a security-relevant failure, not only a
+convergence one.
+
+> **This is D.8.1's exact lesson surviving in a new location:** *the fence keys on resolver presence, but
+> the property is not per-type.* Recorded as a standing rule in D.10.6.
+
+### D.10.3 — CRITICAL 2: two state-derivation paths that disagree
+
+Pure DRP, no ACL, no resolvers anywhere. Shape: a transitive-edge triangle plus **two** concurrent children
+of its apex.
+
+```
+V0 add(e0)@root ; V1 add(e1)@V0 ; V2 add(e2)@[V0,V1] ; V3 add(e3)@V2 ; V4 add(e4)@V2
+
+singles           live = ["e0","e1","e2","e3","e4"]   (incremental tail adoption)
+last-two-batched  live = ["e1","e2","e3","e4"]        (amortized canonical replay)  ← e0 lost
+```
+
+Root cause: `dfsTopologicalSortIterative` double-pushes `V2` and **loses `V0`** whenever
+`hash(V2) < hash(V1)`. That sort is **byte-identical to baseline** — so baseline is equally lossy, but
+baseline routes *every* apply through it and therefore stays self-consistent. **This diff adds a second,
+non-lossy derivation path, and the two disagree.**
+
+Rates on the same corpus: **current 112/200 diverged, baseline 0/200.** Shape isolation, 100 seeds each —
+both features are required and each alone is harmless:
+
+| shape | current | baseline |
+|---|---:|---:|
+| triangle + 2 children | **57/100** | 0/100 |
+| triangle + 1 child | 0/100 | 0/100 |
+| diamond + 2 children | 0/100 | 0/100 |
+| fork-join + 2 children | 0/100 | 0/100 |
+
+Reachability: a transitive edge requires a peer to supply a redundant dependency. Honest local calls use
+`getFrontier()` and never do — but **nothing in `validateVertex` rejects it**, and both engines return
+`applied: true`. Byzantine-reachable at 5 vertices, cheap and undetectable. (Critical 1 needs no byzantine
+peer at all.)
+
+### D.10.4 — Two medium findings
+
+- **`reconcileCanonicalState` always replays from `checkpoints[0]` (root)**, unlike `getReplay` which scans
+  newest-first. The per-call ceiling of D.7.4 is met, but the *size* of that replay is unbounded by
+  `checkpointSuffixSize`. On a long-history + small-concurrent-batch shape (the live-sync shape, absent from
+  the recorded cost table): **3.4–3.6× baseline** at history 3k/6k/12k. Owed: a cost-table row.
+- **A reconcile failure leaves `hasUnreconciledLiveState` permanently `true`** — the assignment sits after
+  the `await` and is skipped when the replay throws. Live state recovers, but the object is permanently
+  degraded: per-hash snapshots stop being written for local calls, checkpoints stop advancing on local
+  calls, and the fast paths stay disabled **for the object's lifetime**, from one transient blueprint throw.
+
+### D.10.5 — The gate was trusted too early
+
+`convergence-differential.test.ts`'s `makeOperation` **hardcodes `drpType: DrpType.DRP`** — the harness
+emits **zero ACL vertices**, so Critical 1 is invisible at any seed count. Its `dependenciesFor` never emits
+a redundant/transitive edge, and none of its six topologies ever gives a join vertex two concurrent children
+— so Critical 2 needs both features it cannot produce.
+
+**D.9.2's "provably able to fail" claim must be restated.** It was demonstrated against attempt 4's failure
+modes only. A shape *one edge away* from `diamond` fails on the current tree while `diamond` passes. So
+0/144 and 0/960 certify **the absence of the D.8 families**, not convergence.
+
+Required widening before the harness is trusted again — each because a divergence lives there:
+1. **ACL vertices as a first-class kind**, interleaved with DRP in one DAG and one call. Highest value.
+2. **Cross-type value collision** — ACL target peerIds drawn from the same domain as DRP element values, so
+   `ObjectACL.resolveConflicts`' `value[0]` comparison can fire across types.
+3. **Redundant/transitive dependency edges** — a vertex depending on both a parent and that parent's ancestor.
+4. **Two or more concurrent children of a join vertex** (all six current topologies are linear after a join).
+5. More concurrent writers, a `writers ≫ 4` slot, and adversarial timestamp ties.
+Both new counterexamples pinned as fixed corpus entries alongside D.8's two.
+
+### D.10.6 — Two standing rules for every future attempt
+
+> **R1 — `hasCustomConflictResolver(drpType)` is not a valid soundness fence.** Conflict resolution is
+> enabled by the presence of *any* resolver-bearing vertex in the replay subgraph, and `ObjectACL` always
+> carries one. Any fast path must gate on *"does the replay subgraph contain a resolver-bearing vertex"*,
+> never on the pending vertex's own type.
+
+> **R2 — the applier MUST NOT have two state-derivation paths that can disagree.** Critical 2 is not a
+> predicate bug: it is a pre-existing linearizer defect (`dfsTopologicalSortIterative`'s double-push,
+> present at baseline) becoming *observable as divergence* the moment a second, non-lossy path exists.
+> Either every path folds the same canonical order, or the linearizer defect is fixed first — and that is a
+> coordinated-upgrade change with its own cross-version story, outside slice 0q. **Decide this before
+> writing code for attempt 6.**
+
+### D.10.7 — Process note
+
+The generalised form of D.8.5's lesson, which the plan had stated too narrowly ("sweep resolver-free DRPs"):
+
+> **The fuzz corpus must contain every vertex type the applier branches on, and every structural feature
+> the linearizer branches on.** The round that fixed resolver-free-DRP blindness still left an entire vertex
+> type (ACL) at zero coverage.
+
+**Independent corroboration.** The third reviewer hit its 100-step budget before writing a final report,
+but its working notes reached both findings independently: *"the seed-1009 split is fold-level fallout of
+the pre-existing DFS duplication (identical insane order in both schedules), not hint/tail misapplication"*
+(Critical 2's root cause) and a fuzz round reporting *"part B 4 diverged (ACL class)"* (Critical 1). Two
+agents converging on both families from different probes is the strongest evidence in this appendix.
+*Process note:* 100 reasoning steps was not enough budget for a review at this depth — raise it for slices
+where differential probing is the point, or the reviewer spends its budget and reports nothing.
+
+Also: two of three reviewers returned SHIP on a change with two critical divergence families. The one that
+found them was the one that built differential probes against a pinned baseline rather than reasoning about
+the diff. Budget for that reviewer on every slice.
+
+
+---
+
+## Appendix D.11 — The widened Gate-0 harness, and how it was made self-validating
+
+D.10.5 recorded that the harness was structurally blind to both new critical families. It has been widened,
+and — more importantly — it can now **prove what it is measuring**.
+
+### D.11.1 — What was added
+
+- **ACL vertices as a first-class kind** (`mixed-acl` slot): `grant`/`revoke` interleaved with DRP vertices
+  in one DAG and one call, with **ACL targets drawn from the same value domain as DRP elements** so
+  `ObjectACL.resolveConflicts`' `value[0]` comparison can fire across types.
+- **Transitive dependency edges + two concurrent children of a join** (`transitive-join-children` slot) —
+  both features are required together; each alone is harmless.
+- **16 concurrent writers with a wide fan-in/fan-out and tied timestamps** (`many-writers` slot).
+- All four D.8/D.10 counterexamples pinned as fixed corpus.
+
+### D.11.2 — The self-validation hook: `TS_DRP_PRIMARY_OBJECT_MODULE`
+
+The harness can now run with the **primary** engine pointed at a pinned build, not just the oracle. This is
+what turns "the harness fails on the current tree" into evidence:
+
+> A fixture that fails with the primary engine set to `7f9e66a` is **not** a regression pin — it is
+> measuring behaviour already broken at baseline, and must be relabelled rather than counted.
+
+Result:
+
+| tier | current tree | baseline as primary |
+|---|---:|---:|
+| widened per-PR (144 cases) | **18 diverged** — mixed-acl 12, transitive-join 6 | 0 |
+| widened nightly (960 cases) | **227 diverged** — mixed-acl 188, transitive-join 39 | 0 |
+| whole file | 3 failing | **8/8 pass** |
+
+> **CORRECTION (D.14, measured after slice 0r).** The "baseline as primary → 0" column is **no longer true
+> and must not be cited as a green control.** Post-0r, baseline-as-primary *correctly* **fails** the widened
+> per-PR tier at 7/144 (`transitive-join-children` @ suffix-1, `replica-vs-fresh`), because the current
+> engine now intentionally differs from baseline on that class. Do not confuse the two modes: with
+> `TS_DRP_BASELINE_OBJECT_MODULE` (baseline as *oracle*, current as primary) the file passes 8/8; with
+> `TS_DRP_PRIMARY_OBJECT_MODULE` (baseline as *primary*) it is expected red on the approved class.
+
+### D.11.3 — Three defects this hook caught in the harness itself
+
+Every one would have discredited the gate:
+
+1. **Future-dated timestamps.** The generators used `1.8e12` (2027). `validateVertex` rejects future-dated
+   vertices, so every widened case failed on *delivery*, not divergence — a gate failing 100% for a reason
+   unrelated to the thing it measures. Moved into the past.
+2. **A hand-computed oracle that was simply wrong.** The Critical-1 fixture asserted canonical
+   `["seed","z"]`, but its timestamps do not produce the `hash(R) < hash(P)` ordering the drop requires —
+   **both** engines legitimately agree on `["seed","w","z"]`. It failed on both engines for the wrong
+   reason, which is exactly how a real signal gets dismissed as noise. Oracle removed; the family is
+   carried by the generated `mixed-acl` slot (12 current / 0 baseline), which reproduces it honestly.
+   *Lesson: a fixture whose expected value depends on hash ordering must derive that ordering, never assume
+   it.*
+3. **A gate that could never reach zero.** `transitive-join-children` mixes regressions with the
+   pre-existing linearizer defect. Initially allowlisted by case id — which silently failed to cover the
+   nightly seed range (34 still diverging at baseline). Replaced with a **structural** predicate:
+   *`transitive-join-children` at `suffixSize === 1`* accounts for **100%** of baseline divergences
+   (70/70 across both tiers), so it scales to any seed range.
+
+The exclusion carries **staleness enforcement**: the tier asserts the pre-existing class still diverges. If
+the linearizer defect is ever fixed, the assertion fires and forces the exclusion to be deleted — the same
+device as the Gate-0 divergence manifest's unexercised-entry check.
+
+### D.11.4 — Standing rule
+
+> **A gate must be able to prove what it measures, not only that it can fail.**
+>
+> *(D.14 amendment: the mechanism below said "run the whole gate against the pinned baseline and require it
+> green." That is unsatisfiable after slice 0r, because baseline is now correctly red on the approved
+> pre-existing class. Restate as: **require it green except for failures attributable to the approved
+> divergence class, and require that attribution to be checked rather than assumed.**)* Principle 5's
+> "provably able to fail" is necessary and insufficient: attempt 4 passed a gate that could fail, and
+> attempt 5's harness failed for three reasons that had nothing to do with the defect. The cheap, general
+> mechanism is a **primary-engine override** — run the whole gate against the pinned baseline and require
+> it green. Any gate comparing against a reference engine should have one.
+
+---
+
+## Appendix D.12 — Confer round 4: slice 0r approved (unanimous), and D.10.3's premise retracted
+
+### D.12.1 — The premise that was wrong
+
+D.10.3 and rule R2 both rested on this sentence:
+
+> *"That sort is byte-identical to baseline — so baseline is equally lossy, but baseline routes every apply
+> through it and therefore stays self-consistent."*
+
+**Two agents independently refuted it by execution against the pinned `7f9e66a` build.** At
+`TS_DRP_CHECKPOINT_SUFFIX_SIZE=1`, baseline yields all five elements for `singles` but loses `e0` for
+`one-batch` and `last-two-batched` — **replica-vs-replica divergence with no new code**. At the default
+suffix all baseline schedules converge on the *lossy* state, silently dropping a committed vertex's effect
+on every replica.
+
+The mechanism: the sort is lossy relative to the **fold origin**, and checkpoint cut placement is
+replica-local delivery history. Baseline routes every apply through the same lossy *function* but not the
+same *subgraph*. **Baseline therefore does not define an order — it defines a schedule-dependent family of
+orders.**
+
+Three consequences, and they change the decision:
+
+1. Attempt 5 did not "add a second derivation path." Baseline already has several (the single-dependency
+   fast path, checkpoint-suffix replay, fresh full replay). Attempt 5 widened the disagreement window from
+   suffix-1 to the default suffix.
+2. **Branch (b) — "force every path through the identical lossy order" — is infeasible, not merely
+   unattractive.** You cannot be bug-compatible with a schedule-dependent family. The only order-identical
+   variant is fold-from-root-always: D.10.4's 3.4–3.6× regression forever, *and* it still silently loses
+   committed state.
+3. This is a **live, byzantine-reachable convergence defect at baseline**, not a latent cosmetic one.
+   `validateVertex` checks hash, dependency presence and timestamps only; the shape is admitted today.
+
+**R2 is withdrawn.** It was unsatisfiable (baseline itself has multiple derivation paths — local `callFn`
+composes onto live proxies while merges re-fold) and it would forbid provably-equivalent optimisations
+forever. Replacement:
+
+> **R2′ — folded state MUST be a deterministic function of the graph, not of the derivation path or the
+> replay window.** Every derivation path must be shown observationally equivalent to the canonical fold,
+> with a stated argument *and* a dual-engine differential gate. Equivalence may never be assumed from
+> "the inputs looked disjoint."
+
+### D.12.2 — The decision: branch (a), unanimous
+
+The round split 2–1 (fix the linearizer now / defer to v2). The dissent was specific — a rolling upgrade
+has no fold-version field, so mixed versions could compute different state from the same graph — and it
+reduced to **one testable claim**, so it was tested rather than argued.
+
+> **Claim: the fix is behaviour-identical on every honestly-formed room.**
+
+Measured with the differential harness against a verified pinned `7f9e66a` build, on the all-antichain
+(honest) generated corpora:
+
+| tier | divergences from baseline |
+|---|---:|
+| honest per-PR (144 cases × 3 schedules) | **0** |
+| honest nightly (960 cases × 10 schedules) | **0** |
+
+**1,104 honest cases, zero divergence**, independently re-run. The dissenting agent then agreed.
+
+*Precision correction it insisted on, and it is right:* call this **behaviour-identical**, not
+byte-identical. The harness compares state and order; the separate zero-line diff on generated
+protobuf/wire files is what establishes byte identity. And **the finite corpus is supporting evidence, not
+proof** — the proof is structural: local dependencies default to `getFrontier()` (`hashgraph/index.ts:237`),
+`addVertex` removes listed dependencies from the frontier (`:250`), so the frontier is an antichain by
+construction and an honest client cannot emit the non-antichain dependency list the double-push requires.
+The patch changes only stale duplicate-stack handling, so it cannot fire on shapes that never had one.
+
+### D.12.3 — Slice 0r, as recorded
+
+> **0r — Legacy linearizer correctness repair (Critical 2).** Fix `dfsTopologicalSortIterative` on the
+> legacy plane: a stale duplicate stack entry MUST be popped without consuming a result slot, and the
+> returned order MUST be asserted to be an exact permutation of the reachable requested subgraph. Vertex
+> encoding, `computeHash` inputs, protobuf/wire formats and admission semantics MUST remain unchanged.
+> **Ship this repair ungated** — a local flag is forbidden, because no legacy vertex records the selected
+> fold semantics, so a flag would create an unrecorded semantic selector and preserve the very coordination
+> problem it appears to solve; v2-only gating would leave the exploitable legacy defect live for every room
+> that never migrates. Migration requires: (1) XVER equality against pinned `7f9e66a` for every
+> direct-antichain fixture and schedule; (2) an approved-divergence manifest limited to the affected
+> non-antichain class, with staleness enforcement; (3) fixed *and* generated replica-vs-replica and
+> replica-vs-fresh gates for `transitive-join-children`; (4) a release note stating that previously admitted
+> non-antichain histories may replay differently, and that they can be identified by dependency/ancestor
+> scanning. **No replay or migration is required for antichain-only rooms**, and no fleet-wide replay is
+> required to find the residual population.
+
+Class: **coordinated-upgrade**, not consensus-affecting — the plan's own principle-3 taxonomy, since no
+vertex bytes or wire format change. D.10.6's "outside slice 0q" was a misclassification: it is a
+prerequisite *inside* 0q's dependency chain.
+
+### D.12.4 — Delivered, and what remains
+
+- **Critical 2 is closed.** `transitive-join-children` current-engine replica-vs-replica and
+  replica-vs-fresh divergences: **0** in both tiers (were 6 per-PR / 39 nightly). Divergence from baseline
+  on that class is now *intentional and approved* (28/48 per-PR, 164/320 nightly).
+- The `isPreexistingWidenedDivergence` exclusion is gone — its staleness assertion fired and forced removal,
+  exactly as designed. It is replaced by an approved-baseline-divergence manifest that **cannot suppress
+  current-engine disagreement**.
+- The fix also heals the causality bitsets: `reachablePredecessors` is built from the same order and was
+  silently skipping the displaced vertex's row.
+- Gates: typecheck clean, lint 0 errors, `packages/node` 202/202, full suite **1362 passed**.
+- **Critical 1 (R1 resolver fence) — was open at the time of writing, CLOSED by attempt 6 (see D.13).**
+  As of this appendix it was deliberately out of scope: `mixed-acl` shows 12
+  current-engine replica divergences per-PR and 188 nightly. That is attempt 6's work, and the three call
+  sites are identified (`drp-applier.ts:560,634,655` — the correct check mirrors `pairSemantics.ts:20`,
+  scanning the replay subgraph for any resolver-bearing vertex rather than testing the pending vertex's
+  own type).
+
+### D.12.5 — On the objective itself
+
+Two agents were asked directly whether slice 0q is still the right goal after five failures. Both said yes,
+with the same reasoning: the failures were not five attempts at an impossible thing, they progressively
+isolated one misfiled prerequisite. Attempts 1–2 were mechanism/contract errors, attempt 3 cost, attempt 4
+an unsound relaxation, attempt 5 two *pre-existing* defects that any fast path would eventually surface.
+Deferring to v2 would leave L6's silent 256-operation erasure and L3's torn reports live on the only plane
+that exists, and would abandon attempt 5's verified assets (byte-equivalent predicates, the D.8 closures,
+0.98–1.22× cost parity). **Attempt 6 is descoped to: the R1 fence, plus D.10.4's two mediums.**
+
+
+---
+
+## Appendix D.13 — Attempt 6: slice 0q closed
+
+Attempt 6 closes the four remaining items recorded in D.12.4 and the attempt-6 handoff:
+
+- The fast-path fence is now computed from the selected replay subgraph, including a pending overlay, with
+  the same resolver-bearing-vertex condition used by `linearizePairSemantics`. Hints carry that replay-cut
+  result forward only while extending it by a same-type causal child. `mixed-acl` current-engine
+  replica-vs-replica and replica-vs-fresh divergences are **0** at both differential tiers (previously
+  12 per-PR and 188 nightly).
+- Canonical reconciliation uses `getReplay(expectedFrontier)`, so checkpoint selection is newest-first and
+  uses the same covering and strict-barrier predicates as every other replay. On the long-history plus 20
+  small-concurrent-batch probe, median current/baseline cost measured in the same run was
+  **34.6/23.9 ms (1.44×)** at 3k, **68.1/43.4 ms (1.57×)** at 6k, and
+  **144.8/93.5 ms (1.55×)** at 12k, replacing the recorded 3.4–3.6× regression.
+- `hasUnreconciledLiveState` is cleared only by the synchronous publication section that installs a
+  canonical replay result. A failed replay keeps the protective fence while live state is stale; the next
+  successful canonical adoption clears it, resumes checkpoint/snapshot maintenance, and does not remove any
+  committed vertex.
+- The fixed Critical-2 fixture is classified as an approved baseline-only divergence with staleness
+  enforcement. Current-engine disagreement remains unsuppressed; the pinned baseline used as the primary
+  engine at suffix 1 fails the fixture on replica-vs-fresh disagreement.
+
+Verification at closure: differential per-PR **6 passed / 2 skipped**, differential nightly
+**8 passed**, object **244 passed / 4 skipped**, node **202 passed**, typecheck **28/28 projects**, and
+lint **0 errors**. The current-engine divergence count is zero in every generated and widened slot. No
+vertex encoding, `computeHash` input, generated protobuf, or wire-format file changed.
+
+---
+
+## Appendix D.14 — Attempt-6 review: the slice holds, but the gate was beaten again
+
+Attempt 6 closed Critical 1 and D.10.4's two mediums. Verified independently: differential **8/8 pass** at
+both tiers with the baseline oracle, full suite **1363 passed / 0 failed**, typecheck clean, lint 0 errors,
+`mixed-acl` current-engine divergences **12→0** per-PR and **188→0** nightly.
+
+Every claim the slice makes about itself survived attack — A1's fence, A2's bounded replay, A3's recovery,
+A4's approval mechanism, S1/S2/S3/S5/S6, R2′, and slice 0r's blast radius. **And the adversarial review beat
+the gate for the third time.**
+
+### D.14.1 — HIGH: honest concurrent admins can permanently fork ACL authority
+
+Four honest vertices, no equivocation, no byzantine peer, stable at every checkpoint suffix:
+
+```
+GA : a1 grants eve ADMIN            @root
+RF : a2 revokes eve Finality        @root   (concurrent with GA)
+WG : eve grants w2 Writer           @GA     (eve has seen only GA)
+W  : w2 writes                      @WG
+```
+
+`ObjectACL.resolveConflicts` compares only `opType` and `value[0]` — **not the group** — so RevokeWins
+drops `GA`. Then:
+
+| delivery order | graph | eve admin? | w2 writer? | DRP |
+|---|---|---|---|---|
+| grant-first | {GA, WG, W} — **RF quarantined forever** | yes | yes | `["hello"]` |
+| revoke-first | {RF, GA} — **WG quarantined forever** | no | no | `[]` |
+
+Same four vertices, different arrival order, permanently different **vertex sets, ACL authority and DRP
+state**. Root cause: pair-semantics drops do not cascade to causal descendants of a dropped ACL vertex, so
+replay executes an operation whose authorization premise was resolved away (`ObjectACL.grant` throws
+"Only admin peers can grant").
+
+**Pre-existing, not a regression.** Baseline `7f9e66a` on the same input is *worse*: it throws out of merge
+and leaves a torn graph (all four vertices present, live state stale, `GA` missing from the order). Attempt
+6 made the failure **atomic** — but also **silent**, since `applyVertices` now returns `quarantined` rather
+than throwing.
+
+**L7 was contested, and was verified first-hand.** The third reviewer returned SHIP after ~800 probe runs
+across seven families the gate does not generate — including one described as *"Admin grant + concurrent
+Finality grant/revoke + delegated grant by new admin"*, 20 seeds × 3 suffixes, **0 divergences**. That is
+nominally the same family. The contradiction was settled by reproducing the exact four-vertex construction
+directly:
+
+```
+[L7] suffix=1/2/4/default   FORKED=true   (all four)
+  grant-first : graph=3  RF absent  eveAdmin=true   w2Writer=true   drp=["hello"]
+  revoke-first: graph=2  WG absent  eveAdmin=false  w2Writer=false  drp=[]
+```
+
+**L7 is real.** The reason a 20-seed generated sweep missed it: the drop fires only when the two ACL
+operations collide on `value[0]` — the *same target peer* — with opposite `opType`. `resolveConflicts`
+ignores the group, so `grant(eve, Admin)` and `revoke(eve, Finality)` are treated as a conflicting pair
+*despite being about different groups*. A random generator almost never lands that exact collision; a
+hand-built shape hits it every time. **Generated coverage of a family is not coverage of its preconditions.**
+
+**This is a new tracked defect (L7), not an attempt-6 blocker.** But it falsifies the headline as stated:
+"0 current-engine divergences everywhere" is a property of the corpus, not of the engine.
+
+### D.14.2 — Why the gate could not see it: four simultaneous blind spots
+
+1. It never generates **Admin-group** ACL operations — only Writer and Finality.
+2. It never generates **authority-chain** shapes: a granted peer exercising its granted authority.
+3. `stateOf` reads **DRP state only**. Live ACL state (`query_isAdmin`, `query_isWriter`,
+   `query_getFinalitySigners`) is never compared by any tier.
+4. `applySchedule` **throws** on any rejection, so an admission-outcome divergence is a harness crash rather
+   than a measured signal — and no generator can produce one anyway.
+
+The divergence lives in the intersection of all four. Each previous widening fixed the axis that had just
+been exploited; none asked which axes remained. **The corpus must be derived from what the code branches on
+— vertex type, ACL group, authorization dependency, admission outcome, and every observable surface — not
+from the last bug found.**
+
+### D.14.3 — Remaining findings
+
+- **MEDIUM — replay-time deterministic throws are misclassified** *(found independently by two reviewers,
+  which is the strongest corroboration in this appendix)*. The taxonomy classifies *pipeline*
+  throws; a deterministic throw raised during canonical replay (the `ObjectACL.grant` above) is treated as
+  possibly-transient → quarantine → every redelivery pays a full canonical replay and fails identically,
+  forever. `deterministic-rejection-taxonomy.test.ts` covers apply-time only, not replay-time.
+- **LOW — `isBaselineProblem` is a substring match on `"baseline"`.** A future schedule or replica name
+  containing that word would reclassify a real current-engine problem as approved-suppressible. Not
+  exploitable with current names; make it a structural tag.
+- **LOW — duplicate-listed dependencies** (`deps = [A, A]`, byzantine-craftable, passes validation) trigger
+  the old double-emit at baseline while current is self-consistent. This *extends* the approved divergence
+  class, but D.12.3's description ("non-antichain") and the structural predicate
+  (`transitive-join-children` @ suffix-1) do not name or cover it — a future dup-deps fixture would fail as
+  unapproved. Independently found by a second reviewer.
+- **INFO — non-root `opType "-1"`**: baseline silently skips it and reports applied; current marks it
+  invalid and cascades to dependents. Deliberate and tested, but it is a cross-version interop change with
+  no release-note obligation recorded; D.12.3's note covers only non-antichain replay.
+
+### D.14.4 — Corrections to this plan, applied
+
+- **D.11.2's "baseline as primary → 0" is false post-0r** and has been annotated in place. Baseline-as-primary
+  is now *correctly* red (7/144) on the approved class. Do not confuse the oracle mode
+  (`TS_DRP_BASELINE_OBJECT_MODULE`, file passes 8/8) with the primary mode
+  (`TS_DRP_PRIMARY_OBJECT_MODULE`, expected red).
+- **D.11.4's standing rule was unsatisfiable as written** and has been amended: green *except* failures
+  attributable to the approved class, with the attribution checked rather than assumed.
+- **D.11.1 / D.13 gate-adequacy claims are corpus-relative** and must be scoped accordingly.
+- **D.12.3's approved class** should explicitly include duplicate-listed dependency vertices.
+- Call-site drift: `drp-applier.ts:560,634,655` → `556-564 / 649 / 671`.
+
+### D.14.5 — The pattern, stated once
+
+Three widenings, three defeats:
+
+| round | gate blind to | found by |
+|---|---|---|
+| D.8 | resolver-free DRPs (proptests used only resolver-bearing) | hand-built probe |
+| D.10 | ACL vertices entirely; transitive edges; join fan-out | hand-built probe |
+| D.14 | Admin group; authority chains; ACL state; admission outcomes | hand-built probe |
+
+A fourth instance landed in the same review: the L7 family *was* generated (20 seeds × 3 suffixes) and
+still came back clean, because the generator never hit the `value[0]` collision the drop requires. So the
+rule is sharper than "the gate lacks the axis":
+
+> **Generating a family is not covering it.** A corpus must hit the *precondition* of a defect, not merely
+> the shape. Where a defect needs a value collision, a hash ordering, or an exact group pairing, the corpus
+> must construct those deliberately — random generation over a large domain will miss them indefinitely.
+
+**Every blind spot was found by an agent constructing shapes by hand, never by the gate.** The gate is
+still worth having — it caught regressions in seconds that four TDD rounds missed — but it is a *regression
+detector*, not a correctness proof, and the plan must stop describing it as though a green run were
+evidence of convergence. **Budget an adversarial prober on every slice, permanently.**
+
+---
+
+## Appendix D.15 — The gate widened on the four blind axes; L7 pinned and confirmed pre-existing
+
+Four dimensions added to `convergence-differential.test.ts`, chosen because a defect lives in their
+intersection (D.14.2). **Zero `src/` changes** — the corpus had to be able to observe L7 before the next
+slice fixes it.
+
+### D.15.1 — What was added
+
+| dimension | why |
+|---|---|
+| **Admin-group ACL operations** | the corpus only ever emitted Writer and Finality |
+| **Authority-chain topology** | a granted peer *exercising* its granted authority — no topology produced this |
+| **ACL state observation** | `stateOf` read DRP state only; an authority fork with matching DRP state was invisible |
+| **Admission-outcome observation** | `applySchedule` *threw* on rejection, so a disagreement in which vertices were admitted was a harness crash, not a signal |
+
+Plus two corrections: `isBaselineProblem` is now a structural `scope` tag rather than a substring match on
+`"baseline"`, and the approved-divergence class explicitly covers **duplicate-listed dependencies**
+(`deps = [A, A]`) alongside `transitive-join-children`.
+
+### D.15.2 — Precondition coverage: 100%, and measured
+
+This was the point of the exercise. D.14.5 recorded that a 20-seed sweep of nominally the L7 family found
+nothing because it never reached the `value[0]` collision the resolver drop requires. The new generator
+draws ACL targets from **three** peers and forces the concurrent pair to share `value[0]`, use opposite
+`grant`/`revoke`, and address **Admin versus Finality**.
+
+Measured drop rate: **48/48 per-PR (100%)** and **320/320 nightly (100%)** — structural collision *and*
+actual resolver drop, not merely the shape. Compare with the previous generator's effective 0%.
+
+> **A generator that reaches its precondition 0% of the time is indistinguishable from no coverage, and
+> reads as green. Measure the firing rate; never assume it.**
+
+### D.15.3 — Results on the current tree
+
+| slot | per-PR | nightly |
+|---|---:|---:|
+| Admin-group / authority-chain / ACL-state / admission-outcome | **48/48** | **320/320** |
+| `mixed-acl`, `many-writers`, ordinary generated slots | 0 | 0 |
+| approved reference divergence (`transitive-join-children`) | 28 | 164 |
+
+The pinned fixed case `fixed-four-vertex-cross-group-authority-chain` fails on
+`replica-vs-replica: grant-chain-before-revoke != revoke-before-grant-chain`, differing across **DRP state,
+ACL state, linear order, graph membership and admission outcome** simultaneously.
+
+### D.15.4 — L7 is confirmed pre-existing, with a dimensional caveat
+
+Run with the pinned reference as the **primary** engine, the same fixture **also fails**
+(verified first-hand: `fixed-four-vertex-cross-group-authority-chain` red on both engines; widened tier
+55/192 per-PR = 48 authority-chain + 7 older transitive; 361/1280 nightly). So the reference forks on this
+family too — **L7 is not a regression introduced by slices 0q/0r.**
+
+**The dimensional split, now settled by direct measurement** (the verification D.15.4 flagged as owed):
+
+| dimension | reference `7f9e66a` | current tree |
+|---|---|---|
+| graph membership | **same** (4 / 4) | **FORKS** (3 vs 2) |
+| linear order | **same** (3 / 3) | **FORKS** (3 vs 1) |
+| ACL authority | forks | forks |
+| DRP state | forks | forks |
+| admission outcome | forks — `THREW` | forks — silent `quarantined` |
+
+```
+reference    grant-first  members=4 order=3 acl=true/true   drp=["hello"] admission=A,A,A,THREW
+             revoke-first members=4 order=3 acl=false/false drp=[]        admission=A,A,THREW,THREW
+current      grant-first  members=3 order=3 acl=true/true   drp=["hello"] admission=A,A,A,-Q
+             revoke-first members=2 order=1 acl=false/false drp=[]        admission=A,A,-Q,-M
+```
+
+**Conclusion: L7 is part pre-existing, part regression.** The ACL-resolution defect itself — authority and
+state diverging by arrival order — is shared with the reference and is *not* introduced by slices 0q/0r.
+But the reference keeps **identical graph membership and linear order** across schedules, because it fails
+loudly: `applyVertices` throws and every vertex stays in the graph. The current engine's per-vertex
+quarantine converts that loud throw into a **silent, arrival-order-dependent vertex drop**, so replicas
+now disagree about *which vertices exist* — a dimension the reference does not fork on.
+
+**Consequence for the fix (binding):** L7's remedy must restore **membership and admission agreement**, not
+only state agreement. Quarantine is the right mechanism for a genuinely transient failure, but a
+deterministic authorization failure arising from conflict resolution is *not* transient — it is a function
+of the causal past, identical on every replica that folds the same order — and must not be resolved
+per-replica by arrival order. This ties directly to the MEDIUM already recorded in D.14.3: replay-time
+deterministic throws are misclassified as possibly-transient. **Fixing that classification is likely the
+larger half of L7's fix, and it is a regression fix, not new work.**
+
+### D.15.5 — Gate status
+
+The gate now fails on the current tree for exactly one reason — the authority-chain family — and that
+failure is the specification for the next slice. Everything the previous rounds closed stays closed:
+ordinary generated slots, `mixed-acl` and `many-writers` all report zero current-engine disagreement, and
+approved reference divergence remains confined to the documented class with staleness enforcement intact.
+
+---
+
+## Appendix D.16 — L7 fix attempt: **RETRACTED — DO-NOT-SHIP** (see D.17)
+
+> ## ⚠ THIS APPENDIX IS FALSE AS WRITTEN. READ D.17 FIRST.
+>
+> Two reviewers independently refuted it by execution. **The fix introduces a new regression**: on a shape
+> the reference build handles convergently (0/80 forks), the current tree forks replica-vs-replica on
+> membership and authority (44/80). Every closure claim below is withdrawn:
+>
+> - ~~"L7 is closed"~~ — the same-group variant still forks, and a new cross-group variant was introduced.
+> - ~~"restores membership and admission agreement"~~ — violated by both reviewers' probes.
+> - ~~"a throw there is identical on every replica"~~ — true of the *fold*, false of the *classification*:
+>   the throw is blamed on the **arriving** vertex, not the vertex that threw, so
+>   `knownInvalidVertexHashes` diverges permanently across replicas.
+> - ~~"every known legacy-plane convergence defect is now closed"~~ — false; the D.16.5 table is wrong.
+> - **D.16.4's fallback condition has been met**: group-aware identity alone is insufficient.
+>
+> The text is kept unedited below as the record of what was believed and why. **Do not cite it.**
+
+## Appendix D.16 (retracted) — L7 fix: ACL conflict identity is group-aware, replay failures classify deterministically
+
+L7 (D.14.1) is closed. Authority-chain current-engine disagreement went **48→0** per-PR and **320→0**
+nightly; the pinned four-vertex case converges on identical membership, order, ACL authority, DRP state and
+admission outcomes. Independently verified: differential **9/9** at both tiers with the reference oracle,
+full suite **1368 passed / 0 failed**, typecheck clean, lint 0 errors.
+
+### D.16.1 — The scope came from the measurement, not from the report
+
+D.15.4's owed verification decided what the fix had to cover. Measured directly:
+
+- The **authority and state** disagreement is shared with the reference build — pre-existing, not caused by
+  slices 0q/0r.
+- The **membership and order** disagreement was **new**. The reference fails *loudly* (`applyVertices`
+  throws, all four vertices retained, identical order both ways); per-vertex quarantine converted that into
+  a **silent, arrival-order-dependent vertex drop** (3 vs 2 members, order 3 vs 1).
+
+So L7 was part pre-existing defect, part regression, and the fix needed both halves. Taking the
+implementer's "pre-existing" framing at face value would have produced a fix that left replicas disagreeing
+about which vertices exist.
+
+### D.16.2 — F1: replay-time failures are deterministic, and now classify that way
+
+`drp-applier.ts:410` classifies `DeterministicRejectionError` as terminal invalidity, and canonical ACL
+replay wraps throws as that type (`:1367`) across the concurrent, hinted, tail and reconciliation paths.
+
+> **Rule:** reconstructed ACL replay is a pure fold over immutable causal history, so a throw there is a
+> function of the causal past — identical on every replica that folds the same order. It is `invalid`
+> (remembered, bounded), never `quarantined`.
+
+The S5/S6 distinction is **sharpened, not collapsed**: genuinely non-deterministic application failures
+still run through ordinary `applyVertices` and remain retriable quarantine. This is the half of the fix
+that closes the *regression* — it is what restores membership and admission agreement.
+
+### D.16.3 — F2: group-aware ACL conflict identity, and it is a coordinated-upgrade change
+
+`acl/index.ts:215` makes ACL-to-ACL conflict identity compare the **group** as well as `opType` and
+`value[0]`. `grant(eve, Admin)` and `revoke(eve, Finality)` are simply not in conflict, so neither is
+dropped and no descendant loses its authorization premise.
+
+Two refinements were required, and both are worth recording because neither was obvious:
+
+1. **The group comparison applies only when *both* operations are ACL operations.** A naive comparison
+   disabled ACL-vs-DRP conflict resolution and produced **28 unapproved `mixed-acl` reference divergences**;
+   restricting it to ACL-vs-ACL returned them to zero. That earlier ACL-vs-DRP collision behaviour is
+   deliberate (it is what Critical 1 was about), so the carve-out preserves a real invariant — but it is a
+   carve-out, and it is under review as to whether it is a principle or a patch.
+2. **Revoking a group an admin does not hold is a no-op** (`acl/index.ts:122`). Existing protection against
+   revoking a group an admin *does* hold is unchanged.
+
+**F2 changes folded state for ordinary rooms** containing concurrent same-target cross-group ACL
+grant/revoke pairs. Unlike slice 0r — whose fix was provably a no-op on honestly-formed rooms — this one is
+a genuine **coordinated-upgrade** change under principle 3. It is recorded in the approved divergence class
+with staleness enforcement, and honest-corpus equivalence against the reference is **0/144** per-PR and
+**0/960** nightly, with the intended authority-chain divergence exercised at 48/48 and 320/320.
+
+### D.16.4 — Option (b) was considered and rejected on scope
+
+Propagating a resolved-away drop to causal descendants would require **persistent drop tombstones across
+checkpoints plus pre-authorization replay** — substantially broader than a conflict-identity change, and it
+would alter drop semantics for every DRP rather than for ACL pairs alone. Recorded so it is not
+re-litigated: if group-aware identity later proves insufficient, (b) is the fallback and its cost is known.
+
+### D.16.5 — Phase 0 legacy-plane status
+
+| defect | status |
+|---|---|
+| L1 state adoption is a merge, not a replacement | closed |
+| L2 replica-local `context` in snapshots | closed |
+| L3 merge batches not atomic | closed (per-vertex atomicity, six attempts) |
+| L4 untyped authorization failure | closed |
+| L5 untyped unknown-operation failure | closed |
+| L6 checkpoint written from un-reconciled live state | closed |
+| L7 ACL authority fork by delivery order | **closed** |
+| Critical 1 resolver fence per-type vs per-subgraph | closed |
+| Critical 2 linearizer double-push | closed (slice 0r) |
+
+Every known legacy-plane convergence defect found by this program is now closed, and the corpus that finds
+them covers vertex type, ACL group, authority chains, transitive edges, join fan-out, ACL state and
+admission outcomes — at a measured 100% precondition rate on the family that motivated it.
+
+---
+
+## Appendix D.17 — Why the L7 fix is a regression, and the premise that was wrong
+
+Two reviewers, working independently with different probes, reached the **same two HIGH findings** and the
+same root cause. That is the strongest corroboration in this appendix, and it retracts D.16.
+
+### D.17.1 — The false premise: ACL groups are not independent
+
+F2 assumed `grant`/`revoke` on **different** groups are independent and therefore never conflict. They are
+not. `ObjectACL.revoke`'s guard at `acl/index.ts:126` couples **every** group's revoke to the target's
+**Admin** membership:
+
+```
+grant(p, Writer) ; grant(p, Admin) ; revoke(p, Writer)
+  -> "Cannot revoke permissions from a peer with admin privileges"
+```
+
+So `grant(p, Admin)` and `revoke(p, G)` — different groups — are **order-coupled** whenever `p` already
+holds `G`. Grant-first: `p` is an admin holding `G`, the guard throws, the revoke fails. Revoke-first: it
+succeeds. F2 de-conflicted exactly that pair.
+
+**Measured, both reviewers, on `W0: grant(p,Writer) → {GA: grant(p,Admin), RW: revoke(p,Writer)}`:**
+
+| engine | forks |
+|---|---|
+| reference `7f9e66a` | **0 / 80** — all schedules and fresh replay agree |
+| current tree | **44 / 80** — `members=[GA,W0] admin=true` vs `members=[RW,W0] admin=false` |
+
+The reference converges here *because* its over-broad predicate drops `GA` via RevokeWins and never reaches
+the guard. **This is a regression introduced by the fix**, not a pre-existing defect, and it is not in the
+approved divergence class.
+
+### D.17.2 — F1 blames the wrong vertex
+
+`applyDeterministicReplayVertices` folds the whole canonical suffix — which routinely contains
+already-admitted vertices — and pins **any** throw on the *pending* vertex. So the same deterministic fold
+failure brands `RF` invalid on one replica and `GA` on another. `knownInvalidVertexHashes` therefore
+diverges permanently, and the invalid-cascade amplifies it to descendants.
+
+D.16.2's rule was right about the fold and wrong about the implementation: *the fold is deterministic; the
+attribution is not.* **This is what converts the forks above from "divergent until retried" into "divergent
+forever."** Any fix must blame the vertex that actually threw.
+
+### D.17.3 — The original L7 mechanism is still open for same-group pairs
+
+`grant(p, Admin)` vs `revoke(p, Admin)` still legitimately conflicts, RevokeWins still drops one, and drops
+**still do not cascade to causal descendants** — so a descendant of the dropped grant still executes with
+its authorization premise removed. Measured: revoke-last → members `{GA2, WG2, P}`, admin=true; revoke-first
+→ members `{GA2, RA}`, admin=false.
+
+D.14.1's root-cause sentence — *"pair-semantics drops do not cascade to causal descendants"* — was never
+addressed. F2 routed **around** it for cross-group pairs instead of fixing it. **D.16.4's recorded fallback
+(option b: propagate drops to descendants) is now triggered.**
+
+### D.17.4 — My own rule, violated one appendix later
+
+D.15.2 established: *"a generator that reaches its precondition 0% of the time is indistinguishable from no
+coverage, and reads as green — measure the firing rate, never assume it."*
+
+The widened generator measures **100%** — but only for the *resolver-collision* precondition. The
+authority-chain generator draws fresh targets that **never pre-hold the revoked group**, so the
+**admin-guard precondition fires at 0%**, and `hasResolverPrecondition` *requires* `crossGroup`, so the
+**same-group-with-descendant precondition also fires at 0%**. Both new forks are invisible to it.
+
+> **The sharper rule: a defect class has a precondition, and a *measured* 100% on one precondition says
+> nothing about the others. Enumerate the preconditions of the mechanism — here: does the resolver drop
+> fire? does the target already hold the group? does the dropped vertex have descendants? — and measure
+> each independently.**
+
+### D.17.5 — What the next attempt must do
+
+1. **Blame the throwing vertex, not the arriving one.** Without this, every other fix still diverges
+   permanently. This is the highest-value single change.
+2. **Handle the group coupling.** Either keep group-aware identity and make the admin guard's outcome
+   order-independent, or treat `grant(p, Admin)` as conflicting with any concurrent `revoke(p, ·)`.
+3. **Make drops cascade to causal descendants** (option b) — the same-group case cannot be routed around.
+   Cost is known and recorded: persistent drop tombstones across checkpoints plus pre-authorization replay.
+4. **Extend the corpus first**, with independently measured firing rates for all three preconditions.
+
+### D.17.6 — Standing corrections
+
+- **D.15.2 / D.15.5's "100% precondition rate" and coverage list are false as scoped** — annotated above.
+- **D.15.4's binding consequence** ("must restore membership and admission agreement") is **violated** by
+  the delivered fix.
+- **D.16 is retracted in full**, including its D.16.5 "all closed" table.
+- **LOW, still open:** `applyDeterministicReplayVertices` wraps *any* throw from *any* `IDRP` as terminal,
+  with no `ObjectACL` check. `DRPObjectOptions.acl` is a public injection point, so a custom ACL with an
+  ambient failure source — or a `RangeError` on an adversarially deep payload — becomes permanent shared
+  invalidity rather than retriable quarantine. No in-repo custom ACL exists; the unguarded surface stands.
+
+## Appendix D.18 — L7 second attempt: replay attribution landed; attempt-1 semantics later reverted
+
+**Status: SUPERSEDED PARTIAL.** Replay attribution from Fix 1 was later completed across direct admission,
+hinted adoption and the submitted-vertex verdict, and remains landed. The attempt-1 group-aware resolver
+identity and relaxed revoke guard were retracted in D.16 but remained in source through attempts 2 and 3;
+D.22 finally reverts both to `7f9e66a`. They are not a kept coordinated upgrade.
+
+`applyDeterministicReplayVertices` now classifies each built-in ACL operation while its vertex is still in
+scope and carries that vertex's hash through the deterministic error. The outer admission loop recorded the
+attributed hash but failed to give the pending vertex any verdict, and it exposed a committed graph member
+through `invalid`. The two-replica pin proved only that the replay wrapper identified the throwing revoke
+given identical committed inputs; it did not generalize to differing committed sets. S1 remained explicit:
+a revoke committed before the later replay failure stayed in the graph.
+
+The D.17.6 custom-ACL replay gap was closed at that seam. Built-in ACL domain failures received an internal
+typed marker, while untyped failures from a custom injected ACL remained quarantined and retriable. The
+marker was not wired into direct admission or hinted adoption, so S5/S6 was not yet satisfied across the
+whole admission surface.
+
+### D.18.1 — Why Fix 2 was not left half-landed
+
+Option (b), measured directly, changed the widened result from
+`held-group-coupling=48, same-group-descendant=48` to
+`admin-authority-chain=48, same-group-descendant=48`: it fixed the regression by reopening the case D.16
+had closed. Ordering the Admin grant after a cross-group revoke (option (a)) was also rejected: the swap
+moved the grant behind its own authority-chain descendants and still produced 32/48 authority-chain
+divergences. Both experiments were reverted.
+
+The later three-way confer rejected preserving either attempt-1 semantic hunk as a partial fix. D.22
+restores reference conflict identity and revoke behavior, keeps attribution/admission/partial-merge
+mechanisms, and returns resolver-drop descendant closure to the deferred F3 owner. Any future closure must
+publish resolver-drop closure and folded state together, persist the closure in checkpoints, classify a
+pending overlay before authorization, repeat that classification after a frontier-CAS retry, and retract
+stale contextual verdicts. Existing performance coverage still requires the cascade to stay scoped to ACL
+drop roots unless the broader resolver contract is deliberately re-specified.
+
+### D.18.2 — Measured partial state and next pickup
+
+- Current engine, per-PR: **96/336** — held-group **48**, same-group descendant **48**, every other slot 0.
+- Current engine, nightly: **640/2240** — held-group **320**, same-group descendant **320**, every other
+  slot 0.
+- P1/P2/P3: **48/48** per-PR and **320/320** nightly.
+- `fixed-four-vertex-cross-group-authority-chain` remains green.
+- Focused rejection taxonomy: **5/5 passed**.
+- Full object suite: **249 passed / 3 failed / 4 skipped**; the three failures are the two fixed deferred
+  cases and the widened differential gate.
+- Node: **202/202 passed**. Typecheck: **28/28 projects**. Lint: **0 errors** (177 pre-existing warnings).
+
+**Next pickup:** implement Fixes 2 and 3 as one ACL-drop replay slice with persistent checkpoint
+tombstones, pre-authorization overlay classification, CAS-retry reclassification, and atomic retraction of
+stale contextual entries from `KnownInvalidHashes`. The retraction mechanism is a hard prerequisite of F3,
+not a follow-up. Keep same-group grant/revoke conflicts, ACL-vs-DRP behavior, S1/S2/S3/S5/S6, bounded retry,
+and all three fixed cases pinned.
+
+---
+
+## Appendix D.19 — Attempt-2 review: unanimous DO-NOT-SHIP; D.18's headline claim is false
+
+Three independent reviewers (grok, kimi at `--max-steps-per-turn 100`, and an adversarial Opus agent with
+executed repros) reviewed the attempt-2 diff unprimed. **All three returned DO-NOT-SHIP, converging on the
+same blocker.** Each finding below was re-confirmed against the source directly before being recorded here.
+
+The attempt-2 self-report was, unusually, numerically honest: an independent re-run of typecheck, lint, the
+object and node suites and all three differential tiers reproduced every number in D.18 exactly. The defect
+is not in the measurements. It is that **D.18 measured the wrong thing** — it verified the replay path and
+claimed the result for the whole admission surface.
+
+### D.19.1 — F1 (blocker): the marker class was never wired into the admission classifier
+
+`drp-applier.ts:420-424`'s `isDeterministicFailure` tests four error types and **not**
+`ObjectACLDeterministicError`. That class is converted to a terminal verdict in exactly one place —
+`drp-applier.ts:1388`, inside `applyDeterministicReplayVertices` — which does not run for an ACL op on the
+*arriving* vertex. `DeterministicRejectionError` is constructed only at `:1097`, `:1335`, `:1345`, `:1350`
+and `:1360`, all writer-check or unknown-operation, so a built-in ACL domain throw has no route to any of
+them. kimi identified a second unwired site: the hinted-adoption `applyVertex` at `drp-applier.ts:594`.
+
+Consequence: every arriving built-in ACL rejection — non-admin `grant`, invalid group, permissionless writer
+grant, non-signer `setKey` — is **quarantined and retried forever** rather than marked permanently invalid.
+Trigger is one signed non-admin peer sending one ACL op: no fork, no concurrency, no special graph.
+
+The same `ObjectACL` guard family therefore yields opposite verdicts by path — replay: `invalid` +
+remembered; direct: `quarantined` + not remembered. **S5/S6 is violated by construction**: `quarantined` now
+provably contains a 100%-deterministic rejection.
+
+This is *not* a regression — at `7f9e66a` those guards threw plain `Error` and were also quarantined. What
+is new is D.18's claim to have fixed it.
+
+### D.19.2 — F2 (blocker): the submitted vertex receives no verdict, and this one IS a regression
+
+`drp-applier.ts:435-441`: when the attributed hash ≠ the pending hash, the loop records the attributed hash
+and `continue`s. The vertex the caller submitted is never pushed to `invalid`, `missing` or `quarantined`.
+At `7f9e66a` the `else` branch pushed `vertex.hash`, so the caller got a terminal verdict — **the result
+contract regressed.**
+
+Two consequences neither reviewer had to infer: `invalid` names a hash that is *committed and present in the
+graph* (it is simultaneously written into `knownInvalidVertexHashes` while S1 keeps it), and a child of the
+dropped vertex sits in `missing` forever. `missing` is the only field `packages/node/src/handlers.ts:260,295`
+acts on, so `recoverMissingSync` re-requests a parent that is silently dropped again on arrival — an
+unbounded sync loop with no terminal state.
+
+### D.19.3 — F3 (major): the L7 mechanism is not closed; the pin does not generalize past two
+
+D.18's two-replica pin holds at two concurrent ACL ops and **does not generalize**. At three concurrent ACL
+ops on a target holding Writer+Finality — all pairwise `Nop` under the group-aware resolver, hashes forced
+`GA < RW < RF` — the replicas' committed sets differ, so the folds differ, a different vertex throws first,
+and `knownInvalidVertexHashes` diverges permanently. `RF` ends committed on one replica and permanently
+invalid on the other; a child of `RF` inherits it, turning one divergence into an unbounded permanently-
+invalid subtree.
+
+This is precisely the D.17.2 mechanism Fix 1 was supposed to close. D.18's "Fix 1 from D.17.5 is complete"
+is therefore **false as written**; the correct statement is that attribution is deterministic *given
+identical committed sets*, which is the assumption the defect violates.
+
+### D.19.4 — F4 (major): the quarantine result was added and the batch abort re-raised anyway
+
+`drp-applier.ts:507` stashes `legacyMergeError` and `packages/object/src/index.ts:228-229` re-throws it from
+`DRPObject.merge`. One unauthorized ACL op attached to an UPDATE therefore suppresses attestation and
+missing-recovery for the whole message: the throw skips `appliedVertices`, the finality-signature block and
+`recoverMissingSync` at `handlers.ts:260-297`, while the honest vertices in the batch commit.
+`packages/message-queue/src/message-queue.ts:90` catches and logs, so this is finality/liveness suppression
+rather than a crash. Throwing out of `merge` is pre-existing in kind; what is new is that a per-vertex
+quarantine result was introduced and the batch abort was left in place, so the abort was never actually
+removed.
+
+### D.19.5 — F5: an undocumented wire-visible change, and the measurement that could not see it
+
+`acl/index.ts:126` was changed from `query_isAdmin(peerId)` to
+`query_isAdmin(peerId) && this._authorizedPeers.get(peerId)?.permissions.has(group)`. Vertices that
+previously failed permanently now commit as no-ops. **This change appears nowhere in this plan** — not in
+D.16, D.17 or the original D.18 report — and that report treated ordinary-room folded state as unchanged.
+It is not.
+(The sibling group-aware resolver change at `acl/index.ts:219-227` *is* disclosed, in D.16.3, as a
+deliberate coordinated upgrade; only the revoke-guard relaxation was undisclosed.)
+
+The honest-corpus equivalence evidence — 0/144 per-PR — could never have caught it. Every revoke fixture in
+the corpus pre-grants the group first (`convergence-differential.test.ts:1394-1416` builds
+`W0=grant(p,Writer)` before `RW=revoke(p,Writer)`), so **no generated case revokes a group the admin does
+not hold.** The 0/144 result is blind to this change by construction.
+
+This is the same lesson as D.14, now for the fourth time, and it is worth stating in its most general form:
+
+> **An equivalence result is scoped to the preconditions its generator actually produces.** "0 divergences
+> across 144 cases" is a statement about the generator, not about the engine. Before any coordinated-upgrade
+> claim, name the precondition the change needs in order to be observable, and assert that it fires.
+
+The attempt-3 RED run adds that measurement as precondition **P4** (`revoke(p, G)` where `p` is admin and
+lacks `G`), with a generator slot and a fixed fixture. First numbers: P4 fires 48/48 per-PR; the new slot
+shows **48/48 unapproved cross-engine differences against `7f9e66a`** (`RA` applied on current, quarantined
+on the reference). The change is real, measurable, and was invisible for two attempts.
+
+### D.19.6 — What the reviewers cleared
+
+Not everything was wrong, and the record should say so. All three reviewers independently judged the new
+`deterministic-rejection-taxonomy.test.ts` **not theater**: it builds real `DRPObject`s and real
+`createVertex` hashes, asserts on graph membership, `knownInvalidVertexHashes` and folded ACL queries, and
+its hash-ordering searches fail loudly. Its weakness is coverage, not honesty — not one test sends an ACL op
+that the built-in ACL rejects on arrival, which is exactly the F1 path.
+
+Verified clean by at least two reviewers each: **S2** (the `UndoJournal` is constructed, used and
+committed/rolled-back inside one synchronous section with no `await` between record and commit), **S3**
+(presence and frontier-CAS re-checked inside that section in both `tryCommitPreparedVertex` and
+`reconcileCanonicalState`), **S1** (no path removes a committed vertex; F2 mislabels `RW`, it does not
+remove it), bounded retry (`MAX_ADOPTION_COMMIT_ATTEMPTS = 3` on both loops, terminating in a typed error),
+no mutex, and synchronous local DRP calls.
+
+Two further items, both from kimi, worth carrying into the fix:
+
+- `ObjectACLDeterministicError` is **not exported from the package entrypoint** —
+  `packages/object/src/index.ts:23` re-exports `./acl/index.js` but never `./acl/errors.js`. An external
+  custom ACL cannot reuse the marker, and under a duplicate-copy load of `@ts-drp/object` the `instanceof`
+  taxonomy degrades silently to "quarantined" — a failure mode that produces no error at all.
+- `REPLICA_LOCAL_STATE_KEYS = {"context"}` (`state.ts:14`) silently drops any third-party blueprint field
+  named `context` from snapshots. No built-in blueprint has one; the comment acknowledges the contract.
+
+### D.19.7 — Process note
+
+Attempt 2's own second-opinion pass never ran: nested `codex review --uncommitted` failed inside its sandbox
+with `failed to initialize in-process app-server client: Operation not permitted (os error 1)`. It reported
+this honestly and finished anyway. **A sandboxed implementation run cannot review itself** — the review must
+be dispatched from outside the sandbox, and the three-reviewer panel is what found all five defects here.
+
+---
+
+## Appendix D.20 — L7 attempt 3 result, corrected by the D.22 revert
+
+**Status: SUPERSEDED PARTIAL.** F1, F2, F4 and F6 remain closed in source. F5's group-aware resolver and
+relaxed revoke guard are not a coordinated upgrade: D.16 retracted their premise and D.22 restores both
+reference semantics. All ten attempt-3 pins now pass after honest re-fixturing; the open F3 owner is the
+inherited resolver-drop/causal-descendant class, not “three concurrent ACL operations.”
+
+### D.20.1 — F1: deterministic ACL admission is wired and observable
+
+`drp-applier.ts` now uses `isObjectACLDeterministicError` in the outer admission classifier as well as in
+canonical replay. This covers direct arrival and the hinted-adoption `applyVertex` propagation point.
+Built-in ACL domain failures are terminal; untyped custom ACL failures remain quarantined. The helper uses
+a `Symbol.for` brand in addition to `instanceof`, so a duplicate installed copy cannot silently invert the
+taxonomy.
+
+The widened corpus adds `arriving-built-in-rejection` and P5. P5 fires **48/48** per-PR. Against
+`7f9e66a`, all 48 cases observe the intended admission-only coordinated-upgrade difference: current returns
+`invalid`; reference returns `quarantined`. Current replicas and fresh replay agree in all 48 cases.
+
+The three F1 RED rows cannot be made green without violating F2 and S1. Each invokes the same
+revoke-first + arriving-GA replay as F2, but expects `invalid=[RW]` even though RW is already in the graph.
+F2 requires `invalid` to contain no graph member and requires the submitted GA to receive the terminal
+verdict. Actual result is `invalid=[GA]`; the expected and received hashes are
+`RW=d3ce71da35da376627206980d1ce4038c49d13369d70df9e5b64313c56af135c` and
+`GA=bdbbbf8c704b2667210c47311fe3f39a15afa994773e2b5db626dd03af2194ac`.
+The older focused taxonomy row contains the same stale expectation. No pin was edited.
+
+### D.20.2 — F2: attribution and caller verdict have separate owners
+
+When an attributed replay failure names a committed vertex other than the submitted vertex, the applier
+records the attributed culprit in `knownInvalidVertexHashes`, but returns and remembers the submitted
+vertex as invalid. This preserves the attribution Fix 1 was created for, keeps S1, prevents `invalid` from
+naming a graph member, gives redelivery the same terminal answer, and makes a child of the rejected
+submitted vertex terminal instead of perpetually `missing`.
+
+All three F2 RED pins pass. The design deliberately does not put the committed culprit in the public
+`invalid` result: that alternative violates both the result contract and the graph-membership invariant.
+
+### D.20.3 — F3: resolver drops still lack causal-descendant closure
+
+The attempt-1 resolver created a held-group regression and amplified it in the three-way fixture. Reverting
+that resolver makes both `fixed-held-group-coupling-regression` and
+`fixed-three-way-held-group-attribution` anti-reintroduction pins green. That does not close F3. The open
+class is a resolver-selected-away ACL authority vertex whose causal descendants remain eligible for replay:
+the two-operation cross-group authority chain and the two-operation same-group pair with a descendant both
+fork exactly as `7f9e66a` does.
+
+Closing the inherited class still requires the D.18.1 slice: persistent ACL-drop tombstones,
+pre-authorization overlay classification, frontier-CAS retry reclassification, and retraction of
+invalid-memory entries made stale by drop-closure reclassification. D.22 lands the cheap general
+retraction-on-commit rule, but does not attempt F3.
+
+### D.20.4 — F4: merge returns the partial per-vertex result
+
+`drp-applier.ts` no longer creates the non-contract `legacyMergeError` property, and `DRPObject.merge` no
+longer rethrows it. A quarantined custom ACL vertex yields legacy tuple `[false, [], []]`; a deterministic
+built-in rejection yields `[false, [], [hash]]`; honest vertices committed in the same batch remain visible.
+
+At `handlers.ts:260-297`, UPDATE handling now continues to compute `appliedVertices`, process eligible
+attestations, sign committed vertices, run missing recovery, store the object and dispatch the update event.
+At `message-queue.ts:90`, these per-vertex outcomes no longer reach the catch/log boundary as a whole-message
+failure. Both F4 RED pins pass. Two older `drpobject.test.ts` rows still expect `merge` to reject and are
+stale against the explicit F4 contract; they were not edited.
+
+### D.20.5 — F5: attempt-1 ACL semantics are reverted
+
+The revoke guard is again `query_isAdmin(peerId)`, and ACL conflict identity again compares only `opType`
+and target peer. P4 still fires **48/48**, but is now a direct cross-engine guard-equivalence check:
+**0/48 differences** against `7f9e66a`. Any remaining full-engine P4 admission difference belongs to P5's
+typed deterministic-admission change, not to revoke semantics. The coordinated-upgrade classification for
+the two reverted hunks is deleted.
+
+### D.20.6 — F6: public marker and duplicate-copy fallback
+
+`packages/object/src/index.ts` exports `./acl/errors.js`. External custom ACLs can reuse
+`ObjectACLDeterministicError`. `isObjectACLDeterministicError` recognizes the shared global-symbol brand
+across duplicate package copies while leaving ordinary custom errors quarantined.
+
+### D.20.7 — Verification ledger
+
+Per-PR widened slots:
+
+| slot | current | `7f9e66a` oracle mode | `7f9e66a` primary |
+|---|---:|---:|---:|
+| mixed-acl | 0 | 0 | 0 |
+| admin-authority-chain | 48 | 48 | 48 |
+| resolver-drop | 0 | 0 | 0 |
+| held-group-coupling | 0 | 0 | 0 |
+| same-group-descendant | 48 | 48 | 48 |
+| admin-revoke-absent-group | 0 | 0 | 48 |
+| arriving-built-in-rejection | 0 | 0 | 0 |
+| transitive-join-children | 0 | 0 | 7 |
+| many-writers | 0 | 0 | 0 |
+| **total** | **96/432** | **96/432 current** | **151/432** |
+
+Oracle mode measures P4 revoke-guard equivalence at **0/48 differences**. Full-engine admission taxonomy
+still differs on P4 inputs because P5's typed classifier is retained; that is one classifier class, not a
+revoke-semantic exception. P1/P2/P3/P4/P5 each fire **48/48 (100%)** in all three per-PR modes.
+
+- L7 attempt-3 file: **10/10 passed** after reference-reachable replay re-fixturing.
+- The two deferred inherited fixed fixtures are `fixed-four-vertex-cross-group-authority-chain` and
+  `fixed-same-group-pair-with-descendant`.
+- Required anti-reintroduction fixtures green: held-group coupling and three-way held-group attribution.
+- Required retained mechanisms green: arriving built-in rejection, partial `merge()`, attributed replay,
+  and the submitted-vertex verdict.
+
+**F1 — CLOSED and honestly pinned with the authority-chain replay shape.**
+
+**F2 — CLOSED; culprit≠submitted is reachable with the built-in ACL on that authority chain.**
+
+**F3 — NOT-CLOSED: 48 authority-chain + 48 same-group-descendant per-PR divergences, both inherited.**
+
+**F4 — CLOSED in source; two older merge-throws expectations are stale.**
+
+**F5 — REVERTED; P4 fires 48/48 and the direct guard comparison is reference-equivalent.**
+
+**F6 — CLOSED.**
+
+---
+
+## Appendix D.21 — Result-contract confer: submitted verdict retained; F3 gains a retraction prerequisite
+
+The replay result contract was put to a three-way confer: an Opus reviewer, a clean read-only Codex
+session, and kimi. The decision is final for this slice:
+
+- `invalid` names the **submitted vertex**.
+- When deterministic canonical replay attributes the throw to a different committed vertex, both the
+  culprit and the submitted vertex are remembered in `knownInvalidVertexHashes`.
+- The committed culprit is not returned in `invalid`; `invalid` never names a graph member.
+
+The confer retained the public submitted-vertex verdict, but its “permanently unadmissible” premise is
+executed-false. A deterministic verdict is terminal for one canonical fold, not terminal per hash: a later
+resolver drop can change the fold and allow the same hash to commit. Therefore a committed hash is removed
+from `KnownInvalidHashes`. Forgetting a currently rejected submitted parent is still unsafe because it
+recreates D.19.2's `missing`/recovery loop; the correction is retraction when the contextual verdict becomes
+stale, not pretending the first verdict never happened. Invalid memory remains replica-local and
+FIFO-bounded, but neither fact makes an entry permanent.
+
+The six stale expectations were corrected without removing or weakening a pin. The three F1 rows now
+require replay and direct admission alike to report their submitted vertex, while separately proving that
+the replay culprit is remembered and not reported. The focused taxonomy row now reports arriving `GA`,
+remembers both `RW` and `GA`, and preserves its grant-first assertion that pending `RW` is attributed to
+itself. D.20's GREEN report counted an “older contradictory taxonomy row” but did not disclose this failing
+test and overturned assertion by name; that omission is corrected here. The two deprecated `merge()` ACL
+tests now require `[false, [], [hash]]` and unchanged ACL state.
+
+Removing `merge()` rejection is correct but is a **breaking behavior change to a public deprecated API**:
+callers that used promise rejection as the unauthorized-vertex signal must migrate to the returned invalid
+hash tuple (or `applyVertices`). Deprecation does not make the behavior change non-breaking.
+
+The confer also identified one hard F3 prerequisite. `KnownInvalidHashes` was append-only even though
+contextual rejection decisions are reversible when resolver closure changes the admissible canonical fold.
+D.22 lands retraction when a hash commits. The remaining F3 slice must publish checkpoint tombstones and
+folded state atomically, classify the pending overlay before authorization, repeat that classification
+after a frontier-CAS retry, and retract any other verdicts made stale by that same reclassification. The
+deferred class is resolver-dropped ACL authority with live causal descendants; it already appears in
+two-operation authority-chain and same-group-descendant shapes, so “three concurrent ACL ops” is not its
+definition.
+
+Verification after correcting the six expectations:
+
+- Focused attempt-3/taxonomy pins now pass; the built-in culprit≠submitted route is the authority chain.
+- The remaining fixed failures are the inherited cross-group authority chain and same-group descendant;
+  held-group coupling and three-way held-group attribution are anti-reintroduction passes.
+- Node: **202/202 passed**. Typecheck: **28/28 projects passed**. Lint: **0 errors / 177 warnings**.
+- Current and baseline-oracle per-PR modes both remain **96/432** current divergences:
+  authority-chain **48**, same-group descendant **48**, every other current slot — including held-group
+  coupling and mixed ACL — 0.
+  Baseline-as-primary remains **151/432**, its expected self-validation result. P1/P2/P3/P4/P5 each fire
+  **48/48 in all three modes**.
+
+---
+
+## Appendix D.22 — Unanimous revert: restore reference ACL semantics, keep the independent rejection work
+
+An Opus reviewer, a clean-session Codex reviewer and kimi conferred on attempts 1–3. All three returned
+**REVERT**. This appendix executes that decision; it does not reopen the design vote.
+
+### D.22.1 — Exact semantic boundary
+
+Two attempt-1 hunks are reverted to `7f9e66a`, and only those two ACL semantics:
+
+1. `ObjectACL.resolveConflicts` no longer includes ACL group in conflict identity. Opposite
+   `grant`/`revoke` operations on the same target conflict regardless of group.
+2. `ObjectACL.revoke` again rejects every revoke whose target is an admin, regardless of whether the target
+   currently holds the named group.
+
+The deterministic direct-admission classifier, attributed canonical replay, submitted-vertex verdict,
+partial `merge()` result and public deterministic ACL marker remain. They are independent of the reverted
+hunks, and the widened `arriving-built-in-rejection` slot remains at **0 current divergences** with P5
+firing **48/48**.
+
+This is deliberately provenance-first, not a claim that the authority fork disappeared. The revert
+knowingly restores the inherited **HIGH**: honest concurrent admins permanently fork ACL authority,
+**48/48** in `admin-authority-chain`. The choice is to keep the current engine reference-identical on this
+legacy semantic boundary and avoid owning attempt 1's new held-group regression. F3 still owns persistent
+ACL resolver-drop closure. Phase 3 supersedes the whole legacy boundary with a latched ACL whose resolver
+identity is `(peer, group)`.
+
+### D.22.2 — Honest re-pins
+
+- F1 keeps all three direct-admission guard rows. Its replay half now uses the reference-reachable authority
+  chain `GA → WG` plus concurrent `RF`. RevokeWins drops `GA`; committed `WG` then throws during canonical
+  replay. This was chosen over duplicating the same-group-descendant fixture because it simultaneously pins
+  the inherited HIGH and the attributed replay seam without an injected resolver.
+- F2's culprit≠submitted route is **reachable with the built-in ACL**, not dormant or custom-only. In the
+  same authority chain, `WG` is the committed culprit and `RF` is the submitted vertex. The public result
+  reports `RF`; internal memory attributes both.
+- `fixed-held-group-coupling-regression` and `fixed-three-way-held-group-attribution` are now green
+  anti-reintroduction pins.
+- `fixed-four-vertex-cross-group-authority-chain` and
+  `fixed-same-group-pair-with-descendant` are deferred inherited failures. Both fail on the current engine
+  and `7f9e66a`.
+- P4 still fires **48/48**, but now compares the direct absent-group revoke guard and reports **0/48
+  cross-engine differences**. The remaining full-engine verdict difference on P4 input belongs to P5's
+  retained deterministic-admission classifier; the revoked-guard coordinated-upgrade class is deleted.
+
+### D.22.3 — Review fix-ups
+
+`KnownInvalidHashes` retracts a hash when that hash commits, and public `invalid` results deduplicate hashes.
+The old built-in held-group repro is neutralised by the attempt-1 revert: both three-way unit pins now pass.
+The premise is still false in general, and a custom ACL using the exported marker reproduces it honestly:
+one fold rejects a hash, a later resolver drop makes it admissible, and redelivery commits it. The commit
+now removes the stale tombstone.
+
+The inherited FIFO bound remains **10,000** hashes, as it was at `7f9e66a`. A pinned 10,001-invalid flood
+evicts a real parent tombstone and changes its child from `invalid` back to `missing`, re-entering recovery.
+No mitigation was added because exact recovery after eviction requires retaining more information; that is
+a memory-risk trade rather than a free fix. Only committed-culprit hashes are new entrants from this slice.
+
+The deterministic marker is re-exported from `acl/index.ts`; `merge()` documents that it resolves with the
+partial legacy tuple and cannot surface `quarantined`; callers needing that retry bucket must use
+`applyVertices`. Promise-valued custom ACL operations now use the same `handlePromiseOrValue` path as DRP
+operations, preserving synchronous behavior for ordinary ACLs while awaiting injected async policies
+before state publication.
+
+### D.22.4 — Differential measurement
+
+| slot | current | `7f9e66a` oracle mode | `7f9e66a` primary |
+|---|---:|---:|---:|
+| mixed-acl | 0 | 0 | 0 |
+| admin-authority-chain | 48 | 48 | 48 |
+| resolver-drop | 0 | 0 | 0 |
+| held-group-coupling | 0 | 0 | 0 |
+| same-group-descendant | 48 | 48 | 48 |
+| admin-revoke-absent-group | 0 | 0 | 48 |
+| arriving-built-in-rejection | 0 | 0 | 0 |
+| transitive-join-children | 0 | 0 | 7 |
+| many-writers | 0 | 0 | 0 |
+| **total** | **96/432** | **96/432 current** | **151/432** |
+
+Every current axis is less than or equal to reference-primary. P1–P5 each fire **48/48** in all three
+per-PR modes. The remaining current failures are exactly the two inherited ACL descendant-closure classes;
+no attempt-1 semantic fork remains owned by this tree.
+
+### D.22.5 — Verification
+
+- Current differential: **3 failed / 8 passed / 2 skipped**; widened **96/432**.
+- `7f9e66a` oracle differential: **3 failed / 8 passed / 2 skipped**; current widened **96/432**; P4
+  revoke-guard equivalence **0/48 differences**.
+- `7f9e66a` primary self-validation: **4 failed / 7 passed / 2 skipped**; widened **151/432**.
+- Full object: **266 passed / 3 failed / 4 skipped**. The only failures are the two deferred fixed fixtures
+  and their widened aggregate.
+- Full node, twice: **202/202 passed** in both runs.
+- Typecheck: **28/28 workspace projects passed**.
+- Lint: **0 errors / 177 pre-existing warnings**.
+
+### D.22.1 — A counter that cannot fail, and 96 un-manifested reference differences
+
+Found while independently verifying the revert, not reported by the slice that produced it.
+
+`unapproved-baseline` moved from **48 to 96** after the revert. A "baseline problem" is
+`current replica outcome ≠ reference replica outcome` (`convergence-differential.test.ts:434-445`) — a
+current-vs-`7f9e66a` mismatch, *not* the reference forking against itself. So the tree now differs from the
+reference on more cases than before the revert, not fewer.
+
+That is expected once the cause is named, and it is worth naming precisely because the number moved in the
+opposite direction to the headline result. The revert restored ACL **semantics** to reference. It did not —
+and was not meant to — revert attempts 2/3's admission **taxonomy**, where a deterministic ACL rejection
+becomes `invalid` while the reference quarantines and retries. Restoring the strict revoke guard makes
+*more* shapes throw, so that intended taxonomy difference now surfaces on 96 cases rather than 48. The
+divergence is deliberate; its breadth was not measured until now.
+
+**The gap:** `approvedBaselineDivergenceClass` (`:1957`) whitelists only `transitive-join-children` /
+duplicate-dependency shapes and the `acl-admin-revoke-absent-group` / `acl-arriving-built-in-rejection`
+topologies. `admin-authority-chain` and `same-group-descendant` are affected by the same deterministic-
+admission change and are **not** whitelisted, so all 96 count as unapproved.
+
+**The sharper gap:** `unapprovedBaselineFailureCases` is incremented at `:2069` and printed at `:2129`, and
+**never asserted anywhere.** There is no `expect()` on it. Gate 0's G-b requires the opposite — every
+differing pair must match a manifest entry, an unknown pair must fail, and a stale entry must fail. Today
+this counter cannot fail a build, so 96 current-vs-reference differences sit unenforced and unexplained.
+
+This is not a defect introduced by this slice, and it is not a commit blocker: the differences are the
+intended taxonomy change, and the harness never claimed to gate them. It is recorded here as a **Gate-0
+prerequisite**: when G-b is built, these two topologies need explicit manifest entries carrying the
+deterministic-admission rationale, and the counter needs an assertion — otherwise the manifest mechanism
+ships with a hole exactly where the legacy plane already diverges.
+
+Generalised, this is the same lesson as D.19.5 from the other direction: **a number that is computed and
+printed but never asserted is not a gate.** It reads like coverage in a report and enforces nothing.
+

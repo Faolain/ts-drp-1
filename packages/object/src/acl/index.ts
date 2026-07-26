@@ -10,6 +10,10 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 
+import { ObjectACLDeterministicError } from "./errors.js";
+
+export { ObjectACLDeterministicError } from "./errors.js";
+
 function getPeerPermissions(params?: { blsPublicKey?: string; permissions?: Set<ACLGroup> }): PeerPermissions {
 	const { blsPublicKey, permissions } = params ?? {};
 
@@ -87,7 +91,7 @@ export class ObjectACL implements IACL {
 	 */
 	grant(peerId: string, group: ACLGroup): void {
 		if (!this.query_isAdmin(this.context.caller)) {
-			throw new Error("Only admin peers can grant permissions.");
+			throw new ObjectACLDeterministicError("Only admin peers can grant permissions.");
 		}
 		let peerPermissions = this._authorizedPeers.get(peerId);
 		if (!peerPermissions) {
@@ -104,12 +108,12 @@ export class ObjectACL implements IACL {
 				break;
 			case ACLGroup.Writer:
 				if (this.permissionless) {
-					throw new Error("Cannot grant write permissions to a peer in permissionless mode.");
+					throw new ObjectACLDeterministicError("Cannot grant write permissions to a peer in permissionless mode.");
 				}
 				peerPermissions.permissions.add(ACLGroup.Writer);
 				break;
 			default:
-				throw new Error("Invalid group.");
+				throw new ObjectACLDeterministicError("Invalid group.");
 		}
 	}
 
@@ -120,10 +124,10 @@ export class ObjectACL implements IACL {
 	 */
 	revoke(peerId: string, group: ACLGroup): void {
 		if (!this.query_isAdmin(this.context.caller)) {
-			throw new Error("Only admin peers can revoke permissions.");
+			throw new ObjectACLDeterministicError("Only admin peers can revoke permissions.");
 		}
 		if (this.query_isAdmin(peerId)) {
-			throw new Error("Cannot revoke permissions from a peer with admin privileges.");
+			throw new ObjectACLDeterministicError("Cannot revoke permissions from a peer with admin privileges.");
 		}
 
 		switch (group) {
@@ -137,7 +141,7 @@ export class ObjectACL implements IACL {
 				this._authorizedPeers.get(peerId)?.permissions.delete(ACLGroup.Writer);
 				break;
 			default:
-				throw new Error("Invalid group.");
+				throw new ObjectACLDeterministicError("Invalid group.");
 		}
 	}
 
@@ -147,7 +151,7 @@ export class ObjectACL implements IACL {
 	 */
 	setKey(blsPublicKey: string): void {
 		if (!this.query_isFinalitySigner(this.context.caller)) {
-			throw new Error("Only finality signers can set their BLS public key.");
+			throw new ObjectACLDeterministicError("Only finality signers can set their BLS public key.");
 		}
 		let peerPermissions = this._authorizedPeers.get(this.context.caller);
 		if (!peerPermissions) {

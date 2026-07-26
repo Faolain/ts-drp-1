@@ -1,10 +1,22 @@
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
-import { DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
+import { type DrpRuntimeContext, DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
 import { cloneDeep } from "es-toolkit";
 
 import { HashGraph } from "./hashgraph/index.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/object/states");
+
+/**
+ * Replica-local blueprint fields excluded from consensus-visible snapshot
+ * bytes. Adding another replica-local field to a blueprint requires adding it
+ * here, or that field becomes part of the replicated state contract.
+ */
+export const REPLICA_LOCAL_STATE_KEYS: ReadonlySet<string> = new Set(["context"]);
+
+export interface PrunedStateSnapshots {
+	drp: [Hash, DRPState][];
+	acl: [Hash, DRPState][];
+}
 
 /**
  * A custom error class for when a state is not found
@@ -33,6 +45,8 @@ export class DRPObjectStateManager<T extends IDRP> {
 	private drpConstructor?: { prototype: any };
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private aclConstructor: { prototype: any };
+	private drpContext?: DrpRuntimeContext;
+	private aclContext?: DrpRuntimeContext;
 
 	/**
 	 * @param acl - The ACL of the DRPObject
@@ -46,6 +60,8 @@ export class DRPObjectStateManager<T extends IDRP> {
 		this.drpConstructor = drp?.constructor as { prototype: any };
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.aclConstructor = acl.constructor as { prototype: any };
+		this.drpContext = cloneDeep(drp?.context);
+		this.aclContext = cloneDeep(acl.context);
 
 		this.drpStates.set(HashGraph.rootHash, drp ? stateFromDRP(drp) : DRPState.create());
 		this.aclStates.set(HashGraph.rootHash, stateFromDRP(acl));
@@ -70,6 +86,17 @@ export class DRPObjectStateManager<T extends IDRP> {
 	}
 
 	/**
+	 * Delete a DRP snapshot only when it is still the supplied instance.
+	 * @param hash - The snapshot hash
+	 * @param expected - The snapshot instance installed by the caller
+	 * @returns Whether the expected snapshot was deleted
+	 */
+	deleteDRPState(hash: Hash, expected: DRPState): boolean {
+		if (this.drpStates.get(hash) !== expected) return false;
+		return this.drpStates.delete(hash);
+	}
+
+	/**
 	 * Get the ACL state for a given hash
 	 * @param hash - The hash of the state to get
 	 * @returns The ACL state for the given hash
@@ -88,24 +115,46 @@ export class DRPObjectStateManager<T extends IDRP> {
 	}
 
 	/**
+	 * Delete an ACL snapshot only when it is still the supplied instance.
+	 * @param hash - The snapshot hash
+	 * @param expected - The snapshot instance installed by the caller
+	 * @returns Whether the expected snapshot was deleted
+	 */
+	deleteACLState(hash: Hash, expected: DRPState): boolean {
+		if (this.aclStates.get(hash) !== expected) return false;
+		return this.aclStates.delete(hash);
+	}
+
+	/**
 	 * Get the DRP and ACL for a given hash
 	 * @param hash - The hash of the state to get
-	 * @param replayDepth
+	 * @param replayDepth - Number of operations replayed for tracing
+	 * @param drpContext - Replica-local DRP runtime context
+	 * @param aclContext - Replica-local ACL runtime context
 	 * @returns The DRP and ACL for the given hash
 	 */
-	fromHash(hash: Hash, replayDepth = 0): [T | undefined, IACL] {
-		if (!isTracingEnabled()) return this.fromHashUntraced(hash);
+	fromHash(
+		hash: Hash,
+		replayDepth = 0,
+		drpContext = this.drpContext,
+		aclContext = this.aclContext
+	): [T | undefined, IACL] {
+		if (!isTracingEnabled()) return this.fromHashUntraced(hash, drpContext, aclContext);
 
 		return metrics.traceFunc(
 			"states.fromHash",
-			(candidateHash: Hash) => this.fromHashUntraced(candidateHash),
+			(candidateHash: Hash) => this.fromHashUntraced(candidateHash, drpContext, aclContext),
 			(span) => {
 				span.setAttribute("drp.replay.depth", replayDepth);
 			}
 		)(hash);
 	}
 
-	private fromHashUntraced(hash: Hash): [T | undefined, IACL] {
+	private fromHashUntraced(
+		hash: Hash,
+		drpContext?: DrpRuntimeContext,
+		aclContext?: DrpRuntimeContext
+	): [T | undefined, IACL] {
 		if (!this.aclConstructor) {
 			throw new Error("ACL constructor not set");
 		}
@@ -116,7 +165,7 @@ export class DRPObjectStateManager<T extends IDRP> {
 			throw new StateNotFoundError(`State ${hash} not found`);
 		}
 
-		return this.fromStates(drpState, aclState);
+		return this.fromStates(drpState, aclState, drpContext, aclContext);
 	}
 
 	/**
@@ -124,14 +173,23 @@ export class DRPObjectStateManager<T extends IDRP> {
 	 * because a merged frontier state does not necessarily belong to one hash.
 	 * @param drpState - DRP snapshot at the causal cut
 	 * @param aclState - ACL snapshot at the causal cut
+	 * @param drpContext - Replica-local DRP runtime context
+	 * @param aclContext - Replica-local ACL runtime context
 	 * @returns Reconstructed DRP and ACL instances
 	 */
-	fromStates(drpState: DRPState, aclState: DRPState): [T | undefined, IACL] {
+	fromStates(
+		drpState: DRPState,
+		aclState: DRPState,
+		drpContext = this.drpContext,
+		aclContext = this.aclContext
+	): [T | undefined, IACL] {
 		const acl = Object.create(this.aclConstructor.prototype);
+		if (aclContext) acl.context = cloneDeep(aclContext);
 		this.applyState(acl, aclState);
 
 		if (this.drpConstructor) {
 			const drp = Object.create(this.drpConstructor.prototype);
+			if (drpContext) drp.context = cloneDeep(drpContext);
 			this.applyState(drp, drpState);
 			return [drp, acl];
 		}
@@ -143,13 +201,36 @@ export class DRPObjectStateManager<T extends IDRP> {
 	 * Retain only snapshots that can still seed incremental replay or are in the
 	 * current replay suffix.
 	 * @param hashes - Snapshot hashes to retain
+	 * @returns Exact snapshot instances removed by this pruning pass
 	 */
-	prune(hashes: ReadonlySet<Hash>): void {
-		for (const hash of this.drpStates.keys()) {
-			if (!hashes.has(hash)) this.drpStates.delete(hash);
+	prune(hashes: ReadonlySet<Hash>): PrunedStateSnapshots {
+		const pruned: PrunedStateSnapshots = { drp: [], acl: [] };
+		for (const [hash, state] of this.drpStates) {
+			if (!hashes.has(hash)) {
+				pruned.drp.push([hash, state]);
+				this.drpStates.delete(hash);
+			}
 		}
-		for (const hash of this.aclStates.keys()) {
-			if (!hashes.has(hash)) this.aclStates.delete(hash);
+		for (const [hash, state] of this.aclStates) {
+			if (!hashes.has(hash)) {
+				pruned.acl.push([hash, state]);
+				this.aclStates.delete(hash);
+			}
+		}
+		return pruned;
+	}
+
+	/**
+	 * Restore snapshots removed by a pruning pass without overwriting a later
+	 * writer at the same hash.
+	 * @param snapshots - Exact snapshot instances removed by prune
+	 */
+	restorePruned(snapshots: PrunedStateSnapshots): void {
+		for (const [hash, state] of snapshots.drp) {
+			if (!this.drpStates.has(hash)) this.drpStates.set(hash, state);
+		}
+		for (const [hash, state] of snapshots.acl) {
+			if (!this.aclStates.has(hash)) this.aclStates.set(hash, state);
 		}
 	}
 
@@ -164,6 +245,7 @@ export class DRPObjectStateManager<T extends IDRP> {
 			throw new StateNotFoundError(`State ${hash} not found`);
 		}
 		const acl = Object.create(this.aclConstructor.prototype);
+		if (this.aclContext) acl.context = cloneDeep(this.aclContext);
 		this.applyState(acl, state);
 		return acl;
 	}
@@ -185,6 +267,7 @@ export function stateFromDRP(drp: IDRP | undefined): DRPState {
 	const state = DRPState.create();
 	if (!drp) return state;
 	for (const key of Object.keys(drp)) {
+		if (REPLICA_LOCAL_STATE_KEYS.has(key)) continue;
 		if (typeof drp[key] === "function") continue;
 
 		state.state.push(DRPStateEntry.create({ key, value: cloneDeep(drp[key]) }));

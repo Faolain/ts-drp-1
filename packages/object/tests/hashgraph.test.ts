@@ -215,6 +215,40 @@ describe("HashGraph construction tests", () => {
 		);
 	});
 
+	test("emits transitive join children once and builds every predecessor row", () => {
+		const hashGraph = new HashGraph("s", undefined, undefined, SemanticsType.pair);
+		const vertex = (value: string, dependencies: Hash[], timestamp: number): Vertex =>
+			createVertex(
+				"s",
+				Operation.create({ opType: "add", value: [value], drpType: DrpType.DRP }),
+				dependencies,
+				timestamp
+			);
+		const v0 = vertex("e0", [HashGraph.rootHash], 504);
+		const v1 = vertex("e1", [v0.hash], 1474);
+		const v2 = vertex("e2", [v0.hash, v1.hash], 2140);
+		const v3 = vertex("e3", [v2.hash], 2511);
+		const v4 = vertex("e4", [v2.hash], 3114);
+		for (const entry of [v0, v1, v2, v3, v4]) hashGraph.addVertex(entry);
+
+		expect(v2.hash < v1.hash).toBe(true);
+		const order = hashGraph.topologicalSort(true);
+		expect(order).toHaveLength(hashGraph.vertices.size);
+		expect(new Set(order)).toEqual(new Set(hashGraph.vertices.keys()));
+		for (const entry of hashGraph.vertices.values()) {
+			for (const dependency of entry.dependencies) {
+				expect(order.indexOf(dependency)).toBeLessThan(order.indexOf(entry.hash));
+			}
+		}
+
+		const predecessorRows = (
+			hashGraph as unknown as {
+				reachablePredecessors: Map<Hash, unknown>;
+			}
+		).reachablePredecessors;
+		expect(new Set(predecessorRows.keys())).toEqual(new Set(hashGraph.vertices.keys()));
+	});
+
 	test("Hash graph should be DAG compatible", () => {
 		const drp1 = obj1.drp as SetDRP<number>;
 		drp1.add(1);

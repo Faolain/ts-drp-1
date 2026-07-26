@@ -32,6 +32,11 @@ export interface ApplyResult {
 	applied: boolean;
 	missing: Hash[];
 	invalid: Hash[];
+	/**
+	 * Vertices whose application failed for a possibly-transient reason.
+	 * Omitted when empty to preserve the additive legacy return shape.
+	 */
+	quarantined?: Hash[];
 }
 
 export type DRPObjectCallback<T extends IDRP> = (object: IDRPObject<T>, origin: string, vertices: Vertex[]) => void;

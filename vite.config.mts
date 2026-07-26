@@ -23,7 +23,10 @@ export default defineConfig({
 		},
 	},
 	test: {
-		exclude: ["**/node_modules", "**/e2e", "**/dist"],
+		// `docs/` carries vendored review bundles that ship their own `node:test`
+		// suites. Vitest cannot run them, and globbing them turns the repo suite red
+		// for reasons unrelated to `packages/`.
+		exclude: ["**/node_modules", "**/e2e", "**/dist", "docs/**"],
 		coverage: {
 			enabled: true,
 			reporter: ["text", "lcov", "json-summary", "json"],

@@ -31,6 +31,19 @@ export type VertexDistance = {
 	closestDependency?: Hash;
 };
 
+export interface FrontierRestorePoint {
+	hash: Hash;
+	previous?: Hash;
+	next?: Hash;
+	wasFirst: boolean;
+}
+
+function removeMatchingValues(values: Hash[], target: Hash): void {
+	for (let index = values.length - 1; index >= 0; index--) {
+		if (values[index] === target) values.splice(index, 1);
+	}
+}
+
 /**
  * Creates a new vertex
  * @param peerId - The peer id of the vertex
@@ -235,6 +248,7 @@ export class HashGraph implements IHashGraph {
 	 * @param vertex - The vertex to add.
 	 */
 	addVertex(vertex: Vertex): void {
+		if (this.vertices.has(vertex.hash)) return;
 		this.vertices.set(vertex.hash, vertex);
 		this.frontier.push(vertex.hash);
 		// Update forward edges
@@ -263,6 +277,84 @@ export class HashGraph implements IHashGraph {
 		this.frontier = this.frontier.filter((hash) => !depsSet.has(hash));
 		this.arePredecessorsFresh = false;
 		this.arePredecessorsScoped = false;
+	}
+
+	/**
+	 * Linearizes a graph containing one hypothetical vertex without mutating or
+	 * copying the retained graph. The overlay is used to prepare live-state
+	 * adoption before a frontier compare-and-swap commit.
+	 * @param vertex - The hypothetical vertex
+	 * @param origin - The replay origin
+	 * @param subgraph - The replay subgraph, including the hypothetical hash
+	 * @returns The legacy linearization for the overlaid graph
+	 */
+	linearizeVerticesWith(vertex: Vertex, origin: Hash, subgraph: Set<string>): Vertex[] {
+		if (this.vertices.has(vertex.hash)) {
+			return this.linearizeVertices(origin, subgraph);
+		}
+		const preview = Object.create(this) as HashGraph;
+		const vertices = new Map(this.vertices);
+		vertices.set(vertex.hash, vertex);
+		const forwardEdges = new Map<Hash, Hash[]>();
+		for (const [hash, children] of this.forwardEdges) forwardEdges.set(hash, [...children]);
+		for (const dependency of vertex.dependencies) {
+			const children = forwardEdges.get(dependency);
+			if (children) children.push(vertex.hash);
+			else forwardEdges.set(dependency, [vertex.hash]);
+		}
+		if (!forwardEdges.has(vertex.hash)) forwardEdges.set(vertex.hash, []);
+		Object.defineProperties(preview, {
+			vertices: { value: vertices },
+			forwardEdges: { value: forwardEdges },
+		});
+		return preview.linearizeVertices(origin, subgraph);
+	}
+
+	/**
+	 * Removes exactly the supplied vertex instance. This is the inverse used by
+	 * transactional rollback; a later insertion at the same hash is left intact.
+	 * @param vertex - The vertex instance previously added
+	 * @param frontierRestorePoints - Value-relative positions of dependency heads removed by insertion
+	 * @returns Whether that exact vertex was removed
+	 */
+	removeVertex(vertex: Vertex, frontierRestorePoints: FrontierRestorePoint[] = []): boolean {
+		if (this.vertices.get(vertex.hash) !== vertex) return false;
+
+		this.vertices.delete(vertex.hash);
+		removeMatchingValues(this.frontier, vertex.hash);
+		const restorableDependencies = new Set<Hash>();
+		for (const dependency of vertex.dependencies) {
+			const children = this.forwardEdges.get(dependency);
+			if (!children) continue;
+			removeMatchingValues(children, vertex.hash);
+			if (children.length === 0 && this.vertices.has(dependency)) {
+				restorableDependencies.add(dependency);
+			}
+		}
+		for (const restorePoint of frontierRestorePoints) {
+			if (!restorableDependencies.delete(restorePoint.hash) || this.frontier.includes(restorePoint.hash)) continue;
+			const previousIndex = restorePoint.previous === undefined ? -1 : this.frontier.indexOf(restorePoint.previous);
+			if (previousIndex !== -1) {
+				this.frontier.splice(previousIndex + 1, 0, restorePoint.hash);
+				continue;
+			}
+			const nextIndex = restorePoint.next === undefined ? -1 : this.frontier.indexOf(restorePoint.next);
+			if (nextIndex !== -1) {
+				this.frontier.splice(nextIndex, 0, restorePoint.hash);
+				continue;
+			}
+			if (restorePoint.wasFirst) this.frontier.unshift(restorePoint.hash);
+		}
+		for (const dependency of restorableDependencies) this.frontier.push(dependency);
+		if ((this.forwardEdges.get(vertex.hash)?.length ?? 0) === 0) {
+			this.forwardEdges.delete(vertex.hash);
+		}
+		this.vertexDistances.delete(vertex.hash);
+		this.reachablePredecessors.delete(vertex.hash);
+		this.topoSortedIndex.delete(vertex.hash);
+		this.arePredecessorsFresh = false;
+		this.arePredecessorsScoped = false;
+		return true;
 	}
 
 	/**
@@ -303,13 +395,13 @@ export class HashGraph implements IHashGraph {
 		let stackIndex = 0;
 		stack[stackIndex] = origin;
 
-		while (resultIndex >= 0) {
+		while (stackIndex >= 0) {
 			const node = stack[stackIndex];
 			if (visited.has(node)) {
-				result[resultIndex] = node;
 				stackIndex--;
+				if (!processing.delete(node)) continue;
+				result[resultIndex] = node;
 				resultIndex--;
-				processing.delete(node);
 				continue;
 			}
 
@@ -323,10 +415,13 @@ export class HashGraph implements IHashGraph {
 				}
 			}
 		}
-		// Shared descendants can make the legacy stack schedule a vertex twice and
-		// displace the origin. Keep the established relative order while making the
-		// already-applied origin explicit for identity-based linearizer filtering.
-		if (!result.includes(origin)) result[0] = origin;
+		if (
+			resultIndex !== -1 ||
+			new ObjectSet(result).size !== subgraph.size ||
+			result.some((hash) => !subgraph.has(hash))
+		) {
+			throw new Error("Topological sort did not emit every subgraph vertex exactly once");
+		}
 
 		return result;
 	}

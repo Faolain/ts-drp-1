@@ -5,6 +5,14 @@ export interface ReplayState {
 	aclState: DRPState;
 }
 
+export interface OperationJournal {
+	/**
+	 * Records an inverse mutation to run if the enclosing batch fails.
+	 * @param undo - Identity-checked inverse mutation
+	 */
+	record(undo: () => void): void;
+}
+
 export interface BaseOperation {
 	/**
 	 * the type of the operation
@@ -18,6 +26,9 @@ export interface BaseOperation {
 
 	/** True only for a vertex created by this local call pipeline. */
 	isLocal?: boolean;
+
+	/** Present only while a remote batch is applying transactionally. */
+	journal?: OperationJournal;
 }
 
 export interface PostLCAOperation extends BaseOperation {

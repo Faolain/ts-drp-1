@@ -213,7 +213,10 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 
 	/**
 	 * @deprecated Use applyVertices instead
-	 * Merges a list of vertices to the DRPObject.
+	 * Merges a list of vertices into the DRPObject and resolves with the
+	 * partial legacy tuple even when individual vertices are rejected.
+	 * Transiently quarantined hashes are not representable in MergeResult;
+	 * use applyVertices when callers need that retry signal.
 	 * @param vertices - The vertices to merge.
 	 * @param rootACLState - Rejected. Root ACL adoption was removed: genesis is derived from the object id.
 	 * @returns The result of the merge.
@@ -238,7 +241,11 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 
 	private _notify(origin: string, vertices: Vertex[]): void {
 		for (const callback of this.subscriptions) {
-			callback(this, origin, vertices);
+			try {
+				callback(this, origin, vertices);
+			} catch (error) {
+				this.log.error("DRPObject subscriber callback failed", error);
+			}
 		}
 	}
 }
