@@ -548,18 +548,6 @@ export function cutValuePreimage(input: Readonly<Record<string, unknown>>): Read
 	return buildCutValue(input);
 }
 
-/** Enforces the registry path/version change-control gate. */
-export function assertRegistryVersionBump(input: {
-	baseVersion: number;
-	changedPaths: readonly string[];
-	currentVersion: number;
-}): void {
-	const changesRegistry = input.changedPaths.some((path) => /(^|\/)registry\//u.test(path));
-	if (changesRegistry && input.currentVersion <= input.baseVersion) {
-		throw new Error("registryVersion bump is required for changes under /registry/**");
-	}
-}
-
 /** Resolves one kind's domain through domains{} and rejects duplicated-registry drift. */
 export function registryDomain(document: RegistryDocument, kind: string): string {
 	const definition = document.kinds[kind];

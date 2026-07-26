@@ -2,25 +2,42 @@ name: Protocol v2 registry change control
 
 on:
   pull_request:
-    paths:
-      - packages/protocol-v2/registry/**
-      - packages/protocol-v2/scripts/check-registry-version.mts
-      - .github/workflows/protocol-v2-registry.yml
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
 
 jobs:
   registry-version:
+    # Keep the established status-check identity while strengthening its implementation.
     name: Require protocol-v2 registryVersion bump
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.24.0
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @ts-drp/protocol-v2 check:registry-version -- "${{ github.event.pull_request.base.sha }}"
+      - name: Run the merge-base-pinned checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v2/scripts/check-protocol-freeze.mjs
+          REGISTRY: packages/protocol-v2/registry/field-registry.json
+          ORIGINAL_REFERENCE: packages/protocol-v2/conformance/ahe-reference/src/canonical.js
+          POLICY: packages/protocol-v2/conformance/freeze-policy.json
+        run: |
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-protocol-freeze.mjs"
+            PROTOCOL_FREEZE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-protocol-freeze.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$POLICY" \
+            && git cat-file -e "$BASE_SHA:$REGISTRY" \
+            && git cat-file -e "$BASE_SHA:$ORIGINAL_REFERENCE"; then
+            node packages/protocol-v2/scripts/check-protocol-freeze.mjs "$BASE_SHA"
+          else
+            echo "Protocol freeze bootstrap requires a stacked base with registry v5 and the original reference." >&2
+            exit 1
+          fi

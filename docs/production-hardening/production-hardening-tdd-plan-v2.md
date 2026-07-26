@@ -232,9 +232,11 @@ Product decision already recorded: build without mirrors now, design assuming op
 
 ## 1. Principles
 
-1. **Freeze before you port.** No consensus byte is written before the Phase −1 registry is merged. Golden
-   vectors are generated **exactly once**, from the frozen schema. A vector diff is a protocol change and
-   must be impossible to land silently.
+1. **Freeze before you port.** No consensus byte is written before the Phase −1 registry is merged. One
+   immutable golden-vector document is minted per registry version. Before reference regeneration, the only
+   lawful extension is an exact `registryVersion + 1` transition with exactly one new vector document that
+   carries every prior vector record byte-identically. Regeneration closes that window; any later consensus
+   change requires `protocolMajor: 3`. A vector diff must be impossible to land silently.
 2. **Compaction amplifies divergence.** The determinism foundation gates every snapshot-trusting feature.
 3. **Classify every change.** *replica-local-safe* (ship now, legacy plane) / *coordinated-upgrade*
    (observable post-merge state or wire format; test cross-version explicitly) / *consensus-affecting*
@@ -362,19 +364,27 @@ fidelity, not spec fidelity. So both versions are kept, with different jobs.
 Plus **(e) an independent linearization re-implementation** in the existing `linearize-reference.test.ts`
 style, written from the spec text by a different author, importing nothing from `packages/compaction`.
 
-**Where the reference lives.** `git mv docs/production-hardening/ts-drp-ahe-review-bundle/reference-implementation
-→ packages/protocol-v2/conformance/ahe-reference/`. It stays untyped ESM, excluded from `tsconfig.build.json`
-and the package `files` array; root `tsconfig.json` already sets `allowJs: true` and Node ≥20 provides
-`globalThis.crypto.subtle`, so vitest imports it directly. Left under `docs/` it sits outside every ownership
-and CI mechanism — which is exactly how it stayed broken.
+**Where the references live.** The byte-identical original is
+`packages/protocol-v2/conformance/ahe-reference/`; it was moved from the review bundle without editing its
+thirteen source files. The independently regenerated implementation lands separately at
+`packages/protocol-v2/conformance/ahe-reference-regen/`. Both stay untyped ESM, excluded from
+`tsconfig.build.json` and the package `files` array; root `tsconfig.json` already sets `allowJs: true` and
+Node ≥20 provides `globalThis.crypto.subtle`, so vitest imports them directly. The original and regenerated
+trees are never overlaid: they are different oracles with different provenance.
 
 **The anti-"fixing" mechanism** (without this the oracle is worthless): commit
-`packages/protocol-v2/conformance/reference.lock.json` — SHA-256 of every file under `ahe-reference/src/`
-(the bundle already ships `SHA256SUMS.txt` as the basis). A per-PR check recomputes and **fails on any drift**
-unless the same PR bumps `registryVersion`. CODEOWNERS routes the lockfile, the registry and the vectors to
-protocol owners. Golden vectors are **append-only**: a test asserts every vector present at the previous
-registry version is byte-identical. Exactly **one** amendment pass is planned (→ `registryVersion 2`); after
-that the original reference freezes permanently and becomes oracle (b).
+`packages/protocol-v2/conformance/reference.lock.json` — SHA-256 of every file under `ahe-reference/src/`,
+bijectively checked against the review bundle's `SHA256SUMS.txt`. The original tree and lock are immutable:
+**no registry bump authorizes changing either one**. A pure-Node, every-PR checker is executed from the
+merge-base after bootstrap, so a PR cannot grade changes with its own replacement checker. The one head-checker
+run is permitted only on a stacked base that already contains registry v5 and the original reference but no
+freeze policy. CODEOWNERS routes the original and regenerated trees, both locks, the registry, vectors,
+policy, checker and workflow to the same protocol-owner cohort. The base checker validates the effective
+protocol CODEOWNERS tail block and workflow security shape semantically, allowing unrelated ownership and
+action-version maintenance without weakening the gate. Golden-vector documents are immutable; while Phase −1 remains open, an exact
+`+1` registry transition may add one byte-identical superset document. Slice −1f then adds
+`reference-regen.lock.json`, whose provenance pins registry v5, the v5 vectors and the original-reference
+lock; once that pair exists, the registry and both oracle ratchets freeze permanently.
 
 ### 2.4 Three live defects in the reference, confirmed by execution here
 
@@ -395,7 +405,7 @@ Two replicas with different default locales compute different `signerSetDigest` 
 **permanent fork**, or two disjoint quorums certifying different anchors for the same cut.
 *Resolution:* UTF-8 byte order equals codepoint order, not UTF-16 code-unit order. All protocol sorts use
 that order, fixed per field in the registry as `sortRule: "codepoint"`. The registry also constrains the `signerId` charset (no control
-characters), which additionally closes the ` ` key-smuggling in the NUL-delimited vote key
+characters), which additionally closes the `\0` key-smuggling in the NUL-delimited vote key
 (`seal.js:264`, `indexeddb-store.js:37`) — replaced by native IDB array keys.
 
 **D2 — `Float32Array` `-0` encodes to bytes the reference's own decoder rejects.** Measured:
@@ -540,9 +550,9 @@ unpinned porting.
 | **−1b** | Codec + framing decisions (D1–D3, §2.4 and the table below) | consensus-v2 | atomic with −1a | `canonical-adversarial.test.ts`: `ENC(Float32Array[-0]) === ENC(Float32Array[+0])` and both decode; changing the process locale cannot alter signer-set or QC bytes |
 | **−1c** | **Round-free `CutValue` / round-bearing `SealProposal` split.** This is a *preimage* decision, not a Phase-5 implementation detail. | consensus-v2 | atomic | `round-repropose.test.ts`: the same semantic value proposed in round `r` and `r+1` has an **identical `valueDigest`** and different `proposalHash` |
 | **−1d** | **Signature suite — two keys, one primitive, distinct suite identifiers.** (a) **Identity/vertex:** `ed25519-sha256-v1`, Ed25519 over the raw 32-byte registered digest. (b) **Seal voter:** `ed25519-seal-v1`, also Ed25519 over its raw registered digest. Distinct identifiers keep identity and seal independently rotatable; because the primitive is shared, the registry domains and exact `hashDomain` framing are load-bearing. Strict RFC 8032 verification (`zip215: false`) is consensus-critical. `p256-sha256-v1` is recognized but **reserved, not active**. Legacy-plane secp256k1 is untouched. | consensus-v2 | atomic | `signature-vectors.test.ts`: deterministic 64-byte Ed25519 vector; raw-digest rule; malformed length, ZIP-215-only and thrown-verifier inputs fail closed; identity-domain signatures do not verify as seal signatures or vice versa; reserved/unknown suites return exactly `false`. Scope labels are metadata: callers must recompute the registered digest from the canonical preimage under the declared registry domain. |
-| **−1e** | **`cryptoSuiteId` permitted values enumerated and negotiated at genesis only** (never downgradeable — Phase 3b). Active: `ed25519-sha256-v1` (identity) and `ed25519-seal-v1` (seal). Reserved: `p256-sha256-v1`. There is no runtime fallback or downgrade. | consensus-v2 | atomic with −1d | `crypto-suite.test.ts`: unenumerated and reserved suites reject with `UNSUPPORTED_PROFILE`; a peer lacking the genesis-named active suite rejects rather than substituting; epoch-anchor/profile enumerations must match and active/reserved sets must be disjoint |
-| **−1e** | Golden vectors minted **once** from the frozen schema; `reference.lock.json`; CODEOWNERS; silent-landing check | consensus-v2 | sliceable | `golden-vectors.test.ts`: per vector `expect(hex(encodeCanonical(v.value))).toBe(v.canonicalHex)` and digest equality, asserted **in TS and in the reference**; a PR touching `/registry/**` without bumping `registryVersion` fails CI |
-| **−1f** | Single regeneration pass of the JS reference from the amended schema, by a **different author** than the TS port. Then it freezes forever. | coordinated | atomic | Regenerated reference reproduces every vector byte-for-byte |
+| **−1e(i)** | **`cryptoSuiteId` permitted values enumerated and negotiated at genesis only** (never downgradeable — Phase 3b). Active: `ed25519-sha256-v1` (identity) and `ed25519-seal-v1` (seal). Reserved: `p256-sha256-v1`. There is no runtime fallback or downgrade. | consensus-v2 | atomic with −1d | `crypto-suite.test.ts`: unenumerated and reserved suites reject with `UNSUPPORTED_PROFILE`; a peer lacking the genesis-named active suite rejects rather than substituting; epoch-anchor/profile enumerations must match and active/reserved sets must be disjoint |
+| **−1e(ii)** | Mint `registry-v5.json` from real registry-built preimages, including ordered `partsHex` for the actual domain-hash parts; preserve the original reference byte-for-byte; add `reference.lock.json`, semantic CODEOWNERS/workflow governance, and the base-governed silent-landing check | consensus-v2 | sliceable; **stacked on −1a…−1e(i)** | `golden-vectors.test.ts`: all registered kinds and active enum values covered; normalized-record `canonicalHex`, ordered `partsHex`, and digests agree in TS and the original reference; lock ↔ source ↔ vendored SHA-256 bijection; bootstrap registry bytes pinned; real temp-git CLI probes reject an invalid base, same-version registry drift, prior-vector drift, noncanonical vector path, bad regen provenance, policy weakening or protected-artifact drift |
+| **−1f** | Regenerate the JS reference from the amended schema into the **separate** `ahe-reference-regen/` tree, by a **different author** than the TS port. Add `reference-regen.lock.json` with registry-v5, vector-v5 and original-lock provenance. Do not bump the registry. Then both references and the registry freeze forever. | coordinated | atomic | Both references reproduce every applicable vector byte-for-byte; regenerated tree/lock atomicity and provenance pass the base-governed checker; a post-regeneration registry bump fails |
 | **−1g** | Spec amendments written into `docs/protocol/` with a versioned amendment log | — | sliceable | Amendment log entry exists for every registry decision below |
 
 ### The frozen decisions
@@ -570,9 +580,14 @@ reactivates `p256-sha256-v1` **MUST, in that same edit**, pin low-S normalizatio
 rules is an incomplete consensus change and must fail review.
 
 ### Exit gate (Phase −1)
-Registry merged; vectors minted once and pinned; reference regenerated once and lockfile-frozen; spec
-amendments merged with an amendment log; **formal-model variable-set sign-off recorded**; a PR that changes
-a vector without bumping `registryVersion` demonstrably fails CI.
+Registry v5 merged; `registry-v5.json` immutable and pinned; original and separately regenerated references
+locked under distinct manifests; regenerated provenance binds the registry, vectors and original lock;
+spec amendments merged with an amendment log; **formal-model variable-set sign-off recorded**. Mutation
+probes demonstrate that same-version registry drift, any old-vector mutation, either reference/lock drift,
+checker or policy weakening, and every post-regeneration registry change fail the always-run CI check.
+Repository branch protection must require the preserved `Require protocol-v2 registryVersion bump` status
+and CODEOWNERS review; those GitHub settings are an external release prerequisite and cannot be proven by
+an in-repo test.
 
 **Real-device mobile evidence is NOT a Phase −1 exit-gate item — it binds at the Pre-release release
 gate, after the whole feature set is green end-to-end.** An
@@ -1488,7 +1503,7 @@ Genuinely open, each blocking the phase named:
 Profile-scoped. Every item names an executable artifact.
 
 **Both profiles**
-- [ ] Registry frozen; vectors minted once and pinned; reference lockfile enforced in CI.
+- [ ] Registry frozen; every per-version vector document immutable; original and regenerated reference locks enforced in CI.
 - [ ] Conformance differential (TS vs pinned reference) green per-PR, with a mutation probe proving it can fail.
 - [ ] Gate-0 divergence manifest exact, **zero unexercised entries**.
 - [ ] Exhaustive order corpus: ≤6 vertices per-PR, 5,231 graphs (≤7) nightly, driving the **real** implementation.
@@ -4157,3 +4172,168 @@ is the accepted cost of reserving `p256-sha256-v1`, and it is a better trade tha
 keeping P-256 active was a **measured** consensus-byte defect (102/200 high-S, both forms verifying 200/200)
 rather than a hypothetical one. The 2j standing test's fail-on-any-change rule is what guards the assumption
 in the interim — this desktop matrix was already wrong once, for roughly 16 months.
+
+---
+
+## Appendix D.24 — Phase −1e(ii): two immutable oracle ratchets and the v5 vector mint
+
+### D.24.1 — The stale assumption and the unanimous correction
+
+The body previously said the original reference could change when `registryVersion` changed, described the
+single amendment as `registryVersion 2`, and implied that regeneration would overwrite the original tree.
+Those statements were mutually incompatible with oracle (b): an “original” reference that can be fixed by
+the implementation team is not an independent oracle.
+
+Before changing that plan, the issue was conferred independently with an Opus-xhigh reviewer, a Codex-high
+reviewer and Kimi with a 100-step ceiling, followed by a convergence round. All three agreed:
+
+- preserve `ahe-reference/src/**` and `reference.lock.json` byte-for-byte forever;
+- add the regenerated implementation under `ahe-reference-regen/**` with its own
+  `reference-regen.lock.json`, never overlay the original;
+- bind regeneration provenance to the registry-v5 bytes, `registry-v5.json`, and the original lock;
+- do not manufacture a registry bump for regeneration;
+- permit an exact `+1`/one-new-vector transition only while Phase −1 is still open; regeneration closes
+  that window, and any later consensus change requires protocol major 3;
+- run a dependency-free checker on every PR, using the merge-base copy after bootstrap so head changes
+  cannot self-grade.
+
+The original reference remains deliberately narrower than the TS registry layer. For the registered v5
+corpus, the TS registry builder produces the normalized preimage/parts, then both TS and original JS codecs
+must reproduce the same canonical bytes and digest. This proves the original encoder and framing subset; it
+does not pretend that the original reference contains an independent v5 registry builder. Non-byte typed
+arrays in open canonical-value slots remain outside this oracle's applicable subset and require the codec
+adversarial suite instead.
+
+### D.24.2 — Implemented evidence
+
+Slice −1e(ii) mints `tests/fixtures/golden-vectors/registry-v5.json`: 26 real schema-built vectors covering
+all 19 registered kinds and every positive enumerated value. `canonicalHex` is explicitly the canonical
+encoding of the normalized preimage record; `partsHex` is the ordered byte array actually passed after the
+domain to `hashDomain`. The test re-normalizes every input through `makeRegistryPreimageBuilder`, rejects
+omitted/wrong/unknown fields, asserts registry part construction against `partsHex`, then decodes those
+frozen parts and recomputes the registered digest in both implementations. This distinction is load-bearing
+for `canonical-array`, `canonical-value-as-single-part`, and `domain-framed-parts` kinds.
+The v5 corpus also makes both index-sorted chunk lists nontrivial (two out-of-order input chunks normalize
+to contiguous ascending order), retains two archive records in declared linearized order, and covers both
+`highestPrepareQC: null` and a nested non-null prepare QC.
+
+`reference.lock.json` contains exactly the thirteen original `src/**` files and is checked both against
+disk and bijectively against the vendored `SHA256SUMS.txt`. `freeze-policy.json` pins its own pure-Node
+checker and byte-protects both oracle trees/locks, vectors, registry, policy, checksum source, plus the two
+higher-precedence CODEOWNERS locations (which must stay absent). Root CODEOWNERS and the workflow remain
+maintainable, but the base checker validates their security-critical structure. The checker enforces:
+
+- byte-identical registry and original-reference bytes during the one-time bootstrap;
+- exactly one top-level `registry-vN.json` per vector version—noncanonical or nested rider files fail;
+- immutable earlier vector documents plus record-level byte-identical carry-over;
+- exact `registryVersion + 1` with one new vector document while the pre-regeneration window is open;
+- no unregistered files under the single-file registry directory;
+- atomic regenerated tree/lock appearance and complete SHA-256/provenance validation;
+- permanent registry closure once the regenerated pair exists;
+- additive-only policy protections and a base-pinned checker digest;
+- a terminal, exact protocol-owner block in root CODEOWNERS, absence of `.github/CODEOWNERS` and
+  `docs/CODEOWNERS`, the stable required-check identity, retarget-triggered PR runs, merge-SHA checkout,
+  read-only permissions, and a base-checker-first/fail-closed bootstrap runner.
+
+The refactor pass removed `assertRegistryVersionBump` and its script/tests. They had become a second,
+weaker policy owner: path-name matching inside the shipped TypeScript API could not protect locks, vectors,
+workflow or checker bytes. The freeze checker is now the single change-control implementation.
+
+### D.24.3 — Review findings, fixes, and operational gotchas
+
+The initial RED contract failed on seven intended assertions. The first GREEN passed 122 protocol tests,
+workspace typecheck and lint with zero errors. Grok and Kimi then independently returned `NEEDS CHANGES`.
+Both found that bootstrap pinned only the numeric v5 value, not the registry bytes; Kimi additionally proved
+that arbitrary files under `golden-vectors/**` were invisible. Grok found that document-level carry rules
+were optional in the exported evaluator and that replacing the old gate had left no focused same-version
+registry mutation assertion. All were fixed TDD-first: the remediation RED failed on the registry-byte and
+workflow contracts, and the strengthened suite then passed.
+
+The final Opus-xhigh review reopened the slice on four production-shell assumptions: the actual `main`
+merge-base (`d041baf`) predates the entire protocol-v2 tree; byte-freezing root CODEOWNERS/workflow would
+make unrelated repository maintenance impossible; the default PR event set does not cover base retargeting;
+and `canonicalHex` alone does not expose the bytes hashed by four encoding families. Opus proposed the
+correction; a Codex-high reviewer and a fresh Kimi 100-step review both agreed with refinements. The
+implemented second remediation:
+
+- fails closed unless −1e(ii) is stacked on a base containing registry v5 plus the original reference and
+  no freeze policy;
+- adds `edited`/`ready_for_review`, read-only permissions, timeout and explicit merge-SHA checkout while
+  preserving the established required-check identity;
+- governs root CODEOWNERS and the workflow semantically instead of byte-freezing them, while forbidding the
+  two higher-precedence CODEOWNERS files;
+- freezes ordered `partsHex` and drives both digest implementations from those artifact bytes;
+- runs the actual CLI in temporary Git repositories through invalid/valid bootstrap, governance mutations,
+  valid and tampered regeneration provenance, incomplete tree/lock pairs, and post-regeneration
+  add/modify/delete/registry-bump attempts.
+
+The final refactor gives the long-running Git-repository matrix its natural owner,
+`tests/freeze-cli.test.ts`, so focused vector/oracle iteration remains sub-second while the full protocol
+suite still exercises the immutable governance boundary. Final gates on the finished tree: 15 protocol
+test files / 121 tests passed, workspace typecheck passed, lint completed with 0 errors (244 pre-existing
+warnings), the checker passed against intended stacked base `19b3d01`, failed as designed against
+`main`/`d041baf`, and `git diff --check` was clean.
+
+Remaining limitations are explicit:
+
+- Bootstrap is necessarily trust-on-first-use for the checker itself because the base commit has no checker.
+  The reviewed bootstrap commit is the trust root; automation cannot manufacture an earlier trust root.
+  `main` at `d041baf` is **not** a valid bootstrap base. First land the pre-freeze checkpoint through
+  `19b3d01` (or an equivalent commit containing the exact registry-v5 and original-reference bytes), then
+  land −1e(ii) as a stacked follow-up without changing those bytes. Retarget only after that base is merged.
+- GitHub executes the PR's workflow definition. A malicious workflow edit can suppress its own command, so
+  branch protection **must** require the preserved `Require protocol-v2 registryVersion bump` check identity
+  and CODEOWNERS approval, prohibit direct/admin bypass, and rerun on retarget. Semantic validation is
+  defense-in-depth when invoked; it cannot replace those external trust roots.
+- The base policy intentionally provides no in-band checker rotation. A defect in a merged checker requires
+  an explicit owner-approved emergency governance action; direct-to-main bypass is not a routine upgrade
+  mechanism. The checker-validated runner body is likewise intentionally literal, so adding `set -euo
+  pipefail`, merge-queue support, or another invocation hardening requires the same governance action. This
+  is the cost of preventing a checker, its pin, and its only caller from being weakened in the same PR.
+- Explicit protocol CODEOWNERS currently name the same cohort as the repository catch-all. The duplicate
+  rules form the checker-validated terminal block and keep protocol ownership stable if earlier unrelated
+  rules change, but they add no stronger cohort today and those three handles cannot rotate in-band without
+  a checker-governance action.
+- The vendored `SHA256SUMS.txt` is byte-protected but has no explicit terminal protocol CODEOWNERS rule; its
+  ownership follows the mutable catch-all, whose own edit is protected by the terminal `/CODEOWNERS` rule.
+  The chain is sound but one link longer than the sibling freeze artifacts.
+
+Local diagnostic evidence is written under `.logs/`. These files are gitignored (`*.log`) and are useful
+for this workspace handoff, but they are **not committed evidence**:
+
+- `phase-n1e2-red-focused.log`, `phase-n1e2-green-focused.log`,
+  `phase-n1e2-green-protocol-tests.log`;
+- `phase-n1e2-green-typecheck.log`, `phase-n1e2-green-lint.log`,
+  `phase-n1e2-green-freeze-cli.log`;
+- `phase-n1e2-refactor-tests.log`, `phase-n1e2-refactor-typecheck.log`,
+  `phase-n1e2-refactor-lint.log`, `phase-n1e2-refactor-freeze-cli.log`;
+- `phase-n1e2-review-grok.log`, `phase-n1e2-review-kimi.log`;
+- `phase-n1e2-review-remediation-red.log`, `phase-n1e2-review-remediation-green.log`,
+  `phase-n1e2-review-remediation-freeze.log`;
+- `phase-n1e2-final-review-opus.log`, `phase-n1e2-opus-findings-consensus-kimi.log`,
+  `phase-n1e2-opus-remediation-red.log`, and `phase-n1e2-opus-remediation-green.log`;
+- `phase-n1e2-final2-protocol-tests.log`, `phase-n1e2-final2-typecheck.log`,
+  `phase-n1e2-final2-lint.log`, `phase-n1e2-final2-freeze-intended-base.log`, and
+  `phase-n1e2-final2-diff-check.log`;
+- `phase-n1e2-final2-review-opus.log` — final verdict: `PASS`.
+
+## Next Agent Prompt
+
+Continue with Phase −1f only after the Phase −1e(ii) checkpoint is committed **and its stacked base is
+resolved**. Do not target `d041baf` directly: first land the pre-freeze history through `19b3d01` (or an
+equivalent base with the exact registry-v5 and original-reference bytes), then land −1e(ii) as the
+follow-up trust-root commit; capture a passing CLI run against that actual intended base. The general
+`.github/workflows/test.yml` runs only for PRs targeting `main` and does not include the `edited` activity
+type: do not treat a green freeze-only stacked PR as full CI evidence. After the pre-freeze PR merges,
+retarget/rebase −1e(ii) onto `main` and push a synchronizing commit (or otherwise explicitly rerun the full
+workflow) before merge. Use a different
+implementation author from the TypeScript port and from the −1e(ii) green author. RED must require a separately located
+`packages/protocol-v2/conformance/ahe-reference-regen/` implementation and
+`reference-regen.lock.json`; it must prove applicable v5 vectors byte-for-byte in TS, the immutable original
+reference and the regenerated reference. GREEN must regenerate from the amended registry/spec without
+copying or modifying `ahe-reference/`, must not bump registry v5 or rewrite `registry-v5.json`, and must
+record complete file hashes plus provenance for the registry, v5 vectors and original lock. Exercise the
+base-governed checker against incomplete tree/lock pairs, bad provenance, old-oracle drift and a
+post-regeneration registry bump. Run focused RED, focused GREEN, protocol tests, workspace typecheck and
+lint to `.logs/`, then perform refactor-clean, Grok, Kimi (100 steps), and final Opus-xhigh adversarial
+reviews before committing. Keep `.agents/`, `.claude/`, and `skills-lock.json` out of the checkpoint.

@@ -413,27 +413,6 @@ describe("mutation-strengthened registry and protocol contract", () => {
 		}
 	});
 
-	it("distinguishes required registry bumps from allowed path/version combinations", async () => {
-		const { assertRegistryVersionBump } = await import("../src/registry.js");
-		expect(() =>
-			assertRegistryVersionBump({
-				baseVersion: 1,
-				currentVersion: 1,
-				changedPaths: ["src/a.ts", "registry/field-registry.json"],
-			})
-		).toThrow(/registryVersion bump/);
-		expect(() =>
-			assertRegistryVersionBump({
-				baseVersion: 1,
-				currentVersion: 2,
-				changedPaths: ["registry/field-registry.json"],
-			})
-		).not.toThrow();
-		expect(() =>
-			assertRegistryVersionBump({ baseVersion: 1, currentVersion: 1, changedPaths: ["src/registry-helper.ts"] })
-		).not.toThrow();
-	});
-
 	it("pins hash framing for empty and non-empty domains and parts", () => {
 		const frame = (domain: string, parts: readonly Uint8Array[]): Uint8Array => {
 			const domainBytes = new TextEncoder().encode(domain);

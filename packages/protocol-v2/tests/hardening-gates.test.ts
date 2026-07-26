@@ -101,13 +101,15 @@ describe("B4 executable hardening gates", () => {
 		);
 	}, 15_000);
 
-	it("has a PR-blocking workflow caller for the registryVersion gate", () => {
+	it("has an every-PR workflow caller for the base-governed protocol freeze", () => {
 		const workflowUrl = new URL("../../../.github/workflows/protocol-v2-registry.yml", import.meta.url);
 		expect(existsSync(workflowUrl)).toBe(true);
 		const workflow = readFileSync(workflowUrl, "utf8");
-		expect(workflow).toContain("packages/protocol-v2/registry/**");
-		expect(workflow).toContain("check:registry-version");
 		expect(workflow).toContain("pull_request");
+		expect(workflow).toContain("git show");
+		expect(workflow).toContain("PROTOCOL_FREEZE_REPOSITORY_ROOT");
+		expect(workflow).toContain("node packages/protocol-v2/scripts/check-protocol-freeze.mjs");
+		expect(workflow).not.toContain("pnpm install");
 	});
 
 	it("pins framing, codec tags, and endianness through emitted bytes and the oracle", async () => {

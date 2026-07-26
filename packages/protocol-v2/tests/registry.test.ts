@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import registry from "../registry/field-registry.json" with { type: "json" };
 import {
-	assertRegistryVersionBump,
 	cutValuePreimage,
 	makeRegistryPreimageBuilder,
 	quorumSize,
@@ -108,16 +107,6 @@ describe("Phase -1a field registry", () => {
 			if (vector.kind === "profile") input.quorum = 1;
 			expect(() => build(input), vector.id).not.toThrow();
 		}
-	});
-
-	it("fails the registry change-control gate when registryVersion is not bumped", () => {
-		expect(() =>
-			assertRegistryVersionBump({
-				baseVersion: 1,
-				currentVersion: 1,
-				changedPaths: ["packages/protocol-v2/registry/field-registry.json"],
-			})
-		).toThrowError(/registryVersion.*bump/i);
 	});
 
 	it("asserts all eleven frozen decisions", () => {

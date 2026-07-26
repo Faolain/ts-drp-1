@@ -43,7 +43,6 @@ export {
 	type RegistryDocument,
 	type RegistryField,
 	type RegistryKind,
-	assertRegistryVersionBump,
 	compareProtocolStrings,
 	cutValuePreimage,
 	digestRegistryPreimage,
