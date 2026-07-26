@@ -145,7 +145,7 @@ const config = tsLintConfig(
 		},
 	},
 	{
-		files: ["packages/protocol-v2/src/**/*.ts"],
+		files: ["packages/compaction/src/**/*.ts", "packages/protocol-v2/src/**/*.ts"],
 		rules: {
 			"no-restricted-globals": [
 				"error",
