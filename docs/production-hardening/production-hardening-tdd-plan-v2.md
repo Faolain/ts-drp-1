@@ -4317,23 +4317,131 @@ for this workspace handoff, but they are **not committed evidence**:
   `phase-n1e2-final2-diff-check.log`;
 - `phase-n1e2-final2-review-opus.log` — final verdict: `PASS`.
 
+---
+
+## Appendix D.25 — Phase −1f: independently regenerated and permanently frozen oracle
+
+### D.25.1 — Implemented evidence
+
+Slice −1f adds a physically separate untyped ESM implementation under
+`packages/protocol-v2/conformance/ahe-reference-regen/`. It imports only Node built-ins and relative modules
+whose real paths remain inside that tree. The implementation owns four deliberately small responsibilities:
+byte comparison/concatenation, the canonical encoder/decoder, synchronous Node SHA-256 domain framing, and a
+registry-v5 interpreter for normalization, constraints, sorting, composite invariants and ordered hash
+parts. It neither imports nor re-exports the TypeScript port or the immutable original reference. Source
+hashes differ from every original-reference source file, the original tree remains byte-identical, and the
+amended Float32 negative-zero rule is an executable anti-copy discriminator: TS and the regenerated oracle
+encode `Float32Array[-0]` as positive zero and reject the negative-zero wire payload, while the original
+oracle retains the measured pre-amendment encoding.
+
+`reference-regen.lock.json` covers every regular file in the regenerated tree and contains exactly three
+provenance bindings: registry v5, `registry-v5.json`, and `reference.lock.json`. The registry remains v5;
+neither the registry nor the minted vector document changed. All 26 vectors across all 19 kinds reproduce
+the same normalized value, ordered `partsHex`, canonical bytes and digest in the applicable TS, original and
+regenerated paths. The real base-governed checker accepts the atomic tree/lock pair against `47426ab` and
+its existing temporary-Git suite rejects incomplete pairs, bad provenance, original-oracle drift and every
+post-regeneration add/modify/delete/registry-bump attempt. Once this checkpoint reaches the merge base, the
+registry, both references and both locks are permanently closed.
+
+The permanent metadata-parity gate is intentionally stronger than the happy-path vector corpus. It derives
+2,662 probes from all 147 constraint occurrences, every frozen v5 vector for the corresponding kind and a
+fixed thirteen-shape mutation corpus. TS runs first; every metadata mutation TS rejects must also be rejected
+by the regenerated interpreter. Ratchets pin all 19 constraint names, the occurrence/probe counts, at least
+1,000 TS-rejected paths and three named adversarial reproductions. The vector test is the positive
+discriminator, so an oracle that rejects everything cannot satisfy the combined contract.
+
+### D.25.2 — TDD and adversarial review history
+
+The initial RED run produced five intended failures and one frozen-ratchet positive control. GREEN added the
+independent oracle and lock; focused tests passed 6/6 and the protocol package passed 127 tests. The
+refactor-clean pass kept the four-module ownership split and found no compatibility layer or duplicate
+policy owner to preserve.
+
+Grok and Kimi (100-step ceiling) independently returned `NEEDS CHANGES`: the regenerated registry
+interpreter recognized several constraint names but could accept malformed numeric, enum and profile-quorum
+metadata that the TypeScript builder rejected. Remediation RED proved the divergence with real frozen
+inputs and TS-positive controls; GREEN added fail-closed metadata typing plus exact quorum-formula
+validation and updated only the regenerated registry source hash in its lock.
+
+The first final Opus-xhigh review then rejected the hand-picked regression table as test-shaped-to-
+implementation. Its wider sweep found remaining fail-opens when enum `values` was absent, `uniqueBy` was not
+a string and `maxSignerIdUtf16Units` was not numeric. Final remediation RED replaced the table with the
+registry-derived 2,662-probe matrix. It failed on exactly 23 signatures in 489 ms while the other six
+focused tests passed. GREEN fixed the three root causes and changed only `src/registry.js` plus its lock
+entry. Reverting any one fix still reproduces all 26 happy-path vectors but fails the matrix, proving that
+the adversarial gate is non-vacuous.
+
+The resumed Opus-xhigh re-review returned `PASS` with no release blockers. Its independent wider corpus ran
+7,823 probes, including 5,365 TS-rejected paths and `registryPreimageParts` differentials: zero regenerated
+fail-opens, zero stricter mismatches and zero parts divergences. It also rechecked 3,116 data mutations,
+codec/hash samples, all source/provenance hashes and actual permanent-closure behavior.
+
+Final exact-tree gates:
+
+- focused Phase −1f: 7/7; the 2,662-probe matrix took 498 ms;
+- protocol-v2: 16 files / 128 tests in 32.89 s when run sequentially;
+- workspace typecheck: pass;
+- targeted and root lint: pass with 0 errors (244 pre-existing warnings);
+- regenerated lock hash, real freeze CLI against `47426ab..working-tree`, and `git diff --check`: pass;
+- final Opus-xhigh re-review: `PASS`.
+
+### D.25.3 — Permanence, shared follow-ups and operational gotchas
+
+- This commit is the last ordinary opportunity to change `ahe-reference-regen/**`. Once the pair is in the
+  merge base, the base checker rejects every byte change, file-set change and registry bump. A later defect
+  requires the explicit emergency governance path, not a routine version increment.
+- The frozen regenerated tree remains in ESLint's surface and therefore carries local disable headers for
+  TypeScript return-type/JSDoc rules on deliberately untyped JS. It is outside the package build and publish
+  surfaces. Future lint-rule changes must be resolved in configuration, not by rewriting frozen files.
+- Run the protocol suite, workspace typecheck and root lint sequentially. Running the two ESLint-spawning
+  protocol tests concurrently with root lint crossed their unchanged 15-second limits; the exact same tests
+  passed sequentially. Do not increase timeouts to hide machine contention. The real freeze-CLI matrix is
+  the intentionally long package test.
+- The metadata matrix is deliberately one-directional: TS rejection implies regenerated rejection.
+  Happy-path vector reproduction is its required positive counterpart. Neither half may be simplified
+  independently. Its numeric ratchets are valid because registry v5 is now permanently frozen.
+- Automated anti-copy checks prove distinct paths, no source symlinks, no byte-identical original source
+  file and no outside import. They cannot prove authorship or detect a whitespace-perturbed/transliterated
+  copy. Different authorship remains a reviewed process assertion; Opus additionally compared structure,
+  line overlap, decoder architecture and the three distinct hash backends.
+- The checker validates the three required provenance entries but does not reject extra keys, while the
+  executable oracle test requires exactly three. Root-level non-regular entries under the regenerated tree
+  are likewise outside both `regularFiles()` inventories; the source subtree test rejects them only under
+  `src/`. These seams do not affect imports or the committed lock, but owner review remains load-bearing.
+- Domain strings are checked against registry v5 by the minted-vector test, but the regenerated digest loop
+  consumes the frozen vector's domain rather than independently exposing `registryDomain()`. Preserve that
+  division of proof when refactoring tests.
+- Review found a shared decoder follow-up outside this slice: TS and the immutable original accept some
+  integral-but-unsafe Float64 wire payloads that their encoder cannot emit, while the regenerated decoder
+  rejects them by re-encoding. `decodeCanonical` currently has no production wire caller. Record the issue
+  for −1g/codec admission work, but do not change a frozen decision or artifact without the required
+  Opus-xhigh, Codex-high and Kimi-100 agreement.
+- Unknown *values* for `case`, `charset` and `signerIdCharset` are ignored symmetrically by TS and the
+  regenerated interpreter; the exact frozen spellings are enforced. This is a shared schema-validation
+  follow-up rather than a −1f differential defect and has the same consensus requirement before changing
+  the plan.
+
+Local diagnostic logs (gitignored, not committed evidence):
+
+- `phase-n1f-red-{focused,typecheck,lint,diff-check}.log`;
+- `phase-n1f-green-{focused-final,protocol-tests-final2,typecheck-final,lint-final,freeze-cli-final,diff-check-final}.log`;
+- `phase-n1f-review-{grok,kimi}.log`;
+- `phase-n1f-review-remediation-{red,green-*}.log`;
+- `phase-n1f-final-review-opus.log`;
+- `phase-n1f-opus-remediation-red-{focused,typecheck,lint,diff-check}.log`;
+- `phase-n1f-opus-remediation-green-{focused,protocol-tests,typecheck,lint,freeze-cli,lock-hash,diff-check}.log`;
+- `phase-n1f-final2-review-opus.log` — final verdict: `PASS`.
+
 ## Next Agent Prompt
 
-Continue with Phase −1f only after the Phase −1e(ii) checkpoint is committed **and its stacked base is
-resolved**. Do not target `d041baf` directly: first land the pre-freeze history through `19b3d01` (or an
-equivalent base with the exact registry-v5 and original-reference bytes), then land −1e(ii) as the
-follow-up trust-root commit; capture a passing CLI run against that actual intended base. The general
-`.github/workflows/test.yml` runs only for PRs targeting `main` and does not include the `edited` activity
-type: do not treat a green freeze-only stacked PR as full CI evidence. After the pre-freeze PR merges,
-retarget/rebase −1e(ii) onto `main` and push a synchronizing commit (or otherwise explicitly rerun the full
-workflow) before merge. Use a different
-implementation author from the TypeScript port and from the −1e(ii) green author. RED must require a separately located
-`packages/protocol-v2/conformance/ahe-reference-regen/` implementation and
-`reference-regen.lock.json`; it must prove applicable v5 vectors byte-for-byte in TS, the immutable original
-reference and the regenerated reference. GREEN must regenerate from the amended registry/spec without
-copying or modifying `ahe-reference/`, must not bump registry v5 or rewrite `registry-v5.json`, and must
-record complete file hashes plus provenance for the registry, v5 vectors and original lock. Exercise the
-base-governed checker against incomplete tree/lock pairs, bad provenance, old-oracle drift and a
-post-regeneration registry bump. Run focused RED, focused GREEN, protocol tests, workspace typecheck and
-lint to `.logs/`, then perform refactor-clean, Grok, Kimi (100 steps), and final Opus-xhigh adversarial
-reviews before committing. Keep `.agents/`, `.claude/`, and `skills-lock.json` out of the checkpoint.
+After the Phase −1f checkpoint is committed, continue with Phase −1g only. Inventory every frozen decision
+and the existing partial signature-suite amendment log against `docs/protocol/**`; do not edit the registry,
+vectors, either reference, either lock, the freeze policy/checker, CODEOWNERS or workflow. RED must derive
+the required amendment entries from the frozen registry/decision table and fail on every missing,
+contradictory or unversioned normative statement rather than merely searching for section titles. GREEN
+writes the smallest coherent versioned amendments and cross-links their normative source without mirroring
+implementation details. Treat the unsafe-integral Float64 decoder behavior and unknown constraint-value
+spellings as review findings requiring Opus-xhigh, Codex-high and Kimi-100 agreement before changing any
+plan decision. Run each −1g item through its own Codex-high RED/GREEN authors, Grok, Kimi-100 and final
+Opus-xhigh review, with focused tests, typecheck, lint and relevant docs/link checks logged sequentially.
+Keep `.agents/`, `.claude/`, and `skills-lock.json` out of every checkpoint.
