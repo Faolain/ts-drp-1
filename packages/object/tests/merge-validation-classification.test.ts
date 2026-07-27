@@ -1,9 +1,10 @@
 /**
  * Contract B: ApplyResult gains `invalid: Hash[]`, and MergeResult gains the
  * corresponding third tuple element: `[merged, missing, invalid]`. `missing`
- * contains only vertices rejected because a referenced dependency hash is not
- * present; every other rejected vertex is reported in `invalid`. `applied` /
- * `merged` is false when either rejection list is non-empty.
+ * contains re-requestable vertices whose dependencies are not yet available or
+ * whose timestamps are not yet eligible, including their pending descendants.
+ * Terminal rejections are reported in `invalid`. `applied` / `merged` is false
+ * when either rejection list is non-empty.
  */
 import { SetDRP } from "@ts-drp/blueprints";
 import { DrpType, type IDRP, Operation, SemanticsType, type Vertex } from "@ts-drp/types";
@@ -47,7 +48,7 @@ describe("DRPObject clock-skew merge", () => {
 });
 
 describe("DRPObject validation-error classification", () => {
-	it("reports only unresolved dependencies as missing and reports an invalid timestamp separately", async () => {
+	it("reports unresolved dependencies and not-yet-eligible timestamps as re-requestable", async () => {
 		vi.useFakeTimers({ now: BASE_TIME });
 		const acl = createACL({ admins: ["receiver", "sender"] });
 		const receiver = new DRPObject({ peerId: "receiver", acl, drp: new SetDRP<number>() });
@@ -63,10 +64,10 @@ describe("DRPObject validation-error classification", () => {
 			missingDependencyVertex,
 			invalidTimestampVertex,
 		])) as unknown as ExtendedMergeResult;
-		expect(result).toEqual([false, [missingDependencyVertex.hash], [invalidTimestampVertex.hash]]);
+		expect(result).toEqual([false, [missingDependencyVertex.hash, invalidTimestampVertex.hash], []]);
 	});
 
-	it("classifies a child before its beyond-tolerance parent as invalid", async () => {
+	it("keeps a child and its not-yet-eligible parent re-requestable", async () => {
 		vi.useFakeTimers({ now: BASE_TIME });
 		const acl = createACL({ admins: ["receiver", "sender"] });
 		const receiver = new DRPObject({ peerId: "receiver", acl, drp: new SetDRP<number>() });
@@ -76,8 +77,8 @@ describe("DRPObject validation-error classification", () => {
 		const result = (await receiver.merge([child, invalidParent])) as unknown as ExtendedMergeResult;
 
 		expect(result[0]).toBe(false);
-		expect(result[1]).toEqual([]);
-		expect(result[2]).toEqual(expect.arrayContaining([invalidParent.hash, child.hash]));
+		expect(result[1]).toEqual([child.hash, invalidParent.hash]);
+		expect(result[2]).toEqual([]);
 	});
 });
 

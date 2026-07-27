@@ -12,7 +12,13 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { handlePromiseOrValue, processSequentially } from "@ts-drp/utils";
-import { InvalidDependenciesError, InvalidHashError, InvalidTimestampError, validateVertex } from "@ts-drp/validation";
+import {
+	InvalidDependenciesError,
+	InvalidHashError,
+	InvalidTimestampError,
+	isReceiverClockPendingValidationResult,
+	validateVertex,
+} from "@ts-drp/validation";
 import { cloneDeep } from "es-toolkit";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
@@ -40,6 +46,12 @@ const MAX_ADOPTION_COMMIT_ATTEMPTS = 3;
 const metrics = new OpentelemetryMetrics("@ts-drp/object/drp-applier");
 
 class DeterministicRejectionError extends Error {}
+
+class ReceiverClockPendingValidationError extends Error {
+	constructor(readonly vertex: Vertex) {
+		super(`Vertex ${vertex.hash} is pending receiver-clock validation`);
+	}
+}
 
 class AttributedDeterministicRejectionError extends DeterministicRejectionError {
 	readonly vertexHash: Hash;
@@ -151,6 +163,11 @@ interface ApplyCallContext {
 	hint?: AdoptionHint<IDRP>;
 }
 
+interface BatchVertexPreflight {
+	submittedVertex: Vertex;
+	operationSnapshot: { succeeded: true; operation: Vertex["operation"] } | { succeeded: false; error: unknown };
+}
+
 function descriptorsEqual(left: PropertyDescriptor | undefined, right: PropertyDescriptor | undefined): boolean {
 	if (left === undefined || right === undefined) return left === right;
 	if (
@@ -164,6 +181,34 @@ function descriptorsEqual(left: PropertyDescriptor | undefined, right: PropertyD
 		return "value" in left && "value" in right && Object.is(left.value, right.value);
 	}
 	return left.get === right.get && left.set === right.set;
+}
+
+function captureBatchVertexOperation(submittedVertex: Vertex): BatchVertexPreflight {
+	try {
+		return {
+			submittedVertex,
+			operationSnapshot: { succeeded: true, operation: cloneDeep(submittedVertex.operation) },
+		};
+	} catch (error) {
+		return { submittedVertex, operationSnapshot: { succeeded: false, error } };
+	}
+}
+
+function snapshotSubmittedVertex(vertex: Vertex, operation: Vertex["operation"]): Vertex {
+	const hash = vertex.hash;
+	const peerId = vertex.peerId;
+	const dependencies = [...vertex.dependencies];
+	const timestamp = vertex.timestamp;
+	const signature = new Uint8Array(vertex.signature);
+
+	return {
+		hash,
+		peerId,
+		operation,
+		dependencies,
+		timestamp,
+		signature,
+	};
 }
 
 function recordPropertyMutation<T extends object>(
@@ -358,15 +403,31 @@ export class DRPVertexApplier<T extends IDRP> {
 	}
 
 	private async applyVerticesUntraced(vertices: Vertex[]): Promise<ApplyResult> {
+		const submittedVertices = [...vertices];
+		const worklist = submittedVertices.filter(
+			(submittedVertex): submittedVertex is Vertex => submittedVertex !== undefined
+		);
+		const preflightByIdentity = new WeakMap<Vertex, BatchVertexPreflight>();
+		const preflight = worklist.map((submittedVertex) => {
+			const captured = preflightByIdentity.get(submittedVertex);
+			if (captured) return captured;
+
+			const record = captureBatchVertexOperation(submittedVertex);
+			preflightByIdentity.set(submittedVertex, record);
+			return record;
+		});
 		const callContext: ApplyCallContext = {
 			canDeferReconciliation:
-				vertices.length > 1 && vertices.every(({ operation }) => operation?.drpType === DrpType.DRP),
+				preflight.length > 1 &&
+				preflight.every(
+					({ operationSnapshot }) => operationSnapshot.succeeded && operationSnapshot.operation?.drpType === DrpType.DRP
+				),
 			deferRemainingVertices: false,
 			needsFullReconciliation: false,
 			notificationsDeferred: false,
 		};
 		try {
-			return await this.applyVerticesCall(vertices, callContext);
+			return await this.applyVerticesCall(preflight, callContext);
 		} finally {
 			try {
 				if (callContext.needsFullReconciliation) {
@@ -381,31 +442,38 @@ export class DRPVertexApplier<T extends IDRP> {
 		}
 	}
 
-	private async applyVerticesCall(vertices: Vertex[], callContext: ApplyCallContext): Promise<ApplyResult> {
+	private async applyVerticesCall(
+		vertices: BatchVertexPreflight[],
+		callContext: ApplyCallContext
+	): Promise<ApplyResult> {
 		const missing: Hash[] = [];
 		const invalid: Hash[] = [];
 		const quarantined: Hash[] = [];
 		const missingVertices = new Map<Hash, Vertex>();
 		const batchInvalidVertexHashes = new Set<Hash>();
-		for (const vertex of vertices) {
-			if (!vertex.operation) {
-				this.log.warn("Vertex has no operation", vertex);
-				continue;
-			}
-			if (vertex.operation.opType === "-1") {
-				if (vertex.hash === HashGraph.rootHash) continue;
-				invalid.push(vertex.hash);
-				batchInvalidVertexHashes.add(vertex.hash);
-				this.rememberInvalidVertexHash(vertex.hash);
-				continue;
-			}
-			if (this.hashGraph.vertices.has(vertex.hash)) continue;
+		for (const { submittedVertex, operationSnapshot } of vertices) {
+			const submittedHash = submittedVertex.hash;
+			if (this.hashGraph.vertices.has(submittedHash)) continue;
 
+			let stableVertex: Vertex | undefined;
 			let pipelineWasAsync = false;
 			try {
+				if (!operationSnapshot.succeeded) throw operationSnapshot.error;
+				stableVertex = snapshotSubmittedVertex(submittedVertex, operationSnapshot.operation);
+				if (!stableVertex.operation) {
+					this.log.warn("Vertex has no operation", stableVertex);
+					continue;
+				}
+				if (stableVertex.operation.opType === "-1") {
+					if (stableVertex.hash === HashGraph.rootHash) continue;
+					invalid.push(stableVertex.hash);
+					batchInvalidVertexHashes.add(stableVertex.hash);
+					this.rememberInvalidVertexHash(stableVertex.hash);
+					continue;
+				}
 				const execution = this.applyVertexPipeline.execute({
-					vertex,
-					isACL: vertex.operation.drpType === DrpType.ACL,
+					vertex: stableVertex,
+					isACL: stableVertex.operation.drpType === DrpType.ACL,
 				});
 				pipelineWasAsync = execution instanceof Promise;
 				const operation = await execution;
@@ -416,10 +484,16 @@ export class DRPVertexApplier<T extends IDRP> {
 					error.partialResult = this.createApplyResult(missing, invalid, quarantined);
 					throw error;
 				}
+				if (error instanceof ReceiverClockPendingValidationError) {
+					missing.push(error.vertex.hash);
+					missingVertices.set(error.vertex.hash, error.vertex);
+					continue;
+				}
 
-				const unresolvedDependencies = vertex.dependencies.filter(
-					(dependency) => !this.hashGraph.vertices.has(dependency)
-				);
+				const rejectedVertex = stableVertex;
+				const rejectedHash = rejectedVertex?.hash ?? submittedHash;
+				const unresolvedDependencies =
+					rejectedVertex?.dependencies.filter((dependency) => !this.hashGraph.vertices.has(dependency)) ?? [];
 				const isDeterministicFailure =
 					error instanceof DeterministicRejectionError ||
 					isObjectACLDeterministicError(error) ||
@@ -431,22 +505,22 @@ export class DRPVertexApplier<T extends IDRP> {
 					// blueprint rejections. Synchronous per-vertex failures use
 					// the newer quarantine result and let valid batch peers commit.
 					if (pipelineWasAsync) throw error;
-					quarantined.push(vertex.hash);
+					quarantined.push(rejectedHash);
 					continue;
 				}
 
-				const rejectedHash = error instanceof AttributedDeterministicRejectionError ? error.vertexHash : vertex.hash;
-				if (error instanceof AttributedDeterministicRejectionError && rejectedHash !== vertex.hash) {
+				const attributedHash = error instanceof AttributedDeterministicRejectionError ? error.vertexHash : rejectedHash;
+				if (error instanceof AttributedDeterministicRejectionError && attributedHash !== rejectedHash) {
 					// Attribution and the caller's verdict answer different
 					// questions. Remember the committed vertex that actually
 					// threw, but reject the submitted vertex: result.invalid
 					// must never name a graph member, and descendants need a
 					// terminal parent tombstone instead of endless recovery.
+					batchInvalidVertexHashes.add(attributedHash);
+					this.rememberInvalidVertexHash(attributedHash);
+					invalid.push(rejectedHash);
 					batchInvalidVertexHashes.add(rejectedHash);
 					this.rememberInvalidVertexHash(rejectedHash);
-					invalid.push(vertex.hash);
-					batchInvalidVertexHashes.add(vertex.hash);
-					this.rememberInvalidVertexHash(vertex.hash);
 					continue;
 				}
 
@@ -459,12 +533,12 @@ export class DRPVertexApplier<T extends IDRP> {
 					unresolvedDependencies.length !== 0 &&
 					!allUnresolvedDependenciesAreInvalid;
 				if (hasGenuinelyMissingDependency) {
-					missing.push(vertex.hash);
-					missingVertices.set(vertex.hash, vertex);
+					missing.push(rejectedHash);
+					if (rejectedVertex) missingVertices.set(rejectedHash, rejectedVertex);
 				} else {
-					invalid.push(rejectedHash);
-					batchInvalidVertexHashes.add(rejectedHash);
-					this.rememberInvalidVertexHash(rejectedHash);
+					invalid.push(attributedHash);
+					batchInvalidVertexHashes.add(attributedHash);
+					this.rememberInvalidVertexHash(attributedHash);
 				}
 			}
 		}
@@ -502,13 +576,31 @@ export class DRPVertexApplier<T extends IDRP> {
 	}
 
 	private createApplyResult(missing: Hash[], invalid: Hash[], quarantined: Hash[]): ApplyResult {
-		const uniqueInvalid = [...new Set(invalid)];
-		const result: ApplyResult = {
-			applied: missing.length === 0 && uniqueInvalid.length === 0 && quarantined.length === 0,
-			missing,
-			invalid: uniqueInvalid,
+		const normalize = (hashes: Hash[], excluded: ReadonlySet<Hash>): Hash[] => {
+			const normalized: Hash[] = [];
+			const seen = new Set<Hash>();
+			for (const hash of hashes) {
+				if (this.hashGraph.vertices.has(hash)) {
+					this.knownInvalidVertexHashes.delete(hash);
+					continue;
+				}
+				if (excluded.has(hash) || seen.has(hash)) continue;
+				seen.add(hash);
+				normalized.push(hash);
+			}
+			return normalized;
 		};
-		if (quarantined.length !== 0) result.quarantined = quarantined;
+		const normalizedInvalid = normalize(invalid, new Set());
+		const invalidHashes = new Set(normalizedInvalid);
+		const normalizedQuarantined = normalize(quarantined, invalidHashes);
+		const rejectedHashes = new Set([...invalidHashes, ...normalizedQuarantined]);
+		const normalizedMissing = normalize(missing, rejectedHashes);
+		const result: ApplyResult = {
+			applied: normalizedMissing.length === 0 && normalizedInvalid.length === 0 && normalizedQuarantined.length === 0,
+			missing: normalizedMissing,
+			invalid: normalizedInvalid,
+		};
+		if (normalizedQuarantined.length !== 0) result.quarantined = normalizedQuarantined;
 		return result;
 	}
 
@@ -815,6 +907,9 @@ export class DRPVertexApplier<T extends IDRP> {
 			skipHashValidation: operation.isLocal === true,
 		});
 		if (result.error) {
+			if (isReceiverClockPendingValidationResult(result)) {
+				throw new ReceiverClockPendingValidationError(vertex);
+			}
 			throw result.error;
 		}
 		return { stop: false, result: operation };
