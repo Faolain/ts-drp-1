@@ -1,19 +1,24 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { ESLint } from "eslint";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { makeAdmissionContext, prepareTestAdmissionContext } from "./admission-context-fixture.js";
 import registryJson from "../registry/field-registry.json" with { type: "json" };
 import {
-	type AdmissionContext,
+	type AdmissionHooks,
 	admitVertex,
 	digestRegistryPreimage,
 	makeRegistryPreimageBuilder,
+	type PreparedAdmissionContext,
 	type QcVote,
 	quorumCertificateBytes,
 	type RegistryDocument,
 	registryDomain,
+	type SignaturePublicKey,
 	signerSetBytes,
+	signIdentityDigest,
 	verifyVertexHash,
 	vertexDigest,
 } from "../src/index.js";
@@ -21,6 +26,11 @@ import { protocolRegistry } from "../src/registry.js";
 
 const ZERO_DIGEST = "0".repeat(64);
 const ONE_DIGEST = "1".repeat(64);
+const ADMISSION_SEED = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+const ADMISSION_PUBLIC_KEY: SignaturePublicKey = {
+	bytes: ed25519.getPublicKey(ADMISSION_SEED),
+	format: "raw",
+};
 
 function hex(value: Uint8Array): string {
 	return Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -89,14 +99,7 @@ const certificate = {
 	votes: [vote()],
 };
 
-const admissionContext: AdmissionContext = {
-	currentAnchor: ZERO_DIGEST,
-	currentEpoch: 4,
-	maxBytes: 1024,
-	maxDependencies: 16,
-	objectId: "room-a",
-	protocolMajor: 2,
-};
+const admissionContext: PreparedAdmissionContext = makeAdmissionContext({ objectId: "room-a", parameters });
 
 function admissionVertex(overrides: Readonly<Record<string, unknown>> = {}): Readonly<Record<string, unknown>> {
 	return {
@@ -104,20 +107,35 @@ function admissionVertex(overrides: Readonly<Record<string, unknown>> = {}): Rea
 		protocolMajor: 2,
 		objectId: "room-a",
 		epoch: 4,
-		anchor: ZERO_DIGEST,
+		anchor: admissionContext.currentAnchor,
 		author: "peer-a",
 		logicalTime: 1,
 		dependencies: [ONE_DIGEST],
 		operation: { op: "set" },
 		hash: ZERO_DIGEST,
-		encodedByteLength: 128,
 		...overrides,
 	};
 }
 
 function hashedVertex(overrides: Readonly<Record<string, unknown>> = {}): Readonly<Record<string, unknown>> {
 	const fields = admissionVertex(overrides);
-	return { ...fields, hash: hex(vertexDigest(fields as never)) };
+	const digest = vertexDigest(fields as never);
+	return {
+		...fields,
+		hash: hex(digest),
+		signature: signIdentityDigest(ADMISSION_SEED, digest),
+	};
+}
+
+function admissionHooks(resolveDependencies: AdmissionHooks["resolveDependencies"] = () => []): AdmissionHooks {
+	return {
+		authorize: () => true,
+		isDependencyAccepted: () => true,
+		resolveAuthorPublicKey: () => ADMISSION_PUBLIC_KEY,
+		resolveDependencies,
+		validateDeterministicInvariant: () => true,
+		validateOperationSchema: () => true,
+	};
 }
 
 describe("reviewer production-hardening regressions", () => {
@@ -220,12 +238,11 @@ describe("reviewer production-hardening regressions", () => {
 	it("C3 rejects a vertex that omits the required anchor", () => {
 		const vertex = { ...admissionVertex() } as Record<string, unknown>;
 		delete vertex.anchor;
-		expect(
-			admitVertex(vertex, admissionContext, {
-				isAncestor: () => false,
-				resolveDependencies: () => [],
-			})
-		).toEqual({ status: "terminal", code: "INVALID_HASH" });
+		expect(admitVertex(vertex, admissionContext, admissionHooks())).toEqual({
+			status: "terminal",
+			code: "INVALID_HASH",
+			latchByHash: false,
+		});
 	});
 
 	it("C4 returns a deeply frozen registry that callers cannot rewrite", () => {
@@ -240,12 +257,8 @@ describe("reviewer production-hardening regressions", () => {
 	});
 
 	it("C5 requires all vertex fields and a non-empty dependency list", () => {
-		const hooks = {
-			isAncestor: (): boolean => false,
-			resolveDependencies: (): readonly unknown[] => [],
-		};
+		const hooks = admissionHooks();
 		const skeletal = {
-			encodedByteLength: 1,
 			hash: ZERO_DIGEST,
 			objectId: "room-a",
 			protocolMajor: 2,
@@ -257,29 +270,39 @@ describe("reviewer production-hardening regressions", () => {
 		expect(admitVertex(admissionVertex({ dependencies: [] }), admissionContext, hooks)).toEqual({
 			status: "terminal",
 			code: "MISSING_DEPENDENCIES",
+			latchByHash: false,
 		});
 	});
 
-	it("C5 consumes resolved dependency envelopes, ancestry, and anchor grounding", () => {
+	it("C5 consumes resolved dependency envelopes and ancestry", () => {
 		const parent = hashedVertex({ logicalTime: 1, operation: { op: "parent" } });
 		const child = hashedVertex({ dependencies: [parent.hash], logicalTime: 2, operation: { op: "child" } });
-		const hooks = {
-			isAncestor: (): boolean => false,
-			resolveDependencies: (): readonly unknown[] => [parent],
-		};
-		expect(admitVertex(child, admissionContext, hooks)).toEqual({ status: "accept", code: "ADMISSIBLE" });
+		const hooks = admissionHooks(() => [parent]);
+		expect(admitVertex(child, admissionContext, hooks)).toEqual({
+			status: "accept",
+			code: "ADMISSIBLE",
+			latchByHash: false,
+		});
 		expect(
 			admitVertex(child, admissionContext, {
 				...hooks,
 				resolveDependencies: () => [],
 			})
-		).toEqual({ status: "pending", code: "MISSING_CURRENT_EPOCH_DEPENDENCIES" });
+		).toEqual({
+			status: "pending",
+			code: "MISSING_CURRENT_EPOCH_DEPENDENCIES",
+			latchByHash: false,
+		});
 		expect(
 			admitVertex(child, admissionContext, {
 				...hooks,
 				resolveDependencies: () => [{ ...parent, operation: { op: "tampered" } }],
 			})
-		).toEqual({ status: "terminal", code: "INVALID_DEPENDENCY_ENVELOPE" });
+		).toEqual({
+			status: "terminal",
+			code: "INVALID_DEPENDENCY_ENVELOPE",
+			latchByHash: false,
+		});
 
 		const otherObjectParent = hashedVertex({ objectId: "room-b" });
 		const otherObjectChild = hashedVertex({ dependencies: [otherObjectParent.hash], logicalTime: 2 });
@@ -288,7 +311,11 @@ describe("reviewer production-hardening regressions", () => {
 				...hooks,
 				resolveDependencies: () => [otherObjectParent],
 			})
-		).toEqual({ status: "terminal", code: "DEPENDENCY_DOMAIN_MISMATCH" });
+		).toEqual({
+			status: "terminal",
+			code: "DEPENDENCY_DOMAIN_MISMATCH",
+			latchByHash: false,
+		});
 
 		const wrongEpochParent = hashedVertex({ epoch: 3 });
 		const wrongEpochChild = hashedVertex({ dependencies: [wrongEpochParent.hash], logicalTime: 2 });
@@ -297,7 +324,11 @@ describe("reviewer production-hardening regressions", () => {
 				...hooks,
 				resolveDependencies: () => [wrongEpochParent],
 			})
-		).toEqual({ status: "terminal", code: "DEPENDENCY_WRONG_EPOCH" });
+		).toEqual({
+			status: "terminal",
+			code: "DEPENDENCY_WRONG_EPOCH",
+			latchByHash: false,
+		});
 
 		const nonMonotoneParent = hashedVertex({ logicalTime: 2 });
 		const nonMonotoneChild = hashedVertex({ dependencies: [nonMonotoneParent.hash], logicalTime: 2 });
@@ -306,19 +337,34 @@ describe("reviewer production-hardening regressions", () => {
 				...hooks,
 				resolveDependencies: () => [nonMonotoneParent],
 			})
-		).toEqual({ status: "terminal", code: "NON_MONOTONE_LOGICAL_TIME" });
+		).toEqual({
+			status: "terminal",
+			code: "INVALID_LOGICAL_TIME",
+			latchByHash: true,
+		});
 
 		const secondParent = hashedVertex({ author: "peer-b", operation: { op: "second-parent" } });
+		const directParents = [parent, secondParent].sort((left, right) =>
+			String(left.hash) < String(right.hash) ? -1 : String(left.hash) > String(right.hash) ? 1 : 0
+		);
 		const twoParentChild = hashedVertex({
-			dependencies: [parent.hash, secondParent.hash],
+			dependencies: directParents.map((directParent) => directParent.hash),
 			logicalTime: 2,
 		});
 		expect(
-			admitVertex(twoParentChild, admissionContext, {
-				isAncestor: (left, right) => left === parent.hash && right === secondParent.hash,
-				resolveDependencies: () => [parent, secondParent],
-			})
-		).toEqual({ status: "terminal", code: "NON_ANTICHAIN_DEPENDENCIES" });
+			admitVertex(
+				twoParentChild,
+				prepareTestAdmissionContext({
+					...admissionContext,
+					isAncestor: (left, right) => left === directParents[0]?.hash && right === directParents[1]?.hash,
+				}),
+				admissionHooks(() => directParents)
+			)
+		).toEqual({
+			status: "terminal",
+			code: "NON_ANTICHAIN_DEPENDENCIES",
+			latchByHash: true,
+		});
 	});
 
 	it("C6 exposes package-owned vertex hashing and rejects an echo-hook integration", async () => {

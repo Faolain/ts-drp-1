@@ -6,7 +6,17 @@ export {
 	deepCloneCanonical,
 	encodeCanonical,
 } from "./canonical.js";
-export { type AdmissionContext, type AdmissionHooks, type AdmissionResult, admitVertex } from "./admission.js";
+export {
+	type AdmissionContext,
+	type AdmissionHooks,
+	type AdmissionParameters,
+	type AdmissionResult,
+	type HardEpochAuthority,
+	type PreparedAdmissionContext,
+	type PrepareAdmissionContextResult,
+	admitVertex,
+	prepareAdmissionContext,
+} from "./admission.js";
 export {
 	type ActiveCryptoSuiteId,
 	type CryptoSuiteId,

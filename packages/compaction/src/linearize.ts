@@ -193,7 +193,10 @@ export function topologicalOrder(
 /** Exact append-only ancestor bitsets for a validated graph order. */
 export class CausalityIndex {
 	private readonly ancestors: Uint32Array[];
+	private readonly anchorHash: string;
+	private readonly epoch: number;
 	private readonly index: Map<string, number>;
+	private readonly objectId: string;
 
 	/**
 	 * Builds exact ancestry for a complete topological order.
@@ -207,6 +210,14 @@ export class CausalityIndex {
 		if (order.length !== vertices.size || new Set(order).size !== order.length) {
 			throw new LinearizationError("INVALID_ORDER", "order must contain every graph vertex exactly once");
 		}
+		const anchorHash = inferredAnchor;
+		const anchor = anchorHash === undefined ? undefined : vertices.get(anchorHash);
+		if (anchorHash === undefined || anchor?.kind !== "drp-epoch-anchor") {
+			throw new LinearizationError("MISSING_ANCHOR", "the active epoch anchor is missing");
+		}
+		this.anchorHash = anchorHash;
+		this.epoch = anchor.epoch;
+		this.objectId = anchor.objectId;
 		this.index = new Map(order.map((hash, position) => [hash, position]));
 		const wordCount = Math.ceil(order.length / 32);
 		this.ancestors = new Array<Uint32Array>(order.length);
@@ -230,6 +241,104 @@ export class CausalityIndex {
 				bits[word] = (bits[word] as number) | (1 << (dependencyPosition & 31));
 			}
 			this.ancestors[position] = bits;
+		}
+	}
+
+	/**
+	 * Number of atomically published vertices in the index.
+	 * @returns Published vertex count.
+	 */
+	get size(): number {
+		return this.index.size;
+	}
+
+	/**
+	 * Reports whether a vertex has been atomically published.
+	 * @param hash - Vertex hash.
+	 * @returns Whether the hash is present.
+	 */
+	has(hash: string): boolean {
+		return this.index.has(hash);
+	}
+
+	/**
+	 * Validates and atomically appends one dependency-complete active-epoch vertex.
+	 * @param hash - Map key for the vertex.
+	 * @param vertex - Vertex whose direct dependencies are already published.
+	 */
+	append(hash: string, vertex: EpochVertex): void {
+		assertDigest(hash, "vertex map key");
+		if (this.index.has(hash)) {
+			throw new LinearizationError("DUPLICATE_VERTEX", `vertex ${hash} is already indexed`);
+		}
+		if (vertex === null || typeof vertex !== "object") {
+			throw new LinearizationError("INVALID_VERTEX", `invalid vertex at ${hash}`);
+		}
+
+		const candidateHash = vertex.hash;
+		const kind = vertex.kind;
+		const objectId = vertex.objectId;
+		const epoch = vertex.epoch;
+		const anchor = vertex.anchor;
+		const rawDependencies: unknown = vertex.dependencies;
+		if (!Array.isArray(rawDependencies)) {
+			throw new LinearizationError("INVALID_VERTEX", `vertex ${hash} dependencies must be an array`);
+		}
+		const dependencyCount = rawDependencies.length;
+		const dependencies: string[] = [];
+		for (let position = 0; position < dependencyCount; position++) {
+			if (!Object.hasOwn(rawDependencies, position)) {
+				throw new LinearizationError("INVALID_VERTEX", `vertex ${hash} dependencies must be dense`);
+			}
+			const dependency: unknown = rawDependencies[position];
+			assertDigest(dependency, "dependency");
+			dependencies.push(dependency);
+		}
+
+		assertDigest(candidateHash, "vertex hash");
+		if (candidateHash !== hash) {
+			throw new LinearizationError("KEY_HASH_MISMATCH", `map key does not match vertex hash ${hash}`);
+		}
+		if (kind !== "drp-vertex") {
+			throw new LinearizationError("INVALID_VERTEX_KIND", `unexpected active vertex kind at ${hash}`);
+		}
+		if (objectId !== this.objectId || epoch !== this.epoch || anchor !== this.anchorHash) {
+			throw new LinearizationError("WRONG_EPOCH", `vertex ${hash} is outside the active hard epoch`);
+		}
+		if (dependencies.length === 0) {
+			throw new LinearizationError("MULTIPLE_ROOTS", `ordinary vertex ${hash} has no dependencies`);
+		}
+		if (new Set(dependencies).size !== dependencies.length) {
+			throw new LinearizationError("DUPLICATE_DEPENDENCY", `vertex ${hash} repeats a dependency`);
+		}
+		if (this.index.has(hash)) {
+			throw new LinearizationError("DUPLICATE_VERTEX", `vertex ${hash} is already indexed`);
+		}
+
+		const vertexPosition = this.index.size;
+		const dependencyPositions = dependencies.map((dependency) => {
+			const dependencyPosition = this.index.get(dependency);
+			if (dependencyPosition === undefined) {
+				throw new LinearizationError("MISSING_DEPENDENCY", `vertex ${hash} is missing dependency ${dependency}`);
+			}
+			return dependencyPosition;
+		});
+		const bits = new Uint32Array(Math.ceil((vertexPosition + 1) / 32));
+		for (const dependencyPosition of dependencyPositions) {
+			const dependencyBits = this.ancestors[dependencyPosition] as Uint32Array;
+			for (let word = 0; word < dependencyBits.length; word++) {
+				bits[word] = (bits[word] as number) | (dependencyBits[word] as number);
+			}
+			const word = dependencyPosition >>> 5;
+			bits[word] = (bits[word] as number) | (1 << (dependencyPosition & 31));
+		}
+
+		this.ancestors.push(bits);
+		try {
+			this.index.set(hash, vertexPosition);
+		} catch (error) {
+			this.ancestors.pop();
+			throw error;
 		}
 	}
 

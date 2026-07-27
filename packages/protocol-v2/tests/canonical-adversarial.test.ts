@@ -1,29 +1,32 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { Buffer } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
 
+import { makeAdmissionContext } from "./admission-context-fixture.js";
 import {
-	type AdmissionContext,
+	type AdmissionHooks,
 	admitVertex,
 	decodeCanonical,
 	encodeCanonical,
+	type PreparedAdmissionContext,
 	type QcVote,
 	quorumCertificateBytes,
+	type SignaturePublicKey,
 	type Signer,
 	signerSetBytes,
+	signIdentityDigest,
 	vertexDigest,
 } from "../src/index.js";
 
 const ZERO_DIGEST = "0".repeat(64);
 const ONE_DIGEST = "1".repeat(64);
-
-const context: AdmissionContext = {
-	currentAnchor: ZERO_DIGEST,
-	currentEpoch: 4,
-	maxBytes: 1024,
-	maxDependencies: 16,
-	objectId: "room-a",
-	protocolMajor: 2,
+const ADMISSION_SEED = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+const ADMISSION_PUBLIC_KEY: SignaturePublicKey = {
+	bytes: ed25519.getPublicKey(ADMISSION_SEED),
+	format: "raw",
 };
+
+const context: PreparedAdmissionContext = makeAdmissionContext({ objectId: "room-a" });
 
 function utf8Compare(left: string, right: string): number {
 	return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
@@ -53,14 +56,23 @@ function makeVote(signerId: string): QcVote {
 	};
 }
 
-function admissionEnvelope(
-	fields: Readonly<Record<string, unknown>>,
-	encodedByteLength = 128
-): Readonly<Record<string, unknown>> {
+function admissionEnvelope(fields: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	const digest = vertexDigest(fields as never);
 	return {
 		...fields,
-		hash: Buffer.from(vertexDigest(fields as never)).toString("hex"),
-		encodedByteLength,
+		hash: Buffer.from(digest).toString("hex"),
+		signature: signIdentityDigest(ADMISSION_SEED, digest),
+	};
+}
+
+function admissionHooks(resolveDependencies: AdmissionHooks["resolveDependencies"] = () => []): AdmissionHooks {
+	return {
+		authorize: () => true,
+		isDependencyAccepted: () => true,
+		resolveAuthorPublicKey: () => ADMISSION_PUBLIC_KEY,
+		resolveDependencies,
+		validateDeterministicInvariant: () => true,
+		validateOperationSchema: () => true,
 	};
 }
 
@@ -130,14 +142,29 @@ describe("Phase -1b canonical adversarial cases", () => {
 		expect(decodeCanonical(positive)).toEqual(Float32Array.of(0));
 	});
 
-	it("D3 rejects syntactic or limit failures before identity, digest, and dependencies", () => {
+	it("D3 quarantines embedded transport measurement before identity, digest, and dependencies", () => {
 		const resolveDependencies = vi.fn(() => []);
-		const result = admitVertex({ encodedByteLength: 1025, objectId: "room-a", protocolMajor: 2, epoch: 4 }, context, {
-			isAncestor: () => false,
+		const otherwiseExact = admissionEnvelope({
+			anchor: context.currentAnchor,
+			author: "peer-a",
+			dependencies: [context.currentAnchor],
+			epoch: 4,
+			kind: "drp-vertex",
+			logicalTime: 1,
+			objectId: "room-a",
+			operation: { op: "set" },
+			protocolMajor: 2,
+		});
+		const result = admitVertex({ ...otherwiseExact, encodedByteLength: 1025 }, context, {
+			...admissionHooks(),
 			resolveDependencies,
 		});
 
-		expect(result).toMatchObject({ status: "terminal", code: "LIMIT_EXCEEDED" });
+		expect(result).toEqual({
+			status: "quarantine",
+			code: "NON_CANONICAL_ENVELOPE",
+			latchByHash: false,
+		});
 		expect(resolveDependencies).not.toHaveBeenCalled();
 	});
 
@@ -145,10 +172,9 @@ describe("Phase -1b canonical adversarial cases", () => {
 		const resolveDependencies = vi.fn(() => []);
 		const result = admitVertex(
 			{
-				anchor: ZERO_DIGEST,
+				anchor: context.currentAnchor,
 				author: "peer-a",
 				dependencies: [ZERO_DIGEST],
-				encodedByteLength: 128,
 				epoch: 4,
 				hash: ONE_DIGEST,
 				kind: "drp-vertex",
@@ -158,7 +184,7 @@ describe("Phase -1b canonical adversarial cases", () => {
 				protocolMajor: 2,
 			},
 			context,
-			{ isAncestor: () => false, resolveDependencies }
+			{ ...admissionHooks(), resolveDependencies }
 		);
 
 		expect(result).toMatchObject({ status: "terminal", code: "WRONG_OBJECT" });
@@ -172,10 +198,10 @@ describe("Phase -1b canonical adversarial cases", () => {
 			protocolMajor: 2,
 			objectId: "room-a",
 			epoch: 4,
-			anchor: ZERO_DIGEST,
+			anchor: context.currentAnchor,
 			author: "peer-a",
 			logicalTime: 1,
-			dependencies: [ZERO_DIGEST],
+			dependencies: [context.currentAnchor],
 			operation: { op: "parent" },
 		});
 		const vertex = admissionEnvelope({
@@ -183,19 +209,20 @@ describe("Phase -1b canonical adversarial cases", () => {
 			protocolMajor: 2,
 			objectId: "room-a",
 			epoch: 4,
-			anchor: ZERO_DIGEST,
+			anchor: context.currentAnchor,
 			author: "peer-a",
 			logicalTime: 2,
 			dependencies: [parent.hash],
 			operation: { op: "child" },
 		});
-		const result = admitVertex(vertex, context, {
-			resolveDependencies: () => {
+		const result = admitVertex(
+			vertex,
+			context,
+			admissionHooks(() => {
 				calls.push("dependencies");
 				return [parent];
-			},
-			isAncestor: () => false,
-		});
+			})
+		);
 
 		expect(calls).toEqual(["dependencies"]);
 		expect(result.status).toBe("accept");

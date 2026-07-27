@@ -18,14 +18,15 @@ import { Buffer } from "node:buffer";
 import { createPrivateKey, createPublicKey, sign as nodeSign, verify as nodeVerify } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
+import { makeAdmissionContext } from "./admission-context-fixture.js";
 import {
-	type AdmissionContext,
 	admitVertex,
 	cryptoSuiteStatus,
 	encodeCanonical,
 	hashDomain,
 	makeRegistryPreimageBuilder,
 	negotiateGenesisCryptoSuite,
+	type PreparedAdmissionContext,
 	quorumSize,
 	type RegisteredSignature,
 	type RegistryDocument,
@@ -133,19 +134,23 @@ function negativeZeroGate(encoder: Encoder): void {
 
 function admissionOrderingGate(admit: typeof admitVertex): void {
 	let digestReads = 0;
-	const context: AdmissionContext = {
-		currentAnchor: "0".repeat(64),
+	const context: PreparedAdmissionContext = makeAdmissionContext({
 		currentEpoch: 1,
-		maxBytes: 100,
-		maxDependencies: 1,
 		objectId: "right-room",
-		protocolMajor: 2,
-	};
+		parameters: {
+			maxEpochVertices: 8192,
+			maxEpochBytes: 8 * 1024 * 1024,
+			maxDependencies: 1,
+			snapshotChunkBytes: 128 * 1024,
+			maxSnapshotBytes: 256 * 1024 * 1024,
+			maxPendingEntries: 4096,
+			maxPendingBytes: 16 * 1024 * 1024,
+		},
+	});
 	const vertex = {
-		anchor: "0".repeat(64),
+		anchor: context.currentAnchor,
 		author: "peer-a",
-		dependencies: ["0".repeat(64)],
-		encodedByteLength: 1,
+		dependencies: [context.currentAnchor],
 		epoch: 1,
 		get operation(): Readonly<Record<string, unknown>> {
 			digestReads++;
@@ -157,10 +162,17 @@ function admissionOrderingGate(admit: typeof admitVertex): void {
 		objectId: "wrong-room",
 		protocolMajor: 2,
 	};
-	admit(vertex, context, {
-		isAncestor: () => false,
+	const result = admit(vertex, context, {
+		authorize: () => false,
+		isDependencyAccepted: () => false,
+		resolveAuthorPublicKey: () => undefined,
 		resolveDependencies: () => [],
+		validateDeterministicInvariant: () => false,
+		validateOperationSchema: () => false,
 	});
+	if (result.status !== "terminal" || result.code !== "WRONG_OBJECT" || result.latchByHash !== false) {
+		throw new Error("wrong-object admission did not retain its exact cheap terminal classification");
+	}
 	if (digestReads !== 0) throw new Error("vertex was hashed before identity admission");
 }
 

@@ -1,19 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type AdmissionContext, admitVertex } from "../src/index.js";
+import { makeAdmissionContext } from "./admission-context-fixture.js";
+import { type AdmissionHooks, admitVertex, type PreparedAdmissionContext } from "../src/index.js";
 
 const ZERO_DIGEST = "0".repeat(64);
 const ONE_DIGEST = "1".repeat(64);
+const roomAContext = makeAdmissionContext({ objectId: "room-a" });
+const unreachableHooks: AdmissionHooks = {
+	authorize: () => false,
+	isDependencyAccepted: () => false,
+	resolveAuthorPublicKey: () => undefined,
+	resolveDependencies: () => [],
+	validateDeterministicInvariant: () => false,
+	validateOperationSchema: () => false,
+};
 
 describe("B1 fail-closed vertex digest admission", () => {
 	it("rejects a declared hash that differs from the computed vertex digest before dependency work", () => {
 		const resolveDependencies = vi.fn(() => []);
 		const result = admitVertex(
 			{
-				anchor: ZERO_DIGEST,
+				anchor: roomAContext.currentAnchor,
 				author: "peer-a",
 				dependencies: [ZERO_DIGEST],
-				encodedByteLength: 128,
 				epoch: 4,
 				hash: ONE_DIGEST,
 				kind: "drp-vertex",
@@ -22,21 +31,14 @@ describe("B1 fail-closed vertex digest admission", () => {
 				operation: { op: "set" },
 				protocolMajor: 2,
 			},
+			roomAContext,
 			{
-				currentAnchor: ZERO_DIGEST,
-				currentEpoch: 4,
-				maxBytes: 1024,
-				maxDependencies: 16,
-				objectId: "room-a",
-				protocolMajor: 2,
-			},
-			{
-				isAncestor: () => false,
+				...unreachableHooks,
 				resolveDependencies,
 			}
 		);
 
-		expect(result).toEqual({ status: "terminal", code: "INVALID_HASH" });
+		expect(result).toEqual({ status: "terminal", code: "INVALID_HASH", latchByHash: false });
 		expect(resolveDependencies).not.toHaveBeenCalled();
 	});
 
@@ -63,15 +65,8 @@ describe("B1 fail-closed vertex digest admission", () => {
 			protocolMajor: 2,
 		});
 		const computedHash = valid.hash as string;
-		const tampered = { ...valid, encodedByteLength: 128, hash: computedHash === ONE_DIGEST ? ZERO_DIGEST : ONE_DIGEST };
-		const context: AdmissionContext = {
-			currentAnchor: ZERO_DIGEST,
-			currentEpoch: 4,
-			maxBytes: 1024,
-			maxDependencies: 16,
-			objectId: "room-a",
-			protocolMajor: 2,
-		};
+		const tampered = { ...valid, hash: computedHash === ONE_DIGEST ? ZERO_DIGEST : ONE_DIGEST };
+		const context: PreparedAdmissionContext = roomAContext;
 
 		const oracle = await referenceAdmission.classifyVertex(tampered, {
 			activeVertices: new Map(),
@@ -83,12 +78,9 @@ describe("B1 fail-closed vertex digest admission", () => {
 			protocolMajor: 2,
 			suppliedDependencies: new Map(),
 		});
-		const candidate = admitVertex(tampered, context, {
-			isAncestor: () => false,
-			resolveDependencies: () => [],
-		});
+		const candidate = admitVertex({ ...tampered, anchor: context.currentAnchor }, context, unreachableHooks);
 
 		expect(oracle).toMatchObject({ status: "terminal", code: "INVALID_HASH" });
-		expect(candidate).toEqual(oracle);
+		expect(candidate).toEqual({ ...oracle, latchByHash: false });
 	});
 });

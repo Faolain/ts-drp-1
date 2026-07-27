@@ -1,23 +1,28 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2";
 import { Buffer } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_ADMISSION_PARAMETERS, makeAdmissionContext } from "./admission-context-fixture.js";
 import registry from "../registry/field-registry.json" with { type: "json" };
 import {
-	type AdmissionContext,
+	type AdmissionHooks,
 	admitVertex,
 	compareBytes,
 	decodeCanonical,
 	encodeCanonical,
 	hashDomain,
 	makeRegistryPreimageBuilder,
+	type PreparedAdmissionContext,
 	type QcVote,
 	quorumCertificateBytes,
 	quorumSize,
 	type RegistryDocument,
 	type RegistryField,
+	type SignaturePublicKey,
 	type Signer,
 	signerSetBytes,
+	signIdentityDigest,
 	validateProtocolString,
 	vertexDigest,
 	type VertexInput,
@@ -27,6 +32,11 @@ import { protocolRegistry } from "../src/registry.js";
 
 const ZERO_DIGEST = "0".repeat(64);
 const ONE_DIGEST = "1".repeat(64);
+const ADMISSION_SEED = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+const ADMISSION_PUBLIC_KEY: SignaturePublicKey = {
+	bytes: ed25519.getPublicKey(ADMISSION_SEED),
+	format: "raw",
+};
 
 function bytes(hex: string): Uint8Array {
 	return Uint8Array.from(Buffer.from(hex, "hex"));
@@ -633,29 +643,33 @@ describe("mutation-strengthened registry and protocol contract", () => {
 });
 
 describe("mutation-strengthened admission contract", () => {
-	const context: AdmissionContext = {
-		currentAnchor: ZERO_DIGEST,
-		currentEpoch: 4,
-		maxBytes: 128,
-		maxDependencies: 2,
+	const context: PreparedAdmissionContext = makeAdmissionContext({
 		objectId: "room",
-		protocolMajor: 2,
-	};
+		parameters: { ...DEFAULT_ADMISSION_PARAMETERS, maxDependencies: 2 },
+	});
 	function admissionEnvelope(fields: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+		const digest = vertexDigest(fields as never);
 		return {
 			...fields,
-			hash: hex(vertexDigest(fields as never)),
-			encodedByteLength: 128,
+			hash: hex(digest),
+			signature: signIdentityDigest(ADMISSION_SEED, digest),
 		};
 	}
+	const admissionHooks: Omit<AdmissionHooks, "resolveDependencies"> = {
+		authorize: () => true,
+		isDependencyAccepted: () => true,
+		resolveAuthorPublicKey: () => ADMISSION_PUBLIC_KEY,
+		validateDeterministicInvariant: () => true,
+		validateOperationSchema: () => true,
+	};
 
 	const parent = admissionEnvelope({
 		kind: "drp-vertex",
 		protocolMajor: 2,
 		objectId: "room",
 		epoch: 4,
-		anchor: ZERO_DIGEST,
-		dependencies: [ZERO_DIGEST],
+		anchor: context.currentAnchor,
+		dependencies: [context.currentAnchor],
 		author: "peer-a",
 		logicalTime: 1,
 		operation: { op: "parent" },
@@ -665,7 +679,7 @@ describe("mutation-strengthened admission contract", () => {
 		protocolMajor: 2,
 		objectId: "room",
 		epoch: 4,
-		anchor: ZERO_DIGEST,
+		anchor: context.currentAnchor,
 		dependencies: [ONE_DIGEST],
 		author: "peer-b",
 		logicalTime: 1,
@@ -676,7 +690,7 @@ describe("mutation-strengthened admission contract", () => {
 		protocolMajor: 2,
 		objectId: "room",
 		epoch: 4,
-		anchor: ZERO_DIGEST,
+		anchor: context.currentAnchor,
 		dependencies: [parent.hash],
 		author: "peer-c",
 		logicalTime: 2,
@@ -689,6 +703,7 @@ describe("mutation-strengthened admission contract", () => {
 	} {
 		const calls: string[] = [];
 		const result = admitVertex(vertex as Readonly<Record<string, unknown>>, context, {
+			...admissionHooks,
 			resolveDependencies: (dependencies) => {
 				calls.push(`deps:${dependencies.join(",")}`);
 				return dependencies.map((dependency) => {
@@ -697,27 +712,26 @@ describe("mutation-strengthened admission contract", () => {
 					return undefined;
 				});
 			},
-			isAncestor: () => false,
 		});
 		return { calls, result };
 	}
 
 	it("rejects every malformed syntax and exact limit overflow before hooks", () => {
-		const cases: readonly [unknown, string][] = [
-			[null, "MALFORMED_VERTEX"],
-			["vertex", "MALFORMED_VERTEX"],
-			[{ ...valid, encodedByteLength: undefined }, "MALFORMED_VERTEX"],
-			[{ ...valid, encodedByteLength: "1" }, "MALFORMED_VERTEX"],
-			[{ ...valid, encodedByteLength: 1.5 }, "MALFORMED_VERTEX"],
-			[{ ...valid, encodedByteLength: -1 }, "MALFORMED_VERTEX"],
-			[{ ...valid, encodedByteLength: 129 }, "LIMIT_EXCEEDED"],
-			[{ ...valid, dependencies: "digest" }, "MALFORMED_VERTEX"],
-			[{ ...valid, dependencies: [ZERO_DIGEST, ONE_DIGEST, "2".repeat(64)] }, "LIMIT_EXCEEDED"],
-			[{ ...valid, dependencies: [ZERO_DIGEST, 1] }, "MALFORMED_VERTEX"],
+		const cases: readonly [unknown, string, string][] = [
+			[null, "terminal", "MALFORMED_VERTEX"],
+			["vertex", "terminal", "MALFORMED_VERTEX"],
+			[{ ...valid, encodedByteLength: undefined }, "quarantine", "NON_CANONICAL_ENVELOPE"],
+			[{ ...valid, encodedByteLength: "1" }, "quarantine", "NON_CANONICAL_ENVELOPE"],
+			[{ ...valid, encodedByteLength: 1.5 }, "quarantine", "NON_CANONICAL_ENVELOPE"],
+			[{ ...valid, encodedByteLength: -1 }, "quarantine", "NON_CANONICAL_ENVELOPE"],
+			[{ ...valid, encodedByteLength: 129 }, "quarantine", "NON_CANONICAL_ENVELOPE"],
+			[{ ...valid, dependencies: "digest" }, "quarantine", "NON_CANONICAL_ENVELOPE"],
+			[{ ...valid, dependencies: [ZERO_DIGEST, ONE_DIGEST, "2".repeat(64)] }, "terminal", "LIMIT_EXCEEDED"],
+			[{ ...valid, dependencies: [ZERO_DIGEST, 1] }, "quarantine", "NON_CANONICAL_ENVELOPE"],
 		];
-		for (const [vertex, code] of cases) {
+		for (const [vertex, status, code] of cases) {
 			const observed = run(vertex);
-			expect(observed.result, code).toEqual({ status: "terminal", code });
+			expect(observed.result, code).toEqual({ status, code, latchByHash: false });
 			expect(observed.calls, code).toEqual([]);
 		}
 	});
@@ -737,7 +751,7 @@ describe("mutation-strengthened admission contract", () => {
 		];
 		for (const [vertex, status, code] of cases) {
 			const observed = run(vertex);
-			expect(observed.result, code).toEqual({ status, code });
+			expect(observed.result, code).toEqual({ status, code, latchByHash: false });
 			expect(observed.calls, code).toEqual([]);
 		}
 	});
@@ -745,22 +759,23 @@ describe("mutation-strengthened admission contract", () => {
 	it("rejects callable records at the object syntax gate", () => {
 		const callable = Object.assign(() => undefined, valid);
 		expect(run(callable)).toEqual({
-			result: { status: "terminal", code: "MALFORMED_VERTEX" },
+			result: { status: "terminal", code: "MALFORMED_VERTEX", latchByHash: false },
 			calls: [],
 		});
 	});
 
 	it("accepts exact boundaries and rejects absent dependencies before hashing", () => {
-		expect(run({ ...valid, encodedByteLength: 0 }).result).toEqual({ status: "accept", code: "ADMISSIBLE" });
+		expect(run(valid).result).toEqual({ status: "accept", code: "ADMISSIBLE", latchByHash: false });
+		const dependencyHashes = [parent.hash as string, secondParent.hash as string].sort();
 		const twoDependencies = admissionEnvelope({
 			...valid,
-			dependencies: [parent.hash, secondParent.hash],
+			dependencies: dependencyHashes,
 		});
-		expect(run(twoDependencies).calls).toEqual([`deps:${parent.hash},${secondParent.hash}`]);
+		expect(run(twoDependencies).calls).toEqual([`deps:${dependencyHashes.join(",")}`]);
 		const withoutDependencies = { ...valid } as Record<string, unknown>;
 		delete withoutDependencies.dependencies;
 		expect(run(withoutDependencies)).toEqual({
-			result: { status: "terminal", code: "MISSING_DEPENDENCIES" },
+			result: { status: "terminal", code: "MISSING_DEPENDENCIES", latchByHash: false },
 			calls: [],
 		});
 	});
@@ -769,10 +784,10 @@ describe("mutation-strengthened admission contract", () => {
 		const resolveDependencies = vi.fn();
 		expect(
 			admitVertex({ ...valid, hash: ONE_DIGEST }, context, {
-				isAncestor: () => false,
+				...admissionHooks,
 				resolveDependencies,
 			})
-		).toEqual({ status: "terminal", code: "INVALID_HASH" });
+		).toEqual({ status: "terminal", code: "INVALID_HASH", latchByHash: false });
 		expect(resolveDependencies).not.toHaveBeenCalled();
 	});
 });
