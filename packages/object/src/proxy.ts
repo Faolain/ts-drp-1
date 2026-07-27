@@ -1,5 +1,5 @@
 import { type DrpType, type IDRP } from "@ts-drp/types";
-import { handlePromiseOrValue } from "@ts-drp/utils";
+import { handlePromiseOrValue, isPromise } from "@ts-drp/utils";
 import { deepEqual } from "fast-equals";
 
 import { type PostOperation } from "./operation.js";
@@ -19,6 +19,84 @@ export interface DRPProxyChainArgs {
 export interface MutationTrackingResult<T extends object> {
 	proxy: T;
 	hasChanges(): boolean;
+}
+
+interface PendingLocalMutation {
+	execute(): unknown | Promise<unknown>;
+	resolve(value: unknown): void;
+	reject(reason?: unknown): void;
+}
+
+/**
+ * Serializes locally authored mutations for one DRP object while preserving
+ * synchronous execution when the lane is idle.
+ */
+export class LocalMutationLane {
+	private running = false;
+	private readonly pending: PendingLocalMutation[] = [];
+
+	/**
+	 * Runs a mutation immediately or queues it behind the active mutation.
+	 * @param execute - The complete local authoring pipeline
+	 * @returns The direct result when uncontended, otherwise a Promise
+	 */
+	run<T>(execute: () => T | Promise<T>): T | Promise<T> {
+		if (this.running) {
+			return new Promise<T>((resolve, reject) => {
+				this.pending.push({ execute, resolve, reject });
+			});
+		}
+
+		this.running = true;
+		let result: T | Promise<T>;
+		try {
+			result = execute();
+		} catch (error) {
+			this.release();
+			throw error;
+		}
+
+		if (!isPromise(result)) {
+			this.release();
+			return result;
+		}
+		void result.then(
+			() => this.release(),
+			() => this.release()
+		);
+		return result;
+	}
+
+	private release(): void {
+		while (this.pending.length > 0) {
+			const next = this.pending.shift();
+			if (!next) continue;
+
+			let result: unknown | Promise<unknown>;
+			try {
+				result = next.execute();
+			} catch (error) {
+				next.reject(error);
+				continue;
+			}
+
+			if (isPromise(result)) {
+				result.then(
+					(value) => {
+						next.resolve(value);
+						this.release();
+					},
+					(error: unknown) => {
+						next.reject(error);
+						this.release();
+					}
+				);
+				return;
+			}
+			next.resolve(result);
+		}
+		this.running = false;
+	}
 }
 
 /**
@@ -230,17 +308,25 @@ export class DRPProxy<T extends IDRP> {
 	private target: T;
 	private readonly _proxy: T;
 	private type: DrpType;
+	private readonly localMutationLane: LocalMutationLane;
 
 	/**
 	 * Creates a new DRPProxy instance
 	 * @param target - The target object this proxy is associated with
 	 * @param pipeline - The pipeline of steps to be executed
 	 * @param type - The type of the proxy
+	 * @param localMutationLane - The per-object local authoring lane
 	 */
-	constructor(target: T, pipeline: Pipeline<DRPProxyChainArgs, PostOperation<IDRP>>, type: DrpType) {
+	constructor(
+		target: T,
+		pipeline: Pipeline<DRPProxyChainArgs, PostOperation<IDRP>>,
+		type: DrpType,
+		localMutationLane = new LocalMutationLane()
+	) {
 		this.type = type;
 		this.target = target;
 		this.pipeline = pipeline;
+		this.localMutationLane = localMutationLane;
 		this._proxy = this.createProxy();
 	}
 
@@ -266,9 +352,10 @@ export class DRPProxy<T extends IDRP> {
 
 				// Return wrapped function
 				return (...args: unknown[]) => {
-					const operation = this.pipeline.execute({ prop, args, type: this.type });
-
-					return handlePromiseOrValue(operation, (postOperation) => postOperation.result);
+					return this.localMutationLane.run(() => {
+						const operation = this.pipeline.execute({ prop, args, type: this.type });
+						return handlePromiseOrValue(operation, (postOperation) => postOperation.result);
+					});
 				};
 			},
 		};

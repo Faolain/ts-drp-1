@@ -35,7 +35,7 @@ import {
 } from "./operation.js";
 import { createPipeline, type Pipeline } from "./pipeline/pipeline.js";
 import { type HandlerReturn } from "./pipeline/types.js";
-import { DRPProxy, type DRPProxyChainArgs, trackMutations } from "./proxy.js";
+import { DRPProxy, type DRPProxyChainArgs, LocalMutationLane, trackMutations } from "./proxy.js";
 import { DRPObjectStateManager, stateFromDRP } from "./state.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
@@ -359,9 +359,10 @@ export class DRPVertexApplier<T extends IDRP> {
 			.setNext(this.validateWriterPermission.bind(this))
 			.setNext(this.applyFn.bind(this));
 
-		this._proxyACL = new DRPProxy(acl, callFnPipeline, DrpType.ACL);
+		const localMutationLane = new LocalMutationLane();
+		this._proxyACL = new DRPProxy(acl, callFnPipeline, DrpType.ACL, localMutationLane);
 		if (drp) {
-			this._proxyDRP = new DRPProxy(drp, callFnPipeline, DrpType.DRP);
+			this._proxyDRP = new DRPProxy(drp, callFnPipeline, DrpType.DRP, localMutationLane);
 		}
 	}
 
