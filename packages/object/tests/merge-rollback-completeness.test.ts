@@ -31,7 +31,7 @@ class RollbackProbeDRP implements IDRP {
 		if (!operationControl) throw new Error(`Missing replay control ${controlId}`);
 		operationControl.invocations++;
 		this.values.push(value);
-		if (operationControl.invocations === 2) throw new Error("controlled transient replay failure");
+		if (operationControl.invocations % 2 === 0) throw new Error("controlled transient replay failure");
 	}
 }
 
@@ -49,7 +49,7 @@ class CheckpointProbeDRP implements IDRP {
 				if (!operationControl) throw new Error(`Missing checkpoint control ${controlId}`);
 				if (!operationControl.armed) return "stable";
 				operationControl.readsWhileArmed++;
-				if (operationControl.readsWhileArmed === 3) {
+				if (operationControl.readsWhileArmed % 3 === 0) {
 					throw new Error("controlled transient checkpoint failure");
 				}
 				return "stable";
@@ -133,7 +133,9 @@ describe("per-vertex rollback completeness", () => {
 			invalid: [replayHostile.hash],
 			quarantined: [replayDRP.hash],
 		});
-		expect(replayControl.invocations, "the transient throw must come from the second, final replay invocation").toBe(2);
+		expect(replayControl.invocations, "every bounded attempt must reconstruct, then fail during its final replay").toBe(
+			6
+		);
 		expect(
 			{
 				committedACLInGraph: receiver.vertices.some(({ hash }) => hash === replayACL.hash),
@@ -202,11 +204,11 @@ describe("per-vertex rollback completeness", () => {
 			expect(
 				checkpointControl.invocations,
 				"positive control: the valid DRP operation must execute in the pipeline and final replay"
-			).toBe(2);
+			).toBe(6);
 			expect(
 				checkpointControl.readsWhileArmed,
 				"positive control: live adoption must reach checkpoint snapshotting before the injected throw"
-			).toBe(3);
+			).toBe(9);
 
 			expect(
 				{

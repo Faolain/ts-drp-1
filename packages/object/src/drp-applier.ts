@@ -43,6 +43,7 @@ const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
 const DEFAULT_CHECKPOINT_SUFFIX_SIZE = 256;
 const MAX_CHECKPOINTS = 32;
 const MAX_ADOPTION_COMMIT_ATTEMPTS = 3;
+const MAX_APPLICATION_ATTEMPTS_PER_OFFER = 3;
 const metrics = new OpentelemetryMetrics("@ts-drp/object/drp-applier");
 
 class DeterministicRejectionError extends Error {}
@@ -133,6 +134,25 @@ class KnownInvalidHashes implements Iterable<Hash> {
 
 class ApplyInvariantError extends AggregateError {
 	partialResult?: ApplyResult;
+}
+
+function isDeterministicVertexFailure(error: unknown): boolean {
+	return (
+		error instanceof DeterministicRejectionError ||
+		isObjectACLDeterministicError(error) ||
+		error instanceof InvalidDependenciesError ||
+		error instanceof InvalidHashError ||
+		error instanceof InvalidTimestampError
+	);
+}
+
+function isApplicationRetryBarrier(error: unknown): boolean {
+	return (
+		error instanceof AdoptionCommitExhaustedError ||
+		error instanceof ApplyInvariantError ||
+		error instanceof ReceiverClockPendingValidationError ||
+		isDeterministicVertexFailure(error)
+	);
 }
 
 interface PreparedAdoption<T extends IDRP> {
@@ -417,12 +437,25 @@ export class DRPVertexApplier<T extends IDRP> {
 			preflightByIdentity.set(submittedVertex, record);
 			return record;
 		});
+		const conflictResolverInspector = (
+			this.hashGraph as IHashGraph & {
+				hasCustomConflictResolver?(drpType: string | undefined): boolean;
+			}
+		).hasCustomConflictResolver;
+		const hasCustomConflictResolver =
+			typeof conflictResolverInspector !== "function" ||
+			conflictResolverInspector.call(this.hashGraph, DrpType.DRP) !== false;
 		const callContext: ApplyCallContext = {
 			canDeferReconciliation:
 				preflight.length > 1 &&
 				preflight.every(
 					({ operationSnapshot }) => operationSnapshot.succeeded && operationSnapshot.operation?.drpType === DrpType.DRP
-				),
+				) &&
+				// Deferred reconciliation commits each candidate before replaying
+				// the combined graph. That is safe only when replay cannot call
+				// application conflict-resolution code and discover a failure
+				// after the candidate became observable.
+				!hasCustomConflictResolver,
 			deferRemainingVertices: false,
 			needsFullReconciliation: false,
 			notificationsDeferred: false,
@@ -457,7 +490,6 @@ export class DRPVertexApplier<T extends IDRP> {
 			if (this.hashGraph.vertices.has(submittedHash)) continue;
 
 			let stableVertex: Vertex | undefined;
-			let pipelineWasAsync = false;
 			try {
 				if (!operationSnapshot.succeeded) throw operationSnapshot.error;
 				stableVertex = snapshotSubmittedVertex(submittedVertex, operationSnapshot.operation);
@@ -472,13 +504,23 @@ export class DRPVertexApplier<T extends IDRP> {
 					this.rememberInvalidVertexHash(stableVertex.hash);
 					continue;
 				}
-				const execution = this.applyVertexPipeline.execute({
-					vertex: stableVertex,
-					isACL: stableVertex.operation.drpType === DrpType.ACL,
-				});
-				pipelineWasAsync = execution instanceof Promise;
-				const operation = await execution;
-				await this.commitPreparedVertex(operation, callContext);
+				for (let attempt = 1; attempt <= MAX_APPLICATION_ATTEMPTS_PER_OFFER; attempt++) {
+					try {
+						// Re-entering the complete pipeline reconstructs the candidate
+						// state for every attempt. A rejected application promise can
+						// therefore never carry partial candidate mutations forward.
+						const operation = await this.applyVertexPipeline.execute({
+							vertex: stableVertex,
+							isACL: stableVertex.operation.drpType === DrpType.ACL,
+						});
+						await this.commitPreparedVertex(operation, callContext);
+						break;
+					} catch (error) {
+						if (isApplicationRetryBarrier(error) || attempt === MAX_APPLICATION_ATTEMPTS_PER_OFFER) {
+							throw error;
+						}
+					}
+				}
 			} catch (error) {
 				if (error instanceof AdoptionCommitExhaustedError) throw error;
 				if (error instanceof ApplyInvariantError) {
@@ -495,17 +537,8 @@ export class DRPVertexApplier<T extends IDRP> {
 				const rejectedHash = rejectedVertex?.hash ?? submittedHash;
 				const unresolvedDependencies =
 					rejectedVertex?.dependencies.filter((dependency) => !this.hashGraph.vertices.has(dependency)) ?? [];
-				const isDeterministicFailure =
-					error instanceof DeterministicRejectionError ||
-					isObjectACLDeterministicError(error) ||
-					error instanceof InvalidDependenciesError ||
-					error instanceof InvalidHashError ||
-					error instanceof InvalidTimestampError;
+				const isDeterministicFailure = isDeterministicVertexFailure(error);
 				if (!isDeterministicFailure) {
-					// Preserve the established retry contract for asynchronous
-					// blueprint rejections. Synchronous per-vertex failures use
-					// the newer quarantine result and let valid batch peers commit.
-					if (pipelineWasAsync) throw error;
 					quarantined.push(rejectedHash);
 					continue;
 				}

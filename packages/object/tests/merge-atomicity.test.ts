@@ -104,7 +104,7 @@ describe("per-vertex merge atomicity", () => {
 				status: "resolved",
 				result: { applied: false, missing: [], invalid: [], quarantined: [transient.hash] },
 			},
-			transientAttempts: 2,
+			transientAttempts: 6,
 			transientSurfaces: {
 				aclState: undefined,
 				drpState: undefined,

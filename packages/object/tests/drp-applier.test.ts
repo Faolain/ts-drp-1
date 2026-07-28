@@ -1,4 +1,4 @@
-import { DrpType, type IACL, type IDRP, Operation, SemanticsType, Vertex } from "@ts-drp/types";
+import { DrpType, type IACL, type IDRP, type IHashGraph, Operation, SemanticsType, Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -85,6 +85,63 @@ describe("DRPVertexApplier", () => {
 				expect(result.applied).toBe(true);
 				expect(result.missing).toHaveLength(0);
 				expect(result.invalid).toHaveLength(0);
+			});
+
+			it("should fail closed when an IHashGraph has no conflict-resolver inspector", async () => {
+				const hashGraphWithoutInspector = new Proxy(mockHashGraph, {
+					get(target, property): unknown {
+						if (property === "hasCustomConflictResolver") return undefined;
+						const value = Reflect.get(target, property, target) as unknown;
+						return typeof value === "function" ? value.bind(target) : value;
+					},
+				}) as IHashGraph;
+				const failClosedApplier = new DRPVertexApplier({
+					drp: mockDRP,
+					acl: mockACL,
+					hashGraph: hashGraphWithoutInspector,
+					states: mockStates,
+					finalityStore: mockFinalityStore,
+					notify: mockNotify,
+				});
+				let observedCanDeferReconciliation: boolean | undefined;
+				const applyVerticesCall = vi
+					.spyOn(
+						failClosedApplier as unknown as {
+							applyVerticesCall(
+								vertices: unknown[],
+								callContext: { canDeferReconciliation: boolean }
+							): Promise<{ applied: boolean; missing: string[]; invalid: string[] }>;
+						},
+						"applyVerticesCall"
+					)
+					.mockImplementation((_vertices, callContext) => {
+						observedCanDeferReconciliation = callContext.canDeferReconciliation;
+						return Promise.resolve({ applied: true, missing: [], invalid: [] });
+					});
+				const operation = Operation.create({ opType: "test", value: [], drpType: DrpType.DRP });
+				const timestamp = Date.now();
+				const first = Vertex.create({
+					hash: computeHash(peerId, operation, [HashGraph.rootHash], timestamp),
+					peerId,
+					dependencies: [HashGraph.rootHash],
+					operation,
+					timestamp,
+				});
+				const second = Vertex.create({
+					hash: computeHash(peerId, operation, [HashGraph.rootHash], timestamp + 1),
+					peerId,
+					dependencies: [HashGraph.rootHash],
+					operation,
+					timestamp: timestamp + 1,
+				});
+
+				await expect(failClosedApplier.applyVertices([first, second])).resolves.toMatchObject({
+					applied: true,
+					missing: [],
+					invalid: [],
+				});
+				expect(applyVerticesCall).toHaveBeenCalledOnce();
+				expect(observedCanDeferReconciliation).toBe(false);
 			});
 
 			it("should classify non-dependency validation failures as invalid", async () => {

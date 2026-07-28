@@ -98,7 +98,7 @@ function operationVertex(receiver: DRPObject<SerializedLogDRP>, value: string): 
 describe("Phase 0g(i) per-object mutation serialization", () => {
 	it.each([
 		{ outcome: "commit" as const, opType: "appendAfter" },
-		{ outcome: "reject" as const, opType: "rejectAfter" },
+		{ outcome: "quarantine" as const, opType: "rejectAfter" },
 	])(
 		"keeps a synchronous local call linearized and published while a parked merge will $outcome",
 		async ({ outcome, opType }) => {
@@ -171,7 +171,7 @@ describe("Phase 0g(i) per-object mutation serialization", () => {
 			).toEqual({
 				localDependencies: [HashGraph.rootHash],
 				mergeCommitted: outcome === "commit",
-				mergeOutcome: outcome === "commit" ? "fulfilled" : "rejected",
+				mergeOutcome: "fulfilled",
 				notificationOrigins: outcome === "commit" ? ["callFn", "merge"] : ["callFn"],
 				publishedButAbsentAtPublication: [],
 				publishedButAbsentFinally: [],

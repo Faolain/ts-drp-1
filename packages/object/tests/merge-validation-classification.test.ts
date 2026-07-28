@@ -109,13 +109,16 @@ describe("DRPObject transient application failures", () => {
 			Date.now()
 		);
 
-		await expect(receiver.applyVertices([vertex])).rejects.toThrow("transient application failure");
-		expect(receiver.drp?.query_log()).toEqual([]);
-		expect(receiver.vertices.some((candidate) => candidate.hash === vertex.hash)).toBe(false);
+		await expect(receiver.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		expect(
+			receiver.drp?.query_log(),
+			"a failed attempt's partial mutation must not accumulate in the fresh successful candidate"
+		).toEqual(["once"]);
+		expect(receiver.vertices.some((candidate) => candidate.hash === vertex.hash)).toBe(true);
 		expect(receiver["_applier"]["knownInvalidVertexHashes"].has(vertex.hash)).toBe(false);
 
-		const retry = await receiver.applyVertices([vertex]);
-		expect(retry).toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(receiver.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		expect(receiver.drp?.query_log(), "redelivery of a committed hash must remain idempotent").toEqual(["once"]);
 
 		throwsRemaining = 0;
 		const fresh = new DRPObject({ peerId: "fresh", acl, drp: new FlakyLogDRP() });

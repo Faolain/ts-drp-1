@@ -8968,12 +8968,258 @@ Non-blocking log note: the post-repair freeze invocations report base label
 explicit base argument the checker uses `HEAD^`; both references enter the same additive bootstrap mode,
 and no D.49 acceptance claim depends on that display label.
 
+## Appendix D.50 — Phase 0h-L legacy exception quarantine
+
+Phase 0h is split deliberately. D.50 covers only the legacy object's bounded-retry quarantine contract;
+the protocol-v2 fail-the-close matrix in §7.2 remains a separate Phase 0h-v2 TDD item.
+
+### D.50.1 — Separate application and resolver REDs
+
+A fresh Codex-high RED owner sealed the legacy blueprint exception test
+`packages/object/tests/legacy-blueprint-quarantine-0h-l-red.test.ts`
+(`d50e56cd5137ab9d2a5d0100dd7fbb5dd795036338144048368049436a25eb59`). The same assertion failed on
+both exact D.1 baseline `7f9e66adeb8cb919910827893ad6220a5aff323b` and checkpoint
+`4cb808954d91e0c3997eafdd892424823313f309`: only one attempt occurred, the offer rejected, no peer
+committed and no partial result was returned. The test proves both negative poison isolation and positive
+unrelated-peer progress on graph, snapshots, finality, live state and notifications; redelivery proves
+quarantine remains re-offerable and never enters `knownInvalidVertexHashes`.
+
+The first GREEN audit then exposed a distinct post-commit resolver seam: deferred reconciliation could
+commit every candidate before a custom DRP resolver threw, leaving graph and live state split while the
+offer rejected. Work stopped rather than expanding GREEN invisibly. A fresh Codex-high resolver RED owner
+sealed `packages/object/tests/legacy-resolver-quarantine-0h-l-red.test.ts`
+(`3ae962cc4d4a1892338a92b5be2fe31e09ae8c499ab3ef5a64b6354507426c4b`). Its no-throw control passes,
+while baseline, checkpoint and the parked application-only candidate all fail the same resolver
+attribution/atomicity assertion. The causal topology commits `left(root)`, offers
+`[poison(root), healthyChild(left)]`, then redelivers `[poison(root), laterChild(healthyChild)]`; only the
+poison may quarantine and `[10,20,30]` must converge on every surface.
+
+Evidence:
+
+- application RED ledger `.logs/phase-0h-l-red-ledger.md`
+  (`abb42c1b1b030a6e9915b98019f85b1c51401985fb77f2dbd6044fb4cc42d368`);
+- resolver RED ledger `.logs/phase-0h-l-resolver-red-evidence.md`
+  (`97ed896233e1ee1b9241be12ee04fbc17c191acbb00edee8f4d3d06d1159b844`).
+
+The `32` appearing in both REDs is only a harness termination ceiling. It is not the production retry
+budget. The object layer also does not authenticate signatures; node handlers own that gate, so neither
+RED invents a fake object-layer signature check.
+
+### D.50.2 — GREEN semantics and compatibility correction
+
+The combined Codex-high GREEN introduces the distinct
+`MAX_APPLICATION_ATTEMPTS_PER_OFFER = 3`, separate from
+`MAX_ADOPTION_COMMIT_ATTEMPTS`. Legacy synchronous and asynchronous blueprint exceptions and custom DRP
+resolver exceptions re-enter the complete isolated application pipeline for each attempt. Each entry
+reconstructs candidate ACL/DRP state from snapshots and graph history; shared graph, snapshot, finality,
+live-proxy and notification writes remain behind the synchronous journaled commit boundary.
+
+After the third possibly-transient application failure, only the submitted vertex is reported as
+`quarantined`. Quarantine is non-semantic, never remembered as invalid, never removes committed data,
+remains re-offerable on another delivery and does not prevent unrelated peers or later causal work from
+committing. Deterministic rejection, receiver-clock pending validation, `ApplyInvariantError` and
+`AdoptionCommitExhaustedError` are retry barriers and preserve their existing result/rejection taxonomy.
+A failed deferred commit can set `hasUnreconciledLiveState` before a CAS retry and thereby cause one
+benign extra final reconciliation; it does not corrupt state.
+
+Deferred reconciliation is disabled when the graph reports a custom DRP resolver. The final compatibility
+repair locally duck-types the optional inspector, invokes it with `this.hashGraph` as the receiver and
+enables the fast path only for a strict `false`; a missing, non-function or non-`false` inspector therefore
+fails closed. `IHashGraph` was not widened. The public-`applyVertices` regression in
+`packages/object/tests/drp-applier.test.ts` hides the inspector and causally observes
+`canDeferReconciliation === false`.
+
+Final production/test hashes:
+
+- `packages/object/src/drp-applier.ts`
+  (`1bd760bb299b3c9ac73388cf65f3d6515efb34a495398a81e8427052932c50d3`);
+- `packages/object/tests/drp-applier.test.ts`
+  (`ea2c920972b4040eb06e8332429725905350e9d1949ee8e760b7748958b200c8`);
+- `packages/object/tests/merge-atomicity.test.ts`
+  (`d035374ed3475d46e4a246486d4bdd4e8f5585ca3c9a40a2c14be8e761a35379`);
+- `packages/object/tests/merge-rollback-completeness.test.ts`
+  (`46262e2ba2a3433a36a1743da3257cb8ba4b8af1b940d252be84bac366ec57b1`);
+- `packages/object/tests/merge-validation-classification.test.ts`
+  (`69830a5a432defa42cfde4d9c1642609ef30facaaeed67370af83a694d4237c2`);
+- `packages/object/tests/mutation-serialization-0g1.test.ts`
+  (`96ea66f55bc7364bfdc355e2f64b32222b6c272ad24c28e8fed67c6377553ea8`);
+- both sealed REDs retain the D.50.1 hashes.
+
+Four existing specifications invert obsolete offer-rejection/count expectations without dropping their
+original safety assertions; `drp-applier.test.ts` receives one additive compatibility regression.
+`merge-atomicity`'s `6` and `merge-rollback-completeness`'s `6`/`9` pin the three-attempt budget through
+their actual replay/checkpoint probes. The one-throw-then-success case strengthens isolation by requiring
+the fresh successful candidate to contain `["once"]`, not a duplicated mutation.
+
+### D.50.3 — Gates and causal mutation evidence
+
+Completed acceptance evidence:
+
+- focused GREEN, 13 files / 75 tests:
+  `.logs/phase-0h-l-green-final-focused-gates.log`
+  (`510febcc457aee6ab5568c5444d737075d6a28f01f9b7c40e262aa23f3bd60b9`);
+- post-Grok remediation, 14 files / 100 tests, both sealed REDs, object typecheck/build, targeted lint,
+  Prettier and `git diff --check`:
+  `.logs/phase-0h-l-green-grok-remediation.log`
+  (`14f7dd146353690416d6521357c95cfee32e3f3d79185c2db71d39bc48bc3359`);
+- workspace typecheck:
+  `.logs/phase-0h-l-green-workspace-typecheck.log`
+  (`92b1c9a5afb83128828fd37b4de5f4ee841b4e617d6b3eb04eadf30cdce3d056`);
+- affected node tests, 4 files / 22 tests:
+  `.logs/phase-0h-l-green-node-affected-tests.log`
+  (`bfaa8bc8918bcb0c4f3740fd2aac7b09e70ee2f5b5c47a9a421ffd75449caba3`);
+- targeted lint/format:
+  `.logs/phase-0h-l-green-targeted-lint-format.log`
+  (`81d02b47d6f04b9f3a2af97154b9ddc8b8bbbeed212e8999061c5d2f815587e4`);
+- clean-equivalent lint:
+  `.logs/phase-0h-l-green-clean-equivalent-lint.log`
+  (`a8e3bbe6a19b0b5b4653580de586e9d7ff871c652f4bcafe674f2d0dba2740cb`).
+
+The budget-1 mutant is killed because both sealed offers cease retrying
+(`.logs/phase-0h-l-green-application-budget1-mutant.log`,
+`b72b453c2847c98d66383dfa2f6938581cace2d2cde8ccfdbe7ea4d76bcb6ad5`). Removing the custom-DRP
+deferred fence is killed because the poison commits/notifies, graph and live state tear, both offers
+reject and no retry occurs
+(`.logs/phase-0h-l-green-resolver-deferred-mutant.log`,
+`311f592331b914f14738b4d6748383b7e16f60b383dcfdab74a5fd5116d4a685`).
+
+The two bounded full object-suite attempts, with and without coverage, ended without terminal Vitest
+summaries and are explicitly incomplete non-evidence. Raw `pnpm lint` remains red only from inherited
+`.logs` parser-project errors plus 226 inherited warnings; clean-equivalent lint has zero errors and the
+same warnings. Three optional Codex self-reviews terminated without verdict and have no evidentiary
+weight.
+
+Final Opus also found that D.9.4's widened Gate-0 harness had been absent from the 0h-L evidence. It ran
+the candidate tree and observed 3 failed / 8 passed / 2 skipped with 96 divergent case IDs, all confined
+to `widened-admin-authority-chain-*`, `widened-same-group-descendant-*` and the two pinned L7 fixtures.
+That is exactly the frozen pre-existing L7 family permitted by D.11.4/D.15.5: attribution was checked
+rather than assumed, but the checkpoint-tree delta was not measured. Do not abbreviate this as an
+unqualified “Gate-0 green.”
+
+One natural third mutant remains unprobed: deleting
+`isDeterministicVertexFailure(error)` from `isApplicationRetryBarrier` would preserve result taxonomy but
+silently replay deterministic rejections three times. Existing deterministic taxonomy tests have no
+attempt counter, so this is a real mutation-coverage gap. It is nonblocking 0h-L follow-up hygiene, not
+evidence that the two executed mutants exhaust the new code.
+
+### D.50.4 — Independent review and open deviations
+
+Grok 4.5/high authenticated the full candidate and returned **PASS_WITH_NOTES**:
+`.logs/phase-0h-l-review-grok45-high.raw.json`
+(`9e82db0c9ff39986760f884791ca9dda486fc6157743cfa89be1eb8e58e82c93`). It found the widened concrete
+`HashGraph` assumption repaired in D.50.2. Its exact two-file follow-up independently reran the
+fail-closed regression and returned **PASS**:
+`.logs/phase-0h-l-grok-remediation-followup-v2.raw.json`
+(`6d72419f4c97bfb19015df9df6a35b36ddfc06462abe36603a0d1eca95f7f2f2`). The first follow-up session
+cancelled before inspection and is non-evidence.
+
+Exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` authenticated the final tuple, independently
+passed 11 files / 60 tests and returned **PASS_WITH_NOTES**:
+`.logs/phase-0h-l-review-kimi3-100-v4.raw.txt`
+(`bec0c7b4cefab2a785b5f5c6b0c0b0e12296a686e9de544f953cadb3d2a957ff`). Three local CLI-option
+rejections occurred before model execution and are non-evidence.
+
+Final Opus-xhigh authenticated all supplied hashes, independently passed 26 files / 183 tests, performed
+the Gate-0 attribution run and returned **PASS_WITH_NOTES**, with no blocker and checkpoint authorization:
+
+- prompt `.logs/phase-0h-l-final-opus-xhigh.prompt.md`
+  (`01df34fba6190f9f916c96f00309eb2018a385730d4705f3ba5e5d661628139e`);
+- raw review `.logs/phase-0h-l-final-opus-xhigh.raw.json`
+  (`0822d8c025f45892287163183d26ca930a158e406b2ea53df492714ea91f1901`);
+- self-contained adjudication `.logs/phase-0h-l-final-opus-xhigh-followup.raw.json`
+  (`1e575fa060714f7b1653a79ce0b6fa2a9539c72459a3fe7089cb5bb554b163c0`).
+
+The following are open, ordinary findings; recording them does not amend governing semantics and did not
+trigger the separate unanimous plan-change quorum:
+
+1. **N1 — custom ACL resolver residual.** The defer fence checks only the custom DRP resolver, while final
+   canonical replay can contain pre-existing ACL vertices. A custom `IACL` with a
+   non-deterministically-throwing resolver, concurrent ACL history and a resolver-free all-DRP batch can
+   still throw post-commit. The built-in ACL resolver is total; a deterministically throwing resolver
+   cannot commit its concurrent pair; and a naive ACL fence would disable the fast path for every
+   standard object because all register an ACL resolver. The per-type query also collides with the letter
+   of D.10.6/R1, but the hazard does not bind this safety fence: it only disables an optimization, fails
+   closed and still terminates in full canonical replay. `fixed-critical-1-cross-type-acl-drop` is the
+   executable corroboration. Owner: a fresh 0h-L hygiene RED or the 0h-v2 seam; do not patch blindly.
+2. **N2 — ordinary deferred final-replay blueprint failure.** A state-dependent blueprint can succeed
+   against its causal cut, then throw when the resolver-free deferred path performs canonical final
+   replay after candidates commit. `applyVertices` rejects post-commit and D.10.4's
+   `hasUnreconciledLiveState` latch can remain permanent. This is an open, ordinary-reachable D.3(b)
+   deviation—for example two concurrent withdrawals against a balance guard—not an “out-of-contract” or
+   merely degenerate blueprint. The deferred path and `finally` structure are byte-identical at HEAD and
+   0h-L strictly narrows entry, so it is nonblocking here. Owner: Phase 0q/0h-v2 lineage.
+3. **N4 — API/attribution hygiene.** Pre-existing replay paths still cast `IHashGraph` to concrete
+   `HashGraph`; production constructs the concrete graph and `createDRPVertexApplier` is not package
+   exported, while a deep-imported incompatible graph fails safe by quarantine but is misattributed.
+   Separately, a final-reconciliation throw can mask a primary hard error or discard a successfully
+   computed `ApplyResult`. Owner: object-API hygiene.
+4. Retry can amplify external blueprint side effects and latency up to three times per poison per offer,
+   then again on redelivery. Owner: Phase 0j's ambient-API/determinism contract.
+
+### D.50.5 — Acceptance and selective checkpoint boundary
+
+Phase 0h-L is accepted with the exact D.50.2 tuple. This checkpoint does not claim a full object-suite
+pass, raw workspace-lint green, exhaustive mutation coverage, unqualified Gate-0 green, closure of N1/N2/
+N4, object-layer signature authentication, Phase 0h-v2 fail-the-close, publication or golden-path
+completion.
+
+The final documented-tree rerun produced:
+
+- focused 14 files / 100 tests:
+  `.logs/phase-0h-l-final-focused.log`
+  (`ce966bb457873d28499635c4279341c982fa337f57b0492f3535f24fc22292e2`);
+- object typecheck:
+  `.logs/phase-0h-l-final-object-typecheck.log`
+  (`d09315f277dd3d9bd2c92cb85a436978a903c7b60210c77f5c823bc161ac8b0d`);
+- object build:
+  `.logs/phase-0h-l-final-object-build.log`
+  (`422dd066f6e0e48762dc03b6a2a43342d03874e9a55e07c90a0ab719a6e7d41b`);
+- workspace typecheck:
+  `.logs/phase-0h-l-final-workspace-typecheck.log`
+  (`734d99e1377a8c467dfb5fedebf1853aaed339e70ceb29bdc528ef34a6dc71bc`);
+- affected node 4 files / 22 tests:
+  `.logs/phase-0h-l-final-node-affected.log`
+  (`f9abcc38e8fb9591ddd7e9802548c081075a96074eb27588761b393935bfefa4`);
+- targeted lint, zero errors / two inherited JSDoc warnings:
+  `.logs/phase-0h-l-final-targeted-lint.log`
+  (`87ded906ac7c6b3c75f937510de4e266404db0e206c320cda7dd7f74b21d5de7`);
+- clean-equivalent lint, zero errors / 226 inherited warnings:
+  `.logs/phase-0h-l-final-clean-equivalent-lint.log`
+  (`a8e3bbe6a19b0b5b4653580de586e9d7ff871c652f4bcafe674f2d0dba2740cb`);
+- targeted format:
+  `.logs/phase-0h-l-final-format.log`
+  (`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`);
+- Gate-0 attribution:
+  `.logs/phase-0h-l-final-gate0.log`
+  (`6099d362eea85dd54a29cf6cc494ff86f3453adb36c22fe185b447f7446af445`).
+
+The final Gate-0 result exactly repeats D.50.3: 3 failed / 8 passed / 2 skipped; 96/432 widened
+divergences are split 48/48 across only the governed L7 authority-chain and same-group-descendant
+families, the two pinned L7 fixtures are the only fixed failures, and
+`fixed-critical-1-cross-type-acl-drop` passes.
+
+After the final compact gate rerun, selectively stage exactly these nine paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `packages/object/src/drp-applier.ts`;
+3. `packages/object/tests/drp-applier.test.ts`;
+4. `packages/object/tests/merge-atomicity.test.ts`;
+5. `packages/object/tests/merge-rollback-completeness.test.ts`;
+6. `packages/object/tests/merge-validation-classification.test.ts`;
+7. `packages/object/tests/mutation-serialization-0g1.test.ts`;
+8. `packages/object/tests/legacy-blueprint-quarantine-0h-l-red.test.ts`;
+9. `packages/object/tests/legacy-resolver-quarantine-0h-l-red.test.ts`.
+
+Never use `git add -A`. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, either stale untracked protocol-v2 0g2 RED, coverage output or another unrelated
+path.
+
 ## Next Agent Prompt
 
-Run the compact final checkpoint gates, selectively stage the ten authorized paths and checkpoint Phase
-0g(ii-S). Then begin **Phase 0h** with a fresh Codex-high RED owner restricted to tests, input-only
-fixtures and bounded `.logs` evidence.
+Run the compact final Phase 0h-L gates, selectively stage the nine authorized D.50.5 paths and checkpoint
+Phase 0h-L. Then begin the separate **Phase 0h-v2** fail-the-close item with a fresh Codex-high RED owner
+restricted to tests, input-only fixtures and bounded `.logs` evidence.
 
-Continue the normal requested loop only; every Kimi invocation remains exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`. Do not schedule another Fable review. Phase 3a
-remains blocked until 0g(ii-S) is checkpointed.
+Continue the normal requested Codex-high RED/GREEN, Grok, exact Kimi 3/100 and Opus-xhigh loop. Do not
+schedule another Fable review unless the user explicitly requests one. Golden-path completion remains
+blocked on the remaining plan items.
