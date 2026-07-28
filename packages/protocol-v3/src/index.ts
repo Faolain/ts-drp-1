@@ -379,6 +379,39 @@ export function digestReceivedVertexPreimage(receivedCanonicalPreimageBytes: Uin
 }
 
 /**
+ * Verifies an Ed25519 signature under the protocol-v3 acceptance profile.
+ *
+ * The message is the raw registered digest, not its hexadecimal text or a
+ * wrapper object. Shape errors and invalid encodings fail closed.
+ * @param signature - The 64-byte `R || S` Ed25519 signature.
+ * @param rawRegisteredDigest - The exact 32-byte registered digest.
+ * @param publicKey - The 32-byte compressed Edwards-y public key.
+ * @returns Whether noble 2.2.0 strict verification accepts the tuple.
+ */
+export function verifyEd25519RegisteredDigest(
+	signature: Uint8Array,
+	rawRegisteredDigest: Uint8Array,
+	publicKey: Uint8Array
+): boolean {
+	if (
+		!(signature instanceof Uint8Array) ||
+		signature.byteLength !== 64 ||
+		!(rawRegisteredDigest instanceof Uint8Array) ||
+		rawRegisteredDigest.byteLength !== 32 ||
+		!(publicKey instanceof Uint8Array) ||
+		publicKey.byteLength !== 32
+	) {
+		return false;
+	}
+
+	try {
+		return ed25519.verify(signature, rawRegisteredDigest, publicKey, { zip215: false });
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Creates a local v3 issuer over one injected transaction boundary.
  *
  * Sequence selection, atomic commit and durable storage remain owned by the
@@ -496,7 +529,7 @@ export function verifyReceivedVertex(input: VerifyReceivedVertexInput): Register
 			return { accepted: false };
 		}
 
-		return ed25519.verify(input.signature, digest, publicKey.bytes, { zip215: false })
+		return verifyEd25519RegisteredDigest(input.signature, digest, publicKey.bytes)
 			? { accepted: true, digest }
 			: { accepted: false };
 	} catch {

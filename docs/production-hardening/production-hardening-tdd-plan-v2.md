@@ -811,6 +811,12 @@ codec → vectors already frozen and now provably correct.
 > with `lastIssued + exhausted` or an equivalent explicit discriminator; it must never compute
 > `MAX_SAFE_INTEGER + 1` or reserve the final registered ordinal as an unissuable `next` sentinel.
 
+> **0g(ii-S) additive path boundary.** The frozen v3 checker governs
+> `packages/protocol-v3/conformance/vectors` as the exact singleton tree `registry-v1.json`; tracked,
+> untracked and nested additions all fail. The separately governed supplement vector therefore lives at
+> `packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json`. Neither the old governed
+> tree nor any frozen checker/policy byte may be edited or restamped.
+
 > **Why 0j moves to Phase 0.** Phase 4's shadow gate asserts byte-identical snapshot digests across replicas
 > and browsers. That assertion is _unattributable_ unless blueprint execution is already deterministic
 > cross-engine — a nondeterministic reducer makes every mismatch ambiguous between engine bug and app bug,
@@ -8709,10 +8715,265 @@ After the final compact gate rerun, selectively stage only this plan,
 `git add -A`; never stage `.agents/`, `.claude/`, `.logs/`, `.pnpm-store/`, `skills-lock.json`, either
 stale v2 `0g2` RED or generated protocol-v3 `dist/`.
 
+## Appendix D.49 — Phase 0g(ii-S) additive supplement accepted
+
+### D.49.1 — First sealed RED and strict-profile finding
+
+At checkpoint `907fae437e558145f63614cd6b5de925ea4bd8c2`, a fresh Codex-high RED owner added only:
+
+- `tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts`
+  (`26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938`);
+- `tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json`
+  (`a5737f00521f775b05b2c54a2e89536becb82aaa28ba40b0718160e5da1431ad`);
+- `.logs/phase-0g2s-red-ledger.md`
+  (`8cec46e8c90baab7d3e5418a45810a1e0789f49b1900a0c49441af562f9708ff`).
+
+The initial live and clean-checkpoint surfaces both fail behaviorally at 4/10; an independently authored
+control passes 10/10. Eight narrow mutants each fail exactly one test and leave nine passing:
+small-order acceptance, `S + L`, noncanonical-point acceptance, incorrect full-order rejection,
+hex/wrapper message substitution, Node/OpenSSL as desired admission, unbound frozen tuple and
+governance-permitted vector drift.
+
+The RED independently pins archived `novifinancial/ed25519-speccheck` commit
+`65519336fda78a3d016e947df6d82848aca0c9da`. Accepted noble 2.2.0 `{ zip215: false }` behavior is not
+blanket subgroup rejection: canonical mixed-order cases 3 and 4 pass the cofactored equation, while
+small-order public keys, noncanonical encodings and `S >= L` reject. A verifier that rejects every
+mixed-order case is therefore killed as too narrow. The permanent live matrix also closes deliberately
+unsorted local issuance through `verifyReceivedVertex`; this does not claim Phase 2l durability.
+
+All 47 frozen-policy paths first authenticated with zero mismatch at aggregate
+`023e7b50c11eff2d5fd4d0d8c5ea6da8d54ad095d73d24b7d3badea2e3769637`.
+
+### D.49.2 — Frozen governed-tree contradiction and unanimous correction
+
+The first RED fixture placed the new manifest at
+`packages/protocol-v3/conformance/vectors/ed25519-acceptance-profile-v1.json`. GREEN reached focused
+10/10, control 10/10 and exact mutant cardinalities, but the existing real v3 freeze CLI correctly
+rejected that file:
+
+```text
+protocol-v3 freeze violation:
+packages/protocol-v3/conformance/vectors is incomplete or contains an extra file
+```
+
+The frozen checker declares that tree to contain exactly `registry-v1.json`, enumerates tracked and
+untracked descendants, and performs exact-set validation. The RED-stage CLI pass used the authenticated
+process-local excludes, which hid the then-untracked manifest; that evidence could not survive tracking
+or CI and was not a lawful GREEN gate.
+
+Work stopped without editing any frozen byte. The required assumption-correction quorum unanimously
+returned `AGREE_RELOCATE_0G2S_VECTOR_OUTSIDE_FROZEN_TREE`:
+
+- common prompt `.logs/phase-0g2s-vector-path-quorum.prompt.md`
+  (`841c1fe08da48f0aac7d927fe8c0b09dce1f0a9218d6f3cc18d529a7fd2046ec`);
+- Codex-high transcript `.logs/phase-0g2s-vector-path-quorum-codex-high.md`
+  (`48bbd12a99976c0c203e0e6f3ea7c21cc9920683f02a1e4317bb9ab090bc57bd`);
+- exact Kimi 3/100 `.logs/phase-0g2s-vector-path-quorum-kimi3-100.raw.log`
+  (`c8cd4e0230c798698ecb99976fd5f2b343fd1c6a3544493e605ca254f49d43ec`);
+- Opus-xhigh `.logs/phase-0g2s-vector-path-quorum-opus-xhigh.raw.json`
+  (`399f689c8107c9114692c5026985636f43f19e6f3a3cfdbe1d47c9f1aa987e7a`).
+
+The smallest lawful correction is path-only: move the new uncommitted manifest to
+`packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json`, update the input fixture
+and every additive supplement reference/hash, then re-seal RED from the clean checkpoint before GREEN
+resumes. The RED test source contains no literal old path and remains byte-identical. No frozen byte
+names the new manifest, so the Phase −1′ tuple needs no supersession.
+
+The new path is outside every frozen governed tree and does not change cryptographic semantics, build or
+current publication: protocol-v3's npm `files` allowlist publishes neither the old nor new vector path.
+The frozen `CODEOWNERS` file cannot acquire a supplement-specific pattern; the additive checker/workflow
+must protect all declared supplement artifacts, while the repository host must separately require that
+workflow status. Neither repository bytes nor this plan may overclaim external branch-protection state.
+
+### D.49.3 — Quorum-authorized RED reseal
+
+The original Codex-high RED owner changed only the input fixture's additive vector path and path-coupled
+scratch/evidence. The permanent RED test stayed byte-identical. Final corrected tuple:
+
+- RED test
+  `26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938`;
+- corrected input fixture
+  `42baf0e200234eedf31bd0e16f4e23f55a463b3a50578b13e168c929ce9f29a2`;
+- corrected RED ledger `.logs/phase-0g2s-red-ledger.md`
+  (`2c5d9b01867d95b51a2fdb7dfd7c1b7174b5819b5573f14044edbff762a4c90b`).
+
+A clean detached `907fae4` with only the corrected RED tuple reproduces 4 failed / 6 passed; the corrected
+independent control passes 10/10 and all eight mutants retain exact 1-fail/9-pass cardinality. Prettier,
+ESLint, 32-project typecheck, accepted 0g(ii-T) 13/13, accepted 0g(ii-I) 10/10, v3 governance 7/7,
+frozen-v2 preservation 24/24 and `git diff --check` pass.
+
+Most importantly, the corrected path was visibly untracked with `core.excludesFile=/dev/null` in the clean
+checkpoint worktree and both existing real freeze CLIs passed. The supplement path is neither an exact
+protected path nor below any frozen governed-tree prefix; no exclude-file hiding is part of this proof.
+
+### D.49.4 — Corrected GREEN tuple and gates
+
+The same separate Codex-high GREEN owner resumed after the corrected RED seal. Final production/additive
+tuple:
+
+- `packages/protocol-v3/src/index.ts`
+  (`143340b97bbdd01bd6416e2cfc59131aa45c25b327dd74ea47b98cac40c21680`);
+- normative addendum `docs/protocol/ed25519-acceptance-profile-v3.md`
+  (`fcbdee7a1597c1e6d212a4e83b074fff52a0ec62693d512513e4ffc2ad093bc5`);
+- machine amendment `docs/protocol/ed25519-acceptance-profile-v3.json`
+  (`36a65af5e3788c68483c360b831e132d24e4ef38ab8c121fd077a0232285c6e3`);
+- permanent supplement vectors
+  `packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json`
+  (`31975a9ef6d16e9cdd836fe9b87b2b369aab0ede69e1d6763a8f75ad46bafc56`);
+- additive policy `packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json`
+  (`d7ad1f6442b04cdfeb993cecd0e96435c27149b175071a019ee60456b27de6e0`);
+- additive checker `packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs`
+  (`137f058914d284f891a8f77d31f51c1ce74ff6c38c49969aec82c306eb1b445d`);
+- additive workflow `.github/workflows/protocol-v3-ed25519-profile.yml`
+  (`e343d76a83fa6a0b8d08d9aeeff3256e240f0c684fb0bee3638f7485591d183a`).
+
+`verifyEd25519RegisteredDigest` rejects non-`Uint8Array` or non-64/32/32 shapes, invokes exactly noble
+2.2.0 `ed25519.verify(signature, rawRegisteredDigest, publicKey, { zip215: false })`, and fails closed.
+`verifyReceivedVertex` delegates its final signature decision to that same adapter after its existing
+registered-byte checks, digest and author-key resolution. No OpenSSL/Node fallback or extra subgroup rule
+was introduced.
+
+Production and independent control pass 10/10; every one of the eight corrected mutants retains exact
+1-fail/9-pass cardinality. Package/workspace typecheck and build, runtime/declaration export smoke,
+targeted formatting/lint, accepted 0g(ii-T) 13/13, accepted 0g(ii-I) 10/10, v3 governance 7/7 and
+frozen-v2 preservation 24/24 pass. Both existing real freeze CLIs pass with the relocated supplement
+visibly untracked and not excluded. The new checker passes atomic bootstrap, steady state and unrelated
+addition; vector drift, protected deletion and valid-JSON policy weakening all reject.
+
+Evidence:
+
+- GREEN ledger `.logs/phase-0g2s-green-ledger.md`
+  (`62292bbeba7cd8d4b9a299b99c72c547dccc6bf829547f3afb2fc7f64ebef9c7`);
+- combined gates `.logs/phase-0g2s-green-gates.log`
+  (`68d66852e085ccde69fa7a5b471212d92df05b380d32dc2b0edf67e99dd7938c`);
+- final seal `.logs/phase-0g2s-green-final-seal.log`
+  (`10604c14dc5606bc6decacdc38eeddadfbcf6f2c443b9a48d5bc34a41389753a`);
+- implementation-owner blocker record
+  `.logs/phase-0g2s-vector-path-blocker-green-codex-high.md`
+  (`3cfd6c99aa1995a47070498e576b42fdaac819b929f190d522ad4108f631e23a`).
+
+Raw `pnpm lint` remains honestly RED with twenty parser-project errors confined to ignored `.logs`
+evidence plus 226 inherited warnings; clean-equivalent lint excluding `.logs/**` has zero errors and the
+same warnings. The inherited D.47 full-suite baseline was not rerun or green-chased.
+
+### D.49.5 — Independent review and checkpoint boundary
+
+External reviewers authenticated the exact D.49.4 tuple, reran the focused, causal, build, lint,
+preservation and freeze gates, and returned no blocker:
+
+- common prompt `.logs/phase-0g2s-external-review.prompt.md`
+  (`03f0b66f9e9d91a1b5bcd568942784979c1c0b9785b713eab508581ea1febe9d`);
+- Grok 4.5/high `.logs/phase-0g2s-review-grok45-high-v2.raw.json`
+  (`9aa58ee8d060b1384cc209a44304a959a2facbf0542a17acac4540f129bd8332`) —
+  **PASS_WITH_NOTES**;
+- exact Kimi 3/100 `.logs/phase-0g2s-review-kimi3-100.raw.log`
+  (`8e091a89ba42b647d7624e386f09f2490de8150badfe48da5095fad07b33168b`) —
+  **PASS_WITH_NOTES**.
+
+The first Grok wrapper session cancelled before repository inspection and produced no verdict; it is not
+review evidence.
+
+Review carry-forwards:
+
+1. The supplement checker freezes the full vector manifest and its fixture binding, but does not
+   independently deep-compare every manifest vector body to the input fixture. Current bodies match
+   byte-for-byte and all thirteen decisions were independently reproduced; any stronger cross-document
+   structural equality belongs in a governed successor profile.
+2. Six crypto mutants kill a direct exported-adapter test while re-exporting production
+   `verifyReceivedVertex`: five fail the independent-vector test and the wrapper/hex mutant fails the
+   raw-digest-message test. They do not rebind the live receiver. Live adapter identity is separately
+   proven by source delegation plus the seven-case production live matrix and issuance-to-admission
+   closure. Do not claim those mutant kills themselves flow through the live receiver.
+3. The workflow's bootstrap shell checks six absent paths explicitly; the running checker then checks all
+   eight and rejects a partial base, closing the fail-open route. An explicit eight-path shell precheck
+   and an exact `S = L` vector are successor-profile hardening, not blockers to this frozen v1 tuple.
+4. The existing frozen v2/v3 checkers fail closed with `spawnSync git ENOBUFS` on the raw dirty evidence
+   tree. Their accepted gate uses the authenticated process-local excludes, which leave every checkpoint
+   path—including the supplement subtree—visible. Do not claim the raw unexcluded dirty-tree invocation
+   passes.
+5. The pre-correction GREEN observation was contemporaneously hash-recorded in the blocker/quorum
+   evidence but has no separate retained gates log. It is historical diagnostic context, not acceptance
+   evidence; only the corrected D.49.4 GREEN log and final seal support checkpoint claims.
+6. Final Opus found that invoking the additive checker through a symlink can silently skip `runCli()`:
+   Node realpaths the entry module but not `process.argv[1]`, so the equality guard at the checker tail
+   fails and the process exits zero without a pass line. The declared Linux CI uses real workspace/temp
+   paths and does not trigger this route. Because the checker is frozen by this checkpoint, a successor
+   profile must replace the invocation guard and add a symlink-path rejection/execution probe.
+
+Final Opus-xhigh authenticated the final tuple, independently reproduced all thirteen vector decisions,
+the focused/control/eight-mutant matrix, ten checker bootstrap/steady-state/failure probes, both accepted
+freeze gates and the exact checkpoint surface. Its prompt is
+`.logs/phase-0g2s-final-opus-xhigh.prompt.md`
+(`4a65739273a34005ec88c3606b151c635ce45de8a6f472f6a0c01ea90db2b9fc`) and raw response is
+`.logs/phase-0g2s-final-opus-xhigh.raw.json`
+(`21e75f84e78b7ac0f63f87bd7121c37c2fdfbd1d9e56137287d63a45292ff368`).
+Verdict: **PASS_WITH_NOTES**, `checkpoint_authorized: yes`, with no blocker and no semantic-plan change.
+
+After the compact final gate rerun, selectively stage exactly these ten paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `packages/protocol-v3/src/index.ts`;
+3. `docs/protocol/ed25519-acceptance-profile-v3.md`;
+4. `docs/protocol/ed25519-acceptance-profile-v3.json`;
+5. `packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json`;
+6. `packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json`;
+7. `packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs`;
+8. `.github/workflows/protocol-v3-ed25519-profile.yml`;
+9. `tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts`;
+10. `tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json`.
+
+Never use `git add -A`. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, generated `packages/protocol-v3/dist/`, either stale untracked v2 `0g2` RED, or any
+other unrelated path. The checkpoint does not claim npm publication of supplement vectors, frozen
+`CODEOWNERS` coverage, configured host branch protection, raw lint/full-suite green, Phase 2l
+durability, Phase 3a live binding, or golden-path completion.
+
+Final compact checkpoint evidence is
+`.logs/phase-0g2s-final-checkpoint-gates.log`
+(`e45ccec818dd994dbef8ec729fdfc6ee1e79366ee4f7abbe657d595fd50e5615`).
+It records focused 10/10, 32-project typecheck, protocol-v3 build, targeted and clean-equivalent lint/
+format, accepted 0g(ii-T) 13/13, accepted 0g(ii-I) 10/10, v3 governance 7/7, frozen-v2 preservation
+24/24, both existing freeze CLIs, the supplement bootstrap checker, `git diff --check`, and exactly the
+ten visible checkpoint paths. `FINAL_GATE_FAILURES 0`.
+
+Selective staging then exposed three Markdown hard-break trailing-space errors in the previously
+untracked normative addendum; the earlier unstaged `git diff --check` could not inspect an untracked
+file. The checkpoint owner replaced only those hard breaks with blank-line-separated metadata. Although
+no normative words or executable behavior changed, the addendum is hash-bound: the first incremental
+Opus-xhigh check correctly returned **BLOCK** because the machine amendment and additive policy still
+pinned the prior digest. Its raw response is
+`.logs/phase-0g2s-poststage-opus-xhigh.raw.json`
+(`db18afbc3be6b42614d301a4a2774086c74d489d2f11ee489ee9b9d081a2ae9c`).
+
+The owner then performed the bounded binding cascade: update the amendment's addendum digest, recompute
+the amendment digest, and update both pins in the additive policy. The final three artifact hashes are
+recorded in D.49.4. This is checkpoint bookkeeping, not a new Ed25519 acceptance decision; no semantic
+quorum was needed. The pre-repair compact gate log above is retained as historical evidence only and
+is superseded by `.logs/phase-0g2s-postrepair-checkpoint-gates.log`
+(`3176c0c261b6f9c3d6c4c00d79dc759137724afdb349fc21e1d9870eb36813dd`). The post-repair log records
+focused 10/10, 32-project typecheck, protocol-v3 build, targeted and clean-equivalent lint/format,
+accepted 0g(ii-T) 13/13, accepted 0g(ii-I) 10/10, v3 governance 7/7, frozen-v2 preservation 24/24, both
+existing freeze CLIs, the supplement bootstrap checker, the exact ten-path checkpoint surface and
+`git diff --cached --check`, with `FINAL_GATE_FAILURES 0`.
+
+The resumed incremental Opus-xhigh session independently recomputed all three moved digests, reproduced
+the focused 10/10 and supplement bootstrap pass, authenticated every post-repair gate result and confirmed
+that reverting only the three binding strings reproduces the previously reviewed amendment/policy bytes.
+Its raw response is `.logs/phase-0g2s-postrepair-opus-xhigh.raw.json`
+(`f1658784695ea03ee3baeea60f6c9e111633a4ce536e9726f0251be3a81fd7f6`).
+Verdict: **PASS**, `CHECKPOINT_AUTHORIZED: yes`, `SEMANTIC_QUORUM_NEEDED: no`.
+
+Non-blocking log note: the post-repair freeze invocations report base label
+`a73764b2adce..working-tree`, whereas the pre-repair run reported `907fae437e55..working-tree`. With no
+explicit base argument the checker uses `HEAD^`; both references enter the same additive bootstrap mode,
+and no D.49 acceptance claim depends on that display label.
+
 ## Next Agent Prompt
 
-Run the final compact 0g(ii-I) gates to one log, record its hash in D.48.5, selectively checkpoint the
-four authorized paths, then begin **Phase 0g(ii-S)** with a fresh Codex-high RED owner. Keep every future
-Kimi review on the exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation. Phase 3a remains blocked until
-0g(ii-S) lands its separate additive governance and live strict-verifier vectors.
+Run the compact final checkpoint gates, selectively stage the ten authorized paths and checkpoint Phase
+0g(ii-S). Then begin **Phase 0h** with a fresh Codex-high RED owner restricted to tests, input-only
+fixtures and bounded `.logs` evidence.
+
+Continue the normal requested loop only; every Kimi invocation remains exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`. Do not schedule another Fable review. Phase 3a
+remains blocked until 0g(ii-S) is checkpointed.
