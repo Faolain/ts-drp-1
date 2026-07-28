@@ -50,6 +50,60 @@ export interface RegisteredVertexVerification {
 	readonly digest?: Uint8Array;
 }
 
+export interface IssueScope {
+	readonly author: string;
+	readonly objectId: string;
+}
+
+export interface LocalVertexInput {
+	readonly anchor: string;
+	readonly dependencies: readonly string[];
+	readonly epoch: number;
+	readonly logicalTime: number;
+	readonly objectId: string;
+	readonly operation: Readonly<Record<string, unknown>>;
+}
+
+export interface SignedVertexEnvelope {
+	readonly canonicalPreimageBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly signature: Uint8Array;
+}
+
+export interface IssuedVertexRecord {
+	readonly authorSequence: number;
+	readonly envelope: SignedVertexEnvelope;
+	readonly scope: IssueScope;
+}
+
+export interface IssuanceOutboxEntry {
+	readonly authorSequence: number;
+	readonly envelope: SignedVertexEnvelope;
+	readonly scope: IssueScope;
+}
+
+export interface IssueCommit {
+	readonly authorSequence: number;
+	readonly envelope: SignedVertexEnvelope;
+	readonly issuedRecord: IssuedVertexRecord;
+	readonly outboxEntry: IssuanceOutboxEntry;
+}
+
+export type BuildAndSign = (authorSequence: number) => Promise<IssueCommit>;
+
+export type TransactIssue = (scope: IssueScope, buildAndSign: BuildAndSign) => Promise<IssueCommit>;
+
+export interface TransactionalVertexIssuer {
+	issue(input: LocalVertexInput): Promise<IssueCommit>;
+}
+
+export interface TransactionalIssuerOptions {
+	readonly author: string;
+	readonly privateKeySeed: Uint8Array;
+	readonly publicKey: RawEd25519PublicKey;
+	readonly transactIssue: TransactIssue;
+}
+
 /** A value does not satisfy the registered protocol-v3 vertex field contract. */
 export class VertexValidationError extends TypeError {}
 
@@ -80,6 +134,14 @@ function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
 	const prototype = Object.getPrototypeOf(value) as object | null;
 	return prototype === Object.prototype || prototype === null;
+}
+
+function detachCanonicalRecord(value: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	const detached = decodeCanonical(encodeCanonical(value));
+	if (!isPlainRecord(detached)) {
+		throw new VertexValidationError("operation must be a canonical object");
+	}
+	return detached;
 }
 
 function assertWellFormedString(value: string, fieldName: string): void {
@@ -314,6 +376,83 @@ export function digestReceivedVertexPreimage(receivedCanonicalPreimageBytes: Uin
 		throw new TypeError("receivedCanonicalPreimageBytes must be a Uint8Array");
 	}
 	return hashDomain(VERTEX_DOMAIN, receivedCanonicalPreimageBytes);
+}
+
+/**
+ * Creates a local v3 issuer over one injected transaction boundary.
+ *
+ * Sequence selection, atomic commit and durable storage remain owned by the
+ * injected coordinator. The issuer only snapshots the request, builds the
+ * registered bytes for the coordinator-selected ordinal and signs their exact
+ * registered digest.
+ * @param options - Author key material and transaction coordinator.
+ * @returns A stateless transactional issuer.
+ */
+export function createTransactionalVertexIssuer(options: TransactionalIssuerOptions): TransactionalVertexIssuer {
+	if (!(options.privateKeySeed instanceof Uint8Array) || options.privateKeySeed.byteLength !== 32) {
+		throw new TypeError("private key seed must be a 32-byte Uint8Array");
+	}
+	if (
+		options.publicKey.format !== "raw" ||
+		!(options.publicKey.bytes instanceof Uint8Array) ||
+		options.publicKey.bytes.byteLength !== 32
+	) {
+		throw new TypeError("public key must be a 32-byte raw Ed25519 key");
+	}
+	if (typeof options.transactIssue !== "function") {
+		throw new TypeError("transactIssue must be a function");
+	}
+
+	const privateKeySeed = new Uint8Array(options.privateKeySeed);
+	const publicKeyBytes = new Uint8Array(options.publicKey.bytes);
+	if (compareBytes(ed25519.getPublicKey(privateKeySeed), publicKeyBytes) !== 0) {
+		throw new TypeError("public and private Ed25519 keys do not match");
+	}
+
+	const author = options.author;
+	const transactIssue = options.transactIssue;
+
+	return {
+		async issue(input: LocalVertexInput): Promise<IssueCommit> {
+			const detachedInput: LocalVertexInput = {
+				anchor: input.anchor,
+				dependencies: [...input.dependencies],
+				epoch: input.epoch,
+				logicalTime: input.logicalTime,
+				objectId: input.objectId,
+				operation: detachCanonicalRecord(input.operation),
+			};
+			const scope: IssueScope = { author, objectId: detachedInput.objectId };
+
+			return transactIssue(scope, (authorSequence) => {
+				const canonicalPreimageBytes = vertexCanonicalBytes({
+					kind: "drp-vertex",
+					protocolMajor: 3,
+					objectId: detachedInput.objectId,
+					epoch: detachedInput.epoch,
+					anchor: detachedInput.anchor,
+					author,
+					authorSequence,
+					logicalTime: detachedInput.logicalTime,
+					dependencies: detachedInput.dependencies,
+					operation: detachedInput.operation,
+				});
+				const digest = digestReceivedVertexPreimage(canonicalPreimageBytes);
+				const envelope: SignedVertexEnvelope = {
+					canonicalPreimageBytes,
+					digest,
+					signature: ed25519.sign(digest, privateKeySeed),
+				};
+
+				return Promise.resolve({
+					authorSequence,
+					envelope,
+					issuedRecord: { authorSequence, envelope, scope },
+					outboxEntry: { authorSequence, envelope, scope },
+				});
+			});
+		},
+	};
 }
 
 /**

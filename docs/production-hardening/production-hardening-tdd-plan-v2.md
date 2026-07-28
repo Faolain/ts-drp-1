@@ -805,6 +805,12 @@ codec → vectors already frozen and now provably correct.
 | **0m**       | `XVER` cross-version bisimulation harness: patched engine vs HEAD-pinned legacy engine (git-worktree build) over the Gate-0 fixture corpus                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | gate infra                                                    | sliceable                              | `expect(patched.vertexHashes).toEqual(pinned.vertexHashes)` + state equality per fixture × schedule. **Required check on any PR touching the legacy applier or validation classification**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **0q**       | **Per-vertex atomic apply and publication (owns L3 and L6 — added by D.3(d), specified by D.5).** One vertex transitions atomically across hashgraph, state snapshots, finality, live proxies, checkpoints and notification: fully applied, or no trace. **A committed vertex is never removed** — any dependency-closed subset of a causal DAG is a valid replica state, so no failure can require removing one. Every shared-store write sits inside **one synchronous commit section after that vertex's last suspension point**, which is what makes the design exempt from 0g's serialization mandate (D.5(f)) — it MUST NOT take the `callFn` lock, whose only effect would be to make synchronous `drp.method()` calls async. Vertex-presence is **re-checked inside the commit section** (the loop-top check is TOCTOU-separated from the insert by the blueprint `await`, and `HashGraph.addVertex` blind-inserts, duplicating frontier entries and hence the `dependencies` of the next locally signed vertex). **Live-proxy adoption is the one surface that breaks with no rollback involved**: its base is captured _before_ the `await`, so a plain replace-at-commit erases concurrently committed operations. Transplanting the local path's `assign` step **relocates that erase rather than removing it** — `assign` writes branch state, correct locally only because a local vertex depends on the whole frontier. Choose and record either commit-time recompute against a consistent base (await-free replay only) or frontier CAS/retry. `pruneSnapshots` must never observe uncommitted staging. `ApplyResult` gains `quarantined: Hash[]`; a transient failure is retriable and **never** enters `knownInvalidVertexHashes`. Hard prerequisite: 0h. | local-safe                                                    | **atomic per vertex**                  | Inverted `merge-atomicity.test.ts` per D.3(b); the four D.4.2 regression schedules; **L6 contract**: two replicas receiving the same DAG — one with a local call interleaved into a 256-append merge at the default suffix, one serial — end with equal live state, byte-equal `getStates` at every shared head, and a truthful `applied` report; **structural gate**: no shared-store mutation or journal entry is live across any `await`. All verified against baseline per D.5(h)                                                                                                                                                                                                                                                                                                     |
 
+> **0g(ii-I) maximum boundary.** The frozen registry, references, c2 contract and replacement mint issue
+> `authorSequence = Number.MAX_SAFE_INTEGER` exactly once, atomically mark the lineage exhausted, and
+> reject every later attempt before build, digest, sign or publication work. A backend may represent this
+> with `lastIssued + exhausted` or an equivalent explicit discriminator; it must never compute
+> `MAX_SAFE_INTEGER + 1` or reserve the final registered ordinal as an unissuable `next` sentinel.
+
 > **Why 0j moves to Phase 0.** Phase 4's shadow gate asserts byte-identical snapshot digests across replicas
 > and browsers. That assertion is _unattributable_ unless blueprint execution is already deterministic
 > cross-engine — a nondeterministic reducer makes every mismatch ambiguous between engine bug and app bug,
@@ -6496,11 +6502,18 @@ artifact; the GREEN agent's separate mismatch inventory is not represented as th
 
 The first corrected −1′c RED was locally completed after two material corrections. It first removed a
 registry-fed reference protocol that would have collapsed the independent oracle into a generic registry
-interpreter. It then corrected the local sequence boundary: receiving
-`authorSequence = Number.MAX_SAFE_INTEGER` is valid, but the last successful local issue uses
-`MAX_SAFE_INTEGER - 1`; once `next` is already maximum, issuance rejects without state change, digest,
-signature or publication. The successful control independently recomputes the registered vertex digest
-and verifies Ed25519 over the raw 32-byte digest with `zip215 = false`.
+interpreter. Its blocked, bare-`next` transaction control treated
+`authorSequence = Number.MAX_SAFE_INTEGER` as valid on receipt but made `MAX_SAFE_INTEGER - 1` the last
+locally issued ordinal because that representation had no separate post-maximum exhaustion state. The
+successful control independently recomputed the registered vertex digest and verified Ed25519 over the raw
+32-byte digest with `zip215 = false`.
+
+That `next`-only boundary was blocked history, not the accepted protocol rule. The later c2 contract,
+both accepted references and the frozen replacement mint persist `lastIssued` plus an explicit
+`exhausted` discriminator: they successfully issue `MAX_SAFE_INTEGER` from
+`lastIssued = MAX_SAFE_INTEGER - 1`, atomically mark the lineage exhausted, then reject later attempts
+without state change, digest, signature or publication. Phase 0g(ii-I) and Phase 2l must preserve that
+accepted transition without computing an unsafe `MAX_SAFE_INTEGER + 1`.
 
 Blocked pre-correction −1′c RED pair:
 
@@ -6578,8 +6591,8 @@ unanimous authorization is exactly the following sequence:
    execution-assisted-reconstructed from no predecessor reference, regenerated reference or TypeScript
    codec must implement the primary byte oracle from the grammar alone. Add grammar provenance and a
    `readNoImplementationSource` attestation. Execute the frozen v2 codec only as a full-corpus preservation
-   differential against that oracle. Preserve the D.38 suite/schema gates, corrected sequence semantics
-   and accurately scoped semantic anti-copy cases.
+   differential against that oracle. Preserve the D.38 suite/schema gates, the c2
+   `sequenceContract`/frozen MAX_SAFE-once semantics and accurately scoped semantic anti-copy cases.
 4. **Independent reference, then vector mint.** A new reference author who wrote neither the normative
    tuple nor RED and inspected no predecessor implementation fixes and hashes the source first. A different
    vector-minting agent—who authored neither the annex nor RED—then builds real registry-derived vectors
@@ -8490,3 +8503,216 @@ Keep the two stale untracked v2 `0g2` REDs untouched; re-author any still-valid 
 Preserve the accepted 0g(ii-T) exact-byte admission surface and all frozen governance. Keep every future
 Kimi review on the exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation. Do not begin
 Phase 3a until 0g(ii-S) is accepted.
+
+## Appendix D.48 — Phase 0g(ii-I) transactional local issuance
+
+### D.48.1 — Final RED/GREEN tuple
+
+Phase 0g(ii-I) adds one stateless author-bound builder over the injected
+`transactIssue(scope, buildAndSign)` boundary. It does not add a default store, issuer-owned counter,
+reservation/abandon API, outbox publisher, protobuf/topic codec, node binder, remote sequence policy or
+durable backend.
+
+The sealed RED tuple is:
+
+- `tests/protocol-v3-transactional-issuance-0g2i.test.ts`
+  (`f29d1d8aad65f3cbf8410f5c16d5ded97736ed9fb838125d570799e0d1213cea`);
+- input-only fixture `tests/fixtures/phase-0g2i/transactional-issuance-contract.json`
+  (`115e31e704eb43a148c9c07211b17cb4076dfb4b4ebd85c04d4bda3fa8641047`);
+- RED ledger `.logs/phase-0g2i-red-ledger.md`
+  (`3414ef4d67baebd0665eaf49fcc3edf44c2a2a898ea09602e240a4a8d4b0b1eb`).
+
+Live production before GREEN passed the fixture/control test and failed all nine behavioral tests solely
+because `createTransactionalVertexIssuer` was absent. An independent compliant scratch surface passed
+10/10. Three narrow mutants retained distinct causal failures:
+
+- global issuer mutex: 8 pass / 2 fail, killing genuine overlap and unrelated-scope progress;
+- unsigned completion counter: 6 pass / 4 fail, killing records whose visible ordinal differs from their
+  authenticated bytes; and
+- mutable caller aliases: 9 pass / 1 fail, killing deferred signing over caller-mutated key/request
+  objects.
+
+The accepted production is:
+
+- `packages/protocol-v3/src/index.ts`
+  (`774cb776e67b92dd0abd49b470d1f85ede1004c9b91cb0f26e1f868068b1a846`);
+- GREEN ledger `.logs/phase-0g2i-green-ledger.md`
+  (`680e2a880d6ed9079dfb562a7aedc916173df94b963590c07306281fd25c2ce9`);
+- compact gate evidence `.logs/phase-0g2i-green-gates.log`
+  (`9fef86657c5f299903eb661f86d9a2a1b4254eacd5d3895411d4ebe60d5f145f`).
+
+At factory construction, the issuer validates and copies the private seed and raw public key, derives the
+public key from the copied seed and rejects a mismatch before transaction, preimage, digest or signature
+work. The synchronous head of `issue()` snapshots scalars and dependencies and detaches the nested
+operation through the accepted canonical codec before transaction suspension.
+
+The trusted closure constructs exactly the ten registered v3 vertex fields. Configured `author` and the
+coordinator-selected `authorSequence` are the only signed identity/ordinal values; caller extras cannot
+overwrite them or the kind/protocol constants. It computes the registered digest over the exact returned
+canonical-preimage bytes and signs that raw 32-byte digest. One envelope value is placed in the internal
+commit, issued record and outbox entry. Only successful resolution of the injected transaction reaches
+the public caller; synchronous transaction throws become rejected promises.
+
+The issuer itself stores no sequencing, exhaustion or publication state. Phase 2l owns the real
+browser/node transaction and crash matrix; Phase 3a owns publication of committed outbox records; Phase
+0o owns remote duplicate/gap/equivocation policy.
+
+### D.48.2 — MAX_SAFE plan correction
+
+RED review found an internal documentation conflict. D.39.1 described the blocked first −1′c RED's bare
+`next` representation as stopping at `MAX_SAFE_INTEGER - 1`, while the accepted registry, maximum vector,
+replacement mint, both references and the c2 contract successfully issue
+`authorSequence = MAX_SAFE_INTEGER`, atomically mark the lineage exhausted and reject later attempts
+before work.
+
+Work stopped at that boundary until the required correction quorum unanimously returned
+`AGREE_CORRECT_D39_MAXSAFE_ISSUED_ONCE`:
+
+- Codex-high collaboration result, transcribed without replacing the original transcript:
+  `.logs/phase-0g2i-maxsafe-quorum-codex-high.md`
+  (`b78f3ade024aa59bff898e0611dd7eeda23d84e0a9aa2ab067576549bc2caa78`);
+- exact Kimi 3/100:
+  `.logs/phase-0g2i-maxsafe-quorum-kimi3-100.raw.log`
+  (`5c7b5c6bf78b40c43a7ab1dabb00ebcb792a50eb6ebfcb241094ddb588a8d765`);
+- Opus-xhigh:
+  `.logs/phase-0g2i-maxsafe-quorum-opus-xhigh.raw.json`
+  (`6a8d276b8108d7a2a0f79134eda94cdc01b118314e32d4de3b923bed29441959`).
+
+The living-plan correction preserves D.39.1 as blocked `next`-only history, records its supersession by
+c2/frozen evidence, anchors D.39.2 to the c2 `sequenceContract`, and clarifies the Phase 0 boundary.
+Neither the registry, vectors, references, c2 tuple nor any other frozen byte changed.
+
+The final RED now proves: a failed commit at the final slot leaves `next = MAX_SAFE_INTEGER`,
+`exhausted = false` and no envelope/record/outbox; retry reselects and successfully signs the maximum
+ordinal; that success sets an explicit exhausted discriminator; the next attempt performs no
+build/commit work and mutates nothing. Phase 2l must persist the ordinal/exhaustion discriminator in the
+same durable transaction and must never compute `MAX_SAFE_INTEGER + 1`.
+
+### D.48.3 — Gates and independent review
+
+Final production and the independent compliant surface pass 10/10. Package and 32-project workspace
+typecheck/build pass; built runtime/declaration exports load; targeted ESLint/Prettier and
+clean-equivalent workspace ESLint pass; accepted 0g(ii-T) passes 13/13; v3 e/e2/e4 governance passes 7/7;
+frozen-v2 preservation passes 24/24; both real freeze CLIs pass; and `git diff --check` is clean.
+
+Raw `pnpm lint` was also run and is honestly RED with eleven parser-project errors confined to ignored
+`.logs` TypeScript evidence plus 226 inherited warnings. Seven error files are accepted 0g(ii-T)
+evidence and four are the 0g(ii-I) compliant/mutant surfaces. The clean-equivalent run excluding
+`.logs/**` has zero errors and the same inherited warnings. The raw full suite was not rerun or
+green-chased; D.47 remains the accepted inherited debt baseline and this slice makes no full-suite-green
+claim.
+
+Both independent external reviewers authenticated the production/test/fixture tuple and the plan snapshot
+at `15eab2d9884bcfdb8b5f1ff56b7027d78fbaef1af6951162f9d8acf69193f025`, then reran the focused,
+mutant and proportionate preservation gates. That snapshot is exactly the current plan before Appendix
+D.48; this appendix itself was reviewed only by the final Opus pass:
+
+- Grok 4.5/high:
+  `.logs/phase-0g2i-review-grok45-high-v3.raw.json`
+  (`c514375ca30ab02b1d79d8925e4ba5ed70ef3cb1a356b1df8a00a309bf4695bf`) —
+  **PASS_WITH_NOTES**;
+- exact Kimi 3/100:
+  `.logs/phase-0g2i-review-kimi3-100.raw.log`
+  (`7011046e65c2ec9c4941f840aae1bf818cc67adb08c03fd22085da6b3b0c8983`) —
+  **PASS_WITH_NOTES**.
+
+Two earlier Grok wrapper attempts cancelled before repository inspection and produced no verdict; they
+are not review evidence.
+
+### D.48.4 — Findings and carry-forward ownership
+
+1. The successful internal commit, issued record and outbox entry intentionally share one envelope value,
+   whose `Uint8Array` members remain mutable after return. The ephemeral test double clones on commit.
+   Phase 2l must clone/serialize before durable commit, and Phase 3a must publish only a detached committed
+   record so caller mutation cannot alter stored or published bytes.
+2. The issuer returns whatever the trusted `transactIssue` resolves. That trust is the injected boundary,
+   not a universal adapter-honesty proof. Phase 2l must require the successful return to be the exact
+   closure commit it stored.
+3. Operation detachment and invalid-operation rejection happen before transaction entry. Other registered
+   request fields validate inside `buildAndSign`, after the adapter selects an ordinal. Phase 2l must prove
+   every build throw is old-state/no-publication and may optionally hoist cheap author/request shape
+   validation without changing registered bytes.
+4. `createTransactionalVertexIssuer(null)` exposes a native property-access `TypeError`; shaped public
+   error taxonomy remains later hardening. This is not a consensus or atomicity defect.
+5. The production issuer is deliberately stateless. It does not itself prevent a malicious adapter from
+   invoking `buildAndSign` more than once, reusing an ordinal or returning a fabricated record. Those are
+   violations of the trusted `transactIssue` contract and require causal real-adapter tests in Phase 2l,
+   not an issuer-local counter or mutex.
+6. This slice does not complete the Discord/chat/game golden paths. It provides their authenticated local
+   issuance seam; durability, live binding/publication, remote equivocation policy and the strict
+   Ed25519 supplement remain required.
+7. The sealed RED does not directly exercise dependency sorting or close the issuance-to-
+   `verifyReceivedVertex` loop. Final Opus independently probed deliberately unsorted dependencies and the
+   resulting envelope was admitted with the same digest. Phase 0g(ii-S) should add the strict-verifier
+   closure, and Phase 2l should retain the dependency/canonicalization integration edge.
+8. `PHASE_0G2I_IMPLEMENTATION_MODULE` is a RED-harness override and must remain unset in ordinary CI and
+   production execution.
+9. This layer does not prove that the configured `author` names the supplied public key. Phase 3a owns
+   construction of the live `resolveAuthorPublicKey` adapter and must prove that one registered author
+   identity resolves to the intended key before admission; duplicating resolver policy in this stateless
+   issuer would steal that live-binding responsibility.
+10. Before Phase 2l GREEN, extract the test double's commit/selection honesty assertion into a shared
+    adapter-conformance harness. It must additionally prove that hostile unsafe/negative ordinals and
+    invalid caller fields reject without consuming an ordinal, successful returns byte-equal the stored
+    closure commit, cloned/serialized envelope and scope bytes cannot be mutated through aliases, and
+    every build/sign failure is old-state/no-publication.
+11. The copied seed remains resident in the issuer closure. Phase 3a/keychain integration owns any
+    stronger custody or zeroization policy; this primitive neither overclaims nor weakens that boundary.
+
+The one-off Fable-xhigh current-path audit used the Claude bridge only because the user requested it:
+
+- prompt:
+  `.logs/phase-0g2i-fable-xhigh-current-path-prompt-20260728T191006Z.md`
+  (`a499be0d693361c42cd8da081ca69b3a49c326a5b63916af12923829147db91e`);
+- raw:
+  `.logs/phase-0g2i-fable-xhigh-current-path-response-20260728T191006Z.json`
+  (`dc95772197dca56a5a22dc3ce2cdcb460ad93bf2f2162338bf237658b7120deb`);
+- verdict: **ON_TRACK_WITH_CORRECTIONS**.
+
+Fable independently authenticated the tuple and all 33 frozen-v3 inputs, reproduced 10/10, 13/13,
+7/7 and 24/24, confirmed the MAX_SAFE correction, and found no 0g(ii-I blocker. It confirmed that
+0g(ii-S) → 2l → 3a remains a coherent route to both chat and game golden paths, with schedule rather
+than architecture now the main risk. Its direct dirty-root v3 freeze invocation reproduced the known
+`spawnSync git ENOBUFS` environmental failure because 47,610 untracked non-ignored files were enumerated.
+The final checkpoint gate below closes that operational concern without broadening this slice: both real
+freeze CLIs pass against the same working tree with the authenticated process-local excludes
+`.logs/phase-0g2t-git-excludes`; no repository ignore policy or frozen artifact changed. The Fable step is
+not recurring—future slices retain the requested Codex-high/Grok/exact-Kimi-3/Opus loop.
+
+### D.48.5 — Acceptance boundary
+
+Final Opus-xhigh authenticated the exact tuple, reconstructed the pre-D.48 external-review snapshot,
+reran the focused/compliant/mutant cardinalities and proportionate gates, and confirmed the MAX_SAFE
+correction is compelled living-plan prose backed by frozen evidence. Its raw response is
+`.logs/phase-0g2i-final-opus-xhigh.raw.json`
+(`d6e6e8a9c0f2d6b9fe65d0b25889576308d9cb9639ab6dc1075e4f91ee7c0e3e`) and its prompt is
+`.logs/phase-0g2i-final-opus-xhigh.prompt.md`
+(`e097ad11a4cccbaeba0d5fedf3d09af5503299670f1a14412fa07785ec9ce136`). Verdict:
+**PASS_WITH_NOTES**, `checkpoint_authorized: yes`, with no blocker and no semantic plan change.
+
+The required external-review snapshot disclosure and malformed 0g(ii-I heading are corrected above.
+Opus also independently proved that unsorted dependencies survive issuance-to-admission with equal
+digest and confirmed the documented validation timing: invalid operation rejects before transaction,
+while an invalid anchor throws from the selected-ordinal build without commit. Its remaining
+nonblockers are assigned in D.48.4.
+
+The final compact gate log is `.logs/phase-0g2i-final-checkpoint-gates.log`
+(`e1dab5ec01605ed9f9bf9fb558c1e699427d2bd82e70d26c5f5b42415be5ae84`): focused 10/10,
+32-project workspace typecheck, protocol-v3 build, targeted ESLint/Prettier, accepted 0g(ii-T) 13/13,
+v3 governance 7/7, frozen-v2 preservation 24/24, both real freeze CLIs and `git diff --check` all pass.
+The first clean-workspace ESLint invocation let zsh expand an unquoted `.logs/**` argument and exited 2
+before linting; the quoted retry in the same log is the authoritative result: zero errors and 226
+inherited warnings. The log records `FINAL_GATE_FAILURES 0` after that transparent command correction.
+
+After the final compact gate rerun, selectively stage only this plan,
+`packages/protocol-v3/src/index.ts`, the sealed RED test and its input-only fixture. Never use
+`git add -A`; never stage `.agents/`, `.claude/`, `.logs/`, `.pnpm-store/`, `skills-lock.json`, either
+stale v2 `0g2` RED or generated protocol-v3 `dist/`.
+
+## Next Agent Prompt
+
+Run the final compact 0g(ii-I) gates to one log, record its hash in D.48.5, selectively checkpoint the
+four authorized paths, then begin **Phase 0g(ii-S)** with a fresh Codex-high RED owner. Keep every future
+Kimi review on the exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation. Phase 3a remains blocked until
+0g(ii-S) lands its separate additive governance and live strict-verifier vectors.
