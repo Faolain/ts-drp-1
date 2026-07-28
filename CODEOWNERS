@@ -4,6 +4,21 @@
 /packages/keychain/    @trungnotchung
 
 # Protocol-v2 consensus bytes and their freeze controls share one owner cohort.
+# Protocol-v3 consensus bytes and their additive freeze controls share the frozen v2 owner cohort.
+/packages/protocol-v3/registry/** @d-roak @anhnd350309 @sfroment
+/docs/protocol/attested-hard-epochs-v5.md @d-roak @anhnd350309 @sfroment
+/docs/protocol/amendments-v3.json @d-roak @anhnd350309 @sfroment
+/docs/protocol/canonical-tag-codec-v1.md @d-roak @anhnd350309 @sfroment
+/docs/protocol/canonical-tag-codec-v1.json @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/formal/** @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/conformance/original-reference/** @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/conformance/regenerated-reference/** @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/conformance/vectors/** @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/conformance/reference.lock.json @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/conformance/reference-regen.lock.json @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/conformance/freeze-policy-v3.json @d-roak @anhnd350309 @sfroment
+/packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs @d-roak @anhnd350309 @sfroment
+/.github/workflows/protocol-v3-registry.yml @d-roak @anhnd350309 @sfroment
 /CODEOWNERS @d-roak @anhnd350309 @sfroment
 /packages/protocol-v2/registry/** @d-roak @anhnd350309 @sfroment
 /packages/protocol-v2/tests/fixtures/golden-vectors/** @d-roak @anhnd350309 @sfroment

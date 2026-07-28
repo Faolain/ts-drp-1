@@ -740,13 +740,15 @@ extend those decisions rather than amend them. Neither frozen v2 row is edited.
 
 The v3 freeze is one consensus-visible checkpoint, but its internal TDD/review slices remain separate:
 
-| Slice    | Decision owned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | RED → GREEN gate                                                                                                                                                                                                                                                                                                                                                 |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **−1′a** | Formal action/invariant model first. Model local issuance, admission, equivocation observation and detection; derive the required signed-field set from those actions and invariants rather than checking a registry-chosen set afterward.                                                                                                                                                                                                                                                                                                             | Fresh artifact-level RED fails on the missing v3 actions/invariants and signed-field derivation, not on a missing import. Pinned Quint checks cover signature authentication of the sequence, contiguous successful local issuance for one durable author lineage, and the separation between local issuance safety and arrival-order-independent remote policy. |
-| **−1′b** | V3 registry/schema and specification: all registered domains use `/v3`; vertex review order inserts required `authorSequence` immediately after `author`, with type `safe-integer`, minimum and initial value `0`, no epoch/anchor reset and no wrap. Preserve the `wireFormat` rule: canonical-preimage bytes plus signature bytes, digest the received bytes without re-encoding. Select a distinct v3 identity-suite identifier and audit every v2-domain-bound suite; exact new identifiers are freeze decisions, not this correction's invention. | Registry/model/spec bijection; malformed and boundary sequence values; v2↔v3 domain/suite rejection in both directions; exact received-byte rule recorded as a numbered amendment. Canonical object key bytes, not registry declaration order, still determine encoded map order.                                                                               |
-| **−1′c** | A genuinely independent original v3 reference, authored from the normative material by someone who wrote neither that material nor the later TS port, followed by real registry-built v3 vectors. The reference is fixed before vector minting and is not edited to follow the vectors.                                                                                                                                                                                                                                                                | Independent reference reproduces every v3 vector byte-for-byte; an anti-copy discriminator fails for a mechanical v2 transliteration; vectors cover every v3 kind/active enum plus sequence boundaries and cross-major negatives.                                                                                                                                |
-| **−1′d** | A separately authored regenerated v3 reference. Its author differs from the original reference and TS-port authors.                                                                                                                                                                                                                                                                                                                                                                                                                                    | Original and regenerated references agree on the full governed corpus and metadata-parity probes without importing either TS implementation.                                                                                                                                                                                                                     |
-| **−1′e** | Locks, additive governance and permanent closure. The v3 checker/policy/workflow are separate from v2; the v3 CODEOWNERS block is inserted before the checker-protected terminal v2 block. The v3 bootstrap is fail-closed and single-use.                                                                                                                                                                                                                                                                                                             | Lock ↔ source ↔ vector provenance; mutations to registry, prior vectors, either reference, locks, policy, checker or bootstrap rules fail. Both unchanged v2 governance and new v3 governance pass. No partial combination of −1′a…−1′e may be treated as authoritative or merged as the freeze checkpoint.                                                    |
+| Slice      | Decision owned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | RED → GREEN gate                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **−1′a**   | Formal action/invariant model first. Model local issuance, admission, equivocation observation and detection; derive the required signed-field set from those actions and invariants rather than checking a registry-chosen set afterward.                                                                                                                                                                                                                                                                                                             | Fresh artifact-level RED fails on the missing v3 actions/invariants and signed-field derivation, not on a missing import. Pinned Quint checks cover signature authentication of the sequence, contiguous successful local issuance for one durable author lineage, and the separation between local issuance safety and arrival-order-independent remote policy.                                                |
+| **−1′b**   | V3 registry/schema and specification: all registered domains use `/v3`; vertex review order inserts required `authorSequence` immediately after `author`, with type `safe-integer`, minimum and initial value `0`, no epoch/anchor reset and no wrap. Preserve the `wireFormat` rule: canonical-preimage bytes plus signature bytes, digest the received bytes without re-encoding. Select a distinct v3 identity-suite identifier and audit every v2-domain-bound suite; exact new identifiers are freeze decisions, not this correction's invention. | Registry/model/spec bijection; malformed and boundary sequence values; v2↔v3 domain/suite rejection in both directions; exact received-byte rule recorded as a numbered amendment. Canonical object key bytes, not registry declaration order, still determine encoded map order.                                                                                                                              |
+| **−1′b2a** | Canonical codec grammar extraction. Before either v3 reference is authored, freeze a language-neutral Markdown grammar plus a machine-readable tag/layout table for `drp-canonical-profile-1`. Only this slice's RED and grammar authors may inspect the frozen predecessor implementations, solely to transcribe and falsify the existing wire contract; neither may author either v3 reference or the later TS port.                                                                                                                                 | A fresh from-grammar implementation, not an implementation import, reproduces the frozen v2 golden corpus and binding worked examples byte-for-byte and kills tag, length, varuint/zig-zag, float/negative-zero, typed-array, ordering, duplicate, non-minimal and limit mutants. The RED fails on non-reproduction, not merely file absence.                                                                   |
+| **−1′b2b** | Bind that grammar as numbered decision `PH-N1P-D07` across the v3 specification, amendments, registry decision bindings and model sign-off. The grammar is authoritative; worked examples are binding conformance examples but never override its production rules.                                                                                                                                                                                                                                                                                    | A separate RED/GREEN cycle proves the D07 spec/amendment/registry bijection, exact `registryPaths`, annex hashes and outward sign-off hashes. Re-execute the unchanged −1′b test over the edited tuple; its RED/fixture, schema, signed-variable Quint, −1′a tuple and frozen v2 artifacts remain byte-identical.                                                                                               |
+| **−1′c**   | A genuinely independent original v3 reference, authored only from the accepted normative tuple—including the frozen codec grammar—by someone who inspected neither predecessor implementation nor vector output and who will author neither the vector mint nor later TS port. Fix its source before a different agent mints real registry-built v3 vectors; never edit it to follow vectors.                                                                                                                                                          | A separately authored from-grammar RED oracle and the independent reference reproduce every v3 vector byte-for-byte; the frozen v2 codec is an executed preservation differential, not the normative byte owner. The semantic anti-copy discriminator fails for a mechanical v2 registry/validator transliteration; vectors cover every v3 kind/active enum plus sequence boundaries and cross-major negatives. |
+| **−1′d**   | A separately authored regenerated v3 reference. Its author differs from the original reference and TS-port authors.                                                                                                                                                                                                                                                                                                                                                                                                                                    | Original and regenerated references agree on the full governed corpus and metadata-parity probes without importing either TS implementation.                                                                                                                                                                                                                                                                    |
+| **−1′e**   | Locks, additive governance and permanent closure. The v3 checker/policy/workflow are separate from v2; the v3 CODEOWNERS block is inserted before the checker-protected terminal v2 block. The v3 bootstrap is fail-closed and single-use.                                                                                                                                                                                                                                                                                                             | Lock ↔ source ↔ vector provenance; mutations to registry, prior vectors, either reference, locks, policy, checker or bootstrap rules fail. Both unchanged v2 governance and new v3 governance pass. No partial combination of −1′a…−1′e may be treated as authoritative or merged as the freeze checkpoint.                                                                                                   |
 
 Internal review snapshots may support iteration, but they are not checkpoints: they remain local,
 unpublished, unmerged and unusable as a governed checker base, and the final freeze is squashed/landed as
@@ -6198,23 +6200,2107 @@ counter/envelope/outbox transaction; permits the trusted closure's internal resu
 external exposure; defines internal freeze snapshots as unpublished/non-authoritative; and repairs the
 traceability table. The plan checkpoint remains gated on a fresh post-correction applied-text review.
 
+## Appendix D.37 — Phase −1′a v3 formal action-model acceptance
+
+### D.37.1 — Artifact RED and rejected first GREEN
+
+The fresh Codex-high RED created only an artifact-level test and a nonnormative fixture. It failed against
+the absence of a v3 Quint action model and a mechanically derived signed-field contract, while its positive
+controls preserved the distinction between contiguous successful local issuance and arrival-independent
+remote admission. The first GREEN then exposed three root-review defects before external sign-off:
+equivocation was specialized to slot 1, `step` was scripted rather than a top-level nondeterministic
+choice, and counters/phases could grow without a finite cap. Those defects were corrected before the first
+external review.
+
+The first review tuple was still rejected. Grok's substantive `BLOCK` found that rejection counters were
+never written, dependency purevals merely annotated a preselected field set, successful local issuance
+stored no signed record binding the selected sequence, and equivocation used an unrelated
+`payloadIdentity`. Kimi-100 and the then-current Opus review treated those weaknesses as nonblocking, but
+the Grok findings were correct on the merits. The slice did not advance.
+
+Corrective RED round 3 replaced the annotation contract with parsed-AST requirements for an exact closed
+ten-field `SignedVertex`; full-record authentication in local issuance and remote admission; stored and
+exposed local signed records; per-envelope decision history; and operation-grounded duplicate versus
+equivocation behavior. The old GREEN then failed 2 integration tests while all 4 RED controls passed,
+which established the intended boundary without weakening an assertion.
+
+### D.37.2 — Accepted round-4 tuple and owned claim
+
+The locally accepted, still-uncommitted Phase −1′a tuple is:
+
+- `tests/protocol-v3-formal-action-model-n1prime-a.test.ts`,
+  `affc5e439220e8ac6353c0795f591da3946a6aeb37d69a71a05763f229f34f6d`;
+- `tests/fixtures/phase-n1prime-a/formal-action-contract.json`,
+  `474c83e7a3f130504e8dedc8ceb0843ee3413ca56c27003a354f6088b0f41dcf`;
+- `packages/protocol-v3/formal/author-lineage-actions.qnt`,
+  `7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038`;
+- `packages/protocol-v3/formal/signed-field-derivation.json`,
+  `e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346`.
+
+The model owns a bounded abstraction for one object/author lineage. Its closed `SignedVertex` contains
+`kind`, `protocolMajor`, `objectId`, `epoch`, `anchor`, `author`, `authorSequence`, `logicalTime`,
+`dependencies` and `operation`. Authentication compares the complete typed records. Successful local
+issuance stores and exposes a record whose embedded sequence is the selected next ordinal; failure advances
+and exposes nothing. Remote admission memoizes an authentication decision by envelope and does not reject
+an authenticated duplicate, gap or equivocation because of arrival history. Observation records
+operations by sequence, so a repeated operation is a duplicate while a different operation at the same
+slot can be detected as equivocation. `step` remains a top-level finite nondeterministic action choice with
+bounded caps and an explicit stutter.
+
+The derivation consumes no registry field list. The test parses the Quint AST, requires the exact closed
+record, proves both owned actions invoke full-record authentication, equates the derived JSON field set to
+that AST surface, and binds the JSON to the live model hash. This is a parse/hash/equality gate over a
+hand-authored JSON artifact, not a claim that a checked-in generator already exists.
+
+### D.37.3 — Cold gate, mutation strength and preservation
+
+Round-3 final Opus correctly blocked the otherwise green tuple because the two Quint-heavy Vitest bodies
+inherited the repository-wide 10-second timeout. Kimi measured a genuine cold timeout at 22.6 seconds,
+while warm runs completed in 5.8–7.2 seconds. The round-4 Codex-high harness correction changed no
+assertion or Quint command: it renamed two misleading existence-test titles and added a local `120_000`
+third-argument timeout to each heavy `it.runIf` body. `vite.config.mts` and the global 10-second timeout
+remain unchanged. The exact reverse diff reconstructs the prior test hash
+`ff150634fad8549b0c46ff6f74c7c52fb6a1c4be09013538d048497e22fe20ba`.
+
+A separate Codex-high GREEN validator isolated and restored only `node_modules/.vite`, then passed a
+genuinely cold focused run: 1 file / 8 tests in 8.96 seconds. Quint typecheck and all 11 scenarios pass;
+the 256-sample, 24-step simulation reports no violation and reaches all 8 witnesses. Workspace typecheck
+passes across all 31 projects. Lint remains 0 errors / 226 inherited warnings. The isolated frozen-v2
+preservation run passes 4 files / 31 tests.
+
+Seven fresh disposable mutants were copied from model hash `7971a025…`, typechecked, and causally killed:
+weakened full-record authentication; selected-sequence-plus-one record binding; failure consuming the
+ordinal; identity derived from `author` rather than `operation`; slot-1-specialized equivocation;
+deterministic `step`; and cap stutter growing phase. Six die in their targeted Quint scenario and the
+deterministic-step mutant dies on parsed AST structure. None reads the derivation JSON, so a stale embedded
+model hash cannot manufacture a kill. The cold/gate ledger is
+`.logs/phase-n1prime-a-round4-green-ledger.log`
+(`e62421170aa041f5f3a54e7fd6814bf74eb503b31a02c978720f3fcae21fa4f4`); the mutant ledger is
+`.logs/phase-n1prime-a-round4-mutant-ledger.log`
+(`70b816c11a59bceeb14b7b52d29d6673133e5dfee900040c5877423231622dbb`).
+
+One attempted v2 preservation run overlapped full lint and workspace typecheck and timed out only the
+existing 5-second Quint-map test and 15-second ESLint subprocess test. The unchanged isolated rerun passed
+31/31 in 7.11 seconds. The failed parallel log is retained as evidence that subprocess-heavy safety gates
+must not be scheduled under artificial local contention; it is not represented as a protocol failure.
+
+### D.37.4 — Independent review and golden-path audit
+
+Corrective round 3 Grok and Kimi-100 passed, but final Opus-xhigh correctly retained two blockers: the cold
+timeout and mutation logs predating the accepted model hash. Round 4 closed both and received fresh delta
+reviews:
+
+- Grok `PASS`, authorizing local −1′a acceptance and −1′b RED only
+  (`phase-n1prime-a-review-grok-bundled-round4-20260727T003000Z.stdout.log`,
+  `83ac050fc470e2826daf1a81cbed59343887b2d868827a85e8b9e59f509524e0`);
+- Kimi CLI with `--max-steps-per-turn 100`, `PASS` with the same scoped authorization
+  (`phase-n1prime-a-review-kimi100-corrective-round4-delta-stdout.log`,
+  `f080315eec20fcf38c4a3a6585ced3e6fbe2285b7cc86d16f23212351405283f`);
+- fresh Claude Opus 5 / xhigh session `6edfbea8-95f6-4054-a928-8e89195dec26`, `PASS`,
+  local −1′a acceptance `YES`, −1′b RED `YES`, atomic freeze merge `NO`
+  (`phase-n1prime-a-final-opus-xhigh-round4-20260727T184833Z.normalized.md`,
+  `38dca0c496e8b0bc81f2f8f4d308a402222c38a6ce195f75d3adfefce28389a5`).
+
+The user-requested Claude-skill Fable-high audit used the actual first-party `claude-fable-5` model at
+high effort, session `82eb155e-5aa1-4d79-b1b7-3c6238672bbb`. It returned `ON TRACK`
+(`fable-golden-path-audit-20260727-v1.normalized.md`,
+`122ef978b63fb8deb7505cf729b0e1891e1f8102eed7e3c79e71d1f38d5f6334`) after tracing the plan backward
+from the Discord and chat golden paths. Runtime durability, persistence, backpressure, compaction,
+bootstrap, ACL supersession and cold-join/archive behavior remain intentionally future-owned; pulling
+them into −1′a would blur ownership rather than strengthen this slice.
+
+### D.37.5 — Findings, gotchas and next-slice constraints
+
+1. Several named Quint invariants remain partly definitional. `operationIdentityGrounded` restates the
+   accessor, `signedFieldDerivationSound` is equality/identity-shaped, duplicate/gap non-rejection follows
+   an admitted-only observation guard, and the two arrival/history invariants currently have the same
+   formula. Executable scenarios, TypeScript controls, AST checks and mutation kills are the primary
+   evidence. Phase −1′b must not copy this pattern where a registry/model/spec bijection can be falsified
+   directly.
+2. Local `authenticateSignedVertex` compares the constructed record to itself. This is an honest
+   scope-limited formal abstraction, not a live signature implementation. Strengthening it now would
+   reopen the model; real crypto, registered-byte binding and durable publication remain owned by the
+   later v3 port, Phase 3a and Phase 2l.
+3. Random simulation chooses only authenticated remote candidates. Ten one-field authentication
+   rejections are executable scripted scenarios; randomized rejection coverage remains absent.
+4. The gap predicate is the bounded predecessor-missing abstraction, not the fixture's richer
+   greatest-seen/fills-gap taxonomy. It is sufficient only for the owned non-rejection claim.
+5. Quint 0.32 requires `parse --out`; `test` needs `--match ^test`; parsed `pure val` declarations use the
+   `pureval` qualifier. `.qnt` has no Prettier parser, so Quint typecheck plus whitespace/diff checks are
+   the formatting gates.
+6. Large untracked inputs can cause `ENOBUFS` or checker noise, and safety gates that launch subprocesses
+   must run isolated. `.logs/`, `.pnpm-store/`, `.agents/`, `.claude/` and `skills-lock.json` are not part
+   of the atomic freeze. The two stale v2 `0g2` RED files also remain excluded. Never use `git add -A` for
+   this freeze; directory-level ignore hygiene must be resolved before the atomic checkpoint.
+7. Before −1′b freezes any `/v3` pacemaker/seal domain or −1′c mints vectors, resolve D.27's
+   `roundChange`/`anchor` residual as a numbered v3 normative decision and perform a v3-wide signed
+   variable-set sign-off for every registered envelope kind, or record an explicit scoped-registry
+   rationale. The exact distinct v3 identity suite and every other v2-domain-bound suite remain −1′b
+   freeze decisions.
+
+---
+
+## Appendix D.38 — Phase −1′b v3 registry/schema/specification
+
+### D.38.1 — Corrected RED and accepted GREEN tuple
+
+The fresh Codex-high RED originally failed on exactly the six absent v3 registry/schema/spec/formal
+artifacts, with nonnormative controls passing. The first GREEN exposed a false RED oracle: its default
+JSON Schema mapping narrowed `canonical-safe-integer`, `parameters`, `canonical-value` and `bytes` to
+`string`, contradicting both the frozen TypeScript normalizer and the independent JavaScript reference.
+That passing result was rejected rather than treated as progress.
+
+A fresh Codex-high read-only adjudication returned `BLOCK` and no plan-semantic change; Kimi-100 returned
+the same ruling. Opus-xhigh agreed that the tuple was blocked, but proposed a new numbered bytes-projection
+decision. The reviewers did not unanimously authorize that plan change, and the implementation avoided
+its trigger: it froze no base16/base64 or other JSON projection. `bytes` and the full canonical-value
+domain therefore carry exact `x-registry-type`/`x-registry-constraints` provenance without a narrowing
+top-level JSON Schema `type`. Any future slice that chooses a bytes-projection literal must treat that as
+a new normative decision and re-run the unanimous plan-change rule.
+
+The corrected RED covers all 17 frozen registry field types exactly once, rejects unknown scalar and array
+types, compares nullable unions order-insensitively, and requires exact native type, constraints, enum and
+numeric-bound provenance. It passed 6/6 controls, then failed against the unchanged first GREEN on exactly
+nine fields: one `parameters`, three `canonical-value`, three `canonical-safe-integer` and two `bytes`.
+The corrected GREEN changed only the schema and its outward-hash sign-off.
+
+Accepted local RED tuple:
+
+- `tests/protocol-v3-registry-spec-n1prime-b.test.ts`
+  `380cce1ad170422be6cab1c3ba316341b63700da2e9ef0588eed6f54897b4022`
+- `tests/fixtures/phase-n1prime-b/registry-spec-contract.json`
+  `0f8e1d62a7eb75961addc07fcc32a6c228ca2c432a3bbafd11478c828c2fc324`
+
+Accepted local GREEN tuple:
+
+- `packages/protocol-v3/registry/registry-v1.json`
+  `7d8ecd8f7ab373018bff7200ba1c287dd3964735c8290491fa4f8a552cf22b9a`
+- `packages/protocol-v3/registry/registry-v1.schema.json`
+  `6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc`
+- `docs/protocol/attested-hard-epochs-v5.md`
+  `ef94d314f9fb080b69051a80769326f43b412fcdaf36633f68fe3da5a1fdf085`
+- `docs/protocol/amendments-v3.json`
+  `6cf8b6e25064227df7665aea37ca2bcfd049b570fcfe9d867172d967e39ffe44`
+- `packages/protocol-v3/formal/registry-signed-envelope-variables.qnt`
+  `f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13`
+- `packages/protocol-v3/formal/registry-model-signoff.json`
+  `882b3ae23c5c65f10542dab961a154b94fc3ad55d16ebb421a974dcae83f56a4`
+
+These remain local, unpublished and unmerged. They are not an independently authoritative checkpoint.
+
+### D.38.2 — Normative result and executable evidence
+
+Protocol v3 registry v1 carries all 19 v2 kinds forward under distinct `/v3` domains. Its 147 fields add
+only `vertex.authorSequence` and the direct `roundChange.anchor` that closes D.27. The accepted −1′a AST
+mechanically fixes the ten-field vertex review order, with `authorSequence` immediately after `author`.
+Receiving `Number.MAX_SAFE_INTEGER` is valid; an exhausted local issuer rejects without advance, wrap,
+reset, signature or publication.
+
+The active suite identifiers are `ed25519-sha256-v3` and `ed25519-seal-v3`, each distinct from its
+v2-domain-bound predecessor. The inactive P-256 alternative is separately reserved as
+`p256-sha256-v3`, with an explicit predecessor disposition and amendment-gated activation. Four kinds are
+mechanically signed — `vertex`, `epochAnchor`, `sealVote`, `roundChange` — and each maps to exactly one
+active suite. All four v2-signed predecessors remain signed. The direct `roundChange.anchor` sits
+immediately after `epoch`, so every signed round-change vote binds its epoch lineage even when
+`highestPrepareQC` is null.
+
+The sign-off maps all 42 signed fields one-to-one to 42 parsed and typechecked Quint variables:
+v2's 40 plus `authorSequence` and `roundChange.anchor`. Six consecutive numbered decisions are bijective
+across registry bindings, specification records and amendments. The sign-off hashes five artifacts
+outward and never hashes itself.
+
+Sequential evidence passed:
+
+- corrected focused test: 8/8;
+- generic registry/schema provenance: 147/147 fields, with eight schema mutants killed;
+- registry/schema/spec/Quint/sign-off bijections: six mutants killed;
+- Quint parse/typecheck: 42 variables;
+- frozen v2 preservation including the freeze CLI: 12/12;
+- accepted −1′a preservation: 8/8;
+- workspace typecheck: all 31 projects;
+- lint: 0 errors and 226 inherited warnings;
+- Prettier, whitespace and diff checks.
+
+The primary GREEN ledger is
+`phase-n1prime-b-green-corrected-hash-ledger.log`
+(`2e64f733918f555eda7ae658a846d2de5d9f09c4cccc27119e47a3fa4c0b4e6e`).
+
+### D.38.3 — Independent reviews and authorization
+
+The completed Grok 4.5/high rerun returned `PASS` after two earlier headless attempts stopped at their own
+permission boundary without reviewing the tree. Only
+`phase-n1prime-b-review-grok45-high-rerun2.raw.json`
+(`006313caedc641afe67451588bdb09c89d596af6bfab292cd5724e67ed91d2be`) is verdict evidence.
+
+Kimi CLI with thinking enabled and `--max-steps-per-turn 100` independently returned `PASS`
+(`phase-n1prime-b-review-kimi100-final.log`,
+`c27a042ac25f2f95ea92436ecf63e9d8a084e7aa221d7de23d5b0c5176e39b1e`).
+Its prose incorrectly said the corrected RED touched only the test; the fixture also changed from six to
+17 type controls. The before/after hashes and TDD result are correct, so this wording slip is nonblocking.
+
+Final Claude Opus 5/xhigh returned `PASS`
+(`phase-n1prime-b-final-opus-xhigh.normalized.md`,
+`27c5d092bcc29ccf421318ea301242a7368f18e30dcae08684182d8f3f4e32ea`;
+raw JSON `82434eafc4f8d8ad8d73811c508b4eb7633888699cf99085bce62c717a72fb9b`).
+All three final reviewers authorize local −1′b acceptance and beginning −1′c RED. All explicitly deny an
+atomic checkpoint until −1′a…−1′e are complete together.
+
+The schema-assumption consultation also included a fresh read-only Codex-high collaboration agent. It
+returned `BLOCK`, the exhaustive no-narrowing mapping used by the correction, and no main-plan semantic
+change. Its response is retained in the collaboration transcript rather than a standalone `.logs`
+artifact; the GREEN agent's separate mismatch inventory is not represented as that independent vote.
+
+### D.38.4 — Findings, gotchas and next-slice constraints
+
+1. The original schema default was a false oracle. A green result that contradicts both frozen
+   implementations is not accepted merely because the test permits it. Future RED corrections retain a
+   reverse diff or other reconstructable delta, not hashes alone; the original −1′b RED/fixture bytes are
+   not recoverable from the final tree.
+2. `bytes` and `canonical-value` intentionally omit top-level JSON Schema `type`. Registry-aware
+   consumers must interpret their exact `x-registry-*` annotations. No textual bytes projection was
+   selected. An Ajv/instance-level differential belongs with −1′c vectors, where concrete wire
+   representations exist.
+3. The current artifacts correctly audit the inactive P-256 successor, but the permanent RED does not
+   mechanically gate `cryptoSuites.reserved`, `reservedPredecessorAudit`, D01's reserved-suite fields, or
+   the enum-to-active-suite relationship. −1′c RED must bind active, predecessor and reserved suite
+   literals to the registry by value equality and tie active enum values to active suite ids.
+4. D01's active/predecessor suite literals agree with the registry today but are not checked as exactly as
+   the wire-format decision. −1′c must close that executable evidence gap before minting vectors.
+5. An extra active suite with an empty `domainKinds` list and a role absent from v2 can pass −1′b's gate.
+   Vector coverage must require every active suite to own a registered signed kind and every signed kind
+   to appear exactly once.
+6. Six successful silent-command logs are zero bytes. Grok, Kimi and Opus independently reran the
+   important gates, so this is not a present blocker; future ledgers record command, exit status and a
+   positive marker.
+7. The package remains artifact-only and intentionally has no `package.json`. −1′c must not introduce a
+   package scaffold merely to make imports convenient.
+8. `.agents/`, `.claude/`, `.logs/`, `.pnpm-store/` and `skills-lock.json` remain unignored, and the two
+   stale v2 `0g2` REDs remain excluded. Resolve directory-level ignore hygiene before −1′e and never use
+   `git add -A` for the atomic freeze.
+9. No vectors, reference implementation, locks or activated governance were created in −1′b. Runtime
+   durability, received-byte binding, persistence, backpressure, compaction, bootstrap, ACL supersession
+   and remote admission retain their later owners. The Fable-high Discord/chat audit therefore remains
+   `ON TRACK`.
+10. Appendix D.39 supersedes only this appendix's forward authorization and the GREEN hashes that D07 will
+    necessarily refresh. D.38 remains the reconstructable record of the exact six-decision bytes and
+    reviews that existed before the missing codec-grammar assumption was discovered.
+
+## Appendix D.39 — Missing canonical grammar and the Phase −1′b2 split
+
+### D.39.1 — The stopped GREEN and the incorrect assumption
+
+The first corrected −1′c RED was locally completed after two material corrections. It first removed a
+registry-fed reference protocol that would have collapsed the independent oracle into a generic registry
+interpreter. It then corrected the local sequence boundary: receiving
+`authorSequence = Number.MAX_SAFE_INTEGER` is valid, but the last successful local issue uses
+`MAX_SAFE_INTEGER - 1`; once `next` is already maximum, issuance rejects without state change, digest,
+signature or publication. The successful control independently recomputes the registered vertex digest
+and verifies Ed25519 over the raw 32-byte digest with `zip215 = false`.
+
+Blocked pre-correction −1′c RED pair:
+
+- `tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts`
+  `10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2`
+- `tests/fixtures/phase-n1prime-c/reference-vector-contract.json`
+  `1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840`
+
+Its seven controls passed and its one intended test failed only on the absent reference, provenance and
+vector tuple. Those hashes are preserved as blocked-first-RED evidence, not accepted final −1′c hashes.
+The corrected RED must retain a reconstructable reverse diff from them.
+
+A different fresh Codex-high GREEN author then stopped before creating any source, vector, provenance or
+log. That stop was correct. The v3 registry and schema are normative material and fully own the 147-field
+surface, domains, encodings and constraints. The registry also fixes framing, endianness and the codec
+identity `drp-canonical-profile-1`. But neither it nor the v3/v2 prose defines the proprietary tag codec's
+actual byte grammar: tag octets, recursive payload layouts, varuint and zig-zag rules, float and
+negative-zero behavior, typed-array widths, duplicate/non-minimal rejection and resource limits exist
+only in predecessor implementations. Asking the independent reference author to recover those rules from
+the predecessor would make the codec differential a shared-source comparison. Asking the author to
+invent them would create a new wire format.
+
+The current RED compounds that gap by importing the frozen v2 TypeScript codec as the definition of
+expected bytes. That import remains valuable as a preservation differential, but it cannot remain the
+normative byte owner. The semantic anti-copy discriminator is deliberately narrower: it kills omission of
+`authorSequence`, omission of direct `roundChange.anchor` and activation of the reserved suite. It does
+not and cannot prove that a codec was independently authored.
+
+### D.39.2 — Required consultation and unanimous correction
+
+Because this changes the plan's oracle chain, work stopped for the required independent consultation.
+Codex-high, Kimi with thinking and a 100-step ceiling, and Claude Opus 5/xhigh all returned Determination
+**B**: `BLOCK` −1′c GREEN and add a normative codec-grammar slice before it. Kimi initially preferred a
+standalone annex to preserve the local −1′b GREEN hashes, then withdrew that option in convergence. All
+three agreed that an unbound annex would reproduce the exact side-channel weakness that −1′b's
+spec/amendment/registry bijection exists to prevent. No checkpoint exists; reopening the local,
+unpublished tuple is correct.
+
+Recorded external evidence:
+
+- Kimi initial:
+  `phase-n1prime-c-assumption-kimi100.log`
+  (`a3f3163707923b255439c0acb523df31f0f6b4004236953e0a4a5ea7143175c3`);
+- Kimi convergence:
+  `phase-n1prime-c-assumption-kimi100-convergence.log`
+  (`4ce421d896d0dc20aa7d79bcd21689fe85d5ce03487d652e7e4f40d4e8021f95`);
+- Opus initial:
+  `phase-n1prime-c-assumption-opus-xhigh.raw.json`
+  (`c8ed199dc121dd1193781a4cbeef5b743d93afe92b1f6cbc5a4fa92be8d6e569`);
+- Opus convergence:
+  `phase-n1prime-c-assumption-opus-xhigh-convergence.raw.json`
+  (`a553d4d9f826cb3cdb73a9587fefeac3423884e46d0998c557d37b4b344f8a52`);
+- Opus final convergence:
+  `phase-n1prime-c-assumption-opus-xhigh-final-convergence.raw.json`
+  (`70ec980ec20952fd696ead76bfc8bf2b1a3b06cb50afb4b2a5b94c8eb60932b0`).
+
+The Codex-high initial and final convergence votes are retained in the collaboration transcript. The final
+unanimous authorization is exactly the following sequence:
+
+1. **−1′b2a, grammar extraction.** A fresh RED author may inspect the frozen predecessor solely to build a
+   falsification corpus. A different grammar author may inspect it solely to transcribe the existing wire
+   contract into `docs/protocol/canonical-tag-codec-v1.md` and a machine-readable tag/layout/worked-example
+   artifact. Both are permanently barred from authoring either v3 reference or the later TypeScript port.
+   The grammar RED must execute a from-grammar implementation and fail on byte non-reproduction, not file
+   absence. The grammar is authoritative; examples are binding conformance cases but cannot override its
+   production rules. Give this item its own RED, GREEN, Grok, Kimi-100 and final Opus-xhigh gate.
+2. **−1′b2b, D07 binding.** Use separate RED and GREEN authors. Append numbered decision
+   `PH-N1P-D07` coherently to the v3 specification, amendments, registry decision bindings and outward
+   sign-off. Bind at least `codec`; bind `framing` and `endianness` in the same decision unless the RED
+   proves an already-numbered owner. Re-run the unchanged −1′b test as the consistency oracle. Its RED
+   test/fixture, registry schema, signed-variable Quint, −1′a tuple and frozen v2 artifacts remain
+   byte-identical. Refresh only the hashes whose bytes actually change and give b2b its own complete review
+   gate.
+3. **Correct −1′c RED.** A fresh author who wrote neither b2 GREEN and inspected, copied, transcribed or
+   execution-assisted-reconstructed from no predecessor reference, regenerated reference or TypeScript
+   codec must implement the primary byte oracle from the grammar alone. Add grammar provenance and a
+   `readNoImplementationSource` attestation. Execute the frozen v2 codec only as a full-corpus preservation
+   differential against that oracle. Preserve the D.38 suite/schema gates, corrected sequence semantics
+   and accurately scoped semantic anti-copy cases.
+4. **Independent reference, then vector mint.** A new reference author who wrote neither the normative
+   tuple nor RED and inspected no predecessor implementation fixes and hashes the source first. A different
+   vector-minting agent—who authored neither the annex nor RED—then builds real registry-derived vectors
+   without editing that source. The regenerated reference and later TS port retain their own distinct
+   authors.
+
+This correction does not weaken atomicity: −1′a…−1′e still land as one consensus-visible checkpoint. It
+adds two internal reviewed TDD items because an unreviewed prose annex or an unbound D07 would be a false
+repair.
+
+### D.39.3 — Carry-forward gotchas
+
+1. A grammar transcribed from frozen code is not magical source independence. It supplies a reviewable,
+   language-neutral and third-party-implementable contract. Independence comes from two later
+   from-grammar implementations, role separation, truthful provenance and the predecessor-source
+   firewall.
+2. The corrected −1′c RED must assert the preservation differential. A retained but unexecuted v2 import
+   is dead evidence.
+3. The D07 append must use decision `7`, anchor `#decision-v3-07`, matching `normativeSource`, identical
+   `registryPaths` across the decision triple and refreshed outward sign-off hashes. The unchanged −1′b
+   test must be re-executed over the changed artifacts; byte identity alone is not evidence.
+4. D.38's reviews remain valid for their exact historical six-decision bytes. D.39 and the later b2b
+   appendix must carry both old and new hashes instead of silently rewriting that record.
+5. The current blocked −1′c RED is not a license to begin reference authoring. −1′c GREEN remains blocked
+   until b2a and b2b each pass their full review gate and the corrected −1′c RED is accepted.
+
+## Appendix D.40 — Phase −1′b2a canonical grammar extraction
+
+### D.40.1 — Accepted tuple and causal TDD history
+
+Phase −1′b2a is accepted at the following exact tuple:
+
+- RED test `tests/protocol-v3-canonical-grammar-n1prime-b2a.test.ts`:
+  `f2f25dd9ae70971ffe920c0ab653e46b15f090d8b4fe5a6ba4e9157abe4aed89`;
+- RED fixture `tests/fixtures/phase-n1prime-b2a/canonical-grammar-contract.json`:
+  `fd921870b36ddab56987b8bc21cc0ad9599884b43364ba45c10a9e1ba365c0cf`;
+- authoritative grammar `docs/protocol/canonical-tag-codec-v1.md`:
+  `40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036`;
+- machine companion `docs/protocol/canonical-tag-codec-v1.json`:
+  `64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e`.
+
+This was not a one-pass artifact-presence GREEN. The accepted tuple is the third causal re-freeze:
+
+1. the original RED/GREEN exposed missing set and typed-array precedence plus false object encode-limit
+   semantics;
+2. the first final Opus gate rejected a flat varuint precedence table, missing `INTEGER_RANGE` coverage and
+   mutation tests that died at schema equality before reaching the byte interpreter;
+3. the second final Opus gate rejected the predecessor-incompatible `TRUNCATED` result for unavailable
+   declared string payloads and required a winning value-range case, a multi-octet length and actual
+   execution of the pinned golden registry;
+4. each rejection returned to the same isolated RED author first and the same isolated GREEN author only
+   after controls passed and the unchanged GREEN failed narrowly. Preimage archives and reverse patches
+   make both corrections reconstructable.
+
+The final corpus contains 28 positive cases, 28 decode-negative cases, 16 encode-negative cases, four
+encode-limit controls, six explicit precedence probes and all 26 pinned registry-v5 golden vectors.
+The grammar oracle executes 10,490 golden canonical bytes generically through encode and
+decode/re-encode identity in approximately 5–8 ms under a 1,000 ms ceiling. Fifteen byte-affecting
+mutants die through `runGrammarCorpus`; the three genuinely structural mutants are labelled separately
+and die only through structural validation.
+
+### D.40.2 — Normative result and executable evidence
+
+The accepted Markdown is the authoritative language-neutral grammar. The JSON file is its
+machine-readable companion and binds the Markdown digest; worked examples are binding conformance
+examples but cannot override productions.
+
+The final extraction explicitly freezes:
+
+- all fifteen tag octets, recursive payload layouts and zero/count productions;
+- minimal varuint, zig-zag integers, big-endian numerics and typed-array widths;
+- encoded-byte ordering, duplicate rejection, finite/negative-zero rules and resource accounting;
+- pre-terminator `VARUINT_RANGE_OCTETS`, then `VARUINT_NON_MINIMAL`, then post-terminator
+  `VARUINT_RANGE_VALUE`;
+- integer-stage `VARUINT` then `INTEGER_RANGE`;
+- the predecessor's string exception: unavailable declared string payloads are `UTF8_INVALID`, while
+  unavailable declared byte/container payloads are `TRUNCATED`;
+- an unsafe-integral scalar Float64 decode non-decision outside the governed corpus rather than a false
+  round-trip guarantee.
+
+The final GREEN gate passed:
+
+- focused b2a: 4/4, including 26/26 golden vectors;
+- accepted −1′a/−1′b preservation: 16/16;
+- frozen v2 preservation: 12/12, including the real freeze CLI;
+- workspace typecheck: 31/31 projects;
+- workspace lint: 0 errors and 226 inherited warnings;
+- all 26 pinned preservation hashes, Prettier/idempotence, Markdown hash binding, implementation-shortcut
+  scan, whitespace, diff and bounded-scope checks.
+
+The final RED and GREEN ledgers are:
+
+- `.logs/phase-n1prime-b2a-red-opus2-correction-hash-ledger.log`
+  (`af78d994f9a244ca672dc0098034aa1817f6ac9524434b44278d9a128c2415aa`);
+- `.logs/phase-n1prime-b2a-green-opus2-remediation-hash-ledger.log`
+  (`3020e072b9f8106fff78b0321e2aa1f528e029a7eecfa573c15e7d4d4be3085b`).
+
+### D.40.3 — Independent reviews
+
+The accepted tuple passed all three required fresh reviews:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-b2a-rereview2-grok45-high-final.raw.json`
+  (`5d4c61ef74b1fa060bf661187d5c14180b7ad851b4b12db674671ca366a4703a`) —
+  **PASS_WITH_NOTES**;
+- Kimi-100:
+  `.logs/phase-n1prime-b2a-rereview2-kimi100-final.log`
+  (`43acde5d9389c65a3c2ec81534a201e1913088e667bc98522fee5be38b4f7b8a`) —
+  **PASS_WITH_NOTES**;
+- Opus-xhigh:
+  `.logs/phase-n1prime-b2a-rereview2-opus-xhigh-final.raw.json`
+  (`4e926162e7e88a518124029edee600fc80df651a0e6e5bdfe2c463a5631ad009`) —
+  **PASS_WITH_NOTES**.
+
+The final Opus gate did not inherit the earlier passes. It extracted the from-grammar interpreter to a
+read-only scratch harness and found zero divergence over 19,291,032 decode inputs, 232 fixed encode-domain
+cases, 4,000 randomized values, all truncation positions, all nine precedence stages and a fresh
+1,245,206-case compiled-dist versus pinned-source comparison. This is evidence for the accepted governed
+surface, not a claim that exhaustive testing proves the grammar universally.
+
+The two superseded Opus blocks remain material evidence rather than being erased:
+
+- `.logs/phase-n1prime-b2a-review-opus-xhigh-final.raw.json`
+  (`143ddfe8f317e95966214c6c30ee0ef2c692de44aeb67f27993aa048786c7918`);
+- `.logs/phase-n1prime-b2a-rereview-opus-xhigh-final.raw.json`
+  (`f9b7c48af343604669166636bf23c409842845bce6d7f15836060bf6b84bea3f`).
+
+### D.40.4 — Findings, gotchas and carry-forward constraints
+
+1. The JSON structure is strongly equality-pinned, but its prose body is not independent corroboration of
+   the Markdown: the meaningful free leaves are the Markdown digest plus 31 rule statements. D07 must bind
+   the Markdown as authority, with the JSON as a companion and examples subordinate.
+2. Four declared precedence stages remain declarative rather than mutation-probed, but the final Opus
+   review independently verified them against genuine dual-defect predecessor inputs. This is a
+   carry-forward coverage note, not a known false rule.
+3. Item multipliers are predecessor-true but thinly falsified in the committed corpus.
+   `zigzag.maximum` is unreachable because the enclosing varuint maximum prevents an encoded positive
+   result beyond `MAX_SAFE`; later implementations may retain the explicit symmetric check without
+   treating it as a reachable corpus obligation.
+4. A multi-octet length is causally covered; a multi-octet collection count is not. Add that coverage in a
+   later from-grammar/fuzz tier when it improves the oracle rather than lengthening every PR gate.
+5. The extraction differential currently reaches `@ts-drp/canonical` through gitignored compiled `dist`
+   while pinning the source. Final Opus measured 1,245,206 dist/source cases with zero divergence, but
+   corrected −1′c must alias to source, rebuild deterministically or pin the actually executed artifact
+   instead of silently inheriting this provenance gap.
+6. Grammar-side encode negatives bind exact categories; the predecessor-side extraction loop still binds
+   only that an error is thrown. All 16 messages were independently verified, but later preservation
+   differentials should bind the exact predecessor category where the public contract owns one.
+7. Empty bytes `06 00` is derivable from `BYTES_LENGTH` but omitted from the otherwise explicit zero-form
+   enumeration. Empty input and empty typed arrays are likewise thinly covered. These are prose/corpus
+   polish items, not permission to reinterpret their productions.
+8. `conformance.decoderProperty` omits the phrase “in the governed corpus”; the numbered rule and
+   authoritative Markdown retain the qualifier. Do not broaden the guarantee while the unsafe-integral
+   Float64 non-decision remains open.
+9. The accepted b2a authors remain permanently barred from either v3 reference, vector mint, regenerated
+   reference and the later TypeScript port. The predecessor firewall survives the re-freezes.
+10. Phase −1′b2a is accepted but not a checkpoint. The whole −1′a…−1′e freeze remains one unpublished,
+    unmerged atomic consensus-visible landing.
+
+## Appendix D.41 — Phase −1′b2b D07 grammar binding
+
+### D.41.1 — Accepted tuple and harness correction
+
+Phase −1′b2b is accepted at this exact tuple:
+
+- RED test `tests/protocol-v3-codec-grammar-decision-n1prime-b2b.test.ts`:
+  `6f69554debf9caa8f30273324cc223631d70f6d76534be2b0d4e33281ce57b1e`;
+- RED fixture `tests/fixtures/phase-n1prime-b2b/codec-grammar-decision-contract.json`:
+  `51848429253440aa103e8b45d942975f8e029df18a3cc5f25c1df2b4c9da5c16`;
+- registry `packages/protocol-v3/registry/registry-v1.json`:
+  `2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9`;
+- specification `docs/protocol/attested-hard-epochs-v5.md`:
+  `a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8`;
+- amendment log `docs/protocol/amendments-v3.json`:
+  `e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508`;
+- outward sign-off `packages/protocol-v3/formal/registry-model-signoff.json`:
+  `9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749`.
+
+The first RED had a genuine harness contradiction: its illustrative positive control started from the live
+tuple and unconditionally appended D07. A correct GREEN therefore made integration pass while the control
+failed on a duplicate eighth decision and duplicate anchor. The GREEN author stopped, archived the correct
+four-file tuple, restored all four targets to their exact pre-GREEN hashes without git rollback and
+re-established the causal absent-D07 RED.
+
+The same RED author then corrected only the test. The illustrative builder now reconstructs the uniquely
+pinned historical D01–D06 slices and appends exactly one D07; a simulated coherent-live input also rebuilds
+to exactly one D07 on every surface. The fixture remained byte-identical. The corrected control kills the
+original eleven incoherence mutants plus an explicit duplicate-D07 mutant. The historical tuple retains
+three passing controls and one narrow integration failure; the final GREEN passes 4/4.
+
+This correction is reconstructable:
+
+- corrected RED ledger `.logs/phase-n1prime-b2b-red-correction-hash-ledger.log`
+  (`a05d170749c5f6d7f9842c0e4b02e11cbc78bfb55cfd1a3a61c04f3f4e75ed9c`);
+- final GREEN ledger `.logs/phase-n1prime-b2b-green-final-hash-ledger.log`
+  (`f426cc10e7853b8466e9cc6d0d884ba4f5cacfdbdbdd9ddb9be7e20caafd883b`);
+- final GREEN summary `.logs/phase-n1prime-b2b-green-final-summary.log`
+  (`a18d553018071dc835bb404e81f58a403037a0340b3a164e54a32f0630755206`).
+
+The final GREEN is a byte-identical replay of the archived blocked-GREEN tuple. That is legitimate because
+the block was an unsatisfiable test harness, not a content defect; it is not an independent re-derivation.
+
+### D.41.2 — Normative result and executable evidence
+
+Exactly one `PH-N1P-D07`, decision number `7` and anchor `#decision-v3-07` now follow semantically unchanged
+D01–D06 on all three decision surfaces. D01–D06 own none of `codec`, `framing` or `endianness`; D07 binds
+all three with identical `registryPaths` and `normativeSource`.
+
+D07 binds the accepted grammar tuple from D.40:
+
+- authoritative Markdown:
+  `docs/protocol/canonical-tag-codec-v1.md`
+  (`40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036`);
+- machine companion:
+  `docs/protocol/canonical-tag-codec-v1.json`
+  (`64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e`).
+
+The Markdown remains authoritative and worked examples remain subordinate. The amendment and specification
+records equal the frozen D07 contract, the anchor resolves to that exact record, registry values match the
+bound codec/framing/endianness requirements and only the three changed outward artifact hashes were
+refreshed in the sign-off. The schema, signed-variable Quint and non-hash sign-off content were not
+restamped.
+
+The accepted GREEN gate passed:
+
+- b2b 4/4, unchanged −1′b 8/8, b2a 4/4 and −1′a 8/8;
+- frozen v2 12/12 across four files, including the real freeze CLI;
+- workspace typecheck 31/31;
+- workspace lint with 0 errors and 226 inherited warnings;
+- 20/20 protected hashes, Prettier/idempotence, diff and scope checks;
+- a wrong-`normativeSource` mutation killed by binding, cross-surface and stale-sign-off checks, then
+  restored byte-exactly with a final 4/4 rerun.
+
+Coverage-writing Vitest suites must remain sequential: concurrent processes collide in the shared
+`coverage/.tmp` directory. Also avoid assigning to zsh's special `path` array in scope scripts because that
+silently mutates `PATH`; use an artifact-specific variable.
+
+### D.41.3 — Independent reviews
+
+The accepted six-file tuple passed all required reviews:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-b2b-review-grok45-high.raw.json`
+  (`d7d8006456def7cfa5d3acaa523bc66dab4701df42e7ddf50c68293b53c8d8a5`) —
+  **PASS_WITH_NOTES**;
+- Kimi-100:
+  `.logs/phase-n1prime-b2b-review-kimi100.log`
+  (`b7703d93b7c4ea5d919590a2664ef9f818c1d91d4d2f2d0a56cc532d254ec9e5`) —
+  **PASS_WITH_NOTES**;
+- Opus-xhigh:
+  `.logs/phase-n1prime-b2b-review-opus-xhigh.raw.json`
+  (`c777ce802718239d7bdb7e11276bbcc3f946fa63bef8815d81bff0701dae51d1`) —
+  **PASS_WITH_NOTES**.
+
+Opus independently reconstructed the RED correction, verified all 36 cited evidence hashes and re-derived
+45 D07 obligations under both locale and codepoint key ordering with zero failures. This is strong
+adversarial evidence, not a universal proof.
+
+### D.41.4 — Findings, gotchas and corrected-−1′c constraints
+
+1. The frozen blocked −1′c control now fails four of eight `acceptedInputs` assertions because it correctly
+   remained byte-identical while b2b changed the registry, specification, amendments and sign-off. D.39.1's
+   “seven controls passed” describes the historical pre-D07 tree, not the current tree. The fresh corrected
+   −1′c RED must pin the accepted seven-decision hashes and must not inherit those four stale pins.
+2. D07's structured `endianness: "big-endian"` value is broader than the grammar's exact split: fixed-width
+   scalar and typed numeric payloads are big-endian, while minimal varuint uses little-endian seven-bit
+   groups. The specification prose scopes this correctly and the grammar is authoritative. Corrected −1′c
+   must implement the grammar rather than interpreting the registry scalar as applying to varuint.
+3. Only D07 carries `normativeSource` in `decisionBindings`; historical D01–D06 do not, and their absence
+   is frozen by semantic pins. The registry schema also does not constrain `decisionBindings`. This
+   heterogeneity is existing governance debt, not permission for −1′c to infer missing anchors.
+4. `.logs/phase-n1prime-b2b-red-intended-failure.log` is an uncited pre-freeze draft from a third,
+   unrecoverable RED revision with fifteen errors. The authoritative causal chain uses the frozen,
+   restored and corrected focused logs. Never count the draft as RED evidence.
+5. The `staleGrammar` mutant dies on contract equality before reaching the file-resolution branch. Live
+   integration and protected-artifact pins cover resolution; record this as indirect mutation coverage.
+6. The grammar and D04 both own encoded-key-byte ordering and agree today, but no cross-binding prevents a
+   future authorized grammar revision from contradicting D04. Later governance should add that check
+   before any grammar amendment.
+7. The RED's stable canonicalizer uses `localeCompare`; present keys order identically under codepoint
+   comparison, but portable hash-pin tooling should use explicit codepoint order.
+8. The unchanged −1′b test tolerates D07 by design and does not own its semantics. Do not cite its 8/8 as
+   D07 coverage; the b2b test owns that surface.
+9. The blocked −1′c pair remains valuable historical evidence but is not executable acceptance evidence on
+   the current tree. Corrected −1′c requires a fresh RED/fixture rather than editing that pair.
+10. Phase −1′b2b is accepted but is not a checkpoint. The entire −1′a…−1′e successor freeze remains one
+    unpublished, unmerged atomic consensus-visible landing.
+
+## Appendix D.42 — Phase −1′c independent reference and first vector mint
+
+### D.42.1 — Accepted tuple, role chronology and authority hold
+
+Phase −1′c is provisionally accepted at this exact five-file tuple:
+
+- corrected RED test `tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts`:
+  `d1d4751ccdb8db0e8dbd11e7e353727cdd3a6ef3c739a4a6e1680c16bf1a9b12`;
+- corrected RED fixture
+  `tests/fixtures/phase-n1prime-c2/independent-reference-vector-contract.json`:
+  `17e22228adc677f9287ced3610211b21ec926e7647b1179574f2299359ccca62`;
+- fixed original reference `packages/protocol-v3/conformance/original-reference/reference.mjs`:
+  `abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc`;
+- reference provenance `packages/protocol-v3/conformance/original-reference/provenance.json`:
+  `8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3`;
+- first mint `packages/protocol-v3/conformance/vectors/registry-v1.json`:
+  `39b7c4e60fcb550c936be220660c8065b0bccc44ce1c288e0f685ced03b9dfa2`.
+
+“Provisionally accepted” means the tuple establishes the correctness and independence result below, but
+the first vector mint is barred from becoming downstream conformance authority until D.42.5's additive
+exhaustion hardening is RED-proved, separately re-minted and re-reviewed. Neither Phase −1′d nor a later
+TypeScript port may pin the first-mint vector hash.
+
+The corrected RED author wrote neither reference nor vectors and inspected no forbidden predecessor,
+reference or TypeScript implementation source. The reference author then implemented only from the
+accepted normative tuple, fixed the source at `2026-07-28T03:30:16.000Z` and permanently stopped editing it.
+A different vector-minter invoked that fixed reference at `2026-07-28T03:39:26.569Z`. The reference and
+provenance therefore causally precede the vectors and remain frozen through the additive re-mint.
+
+The historical blocked −1′c test/fixture remain byte-identical and are not current acceptance evidence.
+The corrected RED chain is recorded in:
+
+- `.logs/phase-n1prime-c-corrected-red-hash-ledger.log`
+  (`f64a376c161beca75b7799a456b2cfc2fde9759ebfb47268d337c5856f984f95`);
+- `.logs/phase-n1prime-c-corrected-red-firewall-audit.log`
+  (`2fb19b34ffbf0e3553807030ab8fbac805a4f0e59db8af10e14ce6051efc9176`);
+- `.logs/phase-n1prime-c-corrected-red-scope.log`
+  (`b3a8655bca1c36d976a8686fef9130e4ca6d1aca13a8ebdecadf7740912c9df0`).
+
+The reference and vector role ledgers are:
+
+- `.logs/phase-n1prime-c-reference-green-scope-firewall-ledger.log`
+  (`7f61bfb258e00a32836690b33989a781f274f2cea736394b62ceaa9911fd35be`);
+- `.logs/phase-n1prime-c-vector-mint-evidence-ledger.log`
+  (`e1b6a6b0b86b52b9fe16738eea323dddac6b6ac3a119e0e3c8d3a61a7dd969b3`).
+
+### D.42.2 — Implemented result and executable evidence
+
+The corrected RED derives its primary byte oracle from the authoritative D.40 grammar, applies D07's
+fixed-width-big-endian versus varuint-low-seven-bit-first split, executes the complete 26-vector frozen-v2
+corpus through an opaque compiled artifact and requires all outputs to match. It also pins six semantic
+anti-copy discriminators, context exclusion with values retention, exact-received-byte Ed25519
+verification, the registered framing/digest rule and the local sequence boundary.
+
+The fixed reference implements standalone grammar encode/decode, all 19 registered kinds, framing and
+digest construction, replica-local context handling, sequence issuance and exact-wire Ed25519. The first
+mint contains 27 positive vectors covering all 19 kinds and every active enum, all nine required negative
+categories, three issuance cases, context/value cases and an exact-wire signature case.
+
+At the first-mint tuple:
+
+- corrected c2 passed 5/5;
+- accepted −1′a/−1′b/b2a/b2b preservation passed 24/24;
+- frozen v2 preservation passed 12/12, including the real freeze CLI;
+- workspace typecheck passed 31/31 projects;
+- workspace lint passed with 0 errors and 226 inherited warnings;
+- Prettier, whitespace, diff, scope, chronology and firewall gates passed.
+
+### D.42.3 — Independent reviews
+
+The five-file tuple received all required independent reviews:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-c-review-grok45-high.raw.json`
+  (`282758dee0fbb9f20ef262a1d7771cc891bccbb4e7d4dec6a321b09a9436aa44`) —
+  **PASS_WITH_NOTES**;
+- Kimi-100:
+  `.logs/phase-n1prime-c-review-kimi100.log`
+  (`75d4dabdc826a059dbd7076ed4ad83f10680f15f44e1eeebf41d2463fdbdf663`) —
+  **PASS_WITH_NOTES**;
+- Opus-xhigh:
+  `.logs/phase-n1prime-c-review-opus-xhigh.raw.json`
+  (`6547889f5dff2aa202aa5d3fdb3f4584287d54241f3ea1ddc4d1622439d9fb60`) —
+  **PASS_WITH_NOTES**.
+
+Opus independently wrote an encoder from the grammar Markdown without repository imports and reproduced
+all 27 first-mint vectors byte-for-byte. This supplies an additional genuinely independent leg beside the
+opaque-v2 preservation differential; it is not a claim that the RED and original reference are themselves
+independent corroborations.
+
+The additive hardening decision was separately conferred after the Opus finding:
+
+- Codex-high:
+  `.logs/phase-n1prime-c-exhaustion-confer-codex-high.log`
+  (`2cab7bc95415180cb2c2e862d813c87f65a8dd097ea01e8611e072fe80a29a90`) —
+  **AGREE**;
+- Kimi-100:
+  `.logs/phase-n1prime-c-exhaustion-confer-kimi100.log`
+  (`be9207bd7848de7a8ed718c915b75b73f69f0e1604e446067badb19196d184c3`) —
+  **AGREE**;
+- the final Opus-xhigh review above — **AGREE**.
+
+All three classify D.42.5 as bounded mutation-strength/coverage hardening, not a normative plan correction.
+The reference already implements the intended behavior; only the first mint fails to isolate its cause.
+
+### D.42.4 — Findings, gotchas and carry-forward constraints
+
+1. Both first-mint issuance rejections combine multiple failure causes and omit `privateKeyHex`. At that
+   tuple, deleting the full exhaustion gate, either exhaustion branch, the key gate or the next-sequence
+   gate reproduces the same output. D.42.5's replacement mint kills deletion of the full exhaustion gate
+   and `before.exhausted === true` only. Deletion of `current >= MAX_SAFE`, the key-presence gate or the
+   next-sequence gate still survives the five-case corpus and remains explicit carry-forward debt.
+2. The additive isolated case pins `before.exhausted === true`; it must not be advertised as independently
+   pinning the defensive `current >= MAX_SAFE` branch, which is observationally redundant at the valid
+   safe-integer ceiling without exposing an internal reason or trace.
+3. The RED grammar encoder enforces immediate `maxItems` on Array but not Map/Set even though the grammar
+   declares all three. The fixed reference correctly enforces all three and present inputs are six orders
+   of magnitude below the limit, so this is nonblocking here. The later TypeScript codec-port RED must
+   mutation-pin all three rather than trusting this oracle gap.
+4. Registry constraint branches for `charset` and `contiguous` are unverified in both directions.
+   `signerIdCharset` and `maxSignerIdUtf16Units` are declared but enforced by neither first-mint reference
+   nor RED; `overflow`, `reset`, `initial` and `negotiatedAt` are likewise not executable constraints.
+   Resolve their ownership or add explicit tests before claiming the later TypeScript port covers the full
+   registry constraint surface.
+5. The frozen reference decoder is not executed by corrected c2. Its roughly 200 lines are not conformance
+   authority until the later codec-port RED exercises decode-corpus behavior and error precedence.
+6. The RED and original reference share nine error strings and check ordering. This is consistent with the
+   recorded firewall, which barred predecessor implementation source rather than the earlier RED, but the
+   two are re-expressions rather than independent corroboration. Preserve the opaque-v2 and independently
+   re-derived Opus legs when reasoning about confidence.
+7. `validate-cases` always emits `accepted: false`; its exact four-way reason taxonomy is discriminating,
+   but the acceptance field is vacuous for its negative-only input. The opaque helper hydrates only
+   `$bytesHex`, and RED dehydration does not preserve raw scalar negative zero. Both are correct for the
+   governed corpus and must not be generalized beyond it.
+8. JSON cannot faithfully round-trip raw negative zero in the typed-array expected shape. The mint avoids
+   that transport form; the known f32 negative-zero fork vector remains a later codec-port obligation.
+9. Review prompts initially named six stale paths. The live normative equivalents reside under
+   `docs/protocol/`, `packages/protocol-v3/registry/` and `packages/protocol-v3/formal/`; future prompts must
+   use those paths.
+10. The RED's `expectedInvocationCount` control is vacuous because `runFixedReference` assigns
+    `invocationCount: 1`; the unforgeable in-process invocation token is the meaningful anti-hand-fill
+    control. Do not cite these as two independent controls.
+11. Grok CLI review automation must use true headless `-p` mode with planning disabled and an explicit
+    read-only tool allowlist. Interactive positional-prompt mode and headless `--permission-mode plan`
+    pause at action approval rather than completing a repository audit.
+12. Phase −1′c remains unpublished, unmerged and unusable as a governed checker base. Even after D.42.5,
+    the entire −1′a…−1′e successor freeze remains one atomic consensus-visible checkpoint.
+
+### D.42.5 — Required additive exhaustion hardening
+
+Before advancing to Phase −1′d, a fresh Codex-high RED author must create a separate remediation test and
+fixture rather than edit either accepted corrected-c2 file or either historical blocked-c file. The RED
+must require a paired issuance probe at one valid non-boundary sequence:
+
+- with `exhausted: false`, valid next sequence, matching keypair and otherwise unchanged epoch/anchor,
+  issuance succeeds with exactly one digest, sign and publication call;
+- changing only `exhausted` to `true` rejects with unchanged state and zero digest, sign and publication
+  calls.
+
+The RED must fail only because the first mint lacks this isolated case. It may not edit, import around or
+reconstruct expected bytes from an implementation. The fixed reference and provenance hashes above are
+immutable. After the narrow RED is demonstrated, a separate vector-minter must invoke the already-fixed
+reference and re-mint only the vector document; it may not author the RED or hand-fill an expected result.
+The final vector hash, mint chronology and changed pins then receive fresh Grok, Kimi-100 and final
+Opus-xhigh reviews. Only that reviewed replacement mint may become the input to Phase −1′d.
+
+### D.42.6 — Exhaustion hardening closed; replacement mint is authoritative
+
+D.42.5 is closed at this exact five-file tuple:
+
+- corrected RED test `tests/protocol-v3-issuance-exhaustion-n1prime-c.test.ts`:
+  `23c5f1eb8d87f9fa9a758670216430d1bc96b8aaa6b4912a4d53690a1f9ae1b1`;
+- corrected RED fixture
+  `tests/fixtures/phase-n1prime-c-exhaustion/paired-issuance-contract.json`:
+  `793da47de639ba3d40a205aab301e0b8b2a456347ded7b3d7a3c4bf3159dcd77`;
+- unchanged original reference:
+  `abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc`;
+- unchanged provenance:
+  `8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3`;
+- replacement vector document:
+  `8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741`.
+
+The first RED pair was GREEN-unsatisfiable because it placed the artifact that D.42.5 explicitly requires
+re-minting inside an unconditional immutable-hash loop:
+
+- superseded test:
+  `e6da1dc70c1740fce22c7986e4a5af7ccfc5c4cf2c115c170e73b95653085210`;
+- superseded fixture:
+  `1c811bb1fb9494b80b6d5b65edf015eae9dfe84e90d9a1f20c921fe7960b39fc`;
+- executable contradiction:
+  `.logs/phase-n1prime-c-exhaustion-original-green-contradiction.log`
+  (`d5491e87e7dbba5808246cb2344388c5e2747a8c2aafa00ea6d392f03d07800b`).
+
+A reference-derived simulated replacement made integration pass while controls failed only on the stale
+historical hash. The same RED author therefore moved only the vector target into
+`mutableTargets.vectorDocument`, retaining its historical pre-GREEN hash as provenance rather than a
+post-GREEN invariant. All six genuinely immutable historical/c2/reference/provenance pins remain
+unconditional. The corrected harness proves controls pass, current integration has one narrow absent-pair
+RED and a scratch correctly re-minted document passes 2/2:
+
+- correction ledger `.logs/phase-n1prime-c-exhaustion-correction-ledger.log`
+  (`7d1654899c8349eb96be7effe42b430cc00f0f9f2f5fe018afd36287c5c4c4f7`).
+
+A different Codex-high vector-minter invoked the already-fixed reference, added only the paired
+`424242 → 424243` issuance cases and advanced `vectorsMintedAt` from
+`2026-07-28T03:39:26.569Z` to `2026-07-28T04:43:02.000Z`. The non-exhausted request succeeds with exact
+1/1/1 instrumentation and a verifying signature; changing only `before.exhausted` to `true` rejects with
+unchanged state, null payload and exact 0/0/0 instrumentation.
+
+Textually removing exactly the appended pair and restoring only the prior timestamp reproduces first-mint
+hash `39b7c4e60fcb550c936be220660c8065b0bccc44ce1c288e0f685ced03b9dfa2`.
+Parse/reserialize does not reproduce that hash because it changes tabs, key order and Prettier wrapping;
+Kimi's initial preservation caveat was a reconstruction-method artifact, independently resolved by root,
+Grok and Opus.
+
+The GREEN ledger is:
+
+- `.logs/phase-n1prime-c-exhaustion-green-ledger.log`
+  (`60833e664edbe7a2a16e8a798e71209abb929831c674735e8a5f825712c32a7d`).
+
+The replacement tuple passed:
+
+- focused remediation 2/2;
+- corrected c2 5/5;
+- accepted successor/remediation preservation 31/31;
+- frozen v2 plus the real freeze CLI 12/12;
+- workspace typecheck 31/31 projects;
+- workspace lint with 0 errors and 226 inherited warnings;
+- targeted Prettier, whitespace, diff, chronology, scope, firewall and historical-byte reconstruction.
+
+Renaming only the new exhausted case leaves controls green and returns integration alone to RED; exact
+restoration returns 2/2. Independent mutation review establishes the exact boundary:
+
+- deleting the whole exhaustion gate — **killed only by the new pair**;
+- deleting `before.exhausted === true` — **killed only by the new pair**;
+- deleting `current >= MAX_SAFE` — survives;
+- deleting the key-presence gate — survives;
+- deleting the next-sequence gate — survives.
+
+The final tuple received all three required fresh reviews:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-c-exhaustion-review-grok45-high-final3.raw.json`
+  (`5736e415d4cdb49011396e968a8544d0f2627a64a014af0941ad084702fa9b45`) —
+  **PASS_WITH_NOTES**;
+- Kimi-100:
+  `.logs/phase-n1prime-c-exhaustion-review-kimi100.log`
+  (`82351b5a3fd0d5306c6b1ce2d45666be47b1927e930cd3b5e9a6f1a642487b2f`) —
+  **PASS_WITH_NOTES**;
+- Opus-xhigh:
+  `.logs/phase-n1prime-c-exhaustion-review-opus-xhigh-final.raw.json`
+  (`241e202da6dcb5a4a23c5d2d83b5935db3db4d4fee45e0a17320adfb1420027a`) —
+  **PASS_WITH_NOTES**.
+
+Opus re-derived the registered digest with an independently written canonical encoder and framing
+implementation, verified the signature with a library different from the reference, reproduced the exact
+historical text hash and matched 46/46 cited log hashes. Phase −1′c is therefore accepted. The only vector
+hash that Phase −1′d or any later authority may pin is
+`8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741`;
+first mint `39b7c4e6…` remains historical evidence only.
+
+## Appendix D.43 — Phase −1′d regenerated reference acceptance and d2 remediation
+
+### D.43.1 — Initial RED, transport correction and first regenerated tuple
+
+The Phase −1′d RED was authored separately from both reference authors, both vector minters and the later
+TypeScript port. Its final corrected contract is:
+
+- RED test `tests/protocol-v3-independent-regenerated-reference-n1prime-d.test.ts`:
+  `d2026fc81c98c709da7ca0dc94d20cd05b56a5e871b35f6e715aec63920fd407`;
+- input-only fixture
+  `tests/fixtures/phase-n1prime-d/regenerated-reference-contract.json`:
+  `f46c4ee3be04f4b0a53d4180322c1e8f4ad201d280ef4f2c5f0beb0bdfd1ab83`;
+- neutral-contract correction ledger
+  `.logs/phase-n1prime-d-red-contract-correction-ledger.log`:
+  `13575c3fae836f718beb921354a1e10456708aba1b76871926f5850a66a8b6b5`;
+- timeout-only correction ledger
+  `.logs/phase-n1prime-d-red-timeout-correction-ledger.log`:
+  `fd10149c6738abf96377c5671994cad286edb6518935a508e98709c61a350d26`.
+
+The transport correction supplied input-only request envelopes for three operations whose first neutral
+contract named semantics without specifying concrete transport. It changed no normative output. The
+timeout correction changed only the two test-local bounds to 30 seconds after the complete six-operation
+multi-process differential exceeded Vitest's default 10-second timeout.
+
+The regenerated author fixed a standalone normative implementation before executing either opaque peer.
+The first source/provenance freeze was `3dafc35b16cce084dbd6407c56b051b07250c4bce830b3c5765214492a6da50b`
+/ `89a6361607f168747a9927cb61033696e335f3d0938707ab2e2aa42a0ebd03ae`.
+The neutral fixture's missing transport detail then caused a recorded 13-freeze adapter chain. Blind
+adapter tuning stopped after the seventh validation-envelope correction; the RED author supplied the
+missing input-only shapes before later differentials continued. This is a process gotcha, not a model for
+future reference generation: a neutral contract must fully specify input transport before the independent
+implementation is frozen.
+
+The first final Phase −1′d tuple was:
+
+- regenerated source:
+  `a81a0248032494b3abfb13f5201201ffd8d4b7577a1275b08ad682c110017580`;
+- regenerated provenance:
+  `7172f6dcb35280c666dcee0c0e58d00af9f7a73e99b75c4a4411b8f885affa77`;
+- comprehensive ledger
+  `.logs/phase-n1prime-d-regenerated-reference-final-ledger.log`:
+  `38fe9b5d70c4d432451524bc3ac2c5298ef682d675175543ac30039790bc9333`.
+
+It passed Phase −1′d 2/2, accepted successors 31/31, exact frozen v2 21/21 including the real freeze CLI,
+workspace typecheck 31/31, lint with zero errors, formatting, scope, firewall and a causal mutation proof.
+
+### D.43.2 — Initial reviews correctly BLOCK; d2 returns to RED
+
+The first tuple received:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-d-review-grok45-high.raw.json`
+  (`60b213b62af626376c8437f23abafbfb2e78ddee4aad8ec1d5ab2f97fb9a925b`) —
+  **PASS_WITH_NOTES**;
+- Kimi-100:
+  `.logs/phase-n1prime-d-review-kimi100.log`
+  (`4efc9256c22a9c56de9b66de0837a593709c7d71f4191edc7c3083a2b56339c1`) —
+  **PASS_WITH_NOTES**;
+- final Opus-xhigh:
+  `.logs/phase-n1prime-d-review-opus-xhigh.raw.json`
+  (`b3c3f5a3d8e1b67af1104c190f26c3ed9c672ec4678c276c30219ccea272e1f0`) —
+  **BLOCK**.
+
+Opus reproduced five material defects: verification decoded and re-encoded before Ed25519, which rejected
+validly signed noncanonical received bytes; the flipped-byte control was therefore vacuous; issuance
+ignored the declared public key and accepted a mismatched keypair; uppercase public-key transport was
+accepted; and own enumerable `__proto__` forked the grammar encoding. It also rejected the ledger's
+claims of exact-received Ed25519 and sustainable author-lineage issuance. The wrong-sequence overwrite was
+an explicit Phase d nonclaim, but Opus required the remediation RED to retire it rather than preserve it.
+
+This changed the plan's next action only after Opus-xhigh, Kimi and Codex-high independently agreed that
+silent repair, key substitution and canonical-gated verification were unacceptable. The predecessor
+`a81a0248…` / `7172f6dc…` tuple remained frozen until a different Codex-high RED author produced:
+
+- d2 RED test:
+  `04c7cbb6f2ccafd58d96cb5b3fd09a77e1ebab83abd2da13a9f92f7e4fffeb3e`;
+- d2 input-only fixture:
+  `ee9d160ccdb646f558ceebaf1aaf0a88296c66332d502f383aa1fdec5b28ee20`;
+- d2 RED ledger `.logs/phase-n1prime-d2-red-ledger.log`:
+  `277f2e38ab4bb8ba04c32dda512403828580956cf8403fcd78d938f90e7d871d`.
+
+Controls passed while the predecessor produced exactly seven causal divergences: wrong sequence,
+mismatched keypair, uppercase public key, validly signed noncanonical bytes, correctly re-signed flipped
+bytes, own `__proto__` encoding and uppercase canonical-hex decode. Missing private key, stale flipped
+signature and unpaired surrogate were positive preservation controls, not falsely claimed new kills.
+
+### D.43.3 — Third-agent GREEN and RED-owned target correction
+
+A third independent Codex-high remediation author, barred from the original reference, predecessor/TS
+implementation, vector output and later TypeScript port, re-derived the affected operations before any d2
+differential. The single remediation freeze produced:
+
+- regenerated source:
+  `0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a`;
+- regenerated provenance:
+  `1ea3a9e0da6d6df667101e7e8c5e208b6eca45da6954cbfaf9da1cef6e50eae4`;
+- comprehensive ledger
+  `.logs/phase-n1prime-d2-remediation-comprehensive-ledger.log`:
+  `98f5606af3c61e59777e8245c2d3c01b78cb6ec5716e182dc70e3e6291215aea`.
+
+The behavioral integration was green on the first post-freeze differential. The control test alone then
+failed because the d2 fixture had classified the two files whose remediation it required as unconditional
+immutables pinned to their predecessor hashes. The GREEN author did not edit the RED or overclaim 2/2.
+The original RED author moved only regenerated source/provenance into `remediationTargets`, retained their
+old hashes as `preRemediationSha256` historical baselines and changed the single source-path lookup:
+
+- corrected d2 test:
+  `c07b64dfaa6e5f40095773f5e81c8847c2a736af5a8c365937db80ef3a77926f`;
+- corrected d2 fixture:
+  `54c4193a03ee2d2b792d340e0128dd5de4721c7d25f69f4cffb640e86b94261f`;
+- correction ledger
+  `.logs/phase-n1prime-d2-target-classification-correction-ledger.log`:
+  `a89a61d364c20d95b0e6cde1970fdfe3e2f397d17e5aeca788ef9e828689cd10`;
+- governed-rerun evidence
+  `.logs/phase-n1prime-d2-target-classification-correction-evidence.log`:
+  `d3e128334286c513fade4e181461d4e38cf08aea9e33867e90f99a138e4d53b3`.
+
+Final Opus-xhigh reconstructed both superseded artifacts using only those claimed structural changes and
+matched their original SHA-256 hashes exactly. Therefore no probe, expected outcome, comparator, mutant,
+runtime bound, attestation or true immutable pin changed by one byte. The correction was necessary,
+GREEN-satisfiable and structurally identical to the accepted D.42.6 mutable-target correction; it is not
+reward hacking.
+
+### D.43.4 — Final gates and independent quorum
+
+The corrected tuple passed:
+
+- d2 controls and integration 2/2;
+- Phase −1′d full six-operation differential 2/2;
+- accepted successor preservation 31/31;
+- exact frozen v2 preservation 21/21, including the real freeze CLI;
+- workspace typecheck 31/31 projects;
+- workspace lint with 0 errors and 226 inherited warnings;
+- targeted ESLint, Prettier, whitespace, scope, chronology and firewall checks;
+- a causal key-binding mutant: deleting only derived-public-key equality made only the mismatched-keypair
+  case RED while Phase d remained 2/2; exact restoration returned the final hashes and d2 2/2.
+
+The final exact tuple received:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-d2-review-grok45-high.raw.json`
+  (`53cd6c79da9aae2200768d66264d8f2266db40c4527a5c262267dc43a7fa2d1e`) —
+  **PASS_WITH_NOTES**;
+- Kimi 3, explicitly invoked as `kimi-code/k3` with
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100`:
+  `.logs/phase-n1prime-d2-review-kimi3-100.log`
+  (`b66203eae99842f2ff94e57dbd038ed1963b06c073c56e6f6eb82d94783e2ce3`) —
+  **PASS_WITH_NOTES**;
+- final Opus-xhigh:
+  `.logs/phase-n1prime-d2-final-opus-xhigh.raw.json`
+  (`8b61eba09062d7a25f64435f12432ec63666a8505f1a76ddcc87e71c97183740`) —
+  **PASS_WITH_NOTES**.
+
+Grok, Kimi 3 and Opus independently executed hostile probes beyond the frozen cases. Final Opus
+re-executed every governed suite, authenticated all 22 cited evidence hashes and reconstructed both
+pre-correction RED preimages exactly. All Kimi reviews from this point forward must use the explicit
+`-m kimi-code/k3` model alias; a default-model assumption is not sufficient audit evidence.
+
+### D.43.5 — Findings, gotchas and carry-forward ownership
+
+1. The Phase d multi-process test has a host-dependent 30-second margin: observed semantic runs range from
+   roughly 15 to 34 seconds, and Grok flaked near 29.9 seconds while the underlying differential passed.
+   Harness hygiene before or during −1′e owns optimization or a documented timeout-only correction. Never
+   weaken, sample or remove the differential.
+2. The defensive `current >= MAX_SAFE` branch remains an explicit nonclaim. Later issuance-mutation /
+   TypeScript-port RED owns an independently observable discriminator.
+3. JSON cannot express sparse arrays, non-plain objects, accessors or symbol keys. The in-process
+   TypeScript codec-port RED owns those direct-JS shapes.
+4. Two negative d2 probes accept any non-zero peer exit rather than pinning an error category. The
+   TypeScript codec-port RED owns precise in-process error taxonomy.
+5. Phase d's private-key-presence and next-sequence nonclaim strings remain immutable historical
+   descriptions of that corpus. d2, not a rewrite of Phase d, now pins those behaviors on the regenerated
+   peer.
+6. The d2 RED intentionally does not self-pin the remediation target's current bytes. Phase −1′e freeze
+   governance must make the live source/provenance hashes permanent and mutation-test that protection.
+7. The d2 oracle uses `localeCompare` for a `sortRule: "codepoint"` helper. The governed vertex dependency
+   case has one element, so no current divergence is possible; the TypeScript-port RED must use the
+   grammar's encoded-byte/codepoint rule directly and cover multi-element ordering.
+8. The d2 oracle's internal `fromHex` accepts uppercase but consumes only trusted lowercase fixture
+   inputs. Peer transport is strict. Later harness hardening/TypeScript-port RED owns a strict helper.
+9. Exact 0/0/0 instrumentation is peer-reported but structurally corroborated by guard ordering before
+   digest, sign and publication. The TypeScript port must use externally observable call spies.
+10. Agent identity and source-firewall claims remain attestation plus structural absence of leakage, not
+    cryptographic proof. Preserve strict role separation and permanent TS-port bars.
+11. A neutral reference contract that omits concrete request envelopes causes expensive, low-information
+    adapter churn. Future cross-implementation REDs must freeze complete input transport before either
+    implementation is executed.
+12. Phase −1′d and d2 remain unpublished and unmerged. The complete −1′a…−1′e successor freeze is still one
+    atomic consensus-visible checkpoint.
+
+### D.43.6 — Acceptance
+
+Phase −1′d is accepted at the exact corrected RED/fixture and regenerated source/provenance hashes in
+D.43.3. The remediation rejects wrong sequence and mismatched identity before work, enforces lowercase
+neutral hex, verifies exact received bytes with Ed25519, preserves own `__proto__` as inert data and
+retains every earlier six-operation behavior. No original Opus blocker remains.
+
+Phase −1′e may begin. It alone may convert the unpublished −1′a…−1′d tuple into a permanently closed,
+atomic protocol-v3 freeze. No earlier internal snapshot is a base, release or merge checkpoint.
+
 ## Next Agent Prompt
 
-Checkpoint this documentation-only correction without the two stale untracked v2 RED files. Then begin
-**Phase −1′a** with a fresh Codex-high RED agent. Each −1′ internal item still receives its own RED, GREEN,
-Grok, Kimi-100 and final Opus-xhigh review, but −1′a…−1′e form one atomic consensus-visible freeze
-checkpoint. Exclude `.agents/`, `.claude/`, `.logs/`, `.pnpm-store/` and `skills-lock.json` from every
-checkpoint.
+Begin **Phase −1′e RED** with a fresh Codex-high author who did not author either reference, either d/d2
+RED, either vector mint, the d2 remediation or the future TypeScript port. The RED may add only a new
+artifact-level governance test, input-only fixture and bounded `.logs`; it must preserve the complete
+accepted −1′a…−1′d tuple and every frozen-v2 artifact byte-identically.
 
-The −1′a RED must fail on the explicit absence of a v3 action/invariant model and mechanically derived
-signed-field set—not on an import, package scaffold or infrastructure error. Model local issuance,
-admission, equivocation observation and detection before choosing registry bytes. Pin the distinction
-between contiguous successful local issuance for one durable author lineage and remote arrival gaps,
-which never become an admission rejection rule.
+The RED must fail narrowly on absent v3 locks and governance, not on missing source data. Its coherent
+scratch control must satisfy the complete proposed closure. Mutation controls must prove failure for:
 
-Do not create `packages/protocol-v3` production code, registry bytes, vectors, references, locks or
-governance in −1′a RED. Do not touch any frozen v2 protected artifact. The atomic freeze must later select
-the exact v3 suite identifiers, preserve the registered received-byte wire rule, use genuinely independent
-original and regenerated reference authors, and start a protocol-local registry v1 lineage. 0g(ii-T) and
-0g(ii-I) remain post-freeze TDD slices; Phase 2l, Phase 3a and Phase 0o retain the durability, live-binding
-and remote-policy boundaries recorded above.
+- any registry/schema/specification/amendment/formal/grammar or vector byte drift;
+- either original-reference source/provenance or regenerated-reference source/provenance drift;
+- incomplete reference trees, incomplete locks, file-set mismatch or source-hash mismatch;
+- missing, stale or extra provenance bindings between registry v1, authoritative vector, both reference
+  pairs and their locks;
+- any post-freeze registry version bump or second bootstrap attempt;
+- weakening/removing policy protections, replacing the checker with a self-grading head checker, or
+  changing the checker and its pin in the same proposal;
+- a v3 workflow that is conditional, non-PR-blocking, write-capable, retarget-insensitive, fails to execute
+  the base checker first, or can pass while the unchanged v2 checker fails;
+- `.github/CODEOWNERS` or `docs/CODEOWNERS` appearing, v3 ownership using a different cohort, v3 rules
+  appended after rather than inserted before the exact terminal v2 block, or any byte/order drift in that
+  v2 terminal block;
+- any partial −1′a…−1′e combination being treated as authoritative or checkpoint-ready.
+
+The GREEN author must be a different Codex-high agent. Expected artifact names are separate v3 surfaces,
+not edits of v2:
+
+- `packages/protocol-v3/conformance/reference.lock.json`;
+- `packages/protocol-v3/conformance/reference-regen.lock.json`;
+- `packages/protocol-v3/conformance/freeze-policy-v3.json`;
+- `packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs`;
+- `.github/workflows/protocol-v3-registry.yml`;
+- a v3 CODEOWNERS block inserted above the checker-protected terminal v2 block.
+
+The v3 checker must retarget the fail-closed single-use bootstrap to `(protocolMajor = 3,
+registryVersion = 1, registry-v1.json)` while preserving the v2 checker's trust boundary. The v2 checker,
+policy, workflow, locks, registry, vectors and both v2 references remain byte-identical and independently
+required. A separate v3 status cannot compensate for a failing v2 status. External branch-protection and
+required-status configuration remain an operational release prerequisite; repository tests must state
+that boundary honestly rather than claim to prove host settings.
+
+Use a separate Codex-high RED and GREEN, then Grok 4.5/high, Kimi 3 explicitly invoked with
+`-m kimi-code/k3` and `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and final Opus-xhigh adversarial review.
+Run focused RED/GREEN, exact accepted successor and frozen-v2 preservation, workspace typecheck and lint
+to bounded `.logs`; keep coverage-writing Vitest commands sequential. Address the Phase d timeout only
+through an isolated, documented harness correction that leaves all cases and assertions unchanged.
+
+Exclude `.agents/`, `.claude/`, `.logs/`, `.pnpm-store/`, `skills-lock.json` and the two stale v2 `0g2`
+RED files from the atomic checkpoint. Never use `git add -A`. Do not checkpoint, publish or merge until
+all Phase −1′e gates and reviews pass; then and only then may −1′a…−1′e land as the one protocol-v3
+consensus-visible freeze checkpoint.
+
+## Appendix D.44 — Phase −1′e governance candidate, e2 correction and atomic-landing blocker
+
+### D.44.1 — Initial RED/GREEN and exact candidate
+
+The separate Phase −1′e RED first froze:
+
+- `tests/protocol-v3-freeze-governance-n1prime-e.test.ts` at
+  `8f73ede7e72d3ae29853691b545935420b8a2bca323b1325b628d9812e0a7e69`;
+- `tests/fixtures/phase-n1prime-e/freeze-governance-contract.json` at
+  `3db15fcce4526dcff96e0159a411832ca1811dc70c081ae26a1dc4e0d5e25cdc`.
+
+Its pure control passed, its live integration failed only because the six governance targets were absent,
+48/48 causal mutations were killed, 58/58 accepted successor/frozen-v2 pins held and the unchanged v2
+checker executed in a bounded scratch repository. A separate Codex-high GREEN then created:
+
+- `reference.lock.json` at `596bd935f060a3fdcbd9fe2e2c5cb12f18897c5f13ed01cd5de35b35dd9e0664`;
+- `reference-regen.lock.json` at
+  `c4d5d54b08f1c4c45395c8250b4e84f582a0924fb964c53f188fedb0b05b0292`;
+- `freeze-policy-v3.json` initially at
+  `267208a6658e0f328bca352510c7d10a2f710756cb729df9c2a359031a0f6914`;
+- `check-protocol-v3-freeze.mjs` initially at
+  `34c667c4bbc45cb7fc4c129c9e4fad3c6692c881db8df8e2d649a9063802849d`;
+- `.github/workflows/protocol-v3-registry.yml` at
+  `402771a64e810ebc3186f84aa719e1d14d107cb3ed7a77a4fdb6b42128c22a58`;
+- the exact root `CODEOWNERS` insertion at
+  `4fcd586a5a0cb1501df2bbf7b8e2882be98903b085e9735e5cbe1e8ae7fc8f15`.
+
+The locks cover exactly the two files in each reference tree and bind both implementations to the frozen
+registry, vector and provenance tuple. The workflow is read-only, unconditional, retarget-sensitive and
+runs the unchanged base v2 checker before either a base v3 checker or the one-time head bootstrap. The
+root ownership block uses the frozen v2 cohort, appears immediately before the exact terminal v2 entries,
+and rejects either higher-precedence CODEOWNERS location.
+
+### D.44.2 — Root audit finds a real policy-persistence escape; e2 returns to RED
+
+Before external review, the root audit found that production `validatePolicy` required
+`minimumPolicyPaths`, while the already-defined `completePolicyPaths` additionally contained the v3
+workflow and root `CODEOWNERS`. Independent real-Git reproduction proved both halves of the escape:
+
+1. a bootstrap policy omitting either path passed; and
+2. a later comment-only byte change to the omitted workflow or `CODEOWNERS` also passed under the
+   merge-base checker.
+
+Semantic removal of required workflow/CODEOWNERS structure still rejected, so this was a byte-freeze
+escape rather than an arbitrary semantic bypass. That distinction did not make it acceptable.
+
+A separate e2 RED froze
+`tests/protocol-v3-freeze-governance-n1prime-e2.test.ts` at
+`7ecb2c2a64b02e79dc5b0cefaa8e3ee60d1ca4cad02d2202f7d03500dae77014`.
+Its complete-policy control passed while the live evaluator failed with exactly four accepted escapes:
+workflow omission, later workflow drift, root `CODEOWNERS` omission and later `CODEOWNERS` drift. The
+e2 RED ledger is
+`4384b39b713878972c390387bd92a6f3ae071a776d9fbe0cf1175495669f43eb`.
+
+The honest production correction exposed the same stale assumption in the original e scratch control.
+The RED owner added exactly `workflowPath` and `codeownersPath` to its `requiredPolicyPaths`, superseding
+the original test hash with
+`62b78923c533704f255e6a5cac180ffdaa5c8506a90081ad7bd81bba6e83285c`.
+The input fixture remained byte-identical. This strengthened the control; the separate e2 live-evaluator
+case remained the causal RED. Its correction ledger is
+`726a7a2082928b3a77273e5be38fc2b0012be8b85a0d750b33110ed51167324c`.
+
+The separate GREEN changed production policy validation to require `completePolicyPaths` and refreshed
+only the checker pin. The corrected candidate is:
+
+- checker `19cbc00020b83244b9c4170f6686f3454dceb8f7787c987a8c33952499814ae6`;
+- policy `20fcc96009aede492e48ba478a01934ba105e50b89d4676dda7c14d0b2f1fd97`.
+
+Focused e/e2 passed 4/4; accepted successor/remediation passed 35/35; the exact frozen-v2 baseline passed
+16/16 plus regenerated-reference 7/7; typecheck passed 31/31; lint reported zero errors and the inherited
+226 warnings. The real-Git matrix now rejects both incomplete policies and both later byte drifts while
+accepting a complete bootstrap and unchanged post-freeze state. The matrix ledger is
+`9f02f777e8b847f51b21f49d573718166a57685dac77049326b9f0dbb115c01c`.
+
+### D.44.3 — Independent reviews and incorrect-assumption quorum
+
+Grok 4.5/high authenticated the candidate, reran 4/4 focused tests and a hostile real-Git matrix, and
+returned `PASS_WITH_NOTES`. Its raw review is
+`6cec55120133523add3896f62c20cc24eb558bf298a22947624975fe9f45a589`.
+It did not identify the landing contradiction below; silence is not concurrence.
+
+Kimi 3 was invoked explicitly as `kimi-code/k3` with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`. It authenticated all targets, reran 4/4 focused tests, executed 14
+in-memory hostile probes and nine isolated real-Git scenarios, and returned `PASS_WITH_NOTES`. It
+independently proved that a one-shot full-tuple landing on the real pre-v3 base rejects because the base
+registry is absent. Its report is
+`b95908016801a33803b861e3ed445e14c9638a0d79e36a7fadc21ca74a050b22`.
+
+A separate Codex-high adjudication classified that same fact as a blocker. Final Opus-xhigh independently
+reproduced it, authenticated every target, reran 4/4 and returned `BLOCK`. Its raw review is
+`116cc58b040dae8ee121e608d3269f8bbe2d9fa1f6dd840030e0f24e2ed37b19`.
+
+Opus, Codex-high and Kimi 3 therefore agree on the incorrect factual assumption: the current workflow and
+checker cannot bootstrap the complete a…e tuple from the actual pre-v3 base. They differ only on
+severity. This satisfies the user-required quorum for correcting the assumption in this document. It
+does not authorize weakening the atomicity rule.
+
+### D.44.4 — Blocking atomic-landing contradiction
+
+The plan requires all −1′a…−1′e artifacts to remain unpublished and unmerged, prohibits registry,
+vector, reference, lock or activated governance reaching the base early, and requires one atomic
+consensus-visible landing. The candidate requires the exact opposite base:
+
+- the workflow bootstrap guard requires the registry, both references and vectors already on
+  `pull_request.base.sha`;
+- checker snapshot construction rejects a base without registry v1;
+- `validateBootstrapBase` calls `validateTuple`, requiring every accepted a–d immutable input on base
+  while governance is absent.
+
+Current `HEAD` `e7d255c3609ff147e86a59e94dc926a8eb2db59c` contains none of those v3 prerequisites. The real
+checker therefore exits with `registry-v1.json is malformed`; the root probe is
+`fc419078da2dc038d0a13293431de3b60bcbbad187aa5b22080ecf7d2a5689fb`.
+Multiple commits inside one PR do not help because both `BASE_SHA` and the merge-base remain the target
+branch's pre-v3 commit.
+
+A content-first PR followed by governance, a temporary target branch, a direct/check bypass or a
+prepublished partial tuple is not a fix. Each violates the explicit atomicity rule. Later fail-closed
+detection protects integrity but cannot retroactively make the intermediate publication atomic. Calling
+this a documentation-only two-step sequence would redefine the acceptance criterion after observing the
+implementation.
+
+The synthetic e/e2 positive controls encode the same wrong world by placing all immutable a–d inputs on
+their governance-free base. Their green result is valid for the candidate's internal mechanics but not
+for the only permitted landing state.
+
+### D.44.5 — Findings and carry-forward decisions
+
+1. Phase −1′e/e2 is **blocked and not accepted**. No checkpoint, publication or merge is permitted.
+2. Preserve the plan. Phase e3 must make the only permitted one-shot a…e landing executable from the
+   exact frozen-v2/no-v3 base and must reject the formerly accepted content-prelanded base.
+3. The hardcoded CLI `v2StatusPassed: true` is acceptable only because the byte-frozen workflow executes
+   the unchanged base v2 checker first and external branch protection must require both statuses.
+4. Bootstrap `protectedPaths` currently permits arbitrary extra patterns. Because policy becomes
+   immutable, e3 must bound the set/shape and prove an extra v2 or unrelated path cannot permanently
+   over-freeze the repository.
+5. The e/e2 tests and Phase e fixture are not currently frozen although earlier phase tests/fixtures are.
+   This does not weaken the base-pinned checker, but e3 must make and test the final auditability decision
+   before the first irreversible bootstrap.
+6. Invalid or unrelated base references expose a raw `git merge-base` failure but still reject. This is
+   optional local-CLI error hygiene, not an authoritative-CI bypass.
+7. Symlink, index and dirty-worktree differences fail closed in authoritative clean CI.
+8. Locks, provenance bindings, checker pin, workflow ordering, CODEOWNERS precedence, single-use closure,
+   retarget behavior and the e2 correction are otherwise sound.
+
+## Next Agent Prompt
+
+Begin **Phase −1′e3 RED** with a fresh Codex-high author who did not own the e/e2 REDs, either reference
+or vector mint, or the future TypeScript port. The RED may add one bounded real-Git governance test,
+input-only fixture if necessary and `.logs`; it must not edit production, the existing REDs, accepted
+successor inputs, frozen v2, this plan, manifests or Git metadata.
+
+The e3 RED must freeze these cases:
+
+1. A one-shot complete a…e landing on the exact frozen-v2/no-v3 base passes. Today the real checker
+   rejects because the base registry is absent; this is the causal RED and must exercise the real CLI.
+2. On that base, the workflow reaches the guarded head-checker bootstrap rather than its fail-closed
+   `else`.
+3. The formerly accepted content-prelanded base—all immutable a–d inputs present with governance
+   absent—rejects as plan-violating.
+4. Any partial v3 base rejects: at minimum registry-only, either reference-only, vectors-only, one formal
+   file, one v3 specification/amendment/grammar file, one a–d test, one a–d fixture, either lock, policy,
+   checker or workflow.
+5. Current state missing any immutable input or any governance target rejects.
+6. Unchanged post-freeze passes; all 48 existing e mutations, e2's four escapes, checker+pin replacement,
+   workflow/CODEOWNERS drift, second bootstrap, exact CODEOWNERS placement and all 58 pins remain covered.
+7. Any bootstrap policy path outside the declared v3 governed surface rejects; specifically prove
+   `packages/protocol-v2/**` cannot be added as an irreversible over-freeze.
+8. Decide and assert whether the e/e2/e3 tests and Phase e/e3 fixtures join immutable/protected paths.
+   Prefer freezing the final governance evidence unless a concrete circularity or maintenance cost
+   outweighs the auditability precedent.
+
+Before GREEN, the original e RED owner must issue a bounded control correction. The existing e oracle
+duplicates both the old workflow runner and the now-forbidden content-prelanded `coherentBase`; a correct
+production fix would otherwise make its positive control fail for the wrong reason. Supersede only those
+test-side assumptions with the e3 RED's exact frozen-v2/no-v3 base and inverted workflow guards, preserve
+the e2/e3 causal failures and record old/new hashes in a correction ledger. The e3 RED author and GREEN
+author must not make this correction.
+
+The separate GREEN author may change only:
+
+- `packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs`;
+- `.github/workflows/protocol-v3-registry.yml`;
+- `packages/protocol-v3/conformance/freeze-policy-v3.json`;
+
+For base snapshot construction only, an entirely absent v3 surface may become an explicit `preV3`
+snapshot. A present-but-malformed registry still rejects. The bootstrap-base validator must require that
+no v3 path of any kind exists, retain exact historical root `CODEOWNERS`, reject alternates, require the
+unchanged v2 status and reject every partial v3 base. Current `validateCompleteClosure` remains strict.
+Invert the workflow bootstrap guard to require the full v3 surface absent on base. Bound policy
+`protectedPaths`, refresh the checker pin and implement the RED-owned evidence-freeze decision.
+
+Keep real-Git cases in one reused scratch repository; normal CI remains the dependency-free git+node
+checker and must not gain long-running tests. Run focused e/e2/e3, accepted successor 35/35, frozen-v2
+16/16 plus regenerated-reference 7/7, workspace typecheck 31/31 and lint to bounded `.logs`. Then use
+Grok 4.5/high, Kimi 3 explicitly as `kimi-code/k3` with the 100-step cap, and final Opus-xhigh. Never
+`git add -A`; do not checkpoint, publish or merge until every e3 gate and review passes.
+
+## Appendix D.45 — Phase −1′e3 atomic-bootstrap remediation
+
+### D.45.1 — Corrected RED controls and exact frozen inputs
+
+The separate Phase −1′e3 RED added
+`tests/protocol-v3-freeze-governance-n1prime-e3.test.ts`. Its final pre-review GREEN input was
+`d0d979f5e8db3d1eec4c07e7de8c9cb5f6c101d01c4742a1be427d5bec84be91`. One reused scratch repository
+proved the exact frozen-v2/no-v3 base, the complete one-shot current closure, 14 named partial-v3 bases,
+the formerly accepted content-prelanded base, exact protected-path bounds, governance-evidence presence
+and the unchanged post-freeze state.
+
+Before GREEN, the original e/e2 RED owner corrected only stale test-side assumptions. The accepted
+evidence inputs are:
+
+- e test `e76590b8e8682d81c030cdffe567ed1901733ce7f18d3371137353637e027f50`;
+- e2 test `77a3aa224066cf40690350b286ea1c65cd8e0355436cb75e7e63cfd641f1ff61`;
+- e3 pre-review test
+  `d0d979f5e8db3d1eec4c07e7de8c9cb5f6c101d01c4742a1be427d5bec84be91`; and
+- Phase e fixture `40141351cd58e3c99520f37105108dd4b37e91ac6f40628329f6c15746e4f3f3`.
+
+The e/e2 coherent and live closure maps now include the four governance-evidence hashes, while their
+pre-v3 bases remain genuinely free of all v3 and evidence content. The e test models the exact historical
+root `CODEOWNERS`, the inverted workflow guard and required e2/e3 slices. The e2 omission/drift control
+uses a no-op delegate so its pure control remains independent of live production behavior.
+
+### D.45.2 — GREEN and atomic landing semantics
+
+The separate Codex-high GREEN changed only the authorized checker, policy and workflow. The accepted
+candidate is:
+
+- `packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs`
+  `fd33c961a3e6c3c3dd821dfb708f009b824329ae2ab208d50c3200763f03557f`;
+- `packages/protocol-v3/conformance/freeze-policy-v3.json`
+  `89040e627de6180ccce185a187419dc11c51e74f46b8881d2358080f93560e50`; and
+- `.github/workflows/protocol-v3-registry.yml`
+  `72aceb0841aa329763c648b9f633ac26593429ba2080ce2a7ca6ae155035ffd3`.
+
+The policy pin equals the checker hash. An entirely absent v3 surface becomes an explicit pre-v3
+snapshot only when the base has the exact historical root `CODEOWNERS`, no alternate CODEOWNERS, an
+unchanged successful v2 prerequisite and no v3-namespaced path. The first current state must already be
+the complete closure. Any partial or content-prelanded base rejects. After bootstrap, the base-pinned
+checker and exact policy govern as before.
+
+`protectedPaths` must deep-equal the declared bounded surface. It cannot gain
+`packages/protocol-v2/**`, an unrelated path or any other irreversible over-freeze. The e/e2/e3 tests and
+Phase e fixture are protected governance evidence but are not immutable normative inputs; every evidence
+file must nevertheless be present before closure and cannot later drift or disappear.
+
+The workflow runs the unchanged base v2 checker first. It then runs base v3 checker bytes when present,
+or the head checker exactly once only when all v3 sentinels are absent on the base. Any other base fails
+closed. The hardcoded snapshot `v2StatusPassed: true` remains sound only on this frozen workflow path and
+with both statuses required by host branch protection; a standalone v3 CLI invocation does not prove v2
+status.
+
+### D.45.3 — GREEN gates and harness gotcha
+
+The final implementation ledger is
+`47efbc4e450ec011fdad00d90a0e2128e586588988ce57996e56317d806d02b9`. Before external review:
+
+- focused e/e2/e3 passed 20/20;
+- accepted successor/remediation passed 35/35;
+- frozen v2 passed 16/16 plus regenerated-reference 7/7;
+- workspace typecheck passed 31/31;
+- lint reported zero errors and the inherited 226 warnings;
+- targeted ESLint, Prettier, JSON, `git diff --check`, static pin/surface/runner checks and the
+  role-dispatch ban passed; and
+- the isolated real-Git e3 matrix passed 16/16
+  (`16100c143314071944f80f6801de862088feab0f2a27e28547a691c51665dc09`).
+
+Two ordinary local v2 regenerated-reference runs failed in the test harness with `spawnSync git ENOBUFS`.
+The declared out-of-scope `.pnpm-store/` contributed 47,294 untracked paths and roughly 7.1 MB of
+`git ls-files` output to the frozen v2 checker's default child-process buffer. A per-process
+`core.excludesFile` containing only declared out-of-scope artifacts made the exact unchanged gate pass
+7/7. No source, test, checker, Git metadata or persistent Git configuration changed. Clean CI is
+unaffected; dirty local invocations fail closed, and the gotcha remains recorded rather than hidden.
+
+### D.45.4 — Grok and Kimi 3 review findings
+
+Grok 4.5/high ran read-only at high reasoning, authenticated every reported target, reran focused and
+hostile real-Git probes and returned `PASS_WITH_NOTES`. Its raw review is
+`2985aec92feb419e2d2999479e417bdf5156b2c173e5f6c9a90defb239a64e67`; its exact command evidence is
+`8f23829f7850a35eaf3a43ddf0b0b7c71e2cd9e5b6cd0c265e4a91e7c863d380`.
+
+Kimi was explicitly invoked as Kimi 3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`. It authenticated the tuple and historical
+`CODEOWNERS`, reran the real v2 checker and governance cases and returned `PASS_WITH_NOTES`. Its raw
+review is `15af9418c4a58d72a45cc045a6760b330f41ff8faf628862f61c2ee7510d91f5`; its exact command evidence is
+`c023ea771af88000aebbbf6af0c7dd1a9d413e0edb315407faa0009dbe2e76ef`.
+
+Neither reviewer found a bootstrap-integrity or post-bootstrap bypass. Both independently reproduced one
+medium CI-runtime defect: the aggregate real-Git test could exceed the repository's 10-second default
+under load. Grok also identified two low causal-attribution weaknesses: partial-base cases proposed an
+incomplete current closure, and the pre-v3 helper called the live evaluator as post-freeze identity
+rather than the promised base-to-current bootstrap. The namespace remains intentionally open to new
+files outside the exact governed trees after closure; the root catch-all still requires the protocol
+owner cohort. This freezes the declared normative and governance bytes, not the entire future
+`packages/protocol-v3/` namespace.
+
+### D.45.5 — Review remediation and post-correction gates
+
+A fresh Codex-high test-correction owner changed only the e3 RED:
+
+1. every named partial-base case now proposes the complete current closure;
+2. the pre-v3 helper invokes the real evaluator with its exact pre-v3 base and complete current; and
+3. the aggregate real-Git case has the bounded 30-second timeout already used by the predecessor
+   governance test.
+
+This supersedes e3
+`d0d979f5e8db3d1eec4c07e7de8c9cb5f6c101d01c4742a1be427d5bec84be91` with
+`9823da3eb98e89bcc494f8bdca17e4ebfe98b9726ad7078fefc29cedf6e74aba`. The correction ledger is
+`6785c1461d6198cdfb4a7bf9d640beb2cc848958a61e350ceed91443bc533abb`.
+
+The separate GREEN owner verified that exact three-change diff without editing it. Under ordinary
+repository configuration and no CLI timeout override, focused e/e2/e3 passes 20/20
+(`47ea02d7cf0845e3b7d05348b82e450cfae963ae815401d561942addaef9ea8f`), workspace typecheck passes
+31/31 (`1a70f83deb2bc53a7c4f4eece50e7058d115cbe92b4f7f02123b688660feef67`) and lint reports zero errors
+with the inherited 226 warnings
+(`ed2866f1f1df87b46b6c141ee6f678253905546fd609d22e75d4f8ee6fc2716e`). Isolated e3 passes 16/16;
+targeted ESLint, Prettier, diff, scope and production-pin checks pass. The production tuple is unchanged.
+
+### D.45.6 — Acceptance boundary
+
+Phase −1′e3 is technically complete but remains uncheckpointed pending the required final Opus-xhigh
+adversarial review of this exact corrected tuple and applied plan text. External branch protection must
+require both v2 and v3 statuses, enforce the frozen CODEOWNERS cohort without admin bypass and rerun on
+retarget before the atomic landing is merged; repository artifacts honestly cannot prove those host
+settings.
+
+No internal −1′a…−1′e snapshot is a release or governed base. If final Opus accepts, the entire v3
+normative tuple must be staged selectively and land as one consensus-visible checkpoint. Splitting
+content from governance, using a temporary target branch or calling an intermediate publication
+non-authoritative remains reward hacking and is prohibited.
+
+## Next Agent Prompt
+
+Run final Opus-xhigh read-only against the exact D.45 tuple, corrected e3 hash
+`9823da3eb98e89bcc494f8bdca17e4ebfe98b9726ad7078fefc29cedf6e74aba`, both external reviews and all
+bounded gates. It must independently reconstruct the real frozen-v2/no-v3 base, execute or inspect the
+one-shot CLI/workflow path, test partial/content-prelanded bases with complete current closures, verify
+evidence presence and bounded protected paths, authenticate the checker pin and CODEOWNERS insertion and
+decide whether the timeout/causal remediations close the review findings.
+
+If and only if Opus returns no blocker, record its exact evidence and checkpoint the complete
+−1′a…−1′e tuple selectively—never `git add -A` and never include `.agents/`, `.claude/`, `.logs/`,
+`.pnpm-store/`, `skills-lock.json` or the two stale v2 `0g2` REDs. After that atomic checkpoint, begin
+Phase 0g(ii-T) with a fresh v3 RED; do not make the stale v2 `0g2` tests green.
+
+## Appendix D.46 — Final Opus blocker and Phase −1′e4 authorization
+
+### D.46.1 — Final Opus result and independent reproduction
+
+Final Opus-xhigh authenticated the D.45 candidate and evidence hashes but returned `BLOCK`. Its raw
+review is `c1e9dc91f09dfc90625cf038cbf1e9243f4ec5aeaf99786654afdf5da7fe8a11`; prompt and exact command
+evidence are `7b50d9be8ac74eaf48677f9536ab60fcf796c72d7069bdfafc85064cbc5be741` and
+`6f80f71c0e326a7ff1bafb345918d915ad751be3a70512d86d686179435d4311`.
+
+The blocker is independent of e3 bootstrap semantics and ENOBUFS. The preserved original Phase −1′c RED
+`tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts` is an untracked file that the
+ordinary root Vitest project collects. It deterministically passes six cases and fails two against the
+corrected accepted registry/provenance tuple:
+
+- the historical fixture expects registry `7d8ecd8f…`, while the accepted current registry and v3 policy
+  pin `2fd6f512…`; and
+- the same superseded input makes the original-reference provenance and vector outward bindings stale.
+
+The root reproduction is
+`be5ff4dce1aece751700ec2a02a7bfc580ac98701bc75c37afa357c65e198839`. `vitest list` independently
+confirms that ordinary discovery collects all eight cases
+(`159b8464d201e9ad22026391e2efc3dc26136337324752c7f6542f68736837ab`). Because
+`.github/workflows/test.yml` runs `pnpm test`, the proposed atomic checkpoint PR would introduce a
+deterministically failing ordinary-CI test even though every recorded successor gate used a focused
+subset.
+
+The historical RED cannot be edited, renamed or deleted. The b2b, corrected c2 and exhaustion contracts
+all pin its exact path/hash `10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2`
+and its fixture path/hash
+`1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840`. Those controls execute the pins
+from disk. The current v3 checker and policy nevertheless omit both historical artifacts from
+`immutableInputs` and `protectedPaths`, even while declaring `phase-n1prime-c` authoritative and freezing
+the downstream contracts that depend on them. This is a second, independent closure defect.
+
+### D.46.2 — Incorrect-assumption quorum and Opus timeout correction
+
+The user-required correction quorum agrees that D.45 is not checkpoint-safe:
+
+- final Opus-xhigh returned `BLOCK`;
+- a fresh read-only Codex-high adjudicator returned `BLOCK` and `PLAN ASSUMPTION: AGREE`; and
+- Kimi 3 was explicitly invoked with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+  `-m kimi-code/k3`, independently reproduced the 2/8 failure and returned `BLOCK`,
+  `PLAN ASSUMPTION: AGREE`.
+
+Kimi's raw review is
+`6639d24d2e31687a7fa366537d318e6d8a639d3e1a3a95523ec681447bf92f3f`; prompt and exact-command
+evidence are `a42fcf3b70791d95dfeb3b03aca7ce1fad36ac37ebf25b931baa1c032752e523` and
+`8113b83db383776ea2df1ff83c44ac705e9a711bfd039c683ebce391cc7aa696`.
+
+Codex-high and Kimi independently corrected one non-dispositive Opus statement. The repository does have
+a root `vite.config.mts`, loaded by `vitest.workspace.ts`, and it sets `testTimeout: 10000`. D.45's
+10-second statement is correct; Opus's no-root-config/5-second arithmetic is not. The corrected e3
+aggregate has a 30-second bound and reruns green. Its remaining real-Git cases inherit 10 seconds and
+remain a load-sensitive hardening note, not the cause of this blocker.
+
+### D.46.3 — Lawful exclusion boundary
+
+Excluding exactly the historical c RED from ordinary execution is lawful test lifecycle management, not
+reward hacking, only when all of these hold atomically:
+
+1. the exclusion is the one exact path
+   `tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts`, never a glob, prefix, directory,
+   `.skip` or rename;
+2. the historical test and fixture remain present at their exact paths and enter hashed
+   `immutableInputs` plus `protectedPaths`;
+3. a new frozen gate loads the live root Vitest/workspace configuration and proves the test-exclusion set
+   equals the six existing infrastructure exclusions plus that one declared historical path;
+4. the gate proves b2b, corrected c2, exhaustion and every other accepted successor test remain
+   discoverable;
+5. omission, rename, wildcard substitution, extra test exclusions, alternate workspace/config bypasses
+   and deletion/drift of either historical artifact all fail; and
+6. an ordinary clean-CI-equivalent full-suite run, not another focused successor subset, is recorded
+   before checkpoint.
+
+The exclusion decision is frozen semantically. `vite.config.mts` itself must not become an immutable
+byte blob: that would unnecessarily freeze aliases, coverage and unrelated future test configuration.
+The base-pinned checker must validate the narrow literal collection policy and the new frozen gate must
+make broadening observable.
+
+Editing the historical RED to follow corrected outputs, deleting or renaming it, moving it beneath an
+already excluded directory, using `tests/protocol-v3-*` or `**/n1prime-c*`, landing red and fixing later,
+or excluding it without immutable preservation and a bounded collection gate are prohibited shortcuts.
+
+### D.46.4 — Phase −1′e4 disposition
+
+Phase −1′e3 remains internally green at the D.45 hashes but final acceptance and the atomic v3 checkpoint
+are **blocked**. A distinct Phase −1′e4 RED/GREEN/review slice is authorized. This is required because the
+remediation touches root collection policy, adds a new frozen test, extends the immutable closure and
+changes checker/policy hashes beyond e3's reviewed scope.
+
+The e4 RED may add only one new checkpoint-collection test, an input-only fixture and bounded `.logs`. It
+must not edit the historical c pair, production, the existing e/e2/e3 tests, this plan, manifests or Git
+metadata. It must fail causally because:
+
+- ordinary root collection still includes the exact historical RED;
+- the live root exclusion set lacks exactly that path;
+- the v3 closure omits the historical test and fixture;
+- no e4 slice/evidence exists; and
+- a broadened or alternate exclusion can escape the currently frozen semantic surface.
+
+The RED's positive controls must prove the current six infrastructure exclusions, root workspace
+selection and CI `pnpm test` command are satisfiable. It must freeze mutants for omission, a neighboring
+c2 path, wildcard/prefix/directory broadening, additional test exclusions, dynamic exclusion
+construction, alternate config/workspace routing and missing/drifted historical evidence.
+
+The separate GREEN may change only:
+
+- `vite.config.mts`, adding the one exact literal historical-RED exclusion;
+- `packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs`;
+- `packages/protocol-v3/conformance/freeze-policy-v3.json`; and
+- the already-authorized v3 workflow only if the RED proves ordinary `pnpm test` is not actually required
+  on the checkpoint PR. The expected path is no workflow change.
+
+GREEN must add both historical c artifacts as hashed immutable/protected inputs, add e4 to required
+slices and freeze its evidence, semantically validate the bounded root exclusion/workspace/CI command and
+refresh the checker pin. It must not byte-freeze all of `vite.config.mts`.
+
+Run e/e2/e3/e4, accepted successor/remediation, frozen-v2 core and regenerated-reference, workspace
+typecheck and lint, plus the ordinary clean-CI-equivalent full suite to bounded logs. Existing unrelated
+failures, if any, must be reproduced from the exact pre-e4 base and reconciled explicitly; they cannot
+hide the historical-c failure or justify a green claim.
+
+Then run fresh Grok 4.5/high, Kimi 3 explicitly with the 100-step cap and final Opus-xhigh. No checkpoint,
+publication or merge is permitted until e4 and all reviews pass.
+
+### D.46.5 — Frozen e4 RED and bounded predecessor-control correction
+
+The fresh Codex-high RED owner completed the authorized test-only slice without editing production or
+the plan:
+
+- e4 RED test
+  `7d3ff120ba2e892de6bde60a15c7c07e3194469d5345589a70192a473d5e0c12`;
+- input-only lifecycle fixture
+  `95e3aabeab12edae583f3d80fb3c8565735279f59e37e100e6ec884ca10997d4`;
+  and
+- RED ledger `50a00cd332a1de135b0769792466293b9f40ad2ff7a48296bf94d916a4011a1d`.
+
+The two pure controls pass. The live aggregate fails for the four intended causal groups: the exact
+historical path is absent from root exclusions; ordinary discovery still collects the historical RED;
+checker/policy omit the historical pair and e4 governance; and the current checker accepts all nine
+lifecycle/governance mutants. The predecessor e/e2/e3 controls, accepted successors, frozen-v2 gates,
+workspace typecheck and lint remain green at the RED boundary.
+
+Before editing, the separate Codex-high GREEN owner found that D.46's final instruction to preserve all
+D.45 test hashes is incompatible with the strict e4 lifecycle surface. Per the plan-correction rule, work
+paused with zero GREEN edits while a correction quorum reviewed that assumption:
+
+- Opus-xhigh returned `BLOCK` and agreed that a bounded predecessor-control correction is required; raw
+  evidence is `4559d670ed2f4bc259bc96d1dc851c26741985ae67659249191d1faef7e7498a`;
+- the Codex-high GREEN owner independently confirmed the stale closure/evidence/scratch assumptions
+  before editing and remained held; and
+- Kimi 3, invoked exactly with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `-m kimi-code/k3`, returned
+  `BLOCK` and `PLAN ASSUMPTION: AGREE`. Its raw review is
+  `4c9fd81ceabe548c476fbce265ee175727358dbf3a5aabe46b10bfc7b4403bab`; prompt and command evidence are
+  `75e9141500b9b214a418ab97a64e43fda495dd621bdaaf55e67a19261aff6e5c` and
+  `2afd259189764cc388bbffa8746cfe968aa5759d779b09950397769396ec7c05`.
+
+The quorum agrees that D.46's preservation assumption is false for four independent reasons:
+
+1. e/e2/e3 omit the e4 test and fixture from their evidence closures;
+2. the Phase e fixture omits the two historical-c immutable bindings and `phase-n1prime-e4`;
+3. e/e2/e3 snapshots omit the new fail-closed lifecycle surface; and
+4. e3's scratch current does not copy the lifecycle sources, so it retains the six-entry base root
+   configuration instead of modeling the seven-entry current.
+
+This subsection supersedes only the conflicting hash-preservation sentence in the prior Next Agent
+Prompt. One fresh Codex-high control-correction owner, distinct from the RED and GREEN owners, is
+authorized to change exactly:
+
+- `tests/protocol-v3-freeze-governance-n1prime-e.test.ts`;
+- `tests/protocol-v3-freeze-governance-n1prime-e2.test.ts`;
+- `tests/protocol-v3-freeze-governance-n1prime-e3.test.ts`;
+- `tests/fixtures/phase-n1prime-e/freeze-governance-contract.json`; and
+- a bounded correction ledger under `.logs/`.
+
+The correction must:
+
+- add the exact historical-c test/fixture hash bindings to the Phase e fixture, append
+  `phase-n1prime-e4`, and update the Phase e preservation count from 58 to 60;
+- add the frozen e4 test/fixture evidence paths to e/e2/e3;
+- make every successful pre-v3 base carry the exact six-entry lifecycle and every complete current carry
+  the exact seven-entry lifecycle, workspace and ordinary-CI sources;
+- copy the named lifecycle sources into only the e3 scratch current, never the base commit; and
+- leave the e4 lifecycle mutation matrix, all historical-c bytes and the existing e/e2/e3 mutation
+  semantics otherwise unchanged.
+
+The corrected predecessor controls are expected to be incompatible with the old exact-record checker,
+while the uncorrected predecessors are incompatible with GREEN. Therefore the correction and GREEN
+batches must coexist in the working tree and be gated jointly before either is accepted. The
+control-correction owner must not edit production; the GREEN owner must not edit tests, fixtures or the
+plan. Optional lifecycle fields, evaluator filesystem fallback, subset/warning-only validation, broad
+exclusions and byte-freezing the entire root config remain prohibited reward-hacking paths.
+
+The distinct Codex-high control-correction owner completed that exact four-file batch:
+
+- Phase e test `7e4a3e6bfca563c1590c2c19065943b4b7cc8a983e9ad9f06eff552cbdc608ff`;
+- Phase e2 test `42177ff4d105e617d041d9ea9187a22e9d09d3f4e1c9ad11ff63445b82ac4617`;
+- Phase e3 test `d89058e02323773cdd0059f57d8a85002735c16adb29afc9eb8333f1248ebc1a`;
+- Phase e fixture `3a6933294e6f760d7c9e24a84e162dc418ddba0039de9a5095c36ac2729ecccb`;
+  and
+- correction ledger `14f150e645eb4816a83b8ceed7bd2907f7e9fc462f6098ad6db49f96ddc7e412`.
+
+The focused interim run passes 19/23. Its four failures are exactly the expected old-checker/old-policy
+boundary: Phase e rejects the corrected 33-entry immutable surface; both Phase e3 controls expose the
+missing e4 protection/current lifecycle; and the frozen e4 live aggregate retains its four RED groups.
+Phase e2 remains 2/2 green. Workspace typecheck passes 31/31, targeted formatting/ESLint pass, and full
+lint exits zero with the unchanged 226-warning baseline. The plan, e4 RED pair, historical-c pair and all
+production bytes remained unchanged during the correction.
+
+One sustainability gotcha remains recorded without expanding this correction scope: after the eventual
+atomic checkpoint, e3's use of `git archive HEAD` can cause its nominal one-shot pre-v3 case to degrade
+into an unchanged post-bootstrap evaluation because `HEAD` then contains the full v3 closure. This
+pre-existing harness property is not introduced by e4. It must be adjudicated through the same
+Opus-xhigh/Codex-high/Kimi-3 correction quorum before any later plan or harness change; it may not be
+silently hidden by a passing post-checkpoint run.
+
+### D.46.6 — e4 RED state-independence correction
+
+The held GREEN owner made only the authorized exact seventh-literal edit to `vite.config.mts`
+(`c1d2eeab4d2d7756549ecd2c818890de93d74d8ea38965ba58dea9c6e672f462`) before discovering that the
+frozen e4 test itself is phase-dependent. Checker and policy remained at their pre-GREEN hashes. Root
+reproduction `a6dd0968d8c1b24fa6a0bc4662dd691d3ec9e44e5f9efa1db66a3079365b0285` shows e4 at 0/3:
+
+- its historical-six satisfiability control reads the now-seven live root config;
+- its omission mutant also reads that live config and becomes identical to the valid current; and
+- its live aggregate retains only the expected checker/policy omissions.
+
+Work paused again with the exact config edit visible. The required correction quorum agrees that the
+frozen e4-test-hash assumption is false:
+
+- a read-only Codex-high adjudicator returned `BLOCK` and `PLAN ASSUMPTION: AGREE`;
+- Opus-xhigh returned `BLOCK`, `PLAN ASSUMPTION: AGREE` and independently proved a third masked defect.
+  Its raw review is `ac7e966d27dface08bef6fbaf8fe4a3758e3c328cc6edb254fed7fd0fe5b441e`;
+  prompt and command evidence are
+  `e7d3ff3259c60549f5843d026fa06894059332261645db198bee7d0ee7cfea51` and
+  `6e90cd68a31df2a5a3c3b7ff1efa41d46d110a5ec7a060f64c992756cd7835d0`;
+  and
+- Kimi 3, invoked exactly with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `-m kimi-code/k3`, returned
+  `BLOCK` and `PLAN ASSUMPTION: AGREE`, also independently finding the masked defect. Its raw review is
+  `46d394ffddb539f0306e91885ba87594f695d6f5300c6e2c012c220002b3f832`;
+  prompt and command evidence are
+  `d8b684c23e4df0ba72653583a49f61ecc37c54231e01a19e067dc2182ac86ee6` and
+  `33c00a082ccf600cc6944af7ba93cb035d51b0218237bfad14da39d4493129ea`.
+
+The masked defect is causal. The dynamic-construction mutant uses a single-line `exclude` regex.
+Pre-GREEN it targets the single-line root `test.exclude`; after the required seventh entry, Prettier
+formats that array across lines and the regex instead rewrites the later single-line `coverage.exclude`.
+Root `test.exclude` remains valid, so the mutant becomes a no-op. The omission mutant fails first and
+hides this second failure. Forcing a 177-column single-line production array, freezing coverage, or
+rejecting the unrelated coverage mutation would violate D.46.3.
+
+This subsection supersedes the frozen hash
+`7d3ff120ba2e892de6bde60a15c7c07e3194469d5345589a70192a473d5e0c12` for the e4 **test only**. The e4
+fixture remains frozen at
+`95e3aabeab12edae583f3d80fb3c8565735279f59e37e100e6ec884ca10997d4`. One fresh Codex-high
+test-correction owner, distinct from the e4 RED, D.46.5 correction and GREEN owners, may change only:
+
+- `tests/protocol-v3-freeze-governance-n1prime-e4.test.ts`; and
+- a bounded e4 state-independence ledger/logs under `.logs/`.
+
+The correction must:
+
+1. add a fail-closed historical-six constructor that AST-locates root `test.exclude`, accepts only the
+   exact six or exact seven declared entries, subtracts exactly one historical literal only when present,
+   and re-parses to prove the exact six remain;
+2. use that derived historical source only for the six-entry satisfiability control and the omission
+   mutant;
+3. replace the dynamic mutant's generic regex with an AST-span replacement of the uniquely located root
+   `test.exclude` initializer, then prove the dynamic spread is rejected; and
+4. preserve `futureRootConfig`, the fixture, every other mutant/oracle, live discovery/governance
+   semantics and all production bytes.
+
+The corrected two pure tests must pass both against the exact historical six-entry HEAD config and the
+formatted seven-entry current. With checker/policy still old, e4 must then be 2/3 with only the live
+aggregate RED. Git/HEAD fallback at runtime, fixture-vs-fixture tautologies, replacing all six historical
+entries from fixture text, subset/reordered acceptance, broad regex matching, `prettier-ignore`, skipped
+or soft assertions and GREEN-owned test edits are prohibited shortcuts. After the corrected e4 test is
+frozen and recorded, the held GREEN owner may resume checker/policy work without editing the correction.
+
+The distinct Codex-high state-independence owner completed the authorized correction:
+
+- corrected e4 test `5fdaa2b9eff5f98e21823e91fd0ca4be4fd409051df43658da22373c5d398d1c`;
+- correction ledger `f836c1d3aa3a71471cd143e5d04d2f4ba6564683c2dae3882e59206f647a766a`;
+- exact HEAD-six/current-seven branch proof
+  `38b50847e184cc80f9d4157a7fa9f74974b1db1a412ce0171ace4806395fcf65`; and
+- focused current evidence `4e34ca3c77915465d08d24527f79629b899bd2feb226fbb6de06ec6363fd2e9b`.
+
+Both pure controls now pass against both exact root-config states, all nine lifecycle mutants are genuine
+and rejected in both states, and the unrelated-edit control passes. The current focused boundary is
+exactly 2/3: only the live aggregate remains RED for the old checker/policy omissions. Targeted
+Prettier/ESLint and the 31-project workspace typecheck pass. The fixture, current exact config edit,
+D.46.5 controls, checker, policy and all other frozen bytes remained unchanged.
+
+### D.46.7 — Predecessor lifecycle-helper multiline correction
+
+GREEN then completed the bounded semantic candidate:
+
+- root config `c1d2eeab4d2d7756549ecd2c818890de93d74d8ea38965ba58dea9c6e672f462`;
+- checker `0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de`;
+  and
+- policy `fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3`,
+  whose checker pin matches.
+
+The first joint e/e2/e3/e4 gate is 17/23. E4 is 3/3 and all fourteen e3 partial-base cases pass. All six
+e/e2/e3 aggregate/live cases fail before invoking production because the D.46.5
+`lifecycleRootConfig` helpers recognize only an exact single-line `exclude: [...]` substring, whereas
+the lawful Prettier-formatted seven-entry array is multiline. Root reproduction is
+`a018a9f00be994f407e52b2c9aa4d588d44ee83aec5f8f023d8e9360a836e016`; the GREEN owner's joint log is
+`7ad73e94330e26fdd10cdbd3b4231b21a565b4286fe1b7f4d271a494e797cd38`.
+
+GREEN paused with those production hashes frozen. The required correction quorum agrees that the three
+D.46.5 test hashes must be superseded while the Phase e fixture and production candidate remain intact:
+
+- read-only Codex-high returned `BLOCK` and `PLAN ASSUMPTION: AGREE`;
+- Opus-xhigh returned `BLOCK` and `PLAN ASSUMPTION: AGREE`. Its raw follow-up is
+  `bbb6a3ca4eebc8ab9536cbfa0baf037311535817e82eed1d3727e7bb80fc1861`;
+  prompt and command evidence are
+  `d00ed6b1a4adaeb794f1741cb08c0e6770719b4532f567c3edd729cae80cef83` and
+  `24aed01c4570a457e4078b8bfeed37f857ab4c85d33af3c16242974ae880c707`;
+  and
+- Kimi 3, invoked exactly with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `-m kimi-code/k3`, returned
+  `BLOCK` and `PLAN ASSUMPTION: AGREE`. Its raw review is
+  `663b4b1ffc9246f73d73b0c0b5fac05e18924398b1ccdf74fd411e302be764f0`;
+  prompt and command evidence are
+  `2016c1ec7245d2fa4d6ec90f3ac05165b1fc0c86dc7314e40cb17641ba9f42c7` and
+  `c7f2ae83255d4e908ea4f6f60191457586a223aa935a08178c9c0b61431b37aa`.
+
+One distinct Codex-high correction owner may change only:
+
+- `tests/protocol-v3-freeze-governance-n1prime-e.test.ts`;
+- `tests/protocol-v3-freeze-governance-n1prime-e2.test.ts`;
+- `tests/protocol-v3-freeze-governance-n1prime-e3.test.ts`; and
+- bounded multiline-correction logs/ledger under `.logs/`.
+
+In each file, only the duplicated lifecycle helper and its necessary `typescript` import/supporting local
+functions may change. The helper must AST-locate the unique default `defineConfig` root object, unique
+literal `test` object and unique root `test.exclude` initializer; require an order-sensitive, static
+string-literal array exactly equal to the declared six or seven; preserve the original source bytes when
+it already has the requested state; otherwise replace only the initializer span with the requested exact
+literal and re-parse to prove the result. The error trigger/message, every call site, snapshot shape,
+mutation matrix/count, partial-base case and assertion must remain unchanged.
+
+A shared helper file is prohibited here: it would add an undeclared, unprotected input to three protected
+evidence tests. Regex or whitespace-normalized fallback, subset/sorted equality, whole-file printer
+rewrites, fixture-derived source tautologies, Git/HEAD runtime fallback, config reformat/revert,
+`prettier-ignore`, optional lifecycle, checker/policy changes or GREEN-owned test edits are prohibited.
+The Phase e fixture remains frozen at
+`3a6933294e6f760d7c9e24a84e162dc418ddba0039de9a5095c36ac2729ecccb`;
+the e4 pair remains frozen at `5fdaa2b9…` / `95e3aabe…`.
+
+The dormant single-line branch in e4's `futureRootConfig` is recorded but not reopened: it early-returns
+for the live seven-entry config, and D.46.6 branch evidence proves the exact committed six-entry state.
+After this correction, rerun all 23 and treat any newly reached checker failure as a new causal finding,
+not permission to widen the correction.
+
+## Next Agent Prompt
+
+Begin the **Phase −1′e4 predecessor multiline correction** with one distinct Codex-high owner. Change
+only the three test helpers and bounded ledger authorized in D.46.7. Preserve the Phase e/e4 fixtures,
+e4 test, production candidate, plan and every assertion/call site. Require the joint e/e2/e3/e4 gate to
+reach 23/23 without production edits.
+
+Then resume the held GREEN owner to verify—not edit—the correction and run the remaining D.46.4 gates:
+discovery, real-Git/bootstrap matrices, accepted successors, frozen v2, workspace typecheck, lint and the
+complete ordinary suite. Do not checkpoint until fresh Grok 4.5/high, Kimi 3 via the exact 100-step
+invocation and final Opus-xhigh all accept the corrected atomic tuple.
+
+### D.46.8 — Canonical protected-path instance correction and order mutant
+
+The D.46.7 correction reached 22/23 rather than 23/23. Formatting, targeted ESLint and all 31 workspace
+typecheck projects passed, e4 remained 3/3, e2 passed 2/2 and all sixteen e3 cases passed. The sole newly
+reached failure is Phase e's synthetic coherent-first-bootstrap policy:
+`protocol-v3 freeze violation: freeze policy protectedPaths differs from the exact declared v3 surface`.
+The bounded correction ledger is
+`99b92bd1e11487b6d2f51b701ca2a9a92dcedad81356bf56a6e1ccbc4d84f491`.
+Its corrected predecessor-test hashes are:
+
+- e `3a3b51f0394334ca22513551ff11ecab6a48c149b894e10ae2d9ca685a4398bb`;
+- e2 `f1563ffc83fb0ce9f43b714d36953f9ef75f3cc77a148bb757b4ea2b8b2c6ed4`; and
+- e3 `202b35e7b0c8f88ce2443c61d1b10de6d1f7cecb6940d6264a01f57ce87f7ccf`.
+
+The failure is an exact two-entry ordering mismatch. The three predecessor controls construct
+`evidencePaths` as e, e2, e3, Phase e fixture, e4 test, e4 fixture. The checker and live policy declare e,
+e2, e3, e4 test, Phase e fixture, e4 fixture. The real checker, live policy and live snapshot already
+agree and pass. Only Phase e's fabricated `coherentPolicy` uses the other order. Its sibling checker hash
+is deliberately synthetic, and the predecessor controls assert the live protected surface through
+membership rather than positional semantics. Therefore the old append position was an incidental mock
+construction choice, not a previously asserted protocol or policy ordering contract.
+
+Work paused before any plan or implementation edit while the required correction quorum reviewed that
+assumption. The first round split:
+
+- Codex-high and Opus-xhigh initially chose a checker/policy reorder;
+- Kimi 3, invoked exactly with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `-m kimi-code/k3`, chose the
+  test-side correction after reproducing the focused 1/2 Phase e failure. Its raw review is
+  `4deb864ea62a34327353f9b679e326f18b0b736e5c104cfa5201fa02c636d7c1`;
+- the initial Opus-xhigh raw review is
+  `1cdf3b5f95eda9c232ad004f8434ede9282f8f10d4967b93595a4c609fd1f9ea`.
+
+A reconciliation round then converged without a majority shortcut:
+
+- Codex-high superseded its first answer and accepted the three-file A-plus correction after
+  distinguishing frozen behavior from an unspecified synthetic-input order;
+- Opus-xhigh independently made the same correction after proving that `coherentPolicy` is a mock while
+  the only order-sensitive system assertion is the checker's exact comparison. Its reconciliation raw
+  review is `e555da73b7a13e5bc1f643a79f475487e2932d784b219b84ced1ab5b52ce5c32`;
+- Opus also found that no existing mutation proves a membership-preserving permutation rejects; and
+- Codex-high and Kimi 3 then independently inspected the shared mutation matrix and agreed that one
+  permutation mutant requires a bounded strengthening of the Phase e local oracle. The final Kimi 3
+  review again used the exact 100-step/model invocation; its raw evidence is
+  `75f38c0d2ebaf99ed55c61a367c21b51c4f1035831b0a910a58db25f4e174bf7`.
+
+The agreed rule is narrow: a synthetic input may be corrected to a valid instance only when the
+property under test is independently asserted and is not weakened. Here the live surface membership is
+already asserted and every production exact-order check remains unchanged. D.46.9 records that the
+post-freeze permutation alone did not make a sorted, set-based or permutation-tolerant relaxation fail:
+the later unchanged-base-policy guard masked that relaxation. The required bootstrap-path assertion is
+the causal compensating control. This is not permission to edit a RED whenever GREEN disagrees.
+
+One fresh Codex-high correction owner, distinct from the e4 RED and held GREEN owners, may change only:
+
+- `tests/protocol-v3-freeze-governance-n1prime-e.test.ts`;
+- `tests/protocol-v3-freeze-governance-n1prime-e2.test.ts`;
+- `tests/protocol-v3-freeze-governance-n1prime-e3.test.ts`; and
+- bounded order-correction logs/ledger under `.logs/`.
+
+The correction must:
+
+1. reorder only the identical `evidencePaths` literals to e, e2, e3, e4 test, Phase e fixture, e4
+   fixture;
+2. in e only, replace the membership-only local-oracle protected-path check with exact order-sensitive
+   equality against `requiredPolicyPaths`;
+3. add exactly one membership-preserving protected-path permutation mutation to the shared e matrix;
+4. update both shared-matrix expectations from 48 to 49 while leaving `mutations.length + 2` unchanged;
+   and
+5. prove the new permutation is rejected by both the independent local oracle and the real checker.
+
+No production, fixture, e4, configuration, workflow, CODEOWNERS, lock, immutable-input, call-site,
+snapshot-shape or unrelated mutation change is authorized. The checker
+`0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de`, policy
+`fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3`, root config
+`c1d2eeab4d2d7756549ecd2c818890de93d74d8ea38965ba58dea9c6e672f462`, e4 pair
+`5fdaa2b9eff5f98e21823e91fd0ca4be4fd409051df43658da22373c5d398d1c` /
+`95e3aabeab12edae583f3d80fb3c8565735279f59e37e100e6ec884ca10997d4` and Phase e fixture
+`3a6933294e6f760d7c9e24a84e162dc418ddba0039de9a5095c36ac2729ecccb` remain frozen.
+
+After the correction, require the joint gate to pass 23/23 with both shared matrix calls returning 49,
+e4 at 3/3 and all fourteen e3 partial-base cases intact. Re-run targeted Prettier/ESLint and workspace
+typecheck 31/31, record old/new hashes plus frozen-byte preservation in the ledger, then return control to
+the held GREEN owner for the complete D.46.4 verification battery.
+
+### D.46.9 — Required bootstrap-path causal correction
+
+The final fresh Opus-xhigh review authenticated the complete Phase −1′e4 tuple and reproduced the
+23/23 gate, discovery, one-shot actual-HEAD bootstrap, self-pins and honest full-suite accounting, but
+returned **BLOCK** on D.46.8's compensating-control claim. Its raw review is
+`.logs/phase-n1prime-e4-final-opus-xhigh.raw.json`
+(`1c1d08592bef7c60ed1d9851cf66f0e41634524e17de799146c961a4ca3da3e0`).
+
+The permutation is currently driven only as a post-freeze mutation with `base = closure`. If the local
+oracle's and real checker's exact-order comparisons are weakened to sorted/set equality, both still
+reject later because `current.policy` differs byte/deep-equal from `base.policy`. Therefore the passing
+49 count is non-discriminating. On the first-bootstrap path, where the base has no policy, the same
+permutation is rejected only by the exact-order comparison and is accepted by the weakened evaluators.
+The post-freeze policy equality similarly masks the other policy-semantic mutants and makes the later
+self-grading-specific guard unreachable; future policy-semantic mutants must be exercised on the
+bootstrap path when they claim to isolate policy validation.
+
+Work again paused before any plan or test edit until the required correction quorum agreed:
+
+- final Opus-xhigh — **BLOCK**, `PLAN ASSUMPTION: AGREE`;
+- Codex-high —
+  `.logs/phase-n1prime-e4-causal-correction-quorum-codex-high.md`
+  (`35ae974639fc65e8dc480223f424f2b8df67142df28806ac5a1f82ac7b03ce6c`) —
+  **AGREE**, `PLAN ASSUMPTION: AGREE`; and
+- Kimi 3, invoked exactly with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+  `-m kimi-code/k3` —
+  `.logs/phase-n1prime-e4-causal-correction-quorum-kimi3.raw.log`
+  (`ea9e2770813989061169c36f33184fade0d74572a29cf2f144c9f495398206d0`) —
+  **AGREE**, `PLAN ASSUMPTION: AGREE`.
+
+One fresh Codex-high correction owner, distinct from every Phase e4 RED, prior correction and held GREEN
+owner, may change only `tests/protocol-v3-freeze-governance-n1prime-e.test.ts` and bounded correction
+evidence under `.logs/`. It must keep the existing post-freeze permutation entry and mutation count,
+then add one separate first-bootstrap rejection using a cloned `closure` whose first two
+`protectedPaths` are swapped against `coherentBase()`. `mutations.length + 2` and both expectations remain 49. No checker, policy, root configuration, workflow, CODEOWNERS, fixture, e2/e3/e4, lock or other
+production/test change is authorized.
+
+The correction is not accepted by a green count alone. Scratch-only weakened copies of both evaluators
+must prove the old post-freeze case remains rejected while the new bootstrap case is accepted when exact
+order is relaxed. The live evaluators must reject that bootstrap case. Then rerun the joint 23/23 gate,
+both 49-count calls, e4 3/3, all fourteen e3 partial-base cases, targeted Prettier/ESLint, workspace
+typecheck 31/31 and frozen-byte hashes before fresh external review.
+
+The same Opus review found distinct residual debt: the ordinary-CI parser proves only the presence of one
+literal `pnpm test` in a multiline run block, so job/step `if: false`, `continue-on-error`, trigger
+narrowing or a `workflow_dispatch`-only replacement can neutralize `test.yml` while the v3 status passes.
+The root `CODEOWNERS` `*` rule supplies only the repository-wide default review routing that any unrelated
+file receives; it is not a targeted v3 safeguard and does not make the parser causal. This must receive a
+separately authorized future slice; it is not permission to widen this test-only correction.
+Also carry forward the no-op absolute-path strip and project-prefixed discovery-line gap in e4, the
+synthetic pre-v3 metadata asymmetry, local-only dirty-tree `ENOBUFS`, alternate-config historical-c
+execution, e3 post-checkpoint `git archive HEAD` degradation, the six HEAD-identical full-suite failures,
+the contention-only d timeout, hard-coded `v2StatusPassed` workflow coupling and external branch
+protection as unproved host state.
+
+The returned matrix value remains `47 + 2 = 49` even though four rejection assertions now follow the
+shared mutation loop. It is a historical matrix metric, not a count of all asserted rejections, and does
+not protect the new bootstrap case. The retained weakened-evaluator logs stop at the first missing throw,
+so by themselves they do not prove that no later rejection also disappeared. The final Opus review closed
+that evidence gap by deleting only the new block in scratch, re-running both weakened evaluators and
+observing 2/2 with all 100 remaining rejection calls throwing; restoring the block produced the sole
+missing throw for each evaluator.
+
+### D.46.10 — Causal correction accepted and atomic checkpoint authorized
+
+The D.46.9 correction changed exactly one governed test:
+
+- corrected Phase e test
+  `9455c3a01fb5480ab88d76445432d97d3c38ee4648cc26a75324efa17bc2196f`;
+- predecessor Phase e test reconstructed by deleting only the new block
+  `19f17c85e78297c40741e27228b4a91f476930d713b901a9c544b2220c649de8`;
+- correction ledger
+  `.logs/phase-n1prime-e4-bootstrap-causal-correction-ledger.md`
+  (`142dd2cbc1a99fc0ae2bc554f049e9502df048181816a7f906838eb0b919b78b`); and
+- held GREEN verification
+  `.logs/phase-n1prime-e4-d469-held-green-verification.md`
+  (`f9df45c2ebcf89f38bc2d853f960d8be1c81ed1df2eb3ae1bfcaf8b87f00148e`) —
+  **PASS**.
+
+Both scratch controls independently weakened only one evaluator's exact-order comparison. The retained
+post-freeze permutation still rejected through `base freeze policy changed`, while the new
+first-bootstrap assertion alone observed no throw. The final Opus review strengthened that proof with
+rejection-reason instrumentation and the block-removal controls described above. Live e/e2/e3/e4 passed
+23/23, e4 passed 3/3, all fourteen e3 partial-base cases remained intact, targeted Prettier and ESLint
+passed, workspace typecheck passed 31/31 and every frozen production, fixture, sibling-test,
+configuration, workflow and CODEOWNERS hash remained unchanged.
+
+The corrected tuple then received:
+
+- Grok 4.5/high:
+  `.logs/phase-n1prime-e4-d469-review-grok45-high.raw.json`
+  (`6853d568766b4fd8c3a0302388d1417cf57f1516e84daa5f8b16a7e8ae20884f`) —
+  **PASS_WITH_NOTES**;
+- Kimi 3, invoked exactly with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+  `-m kimi-code/k3`:
+  `.logs/phase-n1prime-e4-d469-review-kimi3-100.raw.log`
+  (`9e7034d93d4cda5069ce504a96c8f63b86b6237ad8ad75e9ab6d45f012db4c1a`) —
+  **PASS**; and
+- final fresh Opus-xhigh:
+  `.logs/phase-n1prime-e4-d469-final-opus-xhigh.raw.json`
+  (`cf65c8a8c879933df894bb5f87eb1ae56cdbc833fc085b5f24cf3a5a57d1408f`) —
+  **PASS_WITH_NOTES**.
+
+The final Opus review re-authenticated the tuple, independently reproduced the reason flip for the masked
+post-freeze case, proved the bootstrap case is the sole missing rejection under each weakening and
+authorized recording these hashes plus the selective atomic checkpoint. The ordinary-CI neutralization
+and every residual in D.46.9 remain open, explicitly scoped debt; none is represented as fixed.
+
+Phase −1′a…−1′e4 may now land as its one consensus-visible checkpoint. Selectively stage only the
+governed atomic tuple, `vite.config.mts` and this plan. Never use `git add -A`. Exclude `.agents/`,
+`.claude/`, `.logs/`, `.pnpm-store/`, `skills-lock.json` and both untracked v2 `0g2` REDs.
+
+## Next Agent Prompt
+
+Begin **Phase 0g(ii-T)** with a fresh Codex-high v3 RED author restricted to new tests, input-only fixtures
+and bounded `.logs` evidence. Port no production code during RED. The RED must prove the registry-derived
+v3 vertex preimage requires `authorSequence` at the declared review position, that the sequence changes
+canonical preimage bytes and digest, that the v3 signature authenticates it, that malformed values are
+rejected before key resolution, and that v2↔v3 domain/suite substitution is rejected in both directions;
+the verifier must hash the exact received canonical-preimage byte array, never a decoded or re-encoded
+surrogate.
+
+Do not edit, stage or make green the two stale untracked v2 REDs
+`packages/protocol-v2/tests/author-sequence-0g2.test.ts` and
+`packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts`; D.36.1 records why they must be
+re-authored on v3 rather than repaired in place.
+
+Preserve every byte of the committed Phase −1′a…−1′e4 atomic tuple and all completed Phase 0a–0g(i)
+production and tests; frozen v2 and v3 governance must stay green. The ordinary full suite is not green —
+the six HEAD-identical `packages/node`/`packages/object` failures and the contention-only −1′d timeout are
+pre-existing and out of scope for this RED. Keep all future Kimi reviews on the exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation.
