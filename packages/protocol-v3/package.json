@@ -1,0 +1,36 @@
+{
+	"name": "@ts-drp/protocol-v3",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"registry",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		},
+		"./registry/registry-v1.json": "./registry/registry-v1.json"
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@noble/curves": "2.2.0",
+		"@ts-drp/canonical": "0.11.0"
+	}
+}
