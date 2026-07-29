@@ -10497,14 +10497,177 @@ Stage exactly these 17 paths:
 Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
 
+### D.59 — Phase 0j-d non-vacuous shipped-Electron discovery implemented
+
+Phase 0j-d is implemented on the v3 local/release shipping-discovery plane. Electron shipping state
+comes only from the repository-root `shipping-targets.json`; dependency presence, lookalike files and
+nested manifests never activate it. The current manifest is explicitly `inactive` with no versions.
+The positive fixture is an in-repository receipt stub proving activation, forwarding and fail-close
+plumbing for both PR and nightly tiers; it is not a shipped Electron binary and does not claim to run
+Electron.
+
+A future `shipped` entry must name each exact semver and a reviewed, repository-contained runner. The
+parent passes that runner the pinned Phase-0j-c contract, tier and expected version, then accepts only
+exit 0, no signal, empty stderr and one strict receipt with the exact runtime, target, version, result
+and conformance binding. The PR and nightly conformance jobs run discovery directly; release continues
+to reuse the nightly job before npm publication. Phase 0n still owns the later numeric/locale Electron
+matrix, and Phase 0j-d owns no reducer dispatch, fold, sandbox or v2 behavior.
+
+#### D.59.1 — Causal TDD and adversarial-review closure
+
+The fresh Codex-high RED began with seven cases and exactly six intended failures. It required the one
+authoritative manifest path, the explicit inactive state, dependency/lookalike non-activation,
+fail-closed read/parse/path/glob handling, exact version/runner/result binding, positive PR and nightly
+activation, workflow reachability and Phase-0n separation. Distinct GREEN changed only the manifest,
+package-owned discovery runner and existing conformance workflow, then passed 7/7.
+
+Adversarial probing found two ordinary `JSON.parse` last-key-wins defects: a duplicate manifest
+`"state":"shipped"` then `"state":"inactive"` could mint false `not-shipped`, and a duplicate child
+`"result":"failed"` then `"result":"passed"` could mint false `passed`. A fresh Codex-high RED added
+both cases. Distinct GREEN changed only the runner so manifest and child receipts share one strict
+boundary: fatal UTF-8 decoding, `JSON.parse` as the sole JSON syntax authority, then `yaml`
+`parseDocument` with a custom `uniqueKeys` comparator used only for any-depth duplicate-key detection.
+The suite then passed 9/9.
+
+The first final Opus-xhigh review found no runtime defect across 141 bounded probes, but correctly found
+a HIGH test-adequacy gap: deleting only the child nonzero-exit guard or only the child-stderr guard left
+the 9-test suite green while an otherwise-valid child could mint a false parent `passed` receipt. A
+fresh Codex-high test-only RED added a maximally valid child that prints `passed` and then either sets
+exit status 1 or writes one stderr line. The unchanged runner passed 10/10. Distinct Codex-high GREEN
+verification and all three external delta reviewers independently reproduced the exact mutants:
+
+- deleting only `invocation.status !== 0` produces
+  `b98af3a3a18b94bfb50ad196f92fd39cded661d7cd83b8f13db03e4d30ebf624`;
+- deleting only `invocation.stderr.length !== 0` produces
+  `dd477ad0734485b766a2e0a1a91c3cbd8117568307abcb053296cea6c2dea9f6`.
+
+Each mutant now fails exactly the new case while the adjacent positive shipped-execution control stays
+green. Production did not change in this last round: the guards were already correct; the missing
+contract was their causal test. Grok-high returned `PASS_WITH_NOTES`, exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` returned `PASS`, and resumed final Opus-xhigh
+returned `PASS_WITH_NOTES`, closed its HIGH finding and authorized this ledger/checkpoint. No material
+plan assumption changed, so no D.52.4 correction quorum was required.
+
+Final authenticated hashes are:
+
+- root manifest
+  `1e2c25a591cf857b15cd294c7a6203f45ec42b3d16047f577cd60023872d6f64`;
+- discovery runner
+  `feb801aa33a5c0bffe8014c6e2e3c61b42d7d90539bf98587fbb40b7b9671813`;
+- conformance workflow
+  `7a515bad400383b7f31dff9f86812951e954a75da14d64a26e65d970938815c9`;
+- final 10-case test
+  `88e0182507ec1f2e272b7c695116fc96db305b21d583f8fcd5bf38bb1c46eaf0`;
+- inactive manifest fixture
+  `1e2c25a591cf857b15cd294c7a6203f45ec42b3d16047f577cd60023872d6f64`;
+- discovery contract
+  `1d3326837388e7aafe2480f0e53ca9d310b5f434b2be87d6356148f2c926a509`;
+- synthetic shipped fixture
+  `cb68d30b2fe03c62fe8979dd9142760f312b92bd62662679034d1f3226322ad6`.
+
+Primary full-review report hashes were Grok
+`459b7ec8d8d10c44f67de8aae26e15bf1b89e2fd6d32d69a3686baeb386da6a8`, exact Kimi-3/100
+`13401a0f4f23d6e423fa779cc15aa2494a291b563ff6d6611fe4a8e3705ff942` and Opus-xhigh
+`a7ad4e7b37e193c4d5dbda6ae14ce56029c2217b5be6115bf8556616fa43fa75`. Post-hardening delta
+reports were respectively
+`197975a0982725e636dc3523164a5c144655ca6d3719fe4d8271719eab440e95`,
+`7c2018fa8dfc61e6ec1a5df542a49c6e12ab4af96a30bcefe81ea1cfbffe0399` and
+`cfc657527fa984d408dab04025eff10ec4e0b5fbe4ecdbdf8d6fbc79bf040907`.
+
+#### D.59.2 — Gates
+
+The final bounded gates pass:
+
+- Phase 0j-d **10/10**;
+- protected Phase 0j-c **7 passed / 1 intentional skip**;
+- protected Phase 0j-a **101/101** and Phase 0j-b **41/41**;
+- workspace typecheck passes all **33** participating projects;
+- fresh targeted lint is empty; the production candidate's full-tree lint, excluding only evidence and
+  sidecar directories, has **0 errors / 226 inherited warnings**;
+- authored-file Prettier and `git diff --check` pass;
+- the isolated base, Ed25519 and blueprint-artifact-profile freeze checkers pass.
+
+Root Vitest processes remain serial because parallel root runs race on
+`coverage/.tmp/coverage-0.json`. The conformance workflow's normal frozen install must keep running
+root `postinstall`, which builds workspace `dist` exports. The base checker can still hit
+`spawnSync git ENOBUFS` in this sidecar-heavy dirty tree; the isolated exact overlay is the accepted
+bounded evidence, not permission to ignore a real checker failure.
+
+#### D.59.3 — Gotchas and activation boundary
+
+1. **Plain `JSON.parse` is insufficient at this boundary.** It is intentionally the sole JSON syntax
+   authority, but any-depth duplicate-key rejection is a second required step. Removing it reopens both
+   false `not-shipped` and false `passed`.
+2. **Authored manifests and receipts are BOM-free.** On Node 22, `ignoreBOM: true` retains U+FEFF, so a
+   BOM fails at `JSON.parse`. This is fail-closed, not BOM tolerance. Never flip the option without a
+   targeted RED.
+3. **Only the root manifest activates shipping.** Exact runner paths are repository-relative,
+   glob/brace/backslash/NUL-free, contain no empty, `.` or `..` segment, and must resolve through
+   non-symlink regular files inside the repository. The containment checks are intentionally
+   redundant; do not simplify them from a coverage number.
+4. **The reachable child-health contract is now mutation-pinned.** A valid receipt plus nonzero status
+   or any stderr must produce a nonzero parent with no parent result. Keep the adjacent positive
+   control with the negative matrix so blanket rejection cannot look green. Both negative arms share
+   one `it()` block, so the first failure can obscure which guard also regressed; detection is intact,
+   but split the cases if this test is substantively revised.
+5. **The signal guard is unreachable redundancy, not test debt.** A signal-killed `spawnSync` child has
+   `status = null`, so the preceding `status !== 0` guard always fires. Keep the signal check as
+   defense-in-depth; do not manufacture an impossible test or delete the check merely because its
+   mutant survives.
+6. **Residual mutation debt is bounded and classified.** Opus re-scored the final matrix: 21 of 25
+   guard-removal mutants survive, down from 23. One is the unreachable signal guard. Fourteen are
+   reachable manifest-validation relaxations; removing one accepts input that should reject but does
+   not change the result for the current valid authoritative bytes. Paired malformed-input mutation
+   scores, including direct `VERSION_PATTERN` coverage, remain debt. Six receipt/binding and exact-0j-c
+   existence branches are activation-gated while no shipped target exists. **Before any
+   `state: "shipped"` entry lands, those six branches require their own RED and the matrix must be
+   re-scored.** Behavioral probes and mutation scoring are different instruments; never record the
+   former as the latter.
+7. **The synthetic runner proves plumbing only.** A real activation must launch the exact declared
+   Electron version against the pinned 0j-c contract and same engine matrix. Zero-tolerance stderr is
+   test-pinned; Node, Electron, GPU or deprecation warnings will fail closed and must be handled by an
+   explicit activation RED, not a release-pressure relaxation. Phase 0n still owns numeric/locale
+   checks for shipped Electron.
+8. **CI reachability is split deliberately.** Root `pnpm test` collects the 0j-d RED and the base freeze
+   checker pins that literal command; the conformance workflow directly runs discovery in PR/nightly,
+   and release reuses nightly before publication. The first real `ubuntu-latest` execution remains
+   empirical confirmation.
+9. A hardlink from a repository runner path to an outside inode can activate the gate, but hardlinks
+   are not git-representable and require local write access; this is not a repository trust-boundary
+   break. Other C0 path controls remain contained even though only NUL is explicitly rejected. The
+   inactive receipt advertises the pinned conformance binding without executing it; Phase 0j-c owns
+   that byte identity.
+10. Do not describe Phase 0j-d as fully mutation-covered. The accepted result is narrower and
+    sustainable: the two concrete reachable false-pass guards are pinned, remaining debt is
+    classified, and activation carries its own hard RED prerequisite.
+
+#### D.59.4 — Selective checkpoint boundary
+
+Stage exactly these eight paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `shipping-targets.json`;
+3. `packages/protocol-v3/scripts/run-shipped-electron-conformance-v1.mjs`;
+4. `.github/workflows/protocol-v3-blueprint-conformance.yml`;
+5. `tests/protocol-v3-shipped-electron-gate-0j-d.test.ts`;
+6. `tests/fixtures/phase-0j-d-v3/current-inactive-shipping-targets.json`;
+7. `tests/fixtures/phase-0j-d-v3/shipping-target-discovery-contract.json`;
+8. `tests/fixtures/phase-0j-d-v3/synthetic-shipped-electron-target.json`.
+
+Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
+
 ## Next Agent Prompt
 
-Selectively checkpoint only the 17 authorized Phase-0j-c paths and D.58 ledger, then begin 0j-d as its
-own atomic v3 TDD item with a fresh Codex-high RED owner and distinct Codex-high GREEN owner. Preserve the
-exact-byte oracle boundary, serial root-Vitest constraint, root-postinstall build dependency and declared
-non-sandbox residuals.
-Continue with Grok, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final
-Opus-xhigh. Keep the standing v3-forward owner/plane audit for every later item; v2 remains
-preservation/compatibility/freeze only. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
-`skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable
-unless explicitly requested, and do not schedule Phase 0n under its current stale `consensus-v2` label.
+Selectively checkpoint only the eight authorized Phase-0j-d paths and D.59 ledger, then audit and begin
+Phase 0o as the next unblocked v3 TDD item with a fresh Codex-high RED owner and distinct Codex-high
+GREEN owner. Preserve the exact-byte oracle and shipped-target activation boundary, serial root-Vitest
+constraint, root-postinstall build dependency and declared non-sandbox residuals. Continue with
+Grok-high, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final Opus-xhigh. Keep the
+standing v3-forward owner/plane audit for every later item; v2 remains preservation/compatibility/freeze
+only. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
+untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested.
+Do not schedule Phase 0n under its stale `consensus-v2` label before the D.52.4 forward-plane quorum;
+when its bounded core is eventually authorized, retain `@ts-drp/math` and use pinned deterministic
+prior art rather than inventing approximations. Broader Rapier/WASM expansion remains optional until
+after the golden paths.

@@ -1,0 +1,22 @@
+{
+	"schemaVersion": 1,
+	"runnerRelativePath": "packages/protocol-v3/scripts/run-shipped-electron-conformance-v1.mjs",
+	"authoritativeManifestPaths": ["shipping-targets.json"],
+	"currentManifestFixture": "current-inactive-shipping-targets.json",
+	"syntheticShippedManifestFixture": "synthetic-shipped-electron-target.json",
+	"conformanceBinding": {
+		"runnerRelativePath": "packages/protocol-v3/scripts/run-blueprint-conformance-v1.mjs",
+		"contractRelativePath": "tests/fixtures/phase-0j-c-v3/blueprint-conformance-contract.json",
+		"receiptSchemaVersion": 1,
+		"supportedTiers": ["pr", "nightly"],
+		"requiredEngines": ["node", "chromium", "firefox", "webkit"]
+	},
+	"releaseBinding": {
+		"workflowPath": ".github/workflows/protocol-v3-blueprint-conformance.yml",
+		"releaseWorkflowPath": ".github/workflows/release.yml",
+		"prJobId": "phase-0j-c-pr",
+		"nightlyJobId": "phase-0j-c-nightly",
+		"releaseGateJobId": "phase-0j-c-release-conformance",
+		"npmPublishJobId": "npm_publish"
+	}
+}

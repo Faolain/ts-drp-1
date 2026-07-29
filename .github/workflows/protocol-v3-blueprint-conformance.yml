@@ -26,6 +26,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm exec vitest run tests/protocol-v3-blueprint-conformance-0j-c.test.ts
+      - run: node packages/protocol-v3/scripts/run-shipped-electron-conformance-v1.mjs --tier pr
 
   phase-0j-c-nightly:
     if: github.event_name == 'schedule' || inputs.tier == 'nightly'
@@ -42,3 +43,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: RUN_PHASE_0J_C_NIGHTLY=true pnpm exec vitest run tests/protocol-v3-blueprint-conformance-0j-c.test.ts
+      - run: node packages/protocol-v3/scripts/run-shipped-electron-conformance-v1.mjs --tier nightly
