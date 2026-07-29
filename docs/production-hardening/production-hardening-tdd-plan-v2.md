@@ -824,10 +824,22 @@ codec → vectors already frozen and now provably correct.
 
 > **Phase 0o-a/0o-b ownership boundary.** The 0o-a transaction, proof state and advisory signal are
 > deliberately scoped to one `(objectId, author, authorSequence)` slot. They do not establish a
-> cross-slot per-author budget, retention/compaction bound, gossip policy or ACL-visible reputation.
-> Phase 0o-b owns those cross-slot concerns and durable-store concurrency, and must ship before live
-> gossip or ACL composition. Pairwise slot proof persistence remains `O(forks²)` and is not bounded by
-> the 0o-a advisory count.
+> cross-slot per-author budget, retention rule, gossip policy or ACL-visible reputation. D.63
+> supersedes the original unsplit 0o-b row: 0o-b retains ownership of the retention rule, but the
+> governed rule deliberately performs no proof-body or witness compaction and claims no global bound.
+> Pairwise slot proof persistence remains the frozen `O(forks²)` contract and is not bounded by the
+> 0o-a advisory count. The executable split is:
+>
+> | Item       | Ownership                                                                                                                                                                                                                              | Dependency |
+> | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+> | **0o-b1a** | Hash-bound additive projection/reconstruction supplement, deep-only proof-ID/materialization helpers and public-entry audits. It binds but never weakens the frozen 0o-a witness, `state.proofs` or `newlyPersistedProofIds` contract. | 0o-a       |
+> | **0o-b1b** | Durable author digest/pair projection, pending-row lifecycle, same-digest collapse, concurrency, spanning/non-spanning recovery and honest zero-body/total-byte census.                                                                | 0o-b1a     |
+> | **0o-b2**  | Pure author-wide gossip-budget composition over a detached digest-set/pair projection only.                                                                                                                                            | 0o-b1b     |
+> | **0o-b3**  | Pure ACL-visible reputation composition over the same detached projection only.                                                                                                                                                        | 0o-b1b     |
+>
+> Every item is independently TDD-frozen and reviewed. 0o-b must ship before live gossip or ACL
+> mutation. A deterministic anchored replica-uniform evidence horizon is separate future governance,
+> not an implicit 0o-b optimization.
 
 > **Phase 0p ownership boundary.** Phase 0p remains unchanged in substance: it owns only anchored
 > reducer/input/epoch work budgets and the `maxEpochVertices` ceiling. It owns no equivocation-proof
@@ -11049,21 +11061,182 @@ manifest, source/built deep-export audits, equivocation supplement/workflow, fix
 stale untracked protocol-v2 0g2 REDs or unrelated files. This D.62 ledger is a separate documentation
 checkpoint so it can name the implementation hash without a circular self-reference.
 
+### D.63 — Phase 0o-b retention claim correction and executable split
+
+#### D.63.1 — Rejected provisional RED
+
+The first fresh 0o-b RED owner correctly began with an author-wide injected store, two sequence slots,
+24 bounded permutations, conflict retries, same-digest collapse, exact pair identities, pure budget and
+reputation functions, and causal mutants. The provisional tuple was:
+
+- `tests/protocol-v3-author-governance-0o-b.test.ts`
+  `1a17a50c1a9bd03743a704d25fbab8cd8e2c7ee367823986de7528dd28e8838c`;
+- `tests/fixtures/phase-0o-b-v3/author-governance-contract.json`
+  `5e186a0af1680dbf38c69e70b93127730ffbb30190f5c7d2eb50ae422283b7b7`;
+- `tests/fixtures/phase-0o-b-v3/controlled-author-governance.ts`
+  `ed74b2836d2173868202896f9ade48990b589dfcaa360f58da07e09bf5edb942`.
+
+Before the ambiguity revision, the earlier draft produced repository RED 5 fail / 1 independent control
+pass, reference 6/6, and one owned failure for each of five surgical mutants. Those results do not bind
+the hashes above: the tuple then gained authoritative-verifier negatives and payload-bearing outbox work
+and was intentionally stopped before rerun or formatting. It is **rejected working evidence, not a
+frozen RED**, and cannot authorize GREEN.
+
+The stop was necessary because the draft bounded only a duplicate cache. Its source 0o-a slot store
+still retained every authenticated witness and proof body, while its pending outbox also retained proof
+payloads indefinitely. Calling that cache limit an evidence-retention bound would have been reward
+hacking. The first Codex-high record is
+`949ee285a0f010f743f1e390650544f11626c89910b2c28f6f38333535ae8fa0`.
+
+#### D.63.2 — Required correction quorum
+
+The first shared correction prompt was
+`b88ea26bd21acee51fdc018db1b9db7fd33fc0e51086e0bc8cecf48ee61ce8f0`.
+All reviewers agreed that the plan and provisional RED could not freeze:
+
+- exact Kimi 3/100 `AGREE_CORRECTION`
+  `269159e27e01d98f9675a1692585b35717ffe26da42ab787327b28afe663d012`;
+- Opus-xhigh `AGREE_CORRECTION`
+  `e4195170f15b98bc77ef32b08d465120b96f9d917cebb7f4b675c67d1ca87a70`;
+- Codex-high recorded the freeze blocker above.
+
+The first recommendation was not unanimous in substance. Codex and Kimi initially proposed a
+payload-bearing outbox, consumer acknowledgement and exact ID tombstones. Opus found that this was
+unnecessary and unsafe:
+
+- 0o-a already retains each authenticated witness and deterministically reconstructs the canonical proof
+  body from the current witness pair;
+- a payload row could pin an obsolete arrival-dependent signature carrier after the frozen
+  lexicographically lesser same-digest re-carrier rule replaces the stored witness;
+- compacting a witness would change `orderedDigests`, `preferredDigest` and `slotSignal`;
+- the frozen supplement requires all `state.proofs` bodies to persist and each
+  `newlyPersistedProofIds` entry to be returned exactly once by a conforming 0o-a coordinator.
+
+The reconciliation prompt
+`1abf967355c07a3049200e4d5f9f5187dae7c3386b63260ced490b700af1b734`
+therefore tested retained-witness reconstruction and pair-keyed lifetime dedup. Codex-high
+`39785e7353e95919d3813f08727341a8466025abcf69ba1f67ec36fd19e86326`,
+exact Kimi 3/100
+`f2d332ddf60b95515b5540fc926e82a9b450a432a49e57cadf5380432ce045d5`
+and Opus-xhigh
+`42e5ee07e748a5e23f42edde020a42de4fd53fac4bee5b13bdf7cf0f47867091`
+agreed on reconstruction, zero 0o-b proof bodies and the split. Opus correctly withheld unqualified
+approval while the candidate still permitted `state.proofs` compaction and reclassified
+`newlyPersistedProofIds`; an additive supplement may add projection/reconstruction rules but may not
+withdraw the two-conjunct frozen guarantee.
+
+The final ratification prompt was
+`9340d8746da24edd3b2a43078f0a68d563cf1f2ff523a9a694987ac48184d7b5`.
+All three returned unqualified `UNANIMOUSLY_RATIFY_FINAL_BOUNDARY`:
+
+- Codex-high
+  `6ccfe712cd4802c8e1eb8b37af1e5da6685978b89b3daefffc857c990dfe8c6c`;
+- exact Kimi 3/100
+  `35429871a398a2c44953a00f5902e0f2a3542cf1177c10f90df9ab9529ade7cc`;
+- Opus-xhigh
+  `8715a980b2c0b7726fced68111b59e0437ba1c8eeadc4c234fddadbe2139fb83`.
+
+The Kimi processes used exactly `KIMI_LOOP_MAX_STEPS_PER_TURN=100` with `kimi-code/k3`. Both final
+Opus reviews used the same Opus/xhigh session
+`2db2cfe8-b1e2-4e05-a2a3-863919ff0c32`, exited zero, returned `is_error=false`, and required no retry.
+All review pre/post status hashes matched
+`4f5cfcf2cf2a6c26b4d4f7ecedc7c2b9da4b1f7b97146452172d7d190d7b8c27`.
+
+#### D.63.3 — Frozen-contract preservation and retention rule
+
+The frozen `equivocation-digest-identity-v1` supplement remains byte-identical. 0o-b retains ownership
+of the cross-slot retention rule, as that frozen supplement requires, but the governed rule is:
+
+- authenticated per-slot witnesses remain durable;
+- all canonical pair proof bodies in `state.proofs` persist;
+- `newlyPersistedProofIds` retains its existing exactly-once meaning for a conforming 0o-a coordinator;
+- 0o-b performs no witness or proof-body compaction and claims no global evidence-storage bound;
+- pending-row removal is the only 0o-b compaction;
+- a later deterministic anchored replica-uniform evidence horizon requires separate governance.
+
+The cost is explicit: attacker-chosen forks keep the frozen `O(forks²)` slot-proof-body persistence.
+This is larger than the rejected amendment design, but it does not silently retract an accepted
+contract. The 0o-b author projection stores zero proof bodies and zero payload-bearing outbox rows; that
+zero-copy rule is structural honesty, not a claim that total protocol evidence is bounded.
+
+Two exactly-once scopes coexist. A conforming 0o-a coordinator returns each newly persisted slot proof
+ID once per slot transition. 0o-b enqueues one pair identity once per `(scope, unordered digest pair)`
+over the author store's lifetime. After a non-spanning crash, recovery may first enqueue an identity
+whose 0o-a delta was previously emitted and lost. Neither guarantee substitutes for the other.
+
+#### D.63.4 — Executable ownership split
+
+The original unsplit 0o-b row is superseded by four independent TDD items:
+
+1. **0o-b1a — projection/reconstruction profile and deep helpers.** Add one hash-bound supplement that
+   binds but never amends or weakens the frozen 0o-a persistence contract. Add deep-only helpers to
+   derive a proof ID from a canonical unordered digest pair and to materialize the current canonical
+   proof from detached current committed witnesses through the authoritative resolver. Extend source,
+   built and runtime package-root audits so neither helper is public.
+2. **0o-b1b — durable author projection and recovery.** Persist monotone-union observed digest sets per
+   authoritative slot and pending rows keyed by `(scope, unordered distinct digest pair)`. Store no
+   proof body or `Uint8Array`. Reconcile only an authoritative full committed slot snapshot read through
+   the injected `readCommittedSlotState` path. Either co-commit slot and author projection or provide
+   author-scoped recovery enumeration; the author record's existing slot list is not an enumeration
+   source.
+3. **0o-b2 — pure gossip budget.** Compose one deterministic author-wide budget over a detached
+   digest-set/pair projection only. It cannot read pending rows, proof bodies, `state.proofs`, admission
+   or verification results and cannot mutate durable state.
+4. **0o-b3 — pure reputation.** Compose the ACL-visible reputation value over the same detached
+   projection only. It cannot mutate ACLs or policy storage and has the same negative surface boundary
+   as 0o-b2.
+
+0o-b1b computes `newDigests = committedDigests - priorDigests`, enqueues the canonical cross-product
+`newDigests × postUnionDigests` without self-pairs, and updates the slot projection by monotone union,
+never wholesale replacement. Pending-row removal leaves the digest-set dedup fact intact, so drain then
+redelivery enqueues nothing. Same-digest lexicographically lesser carrier replacement changes the body
+materialized later but never the pair identity or enqueue history.
+
+#### D.63.5 — Mandatory 0o-b1b blockers
+
+The fresh RED must pin, with controlled compliant surfaces and surgical causal mutants:
+
+- authoritative full-slot read and authenticated witness validation before irreversible digest union;
+- monotone union versus wholesale slot replacement;
+- `newDigests × postUnionDigests` versus pairs within only the presented/new evidence;
+- one identity per canonical unordered pair, same-digest collapse and no self-pair;
+- exact lifetime enqueue count across bounded permutations, retry, concurrency, drain and redelivery;
+- co-commit and non-spanning author-scoped recovery-enumeration failpoints, including a slot whose first
+  author projection write was lost;
+- current-carrier reconstruction, stale-carrier and byte-swap TOCTOU;
+- recomputed scope, digest pair and proof ID before handoff, with an unmaterializable row failing closed
+  and remaining pending;
+- zero proof bodies and zero `Uint8Array` values in all 0o-b durable state, plus a total durable-byte
+  census that does not hide copies behind a bounded cache;
+- byte-preservation of conforming `state.proofs` and 0o-b read-independence from `state.proofs`,
+  caller digest lists/IDs and `newlyPersistedProofIds`;
+- admission, resolution, `slotSignal` and standalone proof-verification invariance under budget
+  saturation, pending-row drain and author projection replay;
+- deep-only source/built/runtime public audits, no default store, no wall clock and explicit serial root
+  Vitest gates.
+
+The fresh RED also carries the prior access-hardening class: capture/detach authoritative inputs once,
+never dispatch coordinator-owned Array methods, and fail closed before an irreversible union or row
+removal. The 0o-a original/pass-1/pass-2/pass-3 suites and frozen supplement checker are mandatory GREEN
+regressions.
+
 ## Next Agent Prompt
 
-Phase 0o-a is accepted and implementation-checkpointed at `16a864b`; D.62 is the authoritative
-acceptance/remediation ledger. Begin Phase 0o-b with a fresh Codex-high causal RED owner before any live
-gossip or ACL composition. The RED must:
+Phase 0o-a is accepted at `16a864b`; D.62 is its acceptance ledger and D.63 is the unanimous correction
+and executable 0o-b split. Begin **0o-b1a only** with a fresh Codex-high causal RED owner. Freeze one
+hash-bound additive projection/reconstruction profile that preserves every frozen
+`equivocation-digest-identity-v1` byte and semantic guarantee. Require two deep-only helpers:
 
-- place one author in at least two distinct `authorSequence` slots under durable concurrency and all
-  bounded permutations;
-- prove one shared deterministic per-author budget with no wall clock and no admission feedback;
-- define and govern proof retention/compaction before implementing it;
-- collapse same-digest entries per slot and require one proof per unordered pair of distinct digests,
-  with each proof ID durably persisted/announced exactly once under retry, concurrency and compaction;
-- keep gossip/rate aggregation, ACL-visible reputation and durable-store behavior separate from
-  envelope validity and standalone proof verification;
-- use an injected durable coordinator and no default production store.
+- derive the canonical proof ID from one canonical unordered pair of distinct 32-byte digests;
+- materialize the current canonical proof bytes from detached current committed witnesses and the
+  authoritative resolver, rejecting scope/pair/digest/carrier mismatch before output.
+
+The RED must use genuine 0o-a proof bytes and same-digest re-carriers, an independent controlled
+reference, and surgical pair-order, trusted-ID, stale-carrier, missing-authentication and public-re-export
+mutants. Source, built-package and runtime package-root audits must forbid both helpers. Do not implement
+the 0o-b1b store, pending lifecycle, budget, reputation, gossip transport, ACL mutation, witness
+compaction, `state.proofs` compaction, payload outbox, acknowledgement API or global evidence bound in
+0o-b1a.
 
 Phase 0p remains limited to anchored reducer/input/epoch work budgets. Preserve exact received-byte
 identity, the frozen D.37 tuple, the deep-only public boundary, the shipped-target activation boundary,
