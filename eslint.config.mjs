@@ -167,6 +167,13 @@ const config = tsLintConfig(
 				},
 			],
 		},
+	},
+	{
+		files: ["tests/fixtures/phase-0j-a/**/*.{ts,mjs}"],
+		rules: {
+			"@typescript-eslint/explicit-function-return-type": "off",
+			"jsdoc/require-jsdoc": "off",
+		},
 	}
 );
 

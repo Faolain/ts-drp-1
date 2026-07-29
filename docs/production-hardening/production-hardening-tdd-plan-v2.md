@@ -10066,13 +10066,153 @@ Never use `git add -A`. Never stage `eslint.config.mjs`, `.logs/`, `.agents/`, `
 path. The only tracked `eslint.config.mjs` change is the provisional 0j-a fixture lint block; it remains
 with that uncheckpointed RED and does not belong to Phase 0i.
 
+### D.56 — Phase 0j-a conservative authoring gate implemented
+
+Phase 0j-a is implemented on the v3 authoring plane. It adds the reusable
+`eslint-plugin-ts-drp` package and its `drp/no-ambient-in-reducer` rule over explicitly designated whole
+TypeScript source modules and exact emitted self-contained ESM text. It changes no v2 behavior and owns
+none of 0j-b's artifact identity/loader provenance, 0j-c's runtime-profile/intrinsic checks, 0j-d's
+shipping-target discovery or 0n's numeric/locale restrictions.
+
+The final contract has 97 cases: 31 source and 66 artifact, 27 clean and 70 diagnostic, 114 exact
+diagnostics, 31 mutant groups and 101 tests including the plugin surface and sealed-matrix controls.
+The rule is deliberately conservative and syntactic, not a claim of sound-and-complete JavaScript
+purity. Its enforced local boundary is scope-resolved direct module-binding writes, direct member-write
+ancestry, transparent or identity-preserving expression-result wrappers and the structural
+module-value/capture projections pinned by the contract. Provenance through a newly introduced local
+binding, arbitrary container construction, helper return/getter/call/proxy/reflection or interprocedural
+data flow remains D.53.3's explicit completeness boundary. This is a refinement of the existing trust
+boundary, not a plan assumption change or a whole-program taint-analysis promise.
+
+#### D.56.1 — TDD and independent-review closure
+
+The first RED proved the reusable package was absent. Successive independent Codex-high RED/GREEN
+owners expanded and sealed the matrix at 38, 61, 64, 73, 75, 85, 90, 95 and finally 101 tests.
+Independent reviews repeatedly found concrete local fail-opens inside already-enumerated categories;
+each finding returned to a fresh bounded RED before production changed:
+
+1. nested property-write shapes;
+2. destructuring, TypeScript transparent wrappers and write-target patterns;
+3. direct destructured escape and structural member/expression projection;
+4. member-expression aliases, conditional/logical/sequence value shapes and class static state;
+5. tagged-template results, static auto-accessors and StaticBlocks;
+6. sequence/conditional/logical expression-result write laundering;
+7. direct FunctionName/ClassName binding writes and AssignmentExpression-result laundering.
+
+The final RED8 froze production at
+`585b3420d49aa264b17f91af1b0e6bd792948126cd4fe0a9ff27782568a6bc1b`,
+with the final test/contract hashes already present, and produced exactly 3 failed / 98 passed. Only
+`module-function-class-direct-write-operators`, `module-function-class-direct-write-patterns` and
+`assignment-result-module-binding-write-base` failed. GREEN8 changed only
+`packages/eslint-plugin-ts-drp/src/index.ts`: it consumes the first non-initializing runtime
+`reference.isWrite()` for otherwise-lawful module bindings without duplicating already-rejected
+non-const declarations, and treats `AssignmentExpression` as an expression result only from its RHS.
+Reversing those two additions outside the repository byte-reconstructs the exact RED8 hash and exact
+3/98 result; ablating either edit independently kills only its own RED cases.
+
+The final frozen hashes are:
+
+- rule source
+  `9aa32a16500f247f88d1806d4078e254a54ff53ae88752b1fe132cc3b9ae7b4d`;
+- test
+  `66ccc2395f9248c2acb42c45e747ba5a234c38bdb8a0b2501f5e01ff565d99c6`;
+- contract
+  `1fcd4f2a854a9eeca01df85968ddea653c2f1863039f2bfc73d9968cec6cd82b`.
+
+Grok 4.5/high hit its initial turn cap after authenticating the tuple, gates and RED8 causality; the
+resumed same session completed its residual probes and returned `PASS`. Exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` independently returned `PASS`. Final
+Opus-xhigh returned `PASS`, authorized this ledger/checkpoint and authorized 0j-b to begin; it found no
+incorrect plan assumption and no need for the D.52.4 correction quorum. Evidence hashes:
+
+- acceptance prompt
+  `ff0e3cb65ab5e26a869c02e882cc75ac83cef9cae0fdb2e2c9d523ecd5ae783d`;
+- initial/resumed Grok
+  `9f2b0081e78a1a16c549a6fc4e59060f7dae8c6753abac33ca64af1660d237c9`,
+  `2d89c326c160f6dcfad90491dc3628c80a9be950dbf861ef1e8c7a0523e149ae`;
+- exact Kimi 3/100
+  `3f745546086545a2e5ea25996ec604091c39a012624d552f4659c907263aab90`;
+- Opus-xhigh
+  `b8a9989c208ca02c1a4094ee6f961739776238e69f7cae2a6d27793627c22ecc`.
+
+#### D.56.2 — Gates and operational gotchas
+
+The final bounded gates pass:
+
+- exact RED8 3 failed / 98 passed
+  `6a8d646ededa3e0ef190f643de219c0061beae09bd8cb9cc4a59888c3c96ab50`;
+- source 101/101
+  `71804a31cee3e769b902e43530ce227e0341960c66d36979345b9ad466633e20`;
+- built plugin 101/101
+  `485581723a4d386d61dc6760f626233e086ccc717f24cf58ef0a68498a01cc73`;
+- package typecheck/build
+  `d1bd87844fee40db200e1aa88f801f4fc3c04356b0fe743d56fc41097b8493ca`,
+  `62f4c59d811349bd9dba236ac6b394c70f1e5fa5572bc2055725c6b0218f0f3d`;
+- 33-of-34 workspace typechecks
+  `fbcab48d087f0f4ba996dd62c98cc215f3eaeea0b1fc3261a726d5d5cdbcf3ed`;
+- empty targeted lint and diff check
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`;
+- Prettier
+  `17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`;
+- frozen lock
+  `c50d32b6b564ac4d1f99c492257876e055947b5e0ac698e0b2103f0550ea7831`;
+- corrected bounded probes
+  `bddc1626f60107fc11c3002f1805633b4cdf2c1ffcb5b292ce207890bca9a5fd`.
+
+Operational notes:
+
+- `packages/eslint-plugin-ts-drp/src` must contain only `index.ts`; stale source-adjacent generated
+  JavaScript/declarations can make source-vs-built review ambiguous. `dist/` is gitignored build output,
+  never checkpoint evidence.
+- Flat-config scratch probes must use file globs that actually match the supplied filename, such as
+  `**/*.ts` and `**/*.mjs`. A mismatched glob returns “No matching configuration found” with a null
+  `messageId`; do not mistake that for rule behavior. Likewise, source-only auto-accessor syntax is a
+  fatal parse in the exact-artifact parser and must remain a source-kind case.
+- Diagnostics are intentionally binding-centric. Repeated writes through one binding produce one
+  diagnostic; multiple declarators sharing one rejected `let`/`var` declaration also deduplicate at the
+  declaration node. Both fail closed.
+- Logical-expression result tracking is deliberately fail-closed on either operand. Calls/new/tagged
+  results and unknown structural projections are also conservative. The escaping-IIFE/factory counter
+  remains a declared interprocedural completeness limit; D.53.3's repeated same/fresh-instance
+  cross-engine conformance is the later defense in depth, not an excuse to claim the linter proves
+  arbitrary JavaScript.
+- GREEN8 introduced a harmless repeated `variableDefinition(variable)` lookup in the captured branch.
+  Opus recorded it as cosmetic only. Do not change the frozen reviewed tuple solely to remove it; fold it
+  away if this source is substantively touched later.
+
+No 0n implementation belongs in this checkpoint. When the separately authorized core 0n work is
+eventually scheduled, retain `@ts-drp/math` if it remains bounded and base it on pinned deterministic
+prior art rather than new approximation design. Broader Rapier-style WASM/runtime math expansion stays
+optional until after the golden paths. This does not waive the existing 4a numeric prerequisite or the
+required v3 owner/plane correction quorum before scheduling the stale `consensus-v2` 0n row.
+
+#### D.56.3 — Selective checkpoint boundary
+
+Stage exactly these 12 paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `eslint.config.mjs`;
+3. `pnpm-lock.yaml`;
+4. `packages/eslint-plugin-ts-drp/package.json`;
+5. `packages/eslint-plugin-ts-drp/src/index.ts`;
+6. `packages/eslint-plugin-ts-drp/tsconfig.json`;
+7. `packages/eslint-plugin-ts-drp/tsconfig.build.json`;
+8. `tests/eslint-plugin-ts-drp-no-ambient-0j-a.test.ts`;
+9. `tests/fixtures/phase-0j-a/no-ambient-contract.json`;
+10. `tests/fixtures/phase-0j-a/whole-module-pure.ts`;
+11. `tests/fixtures/phase-0j-a/exact-emitted-pure.mjs`;
+12. `tests/fixtures/phase-0j-a/exact-emitted-date.mjs`.
+
+Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
+
 ## Next Agent Prompt
 
-Selectively checkpoint only the authorized atomic Phase-0i correction and D.55 ledger, then return
-directly to the preserved provisional 0j-a RED. Rerun/reseal that RED from the corrected base before
-starting its distinct Codex-high GREEN owner. Continue 0j-a with Grok, exact
+Selectively checkpoint only the authorized Phase-0j-a implementation and D.56 ledger, then begin 0j-b
+as its own atomic v3 TDD item with a fresh Codex-high RED owner and distinct Codex-high GREEN owner.
+Continue with Grok, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final Opus-xhigh. Keep the standing
 v3-forward owner/plane audit for every later item; v2 remains preservation/compatibility/freeze only.
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked
-protocol-v2 0g2 REDs, `eslint.config.mjs` or unrelated paths. Do not schedule Fable unless explicitly
+protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly
 requested, and do not schedule Phase 0n under its current stale `consensus-v2` label.
