@@ -10345,11 +10345,164 @@ Stage exactly these 17 paths:
 Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
 
+### D.58 — Phase 0j-c bounded exact-byte conformance oracle implemented
+
+Phase 0j-c is implemented on the v3 local/release conformance plane. The package-owned
+`run-blueprint-conformance-v1.mjs` authenticates the exact package/artifact/profile tuple before
+starting any worker or browser; executes the same verified artifact bytes in a real Node worker and
+real Chromium, Firefox and WebKit realms; canonical-detaches every reducer state and output before the
+next reducer; repeats same-module and fresh-module executions; poisons bounded ambient APIs; detects
+selected intrinsic mutation; and emits a digest-bound receipt only after proving exactly one result for
+each required engine and one shared conformance digest.
+
+The PR tier is deliberately small. The nightly/release tier is its strict bounded superset, and the
+release workflow makes npm publication depend on that reusable nightly gate. This remains an oracle for
+the 0j-owned minimal reducer ABI, not a production dispatch/fold owner, an arbitrary hostile-JavaScript
+sandbox, Phase-0n numeric policy or Phase-0j-d Electron discovery.
+
+#### D.58.1 — Causal TDD history and authenticated tuple
+
+The frozen RED is load-bearing rather than receipt-shaped cargo cult. It proves:
+
+- exact artifact, package-template and runtime-profile binding before engine execution;
+- real Node, Chromium, Firefox and WebKit membership and receipt recomputation;
+- raw canonical `-0` preservation plus per-reducer `-0 -> +0` state/output handoff;
+- the actual encoded object-key order `z,aa` observed by the next reducer;
+- rejection of an unpaired-surrogate object key and a sparse intermediate before a later reducer can
+  remove either defect;
+- thenable, ambient, module-global, selected-intrinsic, noncanonical and accounting controls;
+- same-module and fresh-module replay;
+- PR, scheduled, reusable-nightly and release-dependency workflow structure; and
+- an engine-divergent exact artifact that yields one stable Node digest and another stable browser
+  digest class.
+
+The bounded realm copier accepts only null, booleans, strings, governed finite numbers, arrays and plain
+objects. It normalizes negative zero, compares object keys by complete canonical encoded string bytes,
+uses captured descriptor values, and rejects accessors, symbols, cycles, sparse arrays, unsupported
+objects and unpaired surrogates. Map, Set, typed-array, application dispatch and deterministic-math
+support are intentionally not smuggled into this slice.
+
+Final authenticated semantic hashes are:
+
+- runner `823adcd21e49daeeb00e4861ef4196bef765cba72751cb8d513ab26e8ccdb2d0`;
+- conformance workflow `f3321cdc48bcf9f2e65c1216699ebeafdde18512885fbb3212101f7524674863`;
+- release workflow `0ea1252d79c484889e96f46742068ebfe13c43f456111f67a47e62aea5a75968`;
+- frozen RED `824fab792234d36e3a8ffb6809a9e1982c51b65ae89451f79eb1c122afcb319a`;
+- conformance contract `2e65c53dab3d2e118b410db315261bbc784f48d08c6596a2aec97b6e3260cb55`;
+- workflow contract `d231d28b675fad90c89175a0e0f8c8dca3532d89ccbbe4e9924be527ed58445b`;
+- primary artifact `3493b58e5b1f9dd388b5cb11bc50e13586176a12a38b3898b2193d11762ca66c`;
+- ambient control `e741bbad2c2a3542404d3bae3f34df2184a2073324bde79ddb0419b1548a85c2`;
+- engine-divergent control `d4300b2e7a34e16cb2fe4628f142dd2d79a912849e97456cd511f83f24db1ad0`;
+- thenable control `d7c672bc318d6ccc81f711022dcfeb1a6a16d406007bcd3c8d5fbd48f6309def`;
+- intrinsic-mutating control `bc0fa16b3febfd6a10b216bcc76ab95c19e4a75cb4574cb310464f58186f34d1`;
+- module-global control `f473f532536c52d3391778aa5e8b142f5bdace094933017e8e1168679e497997`;
+- noncanonical control `2ece977387fd895b65634a4b5daf799f9ea0f51b06714467166a906e5dc9e13b`;
+- sparse control `b2fc9b8a2ade12fe9531969fd7cc89e2d9b0589e8e5eb9ca87108ecd09fc6184`.
+
+#### D.58.2 — Two adversarial-review remediations
+
+The initial Grok review returned `PASS_WITH_NOTES` but found a real runner-level receipt flaw: the Vitest
+wrapper compared engine digests, while the bare runner could still mint a passed receipt containing two
+digest classes. A fresh exact-artifact RED reproduced exit 0 with a passed receipt, Node digest
+`77903e84...` and browser digest `9758812e...`. Distinct GREEN changed only the runner so receipt
+construction now requires exactly one Node, Chromium, Firefox and WebKit result and one shared derived
+digest. The divergent RED now fails before receipt construction with
+`cross-engine conformance digest disagreement`. Grok and exact Kimi-3/100 independently closed that
+finding.
+
+The first final Opus-xhigh review then found a separate CI-only dependency defect. The frozen RED imports
+`yaml`, but root `package.json` did not declare it. Local success escaped to
+`/Users/aristotle/node_modules/yaml`; a clean-ancestor unchanged-test collection failed before any oracle
+assertion. A fresh Codex-high RED reproduced both facts without changing repository bytes. A distinct
+Codex-high GREEN added only root devDependency `"yaml": "^2.8.0"` and refreshed the lock:
+
+- `package.json`
+  `eac235d761ef0cdf48a25653aa53ebc9ba6a2c5fec9b55d9692f8d31b8f616cc`;
+- `pnpm-lock.yaml`
+  `5ce44569ed94090219c1f81d64a47cd62cb74576265d584ab56c9f912abcdcfb`.
+
+Pnpm legitimately retargeted typedoc's compatible `yaml` snapshot from 2.7.1 to 2.8.0 and removed the
+orphan 2.7.1 package/snapshot; typedoc declares `yaml ^2.5.1`. Every semantic hash in D.58.1 remained
+byte-identical. Grok-high, exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh each independently
+authenticated the exact delta and clean-ancestor internal resolution. Their execution depth differed:
+Grok's overlay used `--ignore-scripts` and stopped at resolution; Kimi additionally ran a clean-ancestor
+build and focused tier; Opus additionally ran a clean-ancestor build, collection, focused and nightly
+tier. All three authorized checkpoint and progression to 0j-d.
+
+Neither remediation changes a D.53 assumption, digest identity, trust boundary, v3 owner, engine matrix
+or Phase-4a boundary. No D.52.4 material-assumption correction quorum was required.
+
+#### D.58.3 — Residuals and operational gotchas
+
+1. A workstation-level `~/node_modules` can mask an undeclared direct test/tool import. New direct
+   imports require a declared root or package dependency and a clean-ancestor resolution/collection
+   probe, not only a local green.
+2. The conformance workflow's ordinary `pnpm install --frozen-lockfile` intentionally runs root
+   `postinstall`, which builds workspace `dist` exports. A future `--ignore-scripts` change would fail
+   collection on `@ts-drp/canonical`; keep the install behavior or add an explicit equivalent build.
+3. Root Vitest processes must run serially. Parallel root invocations race on
+   `coverage/.tmp/coverage-0.json` and can fail after otherwise-passing assertions.
+4. Do not run Prettier over the package-manager-generated `pnpm-lock.yaml`; validate it with its exact
+   reviewed delta and a frozen install. Authored source, workflows, fixtures, manifest and documentation
+   remain Prettier-owned.
+5. The raw base freeze checker can hit `spawnSync git ENOBUFS` in this sidecar-heavy dirty tree. The
+   isolated exact overlay passed the base, Ed25519 and blueprint-artifact-profile checkers. This remains
+   harness debt, not permission to waive a real checker failure.
+6. Negative-control diagnostic ambiguity, selected-intrinsic coverage bounds, array-extra dropping,
+   integer-like JavaScript enumeration, post-JSON `Object.is(-0)` assertions, one trivial same-instance
+   replay, the dead mutant-only `runnerIsAbsent` escape and a non-nightly reusable-workflow tier remain
+   informational. Main causal assertions and the pinned release `nightly` call keep the accepted contract
+   load-bearing.
+7. Clean-ancestor frozen-install, build, focused and nightly runs establish CI-equivalence by
+   construction. The newly added workflow has not yet run on `ubuntu-latest`; the first real PR trigger
+   is the remaining empirical confirmation.
+
+#### D.58.4 — Final gates and selective checkpoint boundary
+
+Authoritative post-remediation evidence is:
+
+- focused Phase 0j-c **7 passed / 1 intentional nightly skip**;
+- explicit nightly **8/8**;
+- Phase 0j-a + Phase 0j-b regressions **142/142**;
+- workspace typecheck passes all **33** participating projects;
+- full lint, excluding only sidecar/generated evidence directories, has **0 errors / 226 inherited
+  warnings**;
+- authored-file Prettier and `git diff --check` pass;
+- `pnpm install --frozen-lockfile` passes;
+- clean-ancestor resolution selects its own `yaml@2.8.0`, never `~/node_modules`;
+- isolated base, Ed25519 and blueprint-artifact-profile freeze checkers pass; and
+- Grok-high, exact Kimi-3/100 and final Opus-xhigh authorize the checkpoint.
+
+Stage exactly these 17 paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `package.json`;
+3. `pnpm-lock.yaml`;
+4. `.github/workflows/release.yml`;
+5. `.github/workflows/protocol-v3-blueprint-conformance.yml`;
+6. `packages/protocol-v3/scripts/run-blueprint-conformance-v1.mjs`;
+7. `tests/protocol-v3-blueprint-conformance-0j-c.test.ts`;
+8. `tests/fixtures/phase-0j-c-v3/blueprint-conformance-contract.json`;
+9. `tests/fixtures/phase-0j-c-v3/conformance-workflow-contract.json`;
+10. `tests/fixtures/phase-0j-c-v3/chat-conformance-blueprint.mjs`;
+11. `tests/fixtures/phase-0j-c-v3/chat-conformance-ambient-bad.mjs`;
+12. `tests/fixtures/phase-0j-c-v3/chat-conformance-engine-divergent.mjs`;
+13. `tests/fixtures/phase-0j-c-v3/chat-conformance-thenable.mjs`;
+14. `tests/fixtures/phase-0j-c-v3/chat-conformance-intrinsic-mutating.mjs`;
+15. `tests/fixtures/phase-0j-c-v3/chat-conformance-module-global-drift.mjs`;
+16. `tests/fixtures/phase-0j-c-v3/chat-conformance-noncanonical-intermediate.mjs`;
+17. `tests/fixtures/phase-0j-c-v3/chat-conformance-sparse-intermediate.mjs`.
+
+Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
+
 ## Next Agent Prompt
 
-Selectively checkpoint only the 17 authorized Phase-0j-b paths and D.57 ledger, then begin 0j-c as its
+Selectively checkpoint only the 17 authorized Phase-0j-c paths and D.58 ledger, then begin 0j-d as its
 own atomic v3 TDD item with a fresh Codex-high RED owner and distinct Codex-high GREEN owner. Preserve the
-runtime-capability consumer boundary, same-realm loader assumption and declared non-sandbox residuals.
+exact-byte oracle boundary, serial root-Vitest constraint, root-postinstall build dependency and declared
+non-sandbox residuals.
 Continue with Grok, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final
 Opus-xhigh. Keep the standing v3-forward owner/plane audit for every later item; v2 remains
 preservation/compatibility/freeze only. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,

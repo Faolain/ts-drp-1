@@ -1,0 +1,44 @@
+name: Protocol v3 Blueprint Conformance
+
+on:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_call:
+    inputs:
+      tier:
+        required: true
+        type: string
+
+jobs:
+  phase-0j-c-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm exec vitest run tests/protocol-v3-blueprint-conformance-0j-c.test.ts
+
+  phase-0j-c-nightly:
+    if: github.event_name == 'schedule' || inputs.tier == 'nightly'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: RUN_PHASE_0J_C_NIGHTLY=true pnpm exec vitest run tests/protocol-v3-blueprint-conformance-0j-c.test.ts

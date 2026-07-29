@@ -110,6 +110,9 @@ importers:
       vitest:
         specifier: ^3.0.5
         version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+      yaml:
+        specifier: ^2.8.0
+        version: 2.8.0
 
   examples/browser-network:
     dependencies:
@@ -7752,11 +7755,6 @@ packages:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
     engines: {node: '>=18'}
 
-  yaml@2.7.1:
-    resolution: {integrity: sha512-10ULxpnOCQXxJvBgxsn9ptjq6uviG/htZKk9veJGhlqn3w/DxQ631zFF+nlQXLwmImeS5amR2dl2U8sg6U9jsQ==}
-    engines: {node: '>= 14'}
-    hasBin: true
-
   yaml@2.8.0:
     resolution: {integrity: sha512-4lLa/EcQCB0cJkyts+FpIRx5G/llPxfP6VQU5KByHEhLxY3IJCH0f0Hy1MHI8sClTvsIb8qwRJ6R/ZdlDJ/leQ==}
     engines: {node: '>= 14.6'}
@@ -15294,7 +15292,7 @@ snapshots:
       minimatch: 9.0.5
       shiki: 1.29.2
       typescript: 5.8.2
-      yaml: 2.7.1
+      yaml: 2.8.0
 
   typescript-eslint@8.29.0(eslint@9.23.0)(typescript@5.8.2):
     dependencies:
@@ -15751,8 +15749,6 @@ snapshots:
   yallist@4.0.0: {}
 
   yallist@5.0.0: {}
-
-  yaml@2.7.1: {}
 
   yaml@2.8.0: {}
 

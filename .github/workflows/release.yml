@@ -3,6 +3,13 @@ on:
   release:
     types: [published]
 jobs:
+  phase-0j-c-release-conformance:
+    name: Protocol v3 blueprint nightly conformance
+    secrets: inherit
+    uses: ./.github/workflows/protocol-v3-blueprint-conformance.yml
+    with:
+      tier: nightly
+
   npm_publish:
     name: Publish packages to npmjs
     secrets: inherit
@@ -10,6 +17,8 @@ jobs:
       id-token: write
       packages: write
     uses: ./.github/workflows/npm-publish.yml
+    needs:
+      - phase-0j-c-release-conformance
 
   publish_buf_registry:
     name: Publish buf files
