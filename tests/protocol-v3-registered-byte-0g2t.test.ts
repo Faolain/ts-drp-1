@@ -7,7 +7,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import contract from "./fixtures/phase-0g2t/registered-byte-contract.json" with { type: "json" };
-import blueprintContract from "./fixtures/phase-0i-v3/blueprint-admission-package.json" with { type: "json" };
 import { verifyRegisteredSignature as verifyV2RegisteredSignature } from "../packages/protocol-v2/src/index.js";
 import registryJson from "../packages/protocol-v3/registry/registry-v1.json" with { type: "json" };
 
@@ -38,7 +37,6 @@ interface RegisteredVertexVerification {
 interface VerifyReceivedVertexInput {
 	domain: string;
 	expectedAnchor: string;
-	preparedBlueprintAdmission?: unknown;
 	receivedCanonicalPreimageBytes: Uint8Array;
 	resolveAuthorPublicKey(author: string): { bytes: Uint8Array; format: "raw" } | undefined;
 	signature: Uint8Array;
@@ -47,10 +45,6 @@ interface VerifyReceivedVertexInput {
 
 interface ProtocolV3Surface {
 	digestReceivedVertexPreimage?(receivedCanonicalPreimageBytes: Uint8Array): Uint8Array;
-	prepareBlueprintAdmission?(input: {
-		readonly canonicalBlueprintPackageBytes: Uint8Array;
-		readonly expectedBlueprintDigest: string;
-	}): unknown;
 	verifyReceivedVertex?(input: VerifyReceivedVertexInput): RegisteredVertexVerification;
 	vertexCanonicalBytes?(input: Readonly<Record<string, unknown>>): Uint8Array;
 	vertexDigest?(input: Readonly<Record<string, unknown>>): Uint8Array;
@@ -76,8 +70,6 @@ const V3_SOURCE_DIRECTORY =
 const PKCS8_ED25519_SEED_PREFIX = fromHex("302e020100300506032b657004220420");
 const SPKI_ED25519_PUBLIC_KEY_PREFIX_BYTES = 12;
 const U32_MAX = 0xffff_ffff;
-const EXPECTED_BLUEPRINT_DIGEST = "cabbcc65454211b2e258328632aba8b184c8abdb6fb9082b498714fad503b838";
-const preparedVerifierAudit = { calls: 0 };
 
 const surfaceLoad = import(IMPLEMENTATION_URL)
 	.then((loaded: unknown) => ({ loaded: loaded as ProtocolV3Surface }))
@@ -178,7 +170,7 @@ function materializeMalformed(input: MalformedAuthorSequence): Readonly<Record<s
 	return vertex;
 }
 
-async function requireRawSurfaceFunction<Key extends keyof ProtocolV3Surface>(
+async function requireSurfaceFunction<Key extends keyof ProtocolV3Surface>(
 	name: Key
 ): Promise<NonNullable<ProtocolV3Surface[Key]>> {
 	const result = await surfaceLoad;
@@ -188,24 +180,6 @@ async function requireRawSurfaceFunction<Key extends keyof ProtocolV3Surface>(
 	const candidate = result.loaded[name];
 	if (typeof candidate !== "function") throw new Error(`PHASE_0G2T_MISSING_EXPORT:${String(name)}`);
 	return candidate as NonNullable<ProtocolV3Surface[Key]>;
-}
-
-async function requireSurfaceFunction<Key extends keyof ProtocolV3Surface>(
-	name: Key
-): Promise<NonNullable<ProtocolV3Surface[Key]>> {
-	const candidate = await requireRawSurfaceFunction(name);
-	if (name !== "verifyReceivedVertex") return candidate;
-
-	const prepareBlueprintAdmission = await requireRawSurfaceFunction("prepareBlueprintAdmission");
-	const preparedBlueprintAdmission = prepareBlueprintAdmission({
-		canonicalBlueprintPackageBytes: encodeCanonical(blueprintContract.package),
-		expectedBlueprintDigest: EXPECTED_BLUEPRINT_DIGEST,
-	});
-	const verifyReceivedVertexUnprepared = candidate as NonNullable<ProtocolV3Surface["verifyReceivedVertex"]>;
-	return ((input: VerifyReceivedVertexInput): RegisteredVertexVerification => {
-		preparedVerifierAudit.calls++;
-		return verifyReceivedVertexUnprepared({ ...input, preparedBlueprintAdmission });
-	}) as NonNullable<ProtocolV3Surface[Key]>;
 }
 
 function sourceFiles(directory: string): readonly string[] {
@@ -237,9 +211,6 @@ describe("Phase 0g(ii-T) v3 registered-byte RED", () => {
 		expect(contract).not.toHaveProperty("canonicalHex");
 		expect(contract).not.toHaveProperty("digestHex");
 		expect(contract).not.toHaveProperty("signatureHex");
-		const source = readFileSync(fileURLToPath(import.meta.url), "utf8");
-		expect(source.match(/verifyReceivedVertexUnprepared\s*\(/gu)).toHaveLength(1);
-		expect(source).toMatch(/verifyReceivedVertexUnprepared\(\{\s*\.\.\.input,\s*preparedBlueprintAdmission\s*\}\)/u);
 
 		const bytes = encodeCanonical(normalizeFixtureVertex());
 		const digest = independentHashDomain(contract.domains.v3, bytes);
@@ -263,26 +234,6 @@ describe("Phase 0g(ii-T) v3 registered-byte RED", () => {
 				suiteId: contract.suites.v2,
 			})
 		).toBe(false);
-	});
-
-	it("routes a success-expected verifier call through production-prepared ABI at runtime", async () => {
-		const verifyReceivedVertex = await requireSurfaceFunction("verifyReceivedVertex");
-		const receivedCanonicalPreimageBytes = encodeCanonical(normalizeFixtureVertex());
-		const digest = independentHashDomain(contract.domains.v3, receivedCanonicalPreimageBytes);
-		const { privateKey, publicKey } = keyMaterial();
-		preparedVerifierAudit.calls = 0;
-
-		expect(
-			verifyReceivedVertex({
-				domain: contract.domains.v3,
-				expectedAnchor: contract.vertex.anchor,
-				receivedCanonicalPreimageBytes,
-				resolveAuthorPublicKey: () => ({ bytes: publicKey, format: "raw" }),
-				signature: new Uint8Array(nodeSign(null, digest, privateKey)),
-				suiteId: contract.suites.v3,
-			})
-		).toMatchObject({ accepted: true, digest });
-		expect(preparedVerifierAudit.calls).toBe(1);
 	});
 
 	it("derives the exact ten-field vertex preimage and review position from registry v1", async () => {

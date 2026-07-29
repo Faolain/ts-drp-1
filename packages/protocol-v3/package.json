@@ -7,7 +7,7 @@
 		"url": "git+https://github.com/drp-tech/ts-drp.git"
 	},
 	"type": "module",
-	"types": "./dist/src/index.d.ts",
+	"types": "./dist/src/public.d.ts",
 	"files": [
 		"src",
 		"registry",
@@ -17,8 +17,8 @@
 	],
 	"exports": {
 		".": {
-			"types": "./dist/src/index.d.ts",
-			"import": "./dist/src/index.js"
+			"types": "./dist/src/public.d.ts",
+			"import": "./dist/src/public.js"
 		},
 		"./registry/registry-v1.json": "./registry/registry-v1.json"
 	},
@@ -26,7 +26,9 @@
 		"build": "tsc -b tsconfig.build.json",
 		"clean": "rm -rf dist/ node_modules/",
 		"prepack": "tsc -b",
-		"typecheck": "tsc --noEmit",
+		"smoke:public-package": "node --input-type=module -e \"const required = ['admitReceivedVertex', 'createAdmissionBoundTransactionalVertexIssuer', 'prepareBlueprintAdmission']; const forbidden = ['createTransactionalVertexIssuer', 'verifyReceivedVertex']; const actual = Object.keys(await import('@ts-drp/protocol-v3')).sort(); const missing = required.filter((name) => !actual.includes(name)); const leaked = forbidden.filter((name) => actual.includes(name)); if (missing.length || leaked.length) throw new Error('invalid package exports; missing=' + missing.join(',') + '; leaked=' + leaked.join(',')); console.log('public package exports:', actual.join(','));\" && tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.built-package-audit.json",
+		"typecheck": "tsc --noEmit && pnpm typecheck:public-entry-audit",
+		"typecheck:public-entry-audit": "tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json",
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {

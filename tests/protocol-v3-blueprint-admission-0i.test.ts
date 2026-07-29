@@ -1,9 +1,11 @@
 import { createHash, createPrivateKey, createPublicKey, sign as nodeSign } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import contract from "./fixtures/phase-0i-v3/blueprint-admission-package.json" with { type: "json" };
+import protocolV3Package from "../packages/protocol-v3/package.json" with { type: "json" };
 
 interface CanonicalModule {
 	decodeCanonical(bytes: Uint8Array): unknown;
@@ -115,7 +117,7 @@ interface TransactionalIssuerOptions {
 	validateOperation?(operation: Readonly<Record<string, unknown>>): boolean;
 }
 
-interface VerifyReceivedVertexInput {
+interface AdmitReceivedVertexInput {
 	readonly domain: string;
 	readonly expectedAnchor: string;
 	readonly preparedBlueprintAdmission?: unknown;
@@ -129,12 +131,12 @@ interface VerifyReceivedVertexInput {
 }
 
 interface ProtocolV3Surface {
-	createTransactionalVertexIssuer?(options: TransactionalIssuerOptions): TransactionalVertexIssuer;
-	prepareBlueprintAdmission?(input: BlueprintPreparationInput): unknown;
-	verifyReceivedVertex?(input: VerifyReceivedVertexInput): {
-		readonly accepted: boolean;
+	admitReceivedVertex?(input: AdmitReceivedVertexInput): {
+		readonly admitted: boolean;
 		readonly digest?: Uint8Array;
 	};
+	createAdmissionBoundTransactionalVertexIssuer?(options: TransactionalIssuerOptions): TransactionalVertexIssuer;
+	prepareBlueprintAdmission?(input: BlueprintPreparationInput): unknown;
 }
 
 interface KeyMaterial {
@@ -156,15 +158,23 @@ interface TransactionHarness {
 	readonly outboxWrites: number;
 }
 
+interface AdmissionDecision {
+	readonly admitted: boolean;
+	readonly digest?: Uint8Array;
+}
+
 const CURRENT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
-const IMPLEMENTATION_URL =
-	process.env.PHASE_0I_V3_IMPLEMENTATION_MODULE === undefined
-		? undefined
-		: pathToFileURL(resolve(CURRENT_DIRECTORY, "..", process.env.PHASE_0I_V3_IMPLEMENTATION_MODULE)).href;
-const surfaceLoad =
-	IMPLEMENTATION_URL === undefined
-		? import("../packages/protocol-v3/src/index.js").then((loaded: unknown) => loaded as ProtocolV3Surface)
-		: import(IMPLEMENTATION_URL).then((loaded: unknown) => loaded as ProtocolV3Surface);
+const REPOSITORY_ROOT = resolve(CURRENT_DIRECTORY, "..");
+const PROTOCOL_V3_DIRECTORY = resolve(REPOSITORY_ROOT, "packages/protocol-v3");
+const packageRootImport = protocolV3Package.exports["."].import;
+const packageRootTypes = protocolV3Package.exports["."].types;
+const packageRootSourcePath = resolve(
+	PROTOCOL_V3_DIRECTORY,
+	packageRootImport.replace(/^\.\/dist\//u, "").replace(/\.js$/u, ".js")
+);
+const surfaceLoad = import(pathToFileURL(packageRootSourcePath).href).then(
+	(loaded: unknown) => loaded as ProtocolV3Surface
+);
 const VERTEX_DOMAIN = "ts-drp/vertex/v3";
 const VERTEX_SUITE = "ed25519-sha256-v3";
 const EXPECTED_MANIFEST_HEX =
@@ -264,8 +274,8 @@ function signedRemote(operation: Readonly<Record<string, unknown>>): RemoteCase 
 function remoteInput(
 	remote: RemoteCase,
 	preparedBlueprintAdmission: unknown,
-	overrides: Partial<VerifyReceivedVertexInput> = {}
-): VerifyReceivedVertexInput {
+	overrides: Partial<AdmitReceivedVertexInput> = {}
+): AdmitReceivedVertexInput {
 	const { publicKey } = keyMaterial();
 	return {
 		domain: VERTEX_DOMAIN,
@@ -319,6 +329,17 @@ function transactionHarness(): TransactionHarness {
 			return outboxWrites;
 		},
 	};
+}
+
+function sourceFiles(directory: string): readonly string[] {
+	const files: string[] = [];
+	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		if (entry.isDirectory() && ["coverage", "dist", "node_modules"].includes(entry.name)) continue;
+		const path = resolve(directory, entry.name);
+		if (entry.isDirectory()) files.push(...sourceFiles(path));
+		else if (entry.isFile() && /\.(?:cts|mts|ts|tsx)$/u.test(entry.name)) files.push(path);
+	}
+	return files;
 }
 
 async function requireSurfaceFunction<Key extends keyof ProtocolV3Surface>(
@@ -395,12 +416,14 @@ function forgePrepared(value: unknown): object {
 }
 
 async function createIssuerAttempt(
-	createTransactionalVertexIssuer: NonNullable<ProtocolV3Surface["createTransactionalVertexIssuer"]>,
+	createAdmissionBoundTransactionalVertexIssuer: NonNullable<
+		ProtocolV3Surface["createAdmissionBoundTransactionalVertexIssuer"]
+	>,
 	options: TransactionalIssuerOptions,
 	input: LocalVertexInput
 ): Promise<{ error?: unknown; value?: IssueCommit }> {
 	try {
-		const issuer = createTransactionalVertexIssuer(options);
+		const issuer = createAdmissionBoundTransactionalVertexIssuer(options);
 		return { value: await issuer.issue(input) };
 	} catch (error) {
 		return { error };
@@ -434,8 +457,53 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 		expect(signedRemote(contract.validOperation).signature).toHaveLength(64);
 	});
 
+	it("uses a distinct package-root application entry with no primitive values or repository imports", async () => {
+		expect(packageRootImport).not.toBe("./dist/src/index.js");
+		expect(packageRootTypes).not.toBe("./dist/src/index.d.ts");
+		expect(packageRootImport.replace(/\.js$/u, "")).toBe(packageRootTypes.replace(/\.d\.ts$/u, ""));
+
+		const surface = (await surfaceLoad) as ProtocolV3Surface & Record<string, unknown>;
+		expect(surface.admitReceivedVertex).toBeTypeOf("function");
+		expect(surface.createAdmissionBoundTransactionalVertexIssuer).toBeTypeOf("function");
+		expect(surface.prepareBlueprintAdmission).toBeTypeOf("function");
+		expect(surface).not.toHaveProperty("verifyReceivedVertex");
+		expect(surface).not.toHaveProperty("createTransactionalVertexIssuer");
+
+		const publicSource = readFileSync(packageRootSourcePath.replace(/\.js$/u, ".ts"), "utf8");
+		expect(publicSource).not.toMatch(
+			/export\s+(?:interface|type)\s+(?:VerifyReceivedVertexInput|TransactionalIssuerOptions)\b/u
+		);
+		expect(publicSource).not.toMatch(
+			/export\s+(?:type\s+)?\{[^}]*\b(?:VerifyReceivedVertexInput|TransactionalIssuerOptions)\b/u
+		);
+		expect(publicSource).not.toMatch(/export\s+\*\s+from/u);
+
+		const staticImport = /import\s+([\s\S]*?)\s+from\s+["']([^"']+)["']/gu;
+		const dynamicDeepImport = /import\(\s*["'][^"']*protocol-v3\/src\/index(?:\.js)?["']\s*\)/u;
+		const primitiveName = /\b(?:verifyReceivedVertex|createTransactionalVertexIssuer)\b/u;
+		const sourceRoots = ["packages", "examples", "site"].map((root) => resolve(REPOSITORY_ROOT, root));
+		const violations = sourceRoots
+			.flatMap((root) => sourceFiles(root))
+			.filter((path) => path !== resolve(PROTOCOL_V3_DIRECTORY, "src/index.ts"))
+			.filter((path) => {
+				const source = readFileSync(path, "utf8");
+				if (dynamicDeepImport.test(source)) return true;
+				for (const match of source.matchAll(staticImport)) {
+					const clause = match[1] ?? "";
+					const specifier = match[2] ?? "";
+					if (/protocol-v3\/src\/index(?:\.js)?$/u.test(specifier)) return true;
+					if (specifier === "@ts-drp/protocol-v3" && (primitiveName.test(clause) || /\*\s+as\b/u.test(clause))) {
+						return true;
+					}
+				}
+				return false;
+			})
+			.map((path) => path.slice(REPOSITORY_ROOT.length + 1));
+		expect(violations).toEqual([]);
+	});
+
 	it("behaviorally rejects an authenticated undeclared remote operation after author authentication", async () => {
-		const verifyReceivedVertex = await requireSurfaceFunction("verifyReceivedVertex");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
 		const operation = { action: "undeclared_remote", key: "message", value: "must reject" };
 		const remote = signedRemote(operation);
 		const preparedBlueprintAdmission = await preparedOrLegacyPlaceholder();
@@ -443,7 +511,7 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 		instrumentation.encodeCalls = 0;
 		instrumentation.verifyCalls = 0;
 
-		const result = verifyReceivedVertex({
+		const result = admitReceivedVertex({
 			...remoteInput(remote, preparedBlueprintAdmission),
 			operation: contract.validOperation,
 			resolveAuthorPublicKey,
@@ -454,18 +522,44 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 		expect(resolveAuthorPublicKey).toHaveBeenCalledOnce();
 		expect(resolveAuthorPublicKey).toHaveBeenCalledWith(contract.vertex.author);
 		expect(instrumentation.encodeCalls).toBe(0);
-		expect(result).toEqual({ accepted: false });
+		expect(result).toEqual({ admitted: false });
+	});
+
+	it("rejects invalid authentication with a genuine capability before digest admission", async () => {
+		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
+		const prepared = prepareBlueprintAdmission(prepareInput());
+		const remote = signedRemote(contract.validOperation);
+		const invalidSignature = new Uint8Array(remote.signature);
+		invalidSignature[0] ^= 0x01;
+		const resolveAuthorPublicKey = vi.fn(remoteInput(remote, undefined).resolveAuthorPublicKey);
+		instrumentation.verifyCalls = 0;
+
+		const decision = admitReceivedVertex(
+			remoteInput(remote, prepared, {
+				resolveAuthorPublicKey,
+				signature: invalidSignature,
+			})
+		);
+
+		expect(resolveAuthorPublicKey).toHaveBeenCalledOnce();
+		expect(resolveAuthorPublicKey).toHaveBeenCalledWith(contract.vertex.author);
+		expect(instrumentation.verifyCalls).toBe(1);
+		expect(decision).toEqual({ admitted: false });
+		expect(decision).not.toHaveProperty("digest");
 	});
 
 	it("behaviorally rejects an invalid local operation before transaction, signing, record, or outbox work", async () => {
-		const createTransactionalVertexIssuer = await requireSurfaceFunction("createTransactionalVertexIssuer");
+		const createAdmissionBoundTransactionalVertexIssuer = await requireSurfaceFunction(
+			"createAdmissionBoundTransactionalVertexIssuer"
+		);
 		const harness = transactionHarness();
 		const { publicKey } = keyMaterial();
 		const preparedBlueprintAdmission = await preparedOrLegacyPlaceholder();
 		instrumentation.signCalls = 0;
 
 		const outcome = await createIssuerAttempt(
-			createTransactionalVertexIssuer,
+			createAdmissionBoundTransactionalVertexIssuer,
 			{
 				author: contract.vertex.author,
 				preparedBlueprintAdmission,
@@ -584,7 +678,7 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 
 	it("uses the application-declared discriminator and closed per-operation argument schema", async () => {
 		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
-		const verifyReceivedVertex = await requireSurfaceFunction("verifyReceivedVertex");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
 		const prepared = prepareBlueprintAdmission(prepareInput());
 
 		const invalidOperations = [
@@ -598,8 +692,8 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 
 		for (const operation of invalidOperations) {
 			const remote = signedRemote(operation);
-			expect(verifyReceivedVertex(remoteInput(remote, prepared)), JSON.stringify(operation)).toEqual({
-				accepted: false,
+			expect(admitReceivedVertex(remoteInput(remote, prepared)), JSON.stringify(operation)).toEqual({
+				admitted: false,
 			});
 		}
 
@@ -610,31 +704,54 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 		const verbPrepared = prepareBlueprintAdmission(prepareInput(verbInput.bytes, verbInput.digestHex));
 		const verbOperation = { verb: "set_message", key: "message", value: "declared discriminator" };
 		const verbRemote = signedRemote(verbOperation);
-		expect(verifyReceivedVertex(remoteInput(verbRemote, verbPrepared))).toMatchObject({
-			accepted: true,
+		expect(admitReceivedVertex(remoteInput(verbRemote, verbPrepared))).toMatchObject({
+			admitted: true,
 			digest: verbRemote.digest,
 		});
 	});
 
 	it("keeps invalid discriminator and arguments before every local issuance side effect", async () => {
 		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
-		const createTransactionalVertexIssuer = await requireSurfaceFunction("createTransactionalVertexIssuer");
+		const createAdmissionBoundTransactionalVertexIssuer = await requireSurfaceFunction(
+			"createAdmissionBoundTransactionalVertexIssuer"
+		);
 		const prepared = prepareBlueprintAdmission(prepareInput());
 		const { publicKey } = keyMaterial();
-		const invalidOperations = [
+		const detachedCopyMutant: Record<string, unknown> = {
+			key: "message",
+			value: "non-enumerable discriminator must not survive canonical detachment",
+		};
+		Object.defineProperty(detachedCopyMutant, "action", {
+			configurable: true,
+			enumerable: false,
+			value: "set_message",
+		});
+		const rawCheckMutant: Record<string, unknown> = {
+			action: "set_message",
+			key: "message",
+			value: "non-enumerable extra must fail before canonical detachment",
+		};
+		Object.defineProperty(rawCheckMutant, "extra", {
+			configurable: true,
+			enumerable: false,
+			value: true,
+		});
+		const invalidOperations: readonly Readonly<Record<string, unknown>>[] = [
 			{ opType: "set_message", key: "message", value: "wrong discriminator" },
 			{ action: "unknown", key: "message", value: "unknown" },
 			{ action: "set_message", value: "missing key" },
 			{ action: "set_message", key: 7, value: "wrong key type" },
 			{ action: "set_message", key: "message", value: false },
 			{ action: "set_message", key: "message", value: "extra", extra: true },
+			detachedCopyMutant,
+			rawCheckMutant,
 		];
 
 		for (const operation of invalidOperations) {
 			const harness = transactionHarness();
 			instrumentation.signCalls = 0;
 			const outcome = await createIssuerAttempt(
-				createTransactionalVertexIssuer,
+				createAdmissionBoundTransactionalVertexIssuer,
 				{
 					author: contract.vertex.author,
 					preparedBlueprintAdmission: prepared,
@@ -656,38 +773,86 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 
 	it("requires runtime-proven preparation and rejects missing, raw, branded, cloned, or callback substitutes", async () => {
 		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
-		const verifyReceivedVertex = await requireSurfaceFunction("verifyReceivedVertex");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
 		const prepared = prepareBlueprintAdmission(prepareInput());
+		const crossPackage = clonePackage();
+		const crossManifest = crossPackage.manifest as { operationDiscriminator: string };
+		crossManifest.operationDiscriminator = "verb";
+		const crossInput = expectedDigestFor(crossPackage);
+		const crossPrepared = prepareBlueprintAdmission(prepareInput(crossInput.bytes, crossInput.digestHex));
 		const forgedValues = [
 			undefined,
 			contract.package,
 			{ __brand: "PreparedBlueprintAdmission" },
+			{ ...(prepared as object) },
+			structuredClone(prepared),
 			forgePrepared(prepared),
+			crossPrepared,
 		];
 
 		for (const forged of forgedValues) {
 			const remote = signedRemote(contract.validOperation);
 			expect(
-				verifyReceivedVertex({
+				admitReceivedVertex({
 					...remoteInput(remote, forged),
 					isOperationAllowed: () => true,
 					validateOperation: () => true,
 				})
-			).toEqual({ accepted: false });
+			).toEqual({ admitted: false });
 		}
+	});
+
+	it("keeps non-admitted bytes out of accepted state and causality, including primitive result substitution", async () => {
+		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
+		const prepared = prepareBlueprintAdmission(prepareInput());
+		const acceptedState: string[] = [];
+		const causalityIndex: string[] = [];
+		const forensicRetention: { admitted: false; bytes: Uint8Array }[] = [];
+		const consume = (decision: AdmissionDecision, remote: RemoteCase): void => {
+			if (decision.admitted === true && decision.digest !== undefined) {
+				const digestHex = toHex(decision.digest);
+				acceptedState.push(digestHex);
+				causalityIndex.push(digestHex);
+				return;
+			}
+			forensicRetention.push({ admitted: false, bytes: new Uint8Array(remote.bytes) });
+		};
+
+		const invalidRemote = signedRemote({ action: "not_declared", key: "message", value: "retain only" });
+		const invalidDecision = admitReceivedVertex(remoteInput(invalidRemote, prepared));
+		expect(invalidDecision).toEqual({ admitted: false });
+		consume(invalidDecision, invalidRemote);
+
+		const primitiveDecision = { accepted: true, digest: invalidRemote.digest };
+		consume(primitiveDecision as unknown as AdmissionDecision, invalidRemote);
+		expect(acceptedState).toEqual([]);
+		expect(causalityIndex).toEqual([]);
+		expect(forensicRetention).toHaveLength(2);
+		expect(forensicRetention.every(({ admitted }) => admitted === false)).toBe(true);
+
+		const validRemote = signedRemote(contract.validOperation);
+		const validDecision = admitReceivedVertex(remoteInput(validRemote, prepared));
+		expect(validDecision).toEqual({ admitted: true, digest: validRemote.digest });
+		expect(validDecision).not.toHaveProperty("accepted");
+		consume(validDecision, validRemote);
+		expect(acceptedState).toEqual([toHex(validRemote.digest)]);
+		expect(causalityIndex).toEqual([toHex(validRemote.digest)]);
 	});
 
 	it("treats legacy-looking values as inert data: undeclared reject, exactly declared allow", async () => {
 		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
-		const verifyReceivedVertex = await requireSurfaceFunction("verifyReceivedVertex");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
 		const primaryPrepared = prepareBlueprintAdmission(prepareInput());
 		const declaredPackage = legacyDeclaredPackage();
 		const declaredInput = expectedDigestFor(declaredPackage);
 		const declaredPrepared = prepareBlueprintAdmission(prepareInput(declaredInput.bytes, declaredInput.digestHex));
-		const createTransactionalVertexIssuer = await requireSurfaceFunction("createTransactionalVertexIssuer");
+		const createAdmissionBoundTransactionalVertexIssuer = await requireSurfaceFunction(
+			"createAdmissionBoundTransactionalVertexIssuer"
+		);
 		const harness = transactionHarness();
 		const { publicKey } = keyMaterial();
-		const issuer = createTransactionalVertexIssuer({
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: contract.vertex.author,
 			preparedBlueprintAdmission: declaredPrepared,
 			privateKeySeed: fromHex(contract.privateKeySeedHex),
@@ -698,11 +863,11 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 		for (const value of contract.legacyLookingValues) {
 			const operation = { action: value, payload: "inert application data" };
 			const remote = signedRemote(operation);
-			expect(verifyReceivedVertex(remoteInput(remote, primaryPrepared)), `${value} undeclared`).toEqual({
-				accepted: false,
+			expect(admitReceivedVertex(remoteInput(remote, primaryPrepared)), `${value} undeclared`).toEqual({
+				admitted: false,
 			});
-			expect(verifyReceivedVertex(remoteInput(remote, declaredPrepared)), `${value} declared`).toMatchObject({
-				accepted: true,
+			expect(admitReceivedVertex(remoteInput(remote, declaredPrepared)), `${value} declared`).toMatchObject({
+				admitted: true,
 				digest: remote.digest,
 			});
 			await expect(issuer.issue(localInput(operation)), `${value} locally declared`).resolves.toMatchObject({
@@ -714,20 +879,22 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 
 	it("accepts and issues declared operations while preserving exact received bytes", async () => {
 		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
-		const verifyReceivedVertex = await requireSurfaceFunction("verifyReceivedVertex");
-		const createTransactionalVertexIssuer = await requireSurfaceFunction("createTransactionalVertexIssuer");
+		const admitReceivedVertex = await requireSurfaceFunction("admitReceivedVertex");
+		const createAdmissionBoundTransactionalVertexIssuer = await requireSurfaceFunction(
+			"createAdmissionBoundTransactionalVertexIssuer"
+		);
 		const prepared = prepareBlueprintAdmission(prepareInput());
 		const remote = signedRemote(contract.validOperation);
 		instrumentation.encodeCalls = 0;
-		expect(verifyReceivedVertex(remoteInput(remote, prepared))).toMatchObject({
-			accepted: true,
+		expect(admitReceivedVertex(remoteInput(remote, prepared))).toEqual({
+			admitted: true,
 			digest: remote.digest,
 		});
 		expect(instrumentation.encodeCalls).toBe(0);
 
 		const harness = transactionHarness();
 		const { publicKey } = keyMaterial();
-		const issuer = createTransactionalVertexIssuer({
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: contract.vertex.author,
 			preparedBlueprintAdmission: prepared,
 			privateKeySeed: fromHex(contract.privateKeySeedHex),
@@ -744,21 +911,31 @@ describe("Phase 0i-v3 digest-bound blueprint ABI RED", () => {
 
 	it("keeps all forged local paths before transaction/sign/record/outbox work", async () => {
 		const prepareBlueprintAdmission = await requireSurfaceFunction("prepareBlueprintAdmission");
-		const createTransactionalVertexIssuer = await requireSurfaceFunction("createTransactionalVertexIssuer");
+		const createAdmissionBoundTransactionalVertexIssuer = await requireSurfaceFunction(
+			"createAdmissionBoundTransactionalVertexIssuer"
+		);
 		const prepared = prepareBlueprintAdmission(prepareInput());
+		const crossPackage = clonePackage();
+		const crossManifest = crossPackage.manifest as { operationDiscriminator: string };
+		crossManifest.operationDiscriminator = "verb";
+		const crossInput = expectedDigestFor(crossPackage);
+		const crossPrepared = prepareBlueprintAdmission(prepareInput(crossInput.bytes, crossInput.digestHex));
 		const { publicKey } = keyMaterial();
 		const forgedValues = [
 			undefined,
 			contract.package,
 			{ __brand: "PreparedBlueprintAdmission" },
+			{ ...(prepared as object) },
+			structuredClone(prepared),
 			forgePrepared(prepared),
+			crossPrepared,
 		];
 
 		for (const forged of forgedValues) {
 			const harness = transactionHarness();
 			instrumentation.signCalls = 0;
 			const outcome = await createIssuerAttempt(
-				createTransactionalVertexIssuer,
+				createAdmissionBoundTransactionalVertexIssuer,
 				{
 					author: contract.vertex.author,
 					preparedBlueprintAdmission: forged,

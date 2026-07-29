@@ -39,7 +39,6 @@ export interface RawEd25519PublicKey {
 export interface VerifyReceivedVertexInput {
 	readonly domain: string;
 	readonly expectedAnchor: string;
-	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
 	readonly signature: Uint8Array;
@@ -100,6 +99,28 @@ export interface TransactionalVertexIssuer {
 
 export interface TransactionalIssuerOptions {
 	readonly author: string;
+	readonly privateKeySeed: Uint8Array;
+	readonly publicKey: RawEd25519PublicKey;
+	readonly transactIssue: TransactIssue;
+}
+
+export interface AdmitReceivedVertexInput {
+	readonly domain: string;
+	readonly expectedAnchor: string;
+	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
+	readonly receivedCanonicalPreimageBytes: Uint8Array;
+	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
+	readonly signature: Uint8Array;
+	readonly suiteId: string;
+}
+
+export interface AdmissionDecision {
+	readonly admitted: boolean;
+	readonly digest?: Uint8Array;
+}
+
+export interface AdmissionBoundTransactionalIssuerOptions {
+	readonly author: string;
 	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
 	readonly privateKeySeed: Uint8Array;
 	readonly publicKey: RawEd25519PublicKey;
@@ -141,6 +162,11 @@ interface CompiledOperationSchema {
 interface PreparedBlueprintAdmissionState {
 	readonly discriminator: string;
 	readonly operations: ReadonlyMap<string, CompiledOperationSchema>;
+}
+
+interface AuthenticatedReceivedVertex {
+	readonly digest: Uint8Array;
+	readonly preimage: Readonly<Record<string, unknown>>;
 }
 
 const registry = registryJson as ProtocolRegistry;
@@ -579,7 +605,7 @@ function operationMatchesPreparedAdmission(operation: unknown, state: PreparedBl
 /**
  * Prepares an unforgeable admission capability from exact canonical package bytes.
  * @param input - Canonical package bytes and the digest proven by the caller.
- * @returns A runtime-proven capability accepted by the v3 verifier and issuer.
+ * @returns A capability accepted by admitReceivedVertex and createAdmissionBoundTransactionalVertexIssuer.
  */
 export function prepareBlueprintAdmission(input: BlueprintPreparationInput): PreparedBlueprintAdmission {
 	assertClosedRecord(
@@ -702,10 +728,13 @@ export function verifyEd25519RegisteredDigest(
  * @returns A stateless transactional issuer.
  */
 export function createTransactionalVertexIssuer(options: TransactionalIssuerOptions): TransactionalVertexIssuer {
-	const preparedState = consumerPreparedAdmissionState(options);
-	if (preparedState === undefined) {
-		throw new TypeError("preparedBlueprintAdmission must be produced by prepareBlueprintAdmission");
-	}
+	return createTransactionalVertexIssuerCore(options);
+}
+
+function createTransactionalVertexIssuerCore(
+	options: TransactionalIssuerOptions,
+	operationAdmission?: (operation: Readonly<Record<string, unknown>>) => boolean
+): TransactionalVertexIssuer {
 	if (!(options.privateKeySeed instanceof Uint8Array) || options.privateKeySeed.byteLength !== 32) {
 		throw new TypeError("private key seed must be a 32-byte Uint8Array");
 	}
@@ -731,11 +760,11 @@ export function createTransactionalVertexIssuer(options: TransactionalIssuerOpti
 
 	return {
 		async issue(input: LocalVertexInput): Promise<IssueCommit> {
-			if (!operationMatchesPreparedAdmission(input.operation, preparedState)) {
+			if (operationAdmission !== undefined && !operationAdmission(input.operation)) {
 				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
 			}
 			const operation = detachCanonicalRecord(input.operation);
-			if (!operationMatchesPreparedAdmission(operation, preparedState)) {
+			if (operationAdmission !== undefined && !operationAdmission(operation)) {
 				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
 			}
 			const detachedInput: LocalVertexInput = {
@@ -780,14 +809,26 @@ export function createTransactionalVertexIssuer(options: TransactionalIssuerOpti
 }
 
 /**
- * Verifies a received v3 vertex without ever substituting re-encoded bytes.
+ * Creates an application issuer bound to a genuine prepared blueprint admission.
  *
- * Domain, suite, signature shape, canonical syntax, registered fields and
- * anchor scope all fail closed before author-key resolution.
- * @param input - Received bytes, signature, expected scope and author-key resolver.
- * @returns Acceptance and, on success, the exact-received-byte digest.
+ * Both the caller-provided operation and its canonical detached copy must match
+ * the prepared ABI before the transaction coordinator is entered.
+ * @param options - Prepared admission, author key material and transaction coordinator.
+ * @returns A stateless admission-bound transactional issuer.
  */
-export function verifyReceivedVertex(input: VerifyReceivedVertexInput): RegisteredVertexVerification {
+export function createAdmissionBoundTransactionalVertexIssuer(
+	options: AdmissionBoundTransactionalIssuerOptions
+): TransactionalVertexIssuer {
+	const preparedState = consumerPreparedAdmissionState(options);
+	if (preparedState === undefined) {
+		throw new TypeError("preparedBlueprintAdmission must be produced by prepareBlueprintAdmission");
+	}
+	return createTransactionalVertexIssuerCore(options, (operation) =>
+		operationMatchesPreparedAdmission(operation, preparedState)
+	);
+}
+
+function authenticateReceivedVertex(input: VerifyReceivedVertexInput): AuthenticatedReceivedVertex | undefined {
 	if (
 		input === null ||
 		typeof input !== "object" ||
@@ -798,7 +839,7 @@ export function verifyReceivedVertex(input: VerifyReceivedVertexInput): Register
 		input.signature.byteLength !== 64 ||
 		typeof input.resolveAuthorPublicKey !== "function"
 	) {
-		return { accepted: false };
+		return undefined;
 	}
 
 	try {
@@ -810,25 +851,52 @@ export function verifyReceivedVertex(input: VerifyReceivedVertexInput): Register
 			requireRegisteredOrder: true,
 			sortRegisteredArrays: false,
 		});
-		if (preimage.anchor !== input.expectedAnchor) return { accepted: false };
+		if (preimage.anchor !== input.expectedAnchor) return undefined;
 
 		const digest = digestReceivedVertexPreimage(input.receivedCanonicalPreimageBytes);
 		const author = preimage.author;
-		if (typeof author !== "string") return { accepted: false };
+		if (typeof author !== "string") return undefined;
 		const publicKey = input.resolveAuthorPublicKey(author);
 		if (publicKey?.format !== "raw" || !(publicKey.bytes instanceof Uint8Array) || publicKey.bytes.byteLength !== 32) {
-			return { accepted: false };
+			return undefined;
 		}
 
 		if (!verifyEd25519RegisteredDigest(input.signature, digest, publicKey.bytes)) {
-			return { accepted: false };
+			return undefined;
 		}
-		const preparedState = consumerPreparedAdmissionState(input);
-		if (preparedState === undefined || !operationMatchesPreparedAdmission(preimage.operation, preparedState)) {
-			return { accepted: false };
-		}
-		return { accepted: true, digest };
+		return { digest, preimage };
 	} catch {
-		return { accepted: false };
+		return undefined;
 	}
+}
+
+/**
+ * Verifies a received v3 vertex without ever substituting re-encoded bytes.
+ *
+ * Domain, suite, signature shape, canonical syntax, registered fields and
+ * anchor scope all fail closed before author-key resolution.
+ * @param input - Received bytes, signature, expected scope and author-key resolver.
+ * @returns Acceptance and, on success, the exact-received-byte digest.
+ */
+export function verifyReceivedVertex(input: VerifyReceivedVertexInput): RegisteredVertexVerification {
+	const authenticated = authenticateReceivedVertex(input);
+	return authenticated === undefined ? { accepted: false } : { accepted: true, digest: authenticated.digest };
+}
+
+/**
+ * Authenticates exact received bytes and then applies a genuine prepared ABI.
+ * @param input - Received vertex data and prepared application admission.
+ * @returns Admission and, on success, the exact-received-byte digest.
+ */
+export function admitReceivedVertex(input: AdmitReceivedVertexInput): AdmissionDecision {
+	const authenticated = authenticateReceivedVertex(input);
+	if (authenticated === undefined) return { admitted: false };
+	const preparedState = consumerPreparedAdmissionState(input);
+	if (
+		preparedState === undefined ||
+		!operationMatchesPreparedAdmission(authenticated.preimage.operation, preparedState)
+	) {
+		return { admitted: false };
+	}
+	return { admitted: true, digest: authenticated.digest };
 }

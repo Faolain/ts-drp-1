@@ -9872,16 +9872,207 @@ received `PLAN_ALIGNMENT: AGREE / VERDICT: PASS` from all three:
 This quorum authorizes the plan correction and post-edit verification only. It does not authorize
 production/test implementation before the corrected plan is separately checkpointed.
 
+### D.55 — Phase 0i frozen-contract correction implemented
+
+The atomic D.54 correction is implemented on the forward v3 plane. No v2 production behavior was added.
+`packages/protocol-v3/src/index.ts` remains the path-pinned conformance module and again exposes the
+pre-0i primitive contracts: `verifyReceivedVertex` returns `{ accepted, digest? }` without an admission
+capability, and `createTransactionalVertexIssuer` performs the frozen transactional-signing contract
+without one. `packages/protocol-v3/src/public.ts` is the distinct package-root entry and exposes
+`prepareBlueprintAdmission`, `admitReceivedVertex` and
+`createAdmissionBoundTransactionalVertexIssuer`, but neither primitive value nor the primitive-only
+`VerifyReceivedVertexInput` / `TransactionalIssuerOptions` types.
+
+The application APIs retain genuine module-private `WeakMap` provenance. Remote admission authenticates
+the registered exact received bytes before applying the already-decoded operation ABI and returns the
+non-substitutable `{ admitted, digest? }` decision. Local bound issuance checks both the raw operation and
+its canonical detached copy before transaction, signing, issued-record or outbox work. The unprepared
+primitives remain conformance mechanisms, never application admission.
+
+#### D.55.1 — TDD and exact restoration evidence
+
+The fresh Codex-high RED restored the three inherited primitive suites to the D.54.1 tuple and changed
+only the non-protected Phase-0i application suite. Against the fused implementation, the focused run was
+honestly red: 4 files / 46 tests, 22 passed / 24 failed. Primitive success failed because capability
+requirements had been fused onto frozen names; application tests failed because the distinct public
+entry and application exports did not yet exist. Both qualified freeze checkers were already green in
+the exact candidate overlay, proving that restoration rather than policy restamping was the lawful path.
+
+The distinct Codex-high GREEN changed only protocol-v3 production/package paths and produced the shared
+private authentication and issuer cores, restored primitive behavior, required-capability application
+wrappers, explicit public entry and package-root repointing. The final restored hashes remain:
+
+- 0g(ii-S) protected test:
+  `26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938`;
+- 0g(ii-T):
+  `6d9cba3ebc1ae3b63cf296e6063e4f1cb843c6f057b7cbd5d460e76657fcfa33`;
+- 0g(ii-I):
+  `f29d1d8aad65f3cbf8410f5c16d5ded97736ed9fb838125d570799e0d1213cea`.
+
+The final implementation/test tuple before the final Opus gate is:
+
+- `packages/protocol-v3/src/index.ts`
+  `3dd00b6c3e5c0765bb86af48be1e4099b9ee786b9a9eb6a07b1b63d965e7a275`;
+- `packages/protocol-v3/src/public.ts`
+  `82c57a8dbd0b52cea43c02555999dbda3f67fc94ded7a9734cab0990ab3483c2`;
+- `packages/protocol-v3/package.json`
+  `ca7aef9613397f4407a036a5718d3ddfadf7b41ed744737d98c9e957ce8d4ad4`;
+- `tests/protocol-v3-blueprint-admission-0i.test.ts`
+  `b912194c93998ccd60041736dcab14085264cebd4968cc95793ef7e8692727fa`;
+- source public-entry audit / config:
+  `10e4708d6b77324de1c5d7802d508d21eeafb8662a7ba88f14183f3343981101`,
+  `43e3bd46979761347514c75f80e28e6b15692aede6dfd71bdf8bbcb202f9e88a`;
+- built-package audit / config:
+  `a2fc9c47e934f75d49d6212decd4b84b35d493798915bfc213be9420d69c9e94`,
+  `7d0fb3b115fb1b32098712f874325f7dcb78aaa38c2df48457027cc27ea16a34`.
+
+A fresh post-format artifact audit records that exact tuple in
+`.logs/phase-0i-frozen-contract-final-artifact-hashes.log`
+(`acb1b5c71210e8400f7a8d94f5d1489da649782b6daa96f82e207ec9ee1133f5`). In particular it
+independently confirms the final Phase-0i application-suite hash
+`b912194c93998ccd60041736dcab14085264cebd4968cc95793ef7e8692727fa`; the earlier
+`remediation-final-audit.log` correctly describes the pre-final-hardening suite and is not the log of
+record for this tuple.
+
+#### D.55.2 — Independent findings and bounded remediation
+
+Initial Grok 4.5/high and exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` reviews independently returned
+`VERDICT: PASS / PLAN ALIGNMENT: AGREE`. They found no production defect, but converged on test
+durability gaps. The follow-up Codex-high remediation added a genuine-capability bad-signature case,
+the inverse non-enumerable raw-check mutant, fast compile-time source public-entry audit, separate
+post-build package-name runtime/type smoke and application-specific preparation JSDoc.
+
+The remediation did not merely add green assertions:
+
+- authentication fail-open made the new bad-signature case return `{ admitted: true }` and failed
+  (`1a8b8cebe302e9f88c7a2e1cd5b1d4f8f0a92e9165ff11d3d502a5bd0d1c2e22`);
+- removing the raw pre-detachment check admitted the non-enumerable-extra operation and entered one
+  transaction
+  (`5fd527786e047b2f8edb4cdec531aac74f4e726cb7dcb3454be2aaa8b97c9688`);
+- re-exporting both primitive values and both primitive-only types produced four `TS2578` failures
+  (`0d8bc772ae728a09acd33474441fe968c176b5e3229cffb920f1cc7f2f9195e8`);
+- a seeded namespace relative import of `protocol-v3/src/index.js` outside the conformance module was
+  detected by the widened `packages` / `examples` / `site` audit
+  (`9e39acb5fa9aba6cbb2e5f07e09c9ca7019330e24b5c2c00b1dd4962ba78e960`).
+
+The final audit has no implementation-module environment override. It rejects primitive named or
+namespace package-root imports and relative/dynamic conformance-module deep imports across application
+source roots, while the public entry itself remains the only lawful bridge to the conformance module.
+The runtime smoke checks required application exports as a subset and forbidden primitives as an empty
+intersection, so future lawful pure helpers are not frozen out.
+
+Post-remediation Grok 4.5/high and exact Kimi 3/100 again returned
+`VERDICT: PASS / PLAN ALIGNMENT: AGREE`:
+
+- Grok raw review
+  `eef0709f516e641dabcffcc02fc040b16d096b89e7b7622276bf8e33c2079c83`;
+- Kimi 3/100 raw review
+  `a8a28ba11b6b9f3c859cd1093d0068ce5ab76bf2f72eef6745c70cc5beb65279`.
+
+Their apparent “empty/truncated review artifact” comments were sampling-time observations made while the
+same redirected files were still being written; the completed hashes above contain both final verdicts.
+Kimi additionally identified the low implementation-module override and narrow import-audit edges. The
+final test-only hardening removed that override and widened the import audit, with the seeded
+deep-import RED recorded above.
+
+Final Opus-xhigh found no production, security, test-design or frozen-contract defect and returned
+`PLAN ALIGNMENT: AGREE`, but initially blocked checkpoint on four closure-evidence issues: the missing
+selective path list, the undisclosed boundary-only interpretation of `internal`, a focused run that
+predated the last whitespace-only Prettier write and a stale artifact-hash ledger. D.55.1/D.55.3/D.55.4
+close those four issues. The resumed same-session follow-up returned
+`VERDICT: PASS / PLAN ALIGNMENT: AGREE / CHECKPOINT: AUTHORIZED`:
+
+- initial Opus-xhigh review
+  `985770a136f578dbedaf0b84710b9bc20a5567d420192e19de4c22abf1e84949`;
+- resumed authorization
+  `b66a51a50f93647a5aca26fade8a39d16516b6057da3565ab32aabeb48a6f015`.
+
+#### D.55.3 — Gates and operational gotchas
+
+The final application/primitive run, rerun after the last whitespace-only Prettier write to the suite
+under test, is 4 files / 47 tests green
+(`b4ed392456272295ca7cb05297de977147d296130ab8558ca60305dc0accba36`).
+The earlier 47/47 run preceded that reformat and is retained only as historical evidence.
+Protocol-v3 typecheck includes the quick source public-entry audit and does not build. Full workspace
+typecheck passed all 32 projects in scope
+(`4e29b33324aeb90b05fdc60d86b25e62733c6ed5308f61123897ac91b16cce0b`).
+Targeted lint was empty/green, Prettier was green, explicit protocol-v3 build passed, and the immediately
+following package-name runtime/type smoke passed:
+
+- lint `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`;
+- Prettier `17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`;
+- build `7cd94d05afe83e7bba2c282c95c438aefa1bdeb582d18591b450addd1889eeec`;
+- built smoke
+  `c84dbae054c65d226d93bb20aa9f0a7bdf0f73c2523a1a4f822a1ab9dd1a831f`.
+
+Both freeze CLIs pass against qualified base `59d7000bef9b`:
+
+- protocol-v3 `cdf9e333cd09a0b2f3bbe9ee027d85284fe6897194f7f3d2faa397f1e7906b68`;
+- Ed25519 `0346a3be317db6a6ae240e86d9afa204ed79bef36e765d2dfb9192cd1e0b8c0f`.
+
+The generic checker still aborts in the main worktree when the 47,294-file untracked `.pnpm-store`
+enters `git ls-files`; the logged pass uses an invocation-local excludes file / clean-equivalent overlay
+and changes no checker, policy or repository ignore. On macOS, temporary checker paths must use canonical
+`/private/tmp`, not the `/tmp` symlink, or the direct-invocation path guard can silently skip work. Until
+this correction is committed, the Ed25519 checker must use qualified pre-drift base `59d7000bef9b`;
+default `HEAD^` correctly sees the bad committed checkpoint.
+
+The standalone `smoke:public-package` is intentionally a post-build check; always run a fresh
+protocol-v3 build immediately before it. Normal typecheck remains build-free for quick iteration.
+`dist/` is ignored and is not checkpoint evidence. The public root currently omits optional pure
+codec/digest/crypto helpers; before Phase 3a needs one, explicitly re-export the lawful helper from
+`public.ts` rather than importing an application composition path from the conformance module.
+
+D.54.2's “internal primitive declarations” clause is deliberately implemented as a package boundary,
+not with TypeScript `/** @internal */` markers. Root `tsconfig.json` sets `stripInternal: true`, while the
+hash-pinned 0g(ii-S/T/I) suites load the TypeScript conformance source rather than
+`dist/src/index.d.ts`; adding markers would not enforce the runtime boundary and could erase useful
+direct-conformance declarations from emitted deep declarations. Exclusion is instead enforced by the
+explicit `public.ts` allowlist, the package `exports` map, the source public-entry compile audit and the
+built-package runtime/type smoke. This records Grok's post-remediation Nit 2 and Kimi's equivalent note.
+
+The provisional 0j-a RED, its fixture/config support and its collected one-missing-plugin failure remain
+untouched and uncheckpointed. After the now-authorized atomic Phase-0i checkpoint, rerun and reseal that
+exact RED from the corrected base, then continue 0j-a rather than opening more Phase-0i scope.
+
+The authorization closure reran every bounded gate before staging: focused 4 files / 47 tests
+(`81451c9f4af25d9db49eccf3555190f94deb96437c992aadca2545231f87ef13`), all 32 workspace
+typechecks (`ee16b47082b7ff2e2c0927d94bee569963a8c8c8372045ad9e8acf308d05f14b`), empty targeted
+lint and diff check, Prettier, explicit build, built package smoke and both qualified freeze checkers.
+Their latter hashes remain the already-recorded empty/Prettier/build/smoke/freeze hashes above because
+the command outputs are byte-identical.
+
+#### D.55.4 — Selective checkpoint boundary
+
+D.52.5's inherited seven-path checkpoint list is superseded for this atomic correction. Stage exactly
+these 12 paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `packages/protocol-v3/package.json`;
+3. `packages/protocol-v3/src/index.ts`;
+4. `packages/protocol-v3/src/public.ts`;
+5. `tests/protocol-v3-blueprint-admission-0i.test.ts`;
+6. `tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts`;
+7. `tests/protocol-v3-registered-byte-0g2t.test.ts`;
+8. `tests/protocol-v3-transactional-issuance-0g2i.test.ts`;
+9. `tests/fixtures/phase-0i-v3/public-entry-type-audit.ts`;
+10. `tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json`;
+11. `tests/fixtures/phase-0i-v3/built-package-type-audit.ts`;
+12. `tests/fixtures/phase-0i-v3/tsconfig.built-package-audit.json`.
+
+Never use `git add -A`. Never stage `eslint.config.mjs`, `.logs/`, `.agents/`, `.claude/`,
+`.pnpm-store/`, `skills-lock.json`, either stale untracked protocol-v2 0g2 RED or another unrelated
+path. The only tracked `eslint.config.mjs` change is the provisional 0j-a fixture lint block; it remains
+with that uncheckpointed RED and does not belong to Phase 0i.
+
 ## Next Agent Prompt
 
-Verify and checkpoint only the unanimously approved D.54 plan correction, then execute the atomic
-Phase-0i frozen-contract repair before returning to 0j-a. Use a fresh Codex-high RED owner limited to
-test restoration/test changes, followed by a distinct Codex-high GREEN owner limited to protocol-v3
-production/package changes. Then run Grok, exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh. Both freeze checkers,
-focused tests, workspace typecheck, lint, formatting and diff check are mandatory logged gates. Do not
-edit or restamp any protected policy/checker/workflow/vector/fixture byte; the only protected-path change
-is exact restoration of the 0g(ii-S) test to its already-pinned bytes. Keep the provisional 0j-a RED paths
-untouched until the repair is reviewed and checkpointed. Continue the standing v3-forward owner/plane
-audit for every later item. Do not schedule Fable unless explicitly requested, and do not schedule Phase
-0n under its current stale `consensus-v2` label.
+Selectively checkpoint only the authorized atomic Phase-0i correction and D.55 ledger, then return
+directly to the preserved provisional 0j-a RED. Rerun/reseal that RED from the corrected base before
+starting its distinct Codex-high GREEN owner. Continue 0j-a with Grok, exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final Opus-xhigh. Keep the standing
+v3-forward owner/plane audit for every later item; v2 remains preservation/compatibility/freeze only.
+Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked
+protocol-v2 0g2 REDs, `eslint.config.mjs` or unrelated paths. Do not schedule Fable unless explicitly
+requested, and do not schedule Phase 0n under its current stale `consensus-v2` label.
