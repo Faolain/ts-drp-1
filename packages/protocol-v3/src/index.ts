@@ -1,7 +1,9 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
 
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
+import blueprintArtifactProfileJson from "../supplements/blueprint-artifact-profile-v1/profile.json" with { type: "json" };
 
 interface RegistryField {
 	readonly name: string;
@@ -132,6 +134,13 @@ export interface BlueprintPreparationInput {
 	readonly expectedBlueprintDigest: string;
 }
 
+export interface BlueprintRuntimePreparationInput {
+	readonly canonicalBlueprintPackageBytes: Uint8Array;
+	readonly exactArtifactBytes: Uint8Array;
+	readonly expectedBlueprintDigest: string;
+	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
+}
+
 /**
  * An admission capability prepared from a canonical, digest-bound blueprint package.
  *
@@ -141,6 +150,28 @@ export interface BlueprintPreparationInput {
  */
 export interface PreparedBlueprintAdmission {
 	readonly blueprintDigest: string;
+}
+
+/**
+ * A package-owned runtime capability bound to exact package and artifact bytes.
+ *
+ * Public fields are informational. Module-private provenance, distinct from the
+ * admission capability provenance, establishes whether the capability is genuine.
+ */
+export interface PreparedBlueprintRuntime {
+	readonly artifactDigest: string;
+	readonly artifactId: string;
+	readonly blueprintDigest: string;
+	readonly reducers: Readonly<
+		Record<
+			string,
+			(input: { readonly operation: unknown; readonly state: unknown }) => {
+				readonly output: unknown;
+				readonly state: unknown;
+			}
+		>
+	>;
+	readonly runtimeProfile: string;
 }
 
 /** A value does not satisfy the registered protocol-v3 vertex field contract. */
@@ -160,8 +191,32 @@ interface CompiledOperationSchema {
 }
 
 interface PreparedBlueprintAdmissionState {
+	readonly artifactDigest: string;
+	readonly artifactId: string;
+	readonly blueprintDigest: string;
+	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly discriminator: string;
 	readonly operations: ReadonlyMap<string, CompiledOperationSchema>;
+	readonly runtimeProfile: string;
+}
+
+interface CompiledBlueprintPackage {
+	readonly artifactDigest: string;
+	readonly artifactId: string;
+	readonly discriminator: string;
+	readonly operations: ReadonlyMap<string, CompiledOperationSchema>;
+	readonly runtimeProfile: string;
+}
+
+interface PreparedBlueprintRuntimeState {
+	readonly admission: PreparedBlueprintAdmissionState;
+	readonly exactArtifactBytes: Uint8Array;
+	readonly namespace: object;
+}
+
+interface BlueprintArtifactProfile {
+	readonly artifactDigestDomain: string;
+	readonly runtimeProfile: string;
 }
 
 interface AuthenticatedReceivedVertex {
@@ -185,14 +240,18 @@ if (identitySuite === undefined) {
 
 const VERTEX_SUITE_ID = identitySuite.suiteId;
 const BLUEPRINT_ADMISSION_DOMAIN = "ts-drp/blueprint-admission/v3";
+const textEncoder = new TextEncoder();
+const blueprintArtifactProfile = compileBlueprintArtifactProfile(blueprintArtifactProfileJson);
+const BLUEPRINT_ARTIFACT_DOMAIN = blueprintArtifactProfile.artifactDigestDomain;
+const BLUEPRINT_RUNTIME_PROFILE = blueprintArtifactProfile.runtimeProfile;
 const vertexFields = vertexRegistry.fields;
 const vertexFieldNames = new Set(vertexFields.map(({ name }) => name));
 const anchorFieldCandidate = vertexFields.find(({ name }) => name === "anchor");
 if (anchorFieldCandidate === undefined) throw new Error("protocol-v3 vertex registry is missing anchor");
 const anchorField: RegistryField = anchorFieldCandidate;
 
-const textEncoder = new TextEncoder();
 const preparedBlueprintAdmissions = new WeakMap<object, PreparedBlueprintAdmissionState>();
+const preparedBlueprintRuntimes = new WeakMap<object, PreparedBlueprintRuntimeState>();
 
 function ownDataProperty(input: Readonly<Record<string, unknown>>, name: string, context: string): unknown {
 	const descriptor = Object.getOwnPropertyDescriptor(input, name);
@@ -222,6 +281,85 @@ function assertNonEmptyString(value: unknown, context: string): asserts value is
 		throw new TypeError(`${context} must be a non-empty string`);
 	}
 	assertWellFormedString(value, context);
+}
+
+function assertClosedStringArray(value: unknown, context: string): asserts value is readonly string[] {
+	if (!Array.isArray(value)) throw new TypeError(`${context} must be an array`);
+	let previous: string | undefined;
+	for (const entry of value) {
+		assertNonEmptyString(entry, `${context} entry`);
+		if (previous !== undefined && compareCodePointStrings(previous, entry) >= 0) {
+			throw new TypeError(`${context} must contain unique strings in codepoint order`);
+		}
+		previous = entry;
+	}
+}
+
+function compileBlueprintArtifactProfile(value: unknown): BlueprintArtifactProfile {
+	assertClosedRecord(
+		value,
+		[
+			"schemaVersion",
+			"profileId",
+			"protocolMajor",
+			"artifactDigestDomain",
+			"runtimeProfiles",
+			"pureAllowlist",
+			"frozenTuple",
+		],
+		"blueprint artifact profile"
+	);
+	if (
+		ownDataProperty(value, "schemaVersion", "blueprint artifact profile") !== "ts-drp-blueprint-artifact-profile-v1" ||
+		ownDataProperty(value, "profileId", "blueprint artifact profile") !== "ts-drp-blueprint-artifact-profile-v1" ||
+		ownDataProperty(value, "protocolMajor", "blueprint artifact profile") !== 3
+	) {
+		throw new TypeError("blueprint artifact profile identity is unsupported");
+	}
+	const artifactDigestDomain = ownDataProperty(value, "artifactDigestDomain", "blueprint artifact profile");
+	assertNonEmptyString(artifactDigestDomain, "blueprint artifact profile.artifactDigestDomain");
+	const runtimeProfiles = ownDataProperty(value, "runtimeProfiles", "blueprint artifact profile");
+	assertClosedStringArray(runtimeProfiles, "blueprint artifact profile.runtimeProfiles");
+	if (runtimeProfiles.length !== 1) {
+		throw new TypeError("blueprint artifact profile must define exactly one runtime profile");
+	}
+
+	const pureAllowlist = ownDataProperty(value, "pureAllowlist", "blueprint artifact profile");
+	assertClosedRecord(pureAllowlist, ["identifiers", "mathMembers"], "blueprint artifact profile.pureAllowlist");
+	assertClosedStringArray(
+		ownDataProperty(pureAllowlist, "identifiers", "blueprint artifact profile.pureAllowlist"),
+		"blueprint artifact profile.pureAllowlist.identifiers"
+	);
+	assertClosedStringArray(
+		ownDataProperty(pureAllowlist, "mathMembers", "blueprint artifact profile.pureAllowlist"),
+		"blueprint artifact profile.pureAllowlist.mathMembers"
+	);
+	const frozenTuple = ownDataProperty(value, "frozenTuple", "blueprint artifact profile");
+	assertClosedRecord(
+		frozenTuple,
+		["checkpoint", "freezePolicyPath", "freezePolicySha256", "protectedPathCount", "protectedPathStatesSha256"],
+		"blueprint artifact profile.frozenTuple"
+	);
+	assertNonEmptyString(
+		ownDataProperty(frozenTuple, "checkpoint", "blueprint artifact profile.frozenTuple"),
+		"blueprint artifact profile.frozenTuple.checkpoint"
+	);
+	assertNonEmptyString(
+		ownDataProperty(frozenTuple, "freezePolicyPath", "blueprint artifact profile.frozenTuple"),
+		"blueprint artifact profile.frozenTuple.freezePolicyPath"
+	);
+	assertDigestHexValue(
+		ownDataProperty(frozenTuple, "freezePolicySha256", "blueprint artifact profile.frozenTuple"),
+		"blueprint artifact profile.frozenTuple.freezePolicySha256"
+	);
+	if (ownDataProperty(frozenTuple, "protectedPathCount", "blueprint artifact profile.frozenTuple") !== 47) {
+		throw new TypeError("blueprint artifact profile.frozenTuple.protectedPathCount is unsupported");
+	}
+	assertDigestHexValue(
+		ownDataProperty(frozenTuple, "protectedPathStatesSha256", "blueprint artifact profile.frozenTuple"),
+		"blueprint artifact profile.frozenTuple.protectedPathStatesSha256"
+	);
+	return Object.freeze({ artifactDigestDomain, runtimeProfile: runtimeProfiles[0] as string });
 }
 
 function assertDigestHexValue(value: unknown, context: string): asserts value is string {
@@ -493,7 +631,7 @@ function compileOperation(
 	]);
 }
 
-function compileBlueprintPackage(value: unknown): PreparedBlueprintAdmissionState {
+function compileBlueprintPackage(value: unknown): CompiledBlueprintPackage {
 	assertClosedRecord(
 		value,
 		["kind", "protocolMajor", "schemaVersion", "implementation", "manifest"],
@@ -546,7 +684,13 @@ function compileBlueprintPackage(value: unknown): PreparedBlueprintAdmissionStat
 		compiledOperations.set(name, schema);
 		previousOperationName = name;
 	}
-	return Object.freeze({ discriminator, operations: compiledOperations });
+	return Object.freeze({
+		artifactDigest,
+		artifactId,
+		discriminator,
+		operations: compiledOperations,
+		runtimeProfile,
+	});
 }
 
 function preparedAdmissionState(value: unknown): PreparedBlueprintAdmissionState | undefined {
@@ -631,9 +775,198 @@ export function prepareBlueprintAdmission(input: BlueprintPreparationInput): Pre
 		throw new TypeError("blueprint package digest does not match expectedBlueprintDigest");
 	}
 
-	const state = compileBlueprintPackage(decoded);
+	const compiled = compileBlueprintPackage(decoded);
 	const prepared = Object.freeze({ blueprintDigest: actualBlueprintDigest });
-	preparedBlueprintAdmissions.set(prepared, state);
+	preparedBlueprintAdmissions.set(
+		prepared,
+		Object.freeze({
+			...compiled,
+			blueprintDigest: actualBlueprintDigest,
+			canonicalBlueprintPackageBytes,
+		})
+	);
+	return prepared;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	let output = "";
+	for (let index = 0; index < bytes.length; index += 3) {
+		const first = bytes[index] ?? 0;
+		const second = bytes[index + 1];
+		const third = bytes[index + 2];
+		const packed = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
+		output += alphabet[(packed >>> 18) & 0x3f];
+		output += alphabet[(packed >>> 12) & 0x3f];
+		output += second === undefined ? "=" : alphabet[(packed >>> 6) & 0x3f];
+		output += third === undefined ? "=" : alphabet[packed & 0x3f];
+	}
+	return output;
+}
+
+function assertSamePreparedPackage(
+	actualBlueprintDigest: string,
+	canonicalBlueprintPackageBytes: Uint8Array,
+	compiled: CompiledBlueprintPackage,
+	prepared: PreparedBlueprintAdmissionState,
+	expectedBlueprintDigest: string
+): void {
+	if (
+		actualBlueprintDigest !== expectedBlueprintDigest ||
+		actualBlueprintDigest !== prepared.blueprintDigest ||
+		compareBytes(canonicalBlueprintPackageBytes, prepared.canonicalBlueprintPackageBytes) !== 0 ||
+		compiled.artifactDigest !== prepared.artifactDigest ||
+		compiled.artifactId !== prepared.artifactId ||
+		compiled.runtimeProfile !== prepared.runtimeProfile
+	) {
+		throw new TypeError("blueprint package does not match the prepared admission capability");
+	}
+}
+
+function prepareReducerTable(
+	value: unknown,
+	expectedOperationNames: readonly string[]
+): PreparedBlueprintRuntime["reducers"] {
+	assertClosedRecord(value, expectedOperationNames, "blueprint export.reducers");
+	const prepared = Object.create(null) as Record<string, (...arguments_: readonly unknown[]) => unknown>;
+	for (const name of expectedOperationNames) {
+		const reducer = ownDataProperty(value, name, "blueprint export.reducers");
+		if (typeof reducer !== "function" || Object.getPrototypeOf(reducer) !== Function.prototype) {
+			throw new TypeError(`blueprint export.reducers.${name} must be a synchronous non-generator function`);
+		}
+		prepared[name] = reducer as (...arguments_: readonly unknown[]) => unknown;
+	}
+	return Object.freeze(prepared) as PreparedBlueprintRuntime["reducers"];
+}
+
+function prepareRuntimeExport(
+	namespace: Readonly<Record<string, unknown>>,
+	expectedOperationNames: readonly string[],
+	compiled: CompiledBlueprintPackage
+): PreparedBlueprintRuntime["reducers"] {
+	const namespaceKeys = Object.getOwnPropertyNames(namespace);
+	if (namespaceKeys.length !== 1 || namespaceKeys[0] !== "blueprint") {
+		throw new TypeError("blueprint artifact must export only blueprint");
+	}
+	const envelope = ownDataProperty(namespace, "blueprint", "blueprint artifact namespace");
+	assertClosedRecord(envelope, ["exportSchemaVersion", "artifactId", "runtimeProfile", "reducers"], "blueprint export");
+	if (ownDataProperty(envelope, "exportSchemaVersion", "blueprint export") !== 1) {
+		throw new TypeError("blueprint export.exportSchemaVersion must be 1");
+	}
+	if (ownDataProperty(envelope, "artifactId", "blueprint export") !== compiled.artifactId) {
+		throw new TypeError("blueprint export.artifactId does not match the canonical package");
+	}
+	if (ownDataProperty(envelope, "runtimeProfile", "blueprint export") !== compiled.runtimeProfile) {
+		throw new TypeError("blueprint export.runtimeProfile does not match the canonical package");
+	}
+	return prepareReducerTable(ownDataProperty(envelope, "reducers", "blueprint export"), expectedOperationNames);
+}
+
+/**
+ * Prepares a runtime capability from a genuine admission capability, its exact
+ * canonical package bytes, and the exact self-contained ESM artifact bytes.
+ *
+ * Both byte arrays are copied before the first asynchronous boundary. The
+ * package digest, known runtime profile, artifact digest, UTF-8 source, import
+ * closure and export shape are then checked in that order before reducers are
+ * exposed. Reducers are never invoked by this preparation step.
+ * @param input - The closed package-owned runtime preparation input.
+ * @returns A distinct runtime capability carrying exact-byte provenance.
+ */
+export async function prepareBlueprintRuntime(
+	input: BlueprintRuntimePreparationInput
+): Promise<PreparedBlueprintRuntime> {
+	assertClosedRecord(
+		input,
+		["preparedBlueprintAdmission", "canonicalBlueprintPackageBytes", "expectedBlueprintDigest", "exactArtifactBytes"],
+		"blueprint runtime preparation input"
+	);
+	const preparedBlueprintAdmission = ownDataProperty(
+		input,
+		"preparedBlueprintAdmission",
+		"blueprint runtime preparation input"
+	);
+	const suppliedPackageBytes = ownDataProperty(
+		input,
+		"canonicalBlueprintPackageBytes",
+		"blueprint runtime preparation input"
+	);
+	const expectedBlueprintDigest = ownDataProperty(
+		input,
+		"expectedBlueprintDigest",
+		"blueprint runtime preparation input"
+	);
+	const suppliedArtifactBytes = ownDataProperty(input, "exactArtifactBytes", "blueprint runtime preparation input");
+	if (!(suppliedPackageBytes instanceof Uint8Array)) {
+		throw new TypeError("canonicalBlueprintPackageBytes must be a Uint8Array");
+	}
+	if (!(suppliedArtifactBytes instanceof Uint8Array)) {
+		throw new TypeError("exactArtifactBytes must be a Uint8Array");
+	}
+	assertDigestHexValue(expectedBlueprintDigest, "expectedBlueprintDigest");
+
+	const canonicalBlueprintPackageBytes = new Uint8Array(suppliedPackageBytes);
+	const exactArtifactBytes = new Uint8Array(suppliedArtifactBytes);
+	const preparedAdmission = preparedAdmissionState(preparedBlueprintAdmission);
+	if (preparedAdmission === undefined) {
+		throw new TypeError("preparedBlueprintAdmission must be produced by prepareBlueprintAdmission");
+	}
+
+	const decodedPackage = decodeCanonical(canonicalBlueprintPackageBytes);
+	const reencodedPackage = encodeCanonical(decodedPackage);
+	if (compareBytes(reencodedPackage, canonicalBlueprintPackageBytes) !== 0) {
+		throw new TypeError("blueprint package bytes must use the canonical encoding");
+	}
+	const actualBlueprintDigest = bytesToHex(hashDomain(BLUEPRINT_ADMISSION_DOMAIN, canonicalBlueprintPackageBytes));
+	const compiled = compileBlueprintPackage(decodedPackage);
+	assertSamePreparedPackage(
+		actualBlueprintDigest,
+		canonicalBlueprintPackageBytes,
+		compiled,
+		preparedAdmission,
+		expectedBlueprintDigest
+	);
+
+	if (compiled.runtimeProfile !== BLUEPRINT_RUNTIME_PROFILE) {
+		throw new TypeError(`unsupported blueprint runtime profile: ${compiled.runtimeProfile}`);
+	}
+	const actualArtifactDigest = bytesToHex(hashDomain(BLUEPRINT_ARTIFACT_DOMAIN, exactArtifactBytes));
+	if (actualArtifactDigest !== compiled.artifactDigest) {
+		throw new TypeError("blueprint artifact digest does not match the canonical package");
+	}
+	if (exactArtifactBytes[0] === 0xef && exactArtifactBytes[1] === 0xbb && exactArtifactBytes[2] === 0xbf) {
+		throw new TypeError("blueprint artifact must not begin with a UTF-8 BOM");
+	}
+	const source = new TextDecoder("utf-8", { fatal: true }).decode(exactArtifactBytes);
+
+	await initializeModuleLexer;
+	const [imports, exports] = parseModule(source);
+	if (imports.length !== 0) {
+		throw new TypeError("blueprint artifact imports and import.meta are forbidden");
+	}
+	if (exports.length !== 1 || exports[0]?.n !== "blueprint") {
+		throw new TypeError("blueprint artifact must declare only the blueprint export");
+	}
+
+	const exactByteUrl = `data:text/javascript;base64,${bytesToBase64(exactArtifactBytes)}`;
+	const namespace = (await import(exactByteUrl)) as Readonly<Record<string, unknown>>;
+	const operationNames = [...preparedAdmission.operations.keys()];
+	const reducers = prepareRuntimeExport(namespace, operationNames, compiled);
+	const prepared = Object.freeze({
+		artifactDigest: actualArtifactDigest,
+		artifactId: compiled.artifactId,
+		blueprintDigest: actualBlueprintDigest,
+		reducers,
+		runtimeProfile: compiled.runtimeProfile,
+	});
+	preparedBlueprintRuntimes.set(
+		prepared,
+		Object.freeze({
+			admission: preparedAdmission,
+			exactArtifactBytes,
+			namespace,
+		})
+	);
 	return prepared;
 }
 

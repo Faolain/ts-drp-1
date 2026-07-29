@@ -2,6 +2,7 @@ export {
 	admitReceivedVertex,
 	createAdmissionBoundTransactionalVertexIssuer,
 	prepareBlueprintAdmission,
+	prepareBlueprintRuntime,
 } from "./index.js";
 
 export type {
@@ -9,6 +10,7 @@ export type {
 	AdmissionDecision,
 	AdmitReceivedVertexInput,
 	BlueprintPreparationInput,
+	BlueprintRuntimePreparationInput,
 	BuildAndSign,
 	IssuanceOutboxEntry,
 	IssueCommit,
@@ -16,6 +18,7 @@ export type {
 	IssueScope,
 	LocalVertexInput,
 	PreparedBlueprintAdmission,
+	PreparedBlueprintRuntime,
 	RawEd25519PublicKey,
 	SignedVertexEnvelope,
 	TransactionalVertexIssuer,

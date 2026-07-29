@@ -10206,13 +10206,152 @@ Stage exactly these 12 paths:
 Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
 
+### D.57 — Phase 0j-b exact-byte blueprint runtime preparation implemented
+
+Phase 0j-b is implemented on the v3 forward plane. The package-owned
+`prepareBlueprintRuntime({ preparedBlueprintAdmission, canonicalBlueprintPackageBytes,
+expectedBlueprintDigest, exactArtifactBytes })` surface accepts no caller evaluator, namespace,
+loader, handle or runtime-profile override. It copies both byte inputs synchronously before its first
+suspension, re-authenticates the genuine Phase-0i admission capability and exact canonical package,
+derives
+`artifactDigest = hashDomain("ts-drp/blueprint-artifact/v3", exactArtifactBytes)`, rejects unsupported
+profiles, BOM/malformed UTF-8 and syntactic imports before evaluation, evaluates the exact copied bytes,
+and accepts only the closed sole `blueprint` export envelope and exact reducer-key set. The returned
+frozen runtime and frozen null-prototype reducer table have distinct private WeakMap provenance. Reducers
+are retained but never invoked; dispatch, thenable/throw handling, fold and adoption remain later owners.
+
+The additive `blueprint-artifact-profile-v1` supplement is the runtime source of truth for the digest
+domain and sole supported runtime profile. Its JSON/Markdown amendment, supplement, exact dependency,
+policy, pure checker, PR workflow, RED/fixtures and public type audit form one 11-path governed closure
+without changing either frozen v3 base tuple or the Ed25519 supplement. The package publishes this
+supplement but does not accidentally publish the Ed25519 vectors.
+
+#### D.57.1 — TDD history and compiled-package remediation
+
+The original corrected RED at checkpoint `1bfcfa3` was independently reconstructed and authenticated at
+**3 failed / 1 passed / 36 skipped** with Phase 0i still **14/14**. One apparent RED failure was initially
+caused by doubled escaping in a harmless import-like string, which emitted invalid ESM. The RED owner
+changed only that literal to emit valid `import("not syntax")` text, then reauthenticated the same honest
+three missing-surface failures. An earlier RED agent had proposed a caller-supplied evaluator seam; that
+approach was rejected because it would transfer exact-byte authority back to the caller.
+
+The first GREEN reached **40/40** source tests and **47/47** protected lineage, but a primary probe of the
+actual compiled package found a real distribution-only defect. With the repository's ES6 target,
+TypeScript downleveled the module-local `async function` prototype sentinel into an ordinary function, so
+the built sentinel equaled `Function.prototype` and `dist` rejected every valid synchronous reducer.
+Source execution through Vite did not expose this transformation. This was an ordinary implementation and
+coverage defect, not a material plan-assumption change.
+
+A fresh test-only remediation RED, based correctly on that initial GREEN candidate, performed a real
+`pnpm --filter @ts-drp/protocol-v3 build`, imported the actual `dist/src/public.js`, and failed exactly at
+valid synchronous reducer acceptance: **1 failed / 40 skipped**. The full file additionally exposed the
+two expected stale governance pins until resealing. A distinct GREEN owner removed all
+transpilation-sensitive sentinels, required reducer functions to have exactly `Function.prototype`, and
+resealed the already-governed test/checker/policy. The same built gate now accepts the genuine fixture and
+rejects native async, generator and async-generator reducers in both source and compiled output:
+**41/41**.
+
+Final authoritative hashes include:
+
+- runtime implementation `04c5cba07370e86eb48d600a6d29fac02d65321c60ea37cdb543a40ec9e89911`;
+- public entry `c70d02071592106b04f2b560498d4478e7b3742ef923445cc052c5f70891e3a7`;
+- package manifest `ced879624ae3bfcae35ad4afd7cd452cf290c2a9c5f34636cd28a0ddc265e3a4`;
+- package tsconfig `95b1a0f70a6284e90d16a6382f191a2d554407204633084ef2c852ccc73a8530`;
+- lockfile `9564f5617f5fba5e540d9521b6bb7e1cd422e4bf3e8e52b4ddf5366a79a4cd58`;
+- final RED/runtime test `40c7d5c5bbea476a4f7ccec919db6c89b677d31e46173afcd52f4ec8dd82a5d1`;
+- profile policy `4adaa86780c04e7813dbe0ba90c646b60791d097988004d4cc16a7c92dbbe550`;
+- profile checker `2d6423f70322f2b22698d1fb15af352f03f88f48ac3174de7f593f196ec9831d`.
+
+The earlier `phase-0j-b-green-final-hashes.log` is intentionally historical pre-remediation evidence and
+must not be used as the final pin source.
+
+#### D.57.2 — Independent acceptance and residual ownership
+
+The initial Grok review passed the source candidate with notes but missed the compiled-package defect. The
+initial exact Kimi-3/100 review independently reconstructed the original RED/GREEN and correctly returned
+`NEEDS_CHANGES` after reproducing the built failure. After the fresh remediation pair:
+
+- Grok 4.5 high returned `PASS_WITH_NOTES`;
+- a fresh exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` acceptance reran the final gates
+  and returned `PASS_WITH_NOTES`;
+- final Opus-xhigh returned `PASS_WITH_NOTES`, classified every remaining item as non-material, and
+  authorized the checkpoint and progression to 0j-c.
+
+The following boundaries must remain explicit:
+
+1. `es-module-lexer` denies static imports, re-exports, `import()` syntax and `import.meta`; harmless
+   import-like strings remain valid. It is the actual runtime barrier for those forms. A Node `node:`
+   builtin can resolve from a data-URL module if artifact code evades the lexer through `eval`,
+   `Function`, reflection or another indirect construction. The data URL is exact-byte transport, not a
+   second module-resolution sandbox. D.53.3's trusted publisher/catalog plus the 0j-a authoring gate own
+   this declared residual; 0j-b must never be described as proving arbitrary-JavaScript isolation.
+2. Exact `Function.prototype` equality is correct for the actual same-realm data-URL loader and prevents
+   the ES6 sentinel regression. Promise-returning ordinary functions, proxies, class constructors and
+   prototype-disguised functions remain outside complete structural proof. Direct `async`/generator
+   forms are rejected; 0j-a owns authoring restrictions, while 0j-c/4a own conformance and deterministic
+   invocation failure/thenable policy. A future cross-realm loader would require a new predicate and new
+   tests rather than silently reusing this one.
+3. The runtime WeakMap is intentionally write-only in this slice. Its first real package-owned consumer
+   must require the genuine capability; 0j-c must not create hollow alternate wiring, and later 3a/4a
+   must not dispatch from public fields.
+4. A cosmetic no-op `.replace(/\.js$/u, ".js")` remains in the governance-sealed test helper. Do not
+   reopen the frozen tuple solely for cleanup.
+5. The raw base freeze checker can hit `spawnSync git ENOBUFS` because this working tree contains tens of
+   thousands of unrelated untracked sidecar paths. The clean-clone checker passes. This is evidence
+   harness debt, not permission to ignore a genuine checker failure.
+6. A broad Prettier invocation that includes `pnpm-lock.yaml` warns on pnpm's generated serialization.
+   Preserve the reviewed lock bytes; run Prettier over authored source, manifests, documentation, workflow
+   and fixtures, and use the frozen install plus exact lock delta to validate the generated lockfile.
+
+No finding changes the digest identity model, exact-byte ownership, v3 plane, capability provenance,
+profile source of truth or Phase-4a boundary. Therefore no D.52.4 material-assumption correction quorum is
+required.
+
+#### D.57.3 — Final gates and selective checkpoint boundary
+
+Final acceptance evidence is:
+
+- Phase 0j-b source/built runtime **41/41**;
+- protected Phase-0i + Phase-0j-b lineage **55/55**;
+- Phase-0j-a regression **101/101**;
+- protocol-v3 typecheck, both public-entry audits, build and public-package smoke pass;
+- workspace typecheck passes all **33** projects;
+- targeted lint passes; full-tree lint excluding only `.logs`, `.agents`, `.claude` and `.pnpm-store`
+  sidecar directories has **0 errors** and 226 pre-existing warnings;
+- Prettier over authored artifacts and `git diff --check` pass; the pnpm-generated lockfile is validated
+  by its exact reviewed delta and frozen install rather than reformatted;
+- blueprint-artifact and Ed25519 freeze checkers pass in-tree; the base checker passes in a clean clone.
+
+Stage exactly these 17 paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `.github/workflows/protocol-v3-blueprint-artifact-profile.yml`;
+3. `docs/protocol/blueprint-artifact-profile-v3.json`;
+4. `docs/protocol/blueprint-artifact-profile-v3.md`;
+5. `packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json`;
+6. `packages/protocol-v3/package.json`;
+7. `packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs`;
+8. `packages/protocol-v3/src/index.ts`;
+9. `packages/protocol-v3/src/public.ts`;
+10. `packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json`;
+11. `packages/protocol-v3/tsconfig.json`;
+12. `pnpm-lock.yaml`;
+13. `tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json`;
+14. `tests/fixtures/phase-0j-b-v3/chat-blueprint.mjs`;
+15. `tests/fixtures/phase-0j-b-v3/public-entry-type-audit.ts`;
+16. `tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json`;
+17. `tests/protocol-v3-blueprint-runtime-0j-b.test.ts`.
+
+Never use `git add -A`. Never stage `dist/`, `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, either unrelated untracked protocol-v2 0g2 test or another unrelated path.
+
 ## Next Agent Prompt
 
-Selectively checkpoint only the authorized Phase-0j-a implementation and D.56 ledger, then begin 0j-b
-as its own atomic v3 TDD item with a fresh Codex-high RED owner and distinct Codex-high GREEN owner.
-Continue with Grok, exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final Opus-xhigh. Keep the standing
-v3-forward owner/plane audit for every later item; v2 remains preservation/compatibility/freeze only.
-Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked
-protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly
-requested, and do not schedule Phase 0n under its current stale `consensus-v2` label.
+Selectively checkpoint only the 17 authorized Phase-0j-b paths and D.57 ledger, then begin 0j-c as its
+own atomic v3 TDD item with a fresh Codex-high RED owner and distinct Codex-high GREEN owner. Preserve the
+runtime-capability consumer boundary, same-realm loader assumption and declared non-sandbox residuals.
+Continue with Grok, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` and final
+Opus-xhigh. Keep the standing v3-forward owner/plane audit for every later item; v2 remains
+preservation/compatibility/freeze only. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable
+unless explicitly requested, and do not schedule Phase 0n under its current stale `consensus-v2` label.

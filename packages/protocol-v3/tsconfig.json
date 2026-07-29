@@ -4,5 +4,5 @@
 		"exactOptionalPropertyTypes": true,
 		"outDir": "dist"
 	},
-	"include": ["src/**/*.ts", "registry/registry-v1.json"]
+	"include": ["src/**/*.ts", "registry/registry-v1.json", "supplements/blueprint-artifact-profile-v1/profile.json"]
 }
