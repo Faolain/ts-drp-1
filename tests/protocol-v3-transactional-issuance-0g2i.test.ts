@@ -1,10 +1,12 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import contract from "./fixtures/phase-0g2i/transactional-issuance-contract.json" with { type: "json" };
+import blueprintContract from "./fixtures/phase-0i-v3/blueprint-admission-package.json" with { type: "json" };
 
 interface IssueScope {
 	readonly author: string;
@@ -54,6 +56,7 @@ interface TransactionalVertexIssuer {
 
 interface TransactionalIssuerOptions {
 	readonly author: string;
+	readonly preparedBlueprintAdmission?: unknown;
 	readonly privateKeySeed: Uint8Array;
 	readonly publicKey: {
 		readonly bytes: Uint8Array;
@@ -64,6 +67,10 @@ interface TransactionalIssuerOptions {
 
 interface ProtocolV3IssuanceSurface {
 	createTransactionalVertexIssuer?(options: TransactionalIssuerOptions): TransactionalVertexIssuer;
+	prepareBlueprintAdmission?(input: {
+		readonly canonicalBlueprintPackageBytes: Uint8Array;
+		readonly expectedBlueprintDigest: string;
+	}): unknown;
 }
 
 interface StoredScopeState {
@@ -106,6 +113,8 @@ const IMPLEMENTATION_URL = pathToFileURL(IMPLEMENTATION_PATH).href;
 const implementationLoad = import(IMPLEMENTATION_URL)
 	.then((loaded: unknown) => ({ loaded: loaded as ProtocolV3IssuanceSurface }))
 	.catch((error: unknown) => ({ error }));
+const EXPECTED_BLUEPRINT_DIGEST = "cabbcc65454211b2e258328632aba8b184c8abdb6fb9082b498714fad503b838";
+const preparedIssuerAudit = { calls: 0 };
 
 function fromHex(value: string): Uint8Array {
 	if (!/^(?:[0-9a-f]{2})*$/u.test(value)) throw new TypeError("fixture hex must be lowercase and byte-aligned");
@@ -244,11 +253,22 @@ async function requireIssuanceFactory(): Promise<(options: TransactionalIssuerOp
 	if ("error" in result) {
 		throw new Error("PHASE_0G2I_IMPLEMENTATION_MODULE_UNAVAILABLE", { cause: result.error });
 	}
-	const candidate = result.loaded.createTransactionalVertexIssuer;
-	if (typeof candidate !== "function") {
+	const createTransactionalVertexIssuerUnprepared = result.loaded.createTransactionalVertexIssuer;
+	if (typeof createTransactionalVertexIssuerUnprepared !== "function") {
 		throw new Error("PHASE_0G2I_MISSING_EXPORT:createTransactionalVertexIssuer");
 	}
-	return candidate;
+	const prepareBlueprintAdmission = result.loaded.prepareBlueprintAdmission;
+	if (typeof prepareBlueprintAdmission !== "function") {
+		throw new Error("PHASE_0G2I_MISSING_EXPORT:prepareBlueprintAdmission");
+	}
+	const preparedBlueprintAdmission = prepareBlueprintAdmission({
+		canonicalBlueprintPackageBytes: encodeCanonical(blueprintContract.package),
+		expectedBlueprintDigest: EXPECTED_BLUEPRINT_DIGEST,
+	});
+	return (options: TransactionalIssuerOptions): TransactionalVertexIssuer => {
+		preparedIssuerAudit.calls++;
+		return createTransactionalVertexIssuerUnprepared({ ...options, preparedBlueprintAdmission });
+	};
 }
 
 /**
@@ -423,6 +443,22 @@ describe("Phase 0g(ii-I) injected transactional v3 issuance RED", () => {
 		expect(contract).not.toHaveProperty("signatureHex");
 		expect(contract.domain).toBe("ts-drp/vertex/v3");
 		expect(EphemeralIssueTransactionTestDouble.name).toContain("Ephemeral");
+		const source = readFileSync(fileURLToPath(import.meta.url), "utf8");
+		expect(source.match(/createTransactionalVertexIssuerUnprepared\s*\(/gu)).toHaveLength(1);
+		expect(source).toMatch(
+			/createTransactionalVertexIssuerUnprepared\(\{\s*\.\.\.options,\s*preparedBlueprintAdmission\s*\}\)/u
+		);
+	});
+
+	it("routes a success-expected issuer call through production-prepared ABI at runtime", async () => {
+		const createIssuer = await requireIssuanceFactory();
+		const store = new EphemeralIssueTransactionTestDouble();
+		preparedIssuerAudit.calls = 0;
+		const commit = await createIssuer(issuerOptions(store)).issue(input(contract.scopes.primary, 0));
+
+		expect(preparedIssuerAudit.calls).toBe(1);
+		expect(commit.authorSequence).toBe(0);
+		expect(store.transactCalls).toBe(1);
 	});
 
 	it("uses the coordinator-selected ordinal and author in the exact registered bytes, digest, and signature", async () => {

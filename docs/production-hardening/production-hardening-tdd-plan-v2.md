@@ -9367,20 +9367,265 @@ This restores rather than changes governing semantics. No v2 production behavior
 registry and vectors remain unchanged, and the full §11.4 property stays open until Phase 4a. A fresh
 0i-v3 RED owner followed by a separate GREEN owner is now warranted; Phase 0j must not start first.
 
+### D.52 — Phase 0i-v3 digest-bound blueprint admission implemented
+
+Phase 0i-v3 is now implemented on the forward v3 plane. Frozen v2 remains preservation-only, legacy 0i-L
+remains pre-satisfied by `2259f29`, and no anchor, implementation-determinism or reducer-execution owner
+was pulled into this slice.
+
+#### D.52.1 — Qualified RED and sealed consumer migration
+
+A fresh Codex-high RED owner sealed one new input-only package fixture, one new Phase-0i-v3 behavioral
+test and the three existing real v3 consumer suites:
+
+- `tests/protocol-v3-blueprint-admission-0i.test.ts`
+  (`072a92662c2ca6706a2e25f9a4aa4c25fe540aeed1f2886301f8c2ac55e00135`);
+- `tests/fixtures/phase-0i-v3/blueprint-admission-package.json`
+  (`048c06cea8041bf30fb19984d59453722a19c21da42a46bba7526fe3c111e451`);
+- `tests/protocol-v3-registered-byte-0g2t.test.ts`
+  (`baca2fef06479c881e71bba72d36d98e6889aebe919a12c575f07a1de943972a`);
+- `tests/protocol-v3-transactional-issuance-0g2i.test.ts`
+  (`7676778b3a6cf8d79ceb7684f257f63bd42fc9bae7631df10eaa9de77a7cd8f0`);
+- `tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts`
+  (`64b893bac59508c79b3fec6fd3699df244ebd76187ccefbdcb133d156736d6cc`).
+
+The three inherited success suites now obtain and inject the same production-prepared ABI required by
+the new test. There is no unprepared compatibility success path. Static audits pin one real consumer call
+per wrapper and ensure preparation is injected at that call rather than hidden in a stub.
+
+The coherent RED collected all four files and failed 34 / passed 12. It independently demonstrated both
+load-bearing behavioral failures:
+
+1. an authenticated undeclared remote operation was accepted after exactly one resolver and signature
+   call, while operation re-encoding remained zero; and
+2. an invalid local operation entered `transactIssue` once instead of doing zero transaction work.
+
+The other RED failures were the expected missing-preparer surface in the three migrated consumers. The
+matrix covers package canonicality and closedness, digest binding, discriminator and closed argument
+schemas, missing/raw/branded/cloned/callback preparation, six legacy-looking inert strings, exact
+received bytes and local side-effect ordering.
+
+Evidence:
+
+- RED ledger `.logs/phase-0i-v3-red-gate.md`
+  (`663aff5785522ddc0247966bde7e7fa7e7123b141be32842232565ac37bbe0a9`);
+- coherent RED `.logs/phase-0i-v3-red-qualified-coherent.log`
+  (`5c8abb52c693dc4b47d498e5caa52d500346df0200ff94d81115c8604dd0dca4`);
+- protocol-v3 typecheck
+  (`d3a787b637a76d71d7d6391d7d81db1c4e54da3a5259b9b950f266014628f5ec`);
+- targeted lint and tracked/frozen diff checks produced empty output; Prettier passed.
+
+The production entry point remained byte-identical during RED
+(`143340b97bbdd01bd6416e2cfc59131aa45c25b327dd74ea47b98cac40c21680`);
+the registry and conformance vectors retained
+`2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9` and
+`8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741`.
+
+#### D.52.2 — Separate GREEN and exact admission boundary
+
+A separate Codex-high GREEN owner changed only `packages/protocol-v3/src/index.ts`
+(`6f5f844968bb146828903dc5b8ea93293ea4932c13fcb2c88dfb0c830ad34248`).
+
+`prepareBlueprintAdmission` now:
+
+- copies the caller's exact package bytes;
+- strictly decodes, re-encodes and compares them;
+- domain-hashes them under `ts-drp/blueprint-admission/v3`;
+- requires exact lowercase `expectedBlueprintDigest` equality;
+- validates the closed package, implementation-identity fields and closed manifest; and
+- compiles the application discriminator, operation names and argument schemas into `Map`/`Set` tables.
+
+The returned frozen public value is informational. A module-private `WeakMap` owns the compiled state, so
+spread, descriptor, prototype, proxy, structured-clone, raw-package, brand and digest-only substitutes
+cannot create an admissible capability.
+
+Received verification preserves the required asymmetric ordering: exact registered bytes are decoded and
+digest-checked, the author key is resolved and the Ed25519 signature is verified, and only then is the
+already-decoded operation checked against the prepared ABI. That path never re-encodes the operation.
+Local issuance requires a genuine prepared capability at construction, checks the raw operation, makes a
+canonical detached copy, checks that copy again and only then may enter `transactIssue`. Invalid local
+operations perform zero transaction, signature, record or outbox work.
+
+Operations and allowed fields are data in `Map`/`Set` structures. No DRP/prototype member is indexed and
+no universal name denylist exists. The six legacy-looking strings are therefore rejected when undeclared
+and admitted when exactly declared. Package preparation only structurally digest-binds
+`artifactId`/`artifactDigest`/`runtimeProfile`; it does not authenticate the anchor, load an
+implementation, prove determinism or invoke a reducer.
+
+Final GREEN evidence:
+
+- focused 4 files / 46 tests
+  `.logs/phase-0i-v3-green-focused-tests.log`
+  (`61f372571cea4e36ad31457c46f1500864461879a5a034569c109205397f5a2f`);
+- protocol-v3 typecheck
+  `.logs/phase-0i-v3-green-typecheck.log`
+  (`abd60dcab613f35d8e619b2d39562c242034d529253d8f4c82ff86c78227dce9`);
+- workspace typecheck
+  `.logs/phase-0i-v3-green-workspace-typecheck.log`
+  (`9db475581b66f491e3cb3d38640cda8fb727eaff953d9bd8327c6610167adbbd`);
+- targeted lint, Prettier and diff check
+  (`5ab788a4da06966d2fb4108c1a83a6e36a7de05f1b44ce880d1c2c5fff56660f`,
+  `f125b71b48d6cdae9c93cd4238d741e9f4effde01727fccb370025d3877d366d`,
+  `fc81ad274059f2c11e11919bd7917d3cb983ca6112ed1485c747dd6f55350b02`);
+- clean-equivalent root lint, zero errors / 226 inherited warnings
+  `.logs/phase-0i-v3-green-root-lint-excluding-logs.log`
+  (`a8e3bbe6a19b0b5b4653580de586e9d7ff871c652f4bcafe674f2d0dba2740cb`).
+
+The explicit all-protocol-v3 diagnostic passed 15 files / 89 tests and failed only the 15
+post-checkpoint Phase −1′e3 partial-base cases
+(`.logs/phase-0i-v3-green-all-protocol-v3-tests.log`,
+`963acbf4adcd018d24b6b8bc2b0986e28970ddd2aa4680c6a43f858502481cd4`).
+That harness archives committed `HEAD`, which already contains the complete v3 closure, so its attempted
+"partial" commits are empty. D.46.9/D.47.4 already record this degradation; the uncommitted 0i tuple
+cannot affect it. Raw root lint likewise remains red only because historical TypeScript mutants under
+`.logs/**` are outside every parser project. Neither diagnostic is abbreviated as a green full-suite or
+raw-lint claim.
+
+#### D.52.3 — Independent reviews and causal probes
+
+Grok 4.5/high recomputed the tuple, independently probed provenance, schema, ordering, alias and
+prototype cases and returned **PASS_WITH_NOTES**, authorizing the remaining review loop:
+
+- raw `.logs/phase-0i-v3-grok45-high-review.raw.json`
+  (`ebb90df4d6aed13e988c0644f0b57e5cd17f27796bbfdac85cc4c0b18b46f9ec`);
+- normalized `.logs/phase-0i-v3-grok45-high-review.normalized.md`
+  (`f3c5eeaccca90171a2862e706b53e847b87669fd4dd524851bf8455fd5e4e18a`).
+
+Exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` recomputed the tuple, passed 47 / 47
+scratch probes and returned **PASS_WITH_NOTES** with no correction gate:
+
+- prompt `.logs/phase-0i-v3-kimi3-100-review.prompt.md`
+  (`fc8b2dbd3a4d8c25f8a3454a464f6b6ac0804ef092dd77457ee6555d6fc01e19`);
+- raw review `.logs/phase-0i-v3-kimi3-100-review.raw.log`
+  (`2bb2b9132188f81a00a727d65cfe769e402746b001f742b827fbe6d5af8f801f`).
+
+Its scratch mutants causally killed digest-equality removal, remote-ABI removal, removal of both local
+gates and forgeable-brand provenance. Removing only decode/re-encode equality survived because the strict
+decoder already rejects every noncanonical spelling. Removing only the first local gate survived because
+the post-detach gate still occurs before `transactIssue`; removing both gates was killed. These are
+equivalent/defense-in-depth mutants, not missing behavioral properties.
+
+The first Opus-xhigh bridge completed 44 inspection turns but was terminated during an optional
+repository-wide Vitest probe before returning a verdict. Its `is_error` record is non-evidence:
+`.logs/phase-0i-v3-final-opus-xhigh-review.raw.json`
+(`331901fa16aa0099910f7bd3510bb87f81e68e4b3245b5c6dbb436a3e89fcb73`).
+
+A fresh bounded Opus-xhigh run forbade aggregate/historical tests, recomputed all six tuple and both
+reviewer hashes, independently passed 46 / 46, performed its own live positive-baseline attacks and
+returned **PASS_WITH_NOTES**. It authorized documentation and checkpointing with no code correction and
+no additional RED/GREEN cycle:
+
+- prompt `.logs/phase-0i-v3-final-opus-xhigh-review.prompt.md`
+  (`78bc0df72be99011eb9a24ed8353007132d8197592ef98e21b6c69d8c64d1db7`);
+- raw `.logs/phase-0i-v3-final-opus-xhigh-review-round2.raw.json`
+  (`bd614cedb5ae66569135a7591fddab38607ae042ab1e941b39cf984cb7dd4837`);
+- normalized `.logs/phase-0i-v3-final-opus-xhigh-review-round2.normalized.md`
+  (`3216e1eff8b7804dc57c08e334d623e2f7caedb64b7fbd867efb41905310ba03`).
+
+A narrow continuation of that same Opus session audited the completed D.52 diff, all named hashes/counts,
+ownership boundaries and the seven-path allowlist. It returned **POSTDOC_PASS** and authorized the
+checkpoint:
+
+- prompt `.logs/phase-0i-v3-final-opus-xhigh-postdoc.prompt.md`
+  (`f7204f715ed0ae3906888bdb8870567fe43ba57e29cc5c015cb11dfab6662324`);
+- raw `.logs/phase-0i-v3-final-opus-xhigh-postdoc.raw.json`
+  (`1e8f429acf5812add6ab3a6fcf4fa77ed24e5593374994d021ed930dca1a6c92`);
+- normalized `.logs/phase-0i-v3-final-opus-xhigh-postdoc.normalized.md`
+  (`e1c1c3e927ab4006be43fba566545036bfb97efd7c72fa44ca66ec93d3368dd3`).
+
+#### D.52.4 — Bounded findings and forward ownership
+
+No reviewer found a false accept or checkpoint blocker. Carry these bounded findings forward:
+
+1. `canonical-object` argument validation is shallow before local canonical detachment. Nested symbols,
+   accessors, exotic objects and arrays fail during canonical detach before transaction work; remote
+   values already came from the strict decoder. Phase 0i therefore remains fail closed.
+2. Preparation validates implementation identity/runtime fields but retains only the compiled ABI in its
+   private state. The single package digest still binds those fields. Phase 0j must re-derive and prove
+   the loaded implementation/runtime match from the exact package bytes rather than pretending the 0i
+   capability already carries that proof.
+3. Auth-before-ABI deliberately pays one signature-verification cost for a validly signed ABI-invalid
+   operation. Phase 0p owns input-bounded work; reversing the order here would violate author
+   authentication before operation terminality.
+4. The first local ABI check is a cheap reject and the second post-detach check is the load-bearing signed
+   value gate. A non-enumerable optional field can be dropped by canonical detach and then legitimately
+   remain absent from the signed operation; a required field rejects. The checked detached value is the
+   signed value, so no unchecked data is admitted.
+5. The public prepared interface is structurally only `{blueprintDigest: string}` while runtime
+   provenance is nominal. A handwritten literal type-checks but fails at runtime. A future private
+   `unique symbol` type brand could improve diagnostics; it is not a security boundary.
+6. Initial verifier shape-property reads occur outside its `try`, so a hostile throwing proxy can throw
+   rather than return `{accepted:false}`. It cannot accept and only a local caller supplies that object.
+7. Adding required `preparedBlueprintAdmission` fields is intentionally type-breaking on the v3 surface.
+   There are no workspace consumers outside protocol-v3/tests and live composition does not exist before
+   Phase 3a.
+8. The manifest intentionally admits the frozen historical consumer fixtures. This is not reward
+   hacking: discriminator, closedness, type, cross-ABI and declared-vs-undeclared behavior are proven
+   independently. `append` has all-optional arguments, so `{action:"append"}` is lawfully admissible.
+9. The sealed provenance suite covers descriptor-copy forgery but not `Object.create(prepared)` or
+   `new Proxy(prepared,{})`. Final Opus verified both fail closed by out-of-tree probe. Seal them if the
+   capability representation is refactored so that reviewer-only evidence does not silently expire.
+10. The six legacy-looking strings are sealed as operation names, not declared argument-field names.
+    Final Opus verified the latter path accepts declared/present fields, rejects required/missing or
+    undeclared extras and does not pollute prototypes. Add a focused regression when that schema compiler
+    next changes.
+
+The standing lineage rule from D.50.6 remains in force for every remaining item: new runtime, wire,
+binder and application behavior is v3; v2 work is preservation, compatibility or freeze verification
+only. Before each TDD item, audit its owner/plane. Phase 0j is already labeled consensus-v3. Phase 0n is
+the remaining visible forward row still labeled `consensus-v2`; its row is deliberately untouched here.
+Before scheduling 0n, stop and use the required Codex-high + exact Kimi-3/100 + Opus-xhigh correction
+quorum if the audit confirms that label would request new v2 implementation.
+
+#### D.52.5 — Selective checkpoint boundary
+
+Phase 0i-v3 is accepted with the exact D.52.1/D.52.2 tuple. It does not claim authenticated anchor
+provenance, implementation determinism, input metering, reducer dispatch/fold, full §11.4 completion,
+full-suite green or closure of the bounded notes above.
+
+The final compact documented-tree gate passed:
+
+- focused 4 files / 46 tests
+  `.logs/phase-0i-v3-final-focused.log`
+  (`2227885f724c0656799a0ff1d0c0e27cf66e75655fe625163243adad655c4110`);
+- protocol-v3 typecheck and build
+  (`d3a787b637a76d71d7d6391d7d81db1c4e54da3a5259b9b950f266014628f5ec`,
+  `7cd94d05afe83e7bba2c282c95c438aefa1bdeb582d18591b450addd1889eeec`);
+- workspace typecheck
+  `.logs/phase-0i-v3-final-workspace-typecheck.log`
+  (`5192f9b9f53a7d8d2ab14b888e74acb01e88f312ec3a2954aa68262cf8ac680f`);
+- targeted lint and diff check, both empty output
+  (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`);
+- Prettier
+  `.logs/phase-0i-v3-final-format.log`
+  (`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`).
+
+Selectively stage exactly these seven paths:
+
+1. `docs/production-hardening/production-hardening-tdd-plan-v2.md`;
+2. `packages/protocol-v3/src/index.ts`;
+3. `tests/protocol-v3-blueprint-admission-0i.test.ts`;
+4. `tests/fixtures/phase-0i-v3/blueprint-admission-package.json`;
+5. `tests/protocol-v3-registered-byte-0g2t.test.ts`;
+6. `tests/protocol-v3-transactional-issuance-0g2i.test.ts`;
+7. `tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts`.
+
+Never use `git add -A`. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, either stale untracked protocol-v2 0g2 RED or another unrelated path.
+
 ## Next Agent Prompt
 
-Validate and checkpoint only the quorum-authorized Phase 0i/D.51 plan correction. Then begin the still-open
-**Phase 0i-v3** with a fresh Codex-high RED owner restricted to tests, input-only fixtures and bounded
-`.logs` evidence. The RED must target the two existing real consumers: received signed-v3 verification and
-local transactional issuance. It must pin exact canonical manifest/package bytes, domain-separated
-`expectedBlueprintDigest` equality, runtime provenance that is stronger than a forgeable TypeScript brand,
-discriminator/argument schemas without assuming `opType`, authentication before terminal latch, zero local
-transaction/sign/record/outbox work on rejection, and exact-received operation consumption without
-re-encoding.
-It must not verify anchors, edit frozen v3 artifacts, add v2 production behavior, introduce a callback
-allowlist or reflect over a DRP/prototype. After the plan checkpoint and qualified RED, spawn a separate
-Codex-high GREEN owner.
+Run the final compact D.52 gate and selectively checkpoint only the seven Phase-0i-v3 paths. Then audit
+**Phase 0j** against source before writing a RED: all new runtime/application behavior must remain v3 and
+0j owns implementation-artifact/runtime matching plus determinism, not ABI structure, anchor provenance
+or reducer dispatch. If the row is source-accurate, split it into the smallest independently reviewable
+TDD items before starting because lint enforcement, artifact/runtime matching and cross-engine
+differential replay need not share one RED/GREEN owner. If the audit finds a material incorrect plan
+assumption, pause and obtain unanimous Codex-high + exact Kimi-3/100 + Opus-xhigh agreement before editing
+the plan.
 
-Continue the normal requested Codex-high RED/GREEN, Grok, exact Kimi 3/100 and Opus-xhigh loop. Do not
-schedule another Fable review unless the user explicitly requests one. Golden-path completion remains
+For every Phase-0j item continue the requested separate Codex-high RED, separate Codex-high GREEN, Grok,
+exact Kimi 3/100 and final Opus-xhigh loop, with typecheck/lint/tests written to `.logs`. Do not schedule
+another Fable review unless the user explicitly requests one. Do not schedule Phase 0n from its current
+`consensus-v2` label without the forward-plane audit described in D.52.4. Golden-path completion remains
 blocked on the remaining plan items.

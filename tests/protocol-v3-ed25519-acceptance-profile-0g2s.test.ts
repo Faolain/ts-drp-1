@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import contract from "./fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json" with { type: "json" };
+import blueprintContract from "./fixtures/phase-0i-v3/blueprint-admission-package.json" with { type: "json" };
 
 interface RawPublicKey {
 	readonly bytes: Uint8Array;
@@ -15,6 +16,7 @@ interface RawPublicKey {
 interface VerificationInput {
 	readonly domain: string;
 	readonly expectedAnchor: string;
+	readonly preparedBlueprintAdmission?: unknown;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	resolveAuthorPublicKey(author: string): RawPublicKey | undefined;
 	readonly signature: Uint8Array;
@@ -38,6 +40,7 @@ interface IssueCommit {
 interface ProtocolSurface {
 	createTransactionalVertexIssuer?(options: {
 		readonly author: string;
+		readonly preparedBlueprintAdmission?: unknown;
 		readonly privateKeySeed: Uint8Array;
 		readonly publicKey: RawPublicKey;
 		transactIssue(
@@ -54,6 +57,10 @@ interface ProtocolSurface {
 			readonly operation: Readonly<Record<string, unknown>>;
 		}): Promise<IssueCommit>;
 	};
+	prepareBlueprintAdmission?(input: {
+		readonly canonicalBlueprintPackageBytes: Uint8Array;
+		readonly expectedBlueprintDigest: string;
+	}): unknown;
 	verifyEd25519RegisteredDigest?(
 		signature: Uint8Array,
 		rawRegisteredDigest: Uint8Array,
@@ -93,6 +100,8 @@ const ARTIFACT_ROOT =
 const surfaceLoad = import(pathToFileURL(IMPLEMENTATION_PATH).href)
 	.then((loaded: unknown) => loaded as ProtocolSurface)
 	.catch(() => ({}) as ProtocolSurface);
+const EXPECTED_BLUEPRINT_DIGEST = "cabbcc65454211b2e258328632aba8b184c8abdb6fb9082b498714fad503b838";
+const preparedConsumerAudit = { issuerCalls: 0, verifierCalls: 0 };
 
 function fromHex(value: string): Uint8Array {
 	if (!/^(?:[0-9a-f]{2})*$/u.test(value)) throw new TypeError("fixture hex must be lowercase and byte-aligned");
@@ -136,6 +145,37 @@ function protectedStateDigest(): { count: number; digest: string } {
 	return { count: rows.length, digest: sha256(rows.join("")) };
 }
 
+async function preparedConsumerSurface(): Promise<ProtocolSurface> {
+	const surface = await surfaceLoad;
+	const prepareBlueprintAdmission = surface.prepareBlueprintAdmission;
+	if (typeof prepareBlueprintAdmission !== "function") {
+		throw new Error("PHASE_0G2S_MISSING_EXPORT:prepareBlueprintAdmission");
+	}
+	const preparedBlueprintAdmission = prepareBlueprintAdmission({
+		canonicalBlueprintPackageBytes: encodeCanonical(blueprintContract.package),
+		expectedBlueprintDigest: EXPECTED_BLUEPRINT_DIGEST,
+	});
+	const verifyReceivedVertexUnprepared = surface.verifyReceivedVertex;
+	const createTransactionalVertexIssuerUnprepared = surface.createTransactionalVertexIssuer;
+	return {
+		...surface,
+		createTransactionalVertexIssuer:
+			createTransactionalVertexIssuerUnprepared === undefined
+				? undefined
+				: (options): NonNullable<ReturnType<typeof createTransactionalVertexIssuerUnprepared>> => {
+						preparedConsumerAudit.issuerCalls++;
+						return createTransactionalVertexIssuerUnprepared({ ...options, preparedBlueprintAdmission });
+					},
+		verifyReceivedVertex:
+			verifyReceivedVertexUnprepared === undefined
+				? undefined
+				: (input): VerificationResult => {
+						preparedConsumerAudit.verifierCalls++;
+						return verifyReceivedVertexUnprepared({ ...input, preparedBlueprintAdmission });
+					},
+	};
+}
+
 function liveCall(
 	verifyReceivedVertex: NonNullable<ProtocolSurface["verifyReceivedVertex"]>,
 	signatureHex: string,
@@ -160,6 +200,13 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 			count: contract.frozenTuple.protectedPathCount,
 			digest: contract.frozenTuple.protectedPathStatesSha256,
 		});
+		const source = readFileSync(fileURLToPath(import.meta.url), "utf8");
+		expect(source.match(/verifyReceivedVertexUnprepared\s*\(/gu)).toHaveLength(1);
+		expect(source.match(/createTransactionalVertexIssuerUnprepared\s*\(/gu)).toHaveLength(1);
+		expect(source).toMatch(/verifyReceivedVertexUnprepared\(\{\s*\.\.\.input,\s*preparedBlueprintAdmission\s*\}\)/u);
+		expect(source).toMatch(
+			/createTransactionalVertexIssuerUnprepared\(\{\s*\.\.\.options,\s*preparedBlueprintAdmission\s*\}\)/u
+		);
 	});
 
 	it("binds a normative and machine-readable profile to the untouched frozen tuple", () => {
@@ -269,7 +316,7 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 	});
 
 	it("executes the same strict profile through the live verifyReceivedVertex path", async () => {
-		const surface = await surfaceLoad;
+		const surface = await preparedConsumerSurface();
 		const verifyReceivedVertex = surface.verifyReceivedVertex;
 		expect(verifyReceivedVertex).toBeTypeOf("function");
 		if (verifyReceivedVertex === undefined) return;
@@ -282,6 +329,7 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 			["hex-text-message", contract.live.signatureOverHexTextHex, contract.live.publicKeyHex, false],
 			["json-wrapper-message", contract.live.signatureOverJsonWrapperHex, contract.live.publicKeyHex, false],
 		] as const;
+		preparedConsumerAudit.verifierCalls = 0;
 		expect(
 			cases.map(([id, signature, publicKey, expected]) => ({
 				id,
@@ -296,10 +344,11 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 				resolverCalls: 1,
 			}))
 		);
+		expect(preparedConsumerAudit.verifierCalls).toBe(cases.length);
 	});
 
 	it("keeps Node/OpenSSL as a divergence diagnostic, never the desired admission oracle", async () => {
-		const surface = await surfaceLoad;
+		const surface = await preparedConsumerSurface();
 		const verifyReceivedVertex = surface.verifyReceivedVertex;
 		expect(verifyReceivedVertex).toBeTypeOf("function");
 		if (verifyReceivedVertex === undefined) return;
@@ -322,7 +371,7 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 	});
 
 	it("rejects malformed, noncanonical, and unregistered inputs before resolver or crypto work", async () => {
-		const surface = await surfaceLoad;
+		const surface = await preparedConsumerSurface();
 		const verifyReceivedVertex = surface.verifyReceivedVertex;
 		expect(verifyReceivedVertex).toBeTypeOf("function");
 		if (verifyReceivedVertex === undefined) return;
@@ -373,12 +422,14 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 	});
 
 	it("closes issuance with deliberately unsorted caller dependencies into live strict admission", async () => {
-		const surface = await surfaceLoad;
+		const surface = await preparedConsumerSurface();
 		const createIssuer = surface.createTransactionalVertexIssuer;
 		const verifyReceivedVertex = surface.verifyReceivedVertex;
 		expect(createIssuer).toBeTypeOf("function");
 		expect(verifyReceivedVertex).toBeTypeOf("function");
 		if (createIssuer === undefined || verifyReceivedVertex === undefined) return;
+		preparedConsumerAudit.issuerCalls = 0;
+		preparedConsumerAudit.verifierCalls = 0;
 		const issuer = createIssuer({
 			author: contract.live.preimage.author,
 			privateKeySeed: fromHex(contract.live.privateKeySeedHex),
@@ -413,6 +464,7 @@ describe("Phase 0g(ii-S) post-freeze Ed25519 acceptance-profile RED", () => {
 			})
 		).toMatchObject({ accepted: true, digest: fromHex(contract.live.digestHex) });
 		expect(resolver).toHaveBeenCalledOnce();
+		expect(preparedConsumerAudit).toEqual({ issuerCalls: 1, verifierCalls: 1 });
 	});
 
 	it("freezes supplement, vectors, policy, and checker while allowing unrelated additive work", async () => {

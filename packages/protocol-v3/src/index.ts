@@ -39,6 +39,7 @@ export interface RawEd25519PublicKey {
 export interface VerifyReceivedVertexInput {
 	readonly domain: string;
 	readonly expectedAnchor: string;
+	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
 	readonly signature: Uint8Array;
@@ -99,13 +100,48 @@ export interface TransactionalVertexIssuer {
 
 export interface TransactionalIssuerOptions {
 	readonly author: string;
+	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
 	readonly privateKeySeed: Uint8Array;
 	readonly publicKey: RawEd25519PublicKey;
 	readonly transactIssue: TransactIssue;
 }
 
+export interface BlueprintPreparationInput {
+	readonly canonicalBlueprintPackageBytes: Uint8Array;
+	readonly expectedBlueprintDigest: string;
+}
+
+/**
+ * An admission capability prepared from a canonical, digest-bound blueprint package.
+ *
+ * Its public digest is informational. Consumer authorization is established by
+ * module-private runtime provenance, so copying or reconstructing this value
+ * does not produce a usable capability.
+ */
+export interface PreparedBlueprintAdmission {
+	readonly blueprintDigest: string;
+}
+
 /** A value does not satisfy the registered protocol-v3 vertex field contract. */
 export class VertexValidationError extends TypeError {}
+
+type BlueprintArgumentType = "canonical-object" | "safe-integer" | "string";
+
+interface CompiledArgumentField {
+	readonly name: string;
+	readonly required: boolean;
+	readonly type: BlueprintArgumentType;
+}
+
+interface CompiledOperationSchema {
+	readonly allowedNames: ReadonlySet<string>;
+	readonly fields: readonly CompiledArgumentField[];
+}
+
+interface PreparedBlueprintAdmissionState {
+	readonly discriminator: string;
+	readonly operations: ReadonlyMap<string, CompiledOperationSchema>;
+}
 
 const registry = registryJson as ProtocolRegistry;
 const vertexRegistry = registry.kinds.vertex;
@@ -122,6 +158,7 @@ if (identitySuite === undefined) {
 }
 
 const VERTEX_SUITE_ID = identitySuite.suiteId;
+const BLUEPRINT_ADMISSION_DOMAIN = "ts-drp/blueprint-admission/v3";
 const vertexFields = vertexRegistry.fields;
 const vertexFieldNames = new Set(vertexFields.map(({ name }) => name));
 const anchorFieldCandidate = vertexFields.find(({ name }) => name === "anchor");
@@ -129,6 +166,49 @@ if (anchorFieldCandidate === undefined) throw new Error("protocol-v3 vertex regi
 const anchorField: RegistryField = anchorFieldCandidate;
 
 const textEncoder = new TextEncoder();
+const preparedBlueprintAdmissions = new WeakMap<object, PreparedBlueprintAdmissionState>();
+
+function ownDataProperty(input: Readonly<Record<string, unknown>>, name: string, context: string): unknown {
+	const descriptor = Object.getOwnPropertyDescriptor(input, name);
+	if (descriptor === undefined) throw new TypeError(`${context}.${name} is required`);
+	if (!Object.hasOwn(descriptor, "value")) {
+		throw new TypeError(`${context}.${name} must be an own data property`);
+	}
+	return descriptor.value;
+}
+
+function assertClosedRecord(
+	value: unknown,
+	expectedKeys: readonly string[],
+	context: string
+): asserts value is Readonly<Record<string, unknown>> {
+	if (!isPlainRecord(value)) throw new TypeError(`${context} must be a plain object`);
+	const expected = new Set(expectedKeys);
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== expected.size || keys.some((key) => typeof key !== "string" || !expected.has(key))) {
+		throw new TypeError(`${context} must contain exactly ${expectedKeys.join(", ")}`);
+	}
+	for (const key of expectedKeys) ownDataProperty(value, key, context);
+}
+
+function assertNonEmptyString(value: unknown, context: string): asserts value is string {
+	if (typeof value !== "string" || value.length === 0) {
+		throw new TypeError(`${context} must be a non-empty string`);
+	}
+	assertWellFormedString(value, context);
+}
+
+function assertDigestHexValue(value: unknown, context: string): asserts value is string {
+	if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) {
+		throw new TypeError(`${context} must be 32-byte lowercase digest hex`);
+	}
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+	let output = "";
+	for (const byte of bytes) output += byte.toString(16).padStart(2, "0");
+	return output;
+}
 
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -331,6 +411,206 @@ function registeredVertex(
 	return output;
 }
 
+function compileArgumentField(value: unknown, context: string): CompiledArgumentField {
+	assertClosedRecord(value, ["name", "required", "type"], context);
+	const name = ownDataProperty(value, "name", context);
+	const required = ownDataProperty(value, "required", context);
+	const type = ownDataProperty(value, "type", context);
+	assertNonEmptyString(name, `${context}.name`);
+	if (typeof required !== "boolean") throw new TypeError(`${context}.required must be a boolean`);
+	if (type !== "canonical-object" && type !== "safe-integer" && type !== "string") {
+		throw new TypeError(`${context}.type is unsupported`);
+	}
+	return Object.freeze({ name, required, type });
+}
+
+function compileOperation(
+	value: unknown,
+	discriminator: string,
+	previousOperationName: string | undefined,
+	context: string
+): readonly [string, CompiledOperationSchema] {
+	assertClosedRecord(value, ["name", "argumentSchema"], context);
+	const name = ownDataProperty(value, "name", context);
+	const argumentSchema = ownDataProperty(value, "argumentSchema", context);
+	assertNonEmptyString(name, `${context}.name`);
+	if (previousOperationName !== undefined && compareCodePointStrings(previousOperationName, name) >= 0) {
+		throw new TypeError("blueprint manifest operations must have unique names in codepoint order");
+	}
+	assertClosedRecord(argumentSchema, ["kind", "fields"], `${context}.argumentSchema`);
+	if (ownDataProperty(argumentSchema, "kind", `${context}.argumentSchema`) !== "closed-record") {
+		throw new TypeError(`${context}.argumentSchema.kind must be closed-record`);
+	}
+	const fields = ownDataProperty(argumentSchema, "fields", `${context}.argumentSchema`);
+	if (!Array.isArray(fields)) throw new TypeError(`${context}.argumentSchema.fields must be an array`);
+
+	const compiledFields: CompiledArgumentField[] = [];
+	let previousFieldName: string | undefined;
+	for (let index = 0; index < fields.length; index++) {
+		const compiled = compileArgumentField(fields[index], `${context}.argumentSchema.fields[${index}]`);
+		if (compiled.name === discriminator) {
+			throw new TypeError(`${context} cannot redeclare the operation discriminator`);
+		}
+		if (previousFieldName !== undefined && compareCodePointStrings(previousFieldName, compiled.name) >= 0) {
+			throw new TypeError(`${context} argument fields must have unique names in codepoint order`);
+		}
+		compiledFields.push(compiled);
+		previousFieldName = compiled.name;
+	}
+	const allowedNames = new Set<string>([discriminator, ...compiledFields.map((field) => field.name)]);
+	return Object.freeze([
+		name,
+		Object.freeze({
+			allowedNames,
+			fields: Object.freeze(compiledFields),
+		}),
+	]);
+}
+
+function compileBlueprintPackage(value: unknown): PreparedBlueprintAdmissionState {
+	assertClosedRecord(
+		value,
+		["kind", "protocolMajor", "schemaVersion", "implementation", "manifest"],
+		"blueprint package"
+	);
+	if (ownDataProperty(value, "kind", "blueprint package") !== "drp-blueprint-admission-package") {
+		throw new TypeError("blueprint package.kind is unsupported");
+	}
+	if (ownDataProperty(value, "protocolMajor", "blueprint package") !== 3) {
+		throw new TypeError("blueprint package.protocolMajor must be 3");
+	}
+	if (ownDataProperty(value, "schemaVersion", "blueprint package") !== 1) {
+		throw new TypeError("blueprint package.schemaVersion must be 1");
+	}
+
+	const implementation = ownDataProperty(value, "implementation", "blueprint package");
+	assertClosedRecord(
+		implementation,
+		["artifactId", "artifactDigest", "runtimeProfile"],
+		"blueprint package.implementation"
+	);
+	const artifactId = ownDataProperty(implementation, "artifactId", "blueprint package.implementation");
+	const artifactDigest = ownDataProperty(implementation, "artifactDigest", "blueprint package.implementation");
+	const runtimeProfile = ownDataProperty(implementation, "runtimeProfile", "blueprint package.implementation");
+	assertNonEmptyString(artifactId, "blueprint package.implementation.artifactId");
+	assertDigestHexValue(artifactDigest, "blueprint package.implementation.artifactDigest");
+	assertNonEmptyString(runtimeProfile, "blueprint package.implementation.runtimeProfile");
+
+	const manifest = ownDataProperty(value, "manifest", "blueprint package");
+	assertClosedRecord(manifest, ["schemaVersion", "operationDiscriminator", "operations"], "blueprint package.manifest");
+	if (ownDataProperty(manifest, "schemaVersion", "blueprint package.manifest") !== 1) {
+		throw new TypeError("blueprint package.manifest.schemaVersion must be 1");
+	}
+	const discriminator = ownDataProperty(manifest, "operationDiscriminator", "blueprint package.manifest");
+	assertNonEmptyString(discriminator, "blueprint package.manifest.operationDiscriminator");
+	const operations = ownDataProperty(manifest, "operations", "blueprint package.manifest");
+	if (!Array.isArray(operations) || operations.length === 0) {
+		throw new TypeError("blueprint package.manifest.operations must be a non-empty array");
+	}
+
+	const compiledOperations = new Map<string, CompiledOperationSchema>();
+	let previousOperationName: string | undefined;
+	for (let index = 0; index < operations.length; index++) {
+		const [name, schema] = compileOperation(
+			operations[index],
+			discriminator,
+			previousOperationName,
+			`blueprint package.manifest.operations[${index}]`
+		);
+		compiledOperations.set(name, schema);
+		previousOperationName = name;
+	}
+	return Object.freeze({ discriminator, operations: compiledOperations });
+}
+
+function preparedAdmissionState(value: unknown): PreparedBlueprintAdmissionState | undefined {
+	return value !== null && typeof value === "object" ? preparedBlueprintAdmissions.get(value) : undefined;
+}
+
+function consumerPreparedAdmissionState(input: object): PreparedBlueprintAdmissionState | undefined {
+	const descriptor = Object.getOwnPropertyDescriptor(input, "preparedBlueprintAdmission");
+	if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) return undefined;
+	return preparedAdmissionState(descriptor.value);
+}
+
+function operationMatchesPreparedAdmission(operation: unknown, state: PreparedBlueprintAdmissionState): boolean {
+	if (!isPlainRecord(operation) || Object.getOwnPropertySymbols(operation).length !== 0) return false;
+	const discriminatorDescriptor = Object.getOwnPropertyDescriptor(operation, state.discriminator);
+	if (
+		discriminatorDescriptor === undefined ||
+		!Object.hasOwn(discriminatorDescriptor, "value") ||
+		typeof discriminatorDescriptor.value !== "string"
+	) {
+		return false;
+	}
+	const schema = state.operations.get(discriminatorDescriptor.value);
+	if (schema === undefined) return false;
+
+	const keys = Reflect.ownKeys(operation);
+	if (keys.some((key) => typeof key !== "string" || !schema.allowedNames.has(key))) return false;
+
+	for (const field of schema.fields) {
+		const descriptor = Object.getOwnPropertyDescriptor(operation, field.name);
+		if (descriptor === undefined) {
+			if (field.required) return false;
+			continue;
+		}
+		if (!Object.hasOwn(descriptor, "value")) return false;
+		switch (field.type) {
+			case "canonical-object":
+				if (!isPlainRecord(descriptor.value)) return false;
+				break;
+			case "safe-integer":
+				if (typeof descriptor.value !== "number" || !Number.isSafeInteger(descriptor.value)) return false;
+				break;
+			case "string":
+				if (typeof descriptor.value !== "string") return false;
+				try {
+					assertWellFormedString(descriptor.value, field.name);
+				} catch {
+					return false;
+				}
+				break;
+		}
+	}
+	return true;
+}
+
+/**
+ * Prepares an unforgeable admission capability from exact canonical package bytes.
+ * @param input - Canonical package bytes and the digest proven by the caller.
+ * @returns A runtime-proven capability accepted by the v3 verifier and issuer.
+ */
+export function prepareBlueprintAdmission(input: BlueprintPreparationInput): PreparedBlueprintAdmission {
+	assertClosedRecord(
+		input,
+		["canonicalBlueprintPackageBytes", "expectedBlueprintDigest"],
+		"blueprint preparation input"
+	);
+	const suppliedBytes = ownDataProperty(input, "canonicalBlueprintPackageBytes", "blueprint preparation input");
+	const expectedBlueprintDigest = ownDataProperty(input, "expectedBlueprintDigest", "blueprint preparation input");
+	if (!(suppliedBytes instanceof Uint8Array)) {
+		throw new TypeError("canonicalBlueprintPackageBytes must be a Uint8Array");
+	}
+	assertDigestHexValue(expectedBlueprintDigest, "expectedBlueprintDigest");
+
+	const canonicalBlueprintPackageBytes = new Uint8Array(suppliedBytes);
+	const decoded = decodeCanonical(canonicalBlueprintPackageBytes);
+	const reencoded = encodeCanonical(decoded);
+	if (compareBytes(reencoded, canonicalBlueprintPackageBytes) !== 0) {
+		throw new TypeError("blueprint package bytes must use the canonical encoding");
+	}
+	const actualBlueprintDigest = bytesToHex(hashDomain(BLUEPRINT_ADMISSION_DOMAIN, canonicalBlueprintPackageBytes));
+	if (actualBlueprintDigest !== expectedBlueprintDigest) {
+		throw new TypeError("blueprint package digest does not match expectedBlueprintDigest");
+	}
+
+	const state = compileBlueprintPackage(decoded);
+	const prepared = Object.freeze({ blueprintDigest: actualBlueprintDigest });
+	preparedBlueprintAdmissions.set(prepared, state);
+	return prepared;
+}
+
 /**
  * Derives the registry-v1 signed vertex field set in review order.
  *
@@ -422,6 +702,10 @@ export function verifyEd25519RegisteredDigest(
  * @returns A stateless transactional issuer.
  */
 export function createTransactionalVertexIssuer(options: TransactionalIssuerOptions): TransactionalVertexIssuer {
+	const preparedState = consumerPreparedAdmissionState(options);
+	if (preparedState === undefined) {
+		throw new TypeError("preparedBlueprintAdmission must be produced by prepareBlueprintAdmission");
+	}
 	if (!(options.privateKeySeed instanceof Uint8Array) || options.privateKeySeed.byteLength !== 32) {
 		throw new TypeError("private key seed must be a 32-byte Uint8Array");
 	}
@@ -447,13 +731,20 @@ export function createTransactionalVertexIssuer(options: TransactionalIssuerOpti
 
 	return {
 		async issue(input: LocalVertexInput): Promise<IssueCommit> {
+			if (!operationMatchesPreparedAdmission(input.operation, preparedState)) {
+				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
+			}
+			const operation = detachCanonicalRecord(input.operation);
+			if (!operationMatchesPreparedAdmission(operation, preparedState)) {
+				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
+			}
 			const detachedInput: LocalVertexInput = {
 				anchor: input.anchor,
 				dependencies: [...input.dependencies],
 				epoch: input.epoch,
 				logicalTime: input.logicalTime,
 				objectId: input.objectId,
-				operation: detachCanonicalRecord(input.operation),
+				operation,
 			};
 			const scope: IssueScope = { author, objectId: detachedInput.objectId };
 
@@ -529,9 +820,14 @@ export function verifyReceivedVertex(input: VerifyReceivedVertexInput): Register
 			return { accepted: false };
 		}
 
-		return verifyEd25519RegisteredDigest(input.signature, digest, publicKey.bytes)
-			? { accepted: true, digest }
-			: { accepted: false };
+		if (!verifyEd25519RegisteredDigest(input.signature, digest, publicKey.bytes)) {
+			return { accepted: false };
+		}
+		const preparedState = consumerPreparedAdmissionState(input);
+		if (preparedState === undefined || !operationMatchesPreparedAdmission(preimage.operation, preparedState)) {
+			return { accepted: false };
+		}
+		return { accepted: true, digest };
 	} catch {
 		return { accepted: false };
 	}
