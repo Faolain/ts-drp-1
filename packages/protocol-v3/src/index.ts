@@ -52,6 +52,83 @@ export interface RegisteredVertexVerification {
 	readonly digest?: Uint8Array;
 }
 
+export interface EquivocationScope {
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly objectId: string;
+}
+
+export interface PersistedVertexWitness {
+	readonly digest: Uint8Array;
+	readonly witness: Omit<VerifyReceivedVertexInput, "resolveAuthorPublicKey">;
+}
+
+export interface PersistedEquivocationProof {
+	readonly canonicalProofBytes: Uint8Array;
+	readonly proofId: string;
+}
+
+export interface SlotAdvisorySignal {
+	readonly author: string;
+	readonly observedForkCount: number;
+	readonly advisoryLimitReached: boolean;
+	readonly withinAdvisoryLimitProofCount: number;
+	readonly overAdvisoryLimitProofCount: number;
+}
+
+export interface EquivocationResolution {
+	readonly orderedDigests: readonly string[];
+	readonly preferredDigest: string;
+}
+
+export interface PersistedEquivocationState {
+	readonly proofs: readonly PersistedEquivocationProof[];
+	readonly slotSignal: SlotAdvisorySignal;
+	readonly vertices: readonly PersistedVertexWitness[];
+}
+
+export interface RemoteObservationResult {
+	readonly admitted: boolean;
+	readonly disposition: "duplicate" | "equivocation" | "invalid" | "new";
+	readonly digest?: Uint8Array;
+	readonly newlyPersistedProofIds: readonly string[];
+	readonly resolution?: EquivocationResolution;
+	readonly slotSignal?: SlotAdvisorySignal;
+}
+
+export interface EquivocationTransactionDecision {
+	readonly result: RemoteObservationResult;
+	readonly state: PersistedEquivocationState;
+}
+
+export type ApplyEquivocationPolicy = (state: PersistedEquivocationState) => EquivocationTransactionDecision;
+
+export type TransactObservation = (
+	scope: EquivocationScope,
+	apply: ApplyEquivocationPolicy
+) => Promise<RemoteObservationResult>;
+
+export interface RemoteEquivocationObserver {
+	observe(input: VerifyReceivedVertexInput): Promise<RemoteObservationResult>;
+}
+
+export interface RemoteEquivocationObserverOptions {
+	readonly perSlotAdvisoryProofLimit: number;
+	readonly transactObservation: TransactObservation;
+}
+
+export interface VerifyEquivocationProofInput {
+	readonly canonicalProofBytes: Uint8Array;
+	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
+}
+
+export interface EquivocationProofVerification {
+	readonly digests?: readonly [string, string];
+	readonly proofId?: string;
+	readonly scope?: EquivocationScope;
+	readonly verified: boolean;
+}
+
 export interface IssueScope {
 	readonly author: string;
 	readonly objectId: string;
@@ -240,6 +317,9 @@ if (identitySuite === undefined) {
 
 const VERTEX_SUITE_ID = identitySuite.suiteId;
 const BLUEPRINT_ADMISSION_DOMAIN = "ts-drp/blueprint-admission/v3";
+const EQUIVOCATION_PROFILE_ID = "equivocation-digest-identity-v1";
+const EQUIVOCATION_PROOF_KIND = "drp-equivocation-proof";
+const EQUIVOCATION_PROOF_DOMAIN = "ts-drp/equivocation-proof/v1";
 const textEncoder = new TextEncoder();
 const blueprintArtifactProfile = compileBlueprintArtifactProfile(blueprintArtifactProfileJson);
 const BLUEPRINT_ARTIFACT_DOMAIN = blueprintArtifactProfile.artifactDigestDomain;
@@ -1214,6 +1294,446 @@ function authenticateReceivedVertex(input: VerifyReceivedVertexInput): Authentic
 export function verifyReceivedVertex(input: VerifyReceivedVertexInput): RegisteredVertexVerification {
 	const authenticated = authenticateReceivedVertex(input);
 	return authenticated === undefined ? { accepted: false } : { accepted: true, digest: authenticated.digest };
+}
+
+function detachPersistedVertex(vertex: PersistedVertexWitness): PersistedVertexWitness {
+	if (vertex === null || typeof vertex !== "object") {
+		throw new TypeError("persisted equivocation vertex is malformed");
+	}
+	const digest = vertex.digest;
+	const witness = vertex.witness;
+	if (witness === null || typeof witness !== "object") {
+		throw new TypeError("persisted equivocation vertex is malformed");
+	}
+	const domain = witness.domain;
+	const expectedAnchor = witness.expectedAnchor;
+	const receivedCanonicalPreimageBytes = witness.receivedCanonicalPreimageBytes;
+	const signature = witness.signature;
+	const suiteId = witness.suiteId;
+	if (
+		!(digest instanceof Uint8Array) ||
+		digest.byteLength !== 32 ||
+		typeof domain !== "string" ||
+		typeof expectedAnchor !== "string" ||
+		!(receivedCanonicalPreimageBytes instanceof Uint8Array) ||
+		!(signature instanceof Uint8Array) ||
+		signature.byteLength !== 64 ||
+		typeof suiteId !== "string"
+	) {
+		throw new TypeError("persisted equivocation vertex is malformed");
+	}
+	return {
+		digest: new Uint8Array(digest),
+		witness: {
+			domain,
+			expectedAnchor,
+			receivedCanonicalPreimageBytes: new Uint8Array(receivedCanonicalPreimageBytes),
+			signature: new Uint8Array(signature),
+			suiteId,
+		},
+	};
+}
+
+function canonicalWitnessBytes(vertex: PersistedVertexWitness): Uint8Array {
+	return encodeCanonical({
+		domain: vertex.witness.domain,
+		expectedAnchor: vertex.witness.expectedAnchor,
+		preimage: vertex.witness.receivedCanonicalPreimageBytes,
+		signature: vertex.witness.signature,
+		suiteId: vertex.witness.suiteId,
+	});
+}
+
+function proofIdForDigests(left: Uint8Array, right: Uint8Array): string {
+	const [first, second] = compareBytes(left, right) < 0 ? [left, right] : [right, left];
+	return bytesToHex(hashDomain(EQUIVOCATION_PROOF_DOMAIN, first, second));
+}
+
+function canonicalEquivocationProof(
+	scope: EquivocationScope,
+	left: PersistedVertexWitness,
+	right: PersistedVertexWitness
+): PersistedEquivocationProof {
+	const [first, second] = compareBytes(left.digest, right.digest) < 0 ? [left, right] : [right, left];
+	return {
+		canonicalProofBytes: encodeCanonical({
+			kind: EQUIVOCATION_PROOF_KIND,
+			profile: EQUIVOCATION_PROFILE_ID,
+			protocolMajor: 3,
+			slot: scope,
+			vertices: [first, second].map((vertex) => ({
+				digest: vertex.digest,
+				domain: vertex.witness.domain,
+				expectedAnchor: vertex.witness.expectedAnchor,
+				preimage: vertex.witness.receivedCanonicalPreimageBytes,
+				signature: vertex.witness.signature,
+				suiteId: vertex.witness.suiteId,
+			})),
+		}),
+		proofId: proofIdForDigests(first.digest, second.digest),
+	};
+}
+
+function allCanonicalEquivocationProofs(
+	scope: EquivocationScope,
+	vertices: readonly PersistedVertexWitness[]
+): PersistedEquivocationProof[] {
+	const proofs: PersistedEquivocationProof[] = [];
+	for (let leftIndex = 0; leftIndex < vertices.length; leftIndex++) {
+		for (let rightIndex = leftIndex + 1; rightIndex < vertices.length; rightIndex++) {
+			proofs.push(
+				canonicalEquivocationProof(
+					scope,
+					vertices[leftIndex] as PersistedVertexWitness,
+					vertices[rightIndex] as PersistedVertexWitness
+				)
+			);
+		}
+	}
+	return proofs.sort((left, right) => compareCodePointStrings(left.proofId, right.proofId));
+}
+
+function slotAdvisorySignal(
+	author: string,
+	vertexCount: number,
+	proofCount: number,
+	perSlotAdvisoryProofLimit: number
+): SlotAdvisorySignal {
+	const withinAdvisoryLimitProofCount = Math.min(proofCount, perSlotAdvisoryProofLimit);
+	return {
+		author,
+		observedForkCount: Math.max(0, vertexCount - 1),
+		advisoryLimitReached: proofCount >= perSlotAdvisoryProofLimit,
+		withinAdvisoryLimitProofCount,
+		overAdvisoryLimitProofCount: proofCount - withinAdvisoryLimitProofCount,
+	};
+}
+
+function observationDecision(
+	scope: EquivocationScope,
+	candidate: PersistedVertexWitness,
+	perSlotAdvisoryProofLimit: number,
+	trustedProofs: readonly PersistedEquivocationProof[],
+	authenticatedVertices: readonly PersistedVertexWitness[]
+): EquivocationTransactionDecision {
+	const previousProofIds = new Set(trustedProofs.map(({ proofId }) => proofId));
+	const authenticatedVertexCount = authenticatedVertices.length;
+	const vertices: PersistedVertexWitness[] = [];
+	let existingIndex = -1;
+	for (let index = 0; index < authenticatedVertexCount; index++) {
+		const vertex = authenticatedVertices[index] as PersistedVertexWitness;
+		vertices[index] = vertex;
+		if (existingIndex === -1 && compareBytes(vertex.digest, candidate.digest) === 0) {
+			existingIndex = index;
+		}
+	}
+	const disposition = existingIndex === -1 ? (vertices.length === 0 ? "new" : "equivocation") : "duplicate";
+
+	if (existingIndex === -1) {
+		vertices[authenticatedVertexCount] = detachPersistedVertex(candidate);
+	} else {
+		const existing = vertices[existingIndex] as PersistedVertexWitness;
+		if (compareBytes(canonicalWitnessBytes(candidate), canonicalWitnessBytes(existing)) < 0) {
+			vertices[existingIndex] = detachPersistedVertex(candidate);
+		}
+	}
+	vertices.sort((left, right) => compareBytes(left.digest, right.digest));
+
+	const proofs = allCanonicalEquivocationProofs(scope, vertices);
+	const slotSignal = slotAdvisorySignal(scope.author, vertices.length, proofs.length, perSlotAdvisoryProofLimit);
+	const orderedDigests = vertices.map(({ digest }) => bytesToHex(digest));
+	const result: RemoteObservationResult = {
+		admitted: true,
+		digest: new Uint8Array(candidate.digest),
+		disposition,
+		newlyPersistedProofIds: proofs.map(({ proofId }) => proofId).filter((proofId) => !previousProofIds.has(proofId)),
+		resolution: {
+			orderedDigests,
+			preferredDigest: orderedDigests[0] as string,
+		},
+		slotSignal,
+	};
+	return {
+		result,
+		state: {
+			proofs,
+			slotSignal,
+			vertices,
+		},
+	};
+}
+
+function assertPersistedVerticesAuthenticated(
+	scope: EquivocationScope,
+	state: PersistedEquivocationState,
+	resolveAuthorPublicKey: VerifyReceivedVertexInput["resolveAuthorPublicKey"]
+): readonly PersistedVertexWitness[] {
+	if (state === null || typeof state !== "object") {
+		throw new TypeError("persisted equivocation state is malformed");
+	}
+	const capturedVertices = state.vertices;
+	if (!Array.isArray(capturedVertices)) {
+		throw new TypeError("persisted equivocation state is malformed");
+	}
+	const capturedVertexCount = capturedVertices.length;
+	const detachedVertices: PersistedVertexWitness[] = [];
+	for (let index = 0; index < capturedVertexCount; index++) {
+		const capturedVertex = capturedVertices[index] as PersistedVertexWitness;
+		const vertex = detachPersistedVertex(capturedVertex);
+		const digest = vertex.digest;
+		const witness = vertex.witness;
+		const domain = witness.domain;
+		const expectedAnchor = witness.expectedAnchor;
+		const receivedCanonicalPreimageBytes = witness.receivedCanonicalPreimageBytes;
+		const signature = witness.signature;
+		const suiteId = witness.suiteId;
+
+		const authenticated = authenticateReceivedVertex({
+			domain,
+			expectedAnchor,
+			receivedCanonicalPreimageBytes,
+			resolveAuthorPublicKey,
+			signature,
+			suiteId,
+		});
+		if (authenticated === undefined || compareBytes(authenticated.digest, digest) !== 0) {
+			throw new TypeError("persisted equivocation vertex digest is unauthenticated");
+		}
+		if (
+			authenticated.preimage.author !== scope.author ||
+			authenticated.preimage.authorSequence !== scope.authorSequence ||
+			authenticated.preimage.objectId !== scope.objectId
+		) {
+			throw new TypeError("persisted equivocation vertex is outside transaction scope");
+		}
+		detachedVertices[index] = vertex;
+	}
+	return detachedVertices;
+}
+
+/**
+ * Creates a stateless remote equivocation observer over an injected exact-slot transaction.
+ *
+ * Authentication and input detachment complete before the coordinator is entered.
+ * The coordinator owns serialization and durability; this primitive supplies only
+ * a pure deterministic transition over the coordinator-provided slot state.
+ * @param options - Slot advisory accounting and transaction coordinator.
+ * @returns A remote observer with no default or module-local store.
+ */
+export function createRemoteEquivocationObserver(
+	options: RemoteEquivocationObserverOptions
+): RemoteEquivocationObserver {
+	if (options === null || typeof options !== "object") {
+		throw new TypeError("observer options must be an object");
+	}
+	const perSlotAdvisoryProofLimit = options.perSlotAdvisoryProofLimit;
+	const transactObservation = options.transactObservation;
+	if (typeof transactObservation !== "function") {
+		throw new TypeError("transactObservation must be a function");
+	}
+	if (!Number.isSafeInteger(perSlotAdvisoryProofLimit) || perSlotAdvisoryProofLimit < 1) {
+		throw new TypeError("perSlotAdvisoryProofLimit must be a positive safe integer");
+	}
+
+	return {
+		async observe(input: VerifyReceivedVertexInput): Promise<RemoteObservationResult> {
+			let snapshot: VerifyReceivedVertexInput;
+			try {
+				if (input === null || typeof input !== "object") {
+					throw new TypeError("received vertex input is malformed");
+				}
+				const domain = input.domain;
+				const expectedAnchor = input.expectedAnchor;
+				const receivedCanonicalPreimageBytes = input.receivedCanonicalPreimageBytes;
+				const capturedResolver = input.resolveAuthorPublicKey;
+				const signature = input.signature;
+				const suiteId = input.suiteId;
+				if (
+					!(receivedCanonicalPreimageBytes instanceof Uint8Array) ||
+					!(signature instanceof Uint8Array) ||
+					signature.byteLength !== 64 ||
+					typeof capturedResolver !== "function"
+				) {
+					throw new TypeError("received vertex input is malformed");
+				}
+				const resolveAuthorPublicKey = capturedResolver.bind(input);
+				snapshot = {
+					domain,
+					expectedAnchor,
+					receivedCanonicalPreimageBytes: new Uint8Array(receivedCanonicalPreimageBytes),
+					resolveAuthorPublicKey,
+					signature: new Uint8Array(signature),
+					suiteId,
+				};
+			} catch {
+				return { admitted: false, disposition: "invalid", newlyPersistedProofIds: [] };
+			}
+
+			const authenticated = authenticateReceivedVertex(snapshot);
+			if (authenticated === undefined) {
+				return { admitted: false, disposition: "invalid", newlyPersistedProofIds: [] };
+			}
+
+			const author = authenticated.preimage.author;
+			const authorSequence = authenticated.preimage.authorSequence;
+			const objectId = authenticated.preimage.objectId;
+			if (typeof author !== "string" || typeof objectId !== "string" || typeof authorSequence !== "number") {
+				return { admitted: false, disposition: "invalid", newlyPersistedProofIds: [] };
+			}
+			const scope: EquivocationScope = { author, authorSequence, objectId };
+			const candidate: PersistedVertexWitness = {
+				digest: new Uint8Array(authenticated.digest),
+				witness: {
+					domain: snapshot.domain,
+					expectedAnchor: snapshot.expectedAnchor,
+					receivedCanonicalPreimageBytes: new Uint8Array(snapshot.receivedCanonicalPreimageBytes),
+					signature: new Uint8Array(snapshot.signature),
+					suiteId: snapshot.suiteId,
+				},
+			};
+			return transactObservation(scope, (state) => {
+				const authenticatedVertices = assertPersistedVerticesAuthenticated(
+					scope,
+					state,
+					snapshot.resolveAuthorPublicKey
+				);
+				// Coordinator proofs are a trusted residual until the phase 0o-b policy boundary.
+				return observationDecision(scope, candidate, perSlotAdvisoryProofLimit, state.proofs, authenticatedVertices);
+			});
+		},
+	};
+}
+
+function invalidEquivocationProof(): EquivocationProofVerification {
+	return { verified: false };
+}
+
+/**
+ * Verifies a canonical standalone same-slot equivocation proof.
+ *
+ * Both included exact preimages are authenticated through the strict received
+ * vertex verifier and the caller's authoritative author-key resolver.
+ * @param input - Canonical proof bytes and authoritative key resolver.
+ * @returns The verified scope, ordered digest pair and pair-derived proof ID.
+ */
+export function verifyEquivocationProof(input: VerifyEquivocationProofInput): EquivocationProofVerification {
+	if (input === null || typeof input !== "object") {
+		return invalidEquivocationProof();
+	}
+
+	let capturedCanonicalProofBytes: unknown;
+	let capturedResolver: unknown;
+	let inputCaptureFailed = false;
+	try {
+		capturedCanonicalProofBytes = input.canonicalProofBytes;
+	} catch {
+		inputCaptureFailed = true;
+	}
+	try {
+		capturedResolver = input.resolveAuthorPublicKey;
+	} catch {
+		inputCaptureFailed = true;
+	}
+	if (
+		inputCaptureFailed ||
+		!(capturedCanonicalProofBytes instanceof Uint8Array) ||
+		typeof capturedResolver !== "function"
+	) {
+		return invalidEquivocationProof();
+	}
+
+	try {
+		const canonicalProofBytes = new Uint8Array(capturedCanonicalProofBytes);
+		const resolveAuthorPublicKey = capturedResolver.bind(input);
+		const decoded = decodeCanonical(canonicalProofBytes);
+		if (compareBytes(encodeCanonical(decoded), canonicalProofBytes) !== 0) {
+			return invalidEquivocationProof();
+		}
+		assertClosedRecord(decoded, ["kind", "profile", "protocolMajor", "slot", "vertices"], "equivocation proof");
+		if (
+			ownDataProperty(decoded, "kind", "equivocation proof") !== EQUIVOCATION_PROOF_KIND ||
+			ownDataProperty(decoded, "profile", "equivocation proof") !== EQUIVOCATION_PROFILE_ID ||
+			ownDataProperty(decoded, "protocolMajor", "equivocation proof") !== 3
+		) {
+			return invalidEquivocationProof();
+		}
+
+		const slot = ownDataProperty(decoded, "slot", "equivocation proof");
+		assertClosedRecord(slot, ["author", "authorSequence", "objectId"], "equivocation proof.slot");
+		const author = ownDataProperty(slot, "author", "equivocation proof.slot");
+		const authorSequence = ownDataProperty(slot, "authorSequence", "equivocation proof.slot");
+		const objectId = ownDataProperty(slot, "objectId", "equivocation proof.slot");
+		if (
+			typeof author !== "string" ||
+			typeof objectId !== "string" ||
+			typeof authorSequence !== "number" ||
+			!Number.isSafeInteger(authorSequence)
+		) {
+			return invalidEquivocationProof();
+		}
+		const scope: EquivocationScope = { author, authorSequence, objectId };
+
+		const vertices = ownDataProperty(decoded, "vertices", "equivocation proof");
+		if (!Array.isArray(vertices) || vertices.length !== 2) return invalidEquivocationProof();
+		const verifiedDigests: Uint8Array[] = [];
+		for (const [index, vertex] of vertices.entries()) {
+			assertClosedRecord(
+				vertex,
+				["digest", "domain", "expectedAnchor", "preimage", "signature", "suiteId"],
+				`equivocation proof.vertices[${index}]`
+			);
+			const digest = ownDataProperty(vertex, "digest", `equivocation proof.vertices[${index}]`);
+			const domain = ownDataProperty(vertex, "domain", `equivocation proof.vertices[${index}]`);
+			const expectedAnchor = ownDataProperty(vertex, "expectedAnchor", `equivocation proof.vertices[${index}]`);
+			const preimageBytes = ownDataProperty(vertex, "preimage", `equivocation proof.vertices[${index}]`);
+			const signature = ownDataProperty(vertex, "signature", `equivocation proof.vertices[${index}]`);
+			const suiteId = ownDataProperty(vertex, "suiteId", `equivocation proof.vertices[${index}]`);
+			if (
+				!(digest instanceof Uint8Array) ||
+				digest.byteLength !== 32 ||
+				typeof domain !== "string" ||
+				typeof expectedAnchor !== "string" ||
+				!(preimageBytes instanceof Uint8Array) ||
+				!(signature instanceof Uint8Array) ||
+				typeof suiteId !== "string"
+			) {
+				return invalidEquivocationProof();
+			}
+
+			const authenticated = authenticateReceivedVertex({
+				domain,
+				expectedAnchor,
+				receivedCanonicalPreimageBytes: preimageBytes,
+				resolveAuthorPublicKey,
+				signature,
+				suiteId,
+			});
+			if (authenticated === undefined || compareBytes(authenticated.digest, digest) !== 0) {
+				return invalidEquivocationProof();
+			}
+			if (
+				authenticated.preimage.author !== scope.author ||
+				authenticated.preimage.authorSequence !== scope.authorSequence ||
+				authenticated.preimage.objectId !== scope.objectId
+			) {
+				return invalidEquivocationProof();
+			}
+			verifiedDigests.push(new Uint8Array(digest));
+		}
+
+		const left = verifiedDigests[0] as Uint8Array;
+		const right = verifiedDigests[1] as Uint8Array;
+		if (compareBytes(left, right) >= 0) return invalidEquivocationProof();
+		const digests: [string, string] = [bytesToHex(left), bytesToHex(right)];
+		return {
+			digests,
+			proofId: proofIdForDigests(left, right),
+			scope,
+			verified: true,
+		};
+	} catch {
+		return invalidEquivocationProof();
+	}
 }
 
 /**
