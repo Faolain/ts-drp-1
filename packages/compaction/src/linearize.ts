@@ -11,6 +11,20 @@ import {
 
 const digestPattern = /^[0-9a-f]{64}$/u;
 const conflictActions = new Set<ConflictAction>(["Nop", "DropLeft", "DropRight", "Swap", "Drop"]);
+const IntrinsicMap = Map;
+const intrinsicMapEntries = Function.prototype.call.bind(Map.prototype.entries) as (
+	map: unknown
+) => MapIterator<[unknown, unknown]>;
+const intrinsicMapGet = Function.prototype.call.bind(Map.prototype.get) as (map: unknown, key: unknown) => unknown;
+const intrinsicMapHas = Function.prototype.call.bind(Map.prototype.has) as (map: unknown, key: unknown) => boolean;
+const intrinsicMapIteratorNext = Function.prototype.call.bind(intrinsicMapEntries(new IntrinsicMap()).next) as (
+	iterator: MapIterator<[unknown, unknown]>
+) => IteratorResult<[unknown, unknown]>;
+const intrinsicMapSet = Function.prototype.call.bind(Map.prototype.set) as (
+	map: unknown,
+	key: unknown,
+	value: unknown
+) => unknown;
 const epochFullOutcome: EpochFullOutcome = Object.freeze({
 	code: "EPOCH_FULL",
 	latchByHash: false,
@@ -86,6 +100,21 @@ function assertDigest(value: unknown, name: string): asserts value is string {
 
 function invalidByteCharges(message: string): never {
 	throw new LinearizationError("INVALID_BYTE_CHARGES", message);
+}
+
+function captureInitialByteChargeEntries(value: unknown): [unknown, unknown][] {
+	let iterator: MapIterator<[unknown, unknown]>;
+	try {
+		iterator = intrinsicMapEntries(value);
+	} catch {
+		invalidByteCharges("initialByteCharges must contain compatible intrinsic Map entries");
+	}
+	const entries: [unknown, unknown][] = [];
+	while (true) {
+		const result = intrinsicMapIteratorNext(iterator);
+		if (result.done) return entries;
+		entries.push(result.value);
+	}
 }
 
 function validateGraph(vertices: ReadonlyMap<string, EpochVertex>, anchorHash: string): EpochVertex {
@@ -245,20 +274,21 @@ export class CausalityIndex {
 
 		let initialEpochBytes: number | undefined;
 		if (maxEpochBytes !== undefined) {
-			const initialByteCharges = options.initialByteCharges;
-			if (!(initialByteCharges instanceof Map)) {
-				invalidByteCharges("initialByteCharges must be a Map keyed exactly like vertices");
-			}
+			const initialChargeEntries = captureInitialByteChargeEntries(options.initialByteCharges);
 			const initialHashes = [...vertices.keys()];
-			if (initialByteCharges.size !== initialHashes.length) {
+			if (initialChargeEntries.length !== initialHashes.length) {
 				invalidByteCharges("initialByteCharges keyset must equal the initial graph keyset");
+			}
+			const initialChargeSnapshot = new IntrinsicMap<unknown, unknown>();
+			for (const [hash, charge] of initialChargeEntries) {
+				intrinsicMapSet(initialChargeSnapshot, hash, charge);
 			}
 			let total = 0;
 			for (const hash of initialHashes) {
-				if (!initialByteCharges.has(hash)) {
+				if (!intrinsicMapHas(initialChargeSnapshot, hash)) {
 					invalidByteCharges("initialByteCharges keyset must equal the initial graph keyset");
 				}
-				const charge = initialByteCharges.get(hash);
+				const charge = intrinsicMapGet(initialChargeSnapshot, hash);
 				if (!Number.isSafeInteger(charge) || (charge as number) < 1) {
 					invalidByteCharges(`invalid initial byte charge for ${hash}`);
 				}
