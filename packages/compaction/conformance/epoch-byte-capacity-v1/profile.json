@@ -1,0 +1,48 @@
+{
+	"profileId": "compaction-epoch-byte-capacity-v1",
+	"api": {
+		"maxBytesOption": "maxEpochBytes",
+		"initialChargesOption": "initialByteCharges",
+		"appendChargeArgument": 3,
+		"optional": true,
+		"returnUnion": "undefined | EpochFullOutcome"
+	},
+	"accounting": {
+		"anchorInclusive": true,
+		"initialKeyset": "exact-graph-keyset",
+		"initialRead": "once-before-vertex-observation",
+		"domain": "positive-safe-integer",
+		"comparison": "charge <= maxEpochBytes - total",
+		"equalityAccepted": true,
+		"duplicateCharge": 0,
+		"refusalCharge": 0,
+		"countFirstSaturation": true,
+		"postCaptureDualRecheck": true,
+		"rollback": ["ancestor-row", "index-row", "byte-total"]
+	},
+	"initialPrecedence": ["capacity-domain", "invalid-byte-charge-shape-or-keyset", "count-oversize", "byte-oversize"],
+	"errors": {
+		"invalidCeiling": "RangeError",
+		"invalidCharges": "INVALID_BYTE_CHARGES",
+		"initialOversize": "EPOCH_CAPACITY_EXCEEDED"
+	},
+	"outcome": {
+		"status": "pending",
+		"code": "EPOCH_FULL",
+		"latchByHash": false,
+		"frozen": true,
+		"closedFields": ["status", "code", "latchByHash"],
+		"sharedWithCountCapacity": true,
+		"finalMembershipAuthority": false
+	},
+	"claims": {
+		"carrierAuthentication": false,
+		"carrierMeasurement": false,
+		"parametersDigestAuthentication": false,
+		"supportProfileSelection": false,
+		"finalMembershipAuthority": false,
+		"liveBinding": false,
+		"transportFrameBytes": false,
+		"operationBytes": false
+	}
+}
