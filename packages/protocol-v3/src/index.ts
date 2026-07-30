@@ -74,6 +74,59 @@ export interface MaterializeCurrentEquivocationProofInput {
 	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
 }
 
+export interface AuthorProjectionSlot {
+	readonly scope: EquivocationScope;
+	readonly digestHexes: readonly string[];
+}
+
+export interface PendingEquivocationPair {
+	readonly scope: EquivocationScope;
+	readonly lesserDigestHex: string;
+	readonly greaterDigestHex: string;
+	readonly pairId: string;
+}
+
+export interface DurableAuthorProjectionState {
+	readonly slots: readonly AuthorProjectionSlot[];
+	readonly pending: readonly PendingEquivocationPair[];
+}
+
+export interface AuthorProjectionDecision<Result> {
+	readonly state: DurableAuthorProjectionState;
+	readonly result: Result;
+}
+
+export interface DurableAuthorEquivocationProjectionOptions {
+	readCommittedSlotState(scope: EquivocationScope): Promise<PersistedEquivocationState>;
+	enumerateCommittedAuthorSlots(author: string): Promise<readonly EquivocationScope[]>;
+	transactAuthorProjection<Result>(
+		author: string,
+		apply: (state: DurableAuthorProjectionState) => AuthorProjectionDecision<Result>
+	): Promise<Result>;
+	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
+	handoffProof(proof: PersistedEquivocationProof): Promise<void>;
+}
+
+export interface ReconcileAuthorProjectionResult {
+	readonly enqueuedPairIds: readonly string[];
+	readonly newDigestCount: number;
+}
+
+export interface RecoverAuthorProjectionResult {
+	readonly reconciledSlotCount: number;
+}
+
+export interface DrainAuthorProjectionResult {
+	readonly handedOff: boolean;
+	readonly remainingPending: number;
+}
+
+export interface DurableAuthorEquivocationProjection {
+	reconcile(scope: EquivocationScope): Promise<ReconcileAuthorProjectionResult>;
+	recover(author: string): Promise<RecoverAuthorProjectionResult>;
+	drainOne(author: string): Promise<DrainAuthorProjectionResult>;
+}
+
 export interface SlotAdvisorySignal {
 	readonly author: string;
 	readonly observedForkCount: number;
@@ -1498,6 +1551,433 @@ export function materializeCurrentEquivocationProof(
 	} catch {
 		return undefined;
 	}
+}
+
+interface MutableDurableAuthorProjectionState {
+	readonly slots: AuthorProjectionSlot[];
+	readonly pending: PendingEquivocationPair[];
+}
+
+function captureAuthorProjectionScope(value: unknown): EquivocationScope | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const candidate = value as Partial<EquivocationScope>;
+	const author = candidate.author;
+	const authorSequence = candidate.authorSequence;
+	const objectId = candidate.objectId;
+	if (
+		typeof author !== "string" ||
+		!Number.isSafeInteger(authorSequence) ||
+		(authorSequence as number) < 0 ||
+		typeof objectId !== "string"
+	) {
+		return undefined;
+	}
+	return { author, authorSequence: authorSequence as number, objectId };
+}
+
+function copyAuthorProjectionScope(scope: EquivocationScope): EquivocationScope {
+	return {
+		author: scope.author,
+		authorSequence: scope.authorSequence,
+		objectId: scope.objectId,
+	};
+}
+
+function equalAuthorProjectionScopes(left: EquivocationScope, right: EquivocationScope): boolean {
+	return (
+		left.author === right.author && left.authorSequence === right.authorSequence && left.objectId === right.objectId
+	);
+}
+
+function isDigestHex(value: unknown): value is string {
+	return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+}
+
+function copyAuthorProjectionStrings(values: readonly string[]): string[] {
+	const copied: string[] = [];
+	const length = values.length;
+	for (let index = 0; index < length; index++) {
+		copied[index] = values[index] as string;
+	}
+	return copied;
+}
+
+function authorProjectionIncludes(values: readonly string[], sought: string): boolean {
+	for (let index = 0; index < values.length; index++) {
+		if (values[index] === sought) return true;
+	}
+	return false;
+}
+
+function copyDurableAuthorProjectionState(state: DurableAuthorProjectionState): MutableDurableAuthorProjectionState {
+	if (state === null || typeof state !== "object") {
+		throw new TypeError("durable author projection is malformed");
+	}
+	const capturedSlots = state.slots;
+	const capturedPending = state.pending;
+	if (!Array.isArray(capturedSlots) || !Array.isArray(capturedPending)) {
+		throw new TypeError("durable author projection is malformed");
+	}
+
+	const slots: AuthorProjectionSlot[] = [];
+	const slotCount = capturedSlots.length;
+	for (let index = 0; index < slotCount; index++) {
+		const candidate = capturedSlots[index] as AuthorProjectionSlot;
+		if (candidate === null || typeof candidate !== "object") {
+			throw new TypeError("durable author projection slot is malformed");
+		}
+		const scope = captureAuthorProjectionScope(candidate.scope);
+		const capturedDigestHexes = candidate.digestHexes;
+		if (scope === undefined || !Array.isArray(capturedDigestHexes)) {
+			throw new TypeError("durable author projection slot is malformed");
+		}
+		const digestHexes: string[] = [];
+		const digestCount = capturedDigestHexes.length;
+		for (let digestIndex = 0; digestIndex < digestCount; digestIndex++) {
+			const digestHex = capturedDigestHexes[digestIndex];
+			if (!isDigestHex(digestHex)) {
+				throw new TypeError("durable author projection digest is malformed");
+			}
+			digestHexes[digestIndex] = digestHex;
+		}
+		slots[index] = { scope, digestHexes };
+	}
+
+	const pending: PendingEquivocationPair[] = [];
+	const pendingCount = capturedPending.length;
+	for (let index = 0; index < pendingCount; index++) {
+		const candidate = capturedPending[index] as PendingEquivocationPair;
+		if (candidate === null || typeof candidate !== "object") {
+			throw new TypeError("durable author projection pending row is malformed");
+		}
+		const scope = captureAuthorProjectionScope(candidate.scope);
+		const lesserDigestHex = candidate.lesserDigestHex;
+		const greaterDigestHex = candidate.greaterDigestHex;
+		const pairId = candidate.pairId;
+		if (
+			scope === undefined ||
+			typeof lesserDigestHex !== "string" ||
+			typeof greaterDigestHex !== "string" ||
+			typeof pairId !== "string"
+		) {
+			throw new TypeError("durable author projection pending row is malformed");
+		}
+		pending[index] = { scope, lesserDigestHex, greaterDigestHex, pairId };
+	}
+	return { pending, slots };
+}
+
+function captureAuthenticatedAuthorProjectionVertices(
+	value: unknown,
+	scope: EquivocationScope,
+	resolveAuthorPublicKey: VerifyReceivedVertexInput["resolveAuthorPublicKey"]
+): readonly PersistedVertexWitness[] | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const capturedVertices = (value as PersistedEquivocationState).vertices;
+	if (!Array.isArray(capturedVertices)) return undefined;
+
+	const vertices: PersistedVertexWitness[] = [];
+	const vertexCount = capturedVertices.length;
+	for (let index = 0; index < vertexCount; index++) {
+		const vertex = detachCurrentEquivocationVertex(capturedVertices[index]);
+		if (vertex === undefined) return undefined;
+		vertices[index] = vertex;
+	}
+
+	for (let index = 0; index < vertexCount; index++) {
+		const vertex = vertices[index] as PersistedVertexWitness;
+		const authenticated = authenticateReceivedVertex({
+			domain: vertex.witness.domain,
+			expectedAnchor: vertex.witness.expectedAnchor,
+			receivedCanonicalPreimageBytes: vertex.witness.receivedCanonicalPreimageBytes,
+			resolveAuthorPublicKey,
+			signature: vertex.witness.signature,
+			suiteId: vertex.witness.suiteId,
+		});
+		if (authenticated === undefined || compareBytes(authenticated.digest, vertex.digest) !== 0) {
+			return undefined;
+		}
+		if (
+			authenticated.preimage.author !== scope.author ||
+			authenticated.preimage.authorSequence !== scope.authorSequence ||
+			authenticated.preimage.objectId !== scope.objectId
+		) {
+			return undefined;
+		}
+	}
+	return vertices;
+}
+
+function canonicalAuthorProjectionPair(
+	leftDigestHex: string,
+	rightDigestHex: string
+): readonly [lesserDigestHex: string, greaterDigestHex: string] | undefined {
+	if (!isDigestHex(leftDigestHex) || !isDigestHex(rightDigestHex) || leftDigestHex === rightDigestHex) {
+		return undefined;
+	}
+	return leftDigestHex < rightDigestHex ? [leftDigestHex, rightDigestHex] : [rightDigestHex, leftDigestHex];
+}
+
+function bytesFromDigestHex(value: string): Uint8Array | undefined {
+	if (!isDigestHex(value)) return undefined;
+	const bytes = new Uint8Array(32);
+	for (let index = 0; index < bytes.length; index++) {
+		bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
+	}
+	return bytes;
+}
+
+function authorProjectionPairId(
+	pair: readonly [lesserDigestHex: string, greaterDigestHex: string]
+): string | undefined {
+	const lesser = bytesFromDigestHex(pair[0]);
+	const greater = bytesFromDigestHex(pair[1]);
+	if (lesser === undefined || greater === undefined) return undefined;
+	return deriveEquivocationProofId(lesser, greater);
+}
+
+/**
+ * Creates a deep-only durable projection over injected authoritative slot and author stores.
+ * @param options - Authoritative reads, recovery enumeration, transaction, resolver and handoff capabilities.
+ * @returns A coordinator with reconciliation, recovery and one-row draining operations.
+ */
+export function createDurableAuthorEquivocationProjection(
+	options: DurableAuthorEquivocationProjectionOptions
+): DurableAuthorEquivocationProjection {
+	if (options === null || typeof options !== "object") {
+		throw new TypeError("projection options are required");
+	}
+	const readCommittedSlotState = options.readCommittedSlotState;
+	const enumerateCommittedAuthorSlots = options.enumerateCommittedAuthorSlots;
+	const transactAuthorProjection = options.transactAuthorProjection;
+	const resolveAuthorPublicKey = options.resolveAuthorPublicKey;
+	const handoffProof = options.handoffProof;
+	if (
+		typeof readCommittedSlotState !== "function" ||
+		typeof enumerateCommittedAuthorSlots !== "function" ||
+		typeof transactAuthorProjection !== "function" ||
+		typeof resolveAuthorPublicKey !== "function" ||
+		typeof handoffProof !== "function"
+	) {
+		throw new TypeError("all projection capabilities are required");
+	}
+
+	const resolveAuthor = (author: string): RawEd25519PublicKey | undefined =>
+		Reflect.apply(resolveAuthorPublicKey, options, [author]) as RawEd25519PublicKey | undefined;
+	const readSlot = (scope: EquivocationScope): Promise<PersistedEquivocationState> =>
+		Reflect.apply(readCommittedSlotState, options, [scope]) as Promise<PersistedEquivocationState>;
+	const enumerateSlots = (author: string): Promise<readonly EquivocationScope[]> =>
+		Reflect.apply(enumerateCommittedAuthorSlots, options, [author]) as Promise<readonly EquivocationScope[]>;
+	const transact = <Result>(
+		author: string,
+		apply: (state: DurableAuthorProjectionState) => AuthorProjectionDecision<Result>
+	): Promise<Result> => Reflect.apply(transactAuthorProjection, options, [author, apply]) as Promise<Result>;
+	const handoff = (proof: PersistedEquivocationProof): Promise<void> =>
+		Reflect.apply(handoffProof, options, [proof]) as Promise<void>;
+
+	const reconcile = async (requestedScope: EquivocationScope): Promise<ReconcileAuthorProjectionResult> => {
+		const scope = captureAuthorProjectionScope(requestedScope);
+		if (scope === undefined) throw new TypeError("projection scope is malformed");
+		const committed = await readSlot(copyAuthorProjectionScope(scope));
+		const vertices = captureAuthenticatedAuthorProjectionVertices(committed, scope, resolveAuthor);
+		if (vertices === undefined) {
+			throw new TypeError("authoritative committed slot is invalid");
+		}
+
+		const committedDigestHexes: string[] = [];
+		for (let index = 0; index < vertices.length; index++) {
+			const digestHex = bytesToHex((vertices[index] as PersistedVertexWitness).digest);
+			if (!authorProjectionIncludes(committedDigestHexes, digestHex)) {
+				committedDigestHexes[committedDigestHexes.length] = digestHex;
+			}
+		}
+		committedDigestHexes.sort();
+
+		return transact(scope.author, (durableState) => {
+			const next = copyDurableAuthorProjectionState(durableState);
+			let slotIndex = -1;
+			for (let index = 0; index < next.slots.length; index++) {
+				if (equalAuthorProjectionScopes((next.slots[index] as AuthorProjectionSlot).scope, scope)) {
+					slotIndex = index;
+					break;
+				}
+			}
+
+			const priorDigestHexes =
+				slotIndex === -1
+					? []
+					: copyAuthorProjectionStrings((next.slots[slotIndex] as AuthorProjectionSlot).digestHexes);
+			const newDigestHexes: string[] = [];
+			for (let index = 0; index < committedDigestHexes.length; index++) {
+				const digestHex = committedDigestHexes[index] as string;
+				if (!authorProjectionIncludes(priorDigestHexes, digestHex)) {
+					newDigestHexes[newDigestHexes.length] = digestHex;
+				}
+			}
+			const postUnionDigestHexes = copyAuthorProjectionStrings(priorDigestHexes);
+			for (let index = 0; index < committedDigestHexes.length; index++) {
+				const digestHex = committedDigestHexes[index] as string;
+				if (!authorProjectionIncludes(postUnionDigestHexes, digestHex)) {
+					postUnionDigestHexes[postUnionDigestHexes.length] = digestHex;
+				}
+			}
+			postUnionDigestHexes.sort();
+
+			const enqueuedPairIds: string[] = [];
+			for (let newIndex = 0; newIndex < newDigestHexes.length; newIndex++) {
+				for (let unionIndex = 0; unionIndex < postUnionDigestHexes.length; unionIndex++) {
+					const pair = canonicalAuthorProjectionPair(
+						newDigestHexes[newIndex] as string,
+						postUnionDigestHexes[unionIndex] as string
+					);
+					if (pair === undefined) continue;
+					let pendingExists = false;
+					for (let pendingIndex = 0; pendingIndex < next.pending.length; pendingIndex++) {
+						const row = next.pending[pendingIndex] as PendingEquivocationPair;
+						if (
+							equalAuthorProjectionScopes(row.scope, scope) &&
+							row.lesserDigestHex === pair[0] &&
+							row.greaterDigestHex === pair[1]
+						) {
+							pendingExists = true;
+							break;
+						}
+					}
+					if (pendingExists) continue;
+					const pairId = authorProjectionPairId(pair);
+					if (pairId === undefined) continue;
+					next.pending[next.pending.length] = {
+						scope: copyAuthorProjectionScope(scope),
+						lesserDigestHex: pair[0],
+						greaterDigestHex: pair[1],
+						pairId,
+					};
+					enqueuedPairIds[enqueuedPairIds.length] = pairId;
+				}
+			}
+
+			const slot: AuthorProjectionSlot = {
+				scope: copyAuthorProjectionScope(scope),
+				digestHexes: postUnionDigestHexes,
+			};
+			if (slotIndex === -1) next.slots[next.slots.length] = slot;
+			else next.slots[slotIndex] = slot;
+			return {
+				state: next,
+				result: {
+					enqueuedPairIds,
+					newDigestCount: newDigestHexes.length,
+				},
+			};
+		});
+	};
+
+	const recover = async (author: string): Promise<RecoverAuthorProjectionResult> => {
+		if (typeof author !== "string") throw new TypeError("author is malformed");
+		const enumerated = await enumerateSlots(author);
+		if (!Array.isArray(enumerated)) {
+			throw new TypeError("author recovery enumeration is malformed");
+		}
+		const scopeCount = enumerated.length;
+		const scopes: EquivocationScope[] = [];
+		for (let index = 0; index < scopeCount; index++) {
+			const scope = captureAuthorProjectionScope(enumerated[index]);
+			if (scope === undefined || scope.author !== author) {
+				throw new TypeError("author recovery enumeration returned an invalid scope");
+			}
+			scopes[index] = scope;
+		}
+		for (let index = 0; index < scopeCount; index++) {
+			await reconcile(scopes[index] as EquivocationScope);
+		}
+		return { reconciledSlotCount: scopeCount };
+	};
+
+	const pendingCount = (author: string): Promise<number> =>
+		transact(author, (durableState) => {
+			const captured = copyDurableAuthorProjectionState(durableState);
+			return { state: durableState, result: captured.pending.length };
+		});
+
+	const drainOne = async (author: string): Promise<DrainAuthorProjectionResult> => {
+		if (typeof author !== "string") throw new TypeError("author is malformed");
+		const selection = await transact(author, (durableState) => {
+			const captured = copyDurableAuthorProjectionState(durableState);
+			return {
+				state: durableState,
+				result: {
+					row: captured.pending[0],
+				},
+			};
+		});
+		const row = selection.row;
+		if (row === undefined) return { handedOff: false, remainingPending: 0 };
+
+		const scope = captureAuthorProjectionScope(row.scope);
+		const pair = canonicalAuthorProjectionPair(row.lesserDigestHex, row.greaterDigestHex);
+		const expectedPairId = pair === undefined ? undefined : authorProjectionPairId(pair);
+		if (
+			scope === undefined ||
+			scope.author !== author ||
+			pair === undefined ||
+			row.lesserDigestHex !== pair[0] ||
+			row.greaterDigestHex !== pair[1] ||
+			row.pairId !== expectedPairId
+		) {
+			return { handedOff: false, remainingPending: await pendingCount(author) };
+		}
+
+		const committed = await readSlot(copyAuthorProjectionScope(scope));
+		const vertices = captureAuthenticatedAuthorProjectionVertices(committed, scope, resolveAuthor);
+		let lesser: PersistedVertexWitness | undefined;
+		let greater: PersistedVertexWitness | undefined;
+		if (vertices !== undefined) {
+			for (let index = 0; index < vertices.length; index++) {
+				const vertex = vertices[index] as PersistedVertexWitness;
+				const digestHex = bytesToHex(vertex.digest);
+				if (digestHex === pair[0]) lesser = vertex;
+				if (digestHex === pair[1]) greater = vertex;
+			}
+		}
+		if (lesser === undefined || greater === undefined) {
+			return { handedOff: false, remainingPending: await pendingCount(author) };
+		}
+
+		const proof = materializeCurrentEquivocationProof({
+			scope: copyAuthorProjectionScope(scope),
+			vertices: [lesser, greater],
+			resolveAuthorPublicKey: resolveAuthor,
+		});
+		if (proof === undefined || proof.proofId !== expectedPairId) {
+			return { handedOff: false, remainingPending: await pendingCount(author) };
+		}
+		await handoff({
+			canonicalProofBytes: new Uint8Array(proof.canonicalProofBytes),
+			proofId: proof.proofId,
+		});
+
+		const remainingPending = await transact(author, (durableState) => {
+			const next = copyDurableAuthorProjectionState(durableState);
+			let removeIndex = -1;
+			for (let index = 0; index < next.pending.length; index++) {
+				const candidate = next.pending[index] as PendingEquivocationPair;
+				if (
+					equalAuthorProjectionScopes(candidate.scope, scope) &&
+					candidate.lesserDigestHex === pair[0] &&
+					candidate.greaterDigestHex === pair[1] &&
+					candidate.pairId === expectedPairId
+				) {
+					removeIndex = index;
+					break;
+				}
+			}
+			if (removeIndex !== -1) next.pending.splice(removeIndex, 1);
+			return { state: next, result: next.pending.length };
+		});
+		return { handedOff: true, remainingPending };
+	};
+
+	return { drainOne, reconcile, recover };
 }
 
 function allCanonicalEquivocationProofs(
