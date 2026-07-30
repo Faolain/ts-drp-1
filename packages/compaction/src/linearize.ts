@@ -84,6 +84,10 @@ function assertDigest(value: unknown, name: string): asserts value is string {
 	}
 }
 
+function invalidByteCharges(message: string): never {
+	throw new LinearizationError("INVALID_BYTE_CHARGES", message);
+}
+
 function validateGraph(vertices: ReadonlyMap<string, EpochVertex>, anchorHash: string): EpochVertex {
 	if (!(vertices instanceof Map)) throw new TypeError("vertices must be a Map keyed by hash");
 	assertDigest(anchorHash, "anchorHash");
@@ -206,8 +210,10 @@ export function topologicalOrder(
 export class CausalityIndex {
 	private readonly ancestors: Uint32Array[];
 	private readonly anchorHash: string;
+	private epochBytes: number | undefined;
 	private readonly epoch: number;
 	private readonly index: Map<string, number>;
+	private readonly maxEpochBytes: number | undefined;
 	private readonly maxEpochVertices: number | undefined;
 	private readonly objectId: string;
 
@@ -215,7 +221,7 @@ export class CausalityIndex {
 	 * Builds exact ancestry for a complete topological order.
 	 * @param vertices - Complete graph.
 	 * @param suppliedOrder - Complete dependency-before-child order; inferred deterministically when omitted.
-	 * @param options - Optional anchor-inclusive active-epoch capacity.
+	 * @param options - Optional anchor-inclusive active-epoch count and byte capacities.
 	 */
 	constructor(
 		vertices: ReadonlyMap<string, EpochVertex>,
@@ -230,9 +236,44 @@ export class CausalityIndex {
 		if (maxEpochVertices !== undefined && (!Number.isSafeInteger(maxEpochVertices) || maxEpochVertices < 1)) {
 			throw new RangeError("maxEpochVertices must be a positive safe integer");
 		}
+		const maxEpochBytes = options.maxEpochBytes;
+		if (maxEpochBytes !== undefined && (!Number.isSafeInteger(maxEpochBytes) || maxEpochBytes < 1)) {
+			throw new RangeError("maxEpochBytes must be a positive safe integer");
+		}
 		this.maxEpochVertices = maxEpochVertices;
+		this.maxEpochBytes = maxEpochBytes;
+
+		let initialEpochBytes: number | undefined;
+		if (maxEpochBytes !== undefined) {
+			const initialByteCharges = options.initialByteCharges;
+			if (!(initialByteCharges instanceof Map)) {
+				invalidByteCharges("initialByteCharges must be a Map keyed exactly like vertices");
+			}
+			const initialHashes = [...vertices.keys()];
+			if (initialByteCharges.size !== initialHashes.length) {
+				invalidByteCharges("initialByteCharges keyset must equal the initial graph keyset");
+			}
+			let total = 0;
+			for (const hash of initialHashes) {
+				if (!initialByteCharges.has(hash)) {
+					invalidByteCharges("initialByteCharges keyset must equal the initial graph keyset");
+				}
+				const charge = initialByteCharges.get(hash);
+				if (!Number.isSafeInteger(charge) || (charge as number) < 1) {
+					invalidByteCharges(`invalid initial byte charge for ${hash}`);
+				}
+				if ((charge as number) > Number.MAX_SAFE_INTEGER - total) {
+					invalidByteCharges("initial byte charge sum exceeds the safe-integer domain");
+				}
+				total += charge as number;
+			}
+			initialEpochBytes = total;
+		}
 		if (maxEpochVertices !== undefined && vertices.size > maxEpochVertices) {
 			throw new LinearizationError("EPOCH_CAPACITY_EXCEEDED", "initial graph exceeds maxEpochVertices");
+		}
+		if (maxEpochBytes !== undefined && (initialEpochBytes as number) > maxEpochBytes) {
+			throw new LinearizationError("EPOCH_CAPACITY_EXCEEDED", "initial graph exceeds maxEpochBytes");
 		}
 		const inferredAnchor = [...vertices].find(([, vertex]) => vertex.kind === "drp-epoch-anchor")?.[0];
 		const order = suppliedOrder === undefined ? topologicalOrder(vertices, inferredAnchor ?? "") : [...suppliedOrder];
@@ -271,6 +312,7 @@ export class CausalityIndex {
 			}
 			this.ancestors[position] = bits;
 		}
+		this.epochBytes = initialEpochBytes;
 	}
 
 	/**
@@ -294,14 +336,23 @@ export class CausalityIndex {
 	 * Validates and atomically appends one dependency-complete active-epoch vertex.
 	 * @param hash - Map key for the vertex.
 	 * @param vertex - Vertex whose direct dependencies are already published.
+	 * @param byteCharge - Optional inert canonical-preimage byte charge.
 	 * @returns A pending capacity outcome, or undefined after publication.
 	 */
-	append(hash: string, vertex: EpochVertex): undefined | EpochFullOutcome {
+	append(hash: string, vertex: EpochVertex, byteCharge?: number): undefined | EpochFullOutcome {
 		assertDigest(hash, "vertex map key");
 		if (this.index.has(hash)) {
 			throw new LinearizationError("DUPLICATE_VERTEX", `vertex ${hash} is already indexed`);
 		}
 		if (this.isAtCapacity()) return epochFullOutcome;
+		let charge: number | undefined;
+		if (this.maxEpochBytes !== undefined) {
+			if (!Number.isSafeInteger(byteCharge) || (byteCharge as number) < 1) {
+				invalidByteCharges("append byte charge must be a positive safe integer");
+			}
+			charge = byteCharge as number;
+			if (this.isAtByteCapacity(charge)) return epochFullOutcome;
+		}
 		if (vertex === null || typeof vertex !== "object") {
 			throw new LinearizationError("INVALID_VERTEX", `invalid vertex at ${hash}`);
 		}
@@ -354,6 +405,7 @@ export class CausalityIndex {
 			return dependencyPosition;
 		});
 		if (this.isAtCapacity()) return epochFullOutcome;
+		if (charge !== undefined && this.isAtByteCapacity(charge)) return epochFullOutcome;
 		const vertexPosition = this.index.size;
 		const bits = new Uint32Array(Math.ceil((vertexPosition + 1) / 32));
 		for (const dependencyPosition of dependencyPositions) {
@@ -366,10 +418,14 @@ export class CausalityIndex {
 		}
 
 		this.ancestors.push(bits);
+		const previousEpochBytes = this.epochBytes;
+		if (charge !== undefined) this.epochBytes = (previousEpochBytes as number) + charge;
 		try {
 			this.index.set(hash, vertexPosition);
 		} catch (error) {
 			this.ancestors.pop();
+			this.index.delete(hash);
+			this.epochBytes = previousEpochBytes;
 			throw error;
 		}
 	}
@@ -380,6 +436,15 @@ export class CausalityIndex {
 	 */
 	private isAtCapacity(): boolean {
 		return this.maxEpochVertices !== undefined && this.index.size >= this.maxEpochVertices;
+	}
+
+	/**
+	 * Reports whether one supplied charge would exceed the remaining byte capacity.
+	 * @param charge - Validated positive safe-integer byte charge.
+	 * @returns Whether the charge exceeds the remaining capacity.
+	 */
+	private isAtByteCapacity(charge: number): boolean {
+		return this.maxEpochBytes !== undefined && charge > this.maxEpochBytes - (this.epochBytes as number);
 	}
 
 	/**

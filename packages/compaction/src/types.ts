@@ -14,6 +14,8 @@ export interface EpochVertex {
 
 /** Optional bounds for one append-only active-epoch causality index. */
 export interface CausalityIndexOptions {
+	readonly initialByteCharges?: ReadonlyMap<string, number> | undefined;
+	readonly maxEpochBytes?: number | undefined;
 	readonly maxEpochVertices?: number | undefined;
 }
 
