@@ -11874,42 +11874,133 @@ Accepted gotchas and carry-forward constraints:
     the command-safety hook rejected recursive cleanup. It is not part of the tree or evidence
     authority and must not trigger a cleanup bypass.
 
+### D.71 — Phase 0p-2 canonical operation-byte enforcement
+
+Phase 0p-2 is accepted. Authoritative Codex-high RED
+`80e2ea99a703a36b4c79af5f1fe46bd85b4dc357` adds only the eight frozen
+operation-budget governance, fixture and test artifacts. Its production run has twelve intended
+failures and sixteen legitimate passes; its independent control passes 28/28. All fifteen full-suite
+control mutants fail exactly one intended row and leave twenty-seven siblings green. The final RED
+artifact-manifest SHA-256 is
+`d52d4cb2cae9f22134cbbe397f353a4ca0c9eb4e86a3cf95d674e8af0dbd1001`; its
+evidence-manifest SHA-256 is
+`f3aed25df72c7887bb8244c3882b26681bddd51425973c29929d0126441e5817`.
+
+Distinct Codex-high GREEN `81b8c98347451f223c411e5e75c64eb901847d1f` changes only
+`packages/protocol-v3/src/index.ts`; its patch SHA-256 is
+`e7309ee56b19df1c45cdc120d89dd555da4903251d1f6effc73cd9e376936d92` and the
+resulting source SHA-256 is
+`08301197a11520a503cc0ad8d3235f4b26a8f4cf8b46847a4229d833eb25c778`. The
+already digest-authenticated schema-2 limit is retained on the private compiled operation schema.
+Remote admission authenticates the exact received vertex bytes, resolves the genuine prepared
+capability, matches the discriminator-selected ABI and only then measures the whole operation's
+canonical bytes. Local issuance preserves the raw-ABI gate, canonical-detaches the operation,
+re-resolves the detached ABI and measures that exact captured record before transaction entry,
+signing, issued-record construction or outbox construction. Schema 1 remains unbudgeted, the existing
+`blueprintDigest` remains the sole policy authority, and the four-export package surface is unchanged.
+The GREEN evidence-manifest SHA-256 is
+`e79728b78d73d34b3ece7332903237afddf0e216434df1508678ed51dfd44c78`.
+
+Focused production and control pass 28/28; every selected mutant dies surgically; the eleven-file
+protected predecessor set passes 112 tests. The operation-budget checker, both historical freeze
+families, package build/type/public audits, workspace typecheck, focused lint,
+`.logs/**`-excluded workspace lint with zero errors and 226 inherited warnings, Prettier and diff
+checks pass. Root independently reproduced production and control 28/28, the package type/public
+typecheck, focused lint and the RED transition checker; its post-commit 0p-2/0i/0j-b run passes 83/83,
+log SHA-256 `d06b1ffbdd8343adc70e365b1a34d69c621230761775c8464cdadf2752b5dec9`.
+The required unprimed Codex review found no actionable defect; its log SHA-256 is
+`eb948afff4f915f13b9bf64b7895790530b9b916f54e55d2a9a485be42140b0e`.
+
+All required external reviews accept without a Phase 0p-2 plan correction:
+
+- Grok 4.5/high `PASS_WITH_NOTES`, final SHA-256
+  `0ebc7aceb5f1758891cf2ce257c8f3b7212f4ca4d16cae693b71c88cf5251540`, raw
+  SHA-256 `ca066dd1998c6fd34b1d396f9514163aa339e3d441740a46f937e12175953126` and
+  artifact-manifest SHA-256
+  `806c2912204a7516fb808caf44604b91ec7a5e00f4fb58a9eec26a391daf7329`;
+- exact Kimi 3/high `PASS_WITH_NOTES`, final SHA-256
+  `91e51e66ce8da5295842e65aa44a18d0ac963c81dcbd8dc86b5f8819ea438d11`, raw
+  SHA-256 `79de286ae6af60aa1eb529aa02e17c14ef8aae5ad61c53ebbf3575d148d5d5a1` and
+  manifest SHA-256 `7951740da8941dfa8fcbf97ba6314f3215b784ef0cc6e04c454d6fb3dd4a9954`;
+- final Opus/xhigh `PASS_WITH_NOTES`, final SHA-256
+  `cec5f1837151c388a131e45816f5fec69bacbfbeb83e40f360259b956072bf68`, raw
+  SHA-256 `9ccfdf50bcb855f5bc3047dbb0594a3180cd184453c44c07b579abc40636dc4d` and
+  artifact-manifest SHA-256
+  `8a5d4414b24f4b9b3efded74d4d01dad06b4b3f1c312c990739556a0c826ee5c`.
+
+The Grok session `019fb2df-c31a-7d21-92af-76505cb06dab` resolved the requested
+`grok-4.5` alias to the sole `grok-4.5-build` usage entry for thirteen calls, with no fallback,
+restart or alternate model. The Kimi session
+`session_c8dae549-a324-482f-b47b-1be22f3dfb79` used exact `kimi-code/k3`, high
+thinking, 33/100 steps, exit zero and no fallback or alternate model. The Claude session
+`482c2518-bdb6-4a8c-bb05-0c65e080cdb6` resolved to `claude-opus-5` at xhigh for
+76 turns, exit zero, `success`/`end_turn` and no retry, resume or fallback. Its substantive 67,136
+Opus output tokens and $6.4094485 cost dominate one automatic 27-output-token/$0.003151 Haiku
+auxiliary call. Every retained assistant event, including the final report, is Opus; Haiku did not
+perform or author the review.
+
+Accepted findings and evidence limits:
+
+1. Marker-selective control mutants prove surgical point detectability, not universal bug-class
+   detection. Production contains no fixture marker or alternate meter.
+2. Remote publication, reducer and fold witnesses are downstream consumers gated by the returned
+   admission decision; this package calls none of them. They prove the decision seam, not a live
+   Phase-3a/4a integration.
+3. The global issued-record/outbox construction counters exist only in the controlled fixture and are
+   vacuous against production. The real production proof is the pre-transaction budget branch,
+   zero transaction/sign calls and the absence of every construction site before the coordinator
+   callback.
+4. The local proxy row deliberately freezes the current raw-ABI plus detach descriptor-read boundary.
+   Extra unmotivated pre-detach reads could fail it in the safe direction; the same detached object is
+   nevertheless both measured and issued.
+5. There is no named `<`/`<=` mutant, but exact `limit−1`/`limit`/`limit+1` rows on both paths kill the
+   comparison-direction and off-by-one defects.
+6. The frozen fixture has one budgeted operation. Current GREEN is structurally correct because each
+   ABI lookup returns and immediately meters the discriminator-selected schema, but the suite does
+   not directly freeze distinct per-operation limits. When this dispatch is next touched, add
+   distinct-limit A/B remote and local rows plus a first-operation/re-derived-limit mutant.
+7. GREEN initially exposed a TypeScript narrowing error at the remote meter call. The same GREEN owner
+   removed it before the authoritative evidence and reran every gate; it is not an accepted residual
+   or a reason to weaken types.
+8. The aggregate predecessor run without process-local evidence exclusions can fail with inherited
+   `spawnSync git ENOBUFS` when large untracked `.logs/`/`.pnpm-store/` trees are present. Kimi
+   restored the exclusions byte-identically and then passed 102/102. CI's clean checkout is
+   unaffected.
+9. The bounded serial root run timed out at 90 seconds after inherited object convergence and
+   temporary-repository failures. It left no residual process and supplies no full-root-green claim.
+10. Canonical byte measurement is an input bound, not a pre-decode frame cap, reducer fuel, CPU,
+    allocation, stack, isolation, preemption or nontermination guarantee. Those owners remain where
+    D.68 assigns them.
+11. The checker inherits bootstrap trust, mutable action-tag, pull-request-only/direct-push and
+    self-hash limitations already recorded in D.70. The frozen historical base and branch protection
+    remain necessary.
+12. Opus-side commands were permission-denied before execution, so Opus used static inspection plus
+    immutable root/Grok/Kimi evidence and made no independent executable or root-green claim.
+
 ## Next Agent Prompt
 
-Phase 0p-0 is frozen at authoritative RED `264fcd7`, implemented at `9964219` and accepted by D.70.
-Begin **Phase 0p-2 only** with a fresh Codex-high causal RED owner.
+Phase 0p-2 is frozen at authoritative RED `80e2ea9`, implemented at `81b8c98` and accepted by D.71.
+Do **not** begin the next RED from the current phrase “`maxEpochBytes` is its byte-side twin.”
 
-Enforce each authenticated manifest-schema-2 operation's governed
-`maxCanonicalOperationBytes` against
-`byteLength(encodeCanonical(canonicalDetachedOperation))` for the whole exact closed operation record,
-including its discriminator. The remote path must authenticate the exact received bytes first, then
-perform ABI match, then enforce the byte budget before publication or reducer/fold invocation. The
-local path must canonical-detach the operation, then enforce before transaction creation, signing,
-issued-record construction or outbox publication. Exact refusal must leave every publication,
-transaction, signer, reducer/fold and outbox witness untouched. Manifest schema 1 preserves current
-unbudgeted behavior.
+The next required 0p work is the independently executable `maxEpochBytes` slice required by D.68(7),
+but the current plan does not define the counted carrier, anchor inclusion, initial accounting,
+arithmetic, generic primitive API or live provenance boundary. A Codex-high audit and a fresh exact
+Kimi 3/100 session independently return `AGREE_CORRECTION`. Complete the required final Opus/xhigh
+correction review against the unchanged plan. Only if all three agree may the controller amend the 0p
+row, D.68 and Phase 3a, record the quorum and then start a fresh Codex-high causal RED owner for the
+authorized slice. A split verdict leaves the RED blocked and requires reconciliation.
 
-The independent RED/control must cover exact `limit−1`, `limit` and `limit+1` encoded-byte boundaries
-on both package-root paths, including nested records and non-BMP strings. It must prove that counting
-uses canonical bytes rather than `JSON.stringify`, UTF-16 code units, raw received frame bytes, an
-operation with its discriminator excluded or an injected cooperative counter. Add the unsupported
-manifest-version row and the representable `Number.MAX_SAFE_INTEGER` acceptance boundary required by
-D.70. Use surgical mutants for every named wrong meter/order point, preserve the four-export public
-surface and run the shared 0j-b runtime predecessor.
+The candidate conservative boundary is: count the anchor-inclusive sum of exact registered canonical
+preimage byte carriers; exclude signatures, digests, envelope wrappers and transport/framing; accept
+equality; charge duplicates and refusals zero; keep `EPOCH_FULL` non-terminal and non-latched; make the
+pre-3a compaction primitive provenance-neutral; leave authentication of `parametersDigest`, parameter
+bytes and live vertex carriers exclusively to Phase 3a; and leave deterministic final membership to
+Phase 5. Exact API mechanics remain subordinate to those invariants until the quorum agrees.
 
-Retain the validated limit privately in `CompiledOperationSchema` from the same
-digest-authenticated canonical package bytes; never accept a detached caller value, introduce a second
-budget digest or edit/version-bump the frozen seven-field parameters kind. Do not add a transport frame
-cap, reducer execution meter, elapsed-time/step/helper-counter consensus, supported-profile selection,
-live Phase 3a binding, finality or collection-touch limit. Protocol v2 remains preservation/freeze
-only.
-
-Run focused RED/control/mutant evidence, protected registry/vector/reference/runtime predecessors,
-package build/type/public checks, workspace typecheck and lint to bounded `.logs`; root Vitest remains
-explicit, serial and bounded. After the RED is frozen and committed, use a distinct Codex-high GREEN
-owner, then Grok-high, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final
-Opus-xhigh. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
+Never edit the frozen Phase −1′, 0p-0, 0p-1 or 0p-2 artifacts to create the new slice. Continue the
+per-slice Codex-high RED, distinct Codex-high GREEN, Grok-high, exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
+discipline. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
 untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested.
-Phase 0n remains deferred until after the golden paths; when authorized, retain the bounded
-`@ts-drp/math` core and use pinned deterministic prior art rather than inventing approximations.
-Broader Rapier/WASM expansion remains optional.
+Phase 0n remains optional and deferred until after the golden paths; when authorized, retain the
+bounded `@ts-drp/math` core and prefer pinned deterministic prior art over new approximations.
