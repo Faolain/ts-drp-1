@@ -87,6 +87,56 @@ function expectedPairs(): AuthorGossipPair[] {
 	];
 }
 
+function differentialProjection(): DetachedAuthorGossipProjection {
+	return {
+		author: contract.author,
+		slots: [
+			{
+				scope: scope(contract.orderingBmpObjectId, 2),
+				digestHexes: [D4, D3],
+			},
+			{
+				scope: scope(contract.orderingAstralObjectId, 10),
+				digestHexes: [D4, D1],
+			},
+			{
+				scope: scope(contract.orderingAstralObjectId, 2),
+				digestHexes: [D3, D2, D1],
+			},
+		],
+	};
+}
+
+function expectedDifferentialPairs(): AuthorGossipPair[] {
+	return [
+		{
+			scope: scope(contract.orderingAstralObjectId, 2),
+			lesserDigestHex: D1,
+			greaterDigestHex: D2,
+		},
+		{
+			scope: scope(contract.orderingAstralObjectId, 2),
+			lesserDigestHex: D1,
+			greaterDigestHex: D3,
+		},
+		{
+			scope: scope(contract.orderingAstralObjectId, 2),
+			lesserDigestHex: D2,
+			greaterDigestHex: D3,
+		},
+		{
+			scope: scope(contract.orderingAstralObjectId, 10),
+			lesserDigestHex: D1,
+			greaterDigestHex: D4,
+		},
+		{
+			scope: scope(contract.orderingBmpObjectId, 2),
+			lesserDigestHex: D3,
+			greaterDigestHex: D4,
+		},
+	];
+}
+
 async function requireComposer(): Promise<Composer> {
 	const loaded = await implementationLoad;
 	if (typeof loaded.composeAuthorGossipBudget !== "function") {
@@ -117,6 +167,10 @@ describe("Phase 0o-b2 pure author gossip-budget causal RED", () => {
 				selection: "canonical-first-N-author-wide-pair-tuples",
 				saturationEffect: "composition-output-only",
 			},
+			governance: {
+				provisionalAuthorizesGreen: false,
+				supersedesProvisionalRed: "fdb6765c2d292a86c0fba2d8ac3a2acef420e354",
+			},
 			input: {
 				authoritativeCounts: false,
 				detachedDigestSetsOnly: true,
@@ -129,6 +183,10 @@ describe("Phase 0o-b2 pure author gossip-budget causal RED", () => {
 			"detached digest sets",
 			"canonical first N",
 			"code-unit order",
+			"U+10000",
+			"U+E000",
+			"sequence `2` before `10`",
+			"superseded and must never authorize GREEN",
 			"nonnegative safe integer",
 			"pending rows",
 			"future reputation",
@@ -186,6 +244,30 @@ describe("Phase 0o-b2 pure author gossip-budget causal RED", () => {
 			expect(Object.keys(pair).sort()).toEqual(["greaterDigestHex", "lesserDigestHex", "scope"]);
 			expect(Object.keys(pair.scope).sort()).toEqual(["author", "authorSequence", "objectId"]);
 		}
+	});
+
+	it("[differential-ordering] uses UTF-16 objectId order, numeric sequence order and both digest tie-breaks for first-N", async () => {
+		const composer = await requireComposer();
+		const prefixLength = "object:".length;
+		expect(contract.orderingAstralObjectId < contract.orderingBmpObjectId).toBe(true);
+		expect(
+			(contract.orderingAstralObjectId.codePointAt(prefixLength) as number) >
+				(contract.orderingBmpObjectId.codePointAt(prefixLength) as number)
+		).toBe(true);
+		const allPairs = expectedDifferentialPairs();
+		const result = compose(composer, differentialProjection(), 4);
+		expect(result).toEqual({
+			author: contract.author,
+			saturated: true,
+			selectedPairs: allPairs.slice(0, 4),
+			suppressedPairCount: 1,
+			totalPairCount: 5,
+		});
+		expect(allPairs[0]?.scope.authorSequence).toBe(2);
+		expect(allPairs[3]?.scope.authorSequence).toBe(10);
+		expect(allPairs[0]?.lesserDigestHex).toBe(allPairs[1]?.lesserDigestHex);
+		expect(allPairs[0]?.greaterDigestHex < (allPairs[1]?.greaterDigestHex as string)).toBe(true);
+		expect((allPairs[1]?.lesserDigestHex as string) < (allPairs[2]?.lesserDigestHex as string)).toBe(true);
 	});
 
 	it("[retry-concurrency] merges duplicate/reordered projections without double-counting", async () => {

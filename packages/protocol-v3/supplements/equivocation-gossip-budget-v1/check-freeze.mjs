@@ -131,9 +131,13 @@ function validateCurrentBundle() {
 		profile.input?.authoritativeCounts !== false ||
 		profile.budget?.selection !== "canonical-first-N-author-wide-pair-tuples" ||
 		profile.budget?.saturationEffect !== "composition-output-only" ||
+		profile.ordering?.scope?.[0] !== "objectId-utf16-code-unit-direct-relational" ||
+		profile.ordering?.scope?.[1] !== "authorSequence-numeric" ||
 		profile.output?.pairIdentity !== "scope-plus-canonical-unordered-distinct-digest-pair" ||
 		profile.claims?.globalComputationBound !== false ||
-		profile.claims?.transportRateLimit !== false
+		profile.claims?.transportRateLimit !== false ||
+		profile.governance?.supersedesProvisionalRed !== "fdb6765c2d292a86c0fba2d8ac3a2acef420e354" ||
+		profile.governance?.provisionalAuthorizesGreen !== false
 	) {
 		fail("profile contract differs");
 	}
@@ -152,6 +156,10 @@ function validateCurrentBundle() {
 		"detached digest sets",
 		"canonical first N",
 		"code-unit order",
+		"U+10000",
+		"U+E000",
+		"sequence `2` before `10`",
+		"superseded and must never authorize GREEN",
 		"nonnegative safe integer",
 		"pending rows",
 		"future reputation",

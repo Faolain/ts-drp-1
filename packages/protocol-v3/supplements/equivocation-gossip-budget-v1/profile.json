@@ -15,7 +15,7 @@
 		"saturationEffect": "composition-output-only"
 	},
 	"ordering": {
-		"scope": ["objectId-code-unit", "authorSequence-numeric"],
+		"scope": ["objectId-utf16-code-unit-direct-relational", "authorSequence-numeric"],
 		"pair": ["lesserDigestHex-code-unit", "greaterDigestHex-code-unit"],
 		"localeSensitive": false
 	},
@@ -32,5 +32,9 @@
 		"durableMutation": false,
 		"aclMutation": false,
 		"reputationComposition": false
+	},
+	"governance": {
+		"supersedesProvisionalRed": "fdb6765c2d292a86c0fba2d8ac3a2acef420e354",
+		"provisionalAuthorizesGreen": false
 	}
 }

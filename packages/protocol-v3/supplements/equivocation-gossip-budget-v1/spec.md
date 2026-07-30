@@ -5,14 +5,21 @@ durable projection, recovery, pending-handoff, or at-least-once consequences. It
 author and detached digest sets grouped by full `(objectId, author, authorSequence)` scope. It does not
 consume the durable author-projection object itself.
 
+The provisional RED checkpoint `fdb6765c2d292a86c0fba2d8ac3a2acef420e354` did not contain a
+differential UTF-16/code-point object-order case or a numeric/string sequence-order case. It is
+superseded and must never authorize GREEN.
+
 The composer once-captures all scalar fields and caller-owned arrays by index. It never dispatches a
 caller-owned Array method or iterator. Duplicate slot entries are merged by scope, duplicate digests
 collapse, self-pairs are absent, and every selected item is the existing structured identity:
 `(scope, canonical unordered distinct digest pair)`. This profile creates no second pair-ID namespace.
 
-All normalized pair tuples across the author are ordered by `objectId` code-unit order, numeric
-`authorSequence`, lesser digest code-unit order, then greater digest code-unit order. No locale API or
-locale-sensitive comparator participates. `maxGossipPairCount` is an explicit nonnegative safe integer.
+All normalized pair tuples across the author are ordered by `objectId` UTF-16 code-unit order using
+JavaScript's direct relational comparison, numeric `authorSequence`, lesser digest code-unit order,
+then greater digest code-unit order. The differential corpus orders an equal-prefix `U+10000` object
+before `U+E000`, the opposite of UTF-8 byte/code-point order, and orders sequence `2` before `10` for
+one equal object ID. No locale API or locale-sensitive comparator participates. `maxGossipPairCount`
+is an explicit nonnegative safe integer.
 The result is the canonical first N tuples and exact derived `totalPairCount`, `suppressedPairCount` and
 `saturated` values. Caller-provided counts are never authority. Below and at the pair total, nothing is
 suppressed; above the budget, saturation changes the composition output only.

@@ -10,6 +10,8 @@
 	"author": "alice",
 	"objectA": "object:alpha",
 	"objectB": "object:beta",
+	"orderingAstralObjectId": "object:𐀀",
+	"orderingBmpObjectId": "object:",
 	"sequenceA": 7,
 	"sequenceB": 11,
 	"baseArtifactSha256": {

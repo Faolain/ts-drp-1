@@ -40,8 +40,10 @@ type Mutant =
 	| "self-pair"
 	| "saturation-adjacent-read"
 	| "saturation-mutates"
+	| "sequence-as-string"
 	| "unstable-order"
 	| "unsafe-policy"
+	| "utf8-object-order"
 	| "wall-clock"
 	| "forbidden-surface"
 	| "mutate-input";
@@ -51,6 +53,19 @@ let cachedComposition: AuthorGossipBudgetComposition | undefined;
 
 function compareStrings(left: string, right: string): number {
 	return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareCodePoints(left: string, right: string): number {
+	let leftIndex = 0;
+	let rightIndex = 0;
+	while (leftIndex < left.length && rightIndex < right.length) {
+		const leftPoint = left.codePointAt(leftIndex) as number;
+		const rightPoint = right.codePointAt(rightIndex) as number;
+		if (leftPoint !== rightPoint) return leftPoint - rightPoint;
+		leftIndex += leftPoint > 0xffff ? 2 : 1;
+		rightIndex += rightPoint > 0xffff ? 2 : 1;
+	}
+	return left.length - right.length;
 }
 
 function copyScope(value: unknown, author: string): EquivocationScope {
@@ -113,9 +128,17 @@ function insertionSort<Value>(values: Value[], compare: (left: Value, right: Val
 }
 
 function comparePairs(left: AuthorGossipPair, right: AuthorGossipPair): number {
+	const objectOrder =
+		mutant === "utf8-object-order"
+			? compareCodePoints(left.scope.objectId, right.scope.objectId)
+			: compareStrings(left.scope.objectId, right.scope.objectId);
+	const sequenceOrder =
+		mutant === "sequence-as-string"
+			? compareStrings(String(left.scope.authorSequence), String(right.scope.authorSequence))
+			: left.scope.authorSequence - right.scope.authorSequence;
 	return (
-		compareStrings(left.scope.objectId, right.scope.objectId) ||
-		left.scope.authorSequence - right.scope.authorSequence ||
+		objectOrder ||
+		sequenceOrder ||
 		compareStrings(left.lesserDigestHex, right.lesserDigestHex) ||
 		compareStrings(left.greaterDigestHex, right.greaterDigestHex)
 	);
