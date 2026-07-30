@@ -167,6 +167,9 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 		for (const phrase of [
 			"exact graph keyset",
 			"read exactly once",
+			"Map's intrinsic entries",
+			"Overridden `size`, `keys`, `entries`, `has`, `get`",
+			"incompatible Proxy or Map pretender",
 			"including the anchor",
 			"charge <= maxEpochBytes - total",
 			"count-first",
@@ -299,7 +302,7 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 		expect(index.has(poisonHash)).toBe(false);
 	});
 
-	it("[initial-keyset-read-once] requires exact keys including the anchor and snapshots one numeric read per key", async () => {
+	it("[initial-keyset-read-once] requires exact keys including the anchor and snapshots initial numeric values", async () => {
 		const Constructor = await constructor();
 		const keysetAnchor = anchor("keyset-anchor");
 		const extra = hashFor("keyset-extra");
@@ -314,18 +317,7 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 
 		const mutableAnchor = anchor("mutable-anchor");
 		const mutableChild = vertex("mutable-child", mutableAnchor.hash, mutableAnchor.hash);
-		const reads = new Map<string, number>();
-		class ReadOnceMutableMap extends Map<string, number> {
-			override get(key: string): number | undefined {
-				const count = (reads.get(key) ?? 0) + 1;
-				reads.set(key, count);
-				if (count > 1) throw new Error(`INITIAL_CHARGE_READ_TWICE:${key}`);
-				const value = super.get(key);
-				super.set(key, 1);
-				return value;
-			}
-		}
-		const charges = new ReadOnceMutableMap([
+		const charges = new Map([
 			[mutableAnchor.hash, 6],
 			[mutableChild.hash, 2],
 		]);
@@ -345,16 +337,132 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 		const refused = vertex("mutable-refused", mutableChild.hash, mutableAnchor.hash);
 		expect(snapshotted.append(refused.hash, refused, 3)).toEqual(outcome());
 		expect({
-			anchorReads: reads.get(mutableAnchor.hash),
-			childReads: reads.get(mutableChild.hash),
 			present: snapshotted.has(refused.hash),
 			size: snapshotted.size,
 		}).toEqual({
-			anchorReads: 1,
-			childReads: 1,
 			present: false,
 			size: 2,
 		});
+	});
+
+	it("[intrinsic-initial-entry-snapshot] snapshots exact intrinsic Map entries once before vertex observation", async () => {
+		const Constructor = await constructor();
+		const intrinsicAnchor = anchor("intrinsic-keyset-anchor");
+		const extra = hashFor("intrinsic-keyset-extra");
+		const virtualCalls = {
+			entries: 0,
+			get: 0,
+			has: 0,
+			iterator: 0,
+			keys: 0,
+			size: 0,
+		};
+		class SpoofedCharges extends Map<string, number> {
+			override get size(): number {
+				virtualCalls.size++;
+				return 1;
+			}
+
+			override entries() {
+				virtualCalls.entries++;
+				throw new Error("OVERRIDDEN_INITIAL_ENTRIES_USED");
+			}
+
+			override get(key: string): number | undefined {
+				virtualCalls.get++;
+				return key === intrinsicAnchor.hash ? 1 : undefined;
+			}
+
+			override has(key: string): boolean {
+				virtualCalls.has++;
+				return key === intrinsicAnchor.hash;
+			}
+
+			override [Symbol.iterator]() {
+				virtualCalls.iterator++;
+				throw new Error("OVERRIDDEN_INITIAL_ITERATOR_USED");
+			}
+
+			override keys() {
+				virtualCalls.keys++;
+				throw new Error("OVERRIDDEN_INITIAL_KEYS_USED");
+			}
+		}
+		const graph = new Map([[intrinsicAnchor.hash, intrinsicAnchor]]);
+		const hiddenExtraError = capturedError(
+			() =>
+				new Constructor(graph, undefined, {
+					initialByteCharges: new SpoofedCharges([
+						[intrinsicAnchor.hash, 1],
+						[extra, 9],
+					]),
+					maxEpochBytes: 1,
+				})
+		);
+		expect(errorCode(hiddenExtraError)).toBe(contract.invalidChargesCode);
+		const missingAnchorError = capturedError(
+			() =>
+				new Constructor(graph, undefined, {
+					initialByteCharges: new SpoofedCharges([[extra, 9]]),
+					maxEpochBytes: 1,
+				})
+		);
+		expect(errorCode(missingAnchorError)).toBe(contract.invalidChargesCode);
+
+		const validCharges = new SpoofedCharges([[intrinsicAnchor.hash, 1]]);
+		const snapshotted = new Constructor(graph, undefined, {
+			initialByteCharges: validCharges,
+			maxEpochBytes: 2,
+		});
+		validCharges.set(intrinsicAnchor.hash, 2);
+		const afterMutation = vertex("intrinsic-after-mutation", intrinsicAnchor.hash, intrinsicAnchor.hash);
+		expect(snapshotted.append(afterMutation.hash, afterMutation, 1)).toBeUndefined();
+		expect(virtualCalls).toEqual({
+			entries: 0,
+			get: 0,
+			has: 0,
+			iterator: 0,
+			keys: 0,
+			size: 0,
+		});
+
+		const poisonHash = hashFor("intrinsic-keyset-poison");
+		let vertexObservations = 0;
+		const poison = {
+			dependencies: [],
+			epoch: 29,
+			hash: poisonHash,
+			get kind(): "drp-epoch-anchor" {
+				vertexObservations++;
+				throw new Error("INCOMPATIBLE_INITIAL_CHARGES_OBSERVED_VERTEX");
+			},
+			objectId: OBJECT_ID,
+		};
+		const poisonGraph = new Map<string, EpochVertex>([[poisonHash, poison]]);
+		const revoked = Proxy.revocable(new Map([[poisonHash, 1]]), {});
+		revoked.revoke();
+		const incompatibleCharges: ReadonlyMap<string, number>[] = [
+			new Proxy(new Map([[poisonHash, 1]]), {}),
+			new Proxy(new Map([[poisonHash, 1]]), {
+				getPrototypeOf() {
+					throw new Error("INCOMPATIBLE_INITIAL_CHARGES_BRAND_TRAP");
+				},
+			}),
+			revoked.proxy,
+			Object.create(Map.prototype) as ReadonlyMap<string, number>,
+		];
+		for (const charges of incompatibleCharges) {
+			const error = capturedError(
+				() =>
+					new Constructor(poisonGraph, undefined, {
+						initialByteCharges: charges,
+						maxEpochBytes: 1,
+					})
+			);
+			expect(errorCode(error)).toBe(contract.invalidChargesCode);
+			expect(String(error)).not.toContain("INCOMPATIBLE_INITIAL_CHARGES_OBSERVED_VERTEX");
+		}
+		expect(vertexObservations).toBe(0);
 	});
 
 	it("[initial-precedence] rejects invalid charge shape/keyset before count oversize and without vertex observation", async () => {

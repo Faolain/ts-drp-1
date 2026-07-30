@@ -13,11 +13,13 @@ non-latched `{ status: "pending", code: "EPOCH_FULL", latchByHash: false }`.
 
 When `maxEpochBytes` is present it is a positive safe integer and `initialByteCharges` must be a Map whose
 exact graph keyset is identical to the initial vertex Map's keyset, including the anchor without anchor
-discovery. Every charge is a positive safe integer. Each key's value is read exactly once and snapshotted
-before vertex observation, traversal or bitset allocation; later mutation of a caller-owned Map cannot
-change accounting. Initial precedence is ceiling domain, invalid charge shape or keyset, count oversize,
-then byte oversize. `INVALID_BYTE_CHARGES` identifies charge failures and
-`EPOCH_CAPACITY_EXCEEDED` identifies either initial capacity oversize.
+discovery. Membership and values are read exactly once from the Map's intrinsic entries and snapshotted
+before vertex observation, traversal or bitset allocation. Overridden `size`, `keys`, `entries`, `has`,
+`get` and iterator operations are ignored. An incompatible Proxy or Map pretender is rejected with stable
+`INVALID_BYTE_CHARGES` before vertex observation; later mutation of a caller-owned Map cannot change
+accounting. Every snapshotted charge is a positive safe integer. Initial precedence is ceiling domain,
+invalid charge shape or keyset, count oversize, then byte oversize. `INVALID_BYTE_CHARGES` identifies
+charge failures and `EPOCH_CAPACITY_EXCEEDED` identifies either initial capacity oversize.
 
 The invariant is the anchor-inclusive sum of published charges at or below `maxEpochBytes`. Equality is
 accepted. The normative exact test is `charge <= maxEpochBytes - total`; 32-bit coercion, truncation and

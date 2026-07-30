@@ -35,6 +35,7 @@ type Mutant =
 	| "live-charge-authority"
 	| "lt-vs-le"
 	| "mutable-initial-charges"
+	| "mutable-initial-keyset"
 	| "partial-rollback"
 	| "stale-pre-reentrancy"
 	| "terminal-byte-full"
@@ -128,15 +129,40 @@ export class CausalityIndex {
 		let initialTotal: number | undefined;
 		if (maxEpochBytes !== undefined) {
 			const charges = options.initialByteCharges;
-			if (!(charges instanceof Map)) invalidCharges("initialByteCharges must be a Map keyed exactly like vertices");
+			let isMap = false;
+			try {
+				isMap = charges instanceof Map;
+			} catch {
+				invalidCharges("initialByteCharges must be a compatible Map keyed exactly like vertices");
+			}
+			if (!isMap) invalidCharges("initialByteCharges must be a Map keyed exactly like vertices");
 			const skipExactKeyset = mutant === "initial-keyset-lax" && vertices.has(testHash("keyset-anchor"));
-			if (!skipExactKeyset && charges.size !== vertices.size) {
+			const mutableInitialKeyset =
+				mutant === "mutable-initial-keyset" && vertices.has(testHash("intrinsic-keyset-anchor"));
+			let chargeEntries: ReadonlyMap<string, number>;
+			if (mutableInitialKeyset) {
+				if (charges.size !== vertices.size) {
+					invalidCharges("initialByteCharges keyset must equal the initial graph keyset");
+				}
+				chargeEntries = new Map([...vertices.keys()].map((hash) => [hash, charges.get(hash) as number]));
+			} else {
+				try {
+					chargeEntries = new Map(Map.prototype.entries.call(charges) as MapIterator<[string, number]>);
+				} catch {
+					invalidCharges("initialByteCharges must contain compatible intrinsic Map entries");
+				}
+			}
+			if (!skipExactKeyset && chargeEntries.size !== vertices.size) {
 				invalidCharges("initialByteCharges keyset must equal the initial graph keyset");
 			}
 			let total = 0;
-			const chargeEntries: ReadonlyMap<string, number> = skipExactKeyset
-				? new Map(charges)
-				: new Map([...vertices.keys()].map((hash) => [hash, charges.get(hash) as number]));
+			if (!skipExactKeyset) {
+				for (const hash of vertices.keys()) {
+					if (!chargeEntries.has(hash)) {
+						invalidCharges("initialByteCharges keyset must equal the initial graph keyset");
+					}
+				}
+			}
 			for (const [hash, charge] of chargeEntries) {
 				if (charge === undefined || !Number.isSafeInteger(charge) || charge < 1) {
 					invalidCharges(`invalid initial byte charge for ${hash}`);

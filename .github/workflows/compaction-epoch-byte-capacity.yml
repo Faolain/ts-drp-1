@@ -73,7 +73,7 @@ jobs:
             const failureLines = output.split(/\r?\n/u).filter((line) => line.startsWith(" FAIL  "));
             if (
               result.status !== 1 ||
-              !output.includes("Tests  1 failed | 15 passed (16)") ||
+              !output.includes("Tests  1 failed | 16 passed (17)") ||
               failureLines.length !== 1 ||
               !failureLines[0].includes(`> ${expectedRow} `)
             ) {

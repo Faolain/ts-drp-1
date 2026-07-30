@@ -10,7 +10,9 @@
 	"accounting": {
 		"anchorInclusive": true,
 		"initialKeyset": "exact-graph-keyset",
-		"initialRead": "once-before-vertex-observation",
+		"initialRead": "intrinsic-map-entries-once-before-vertex-observation",
+		"initialVirtualOperations": "ignored",
+		"incompatibleInitialMap": "INVALID_BYTE_CHARGES",
 		"domain": "positive-safe-integer",
 		"comparison": "charge <= maxEpochBytes - total",
 		"equalityAccepted": true,

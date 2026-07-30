@@ -70,6 +70,9 @@ if (
 	profile.api?.optional !== true ||
 	profile.api?.returnUnion !== "undefined | EpochFullOutcome" ||
 	profile.accounting?.anchorInclusive !== true ||
+	profile.accounting?.initialRead !== "intrinsic-map-entries-once-before-vertex-observation" ||
+	profile.accounting?.initialVirtualOperations !== "ignored" ||
+	profile.accounting?.incompatibleInitialMap !== "INVALID_BYTE_CHARGES" ||
 	profile.accounting?.comparison !== "charge <= maxEpochBytes - total" ||
 	profile.accounting?.countFirstSaturation !== true ||
 	profile.accounting?.postCaptureDualRecheck !== true ||
@@ -88,7 +91,7 @@ if (
 const contract = JSON.parse(read("tests/fixtures/phase-0p3-v3/epoch-byte-capacity-contract.json"));
 if (
 	!Array.isArray(contract.mutants) ||
-	contract.mutants.length !== 17 ||
+	contract.mutants.length !== 18 ||
 	JSON.stringify(Object.keys(contract.mutantRows ?? {})) !== JSON.stringify(contract.mutants)
 ) {
 	fail("mutant matrix identity differs");
@@ -98,7 +101,7 @@ for (const phrase of [
 	"permissions:\n  contents: read",
 	"PHASE_0P3_IMPLEMENTATION_MODULE",
 	"PHASE_0P3_MUTANT",
-	"Tests  1 failed | 15 passed (16)",
+	"Tests  1 failed | 16 passed (17)",
 	"mutant failure title mismatch",
 	"--maxWorkers=1 --minWorkers=1",
 	"epoch-capacity-v1/check-freeze.mjs",
