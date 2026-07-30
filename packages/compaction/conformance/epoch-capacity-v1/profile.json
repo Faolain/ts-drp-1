@@ -13,7 +13,8 @@
 		"anchorPosition": 0,
 		"ordinaryVertexMaximum": "maxEpochVertices - 1",
 		"absent": "legacy-unbounded-behavior",
-		"exactDuplicate": "DUPLICATE_VERTEX-no-charge"
+		"exactDuplicate": "DUPLICATE_VERTEX-no-charge",
+		"reentrantRecheck": "after-candidate-observation-before-bitset-allocation-and-publication"
 	},
 	"outcome": {
 		"status": "pending",

@@ -18,6 +18,11 @@ hash or ancestor row, creates no invalid tombstone and records no permanent clas
 therefore re-evaluated. An exact duplicate retains the existing `DUPLICATE_VERTEX` result and consumes no
 additional capacity.
 
+Caller re-entrancy cannot overfill the index. If candidate observation invokes a nested append that
+consumes the final slot, the outer append rechecks capacity after all candidate fields and dependencies
+have been captured but before dependency-bitset allocation or publication. The nested vertex remains
+published and the outer vertex receives the frozen pending capacity outcome.
+
 This primitive does not name or certify a final winner. Opposing delivery orders may have different
 transient local membership at saturation; Phase 5 owns certified close-set membership. The capacity result
 contains no candidate, member, winner, hash, finality or close identity.

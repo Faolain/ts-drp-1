@@ -24,7 +24,8 @@ type Mutant =
 	| "invalidity"
 	| "late-initial-capacity"
 	| "latch"
-	| "off-by-one";
+	| "off-by-one"
+	| "reentrant-fill";
 
 const mutant = process.env.PHASE_0P1_MUTANT as Mutant | undefined;
 const digestPattern = /^[0-9a-f]{64}$/u;
@@ -138,6 +139,28 @@ export class CausalityIndex {
 		if (this.latched) {
 			throw new LinearizationError("EPOCH_CAPACITY_LATCHED", "capacity was permanently latched");
 		}
+		const initialCapacity = this.capacityOutcome(hash, vertex);
+		if (initialCapacity !== undefined) return initialCapacity;
+		const dependencies = this.captureOrdinaryVertex(hash, vertex);
+		if (this.index.has(hash)) {
+			throw new LinearizationError("DUPLICATE_VERTEX", `vertex ${hash} was published during validation`);
+		}
+		if (mutant !== "reentrant-fill") {
+			const lateCapacity = this.capacityOutcome(hash, vertex);
+			if (lateCapacity !== undefined) return lateCapacity;
+		}
+		this.publishDependencies(hash, dependencies);
+		this.chargedSize++;
+		return undefined;
+	}
+
+	/**
+	 * Reports saturation at the current published size.
+	 * @param hash - Candidate hash used only by the after-publication mutant.
+	 * @param vertex - Candidate used only by the after-publication mutant.
+	 * @returns A frozen pending result when the current index is full.
+	 */
+	private capacityOutcome(hash: string, vertex: EpochVertex): EpochFullOutcome | undefined {
 		const effectiveSize = mutant === "anchor-exclusion" ? Math.max(0, this.chargedSize - 1) : this.chargedSize;
 		const effectiveLimit =
 			mutant === "off-by-one" && this.maxEpochVertices !== undefined
@@ -159,9 +182,61 @@ export class CausalityIndex {
 				latchByHash: false,
 			});
 		}
-		this.publish(hash, vertex);
-		this.chargedSize++;
 		return undefined;
+	}
+
+	/**
+	 * Once-captures and validates an ordinary append candidate without allocating or publishing a bitset.
+	 * @param hash - Candidate map key.
+	 * @param vertex - Caller-owned candidate.
+	 * @returns Captured direct dependencies.
+	 */
+	private captureOrdinaryVertex(hash: string, vertex: EpochVertex): readonly string[] {
+		const candidateHash = vertex.hash;
+		const kind = vertex.kind;
+		const objectId = vertex.objectId;
+		const epoch = vertex.epoch;
+		const anchor = vertex.anchor;
+		const rawDependencies = vertex.dependencies;
+		assertDigest(candidateHash, "vertex hash");
+		if (candidateHash !== hash) throw new LinearizationError("KEY_HASH_MISMATCH", "hash differs");
+		if (kind !== "drp-vertex") throw new LinearizationError("INVALID_VERTEX_KIND", "expected ordinary vertex");
+		if (objectId !== this.objectId || epoch !== this.epoch || anchor !== this.anchorHash) {
+			throw new LinearizationError("WRONG_EPOCH", "vertex is outside the active epoch");
+		}
+		if (!Array.isArray(rawDependencies) || rawDependencies.length === 0) {
+			throw new LinearizationError("MULTIPLE_ROOTS", "ordinary vertex must have dependencies");
+		}
+		const dependencies: string[] = [];
+		for (let position = 0; position < rawDependencies.length; position++) {
+			const dependency = rawDependencies[position];
+			assertDigest(dependency, "dependency");
+			if (this.index.get(dependency) === undefined) {
+				throw new LinearizationError("MISSING_DEPENDENCY", `missing dependency ${dependency}`);
+			}
+			dependencies.push(dependency);
+		}
+		return dependencies;
+	}
+
+	/**
+	 * Allocates and publishes a captured ordinary-vertex ancestry row.
+	 * @param hash - Captured vertex hash.
+	 * @param dependencies - Captured direct dependencies.
+	 */
+	private publishDependencies(hash: string, dependencies: readonly string[]): void {
+		const position = this.index.size;
+		const bits = new Uint32Array(Math.ceil((position + 1) / 32));
+		for (const dependency of dependencies) {
+			const dependencyPosition = this.index.get(dependency) as number;
+			const dependencyBits = this.ancestors[dependencyPosition] as Uint32Array;
+			for (let word = 0; word < dependencyBits.length; word++) {
+				bits[word] = (bits[word] as number) | (dependencyBits[word] as number);
+			}
+			bits[dependencyPosition >>> 5] = (bits[dependencyPosition >>> 5] as number) | (1 << (dependencyPosition & 31));
+		}
+		this.ancestors.push(bits);
+		this.index.set(hash, position);
 	}
 
 	/**

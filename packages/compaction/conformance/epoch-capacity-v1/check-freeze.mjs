@@ -61,6 +61,7 @@ const profile = JSON.parse(read(`${conformance}/profile.json`));
 if (
 	profile.capacity?.anchorInclusive !== true ||
 	profile.capacity?.ordinaryVertexMaximum !== "maxEpochVertices - 1" ||
+	profile.capacity?.reentrantRecheck !== "after-candidate-observation-before-bitset-allocation-and-publication" ||
 	profile.outcome?.code !== "EPOCH_FULL" ||
 	profile.outcome?.status !== "pending" ||
 	profile.outcome?.latchByHash !== false ||

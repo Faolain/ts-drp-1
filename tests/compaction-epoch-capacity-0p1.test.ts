@@ -121,6 +121,7 @@ describe("Phase 0p-1 anchor-inclusive CausalityIndex capacity causal RED", () =>
 				anchorInclusive: true,
 				ordinaryVertexMaximum: "maxEpochVertices - 1",
 				absent: "legacy-unbounded-behavior",
+				reentrantRecheck: "after-candidate-observation-before-bitset-allocation-and-publication",
 			},
 			outcome: {
 				status: "pending",
@@ -141,6 +142,7 @@ describe("Phase 0p-1 anchor-inclusive CausalityIndex capacity causal RED", () =>
 			"before publication",
 			"does not name or certify a final winner",
 			"different transient local membership",
+			"after all candidate fields and dependencies have been captured",
 			"Phase 5",
 			"no invalid tombstone",
 		]) {
@@ -254,6 +256,50 @@ describe("Phase 0p-1 anchor-inclusive CausalityIndex capacity causal RED", () =>
 		expect(reevaluated.append(retried.hash, retried)).toBeUndefined();
 		expect({ present: reevaluated.has(retried.hash), size: reevaluated.size }).toEqual({
 			present: true,
+			size: 3,
+		});
+	});
+
+	it("[reentrant-fill] rechecks capacity after candidate observation and before bitset publication", async () => {
+		const epochAnchorHash = hashFor("anchor");
+		const base = vertex("reentrant-base", epochAnchorHash);
+		const nested = vertex("reentrant-nested", base.hash);
+		const outerHash = hashFor("reentrant-outer");
+		const index = await emptyIndex(3);
+		expect(index.append(base.hash, base)).toBeUndefined();
+		let dependencyReads = 0;
+		let nestedResult: undefined | EpochFullOutcome;
+		const outer = {
+			anchor: epochAnchorHash,
+			get dependencies(): readonly string[] {
+				dependencyReads++;
+				nestedResult = index.append(nested.hash, nested);
+				return [base.hash];
+			},
+			epoch: 23,
+			hash: outerHash,
+			kind: "drp-vertex" as const,
+			objectId: OBJECT_ID,
+		};
+
+		const result = index.append(outerHash, outer);
+
+		expect(nestedResult).toBeUndefined();
+		expect(result).toEqual(outcome());
+		expect(Object.isFrozen(result)).toBe(true);
+		expect({
+			anchorOfNested: index.isAncestor(epochAnchorHash, nested.hash),
+			baseOfNested: index.isAncestor(base.hash, nested.hash),
+			dependencyReads,
+			nestedPresent: index.has(nested.hash),
+			outerPresent: index.has(outerHash),
+			size: index.size,
+		}).toEqual({
+			anchorOfNested: true,
+			baseOfNested: true,
+			dependencyReads: 1,
+			nestedPresent: true,
+			outerPresent: false,
 			size: 3,
 		});
 	});
