@@ -913,6 +913,7 @@ function authenticateAcceptanceEvidence(config: XverConfig): {
 	primarySha: string;
 	primaryArtifactSha256: string;
 	referenceArtifactSha256: string;
+	primaryRuntimeClosureSha256: string;
 	referenceRuntimeClosureSha256: string;
 } {
 	const primarySha = requiredXverEvidence("TS_DRP_XVER_PRIMARY_SHA");
@@ -950,6 +951,7 @@ function authenticateAcceptanceEvidence(config: XverConfig): {
 		primarySha,
 		primaryArtifactSha256,
 		referenceArtifactSha256,
+		primaryRuntimeClosureSha256,
 		referenceRuntimeClosureSha256,
 	};
 }
@@ -2346,6 +2348,7 @@ async function expectXverFixedCorpusAcceptance(): Promise<void> {
 			primarySha: evidence.primarySha,
 			primaryArtifactSha256: evidence.primaryArtifactSha256,
 			referenceArtifactSha256: evidence.referenceArtifactSha256,
+			primaryRuntimeClosureSha256: evidence.primaryRuntimeClosureSha256,
 			referenceRuntimeClosureSha256: evidence.referenceRuntimeClosureSha256,
 			fixtures: fixtures.map((fixture) => fixture.id),
 			scheduleCount: fixtures.reduce((total, fixture) => total + fixture.schedules.length, 0),

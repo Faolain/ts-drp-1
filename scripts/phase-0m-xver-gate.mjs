@@ -8,8 +8,49 @@ import { fileURLToPath } from "node:url";
 
 const REFERENCE_SHA = "1d40885ffb2ab666ffb2817a99fe69a42af83e77";
 const EXPECTED_COMPARISONS = 108;
+const EXPECTED_SCHEDULE_COUNT = 18;
 const ACCEPTANCE_TEST = "^Phase 0m authenticated fixed-corpus acceptance$";
 const REQUIRED_PNPM_VERSION = "10.24.0";
+const ACCEPTANCE_SUMMARY_MARKER = "XVER_ACCEPTANCE_SUMMARY";
+const EXPECTED_FIXTURES = [
+	"fixed-three-vertex-noncanonical-cut",
+	"fixed-four-vertex-incomplete-tail",
+	"fixed-four-vertex-cross-group-authority-chain",
+	"fixed-held-group-coupling-regression",
+	"fixed-same-group-pair-with-descendant",
+	"fixed-three-way-held-group-attribution",
+	"fixed-admin-revoke-group-the-target-does-not-hold",
+	"fixed-critical-1-cross-type-acl-drop",
+	"fixed-critical-2-transitive-join-with-two-children",
+];
+const EXPECTED_SURFACES = [
+	"drp-state",
+	"acl-state",
+	"admission",
+	"engine-authored-vertex-hashes",
+	"raw-hash-membership",
+	"raw-hash-order",
+];
+const ACCEPTANCE_SUMMARY_KEYS = [
+	"referenceSha",
+	"primarySha",
+	"primaryArtifactSha256",
+	"referenceArtifactSha256",
+	"primaryRuntimeClosureSha256",
+	"referenceRuntimeClosureSha256",
+	"fixtures",
+	"scheduleCount",
+	"surfaces",
+	"comparisons",
+	"mapFixtures",
+	"approvedDeltaCount",
+].sort();
+const ACCEPTANCE_EVIDENCE_FIELDS = [
+	"primaryArtifactSha256",
+	"referenceArtifactSha256",
+	"primaryRuntimeClosureSha256",
+	"referenceRuntimeClosureSha256",
+];
 const DESCRIPTOR = {
 	referenceSha: REFERENCE_SHA,
 	failClosed: true,
@@ -36,6 +77,7 @@ const PLAN = {
 		"authenticate-reference-artifact",
 		"authenticate-reference-runtime-closure",
 		"run-108-cell-acceptance",
+		"validate-authenticated-acceptance-summary",
 		"remove-reference-worktree",
 	],
 };
@@ -190,20 +232,126 @@ function assertDigestUnchanged(label, expected, actual) {
 	if (actual !== expected) fail(`${label} changed during acceptance: expected=${expected} actual=${actual}`);
 }
 
+function sameOrderedStrings(actual, expected) {
+	return (
+		Array.isArray(actual) &&
+		actual.length === expected.length &&
+		actual.every((entry, index) => entry === expected[index])
+	);
+}
+
+/**
+ * Authenticate the sole machine-readable acceptance record emitted by the
+ * filtered Vitest child. This is intentionally independent of Vitest's exit
+ * status because a filter matching zero tests exits successfully.
+ * @param output Captured child stdout.
+ * @param expected Live runner-computed provenance.
+ * @returns The authenticated acceptance summary.
+ */
+export function validateAcceptanceOutput(output, expected) {
+	if (typeof output !== "string") fail("XVER_ACCEPTANCE_SUMMARY_JSON output must be a string");
+	if (!expected || typeof expected !== "object" || Array.isArray(expected)) {
+		fail("XVER_ACCEPTANCE_SUMMARY_EVIDENCE expected live runner evidence");
+	}
+	const markerCount = output.split(ACCEPTANCE_SUMMARY_MARKER).length - 1;
+	if (markerCount === 0) {
+		fail("XVER_ACCEPTANCE_SUMMARY_REQUIRED expected=1 actual=0");
+	}
+	if (markerCount !== 1) {
+		fail(`XVER_ACCEPTANCE_SUMMARY_COUNT expected=1 actual=${markerCount}`);
+	}
+	const summaryLine = output.split(/\r?\n/).find((line) => line.startsWith(`${ACCEPTANCE_SUMMARY_MARKER} `));
+	if (!summaryLine) fail("XVER_ACCEPTANCE_SUMMARY_JSON marker must precede one JSON object");
+	let summary;
+	try {
+		summary = JSON.parse(summaryLine.slice(ACCEPTANCE_SUMMARY_MARKER.length + 1));
+	} catch {
+		return fail("XVER_ACCEPTANCE_SUMMARY_JSON invalid JSON object");
+	}
+	if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+		fail("XVER_ACCEPTANCE_SUMMARY_JSON expected an object");
+	}
+	if (
+		!Array.isArray(summary.mapFixtures) ||
+		summary.mapFixtures.length === 0 ||
+		summary.mapFixtures.some((fixture) => typeof fixture !== "string" || !EXPECTED_FIXTURES.includes(fixture))
+	) {
+		fail("XVER_ACCEPTANCE_SUMMARY_MAP_FIXTURES expected a non-empty subset of the acceptance corpus");
+	}
+	const actualKeys = Object.keys(summary).sort();
+	if (!sameOrderedStrings(actualKeys, ACCEPTANCE_SUMMARY_KEYS)) {
+		fail("XVER_ACCEPTANCE_SUMMARY_JSON expected the exact acceptance summary schema");
+	}
+	if (summary.referenceSha !== expected.referenceSha) {
+		fail(
+			`XVER_ACCEPTANCE_SUMMARY_REFERENCE_SHA actual=${String(summary.referenceSha)} expected=${String(expected.referenceSha)}`
+		);
+	}
+	if (summary.primarySha !== expected.primarySha) {
+		fail(
+			`XVER_ACCEPTANCE_SUMMARY_PRIMARY_SHA actual=${String(summary.primarySha)} expected=${String(expected.primarySha)}`
+		);
+	}
+	if (!sameOrderedStrings(summary.fixtures, EXPECTED_FIXTURES)) {
+		fail("XVER_ACCEPTANCE_SUMMARY_FIXTURES expected the exact ordered nine-fixture corpus");
+	}
+	if (summary.scheduleCount !== EXPECTED_SCHEDULE_COUNT) {
+		fail(
+			`XVER_ACCEPTANCE_SUMMARY_SCHEDULE_COUNT expected=${EXPECTED_SCHEDULE_COUNT} actual=${String(summary.scheduleCount)}`
+		);
+	}
+	if (!sameOrderedStrings(summary.surfaces, EXPECTED_SURFACES)) {
+		fail("XVER_ACCEPTANCE_SUMMARY_SURFACES expected the exact ordered six-surface contract");
+	}
+	if (summary.comparisons !== EXPECTED_COMPARISONS) {
+		fail(`XVER_ACCEPTANCE_SUMMARY_COMPARISONS expected=${EXPECTED_COMPARISONS} actual=${String(summary.comparisons)}`);
+	}
+	if (summary.approvedDeltaCount !== 0) {
+		fail(`XVER_ACCEPTANCE_SUMMARY_APPROVED_DELTAS expected=0 actual=${String(summary.approvedDeltaCount)}`);
+	}
+	for (const field of ACCEPTANCE_EVIDENCE_FIELDS) {
+		const actual = summary[field];
+		const authenticated = expected[field];
+		if (
+			typeof actual !== "string" ||
+			!/^[0-9a-f]{64}$/.test(actual) ||
+			typeof authenticated !== "string" ||
+			!/^[0-9a-f]{64}$/.test(authenticated)
+		) {
+			fail(`XVER_ACCEPTANCE_SUMMARY_EVIDENCE ${field} must be 64-character lowercase hex`);
+		}
+		if (actual !== authenticated) {
+			fail(`XVER_ACCEPTANCE_SUMMARY_EVIDENCE ${field} mismatch`);
+		}
+	}
+	return summary;
+}
+
 function validateCli() {
 	if (process.argv.length === 2) return "run";
-	if (process.argv.length !== 3) fail("usage: phase-0m-xver-gate.mjs [--describe-contract|--plan]");
+	if (process.argv.length !== 3) {
+		fail("usage: phase-0m-xver-gate.mjs [--describe-contract|--plan|--validate-acceptance-output]");
+	}
 	const argument = process.argv[2];
 	if (argument === "--describe-contract") return "describe";
 	if (argument === "--plan") return "plan";
+	if (argument === "--validate-acceptance-output") return "validate";
 	return fail(`unknown argument: ${argument}`);
 }
 
-const mode = validateCli();
-if (mode === "describe") {
+const invokedAsMain =
+	process.argv[1] !== undefined &&
+	realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+const mode = invokedAsMain ? validateCli() : "import";
+if (mode === "import") {
+	// Importers consume the pure validator without starting the hermetic gate.
+} else if (mode === "describe") {
 	process.stdout.write(`${JSON.stringify(DESCRIPTOR)}\n`);
 } else if (mode === "plan") {
 	process.stdout.write(`${JSON.stringify(PLAN)}\n`);
+} else if (mode === "validate") {
+	const envelope = JSON.parse(readFileSync(0, "utf8"));
+	validateAcceptanceOutput(envelope.output, envelope.expected);
 } else {
 	const scriptPath = realpathSync(fileURLToPath(import.meta.url));
 	const repositoryRoot = realpathSync(resolve(dirname(scriptPath), ".."));
@@ -281,7 +429,7 @@ if (mode === "describe") {
 			TS_DRP_XVER_PRIMARY_RUNTIME_CLOSURE_SHA256: primaryRuntimeClosureSha256,
 			TS_DRP_XVER_REFERENCE_RUNTIME_CLOSURE_SHA256: referenceRuntimeClosureSha256,
 		};
-		run(
+		const acceptanceOutput = run(
 			process.execPath,
 			[
 				vitestEntry,
@@ -297,6 +445,14 @@ if (mode === "describe") {
 			],
 			{ cwd: repositoryRoot, env: environment, timeout: 180_000, forwardOutput: true }
 		);
+		validateAcceptanceOutput(acceptanceOutput, {
+			referenceSha: REFERENCE_SHA,
+			primarySha,
+			primaryArtifactSha256,
+			referenceArtifactSha256,
+			primaryRuntimeClosureSha256,
+			referenceRuntimeClosureSha256,
+		});
 		assertDigestUnchanged("primary artifact", primaryArtifactSha256, sha256File(primaryObjectModule));
 		assertDigestUnchanged("reference artifact", referenceArtifactSha256, sha256File(referenceObjectModule));
 		assertDigestUnchanged(
