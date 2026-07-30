@@ -14,9 +14,11 @@ export { stateDigest } from "./state.js";
 export type {
 	AccumulatorSnapshot,
 	BatchOptions,
+	CausalityIndexOptions,
 	ConflictAction,
 	ConflictResult,
 	ConsistencyProof,
+	EpochFullOutcome,
 	EpochVertex,
 	InclusionProof,
 	LinearizeOptions,

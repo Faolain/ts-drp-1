@@ -12,6 +12,18 @@ export interface EpochVertex {
 	};
 }
 
+/** Optional bounds for one append-only active-epoch causality index. */
+export interface CausalityIndexOptions {
+	readonly maxEpochVertices?: number | undefined;
+}
+
+/** A non-terminal refusal produced when an active-epoch index is full. */
+export interface EpochFullOutcome {
+	readonly code: "EPOCH_FULL";
+	readonly latchByHash: false;
+	readonly status: "pending";
+}
+
 /** The frozen conflict actions for protocol v2. */
 export type ConflictAction = "Nop" | "DropLeft" | "DropRight" | "Swap" | "Drop";
 

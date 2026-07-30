@@ -1,9 +1,21 @@
 import { deepCloneCanonical, encodeCanonical } from "@ts-drp/canonical";
 
-import { type ConflictAction, type ConflictResult, type EpochVertex, type LinearizeOptions } from "./types.js";
+import {
+	type CausalityIndexOptions,
+	type ConflictAction,
+	type ConflictResult,
+	type EpochFullOutcome,
+	type EpochVertex,
+	type LinearizeOptions,
+} from "./types.js";
 
 const digestPattern = /^[0-9a-f]{64}$/u;
 const conflictActions = new Set<ConflictAction>(["Nop", "DropLeft", "DropRight", "Swap", "Drop"]);
+const epochFullOutcome: EpochFullOutcome = Object.freeze({
+	code: "EPOCH_FULL",
+	latchByHash: false,
+	status: "pending",
+});
 
 /** A deterministic graph or conflict-policy failure. */
 export class LinearizationError extends Error {
@@ -196,15 +208,32 @@ export class CausalityIndex {
 	private readonly anchorHash: string;
 	private readonly epoch: number;
 	private readonly index: Map<string, number>;
+	private readonly maxEpochVertices: number | undefined;
 	private readonly objectId: string;
 
 	/**
 	 * Builds exact ancestry for a complete topological order.
 	 * @param vertices - Complete graph.
 	 * @param suppliedOrder - Complete dependency-before-child order; inferred deterministically when omitted.
+	 * @param options - Optional anchor-inclusive active-epoch capacity.
 	 */
-	constructor(vertices: ReadonlyMap<string, EpochVertex>, suppliedOrder?: readonly string[]) {
+	constructor(
+		vertices: ReadonlyMap<string, EpochVertex>,
+		suppliedOrder?: readonly string[],
+		options: CausalityIndexOptions = {}
+	) {
 		if (!(vertices instanceof Map)) throw new TypeError("vertices must be a Map keyed by hash");
+		if (options === null || typeof options !== "object" || Array.isArray(options)) {
+			throw new TypeError("CausalityIndex options must be an object");
+		}
+		const maxEpochVertices = options.maxEpochVertices;
+		if (maxEpochVertices !== undefined && (!Number.isSafeInteger(maxEpochVertices) || maxEpochVertices < 1)) {
+			throw new RangeError("maxEpochVertices must be a positive safe integer");
+		}
+		this.maxEpochVertices = maxEpochVertices;
+		if (maxEpochVertices !== undefined && vertices.size > maxEpochVertices) {
+			throw new LinearizationError("EPOCH_CAPACITY_EXCEEDED", "initial graph exceeds maxEpochVertices");
+		}
 		const inferredAnchor = [...vertices].find(([, vertex]) => vertex.kind === "drp-epoch-anchor")?.[0];
 		const order = suppliedOrder === undefined ? topologicalOrder(vertices, inferredAnchor ?? "") : [...suppliedOrder];
 		if (order.length !== vertices.size || new Set(order).size !== order.length) {
@@ -265,12 +294,14 @@ export class CausalityIndex {
 	 * Validates and atomically appends one dependency-complete active-epoch vertex.
 	 * @param hash - Map key for the vertex.
 	 * @param vertex - Vertex whose direct dependencies are already published.
+	 * @returns A pending capacity outcome, or undefined after publication.
 	 */
-	append(hash: string, vertex: EpochVertex): void {
+	append(hash: string, vertex: EpochVertex): undefined | EpochFullOutcome {
 		assertDigest(hash, "vertex map key");
 		if (this.index.has(hash)) {
 			throw new LinearizationError("DUPLICATE_VERTEX", `vertex ${hash} is already indexed`);
 		}
+		if (this.isAtCapacity()) return epochFullOutcome;
 		if (vertex === null || typeof vertex !== "object") {
 			throw new LinearizationError("INVALID_VERTEX", `invalid vertex at ${hash}`);
 		}
@@ -315,7 +346,6 @@ export class CausalityIndex {
 			throw new LinearizationError("DUPLICATE_VERTEX", `vertex ${hash} is already indexed`);
 		}
 
-		const vertexPosition = this.index.size;
 		const dependencyPositions = dependencies.map((dependency) => {
 			const dependencyPosition = this.index.get(dependency);
 			if (dependencyPosition === undefined) {
@@ -323,6 +353,8 @@ export class CausalityIndex {
 			}
 			return dependencyPosition;
 		});
+		if (this.isAtCapacity()) return epochFullOutcome;
+		const vertexPosition = this.index.size;
 		const bits = new Uint32Array(Math.ceil((vertexPosition + 1) / 32));
 		for (const dependencyPosition of dependencyPositions) {
 			const dependencyBits = this.ancestors[dependencyPosition] as Uint32Array;
@@ -340,6 +372,14 @@ export class CausalityIndex {
 			this.ancestors.pop();
 			throw error;
 		}
+	}
+
+	/**
+	 * Reports whether the opt-in anchor-inclusive capacity is currently exhausted.
+	 * @returns Whether another distinct vertex would exceed the configured limit.
+	 */
+	private isAtCapacity(): boolean {
+		return this.maxEpochVertices !== undefined && this.index.size >= this.maxEpochVertices;
 	}
 
 	/**
