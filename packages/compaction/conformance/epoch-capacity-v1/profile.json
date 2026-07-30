@@ -1,0 +1,39 @@
+{
+	"profileId": "compaction-epoch-capacity-v1",
+	"constructor": {
+		"argument": 3,
+		"optionsShape": "non-null-object-not-array",
+		"option": "maxEpochVertices",
+		"domain": "positive-safe-integer",
+		"initialOversizeCode": "EPOCH_CAPACITY_EXCEEDED",
+		"oversizePrecedence": "after-map-and-option-validation-before-graph-traversal"
+	},
+	"capacity": {
+		"anchorInclusive": true,
+		"anchorPosition": 0,
+		"ordinaryVertexMaximum": "maxEpochVertices - 1",
+		"absent": "legacy-unbounded-behavior",
+		"exactDuplicate": "DUPLICATE_VERTEX-no-charge"
+	},
+	"outcome": {
+		"status": "pending",
+		"code": "EPOCH_FULL",
+		"latchByHash": false,
+		"frozen": true,
+		"closedFields": ["status", "code", "latchByHash"],
+		"publication": false,
+		"invalidTombstone": false,
+		"permanentClassification": false,
+		"finalMembershipAuthority": false
+	},
+	"claims": {
+		"supportedProfileSelection": false,
+		"liveBinding": false,
+		"maxEpochBytes": false,
+		"operationBytes": false,
+		"transportFrameBytes": false,
+		"executionMetering": false,
+		"collectionTouchLimit": false,
+		"finality": false
+	}
+}
