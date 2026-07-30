@@ -12452,25 +12452,104 @@ lost or reassigned: it remains a mandatory Phase-3a pre-live binding using captu
 owned built-in graph Map, one authenticated keyset for order and charges, explicit equality, and hostile
 subclass/proxy/prototype-poisoning REDs. Any earlier non-3a byte-cap caller remains blocked.
 
+### D.75 — Phase 0m non-vacuous XVER acceptance
+
+Phase 0m is accepted at final HEAD `bbd55f3`. The retained TDD chain records why a green Vitest exit is
+not acceptance evidence by itself:
+
+- RED `d6d2213` established the initial exact-pin/differential contract; GREEN `b8a5735` was rejected
+  because it exercised only a selected smoke cell and could skip;
+- corrective RED `ac38585` required the full fixed corpus and authenticated runner; GREEN `9fa39a3`
+  supplied the detached-pin workflow and real aggregate gate;
+- final RED `1ab54c1` reproduced the remaining vacuity: an exact test-name filter matching nothing exits
+  zero with every test skipped and emits no acceptance summary;
+- GREEN `35edb85` captured the actual child stdout and required one strict authenticated summary, while
+  `bbd55f3` closed the sole post-review Prettier failure without changing the runner AST.
+
+The mandatory gate now builds the exact shipped pin
+`1d40885ffb2ab666ffb2817a99fe69a42af83e77` in a fresh detached worktree, resolves each engine's own
+runtime dependency closure, and fails closed on absent or mismatched provenance. The child and parent
+independently authenticate the primary/reference SHAs, both object artifacts and both runtime closures.
+The corpus is **nine fixtures containing eighteen schedules total**; eighteen schedules multiplied by
+six surfaces yields exactly 108 comparisons. Set and Map local-authoring legs, raw-hash order/membership,
+live and canonical ACL/DRP state, and admission/result outcomes are covered. The exact-tuple delta
+manifest remains empty; any unexpected, duplicate or stale delta fails.
+
+The final committed-target gates pass:
+
+- RED3 contract: 39 passed with 14 intentional non-hermetic skips;
+- detached-pin XVER: one authenticated summary, 108 comparisons, all nine fixtures exercising the Map
+  leg and zero approved deltas;
+- workspace typecheck, scoped ESLint, Prettier and import-safe validator smoke: green.
+
+The final focused, hermetic, workspace-typecheck, scoped-lint, Prettier and import-smoke log SHA-256
+values are, respectively,
+`3c66d3454625c95f157f4db6361f6914936d64bf9b2ebd5de3a0bf30a988bb90`,
+`296e8a6fbe6010babb68545263223ab1a3c5690cc99557f30f002b95ad339144`,
+`f36174d7cb597ae010dae94ffeb1c0c50953fc64087892cec5a01d13e72fafd6`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20` and
+`dae8fd566ca67a26f1e7ad40fa0361648dfce1e9921e9b9930b29dd8835268d8`.
+
+Fresh final-target reviews accept the result:
+
+- Grok 4.5/high returned `PASS` with sole effective model `grok-4.5-build`, session
+  `019fb53e-9dfa-7343-a8c9-fa9b4c1587c8`, 10/20 turns and no tracked-state mutation;
+- exact Kimi 3/high returned `PASS`, session
+  `session_93b851d9-9b46-4d45-84b0-3aacaeb7154a`, 24/24 requests using
+  `kimi-code/k3` at high reasoning with no retry, resume, fallback or substitution;
+- final Opus/xhigh returned `PASS`, session `0710a5a5-c7e5-497d-adeb-851e7dd40132`.
+  All 85 assistant events were `claude-opus-5` at xhigh, and the last Opus text event is byte-identical
+  to the final result. One automatic Haiku auxiliary produced only title metadata (25 output tokens)
+  and authored no assistant event, finding or verdict. The Opus artifact-manifest SHA-256 is
+  `371ed3aa714a4ddf723c58f7df5df3d796c03f91e68d341d0b9cd7627f0e2291`.
+
+Retained gotchas and forward bindings:
+
+1. The tracked test title saying `9 × 18 × 6 = 108` is misleading: eighteen is the total schedule
+   count across nine fixtures, so the calculation is `18 × 6 = 108`. Do not propagate the false
+   arithmetic into future contracts.
+2. The workflow trigger intentionally satisfies the current row's mandatory
+   `packages/object/**` and `packages/validation/**` scope, but it does not yet include every package in
+   the built runtime closure. In particular, `packages/utils/**` owns `computeHash`; add that scope
+   before a hashing change relies on XVER as a required PR gate, and consider `packages/types/**` and
+   `packages/blueprints/**` with the same rule.
+3. At this checkpoint the primary and reference engine artifacts are byte-identical because no
+   intervening commit changes production package sources. The green aggregate proves the non-vacuous
+   harness runs; the divergent-engine controls prove detection capability, and later production
+   changes provide the first informative patched-versus-pin comparison.
+4. Exact column-zero summary-marker parsing and exact marker count are deliberately strict-side:
+   reporter-prefix drift fails closed. Do not replace summary validation with child exit status.
+5. The structural RED currently proves live evidence identifiers and same-block dataflow. If those
+   identifiers are ever rebound, strengthen the test to prove derivation provenance rather than names.
+   Schedule names must also remain unique within each fixture because local-hash and delta accounting
+   key by schedule name.
+6. D.73's virtual graph-side `Map.keys()` exploit remains unchanged and mandatory in Phase 3a. Phase
+   0m acceptance does not authorize any earlier non-3a byte-cap caller.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
-binding. D.74 supersedes the prior “0q next” instruction. Phase 0n remains optional and deferred until
-after the golden paths.
+binding. Phase 0m is accepted at `bbd55f3`; D.74's remaining sequence is
+`0k/0l (either order) → 0q-a → 0q-b`. Phase 0n remains optional and deferred until after the golden
+paths.
 
-The next item is **Phase 0m**, as a separate strict TDD item. Start a fresh Codex-high RED-only owner.
-The RED must causally prove the existing differential is not XVER: unset/mismatched oracle fails rather
-than skips, exact comparison count cannot silently shrink, a deliberately divergent engine is detected,
-engine-authored hash divergence is observable, raw hashes are compared, and Gate-0 allowances are
-structurally unreadable in XVER mode. Checkpoint that RED before handing the unchanged contract to a
-distinct fresh Codex-high GREEN owner. The shipped reference pin is
-`1d40885ffb2ab666ffb2817a99fe69a42af83e77`; no 0q production line changes before 0m is accepted.
+The next item is **Phase 0k**, as a separate strict TDD item: bound legacy `FinalityStore.states`.
+Start a fresh Codex-high RED-only owner. First locate every state owner/consumer and establish the
+current retention behavior without changing production or the plan. The RED must causally demonstrate
+unbounded growth across at least 10,000 vertices, pin the chosen bound and prove retained finality
+semantics at eviction boundaries; a test that only caps a test double or deletes state without proving
+consumer behavior is invalid. Keep the fast default tier bounded and deterministic, and isolate any
+longer retention/performance sweep. Checkpoint the RED before handing the unchanged contract to a
+distinct fresh Codex-high GREEN owner.
 
-After 0m, complete the still-open 0k and 0l rows in either order, each through its own full TDD/review
-loop. Then run a fresh pre-RED no-RED audit for 0q-a and author REDs only for D.74.2's genuinely open local
-and deferred-publication surfaces. 0q-b follows 0q-a. If any causal RED proves a patched-vs-pinned
-compatibility delta necessary, stop before GREEN and obtain the correction quorum for the exact manifest
-entry and coordinated-upgrade rollout.
+Phase 0k shares the finality commit surface with 0q-a, so preserve the existing atomic
+apply/rollback/checkpoint suites and rerun Phase 0m XVER if 0k touches the legacy applier or validation
+classification. After 0k, complete the still-open 0l row through its own full TDD/review loop. Then run
+a fresh pre-RED no-RED audit for 0q-a and author REDs only for D.74.2's genuinely open local and
+deferred-publication surfaces. 0q-b follows 0q-a. If a causal RED requires a compatibility delta or a
+normative plan correction, stop before GREEN and obtain the required Codex-high, exact Kimi 3/high and
+Opus/xhigh correction quorum.
 
 Continue the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
