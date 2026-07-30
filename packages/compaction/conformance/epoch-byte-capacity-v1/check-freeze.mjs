@@ -70,7 +70,8 @@ if (
 	profile.api?.optional !== true ||
 	profile.api?.returnUnion !== "undefined | EpochFullOutcome" ||
 	profile.accounting?.anchorInclusive !== true ||
-	profile.accounting?.initialRead !== "intrinsic-map-entries-once-before-vertex-observation" ||
+	profile.accounting?.initialRead !== "intrinsic-map-entries-once-before-graph-key-snapshot-and-vertex-observation" ||
+	profile.accounting?.initialCaptureOrder !== "charge-entries-before-graph-key-snapshot" ||
 	profile.accounting?.initialVirtualOperations !== "ignored" ||
 	profile.accounting?.incompatibleInitialMap !== "INVALID_BYTE_CHARGES" ||
 	profile.accounting?.comparison !== "charge <= maxEpochBytes - total" ||
@@ -91,7 +92,11 @@ if (
 const contract = JSON.parse(read("tests/fixtures/phase-0p3-v3/epoch-byte-capacity-contract.json"));
 if (
 	!Array.isArray(contract.mutants) ||
-	contract.mutants.length !== 18 ||
+	contract.mutants.length !== 19 ||
+	contract.initialCaptureOrder !== "charge-entries-before-graph-key-snapshot" ||
+	contract.causalProvenance?.firstRed !== "corrective-review-temporary-reversed-order-module" ||
+	contract.causalProvenance?.firstRedObservation !== "ACCEPTED-BYPASS size=2 childCharged=false" ||
+	contract.causalProvenance?.frozenMutant !== "stale-initial-graph-snapshot" ||
 	JSON.stringify(Object.keys(contract.mutantRows ?? {})) !== JSON.stringify(contract.mutants)
 ) {
 	fail("mutant matrix identity differs");
@@ -101,7 +106,7 @@ for (const phrase of [
 	"permissions:\n  contents: read",
 	"PHASE_0P3_IMPLEMENTATION_MODULE",
 	"PHASE_0P3_MUTANT",
-	"Tests  1 failed | 16 passed (17)",
+	"Tests  1 failed | 17 passed (18)",
 	"mutant failure title mismatch",
 	"--maxWorkers=1 --minWorkers=1",
 	"epoch-capacity-v1/check-freeze.mjs",

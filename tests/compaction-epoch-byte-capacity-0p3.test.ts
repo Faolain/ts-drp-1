@@ -148,6 +148,7 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 				anchorInclusive: true,
 				comparison: "charge <= maxEpochBytes - total",
 				duplicateCharge: 0,
+				initialCaptureOrder: "charge-entries-before-graph-key-snapshot",
 				refusalCharge: 0,
 			},
 			api: {
@@ -168,6 +169,7 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 			"exact graph keyset",
 			"read exactly once",
 			"Map's intrinsic entries",
+			"before snapshotting the graph keys",
 			"Overridden `size`, `keys`, `entries`, `has`, `get`",
 			"incompatible Proxy or Map pretender",
 			"including the anchor",
@@ -463,6 +465,46 @@ describe("Phase 0p-3 anchor-inclusive epoch-byte capacity causal RED", () => {
 			expect(String(error)).not.toContain("INCOMPATIBLE_INITIAL_CHARGES_OBSERVED_VERTEX");
 		}
 		expect(vertexObservations).toBe(0);
+	});
+
+	it("[initial-charge-before-graph-key-snapshot] rejects graph mutation by the initial-charge accessor before vertex traversal", async () => {
+		const Constructor = await constructor();
+		const captureOrderAnchor = anchor("capture-order-anchor");
+		const captureOrderChildHash = hashFor("capture-order-child");
+		let childObservations = 0;
+		const captureOrderChildTarget: EpochVertex = {
+			anchor: captureOrderAnchor.hash,
+			dependencies: [captureOrderAnchor.hash],
+			epoch: 29,
+			hash: captureOrderChildHash,
+			kind: "drp-vertex",
+			objectId: OBJECT_ID,
+		};
+		const captureOrderChild = new Proxy(captureOrderChildTarget, {
+			get(target, property, receiver) {
+				childObservations++;
+				return Reflect.get(target, property, receiver);
+			},
+		});
+		const graph = new Map<string, EpochVertex>([[captureOrderAnchor.hash, captureOrderAnchor]]);
+		let chargeAccessorReads = 0;
+		const error = capturedError(
+			() =>
+				new Constructor(graph, undefined, {
+					get initialByteCharges(): ReadonlyMap<string, number> {
+						chargeAccessorReads++;
+						graph.set(captureOrderChildHash, captureOrderChild);
+						return new Map([[captureOrderAnchor.hash, 1]]);
+					},
+					maxEpochBytes: 1,
+				})
+		);
+		expect(errorCode(error)).toBe(contract.invalidChargesCode);
+		expect({ chargeAccessorReads, childObservations, graphSize: graph.size }).toEqual({
+			chargeAccessorReads: 1,
+			childObservations: 0,
+			graphSize: 2,
+		});
 	});
 
 	it("[initial-precedence] rejects invalid charge shape/keyset before count oversize and without vertex observation", async () => {

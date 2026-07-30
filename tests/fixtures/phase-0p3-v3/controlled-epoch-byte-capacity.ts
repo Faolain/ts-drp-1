@@ -37,6 +37,7 @@ type Mutant =
 	| "mutable-initial-charges"
 	| "mutable-initial-keyset"
 	| "partial-rollback"
+	| "stale-initial-graph-snapshot"
 	| "stale-pre-reentrancy"
 	| "terminal-byte-full"
 	| "wrapping-accumulation";
@@ -128,7 +129,11 @@ export class CausalityIndex {
 
 		let initialTotal: number | undefined;
 		if (maxEpochBytes !== undefined) {
+			const staleInitialGraphSnapshot =
+				mutant === "stale-initial-graph-snapshot" && vertices.has(testHash("capture-order-anchor"));
+			const initialHashesBeforeCharges = staleInitialGraphSnapshot ? [...vertices.keys()] : undefined;
 			const charges = options.initialByteCharges;
+			const initialHashes = initialHashesBeforeCharges ?? [...vertices.keys()];
 			let isMap = false;
 			try {
 				isMap = charges instanceof Map;
@@ -152,12 +157,12 @@ export class CausalityIndex {
 					invalidCharges("initialByteCharges must contain compatible intrinsic Map entries");
 				}
 			}
-			if (!skipExactKeyset && chargeEntries.size !== vertices.size) {
+			if (!skipExactKeyset && chargeEntries.size !== initialHashes.length) {
 				invalidCharges("initialByteCharges keyset must equal the initial graph keyset");
 			}
 			let total = 0;
 			if (!skipExactKeyset) {
-				for (const hash of vertices.keys()) {
+				for (const hash of initialHashes) {
 					if (!chargeEntries.has(hash)) {
 						invalidCharges("initialByteCharges keyset must equal the initial graph keyset");
 					}
