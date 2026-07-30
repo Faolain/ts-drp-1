@@ -809,6 +809,48 @@ codec → vectors already frozen and now provably correct.
 | **0m**       | `XVER` cross-version bisimulation harness: patched engine vs HEAD-pinned legacy engine (git-worktree build) over the Gate-0 fixture corpus                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | gate infra                                                                                                     | sliceable                                                                                                      | `expect(patched.vertexHashes).toEqual(pinned.vertexHashes)` + state equality per fixture × schedule. **Required check on any PR touching the legacy applier or validation classification**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **0q**       | **Per-vertex atomic apply and publication (owns L3 and L6 — added by D.3(d), specified by D.5).** One vertex transitions atomically across hashgraph, state snapshots, finality, live proxies, checkpoints and notification: fully applied, or no trace. **A committed vertex is never removed** — any dependency-closed subset of a causal DAG is a valid replica state, so no failure can require removing one. Every shared-store write sits inside **one synchronous commit section after that vertex's last suspension point**, which is what makes the design exempt from 0g's serialization mandate (D.5(f)) — it MUST NOT take the `callFn` lock, whose only effect would be to make synchronous `drp.method()` calls async. Vertex-presence is **re-checked inside the commit section** (the loop-top check is TOCTOU-separated from the insert by the blueprint `await`, and `HashGraph.addVertex` blind-inserts, duplicating frontier entries and hence the `dependencies` of the next locally signed vertex). **Live-proxy adoption is the one surface that breaks with no rollback involved**: its base is captured _before_ the `await`, so a plain replace-at-commit erases concurrently committed operations. Transplanting the local path's `assign` step **relocates that erase rather than removing it** — `assign` writes branch state, correct locally only because a local vertex depends on the whole frontier. Choose and record either commit-time recompute against a consistent base (await-free replay only) or frontier CAS/retry. `pruneSnapshots` must never observe uncommitted staging. `ApplyResult` gains `quarantined: Hash[]`; a transient failure is retriable and **never** enters `knownInvalidVertexHashes`. Hard prerequisite: 0h.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | local-safe                                                                                                     | **atomic per vertex**                                                                                          | Inverted `merge-atomicity.test.ts` per D.3(b); the four D.4.2 regression schedules; **L6 contract**: two replicas receiving the same DAG — one with a local call interleaved into a 256-append merge at the default suffix, one serial — end with equal live state, byte-equal `getStates` at every shared head, and a truthful `applied` report; **structural gate**: no shared-store mutation or journal entry is live across any `await`. All verified against baseline per D.5(h)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
+> **Normative Phase-0 residual correction (D.74; supersedes the unsplit 0m/0q scheduling above).**
+> Phase 0m is a separate strict predecessor. After it is accepted, complete the still-open 0k and 0l
+> rows (in either order), then implement 0q-a and 0q-b. 0k is otherwise independent but shares the
+> finality commit surface, so whichever of 0k and 0q-a lands second reruns the other's acceptance suite.
+> 0l remains independent only while 0q introduces no public error class, code or required result field.
+>
+> **0m — non-vacuous HEAD-pinned XVER.** Extend the existing differential harness rather than building a
+> second one, but do not call the extension cheap or complete until it closes all current vacuity holes.
+> The pinned oracle is exact shipped HEAD `1d40885ffb2ab666ffb2817a99fe69a42af83e77` and must resolve that
+> worktree's own runtime dependency closure. XVER fails rather than skips when the oracle, exact SHA or
+> dependency closure is absent/mismatched; it asserts the exact non-zero fixture × schedule × surface
+> comparison count; and it includes a checked deliberately divergent-engine control. Add an
+> engine-authored local leg so each engine emits its own vertex hashes, and compare raw-hash membership and
+> order plus live/canonical DRP and ACL state and admission/result outcomes. The approved-delta manifest is
+> initially empty and keyed only by exact `(fixtureId, scheduleName, surface)` tuples. It is structurally
+> unable to consult Gate-0's category-scoped `7f9e66a` allowances or known-failure census. Wildcards,
+> predicates, seed ranges, percentage budgets, auto-update and silent rebaseline are forbidden; stale and
+> unexercised entries fail. If a later causal RED proves a compatibility delta unavoidable, stop before
+> GREEN and obtain the correction quorum for the exact before/after values, fixture, schedule, surface,
+> expiry condition and coordinated-upgrade rollout.
+>
+> **0q-a — authoritative-state atomicity.** The already-green merge presence/CAS/journal machinery remains
+> preservation evidence, not a manufactured RED. 0q-a owns both residual failures: the journal-less,
+> CAS-less local `callFn` publication across an async blueprint suspension, and the deferred-merge tear
+> where graph/snapshots/finality/notification can commit without authoritative live ACL/DRP and checkpoint
+> state. Post-commit canonical reconciliation must become unreachable. Either adopt each vertex's canonical
+> live state before its own synchronous frontier-CAS commit, or prepare one dependency-closed accepted set
+> with canonical replay before any candidate is visible and commit the prepared set synchronously under one
+> frontier CAS. A replay throw or CAS exhaustion leaves no trace for uncommitted candidates; no resolved or
+> rejected `applyVertices` boundary may retain `hasUnreconciledLiveState === true`. The latch may remain only
+> as private zero-asserted instrumentation. Every rejection carries the exact `partialResult`, including
+> `AdoptionCommitExhaustedError` and reconciliation invariant paths. Snapshots are derived caches: they may
+> be absent, but may never be present-and-wrong.
+>
+> **0q-b — post-commit publication and consumer truthfulness.** Keep notification delivery outside the
+> authoritative commit, preserve commit order and re-entrancy containment, report observer failure without
+> rolling back committed state, consume exact `partialResult` in node handlers so recovery/persistence still
+> run, and preserve the primary error through `cause`. Do not add a public
+> `liveStateUnreconciled` success field: that would reward-hack a torn authoritative state into a passing
+> outcome. Phase 0q is legacy in-process discipline only; crash/durable transactions remain Phase 2,
+> actual v3 append/binding remains Phase 3a and production reducer/fold atomicity remains Phase 4a.
+
 > **Phase 0o digest-identity correction.** The unanimous D.60 quorum closes the gap between the
 > frozen D.37 bounded witness and the live policy. The equivocation slot key is
 > `(objectId, author, authorSequence)` and its value is the digest of the exact authenticated received
@@ -3428,7 +3470,11 @@ that exists, and would abandon attempt 5's verified assets (byte-equivalent pred
 
 ---
 
-## Appendix D.13 — Attempt 6: slice 0q closed
+## Appendix D.13 — Attempt 6: historical 0q merge-path closure
+
+> **Status correction (D.74).** This appendix is inherited implementation history for the merge fast path,
+> not current acceptance of the full Phase 0q row. D.35.4 and D.50.4 correctly keep the residual local and
+> deferred-publication atomicity work open.
 
 Attempt 6 closes the four remaining items recorded in D.12.4 and the attempt-6 handoff:
 
@@ -9296,13 +9342,18 @@ trigger the separate unanimous plan-change quorum:
    closed and still terminates in full canonical replay. `fixed-critical-1-cross-type-acl-drop` is the
    executable corroboration. Owner: a fresh 0h-L hygiene RED or the forward v3 Phase 4a seam; do not
    patch blindly.
-2. **N2 — ordinary deferred final-replay blueprint failure.** A state-dependent blueprint can succeed
-   against its causal cut, then throw when the resolver-free deferred path performs canonical final
-   replay after candidates commit. `applyVertices` rejects post-commit and D.10.4's
-   `hasUnreconciledLiveState` latch can remain permanent. This is an open, ordinary-reachable D.3(b)
-   deviation—for example two concurrent withdrawals against a balance guard—not an “out-of-contract” or
-   merely degenerate blueprint. The deferred path and `finally` structure are byte-identical at HEAD and
-   0h-L strictly narrows entry, so it is nonblocking here. Owner: Phase 0q / forward v3 Phase 4a lineage.
+2. **N2 — ordinary deferred final-replay blueprint failure (re-adjudicated by D.74).** A
+   state-dependent blueprint can succeed against its causal cut, then throw when the resolver-free
+   deferred path performs canonical final replay after candidates commit. The defer branch commits graph,
+   snapshots, finality and notification eligibility without authoritative live ACL/DRP and checkpoint
+   publication; a replay throw occurs before reconciliation's journal, while the nested `finally` can still
+   drain notifications and replace the computed `ApplyResult`. Public live getters and the node's
+   finality-signer check make the window observable and security-relevant. The latch is not sufficient or
+   self-healing. This is a torn per-vertex commit forbidden by Phase 0, not an attribution gap.
+   `liveStateUnreconciled` therefore cannot be public success evidence. Owner: **Phase 0q-a**, which makes
+   post-commit reconciliation unreachable and attaches exact partial results. Phase 0q-b owns only
+   post-commit observer isolation, handler consumption and cause preservation. Forward v3 Phase 4a owns
+   the production reducer/fold seam.
 3. **N4 — API/attribution hygiene.** Pre-existing replay paths still cast `IHashGraph` to concrete
    `HashGraph`; production constructs the concrete graph and `createDRPVertexApplier` is not package
    exported, while a deep-imported incompatible graph fails safe by quarantine but is misattributed.
@@ -12305,22 +12356,126 @@ binding evidence-summary/raw/metadata/manifest SHA-256 values are
 `e8e891eef20825016583d8aafb8ca5b02cae1a7c7dc67c84b1f3a37a37936fbf` /
 `dc85ee02f4d2c733669c1286c14f95a7d93d54133eecb0a1e660d33ff0e68fb5`.
 
+### D.74 — Phase 0m/0q pre-RED scheduling and atomicity correction
+
+The D.73 instruction to start Phase 0q was wrong. Phase 0m's row makes XVER mandatory for any legacy
+applier or validation-classification change, yet D.35.4 records that XVER remains unmet. Phase 0q
+necessarily changes the legacy applier. Phases 0k and 0l also remain open; no checkpoint or acceptance
+ledger closes either row. The corrected sustainable sequence is therefore:
+
+`0m → 0k/0l (either order) → 0q-a → 0q-b`
+
+0k is semantically independent, but it shares the finality commit surface with 0q-a. 0l is independent
+only while the 0q splits add no public error class, code or required result field. This correction does
+not change the v3-forward lineage: Phase 3a owns the first actual v3 append/binder and the D.73 hostile
+graph-container closure; Phase 4a owns production reducer/fold atomicity. Phase 0n remains optional after
+the golden paths.
+
+#### D.74.1 — Why 0m is real work
+
+The existing Gate-0 differential supplies useful loading and fixture machinery but does not satisfy XVER:
+
+1. with the baseline env unset, its oracle leg silently performs zero comparisons and still passes;
+2. fixtures are hashed once by the current tree and injected into both engines, while `Outcome` has no
+   hash field and maps order/membership back to labels, so the promised `vertexHashes` comparison is not
+   present;
+3. the corpus authors no vertices through each engine's local path; and
+4. Gate-0's `7f9e66a` approved divergences are category-scoped and cannot be reused as shipped-HEAD
+   compatibility allowances.
+
+Phase 0m therefore extends this harness with a fail-not-skip exact-SHA oracle, exact non-zero comparison
+count, checked divergent-engine control, engine-authored hash leg, raw-hash membership/order and isolated
+exact-tuple empty manifest. The pinned build must resolve its own worktree runtime dependency closure, not
+current workspace dependencies. The existing Gate-0 result—3 failed / 8 passed / 2 skipped and 96/432
+governed legacy-baseline divergences—is an inherited-failure census only and never excuses an XVER delta.
+Any later exact delta requires the correction quorum and coordinated-upgrade story before GREEN.
+
+#### D.74.2 — Why the old 0q row splits differently
+
+Focused preservation suites are already green at HEAD: the merge atomicity/rollback/checkpoint set passes
+4 files / 7 tests, and merge concurrency/local serialization/taxonomy passes 4 files / 25 tests. A RED
+restating the current presence recheck, frontier CAS, synchronous journal or existing `quarantined` field
+would be PASS/PASS theater.
+
+The genuine 0q-a RED surfaces are:
+
+- a local async blueprint suspended across a committing merge, where the local path currently publishes
+  without a journal or frontier CAS;
+- D.50.4 N2's deferred multi-candidate path, which can expose graph, snapshots, finality and notification
+  eligibility before authoritative live ACL/DRP and checkpoints are ready;
+- exact `partialResult` on every rejected batch, including adoption-CAS exhaustion and reconciliation
+  invariants; and
+- an executable structural gate proving no shared mutation/rollback authority survives an `await` and no
+  `applyVertices` boundary retains the unreconciled latch.
+
+The authoritative outcome is still “fully applied or no trace.” Public
+`liveStateUnreconciled: true` was considered and rejected unanimously: node handlers can read stale ACL,
+admit/sign finality, persist and disseminate the torn object, so the field would label a correctness failure
+as success. State snapshots remain derived caches and may be absent; the contract is never
+present-and-wrong. Phase 0q-b begins only after that internal tear is unreachable, and owns notification
+delivery isolation, observer failure reporting, downstream consumption of exact partial results and cause
+preservation.
+
+#### D.74.3 — Correction quorum and retained gotchas
+
+The correction was made only after the required read-only quorum:
+
+- Codex-high returned `AGREE_CORRECTED_BINDING`, including the pinned worktree dependency-closure
+  requirement and the schedule `0m → 0k/0l → 0q-a → 0q-b`;
+- fresh Opus/xhigh session `a4d8e511-db6f-4d8d-8dcb-0358322d731a` used 89/89
+  `claude-opus-5` assistant events with no fallback/retry/resume and withdrew its earlier
+  `liveStateUnreconciled` recommendation. Raw/final SHA-256 values are
+  `24ec625b6a1232b215d5520fec056298b5c13a14a51e3e432abcb1ba8ef89497` /
+  `9bdfb23fc4e0189ea7db4b15d750fa207f37b4cdd662c9818bdd643b29109f77`;
+- exact Kimi 3/high session `session_3ad4ce7b-414b-4f8e-b05d-04c0e303015d` returned
+  `AGREE_CORRECTION` after 61 independent plus 9 same-session adjudication steps. Three overload retries
+  stayed on Kimi k3/high; both exits were zero and no fallback occurred. Initial/follow-up raw SHA-256
+  values are `fadea3873dcbaa75a61c4f1cd3448e73fdcecbdbe75e9e23a2134a6c37bfae15` /
+  `664caf8742e4de35551a3877856792e066a94b8bce5028c70aded6ae92422584`.
+
+The applied correction passes Prettier, diff check, workspace typecheck, tracked-source ESLint with zero
+errors and 249 inherited/ignored-file warnings, and the plan-sensitive hardening-gate row 1/1. Logged
+SHA-256 values are, respectively,
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`7225ff48ac2ae10f575a3fb47bed77bd2a20690823d9a82eb4cb4f6eb32210af`,
+`805314bbdb5ee25b89d99f164ec41f9469ae2849520fe2530247da50edad6f38` and
+`9e3080acac79bbc8d58b6c02077f5b2fd45e637411dee92fb7272e2723134c03`. An unfiltered
+workspace-lint attempt again encountered 32 parser errors solely under excluded untracked `.logs`
+scratch artifacts; the tracked-source rerun is the authenticated result. A concurrent full
+`hardening-gates.test.ts` attempt and its isolated full-file rerun both timed out only inside the
+15-second self-ESLint row (the other eight rows passed); the directly plan-sensitive row passed
+separately and no timeout was weakened.
+
+No reviewer modified tracked or staged state. The D.73 graph-side virtual `Map.keys()` finding is not
+lost or reassigned: it remains a mandatory Phase-3a pre-live binding using captured Map intrinsics, an
+owned built-in graph Map, one authenticated keyset for order and charges, explicit equality, and hostile
+subclass/proxy/prototype-poisoning REDs. Any earlier non-3a byte-cap caller remains blocked.
+
 ## Next Agent Prompt
 
-Phase 0p is complete through accepted 0p-3 at `b6d65d9`; D.73 records the final external-review
-findings and the mandatory Phase-3a graph-container binding. Phase 0n remains optional and deferred
-until after the golden paths.
+Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
+binding. D.74 supersedes the prior “0q next” instruction. Phase 0n remains optional and deferred until
+after the golden paths.
 
-The next scheduled item is Phase 0q, per-vertex atomic apply/publication. Before RED, re-read the 0q
-row plus D.3(d)/D.5 and audit whether its current wording is independently executable against the
-v3-forward ownership boundaries. If a material assumption is wrong or under-specified, obtain the
-required Opus-xhigh, Codex-high and exact Kimi 3/100 agreement before editing the plan. Otherwise
-start a fresh Codex-high RED-only owner, checkpoint the causal RED, then hand the unchanged contract
-to a distinct fresh Codex-high GREEN owner.
+The next item is **Phase 0m**, as a separate strict TDD item. Start a fresh Codex-high RED-only owner.
+The RED must causally prove the existing differential is not XVER: unset/mismatched oracle fails rather
+than skips, exact comparison count cannot silently shrink, a deliberately divergent engine is detected,
+engine-authored hash divergence is observable, raw hashes are compared, and Gate-0 allowances are
+structurally unreadable in XVER mode. Checkpoint that RED before handing the unchanged contract to a
+distinct fresh Codex-high GREEN owner. The shipped reference pin is
+`1d40885ffb2ab666ffb2817a99fe69a42af83e77`; no 0q production line changes before 0m is accepted.
+
+After 0m, complete the still-open 0k and 0l rows in either order, each through its own full TDD/review
+loop. Then run a fresh pre-RED no-RED audit for 0q-a and author REDs only for D.74.2's genuinely open local
+and deferred-publication surfaces. 0q-b follows 0q-a. If any causal RED proves a patched-vs-pinned
+compatibility delta necessary, stop before GREEN and obtain the correction quorum for the exact manifest
+entry and coordinated-upgrade rollout.
 
 Continue the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
-discipline. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
-untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested.
-When Phase 0n is eventually authorized, retain the bounded `@ts-drp/math` core and prefer pinned
-deterministic prior art over new approximations.
+discipline. Run typecheck, lint and relevant tests to `.log` files at every item. Never stage `.logs/`,
+`.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or
+unrelated paths. Do not schedule Fable unless explicitly requested. When Phase 0n is eventually
+authorized, retain the bounded `@ts-drp/math` core and prefer pinned deterministic prior art over new
+approximations.
