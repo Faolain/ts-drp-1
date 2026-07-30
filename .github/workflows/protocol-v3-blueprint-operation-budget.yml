@@ -1,0 +1,109 @@
+name: Protocol v3 blueprint operation budget freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-blueprint-operation-budget:
+    name: Require immutable protocol-v3 operation budget enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run merge-base-pinned operation budget checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs
+        run: |
+          node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs "$BASE_SHA"
+          node packages/protocol-v2/scripts/check-protocol-freeze.mjs "$BASE_SHA"
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-blueprint-operation-budget-freeze.mjs"
+            PROTOCOL_V3_BLUEPRINT_OPERATION_BUDGET_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-blueprint-operation-budget-freeze.mjs" "$BASE_SHA"
+          else
+            node "$CHECKER" "$BASE_SHA"
+          fi
+          node "$CHECKER" "$BASE_SHA"
+      - name: Run independent control and production contract serially
+        run: |
+          PHASE_0P2_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts \
+            pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts \
+              --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts \
+            --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Kill surgical control mutants at their intended rows
+        run: |
+          run_mutant() {
+            mutant="$1"
+            row="$2"
+            output_file="$(mktemp)"
+            if PHASE_0P2_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts \
+              PHASE_0P2_MUTANT="$mutant" \
+              pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts \
+                --no-coverage --maxWorkers=1 --minWorkers=1 >"$output_file" 2>&1; then
+              cat "$output_file"
+              rm "$output_file"
+              echo "mutant survived: $mutant"
+              exit 1
+            fi
+            cat "$output_file"
+            if ! grep -Fq "Tests  1 failed | 27 passed (28)" "$output_file"; then
+              rm "$output_file"
+              echo "mutant did not fail surgically: $mutant"
+              exit 1
+            fi
+            failure_count="$(grep -c '^ FAIL  ' "$output_file")"
+            if [ "$failure_count" -ne 1 ] || ! grep '^ FAIL  ' "$output_file" | grep -Fq " > [$row]"; then
+              rm "$output_file"
+              echo "mutant failure title mismatch: $mutant -> $row"
+              exit 1
+            fi
+            rm "$output_file"
+          }
+          run_mutant json-stringify-meter json-stringify-meter
+          run_mutant utf16-meter utf16-meter
+          run_mutant raw-frame-meter raw-frame-meter
+          run_mutant discriminator-excluding-meter discriminator-included-meter
+          run_mutant injected-counter-meter injected-counter-meter
+          run_mutant remote-budget-before-authentication remote-auth-before-budget
+          run_mutant remote-budget-before-abi remote-abi-before-budget
+          run_mutant remote-budget-after-publication remote-pre-publication
+          run_mutant remote-budget-after-reducer remote-pre-reducer
+          run_mutant remote-budget-after-fold remote-pre-fold
+          run_mutant local-budget-before-detach local-detach-before-budget
+          run_mutant local-budget-after-transaction local-pre-transaction
+          run_mutant local-budget-after-signing local-pre-signing
+          run_mutant local-budget-after-issued-record local-pre-issued-record
+          run_mutant local-budget-after-outbox local-pre-outbox
+      - name: Preserve runtime, registry, vector and reference predecessors
+        run: |
+          pnpm exec vitest run tests/protocol-v3-blueprint-work-budget-0p0.test.ts \
+            tests/protocol-v3-blueprint-admission-0i.test.ts \
+            tests/protocol-v3-blueprint-runtime-0j-b.test.ts \
+            tests/protocol-v3-registry-spec-n1prime-b.test.ts \
+            tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts \
+            tests/protocol-v3-regenerated-reference-n1prime-d.test.ts \
+            packages/protocol-v2/tests/registry.test.ts \
+            packages/protocol-v2/tests/golden-vectors.test.ts \
+            packages/protocol-v2/tests/reference-regeneration.test.ts \
+            packages/protocol-v2/tests/freeze-cli.test.ts \
+              --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit build, type surface and runtime surface
+        run: |
+          pnpm --filter @ts-drp/protocol-v3 build
+          pnpm --filter @ts-drp/protocol-v3 typecheck
+          pnpm --filter @ts-drp/protocol-v3 smoke:public-package
