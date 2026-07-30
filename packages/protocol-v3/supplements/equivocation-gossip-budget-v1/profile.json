@@ -1,0 +1,36 @@
+{
+	"profileId": "equivocation-gossip-budget-v1",
+	"baseProfileId": "equivocation-author-projection-v1",
+	"input": {
+		"detachedDigestSetsOnly": true,
+		"authoritativeCounts": false,
+		"pendingRows": false,
+		"proofBodies": false,
+		"uint8ArrayValues": false
+	},
+	"budget": {
+		"policyField": "maxGossipPairCount",
+		"policyDomain": "nonnegative-safe-integer",
+		"selection": "canonical-first-N-author-wide-pair-tuples",
+		"saturationEffect": "composition-output-only"
+	},
+	"ordering": {
+		"scope": ["objectId-code-unit", "authorSequence-numeric"],
+		"pair": ["lesserDigestHex-code-unit", "greaterDigestHex-code-unit"],
+		"localeSensitive": false
+	},
+	"output": {
+		"fields": ["author", "selectedPairs", "totalPairCount", "suppressedPairCount", "saturated"],
+		"pairFields": ["scope", "lesserDigestHex", "greaterDigestHex"],
+		"pairIdentity": "scope-plus-canonical-unordered-distinct-digest-pair",
+		"callerCountAuthority": false
+	},
+	"claims": {
+		"globalEvidenceBound": false,
+		"globalComputationBound": false,
+		"transportRateLimit": false,
+		"durableMutation": false,
+		"aclMutation": false,
+		"reputationComposition": false
+	}
+}
