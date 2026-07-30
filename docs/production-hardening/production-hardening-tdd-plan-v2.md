@@ -11718,40 +11718,107 @@ programmatic-ESLint row exceeded its fixed 15-second test timeout after roughly 
 other eight rows passed. The first attempt also competed with workspace lint; the second did not and
 reproduced the same harness-duration failure. No timeout was weakened and no product source changed.
 
+### D.69 — Phase 0p-1 anchor-inclusive capacity primitive
+
+Phase 0p-1 is accepted. The first RED checkpoint `a1a2a8b` was provisional: root audit found that a
+candidate getter could re-enter and consume the final slot after the initial capacity check, allowing
+the outer append to overfill. The same RED owner hardened that causal boundary at `6a37114`; this is the
+sole authorizing RED. Its independent control passes 10/10, production fails eight capacity rows while
+retaining two legitimate predecessor passes, and all eight selected mutant points are detectable. The
+re-entrant mutant's full run fails only its intended row. The corrected RED artifact manifest is
+`696d4daf12f2564222b77df9518bd25a01e7ef8a135b26ff0ef836734a4156f3`; its evidence manifest is
+`6370f594a9f943a763bf80a847911b7b83e42d0e041837f5a08a4cc45a708f2b`.
+
+Distinct Codex-high GREEN `745838f` changes only the shared compaction implementation and type surface.
+It adds an opt-in constructor ceiling, counts the anchor, refuses an oversized initial graph before
+traversal, keeps duplicate rejection ahead of capacity, and rechecks capacity after once-capturing and
+validating a candidate but before bitset allocation or publication. The exact closed refusal remains
+non-terminal and non-latched; no winner, member, hash, finality, close identity or profile policy enters
+the primitive. Absent capacity preserves the legacy path, and the new public exports erase at runtime.
+The GREEN evidence manifest is
+`7081f5e6b4a324be0ce33f027a46f2de6dc211e0ee0b3bf1978d772c9e42efc3`.
+
+The focused production and control contracts pass 10/10; all eight targeted mutants die, Phase 0e
+passes 5/5, and the compaction package passes 53 with one intentional skip. Freeze checks against
+`6a37114`, source and built public-type audits, built runtime-surface audit, package build/typecheck,
+workspace typecheck, focused lint, `.logs/**`-excluded workspace lint, Prettier and diff checks pass.
+The one serial root attempt was intended to be bounded at 90 seconds but controller polling terminated
+its exact process group at about 95 seconds. `SIGTERM` sufficed, no residual process remained, inherited
+temporary-repository governance failures were reached, and no full-root-green claim is made.
+
+All required independent reviews accept:
+
+- Grok 4.5/high final SHA-256
+  `7067fb5bde68211c9a7e6586e8c6a148e3c120ea80eaf10464bc360440bb7dc2`, raw SHA-256
+  `02b56598824a28a56524d84017de0f262106c8cdffba9941910d0ef3a78f813e` and manifest SHA-256
+  `b4790558c50d75419ee67731551757d66dfb94fe8c4000a9785f926430cc14d8`;
+- exact Kimi 3/high, 33/100-step final SHA-256
+  `4b79fb313ac33054ad6b4d1fc01d4dead7e44fa058c160f9a2a58c8eb27ce584` and manifest SHA-256
+  `3e237703c1ffdf3b6c52fcc1ce8732230baac71e285df0b7771064a93e4d187d`;
+- Opus/xhigh final SHA-256
+  `ce98a452c624eb741104f1f2272b39495fa663de67b11d655b4b851d81aaa607`, raw SHA-256
+  `bca060d1ba871cd713d33f60c5e74f663af43f6e8e672b4eece791a850be8518` and manifest SHA-256
+  `f8e21bca771f0c6edf41ad993ed7f5b723626c294afab122975876e805d07f57`.
+
+The Kimi session used exact `kimi-code/k3`, high thinking, 33/100 steps, exit zero and no fallback,
+retry or resume. Two convenience-flag invocations were rejected by the local parser before any model
+session and are retained as non-substantive evidence. The final Claude session resolved to
+`claude-opus-5` at xhigh, 27 turns, exit zero and no retry/substitution. Its 32,703 Opus output tokens
+and $2.518068 substantive cost dominate the automatic 23-output-token/$0.002103 Haiku auxiliary call;
+Haiku did not perform the review. Optional Opus-side test commands were permission-denied before
+execution, so that review combined static inspection with the immutable GREEN evidence; root and the
+other reviewers independently reran the executable gates.
+
+Accepted gotchas and residual boundaries:
+
+1. At an already-saturated index, an exact duplicate still throws `DUPLICATE_VERTEX`, while any other
+   valid-digest hash receives `EPOCH_FULL` before candidate fields or getters are observed. This cheap
+   O(1) saturated path is intentional, matches the frozen independent control and must be preserved or
+   deliberately re-frozen; it is not proof that the refused candidate is structurally valid.
+2. The frozen RED does not directly pin that distinct-invalid saturated precedence or the early
+   short-circuit as its own mutant. Phase 3a must treat `EPOCH_FULL` only as a re-evaluable local
+   capacity stall, never as validation or admission evidence.
+3. The refusal is a shared frozen singleton. Identity is observable but harmless while its exact closed
+   fields remain primitives; callers must depend on the typed value, not object identity.
+4. The decisive final-slot re-entrant path is covered. A separate successful re-entrant append that
+   leaves capacity remains is not a dedicated 0p-1 row; inherited Phase 0e coverage and independent
+   probes pass.
+5. The independent control and production implementation intentionally differ in multi-defect
+   validation precedence. The frozen single-defect behaviors agree; this architectural separation is
+   positive anti-reward-hacking evidence, not permission to infer unspecified multi-error precedence.
+6. This slice supplies no supported-profile selection, live binder, `maxEpochBytes`, operation-byte
+   budget, close-set membership, wall-clock/instruction metering or deterministic VM. Those owners
+   remain exactly where D.68 assigns them.
+
 ## Next Agent Prompt
 
-Phase 0o-b3 is frozen at `ab98831`, implemented at `e5537fc` and accepted by D.67. D.68 records the
-unanimous Phase 0p correction quorum and replaces the contradictory wall-clock/arrival-order boundary.
-Begin **Phase 0p-1 only** with a fresh Codex-high causal RED owner.
+Phase 0p-1 is frozen at authoritative RED `6a37114`, implemented at `745838f` and accepted by D.69.
+Begin **Phase 0p-0 only** with a fresh Codex-high causal RED owner.
 
-Freeze one opt-in, anchor-inclusive `CausalityIndex` capacity primitive in the shared
-`@ts-drp/compaction` implementation. Ceiling `N` counts the anchor at position zero and admits at most
-`N−1` ordinary vertices. The next distinct vertex must return typed, non-terminal, non-latched
-`EPOCH_FULL` before publication, with the complete relation snapshot unchanged, no invalid tombstone
-and no permanent classification. Redelivery is re-evaluated; exact duplicates consume nothing. With
-capacity absent, every frozen v2 and Phase 0e behavior and byte remains unchanged.
+Freeze the additive `blueprint-work-budget-v1` governance supplement that will carry each manifest
+operation's `maxCanonicalOperationBytes` under the anchor-proven `blueprintDigest`. This slice owns the
+governed supplement schema, canonical representation, digest/provenance binding and freeze/reference
+artifacts only. It must not edit or version-bump the frozen seven-field `parameters` kind, make a
+protocol-v2 behavior change, enforce operation bytes, call a reducer/fold, add a transport frame cap,
+or claim live Phase 3a composition. Phase 0p-2 will separately enforce the governed value on the whole
+closed canonical operation record, including its discriminator.
 
-The RED must pin the exact constructor/API/outcome surface before GREEN, including invalid capacity
-inputs, anchor initialization, exact-boundary ancestry, duplicate/redelivery behavior, no publication,
-no latch and no named final-slot winner under opposing delivery orders. Unsupported-profile rejection
-belongs to the later live binder unless a shared constructor invariant can express it without importing
-node/profile policy. Use an independent positive control and surgical after-publication, `N+1`,
-anchor-exclusion, latch, duplicate-charge and invalidity mutants. Do not make fake timers, elapsed time,
-helper counters, reducer calls or arrival order into consensus evidence.
+The RED must prove that the supplement is additive and v3-forward, that changing any governed limit or
+operation identity changes the blueprint digest, that omitted/unknown/duplicate/malformed fields fail
+under an explicit closed-world rule, and that frozen parameters/v2 vectors and runtime behavior remain
+byte-for-byte preserved. Use an implementation-independent positive control and surgical mutants for
+digest omission, operation/limit omission, discriminator exclusion, duplicate acceptance, unknown-field
+acceptance and accidental parameters-registry mutation. Do not smuggle `JSON.stringify`, UTF-16 length,
+raw-frame length, elapsed time, helper counters, finality, profile selection or enforcement into this
+governance slice.
 
-Keep 0p-0 additive blueprint-work-budget governance, 0p-2 whole-operation byte enforcement,
-`maxEpochBytes`, Phase 3a live composition, Phase 5 certified final membership, Phase 4a collection-touch
-limits, transport frame caps and any deterministic VM/fuel/preemption work out of this slice. In
-particular, 0p-1 does not make `maxEpochBytes` green and does not choose the final operation at
-saturation.
-
-Run the focused RED/control/mutant evidence, protected predecessor tests, package build/type/public
-checks, workspace typecheck and lint to bounded `.logs`; root Vitest remains explicit, serial and
-bounded. After the RED is frozen and committed, use a distinct Codex-high GREEN owner, then Grok-high,
-exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh. Keep the standing
-v3-forward owner/plane audit; v2 remains preservation/compatibility/freeze only. Never stage `.logs/`,
-`.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or
-unrelated paths. Do not schedule Fable unless explicitly requested. Phase 0n remains deferred until
-after the golden paths; when authorized, retain the bounded `@ts-drp/math` core and use pinned
-deterministic prior art rather than inventing approximations. Broader Rapier/WASM expansion remains
-optional.
+Run focused RED/control/mutant evidence, protected registry/vector/reference predecessors, package
+build/type/public checks, workspace typecheck and lint to bounded `.logs`; root Vitest remains explicit,
+serial and bounded. After the RED is frozen and committed, use a distinct Codex-high GREEN owner, then
+Grok-high, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh. Keep the
+standing v3-forward owner/plane audit; v2 remains preservation/compatibility/freeze only. Never stage
+`.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked protocol-v2
+0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested. Phase 0n remains
+deferred until after the golden paths; when authorized, retain the bounded `@ts-drp/math` core and use
+pinned deterministic prior art rather than inventing approximations. Broader Rapier/WASM expansion
+remains optional.
