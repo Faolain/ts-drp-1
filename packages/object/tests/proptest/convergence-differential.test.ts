@@ -10,6 +10,9 @@
 import { MapDRP, SetDRP } from "@ts-drp/blueprints";
 import { SeededRandom } from "@ts-drp/test-utils";
 import { ACLGroup, DrpType, Operation, type Vertex } from "@ts-drp/types";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -73,10 +76,19 @@ interface ConvergenceCase {
 	resolverPair?: [string, string];
 }
 
+type XverCase = Omit<ConvergenceCase, "approvedBaselineDivergence">;
+
 interface EngineModule {
 	DRPObject: new (options: Record<string, unknown>) => EngineObject;
 	createACL(options?: { admins?: string[] | string; permissionless?: boolean }): unknown;
 	createPermissionlessACL(writers?: string | string[]): unknown;
+	createVertex(
+		peerId: string,
+		operation: Operation,
+		dependencies: string[],
+		timestamp: number,
+		signature?: Uint8Array
+	): Vertex;
 }
 
 interface EngineObject {
@@ -88,6 +100,7 @@ interface EngineObject {
 	drp?: {
 		query_getValues?(): unknown[];
 		query_entries?(): [unknown, unknown][];
+		add?(value: unknown): Promise<unknown>;
 	};
 	applyVertices(vertices: Vertex[]): Promise<{
 		applied: boolean;
@@ -107,6 +120,8 @@ interface Outcome {
 	order: string[];
 	members: string[];
 	admissions: Record<string, AdmissionStatus>;
+	rawOrder?: string[];
+	rawMembers?: string[];
 }
 
 interface EngineRun {
@@ -166,17 +181,216 @@ const ACL_GROUP_PAIRS = [
 const MIN_GENERATOR_PRECONDITION_RATE = 0.95;
 const DEFAULT_SUFFIX = process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
 const BASELINE_MODULE_PATH = process.env.TS_DRP_BASELINE_OBJECT_MODULE;
+const XVER_ENABLED = process.env.TS_DRP_XVER === "1";
+const XVER_REFERENCE_SHA = "1d40885ffb2ab666ffb2817a99fe69a42af83e77";
+const XVER_SURFACES = [
+	"drp-state",
+	"acl-state",
+	"admission",
+	"engine-authored-vertex-hashes",
+	"raw-hash-membership",
+	"raw-hash-order",
+] as const;
+type XverSurface = (typeof XVER_SURFACES)[number];
 
 const currentEngine: EngineModule = {
 	DRPObject: DRPObject as unknown as EngineModule["DRPObject"],
 	createACL,
 	createPermissionlessACL,
+	createVertex,
 };
 
 const PRIMARY_MODULE_PATH = process.env.TS_DRP_PRIMARY_OBJECT_MODULE;
 
 let baselineEnginePromise: Promise<EngineModule | undefined> | undefined;
 let primaryEnginePromise: Promise<EngineModule> | undefined;
+let xverConfigPromise: Promise<XverConfig> | undefined;
+
+interface XverDelta {
+	fixtureId: string;
+	schedule: string;
+	surface: XverSurface;
+	current: unknown;
+	reference: unknown;
+}
+
+interface XverConfig {
+	primary: EngineModule;
+	reference: EngineModule;
+	expectedComparisons: number;
+	deltas: XverDelta[];
+}
+
+interface XverEngineRun {
+	replicas: Outcome[];
+	fresh: Outcome;
+	authoredHashes: Map<string, string[]>;
+}
+
+function xverFailure(code: string, detail: string): never {
+	throw new Error(`${code}: ${detail}`);
+}
+
+function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+	const actual = Object.keys(value).sort();
+	const expected = [...keys].sort();
+	return JSON.stringify(actual) === JSON.stringify(expected);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function inside(root: string, candidate: string): boolean {
+	const path = relative(root, candidate);
+	return path === "" || (!path.startsWith("..") && !isAbsolute(path));
+}
+
+function nearestPackageManifest(entry: string, worktree: string): string {
+	let directory = dirname(entry);
+	while (inside(worktree, directory)) {
+		const manifest = resolve(directory, "package.json");
+		if (existsSync(manifest)) return manifest;
+		const parent = dirname(directory);
+		if (parent === directory) break;
+		directory = parent;
+	}
+	return xverFailure("XVER_ORACLE_RUNTIME_CLOSURE", `${entry} has no package manifest inside oracle worktree`);
+}
+
+function authenticateWorkspaceRuntimeClosure(objectModule: string, worktree: string): void {
+	const checked = new Set<string>();
+	const visit = (manifestPath: string): void => {
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as unknown;
+		if (!isRecord(manifest) || !isRecord(manifest.dependencies)) return;
+		const packageName = typeof manifest.name === "string" ? manifest.name : manifestPath;
+		if (checked.has(packageName)) return;
+		checked.add(packageName);
+		for (const dependency of Object.keys(manifest.dependencies)) {
+			if (!dependency.startsWith("@ts-drp/")) continue;
+			let dependencyRoot: string;
+			try {
+				dependencyRoot = realpathSync(resolve(dirname(manifestPath), "node_modules", dependency));
+			} catch (error) {
+				return xverFailure(
+					"XVER_ORACLE_RUNTIME_CLOSURE",
+					`${dependency} did not resolve from ${packageName}: ${String(error)}`
+				);
+			}
+			if (!inside(worktree, dependencyRoot)) {
+				xverFailure("XVER_ORACLE_RUNTIME_CLOSURE", `${dependency} resolved outside oracle worktree: ${dependencyRoot}`);
+			}
+			visit(resolve(dependencyRoot, "package.json"));
+		}
+	};
+	visit(nearestPackageManifest(objectModule, worktree));
+}
+
+function parseXverManifest(path: string): XverDelta[] {
+	const manifest = JSON.parse(readFileSync(path, "utf8")) as unknown;
+	if (
+		!isRecord(manifest) ||
+		!exactKeys(manifest, ["schemaVersion", "referenceSha", "deltas"]) ||
+		manifest.schemaVersion !== "phase-0m-xver-delta-v1" ||
+		manifest.referenceSha !== XVER_REFERENCE_SHA ||
+		!Array.isArray(manifest.deltas)
+	) {
+		return xverFailure("XVER_DELTA_MANIFEST_SCHEMA", "expected the exact phase-0m-xver-delta-v1 manifest");
+	}
+	const surfaces = new Set<string>(XVER_SURFACES);
+	const keys = new Set<string>();
+	return manifest.deltas.map((entry, index) => {
+		if (
+			!isRecord(entry) ||
+			!exactKeys(entry, ["fixtureId", "schedule", "surface", "current", "reference"]) ||
+			typeof entry.fixtureId !== "string" ||
+			typeof entry.schedule !== "string" ||
+			typeof entry.surface !== "string" ||
+			entry.fixtureId.includes("*") ||
+			entry.schedule.includes("*") ||
+			!surfaces.has(entry.surface)
+		) {
+			return xverFailure(
+				"XVER_DELTA_MANIFEST_SCHEMA",
+				`delta ${index} must be one exact (fixtureId,schedule,surface,current,reference) tuple`
+			);
+		}
+		const key = `${entry.fixtureId}\u0000${entry.schedule}\u0000${entry.surface}`;
+		if (keys.has(key)) return xverFailure("XVER_DELTA_MANIFEST_SCHEMA", `duplicate exact tuple ${key}`);
+		keys.add(key);
+		return entry as unknown as XverDelta;
+	});
+}
+
+function validateEngineModule(module: unknown, path: string): EngineModule {
+	const candidate = module as Partial<EngineModule>;
+	if (!candidate.DRPObject || !candidate.createACL || !candidate.createPermissionlessACL || !candidate.createVertex) {
+		return xverFailure(
+			"XVER_ENGINE_SURFACE",
+			`${path} does not export DRPObject + createACL + createPermissionlessACL + createVertex`
+		);
+	}
+	return candidate as EngineModule;
+}
+
+async function loadXverConfig(): Promise<XverConfig> {
+	const configuredSha = process.env.TS_DRP_XVER_ORACLE_SHA;
+	const configuredWorktree = process.env.TS_DRP_XVER_ORACLE_WORKTREE;
+	const configuredObjectModule = process.env.TS_DRP_XVER_ORACLE_OBJECT_MODULE;
+	const expectedComparisonsValue = process.env.TS_DRP_XVER_EXPECTED_COMPARISONS;
+	const manifestPath = process.env.TS_DRP_XVER_DELTA_MANIFEST;
+	if (!configuredSha || !configuredWorktree || !configuredObjectModule || !expectedComparisonsValue || !manifestPath) {
+		return xverFailure("XVER_ORACLE_REQUIRED", `exact oracle tuple required for ${XVER_REFERENCE_SHA}`);
+	}
+	if (configuredSha !== XVER_REFERENCE_SHA) {
+		return xverFailure("XVER_ORACLE_SHA_MISMATCH", `configured=${configuredSha} expected=${XVER_REFERENCE_SHA}`);
+	}
+	const worktree = realpathSync(configuredWorktree);
+	let actualSha: string;
+	try {
+		actualSha = execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: worktree,
+			encoding: "utf8",
+			timeout: 10_000,
+		}).trim();
+	} catch (error) {
+		return xverFailure("XVER_ORACLE_WORKTREE_SHA_MISMATCH", `expected=${XVER_REFERENCE_SHA} actual=${String(error)}`);
+	}
+	if (actualSha !== XVER_REFERENCE_SHA) {
+		return xverFailure("XVER_ORACLE_WORKTREE_SHA_MISMATCH", `expected=${XVER_REFERENCE_SHA} actual=${actualSha}`);
+	}
+	const objectModule = realpathSync(configuredObjectModule);
+	if (!inside(worktree, objectModule)) {
+		return xverFailure(
+			"XVER_ORACLE_RUNTIME_CLOSURE",
+			`object module resolved outside oracle worktree: ${objectModule}`
+		);
+	}
+	authenticateWorkspaceRuntimeClosure(objectModule, worktree);
+	const expectedComparisons = Number(expectedComparisonsValue);
+	if (!Number.isSafeInteger(expectedComparisons) || expectedComparisons <= 0) {
+		return xverFailure("XVER_COMPARISON_COUNT_NONZERO", `expected=${expectedComparisonsValue}`);
+	}
+	const reference = validateEngineModule(
+		await import(/* @vite-ignore */ pathToFileURL(objectModule).href),
+		objectModule
+	);
+	const primaryPath = process.env.TS_DRP_XVER_PRIMARY_OBJECT_MODULE;
+	const primary = primaryPath
+		? validateEngineModule(await import(/* @vite-ignore */ pathToFileURL(primaryPath).href), primaryPath)
+		: currentEngine;
+	return {
+		primary,
+		reference,
+		expectedComparisons,
+		deltas: parseXverManifest(manifestPath),
+	};
+}
+
+function xverConfig(): Promise<XverConfig> {
+	xverConfigPromise ??= loadXverConfig();
+	return xverConfigPromise;
+}
 
 function baselineEngine(): Promise<EngineModule | undefined> {
 	if (!BASELINE_MODULE_PATH) return Promise.resolve(undefined);
@@ -212,6 +426,13 @@ function makeOperation(spec: VertexSpec): Operation {
 }
 
 function materialize(specs: VertexSpec[]): { vertices: Vertex[]; byLabel: Map<string, Vertex> } {
+	return materializeWithEngine(currentEngine, specs);
+}
+
+function materializeWithEngine(
+	engine: EngineModule,
+	specs: VertexSpec[]
+): { vertices: Vertex[]; byLabel: Map<string, Vertex> } {
 	const byLabel = new Map<string, Vertex>();
 	const vertices = specs.map((spec) => {
 		const dependencies =
@@ -222,7 +443,7 @@ function materialize(specs: VertexSpec[]): { vertices: Vertex[]; byLabel: Map<st
 						if (!dependency) throw new Error(`Fixture ${spec.label} precedes dependency ${label}`);
 						return dependency.hash;
 					});
-		const vertex = createVertex(spec.peerId, makeOperation(spec), dependencies, spec.timestamp);
+		const vertex = engine.createVertex(spec.peerId, makeOperation(spec), dependencies, spec.timestamp);
 		byLabel.set(spec.label, vertex);
 		return vertex;
 	});
@@ -307,12 +528,28 @@ function membersOf(object: EngineObject, labelsByHash: Map<string, string>): str
 		.sort();
 }
 
+function rawOrderOf(object: EngineObject): string[] {
+	const graph = (object as unknown as { hashGraph: HashGraph }).hashGraph;
+	return graph
+		.linearizeVertices()
+		.filter((vertex) => vertex.hash !== HashGraph.rootHash)
+		.map((vertex) => vertex.hash);
+}
+
+function rawMembersOf(object: EngineObject): string[] {
+	return object.vertices
+		.map((vertex) => vertex.hash)
+		.filter((hash) => hash !== HashGraph.rootHash)
+		.sort();
+}
+
 async function applySchedule(
 	engine: EngineModule,
 	fixture: ConvergenceCase,
 	schedule: DeliverySchedule,
 	byLabel: Map<string, Vertex>,
-	labelsByHash: Map<string, string>
+	labelsByHash: Map<string, string>,
+	includeRawHashes = false
 ): Promise<Outcome> {
 	const object = makeObject(engine, fixture, `replica-${schedule.name}`);
 	const admissions: Record<string, AdmissionStatus> = {};
@@ -368,6 +605,12 @@ async function applySchedule(
 		admissions: Object.fromEntries(
 			Object.entries(admissions).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
 		),
+		...(includeRawHashes
+			? {
+					rawOrder: rawOrderOf(object),
+					rawMembers: rawMembersOf(object),
+				}
+			: {}),
 	};
 }
 
@@ -391,6 +634,110 @@ async function runEngine(engine: EngineModule, fixture: ConvergenceCase): Promis
 		replicas,
 		fresh,
 	};
+}
+
+async function authorLocalHashes(
+	engine: EngineModule,
+	fixture: XverCase,
+	schedule: DeliverySchedule
+): Promise<string[]> {
+	const object = makeObject(engine, fixture, fixture.acl?.admins[0] ?? "writer-a");
+	const add = object.drp?.add;
+	if (!add) return xverFailure("XVER_ENGINE_LOCAL_AUTHORING", `${fixture.id}/${schedule.name} has no add method`);
+	const originalNow = Date.now;
+	Date.now = (): number => 1_730_000_000_000;
+	try {
+		await add.call(object.drp, `xver:${fixture.id}:${schedule.name}`);
+	} finally {
+		Date.now = originalNow;
+	}
+	const hashes = object.vertices.map((vertex) => vertex.hash).filter((hash) => hash !== HashGraph.rootHash);
+	if (hashes.length === 0) {
+		return xverFailure("XVER_ENGINE_LOCAL_AUTHORING", `${fixture.id}/${schedule.name} authored zero vertices`);
+	}
+	return hashes;
+}
+
+async function runXverEngine(engine: EngineModule, fixture: XverCase): Promise<XverEngineRun> {
+	setSuffixSize(fixture.suffixSize);
+	const { vertices, byLabel } = materializeWithEngine(engine, fixture.vertices);
+	const labelsByHash = new Map([...byLabel].map(([label, vertex]) => [vertex.hash, label]));
+	const replicas: Outcome[] = [];
+	const authoredHashes = new Map<string, string[]>();
+	for (const schedule of fixture.schedules) {
+		replicas.push(await applySchedule(engine, fixture, schedule, byLabel, labelsByHash, true));
+		authoredHashes.set(schedule.name, await authorLocalHashes(engine, fixture, schedule));
+	}
+	const fresh = await applySchedule(
+		engine,
+		fixture,
+		{ name: "fresh-replay", batches: [vertices.map((vertex) => labelsByHash.get(vertex.hash) ?? vertex.hash)] },
+		byLabel,
+		labelsByHash
+	);
+	return { replicas, fresh, authoredHashes };
+}
+
+function xverSurfaceValue(run: XverEngineRun, scheduleIndex: number, surface: XverSurface): unknown {
+	const replica = run.replicas[scheduleIndex];
+	switch (surface) {
+		case "drp-state":
+			return { live: replica.state, canonical: run.fresh.state };
+		case "acl-state":
+			return { live: replica.aclState, canonical: run.fresh.aclState };
+		case "admission":
+			return replica.admissions;
+		case "engine-authored-vertex-hashes":
+			return run.authoredHashes.get(replica.name);
+		case "raw-hash-membership":
+			return replica.rawMembers;
+		case "raw-hash-order":
+			return replica.rawOrder;
+	}
+}
+
+function sameXverValue(left: unknown, right: unknown): boolean {
+	return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+async function expectXverConverged(fixture: XverCase): Promise<void> {
+	const config = await xverConfig();
+	const primary = await runXverEngine(config.primary, fixture);
+	const reference = await runXverEngine(config.reference, fixture);
+	const exercised = new Set<XverDelta>();
+	const unexpected = new Set<XverSurface>();
+	let comparisons = 0;
+	for (let scheduleIndex = 0; scheduleIndex < fixture.schedules.length; scheduleIndex++) {
+		const schedule = fixture.schedules[scheduleIndex];
+		for (const surface of XVER_SURFACES) {
+			comparisons++;
+			const currentValue = xverSurfaceValue(primary, scheduleIndex, surface);
+			const referenceValue = xverSurfaceValue(reference, scheduleIndex, surface);
+			if (sameXverValue(currentValue, referenceValue)) continue;
+			const delta = config.deltas.find(
+				(entry) => entry.fixtureId === fixture.id && entry.schedule === schedule.name && entry.surface === surface
+			);
+			if (delta && sameXverValue(delta.current, currentValue) && sameXverValue(delta.reference, referenceValue)) {
+				exercised.add(delta);
+			} else {
+				unexpected.add(surface);
+			}
+		}
+	}
+	if (unexpected.size > 0) {
+		xverFailure(
+			"XVER_DELTA",
+			`${fixture.id} differs on ${XVER_SURFACES.filter((surface) => unexpected.has(surface)).join(",")}`
+		);
+	}
+	if (comparisons !== config.expectedComparisons) {
+		xverFailure("XVER_COMPARISON_COUNT", `expected=${config.expectedComparisons} actual=${comparisons}`);
+	}
+	const stale = config.deltas.filter((entry) => !exercised.has(entry));
+	if (stale.length > 0) {
+		const first = stale[0];
+		xverFailure("XVER_STALE_DELTA", `${first.fixtureId}/${first.schedule}/${first.surface}`);
+	}
 }
 
 function sameOutcome(left: Outcome, right: Outcome): boolean {
@@ -483,6 +830,9 @@ async function primaryEngine(): Promise<EngineModule> {
 }
 
 async function evaluate(fixture: ConvergenceCase): Promise<CaseResult> {
+	if (XVER_ENABLED) {
+		return xverFailure("XVER_INTERNAL_BYPASS", `${fixture.id} reached the ordinary Gate-0 evaluator`);
+	}
 	const current = await runEngine(await primaryEngine(), fixture);
 	const pinned = PRIMARY_MODULE_PATH ? undefined : await baselineEngine();
 	const baseline = pinned ? await runEngine(pinned, fixture) : undefined;
@@ -1358,6 +1708,12 @@ function report(fixture: ConvergenceCase, result: CaseResult): string {
 }
 
 async function expectConverged(fixture: ConvergenceCase): Promise<void> {
+	if (XVER_ENABLED) {
+		const { approvedBaselineDivergence: _gate0Only, ...xverFixture } = fixture;
+		void _gate0Only;
+		await expectXverConverged(xverFixture);
+		return;
+	}
 	const result = await evaluate(fixture);
 	const baselineProblems = result.problems.filter(isBaselineProblem);
 	const currentEngineProblems = result.problems.filter((problem) => !isBaselineProblem(problem));
