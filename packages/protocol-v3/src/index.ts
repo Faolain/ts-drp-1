@@ -368,6 +368,7 @@ interface CompiledArgumentField {
 interface CompiledOperationSchema {
 	readonly allowedNames: ReadonlySet<string>;
 	readonly fields: readonly CompiledArgumentField[];
+	readonly maxCanonicalOperationBytes?: number;
 }
 
 interface PreparedBlueprintAdmissionState {
@@ -789,11 +790,13 @@ function compileOperation(
 	if (previousOperationName !== undefined && compareCodePointStrings(previousOperationName, name) >= 0) {
 		throw new TypeError("blueprint manifest operations must have unique names in codepoint order");
 	}
+	let maxCanonicalOperationBytes: number | undefined;
 	if (hasWorkBudget) {
-		const maxCanonicalOperationBytes = ownDataProperty(value, "maxCanonicalOperationBytes", context);
-		if (!Number.isSafeInteger(maxCanonicalOperationBytes) || (maxCanonicalOperationBytes as number) <= 0) {
+		const candidate = ownDataProperty(value, "maxCanonicalOperationBytes", context);
+		if (!Number.isSafeInteger(candidate) || (candidate as number) <= 0) {
 			throw new RangeError(`${context}.maxCanonicalOperationBytes must be a positive safe integer`);
 		}
+		maxCanonicalOperationBytes = candidate as number;
 	}
 	assertClosedRecord(argumentSchema, ["kind", "fields"], `${context}.argumentSchema`);
 	if (ownDataProperty(argumentSchema, "kind", `${context}.argumentSchema`) !== "closed-record") {
@@ -821,6 +824,7 @@ function compileOperation(
 		Object.freeze({
 			allowedNames,
 			fields: Object.freeze(compiledFields),
+			...(maxCanonicalOperationBytes === undefined ? {} : { maxCanonicalOperationBytes }),
 		}),
 	]);
 }
@@ -915,47 +919,60 @@ function consumerPreparedAdmissionState(input: object): PreparedBlueprintAdmissi
 	return preparedAdmissionState(descriptor.value);
 }
 
-function operationMatchesPreparedAdmission(operation: unknown, state: PreparedBlueprintAdmissionState): boolean {
-	if (!isPlainRecord(operation) || Object.getOwnPropertySymbols(operation).length !== 0) return false;
+function operationSchemaForPreparedAdmission(
+	operation: unknown,
+	state: PreparedBlueprintAdmissionState
+): CompiledOperationSchema | undefined {
+	if (!isPlainRecord(operation) || Object.getOwnPropertySymbols(operation).length !== 0) return undefined;
 	const discriminatorDescriptor = Object.getOwnPropertyDescriptor(operation, state.discriminator);
 	if (
 		discriminatorDescriptor === undefined ||
 		!Object.hasOwn(discriminatorDescriptor, "value") ||
 		typeof discriminatorDescriptor.value !== "string"
 	) {
-		return false;
+		return undefined;
 	}
 	const schema = state.operations.get(discriminatorDescriptor.value);
-	if (schema === undefined) return false;
+	if (schema === undefined) return undefined;
 
 	const keys = Reflect.ownKeys(operation);
-	if (keys.some((key) => typeof key !== "string" || !schema.allowedNames.has(key))) return false;
+	if (keys.some((key) => typeof key !== "string" || !schema.allowedNames.has(key))) return undefined;
 
 	for (const field of schema.fields) {
 		const descriptor = Object.getOwnPropertyDescriptor(operation, field.name);
 		if (descriptor === undefined) {
-			if (field.required) return false;
+			if (field.required) return undefined;
 			continue;
 		}
-		if (!Object.hasOwn(descriptor, "value")) return false;
+		if (!Object.hasOwn(descriptor, "value")) return undefined;
 		switch (field.type) {
 			case "canonical-object":
-				if (!isPlainRecord(descriptor.value)) return false;
+				if (!isPlainRecord(descriptor.value)) return undefined;
 				break;
 			case "safe-integer":
-				if (typeof descriptor.value !== "number" || !Number.isSafeInteger(descriptor.value)) return false;
+				if (typeof descriptor.value !== "number" || !Number.isSafeInteger(descriptor.value)) return undefined;
 				break;
 			case "string":
-				if (typeof descriptor.value !== "string") return false;
+				if (typeof descriptor.value !== "string") return undefined;
 				try {
 					assertWellFormedString(descriptor.value, field.name);
 				} catch {
-					return false;
+					return undefined;
 				}
 				break;
 		}
 	}
-	return true;
+	return schema;
+}
+
+function operationWithinCanonicalByteBudget(
+	operation: Readonly<Record<string, unknown>>,
+	schema: CompiledOperationSchema
+): boolean {
+	return (
+		schema.maxCanonicalOperationBytes === undefined ||
+		encodeCanonical(operation).byteLength <= schema.maxCanonicalOperationBytes
+	);
 }
 
 /**
@@ -1278,7 +1295,7 @@ export function createTransactionalVertexIssuer(options: TransactionalIssuerOpti
 
 function createTransactionalVertexIssuerCore(
 	options: TransactionalIssuerOptions,
-	operationAdmission?: (operation: Readonly<Record<string, unknown>>) => boolean
+	operationAdmission?: (operation: Readonly<Record<string, unknown>>) => CompiledOperationSchema | undefined
 ): TransactionalVertexIssuer {
 	if (!(options.privateKeySeed instanceof Uint8Array) || options.privateKeySeed.byteLength !== 32) {
 		throw new TypeError("private key seed must be a 32-byte Uint8Array");
@@ -1305,12 +1322,18 @@ function createTransactionalVertexIssuerCore(
 
 	return {
 		async issue(input: LocalVertexInput): Promise<IssueCommit> {
-			if (operationAdmission !== undefined && !operationAdmission(input.operation)) {
+			if (operationAdmission !== undefined && operationAdmission(input.operation) === undefined) {
 				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
 			}
 			const operation = detachCanonicalRecord(input.operation);
-			if (operationAdmission !== undefined && !operationAdmission(operation)) {
-				throw new VertexValidationError("operation does not match the prepared blueprint ABI");
+			if (operationAdmission !== undefined) {
+				const schema = operationAdmission(operation);
+				if (schema === undefined) {
+					throw new VertexValidationError("operation does not match the prepared blueprint ABI");
+				}
+				if (!operationWithinCanonicalByteBudget(operation, schema)) {
+					throw new RangeError("operation exceeds the prepared blueprint canonical byte budget");
+				}
 			}
 			const detachedInput: LocalVertexInput = {
 				anchor: input.anchor,
@@ -1369,7 +1392,7 @@ export function createAdmissionBoundTransactionalVertexIssuer(
 		throw new TypeError("preparedBlueprintAdmission must be produced by prepareBlueprintAdmission");
 	}
 	return createTransactionalVertexIssuerCore(options, (operation) =>
-		operationMatchesPreparedAdmission(operation, preparedState)
+		operationSchemaForPreparedAdmission(operation, preparedState)
 	);
 }
 
@@ -2633,9 +2656,14 @@ export function admitReceivedVertex(input: AdmitReceivedVertexInput): AdmissionD
 	const authenticated = authenticateReceivedVertex(input);
 	if (authenticated === undefined) return { admitted: false };
 	const preparedState = consumerPreparedAdmissionState(input);
+	if (preparedState === undefined) {
+		return { admitted: false };
+	}
+	const operation = authenticated.preimage.operation;
+	const schema = operationSchemaForPreparedAdmission(operation, preparedState);
 	if (
-		preparedState === undefined ||
-		!operationMatchesPreparedAdmission(authenticated.preimage.operation, preparedState)
+		schema === undefined ||
+		!operationWithinCanonicalByteBudget(operation as Readonly<Record<string, unknown>>, schema)
 	) {
 		return { admitted: false };
 	}
