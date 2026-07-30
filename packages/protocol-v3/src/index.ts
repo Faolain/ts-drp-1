@@ -68,6 +68,12 @@ export interface PersistedEquivocationProof {
 	readonly proofId: string;
 }
 
+export interface MaterializeCurrentEquivocationProofInput {
+	readonly scope: EquivocationScope;
+	readonly vertices: readonly [PersistedVertexWitness, PersistedVertexWitness];
+	resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;
+}
+
 export interface SlotAdvisorySignal {
 	readonly author: string;
 	readonly observedForkCount: number;
@@ -1349,6 +1355,27 @@ function proofIdForDigests(left: Uint8Array, right: Uint8Array): string {
 	return bytesToHex(hashDomain(EQUIVOCATION_PROOF_DOMAIN, first, second));
 }
 
+/**
+ * Derives the frozen proof identity for an unordered pair of distinct digests.
+ * @param leftDigest - One registered 32-byte vertex digest.
+ * @param rightDigest - The other registered 32-byte vertex digest.
+ * @returns The lowercase hexadecimal proof identity.
+ */
+export function deriveEquivocationProofId(leftDigest: Uint8Array, rightDigest: Uint8Array): string {
+	if (!(leftDigest instanceof Uint8Array) || !(rightDigest instanceof Uint8Array)) {
+		throw new TypeError("equivocation proof digests must be Uint8Array values");
+	}
+	const left = new Uint8Array(leftDigest);
+	const right = new Uint8Array(rightDigest);
+	if (left.byteLength !== 32 || right.byteLength !== 32) {
+		throw new TypeError("equivocation proof digests must each be 32 bytes");
+	}
+	if (compareBytes(left, right) === 0) {
+		throw new TypeError("equivocation proof digests must be distinct");
+	}
+	return proofIdForDigests(left, right);
+}
+
 function canonicalEquivocationProof(
 	scope: EquivocationScope,
 	left: PersistedVertexWitness,
@@ -1372,6 +1399,105 @@ function canonicalEquivocationProof(
 		}),
 		proofId: proofIdForDigests(first.digest, second.digest),
 	};
+}
+
+function detachCurrentEquivocationVertex(value: unknown): PersistedVertexWitness | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const candidate = value as PersistedVertexWitness;
+	const capturedDigest = candidate.digest;
+	if (!(capturedDigest instanceof Uint8Array)) return undefined;
+	const digest = new Uint8Array(capturedDigest);
+	if (digest.byteLength !== 32) return undefined;
+
+	const capturedWitness = candidate.witness;
+	if (capturedWitness === null || typeof capturedWitness !== "object") return undefined;
+	const domain = capturedWitness.domain;
+	const expectedAnchor = capturedWitness.expectedAnchor;
+	const capturedPreimage = capturedWitness.receivedCanonicalPreimageBytes;
+	if (!(capturedPreimage instanceof Uint8Array)) return undefined;
+	const receivedCanonicalPreimageBytes = new Uint8Array(capturedPreimage);
+	const capturedSignature = capturedWitness.signature;
+	if (!(capturedSignature instanceof Uint8Array)) return undefined;
+	const signature = new Uint8Array(capturedSignature);
+	if (signature.byteLength !== 64) return undefined;
+	const suiteId = capturedWitness.suiteId;
+	if (typeof domain !== "string" || typeof expectedAnchor !== "string" || typeof suiteId !== "string") {
+		return undefined;
+	}
+	return {
+		digest,
+		witness: {
+			domain,
+			expectedAnchor,
+			receivedCanonicalPreimageBytes,
+			signature,
+			suiteId,
+		},
+	};
+}
+
+/**
+ * Reconstructs the current canonical proof from two current persisted witnesses.
+ * @param input - Current slot scope, witnesses and authoritative key resolver.
+ * @returns A verifier-compatible canonical proof, or undefined when validation fails.
+ */
+export function materializeCurrentEquivocationProof(
+	input: MaterializeCurrentEquivocationProofInput
+): PersistedEquivocationProof | undefined {
+	try {
+		if (input === null || typeof input !== "object") return undefined;
+		const capturedScope = input.scope;
+		const capturedVertices = input.vertices;
+		const capturedResolver = input.resolveAuthorPublicKey;
+		if (
+			capturedScope === null ||
+			typeof capturedScope !== "object" ||
+			!Array.isArray(capturedVertices) ||
+			capturedVertices.length !== 2 ||
+			typeof capturedResolver !== "function"
+		) {
+			return undefined;
+		}
+
+		const author = capturedScope.author;
+		const authorSequence = capturedScope.authorSequence;
+		const objectId = capturedScope.objectId;
+		if (typeof author !== "string" || !Number.isSafeInteger(authorSequence) || typeof objectId !== "string") {
+			return undefined;
+		}
+		const scope: EquivocationScope = { author, authorSequence, objectId };
+
+		const first = detachCurrentEquivocationVertex(capturedVertices[0]);
+		if (first === undefined) return undefined;
+		const second = detachCurrentEquivocationVertex(capturedVertices[1]);
+		if (second === undefined || compareBytes(first.digest, second.digest) === 0) return undefined;
+
+		const resolveAuthorPublicKey = (candidateAuthor: string): RawEd25519PublicKey | undefined =>
+			Reflect.apply(capturedResolver, input, [candidateAuthor]);
+		for (const vertex of [first, second]) {
+			const authenticated = authenticateReceivedVertex({
+				domain: vertex.witness.domain,
+				expectedAnchor: vertex.witness.expectedAnchor,
+				receivedCanonicalPreimageBytes: vertex.witness.receivedCanonicalPreimageBytes,
+				resolveAuthorPublicKey,
+				signature: vertex.witness.signature,
+				suiteId: vertex.witness.suiteId,
+			});
+			if (authenticated === undefined || compareBytes(authenticated.digest, vertex.digest) !== 0) {
+				return undefined;
+			}
+			if (
+				authenticated.preimage.author !== scope.author ||
+				authenticated.preimage.authorSequence !== scope.authorSequence ||
+				authenticated.preimage.objectId !== scope.objectId
+			) {
+				return undefined;
+			}
+		}
+		return canonicalEquivocationProof(scope, first, second);
+	} catch {
+		return undefined;
+	}
 }
 
 function allCanonicalEquivocationProofs(
