@@ -1,0 +1,48 @@
+name: Protocol v3 equivocation ACL reputation freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-equivocation-acl-reputation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Freeze provenance
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs "$BASE_SHA"
+          node packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs "$BASE_SHA"
+          node packages/protocol-v3/supplements/equivocation-author-projection-v1/check-freeze.mjs "$BASE_SHA"
+          node packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs "$BASE_SHA"
+          node packages/protocol-v3/supplements/equivocation-acl-reputation-v1/check-freeze.mjs "$BASE_SHA"
+      - name: Controlled and production contract serially
+        run: |
+          PHASE_0O_B3_IMPLEMENTATION_MODULE=tests/fixtures/phase-0o-b3-v3/controlled-acl-reputation.ts pnpm exec vitest run tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Preserve frozen predecessor suites serially
+        run: |
+          pnpm exec vitest run tests/protocol-v3-equivocation-0o.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-equivocation-projection-0o-b1a.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit public roots
+        run: |
+          pnpm --filter @ts-drp/protocol-v3 build
+          pnpm exec tsc -p tests/fixtures/phase-0o-b3-v3/tsconfig.public-entry-audit.json
+          pnpm exec tsc -p tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json
+          node --import tsx tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs
