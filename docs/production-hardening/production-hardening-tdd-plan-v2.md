@@ -11220,23 +11220,110 @@ never dispatch coordinator-owned Array methods, and fail closed before an irreve
 removal. The 0o-a original/pass-1/pass-2/pass-3 suites and frozen supplement checker are mandatory GREEN
 regressions.
 
+### D.64 — Phase 0o-b1a acceptance ledger
+
+Phase 0o-b1a is accepted. The causal RED/profile checkpoint is `05e9f9c`; the selective production
+checkpoint is `5e26eef141f5f18acba9bb2aa547a9687a811272`. Its only production path is
+`packages/protocol-v3/src/index.ts`, SHA-256
+`6284ec3dcf579cf0e81d7ccf3c61d239190ae3ba55f4d307c9fb0fbcb4b3ba48`.
+
+The deep surface now:
+
+- derives the frozen `ts-drp/equivocation-proof/v1` identity from one detached canonical unordered pair
+  of distinct 32-byte digests;
+- materializes the current canonical proof only after once-captured scope/witness bytes authenticate,
+  the recomputed digests match the stored digests and both decoded vertices match the supplied slot;
+- ignores caller proof IDs, preserves same-digest re-carrier identity while rebuilding the current
+  carrier bytes, and returns `undefined` on malformed, unauthenticated, equal-pair or cross-scope input;
+- remains absent from source, built declaration and runtime package roots; and
+- adds no store, pending lifecycle, payload outbox, budget, reputation, gossip, ACL or compaction
+  behavior and changes no frozen 0o-a persistence or announcement semantics.
+
+#### D.64.1 — Causal evidence and reviews
+
+The GREEN evidence manifest is
+`2e143b7036381253fe2cf50b0b9cf300194a2c5570b5aa2f7be78e7b23bd985e`.
+Production and the independent controlled reference each pass 9/9. There are **seven**, not eight,
+surgical mutants: pair ordering, proof domain, trusted caller ID, stale carrier, skipped
+authentication, wrong scope/digest and public re-export. Each kills exactly its one owned test and
+leaves the other eight green. The protected 0o-a matrix remains 32/32. Both freeze checkers, the
+protocol-v3 build/typecheck, source/built/runtime public audits, targeted lint/format, workspace
+typecheck and the process-local `.logs/**`-excluded workspace lint pass.
+
+The independent root verification manifest is
+`36f83f8465a2152e6c79f6faf272d810843f1ec12cac02116a32cbc0f871b86d`.
+Its first manifest invocation is intentionally retained as a failed non-verification: it ran from the
+evidence directory even though the manifest paths are repository-relative. The corrected repository-root
+invocation verifies all 38 entries and exits zero. Never cite the invalid-cwd invocation as evidence.
+
+The final review sequence found no implementation blocker:
+
+- Grok 4.5/high `PASS_WITH_NOTES`, artifact-manifest SHA-256
+  `409665dab096f80ef095393b2ff7610053c0ceda08d1e0e32efc486c21869070`;
+- exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`
+  `PASS_WITH_NOTES`, artifact-manifest SHA-256
+  `1a47427dc72376bda23962fad22639def98923ecdddb8e87ab14960f9d857663`;
+- final Opus/xhigh `PASS_WITH_NOTES`, exact result SHA-256
+  `54f61dd25f1cdaf814e3af33961df99ac64e6bc58edce8208130f8f12996b9ba`
+  and artifact-manifest SHA-256
+  `fcb9734103081fab7c3050753ce2aafa774015d29ccf00d1e856189fd2b39584`.
+
+The Opus process used resolved `claude-opus-5`, session
+`5eeecfe5-7f51-41ee-8bce-3a5a090a6016`, effort xhigh, exit zero and no retry or resume. Its bridge
+created one out-of-workspace Claude plan artifact despite the logs-only wrapper instruction. It changed
+no project path; retain this as a review-process side-effect gotcha rather than representing the run as
+strictly logs-only.
+
+#### D.64.2 — Residuals and mandatory carry-forward
+
+The raw workspace lint still has 30 parser errors from accumulated `.logs/**` scratch sources and 226
+inherited warnings; excluding only `.logs/**` yields zero errors and the same warnings. Do not call the
+raw lint green.
+
+The required serial, coverage-off root Vitest command was invoked twice but never completed. Both
+attempts first reproduced the already recorded dirty-root failure classes, including `spawnSync git
+ENOBUFS`, and were then operator-terminated after the object package's
+`incremental-linearize.test.ts` became CPU-bound far beyond its 5.5–18 second historical range. An
+isolated same-worker run reproduced that object-test slowdown and was terminated after 90 seconds.
+`packages/object` has no protocol-v3 dependency and neither new helper has a production caller, so the
+review quorum classified this as causally disjoint and non-blocking for the additive 0o-b1a
+checkpoint. It remains an unresolved repository residual; do not report a passing full-root suite or
+launder the new slowdown into the historical baseline.
+
+0o-b1b must carry four defense-in-depth rules:
+
+1. `deriveEquivocationProofId` is an unauthenticated pure derivation. A pair ID or pending row is never
+   evidence of equivocation; proof handoff still requires current-witness materialization and
+   authentication.
+2. The authoritative resolver is currently invoked once per witness. This matches accepted 0o-a
+   behavior, but a stateful resolver can make an artifact non-transferable. The durable projection may
+   not cache or treat one resolver result, one derived ID or one successful local materialization as
+   durable authentication authority.
+3. The generic `smoke:public-package` deny-list does not name the two new helpers. The frozen
+   source/built/runtime package-root assertions are stronger and make this non-blocking; after a fresh
+   RED, extend the generic smoke guard or replace it with an equivalent closed export-set assertion.
+4. Preserve the invalid-cwd evidence record, raw-lint distinction and unresolved root/object residual
+   in 0o-b1b evidence. A later clean root run may close them; documentation cannot.
+
 ## Next Agent Prompt
 
-Phase 0o-a is accepted at `16a864b`; D.62 is its acceptance ledger and D.63 is the unanimous correction
-and executable 0o-b split. Begin **0o-b1a only** with a fresh Codex-high causal RED owner. Freeze one
-hash-bound additive projection/reconstruction profile that preserves every frozen
-`equivocation-digest-identity-v1` byte and semantic guarantee. Require two deep-only helpers:
+Phase 0o-a is accepted at `16a864b`; D.62 is its acceptance ledger. D.63 is the unanimous 0o-b
+correction/split. Phase 0o-b1a is frozen at `05e9f9c`, implemented at `5e26eef`, and accepted by D.64.
+Begin **0o-b1b only** with a fresh Codex-high causal RED owner.
 
-- derive the canonical proof ID from one canonical unordered pair of distinct 32-byte digests;
-- materialize the current canonical proof bytes from detached current committed witnesses and the
-  authoritative resolver, rejecting scope/pair/digest/carrier mismatch before output.
+Freeze one additive durable-projection/recovery contract over injected storage and authoritative
+full-slot reads. Pin every D.63.5 blocker, including monotone union, `newDigests × postUnionDigests`,
+lifetime pair enqueue identity, co-commit or author-scoped recovery enumeration, current-carrier
+reconstruction, fail-closed pending removal, zero proof-body/byte copies, exact 0o-a invariance and the
+prior hostile capture/detach class. The controlled reference and surgical mutants must prove each
+failure causally. Treat `deriveEquivocationProofId` only as pure identity derivation; proof handoff must
+materialize and authenticate current witnesses. Add the D.64 generic package-smoke defense only after
+the fresh RED owns it.
 
-The RED must use genuine 0o-a proof bytes and same-digest re-carriers, an independent controlled
-reference, and surgical pair-order, trusted-ID, stale-carrier, missing-authentication and public-re-export
-mutants. Source, built-package and runtime package-root audits must forbid both helpers. Do not implement
-the 0o-b1b store, pending lifecycle, budget, reputation, gossip transport, ACL mutation, witness
-compaction, `state.proofs` compaction, payload outbox, acknowledgement API or global evidence bound in
-0o-b1a.
+Do not implement 0o-b2 budget, 0o-b3 reputation, gossip transport, ACL mutation, witness compaction,
+`state.proofs` compaction, payload outbox, acknowledgement API or a global evidence bound in 0o-b1b.
+Preserve the invalid-cwd/raw-lint/root-object residual distinctions instead of claiming those gates
+passed.
 
 Phase 0p remains limited to anchored reducer/input/epoch work budgets. Preserve exact received-byte
 identity, the frozen D.37 tuple, the deep-only public boundary, the shipped-target activation boundary,
