@@ -340,8 +340,7 @@ function validateCli() {
 }
 
 const invokedAsMain =
-	process.argv[1] !== undefined &&
-	realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+	process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
 const mode = invokedAsMain ? validateCli() : "import";
 if (mode === "import") {
 	// Importers consume the pure validator without starting the hermetic gate.
