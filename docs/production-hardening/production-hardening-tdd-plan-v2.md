@@ -11790,35 +11790,126 @@ Accepted gotchas and residual boundaries:
    budget, close-set membership, wall-clock/instruction metering or deterministic VM. Those owners
    remain exactly where D.68 assigns them.
 
+### D.70 — Phase 0p-0 blueprint work-budget governance
+
+Phase 0p-0 is accepted. Authoritative Codex-high RED `264fcd7` adds only the additive
+`blueprint-work-budget-v1` supplement, its independent control and contract, the focused test and its
+freeze workflow. It changes no production source, frozen parameters entry, registry, vector,
+reference or protocol-v2 behavior. Production fails the four positive capability-binding rows while
+the independent control passes 12/12; seven surgical control mutants each fail exactly their intended
+row, and a separate archived-tree mutant proves that parameters-registry drift is rejected. The RED
+artifact-manifest SHA-256 is
+`6ac2fc2cb4b5eff112c9922e3fc20822a5257fe0aca960271b9c83458b4efbe2`; its evidence-manifest
+SHA-256 is `5481bdd99647c4e4fad303888de9a513612d8adbc7f28583fcbc0759557ecd26`.
+
+Distinct Codex-high GREEN `9964219` changes only `packages/protocol-v3/src/index.ts`. Package schema
+version 1 and protocol major 3 remain unchanged. Legacy manifest schema 1 retains its exact closed
+shape; additive manifest schema 2 requires exact profile `blueprint-work-budget-v1` and a positive safe
+integer `maxCanonicalOperationBytes` in every exact closed operation record. The existing
+`blueprintDigest` remains the single authority because it authenticates the exact canonical whole
+package, including manifest version, profile, operation discriminator, operation identity/schema and
+every limit. This slice validates and then deliberately discards each limit: it performs no operation
+measurement or enforcement and adds no export, reducer/fold call, transaction/outbox change, frame
+cap, timer, counter or live binding. The GREEN evidence-manifest SHA-256 is
+`c457132561c285953c32f452828c1b526bb65c1de415e077c045890a2e689c55`.
+
+Focused production and control contracts pass 12/12; every selected mutant dies; v3 predecessors pass
+29/29, v2 predecessors pass 20/20 and the original v2 reference passes 22/22. Both freeze families,
+the package build/type/public-surface checks, workspace typecheck, focused lint,
+`.logs/**`-excluded workspace lint, Prettier and diff checks pass. The explicit serial root run was
+bounded at 90 seconds, terminated its exact process group with `SIGTERM`, left no residual process and
+reached inherited temporary-repository governance failures; it supplies no root-green claim.
+
+All independent reviews accept and require no plan-assumption correction:
+
+- Grok 4.5/high final SHA-256
+  `21c25dd5d797f89fe2fc87b265f67c71ff278433321a4b41f69c897e68f7d190`, raw SHA-256
+  `4eb7dc6906013668379b010b41119619b18886862c9c68648df6ce75470bcc12` and manifest SHA-256
+  `7aeffb39828a8c994c48c30be508d2853e50a2c18b97d65c035db50431cee93b`;
+- exact Kimi 3/high final SHA-256
+  `0c588f0f72834dede17bfc30ec9d201f5d0b418e1daf0cc68921a6fbb298fb80` and manifest SHA-256
+  `73338c8d827919e9f95f549ec645d15162d28c2599336688283c7ec6038f8226`;
+- Opus/xhigh final SHA-256
+  `aeb22afc9c04c83984cefe44fe48f02bd4f75eac45ba03a6f6629c9a2daadd26`, raw SHA-256
+  `cde7328be33eaab3bf4542445bdcd344c156bd2e6004a1123d3b266a238e693b` and manifest SHA-256
+  `f4942be2553ff65be6ead4423983a320d32fe196cd5710696af45b3d806000c4`.
+
+The Grok session `019fb276-22a9-73f2-825f-a64b3998b79b` used Grok 4.5 at high for 17 calls with
+no fallback or restart. The Kimi session `session_6560b6b1-bbd3-4134-8b66-7f19149d2794` used exact
+`kimi-code/k3`, thinking enabled, 41/100 steps, exit zero and no fallback, retry or resume. Its
+temporary adversarial test and process-local freeze exclusions were removed or restored
+byte-identically. The Claude session `e606893f-64c5-4278-aabd-b034e9823882` resolved to
+`claude-opus-5` at xhigh for 67 turns, exit zero and no fallback/restart. Its 52,338 Opus output
+tokens and $4.4169495 substantive cost dominate the automatic 27-output-token/$0.001995 Haiku
+auxiliary call; Haiku did not perform the review.
+
+Accepted gotchas and carry-forward constraints:
+
+1. The RED does not directly pin unsupported manifest versions. Production rejects both v1-shaped and
+   v2-shaped unsupported versions today, but exact error precedence is shape-dependent. Phase 0p-2
+   must add a frozen unsupported-version row when it touches the same dispatch.
+2. The unsafe-integer RED input is rejected by canonical encoding before schema validation, so the
+   production `Number.isSafeInteger` branch is defense-in-depth rather than directly pinned. Unsafe
+   integers cannot exist in the canonical domain. Phase 0p-2 must pin the representable accepting
+   `Number.MAX_SAFE_INTEGER` boundary and keep encoder rejection distinct from validator rejection.
+3. Production authenticates the digest before schema compilation while the independent control
+   validates schema first. Both reject multi-defect inputs; no multi-error precedence is specified.
+4. The supplement directory is exact-file closed, while its fixture directory hash-pins only the named
+   files. Extra inert fixture files are not authority and do not affect the loaded contract.
+5. The slice workflow omits 0j-b even though GREEN and root evidence pass its 41 rows. Phase 0p-2 must
+   include the runtime predecessor when it changes the shared compiler/runtime path.
+6. The historical freeze CLIs need process-local evidence exclusions when large untracked log trees
+   would overflow their git buffer. The exclusions are evidence harness state, not repository policy,
+   and must always be restored byte-identically.
+7. Base-checker bootstrap trust, mutable major action tags, pull-request-only execution and direct-push
+   enforcement remain inherited repository/branch-protection boundaries. The parameters field-name
+   assertion is defense-in-depth behind protected predecessor hashes.
+8. Four negative RED rows were legitimate predecessor passes rather than causal failures. Their
+   discrimination is proven by the surgical mutant runs, not by pretending every RED row was red.
+9. The limits are not retained in `CompiledOperationSchema`. Phase 0p-2 must retain the already
+   validated value during compilation from the same digest-authenticated canonical bytes (or rederive
+   only from those retained bytes), never accept a fresh caller-supplied package or create another
+   digest/policy authority.
+10. An isolated parameters-registry mutant archive remains outside the workspace under `/tmp` because
+    the command-safety hook rejected recursive cleanup. It is not part of the tree or evidence
+    authority and must not trigger a cleanup bypass.
+
 ## Next Agent Prompt
 
-Phase 0p-1 is frozen at authoritative RED `6a37114`, implemented at `745838f` and accepted by D.69.
-Begin **Phase 0p-0 only** with a fresh Codex-high causal RED owner.
+Phase 0p-0 is frozen at authoritative RED `264fcd7`, implemented at `9964219` and accepted by D.70.
+Begin **Phase 0p-2 only** with a fresh Codex-high causal RED owner.
 
-Freeze the additive `blueprint-work-budget-v1` governance supplement that will carry each manifest
-operation's `maxCanonicalOperationBytes` under the anchor-proven `blueprintDigest`. This slice owns the
-governed supplement schema, canonical representation, digest/provenance binding and freeze/reference
-artifacts only. It must not edit or version-bump the frozen seven-field `parameters` kind, make a
-protocol-v2 behavior change, enforce operation bytes, call a reducer/fold, add a transport frame cap,
-or claim live Phase 3a composition. Phase 0p-2 will separately enforce the governed value on the whole
-closed canonical operation record, including its discriminator.
+Enforce each authenticated manifest-schema-2 operation's governed
+`maxCanonicalOperationBytes` against
+`byteLength(encodeCanonical(canonicalDetachedOperation))` for the whole exact closed operation record,
+including its discriminator. The remote path must authenticate the exact received bytes first, then
+perform ABI match, then enforce the byte budget before publication or reducer/fold invocation. The
+local path must canonical-detach the operation, then enforce before transaction creation, signing,
+issued-record construction or outbox publication. Exact refusal must leave every publication,
+transaction, signer, reducer/fold and outbox witness untouched. Manifest schema 1 preserves current
+unbudgeted behavior.
 
-The RED must prove that the supplement is additive and v3-forward, that changing any governed limit or
-operation identity changes the blueprint digest, that omitted/unknown/duplicate/malformed fields fail
-under an explicit closed-world rule, and that frozen parameters/v2 vectors and runtime behavior remain
-byte-for-byte preserved. Use an implementation-independent positive control and surgical mutants for
-digest omission, operation/limit omission, discriminator exclusion, duplicate acceptance, unknown-field
-acceptance and accidental parameters-registry mutation. Do not smuggle `JSON.stringify`, UTF-16 length,
-raw-frame length, elapsed time, helper counters, finality, profile selection or enforcement into this
-governance slice.
+The independent RED/control must cover exact `limit−1`, `limit` and `limit+1` encoded-byte boundaries
+on both package-root paths, including nested records and non-BMP strings. It must prove that counting
+uses canonical bytes rather than `JSON.stringify`, UTF-16 code units, raw received frame bytes, an
+operation with its discriminator excluded or an injected cooperative counter. Add the unsupported
+manifest-version row and the representable `Number.MAX_SAFE_INTEGER` acceptance boundary required by
+D.70. Use surgical mutants for every named wrong meter/order point, preserve the four-export public
+surface and run the shared 0j-b runtime predecessor.
 
-Run focused RED/control/mutant evidence, protected registry/vector/reference predecessors, package
-build/type/public checks, workspace typecheck and lint to bounded `.logs`; root Vitest remains explicit,
-serial and bounded. After the RED is frozen and committed, use a distinct Codex-high GREEN owner, then
-Grok-high, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh. Keep the
-standing v3-forward owner/plane audit; v2 remains preservation/compatibility/freeze only. Never stage
-`.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked protocol-v2
-0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested. Phase 0n remains
-deferred until after the golden paths; when authorized, retain the bounded `@ts-drp/math` core and use
-pinned deterministic prior art rather than inventing approximations. Broader Rapier/WASM expansion
-remains optional.
+Retain the validated limit privately in `CompiledOperationSchema` from the same
+digest-authenticated canonical package bytes; never accept a detached caller value, introduce a second
+budget digest or edit/version-bump the frozen seven-field parameters kind. Do not add a transport frame
+cap, reducer execution meter, elapsed-time/step/helper-counter consensus, supported-profile selection,
+live Phase 3a binding, finality or collection-touch limit. Protocol v2 remains preservation/freeze
+only.
+
+Run focused RED/control/mutant evidence, protected registry/vector/reference/runtime predecessors,
+package build/type/public checks, workspace typecheck and lint to bounded `.logs`; root Vitest remains
+explicit, serial and bounded. After the RED is frozen and committed, use a distinct Codex-high GREEN
+owner, then Grok-high, exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final
+Opus-xhigh. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
+untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested.
+Phase 0n remains deferred until after the golden paths; when authorized, retain the bounded
+`@ts-drp/math` core and use pinned deterministic prior art rather than inventing approximations.
+Broader Rapier/WASM expansion remains optional.
