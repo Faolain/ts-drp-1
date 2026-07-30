@@ -1,0 +1,59 @@
+name: Protocol v3 blueprint work budget freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-blueprint-work-budget:
+    name: Require immutable protocol-v3 blueprint work budget supplement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run merge-base-pinned blueprint work budget checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs
+        run: |
+          node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs "$BASE_SHA"
+          node packages/protocol-v2/scripts/check-protocol-freeze.mjs "$BASE_SHA"
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-blueprint-work-budget-freeze.mjs"
+            PROTOCOL_V3_BLUEPRINT_WORK_BUDGET_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-blueprint-work-budget-freeze.mjs" "$BASE_SHA"
+          else
+            node "$CHECKER" "$BASE_SHA"
+          fi
+          node "$CHECKER" "$BASE_SHA"
+      - name: Run controlled reference and repository RED serially
+        run: |
+          PHASE_0P0_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts \
+            pnpm exec vitest run tests/protocol-v3-blueprint-work-budget-0p0.test.ts \
+              --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-blueprint-work-budget-0p0.test.ts \
+            --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Preserve blueprint and registry predecessors
+        run: |
+          pnpm exec vitest run tests/protocol-v3-blueprint-admission-0i.test.ts \
+            tests/protocol-v3-registry-spec-n1prime-b.test.ts \
+            tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts \
+            tests/protocol-v3-regenerated-reference-n1prime-d.test.ts \
+              --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit build, type surface and runtime surface
+        run: |
+          pnpm --filter @ts-drp/protocol-v3 build
+          pnpm --filter @ts-drp/protocol-v3 typecheck
+          pnpm --filter @ts-drp/protocol-v3 smoke:public-package
