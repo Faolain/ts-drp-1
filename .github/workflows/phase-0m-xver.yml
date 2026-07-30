@@ -1,0 +1,35 @@
+name: Phase 0m XVER
+
+on:
+  pull_request:
+    paths:
+      - "packages/object/**"
+      - "packages/validation/**"
+      - "packages/object/tests/proptest/convergence-differential.test.ts"
+      - "packages/object/tests/proptest/xver-contract-0m.test.ts"
+      - "scripts/phase-0m-xver-gate.mjs"
+      - ".github/workflows/phase-0m-xver.yml"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase-0m-xver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/phase-0m-xver-gate.mjs
