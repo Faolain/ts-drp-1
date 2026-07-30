@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
 import { parseDocument } from "yaml";
 
@@ -71,6 +72,7 @@ const multiFixtureDuplicateManifest = fileURLToPath(
 	new URL("multi-fixture-duplicate-delta-manifest.json", fixtureRoot)
 );
 const runnerWorkflowContract = fileURLToPath(new URL("runner-workflow-contract.json", fixtureRoot));
+const acceptanceOutputContractPath = fileURLToPath(new URL("acceptance-output-contract.json", fixtureRoot));
 const currentObjectModule = fileURLToPath(new URL("../../dist/src/index.js", import.meta.url));
 const currentHead = spawnSync("git", ["rev-parse", "HEAD"], {
 	cwd: repositoryRoot,
@@ -91,6 +93,7 @@ interface AcceptanceSummary {
 	primarySha: string;
 	primaryArtifactSha256: string;
 	referenceArtifactSha256: string;
+	primaryRuntimeClosureSha256: string;
 	referenceRuntimeClosureSha256: string;
 	fixtures: string[];
 	scheduleCount: number;
@@ -99,6 +102,25 @@ interface AcceptanceSummary {
 	mapFixtures: string[];
 	approvedDeltaCount: number;
 }
+
+interface AcceptanceEvidence {
+	referenceSha: string;
+	primarySha: string;
+	primaryArtifactSha256: string;
+	referenceArtifactSha256: string;
+	primaryRuntimeClosureSha256: string;
+	referenceRuntimeClosureSha256: string;
+}
+
+interface AcceptanceOutputContract {
+	schemaVersion: string;
+	expected: AcceptanceEvidence;
+	summary: AcceptanceSummary;
+}
+
+const acceptanceOutputContract = JSON.parse(
+	readFileSync(acceptanceOutputContractPath, "utf8")
+) as AcceptanceOutputContract;
 
 function runDifferential(
 	overrides: Readonly<Record<string, string | undefined>> = {},
@@ -177,6 +199,35 @@ function runHermeticGate(args: readonly string[] = []): GateRun {
 	};
 }
 
+function runAcceptanceOutputValidator(
+	output: string,
+	expected: AcceptanceEvidence = acceptanceOutputContract.expected
+): GateRun {
+	const result = spawnSync(process.execPath, [resolve(repositoryRoot, RUNNER_PATH), "--validate-acceptance-output"], {
+		cwd: repositoryRoot,
+		encoding: "utf8",
+		env: { ...process.env, FORCE_COLOR: "0" },
+		input: JSON.stringify({ output, expected }),
+		timeout: 10_000,
+	});
+	return {
+		status: result.status,
+		output: `${result.stdout ?? ""}\n${result.stderr ?? ""}`,
+	};
+}
+
+function acceptanceOutput(summary: AcceptanceSummary = acceptanceOutputContract.summary): string {
+	return `vitest child prelude\nXVER_ACCEPTANCE_SUMMARY ${JSON.stringify(summary)}\nvitest child epilogue\n`;
+}
+
+function mutatedSummary(overrides: Partial<AcceptanceSummary>): AcceptanceSummary {
+	return { ...structuredClone(acceptanceOutputContract.summary), ...overrides };
+}
+
+function expectOutputValidationFailure(output: string, diagnostic: RegExp): void {
+	expectCausalFailure(runAcceptanceOutputValidator(output), diagnostic);
+}
+
 function readAcceptanceSummary(run: GateRun): AcceptanceSummary {
 	const match = /XVER_ACCEPTANCE_SUMMARY\s+(\{[^\n]+\})/.exec(run.output);
 	expect(match, run.output).not.toBeNull();
@@ -198,6 +249,7 @@ function expectAuthenticatedCorpusSummary(run: GateRun): void {
 	});
 	expect(summary.primaryArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
 	expect(summary.referenceArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
+	expect(summary.primaryRuntimeClosureSha256).toMatch(/^[0-9a-f]{64}$/);
 	expect(summary.referenceRuntimeClosureSha256).toMatch(/^[0-9a-f]{64}$/);
 	expect(summary.mapFixtures.every((fixture) => ACCEPTANCE_FIXTURES.includes(fixture as never))).toBe(true);
 }
@@ -320,7 +372,7 @@ describe("Phase 0m XVER positive controls", () => {
 	it("pins the hermetic gate's minimal observable runner/workflow contract", () => {
 		const contract = JSON.parse(readFileSync(runnerWorkflowContract, "utf8")) as unknown;
 		expect(contract).toEqual({
-			schemaVersion: "phase-0m-xver-runner-v1",
+			schemaVersion: "phase-0m-xver-runner-v2",
 			referenceSha: REFERENCE_SHA,
 			runner: RUNNER_PATH,
 			workflow: WORKFLOW_PATH,
@@ -332,8 +384,220 @@ describe("Phase 0m XVER positive controls", () => {
 				comparisonCount: ACCEPTANCE_COMPARISON_COUNT,
 				requiresMapFixture: true,
 			},
+			outputVerification: {
+				marker: "XVER_ACCEPTANCE_SUMMARY",
+				exactSummaryCount: 1,
+				validatesCapturedChildStdout: true,
+				authenticatesPrimaryRuntimeClosure: true,
+			},
 			triggerPaths: [...GATE_TRIGGER_PATHS],
 		});
+	});
+});
+
+describe("Phase 0m XVER mandatory-runner output authentication RED", () => {
+	it("proves Vitest exits zero when the acceptance filter matches no tests", () => {
+		const run = runDifferential({ TS_DRP_XVER: "1" }, "^Phase 0m deliberately nonmatching acceptance control$");
+		expect(run.status, run.output).toBe(0);
+		expect(run.output).toMatch(/14 skipped/);
+		expect(run.output).not.toContain("XVER_ACCEPTANCE_SUMMARY");
+	});
+
+	it("accepts exactly one valid authenticated acceptance summary", () => {
+		const run = runAcceptanceOutputValidator(acceptanceOutput());
+		expect(run.status, run.output).toBe(0);
+	});
+
+	it("rejects child output containing no acceptance summary", () => {
+		expectOutputValidationFailure(
+			"vitest exited zero with 14 skipped\n",
+			/XVER_ACCEPTANCE_SUMMARY_REQUIRED.*expected=1.*actual=0/
+		);
+	});
+
+	it("rejects child output containing duplicate acceptance summaries", () => {
+		const valid = acceptanceOutput();
+		expectOutputValidationFailure(`${valid}${valid}`, /XVER_ACCEPTANCE_SUMMARY_COUNT.*expected=1.*actual=2/);
+	});
+
+	it.each([
+		["malformed JSON", 'XVER_ACCEPTANCE_SUMMARY {"referenceSha":\n'],
+		["non-JSON text", "XVER_ACCEPTANCE_SUMMARY definitely-not-json\n"],
+	])("rejects %s after the acceptance marker", (_label, output) => {
+		expectOutputValidationFailure(output, /XVER_ACCEPTANCE_SUMMARY_JSON/);
+	});
+
+	it.each([
+		["reference SHA", { referenceSha: GATE0_REFERENCE_SHA }, /XVER_ACCEPTANCE_SUMMARY_REFERENCE_SHA.*7f9e66a.*1d40885/],
+		[
+			"primary SHA",
+			{ primarySha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+			/XVER_ACCEPTANCE_SUMMARY_PRIMARY_SHA.*bbbbbbb.*aaaaaaa/,
+		],
+	] as const)("rejects a wrong %s", (_label, overrides, diagnostic) => {
+		expectOutputValidationFailure(acceptanceOutput(mutatedSummary(overrides)), diagnostic);
+	});
+
+	it.each([
+		["a missing fixture", { fixtures: acceptanceOutputContract.summary.fixtures.slice(0, -1) }],
+		[
+			"a reordered fixture list",
+			{
+				fixtures: [
+					acceptanceOutputContract.summary.fixtures[1],
+					acceptanceOutputContract.summary.fixtures[0],
+					...acceptanceOutputContract.summary.fixtures.slice(2),
+				],
+			},
+		],
+	])("rejects %s instead of the exact ordered fixture corpus", (_label, overrides) => {
+		expectOutputValidationFailure(acceptanceOutput(mutatedSummary(overrides)), /XVER_ACCEPTANCE_SUMMARY_FIXTURES/);
+	});
+
+	it("rejects a schedule count other than 18", () => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary({ scheduleCount: ACCEPTANCE_SCHEDULE_COUNT - 1 })),
+			/XVER_ACCEPTANCE_SUMMARY_SCHEDULE_COUNT.*expected=18.*actual=17/
+		);
+	});
+
+	it.each([
+		[
+			"surface order",
+			{
+				surfaces: [XVER_SURFACES[1], XVER_SURFACES[0], ...XVER_SURFACES.slice(2)],
+			},
+		],
+		["surface membership", { surfaces: XVER_SURFACES.slice(0, -1) }],
+		["foreign surface", { surfaces: [...XVER_SURFACES.slice(0, -1), "graph-membership"] }],
+	])("rejects wrong exact six-surface %s", (_label, overrides) => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary(overrides as Partial<AcceptanceSummary>)),
+			/XVER_ACCEPTANCE_SUMMARY_SURFACES/
+		);
+	});
+
+	it("rejects a comparison count other than 108", () => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary({ comparisons: ACCEPTANCE_COMPARISON_COUNT - 1 })),
+			/XVER_ACCEPTANCE_SUMMARY_COMPARISONS.*expected=108.*actual=107/
+		);
+	});
+
+	it("rejects a nonzero approved-delta count", () => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary({ approvedDeltaCount: 1 })),
+			/XVER_ACCEPTANCE_SUMMARY_APPROVED_DELTAS.*expected=0.*actual=1/
+		);
+	});
+
+	it.each([
+		["an empty Map fixture list", { mapFixtures: [] }],
+		["an absent Map fixture list", { mapFixtures: undefined }],
+		["a foreign Map fixture", { mapFixtures: ["not-in-the-acceptance-corpus"] }],
+	])("rejects %s", (_label, overrides) => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary(overrides as Partial<AcceptanceSummary>)),
+			/XVER_ACCEPTANCE_SUMMARY_MAP_FIXTURES/
+		);
+	});
+
+	it.each([
+		["primary artifact", "primaryArtifactSha256"],
+		["reference artifact", "referenceArtifactSha256"],
+		["primary runtime closure", "primaryRuntimeClosureSha256"],
+		["reference runtime closure", "referenceRuntimeClosureSha256"],
+	] as const)("rejects non-64hex %s evidence", (_label, field) => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary({ [field]: "not-a-sha256" })),
+			/XVER_ACCEPTANCE_SUMMARY_EVIDENCE.*64.*hex/
+		);
+	});
+
+	it.each([
+		["primary artifact", "primaryArtifactSha256"],
+		["reference artifact", "referenceArtifactSha256"],
+		["primary runtime closure", "primaryRuntimeClosureSha256"],
+		["reference runtime closure", "referenceRuntimeClosureSha256"],
+	] as const)("rejects mismatched %s evidence", (_label, field) => {
+		expectOutputValidationFailure(
+			acceptanceOutput(mutatedSummary({ [field]: "f".repeat(64) })),
+			/XVER_ACCEPTANCE_SUMMARY_EVIDENCE.*mismatch/
+		);
+	});
+
+	it("binds the real acceptance child stdout and live evidence into the validator call", () => {
+		const runnerPath = resolve(repositoryRoot, RUNNER_PATH);
+		const source = readFileSync(runnerPath, "utf8");
+		const parsed = ts.createSourceFile(runnerPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+		const parents = new Map<ts.Node, ts.Node>();
+		const visitParents = (node: ts.Node): void => {
+			node.forEachChild((child) => {
+				parents.set(child, node);
+				visitParents(child);
+			});
+		};
+		visitParents(parsed);
+
+		let acceptanceRun: ts.CallExpression | undefined;
+		const validatorCalls: ts.CallExpression[] = [];
+		const visitCalls = (node: ts.Node): void => {
+			if (ts.isCallExpression(node)) {
+				const callee = node.expression.getText(parsed);
+				if (callee === "run" && node.getText(parsed).includes("ACCEPTANCE_TEST")) acceptanceRun = node;
+				if (callee === "validateAcceptanceOutput") validatorCalls.push(node);
+			}
+			node.forEachChild(visitCalls);
+		};
+		visitCalls(parsed);
+		expect(acceptanceRun, "the real ACCEPTANCE_TEST child invocation must exist").toBeDefined();
+
+		let declaration: ts.Node | undefined = acceptanceRun;
+		while (declaration && !ts.isVariableDeclaration(declaration)) declaration = parents.get(declaration);
+		expect(declaration && ts.isIdentifier(declaration.name), "acceptance child stdout must be captured").toBe(true);
+		const outputBinding =
+			declaration && ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name)
+				? declaration.name.text
+				: "";
+		const enclosingBlock = (node: ts.Node | undefined): ts.Block | undefined => {
+			while (node && !ts.isBlock(node)) node = parents.get(node);
+			return node;
+		};
+		const acceptanceBlock = enclosingBlock(acceptanceRun);
+		const validatorCall = validatorCalls.find(
+			(call) =>
+				call.arguments[0]?.getText(parsed) === outputBinding &&
+				call.getStart(parsed) > (acceptanceRun?.getEnd() ?? Number.MAX_SAFE_INTEGER) &&
+				enclosingBlock(call) === acceptanceBlock
+		);
+		expect(
+			validatorCall,
+			"the mandatory path must validate the captured stdout in the same acceptance block"
+		).toBeDefined();
+
+		let evidenceText = validatorCall?.arguments[1]?.getText(parsed) ?? "";
+		const evidenceArgument = validatorCall?.arguments[1];
+		if (evidenceArgument && ts.isIdentifier(evidenceArgument)) {
+			let evidenceDeclaration: ts.VariableDeclaration | undefined;
+			const findDeclaration = (node: ts.Node): void => {
+				if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === evidenceArgument.text) {
+					evidenceDeclaration = node;
+				}
+				node.forEachChild(findDeclaration);
+			};
+			findDeclaration(parsed);
+			evidenceText = evidenceDeclaration?.initializer?.getText(parsed) ?? evidenceText;
+		}
+		for (const binding of [
+			"REFERENCE_SHA",
+			"primarySha",
+			"primaryArtifactSha256",
+			"referenceArtifactSha256",
+			"primaryRuntimeClosureSha256",
+			"referenceRuntimeClosureSha256",
+		]) {
+			expect(evidenceText, `validator must receive live ${binding}`).toMatch(new RegExp(`\\b${binding}\\b`));
+		}
 	});
 });
 
@@ -557,6 +821,7 @@ describe("Phase 0m XVER hermetic runner and workflow RED", () => {
 				"authenticate-reference-artifact",
 				"authenticate-reference-runtime-closure",
 				"run-108-cell-acceptance",
+				"validate-authenticated-acceptance-summary",
 				"remove-reference-worktree",
 			],
 		});

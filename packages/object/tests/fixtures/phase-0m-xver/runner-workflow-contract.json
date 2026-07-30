@@ -1,5 +1,5 @@
 {
-	"schemaVersion": "phase-0m-xver-runner-v1",
+	"schemaVersion": "phase-0m-xver-runner-v2",
 	"referenceSha": "1d40885ffb2ab666ffb2817a99fe69a42af83e77",
 	"runner": "scripts/phase-0m-xver-gate.mjs",
 	"workflow": ".github/workflows/phase-0m-xver.yml",
@@ -10,6 +10,12 @@
 		"surfaceCount": 6,
 		"comparisonCount": 108,
 		"requiresMapFixture": true
+	},
+	"outputVerification": {
+		"marker": "XVER_ACCEPTANCE_SUMMARY",
+		"exactSummaryCount": 1,
+		"validatesCapturedChildStdout": true,
+		"authenticatesPrimaryRuntimeClosure": true
 	},
 	"triggerPaths": [
 		"packages/object/**",
