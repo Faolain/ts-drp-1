@@ -896,9 +896,10 @@ codec → vectors already frozen and now provably correct.
 > byte total; and no arrival-order winner. Mutants that must die are
 > `anchor-charge-omitted`, `lt-vs-le`, `wrapping-accumulation`, `duplicate-charge`,
 > `charge-on-refusal`, `latched-byte-full`, `terminal-byte-full`, `initial-keyset-lax`,
-> `mutable-initial-charges`, `late-initial-byte-check`, `initial-precedence-swap`, `count-only`,
-> `byte-only`, `stale-pre-reentrancy`, `partial-rollback`, `arrival-winner` and
-> `live-charge-authority`. Behavioral rows carry the proof; any exposed total is corroboration only.
+> `mutable-initial-charges`, `mutable-initial-keyset`, `stale-initial-graph-snapshot`,
+> `late-initial-byte-check`, `initial-precedence-swap`, `count-only`, `byte-only`,
+> `stale-pre-reentrancy`, `partial-rollback`, `arrival-winner` and `live-charge-authority`.
+> Behavioral rows carry the proof; any exposed total is corroboration only.
 > Exact-carrier substitution mutants belong to Phase 3a because the generic primitive never meters.
 
 > **0g(ii-I) maximum boundary.** The frozen registry, references, c2 contract and replacement mint issue
@@ -1074,6 +1075,22 @@ remains immutable; the supplement is a separately governed post-freeze addendum.
 > idempotently retryable and re-evaluable until a certified epoch transition determines staleness.
 > This preserves `accepted iff appended` without violating sequence linearizability or durable crash
 > atomicity.
+>
+> The live binder also closes the accepted D.73 graph-container limitation before first use. At
+> binder-module evaluation it captures the built-in `Map` constructor and the exact graph
+> `keys`/`entries` operations it needs. From the authenticated initial graph it materializes one
+> composition-root-owned built-in Map and derives the supplied order, owned keyset and
+> `initialByteCharges` from that same captured keyset. Before `CausalityIndex` construction it proves
+> that every supplied-order hash has exactly one authenticated charge and that no charged or owned
+> hash is absent from the order. It never forwards a caller-/network-supplied `ReadonlyMap`,
+> subclass or proxy, never relies on `instanceof`, and never treats generic primitive acceptance as
+> proof that every indexed vertex was charged. The live-binder RED includes a positive owned
+> ordinary-Map case plus genuine Map-subclass, transparent-Proxy and post-import
+> `Map.prototype.keys` poisoning cases; no hostile graph container may reach the primitive and zero
+> indexed hashes may lack a charge. Any non-3a byte-cap caller, acceptance of a foreign graph Map or
+> Phase-5 reliance without this chain of custody first requires a successor governed compaction
+> slice that intrinsically cross-checks the charge snapshot against the actual indexed order with a
+> causal row and mapped mutant.
 
 ### Exit gate (Phase 3)
 
@@ -12183,22 +12200,127 @@ Prettier-check and diff-check SHA-256 values are
 `17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20` and
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 
+### D.73 — Phase 0p-3 epoch-byte capacity acceptance
+
+Phase 0p-3 is accepted at final HEAD `b6d65d9`. The implementation remains the minimal compaction
+production surface in `packages/compaction/src/types.ts` and `linearize.ts`; protocol-v3, the
+registry, transport, node composition and every predecessor freeze remain unchanged.
+
+The TDD lineage is intentionally retained rather than flattened:
+
+- initial authoritative RED `22bdd8d` froze the additive `epoch-byte-capacity-v1` family;
+- GREEN `67277f5` implemented optional byte capacity;
+- exact Kimi review then found charge-Map keyset spoofing through virtual `size`/`has`/`get`;
+- corrective RED `fac6c6b` froze intrinsic charge-entry snapshotting and an eighteenth mutant;
+- corrective GREEN `084bcca` captured Map intrinsics and fixed a clean-review P1 in which an
+  `initialByteCharges` getter mutated the graph between snapshots;
+- exact Kimi then blocked because that load-bearing capture order had no frozen causal witness;
+- final governance RED `b6d65d9` added
+  `[initial-charge-before-graph-key-snapshot]` and `stale-initial-graph-snapshot`, preserving the
+  real review-time/reconstructed wrong-order failure without reverting production to manufacture a
+  RED.
+
+The final governed contract has eighteen behavioral rows and nineteen named surgical mutants.
+Production and the independent control pass 18/18. Every mutant fails exactly its contracted row
+with seventeen siblings green. A faithful temporary production bundle with only the two capture
+lines reversed fails exactly the new row and reproduces the uncharged-child bypass. The earlier
+keyset-spoof implementation similarly fails only
+`[intrinsic-initial-entry-snapshot]`. Package tests pass 53 with one intentional skip; compaction
+build/typecheck, four source/built type audits, workspace typecheck, focused/scoped lint, Prettier,
+diff check, predecessor suites and all relevant freeze checkers pass. Unfiltered workspace lint and
+some broad checker attempts retain the known excluded-untracked `.logs`/store `ENOBUFS` or parser
+noise; clean-worktree and authenticated-scope reruns pass and no timeout/gate was weakened.
+
+Evidence manifests:
+
+- initial RED artifact/evidence SHA-256
+  `8965466f51c4dde2e10095e3bba2524614eda08b2524b894f6b7ad06fd981896` /
+  `28672d1b85c6e3ebd94444dfa93c8b1e257566194c922f36ee314ad24eead8e0`;
+- initial GREEN artifact/evidence SHA-256
+  `adff506ebd57ff077f6be352d0a7632a2007c0f0c75cf588f306301ecc6cf493` /
+  `620ce53073eff6638ce8bfecba49cc1846410e26737c224f0c3b10cf53124194`;
+- keyset corrective RED artifact/evidence SHA-256
+  `e4d7d2abad359fa6f31c8c340c89c69a5fac43a1bc053f33257b93539aa91e0a` /
+  `d75d316ce46b8756759644ef59d056402086887aa1824128b8dc0cadc972d567`;
+- keyset corrective GREEN evidence-manifest SHA-256
+  `c945febbf4856e771db9c988d53353bb51aceaa8431f9e2c3bdb3fe73629fc5a`;
+- final capture-order governance evidence-manifest SHA-256
+  `b710035ff8e3915217fc7466085f47200d6503c6b4fe84369e5943e777cd152c`.
+
+The final acceptance-ledger checkpoint passes Prettier, diff check, the final 0p-3 plus
+plan-sensitive tests 19/19, workspace typecheck and workspace ESLint with zero errors/226 inherited
+warnings. Logged SHA-256 values are
+`1e2974cbacf641cf0d17b87b08939dd9c137ebed55ac6976e58ef3f9adba672a`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`64ed1d371a614db7a946c72daceaefe0b7d956c1f1ffa4f3457d6355cd193a30`,
+`c20f6b9fa08a971925c2618d1dc48ad6cb11d4daacd7f67e113473b71a32c4fd` and
+`a8e3bbe6a19b0b5b4653580de586e9d7ff871c652f4bcafe674f2d0dba2740cb`,
+respectively.
+
+Final required reviews accept without reopening 0p-3 or changing D.72:
+
+- final Grok 4.5/high `PASS`, session `019fb3e1-2943-7eb2-9463-047fe408bfb1`,
+  sole model usage `grok-4.5-build`, no fallback/subagents/web, artifact-manifest SHA-256
+  `cd886601518f6409c8b4ade230f8c37ec909811c00570355d1877a26b09dae6f`;
+- final exact Kimi 3/high `PASS`, session
+  `session_bcbbc44a-0ef1-44aa-a397-5d82ec0fb993`, 55/100 requests, no fallback,
+  evidence-summary/raw/metadata/manifest SHA-256
+  `c0e12ec5b62a0940e2893e31b4e27e6670a71dda6a110f0a061ec11159b1285f` /
+  `94c7ae70edbc6f0f905b4b01a281ad7e52db4ee94a334f55755b646c7bbb251e` /
+  `0b8052dc70714dab3169d0be749a0a6714fca1e06808f303f0e6d7a1104a3334` /
+  `14e3fddef7a0bee1e9f9d161e207e414b44e9a0ce715fcfce48668f68c360400`;
+- final Opus/xhigh `PASS_WITH_NOTES`, session `a417cbaa-f67a-4f19-9c9f-32e178d8af82`,
+  success/end-turn, 92 CLI turns and no retry/resume/fallback/substitution. All 169 retained assistant
+  events are `claude-opus-5`; Opus produced 89,669 output tokens/$9.7575575. One automatic Haiku
+  auxiliary call produced 26 output tokens/$0.00411 and authored no review event. Final/raw/
+  artifact-manifest SHA-256 values are
+  `884816db19df0c2de99d68a31497b3a3bab38cbfc11698c589020bc6ced5f9d5` /
+  `0d69f5f468239c13cef7af25a3b478a8adc2136ea4da0752c5a1b23f4294d0f8` /
+  `095d9987aacfb1e9aaa91546e55e8d09a455bd29dc49984e9dd935e38282c302`.
+
+Accepted limitation and forward binding:
+
+1. `CausalityIndex` intrinsically snapshots the charge Map, but graph-side `vertices.keys()` remains
+   virtual. A genuine Map subclass, transparent Proxy or poisoned `Map.prototype.keys` can hide an
+   indexed vertex from a dishonest caller-supplied charge set.
+2. This does not reopen 0p-3: the primitive is deliberately provenance-neutral, no tracked live
+   caller enables `maxEpochBytes`, and Phase 3a owns the first authenticated graph/charge
+   composition. Generic primitive acceptance is never authenticity evidence.
+3. The Phase-3a supplement above is therefore a hard pre-live binding, not prose-only risk
+   acceptance. Captured Map intrinsics, an owned built-in graph Map, one common authenticated
+   keyset for order and charges, and an explicit equality check before construction are all required.
+   Owned ordinary Map alone is insufficient under post-import prototype poisoning.
+4. The live RED must kill genuine subclass, transparent Proxy and prototype-poisoning paths and
+   prove every indexed hash has exactly one authenticated charge. A non-3a byte-cap caller, foreign
+   graph Map or Phase-5 use without this chain of custody is blocked until a successor governed
+   primitive cross-check lands.
+
+The binding decision is substantively unanimous. Opus accepted it in the final review; a read-only
+Codex-high consultation returned `AGREE_ACCEPT_WITH_BINDING`; fresh exact Kimi 3/high session
+`session_abdb6af8-652a-4e6d-b1f8-dd873e0a2da6` independently reproduced both subclass and proxy
+bypasses and returned `AGREE_ACCEPT_WITH_BINDING` in 16/100 requests with no fallback. Kimi's
+binding evidence-summary/raw/metadata/manifest SHA-256 values are
+`543247baf5cd978e4c65e37baf1b6a0e6c107bf4d827609cdcded2396b442297` /
+`d55462166090868653f6c9deab8975e3e54735ace2d245eae8ca4eabbf5fb8b1` /
+`e8e891eef20825016583d8aafb8ca5b02cae1a7c7dc67c84b1f3a37a37936fbf` /
+`dc85ee02f4d2c733669c1286c14f95a7d93d54133eecb0a1e660d33ff0e68fb5`.
+
 ## Next Agent Prompt
 
-Phase 0p-2 is frozen at authoritative RED `80e2ea9`, implemented at `81b8c98`, documented at
-`b224414` and accepted by D.71. D.72 unanimously corrects the next slice before RED.
+Phase 0p is complete through accepted 0p-3 at `b6d65d9`; D.73 records the final external-review
+findings and the mandatory Phase-3a graph-container binding. Phase 0n remains optional and deferred
+until after the golden paths.
 
-Start a fresh Codex-high **RED-only** owner for additive Phase 0p-3. It may add only the new governed
-`epoch-byte-capacity-v1` artifacts, workflow, root causal test and controlled fixture needed to freeze
-the D.72 contract. It may not edit production, this plan, any frozen Phase −1′/0p-0/0p-1/0p-2
-artifact, protocol-v3, the registry, transport or node composition. The RED must prove production
-fails for the intended missing byte-capacity behavior while a controlled implementation passes and
-each named surgical mutant dies without weakening an existing gate. Then checkpoint RED and hand the
-same frozen contract to a distinct fresh Codex-high GREEN owner.
+The next scheduled item is Phase 0q, per-vertex atomic apply/publication. Before RED, re-read the 0q
+row plus D.3(d)/D.5 and audit whether its current wording is independently executable against the
+v3-forward ownership boundaries. If a material assumption is wrong or under-specified, obtain the
+required Opus-xhigh, Codex-high and exact Kimi 3/100 agreement before editing the plan. Otherwise
+start a fresh Codex-high RED-only owner, checkpoint the causal RED, then hand the unchanged contract
+to a distinct fresh Codex-high GREEN owner.
 
-Continue the per-slice Codex-high RED, distinct Codex-high GREEN, Grok-high, exact
+Continue the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
 discipline. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
 untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested.
-Phase 0n remains optional and deferred until after the golden paths; when authorized, retain the
-bounded `@ts-drp/math` core and prefer pinned deterministic prior art over new approximations.
+When Phase 0n is eventually authorized, retain the bounded `@ts-drp/math` core and prefer pinned
+deterministic prior art over new approximations.
