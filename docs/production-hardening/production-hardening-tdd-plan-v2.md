@@ -11435,26 +11435,146 @@ slot-proof ID once per slot transition, while 0o-b1b enqueues each author-pair i
 store lifetime. The latter depends on the permanent per-slot digest set and is deliberately not a
 global evidence-storage bound.
 
+### D.66 — Phase 0o-b2 acceptance ledger
+
+Phase 0o-b2 is accepted. The first checkpoint `fdb6765c2d292a86c0fba2d8ac3a2acef420e354`
+is a rejected provisional RED and does not authorize implementation. It lacked a differential
+UTF-16/code-point object-order case and a numeric/string sequence-order case. The frozen causal RED is
+`d9891718d99da132c8f6268c681688f238527f7b`, and the selective GREEN checkpoint
+`b551f856ad7e279396980f4987abb258e56af9e6` is its direct child.
+
+GREEN changes only `packages/protocol-v3/src/index.ts`, SHA-256
+`1d071ddfb9236841c198fc83d8c4b028cbf8a172c3b455a952840c9dae39f429`, and the
+`packages/protocol-v3/package.json` generic public-smoke deny-list, SHA-256
+`02ea9096e793400e7632f733f8ee446630c8c3e5f0d7425891d40d1167a3bf01`. All fourteen
+workflow/supplement/test/fixture artifacts are byte-identical from the corrected RED through GREEN.
+The freeze checker accepts the atomic-absent bootstrap at `6514489`, accepts the corrected RED and
+GREEN, and rejects the provisional tuple as a base.
+
+The deep-only composer:
+
+- once-captures one detached author projection and an explicit nonnegative safe-integer selection
+  policy, dispatches no caller-owned array method or iterator and returns freshly detached output;
+- merges duplicate full scopes, collapses duplicate digests and enumerates every canonical unordered
+  pair of distinct digests;
+- orders author-wide tuples by direct ECMAScript UTF-16 relational `objectId`, numeric
+  `authorSequence`, lesser digest and greater digest, then selects the exact first N;
+- derives the total, suppressed count and saturation result from the normalized pair set rather than
+  caller counts; and
+- reads no pending row, proof body, received vertex, admission/verification/materialization result,
+  resolver output, durable state, recovery/handoff result, ACL/reputation value, clock, randomness,
+  locale, transport, store or mutable module state.
+
+Budget saturation changes only the returned composition. The helper remains absent from source,
+built-declaration and runtime public package roots. This slice adds no v2 behavior, 0o-b3 reputation,
+ACL mutation, transport, persistence, compaction or Phase 0n math work.
+
+#### D.66.1 — Causal evidence and independent reviews
+
+The corrected RED evidence file and 45-entry manifest have SHA-256
+`4deee8f095fd35531d8787bce5c80f44d6af42098f5e60abddd8efa8b84b8216` and
+`c499e2a1a6ca916cf52225d4c9570cef4e2bfb946dbb2a741c482928ae1ac8b3`. Control passes
+15/15. Production has exactly twelve missing-helper failures and three legitimate governance,
+public-boundary and phase-exclusion passes. The corrected corpus places equal-prefix `U+10000` before
+`U+E000` under UTF-16 code-unit comparison while code-point/UTF-8 order is opposite, places numeric
+sequence 2 before 10 for the same object, exercises both digest tie-breaks and pins the exact first
+four of five tuples. Each of nineteen controlled mutants kills exactly one owned row and leaves
+fourteen siblings green.
+
+The GREEN evidence file and 48-entry manifest have SHA-256
+`5dda5adb6252fc0167300eac2e11d1d58c361cc2d130bc478a1f2c10f977f5b7` and
+`b130c4aa58915b2fa7fd402133bbbf607daa1828a21a351c924bda580579b0cf`.
+Production and control pass 15/15, all nineteen controlled mutants preserve their exact
+one-failure/fourteen-pass result, and protected 0o-a, 0o-b1a and 0o-b1b regressions pass 59/59. All
+four freeze checkers, build/type/public audits, public-package smoke, targeted lint/format/diff and
+workspace typecheck pass. Process-local `.logs/**`-excluded workspace lint has zero errors and 226
+inherited warnings.
+
+The final independent sequence found no acceptance blocker, required production/frozen-test fix or
+plan correction:
+
+- Grok 4.5/high `PASS_WITH_NOTES`, exact final SHA-256
+  `a9bfd5c322b04eaf2b25ea69360575f5bd5406404dc585db6fadf46058245e76` and 28-entry
+  review-manifest SHA-256 `f5d857fa9ff95e40278199d813fb3a8c6c4e0c20db9fd535f21543a4f5970fbe`;
+- exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`
+  `PASS_WITH_NOTES`, exact final SHA-256
+  `0ebf41583d7b1aadf1f0d2fa3d7a27627d1d848b2d0d53d22cdc73d968dd15c5` and 39-entry
+  review-manifest SHA-256 `7b928c35129149befaea0fdd67881b158654e6b365ab51e483f054d39a23d1a1`;
+- final Opus/xhigh `PASS_WITH_NOTES`, exact final SHA-256
+  `b385ab846c32d899c12414e49b1aa649f2e0407febc6c68249f3425ee633c11f` and 16-entry
+  review-manifest SHA-256 `364a4a9c8b5291652a1b2fafa96a108ba4998aa0a16e3178f2de90f30872e577`.
+
+The successful Opus session resolved to `claude-opus-5`, session
+`00b17550-eb69-4e7f-99d0-d09c939d9e9f`, effort xhigh, 56 turns, exit zero,
+`is_error=false` and `end_turn`. Its usage record also contains a 28-output-token auxiliary
+`claude-haiku-4-5` call; the substantive 57,770-output-token review is attributed to
+`claude-opus-5`. The first CLI invocation exited before any model session because `--allowedTools`
+consumed the prompt. The Claude skill authorized one corrected retry; there was no resume or further
+retry.
+
+#### D.66.2 — Findings, gotchas and 0o-b3 carry-forward
+
+These are accepted residuals and next-slice constraints, not amendments to the frozen 0o-b2
+contract:
+
+1. `maxGossipPairCount` bounds only the returned selection. Exact derivation still creates and sorts
+   every pair, with `O(sum(slotDigestCount²))` pair work plus full intermediate allocation. No global
+   input, computation or evidence-storage bound is claimed. A protocol-wide ceiling requires separate
+   governance.
+2. The malformed/cross-author projection rejection branches currently fail closed but are not frozen
+   by 0o-b2. The fresh 0o-b3 RED must pin this shared negative surface, especially
+   `scope.author !== projection.author`, without reopening the fourteen 0o-b2 artifacts.
+3. Twelve controlled mutants use budget-value gates to localize one owned kill. Their sibling passes
+   prove point detectability, not general detection of each bug class. The two ordering-correction
+   mutants are ungated. Nineteen mutants own thirteen behavioral rows; governance and phase-exclusion
+   have no designated mutant. Do not claim a row-mutant bijection.
+4. The contract's `controlledModule` field is documentary; the test runner and workflow select the
+   implementation through `PHASE_0O_B2_IMPLEMENTATION_MODULE`. The phase-exclusion row is likewise
+   documentary, while negative-surface, saturation, purity and public-boundary rows enforce the
+   behavior it labels.
+5. The RED/GREEN evidence did not record the standing ignored-cache side effect. Focused Vitest runs
+   can refresh `node_modules/.vite/results.json`, and type audits can refresh ignored tsbuildinfo under
+   `packages/protocol-v3/node_modules/.tmp/`. Reviews changed no tracked, staged or governed path, but
+   future evidence must disclose these cache writes.
+6. Budget zero is saturated only when the normalized projection contains at least one pair. Empty
+   projection plus zero budget is correctly unsaturated.
+7. The local protected workflow step covers 36 tests; the remaining tests in the evidenced 59-test
+   protected matrix are governed by their owning workflows. The evidence's focused 59/59 run remains
+   valid, but do not imply this one workflow enumerates all 59.
+8. Evidence remains untracked and repository-root relative. Raw workspace lint remains non-green with
+   30 `.logs/**` parser errors and 226 inherited warnings; the `.logs/**`-excluded run has zero errors
+   and the same warnings. Do not call raw lint green.
+9. No full serial root Vitest pass is established. The GREEN bounded run exited −15 after 115.017
+   seconds, reproduced nineteen inherited failures, produced no final root summary and did not reach
+   `incremental-linearize`. Its immediate process-group residual and later clean audit are separate
+   facts. Keep the earlier object slowdown open.
+10. Carry D.65's trusted-store, FIFO-starvation, conditional-recovery and at-least-once consequences.
+    Neither the budget nor 0o-b3 reputation may depend on pending rows, handoff, one recovery call's
+    completeness or a cached authentication result.
+
 ## Next Agent Prompt
 
 Phase 0o-a is accepted at `16a864b` by D.62. D.63 is the unanimous 0o-b correction/split. Phase
 0o-b1a is accepted at `5e26eef` by D.64. Phase 0o-b1b is frozen at `636490a`, implemented at
-`c2f63f9`, and accepted by D.65. Begin **0o-b2 only** with a fresh Codex-high causal RED owner.
+`c2f63f9`, and accepted by D.65. Phase 0o-b2's sole authorizing RED is `d989171`; it is implemented at
+`b551f85` and accepted by D.66. Begin **0o-b3 only** with a fresh Codex-high causal RED owner.
 
-Freeze one pure deterministic author-wide gossip-budget composition over a once-detached
-digest-set/pair projection. The budget may depend only on that projection plus explicit bounded policy
-inputs. It must be permutation/retry/concurrency invariant, deterministic at exact boundaries and
-incapable of mutating its inputs or any durable state. Pin hostile getters/arrays and surgical mutants
-that prove the positive budget result and the negative authority boundary.
+Freeze one pure deterministic ACL-visible reputation composition over the same once-detached
+single-author digest-set projection class used by 0o-b2. Establish the exact explicit policy inputs and
+closed output shape in RED; derive reputation only from normalized full scopes and digest sets, never
+from caller counts, gossip selection or saturation. Pin equivalent duplicate/reordered/retried
+projections, exact policy boundaries, fresh output, hostile getters/arrays and surgical causal mutants.
+The RED must also freeze the shared malformed-input fail-closed surface, including a cross-author slot,
+without changing any 0o-b2 artifact.
 
-The 0o-b2 surface must not read pending rows, proof bodies, `state.proofs`, received vertices,
-admission/verification/materialization results, clocks, resolver output, ACL state or mutable global
-state. Budget saturation changes only pure gossip composition output: it cannot change admission,
-resolution, `slotSignal`, standalone proof verification, durable projection/recovery, pending handoff
-or the future reputation value. Do not add transport, a store/default store, token bucket, wall clock,
-acknowledgement API, payload outbox, witness/proof compaction, global evidence bound, 0o-b3 reputation
-or ACL mutation. Carry D.65's trusted-store, conditional-recovery and at-least-once consequences
-without making budget depend on them.
+Reputation is a pure ACL-visible value, not ACL authority. It may not mutate an ACL, admission,
+resolution, `slotSignal`, standalone proof verification, durable projection/recovery, pending handoff,
+gossip composition or policy storage. It must not read pending rows, proof bodies, `state.proofs`,
+received vertices, admission/verification/materialization results, resolver output, the 0o-b2 selected
+pairs or saturation result, clocks, locale, transport, stores or mutable global state. Do not add a
+ban, threshold-triggered admission rule, live ACL binder, transport, token bucket, wall clock,
+acknowledgement API, payload outbox, witness/proof compaction or global evidence bound. Carry D.65 and
+D.66 residuals without making reputation depend on recovery completeness, handoff or ignored caches.
 
 Preserve exact received-byte identity, the frozen D.37 tuple, the deep-only public boundary, the
 shipped-target activation boundary, serial root-Vitest constraint, root-postinstall build dependency
