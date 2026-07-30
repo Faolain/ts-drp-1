@@ -152,6 +152,25 @@ export interface AuthorGossipBudgetComposition {
 	readonly saturated: boolean;
 }
 
+export type DetachedAuthorReputationSlot = AuthorProjectionSlot;
+
+export interface DetachedAuthorReputationProjection {
+	readonly author: string;
+	readonly slots: readonly DetachedAuthorReputationSlot[];
+}
+
+export interface AuthorAclReputationPolicy {
+	readonly maxReputationPenalty: number;
+}
+
+export interface AuthorAclReputationComposition {
+	readonly author: string;
+	readonly equivocatingSlotCount: number;
+	readonly totalCanonicalPairCount: number;
+	readonly reputationPenalty: number;
+	readonly saturated: boolean;
+}
+
 export interface SlotAdvisorySignal {
 	readonly author: string;
 	readonly observedForkCount: number;
@@ -2127,6 +2146,90 @@ export function composeAuthorGossipBudget(
 		totalPairCount,
 		suppressedPairCount: totalPairCount - selectedPairCount,
 		saturated: totalPairCount > maxGossipPairCount,
+	};
+}
+
+/**
+ * Derives a pure ACL-visible reputation observation from detached author digest sets.
+ * @param projection - Detached per-slot digest sets for exactly one author.
+ * @param policy - Explicit nonnegative reputation-penalty cap.
+ * @returns A fresh aggregate in canonical unordered distinct digest-pair units.
+ */
+export function composeAuthorAclReputation(
+	projection: DetachedAuthorReputationProjection,
+	policy: AuthorAclReputationPolicy
+): AuthorAclReputationComposition {
+	if (projection === null || typeof projection !== "object" || policy === null || typeof policy !== "object") {
+		throw new TypeError("ACL reputation inputs are required");
+	}
+
+	const maxReputationPenalty = policy.maxReputationPenalty;
+	if (!Number.isSafeInteger(maxReputationPenalty) || maxReputationPenalty < 0) {
+		throw new RangeError("maxReputationPenalty must be a nonnegative safe integer");
+	}
+
+	const author = projection.author;
+	const capturedSlots = projection.slots;
+	if (typeof author !== "string" || !Array.isArray(capturedSlots)) {
+		throw new TypeError("ACL reputation projection is malformed");
+	}
+
+	const normalizedScopes = new Map<string, Map<number, Set<string>>>();
+	const slotCount = capturedSlots.length;
+	for (let index = 0; index < slotCount; index++) {
+		const candidate = capturedSlots[index];
+		if (candidate === null || typeof candidate !== "object") {
+			throw new TypeError("ACL reputation slot is malformed");
+		}
+		const scope = captureAuthorProjectionScope(candidate.scope);
+		const capturedDigestHexes = candidate.digestHexes;
+		if (scope === undefined || scope.author !== author || !Array.isArray(capturedDigestHexes)) {
+			throw new TypeError("ACL reputation slot is malformed");
+		}
+
+		let sequences = normalizedScopes.get(scope.objectId);
+		if (sequences === undefined) {
+			sequences = new Map<number, Set<string>>();
+			normalizedScopes.set(scope.objectId, sequences);
+		}
+		let digests = sequences.get(scope.authorSequence);
+		if (digests === undefined) {
+			digests = new Set<string>();
+			sequences.set(scope.authorSequence, digests);
+		}
+
+		const digestCount = capturedDigestHexes.length;
+		for (let digestIndex = 0; digestIndex < digestCount; digestIndex++) {
+			const digestHex = capturedDigestHexes[digestIndex];
+			if (!isDigestHex(digestHex)) {
+				throw new TypeError("ACL reputation digest is malformed");
+			}
+			digests.add(digestHex);
+		}
+	}
+
+	let equivocatingSlotCount = 0;
+	let totalCanonicalPairCount = 0;
+	for (const sequences of normalizedScopes.values()) {
+		for (const digests of sequences.values()) {
+			const digestCount = digests.size;
+			const leftFactor = digestCount % 2 === 0 ? digestCount / 2 : digestCount;
+			const rightFactor = digestCount % 2 === 0 ? digestCount - 1 : (digestCount - 1) / 2;
+			const pairCount = leftFactor * rightFactor;
+			if (!Number.isSafeInteger(pairCount) || pairCount > Number.MAX_SAFE_INTEGER - totalCanonicalPairCount) {
+				throw new RangeError("canonical pair count exceeds safe integer");
+			}
+			if (pairCount > 0) equivocatingSlotCount++;
+			totalCanonicalPairCount += pairCount;
+		}
+	}
+
+	return {
+		author,
+		equivocatingSlotCount,
+		totalCanonicalPairCount,
+		reputationPenalty: Math.min(totalCanonicalPairCount, maxReputationPenalty),
+		saturated: totalCanonicalPairCount > maxReputationPenalty,
 	};
 }
 
