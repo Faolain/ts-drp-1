@@ -11305,30 +11305,160 @@ launder the new slowdown into the historical baseline.
 4. Preserve the invalid-cwd evidence record, raw-lint distinction and unresolved root/object residual
    in 0o-b1b evidence. A later clean root run may close them; documentation cannot.
 
+### D.65 — Phase 0o-b1b acceptance ledger
+
+Phase 0o-b1b is accepted. The frozen causal RED checkpoint is
+`636490a8a8ac6cd82495b0cabe773f039979cdfa`; the selective GREEN checkpoint is
+`c2f63f935d833a7461a3f9429b4249faf40562ab`. GREEN changes only
+`packages/protocol-v3/src/index.ts`, SHA-256
+`81695351ba7c1068616852f257288d1cfc6a527bce34219703528dfa10ca40e2`, and the
+`packages/protocol-v3/package.json` generic public-smoke deny-list, SHA-256
+`c3c17c2400e3523c6ef9802dba822308ac7737f67efd6b8aaf69864e9acc3575`.
+
+The deep-only coordinator now:
+
+- once-captures and authenticates the authoritative current committed-slot witnesses before its first
+  author-projection transaction;
+- persists a monotone per-slot digest union and exactly the canonical distinct
+  `newDigests × postUnionDigests` pair identities, retaining the digest-set lifetime-dedup fact after
+  pending-row removal;
+- stores no proof body or `Uint8Array`, uses no default store or clock, and treats neither
+  `state.proofs`, caller deltas/IDs nor `newlyPersistedProofIds` as author-projection authority;
+- supports independent author-scoped recovery enumeration when a slot write and projection write do
+  not span one transaction;
+- re-reads, detaches and authenticates the current witnesses and recomputes scope, digest pair and
+  proof ID before handoff; and
+- hands off before exact-row removal, explicitly providing at-least-once rather than external
+  exactly-once delivery.
+
+All fourteen RED workflow/supplement/test/fixture artifacts remain byte-identical at GREEN. The three
+deep helpers remain absent from source, built declaration and runtime package roots, and the generic
+package smoke now rejects all three by name. No 0o-b2 budget, 0o-b3 reputation, gossip transport, ACL
+mutation, witness/proof compaction, payload outbox, acknowledgement API or global evidence bound was
+added.
+
+#### D.65.1 — Causal evidence and independent reviews
+
+The RED evidence file and 33-entry manifest have SHA-256
+`a480659b0f311795519435d53f53f4782724559ee309c7e3359828ac267f8584` and
+`c1a48b2e7f055c7fe6595a620e4c67e6037901f504cede2f0b982ec693fb1832`.
+The independent controlled implementation passes 18/18. Production RED has exactly sixteen owned
+failures, each for the missing `createDurableAuthorEquivocationProjection` surface, while the
+governance and public-absence rows correctly pass. Each of eighteen controlled surgical mutants kills
+exactly its one owned row and leaves seventeen siblings green.
+
+The GREEN evidence file and 51-entry manifest have SHA-256
+`952e8038d9cef0ce1da32172a52b83aa4b74e16fbe9e5f052674422e37e3d669` and
+`4ef1b2dd9782ad3380032cf96910a31f26c19dbbeb234f424692f790d0332878`.
+Production and the independent control each pass 18/18, every controlled mutant retains its exact
+one-owned-failure/17-pass result, and the protected 0o-a and 0o-b1a matrices pass 32/32 and 9/9.
+All three freeze checkers, protocol-v3 build/type/public audits, public-package smoke, targeted
+lint/format/diff and workspace typecheck pass. The process-local `.logs/**`-excluded workspace lint has
+zero errors and 226 inherited warnings.
+
+That GREEN manifest binds the plan blob at implementation checkpoint `c2f63f9`. This separate D.65
+checkpoint intentionally changes that one bound documentation path. Future audits must verify the
+51-entry tuple against `c2f63f9` (or compare the plan entry to that commit's blob) rather than claiming
+an unqualified HEAD-level all-pass or recutting the historical evidence.
+
+The final review sequence unanimously found no acceptance blocker, required code/test fix or plan
+correction:
+
+- Grok 4.5/high `PASS_WITH_NOTES`, exact final SHA-256
+  `2a38064d8996c9b0a3f483a31e224ad0117924b90aff224abd477932ccf0e1c0` and review-manifest
+  SHA-256 `42876cea87f66dc4477d029bfbe873d45d36fb3fbdc62e9799bc7ff980df29bd`;
+- exact `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`
+  `PASS_WITH_NOTES`, exact final SHA-256
+  `7185d07ec9d2d2e7abb5110db465bc0c9f3a78f41f16708411f3681ed060e463` and review-manifest
+  SHA-256 `256eb5204ba7d29167fbd87c47fbb2861ccb415502f9fcdf6ff3170c9592085e`;
+- final Opus/xhigh `PASS_WITH_NOTES`, exact final SHA-256
+  `2aaac6f75cc9c0cd2ac1ab3719604c6fcbef3af37ae7199bcac6c08679795418` and 24-entry
+  review-manifest SHA-256 `ee58b12298caefb01e54df3536c2664e102003aa3aa1b3109249b87992ac0444`.
+
+The Opus process resolved to `claude-opus-5`, session
+`1502c2fe-d123-4a19-a73d-460d7922acd2`, effort xhigh, 57 turns, exit zero, `is_error=false` and no
+retry or resume. Opus's safe-mode shell invocations were denied, which its report states plainly. The
+wrapper independently reverified both evidence manifests, the frozen diff/checker, production 18/18
+and public-package smoke. That focused Vitest run refreshed the pre-existing ignored
+`node_modules/.vite/results.json` cache; it changed no tracked, staged or phase-owned path.
+
+#### D.65.2 — Contract consequences and mandatory carry-forward
+
+These findings are accepted behavior or evidence-quality residuals, not amendments to the frozen
+contract:
+
+1. Pending drain is FIFO with no skip-forward. A permanently corrupt or unmaterializable head can
+   starve later valid rows until trusted-store/operator repair.
+2. Pending dedup is correctly keyed by canonical `(scope, unordered digest pair)`, not by the derived
+   `pairId`. Consequently, a shape-valid row injected into the trusted durable store with the correct
+   pair and a wrong `pairId` suppresses a legitimate re-enqueue, remains un-drainable and can combine
+   with FIFO starvation. This is fail-closed behavior over the injected store trust root, not evidence
+   that the row is authentic.
+3. A pending row with a non-hex digest fails during durable-state capture, so `drainOne` rejects rather
+   than returning the ordinary `{ handedOff: false, ... }` result. It remains pending and no handoff or
+   removal occurs.
+4. Recovery completeness is conditional. A malformed or cross-author enumerated scope aborts before
+   any reconciliation; a witness-authentication failure aborts mid-enumeration after earlier valid
+   slots may already have committed. Monotone union and pair dedup make a retry after repair
+   idempotent. 0o-b2 and 0o-b3 may not infer that one `recover()` invocation reconciled every slot.
+5. Concurrent drains can select and hand off the same head row before either removal commits. The
+   losing remover can still report `handedOff: true` after removing nothing. This and the post-handoff
+   removal-crash case are both within the explicit at-least-once boundary; no external exactly-once
+   claim is permitted.
+6. If a nonconforming authoritative slot contains multiple carriers for one digest, drain selects the
+   last indexed matching carrier instead of independently reproducing 0o-a's lexicographically lesser
+   choice. Conforming 0o-a state retains exactly one lex-selected carrier per digest; proof identity and
+   standalone verification are unaffected.
+7. The injected transaction must serialize conflicting author updates. The injected resolver must be
+   pure/idempotent: drain currently resolves each witness key once during capture/authentication and
+   again during current-proof materialization. No resolver result, carrier, proof or successful
+   materialization may become durable authority.
+8. Several hostile-surface mutants fail at an earlier rejection assertion before the owned row's
+   finer once-count, no-partial-write or public-boundary sub-assertions. The causal kill remains exact
+   and code inspection plus the other gates establish the finer behavior, but do not claim every
+   assertion was mutation-fired. Eighteen mutants cover fifteen owned rows; governance, invariance and
+   injected-only have no designated mutant, and the evidence does not claim a row-mutant bijection.
+   The public-reexport arm lives in the frozen test because the absence row correctly passes at RED.
+9. The controlled reference is independent for the new projection logic but intentionally shares the
+   already accepted lower `verifyReceivedVertex` primitive. Its `controlledModule` contract field is
+   documentation-only; the runner/workflow selects the module path.
+10. Evidence remains untracked and is bound by repository-relative SHA manifests. The retained
+    invalid-CWD manifest invocation is non-verification. Raw workspace lint remains non-green with 30
+    `.logs/**` parser errors and 226 inherited warnings; do not describe it as passing.
+11. No full serial root Vitest pass is established. The 0o-b1b RED run reached the already known object
+    slowdown and was terminated; the GREEN run was bounded and terminated after inherited dirty-root
+    failures, with 0o-b1b green inside it, but did **not** reach or reproduce the object slowdown. Keep
+    the unresolved root/object residual open and preserve that distinction.
+
+The two once scopes remain distinct: a conforming 0o-a coordinator returns each newly persisted
+slot-proof ID once per slot transition, while 0o-b1b enqueues each author-pair identity once per author
+store lifetime. The latter depends on the permanent per-slot digest set and is deliberately not a
+global evidence-storage bound.
+
 ## Next Agent Prompt
 
-Phase 0o-a is accepted at `16a864b`; D.62 is its acceptance ledger. D.63 is the unanimous 0o-b
-correction/split. Phase 0o-b1a is frozen at `05e9f9c`, implemented at `5e26eef`, and accepted by D.64.
-Begin **0o-b1b only** with a fresh Codex-high causal RED owner.
+Phase 0o-a is accepted at `16a864b` by D.62. D.63 is the unanimous 0o-b correction/split. Phase
+0o-b1a is accepted at `5e26eef` by D.64. Phase 0o-b1b is frozen at `636490a`, implemented at
+`c2f63f9`, and accepted by D.65. Begin **0o-b2 only** with a fresh Codex-high causal RED owner.
 
-Freeze one additive durable-projection/recovery contract over injected storage and authoritative
-full-slot reads. Pin every D.63.5 blocker, including monotone union, `newDigests × postUnionDigests`,
-lifetime pair enqueue identity, co-commit or author-scoped recovery enumeration, current-carrier
-reconstruction, fail-closed pending removal, zero proof-body/byte copies, exact 0o-a invariance and the
-prior hostile capture/detach class. The controlled reference and surgical mutants must prove each
-failure causally. Treat `deriveEquivocationProofId` only as pure identity derivation; proof handoff must
-materialize and authenticate current witnesses. Add the D.64 generic package-smoke defense only after
-the fresh RED owns it.
+Freeze one pure deterministic author-wide gossip-budget composition over a once-detached
+digest-set/pair projection. The budget may depend only on that projection plus explicit bounded policy
+inputs. It must be permutation/retry/concurrency invariant, deterministic at exact boundaries and
+incapable of mutating its inputs or any durable state. Pin hostile getters/arrays and surgical mutants
+that prove the positive budget result and the negative authority boundary.
 
-Do not implement 0o-b2 budget, 0o-b3 reputation, gossip transport, ACL mutation, witness compaction,
-`state.proofs` compaction, payload outbox, acknowledgement API or a global evidence bound in 0o-b1b.
-Preserve the invalid-cwd/raw-lint/root-object residual distinctions instead of claiming those gates
-passed.
+The 0o-b2 surface must not read pending rows, proof bodies, `state.proofs`, received vertices,
+admission/verification/materialization results, clocks, resolver output, ACL state or mutable global
+state. Budget saturation changes only pure gossip composition output: it cannot change admission,
+resolution, `slotSignal`, standalone proof verification, durable projection/recovery, pending handoff
+or the future reputation value. Do not add transport, a store/default store, token bucket, wall clock,
+acknowledgement API, payload outbox, witness/proof compaction, global evidence bound, 0o-b3 reputation
+or ACL mutation. Carry D.65's trusted-store, conditional-recovery and at-least-once consequences
+without making budget depend on them.
 
-Phase 0p remains limited to anchored reducer/input/epoch work budgets. Preserve exact received-byte
-identity, the frozen D.37 tuple, the deep-only public boundary, the shipped-target activation boundary,
-serial root-Vitest constraint, root-postinstall build dependency and declared non-sandbox residuals.
-Use a distinct Codex-high GREEN owner, then Grok-high, exact
+Preserve exact received-byte identity, the frozen D.37 tuple, the deep-only public boundary, the
+shipped-target activation boundary, serial root-Vitest constraint, root-postinstall build dependency
+and declared non-sandbox residuals. Use a distinct Codex-high GREEN owner, then Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh. Keep the standing
 v3-forward owner/plane audit; v2 remains preservation/compatibility/freeze only. Never stage `.logs/`,
 `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or
