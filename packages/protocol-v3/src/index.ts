@@ -127,6 +127,31 @@ export interface DurableAuthorEquivocationProjection {
 	drainOne(author: string): Promise<DrainAuthorProjectionResult>;
 }
 
+export type DetachedAuthorGossipSlot = AuthorProjectionSlot;
+
+export interface DetachedAuthorGossipProjection {
+	readonly author: string;
+	readonly slots: readonly DetachedAuthorGossipSlot[];
+}
+
+export interface AuthorGossipBudgetPolicy {
+	readonly maxGossipPairCount: number;
+}
+
+export interface AuthorGossipPair {
+	readonly scope: EquivocationScope;
+	readonly lesserDigestHex: string;
+	readonly greaterDigestHex: string;
+}
+
+export interface AuthorGossipBudgetComposition {
+	readonly author: string;
+	readonly selectedPairs: readonly AuthorGossipPair[];
+	readonly totalPairCount: number;
+	readonly suppressedPairCount: number;
+	readonly saturated: boolean;
+}
+
 export interface SlotAdvisorySignal {
 	readonly author: string;
 	readonly observedForkCount: number;
@@ -1978,6 +2003,131 @@ export function createDurableAuthorEquivocationProjection(
 	};
 
 	return { drainOne, reconcile, recover };
+}
+
+interface MutableDetachedAuthorGossipSlot {
+	readonly scope: EquivocationScope;
+	readonly digestHexes: string[];
+}
+
+function compareCodeUnits(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareAuthorGossipPairs(left: AuthorGossipPair, right: AuthorGossipPair): number {
+	return (
+		compareCodeUnits(left.scope.objectId, right.scope.objectId) ||
+		left.scope.authorSequence - right.scope.authorSequence ||
+		compareCodeUnits(left.lesserDigestHex, right.lesserDigestHex) ||
+		compareCodeUnits(left.greaterDigestHex, right.greaterDigestHex)
+	);
+}
+
+/**
+ * Selects the canonical first N author-wide equivocation pairs from a detached projection.
+ *
+ * The policy bounds only the returned selection. Exact pair enumeration remains
+ * quadratic in each normalized slot's digest count.
+ * @param projection - Detached per-slot digest sets for exactly one author.
+ * @param policy - Explicit nonnegative selection limit.
+ * @returns A fresh deterministic composition with exact derived counts.
+ */
+export function composeAuthorGossipBudget(
+	projection: DetachedAuthorGossipProjection,
+	policy: AuthorGossipBudgetPolicy
+): AuthorGossipBudgetComposition {
+	if (projection === null || typeof projection !== "object" || policy === null || typeof policy !== "object") {
+		throw new TypeError("gossip budget inputs are required");
+	}
+
+	const maxGossipPairCount = policy.maxGossipPairCount;
+	if (!Number.isSafeInteger(maxGossipPairCount) || maxGossipPairCount < 0) {
+		throw new RangeError("maxGossipPairCount must be a nonnegative safe integer");
+	}
+
+	const author = projection.author;
+	const capturedSlots = projection.slots;
+	if (typeof author !== "string" || !Array.isArray(capturedSlots)) {
+		throw new TypeError("gossip projection is malformed");
+	}
+
+	const mergedSlots = new Map<string, Map<number, MutableDetachedAuthorGossipSlot>>();
+	const slotCount = capturedSlots.length;
+	for (let index = 0; index < slotCount; index++) {
+		const candidate = capturedSlots[index];
+		if (candidate === null || typeof candidate !== "object") {
+			throw new TypeError("gossip projection slot is malformed");
+		}
+		const capturedScope = candidate.scope;
+		const scope = captureAuthorProjectionScope(capturedScope);
+		const capturedDigestHexes = candidate.digestHexes;
+		if (scope === undefined || scope.author !== author || !Array.isArray(capturedDigestHexes)) {
+			throw new TypeError("gossip projection slot is malformed");
+		}
+
+		const digestHexes: string[] = [];
+		const digestCount = capturedDigestHexes.length;
+		for (let digestIndex = 0; digestIndex < digestCount; digestIndex++) {
+			const digestHex = capturedDigestHexes[digestIndex];
+			if (!isDigestHex(digestHex)) {
+				throw new TypeError("gossip projection digest is malformed");
+			}
+			digestHexes[digestIndex] = digestHex;
+		}
+
+		let sequences = mergedSlots.get(scope.objectId);
+		if (sequences === undefined) {
+			sequences = new Map<number, MutableDetachedAuthorGossipSlot>();
+			mergedSlots.set(scope.objectId, sequences);
+		}
+		let merged = sequences.get(scope.authorSequence);
+		if (merged === undefined) {
+			merged = { scope: copyAuthorProjectionScope(scope), digestHexes: [] };
+			sequences.set(scope.authorSequence, merged);
+		}
+		for (let digestIndex = 0; digestIndex < digestHexes.length; digestIndex++) {
+			const digestHex = digestHexes[digestIndex] as string;
+			if (!authorProjectionIncludes(merged.digestHexes, digestHex)) {
+				merged.digestHexes[merged.digestHexes.length] = digestHex;
+			}
+		}
+	}
+
+	const pairs: AuthorGossipPair[] = [];
+	for (const sequences of mergedSlots.values()) {
+		for (const slot of sequences.values()) {
+			slot.digestHexes.sort(compareCodeUnits);
+			for (let lesserIndex = 0; lesserIndex < slot.digestHexes.length; lesserIndex++) {
+				for (let greaterIndex = lesserIndex + 1; greaterIndex < slot.digestHexes.length; greaterIndex++) {
+					pairs[pairs.length] = {
+						scope: copyAuthorProjectionScope(slot.scope),
+						lesserDigestHex: slot.digestHexes[lesserIndex] as string,
+						greaterDigestHex: slot.digestHexes[greaterIndex] as string,
+					};
+				}
+			}
+		}
+	}
+	pairs.sort(compareAuthorGossipPairs);
+
+	const totalPairCount = pairs.length;
+	const selectedPairCount = Math.min(totalPairCount, maxGossipPairCount);
+	const selectedPairs: AuthorGossipPair[] = [];
+	for (let index = 0; index < selectedPairCount; index++) {
+		const pair = pairs[index] as AuthorGossipPair;
+		selectedPairs[index] = {
+			scope: copyAuthorProjectionScope(pair.scope),
+			lesserDigestHex: pair.lesserDigestHex,
+			greaterDigestHex: pair.greaterDigestHex,
+		};
+	}
+	return {
+		author,
+		selectedPairs,
+		totalPairCount,
+		suppressedPairCount: totalPairCount - selectedPairCount,
+		saturated: totalPairCount > maxGossipPairCount,
+	};
 }
 
 function allCanonicalEquivocationProofs(
