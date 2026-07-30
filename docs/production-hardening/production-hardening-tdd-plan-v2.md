@@ -842,9 +842,64 @@ codec → vectors already frozen and now provably correct.
 > not an implicit 0o-b optimization.
 
 > **Phase 0p ownership boundary.** Phase 0p owns only anchored input/epoch work budgets and the
-> `maxEpochVertices` ceiling. It owns no execution-time, wall-clock, step, instruction or collection-touch
+> `maxEpochVertices`/`maxEpochBytes` ceilings. It owns no execution-time, wall-clock, step, instruction or collection-touch
 > rule, and no equivocation-proof retention, gossip/rate aggregation, reputation composition or
 > evidence-storage policy.
+
+> **Phase 0p-3 epoch-byte correction.** This normative supplement replaces the under-specified
+> “`maxEpochBytes` is its byte-side twin” shorthand in the 0p row. 0p-3 lands after accepted
+> 0p-1/0p-2 and before live Phase 3a. Epoch bytes count exactly the registered canonical-preimage
+> byte carrier of every published hash, including the anchor: the exact received preimage bytes that
+> authentication verified for a remote vertex, the anchor's exact authenticated signed-preimage
+> bytes, and the exact canonical-preimage bytes inside a durably committed local signed
+> envelope/outbox entry. A decoded vertex or anchor is never re-encoded to meter it. This differs
+> deliberately from 0p-0/0p-2: an operation is a sub-object with no independently authenticated byte
+> carrier, whereas a vertex/anchor preimage has one and re-encoding would create a second byte
+> authority. Signature bytes, digest bytes, signed-envelope wrapper fields, referenced
+> blueprint/parameters/artifact bodies, raw pubsub/transport framing and retry delivery overhead are
+> excluded. The operation-record meter does not define epoch bytes.
+>
+> The invariant is `sum(published exact-preimage charges) <= maxEpochBytes`; exact equality is
+> accepted. Every ceiling and charge is a positive safe integer, the running total remains in
+> `[0, maxEpochBytes]`, and the normative exact comparison is
+> `charge <= maxEpochBytes - total`. Internal `bigint` is unnecessary; truncating or wrapping
+> accumulation, including 32-bit coercion, is forbidden. An exact duplicate/redelivery charges
+> nothing. A refused candidate charges nothing, publishes no hash or ancestor row and is freshly
+> re-evaluated on retry. Byte saturation returns the existing frozen, field-closed, non-terminal and
+> non-latched `{ status: "pending", code: "EPOCH_FULL", latchByHash: false }`; no new outcome or
+> widened return type is allowed. Append preserves duplicate-before-capacity and count-first
+> saturation. A count-full index returns `EPOCH_FULL` before candidate observation or charge
+> validation. When count has room, append captures and validates the inert charge and performs the
+> byte precheck before candidate observation; after candidate/dependency capture it rechecks both
+> ceilings before allocation or publication.
+>
+> The `@ts-drp/compaction` primitive is provenance-neutral. It receives charges only as inert,
+> once-captured positive safe integers and never imports protocol-v3, encodes/decodes a carrier,
+> authenticates a signature, digest or `parametersDigest`, selects a support profile or invokes a
+> lazy charge callback. Primitive acceptance proves only that the supplied charges fit, never that
+> they are authentic. Absent byte capacity preserves legacy/0p-1 behavior. Governance is additive in
+> a separate `packages/compaction/conformance/epoch-byte-capacity-v1/` family. The frozen
+> `epoch-capacity-v1` directory remains exactly four files, its `claims.maxEpochBytes: false` remains
+> byte-identical and its hash-pinned public/built type audits must continue to typecheck; therefore
+> `maxEpochBytes`, the initial charge input and the append-time charge are optional, while `append`
+> retains its existing return union.
+>
+> The 0p-3 RED is `compaction-epoch-byte-capacity-0p3.test.ts`. It freezes: ceiling-domain and absent
+> behavior; an exact, once-read snapshot whose charge keyset equals the initial graph keyset,
+> including the anchor without anchor discovery; positive-safe-integer charges; initial equality and
+> oversize; stable `INVALID_BYTE_CHARGES` and `EPOCH_CAPACITY_EXCEEDED` domains; precedence
+> ceiling-domain → invalid charge shape/keyset → count oversize → byte oversize before vertex
+> observation, traversal or bitset allocation; `B-1`/`B`/`B+1`; a reachable 32-bit-truncation
+> boundary; zero duplicate/refusal charge; intentional count-first append saturation before
+> candidate observation or charge validation; the identical shared outcome when both caps refuse;
+> post-capture dual-cap recheck under nested append; atomic rollback of ancestor row, index row and
+> byte total; and no arrival-order winner. Mutants that must die are
+> `anchor-charge-omitted`, `lt-vs-le`, `wrapping-accumulation`, `duplicate-charge`,
+> `charge-on-refusal`, `latched-byte-full`, `terminal-byte-full`, `initial-keyset-lax`,
+> `mutable-initial-charges`, `late-initial-byte-check`, `initial-precedence-swap`, `count-only`,
+> `byte-only`, `stale-pre-reentrancy`, `partial-rollback`, `arrival-winner` and
+> `live-charge-authority`. Behavioral rows carry the proof; any exposed total is corroboration only.
+> Exact-carrier substitution mutants belong to Phase 3a because the generic primitive never meters.
 
 > **0g(ii-I) maximum boundary.** The frozen registry, references, c2 contract and replacement mint issue
 > `authorSequence = Number.MAX_SAFE_INTEGER` exactly once, atomically mark the lineage exhausted, and
@@ -995,6 +1050,31 @@ remains immutable; the supplement is a separately governed post-freeze addendum.
 | **3g** | **Rebase outbox**: original-author-only re-signing, idempotence by stable `clientOperationId`, per-operation policy (idempotent-rebase / transform / expire / manual-review), rate-limited so post-cut rebase storms cannot amplify                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | consensus-v3 | sliceable                                     | Non-author replacement **fails verification**; duplicate rebase delivery applies once; per-blueprint metamorphic test: uninterrupted execution ≡ every cut/rebase placement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **3h** | Migration record + **rehearsal gate**. The signed migration record is the only irreversible act in the whole plan and round 1 gave it no dry-run. Authorization is **creator-only or an externally pinned/threshold authority** — never "current authority", which is replay-influenceable until 3a lands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | coordinated  | sliceable                                     | Rehearsal E2E: after the dry run the room is **provably still on the legacy plane** (rollback intact); activation is a separate signed act                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
+> **Phase 3a epoch-byte provenance and local-publication supplement.** Phase 3a is the exclusive
+> owner of parameters provenance and every live epoch-byte charge. Because registered `parameters`
+> is unsigned, its only authenticity channel is the anchor-signed `parametersDigest`: after verifying
+> the anchor signature, 3a resolves the exact canonical parameters carrier named by that digest,
+> recomputes and verifies the digest over those exact bytes, and selects locally supported
+> `maxEpochVertices` and `maxEpochBytes` before subscription or index construction. It supplies only
+> authenticated exact-preimage charges: the anchor and exact initial-graph keyset at construction,
+> exact received preimage bytes already authenticated on a remote append, and the exact committed
+> envelope preimage bytes on a local append. Live-binder REDs kill raw-frame, signature-inclusive,
+> envelope-inclusive, decoded-re-encode, discriminator-only and operation-only meters; unauthenticated
+> or caller-supplied limits; and any claim that generic primitive acceptance is authenticated
+> evidence.
+>
+> `authorSequence` is selected inside durable `transactIssue`, so the exact local preimage charge is
+> not known until commit. A maximal-sequence upper-bound precheck is permitted only as an explicitly
+> non-authoritative waste-avoidance heuristic and is not required: it can falsely refuse an exactly
+> fitting issuance and cannot prevent a remote append from consuming capacity before publication.
+> Any genuine reservation/serialization belongs only to an owner that proves atomicity between local
+> publication and remote append. The normative rule is postcommit: `EPOCH_FULL` never rolls back,
+> overwrites, hides or pretends away the committed author sequence, exact envelope, issued record or
+> outbox entry. The entry remains durable, unpublished and non-admitted—therefore not accepted—plus
+> idempotently retryable and re-evaluable until a certified epoch transition determines staleness.
+> This preserves `accepted iff appended` without violating sequence linearizability or durable crash
+> atomicity.
+
 ### Exit gate (Phase 3)
 
 Exhaustive small-graph model + adversarial schedule suite green **in repository code**; **envelope purity**
@@ -1069,11 +1149,17 @@ the formal model is green. **Creator-certified ships before attested.**
 | **5g**  | **Authority handoff & weak subjectivity**: handoff intent + all new-signer acceptances + old-authority QC; data-cut vs authority-cut separation (joiner cost ∝ governance changes, not messages); invite pinning (genesis + recent cut); conflicting-branch warning UX                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | consensus-v3 | sliceable                                   | Profile changes only at the named next epoch; a missing new-signer acceptance or old-authority QC **rejects**. **Equivocation:** two valid-looking handoff certificates for different new sets → **loud halt + UI, never an automatic pick**                                                                                                                                                                                                                                                                                                                                                                                             |
 | **5h**  | **Close barrier** (AHE §8.4, currently unsliced anywhere): before proposing, the proposer announces intent, gathers signer frontiers, reconciles missing vertices, then proposes; new local writes during the barrier go to the next-epoch outbox. An optimization that makes **first-round agreement likely** — explicitly **not a validity oracle**, and never load-bearing for safety. Without it, k-of-n delegates proposing from different sync states burn pacemaker rounds before converging: correct but wasteful, and for a 2-of-3 friend room it would look like "compaction is broken."                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | local-safe   | sliceable                                   | `close-barrier.test.ts`: delegates with deliberately divergent frontiers converge in **one** round with the barrier on; **disable the barrier → correctness unchanged** (same final `valueDigest`, zero conflicting QCs), only the round count rises — proving the barrier is not load-bearing for safety                                                                                                                                                                                                                                                                                                                                |
 
-**Saturated-epoch ownership.** Under Phase 0p's anchor-inclusive capacity rule, the certified close set
-contains at most `maxEpochVertices − 1` ordinary vertices because the index counts the anchor while the
-close set does not. Phase 5 owns exact deterministic final membership at saturation; every excluded
-current-epoch operation becomes stale by the certified next anchor and may be rebased. No earlier phase
-may turn a local arrival-order winner into semantic final membership.
+**Saturated-epoch ownership.** Under Phase 0p's anchor-inclusive capacity rules the certified close set
+is bounded on both axes. It contains at most `maxEpochVertices − 1` ordinary vertices because the index
+counts the anchor while the close set does not. Its exact authenticated canonical-preimage byte sum is
+at most `maxEpochBytes − anchorBytes` because the epoch byte total charges the anchor while the close
+set does not. Proving the byte ceiling requires strictly more evidence than proving the count ceiling:
+Phase 5 retains each close-set member's exact authenticated preimage length or bytes so every signer
+recomputes the same bound from authenticated artifacts, never a re-encoded surrogate. Phase 5 owns
+exact deterministic final membership at saturation on both axes; every excluded current-epoch
+operation becomes stale by the certified next anchor and may be rebased. No earlier phase may turn a
+local arrival-order winner into semantic final membership, and neither 0p-3 nor Phase 3a names an
+arrival-order winner on either axis.
 
 ### The n=4 permanent stall this fixes (G2), as an executable schedule
 
@@ -11704,7 +11790,21 @@ The body edits above apply the unanimous conservative boundary:
    engine-owned constrained staged-state surface. Fake state proxies and cooperative counters are not
    gates.
 7. `maxEpochBytes` remains an anchored 0p responsibility but is not made green by 0p-1; it must receive
-   its own executable slice before the live binder claims complete epoch-byte enforcement.
+   its own executable slice before the live binder claims complete epoch-byte enforcement. That
+   additive Phase **0p-3** is ordered after accepted 0p-1/0p-2 and before Phase 3a. It extends only
+   the opt-in `CausalityIndex` surface with optional `maxEpochBytes`, an exact initial charge keyset
+   snapshotted/read once, an optional append-time inert numeric charge, anchor-inclusive exact
+   subtraction-safe accounting, the shared frozen `EPOCH_FULL` outcome, a post-capture dual-cap
+   recheck and atomic three-way rollback of ancestor row, index row and byte total. Stable domains are
+   `RangeError` for ceiling domain, `LinearizationError("INVALID_BYTE_CHARGES")` for charge
+   shape/keyset, `LinearizationError("EPOCH_CAPACITY_EXCEEDED")` for either initial oversize and the
+   frozen `EPOCH_FULL` singleton for append saturation. Initial precedence is cap domains → invalid
+   charges → count oversize → byte oversize, before anchor discovery, traversal, vertex getters or
+   bitset allocation; other multi-defect precedence remains deliberately unspecified. It changes no
+   registry kind, frozen seven-field `parameters` entry, transport rule or protocol-v3 source and
+   edits no frozen 0p-1 artifact. The closed `epoch-capacity-v1` directory and
+   `claims.maxEpochBytes: false` remain byte-identical; the new governed family is
+   `epoch-byte-capacity-v1`.
 8. Deterministic fuel, allocation, stack limits and preemption defer to a governed isolated VM. A
    pre-decode frame limit remains transport-owned. Within-bound CPU/memory/nontermination risk is
    explicit.
@@ -11977,28 +12077,126 @@ Accepted findings and evidence limits:
 12. Opus-side commands were permission-denied before execution, so Opus used static inspection plus
     immutable root/Grok/Kimi evidence and made no independent executable or root-green claim.
 
+### D.72 — Phase 0p-3 epoch-byte plan correction
+
+The four-word “`maxEpochBytes` is its byte-side twin” shorthand was materially under-specified. It
+did not select the counted carrier, exclusions, anchor inclusion, equality boundary, initial
+accounting/keyset, arithmetic domain, combined-cap precedence, reentrant rollback, primitive/live
+provenance boundary, local postcommit outcome or Phase-5 evidence. The ambiguity was dangerous
+because accepted 0p-2 correctly re-encodes an operation sub-object, while the v3 exact-received-byte
+rule forbids re-encoding the independently authenticated vertex carrier. Honest RED/GREEN owners
+could therefore freeze incompatible saturation points.
+
+The required plan-correction quorum unanimously returned `AGREE_CORRECTION` across the same
+load-bearing plan text. Exact Kimi reviewed implementation checkpoint `81b8c98`; Codex-high and final
+Opus/xhigh reviewed documentation checkpoint `b224414`. The intervening D.71-only documentation
+checkpoint accepted 0p-2 without changing the under-specified 0p/D.68/3a/Phase-5 lines under review:
+
+- Codex-high final SHA-256
+  `c2e5e71802e7e83c87a9a057993622ba7b579f49cddee16299b172ddc131f48e`,
+  provenance SHA-256
+  `d43c019ed50a91a3f4d1f8ec1ba3d241d2d1baca762238f95b2fe1b4d1750ee9` and
+  evidence-manifest SHA-256
+  `f08b92a13d9eebaf855067f665338adf7c93eb930ad9bed80fb17d052a020bc0`;
+- exact Kimi 3/100 final SHA-256
+  `d7e49278dec3edf6ccef2444cf8815a06ca0baf65b112b7fa10358a569281def`, raw
+  SHA-256 `59ca67521ef9e4e0296ac01c5db49ac0544d6c9ca75876a0ee55eb4afd65dde7`
+  and manifest SHA-256
+  `b05a5d60f56bf762441222c50de13bb58a997c0e53b0a5fa36b6b0d5106aa10e`;
+- final Opus/xhigh final SHA-256
+  `d6a58efd856677bc9e2c08649e5d453cdb33c33951ec99f14760655f4c8191f9`, raw
+  SHA-256 `1b9bf03e806628b51714b3bf0abae798ea44f7133cf38a510ecdd45b08391161`,
+  model-resolution SHA-256
+  `c0cef88aa0e9ed8d7364d75fe99c54ada8858d35848d6bb21519a7b5de3018c9`
+  and artifact-manifest SHA-256
+  `26cfdea85433f82028892831f2698506b3a11b9927af41e5be51ff078192cd8a`.
+
+The Kimi session `session_fe3218e9-8a31-4fa3-95fc-3587342583b2` used exact
+`kimi-code/k3`, high thinking, 15/100 steps, exit zero and no fallback. The fresh Claude session
+`bba8f351-ef3f-4355-adb9-ecafede35f1c` used `claude-opus-5` at xhigh for 41 turns,
+`success`/`end_turn`, exit zero and no retry, resume or fallback. Its substantive 49,552 Opus output
+tokens and $4.1927465 cost dominate one automatic 26-output-token/$0.003933 Haiku auxiliary call;
+all 83 retained assistant events and the final review are Opus. Haiku did not review or author the
+result. The Codex agent runtime did not expose an exact serving-model or session identifier, so its
+provenance records the requested Codex-high role without inventing metadata.
+
+The normative edits above record the unanimous conservative result:
+
+1. Count only exact authenticated registered canonical-preimage carriers, anchor-inclusive, with
+   equality accepted; signatures, digests, envelope wrappers, referenced artifacts, frames and
+   retry overhead are excluded.
+2. The primitive uses positive safe integers and exact subtraction-safe accounting. `bigint` is not
+   mandated; behavioral REDs kill reachable truncation/wrapping rather than asserting a source form.
+3. Initial charges have an exact graph keyset, are read once and snapshotted before vertex
+   observation. Stable precedence is cap domain → invalid charges → count oversize → byte oversize.
+4. Duplicates and refusals charge zero. Append keeps count-first O(1) saturation, intentionally
+   skipping charge validation when count is already full, and returns the same frozen `EPOCH_FULL`.
+5. A post-capture dual-cap recheck and three-way rollback keep ancestor row, index row and byte total
+   atomic under reentrancy or publication failure.
+6. 0p-3 is a provenance-neutral compaction primitive in a new `epoch-byte-capacity-v1` family. It
+   edits no frozen 0p-1 artifact and does not authenticate or measure live carriers.
+7. Phase 3a exclusively authenticates `parametersDigest`, supplies exact live charges and kills
+   carrier-substitution meters. A maximal-sequence precheck is optional and non-authoritative, never
+   a reservation claim.
+8. A postcommit local `EPOCH_FULL` never rolls back or hides the durable sequence/envelope/record/
+   outbox. The entry remains unpublished, non-admitted and retryable, preserving
+   `accepted iff appended`.
+9. Phase 5 proves both ceilings. Its ordinary-member byte bound is
+   `maxEpochBytes - anchorBytes`, using retained authenticated carrier lengths or bytes.
+
+Accepted gotchas and evidence limits:
+
+1. The frozen `epoch-capacity-v1` directory asserts an exact four-file tree and
+   `claims.maxEpochBytes: false`; flipping that claim or adding a fifth file is a freeze violation,
+   not an implementation shortcut.
+2. Frozen type audits require the new option and append charge to remain optional and forbid widening
+   `append` beyond `undefined | EpochFullOutcome`.
+3. Count-saturated refusal proves neither candidate validity nor charge validity. That is deliberate
+   inherited O(1) behavior, not fail-open admission evidence.
+4. A `ReadonlyMap` can still be a mutable subclass/proxy. Snapshot/read-once semantics, plus
+   behavioral follow-on capacity tests, are required; introspection alone is not proof.
+5. Safe-integer `total + charge <= cap` would not itself wrongly accept under the validated domain,
+   so “float overflow” is not the causal bug. The plan chooses subtraction as a proof-preserving form
+   and targets reachable 32-bit coercion/wrapping instead.
+6. A maximal-author-sequence bound can overestimate an exact local preimage and still cannot prevent
+   a concurrent remote append. Requiring it would reward-hack a false guarantee.
+7. Generic primitive callers can lie about charges by design. Phase 3a must never treat primitive
+   acceptance as authenticated evidence.
+8. Phase 5 needs more than hash counts to prove the byte ceiling; authenticated carrier lengths or
+   bytes must survive until close.
+9. The Opus consultation was read-only and ran no tests/builds. Its executable claims are static
+   conclusions; the controller's logged gates and the forthcoming RED/GREEN own runtime proof.
+10. A fresh applied-text exact Kimi 3/high fidelity audit passed all twelve axes in 19/100 steps with
+    no fallback or tracked-state mutation. Its final SHA-256 is
+    `68bd5de6ace9f733b452f322641493b6267a074ffaa1976e472fd4edb6e675f7`, raw
+    SHA-256 `29dd0b5bbe6677b3f6a505d86ab1f6aee86426aaa24eeac614cfa2127f958dee`
+    and manifest SHA-256
+    `3b65dec9a4927033a240b98bffcaf1c818f682069fda8c067f33fd20888b263a`.
+
+The applied correction passes Prettier, diff check, workspace typecheck, workspace ESLint with zero
+errors and 226 inherited warnings, the complete frozen 0p-1/0p-2 causal suites 38/38 and the
+plan-sensitive hardening-gate row 1/1. Logged SHA-256 values are, respectively, workspace typecheck
+`0dcceb0a548b9346677c2b34f07362b47539afce6bb016a8e5aff0e6ea29b970`, workspace lint
+`a8e3bbe6a19b0b5b4653580de586e9d7ff871c652f4bcafe674f2d0dba2740cb` and tests
+`4793b4225cb3095d7f1d42f24cd39417d2971cd2d9cd89658ec273c203e3c302`. Retained
+Prettier-check and diff-check SHA-256 values are
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20` and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
 ## Next Agent Prompt
 
-Phase 0p-2 is frozen at authoritative RED `80e2ea9`, implemented at `81b8c98` and accepted by D.71.
-Do **not** begin the next RED from the current phrase “`maxEpochBytes` is its byte-side twin.”
+Phase 0p-2 is frozen at authoritative RED `80e2ea9`, implemented at `81b8c98`, documented at
+`b224414` and accepted by D.71. D.72 unanimously corrects the next slice before RED.
 
-The next required 0p work is the independently executable `maxEpochBytes` slice required by D.68(7),
-but the current plan does not define the counted carrier, anchor inclusion, initial accounting,
-arithmetic, generic primitive API or live provenance boundary. A Codex-high audit and a fresh exact
-Kimi 3/100 session independently return `AGREE_CORRECTION`. Complete the required final Opus/xhigh
-correction review against the unchanged plan. Only if all three agree may the controller amend the 0p
-row, D.68 and Phase 3a, record the quorum and then start a fresh Codex-high causal RED owner for the
-authorized slice. A split verdict leaves the RED blocked and requires reconciliation.
+Start a fresh Codex-high **RED-only** owner for additive Phase 0p-3. It may add only the new governed
+`epoch-byte-capacity-v1` artifacts, workflow, root causal test and controlled fixture needed to freeze
+the D.72 contract. It may not edit production, this plan, any frozen Phase −1′/0p-0/0p-1/0p-2
+artifact, protocol-v3, the registry, transport or node composition. The RED must prove production
+fails for the intended missing byte-capacity behavior while a controlled implementation passes and
+each named surgical mutant dies without weakening an existing gate. Then checkpoint RED and hand the
+same frozen contract to a distinct fresh Codex-high GREEN owner.
 
-The candidate conservative boundary is: count the anchor-inclusive sum of exact registered canonical
-preimage byte carriers; exclude signatures, digests, envelope wrappers and transport/framing; accept
-equality; charge duplicates and refusals zero; keep `EPOCH_FULL` non-terminal and non-latched; make the
-pre-3a compaction primitive provenance-neutral; leave authentication of `parametersDigest`, parameter
-bytes and live vertex carriers exclusively to Phase 3a; and leave deterministic final membership to
-Phase 5. Exact API mechanics remain subordinate to those invariants until the quorum agrees.
-
-Never edit the frozen Phase −1′, 0p-0, 0p-1 or 0p-2 artifacts to create the new slice. Continue the
-per-slice Codex-high RED, distinct Codex-high GREEN, Grok-high, exact
+Continue the per-slice Codex-high RED, distinct Codex-high GREEN, Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
 discipline. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale
 untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested.
