@@ -775,14 +775,25 @@ function compileOperation(
 	value: unknown,
 	discriminator: string,
 	previousOperationName: string | undefined,
+	hasWorkBudget: boolean,
 	context: string
 ): readonly [string, CompiledOperationSchema] {
-	assertClosedRecord(value, ["name", "argumentSchema"], context);
+	assertClosedRecord(
+		value,
+		hasWorkBudget ? ["name", "argumentSchema", "maxCanonicalOperationBytes"] : ["name", "argumentSchema"],
+		context
+	);
 	const name = ownDataProperty(value, "name", context);
 	const argumentSchema = ownDataProperty(value, "argumentSchema", context);
 	assertNonEmptyString(name, `${context}.name`);
 	if (previousOperationName !== undefined && compareCodePointStrings(previousOperationName, name) >= 0) {
 		throw new TypeError("blueprint manifest operations must have unique names in codepoint order");
+	}
+	if (hasWorkBudget) {
+		const maxCanonicalOperationBytes = ownDataProperty(value, "maxCanonicalOperationBytes", context);
+		if (!Number.isSafeInteger(maxCanonicalOperationBytes) || (maxCanonicalOperationBytes as number) <= 0) {
+			throw new RangeError(`${context}.maxCanonicalOperationBytes must be a positive safe integer`);
+		}
 	}
 	assertClosedRecord(argumentSchema, ["kind", "fields"], `${context}.argumentSchema`);
 	if (ownDataProperty(argumentSchema, "kind", `${context}.argumentSchema`) !== "closed-record") {
@@ -844,9 +855,26 @@ function compileBlueprintPackage(value: unknown): CompiledBlueprintPackage {
 	assertNonEmptyString(runtimeProfile, "blueprint package.implementation.runtimeProfile");
 
 	const manifest = ownDataProperty(value, "manifest", "blueprint package");
-	assertClosedRecord(manifest, ["schemaVersion", "operationDiscriminator", "operations"], "blueprint package.manifest");
-	if (ownDataProperty(manifest, "schemaVersion", "blueprint package.manifest") !== 1) {
-		throw new TypeError("blueprint package.manifest.schemaVersion must be 1");
+	if (!isPlainRecord(manifest)) {
+		throw new TypeError("blueprint package.manifest must be a plain object");
+	}
+	const manifestSchemaVersion = ownDataProperty(manifest, "schemaVersion", "blueprint package.manifest");
+	const hasWorkBudget = manifestSchemaVersion === 2;
+	assertClosedRecord(
+		manifest,
+		hasWorkBudget
+			? ["schemaVersion", "operationDiscriminator", "workBudgetProfile", "operations"]
+			: ["schemaVersion", "operationDiscriminator", "operations"],
+		"blueprint package.manifest"
+	);
+	if (manifestSchemaVersion !== 1 && manifestSchemaVersion !== 2) {
+		throw new TypeError("blueprint package.manifest.schemaVersion is unsupported");
+	}
+	if (
+		hasWorkBudget &&
+		ownDataProperty(manifest, "workBudgetProfile", "blueprint package.manifest") !== "blueprint-work-budget-v1"
+	) {
+		throw new TypeError("blueprint package.manifest.workBudgetProfile is unsupported");
 	}
 	const discriminator = ownDataProperty(manifest, "operationDiscriminator", "blueprint package.manifest");
 	assertNonEmptyString(discriminator, "blueprint package.manifest.operationDiscriminator");
@@ -862,6 +890,7 @@ function compileBlueprintPackage(value: unknown): CompiledBlueprintPackage {
 			operations[index],
 			discriminator,
 			previousOperationName,
+			hasWorkBudget,
 			`blueprint package.manifest.operations[${index}]`
 		);
 		compiledOperations.set(name, schema);
