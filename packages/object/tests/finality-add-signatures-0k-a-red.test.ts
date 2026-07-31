@@ -40,6 +40,43 @@ describe("Phase 0k-a FinalityStore.addSignatures return contract", () => {
 		expect(store.getNumberOfSignatures(knownHash)).toBe(1);
 	});
 
+	it("continues a mixed batch and returns every changed attestation in input order", () => {
+		const firstHash = "phase-0k-a-batch-first";
+		const middleHash = "phase-0k-a-batch-middle";
+		const lastHash = "phase-0k-a-batch-last";
+		const throwingHash = "phase-0k-a-batch-throwing";
+		const store = new FinalityStore();
+		for (const hash of [firstHash, middleHash, lastHash]) {
+			store.initializeState(hash, signerCredentials);
+		}
+		store.initializeState(throwingHash, new Map([["different-peer", "credential"]]));
+		const first = attestation(firstHash);
+		const unknown = attestation("phase-0k-a-batch-unknown");
+		const middle = attestation(middleHash);
+		const duplicate = attestation(firstHash);
+		const throwing = attestation(throwingHash);
+		const last = attestation(lastHash);
+		const warn = vi.fn();
+		(store as unknown as { log: { warn: typeof warn } }).log.warn = warn;
+
+		const added = store.addSignatures(peerId, [first, unknown, middle, duplicate, throwing, last], false);
+
+		expect(added).toEqual([first, middle, last]);
+		expect(added[0]).toBe(first);
+		expect(added[1]).toBe(middle);
+		expect(added[2]).toBe(last);
+		expect(added).not.toContain(unknown);
+		expect(added).not.toContain(duplicate);
+		expect(added).not.toContain(throwing);
+		expect(store.states.has(unknown.data)).toBe(false);
+		expect(store.getNumberOfSignatures(firstHash)).toBe(1);
+		expect(store.getNumberOfSignatures(middleHash)).toBe(1);
+		expect(store.getNumberOfSignatures(lastHash)).toBe(1);
+		expect(store.getNumberOfSignatures(throwingHash)).toBe(0);
+		expect(store.states.get(firstHash)?.signature).toBe(first.signature);
+		expect(warn).toHaveBeenCalledTimes(1);
+	});
+
 	it("atomically preserves a known record when aggregating a second signer throws", async () => {
 		const firstPeerId = "phase-0k-a-first-signer";
 		const secondPeerId = "phase-0k-a-second-signer";
