@@ -4,6 +4,7 @@ import {
 	ActionType,
 	DRPState,
 	DRPStateEntry,
+	DRPStateOtherTheWire,
 	DrpType,
 	type Hash,
 	type IDRP,
@@ -13,7 +14,7 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
-import { serializeValue } from "@ts-drp/utils/serialization";
+import { serializeDRPState, serializeValue } from "@ts-drp/utils/serialization";
 import { cloneDeep } from "es-toolkit";
 import { deepEqual } from "fast-equals";
 import { describe, expect, it } from "vitest";
@@ -52,25 +53,24 @@ interface PublicationCopyMetadata {
 	image: "pre" | "post";
 }
 
-interface PublicationInstrumentation {
-	clonePayload(value: unknown, metadata: PublicationCopyMetadata): unknown;
-	onPublication(record: PublicationRecord): void;
-}
-
 interface CopyObservation extends PublicationCopyMetadata {
 	bytes: number;
 }
 
-class PublicationProbe implements PublicationInstrumentation {
+type PublicationObserverEvent =
+	| { type: "copy"; value: unknown; metadata: PublicationCopyMetadata }
+	| { type: "publication"; record: PublicationRecord };
+
+class PublicationProbe {
 	readonly copies: CopyObservation[] = [];
 	readonly publications: PublicationRecord[] = [];
 
-	clonePayload(value: unknown, metadata: PublicationCopyMetadata): unknown {
-		this.copies.push({ ...metadata, bytes: serializeValue(value).byteLength });
-		return cloneDeep(value);
-	}
-
-	onPublication(record: PublicationRecord): void {
+	observe(event: PublicationObserverEvent): unknown {
+		if (event.type === "copy") {
+			this.copies.push({ ...event.metadata, bytes: serializeValue(event.value).byteLength });
+			return cloneDeep(event.value);
+		}
+		const { record } = event;
 		this.publications.push({
 			...record,
 			baselineHashes: [...record.baselineHashes],
@@ -164,7 +164,7 @@ function harness(drp = new MatrixDRP(), configure?: (drp: MatrixDRP) => void): H
 		states,
 		finalityStore: new FinalityStore(),
 		notify: (): void => {},
-		publicationInstrumentation: probe,
+		publicationObserver: probe.observe.bind(probe),
 	};
 	const Applier = DRPVertexApplier as unknown as new (candidate: typeof options) => DRPVertexApplier<MatrixDRP>;
 	return { applier: new Applier(options), hashGraph, probe, states };
@@ -190,6 +190,10 @@ function snapshot(entries: Record<string, unknown>): DRPState {
 	return DRPState.create({
 		state: Object.entries(entries).map(([key, value]) => DRPStateEntry.create({ key, value })),
 	});
+}
+
+function encodedState(value: DRPState): Uint8Array {
+	return DRPStateOtherTheWire.encode(serializeDRPState(value)).finish();
 }
 
 function equalBytes(left: unknown, right: unknown): boolean {
@@ -362,6 +366,49 @@ describe("Phase 1d(i) eligible incremental publication work", () => {
 		const vertex = h.hashGraph.getAllVertices().find((candidate) => candidate.operation?.opType === "mutateNested");
 		expect(vertex).toBeDefined();
 		assertIncrementalPublication(h, vertex!.hash, HashGraph.rootHash, "drp");
+	});
+
+	it("publishes an exact single-head checkpoint with zero payload detachment and unconstrained wrappers", async () => {
+		const previousSuffix = process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+		process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = "1";
+		try {
+			const h = harness();
+			const vertex = remoteVertex("replace", ["checkpoint"], [HashGraph.rootHash], 4);
+			await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+			assertIncrementalPublication(h, vertex.hash, HashGraph.rootHash, "drp");
+			const publication = h.probe.publications.find(
+				(candidate) =>
+					candidate.kind === "checkpoint" && candidate.frontier.length === 1 && candidate.frontier[0] === vertex.hash
+			);
+			expect(publication).toMatchObject({
+				kind: "checkpoint",
+				mode: "incremental",
+				outcome: "published",
+				baselineHashes: [vertex.hash],
+				frontier: [vertex.hash],
+			});
+			expect(publicationCopies(h.probe, publication?.publicationId ?? "missing")).toEqual([]);
+
+			const checkpoint = (
+				h.applier as unknown as {
+					checkpoints: { frontier: Hash[]; state: { aclState: DRPState; drpState: DRPState } }[];
+				}
+			).checkpoints.find((candidate) => candidate.frontier.length === 1 && candidate.frontier[0] === vertex.hash);
+			expect(checkpoint).toBeDefined();
+			expect(encodedState(checkpoint!.state.aclState)).toEqual(encodedState(h.states.getACLState(vertex.hash)!));
+			expect(encodedState(checkpoint!.state.drpState)).toEqual(encodedState(h.states.getDRPState(vertex.hash)!));
+			expect(effectiveDelta(h.states.getACLState(vertex.hash)!, checkpoint!.state.aclState)).toEqual({
+				keys: [],
+				mutatedBytes: 0,
+			});
+			expect(effectiveDelta(h.states.getDRPState(vertex.hash)!, checkpoint!.state.drpState)).toEqual({
+				keys: [],
+				mutatedBytes: 0,
+			});
+		} finally {
+			if (previousSuffix === undefined) delete process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+			else process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = previousSuffix;
+		}
 	});
 
 	it("attributes an ACL operation while reusing the unchanged DRP entry-for-entry", () => {

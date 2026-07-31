@@ -6,163 +6,275 @@ import { describe, expect, it } from "vitest";
 
 const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../src");
-interface Sources {
-	readonly state: string;
-	readonly applier: string;
-	readonly proxy: string;
-	readonly primitive?: string;
+const ROOT_METHODS = new Set(["assignState", "advanceCheckpointIfNeeded"]);
+
+interface FunctionNode {
+	readonly body: ts.Block;
+	readonly className?: string;
+	readonly file: ts.SourceFile;
+	readonly id: string;
+	readonly name: string;
 }
 
-function count(source: string, pattern: RegExp): number {
-	return [...source.matchAll(new RegExp(pattern.source, "g"))].length;
+interface CallSite {
+	readonly directSelfCall: boolean;
+	readonly localName?: string;
+	readonly targetClass?: string;
+	readonly targetFile?: string;
 }
 
-function namedBodies(source: string): { name: string; text: string }[] {
-	const file = ts.createSourceFile("gate.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	const result: { name: string; text: string }[] = [];
-	const visit = (node: ts.Node): void => {
-		if (ts.isConstructorDeclaration(node) && node.body) {
-			result.push({ name: "constructor", text: node.body.getText(file) });
-		} else if ((ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && node.body) {
-			const name = ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file);
-			result.push({ name, text: node.body.getText(file) });
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(file);
+interface ClosureAnalysis {
+	readonly injectedCopyLeaves: string[];
+	readonly reachable: string[];
+	readonly violations: string[];
+}
+
+function sourceFiles(directory: string): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+		const absolute = path.join(directory, entry.name);
+		if (entry.isDirectory()) Object.assign(result, sourceFiles(absolute));
+		else if (entry.isFile() && entry.name.endsWith(".ts"))
+			result[path.relative(SOURCE_DIRECTORY, absolute)] = fs.readFileSync(absolute, "utf8");
+	}
 	return result;
 }
 
-function body(source: string, method: string): string {
-	const file = ts.createSourceFile("gate.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	const found: string[] = [];
-	const visit = (node: ts.Node): void => {
-		if (ts.isConstructorDeclaration(node) && method === "constructor" && node.body) {
-			found.push(node.body.getText(file));
-			return;
-		}
-		if ((ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && node.body) {
-			const name = ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file);
-			if (name === method) {
-				found.push(node.body.getText(file));
+function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
+	const result: FunctionNode[] = [];
+	for (const file of files) {
+		const visit = (node: ts.Node, className?: string): void => {
+			if (ts.isClassDeclaration(node)) {
+				const nextClass = node.name?.text ?? `<anonymous@${node.pos}>`;
+				for (const child of node.members) visit(child, nextClass);
 				return;
 			}
+			if ((ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && node.body) {
+				const name = ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file);
+				result.push({
+					body: node.body,
+					className,
+					file,
+					id: `${file.fileName}:${className ?? "<module>"}.${name}@${node.pos}`,
+					name,
+				});
+			}
+			ts.forEachChild(node, (child) => visit(child, className));
+		};
+		visit(file);
+	}
+	return result;
+}
+
+function classPropertyTargets(files: readonly ts.SourceFile[]): Map<string, string> {
+	const targets = new Map<string, string>();
+	for (const file of files) {
+		const visit = (node: ts.Node, className?: string): void => {
+			if (ts.isClassDeclaration(node)) {
+				const nextClass = node.name?.text ?? `<anonymous@${node.pos}>`;
+				for (const child of node.members) visit(child, nextClass);
+				return;
+			}
+			if (className && ts.isPropertyDeclaration(node) && node.name && node.type) {
+				const property = ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : undefined;
+				const type = node.type.getText(file).match(/[A-Za-z_$][\w$]*/)?.[0];
+				if (property && type) targets.set(`${className}:${property}`, type);
+			}
+			ts.forEachChild(node, (child) => visit(child, className));
+		};
+		visit(file);
+	}
+	return targets;
+}
+
+function importedTargets(files: readonly ts.SourceFile[]): Map<string, string> {
+	const targets = new Map<string, string>();
+	for (const file of files) {
+		for (const statement of file.statements) {
+			if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+			const specifier = statement.moduleSpecifier.text;
+			if (!specifier.startsWith(".")) continue;
+			const target = path.posix
+				.normalize(path.posix.join(path.posix.dirname(file.fileName), specifier))
+				.replace(/\.js$/, ".ts");
+			for (const element of statement.importClause?.namedBindings &&
+			ts.isNamedImports(statement.importClause.namedBindings)
+				? statement.importClause.namedBindings.elements
+				: []) {
+				targets.set(`${file.fileName}:${element.name.text}`, target);
+			}
+		}
+	}
+	return targets;
+}
+
+function calls(
+	candidate: FunctionNode,
+	properties: ReadonlyMap<string, string>,
+	imports: ReadonlyMap<string, string>
+): CallSite[] {
+	const result: CallSite[] = [];
+	const visit = (node: ts.Node): void => {
+		if (ts.isCallExpression(node)) {
+			const expression = node.expression;
+			let localName: string | undefined;
+			let targetClass: string | undefined;
+			let targetFile: string | undefined;
+			let directSelfCall = false;
+			if (ts.isIdentifier(expression)) {
+				localName = expression.text;
+				targetFile = imports.get(`${candidate.file.fileName}:${localName}`) ?? candidate.file.fileName;
+				directSelfCall = localName === candidate.name;
+			} else if (ts.isPropertyAccessExpression(expression)) {
+				localName = expression.name.text;
+				if (expression.expression.kind === ts.SyntaxKind.ThisKeyword) {
+					targetClass = candidate.className;
+					directSelfCall = localName === candidate.name;
+				} else if (
+					ts.isPropertyAccessExpression(expression.expression) &&
+					expression.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+					candidate.className
+				) {
+					targetClass = properties.get(`${candidate.className}:${expression.expression.name.text}`);
+				}
+			}
+			result.push({
+				directSelfCall,
+				localName,
+				targetClass,
+				targetFile,
+			});
 		}
 		ts.forEachChild(node, visit);
 	};
-	visit(file);
-	return found.join("\n");
+	visit(candidate.body);
+	return result;
 }
 
-function violations(sources: Sources): string[] {
-	const problems: string[] = [];
-	if (!sources.primitive) problems.push("missing trusted publication-copy primitive");
-	const vertexCaller = body(sources.applier, "assignState");
-	const checkpointCaller = body(sources.applier, "advanceCheckpointIfNeeded");
-	for (const [name, caller] of [
-		["assignState", vertexCaller],
-		["advanceCheckpointIfNeeded", checkpointCaller],
-	] as const) {
-		if (!/publishSnapshotPair/.test(caller)) problems.push(`${name} bypasses publishSnapshotPair`);
-		for (const forbidden of [
-			[/\bstateFromDRP\s*\(/, "full stateFromDRP capture"],
-			[/\bcloneDeep\s*\(/, "cloneDeep"],
-			[/\bstructuredClone\s*\(/, "structuredClone"],
-			[/JSON\.(?:parse|stringify)\s*\(/, "JSON round trip"],
-			[/\bserialize(?:Value|DRPState)\s*\(/, "serialization-as-clone"],
-		] as const) {
-			if (forbidden[0].test(caller)) problems.push(`${name} contains ${forbidden[1]}`);
+function analyze(sources: Readonly<Record<string, string>>): ClosureAnalysis {
+	const files = Object.entries(sources).map(([name, source]) =>
+		ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+	);
+	const nodes = functions(files);
+	const properties = classPropertyTargets(files);
+	const imports = importedTargets(files);
+	const byName = new Map<string, FunctionNode[]>();
+	for (const node of nodes) byName.set(node.name, [...(byName.get(node.name) ?? []), node]);
+	const roots = nodes.filter(({ name }) => ROOT_METHODS.has(name));
+	const reachable = new Map<string, FunctionNode>();
+	const pending = [...roots];
+	while (pending.length > 0) {
+		const node = pending.pop();
+		if (!node || reachable.has(node.id)) continue;
+		reachable.set(node.id, node);
+		for (const call of calls(node, properties, imports)) {
+			if (!call.localName) continue;
+			const candidates = (byName.get(call.localName) ?? []).filter((candidate) => {
+				if (call.targetClass) return candidate.className === call.targetClass;
+				if (call.targetFile) return candidate.className === undefined && candidate.file.fileName === call.targetFile;
+				return false;
+			});
+			pending.push(...candidates);
 		}
 	}
 
-	if (sources.primitive) {
-		if (!/clonePayload/.test(sources.primitive)) problems.push("trusted primitive omits clonePayload");
-		if (!/onPublication/.test(sources.primitive)) problems.push("trusted primitive omits publication attribution");
-		if (!/serializeValue\s*\([^)]*\)\.byteLength/.test(sources.primitive)) {
-			problems.push("payload byte accounting is not pinned to serializeValue(value).byteLength");
-		}
+	const violations: string[] = [];
+	for (const root of ROOT_METHODS) {
+		if (!roots.some(({ name }) => name === root)) violations.push(`missing publication root ${root}`);
 	}
-
-	const allowedCloneDeep = new Set([
-		"state:constructor",
-		"state:fromStates",
-		"state:fromHashACL",
-		"state:applyState",
-		"state:stateFromDRP",
-		"applier:captureBatchVertexOperation",
-		"applier:cloneEnumerableInstance",
-		"applier:createVertex",
-		"applier:callDRP",
-	]);
-	for (const [file, source] of [
-		["state", sources.state],
-		["applier", sources.applier],
-		["proxy", sources.proxy],
-	] as const) {
-		for (const candidate of namedBodies(source)) {
-			if (/\bcloneDeep\s*\(/.test(candidate.text) && !allowedCloneDeep.has(`${file}:${candidate.name}`)) {
-				problems.push(`${file}:${candidate.name} relocates cloneDeep outside the allowlist`);
+	const injectedLeaves = [...reachable.values()].filter((node) =>
+		/(?:type|kind)\s*:\s*["']copy["']/.test(node.body.getText(node.file))
+	);
+	if (injectedLeaves.length !== 1) {
+		violations.push(`expected one observable injected copy leaf, found ${injectedLeaves.length}`);
+	}
+	const leafIds = new Set(injectedLeaves.map(({ id }) => id));
+	for (const node of reachable.values()) {
+		const nodeCalls = calls(node, properties, imports);
+		for (const call of nodeCalls) {
+			if (call.localName === "stateFromDRP") violations.push(`${node.id} bypasses accounting through stateFromDRP`);
+			if (["cloneDeep", "structuredClone"].includes(call.localName ?? "") && !leafIds.has(node.id)) {
+				violations.push(`${node.id} detaches payload outside the injected copy leaf`);
 			}
-			if (/\b(?:structuredClone|serializeValue|serializeDRPState)\s*\(/.test(candidate.text)) {
-				problems.push(`${file}:${candidate.name} contains an unapproved clone mechanism`);
+			if (["serializeDRPState", "deserializeDRPState"].includes(call.localName ?? "")) {
+				violations.push(`${node.id} uses serialization as a clone`);
+			}
+			if (call.localName === "serializeValue" && !/\.byteLength\b/.test(node.body.getText(node.file))) {
+				violations.push(`${node.id} uses serialization as a clone`);
+			}
+			if (call.directSelfCall && !leafIds.has(node.id)) {
+				violations.push(`${node.id} is an unapproved recursive helper`);
 			}
 		}
-	}
-	for (const candidate of namedBodies(sources.applier)) {
-		if (/\bstateFromDRP\s*\(/.test(candidate.text) && candidate.name !== "computeOperationUntraced") {
-			problems.push(`applier:${candidate.name} relocates full stateFromDRP capture`);
+		if (/JSON\.(?:parse|stringify)\s*\(/.test(node.body.getText(node.file))) {
+			violations.push(`${node.id} uses a JSON round trip`);
 		}
 	}
-	return problems;
-}
-
-function currentSources(): Sources {
-	const primitivePath = path.join(SOURCE_DIRECTORY, "publication-copy.ts");
 	return {
-		state: fs.readFileSync(path.join(SOURCE_DIRECTORY, "state.ts"), "utf8"),
-		applier: fs.readFileSync(path.join(SOURCE_DIRECTORY, "drp-applier.ts"), "utf8"),
-		proxy: fs.readFileSync(path.join(SOURCE_DIRECTORY, "proxy.ts"), "utf8"),
-		primitive: fs.existsSync(primitivePath) ? fs.readFileSync(primitivePath, "utf8") : undefined,
+		injectedCopyLeaves: injectedLeaves.map(({ id }) => id).sort(),
+		reachable: [...reachable.keys()].sort(),
+		violations: [...new Set(violations)].sort(),
+	};
+}
+
+function compliantSource(extra = ""): Record<string, string> {
+	return {
+		"arbitrary-location.ts": `
+			class ArbitrarilyNamedPublisher {
+				private readonly sink: (event: unknown) => unknown;
+				constructor({ publicationObserver }: { publicationObserver: (event: unknown) => unknown }) {
+					this.sink = publicationObserver;
+				}
+				assignState(): void { this.route(); }
+				advanceCheckpointIfNeeded(): void { this.route(); }
+				private route(): void { this.detachPayload({ value: 1 }); ${extra} }
+				private detachPayload(value: unknown): unknown {
+					return this.sink({ type: "copy", value });
+				}
+			}
+		`,
 	};
 }
 
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
-	it("routes both governed callers through the trusted pair publisher", () => {
-		expect(violations(currentSources())).toEqual([]);
+	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
+		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
+		expect(analysis.violations).toEqual([]);
+		expect(analysis.injectedCopyLeaves).toHaveLength(1);
+	});
+
+	it("accepts an equivalent safe publisher in an arbitrary file with arbitrary internal names", () => {
+		expect(analyze(compliantSource()).violations).toEqual([]);
 	});
 
 	it.each([
-		["clone-everything-then-share", "const staged = stateFromDRP(live); publishSnapshotPair(staged);"],
-		["discarded pre-copy", "const discarded = cloneDeep(value); publishSnapshotPair(value);"],
-		["serialization-as-clone", "const detached = serializeValue(value); publishSnapshotPair(detached);"],
-		["ordinary full fallback", "const full = stateFromDRP(live); publishSnapshotPair(full);"],
-		["just-outside-counter relocation", "const relocated = structuredClone(value); publishSnapshotPair(relocated);"],
+		["clone-everything-then-share", "stateFromDRP(live);"],
+		["discarded pre-copy", "cloneDeep(value);"],
+		["serialization-as-clone", "serializeDRPState(value);"],
+		["ordinary full fallback", "stateFromDRP(live);"],
+		["just-outside-counter relocation", "structuredClone(value);"],
 	] as const)("kills the named %s mutant", (_name, mutant) => {
-		const safeCaller = "{ publishSnapshotPair(); }";
-		const mutated = {
-			state: "",
-			proxy: "",
-			primitive:
-				"function clonePayload(value: unknown) { return value; } function onPublication() {} const bytes = serializeValue(value).byteLength;",
-			applier: `function assignState() { ${mutant} } function advanceCheckpointIfNeeded() ${safeCaller}`,
-		};
-		expect(violations(mutated).length).toBeGreaterThan(0);
+		expect(analyze(compliantSource(mutant)).violations.length).toBeGreaterThan(0);
 	});
 
 	it("pins the exact excluded-copy-site census outside governed publication", () => {
-		const sources = currentSources();
-		const census = {
-			stateManagerContextInitialization: count(body(sources.state, "constructor"), /\bcloneDeep\s*\(/),
-			mutableReconstructionContext: count(body(sources.state, "fromStates"), /\bcloneDeep\s*\(/),
-			mutableReconstructionPayload: count(body(sources.state, "applyState"), /\bcloneDeep\s*\(/),
-			aclReconstructionContext: count(body(sources.state, "fromHashACL"), /\bcloneDeep\s*\(/),
-			incomingOperationDetachment: count(body(sources.applier, "captureBatchVertexOperation"), /\bcloneDeep\s*\(/),
-			hintedAdoptionReconstruction: count(body(sources.applier, "cloneEnumerableInstance"), /\bcloneDeep\s*\(/),
-			callerOperationDetachment: count(body(sources.applier, "createVertex"), /\bcloneDeep\s*\(/),
-			operationArgumentDetachment: count(body(sources.applier, "callDRP"), /\bcloneDeep\s*\(/),
-			proxyBypassCopies: count(sources.proxy, /\bcloneDeep\s*\(/),
-		};
-		expect(census).toEqual({
+		const sources = sourceFiles(SOURCE_DIRECTORY);
+		const state = sources["state.ts"];
+		const applier = sources["drp-applier.ts"];
+		const proxy = sources["proxy.ts"];
+		expect({
+			stateManagerContextInitialization: (state.match(/this\.(?:drp|acl)Context = cloneDeep/g) ?? []).length,
+			mutableReconstructionContext: (state.match(/if \((?:acl|drp)Context\) (?:acl|drp)\.context = cloneDeep/g) ?? [])
+				.length,
+			mutableReconstructionPayload: (state.match(/\[entry\.key\] = cloneDeep\(entry\.value\)/g) ?? []).length,
+			aclReconstructionContext: (state.match(/if \(this\.aclContext\) acl\.context = cloneDeep/g) ?? []).length,
+			incomingOperationDetachment: (applier.match(/operation: cloneDeep\(submittedVertex\.operation\)/g) ?? []).length,
+			hintedAdoptionReconstruction: (applier.match(/cloneRecord\[key\] = cloneDeep\(sourceRecord\[key\]\)/g) ?? [])
+				.length,
+			callerOperationDetachment: (applier.match(/value: cloneDeep\(value\)/g) ?? []).length,
+			operationArgumentDetachment: (applier.match(/Reflect\.apply\(operation, drp, cloneDeep\(args\)\)/g) ?? []).length,
+			proxyBypassCopies: (proxy.match(/\bcloneDeep\s*\(/g) ?? []).length,
+		}).toEqual({
 			stateManagerContextInitialization: 2,
 			mutableReconstructionContext: 2,
 			mutableReconstructionPayload: 1,

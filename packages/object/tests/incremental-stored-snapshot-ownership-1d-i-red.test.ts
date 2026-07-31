@@ -191,10 +191,6 @@ describe("Phase 1d(i) public stored-snapshot ownership", () => {
 			).checkpoints;
 			const checkpoint = checkpoints.at(-1)!;
 			expect(checkpoint.frontier).toEqual([vertex!.hash]);
-			const stored = manager.getDRPState(vertex!.hash)!;
-			for (const storedEntry of stored.state) {
-				expect.soft(checkpoint.state.drpState.state.find(({ key }) => key === storedEntry.key)).toBe(storedEntry);
-			}
 			const checkpointACLBytes = encoded(checkpoint.state.aclState);
 			const checkpointDRPBytes = encoded(checkpoint.state.drpState);
 

@@ -30,17 +30,20 @@ interface PublicationRecord {
 	changed: Readonly<Record<"acl" | "drp", readonly string[]>>;
 }
 
+type PublicationObserverEvent =
+	| { type: "copy"; value: unknown; metadata: CopyMetadata }
+	| { type: "publication"; record: PublicationRecord };
+
 class CharacterizationProbe {
 	readonly copies: (CopyMetadata & { bytes: number })[] = [];
 	readonly publications: PublicationRecord[] = [];
 
-	clonePayload(value: unknown, metadata: CopyMetadata): unknown {
-		this.copies.push({ ...metadata, bytes: serializeValue(value).byteLength });
-		return cloneDeep(value);
-	}
-
-	onPublication(record: PublicationRecord): void {
-		this.publications.push(record);
+	observe(event: PublicationObserverEvent): unknown {
+		if (event.type === "copy") {
+			this.copies.push({ ...event.metadata, bytes: serializeValue(event.value).byteLength });
+			return cloneDeep(event.value);
+		}
+		this.publications.push(event.record);
 	}
 }
 
@@ -82,7 +85,7 @@ describe("Phase 1d(i) 1k-vertex / 1 MiB characterization", () => {
 			states,
 			finalityStore: new FinalityStore(),
 			notify: (): void => {},
-			publicationInstrumentation: probe,
+			publicationObserver: probe.observe.bind(probe),
 		};
 		const Applier = DRPVertexApplier as unknown as new (candidate: typeof options) => DRPVertexApplier<OneMiBState>;
 		const applier = new Applier(options);
