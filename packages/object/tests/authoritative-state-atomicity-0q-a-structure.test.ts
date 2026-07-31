@@ -25,7 +25,9 @@ interface MutationHelperFacts {
 	readonly calls: Set<string>;
 	readonly directPostCommitBookkeeping: boolean;
 	readonly directSharedMutation: boolean;
+	readonly hasOwnAwait: boolean;
 	readonly hasMandatoryRollbackAuthority: boolean;
+	readonly isAsync: boolean;
 	readonly journalGuards: readonly string[];
 	readonly ownsSynchronousRollbackAuthority: boolean;
 	readonly optionalJournalAccesses: readonly string[];
@@ -512,13 +514,26 @@ function typeProvidesRollbackAuthority(
 	);
 }
 
+function hasOwnAwait(declaration: ts.FunctionDeclaration | ts.MethodDeclaration): boolean {
+	if (!declaration.body) return false;
+	let found = false;
+	const inspect = (node: ts.Node): void => {
+		if (found || (node !== declaration.body && ts.isFunctionLike(node))) return;
+		if (ts.isAwaitExpression(node)) {
+			found = true;
+			return;
+		}
+		ts.forEachChild(node, inspect);
+	};
+	inspect(declaration.body);
+	return found;
+}
+
 function ownsSynchronousRollbackAuthority(declaration: ts.FunctionDeclaration | ts.MethodDeclaration): boolean {
 	if (!declaration.body || hasModifier(declaration, ts.SyntaxKind.AsyncKeyword)) return false;
 	const journalClosures = new Map<string, Set<"commit" | "rollback">>();
-	let containsAwait = false;
 	const inspect = (node: ts.Node): void => {
 		if (node !== declaration.body && ts.isFunctionLike(node)) return;
-		if (ts.isAwaitExpression(node)) containsAwait = true;
 		if (
 			ts.isVariableDeclaration(node) &&
 			ts.isIdentifier(node.name) &&
@@ -541,7 +556,7 @@ function ownsSynchronousRollbackAuthority(declaration: ts.FunctionDeclaration | 
 	};
 	inspect(declaration.body);
 	return (
-		!containsAwait &&
+		!hasOwnAwait(declaration) &&
 		[...journalClosures.values()].some((closures) => closures.has("commit") && closures.has("rollback"))
 	);
 }
@@ -668,7 +683,9 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 			calls,
 			directPostCommitBookkeeping,
 			directSharedMutation,
+			hasOwnAwait: hasOwnAwait(declaration),
 			hasMandatoryRollbackAuthority,
+			isAsync: hasModifier(declaration, ts.SyntaxKind.AsyncKeyword),
 			journalGuards,
 			name,
 			ownsSynchronousRollbackAuthority: ownsSynchronousRollbackAuthority(declaration),
@@ -704,11 +721,25 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 
 function rollbackAuthorityViolations(input: ts.SourceFile = sourceFile): RollbackAuthorityViolation[] {
 	return [...collectMutationHelperFacts(input).values()]
-		.filter(
-			({ directSharedMutation, hasMandatoryRollbackAuthority, ownsSynchronousRollbackAuthority }) =>
-				directSharedMutation && !hasMandatoryRollbackAuthority && !ownsSynchronousRollbackAuthority
+		.flatMap(
+			({
+				directSharedMutation,
+				hasMandatoryRollbackAuthority,
+				hasOwnAwait,
+				isAsync,
+				name,
+				ownsSynchronousRollbackAuthority,
+			}): RollbackAuthorityViolation[] => {
+				if (!directSharedMutation) return [];
+				if (hasMandatoryRollbackAuthority && (isAsync || hasOwnAwait)) {
+					return [{ name, reason: "suspends while holding rollback authority" }];
+				}
+				if (!hasMandatoryRollbackAuthority && !ownsSynchronousRollbackAuthority) {
+					return [{ name, reason: "missing mandatory rollback authority" }];
+				}
+				return [];
+			}
 		)
-		.map(({ name }) => ({ name, reason: "missing mandatory rollback authority" as const }))
 		.sort((left, right) => left.name.localeCompare(right.name));
 }
 
