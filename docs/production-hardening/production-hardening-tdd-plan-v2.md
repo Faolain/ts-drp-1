@@ -13105,50 +13105,148 @@ The D.73 hostile graph-side virtual-`Map.keys()` exploit remains **real, unresol
 before the first live Phase-3a binder**. Phase 0q-b1 neither consumes nor repairs it. Phase 0n remains
 optional after the golden paths.
 
+### D.82 — Phase 0q-b2 post-commit observer acceptance
+
+Phase 0q-b2 is accepted at final code/test HEAD
+`3d94411f3b715ff3e74a0898245edab9256cd129`. The causal RED is
+`6975c3a65a76dfcd7e61d1ddf4d7738c7da74b0f`; the accepted D.81 handoff is `a7abedc`.
+Tracked state remained clean throughout. The only production change is the existing object-store
+subscriber loop; 0q-b3 consumers, public result/taxonomy/event shapes, applier atomicity, D.73 and
+optional 0n are untouched.
+
+The pre-RED audit named four observer surfaces rather than manufacturing one generic fix:
+
+1. `DRPVertexApplier` already commits before its FIFO queue drain, contains reentrant notification
+   delivery and catches/reports/continues per notification;
+2. `DRPObject._notify` already catches/reports/continues per subscriber;
+3. `DRPObjectStore._notifySubscribers` was the one causal DRP-owned gap: the replacement was stored
+   first, but the first throwing subscriber escaped `put`, produced no governed report and skipped
+   the later subscriber; and
+4. node public events are dependency/host-owned `TypedEventEmitter`/`EventTarget` behavior. Direct
+   characterization against the real dependency produced
+   `["first","second","returned:true","host-reported:controlled"]`: later listeners run, dispatch
+   returns normally and the exact throw is reported asynchronously by the host.
+
+The RED checkpoint adds one behavioral store test and strengthens the inherited 0q-b1 mutant:
+
+- exact RED was two failures / one pass. The store observation retained
+  `stored: replacement` while observing the exact escaped error, zero reports and zero later calls,
+  proving that rollback was not the missing behavior; and
+- a synthetic `class DRPVertexApplier { #hasUnreconciledLiveState = false; }` produced zero detected
+  members/tokens while the real-source latch-absence/positive-control test remained green.
+
+GREEN adds one import plus a per-callback `try/catch` inside the existing ordered object-store loop.
+It reports the exact throwable once through the existing internal node logger and continues later
+subscribers without changing the already-committed replacement. The behavioral b2 test is
+byte-identical from RED to GREEN. Reference identity remains separately pinned by the pre-existing
+`object-store.test.ts` `toBe(replacement)` control.
+
+The accepted AST helper now includes `PrivateIdentifier` and strips exactly its leading `#`.
+Installed TypeScript 5.8.2 exposes `PrivateIdentifier.text` as
+`"#hasUnreconciledLiveState"`; the first GREEN attempt honestly failed because it included the
+leading `#`, and the corrected normalizer then passed. Identifier and string-literal behavior is
+unchanged, so the real-source absence gate is strictly stronger rather than rewritten to the
+implementation.
+
+The logger import is an accepted existing internal seam, with these lifecycle facts recorded:
+
+- `packages/node/src/logger.ts` begins as a dependency-free no-op singleton to break an older cycle;
+- its sole import is type-only and emitted `logger.js` has zero imports;
+- `DRPNode` installs pre-bound methods from a real `Logger("drp::node")` before constructing the
+  only production `DRPObjectStore`;
+- the store is not re-exported from the package root or runtime entry point; and
+- the singleton is process-global mutable/last-node-wins, and standalone internal store construction
+  before a node would report to the no-op. Those are pre-existing lifecycle debts, not a b2
+  production blocker or a reason to invent a public failure channel.
+
+Authenticated final GREEN gates at exact `3d94411…` are:
+
+- focused b1+b2 3/3, exact 0q-a 27/27 and subscriber reentrancy 5/5;
+- node observer/public controls 6/6, preservation seven files / 49 tests and bounded object sixteen
+  files / 101 tests;
+- object, node and workspace typechecks;
+- tracked ESLint over 690 files with zero errors / 249 inherited warnings, plus Prettier and exact
+  two-file diff checks; and
+- hermetic XVER with exact `primarySha: 3d94411…`, 108 comparisons / zero approved deltas.
+
+The two RED control runs that initially collided on a shared Vitest `coverage/.tmp` file had already
+reported passing tests before their ENOENT exits. Authoritative serial reruns passed with identical
+counts, the infrastructure failure is retained, and postcommit gates disabled coverage. Final Opus
+also started an unrelated all-object-directory run; it was terminated after ten minutes without a
+test-failure line and is explicitly superseded by the bounded 101-test gate. This broad run is not a
+new acceptance requirement.
+
+Required reviewers accept without a code/test correction:
+
+- Grok 4.5/high returned `PASS_WITH_NOTES`, session
+  `019fb7e1-2a40-7741-add5-a5bf86c628f7`, request
+  `9a5cd8a5-9ad1-41ff-bcad-42c2d7e8c8e2`, with sole model usage `grok-4.5-build`;
+- exact Kimi 3/high/max-100 returned `PASS_WITH_NOTES`, session
+  `session_955152c4-4257-44ec-b0cf-6b72a6db4928`, from one
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation; and
+- final Opus/xhigh returned `PASS_WITH_NOTES`, session
+  `be9e8e67-f0ef-472e-bf48-4ec3aedd4213`, exit 0 / `end_turn`. Its transcript contains 135/135
+  substantive `claude-opus-5` assistant records: 38 thinking, 74 tool-use and 23 text. Seventy-three
+  tool calls were read-only; one `Write` attempt to Claude's out-of-repository plan path was rejected
+  by the harness and created no file. There was no edit, commit, Agent or Task call. The result
+  envelope's separate `claude-haiku-4-5-20251001` usage—1,774 input / 26 output tokens—is
+  metadata/title overhead and authored zero assistant, reasoning, tool, finding or verdict events.
+
+Retained 0q-b2 gotchas:
+
+1. A Promise-returning callback is structurally assignable to the current `void` subscriber type;
+   rejection happens after the synchronous catch on all three DRP-owned observer surfaces. This is a
+   pre-existing cross-surface callback-contract question, not a regression introduced by b2.
+   Do not silently fold it into b2 or b3 or choose await/detach semantics. Any new plan item requires
+   the plan-correction Opus-xhigh + Codex-high + exact-Kimi-3/max-100 quorum first.
+2. The public EventTarget characterization is retained as named logged evidence, not a committed
+   dependency-behavior test. If a later phase causally changes node event dispatch, promote it to a
+   committed preservation control in that phase; do not manufacture a post-GREEN b2 test.
+3. Two throwing store observers are not a separate test row, but independence is structural: the
+   catch is inside the ordered loop. The existing identity and registration-order test remains green.
+4. Store snapshot/reentrancy semantics and the process-global logger owner predate b2. They remain
+   evidence for later causal work rather than justification for expanding this item.
+
+The D.73 hostile graph-side virtual-`Map.keys()` exploit remains **real, unresolved and mandatory
+before the first live Phase-3a binder**. Phase 0q-b2 neither consumes nor repairs it. Phase 0n remains
+optional after the golden paths.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
 binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted through its plan checkpoint
 `114ae6e`; Phase 0l is accepted at `33afab5`; Phase 0q-a is accepted at `2a62a30`; Phase 0q-b1 is
-accepted at `5aba014`. The mandatory Phase-0 remainder is **`0q-b2 → 0q-b3`**. Phase 0n remains
-optional and deferred until after the golden paths.
+accepted at `5aba014`; and Phase 0q-b2 is accepted at `3d94411`. The sole mandatory Phase-0
+remainder is **Phase 0q-b3**. Phase 0n remains optional and deferred until after the golden paths.
 
-The next item is **Phase 0q-b2 — post-commit publication and observer truthfulness**. Begin with a
-fresh Codex-high pre-RED/no-RED audit. Enumerate the actual observer surfaces before authoring a RED:
-the applier queue/drain, `DRPObject` subscribers, node object-store subscribers and node event
-dispatch. Preserve 0q-a's single synchronous CAS-plus-journal owner and re-run its atomicity/structure
-and subscriber-reentrancy gates as controls.
+The next item is **Phase 0q-b3 — exact rejected-boundary consumer truthfulness**. Begin with a fresh
+Codex-high RED owner. The node update/sync handlers must consume the exact `partialResult` carried by
+thrown `AdoptionCommitExhaustedError` and `ApplyInvariantError` so recovery and persistence still run
+against the actual rejected boundary. Any wrapper exposed by the governed handler must retain the
+primary caught throwable by exact reference as `cause`; do not reconstruct, stringify or replace it.
+Extend D.81's governed public-success-flag probe to the relevant error surface so an unapproved
+success/latch field cannot migrate into an error object.
 
-The existing queue appears to commit before enqueue, drain FIFO and contain reentrant public
-mutations; those are already-green evidence unless a causal counterexample proves otherwise. Author a
-behavioral RED only for an actual observer-reporting/order/isolation gap. A subscriber throw must not
-roll back or misreport already-committed authoritative state, skip later governed observers, or escape
-through an unowned channel. If “governed failure channel” is materially ambiguous across the four
-observer surfaces, stop before GREEN and obtain the correction quorum rather than inventing a new
-public result field or error taxonomy.
+The RED must prove the current causal consumer gap before production changes and preserve positive
+controls for the existing successful path. Keep error taxonomy/classifiers and result shapes
+unchanged unless a causal RED proves the accepted types cannot carry the exact result/cause. Do not
+change observer/public-event behavior, logger ownership, queue/drain ordering, applier
+CAS/journal/rollback behavior, trusted-hook policy or notification atomicity. The Promise-returning
+observer-contract question in D.82 is deliberately unassigned pending its separate plan-correction
+quorum and is not permission to widen b3.
 
-Separately harden the accepted 0q-b1 absence tripwire with a causal synthetic
-`#hasUnreconciledLiveState` `PrivateIdentifier` RED. This is test/gate maintenance only; do not
-reintroduce a production latch or manufacture a behavioral failure. Do not touch node
-`partialResult`/recovery/persistence consumption or primary `cause`; those remain the distinct
-0q-b3 item.
+Preserve exact Phase 0q-a accounting/rollback/frontier-CAS tests, Phase 0l taxonomy/result/classifier
+controls, the accepted 0q-b1 latch-absence gate, the 0q-b2 observer controls and the Phase 0m XVER
+trigger. Keep the dependency-owned public EventTarget characterization as named logged evidence; add
+a committed control only if b3 causally changes event dispatch. Checkpoint every genuine RED before
+handing the byte-identical contract to a distinct fresh Codex-high GREEN owner.
 
-Do not move notification delivery into `commitPreparedState`, add deferred reconciliation, widen
-public result shapes or taxonomy without a causal need, absorb protocol-v2 trusted-hook/latch/retry
-policy from Phase 3a, or claim to close D.73. If the audit proves a behavior already green, retain it
-as a named preservation control. Checkpoint every genuine RED before handing the unchanged contract
-to a distinct fresh Codex-high GREEN owner.
+Run package/workspace typecheck, zero-error tracked lint, format, focused tests, the bounded serial
+preservation gates and hermetic XVER to `.log` files. Then run the per-item Grok-high, exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh review loop. Phase 3a
+continues to own protocol-v2 trusted-hook policy and the D.73 hostile graph-container exploit.
 
-Preserve Phase 0l taxonomy/result/classifier controls, all 0q-a exact-partial-result and
-rollback/frontier-CAS behavior, and the Phase 0m XVER trigger. Run package/workspace typecheck,
-zero-error lint, format, focused tests and bounded serial preservation tests to `.log` files. Then run
-the per-item Grok-high, exact Kimi 3/high and final Opus-xhigh review loop. Phase 3a continues to own
-protocol-v2 trusted-hook policy and the D.73 hostile graph-container exploit.
-
-Continue the per-item Grok-high, exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
-discipline. Run typecheck, lint and relevant tests to `.log` files at every item. Never stage `.logs/`,
-`.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or
-unrelated paths. Do not schedule Fable unless explicitly requested. When Phase 0n is eventually
-authorized, retain the bounded `@ts-drp/math` core and prefer pinned deterministic prior art over new
-approximations.
+Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked
+protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested. When
+Phase 0n is eventually authorized, retain the bounded `@ts-drp/math` core and prefer pinned
+deterministic prior art over new approximations.
