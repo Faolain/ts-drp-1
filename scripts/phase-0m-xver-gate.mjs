@@ -86,7 +86,7 @@ const BUILD_PACKAGES = [
 	{ directory: "packages/utils", bundle: true },
 	{ directory: "packages/logger", bundle: true },
 	{ directory: "packages/tracer", bundle: true },
-	{ directory: "packages/errors", bundle: false },
+	{ directory: "packages/errors", bundle: false, referenceOptional: true },
 	{ directory: "packages/validation", bundle: true },
 	{ directory: "packages/blueprints", bundle: true },
 	{ directory: "packages/keychain", bundle: true },
@@ -155,9 +155,13 @@ function assertSafeBuildDirectory(worktree, path) {
 	}
 }
 
-function buildWorkspaceEngine(worktree) {
+function buildWorkspaceEngine(worktree, role) {
 	for (const entry of BUILD_PACKAGES) {
 		const packageRoot = resolve(worktree, entry.directory);
+		if (!existsSync(packageRoot)) {
+			if (role === "reference" && entry.referenceOptional === true) continue;
+			fail(`${role} build package is absent: ${entry.directory}`);
+		}
 		const output = resolve(packageRoot, "dist");
 		assertSafeBuildDirectory(worktree, output);
 		rmSync(output, { recursive: true, force: true });
@@ -393,10 +397,10 @@ if (mode === "import") {
 			cwd: referenceWorktree,
 			timeout: 240_000,
 		});
-		buildWorkspaceEngine(repositoryRoot);
+		buildWorkspaceEngine(repositoryRoot, "primary");
 		assertExpectedHead(repositoryRoot, primarySha, "primary");
 		assertCleanSourceProvenance(repositoryRoot, "primary");
-		buildWorkspaceEngine(referenceWorktree);
+		buildWorkspaceEngine(referenceWorktree, "reference");
 		assertExpectedHead(referenceWorktree, REFERENCE_SHA, "reference");
 		assertCleanSourceProvenance(referenceWorktree, "reference");
 
