@@ -17,6 +17,7 @@ on:
       - "scripts/phase-0m-xver-gate.mjs"
       - ".github/workflows/phase-0m-xver.yml"
       - "pnpm-lock.yaml"
+      - "tsconfig.json"
   workflow_dispatch:
 
 permissions:
