@@ -369,8 +369,9 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
 		return;
 	}
 
+	await signGeneratedVertices(node, object.vertices);
+
 	const localVertices = object.vertices;
-	await signGeneratedVertices(node, localVertices);
 
 	const requested: Set<Vertex> = new Set(localVertices);
 	const localVerticesByHash = new Map<string, Vertex>();
