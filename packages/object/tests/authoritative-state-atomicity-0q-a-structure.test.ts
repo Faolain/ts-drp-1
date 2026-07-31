@@ -246,6 +246,15 @@ function journalsAreClosed(method: MethodFacts): boolean {
 }
 
 describe("Phase 0q-a structural commit gate", () => {
+	it("does not retain unreachable assign or notify compatibility pipeline stages", () => {
+		const methods = collectMethodFacts();
+
+		expect(
+			["assign", "notify"].filter((name) => methods.has(name)),
+			"the removed publication pipeline must not survive as private white-box-only stages"
+		).toEqual([]);
+	});
+
 	it("keeps every UndoJournal lifetime inside a non-suspending function", () => {
 		const methods = collectMethodFacts();
 		const journalOwners = [...methods.values()].filter(({ journalLifetimes }) => journalLifetimes.length > 0);
