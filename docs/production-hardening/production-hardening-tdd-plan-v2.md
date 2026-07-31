@@ -851,6 +851,19 @@ codec → vectors already frozen and now provably correct.
 > `liveStateUnreconciled` success field: that would reward-hack a torn authoritative state into a passing
 > outcome. Phase 0q is legacy in-process discipline only; crash/durable transactions remain Phase 2,
 > actual v3 append/binding remains Phase 3a and production reducer/fold atomicity remains Phase 4a.
+>
+> **0q-c — detached async-observer rejection containment.** This is a new sibling charter, not a fourth
+> 0q-b owner. Keep the published object/node subscriber signatures returning `void` and keep publication
+> synchronous. When either DRP-owned leaf loop receives a thenable return, detach it immediately and report
+> an eventual exact rejection once through that surface's existing logger; never await observers, add
+> backpressure or keep publication/reentrancy ownership across suspension. This closes only the observable
+> thenable-returning callback vector: a synchronous callback that starts a floating Promise and returns
+> `undefined` remains outside runtime containment and is forbidden in-repo by `no-floating-promises`.
+> Public `TypedEventEmitter`/`EventTarget` remains host-owned, and message-queue subscribers already have
+> an explicit `void | Promise<void>` awaited contract. 0q-c is mandatory after 0q-b3 and before the first
+> live Phase-3a binder or before inviting any third-party consumer onto the published subscribe APIs,
+> whichever comes first. It is not a prerequisite for the current chat/canvas/grid golden paths, whose
+> subscribers are synchronous and whose tracked code is already guarded by `no-misused-promises`.
 
 > **Phase 0o digest-identity correction.** The unanimous D.60 quorum closes the gap between the
 > frozen D.37 bounded witness and the live policy. The equivocation slot key is
@@ -13197,8 +13210,8 @@ Retained 0q-b2 gotchas:
 1. A Promise-returning callback is structurally assignable to the current `void` subscriber type;
    rejection happens after the synchronous catch on all three DRP-owned observer surfaces. This is a
    pre-existing cross-surface callback-contract question, not a regression introduced by b2.
-   Do not silently fold it into b2 or b3 or choose await/detach semantics. Any new plan item requires
-   the plan-correction Opus-xhigh + Codex-high + exact-Kimi-3/max-100 quorum first.
+   D.83's unanimous plan-correction quorum assigns the two public leaf loops to the new 0q-c
+   detach-and-report slice. Do not silently fold it into b2 or b3.
 2. The public EventTarget characterization is retained as named logged evidence, not a committed
    dependency-behavior test. If a later phase causally changes node event dispatch, promote it to a
    committed preservation control in that phase; do not manufacture a post-GREEN b2 test.
@@ -13211,13 +13224,74 @@ The D.73 hostile graph-side virtual-`Map.keys()` exploit remains **real, unresol
 before the first live Phase-3a binder**. Phase 0q-b2 neither consumes nor repairs it. Phase 0n remains
 optional after the golden paths.
 
+### D.83 — Async-observer plan correction and Phase 0q-c assignment
+
+D.82's final Opus review found a real residual outside its accepted synchronous-throw contract:
+TypeScript permits an `async` function where the published `DRPObjectCallback` and
+`DRPObjectSubscribeCallback` return `void`, but both DRP-owned public leaf loops discard the returned
+Promise. A later rejection escapes their synchronous `try/catch` and can terminate a current Node
+process as an unhandled rejection. This does not roll back committed state, does not skip later
+synchronous observers, predates 0q-b2 on both surfaces and does not invalidate its acceptance.
+
+No plan assignment was made until the required read-only correction quorum agreed:
+
+- final Opus/xhigh returned `AGREE_NEW_PLAN_ITEM` in same session
+  `be9e8e67-f0ef-472e-bf48-4ec3aedd4213`. It independently compiled both published callback shapes
+  with async functions under TypeScript 5.8.2 with zero diagnostics and reproduced Node 22.15.0
+  process termination. It then supplied the exact ownership/order/test corrections below;
+- Codex-high first returned `AGREE_NEW_PLAN_ITEM`, then `AGREE_EXACT` on the Opus wording; and
+- exact Kimi 3/high/max-100 returned `AGREE_NEW_PLAN_ITEM`, then `AGREE_EXACT` in resumed session
+  `session_bc1e71fb-bec4-44c0-8cb0-28117ee9872e`. Its first turn independently compiled the callback
+  assignment and reproduced the unhandled rejection at exit 1; its follow-up verified the lint and
+  message-queue premises. No fallback or substituted model is claimed.
+
+The unanimous correction is one new **Phase 0q-c — detached async-observer rejection containment**,
+ordered after 0q-b3. It is mandatory before the first live Phase-3a binder or before any third-party
+consumer is invited onto the published subscribe APIs, whichever comes first. It is not a blocker for
+the current in-repo golden paths: chat, canvas and grid register only synchronous callbacks, while
+type-aware tracked lint already makes `no-misused-promises` and `no-floating-promises` errors.
+
+0q-c's accepted design is deliberately bounded:
+
+1. Keep both callback type shapes returning `void`; add JSDoc only. Widening to
+   `void | Promise<void>` would endorse a different public async/backpressure contract and disable the
+   existing `no-misused-promises` guard.
+2. At `DRPObject._notify` and `DRPObjectStore._notifySubscribers`, capture the runtime return. If it
+   is thenable, immediately attach rejection reporting through that surface's existing logger. Report
+   the exact reason once with an async-rejection-specific message. Never await the thenable.
+3. Invocation remains synchronous, registration/FIFO order and reentrancy containment remain
+   unchanged, committed state is already visible, and async completion/report order is settlement
+   order. No observer backpressure is promised.
+4. The applier drain is preservation-only because production wires it to `DRPObject._notify`.
+   Public `TypedEventEmitter`/`EventTarget` stays host-owned. Message queue is excluded because its
+   handlers are already typed `void | Promise<void>` and awaited inside a per-handler catch.
+5. Runtime containment can observe only a returned thenable. A callback that starts a floating
+   Promise and returns `undefined` remains out of scope; in-repo lint forbids that pattern.
+
+The 0q-c RED must use controlled hand-rolled thenables rather than an `async` test callback that would
+violate the repository's own lint. For each of the two causal leaf loops, commit three rows:
+
+1. a rejecting thenable reports the exact reason once, does not escape, leaves committed
+   state/reference identity intact and does not skip the later observer;
+2. a delayed thenable proves the later observer runs before settlement, so an await/backpressure
+   implementation cannot pass; and
+3. `undefined`/non-thenable returns produce no extra report.
+
+Retain b2's synchronous-throw/report/continue tests, object-store registration-order/reference
+identity, 0q-a's 27/27 and reentrancy controls, the bounded preservation gates and the Phase-0m XVER
+trigger. 0q-c must not touch b3 partial-result/cause consumers, logger ownership, EventTarget or
+message-queue behavior. D.73 remains separate and mandatory in Phase 3a; Phase 0n remains optional
+after the golden paths.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
 binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted through its plan checkpoint
 `114ae6e`; Phase 0l is accepted at `33afab5`; Phase 0q-a is accepted at `2a62a30`; Phase 0q-b1 is
-accepted at `5aba014`; and Phase 0q-b2 is accepted at `3d94411`. The sole mandatory Phase-0
-remainder is **Phase 0q-b3**. Phase 0n remains optional and deferred until after the golden paths.
+accepted at `5aba014`; and Phase 0q-b2 is accepted at `3d94411`. The remaining Phase-0 work is
+**Phase 0q-b3 → Phase 0q-c**. Phase 0q-c is not a prerequisite for the current synchronous in-repo
+golden paths, but it is mandatory before the first live Phase-3a binder or third-party subscribe-API
+exposure. Phase 0n remains optional and deferred until after the golden paths.
 
 The next item is **Phase 0q-b3 — exact rejected-boundary consumer truthfulness**. Begin with a fresh
 Codex-high RED owner. The node update/sync handlers must consume the exact `partialResult` carried by
@@ -13231,9 +13305,8 @@ The RED must prove the current causal consumer gap before production changes and
 controls for the existing successful path. Keep error taxonomy/classifiers and result shapes
 unchanged unless a causal RED proves the accepted types cannot carry the exact result/cause. Do not
 change observer/public-event behavior, logger ownership, queue/drain ordering, applier
-CAS/journal/rollback behavior, trusted-hook policy or notification atomicity. The Promise-returning
-observer-contract question in D.82 is deliberately unassigned pending its separate plan-correction
-quorum and is not permission to widen b3.
+CAS/journal/rollback behavior, trusted-hook policy or notification atomicity. D.83 assigns the
+Promise-returning observer contract to the later 0q-c slice; it is not permission to widen b3.
 
 Preserve exact Phase 0q-a accounting/rollback/frontier-CAS tests, Phase 0l taxonomy/result/classifier
 controls, the accepted 0q-b1 latch-absence gate, the 0q-b2 observer controls and the Phase 0m XVER
@@ -13245,6 +13318,10 @@ Run package/workspace typecheck, zero-error tracked lint, format, focused tests,
 preservation gates and hermetic XVER to `.log` files. Then run the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh review loop. Phase 3a
 continues to own protocol-v2 trusted-hook policy and the D.73 hostile graph-container exploit.
+
+After 0q-b3 acceptance, execute 0q-c through its own fresh Codex-high RED, distinct Codex-high GREEN
+and full Grok-high / exact-Kimi-3 / final-Opus-xhigh review loop. Do not reuse b2 tests as a substitute
+for its controlled thenable REDs, and do not make 0q-c await observers.
 
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked
 protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested. When
