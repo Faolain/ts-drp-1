@@ -13283,47 +13283,155 @@ trigger. 0q-c must not touch b3 partial-result/cause consumers, logger ownership
 message-queue behavior. D.73 remains separate and mandatory in Phase 3a; Phase 0n remains optional
 after the golden paths.
 
+### D.84 — Phase 0q-b3 rejected-boundary consumer acceptance
+
+Phase 0q-b3 is accepted at final code/test HEAD
+`ac33bda9abf1c74d4d372edab5154b9d712d0c11`. The retained TDD lineage is:
+
+- initial RED `deb1db8abcf397bc0278f9831f58725393364379` added the UPDATE/SYNC_ACCEPT
+  × AdoptionCommitExhaustedError/ApplyInvariantError consumer matrix and extended
+  the governed success/latch-token probe through the error surface;
+- corrective RED `1fb1560fdab6b95260ec3c1de3b37b2c047ad2c3` added both recovery-rejection
+  schedules after the naive GREEN design was challenged before production work;
+- final corrective RED `f73389c857fe2db1bd08a54fd9cd4eb6908528fc` required the existing logger to
+  report the exact secondary recovery error once; and
+- GREEN `ac33bda9abf1c74d4d372edab5154b9d712d0c11` changes only
+  `packages/node/src/handlers.ts`. Both governed test files are byte-identical
+  from final RED to GREEN, and D.83 is byte-identical from `442969f` through
+  GREEN.
+
+The initial RED failed four rows while four controls passed: direct primary
+identity already survived, but the exact `partialResult` was never read and
+recovery/persistence were skipped. The final corrective RED failed six rows
+while four controls passed, additionally proving that recovery rejection
+skipped persistence and exact-secondary reporting. The tests drive the real
+`handleMessage` boundary with the exported error classes and genuinely signed
+vertices; they do not substitute a test-only consumer.
+
+GREEN introduces two module-private functions—a rejected-boundary predicate and
+the merge helper that consumes it—and the helper is called only by UPDATE and
+SYNC_ACCEPT. A normal merge is unchanged. An unknown throwable, either governed
+class without `partialResult`, or any non-governed error is rethrown unchanged.
+For the two governed rejected-boundary classes with an exact partial result, the
+helper:
+
+1. uses `partialResult.missing` through the existing `(objectId, sender)`
+   recovery-episode seam when non-empty;
+2. reports a recovery secondary through the existing logger without replacing
+   the primary;
+3. attempts to persist the exact object once even after recovery rejects;
+4. reports a hypothetical persistence secondary; and
+5. rethrows the exact primary object.
+
+The throw exits before all success-only finality, attestation, persistence and
+public-event work, so no `DRP_UPDATE`, `DRP_SYNC_ACCEPTED` or other success
+signal can escape the rejected boundary. The one public event still reachable
+is the shared seam's `DRP_SYNC_REJECTED` on budget exhaustion, which is a
+truthful failure signal and is unchanged from the success path. The traced
+wrapper also rethrows the same `Error` identity. Imports use the existing
+`@ts-drp/object` package-root edge; no cycle, duplicate error owner,
+taxonomy/result-shape change or browser surface was introduced.
+
+Authenticated final GREEN gates at exact `ac33bda…` are:
+
+- focused b3 plus the success/latch probe 10/10;
+- Phase 0q-a 27/27, preservation seven files / 49 tests, bounded object sixteen
+  files / 101 tests and node controls four files / 12 tests;
+- object, node and workspace typechecks;
+- tracked ESLint over 691 files with zero errors / 249 inherited warnings,
+  plus Prettier, exact scope/diff and frozen-test/plan-byte-identity checks; and
+- hermetic XVER with `primarySha: ac33bda…`, 108 comparisons and zero approved
+  deltas.
+
+Required reviewers accept without a code/test correction:
+
+- Grok 4.5/high returned `PASS_WITH_NOTES`, session
+  `019fb82f-3864-72e3-987c-590b4ae430c0`, request
+  `1a5bbf45-8106-4521-a236-74066b1375b1`, with sole model usage
+  `grok-4.5-build`;
+- exact Kimi 3/high/max-100 returned `PASS_WITH_NOTES`, session
+  `session_15d79464-9109-4dce-a890-0c85df8c27d1`, from one
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation; and
+- final Opus/xhigh returned `PASS_WITH_NOTES`, session
+  `acfeb5a8-2d31-4e54-9242-8cf064828ee8`, exit 0 / `end_turn`. Its transcript
+  contains 97/97 substantive `claude-opus-5` assistant records: 36 thinking,
+  58 read-only Bash/Grep/Read tool uses, two text records and one disabled
+  `Write` attempt to Claude's out-of-repository plan path, which created no
+  file. The envelope's separate `claude-haiku-4-5-20251001` usage—1,743 input /
+  24 output tokens—is metadata/title overhead and authored no assistant,
+  reasoning, tool, finding or verdict event.
+
+Retained non-blocking gotchas:
+
+1. The frozen rows prove current success events are unreachable but would not
+   kill a future dispatch-then-rethrow refactor. If b3 is reopened, that is the
+   highest-value causal row.
+2. The empty-`missing` guard is load-bearing but has no dedicated row/comment:
+   calling the recovery seam with `[]` would clear an earlier episode even
+   though a rejected boundary is not evidence of sync completion.
+3. The internal `recoverMissingSync` seam forwards only object id and sender to
+   public `syncObject`, so the tests prove the exact partial-result getter was
+   read and recovery ran with the right ids, not the identity of the internal
+   `missing` array. The production code forwards that exact array into the
+   seam.
+4. Persistence-secondary and unknown-error passthrough have no dedicated b3
+   row. The persistence call resets the already-registered identical reference;
+   every committed prefix already published it, and the b2-hardened in-repo
+   store path has no escaping callback throw. The exact primary remains
+   unsuppressed, so no corrective RED is required.
+5. Recover-before-persist ordering is unasserted and differs from the
+   SYNC_ACCEPT success path, but is immaterial for the already-stored identical
+   object. Rejected-boundary recovery deliberately shares the existing
+   `(objectId, sender)` budget.
+6. Store subscribers now observe the truthful committed prefix on the rejected
+   path because persistence includes notification. Observer mechanics are
+   unchanged and Phase 0q-c remains their async-rejection owner.
+7. Rejected-boundary persistence and recovery add a third site that can
+   re-register an object, or open a fresh recovery episode, after a concurrent
+   `unsubscribeObject` purge and `clearSyncRecoveryEpisodes`. The window is
+   identical in kind to the pre-existing UPDATE and SYNC_ACCEPT success paths,
+   which already persist and recover after the same awaited merge, so b3 widens
+   a pre-existing hazard rather than introducing a new class of one.
+
+Phase 0q-b3 neither consumes nor repairs D.73. The hostile graph-side virtual
+`Map.keys()` exploit remains real, unresolved and a hard Phase-3a pre-live
+binder requirement. Phase 0n remains optional and deferred until after the
+golden paths.
+
 ## Next Agent Prompt
 
-Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
-binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted through its plan checkpoint
-`114ae6e`; Phase 0l is accepted at `33afab5`; Phase 0q-a is accepted at `2a62a30`; Phase 0q-b1 is
-accepted at `5aba014`; and Phase 0q-b2 is accepted at `3d94411`. The remaining Phase-0 work is
-**Phase 0q-b3 → Phase 0q-c**. Phase 0q-c is not a prerequisite for the current synchronous in-repo
-golden paths, but it is mandatory before the first live Phase-3a binder or third-party subscribe-API
-exposure. Phase 0n remains optional and deferred until after the golden paths.
+Phase 0q-b3 is accepted at `ac33bda`. The final remaining required Phase-0 item
+is **Phase 0q-c — detached async-observer rejection containment**, governed by
+D.83; it is mandatory before the first live Phase-3a binder or any third-party
+exposure of the published subscribe APIs. Phase 0n remains optional and
+deferred until after the golden paths. Begin with a fresh Codex-high RED owner
+that may change tests only.
 
-The next item is **Phase 0q-b3 — exact rejected-boundary consumer truthfulness**. Begin with a fresh
-Codex-high RED owner. The node update/sync handlers must consume the exact `partialResult` carried by
-thrown `AdoptionCommitExhaustedError` and `ApplyInvariantError` so recovery and persistence still run
-against the actual rejected boundary. Any wrapper exposed by the governed handler must retain the
-primary caught throwable by exact reference as `cause`; do not reconstruct, stringify or replace it.
-Extend D.81's governed public-success-flag probe to the relevant error surface so an unapproved
-success/latch field cannot migrate into an error object.
+For each causal public leaf loop—`DRPObject._notify` and
+`DRPObjectStore._notifySubscribers`—commit controlled hand-rolled thenable
+rows proving: an exact rejection reason is reported once without escaping,
+committed state/reference identity is retained and a later observer is not
+skipped; a delayed thenable does not create await/backpressure and the later
+observer runs before settlement; and `undefined`/non-thenable returns create no
+extra report. Do not use an `async` test callback that violates tracked lint.
+Retain the published `void` callback types, registration/FIFO order,
+reentrancy, synchronous-throw/report/continue behavior and existing logger
+owners. Do not touch the applier beyond preservation tests, public
+TypedEventEmitter/EventTarget, message queue, b3 consumers, D.73 or Phase 0n.
 
-The RED must prove the current causal consumer gap before production changes and preserve positive
-controls for the existing successful path. Keep error taxonomy/classifiers and result shapes
-unchanged unless a causal RED proves the accepted types cannot carry the exact result/cause. Do not
-change observer/public-event behavior, logger ownership, queue/drain ordering, applier
-CAS/journal/rollback behavior, trusted-hook policy or notification atomicity. D.83 assigns the
-Promise-returning observer contract to the later 0q-c slice; it is not permission to widen b3.
+Checkpoint the genuine RED before handing byte-identical tests to a distinct
+fresh Codex-high GREEN owner. GREEN must capture a runtime return, detect a
+thenable, attach exact rejection reporting immediately, and never await it or
+promise observer backpressure. A callback that starts a floating Promise and
+returns `undefined` remains outside runtime containment.
 
-Preserve exact Phase 0q-a accounting/rollback/frontier-CAS tests, Phase 0l taxonomy/result/classifier
-controls, the accepted 0q-b1 latch-absence gate, the 0q-b2 observer controls and the Phase 0m XVER
-trigger. Keep the dependency-owned public EventTarget characterization as named logged evidence; add
-a committed control only if b3 causally changes event dispatch. Checkpoint every genuine RED before
-handing the byte-identical contract to a distinct fresh Codex-high GREEN owner.
+Run the focused rows, accepted b1/b2/b3 controls, exact Phase 0q-a 27/27,
+reentrancy, bounded preservation gates, package/workspace typecheck, tracked
+zero-error lint, Prettier/diff/scope and hermetic XVER to `.log` files. Then run
+the per-item Grok-high, exact
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus/xhigh
+review loop.
 
-Run package/workspace typecheck, zero-error tracked lint, format, focused tests, the bounded serial
-preservation gates and hermetic XVER to `.log` files. Then run the per-item Grok-high, exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus-xhigh review loop. Phase 3a
-continues to own protocol-v2 trusted-hook policy and the D.73 hostile graph-container exploit.
-
-After 0q-b3 acceptance, execute 0q-c through its own fresh Codex-high RED, distinct Codex-high GREEN
-and full Grok-high / exact-Kimi-3 / final-Opus-xhigh review loop. Do not reuse b2 tests as a substitute
-for its controlled thenable REDs, and do not make 0q-c await observers.
-
-Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the stale untracked
-protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable unless explicitly requested. When
-Phase 0n is eventually authorized, retain the bounded `@ts-drp/math` core and prefer pinned
-deterministic prior art over new approximations.
+Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
+paths. Do not schedule Fable unless explicitly requested.
