@@ -369,12 +369,18 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
 		return;
 	}
 
-	await signGeneratedVertices(node, object.vertices);
+	const localVertices = object.vertices;
+	await signGeneratedVertices(node, localVertices);
 
-	const requested: Set<Vertex> = new Set(object.vertices);
+	const requested: Set<Vertex> = new Set(localVertices);
+	const localVerticesByHash = new Map<string, Vertex>();
+	for (let index = localVertices.length - 1; index >= 0; index--) {
+		const vertex = localVertices[index];
+		localVerticesByHash.set(vertex.hash, vertex);
+	}
 	const requesting: string[] = [];
 	for (const h of syncMessage.vertexHashes) {
-		const vertex = object.vertices.find((v) => v.hash === h);
+		const vertex = localVerticesByHash.get(h);
 		if (vertex) {
 			requested.delete(vertex);
 		} else {
