@@ -178,6 +178,55 @@ describe("Phase 0q-b3 rejected-boundary node consumers", () => {
 	);
 
 	it.each(["UPDATE", "SYNC_ACCEPT"] as const)(
+		"%s persists the rejected boundary and preserves the primary error when recovery also rejects",
+		async (surface) => {
+			const { message, object } = await makeFixture(surface);
+			const partialResult: ApplyResult = {
+				applied: false,
+				missing: [`missing-before-recovery-rejection-at-${surface}`],
+				invalid: [],
+				quarantined: [`quarantined-before-recovery-rejection-at-${surface}`],
+			};
+			const rejectedBoundary = makeRejectedBoundaryError("adoption", partialResult);
+			const primaryError = rejectedBoundary.error;
+			const recoveryError = new Error(`controlled recovery rejection at ${surface}`);
+			const merge = vi.spyOn(object, "merge").mockRejectedValue(primaryError);
+			const recover = vi.spyOn(receiver, "syncObject").mockRejectedValue(recoveryError);
+			const persist = vi.spyOn(receiver, "put");
+
+			try {
+				const exposedError = await captureError(() => handleMessage(receiver, message));
+
+				expect(merge).toHaveBeenCalledTimes(1);
+				expect({
+					exactPartialResultConsumed: rejectedBoundary.partialResultReads() > 0,
+					recoveryAttemptedOnce:
+						recover.mock.calls.length === 1 &&
+						recover.mock.calls[0]?.[0] === message.objectId &&
+						recover.mock.calls[0]?.[1] === message.sender,
+					persistenceStillUsedExactObject:
+						persist.mock.calls.length === 1 &&
+						persist.mock.calls[0]?.[0] === object.id &&
+						persist.mock.calls[0]?.[1] === object,
+					primaryPreserved:
+						exposedError === primaryError || Reflect.get(exposedError as object, "cause") === primaryError,
+					secondaryDidNotReplacePrimary: exposedError !== recoveryError,
+				}).toEqual({
+					exactPartialResultConsumed: true,
+					recoveryAttemptedOnce: true,
+					persistenceStillUsedExactObject: true,
+					primaryPreserved: true,
+					secondaryDidNotReplacePrimary: true,
+				});
+			} finally {
+				merge.mockRestore();
+				recover.mockRestore();
+				persist.mockRestore();
+			}
+		}
+	);
+
+	it.each(["UPDATE", "SYNC_ACCEPT"] as const)(
 		"%s retains successful missing-result recovery and persistence",
 		async (surface) => {
 			const { message, object } = await makeFixture(surface);
