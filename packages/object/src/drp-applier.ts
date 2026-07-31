@@ -1264,6 +1264,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	}
 
 	private initializeFinalityStore(operation: JournaledOperation<T>): void {
+		if (!this.finalityStore.enabled) return;
 		const { vertex, acl, currentDRP, isACL, journal } = operation;
 		const finalitySigners = isACL ? currentDRP?.query_getFinalitySigners() : acl.query_getFinalitySigners();
 		const previous = this.finalityStore.states.get(vertex.hash);

@@ -255,6 +255,7 @@ function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<I
 		log.error("::attestationUpdateHandler: Object not found");
 		return;
 	}
+	if (object.finalityStore.enabled === false) return;
 
 	if (object.acl.query_isFinalitySigner(sender)) {
 		object.finalityStore.addSignatures(sender, attestationUpdate.attestations);
@@ -298,7 +299,7 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	const [, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
 	const appliedVertices = verifiedVertices.filter((vertex) => object.getVertex(vertex.hash) !== undefined);
 
-	if (appliedVertices.length !== 0) {
+	if (appliedVertices.length !== 0 && object.finalityStore.enabled !== false) {
 		// add their signatures — only if the sender is a finality signer on the LIVE
 		// ACL. Mirrors attestationUpdateHandler; without this gate a non-signer could
 		// piggyback forged attestations on an UPDATE and have them counted toward
@@ -452,26 +453,30 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	let missing: string[] = [];
 	if (mergeRan) {
 		[, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
-		object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
+		if (object.finalityStore.enabled !== false) {
+			object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
+		}
 		node.put(object.id, object);
 		await recoverMissingSync(node, object.id, sender, missing);
 	}
 
 	await signGeneratedVertices(node, object.vertices);
-	const addedAttestations = signFinalityVertices(node, object, object.vertices);
-	if (addedAttestations.length !== 0) {
-		// Vertices learned through sync must still propagate our finality
-		// signatures; otherwise a sync that front-runs the gossip UPDATE would
-		// strand these attestations on this replica.
-		const attestationUpdate = Message.create({
-			sender: node.networkNode.peerId,
-			type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
-			data: AttestationUpdate.encode(AttestationUpdate.create({ attestations: addedAttestations })).finish(),
-			objectId: object.id,
-		});
-		node.networkNode.broadcastMessage(object.id, attestationUpdate).catch((e) => {
-			log.error("::syncAcceptHandler: Error broadcasting attestations", e);
-		});
+	if (object.finalityStore.enabled !== false) {
+		const addedAttestations = signFinalityVertices(node, object, object.vertices);
+		if (addedAttestations.length !== 0) {
+			// Vertices learned through sync must still propagate our finality
+			// signatures; otherwise a sync that front-runs the gossip UPDATE would
+			// strand these attestations on this replica.
+			const attestationUpdate = Message.create({
+				sender: node.networkNode.peerId,
+				type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
+				data: AttestationUpdate.encode(AttestationUpdate.create({ attestations: addedAttestations })).finish(),
+				objectId: object.id,
+			});
+			node.networkNode.broadcastMessage(object.id, attestationUpdate).catch((e) => {
+				log.error("::syncAcceptHandler: Error broadcasting attestations", e);
+			});
+		}
 	}
 
 	if (mergeRan && missing.length === 0) {
@@ -610,6 +615,7 @@ export function signFinalityVertices<T extends IDRP>(
 	obj: IDRPObject<T>,
 	vertices: Vertex[]
 ): Attestation[] {
+	if (obj.finalityStore.enabled === false) return [];
 	const attestations = generateAttestations(node, obj, vertices);
 	return obj.finalityStore.addSignatures(node.networkNode.peerId, attestations, false);
 }
@@ -632,6 +638,7 @@ function generateAttestations<T extends IDRP>(node: DRPNode, object: IDRPObject<
 }
 
 function getAttestations<T extends IDRP>(object: IDRPObject<T>, vertices: Vertex[]): AggregatedAttestation[] {
+	if (object.finalityStore.enabled === false) return [];
 	return (
 		vertices
 			.map((v) => object.finalityStore.getAttestation(v.hash))

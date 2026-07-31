@@ -4,6 +4,11 @@ import { type AggregatedAttestation, type Attestation } from "./proto/drp/v1/obj
 
 export interface FinalityConfig {
 	/**
+	 * Whether the legacy attestation plane is enabled.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
 	 * The threshold for finality.
 	 */
 	finality_threshold?: number;
@@ -51,6 +56,10 @@ export interface IFinalityState {
 }
 
 export interface IFinalityStore {
+	/**
+	 * Whether the legacy attestation plane is enabled.
+	 */
+	readonly enabled: boolean;
 	/**
 	 * The states of the finality store.
 	 */

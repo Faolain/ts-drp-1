@@ -156,6 +156,7 @@ export class FinalityState implements IFinalityState {
  * Manages the finality states of vertices.
  */
 export class FinalityStore implements IFinalityStore {
+	readonly enabled: boolean;
 	states: Map<string, FinalityState>;
 	finalityThreshold: number;
 
@@ -167,6 +168,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @param logConfig @default undefined - The logger configuration.
 	 */
 	constructor(config?: FinalityConfig, logConfig?: LoggerOptions) {
+		this.enabled = config?.enabled !== false;
 		this.states = new Map();
 		this.finalityThreshold = config?.finality_threshold ?? DEFAULT_FINALITY_THRESHOLD;
 
@@ -179,6 +181,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @param signers - The signers of the vertex.
 	 */
 	initializeState(hash: Hash, signers: Map<string, string>): void {
+		if (!this.enabled) return;
 		if (!this.states.has(hash)) {
 			this.states.set(hash, new FinalityState(hash, signers));
 		}
@@ -190,6 +193,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns The quorum.
 	 */
 	getQuorum(hash: Hash): number | undefined {
+		if (!this.enabled) return;
 		const state = this.states.get(hash);
 		if (state === undefined) {
 			return;
@@ -203,6 +207,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns The number of signatures.
 	 */
 	getNumberOfSignatures(hash: Hash): number | undefined {
+		if (!this.enabled) return;
 		return this.states.get(hash)?.numberOfSignatures;
 	}
 
@@ -212,6 +217,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns Whether the vertex has reached finality.
 	 */
 	isFinalized(hash: Hash): boolean | undefined {
+		if (!this.enabled) return;
 		const numberOfSignatures = this.getNumberOfSignatures(hash);
 		const quorum = this.getQuorum(hash);
 		if (numberOfSignatures !== undefined && quorum !== undefined) {
@@ -226,6 +232,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns Whether the peer can sign the vertex.
 	 */
 	canSign(peerId: string, hash: Hash): boolean | undefined {
+		if (!this.enabled) return;
 		return this.states.get(hash)?.signerIndices.has(peerId);
 	}
 
@@ -236,6 +243,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns Whether the peer has signed the vertex.
 	 */
 	signed(peerId: string, hash: Hash): boolean | undefined {
+		if (!this.enabled) return;
 		const state = this.states.get(hash);
 		if (state !== undefined) {
 			const index = state.signerIndices.get(peerId);
@@ -253,6 +261,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns The added attestations.
 	 */
 	addSignatures(peerId: string, attestations: Attestation[], verify = true): Attestation[] {
+		if (!this.enabled) return [];
 		const added = [];
 		for (const attestation of attestations) {
 			const state = this.states.get(attestation.data);
@@ -276,6 +285,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @returns The attestation.
 	 */
 	getAttestation(hash: Hash): AggregatedAttestation | undefined {
+		if (!this.enabled) return;
 		const state = this.states.get(hash);
 		if (state !== undefined && state.signature !== undefined) {
 			return AggregatedAttestation.create({
@@ -291,6 +301,7 @@ export class FinalityStore implements IFinalityStore {
 	 * @param attestations - The attestations to merge.
 	 */
 	mergeSignatures(attestations: AggregatedAttestation[]): void {
+		if (!this.enabled) return;
 		if (!isTracingEnabled()) {
 			this.mergeSignaturesUntraced(attestations);
 			return;
