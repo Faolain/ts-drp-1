@@ -17,6 +17,7 @@ import { type DRPNode } from "../src/index.js";
 interface LookupObservations {
 	candidateComparisons: number;
 	keyedLookups: number;
+	localHashReads: number;
 	materializations: number;
 }
 
@@ -32,11 +33,36 @@ interface HarnessResult {
 
 const STOP_AFTER_COMPARE = new Error("sync lookup comparison complete");
 
-function vertex(hash: string): Vertex {
-	return Vertex.create({
+function vertex(hash: string, observations?: LookupObservations): Vertex {
+	const candidate = Vertex.create({
 		hash,
 		peerId: "remote-author",
 		signature: Uint8Array.of(1),
+		dependencies: [],
+		timestamp: 1,
+	});
+	if (observations) {
+		let storedHash = hash;
+		Object.defineProperty(candidate, "hash", {
+			configurable: true,
+			enumerable: true,
+			get: () => {
+				observations.localHashReads++;
+				return storedHash;
+			},
+			set: (nextHash: string) => {
+				storedHash = nextHash;
+			},
+		});
+	}
+	return candidate;
+}
+
+function unsignedLocalVertex(hash: string): Vertex {
+	return Vertex.create({
+		hash,
+		peerId: "local-peer",
+		signature: new Uint8Array(),
 		dependencies: [],
 		timestamp: 1,
 	});
@@ -77,6 +103,10 @@ class InstrumentedSyncObject {
 		this.observations.materializations++;
 		return instrumentFind([...this.inventory], this.observations);
 	}
+
+	append(...vertices: Vertex[]): void {
+		this.inventory.push(...vertices);
+	}
 }
 
 function installKeyedLookupProbe(incomingHashes: readonly string[], observations: LookupObservations): void {
@@ -100,7 +130,12 @@ function installKeyedLookupProbe(incomingHashes: readonly string[], observations
 	});
 }
 
-function makeHarness(object: InstrumentedSyncObject): { node: DRPNode; result: HarnessResult } {
+function makeHarness(
+	object: InstrumentedSyncObject,
+	signWithSecp256k1: (hash: string) => Promise<Uint8Array> = (): Promise<Uint8Array> => {
+		throw new Error("Remote-authored fixture vertices must not be signed locally");
+	}
+): { node: DRPNode; result: HarnessResult } {
 	const result: HarnessResult = { dispatches: [], responses: [] };
 	const node = {
 		networkNode: {
@@ -111,9 +146,7 @@ function makeHarness(object: InstrumentedSyncObject): { node: DRPNode; result: H
 			},
 		},
 		keychain: {
-			signWithSecp256k1: (): never => {
-				throw new Error("Remote-authored fixture vertices must not be signed locally");
-			},
+			signWithSecp256k1,
 		},
 		get: (id: string) => (id === object.id ? (object as unknown as IDRPObject<IDRP>) : undefined),
 		put: vi.fn(),
@@ -137,9 +170,10 @@ async function observeLookup(localSize: number, incomingCount: number): Promise<
 	const observations: LookupObservations = {
 		candidateComparisons: 0,
 		keyedLookups: 0,
+		localHashReads: 0,
 		materializations: 0,
 	};
-	const inventory = Array.from({ length: localSize }, (_, index) => vertex(`local-${index}`));
+	const inventory = Array.from({ length: localSize }, (_, index) => vertex(`local-${index}`, observations));
 	const incomingHashes = Array.from({ length: incomingCount }, (_, index) => `missing-${index}`);
 	const object = new InstrumentedSyncObject(inventory, observations, true);
 	const { node, result } = makeHarness(object);
@@ -165,6 +199,7 @@ describe("sync responder lookup performance contract", () => {
 		for (const { localSize, observations } of rows) {
 			const probesPerIncomingHash = observations.candidateComparisons + observations.keyedLookups;
 			expect.soft(probesPerIncomingHash, `${localSize} local vertices`).toBe(1);
+			expect.soft(observations.localHashReads, `${localSize} local vertices`).toBeLessThanOrEqual(localSize + 1);
 		}
 		const materializations = rows.map(({ observations }) => observations.materializations);
 		expect(new Set(materializations).size, JSON.stringify(materializations)).toBe(1);
@@ -181,15 +216,71 @@ describe("sync responder lookup performance contract", () => {
 		for (const { incomingCount, observations } of rows) {
 			const probesPerIncomingHash = (observations.candidateComparisons + observations.keyedLookups) / incomingCount;
 			expect.soft(probesPerIncomingHash, `${incomingCount} incoming hashes`).toBe(1);
+			expect.soft(observations.localHashReads, `${incomingCount} incoming hashes`).toBeLessThanOrEqual(513);
 		}
+		const localHashReads = rows.map(({ observations }) => observations.localHashReads);
+		expect(new Set(localHashReads).size, JSON.stringify(localHashReads)).toBe(1);
 		const materializations = rows.map(({ observations }) => observations.materializations);
 		expect(new Set(materializations).size, JSON.stringify(materializations)).toBe(1);
+	});
+
+	test("uses inventory added while signing is suspended for response membership and order", async () => {
+		const observations: LookupObservations = {
+			candidateComparisons: 0,
+			keyedLookups: 0,
+			localHashReads: 0,
+			materializations: 0,
+		};
+		const signing = unsignedLocalVertex("local-signing");
+		const latePeerKnown = vertex("late-peer-known");
+		const latePeerMissing = vertex("late-peer-missing");
+		const object = new InstrumentedSyncObject([signing], observations, false);
+		let releaseSigning: (signature: Uint8Array) => void = () => undefined;
+		const signingGate = new Promise<Uint8Array>((resolve) => {
+			releaseSigning = resolve;
+		});
+		const signWithSecp256k1 = vi.fn(() => signingGate);
+		const { node, result } = makeHarness(object, signWithSecp256k1);
+		const incoming = ["missing-z", latePeerKnown.hash, signing.hash, "missing-y"];
+
+		const handling = handleMessage(node, syncRequest(object.id, incoming));
+		expect(signWithSecp256k1).toHaveBeenCalledOnce();
+		expect(signWithSecp256k1).toHaveBeenCalledWith(signing.hash);
+		object.append(latePeerKnown, latePeerMissing);
+		releaseSigning(Uint8Array.of(9));
+		await handling;
+
+		expect(signing.signature).toEqual(Uint8Array.of(9));
+		expect(result.responses).toHaveLength(1);
+		const responseMessage = result.responses[0];
+		const expectedPayload = SyncAccept.encode(
+			SyncAccept.create({
+				requested: [latePeerMissing],
+				requesting: ["missing-z", "missing-y"],
+				attestations: [],
+			})
+		).finish();
+		expect(responseMessage).toMatchObject({
+			sender: "local-peer",
+			type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
+			objectId: object.id,
+		});
+		expect(responseMessage.data).toEqual(expectedPayload);
+		expect(SyncAccept.decode(responseMessage.data)).toEqual(SyncAccept.decode(expectedPayload));
+
+		const syncDispatch = result.dispatches.find(({ type }) => type === NodeEventName.DRP_SYNC);
+		expect(syncDispatch).toBeDefined();
+		const detail = syncDispatch?.event.detail as { requested: Set<Vertex>; requesting: string[] };
+		expect(detail.requested).toBeInstanceOf(Set);
+		expect([...detail.requested]).toEqual([latePeerMissing]);
+		expect(detail.requesting).toEqual(["missing-z", "missing-y"]);
 	});
 
 	test("preserves response bytes, requested Set semantics, and requesting order", async () => {
 		const observations: LookupObservations = {
 			candidateComparisons: 0,
 			keyedLookups: 0,
+			localHashReads: 0,
 			materializations: 0,
 		};
 		const [first, second, third] = [vertex("local-a"), vertex("local-b"), vertex("local-c")];
@@ -224,6 +315,7 @@ describe("sync responder lookup performance contract", () => {
 		const observations: LookupObservations = {
 			candidateComparisons: 0,
 			keyedLookups: 0,
+			localHashReads: 0,
 			materializations: 0,
 		};
 		const inventory = [vertex("local-a"), vertex("local-b")];
