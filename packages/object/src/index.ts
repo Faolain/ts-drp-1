@@ -15,13 +15,20 @@ import {
 } from "@ts-drp/types";
 
 import { createPermissionlessACL } from "./acl/index.js";
-import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js";
+import {
+	AdoptionCommitExhaustedError,
+	ApplyInvariantError,
+	createDRPVertexApplier,
+	type DRPVertexApplier,
+} from "./drp-applier.js";
+import { RootACLMutationError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
 import { type DRPObjectStateManager } from "./state.js";
 
 export * from "./acl/index.js";
 export * from "./hashgraph/index.js";
+export { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError };
 
 /**
  * Object ids are creator-bound: `<creatorPeerId>:<randomHexSalt>`.
@@ -188,7 +195,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		if (vertexHash === HashGraph.rootHash) {
 			// Genesis authority is derived locally from the creator-bound object id
 			// and is never adopted from the network or overwritten after creation.
-			throw new Error("Refusing to overwrite the root ACL state: genesis is derived from the object id");
+			throw new RootACLMutationError("Refusing to overwrite the root ACL state: genesis is derived from the object id");
 		}
 		this._states.setACLState(vertexHash, aclState);
 	}
@@ -225,7 +232,9 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		if (rootACLState !== undefined) {
 			// Genesis authority is derived locally from the creator-bound object id;
 			// a root ACL supplied through sync is an attempted authority takeover.
-			throw new Error("Refusing to adopt a root ACL from the network: genesis is derived from the object id");
+			throw new RootACLMutationError(
+				"Refusing to adopt a root ACL from the network: genesis is derived from the object id"
+			);
 		}
 		const { applied, missing, invalid } = await this._applier.applyVertices(vertices);
 		return [applied, missing, invalid];

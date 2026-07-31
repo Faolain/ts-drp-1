@@ -1,5 +1,5 @@
 {
-	"name": "@ts-drp/compaction",
+	"name": "@ts-drp/errors",
 	"version": "0.11.0",
 	"license": "MIT",
 	"repository": {
@@ -20,22 +20,12 @@
 			"import": "./dist/src/index.js"
 		}
 	},
+	"dependencies": {},
 	"scripts": {
 		"build": "tsc -b tsconfig.build.json",
 		"clean": "rm -rf dist/ node_modules/",
 		"prepack": "tsc -b",
-		"test": "vitest run",
-		"test:nightly": "RUN_PHASE_0B_NIGHTLY=true vitest run tests/order-exhaustive.test.ts",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -b -w"
-	},
-	"dependencies": {
-		"@noble/hashes": "^1.7.1",
-		"@ts-drp/canonical": "0.11.0",
-		"@ts-drp/errors": "0.11.0"
-	},
-	"devDependencies": {
-		"@ts-drp/object": "0.11.0",
-		"@ts-drp/types": "0.11.0"
 	}
 }

@@ -1,3 +1,5 @@
+import { DRPError } from "@ts-drp/errors";
+
 import { protocolRegistry, type RegistryDocument, type RegistryField } from "./registry.js";
 
 /** Suite identifiers available for genesis negotiation. */
@@ -19,14 +21,16 @@ export interface GenesisCryptoSuiteNegotiation {
 }
 
 /** Fail-closed protocol error for an unavailable genesis crypto profile. */
-export class UnsupportedProfileError extends Error {
-	readonly code = "UNSUPPORTED_PROFILE";
-
+export class UnsupportedProfileError extends DRPError {
+	/**
+	 * @param suiteId - Requested suite identifier.
+	 * @param suiteStatus - Registry or peer-support classification.
+	 */
 	constructor(
 		readonly suiteId: string,
 		readonly suiteStatus: CryptoSuiteStatus
 	) {
-		super(`crypto suite ${suiteId} is ${suiteStatus}`);
+		super("UNSUPPORTED_PROFILE", `crypto suite ${suiteId} is ${suiteStatus}`);
 		this.name = "UnsupportedProfileError";
 	}
 }

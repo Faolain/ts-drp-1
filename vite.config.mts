@@ -8,6 +8,7 @@ export default defineConfig({
 		alias: {
 			"@ts-drp/routing-node/constants": path.resolve(__dirname, "packages/routing-node/src/constants.ts"),
 			"@ts-drp/control-plane": path.resolve(__dirname, "packages/control-plane/src/index.ts"),
+			"@ts-drp/errors": path.resolve(__dirname, "packages/errors/src/index.ts"),
 			"@ts-drp/membership": path.resolve(__dirname, "packages/membership/src/index.ts"),
 			"@ts-drp/network": path.resolve(__dirname, "packages/network/src/index.ts"),
 			"@ts-drp/object": path.resolve(__dirname, "packages/object/src/index.ts"),

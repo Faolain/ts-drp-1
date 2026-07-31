@@ -1,3 +1,4 @@
+import { DRPError } from "@ts-drp/errors";
 import { Logger } from "@ts-drp/logger";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
@@ -45,6 +46,7 @@ const MAX_CHECKPOINTS = 32;
 const MAX_ADOPTION_COMMIT_ATTEMPTS = 3;
 const MAX_APPLICATION_ATTEMPTS_PER_OFFER = 3;
 const metrics = new OpentelemetryMetrics("@ts-drp/object/drp-applier");
+const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 
 class DeterministicRejectionError extends Error {}
 
@@ -63,12 +65,17 @@ class AttributedDeterministicRejectionError extends DeterministicRejectionError 
 	}
 }
 
-export class AdoptionCommitExhaustedError extends Error {
+/** The frontier changed too often for a bounded adoption commit to succeed. */
+export class AdoptionCommitExhaustedError extends DRPError {
 	readonly vertexHash: Hash;
 	readonly attempts: number;
 
+	/**
+	 * @param vertexHash - Vertex whose prepared adoption could not commit.
+	 * @param attempts - Number of bounded frontier CAS attempts.
+	 */
 	constructor(vertexHash: Hash, attempts: number) {
-		super(`Failed to commit vertex ${vertexHash} after ${attempts} frontier CAS attempts`);
+		super("ADOPTION_COMMIT_EXHAUSTED", `Failed to commit vertex ${vertexHash} after ${attempts} frontier CAS attempts`);
 		this.name = "AdoptionCommitExhaustedError";
 		this.vertexHash = vertexHash;
 		this.attempts = attempts;
@@ -132,8 +139,21 @@ class KnownInvalidHashes implements Iterable<Hash> {
 	}
 }
 
-class ApplyInvariantError extends AggregateError {
+/** An internal apply invariant failed while preserving any available partial result. */
+export class ApplyInvariantError extends AggregateError {
+	readonly [DRP_ERROR_BRAND] = true;
+	readonly code = "APPLY_INVARIANT";
 	partialResult?: ApplyResult;
+
+	/**
+	 * @param errors - Failures that caused the invariant violation.
+	 * @param message - Human-readable diagnostic text.
+	 * @param options - Standard aggregate-error options.
+	 */
+	constructor(errors: Iterable<unknown>, message?: string, options?: ErrorOptions) {
+		super(errors, message, options);
+		this.name = "ApplyInvariantError";
+	}
 }
 
 function isDeterministicVertexFailure(error: unknown): boolean {

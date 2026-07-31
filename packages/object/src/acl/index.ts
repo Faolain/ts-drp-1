@@ -12,7 +12,7 @@ import {
 
 import { ObjectACLDeterministicError } from "./errors.js";
 
-export { ObjectACLDeterministicError } from "./errors.js";
+export { ObjectACLDeterministicError, isObjectACLDeterministicError } from "./errors.js";
 
 function getPeerPermissions(params?: { blsPublicKey?: string; permissions?: Set<ACLGroup> }): PeerPermissions {
 	const { blsPublicKey, permissions } = params ?? {};

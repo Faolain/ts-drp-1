@@ -32,12 +32,19 @@ const DEFAULT_LIMITS: Readonly<CanonicalLimits> = Object.freeze({
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const textDecoder = new TextDecoder("utf-8", { fatal: true });
 const textEncoder = new TextEncoder();
+const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 
 /** A value cannot be represented by the frozen canonical codec. */
-export class CanonicalEncodingError extends TypeError {}
+export class CanonicalEncodingError extends TypeError {
+	readonly [DRP_ERROR_BRAND] = true;
+	readonly code = "CANONICAL_ENCODING";
+}
 
 /** Bytes are malformed or use a non-canonical representation. */
-export class CanonicalDecodingError extends TypeError {}
+export class CanonicalDecodingError extends TypeError {
+	readonly [DRP_ERROR_BRAND] = true;
+	readonly code = "CANONICAL_DECODING";
+}
 
 /**
  * Compares byte strings lexicographically by unsigned byte value.

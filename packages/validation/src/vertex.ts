@@ -1,7 +1,7 @@
 import { type IHashGraph, type Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
 
-import { InvalidDependenciesError, InvalidHashError, InvalidTimestampError } from "./errors.js";
+import { InvalidDependenciesError, InvalidHashError, InvalidTimestampError, VertexValidationError } from "./errors.js";
 
 export const DRP_VERTEX_FUTURE_TOLERANCE_MS = 60_000;
 
@@ -111,9 +111,16 @@ export function validateVertex(
 		}
 		return { success: true };
 	} catch (error) {
+		if (
+			error instanceof InvalidHashError ||
+			error instanceof InvalidDependenciesError ||
+			error instanceof InvalidTimestampError
+		) {
+			return { success: false, error };
+		}
 		return {
 			success: false,
-			error: error instanceof Error ? error : new Error(`Vertex validation unknown error for vertex ${validationHash}`),
+			error: new VertexValidationError(error, `Vertex validation failed for vertex ${validationHash}`),
 		};
 	}
 }

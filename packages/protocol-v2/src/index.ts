@@ -11,6 +11,7 @@ export {
 	type AdmissionHooks,
 	type AdmissionParameters,
 	type AdmissionResult,
+	type AdmissionResultCode,
 	type HardEpochAuthority,
 	type PreparedAdmissionContext,
 	type PrepareAdmissionContextResult,
@@ -29,6 +30,8 @@ export {
 } from "./crypto-suite.js";
 export { hashDomain } from "./hash.js";
 export {
+	EmptyQuorumCertificateError,
+	MixedQuorumCertificateError,
 	type QcVote,
 	type QuorumCertificate,
 	type Signer,

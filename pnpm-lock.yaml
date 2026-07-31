@@ -314,6 +314,9 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../canonical
+      '@ts-drp/errors':
+        specifier: 0.11.0
+        version: link:../errors
     devDependencies:
       '@ts-drp/object':
         specifier: 0.11.0
@@ -334,6 +337,8 @@ importers:
       vitest:
         specifier: ^3.0.5
         version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
+
+  packages/errors: {}
 
   packages/eslint-plugin-ts-drp:
     devDependencies:
@@ -781,6 +786,9 @@ importers:
       '@noble/hashes':
         specifier: ^1.7.1
         version: 1.7.1
+      '@ts-drp/errors':
+        specifier: 0.11.0
+        version: link:../errors
       '@ts-drp/logger':
         specifier: ^0.11.0
         version: link:../logger
@@ -845,6 +853,9 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../canonical
+      '@ts-drp/errors':
+        specifier: 0.11.0
+        version: link:../errors
     devDependencies:
       '@stryker-mutator/core':
         specifier: 9.6.1
@@ -1083,6 +1094,9 @@ importers:
 
   packages/validation:
     dependencies:
+      '@ts-drp/errors':
+        specifier: 0.11.0
+        version: link:../errors
       '@ts-drp/types':
         specifier: 0.11.0
         version: link:../types

@@ -1,4 +1,5 @@
 const OBJECT_ACL_DETERMINISTIC_ERROR = Symbol.for("@ts-drp/object/ObjectACLDeterministicError");
+const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 
 /**
  * Marker for deterministic domain rejections raised by the built-in ACL.
@@ -6,7 +7,9 @@ const OBJECT_ACL_DETERMINISTIC_ERROR = Symbol.for("@ts-drp/object/ObjectACLDeter
  * replica-independent rejection contract.
  */
 export class ObjectACLDeterministicError extends Error {
+	readonly [DRP_ERROR_BRAND] = true;
 	readonly [OBJECT_ACL_DETERMINISTIC_ERROR] = true;
+	readonly code = "OBJECT_ACL_DETERMINISTIC";
 }
 
 /**

@@ -1,4 +1,5 @@
 import { deepCloneCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { DRPError, type DRPErrorCode } from "@ts-drp/errors";
 
 import {
 	type CausalityIndexOptions,
@@ -31,19 +32,45 @@ const epochFullOutcome: EpochFullOutcome = Object.freeze({
 	status: "pending",
 });
 
-/** A deterministic graph or conflict-policy failure. */
-export class LinearizationError extends Error {
-	readonly code: string;
+type LinearizationErrorCode = Extract<
+	DRPErrorCode,
+	| "CAUSALITY_VIOLATION"
+	| "CONFLICT_RESOLVER_FAILED"
+	| "CYCLE"
+	| "DUPLICATE_DEPENDENCY"
+	| "DUPLICATE_VERTEX"
+	| "EPOCH_CAPACITY_EXCEEDED"
+	| "INVALID_ANCHOR"
+	| "INVALID_BYTE_CHARGES"
+	| "INVALID_CONFLICT_ACTION"
+	| "INVALID_CONFLICT_RESULT"
+	| "INVALID_MULTIPLE_RESULT"
+	| "INVALID_ORDER"
+	| "INVALID_VERTEX"
+	| "INVALID_VERTEX_KIND"
+	| "KEY_HASH_MISMATCH"
+	| "MISSING_ANCHOR"
+	| "MISSING_CONFLICT_RESOLVER"
+	| "MISSING_DEPENDENCY"
+	| "MISSING_VERTEX"
+	| "MULTIPLE_ROOTS"
+	| "NON_ANTICHAIN_DEPENDENCIES"
+	| "NON_CONVERGENT_CONFLICT_POLICY"
+	| "UNKNOWN_MODE"
+	| "WRONG_EPOCH"
+>;
 
+/** A deterministic graph or conflict-policy failure. */
+export class LinearizationError extends DRPError {
 	/**
 	 * Creates a coded linearization error.
 	 * @param code - Stable machine-readable error code.
 	 * @param message - Human-readable failure detail.
+	 * @param options - Standard error options, including an exact causal throwable.
 	 */
-	constructor(code: string, message: string) {
-		super(message);
+	constructor(code: LinearizationErrorCode, message: string, options?: ErrorOptions) {
+		super(code, message, options);
 		this.name = "LinearizationError";
-		this.code = code;
 	}
 }
 
@@ -139,8 +166,10 @@ function validateGraph(vertices: ReadonlyMap<string, EpochVertex>, anchorHash: s
 	for (const [hash, vertex] of orderedEntries) {
 		try {
 			encodeCanonical(vertex);
-		} catch {
-			throw new LinearizationError("INVALID_VERTEX", `vertex ${hash} is outside the canonical domain`);
+		} catch (error) {
+			throw new LinearizationError("INVALID_VERTEX", `vertex ${hash} is outside the canonical domain`, {
+				cause: error,
+			});
 		}
 	}
 	const anchor = vertices.get(anchorHash) as EpochVertex | undefined;
@@ -565,10 +594,7 @@ function applyPairSemantics(
 					);
 				} catch (error) {
 					if (error instanceof LinearizationError) throw error;
-					throw new LinearizationError(
-						"CONFLICT_RESOLVER_FAILED",
-						`pair conflict resolver failed: ${error instanceof Error ? error.message : String(error)}`
-					);
+					throw new LinearizationError("CONFLICT_RESOLVER_FAILED", "pair conflict resolver failed", { cause: error });
 				}
 				if (action === "Nop") continue;
 				changed = true;
@@ -689,10 +715,7 @@ function applyMultipleSemantics(
 				);
 			} catch (error) {
 				if (error instanceof LinearizationError) throw error;
-				throw new LinearizationError(
-					"CONFLICT_RESOLVER_FAILED",
-					`multiple conflict resolver failed: ${error instanceof Error ? error.message : String(error)}`
-				);
+				throw new LinearizationError("CONFLICT_RESOLVER_FAILED", "multiple conflict resolver failed", { cause: error });
 			}
 		}
 		for (const member of group) {

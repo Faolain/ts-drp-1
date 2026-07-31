@@ -1,3 +1,5 @@
+import { DRPError } from "@ts-drp/errors";
+
 import { encodeCanonical } from "./canonical.js";
 import { matchesDigestHex } from "./hash.js";
 import {
@@ -13,6 +15,28 @@ const buildVertex = makeRegistryPreimageBuilder(registry, "vertex");
 const buildSealVote = makeRegistryPreimageBuilder(registry, "sealVote");
 const buildSealQc = makeRegistryPreimageBuilder(registry, "sealQC");
 const digestPattern = /^[0-9a-f]{64}$/u;
+
+/** A quorum certificate cannot bind an empty vote set. */
+export class EmptyQuorumCertificateError extends DRPError {
+	/**
+	 * @param message - Human-readable diagnostic text.
+	 */
+	constructor(message: string = "quorum certificate must contain at least one vote") {
+		super("EMPTY_QC", message);
+		this.name = "EmptyQuorumCertificateError";
+	}
+}
+
+/** A quorum certificate contains a vote from a different proposal domain. */
+export class MixedQuorumCertificateError extends DRPError {
+	/**
+	 * @param message - Human-readable diagnostic text.
+	 */
+	constructor(message: string = "quorum certificate votes must share one proposal domain") {
+		super("MIXED_QC", message);
+		this.name = "MixedQuorumCertificateError";
+	}
+}
 
 function requiredRegistryField(kind: string, name: string): RegistryField {
 	const field = registry.kinds[kind]?.fields.find((candidate) => candidate.name === name);
@@ -153,12 +177,12 @@ export function quorumCertificateBytes(certificate: QuorumCertificate): Uint8Arr
 		proposalHash: assertDigest(certificate.proposalHash, "proposalHash"),
 		votes,
 	});
-	if (votes.length === 0) throw new TypeError("EMPTY_QC: quorum certificate must contain at least one vote");
+	if (votes.length === 0) throw new EmptyQuorumCertificateError();
 	const boundFields = ["objectId", "epoch", "round", "phase", "proposalDigest", "proposalHash"] as const;
 	for (const vote of votes) {
 		for (const field of boundFields) {
 			if (vote[field] !== preimage[field]) {
-				throw new TypeError(`MIXED_QC: vote ${vote.signerId} disagrees with certificate ${field}`);
+				throw new MixedQuorumCertificateError(`vote ${vote.signerId} disagrees with certificate ${field}`);
 			}
 		}
 	}

@@ -1,3 +1,5 @@
+import type { DRPErrorCode } from "@ts-drp/errors";
+
 import { decodeCanonical, deepCloneCanonical, encodeCanonical } from "./canonical.js";
 import type { ActiveCryptoSuiteId } from "./crypto-suite.js";
 import { matchesDigestHex } from "./hash.js";
@@ -24,6 +26,45 @@ declare const preparedAdmissionContextBrand: unique symbol;
 const preparedAdmissionContexts = new WeakSet<object>();
 
 type RegisteredDependencyKind = "drp-epoch-anchor" | "drp-vertex";
+
+/** Every result code emitted by the TypeScript admission port. */
+export type AdmissionResultCode = Extract<
+	DRPErrorCode,
+	| "ADMISSIBLE"
+	| "ADMISSION_CONTEXT_INVALID"
+	| "ADMISSION_CONTEXT_UNPREPARED"
+	| "AUTHORIZATION_EXCEPTION"
+	| "AUTHORIZATION_UNAVAILABLE"
+	| "AUTHOR_KEY_RESOLVER_UNAVAILABLE"
+	| "CRYPTO_SUITE_UNAVAILABLE"
+	| "DEPENDENCY_ACCEPTANCE_ORACLE_UNAVAILABLE"
+	| "DEPENDENCY_DOMAIN_MISMATCH"
+	| "DEPENDENCY_RESOLVER_UNAVAILABLE"
+	| "DEPENDENCY_WRONG_ANCHOR"
+	| "DEPENDENCY_WRONG_EPOCH"
+	| "DETERMINISTIC_INVARIANT_VALIDATOR_UNAVAILABLE"
+	| "FUTURE_EPOCH"
+	| "FUTURE_PROTOCOL"
+	| "INVALID_DEPENDENCY_ENVELOPE"
+	| "INVALID_HASH"
+	| "INVALID_LOGICAL_TIME"
+	| "INVALID_OPERATION_SCHEMA"
+	| "INVALID_SIGNATURE"
+	| "INVARIANT_VIOLATION"
+	| "LEGACY_PROTOCOL"
+	| "LIMIT_EXCEEDED"
+	| "MALFORMED_VERTEX"
+	| "MISSING_CURRENT_EPOCH_DEPENDENCIES"
+	| "MISSING_DEPENDENCIES"
+	| "NON_ANTICHAIN_DEPENDENCIES"
+	| "NON_CANONICAL_ENVELOPE"
+	| "OPERATION_SCHEMA_VALIDATOR_UNAVAILABLE"
+	| "STALE_EPOCH"
+	| "UNACCEPTED_DEPENDENCIES"
+	| "UNAUTHORIZED"
+	| "WRONG_ANCHOR"
+	| "WRONG_OBJECT"
+>;
 
 interface ResolvedDependencySnapshot {
 	readonly envelope: Readonly<Record<string, unknown>>;
@@ -87,7 +128,7 @@ export interface PreparedAdmissionContext {
 /** Stable result of validating and detaching raw epoch admission evidence. */
 export type PrepareAdmissionContextResult =
 	| { readonly context: PreparedAdmissionContext; readonly ok: true }
-	| { readonly code: "ADMISSION_CONTEXT_INVALID"; readonly ok: false };
+	| { readonly code: Extract<AdmissionResultCode, "ADMISSION_CONTEXT_INVALID">; readonly ok: false };
 
 /** Trusted integration operations invoked only after their preceding admission stages pass. */
 export interface AdmissionHooks {
@@ -106,24 +147,24 @@ export interface AdmissionHooks {
 
 /** A stable admission classification. */
 export interface AdmissionResult {
-	code: string;
+	code: AdmissionResultCode;
 	latchByHash: boolean;
 	status: "accept" | "pending" | "quarantine" | "terminal";
 }
 
-function terminal(code: string, latchByHash = false): AdmissionResult {
+function terminal(code: AdmissionResultCode, latchByHash = false): AdmissionResult {
 	return Object.freeze({ status: "terminal", code, latchByHash });
 }
 
-function pending(code: string): AdmissionResult {
+function pending(code: AdmissionResultCode): AdmissionResult {
 	return Object.freeze({ status: "pending", code, latchByHash: false });
 }
 
-function quarantine(code: string): AdmissionResult {
+function quarantine(code: AdmissionResultCode): AdmissionResult {
 	return Object.freeze({ status: "quarantine", code, latchByHash: false });
 }
 
-function accept(code: string): AdmissionResult {
+function accept(code: AdmissionResultCode): AdmissionResult {
 	return Object.freeze({ status: "accept", code, latchByHash: false });
 }
 
