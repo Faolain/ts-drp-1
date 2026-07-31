@@ -1209,16 +1209,6 @@ export class DRPVertexApplier<T extends IDRP> {
 		return { stop: operation.stateChanged !== true, result: operation };
 	}
 
-	private assign<Op extends Operation<T>>(operation: Op): HandlerReturn<Op> {
-		const { isACL, currentDRP } = operation;
-		if (!isACL && this._proxyDRP) {
-			if (currentDRP) replaceEnumerableState(this._proxyDRP.proxy, currentDRP);
-			return { stop: false, result: operation };
-		}
-		if (currentDRP) replaceEnumerableState(this._proxyACL.proxy, currentDRP);
-		return { stop: false, result: operation };
-	}
-
 	private assignState<Op extends Operation<T>>(operation: Op): HandlerReturn<Op> {
 		const {
 			isACL,
@@ -1287,11 +1277,6 @@ export class DRPVertexApplier<T extends IDRP> {
 				}
 			});
 		}
-		return { stop: false, result: operation };
-	}
-
-	private notify(operation: PostOperation<T>): HandlerReturn<PostOperation<T>> {
-		this.enqueueNotification("callFn", [operation.vertex]);
 		return { stop: false, result: operation };
 	}
 

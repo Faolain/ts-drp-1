@@ -86,6 +86,7 @@ const BUILD_PACKAGES = [
 	{ directory: "packages/utils", bundle: true },
 	{ directory: "packages/logger", bundle: true },
 	{ directory: "packages/tracer", bundle: true },
+	{ directory: "packages/errors", bundle: false },
 	{ directory: "packages/validation", bundle: true },
 	{ directory: "packages/blueprints", bundle: true },
 	{ directory: "packages/keychain", bundle: true },

@@ -490,35 +490,6 @@ describe("DRPVertexApplier", () => {
 			});
 		});
 
-		describe("assign", () => {
-			it("should assign DRP state correctly", () => {
-				const vertex = Vertex.create({
-					hash: "test-hash",
-					peerId: "test-peer",
-					dependencies: [],
-					operation: {
-						drpType: DrpType.DRP,
-						opType: "test",
-						value: [],
-					},
-					timestamp: Date.now(),
-					signature: new Uint8Array([1, 2, 3]),
-				});
-
-				const result = applier["assign"]({
-					vertex,
-					isACL: false,
-					currentDRP: mockDRP,
-					acl: mockACL,
-					drpVertices: [],
-					aclVertices: [],
-					lcaResult: { lca: "test-lca", linearizedVertices: [] },
-				});
-
-				expect(result.stop).toBe(false);
-			});
-		});
-
 		describe("assignState", () => {
 			it("should assign state to store", () => {
 				const vertex = Vertex.create({
@@ -639,36 +610,6 @@ describe("DRPVertexApplier", () => {
 				applier["finalityStore"].states.get(hash)?.signerCredentials.forEach((signer) => {
 					expect(signer).toBe("signer2");
 				});
-			});
-		});
-
-		describe("notify", () => {
-			it("should call notify function", () => {
-				const vertex = Vertex.create({
-					hash: "test-hash",
-					peerId: "test-peer",
-					dependencies: [],
-					operation: {
-						drpType: DrpType.DRP,
-						opType: "test",
-						value: [],
-					},
-					timestamp: Date.now(),
-					signature: new Uint8Array([1, 2, 3]),
-				});
-
-				const result = applier["notify"]({
-					vertex,
-					isACL: false,
-					result: undefined,
-					acl: mockACL,
-					drpVertices: [],
-					aclVertices: [],
-					lcaResult: { lca: "test-lca", linearizedVertices: [] },
-				});
-
-				expect(result.stop).toBe(false);
-				expect(mockNotify).toHaveBeenCalledWith("callFn", [vertex]);
 			});
 		});
 	});

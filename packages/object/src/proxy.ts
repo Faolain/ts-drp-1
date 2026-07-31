@@ -355,8 +355,7 @@ export class DRPProxy<T extends IDRP> {
 				return (...args: unknown[]) => {
 					return this.localMutationLane.run(() => {
 						let attempts = 1;
-						const retrying = (postOperation: PostOperation<IDRP>): boolean =>
-							postOperation.commitOutcome === "retry" || postOperation.commitOutcome === "duplicate";
+						const retrying = (postOperation: PostOperation<IDRP>): boolean => postOperation.commitOutcome === "retry";
 						const assertRetryAvailable = (postOperation: PostOperation<IDRP>): void => {
 							if (attempts < MAX_ADOPTION_COMMIT_ATTEMPTS) return;
 							throw new AdoptionCommitExhaustedError(postOperation.vertex.hash, attempts);
