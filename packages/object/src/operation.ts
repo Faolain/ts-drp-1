@@ -1,5 +1,8 @@
 import { type DRPState, type IACL, type IDRP, type LowestCommonAncestorResult, type Vertex } from "@ts-drp/types";
 
+/** Shared retry ceiling for local and received frontier-CAS publication. */
+export const MAX_ADOPTION_COMMIT_ATTEMPTS = 3;
+
 export interface ReplayState {
 	drpState: DRPState;
 	aclState: DRPState;
@@ -59,4 +62,7 @@ export interface Operation<T extends IDRP> extends PostSplitOperation {
 export interface PostOperation<T extends IDRP> extends Operation<T> {
 	result: unknown;
 	stateChanged?: boolean;
+
+	/** Internal publication result; local retries remain inside the proxy boundary. */
+	commitOutcome?: "committed" | "duplicate" | "retry";
 }

@@ -1,4 +1,3 @@
-import { DRPError } from "@ts-drp/errors";
 import { Logger } from "@ts-drp/logger";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
@@ -23,10 +22,12 @@ import {
 import { cloneDeep } from "es-toolkit";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
+import { AdoptionCommitExhaustedError, ApplyInvariantError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
 import { type FrontierRestorePoint, HashGraph } from "./hashgraph/index.js";
 import {
 	type BaseOperation,
+	MAX_ADOPTION_COMMIT_ATTEMPTS,
 	type Operation,
 	type OperationJournal,
 	type PostLCAOperation,
@@ -43,10 +44,8 @@ import { DRPObjectStateManager, stateFromDRP } from "./state.js";
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
 const DEFAULT_CHECKPOINT_SUFFIX_SIZE = 256;
 const MAX_CHECKPOINTS = 32;
-const MAX_ADOPTION_COMMIT_ATTEMPTS = 3;
 const MAX_APPLICATION_ATTEMPTS_PER_OFFER = 3;
 const metrics = new OpentelemetryMetrics("@ts-drp/object/drp-applier");
-const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 
 class DeterministicRejectionError extends Error {}
 
@@ -62,23 +61,6 @@ class AttributedDeterministicRejectionError extends DeterministicRejectionError 
 	constructor(vertexHash: Hash, cause: unknown) {
 		super(`Deterministic ACL replay rejected vertex ${vertexHash}`, { cause });
 		this.vertexHash = vertexHash;
-	}
-}
-
-/** The frontier changed too often for a bounded adoption commit to succeed. */
-export class AdoptionCommitExhaustedError extends DRPError {
-	readonly vertexHash: Hash;
-	readonly attempts: number;
-
-	/**
-	 * @param vertexHash - Vertex whose prepared adoption could not commit.
-	 * @param attempts - Number of bounded frontier CAS attempts.
-	 */
-	constructor(vertexHash: Hash, attempts: number) {
-		super("ADOPTION_COMMIT_EXHAUSTED", `Failed to commit vertex ${vertexHash} after ${attempts} frontier CAS attempts`);
-		this.name = "AdoptionCommitExhaustedError";
-		this.vertexHash = vertexHash;
-		this.attempts = attempts;
 	}
 }
 
@@ -139,23 +121,6 @@ class KnownInvalidHashes implements Iterable<Hash> {
 	}
 }
 
-/** An internal apply invariant failed while preserving any available partial result. */
-export class ApplyInvariantError extends AggregateError {
-	readonly [DRP_ERROR_BRAND] = true;
-	readonly code = "APPLY_INVARIANT";
-	partialResult?: ApplyResult;
-
-	/**
-	 * @param errors - Failures that caused the invariant violation.
-	 * @param message - Human-readable diagnostic text.
-	 * @param options - Standard aggregate-error options.
-	 */
-	constructor(errors: Iterable<unknown>, message?: string, options?: ErrorOptions) {
-		super(errors, message, options);
-		this.name = "ApplyInvariantError";
-	}
-}
-
 function isDeterministicVertexFailure(error: unknown): boolean {
 	return (
 		error instanceof DeterministicRejectionError ||
@@ -181,8 +146,6 @@ interface PreparedAdoption<T extends IDRP> {
 	acl?: IACL;
 	nextHint?: AdoptionHint<T>;
 	forceCheckpoint?: boolean;
-	skipCheckpoint?: boolean;
-	restoresCanonicalState?: boolean;
 }
 
 interface AdoptionHint<T extends IDRP> {
@@ -196,11 +159,11 @@ interface AdoptionHint<T extends IDRP> {
 }
 
 interface ApplyCallContext {
-	canDeferReconciliation: boolean;
-	deferRemainingVertices: boolean;
-	needsFullReconciliation: boolean;
-	notificationsDeferred: boolean;
 	hint?: AdoptionHint<IDRP>;
+}
+
+interface CommitOperation<T extends IDRP> extends PostOperation<T> {
+	commitOutcome: "committed" | "duplicate" | "retry";
 }
 
 interface BatchVertexPreflight {
@@ -347,7 +310,8 @@ export class DRPVertexApplier<T extends IDRP> {
 	private readonly checkpointSuffixSize = checkpointSuffixSizeFromEnvironment();
 	private readonly notificationQueue: { origin: string; vertices: Vertex[] }[] = [];
 	private isDrainingNotifications = false;
-	private notificationDeferralDepth = 0;
+	// Retained as a private invariant probe until Phase 0q-b removes the legacy
+	// observer path; authoritative publication never sets this latch.
 	private hasUnreconciledLiveState = false;
 
 	/**
@@ -386,11 +350,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			.setNext(this.validateWriterPermission.bind(this))
 			.setNext(this.applyFn.bind(this))
 			.setNext(this.equal.bind(this)) // in callFn but not in applyVertex
-			.setNext(this.assign.bind(this))
-			.setNext(this.assignState.bind(this))
-			.setNext(this.addVertexToHashGraph.bind(this))
-			.setNext(this.initializeFinalityStore.bind(this))
-			.setNext(this.notify.bind(this)); // in callFn but not in applyVertex
+			.setNext(this.commitPreparedState.bind(this));
 
 		this.applyVertexPipeline = createPipeline(this.validateVertex.bind(this))
 			.setNext(this.getLCA.bind(this))
@@ -457,43 +417,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			preflightByIdentity.set(submittedVertex, record);
 			return record;
 		});
-		const conflictResolverInspector = (
-			this.hashGraph as IHashGraph & {
-				hasCustomConflictResolver?(drpType: string | undefined): boolean;
-			}
-		).hasCustomConflictResolver;
-		const hasCustomConflictResolver =
-			typeof conflictResolverInspector !== "function" ||
-			conflictResolverInspector.call(this.hashGraph, DrpType.DRP) !== false;
-		const callContext: ApplyCallContext = {
-			canDeferReconciliation:
-				preflight.length > 1 &&
-				preflight.every(
-					({ operationSnapshot }) => operationSnapshot.succeeded && operationSnapshot.operation?.drpType === DrpType.DRP
-				) &&
-				// Deferred reconciliation commits each candidate before replaying
-				// the combined graph. That is safe only when replay cannot call
-				// application conflict-resolution code and discover a failure
-				// after the candidate became observable.
-				!hasCustomConflictResolver,
-			deferRemainingVertices: false,
-			needsFullReconciliation: false,
-			notificationsDeferred: false,
-		};
-		try {
-			return await this.applyVerticesCall(preflight, callContext);
-		} finally {
-			try {
-				if (callContext.needsFullReconciliation) {
-					await this.reconcileCanonicalState();
-				}
-			} finally {
-				if (callContext.notificationsDeferred) {
-					this.notificationDeferralDepth--;
-					if (this.notificationDeferralDepth === 0) this.drainNotifications();
-				}
-			}
-		}
+		return this.applyVerticesCall(preflight, {});
 	}
 
 	private async applyVerticesCall(
@@ -542,9 +466,13 @@ export class DRPVertexApplier<T extends IDRP> {
 					}
 				}
 			} catch (error) {
-				if (error instanceof AdoptionCommitExhaustedError) throw error;
+				const rejectedHash = stableVertex?.hash ?? submittedHash;
+				if (error instanceof AdoptionCommitExhaustedError) {
+					error.partialResult = this.createApplyResult(missing, invalid, [...quarantined, rejectedHash]);
+					throw error;
+				}
 				if (error instanceof ApplyInvariantError) {
-					error.partialResult = this.createApplyResult(missing, invalid, quarantined);
+					error.partialResult = this.createApplyResult(missing, invalid, [...quarantined, rejectedHash]);
 					throw error;
 				}
 				if (error instanceof ReceiverClockPendingValidationError) {
@@ -554,7 +482,6 @@ export class DRPVertexApplier<T extends IDRP> {
 				}
 
 				const rejectedVertex = stableVertex;
-				const rejectedHash = rejectedVertex?.hash ?? submittedHash;
 				const unresolvedDependencies =
 					rejectedVertex?.dependencies.filter((dependency) => !this.hashGraph.vertices.has(dependency)) ?? [];
 				const isDeterministicFailure = isDeterministicVertexFailure(error);
@@ -667,26 +594,11 @@ export class DRPVertexApplier<T extends IDRP> {
 			if (this.hashGraph.vertices.has(operation.vertex.hash)) return false;
 			const expectedFrontier = this.hashGraph.getFrontier();
 			let adoption: PreparedAdoption<T>;
-			if (
-				!callContext.deferRemainingVertices &&
-				!this.hasUnreconciledLiveState &&
-				this.descendsFromWholeFrontier(operation.vertex, expectedFrontier)
-			) {
+			if (this.descendsFromWholeFrontier(operation.vertex, expectedFrontier)) {
 				callContext.hint = undefined;
 				adoption = this.prepareLinearAdoption(operation, expectedFrontier);
-			} else if (
-				!callContext.deferRemainingVertices &&
-				!this.hasUnreconciledLiveState &&
-				this.canUseAdoptionHint(operation, expectedFrontier, callContext.hint)
-			) {
+			} else if (this.canUseAdoptionHint(operation, expectedFrontier, callContext.hint)) {
 				adoption = await this.prepareHintedAdoption(operation, expectedFrontier, callContext.hint);
-			} else if (callContext.canDeferReconciliation) {
-				callContext.hint = undefined;
-				this.beginDeferredReconciliation(callContext);
-				adoption = {
-					expectedFrontier,
-					skipCheckpoint: true,
-				};
 			} else {
 				callContext.hint = undefined;
 				adoption = await this.prepareConcurrentAdoption(operation, expectedFrontier);
@@ -704,15 +616,6 @@ export class DRPVertexApplier<T extends IDRP> {
 		}
 		if (this.hashGraph.vertices.has(operation.vertex.hash)) return false;
 		throw new AdoptionCommitExhaustedError(operation.vertex.hash, MAX_ADOPTION_COMMIT_ATTEMPTS);
-	}
-
-	private beginDeferredReconciliation(callContext: ApplyCallContext): void {
-		callContext.deferRemainingVertices = true;
-		callContext.needsFullReconciliation = true;
-		this.hasUnreconciledLiveState = true;
-		if (callContext.notificationsDeferred) return;
-		callContext.notificationsDeferred = true;
-		this.notificationDeferralDepth++;
 	}
 
 	private canUseAdoptionHint(
@@ -821,7 +724,6 @@ export class DRPVertexApplier<T extends IDRP> {
 			drp,
 			acl,
 			nextHint,
-			restoresCanonicalState: true,
 			// A root replay has already paid the batch ceiling. Pin its canonical
 			// result immediately so later arrivals can extend that causal cut.
 			forceCheckpoint: replay.origin === HashGraph.rootHash,
@@ -851,8 +753,8 @@ export class DRPVertexApplier<T extends IDRP> {
 		await (operation.isACL ? applyDeterministicReplayVertices(adopted, tail) : applyVertices(adopted, tail));
 		const nextHint = this.createTailAdoptionHint(vertex, expectedFrontier, tail, replay.requiresConflictResolution);
 		return operation.isACL
-			? { expectedFrontier, acl: adopted as IACL, nextHint, restoresCanonicalState: true }
-			: { expectedFrontier, drp: adopted as T, nextHint, restoresCanonicalState: true };
+			? { expectedFrontier, acl: adopted as IACL, nextHint }
+			: { expectedFrontier, drp: adopted as T, nextHint };
 	}
 
 	private createTailAdoptionHint(
@@ -908,10 +810,36 @@ export class DRPVertexApplier<T extends IDRP> {
 
 	private tryCommitPreparedVertex(
 		operation: PostOperation<T>,
-		adoption: PreparedAdoption<T>
+		preparedAdoption: PreparedAdoption<T>
 	): "committed" | "duplicate" | "retry" {
-		if (this.hashGraph.vertices.has(operation.vertex.hash)) return "duplicate";
-		if (!sameHashes(this.hashGraph.getFrontier(), adoption.expectedFrontier)) return "retry";
+		return this.commitPreparedState(operation, preparedAdoption).result.commitOutcome;
+	}
+
+	private commitPreparedState(
+		operation: PostOperation<T>,
+		preparedAdoption?: PreparedAdoption<T>
+	): HandlerReturn<CommitOperation<T>> {
+		const adoption =
+			preparedAdoption ??
+			(operation.isACL
+				? {
+						expectedFrontier: operation.vertex.dependencies,
+						acl: operation.currentDRP as IACL | undefined,
+					}
+				: {
+						expectedFrontier: operation.vertex.dependencies,
+						drp: operation.currentDRP as T | undefined,
+					});
+		const complete = (commitOutcome: "committed" | "duplicate" | "retry"): HandlerReturn<CommitOperation<T>> => ({
+			stop: commitOutcome !== "committed",
+			result: {
+				...operation,
+				commitOutcome,
+			},
+		});
+		if (this.hashGraph.vertices.has(operation.vertex.hash)) return complete("duplicate");
+		const expectedFrontier = adoption.expectedFrontier;
+		if (!sameHashes(this.hashGraph.getFrontier(), expectedFrontier)) return complete("retry");
 
 		// This journal is born, used, and closed in one synchronous section after
 		// the vertex's final await. No rollback authority crosses a suspension.
@@ -923,12 +851,11 @@ export class DRPVertexApplier<T extends IDRP> {
 			this.addVertexToHashGraph(commitOperation);
 			if (adoption.acl) replaceEnumerableState(this.acl, adoption.acl, journal);
 			if (adoption.drp && this.drp) replaceEnumerableState(this.drp, adoption.drp, journal);
-			if (!adoption.skipCheckpoint) this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint);
-			if (adoption.restoresCanonicalState) this.hasUnreconciledLiveState = false;
+			this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint);
 			journal.commit();
 			this.knownInvalidVertexHashes.delete(operation.vertex.hash);
-			this.enqueueNotification("merge", [operation.vertex]);
-			return "committed";
+			this.enqueueNotification(operation.isLocal ? "callFn" : "merge", [operation.vertex]);
+			return complete("committed");
 		} catch (error) {
 			try {
 				journal.rollback();
@@ -972,7 +899,6 @@ export class DRPVertexApplier<T extends IDRP> {
 	private getLCA(operation: BaseOperation): HandlerReturn<PostLCAOperation> {
 		const { vertex } = operation;
 		if (operation.isLocal) {
-			if (!this.hasUnreconciledLiveState) this.advanceCheckpointIfNeeded();
 			return {
 				stop: false,
 				result: { ...operation, lcaResult: { lca: HashGraph.rootHash, linearizedVertices: [] } },
@@ -1296,20 +1222,12 @@ export class DRPVertexApplier<T extends IDRP> {
 	private assignState<Op extends Operation<T>>(operation: Op): HandlerReturn<Op> {
 		const {
 			isACL,
-			isLocal,
 			currentDRP,
 			acl,
 			drp,
 			journal,
 			vertex: { hash },
 		} = operation;
-
-		// A synchronous local call may run while a remote call is amortizing its
-		// one canonical replay. Its return value is necessarily based on the live
-		// proxy, but that proxy is not a valid causal snapshot for the new hash.
-		// Omitting the snapshot forces every later child to reconstruct from the
-		// graph instead of re-adopting stale state.
-		if (isLocal && this.hasUnreconciledLiveState) return { stop: false, result: operation };
 
 		const [aclState, drpState] = isACL
 			? [stateFromDRP(currentDRP), stateFromDRP(drp)]
@@ -1379,7 +1297,6 @@ export class DRPVertexApplier<T extends IDRP> {
 
 	private enqueueNotification(origin: string, vertices: Vertex[]): void {
 		this.notificationQueue.push({ origin, vertices });
-		if (this.notificationDeferralDepth !== 0) return;
 		this.drainNotifications();
 	}
 
@@ -1400,44 +1317,6 @@ export class DRPVertexApplier<T extends IDRP> {
 		} finally {
 			this.isDrainingNotifications = false;
 		}
-	}
-
-	private async reconcileCanonicalState(): Promise<void> {
-		for (let attempt = 1; attempt <= MAX_ADOPTION_COMMIT_ATTEMPTS; attempt++) {
-			const expectedFrontier = this.hashGraph.getFrontier();
-			const replay = this.getReplay(expectedFrontier);
-			const [drpVertices, aclVertices] = splitOperation(replay.linearizedVertices);
-			const [drp, acl] = this.states.fromStates(
-				replay.state.drpState,
-				replay.state.aclState,
-				this.drp?.context,
-				this.acl.context
-			);
-			await applyDeterministicReplayVertices(acl, aclVertices);
-			if (drp && this.drp) await applyVertices(drp, drpVertices);
-			if (!sameHashes(this.hashGraph.getFrontier(), expectedFrontier)) continue;
-
-			const journal = new UndoJournal();
-			try {
-				// Presence has already been established by the replay input, and
-				// frontier CAS is repeated inside this synchronous publication
-				// section after the replay's final suspension point.
-				if (!sameHashes(this.hashGraph.getFrontier(), expectedFrontier)) continue;
-				replaceEnumerableState(this.acl, acl, journal);
-				if (drp && this.drp) replaceEnumerableState(this.drp, drp, journal);
-				this.advanceCheckpointIfNeeded(journal, true);
-				this.hasUnreconciledLiveState = false;
-				journal.commit();
-				return;
-			} catch (error) {
-				journal.rollback();
-				throw error;
-			}
-		}
-		throw new ApplyInvariantError(
-			[new Error("Frontier changed during every canonical replay attempt")],
-			`Failed to reconcile canonical state after ${MAX_ADOPTION_COMMIT_ATTEMPTS} attempts`
-		);
 	}
 }
 

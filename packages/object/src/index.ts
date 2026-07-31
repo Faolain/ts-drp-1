@@ -15,13 +15,8 @@ import {
 } from "@ts-drp/types";
 
 import { createPermissionlessACL } from "./acl/index.js";
-import {
-	AdoptionCommitExhaustedError,
-	ApplyInvariantError,
-	createDRPVertexApplier,
-	type DRPVertexApplier,
-} from "./drp-applier.js";
-import { RootACLMutationError } from "./errors.js";
+import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js";
+import { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
 import { type DRPObjectStateManager } from "./state.js";

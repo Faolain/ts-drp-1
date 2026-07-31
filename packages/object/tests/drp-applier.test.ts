@@ -87,7 +87,7 @@ describe("DRPVertexApplier", () => {
 				expect(result.invalid).toHaveLength(0);
 			});
 
-			it("should fail closed when an IHashGraph has no conflict-resolver inspector", async () => {
+			it("should not reintroduce deferred reconciliation when an IHashGraph has no conflict-resolver inspector", async () => {
 				const hashGraphWithoutInspector = new Proxy(mockHashGraph, {
 					get(target, property): unknown {
 						if (property === "hasCustomConflictResolver") return undefined;
@@ -103,19 +103,19 @@ describe("DRPVertexApplier", () => {
 					finalityStore: mockFinalityStore,
 					notify: mockNotify,
 				});
-				let observedCanDeferReconciliation: boolean | undefined;
+				let observedCallContextKeys: string[] | undefined;
 				const applyVerticesCall = vi
 					.spyOn(
 						failClosedApplier as unknown as {
 							applyVerticesCall(
 								vertices: unknown[],
-								callContext: { canDeferReconciliation: boolean }
+								callContext: Record<string, unknown>
 							): Promise<{ applied: boolean; missing: string[]; invalid: string[] }>;
 						},
 						"applyVerticesCall"
 					)
 					.mockImplementation((_vertices, callContext) => {
-						observedCanDeferReconciliation = callContext.canDeferReconciliation;
+						observedCallContextKeys = Object.keys(callContext);
 						return Promise.resolve({ applied: true, missing: [], invalid: [] });
 					});
 				const operation = Operation.create({ opType: "test", value: [], drpType: DrpType.DRP });
@@ -141,7 +141,7 @@ describe("DRPVertexApplier", () => {
 					invalid: [],
 				});
 				expect(applyVerticesCall).toHaveBeenCalledOnce();
-				expect(observedCanDeferReconciliation).toBe(false);
+				expect(observedCallContextKeys).toEqual([]);
 			});
 
 			it("should classify non-dependency validation failures as invalid", async () => {

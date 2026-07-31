@@ -2,7 +2,8 @@ import { type DrpType, type IDRP } from "@ts-drp/types";
 import { handlePromiseOrValue, isPromise } from "@ts-drp/utils";
 import { deepEqual } from "fast-equals";
 
-import { type PostOperation } from "./operation.js";
+import { AdoptionCommitExhaustedError } from "./errors.js";
+import { MAX_ADOPTION_COMMIT_ATTEMPTS, type PostOperation } from "./operation.js";
 import { type Pipeline } from "./pipeline/pipeline.js";
 
 export interface DRPProxyBeforeChainArgs {
@@ -353,7 +354,30 @@ export class DRPProxy<T extends IDRP> {
 				// Return wrapped function
 				return (...args: unknown[]) => {
 					return this.localMutationLane.run(() => {
-						const operation = this.pipeline.execute({ prop, args, type: this.type });
+						let attempts = 1;
+						const retrying = (postOperation: PostOperation<IDRP>): boolean =>
+							postOperation.commitOutcome === "retry" || postOperation.commitOutcome === "duplicate";
+						const assertRetryAvailable = (postOperation: PostOperation<IDRP>): void => {
+							if (attempts < MAX_ADOPTION_COMMIT_ATTEMPTS) return;
+							throw new AdoptionCommitExhaustedError(postOperation.vertex.hash, attempts);
+						};
+						const continueAsync = async (pending: Promise<PostOperation<IDRP>>): Promise<PostOperation<IDRP>> => {
+							let postOperation = await pending;
+							while (retrying(postOperation)) {
+								assertRetryAvailable(postOperation);
+								attempts++;
+								postOperation = await this.pipeline.execute({ prop, args, type: this.type });
+							}
+							return postOperation;
+						};
+
+						let operation = this.pipeline.execute({ prop, args, type: this.type });
+						while (!isPromise(operation) && retrying(operation)) {
+							assertRetryAvailable(operation);
+							attempts++;
+							operation = this.pipeline.execute({ prop, args, type: this.type });
+						}
+						if (isPromise(operation)) operation = continueAsync(operation);
 						return handlePromiseOrValue(operation, (postOperation) => postOperation.result);
 					});
 				};

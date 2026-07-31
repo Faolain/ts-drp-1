@@ -83,16 +83,11 @@ describe("Phase 0l object public error taxonomy RED", () => {
 				currentDRP: undefined,
 				isACL: false,
 				vertex: {
-					dependencies: [],
+					dependencies: [HashGraph.rootHash],
 					hash: "f".repeat(64),
 				},
 			};
-			const callContext = {
-				canDeferReconciliation: true,
-				deferRemainingVertices: false,
-				needsFullReconciliation: false,
-				notificationsDeferred: false,
-			};
+			const callContext = {};
 			const error = await capture(() =>
 				Reflect.apply(applier.commitPreparedVertex as (...args: unknown[]) => unknown, applier, [
 					operation,
