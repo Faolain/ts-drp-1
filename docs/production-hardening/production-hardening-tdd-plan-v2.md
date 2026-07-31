@@ -12902,43 +12902,154 @@ rejected. This is not a Phase-0l blocker because 0l did not change or live-bind 
 must still own the built-in graph container, captured intrinsics, common authenticated order/charge
 keyset and hostile subclass/Proxy/prototype-poisoning REDs.
 
+### D.80 — Phase 0q-a authoritative-state atomicity acceptance
+
+Phase 0q-a is accepted at final code/test HEAD
+`2a62a3006eb173baee06bfa233b8fa1f44bfdb59`. The production behavior landed at
+`d099158bbb8ea39973d5bb4dfe2bc1c7043fba64`; the four later commits are test-only structural-gate
+hardening and leave `packages/object/src/**` byte-identical to that checkpoint. The complete causal
+lineage is:
+
+- initial RED `56afa54` and GREEN `6da707a` established local duplicate handling, retry/exhaustion,
+  exact partial-result boundaries and the first synchronous journal/frontier-CAS owner;
+- corrective RED `99c8af3` and interim GREEN `df27637` closed the first behavioral gaps, but that
+  GREEN failed the clean XVER contract and was superseded;
+- revision-aware RED `8475473` and GREEN `22049d4`, followed by test-honesty checkpoint `3c1ebec`,
+  closed that workflow defect;
+- root-config/async-outcome RED `141e3ee` and GREEN `156863e` made the XVER closure sensitive to the
+  root configuration chain and async workflow outcomes;
+- structural corrective RED `df4830a` proved that authoritative helpers could still mutate without
+  mandatory rollback authority; production GREEN `d099158` made `commitPreparedState` the single
+  synchronous CAS-plus-`UndoJournal` commit owner and required a journal at every direct
+  authoritative mutation helper;
+- missing-authority RED `ee80d34` and GREEN `aa5b486` strengthened the executable structure gate
+  against zero-parameter direct mutators, string-literal computed canonical calls, unrelated
+  commit/rollback-shaped types, nested deferred owner impersonation and verb-named transitive
+  helpers; and
+- suspension RED `1bc4946` and final GREEN `2a62a30` reject a direct authoritative mutator that is
+  `async` or has an own-scope `await` while holding mandatory rollback authority.
+
+The accepted ownership model is deliberately narrow. Candidate preparation, including live ACL/DRP
+replay and checkpoint calculation, completes before the synchronous commit owner. That owner
+rechecks the authoritative frontier, applies graph/state/finality/checkpoint changes through one
+undo journal, then commits or rolls back before returning. A local duplicate is terminal. A frontier
+conflict retries by re-executing the complete deterministic blueprint and canonical preparation,
+with exactly three total attempts; it never reuses a stale prepared result. This relies on the
+Phase-0j no-ambient/nondeterminism contract. The former deferred multi-candidate reconciliation path
+was **deleted rather than hardened**: each candidate pays canonical preparation before its CAS
+attempt, so CAS contention alone may perform that work three times. The independent, pre-existing
+outer application-attempt loop can make a transient non-barrier failure perform up to three such
+three-attempt rounds, or nine preparations per offered vertex; CAS exhaustion itself is a retry
+barrier and is not multiplied. There is no post-commit reconciliation window and no success-visible
+present-and-wrong snapshot. The common linear/hinted path remains the intended fast path.
+
+`AdoptionCommitExhaustedError` and `ApplyInvariantError` retain the exact partial `ApplyResult` that
+exists at their rejected boundary. No notification or observer callback participates in the
+authoritative journal: publication happens only after commit. Phase 0q-b therefore owns notification
+ordering/reentrancy isolation, observer-failure reporting without rollback of committed state, exact
+partial-result consumption by node/recovery/persistence callers, preservation of the primary error
+as `cause`, and removal of the now write-dead private `hasUnreconciledLiveState` tripwire. It must not
+reintroduce deferred authoritative reconciliation or move notification delivery inside the commit.
+
+Authenticated final gates at exact HEAD `2a62a30` are:
+
+- the structural commit gate, 9/9;
+- the exact four-file Phase-0q-a set, 27/27: five atomicity, nine structure, six local-publication and
+  seven XVER-closure tests;
+- preservation/classifier coverage, seven files / 49 tests;
+- the bounded object set, sixteen files / 101 tests;
+- package and workspace typechecks green;
+- tracked ESLint over 688 files, 0 errors / 249 inherited warnings, plus scoped Prettier and diff
+  checks; and
+- authenticated XVER at `2a62a30`, 108 comparisons / zero approved deltas.
+
+The full `incremental-linearize.test.ts` is **not** acceptance evidence: a run at then-HEAD
+`156863e` was terminated after ten minutes while its pre-existing deep checkpoint-parity workload
+remained CPU-bound at approximately one core. Instead, bounded Sections B and D ran at both reference
+`b50cbac` and final `2a62a30`; both reported 3 passed / 4 skipped of 7 with the same `drp=156`,
+`acl=156`, `bound=768` instrumentation. This proves the governed bounded regression only and does not
+relabel the full file green.
+
+Final focused reviewers found no blocking code, test or gate defect:
+
+- Grok 4.5/high returned `PASS`, session `019fb780-674b-7c01-9040-32fcd27a14b1`, request
+  `01efef35-d1b3-480d-8c0b-bf60c107d891`, with sole model usage `grok-4.5-build`; and
+- exact Kimi 3/high returned `PASS_WITH_NOTES` in the same continuous session
+  `session_9da8f4b5-3065-469b-b22b-e4a1a8b20c2c`, using
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`. No served-provider/effective-effort
+  metadata absent from its stream is invented; and
+- final Opus/xhigh returned `PASS_WITH_NOTES`, session
+  `efb43d80-da4e-4798-9ac7-be77a5bd7ec8`, exit 0 / `end_turn`. At the frozen initial-review
+  boundary preceding the follow-up user turn, the stored transcript contains 113 substantive
+  assistant records—43 thinking, 66 tool-use and four text records—and every one is
+  `claude-opus-5`. The initial `raw.json` envelope's separate `claude-haiku-4-5-20251001` usage is
+  1,559 input / 22 output tokens of title/metadata overhead; there is no Haiku assistant, reasoning,
+  finding, tool or verdict event. Opus attempted one disabled `Write` call to its own user-level
+  plan path; it was rejected as unavailable, and no repository or external plan file was created.
+  Its other 65 tool calls were read-only Bash/Read/Grep, and it independently reproduced the exact
+  four-file 27/27 gate. A same-session, Opus-only read-only follow-up returned `PASS` on the corrected
+  D.80 text and 0q-b handoff.
+
+Retained gotchas are explicit rather than reward-hacked away:
+
+1. The TypeScript-AST structure gate is a governed-pattern tripwire, not semantic whole-program
+   proof. It parses only `packages/object/src/drp-applier.ts` and recognizes direct `this`-rooted
+   canonical receiver chains, string-literal computed access and a name-anchored
+   `OperationJournal` authority by mandatory signature. It does not prove that a declared journal is
+   used unconditionally. Aliased receivers, nonliteral computed names, an imposter same-named type,
+   a different mutation mechanism or a new authoritative owner in another file require review/gate
+   maintenance. Current governed production direct mutators record their undo action.
+2. Own-scope `async`/`await` is rejected, but nested floating closures are deliberately excluded
+   from that detector because the real journal owner closes synchronously. A future closure that
+   performs late authoritative mutation would require a new causal RED; current production has no
+   such path.
+3. The full incremental Section C search remains an iteration-time problem. Long-running coverage
+   must stay targeted and instrumented rather than becoming an unactionable per-item gate.
+4. The private unreconciled-state latch is write-dead after deferred reconciliation deletion. It is
+   retained only until 0q-b removes it alongside the publication/consumer integration it governs.
+
+The D.73 hostile graph-side virtual-`Map.keys()` exploit remains **real, unresolved and mandatory
+before the first live Phase-3a binder**. Phase 0q-a neither consumes nor repairs that generic
+byte-capacity surface. Phase 3a must bind graph membership, supplied order and charge keysets through
+owned/built-in containers and captured intrinsics, with hostile subclass/Proxy/prototype-poisoning
+REDs. Phase 0n remains optional and deferred until after the golden paths; if authorized, retain the
+bounded `@ts-drp/math` core and prefer pinned deterministic prior art.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
 binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted through its plan checkpoint
-`114ae6e`; Phase 0l is accepted at `33afab5`. The remaining Phase-0 sequence is
-**`0q-a → 0q-b`**. Phase 0n remains optional and deferred until after the golden paths.
+`114ae6e`; Phase 0l is accepted at `33afab5`; Phase 0q-a is accepted at `2a62a30`. The sole remaining
+mandatory Phase-0 item is **0q-b**. Phase 0n remains optional and deferred until after the golden
+paths.
 
-The next item is **Phase 0q-a — authoritative-state atomicity**. Begin with a fresh Codex-high
-pre-RED/no-RED audit. Re-run the already-green merge presence recheck, frontier CAS, synchronous
-journal, rollback/checkpoint and classifier controls, and report them honestly as preservation
-evidence rather than manufacturing failures.
+The next item is **Phase 0q-b — post-commit publication and consumer truthfulness**. Begin with a
+fresh Codex-high pre-RED/no-RED audit. Preserve 0q-a's single synchronous CAS-plus-journal commit
+owner and re-run its focused atomicity/structure gates as controls. Author causal REDs only for the
+open 0q-b boundaries:
 
-Author causal REDs only for D.74.2 and the 0q-a row's genuinely open boundaries:
+- notification delivery stays after authoritative commit, preserves deterministic commit order and
+  cannot reenter or roll back the committed state;
+- observer failures are reported through the governed failure channel while the already-committed
+  authoritative state remains committed;
+- node, recovery and persistence callers consume the exact `partialResult` attached at the rejected
+  adoption/apply boundary rather than reconstructing or discarding it;
+- a wrapper that attributes a returned failure preserves the primary caught throwable as exact
+  `cause`; and
+- the private write-dead `hasUnreconciledLiveState` latch is removed with no public
+  `liveStateUnreconciled` replacement.
 
-- local async `callFn`/blueprint suspension across a committing merge must not publish without a
-  journal and frontier CAS;
-- the deferred multi-candidate path must not expose graph, snapshots, finality or notification
-  eligibility before canonical live ACL/DRP plus checkpoint state are authoritative;
-- replay failure or CAS exhaustion must leave no trace for uncommitted candidates, and every
-  rejected boundary must carry its exact `partialResult`; and
-- an executable structural gate must prove no shared mutation/rollback authority survives an
-  `await` and no resolved or rejected `applyVertices` boundary retains the private unreconciled
-  latch.
+Do not move notification delivery into `commitPreparedState`, add deferred reconciliation, widen
+public result shapes or taxonomy without a causal need, absorb protocol-v2 trusted-hook/latch/retry
+policy from Phase 3a, or claim to close D.73. If the audit proves one bullet already green, retain it
+as a named preservation control instead of manufacturing a RED. Checkpoint every genuine RED before
+handing the unchanged contract to a distinct fresh Codex-high GREEN owner.
 
-Snapshots may be absent but never present-and-wrong. Do not introduce public
-`liveStateUnreconciled` success, move observer/notification delivery into the authoritative commit,
-change public error taxonomy, or absorb 0q-b's consumer/cause-preservation work. If the audit finds a
-real ownership contradiction rather than an implementation gap, stop before changing the plan and
-use the required correction quorum.
-
-Checkpoint a genuine RED before handing the unchanged contract to a distinct fresh Codex-high GREEN
-owner. Preserve Phase 0l's taxonomy/result/classifier controls and run the relevant Phase 0m XVER
-trigger, package/workspace typecheck, zero-error lint, format and bounded serial tests to logs. Then
-run the per-item Grok-high, exact Kimi 3/high and final Opus-xhigh review loop. Phase 0q-b follows and
-owns post-commit notification isolation, observer failure reporting, downstream exact-partial-result
-consumption and primary-error `cause` preservation. Phase 3a continues to own protocol-v2 trusted-hook
-policy and the D.73 hostile graph-container exploit.
+Preserve Phase 0l taxonomy/result/classifier controls, all 0q-a exact-partial-result and
+rollback/frontier-CAS behavior, and the Phase 0m XVER trigger. Run package/workspace typecheck,
+zero-error lint, format, focused tests and bounded serial preservation tests to `.log` files. Then run
+the per-item Grok-high, exact Kimi 3/high and final Opus-xhigh review loop. Phase 3a continues to own
+protocol-v2 trusted-hook policy and the D.73 hostile graph-container exploit.
 
 Continue the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
