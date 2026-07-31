@@ -240,10 +240,15 @@ function assertExactIncrementalDRPPublication(
 	}
 	expect(storedEntries.get("ballast"), "unchanged ballast must remain shared").toBe(baselineEntries.get("ballast"));
 	const publicationCopies = h.probe.copied.filter((copy) => copy.publicationId === publication?.publicationId);
+	const expectedCopyOperations = expectedKeys
+		// Deletion charges its pre-image to mutatedBytes but has no target payload to detach.
+		.filter((key) => byKey(expected).has(key))
+		.map((key) => `drp:${key}:post`)
+		.sort();
 	expect(
 		publicationCopies.map(({ image, key, side }) => `${side}:${key}:${image}`).sort(),
 		"copy accounting must be precise and must not inflate every key"
-	).toEqual(expectedKeys.map((key) => `drp:${key}:post`).sort());
+	).toEqual(expectedCopyOperations);
 	expect(publicationCopies.reduce((total, copy) => total + copy.bytes, 0)).toBeLessThan(20 * delta.mutatedBytes);
 	expect(publication?.changed.drp).not.toContain("context");
 }
