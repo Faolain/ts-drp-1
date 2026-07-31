@@ -296,8 +296,7 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	const verifiedVertices = authenticateIncomingVertices(object, updateMessage.vertices);
 
 	const [, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
-	const presentHashes = new Set(object.vertices.map((vertex) => vertex.hash));
-	const appliedVertices = verifiedVertices.filter((vertex) => presentHashes.has(vertex.hash));
+	const appliedVertices = verifiedVertices.filter((vertex) => object.getVertex(vertex.hash) !== undefined);
 
 	if (appliedVertices.length !== 0) {
 		// add their signatures — only if the sender is a finality signer on the LIVE
@@ -375,6 +374,7 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
 
 	const requested: Set<Vertex> = new Set(localVertices);
 	const localVerticesByHash = new Map<string, Vertex>();
+	// Reverse fill preserves Array.find's first match when duplicate hashes are present.
 	for (let index = localVertices.length - 1; index >= 0; index--) {
 		const vertex = localVertices[index];
 		localVerticesByHash.set(vertex.hash, vertex);
@@ -483,7 +483,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	// send missing vertices
 	const requested: Vertex[] = [];
 	for (const h of syncAcceptMessage.requesting) {
-		const vertex = object.vertices.find((v) => v.hash === h);
+		const vertex = object.getVertex(h);
 		if (vertex) {
 			requested.push(vertex);
 		}

@@ -6,6 +6,7 @@ import {
 	type DRPObjectCallback,
 	type DRPObjectOptions,
 	type DRPState,
+	type Hash,
 	type IACL,
 	type IDRP,
 	type IDRPObject,
@@ -162,6 +163,15 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 */
 	get vertices(): Vertex[] {
 		return this.hashGraph.getAllVertices();
+	}
+
+	/**
+	 * Gets a stored vertex by hash.
+	 * @param hash - The vertex hash.
+	 * @returns The stored vertex reference, or undefined when the hash is absent.
+	 */
+	getVertex(hash: Hash): Vertex | undefined {
+		return this.hashGraph.getVertex(hash);
 	}
 
 	/**

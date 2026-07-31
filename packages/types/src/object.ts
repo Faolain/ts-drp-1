@@ -63,6 +63,13 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	vertices: Vertex[];
 
 	/**
+	 * Gets the stored vertex for a hash.
+	 * @param hash - The vertex hash.
+	 * @returns The stored vertex reference, or undefined when the hash is absent.
+	 */
+	getVertex(hash: Hash): Vertex | undefined;
+
+	/**
 	 * The finality store of the DRP object.
 	 */
 	finalityStore: IFinalityStore;
