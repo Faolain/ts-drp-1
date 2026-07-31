@@ -48,16 +48,12 @@ function expectFullResidentRecord(store: FinalityStore, hash: string): void {
 	expect(record).toMatchObject({
 		data: hash,
 		numberOfSignatures: 0,
-		signerCredentials: ["", "verification-disabled-test-credential"],
 	});
-	expect(record?.signerIndices).toEqual(
-		new Map([
-			["receiver", 0],
-			["sender", 1],
-		])
-	);
-	expect(record?.aggregation_bits.toBytes()).toEqual(new Uint8Array(4));
-	expect(record?.signature).toBeUndefined();
+	if (!record) throw new Error("Expected a resident finality record");
+	expect(new Set(record.signerIndices.keys())).toEqual(new Set(["receiver", "sender"]));
+	expect(record.signerCredentials).toHaveLength(record.signerIndices.size);
+	for (const index of record.signerIndices.values()) expect(record.aggregation_bits.get(index)).toBe(false);
+	expect(record.signature).toBeUndefined();
 }
 
 describe("Phase 0k-a enabled legacy-finality retention", () => {

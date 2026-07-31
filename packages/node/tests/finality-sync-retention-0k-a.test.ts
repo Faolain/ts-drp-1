@@ -35,7 +35,7 @@ describe("Phase 0k-a ancient finality sync completeness", () => {
 		await Promise.allSettled(nodes.splice(0).map((node) => node.stop()));
 	});
 
-	it("includes resident attestations for both the oldest and newest requested vertices in a real SYNC response", async () => {
+	it("includes exactly every signed requested non-root vertex attestation in a real SYNC response", async () => {
 		const node = await makeNode();
 		nodes.push(node);
 		const direct: Message[] = [];
@@ -52,9 +52,7 @@ describe("Phase 0k-a ancient finality sync completeness", () => {
 		for (let value = 0; value < 32; value++) object.drp?.append(value);
 		const requestedVertices = object.vertices.filter(({ operation }) => operation?.opType !== "-1");
 		signFinalityVertices(node, object, requestedVertices);
-		const oldest = requestedVertices[0];
-		const newest = requestedVertices.at(-1);
-		if (!oldest || !newest) throw new Error("Expected an old and new retained vertex");
+		if (requestedVertices.length === 0) throw new Error("Expected signed non-root vertices");
 
 		await handleMessage(
 			node,
@@ -70,10 +68,10 @@ describe("Phase 0k-a ancient finality sync completeness", () => {
 		expect(responses).toHaveLength(1);
 		const response = SyncAccept.decode(responses[0].data);
 		const attestationHashes = response.attestations.map(({ data }) => data);
+		const signedRequestedHashes = requestedVertices.map(({ hash }) => hash);
 		expect(response.requested.map(({ hash }) => hash)).toEqual(object.vertices.map(({ hash }) => hash));
-		expect(attestationHashes).toContain(oldest.hash);
-		expect(attestationHashes).toContain(newest.hash);
-		expect(response.attestations.find(({ data }) => data === oldest.hash)?.signature.length).toBeGreaterThan(0);
-		expect(response.attestations.find(({ data }) => data === newest.hash)?.signature.length).toBeGreaterThan(0);
+		expect(new Set(attestationHashes)).toEqual(new Set(signedRequestedHashes));
+		expect(attestationHashes).toHaveLength(signedRequestedHashes.length);
+		for (const attestation of response.attestations) expect(attestation.signature.length).toBeGreaterThan(0);
 	}, 20_000);
 });

@@ -1,5 +1,7 @@
+import { bls } from "@chainsafe/bls/herumi";
+import { Keychain } from "@ts-drp/keychain";
 import { type Attestation } from "@ts-drp/types";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FinalityStore } from "../src/finality/index.js";
 
@@ -15,6 +17,10 @@ function attestation(data: string): Attestation {
 }
 
 describe("Phase 0k-a FinalityStore.addSignatures return contract", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
 	it("excludes an attestation for an unknown hash from the returned added set", () => {
 		const store = new FinalityStore();
 		const unknown = attestation("phase-0k-a-unknown-hash");
@@ -32,5 +38,51 @@ describe("Phase 0k-a FinalityStore.addSignatures return contract", () => {
 		expect(store.addSignatures(peerId, [first], false)).toEqual([first]);
 		expect(store.addSignatures(peerId, [duplicate], false)).toEqual([]);
 		expect(store.getNumberOfSignatures(knownHash)).toBe(1);
+	});
+
+	it("atomically preserves a known record when aggregating a second signer throws", async () => {
+		const firstPeerId = "phase-0k-a-first-signer";
+		const secondPeerId = "phase-0k-a-second-signer";
+		const firstKeychain = new Keychain({ private_key_seed: firstPeerId });
+		const secondKeychain = new Keychain({ private_key_seed: secondPeerId });
+		await Promise.all([firstKeychain.start(), secondKeychain.start()]);
+		const store = new FinalityStore();
+		store.initializeState(
+			knownHash,
+			new Map([
+				[firstPeerId, firstKeychain.blsPublicKey],
+				[secondPeerId, secondKeychain.blsPublicKey],
+			])
+		);
+		const first = { data: knownHash, signature: firstKeychain.signWithBls(knownHash) };
+		const second = { data: knownHash, signature: secondKeychain.signWithBls(knownHash) };
+
+		expect(store.addSignatures(firstPeerId, [first])).toEqual([first]);
+		const state = store.states.get(knownHash);
+		if (!state?.signature) throw new Error("Expected the first signature to be installed");
+		const firstIndex = state.signerIndices.get(firstPeerId);
+		const secondIndex = state.signerIndices.get(secondPeerId);
+		if (firstIndex === undefined || secondIndex === undefined) throw new Error("Expected both signers");
+		const signatureBefore = state.signature;
+		const countBefore = state.numberOfSignatures;
+		const aggregateBefore = structuredClone(store.getAttestation(knownHash));
+
+		const aggregate = vi.spyOn(bls, "aggregateSignatures").mockImplementationOnce(() => {
+			throw new Error("phase-0k-a controlled aggregation failure");
+		});
+
+		expect(store.addSignatures(secondPeerId, [second])).toEqual([]);
+		expect.soft(aggregate).toHaveBeenCalledTimes(1);
+		expect.soft(state.aggregation_bits.get(firstIndex)).toBe(true);
+		expect.soft(state.aggregation_bits.get(secondIndex)).toBe(false);
+		expect.soft(state.signature).toBe(signatureBefore);
+		expect.soft(state.numberOfSignatures).toBe(countBefore);
+		expect.soft(store.getAttestation(knownHash)).toEqual(aggregateBefore);
+
+		expect.soft(store.addSignatures(secondPeerId, [second])).toEqual([second]);
+		expect.soft(aggregate).toHaveBeenCalledTimes(2);
+		expect.soft(state.aggregation_bits.get(secondIndex)).toBe(true);
+		expect.soft(state.numberOfSignatures).toBe(2);
+		expect.soft(state.signature).not.toEqual(signatureBefore);
 	});
 });
