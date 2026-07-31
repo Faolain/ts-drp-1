@@ -13015,35 +13015,129 @@ owned/built-in containers and captured intrinsics, with hostile subclass/Proxy/p
 REDs. Phase 0n remains optional and deferred until after the golden paths; if authorized, retain the
 bounded `@ts-drp/math` core and prefer pinned deterministic prior art.
 
+### D.81 — Phase 0q-b1 dead-latch removal acceptance and 0q-b execution split
+
+Phase 0q-b1 is accepted at final code/test HEAD
+`5aba014d4a08767fd4333894dc37d95bfb07116e`. This is a sequencing split only; it does not amend
+0q-b's accepted semantics. The TDD execution uses three independently reviewable owners:
+
+1. **0q-b1** removes the private write-dead reconciliation latch and forbids a public success-flag
+   replacement;
+2. **0q-b2** preserves post-commit ordering/reentrancy containment and makes observer-failure
+   reporting explicit without rolling back committed state; and
+3. **0q-b3** makes node/recovery/persistence consumers use exact rejected-boundary `partialResult`
+   and preserves the primary throwable as exact `cause`.
+
+Codex-high, Grok-high, exact Kimi 3/high and final Opus/xhigh all agreed that this split preserves the
+original 0q-b charter. D.80 therefore supersedes the older D.50.4/N2 shorthand that described 0q-b
+as “only” observer isolation, handler consumption and cause preservation: removal of the
+write-dead latch was already the fifth accepted D.80 handoff bullet.
+
+The 0q-b1 TDD lineage is deliberately small:
+
+- causal RED `e69bf6b3007de3a6ab6f7b24d185b6cae36ae657` added one real-source AST test. It failed
+  exactly one test because `DRPVertexApplier` still declared one
+  `hasUnreconciledLiveState` identifier; the applier and `notificationQueue` positive controls were
+  present and the governed public `liveStateUnreconciled` token count was zero; and
+- GREEN `5aba014d4a08767fd4333894dc37d95bfb07116e` contains zero insertions and seventeen deletions.
+  Three production lines remove only the dead field/comment. Fourteen authorized test-hygiene lines
+  remove `privateLatch()` plus five `latchCleared: !privateLatch(...)` observed/expected pairs from
+  the inherited 0q-a test.
+
+The inherited test migration is load-bearing honesty, not weakening. The deleted field had no writer,
+so every removed projection was a constant `true` and carried no discriminating power. Deleting the
+field first made object typecheck fail with `TS7053` at that private-field index; that exit-2 preflight
+is retained. The new structural RED is the non-vacuous owner of declaration/name-token absence. All
+real 0q-a assertions remain: three-attempt CAS/retry, exact accounting/`partialResult`, rollback
+restoration and identities, authoritative graph/state/finality/checkpoint surfaces, notification
+order/absence and the nine-row structure gate. Production notification, commit, journal, result,
+taxonomy and consumer paths are byte-identical to the 0q-b1 RED.
+
+Authenticated GREEN gates are:
+
+- 0q-b1 focused 1/1;
+- exact Phase 0q-a 27/27 and subscriber-reentrancy 5/5;
+- preservation seven files / 49 tests and bounded object sixteen files / 101 tests;
+- object and workspace typechecks green;
+- tracked ESLint 0 errors / 249 inherited warnings, plus Prettier and diff/scope checks; and
+- hermetic XVER with exact `primarySha: 5aba014…`, 108 comparisons / zero approved deltas.
+
+The first non-XVER GREEN runs preceded the commit by minutes and were bound to it by exact
+two-path/zero-insertion diff scope plus clean tracked state. To remove even that evidence inference,
+all focused, 0q-a, reentrancy, preservation, bounded, workspace-typecheck, 689-file tracked-lint and
+format/diff gates were rerun after the commit with full `5aba014…` written into every log; the same
+counts and zero-error results hold.
+
+Required reviewers accept without a code/test correction:
+
+- Grok 4.5/high returned `PASS_WITH_NOTES`, session
+  `019fb7b3-133b-7ba1-95a4-b69e7f44c39d`, request
+  `5577a211-3f01-41f0-a2f1-03d7178e3604`, with sole model usage `grok-4.5-build`;
+- exact Kimi 3/high returned `PASS`, session
+  `session_a96f218e-895d-4ef1-8052-f9d98810021a`, from one
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation; no provider/effort metadata
+  absent from its stream is invented; and
+- final Opus/xhigh returned `PASS_WITH_NOTES`, session
+  `e183b341-36a6-4663-a968-daf5ee0b522f`, exit 0 / `end_turn`. At the frozen initial-review
+  boundary preceding the follow-up user turn, the transcript has 70/70 `claude-opus-5` assistant
+  records: 26 thinking, 41 read-only Bash/Read tool-use and three text records, with no
+  write/edit/Agent/Task call. The initial envelope's separate
+  `claude-haiku-4-5-20251001` usage—1,540 input / 25 output tokens—is title/metadata overhead and
+  authored no assistant, reasoning, tool, finding or verdict event.
+
+Retained 0q-b1 gotchas:
+
+1. The AST absence gate counts `Identifier` and string-literal names but not TypeScript
+   `PrivateIdentifier`; a future `#hasUnreconciledLiveState` field could evade it. Current production
+   has zero tokens and no defect. 0q-b2 must add a causal synthetic `#private` detector RED before
+   treating the absence gate as permanent.
+2. The old 0q-a structure detector still contains `"hasUnreconciledLiveState"` in a dormant
+   binary-assignment branch. It flags rather than permits that name and predates 0q-b1; live
+   checkpoint mutation coverage is owned by the separate canonical-root call detector. Retain as
+   inert maintenance evidence rather than manufacturing production work.
+3. The public-success-flag probe scans the applier, object root and the types declaration that owns
+   `ApplyResult`. When 0q-b3 changes error/`partialResult` attribution, extend the governed probe to
+   the error surface rather than assuming these three files are exhaustive.
+4. Ignored compiled example bundles still contain historical latch text. They are build artifacts,
+   not tracked source or shipped evidence, and must not be mistaken for a live field.
+
+The D.73 hostile graph-side virtual-`Map.keys()` exploit remains **real, unresolved and mandatory
+before the first live Phase-3a binder**. Phase 0q-b1 neither consumes nor repairs it. Phase 0n remains
+optional after the golden paths.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
 binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted through its plan checkpoint
-`114ae6e`; Phase 0l is accepted at `33afab5`; Phase 0q-a is accepted at `2a62a30`. The sole remaining
-mandatory Phase-0 item is **0q-b**. Phase 0n remains optional and deferred until after the golden
-paths.
+`114ae6e`; Phase 0l is accepted at `33afab5`; Phase 0q-a is accepted at `2a62a30`; Phase 0q-b1 is
+accepted at `5aba014`. The mandatory Phase-0 remainder is **`0q-b2 → 0q-b3`**. Phase 0n remains
+optional and deferred until after the golden paths.
 
-The next item is **Phase 0q-b — post-commit publication and consumer truthfulness**. Begin with a
-fresh Codex-high pre-RED/no-RED audit. Preserve 0q-a's single synchronous CAS-plus-journal commit
-owner and re-run its focused atomicity/structure gates as controls. Author causal REDs only for the
-open 0q-b boundaries:
+The next item is **Phase 0q-b2 — post-commit publication and observer truthfulness**. Begin with a
+fresh Codex-high pre-RED/no-RED audit. Enumerate the actual observer surfaces before authoring a RED:
+the applier queue/drain, `DRPObject` subscribers, node object-store subscribers and node event
+dispatch. Preserve 0q-a's single synchronous CAS-plus-journal owner and re-run its atomicity/structure
+and subscriber-reentrancy gates as controls.
 
-- notification delivery stays after authoritative commit, preserves deterministic commit order and
-  cannot reenter or roll back the committed state;
-- observer failures are reported through the governed failure channel while the already-committed
-  authoritative state remains committed;
-- node, recovery and persistence callers consume the exact `partialResult` attached at the rejected
-  adoption/apply boundary rather than reconstructing or discarding it;
-- a wrapper that attributes a returned failure preserves the primary caught throwable as exact
-  `cause`; and
-- the private write-dead `hasUnreconciledLiveState` latch is removed with no public
-  `liveStateUnreconciled` replacement.
+The existing queue appears to commit before enqueue, drain FIFO and contain reentrant public
+mutations; those are already-green evidence unless a causal counterexample proves otherwise. Author a
+behavioral RED only for an actual observer-reporting/order/isolation gap. A subscriber throw must not
+roll back or misreport already-committed authoritative state, skip later governed observers, or escape
+through an unowned channel. If “governed failure channel” is materially ambiguous across the four
+observer surfaces, stop before GREEN and obtain the correction quorum rather than inventing a new
+public result field or error taxonomy.
+
+Separately harden the accepted 0q-b1 absence tripwire with a causal synthetic
+`#hasUnreconciledLiveState` `PrivateIdentifier` RED. This is test/gate maintenance only; do not
+reintroduce a production latch or manufacture a behavioral failure. Do not touch node
+`partialResult`/recovery/persistence consumption or primary `cause`; those remain the distinct
+0q-b3 item.
 
 Do not move notification delivery into `commitPreparedState`, add deferred reconciliation, widen
 public result shapes or taxonomy without a causal need, absorb protocol-v2 trusted-hook/latch/retry
-policy from Phase 3a, or claim to close D.73. If the audit proves one bullet already green, retain it
-as a named preservation control instead of manufacturing a RED. Checkpoint every genuine RED before
-handing the unchanged contract to a distinct fresh Codex-high GREEN owner.
+policy from Phase 3a, or claim to close D.73. If the audit proves a behavior already green, retain it
+as a named preservation control. Checkpoint every genuine RED before handing the unchanged contract
+to a distinct fresh Codex-high GREEN owner.
 
 Preserve Phase 0l taxonomy/result/classifier controls, all 0q-a exact-partial-result and
 rollback/frontier-CAS behavior, and the Phase 0m XVER trigger. Run package/workspace typecheck,
