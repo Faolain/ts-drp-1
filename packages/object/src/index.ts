@@ -246,7 +246,20 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	private _notify(origin: string, vertices: Vertex[]): void {
 		for (const callback of this.subscriptions) {
 			try {
-				callback(this, origin, vertices);
+				const callbackResult = (
+					callback as unknown as (object: IDRPObject<T>, origin: string, vertices: Vertex[]) => unknown
+				)(this, origin, vertices);
+				if (callbackResult !== null && (typeof callbackResult === "object" || typeof callbackResult === "function")) {
+					const then = (callbackResult as { then?: unknown }).then;
+					if (typeof then === "function") {
+						let rejectionReported = false;
+						then.call(callbackResult, undefined, (reason: unknown) => {
+							if (rejectionReported) return;
+							rejectionReported = true;
+							this.log.error("DRPObject subscriber callback rejected", reason);
+						});
+					}
+				}
 			} catch (error) {
 				this.log.error("DRPObject subscriber callback failed", error);
 			}

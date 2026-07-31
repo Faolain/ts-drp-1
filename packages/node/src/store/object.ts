@@ -86,7 +86,21 @@ export class DRPObjectStore<T extends IDRP = any> {
 		if (callbacks) {
 			for (const callback of callbacks) {
 				try {
-					callback(objectId, object);
+					const callbackResult = (callback as unknown as (objectId: string, object: IDRPObject<T>) => unknown)(
+						objectId,
+						object
+					);
+					if (callbackResult !== null && (typeof callbackResult === "object" || typeof callbackResult === "function")) {
+						const then = (callbackResult as { then?: unknown }).then;
+						if (typeof then === "function") {
+							let rejectionReported = false;
+							then.call(callbackResult, undefined, (reason: unknown) => {
+								if (rejectionReported) return;
+								rejectionReported = true;
+								log.error("::objectStore: Subscriber callback rejected", reason);
+							});
+						}
+					}
 				} catch (error) {
 					log.error("::objectStore: Subscriber callback failed", error);
 				}
