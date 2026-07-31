@@ -2,8 +2,28 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import * as blueprintsRoot from "../packages/blueprints/src/index.js";
-import { CausalityIndex, linearizeEpoch } from "../packages/compaction/src/index.js";
+import { CanonicalDecodingError, CanonicalEncodingError } from "../packages/canonical/src/index.js";
+import { CausalityIndex, LinearizationError, linearizeEpoch } from "../packages/compaction/src/index.js";
+import {
+	AdoptionCommitExhaustedError,
+	ApplyInvariantError,
+	isObjectACLDeterministicError,
+	ObjectACLDeterministicError,
+	RootACLMutationError,
+} from "../packages/object/src/index.js";
+import {
+	EmptyQuorumCertificateError,
+	MixedQuorumCertificateError,
+	UnsupportedProfileError,
+} from "../packages/protocol-v2/src/index.js";
 import * as typesRoot from "../packages/types/src/index.js";
+import {
+	DRPValidationError,
+	InvalidDependenciesError,
+	InvalidHashError,
+	InvalidTimestampError,
+	VertexValidationError,
+} from "../packages/validation/src/index.js";
 
 interface ErrorRoot {
 	DRPError: new (code: string, message?: string, options?: ErrorOptions) => Error & { readonly code: string };
@@ -13,6 +33,8 @@ interface ErrorRoot {
 
 const errorRootSpecifier = "@ts-drp/errors";
 const duplicateProbeSpecifier = "./fixtures/phase-0l-errors-probe.js";
+const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
+const OBJECT_ACL_DETERMINISTIC_ERROR = Symbol.for("@ts-drp/object/ObjectACLDeterministicError");
 
 async function loadErrorRoot(): Promise<ErrorRoot> {
 	return (await import(errorRootSpecifier)) as ErrorRoot;
@@ -89,6 +111,74 @@ describe("Phase 0l @ts-drp/errors public root RED", () => {
 		expect(first.DRPError).not.toBe(second.DRPError);
 		expect(first.isDRPError(foreign)).toBe(true);
 		expect(first.isDRPError({ code: "PROBE_ERROR" })).toBe(false);
+	});
+
+	it.each([
+		["CanonicalDecodingError", new CanonicalDecodingError(), "CANONICAL_DECODING"],
+		["CanonicalEncodingError", new CanonicalEncodingError(), "CANONICAL_ENCODING"],
+		["LinearizationError", new LinearizationError("INVALID_VERTEX", "invalid vertex"), "INVALID_VERTEX"],
+		["EmptyQuorumCertificateError", new EmptyQuorumCertificateError(), "EMPTY_QC"],
+		["MixedQuorumCertificateError", new MixedQuorumCertificateError(), "MIXED_QC"],
+		["UnsupportedProfileError", new UnsupportedProfileError("unknown", "unknown"), "UNSUPPORTED_PROFILE"],
+		["DRPValidationError", new DRPValidationError({ message: "invalid schema" } as never), "DRP_VALIDATION"],
+		["InvalidDependenciesError", new InvalidDependenciesError(), "INVALID_DEPENDENCIES"],
+		["InvalidHashError", new InvalidHashError(), "INVALID_HASH"],
+		["InvalidTimestampError", new InvalidTimestampError(), "INVALID_TIMESTAMP"],
+		["VertexValidationError", new VertexValidationError(new Error("graph access")), "VERTEX_VALIDATION_FAILED"],
+		["AdoptionCommitExhaustedError", new AdoptionCommitExhaustedError("vertex-hash", 3), "ADOPTION_COMMIT_EXHAUSTED"],
+		["ApplyInvariantError", new ApplyInvariantError([], "apply invariant"), "APPLY_INVARIANT"],
+		["ObjectACLDeterministicError", new ObjectACLDeterministicError(), "OBJECT_ACL_DETERMINISTIC"],
+		["RootACLMutationError", new RootACLMutationError("root ACL"), "ROOT_ACL_MUTATION_FORBIDDEN"],
+	] as const)("catalogues and recognizes %s with its exact public code", async (_name, error, code) => {
+		const errors = await loadErrorRoot();
+
+		expect(error).toMatchObject({ code });
+		expect(errors.DRP_ERROR_CODES).toContain(code);
+		expect(errors.isDRPError(error)).toBe(true);
+	});
+
+	it("rejects code-only, unknown-code, and hostile generic recognizer inputs", async () => {
+		const errors = await loadErrorRoot();
+		const code = errors.DRP_ERROR_CODES[0] as string;
+		const unknownCode = { [DRP_ERROR_BRAND]: true, code: "NOT_A_DRP_ERROR_CODE" };
+		const hostile = new Proxy(
+			{},
+			{
+				get(): never {
+					throw new Error("hostile accessor");
+				},
+			}
+		);
+
+		expect(errors.isDRPError({ code })).toBe(false);
+		expect(errors.isDRPError(unknownCode)).toBe(false);
+		expect(() => errors.isDRPError(hostile)).not.toThrow();
+		expect(errors.isDRPError(hostile)).toBe(false);
+	});
+
+	it("keeps the object ACL recognizer distinct from the generic taxonomy recognizer", async () => {
+		const errors = await loadErrorRoot();
+		const aclOnly = { [OBJECT_ACL_DETERMINISTIC_ERROR]: true };
+		const genericOnly = {
+			[DRP_ERROR_BRAND]: true,
+			code: "OBJECT_ACL_DETERMINISTIC",
+		};
+		const hostile = new Proxy(
+			{},
+			{
+				get(): never {
+					throw new Error("hostile ACL accessor");
+				},
+			}
+		);
+
+		expect(isObjectACLDeterministicError(new ObjectACLDeterministicError())).toBe(true);
+		expect(isObjectACLDeterministicError(aclOnly)).toBe(true);
+		expect(errors.isDRPError(aclOnly)).toBe(false);
+		expect(errors.isDRPError(genericOnly)).toBe(true);
+		expect(isObjectACLDeterministicError(genericOnly)).toBe(false);
+		expect(() => isObjectACLDeterministicError(hostile)).not.toThrow();
+		expect(isObjectACLDeterministicError(hostile)).toBe(false);
 	});
 });
 

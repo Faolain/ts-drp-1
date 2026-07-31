@@ -10,7 +10,9 @@ import {
 	type AdmissionHooks,
 	admitVertex,
 	digestRegistryPreimage,
+	EmptyQuorumCertificateError,
 	makeRegistryPreimageBuilder,
+	MixedQuorumCertificateError,
 	type PreparedAdmissionContext,
 	type QcVote,
 	quorumCertificateBytes,
@@ -136,6 +138,15 @@ function admissionHooks(resolveDependencies: AdmissionHooks["resolveDependencies
 		validateDeterministicInvariant: () => true,
 		validateOperationSchema: () => true,
 	};
+}
+
+function capture(action: () => unknown): unknown {
+	try {
+		action();
+	} catch (error) {
+		return error;
+	}
+	throw new Error("expected action to throw");
 }
 
 describe("reviewer production-hardening regressions", () => {
@@ -497,13 +508,18 @@ describe("reviewer production-hardening regressions", () => {
 	});
 
 	it("C9 rejects empty and header-mismatched QC votes", () => {
-		expect(() => quorumCertificateBytes({ ...certificate, votes: [] })).toThrow(/EMPTY_QC/);
-		expect(() =>
+		const empty = capture(() => quorumCertificateBytes({ ...certificate, votes: [] }));
+		const mixed = capture(() =>
 			quorumCertificateBytes({
 				...certificate,
 				votes: [vote({ proposalDigest: ONE_DIGEST })],
 			})
-		).toThrow(/MIXED_QC.*proposalDigest/i);
+		);
+
+		expect(empty).toBeInstanceOf(EmptyQuorumCertificateError);
+		expect(empty).toMatchObject({ code: "EMPTY_QC" });
+		expect(mixed).toBeInstanceOf(MixedQuorumCertificateError);
+		expect(mixed).toMatchObject({ code: "MIXED_QC" });
 	});
 
 	it("C10 bans globalThis.structuredClone and makes the package test script non-watching", async () => {
