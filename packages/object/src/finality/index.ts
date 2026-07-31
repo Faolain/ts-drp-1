@@ -60,8 +60,9 @@ export class FinalityState implements IFinalityState {
 	 * @param peerId - The peer ID of the signer.
 	 * @param signature - The signature to add.
 	 * @param verify - Whether to verify the signature.
+	 * @returns Whether the signature changed the finality state.
 	 */
-	addSignature(peerId: string, signature: Uint8Array, verify = true): void {
+	addSignature(peerId: string, signature: Uint8Array, verify = true): boolean {
 		const index = this.signerIndices.get(peerId);
 		if (index === undefined) {
 			throw new Error("Peer not found in signer list");
@@ -73,7 +74,7 @@ export class FinalityState implements IFinalityState {
 
 		if (this.aggregation_bits.get(index)) {
 			// signer already signed
-			return;
+			return false;
 		}
 
 		if (verify) {
@@ -92,6 +93,7 @@ export class FinalityState implements IFinalityState {
 			this.signature = bls.aggregateSignatures([this.signature, signature]);
 		}
 		this.numberOfSignatures++;
+		return true;
 	}
 
 	/**
@@ -255,9 +257,14 @@ export class FinalityStore implements IFinalityStore {
 	addSignatures(peerId: string, attestations: Attestation[], verify = true): Attestation[] {
 		const added = [];
 		for (const attestation of attestations) {
+			const state = this.states.get(attestation.data);
+			if (!state) {
+				continue;
+			}
 			try {
-				this.states.get(attestation.data)?.addSignature(peerId, attestation.signature, verify);
-				added.push(attestation);
+				if (state.addSignature(peerId, attestation.signature, verify)) {
+					added.push(attestation);
+				}
 			} catch (e) {
 				this.log.warn("::finality::addSignatures", e);
 			}
