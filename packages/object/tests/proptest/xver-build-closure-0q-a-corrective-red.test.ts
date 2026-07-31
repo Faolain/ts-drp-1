@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +19,31 @@ interface WorkspacePackage {
 	readonly name: string;
 }
 
-function runnerBuildDirectories(source: string): string[] {
+interface BuildEntry {
+	readonly directory: string;
+	readonly referenceOptional?: boolean;
+}
+
+function runnerStringConstant(sourceFile: ts.SourceFile, name: string): string | undefined {
+	let value: string | undefined;
+	const visit = (node: ts.Node): void => {
+		if (
+			ts.isVariableDeclaration(node) &&
+			ts.isIdentifier(node.name) &&
+			node.name.text === name &&
+			node.initializer &&
+			ts.isStringLiteral(node.initializer)
+		) {
+			value = node.initializer.text;
+			return;
+		}
+		node.forEachChild(visit);
+	};
+	visit(sourceFile);
+	return value;
+}
+
+function runnerBuildEntries(source: string): BuildEntry[] {
 	const sourceFile = ts.createSourceFile(runnerPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
 	let declaration: ts.VariableDeclaration | undefined;
 	const visit = (node: ts.Node): void => {
@@ -36,13 +61,30 @@ function runnerBuildDirectories(source: string): string[] {
 
 	return initializer.elements.flatMap((element) => {
 		if (!ts.isObjectLiteralExpression(element)) return [];
-		const property = element.properties.find(
+		const directoryProperty = element.properties.find(
 			(candidate): candidate is ts.PropertyAssignment =>
 				ts.isPropertyAssignment(candidate) &&
 				(ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
 				candidate.name.text === "directory"
 		);
-		return property && ts.isStringLiteral(property.initializer) ? [property.initializer.text] : [];
+		if (!directoryProperty || !ts.isStringLiteral(directoryProperty.initializer)) return [];
+		const optionalProperty = element.properties.find(
+			(candidate): candidate is ts.PropertyAssignment =>
+				ts.isPropertyAssignment(candidate) &&
+				(ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
+				candidate.name.text === "referenceOptional"
+		);
+		return [
+			{
+				directory: directoryProperty.initializer.text,
+				referenceOptional:
+					optionalProperty?.initializer.kind === ts.SyntaxKind.TrueKeyword
+						? true
+						: optionalProperty?.initializer.kind === ts.SyntaxKind.FalseKeyword
+							? false
+							: undefined,
+			},
+		];
 	});
 }
 
@@ -117,10 +159,31 @@ function buildOrderViolations(
 	return violations.sort();
 }
 
+function revisionClosureViolations(
+	entries: readonly BuildEntry[],
+	currentPresent: ReadonlySet<string>,
+	referencePresent: ReadonlySet<string>
+): string[] {
+	const violations: string[] = [];
+	for (const entry of entries) {
+		if (!currentPresent.has(entry.directory)) {
+			violations.push(`primary missing ${entry.directory}`);
+			continue;
+		}
+		if (!referencePresent.has(entry.directory) && entry.referenceOptional !== true) {
+			violations.push(`reference missing ${entry.directory} is not declared reference-optional`);
+		}
+		if (referencePresent.has(entry.directory) && entry.referenceOptional === true) {
+			violations.push(`reference-optional ${entry.directory} still exists at the pinned revision`);
+		}
+	}
+	return violations.sort();
+}
+
 describe("Phase 0q-a corrective XVER build-closure RED", () => {
 	it("builds every in-repo runtime dependency before each selected consumer", () => {
 		const byName = workspacePackages();
-		const buildDirectories = runnerBuildDirectories(readFileSync(runnerPath, "utf8"));
+		const buildDirectories = runnerBuildEntries(readFileSync(runnerPath, "utf8")).map(({ directory }) => directory);
 		const closure = runtimeClosure(XVER_RUNTIME_ROOTS, byName);
 
 		expect(
@@ -144,6 +207,40 @@ describe("Phase 0q-a corrective XVER build-closure RED", () => {
 		expect(missingTriggers, "every clean-build input must trigger the gate").toEqual([]);
 	});
 
+	it("declares every package absent from the pinned reference as narrowly reference-optional", () => {
+		const source = readFileSync(runnerPath, "utf8");
+		const sourceFile = ts.createSourceFile(runnerPath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+		const referenceSha = runnerStringConstant(sourceFile, "REFERENCE_SHA");
+		expect(referenceSha, "the runner must pin REFERENCE_SHA as a string literal").toMatch(/^[0-9a-f]{40}$/);
+		if (!referenceSha) return;
+		expect(
+			spawnSync("git", ["cat-file", "-e", `${referenceSha}^{commit}`], { cwd: repositoryRoot }).status,
+			"the pinned reference commit must be available locally"
+		).toBe(0);
+
+		const entries = runnerBuildEntries(source);
+		const currentPresent = new Set(
+			entries
+				.filter(({ directory }) => existsSync(resolve(repositoryRoot, directory, "package.json")))
+				.map(({ directory }) => directory)
+		);
+		const referencePresent = new Set(
+			entries
+				.filter(
+					({ directory }) =>
+						spawnSync("git", ["cat-file", "-e", `${referenceSha}:${directory}/package.json`], {
+							cwd: repositoryRoot,
+						}).status === 0
+				)
+				.map(({ directory }) => directory)
+		);
+
+		expect(
+			revisionClosureViolations(entries, currentPresent, referencePresent),
+			"historical absence must be explicit; primary absence and stale exceptions remain forbidden"
+		).toEqual([]);
+	});
+
 	it("detects both a missing workspace dependency and a reversed build edge", () => {
 		const byName = new Map<string, WorkspacePackage>([
 			["@test/base", { dependencies: [], directory: "packages/base", name: "@test/base" }],
@@ -155,5 +252,23 @@ describe("Phase 0q-a corrective XVER build-closure RED", () => {
 		expect(buildOrderViolations(["packages/consumer", "packages/base"], closure, byName)).toEqual([
 			"packages/base must precede packages/consumer",
 		]);
+	});
+
+	it("rejects unmarked reference absence and all primary absence", () => {
+		const entries: BuildEntry[] = [
+			{ directory: "packages/base" },
+			{ directory: "packages/new", referenceOptional: true },
+		];
+
+		expect(revisionClosureViolations(entries, new Set(["packages/base", "packages/new"]), new Set())).toEqual([
+			"reference missing packages/base is not declared reference-optional",
+		]);
+		expect(revisionClosureViolations(entries, new Set(["packages/base"]), new Set())).toEqual([
+			"primary missing packages/new",
+			"reference missing packages/base is not declared reference-optional",
+		]);
+		expect(
+			revisionClosureViolations(entries, new Set(["packages/base", "packages/new"]), new Set(["packages/base"]))
+		).toEqual([]);
 	});
 });
