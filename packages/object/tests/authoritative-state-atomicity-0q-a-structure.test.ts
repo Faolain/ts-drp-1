@@ -35,7 +35,7 @@ interface MutationHelperFacts {
 
 interface RollbackAuthorityViolation {
 	readonly name: string;
-	readonly reason: "missing mandatory rollback authority";
+	readonly reason: "missing mandatory rollback authority" | "suspends while holding rollback authority";
 }
 
 const sourcePath = new URL("../src/drp-applier.ts", import.meta.url);
@@ -702,7 +702,7 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 	return authoritative;
 }
 
-function mandatoryRollbackAuthorityViolations(input: ts.SourceFile = sourceFile): RollbackAuthorityViolation[] {
+function rollbackAuthorityViolations(input: ts.SourceFile = sourceFile): RollbackAuthorityViolation[] {
 	return [...collectMutationHelperFacts(input).values()]
 		.filter(
 			({ directSharedMutation, hasMandatoryRollbackAuthority, ownsSynchronousRollbackAuthority }) =>
@@ -741,7 +741,7 @@ describe("Phase 0q-a structural commit gate", () => {
 		);
 
 		expect(
-			mandatoryRollbackAuthorityViolations(),
+			rollbackAuthorityViolations(),
 			"authoritative mutation helpers must not make rollback authority optional, undefined or defaultable"
 		).toEqual([]);
 	});
@@ -842,13 +842,81 @@ describe("Phase 0q-a structural commit gate", () => {
 			transitiveCallerIsDirect: false,
 		});
 		expect(
-			mandatoryRollbackAuthorityViolations(control),
+			rollbackAuthorityViolations(control),
 			"every direct authoritative mutator needs a required OperationJournal or journal-bearing operation, unless it synchronously owns construction, commit and rollback"
 		).toEqual([
 			{ name: "deferredJournalOwner", reason: "missing mandatory rollback authority" },
 			{ name: "missingAuthority", reason: "missing mandatory rollback authority" },
 			{ name: "optionalAuthority", reason: "missing mandatory rollback authority" },
 			{ name: "unrelatedTransaction", reason: "missing mandatory rollback authority" },
+		]);
+	});
+
+	it("rejects suspending authoritative helpers even with mandatory rollback authority", () => {
+		const control = parseSource(
+			"synthetic-suspending-rollback-authority.ts",
+			`
+				interface OperationJournal {
+					record(undo: () => void): void;
+				}
+				interface JournaledOperation {
+					journal: OperationJournal;
+				}
+				function synchronousAuthority(operation: JournaledOperation): void {
+					setACLState();
+					operation.journal.record(() => {});
+				}
+				async function suspendsWithJournaledOperation(operation: JournaledOperation): Promise<void> {
+					setACLState();
+					await Promise.resolve();
+					operation.journal.record(() => {});
+				}
+				async function asyncWithoutAwait(journal: OperationJournal): Promise<void> {
+					setACLState();
+					journal.record(() => {});
+				}
+				async function transitiveAsync(operation: JournaledOperation): Promise<void> {
+					await synchronousAuthority(operation);
+				}
+				function nestedCallbackAwait(operation: JournaledOperation): void {
+					setACLState();
+					const callback = async (): Promise<void> => {
+						await Promise.resolve();
+						operation.journal.record(() => {});
+					};
+					function nestedFunction(): void {
+						void callback();
+					}
+					void nestedFunction;
+					operation.journal.record(() => {});
+				}
+			`
+		);
+		const helpers = collectMutationHelperFacts(control);
+
+		expect({
+			asyncWithoutAwait: helpers.get("asyncWithoutAwait")?.directSharedMutation,
+			nestedCallbackAwait: helpers.get("nestedCallbackAwait")?.directSharedMutation,
+			suspendsWithJournaledOperation: helpers.get("suspendsWithJournaledOperation")?.hasMandatoryRollbackAuthority,
+			synchronousAuthority: helpers.get("synchronousAuthority")?.hasMandatoryRollbackAuthority,
+			transitiveAsync: helpers.get("transitiveAsync")?.directSharedMutation,
+		}).toEqual({
+			asyncWithoutAwait: true,
+			nestedCallbackAwait: true,
+			suspendsWithJournaledOperation: true,
+			synchronousAuthority: true,
+			transitiveAsync: false,
+		});
+		expect(
+			rollbackAuthorityViolations(),
+			"current production authoritative helpers must remain synchronous while holding rollback authority"
+		).toEqual([]);
+		expect(
+			rollbackAuthorityViolations(control),
+			"direct authoritative mutation must not suspend while its caller-provided rollback authority is live"
+		).toEqual([
+			{ name: "asyncWithoutAwait", reason: "suspends while holding rollback authority" },
+			{ name: "suspendsWithJournaledOperation", reason: "suspends while holding rollback authority" },
 		]);
 	});
 
