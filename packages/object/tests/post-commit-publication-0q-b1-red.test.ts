@@ -55,3 +55,21 @@ test("Phase 0q-b1 removes the write-dead reconciliation latch without publishing
 		publicSuccessFlagNameTokens: 0,
 	});
 });
+
+test("the dead-latch absence detector includes TypeScript private identifiers", () => {
+	const syntheticSource = ts.createSourceFile(
+		"synthetic-private-latch.ts",
+		"class DRPVertexApplier { #hasUnreconciledLiveState = false; }",
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TS
+	);
+
+	expect({
+		memberNames: [...(classMemberNames(syntheticSource, "DRPVertexApplier") ?? [])],
+		nameTokens: nameTokenCount(syntheticSource, "hasUnreconciledLiveState"),
+	}).toEqual({
+		memberNames: ["hasUnreconciledLiveState"],
+		nameTokens: 1,
+	});
+});
