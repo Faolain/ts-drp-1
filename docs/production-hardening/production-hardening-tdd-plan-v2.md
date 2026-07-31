@@ -13763,63 +13763,212 @@ Retained gotchas and forward bindings:
 5. The stale untracked protocol-v2 0g2 RED files remain unrelated and must not
    be staged or allowed into a bare workspace test selection.
 
+### D.89 — Phase 1c legacy-attestation off-switch acceptance
+
+Phase 1c is accepted at implementation checkpoint
+`23965d0089ec2834e420ba8eba70d47c37ce0fdd`. Its governed lineage is:
+
+- `8a7034cc6ff1b387a4979e874ae8c3f027223a2d` — D.88 Phase 1b acceptance;
+- `7ab94d96c5f0af44f7a43ca7ae80d48afc893043` — tests-only RED;
+- `b9be9ba564fef1fd63d136187df9ec440ea12600` — initial production-only GREEN,
+  deliberately not accepted after its owner found that the tests reached only
+  raw `DRPObject` construction and missed normal public node construction;
+- `af084e520936edf33488263d98b8223bfcce59ed` — corrective tests-only RED for
+  public `DRPNode.createObject` and `DRPNode.connectObject` reachability; and
+- `23965d0089ec2834e420ba8eba70d47c37ce0fdd` — corrective production-only GREEN
+  plumbing the existing room configuration through public types, validation
+  and node construction.
+
+The frozen original RED test, corrective RED test and pre-acceptance plan blobs
+are `b1e064c969e1194d096137ada393866ea6c485bd`,
+`4cbebcca323c94534b73338345bbc8452dca959f` and
+`f2f381729b92add35d7488752362a95f5c22c8ee`. The accepted initial-GREEN
+production blobs for handler, applier, finality store and finality types are
+`282c12e28ab27c724bea34941b4d9bb66b183249`,
+`3af93958a4cbe6d8b14c405005477600ccefd084`,
+`8caf7f3a76b0ee06c33c256bc8ae4be199d58a92` and
+`b0b6245448ad29919255e1b29b96d2afcf618712`. The accepted corrective-GREEN
+blobs for node construction, public node types and object-option validation are
+`a7d1454d79e21b5c8aeb7f85ac8e41e7e3df7c67`,
+`fb193369ad33ca49d2f4ec01f7c22c5f62c8c513` and
+`e299b84513f7d220bda3403ad3fced0570c71552`.
+
+The first RED fails five disabled-plane rows while its enabled-default control
+passes. It observes non-zero finality-record growth, local BLS signing,
+single/aggregate verification, outbound legacy attestations and mutation of
+defensive pre-existing records. The initial GREEN passes 6/6 and makes one
+default-true, room-scoped `FinalityStore.enabled` value guard record
+initialization/query, local signing, inbound verification/merge, payload reads
+and `ATTESTATION_UPDATE` broadcast/dispatch without weakening secp256k1 vertex
+authentication or changing wire schemas. Its owner nevertheless rejected it:
+`NodeCreateObjectOptions` and `NodeConnectObjectOptions` could not carry
+`finality_config`, their schemas did not admit it, and public create/connect did
+not forward it.
+
+The corrective RED leaves the original test and all production frozen. Its
+combined suite passes the six original rows and fails only the two real public
+create/connect rows; node and workspace typecheck fail only with the two owned
+TS2353 missing-option errors. The corrective GREEN shares optional
+`FinalityConfig` across both public option types, validates the already-existing
+`enabled` and `finality_threshold` fields, and forwards the room configuration
+to `DRPObject`. The exact committed target passes 8/8. Public storage,
+subscription, message queue, authenticated vertex propagation, DRP application,
+UPDATE/SYNC behavior unrelated to attestation payloads, recovery and enabled
+sibling isolation remain live while a disabled room has zero legacy records,
+BLS work, embedded attestation payloads and attestation-update broadcasts.
+
+The final verification ladder is green:
+
+- public create/connect preservation 34/34, Phase 1a/1b preservation 11/11,
+  enabled node/finality preservation 31/31, object/finality/applier preservation
+  75/75 and sync/recovery preservation 16/16;
+- types and object typechecks, types declaration build, validation typecheck and
+  declaration build, node typecheck and workspace typecheck;
+- focused ESLint with zero diagnostics, tracked-source ESLint with zero errors
+  and 249 inherited warnings, Prettier, diff, scope and frozen-blob checks; and
+- the inherited `sync-livelock` census remains exactly three failures and three
+  passes with the same governed rows.
+
+The initial applier GREEN ran mandatory XVER at exact SHA `b9be9ba` and passed
+108 comparisons with zero approved deltas. The corrective-GREEN result's claim
+that XVER was not triggered is false: `23965d0` changes path-triggered
+`packages/types/**` and `packages/validation/**`, and the validation export is
+inside the authenticated runtime closure. Opus caught the error. Exact-HEAD
+XVER was then run at `23965d0089ec2834e420ba8eba70d47c37ce0fdd` and passed all
+108 comparisons with zero approved deltas against reference
+`1d40885ffb2ab666ffb2817a99fe69a42af83e77`. This exact-head result, not the
+superseded non-trigger rationale in a working result, is the acceptance record.
+Grok's supporting non-trigger note is likewise superseded; Kimi's path-trigger
+reading was correct.
+
+Fresh final reviews accept the complete initial/corrective loop:
+
+- Grok 4.5/high session `019fb968-09f9-71d2-99a2-6cab9745b2e4`, effective
+  `grok-4.5-build`: `PASS_WITH_NOTES`, no corrective RED;
+- exact Kimi 3/high/100 session
+  `session_2ad6d0b7-3e87-4c2e-acc1-8ae9ba182f85`, 29/29 requests using
+  `kimi-code/k3`: `PASS_WITH_NOTES`, no corrective RED; and
+- Opus/xhigh session `60f13d15-7b18-442a-9af2-99b3d7983a8c`:
+  `PASS_WITH_NOTES`, no corrective RED after the exact-head XVER remediation.
+  All 126 assistant transcript records are `claude-opus-5`; an automatic
+  21-output-token Haiku title auxiliary authored no assistant record, finding
+  or review content.
+
+Retained gotchas and forward bindings:
+
+1. Required `IFinalityStore.enabled` can source-break a hypothetical external
+   structural implementer of published `@ts-drp/types`. Consolidate it with the
+   earlier required `IFinalityState` and `IDRPObject` additions under one P1
+   release/version binding; do not add an optional compatibility fallback or
+   invent absent changeset machinery in a later slice.
+2. Public node construction now makes `finality_threshold` reachable without a
+   range constraint. The threshold is unbounded: current validation accepts
+   zero, negative, fractional and infinite numbers, and enabled legacy retention
+   remains unbounded. The current `isFinalized` result has no production caller,
+   but neither fact authorizes silently choosing threshold or retention
+   semantics in Phase 1d.
+3. Several handler, applier and store guards are intentional redundant
+   defense-in-depth. Mutating one can be masked by another and survive the
+   causal suite; record such survivors rather than misclassifying them as a
+   missing zero-work assertion.
+4. The normative row's 8-signer/100-vertex characterization was not run. The
+   causal suite uses exact-zero call/census assertions, whose result is
+   scale-independent; the larger run would add time without changing the
+   zero-versus-nonzero oracle. This is an explicit omission, not evidence that
+   enabled legacy finality is bounded or cheap.
+5. Mixed enabled/disabled peers converge in replicated DRP state while their
+   legacy finality metadata intentionally diverges. Migration, negotiation and
+   coordinated mixed-peer finality semantics remain out of scope.
+6. The public-path miss and corrective loop are part of the accepted TDD proof:
+   do not collapse `b9be9ba` and `23965d0` into one GREEN or describe the first
+   GREEN as accepted.
+7. The inherited `sync-livelock` baseline remains ownerless. Fable-high's
+   whole-program finding about that ownership gap is retained under
+   `.logs/fable-high-golden-path-course-review-20260730/` but is non-normative;
+   changing an owner, order or plan assumption still requires the standing
+   correction quorum.
+
 ## Next Agent Prompt
 
-Begin **Phase 1c — legacy attestation off-switch** from accepted Phase 1b
-checkpoint `c84c8b3` and this D.88 acceptance checkpoint. Start with a fresh
-Codex-high RED owner that may change tests only and must commit a genuine RED
-before a distinct fresh Codex-high GREEN owner receives byte-identical tests.
+Begin **Phase 1d — incremental state snapshots** from accepted Phase 1c
+checkpoint `23965d0` and this D.89 acceptance checkpoint. Start with a fresh
+Codex-high RED owner that may change tests only and must commit a genuine causal
+RED. Only then give the frozen tests to a distinct fresh Codex-high GREEN owner.
 
-Re-derive the row from current code rather than trusting drifted line numbers.
-At this checkpoint UPDATE, SYNC_ACCEPT and local object-update paths call
-`signFinalityVertices`; UPDATE and SYNC_ACCEPT may broadcast
-`ATTESTATION_UPDATE`; received UPDATE/ATTESTATION_UPDATE/SYNC_ACCEPT messages
-may merge or verify legacy attestations; and the applier initializes one
-legacy finality record per applied vertex. `FinalityConfig` currently exposes
-only `finality_threshold`. Stop before RED and invoke the correction quorum if
-one flag cannot coherently define the entire disabled-plane behavior without
-inventing migration, mixed-peer or wire semantics not owned by the row.
+Re-derive every surface from current code rather than trusting the Phase 1d
+row's stale line numbers or clone-count estimate. At this checkpoint
+`DRPObjectStateManager.fromStates`/`applyState` deep-clones every stored entry
+into reconstructed ACL/DRP instances; `stateFromDRP` deep-clones every
+enumerable, non-function, non-`context` key into ordered `DRPState` entries;
+`assignState` publishes both ACL and DRP snapshots for an applied hash; and
+checkpoint advancement snapshots the full live pair again. `trackMutations`
+currently reports only one Boolean, not mutated keys. `getStates` exposes the
+stored `DRPState` objects to fetch-state serialization and public callers, while
+public state setters can install snapshots. Inspect all replay, conflict,
+checkpoint, rollback, adoption and pruning paths before selecting the smallest
+owned seam.
 
-The tests-only RED should create a net-new `attestation-budget.test.ts`, drive
-real exported paths and first pin the enabled default for backwards
-compatibility. With the flag disabled, prove the entire legacy attestation
-plane is off for that room: zero BLS signing and verification, zero
-`ATTESTATION_UPDATE` broadcasts, no inbound attestation mutation and no
-per-vertex finality-state growth caused by normal apply/sync. Preserve vertex
-admission, application, convergence digest, update/sync wire behavior unrelated
-to attestation payloads, dispatch/recovery behavior and room isolation. Compare
-the same admitted history with the plane enabled and disabled; convergence of
-the replicated object state must be identical even though legacy finality
-metadata is intentionally absent in the disabled room.
+The Phase 1d contract is atomic. The tests-only RED must establish a deep-clone
+reference before changing production, then require incremental snapshots to
+clone only keys actually mutated by the operation while structurally sharing
+unchanged entries under an enforced immutability contract. Exercise top-level
+replacement, nested object/Array mutation, Map/Set/Date mutation, key addition
+and deletion, ACL and DRP operations, remote replay, local authoring, conflict
+replay and checkpoint/prune/rollback boundaries. A failed, quarantined or
+rolled-back application may publish no snapshot fragment, mutated shared value
+or torn ACL/DRP pair. Earlier and sibling snapshots, the live object and caller-
+supplied/publicly returned state must not be able to mutate one another through
+shared aliases.
 
-Use deterministic call/census counters rather than throughput timing. Include
-multiple signers and enough vertices to prove the work stays exactly zero
-rather than merely smaller, but keep the fast causal loop small; retain any
-larger 8-signer/100-vertex budget run as a targeted characterization if it is
-materially slower. Kill partial switches: disabling only outbound broadcasts,
-only local signing, only inbound verification or only store initialization
-must each leave a RED failure. The flag must be room/object scoped and enabled
-by default for legacy compatibility.
+Preserve exact snapshot meaning and ordering. For the same admitted history,
+every `DRPState` semantic value and the exact serialized
+`FetchStateResponse`/nested `DRPStateOtherTheWire` bytes must be byte-identical
+to the deep-clone baseline, including explicit pruned/missing-state presence,
+replica-local `context` exclusion, requesting hash and ACL-before-DRP field
+placement. Do not change protobufs, MessagePack encoding, public wire shapes,
+hashes, operation order, convergence, adoption or recovery semantics to make
+the optimization pass.
 
-GREEN may add the smallest explicit configuration surface and guards required
-to disable the whole legacy attestation plane. It must not delete the legacy
-implementation, redefine enabled-mode finality, alter wire schemas, weaken
-vertex signature authentication, absorb observer mode, Phase 6d retention,
-v3 trust/seal work, D.73, Phase 0n or Phase 1n, or claim that enabled legacy
-finality is bounded. Do not run legacy and v3 attestation systems concurrently.
+Use deterministic instrumentation, never wall-clock throughput, heap sampling
+or a mocked shortcut around production. Count copied keys, cloned payload bytes
+and copy operations at the actual clone/snapshot seam. Over a state dominated
+by large unchanged keys and a long sequence mutating a small key set, pin that
+copied work to the mutated payload and kill implementations that still clone
+the full state, clone every key before later sharing, serialize/deserialize as
+a hidden clone, or retain a full fallback on the normal path. Keep the causal
+loop small; run the row's 1k-vertex/1 MB case separately if needed, with
+`clonedBytes < 20 * mutatedBytes` and exact wire-byte equality.
 
-Preserve Phase 1a/1b performance contracts and the inherited sync-livelock
-3-fail/3-pass baseline unless Phase 1c causally owns a row; any unexplained
-movement is a regression signal. Rebuild declarations before downstream
-typechecks when a published type changes.
+Do not assume that adding a mutated-key accessor to `trackMutations` alone
+solves the row: current reconstruction has already cloned values before that
+tracker runs. GREEN must remove the owned full-copy work without exposing
+mutable sharing, and it must retain journal identity guards and history-
+independent rollback. Do not absorb canonical v3 snapshots, streaming chunks,
+wire redesign, Phase 4/5/6 work, legacy-finality threshold/retention policy,
+the mixed-peer metadata gap, D.73, optional Phase 0n or Phase 1n.
 
-Run focused RED/GREEN, relevant finality/object/node preservation, package and
-workspace typecheck, tracked zero-error lint, Prettier/diff/scope and any
-plan-triggered XVER gate to `.log` files at both checkpoints. Then run the
-per-item Grok-high, exact Kimi 3/high with
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and final Opus/xhigh review loop. Do not
-apply the Fable course-review suggestions as plan corrections without their
-separate required quorum.
+If current code proves the row internally inconsistent—for example, its
+required sharing cannot coexist with an existing public mutability contract or
+its metric cannot distinguish the claimed optimization—stop before authoring
+RED or changing this plan. Return the exact contradiction and invoke the
+standing Codex-high, exact Kimi 3/high/100 and Opus/xhigh correction quorum. Do
+not silently correct the row, choose a new public immutability policy or weaken
+the atomic/wire contract inside implementation.
+
+Preserve the complete Phase 1a/1b performance contracts, Phase 1c enabled and
+disabled behavior, relevant state/adoption/atomicity/finality/node suites and
+the inherited `sync-livelock` 3-fail/3-pass baseline. Any unexplained movement
+is a regression signal. Phase 1d changes the legacy applier/state path, so run
+mandatory exact-SHA XVER; a path-trigger or runtime-closure hit is never a
+non-trigger merely because the expected comparison result is unchanged.
+
+At both RED and GREEN checkpoints, write focused results, deterministic copy-
+counter evidence, semantic/wire baselines, relevant preservation suites,
+package and workspace typechecks, tracked zero-error lint, Prettier/diff/scope,
+frozen-blob audits and XVER applicability/results to `.log` files. After GREEN,
+run the full per-item review loop: Grok-high, exact Kimi 3/high with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, then final Opus/xhigh. Any reviewer-requested
+corrective change begins with another fresh tests-only RED owner.
 
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
