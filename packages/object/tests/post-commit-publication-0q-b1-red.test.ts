@@ -37,6 +37,7 @@ function nameTokenCount(sourceFile: ts.SourceFile, name: string): number {
 
 test("Phase 0q-b1 removes the write-dead reconciliation latch without publishing a success flag", () => {
 	const applierSource = parseSource(new URL("../src/drp-applier.ts", import.meta.url));
+	const errorSource = parseSource(new URL("../src/errors.ts", import.meta.url));
 	const objectRootSource = parseSource(new URL("../src/index.ts", import.meta.url));
 	const objectTypesSource = parseSource(new URL("../../types/src/object.ts", import.meta.url));
 	const applierMembers = classMemberNames(applierSource, "DRPVertexApplier");
@@ -45,10 +46,13 @@ test("Phase 0q-b1 removes the write-dead reconciliation latch without publishing
 		{
 			applierFound: applierMembers !== undefined,
 			legacyPrivateLatchDeclared: applierMembers?.has("hasUnreconciledLiveState") ?? false,
-			legacyPrivateLatchNameTokens: nameTokenCount(applierSource, "hasUnreconciledLiveState"),
+			legacyPrivateLatchNameTokens:
+				nameTokenCount(applierSource, "hasUnreconciledLiveState") +
+				nameTokenCount(errorSource, "hasUnreconciledLiveState"),
 			notificationQueueFound: applierMembers?.has("notificationQueue") ?? false,
 			publicSuccessFlagNameTokens:
 				nameTokenCount(applierSource, "liveStateUnreconciled") +
+				nameTokenCount(errorSource, "liveStateUnreconciled") +
 				nameTokenCount(objectRootSource, "liveStateUnreconciled") +
 				nameTokenCount(objectTypesSource, "liveStateUnreconciled"),
 		},
