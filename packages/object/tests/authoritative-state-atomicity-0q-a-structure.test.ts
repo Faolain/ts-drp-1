@@ -9,7 +9,9 @@ interface MethodFacts {
 	readonly hasFrontierCAS: boolean;
 	readonly hasJournalCommit: boolean;
 	readonly hasJournalRollback: boolean;
+	readonly hasPipelineStageShape: boolean;
 	readonly isAsync: boolean;
+	readonly isPrivate: boolean;
 	readonly journalLifetimes: readonly JournalLifetime[];
 	readonly name: string;
 }
@@ -19,9 +21,22 @@ interface JournalLifetime {
 	readonly constructionPosition: number;
 }
 
+interface MutationHelperFacts {
+	readonly calls: Set<string>;
+	readonly directSharedMutation: boolean;
+	readonly journalGuards: readonly string[];
+	readonly optionalJournalAccesses: readonly string[];
+	readonly optionalJournalParameters: readonly string[];
+	readonly name: string;
+}
+
 const sourcePath = new URL("../src/drp-applier.ts", import.meta.url);
 const sourceText = readFileSync(sourcePath, "utf8");
 const sourceFile = ts.createSourceFile(sourcePath.pathname, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+
+function parseSource(name: string, text: string): ts.SourceFile {
+	return ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+}
 
 function methodName(node: ts.MethodDeclaration): string | undefined {
 	return ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : undefined;
@@ -56,7 +71,34 @@ function isExpectedFrontierReference(node: ts.Node): boolean {
 	return ts.isIdentifier(node) && node.text === "expectedFrontier";
 }
 
-function collectMethodFacts(): Map<string, MethodFacts> {
+function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
+	return ts.canHaveModifiers(node) && (ts.getModifiers(node)?.some((modifier) => modifier.kind === kind) ?? false);
+}
+
+function hasPipelineStageShape(node: ts.MethodDeclaration, input: ts.SourceFile): boolean {
+	if (!node.type) return false;
+	const parameterTypes = new Set(
+		node.parameters.flatMap((parameter) => (parameter.type ? [parameter.type.getText(input)] : []))
+	);
+	let matchingReturn = false;
+	const visit = (candidate: ts.Node): void => {
+		if (
+			ts.isTypeReferenceNode(candidate) &&
+			ts.isIdentifier(candidate.typeName) &&
+			candidate.typeName.text === "HandlerReturn" &&
+			candidate.typeArguments?.length === 1 &&
+			parameterTypes.has(candidate.typeArguments[0].getText(input))
+		) {
+			matchingReturn = true;
+			return;
+		}
+		ts.forEachChild(candidate, visit);
+	};
+	visit(node.type);
+	return matchingReturn;
+}
+
+function collectMethodFacts(input: ts.SourceFile = sourceFile): Map<string, MethodFacts> {
 	const methods = new Map<string, MethodFacts>();
 	const sharedPrimitiveCalls = new Set([
 		"addVertex",
@@ -86,7 +128,7 @@ function collectMethodFacts(): Map<string, MethodFacts> {
 				let hasJournalRollback = false;
 				const journals = new Map<string, JournalLifetime>();
 				const inspect = (child: ts.Node): void => {
-					if (ts.isAwaitExpression(child)) awaitPositions.push(child.getStart(sourceFile));
+					if (ts.isAwaitExpression(child)) awaitPositions.push(child.getStart(input));
 					if (
 						ts.isVariableDeclaration(child) &&
 						ts.isIdentifier(child.name) &&
@@ -97,7 +139,7 @@ function collectMethodFacts(): Map<string, MethodFacts> {
 					) {
 						journals.set(child.name.text, {
 							closurePositions: [],
-							constructionPosition: child.initializer.getStart(sourceFile),
+							constructionPosition: child.initializer.getStart(input),
 						});
 					}
 					if (
@@ -128,7 +170,7 @@ function collectMethodFacts(): Map<string, MethodFacts> {
 						) {
 							const journal = journals.get(child.expression.expression.text);
 							if (journal) {
-								journal.closurePositions.push(child.getStart(sourceFile));
+								journal.closurePositions.push(child.getStart(input));
 								if (call === "commit") hasJournalCommit = true;
 								else hasJournalRollback = true;
 							}
@@ -154,7 +196,9 @@ function collectMethodFacts(): Map<string, MethodFacts> {
 					hasFrontierCAS,
 					hasJournalCommit,
 					hasJournalRollback,
-					isAsync: member.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.AsyncKeyword) ?? false,
+					hasPipelineStageShape: hasPipelineStageShape(member, input),
+					isAsync: hasModifier(member, ts.SyntaxKind.AsyncKeyword),
+					isPrivate: hasModifier(member, ts.SyntaxKind.PrivateKeyword),
 					journalLifetimes: [...journals.values()],
 					name,
 				});
@@ -163,36 +207,59 @@ function collectMethodFacts(): Map<string, MethodFacts> {
 		}
 		ts.forEachChild(node, visitClass);
 	};
-	visitClass(sourceFile);
+	visitClass(input);
 	return methods;
 }
 
-function callFnPipelineHandlers(): string[] {
+function boundThisMethod(node: ts.Expression | undefined): string | undefined {
+	if (
+		!node ||
+		!ts.isCallExpression(node) ||
+		!ts.isPropertyAccessExpression(node.expression) ||
+		node.expression.name.text !== "bind" ||
+		!ts.isPropertyAccessExpression(node.expression.expression) ||
+		!isThisExpression(node.expression.expression.expression)
+	) {
+		return undefined;
+	}
+	return node.expression.expression.name.text;
+}
+
+function productionPipelineHandlers(input: ts.SourceFile = sourceFile): Set<string> {
+	const handlers = new Set<string>();
+	const visit = (node: ts.Node): void => {
+		if (ts.isCallExpression(node)) {
+			const isPipelineRegistration =
+				(ts.isIdentifier(node.expression) && node.expression.text === "createPipeline") ||
+				(ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "setNext");
+			if (isPipelineRegistration) {
+				const handler = boundThisMethod(node.arguments[0]);
+				if (handler) handlers.add(handler);
+			}
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(input);
+	return handlers;
+}
+
+function pipelineHandlersForVariable(variableName: string, input: ts.SourceFile = sourceFile): string[] {
 	const handlers: string[] = [];
 	const visit = (node: ts.Node): void => {
 		if (
 			ts.isVariableDeclaration(node) &&
 			ts.isIdentifier(node.name) &&
-			node.name.text === "callFnPipeline" &&
+			node.name.text === variableName &&
 			node.initializer
 		) {
 			const visitInitializer = (candidate: ts.Node): void => {
 				if (
 					ts.isCallExpression(candidate) &&
-					ts.isPropertyAccessExpression(candidate.expression) &&
-					candidate.expression.name.text === "setNext"
+					((ts.isIdentifier(candidate.expression) && candidate.expression.text === "createPipeline") ||
+						(ts.isPropertyAccessExpression(candidate.expression) && candidate.expression.name.text === "setNext"))
 				) {
-					const argument = candidate.arguments[0];
-					if (
-						argument &&
-						ts.isCallExpression(argument) &&
-						ts.isPropertyAccessExpression(argument.expression) &&
-						argument.expression.name.text === "bind" &&
-						ts.isPropertyAccessExpression(argument.expression.expression) &&
-						isThisExpression(argument.expression.expression.expression)
-					) {
-						handlers.push(argument.expression.expression.name.text);
-					}
+					const handler = boundThisMethod(candidate.arguments[0]);
+					if (handler) handlers.push(handler);
 				}
 				ts.forEachChild(candidate, visitInitializer);
 			};
@@ -201,8 +268,25 @@ function callFnPipelineHandlers(): string[] {
 		}
 		ts.forEachChild(node, visit);
 	};
-	visit(sourceFile);
+	visit(input);
 	return handlers.reverse();
+}
+
+function unreachablePipelineStages(input: ts.SourceFile = sourceFile): {
+	candidateCount: number;
+	registeredCandidateCount: number;
+	unreachable: string[];
+} {
+	const methods = collectMethodFacts(input);
+	const handlers = productionPipelineHandlers(input);
+	const candidates = [...methods.values()].filter(
+		({ hasPipelineStageShape, isPrivate }) => hasPipelineStageShape && isPrivate
+	);
+	return {
+		candidateCount: candidates.length,
+		registeredCandidateCount: candidates.filter(({ name }) => handlers.has(name)).length,
+		unreachable: candidates.filter(({ name }) => !handlers.has(name)).map(({ name }) => name),
+	};
 }
 
 function hasSharedMutation(
@@ -245,14 +329,319 @@ function journalsAreClosed(method: MethodFacts): boolean {
 	);
 }
 
+function declarationName(node: ts.FunctionDeclaration | ts.MethodDeclaration): string | undefined {
+	if (!node.name || (!ts.isIdentifier(node.name) && !ts.isStringLiteral(node.name))) return undefined;
+	return node.name.text;
+}
+
+function isJournalName(node: ts.Node): node is ts.Identifier {
+	return ts.isIdentifier(node) && node.text.toLowerCase().includes("journal");
+}
+
+function parameterIsOptional(parameter: ts.ParameterDeclaration): boolean {
+	return (
+		parameter.questionToken !== undefined ||
+		parameter.initializer !== undefined ||
+		(parameter.type !== undefined &&
+			nodeContains(parameter.type, (candidate) => candidate.kind === ts.SyntaxKind.UndefinedKeyword))
+	);
+}
+
+function journalAccessRoot(node: ts.Expression): ts.Identifier | undefined {
+	let current = node;
+	while (ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)) current = current.expression;
+	if (isJournalName(current)) return current;
+	if (ts.isPropertyAccessExpression(current)) {
+		if (isJournalName(current.name)) return current.name;
+		return journalAccessRoot(current.expression);
+	}
+	if (ts.isElementAccessExpression(current)) {
+		if (current.argumentExpression && isJournalName(current.argumentExpression)) return current.argumentExpression;
+		if (current.argumentExpression && ts.isStringLiteral(current.argumentExpression)) {
+			if (current.argumentExpression.text.toLowerCase().includes("journal")) {
+				return ts.factory.createIdentifier(current.argumentExpression.text);
+			}
+		}
+		return journalAccessRoot(current.expression);
+	}
+	return undefined;
+}
+
+function isOptionalJournalAccess(node: ts.Node): boolean {
+	return (
+		(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node) || ts.isCallExpression(node)) &&
+		node.questionDotToken !== undefined &&
+		journalAccessRoot(node.expression) !== undefined
+	);
+}
+
+function isUndefinedLike(node: ts.Expression): boolean {
+	return (
+		(ts.isIdentifier(node) && node.text === "undefined") ||
+		node.kind === ts.SyntaxKind.NullKeyword ||
+		(ts.isStringLiteral(node) && node.text === "undefined")
+	);
+}
+
+function isJournalGuardExpression(node: ts.Expression): boolean {
+	if (ts.isParenthesizedExpression(node)) return isJournalGuardExpression(node.expression);
+	if (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken) {
+		return journalAccessRoot(node.operand) !== undefined;
+	}
+	if (ts.isBinaryExpression(node)) {
+		if (
+			[
+				ts.SyntaxKind.EqualsEqualsToken,
+				ts.SyntaxKind.EqualsEqualsEqualsToken,
+				ts.SyntaxKind.ExclamationEqualsToken,
+				ts.SyntaxKind.ExclamationEqualsEqualsToken,
+			].includes(node.operatorToken.kind)
+		) {
+			return (
+				(journalAccessRoot(node.left) !== undefined && isUndefinedLike(node.right)) ||
+				(journalAccessRoot(node.right) !== undefined && isUndefinedLike(node.left))
+			);
+		}
+		if (
+			[ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(
+				node.operatorToken.kind
+			)
+		) {
+			return journalAccessRoot(node.left) !== undefined;
+		}
+	}
+	if (
+		ts.isTypeOfExpression(node) ||
+		ts.isPropertyAccessExpression(node) ||
+		ts.isElementAccessExpression(node) ||
+		ts.isIdentifier(node)
+	) {
+		return journalAccessRoot(node as ts.Expression) !== undefined;
+	}
+	return false;
+}
+
+function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<string, MutationHelperFacts> {
+	const helpers = new Map<string, MutationHelperFacts>();
+	const sharedPrimitiveCalls = new Set([
+		"addVertex",
+		"advanceCheckpointIfNeeded",
+		"deleteACLState",
+		"deleteDRPState",
+		"defineProperty",
+		"deleteProperty",
+		"initializeState",
+		"prune",
+		"replaceEnumerableState",
+		"setACLState",
+		"setDRPState",
+	]);
+	const sharedContainerMutators = new Set(["delete", "pop", "push", "set", "shift", "splice"]);
+	const isSharedContainerMutation = (node: ts.CallExpression): boolean => {
+		if (!ts.isPropertyAccessExpression(node.expression) || !sharedContainerMutators.has(node.expression.name.text)) {
+			return false;
+		}
+		const receiver = node.expression.expression;
+		return (
+			ts.isPropertyAccessExpression(receiver) &&
+			((isThisExpression(receiver.expression) &&
+				["checkpoints", "finalityStore", "hashGraph", "knownInvalidVertexHashes", "states"].includes(
+					receiver.name.text
+				)) ||
+				(ts.isPropertyAccessExpression(receiver.expression) &&
+					isThisExpression(receiver.expression.expression) &&
+					["finalityStore", "hashGraph", "states"].includes(receiver.expression.name.text)))
+		);
+	};
+
+	const collect = (declaration: ts.FunctionDeclaration | ts.MethodDeclaration): void => {
+		const name = declarationName(declaration);
+		if (!name || !declaration.body) return;
+		const calls = new Set<string>();
+		let directSharedMutation = false;
+		const journalGuards: string[] = [];
+		const optionalJournalAccesses: string[] = [];
+		const optionalJournalParameters = declaration.parameters
+			.filter((parameter) => isJournalName(parameter.name) && parameterIsOptional(parameter))
+			.map((parameter) => parameter.name.getText(input));
+		const inspect = (node: ts.Node): void => {
+			if (ts.isCallExpression(node)) {
+				const call = calledName(node);
+				if (call) calls.add(call);
+				if ((call && sharedPrimitiveCalls.has(call)) || isSharedContainerMutation(node)) {
+					directSharedMutation = true;
+				}
+			}
+			if (isOptionalJournalAccess(node)) optionalJournalAccesses.push(node.getText(input));
+			if (ts.isIfStatement(node) && isJournalGuardExpression(node.expression)) {
+				journalGuards.push(node.expression.getText(input));
+			}
+			if (ts.isConditionalExpression(node) && isJournalGuardExpression(node.condition)) {
+				journalGuards.push(node.condition.getText(input));
+			}
+			if (
+				ts.isBinaryExpression(node) &&
+				[
+					ts.SyntaxKind.AmpersandAmpersandToken,
+					ts.SyntaxKind.BarBarToken,
+					ts.SyntaxKind.QuestionQuestionToken,
+				].includes(node.operatorToken.kind) &&
+				isJournalGuardExpression(node)
+			) {
+				journalGuards.push(node.getText(input));
+			}
+			ts.forEachChild(node, inspect);
+		};
+		inspect(declaration.body);
+		helpers.set(name, {
+			calls,
+			directSharedMutation,
+			journalGuards,
+			name,
+			optionalJournalAccesses,
+			optionalJournalParameters,
+		});
+	};
+
+	for (const statement of input.statements) {
+		if (ts.isFunctionDeclaration(statement)) collect(statement);
+		if (ts.isClassDeclaration(statement) && statement.name?.text === "DRPVertexApplier") {
+			for (const member of statement.members) {
+				if (ts.isMethodDeclaration(member)) collect(member);
+			}
+		}
+	}
+
+	const authoritative = new Map<string, MutationHelperFacts>();
+	const mutates = (name: string, visiting = new Set<string>()): boolean => {
+		if (visiting.has(name)) return false;
+		const helper = helpers.get(name);
+		if (!helper) return false;
+		if (helper.directSharedMutation) return true;
+		const nextVisiting = new Set(visiting);
+		nextVisiting.add(name);
+		return [...helper.calls].some((called) => mutates(called, nextVisiting));
+	};
+	for (const [name, helper] of helpers) {
+		if (mutates(name)) authoritative.set(name, helper);
+	}
+	return authoritative;
+}
+
 describe("Phase 0q-a structural commit gate", () => {
-	it("does not retain unreachable assign or notify compatibility pipeline stages", () => {
-		const methods = collectMethodFacts();
+	it("registers every private pass-through HandlerReturn-shaped stage in a production pipeline", () => {
+		const handlers = productionPipelineHandlers();
+		const { candidateCount, registeredCandidateCount, unreachable } = unreachablePipelineStages();
+
+		expect(handlers.size, "positive control: production must contain extracted pipeline registrations").toBeGreaterThan(
+			0
+		);
+		expect(
+			candidateCount,
+			"positive control: production must contain private HandlerReturn-shaped stages"
+		).toBeGreaterThan(0);
+		expect(
+			registeredCandidateCount,
+			"positive control: at least one HandlerReturn-shaped private method must be a real pipeline stage"
+		).toBeGreaterThan(0);
+		expect(
+			unreachable,
+			"pipeline-shaped private methods must not survive solely as direct-call compatibility helpers"
+		).toEqual([]);
+	});
+
+	it("requires journal parameters on authoritative mutation helpers", () => {
+		const helpers = [...collectMutationHelperFacts().values()];
+		expect(helpers.length, "positive control: the gate must discover authoritative mutation helpers").toBeGreaterThan(
+			0
+		);
 
 		expect(
-			["assign", "notify"].filter((name) => methods.has(name)),
-			"the removed publication pipeline must not survive as private white-box-only stages"
+			helpers
+				.filter(({ optionalJournalParameters }) => optionalJournalParameters.length > 0)
+				.map(({ name, optionalJournalParameters }) => ({ name, optionalJournalParameters })),
+			"authoritative mutation helpers must not make rollback authority optional, undefined or defaultable"
 		).toEqual([]);
+	});
+
+	it("does not optionally record rollback for authoritative mutations", () => {
+		const helpers = [...collectMutationHelperFacts().values()];
+		expect(
+			helpers
+				.filter(({ optionalJournalAccesses }) => optionalJournalAccesses.length > 0)
+				.map(({ name, optionalJournalAccesses }) => ({ name, optionalJournalAccesses })),
+			"every authoritative mutation must record rollback unconditionally"
+		).toEqual([]);
+	});
+
+	it("does not branch around rollback authority in shared-mutation helpers", () => {
+		const helpers = [...collectMutationHelperFacts().values()];
+		expect(
+			helpers
+				.filter(({ journalGuards }) => journalGuards.length > 0)
+				.map(({ journalGuards, name }) => ({ journalGuards, name })),
+			"an authoritative shared-mutation helper must not retain a journal-less branch"
+		).toEqual([]);
+	});
+
+	it("proves the structural extractors against synthetic violating source", () => {
+		const control = parseSource(
+			"synthetic-structural-control.ts",
+			`
+				class UndoJournal {
+					commit(): void {}
+					record(_undo: () => void): void {}
+				}
+				function syntheticMutation(journal: OperationJournal | undefined = undefined): void {
+					setACLState();
+					if (!journal) return;
+					journal?.record(() => {});
+				}
+				class DRPVertexApplier {
+					constructor() {
+						createPipeline(this.registered.bind(this));
+					}
+					private async crossesAwait(): Promise<void> {
+						const journal = new UndoJournal();
+						await Promise.resolve();
+						journal.commit();
+					}
+					private leavesJournalOpen(): void {
+						const journal = new UndoJournal();
+						journal.record(() => {});
+					}
+					private registered(value: string): HandlerReturn<string> {
+						return { stop: false, result: value };
+					}
+					private stranded(value: string): HandlerReturn<string> {
+						return { stop: false, result: value };
+					}
+				}
+			`
+		);
+		const methods = collectMethodFacts(control);
+		const mutationHelper = collectMutationHelperFacts(control).get("syntheticMutation");
+		const stages = unreachablePipelineStages(control);
+
+		expect({
+			crossesAwait: journalLifetimeCrossesAwait(methods.get("crossesAwait") as MethodFacts),
+			journalGuardCount: mutationHelper?.journalGuards.length,
+			journalsAreClosed: journalsAreClosed(methods.get("leavesJournalOpen") as MethodFacts),
+			optionalJournalAccessCount: mutationHelper?.optionalJournalAccesses.length,
+			optionalJournalParameterCount: mutationHelper?.optionalJournalParameters.length,
+			pipelineCandidateCount: stages.candidateCount,
+			registeredPipelineCandidateCount: stages.registeredCandidateCount,
+			unreachablePipelineStageCount: stages.unreachable.length,
+		}).toEqual({
+			crossesAwait: true,
+			journalGuardCount: 1,
+			journalsAreClosed: false,
+			optionalJournalAccessCount: 1,
+			optionalJournalParameterCount: 1,
+			pipelineCandidateCount: 2,
+			registeredPipelineCandidateCount: 1,
+			unreachablePipelineStageCount: 1,
+		});
 	});
 
 	it("keeps every UndoJournal lifetime inside a non-suspending function", () => {
@@ -277,7 +666,7 @@ describe("Phase 0q-a structural commit gate", () => {
 
 	it("routes post-suspension local publication through one CAS-guarded synchronous journal owner", () => {
 		const methods = collectMethodFacts();
-		const handlers = callFnPipelineHandlers();
+		const handlers = pipelineHandlersForVariable("callFnPipeline");
 		const suspensionIndex = handlers.indexOf("applyFn");
 		expect(suspensionIndex, "the gate must find the async-capable blueprint application seam").toBeGreaterThanOrEqual(
 			0
