@@ -315,9 +315,6 @@ export class DRPVertexApplier<T extends IDRP> {
 	private readonly checkpointSuffixSize = checkpointSuffixSizeFromEnvironment();
 	private readonly notificationQueue: { origin: string; vertices: Vertex[] }[] = [];
 	private isDrainingNotifications = false;
-	// Retained as a private invariant probe until Phase 0q-b removes the legacy
-	// observer path; authoritative publication never sets this latch.
-	private hasUnreconciledLiveState = false;
 
 	/**
 	 * Creates a new DRPVertexApplier

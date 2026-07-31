@@ -194,10 +194,6 @@ function claimSnapshotMatchesOwner(receiver: DRPObject<ExclusiveClaimDRP>, verte
 	);
 }
 
-function privateLatch<T extends IDRP>(receiver: DRPObject<T>): boolean {
-	return receiver["_applier"]["hasUnreconciledLiveState"];
-}
-
 describe("Phase 0q-a authoritative-state atomicity RED", () => {
 	beforeEach(() => {
 		barriers.clear();
@@ -252,7 +248,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 						.map(({ hash }) => hash)
 						.sort()
 						.join(),
-				latchCleared: !privateLatch(receiver),
 				localResult,
 				notificationOrder: notifications.map(({ origin }) => origin),
 				remoteResult,
@@ -264,7 +259,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 			"the local publication must CAS/reprepare after the merge instead of erasing its committed live state"
 		).toEqual({
 			graphHashesEqual: true,
-			latchCleared: true,
 			localResult: "appended:local",
 			notificationOrder: ["merge", "callFn"],
 			remoteResult: { applied: true, missing: [], invalid: [] },
@@ -306,7 +300,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 			{
 				accounting,
 				exactAccounting: JSON.stringify(accounting) === JSON.stringify(expectedAccounting(uncommitted)),
-				latchCleared: !privateLatch(receiver),
 				liveStateMatchesCommittedGraph: receiver.drp?.owner === expectedOwner,
 				noCandidateHasMixedAuthoritativeSurfaces: surfaces.every(
 					(surface) =>
@@ -321,7 +314,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 		).toEqual({
 			accounting: expectedAccounting(uncommitted),
 			exactAccounting: true,
-			latchCleared: true,
 			liveStateMatchesCommittedGraph: true,
 			noCandidateHasMixedAuthoritativeSurfaces: true,
 			noInvalidCombinedCommit: true,
@@ -342,14 +334,12 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 		const result = await receiver.applyVertices([first, second]);
 		const surfaces = [first, second].map((vertex) => vertexSurfaces(receiver, vertex, notifications));
 		expect({
-			latchCleared: !privateLatch(receiver),
 			liveValues: receiver.drp?.values.toSorted(),
 			result,
 			snapshotsValidWhenPresent:
 				logSnapshotMatchesValue(receiver, first, "first") && logSnapshotMatchesValue(receiver, second, "second"),
 			surfacesCommitted: surfaces.every(({ finality, graph, notified }) => finality && graph && notified),
 		}).toEqual({
-			latchCleared: true,
 			liveValues: ["first", "second"],
 			result: { applied: true, missing: [], invalid: [] },
 			snapshotsValidWhenPresent: true,
@@ -377,14 +367,12 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 				exactPartialResult:
 					outcome.status === "rejected" &&
 					JSON.stringify(outcome.partialResult) === JSON.stringify(expectedAccounting([candidate])),
-				latchCleared: !privateLatch(receiver),
 				retryAttempts,
 				status: outcome.status,
 			}).toEqual({
 				candidateSurfaces: { finality: false, graph: false, notified: false, snapshots: false },
 				errorIsAdoptionExhaustion: true,
 				exactPartialResult: true,
-				latchCleared: true,
 				retryAttempts: 3,
 				status: "rejected",
 			});
@@ -444,7 +432,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 					checkpointCalls,
 					errorIsApplyInvariant: error instanceof ApplyInvariantError,
 					graphInsertedBeforePrimary,
-					latchCleared: !privateLatch(receiver),
 					liveStateBeforePrimary,
 					liveStateRestored: receiver.drp?.values,
 					notifications,
@@ -463,7 +450,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 				checkpointCalls: 1,
 				errorIsApplyInvariant: true,
 				graphInsertedBeforePrimary: true,
-				latchCleared: true,
 				liveStateBeforePrimary: ["invariant-candidate"],
 				liveStateRestored: [],
 				notifications: [],
