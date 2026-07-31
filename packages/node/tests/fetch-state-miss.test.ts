@@ -11,7 +11,11 @@ describe("fetch-state snapshot misses", () => {
 			sent.push(message);
 			return Promise.resolve();
 		});
-		const object = { id: "object", getStates: vi.fn(() => [undefined, undefined]) };
+		const getSerializedStates = vi.fn(() => [undefined, undefined]);
+		const getStates = vi.fn(() => {
+			throw new Error("public state seam must not be read");
+		});
+		const object = { id: "object", getSerializedStates, getStates };
 		const node = {
 			get: vi.fn(() => object),
 			networkNode: { peerId: "receiver", sendMessage },
@@ -25,6 +29,9 @@ describe("fetch-state snapshot misses", () => {
 		});
 
 		await handleMessage(node, request);
+		expect(getSerializedStates).toHaveBeenCalledOnce();
+		expect(getSerializedStates).toHaveBeenCalledWith("pruned-hash");
+		expect(getStates).not.toHaveBeenCalled();
 		expect(sendMessage).toHaveBeenCalledOnce();
 		const responseMessage = sent[0];
 		const response = FetchStateResponse.decode(responseMessage.data);
