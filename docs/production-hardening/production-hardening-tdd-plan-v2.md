@@ -13528,11 +13528,19 @@ is the reward-hack: an implementation that builds a fresh index inside the
 per-hash loop performs one comparison per incoming hash while still touching
 every local vertex per hash, so it satisfies `probesPerIncomingHash === 1` and
 stays O(V²). The materialization counter is what rules that out — note the
-responder already materializes once per request at `handlers.ts:374` for
-`requested`, so the RED baseline is one plus one per incoming hash, and GREEN
-must be constant. Do not restate the probe as a `find()` invocation count: the
-linear responder already performs exactly one `find()` per incoming hash, so
-that reading would make the RED unable to fail. Model the counter on
+responder reaches the getter at three sites on this path — once at
+`handlers.ts:372` for `signGeneratedVertices`, once at `handlers.ts:374` for
+`requested`, then once per incoming hash at `handlers.ts:377` — so the RED
+baseline is two plus one per incoming hash, and GREEN must be constant in the
+incoming-hash count. `signGeneratedVertices` receives an already-materialized
+`Vertex[]` and never re-reads the getter, so it contributes exactly one. Build
+the fixture so its per-vertex guard short-circuits — every local vertex either
+foreign-authored or already signed — because it otherwise awaits one
+`signWithSecp256k1` per self-authored unsigned vertex, an O(V) secp burst that
+would stall the 100k row and create pressure to mock the responder that the
+counter rules forbid. Do not restate the probe as a `find()` invocation count:
+the linear responder already performs exactly one `find()` per incoming hash,
+so that reading would make the RED unable to fail. Model the counter on
 `packages/object/tests/perf-contracts.test.ts:15-28`, but note that pattern
 mocks a module boundary while 1a's seam is a class getter; an equivalent
 instrumented seam is permitted provided the counter stays causal and is not
