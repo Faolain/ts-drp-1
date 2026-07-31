@@ -12588,30 +12588,127 @@ The governed correction is therefore:
 4. **Ordering:** `0k-a → 0l → 0q-a → 0q-b`. Eventual Phase-6d cleanup revalidates 0q's journal/commit
    discipline but does not block Phase-0 atomicity work.
 
+### D.77 — Phase 0k-a acceptance and XVER-waiver wording correction
+
+Phase 0k-a is accepted at implementation HEAD `70d7162`. The linear TDD chain is:
+
+- `41b7d78` — tests only: two genuine return-contract REDs plus already-green retention, rollback,
+  ownership, sync and 10,001-record characterization controls;
+- `3e459ad` — initial GREEN: unknown hashes and already-signed duplicates are no longer falsely returned
+  from `addSignatures`;
+- `2e745a6` — corrective tests only: reproduced bit-before-aggregate partial mutation, pinned the
+  `IFinalityState.addSignature(): boolean` type contract, made sync completeness exact and removed
+  incidental signer-order/BitSet-width assertions;
+- `9888311` — corrective GREEN: compute the next aggregate before publishing bit/signature/count, so a
+  thrown aggregation leaves the exact record unchanged and retry remains possible; align the public
+  interface with the authoritative boolean;
+- `70d7162` — tests only: one mixed batch now pins exact returned identity, membership and input order
+  across valid, unknown, duplicate and throwing neighbors. It kills both unknown-`continue`→`return`
+  and valid-middle-drop mutants without changing production.
+
+The final Phase 0k-a runtime suite passes 10/10; the corrective focused suite passes 3/3; the retained
+finality/atomicity/rollback/checkpoint/ownership preservation selection passes 48/48; types, object,
+node and workspace typechecks pass; focused ESLint, Prettier and diff-check pass; and the
+artifact-excluding workspace lint has zero errors. Corrective-focused, final pre-coverage-closure,
+preservation, workspace-typecheck, Prettier, clean-equivalent-lint and final 10-test log SHA-256 values
+are, respectively,
+`f9672477d9fe3dbc39b2f385ca6ba81b7c0edd0fd2ed2e69827edc4e7887e1cb`,
+`54402fa6da559ca655b37dc590ec8503945e06c4ff1207112f48064c803bdcc7`,
+`09f97428483c4b4ae5ff73042b91e143fa1197683a94c8961fd0111e5201d823`,
+`ac9b675656f1153bcfe70decec21a94abdd07a05f233e675951cb3a88e111dfb`,
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`,
+`805314bbdb5ee25b89d99f164ec41f9469ae2849520fe2530247da50edad6f38` and
+`1e9b6994dcbc463fd005e245d131329adf78afe09519620b8ad433e842672b05`.
+After the acceptance-ledger correction, the final serial 0k-a plus preservation selection passes 58/58
+across 11 files; workspace typecheck, zero-error artifact-excluding lint and the plan-sensitive
+hardening row also pass. Their log SHA-256 values are
+`069129febc12ffa26a5f01891d7c19ae65ecf16efca04a0f5186250b4d863235`,
+`7465f174e68d7c7c3c385034b57ed8034e9ae275b2d3427f64872362120f1378`,
+`a8e3bbe6a19b0b5b4653580de586e9d7ff871c652f4bcafe674f2d0dba2740cb` and
+`2c4e02e9368c54118369e8daf9f5e7adbe9ef047c9f1e9d5b46027ea5bf07d48`.
+
+Fresh post-fix reviews accept the final implementation:
+
+- Grok 4.5/high returned `PASS_WITH_NOTES`, session
+  `b7fb92f9-ca6a-43d8-820e-10e59490ac88`, effective model only
+  `grok-4.5-build`. Its first request was cancelled by a read-only command-approval mismatch; the same
+  authenticated session resumed once and ended normally with no model retry, fallback or substitution.
+  Raw-response SHA-256 is
+  `a8a12478884efe42ef73f3507104f4292912d0fe35d415f098300dc90e18d46f`.
+- exact Kimi 3/high returned `PASS_WITH_NOTES`, session
+  `session_25d7c2bc-1923-4d0d-ac00-bde121722016`, 50/100 requests, every request
+  `kimi-code/k3` at high reasoning with no retry, resume, fallback or substitution. Its surviving
+  multi-element-return mutant caused `70d7162`; its post-fix review manifest SHA-256 is
+  `ccb207d4ae61ba6963b28f3baab7c9df0dd0d234dada33009214ea314549e3e8`.
+- final Opus/xhigh returned `PASS_WITH_NOTES`, session
+  `96fe962a-d630-4f82-bc08-33564c987cce`, 121/121 substantive assistant records
+  `claude-opus-5` at xhigh with no retry, resume, fallback or substitution. An automatic 27-output-token
+  Haiku auxiliary authored zero review records. Raw-result SHA-256 is
+  `73a0c261a2f393ca0d00704ca10b809ff63c6ec43f5b2ba630cf48d92c12d29a`.
+
+Opus found one false clause in the prior Next Agent Prompt: only the direct call sites at
+`handlers.ts:222` and `:270` discard `addSignatures`' return; the paths at `:274`, `:416` and `:505`
+consume it for outbound messages. Phase 0m XVER is not required for this repair because the current
+comparison surfaces do not observe outbound attestation-array membership and the slice changed neither
+the legacy applier nor validation classification. On the consuming paths, `generateAttestations`
+pre-filters `canSign(...) && !signed(...)`: unique successful candidates are unchanged, duplicate
+candidates are newly and truthfully narrowed, unknown candidates were already excluded by the
+pre-filter, and throwing candidates were already omitted by the per-element catch. The workflow still
+path-triggers this slice through `packages/object/**`; the missing `packages/types/**` trigger remains
+the D.75 future type-only gap. This corrected rationale was applied only after the required quorum:
+
+- Opus/xhigh required the narrow documentation correction and no additional RED;
+- fresh Codex-high returned `AGREE_CORRECTION`, with the precision that thrown insertions were omitted by
+  both versions and only duplicate candidates are newly narrowed;
+- the same exact Kimi 3/high session resumed for six requests (56/100 cumulative), returned
+  `AGREE_CORRECTION`, and used only K3/high with no fallback or substitution. Its correction-adjudication
+  manifest SHA-256 is
+  `96af5a9bed4b1e83e511c9b201d97fce8ac1702b72f3bc3f98b3778797e4c55a`.
+
+Retained gotchas and forward bindings:
+
+1. Phase 0k-a intentionally proves **unbounded** enabled legacy retention; it does not solve the leak.
+   Phase 1c owns the bound-zero off-switch and Phase 6d owns eventual coordinated deletion.
+2. `IFinalityState.addSignature(): void → boolean` is source-compatible for callers that ignored the
+   result but can break an external structural implementer returning `void`; this is a deliberate public
+   contract hardening in a pre-1.0 package.
+3. The Phase 0m workflow path-triggers this slice through `packages/object/**`, but still omits
+   `packages/types/**`; D.75 gotcha 2 remains open for a future type-only change.
+4. Rollback census equality is structurally pinned rather than record-identity pinned. Current production
+   rollback is identity-guarded and only deletes the just-created identical record; no replacement path
+   exists at this checkpoint.
+5. The initial `41b7d78` subject says “RED,” but only its two return-contract rows were red; its remaining
+   rows were intentionally already-green characterization controls. Do not report the whole file set as
+   failing RED evidence.
+6. Private-field reach-through in the retention tests is deliberate because D.76 requires the concrete
+   authoritative store, not `IFinalityStore`; such coupling must remain confined to diagnostic
+   characterization.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
-binding. Phase 0m is accepted at `bbd55f3`; D.76 replaces the invalid finite-bound 0k row. The remaining
-Phase-0 sequence is `0k-a → 0l → 0q-a → 0q-b`. Phase 0n remains optional and deferred until after the
-golden paths.
+binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted at `70d7162`. The remaining
+Phase-0 sequence is `0l → 0q-a → 0q-b`. Phase 0n remains optional and deferred until after the golden
+paths.
 
-The next item is **Phase 0k-a**, as a separate strict TDD item: characterize enabled legacy-finality
-retention and repair its observable contract without eviction. Start a fresh Codex-high RED-only owner.
-Use fast small-N exact equality through real consumers to prove one resident record per accepted
-distinct vertex, zero for rejected/rolled-back vertices, ancient late-attestation and sync
-completeness, exact rollback, one authoritative store per object and separate-store isolation. Add
-direct unit REDs proving unknown-hash and already-signed duplicate attestations are absent from
-`addSignatures`' return. RED the exact concrete-store/diagnostic resident-record census. Keep the
-≥10⁴ monotonic-growth run isolated and bounded in time; it is characterization, never a `≤ bound`
-acceptance. Do not add a compact-summary field and do not delete any finality record.
+The next item is **Phase 0l**, as its own strict TDD item. Start with a fresh Codex-high RED-only owner
+and inventory the actual public throw/result sites and existing error classes before writing tests.
+The row's phrase “every public throw site” must be resolved to exact package exports and runtime entry
+paths; do not make a regex-only test over arbitrary source text the acceptance contract. RED the
+observable public contract: every governed failure has one catalogued stable code/class, thrown and
+returned failures preserve their primary cause, internal implementation text is not exposed as the
+contract, and unknown/uncategorized resolver, ancestry, blueprint and semantic-hook failures cannot
+escape without a stable public category. Keep Phase 0h's quarantine policy, Phase 0q's atomicity/result
+ownership and Phase 3a's v3 binder out of scope. If the inventory proves the row cannot define a
+non-vacuous boundary without inventing compatibility policy, stop before GREEN and obtain the required
+Codex-high, exact Kimi 3/high and Opus/xhigh correction quorum.
 
 Checkpoint the causal RED before handing the unchanged contract to a distinct fresh Codex-high GREEN
-owner. Phase 0m XVER is not required for the documented `addSignatures` return repair alone because the
-current XVER surfaces do not observe it and node handlers discard that return; rerun XVER if the
-implementation touches the legacy applier or validation classification. Preserve the existing
-atomic apply/rollback/checkpoint suites. After 0k-a, complete 0l through its own full TDD/review loop,
-then run the fresh pre-RED no-RED audit for 0q-a and author REDs only for D.74.2's genuinely open local
-and deferred-publication surfaces. 0q-b follows 0q-a.
+owner. Preserve Phase 0k-a's finality/atomicity/rollback/checkpoint tests. Rerun Phase 0m XVER if 0l
+touches the legacy applier or validation classification; a taxonomy-only module or documentation change
+does not waive XVER for a caller change. After 0l's full review loop, run the fresh pre-RED no-RED audit
+for 0q-a and author REDs only for D.74.2's genuinely open local and deferred-publication surfaces.
+0q-b follows 0q-a.
 
 Continue the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
