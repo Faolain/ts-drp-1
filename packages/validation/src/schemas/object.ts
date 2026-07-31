@@ -1,7 +1,13 @@
 import { z } from "zod";
 
+const FinalityConfigSchema = z.object({
+	enabled: z.boolean().optional(),
+	finality_threshold: z.number().optional(),
+});
+
 export const NodeCreateObjectOptionsSchema = z.object({
 	id: z.string().min(1, "A valid object id must be provided").optional(),
+	finality_config: FinalityConfigSchema.optional(),
 	sync: z
 		.object({
 			enabled: z.boolean(),
@@ -12,6 +18,7 @@ export const NodeCreateObjectOptionsSchema = z.object({
 
 export const NodeConnectObjectOptionsSchema = z.object({
 	id: z.string().min(1, "A valid object id must be provided"),
+	finality_config: FinalityConfigSchema.optional(),
 	sync: z
 		.object({
 			peerId: z.string().min(1, "A valid peer id must be provided"),

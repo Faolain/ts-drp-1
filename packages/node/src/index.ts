@@ -1231,6 +1231,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			id: options.id,
 			metrics: options.metrics,
 			config: {
+				finality_config: options.finality_config,
 				log_config: options.log_config,
 			},
 		});
@@ -1267,7 +1268,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			id: options.id,
 			drp: options.drp,
 			metrics: options.metrics,
-			config: { log_config: options.log_config },
+			config: {
+				finality_config: options.finality_config,
+				log_config: options.log_config,
+			},
 		});
 
 		// put the object in the object store

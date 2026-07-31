@@ -4,6 +4,7 @@ import { type IACL } from "./acl.js";
 import { type DRPIntervalDiscoveryOptions } from "./drp-interval-discovery.js";
 import { type DRPIntervalReconnectOptions } from "./drp-interval-reconnect.js";
 import { type IDRP } from "./drp.js";
+import { type FinalityConfig } from "./finality.js";
 import {
 	type FetchState,
 	type FetchStateResponse,
@@ -33,6 +34,7 @@ interface NodeObjectOptionsBase<T> {
 	drp?: T;
 	metrics?: IMetrics;
 	log_config?: LoggerOptions;
+	finality_config?: FinalityConfig;
 }
 
 export interface NodeCreateObjectOptions<T extends IDRP> extends NodeObjectOptionsBase<T> {
