@@ -13398,39 +13398,169 @@ Phase 0q-b3 neither consumes nor repairs D.73. The hostile graph-side virtual
 binder requirement. Phase 0n remains optional and deferred until after the
 golden paths.
 
+### D.85 — Phase 0q-c detached async-observer acceptance and Phase-0 close
+
+Phase 0q-c is accepted at final code/test HEAD
+`d4b2508f0ff3d7281740c4cd56a20157ad9a9767`. The retained TDD lineage is:
+
+- RED `e11489b9a9afa339a8501b8cf005b2d67cb89f9a` adds only the two leaf-loop
+  test files. Its focused run is exactly two failed / nine passed: only the
+  rejecting-thenable report assertion fails at each leaf, while committed
+  state/reference, later-subscriber and no-backpressure controls already pass;
+- GREEN `d4b2508f0ff3d7281740c4cd56a20157ad9a9767` changes only
+  `DRPObject._notify` and `DRPObjectStore._notifySubscribers`. The RED test
+  blobs remain `0108c0d2c83eaafdd2880f3c06f6306faf514177` and
+  `c1ca9d3314635745985ad7c8b9a5ba3404090eba`; and
+- the accepted predecessor/plan checkpoint is
+  `da6d2eb81df66177c076e64b9df122ca5bf35ec1`. The plan blob remains
+  `e792931cb6e66de534a5b16a6c03cf8bd94fe72b` across RED and GREEN.
+
+Both public callback types still return `void`. Each private leaf loop captures
+the actual runtime return, structurally recognizes object or callable
+thenables, attaches a rejection handler synchronously and reports the exact
+reason once through that surface's existing logger. It never awaits or adopts
+the thenable. Publication, registration/FIFO order, reentrancy, committed
+reference identity and the existing synchronous-throw/report/continue behavior
+remain unchanged. Public EventTarget/TypedEventEmitter, the awaited
+message-queue contract, the applier drain and 0q-b3 consumers remain outside
+the production diff. The applier drain calls the bound `DRPObject._notify`
+(`index.ts:137` → `drp-applier.ts:1295`), so drained notifications inherit the
+new containment without any change to the drain itself.
+
+Authenticated final GREEN gates at exact `d4b2508…` are:
+
+- focused 0q-c plus the retained b1/b2 controls and
+  `packages/node/tests/object-store.test.ts` — five files, 11/11;
+- Phase 0q-a 27/27, reentrancy 5/5, node controls 12/12, preservation 49/49
+  and bounded object 101/101;
+- object, node and workspace typechecks;
+- tracked ESLint over 693 files with zero errors / 249 inherited warnings,
+  plus Prettier, exact scope/diff and frozen-test/plan-byte checks; and
+- hermetic XVER with `primarySha: d4b2508…`, 108 comparisons and zero approved
+  deltas.
+
+Required reviewers accept without a corrective RED:
+
+- Grok 4.5/high returned `PASS_WITH_NOTES`, session
+  `019fb868-2d30-78a1-810f-deb49d580cca`, request
+  `0a08cf2a-0f37-46aa-be16-d8748372249d`, with sole model usage
+  `grok-4.5-build`;
+- exact Kimi 3/high/max-100 returned `PASS_WITH_NOTES`, session
+  `session_cef38f87-9e57-4b9f-bfb5-a71da4959f3d`, from one
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation; and
+- final Opus/xhigh returned `PASS_WITH_NOTES`, session
+  `bdf4b5ee-2482-4d8f-956c-5d653926f818`, exit 0 / `end_turn`. Its transcript
+  verdict turn contains exactly 100 substantive `claude-opus-5` assistant
+  records: 36 thinking, 61 read-only Bash/Read tool uses, two text records and
+  one disabled `Write` attempt to Claude's out-of-repository plan path, which
+  returned a tool-unavailable error and created no file. The same session then
+  carried read-only D.85 exactness audits, so the full transcript exceeds that
+  count. Every assistant record in the session is `claude-opus-5`, and no audit
+  turn changed code, tests or gates. The envelope's separate
+  `claude-haiku-4-5-20251001` usage—1,669 input / 24 output tokens—is metadata
+  overhead and authored no assistant, reasoning, tool, finding or verdict
+  event.
+
+Retained non-blocking gotchas:
+
+1. The hand-rolled thenables causally prove attachment and reporting but cannot
+   pin native-Promise `unhandledRejection` suppression or kill a
+   macrotask-deferred attachment mutant. Opus independently executed a faithful
+   standalone transcription of both leaf blocks under Node v22.15.0 and
+   confirmed that native `Promise` and real-`async` rejections are contained
+   with no `unhandledRejection`, and that a macrotask-deferred attachment leaks.
+   No artifact executes HEAD's own leaf loops against a native promise. If 0q-c
+   is reopened, a scoped native `Promise.reject`/`unhandledRejection` row is the
+   highest-value addition.
+2. `returnThroughVoidBoundary` honestly models the compile-time-`void`,
+   runtime-thenable boundary, but also hides the fixture from
+   `no-misused-promises`. The real-async compile-time premise remains
+   authenticated by D.83's unanimous correction quorum.
+3. The production double casts re-state each callback parameter list and could
+   miss a future public-signature change. If this slice is reopened, a direct
+   assignment of the callback result to `unknown` would remove that decoupling
+   and is lint-clean under the current config.
+4. The once-only rejection guard is correct but unpinned because
+   `ControlledThenable` itself prevents repeated settlement.
+5. The node logger remains a pre-existing production no-op. Attachment still
+   prevents process termination, but async-rejection observability is test-spy
+   only until the logger TODO is resolved.
+6. Throwing `then` getters/invocations remain synchronously contained. A
+   reject-then-throw hostile thenable reports the exact rejection reason once
+   plus its separate synchronous throw; this is not an exact-once violation.
+7. The node 0q-c row deep-compares retained state, while the retained
+   object-store control separately pins exact reference identity.
+8. The two leaf-local blocks are proportionate. Reconsider extraction at a
+   third leaf or when either copy gains behavior beyond attach-and-report.
+9. D.83's contemplated callback JSDoc was not added. This is documentation
+   hygiene owed before a live Phase-3a binder or third-party subscriber
+   exposure, not a Phase-0 defect.
+
+Every **required** Phase-0 item is now complete. Phase 0n remains open, optional
+and deferred until after the chat/canvas/grid golden paths, and is a hard
+prerequisite for Phase 4a's live fold. 0n is not schedulable on demand: it is
+the remaining forward row still labeled `consensus-v2`, so per D.52.4 it must
+first pass the required Codex-high + exact Kimi-3/100 + Opus-xhigh
+forward-plane correction quorum. That quorum is unrun, and Phase 4a's live fold
+is transitively blocked on it. D.73 remains unchanged: the hostile graph-side
+virtual-`Map.keys()` exploit is real, unresolved and a hard Phase-3a pre-live
+binder requirement.
+
 ## Next Agent Prompt
 
-Phase 0q-b3 is accepted at `ac33bda`. The final remaining required Phase-0 item
-is **Phase 0q-c — detached async-observer rejection containment**, governed by
-D.83; it is mandatory before the first live Phase-3a binder or any third-party
-exposure of the published subscribe APIs. Phase 0n remains optional and
-deferred until after the golden paths. Begin with a fresh Codex-high RED owner
-that may change tests only.
+Every required Phase-0 item is complete at code/test checkpoint `d4b2508` and
+the acceptance-ledger checkpoint following D.85. Phase 0n remains open,
+optional and post-golden-path, and is blocked behind D.52.4's unrun
+forward-plane correction quorum — do not schedule it here. Begin **Phase 1a —
+sync responder hash indexing**, the first item in the plan's measured wall
+order. Start with a fresh Codex-high RED owner that may change tests only.
 
-For each causal public leaf loop—`DRPObject._notify` and
-`DRPObjectStore._notifySubscribers`—commit controlled hand-rolled thenable
-rows proving: an exact rejection reason is reported once without escaping,
-committed state/reference identity is retained and a later observer is not
-skipped; a delayed thenable does not create await/backpressure and the later
-observer runs before settlement; and `undefined`/non-thenable returns create no
-extra report. Do not use an `async` test callback that violates tracked lint.
-Retain the published `void` callback types, registration/FIFO order,
-reentrancy, synchronous-throw/report/continue behavior and existing logger
-owners. Do not touch the applier beyond preservation tests, public
-TypedEventEmitter/EventTarget, message queue, b3 consumers, D.73 or Phase 0n.
+Drive the real `syncHandler` path with a net-new
+`sync-perf-contract.test.ts`. Prove the responder does not perform a linear
+`vertices.find` for each incoming hash: define a probe as one candidate-vertex
+hash comparison, and separately count local-hash materializations
+(`DRPObject.vertices` / `HashGraph.getAllVertices`) per sync request. Require
+`probesPerIncomingHash === 1` and a materialization count that is constant in
+the incoming-hash count, at 10k/50k/100k local sizes. Both counters must be
+asserted. Under this definition the per-hash counter does fail at RED, because
+each `find()` compares against up to every local vertex. What it does not close
+is the reward-hack: an implementation that builds a fresh index inside the
+per-hash loop performs one comparison per incoming hash while still touching
+every local vertex per hash, so it satisfies `probesPerIncomingHash === 1` and
+stays O(V²). The materialization counter is what rules that out — note the
+responder already materializes once per request at `handlers.ts:374` for
+`requested`, so the RED baseline is one plus one per incoming hash, and GREEN
+must be constant. Do not restate the probe as a `find()` invocation count: the
+linear responder already performs exactly one `find()` per incoming hash, so
+that reading would make the RED unable to fail. Model the counter on
+`packages/object/tests/perf-contracts.test.ts:15-28`, but note that pattern
+mocks a module boundary while 1a's seam is a class getter; an equivalent
+instrumented seam is permitted provided the counter stays causal and is not
+satisfied by mocking the responder itself. Keep wall-clock measurements as
+diagnostic evidence only; they may not be the causal gate. Freeze and commit
+the genuine RED before handing byte-identical tests to a distinct fresh
+Codex-high GREEN owner.
 
-Checkpoint the genuine RED before handing byte-identical tests to a distinct
-fresh Codex-high GREEN owner. GREEN must capture a runtime return, detect a
-thenable, attach exact rejection reporting immediately, and never await it or
-promise observer backpressure. A callback that starts a floating Promise and
-returns `undefined` remains outside runtime containment.
+GREEN may only replace the responder's getter-re-materialized linear lookup
+with one request-local `Set`/`Map` built from the local hashes. Preserve wire
+bytes, response ordering, missing-hash semantics, auth/admission behavior and
+all public APIs. Do not absorb Phase 1b's applied-vertex index, Phase 1n's
+heads-exchange protocol, Phase 3a's D.73 binder, or optional Phase 0n. The slice
+table's line references have drifted: re-derive them. The responder's linear
+lookup is now `handlers.ts:377` inside `syncHandler` (362), re-materializing the
+`packages/object/src/index.ts:163` getter on every iteration. The second
+`vertices.find` at `handlers.ts:479` is inside `syncAcceptHandlerUntraced` and
+belongs to Phase 1b — do not touch it. Preserve the existing
+`requested: Set<Vertex>` semantics and the `requesting` array's contents and
+order.
 
-Run the focused rows, accepted b1/b2/b3 controls, exact Phase 0q-a 27/27,
-reentrancy, bounded preservation gates, package/workspace typecheck, tracked
-zero-error lint, Prettier/diff/scope and hermetic XVER to `.log` files. Then run
-the per-item Grok-high, exact
+Run the focused test, sync/node preservation suites, package/workspace
+typecheck, tracked zero-error lint, Prettier/diff/scope and any plan-triggered
+XVER gate to `.log` files at both RED and GREEN checkpoints. Then run the
+per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus/xhigh
-review loop.
+review loop. Treat large-size runs as targeted contract/performance gates, not
+part of every fast unit-test loop.
 
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
