@@ -7,13 +7,19 @@ function parseSource(path: URL): ts.SourceFile {
 	return ts.createSourceFile(path.pathname, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 }
 
+function nameText(node: ts.Node): string | undefined {
+	if (ts.isPrivateIdentifier(node)) return node.text.slice(1);
+	return ts.isIdentifier(node) || ts.isStringLiteral(node) ? node.text : undefined;
+}
+
 function classMemberNames(sourceFile: ts.SourceFile, className: string): Set<string> | undefined {
 	for (const statement of sourceFile.statements) {
 		if (!ts.isClassDeclaration(statement) || statement.name?.text !== className) continue;
 		return new Set(
-			statement.members.flatMap((member) =>
-				member.name && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) ? [member.name.text] : []
-			)
+			statement.members.flatMap((member) => {
+				const name = member.name ? nameText(member.name) : undefined;
+				return name === undefined ? [] : [name];
+			})
 		);
 	}
 	return undefined;
@@ -22,7 +28,7 @@ function classMemberNames(sourceFile: ts.SourceFile, className: string): Set<str
 function nameTokenCount(sourceFile: ts.SourceFile, name: string): number {
 	let count = 0;
 	const visit = (node: ts.Node): void => {
-		if ((ts.isIdentifier(node) || ts.isStringLiteral(node)) && node.text === name) count++;
+		if (nameText(node) === name) count++;
 		ts.forEachChild(node, visit);
 	};
 	visit(sourceFile);
