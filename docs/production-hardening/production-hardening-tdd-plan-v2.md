@@ -12799,30 +12799,146 @@ subpart cannot waive XVER for the accompanying object/validation caller changes.
 The D.73 graph-side virtual `Map.keys()` exploit remains unresolved and mandatory for Phase 3a. No
 pre-3a generic byte-cap caller may claim live authenticated graph/charge binding.
 
+### D.79 — Phase 0l closed public error taxonomy acceptance
+
+Phase 0l is accepted at final HEAD `33afab55b4d2428c4c928d033490cb91d875e390`. The
+TDD lineage remains explicit:
+
+- causal RED `142583d` added nine test/fixture/type-closure files and produced 18 intended runtime
+  failures with 16 already-green controls, plus the intended absent-package/root-export type errors;
+- GREEN `97e588e` implemented D.78 across `@ts-drp/errors`, canonical, compaction, protocol-v2,
+  validation and object; and
+- corrective test-only commit `33afab5` changed exactly three test files (+156/−9) after the first
+  review loop proved that GREEN had missed a tracked stale `C9` assertion. The correction touches no
+  production file, manifest, lockfile, Vite alias, plan or governance artifact.
+
+The first reviews found a real evidence defect rather than a reason to revert the product behavior:
+`reviewer-hardening.test.ts` still required `/EMPTY_QC/` and `/MIXED_QC.*proposalDigest/i` in error
+messages even though D.78.1.6 makes names/messages non-contract and the 0l row requires real
+catalogued classes. The GREEN gate set had not run that file. Exact Kimi 3/high therefore returned
+`BLOCK`; Grok also reproduced the failure and the missing recognizer/type-strength pins. The
+corrective commit:
+
+1. asserts `EmptyQuorumCertificateError` / `MixedQuorumCertificateError` and exact codes only, with
+   no message or protocol-v2 `TypeError`-ancestry requirement;
+2. pins all fifteen governed public classes to their exact code, frozen registry membership and
+   generic brand recognition;
+3. commits code-only, branded-unknown-code, hostile-Proxy and generic-vs-object-ACL recognizer
+   controls, while retaining the rule that a valid brand plus a registered code proves membership,
+   never provenance; and
+4. replaces the one-way admission-code `Extends` assertion with bidirectional `Equal` over the
+   exact thirty-four emitted codes, the public `AdmissionResult["code"]` alias and the sole
+   `ADMISSION_CONTEXT_INVALID` preparation failure.
+
+Four isolated production-side mutants are causal kills rather than mutation theater: unregistering
+`INVALID_VERTEX` fails only the `LinearizationError` row; unregistering `INVALID_HASH` and
+`VERTEX_VALIDATION_FAILED` fails those two rows; removing the generic object-ACL brand fails the ACL
+row while its package-specific marker remains; and widening `AdmissionResultCode` makes the type
+closure fail at the `Equal` assertions. Final Opus/xhigh additionally killed code-only recognition
+and removal of the hostile-access guard in isolated scratch copies.
+
+No result shape, classifier or deferred owner moved. `AdmissionResult`, `ValidationResult`,
+`ApplyResult`, `MergeResult` and `EpochFullOutcome` keysets remain exact; no cause or `partialResult`
+field was added; known `Invalid*` identities and invalid-vs-quarantine behavior remain unchanged;
+trusted admission-hook policy remains Phase 3a; authoritative returned-failure/consumer integration
+remains within the 0q split.
+
+Authenticated final gates at exact HEAD `33afab5` are:
+
+- Phase-0l focused runtime 51/51 and reviewer hardening 13/13;
+- the full tracked protocol-v2 suite in a clean detached worktree, 24 files / 184 tests;
+- preservation/classifier coverage, 111 passed with 14 intentional skips across 13 files;
+- workspace typecheck green across 34 applicable projects;
+- ESLint 0 errors / exactly 226 inherited warnings, plus scoped Prettier and diff checks;
+- the clean detached protocol freeze; and
+- authenticated XVER against reference `1d40885ffb2ab666ffb2817a99fe69a42af83e77`.
+  The correct XVER wording is **nine fixtures containing eighteen scheduled cases total, each
+  compared across six surfaces: `18 × 6 = 108` comparisons**, not `9 × 18 × 6`; all nine Map
+  fixtures were exercised and the approved-delta count is zero.
+
+Fresh corrected-head reviews all accept without code/test/existing-plan correction:
+
+- Grok 4.5/high `PASS_WITH_NOTES`, session
+  `019fb66a-3b48-7d31-a809-6bf2cca2756d`, request
+  `b0b4426f-b856-44d2-9d34-65b14be2f632`, exit 0, no fallback/substitution/subagent/web;
+- exact Kimi 3/high `PASS_WITH_NOTES`, session
+  `session_26605b89-7e52-45b9-b8c0-0e1d7f2b739d`, one continuous
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3` invocation, exit 0, no
+  retry/resume/fallback/substitution. Its stream did not expose authoritative served-provider,
+  effective-model or effort metadata, so those are not invented; and
+- final Opus/xhigh `PASS_WITH_NOTES`, authenticated session
+  `9343c04b-e909-468e-b999-fe9052087c5f`, one fresh safe-mode bridge invocation, exit 0 /
+  `end_turn`. All 177/177 substantive assistant records are `claude-opus-5` at xhigh; its 98 tool
+  uses are read-only Bash/Read/Grep, with zero Agent/Task/edit/write/web calls. The envelope also
+  reports automatic Haiku title-metadata overhead (2,312 input / 20 output tokens), but the complete
+  transcript contains no Haiku assistant, reasoning, tool, finding or verdict event. Haiku did not
+  perform the review.
+
+Retained non-blocking gotchas:
+
+1. The thirty-four-code emitted oracle is hand-maintained. Independent extraction proves exact
+   equality today, but future admission-code work must update both production and the oracle.
+2. The aggregate type-class assertion lists nine of fifteen classes. `LinearizationError` is closed
+   separately and most omissions extend the coded base; the exact compile-time residue is
+   `ObjectACLDeterministicError`, whose literal code is pinned only by the runtime matrix. Add a
+   type-level closure assertion before changing that literal.
+3. The test-only duplicate-module probe supplements rather than replaces a real
+   `@ts-drp/errors` cross-copy re-evaluation test.
+4. Two corrective-green artifacts are zero-byte quiet-success logs; a superseded precommit hash
+   retains one stale workspace-lint entry; and one superseded C10 timeout sidecar was not annotated.
+   Prefer non-empty exit-bearing logs and annotate superseded sidecars.
+5. The generic and object-ACL brands are membership classifiers, not security/provenance
+   boundaries. The ACL classifier behavior predates 0l.
+6. `StateNotFoundError` remains unbranded but is unreachable from the declared object package root,
+   so it is outside D.78's governed boundary.
+7. Final Opus test probes refreshed two ignored Vitest caches under `node_modules/.vite`. No baseline
+   byte hashes existed, so they were reported rather than guessed back. HEAD, tracked/staged state
+   and the Git-visible status set remain unchanged.
+
+The D.73 graph-side virtual `Map.keys()` exploit remains **unresolved, real and mandatory for
+Phase 3a**. Final Opus reproduced it at this HEAD: a `Map` subclass overriding only `keys()` can be
+accepted with two indexed vertices but one charge, while the corresponding plain-Map under-charge is
+rejected. This is not a Phase-0l blocker because 0l did not change or live-bind that surface. Phase 3a
+must still own the built-in graph container, captured intrinsics, common authenticated order/charge
+keyset and hostile subclass/Proxy/prototype-poisoning REDs.
+
 ## Next Agent Prompt
 
 Phase 0p is accepted through 0p-3 at `1d40885`; D.73 retains the mandatory Phase-3a graph-container
-binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted at `70d7162`. The remaining
-Phase-0 sequence is `0l → 0q-a → 0q-b`. Phase 0n remains optional and deferred until after the golden
-paths.
+binding. Phase 0m is accepted at `bbd55f3`; Phase 0k-a is accepted through its plan checkpoint
+`114ae6e`; Phase 0l is accepted at `33afab5`. The remaining Phase-0 sequence is
+**`0q-a → 0q-b`**. Phase 0n remains optional and deferred until after the golden paths.
 
-The next item is corrected **Phase 0l**, as one strict TDD item. Start with a new Codex-high RED-only
-owner at the plan-correction checkpoint; the prior inventory owner is not the fresh causal RED owner.
-Implement D.78's R1-R12-equivalent matrix through the declared package roots and subpaths. The first
-causal failure is the absent public zero-dependency `@ts-drp/errors` package; the same RED checkpoint
-must pin compaction's three wrapper sites, both validation sentinel branches, known `Invalid*` identity,
-object root guards/escaping classes, genuine duplicate-module recognition, exact result keysets and
-non-vacuous compile-time closure. Do not use regex-over-arbitrary-source, `structuredClone`,
-message-text assertions, an unused `never` alias, a code-only recognizer, or a result-shape change.
-Report the already-green controls separately.
+The next item is **Phase 0q-a — authoritative-state atomicity**. Begin with a fresh Codex-high
+pre-RED/no-RED audit. Re-run the already-green merge presence recheck, frontier CAS, synchronous
+journal, rollback/checkpoint and classifier controls, and report them honestly as preservation
+evidence rather than manufacturing failures.
 
-Checkpoint the causal RED before handing the unchanged contract to a distinct fresh Codex-high GREEN
-owner. Preserve Phase 0k-a and the canonical/0d/result-key/classifier controls. Full Phase 0m XVER is
-mandatory for 0l, together with logged package/workspace typecheck, zero-error lint, format and bounded
-serial tests. After 0l's Grok-high, exact Kimi 3/high and final Opus-xhigh loop, run the fresh pre-RED
-no-RED audit for 0q-a and author REDs only for D.74.2's genuinely open local and
-deferred-publication surfaces. 0q-b follows 0q-a and owns returned-cause/result integration; Phase 3a
-owns protocol-v2 hook policy and the D.73 graph-container exploit.
+Author causal REDs only for D.74.2 and the 0q-a row's genuinely open boundaries:
+
+- local async `callFn`/blueprint suspension across a committing merge must not publish without a
+  journal and frontier CAS;
+- the deferred multi-candidate path must not expose graph, snapshots, finality or notification
+  eligibility before canonical live ACL/DRP plus checkpoint state are authoritative;
+- replay failure or CAS exhaustion must leave no trace for uncommitted candidates, and every
+  rejected boundary must carry its exact `partialResult`; and
+- an executable structural gate must prove no shared mutation/rollback authority survives an
+  `await` and no resolved or rejected `applyVertices` boundary retains the private unreconciled
+  latch.
+
+Snapshots may be absent but never present-and-wrong. Do not introduce public
+`liveStateUnreconciled` success, move observer/notification delivery into the authoritative commit,
+change public error taxonomy, or absorb 0q-b's consumer/cause-preservation work. If the audit finds a
+real ownership contradiction rather than an implementation gap, stop before changing the plan and
+use the required correction quorum.
+
+Checkpoint a genuine RED before handing the unchanged contract to a distinct fresh Codex-high GREEN
+owner. Preserve Phase 0l's taxonomy/result/classifier controls and run the relevant Phase 0m XVER
+trigger, package/workspace typecheck, zero-error lint, format and bounded serial tests to logs. Then
+run the per-item Grok-high, exact Kimi 3/high and final Opus-xhigh review loop. Phase 0q-b follows and
+owns post-commit notification isolation, observer failure reporting, downstream exact-partial-result
+consumption and primary-error `cause` preservation. Phase 3a continues to own protocol-v2 trusted-hook
+policy and the D.73 hostile graph-container exploit.
 
 Continue the per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, final Opus-xhigh and bounded logged-gate
