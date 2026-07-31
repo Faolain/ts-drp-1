@@ -25,7 +25,9 @@ interface MutationHelperFacts {
 	readonly calls: Set<string>;
 	readonly directPostCommitBookkeeping: boolean;
 	readonly directSharedMutation: boolean;
+	readonly hasMandatoryRollbackAuthority: boolean;
 	readonly journalGuards: readonly string[];
+	readonly ownsSynchronousRollbackAuthority: boolean;
 	readonly optionalJournalAccesses: readonly string[];
 	readonly optionalJournalParameters: readonly string[];
 	readonly name: string;
@@ -54,6 +56,13 @@ function isThisExpression(node: ts.Node): boolean {
 
 function calledName(node: ts.CallExpression): string | undefined {
 	if (ts.isIdentifier(node.expression)) return node.expression.text;
+	if (
+		ts.isElementAccessExpression(node.expression) &&
+		node.expression.argumentExpression &&
+		ts.isStringLiteral(node.expression.argumentExpression)
+	) {
+		return node.expression.argumentExpression.text;
+	}
 	if (!ts.isPropertyAccessExpression(node.expression)) return undefined;
 	if (isThisExpression(node.expression.expression)) return node.expression.name.text;
 	return node.expression.name.text;
@@ -427,23 +436,159 @@ function isJournalGuardExpression(node: ts.Expression): boolean {
 	return false;
 }
 
+type RollbackAuthorityTypeDeclaration = ts.InterfaceDeclaration | ts.TypeAliasDeclaration;
+
+function typeDeclarationName(node: RollbackAuthorityTypeDeclaration): string {
+	return node.name.text;
+}
+
+function entityNameText(node: ts.EntityName): string {
+	return ts.isIdentifier(node) ? node.text : node.right.text;
+}
+
+function memberNameText(node: ts.NamedDeclaration): string | undefined {
+	if (!node.name || (!ts.isIdentifier(node.name) && !ts.isStringLiteral(node.name))) return undefined;
+	return node.name.text;
+}
+
+function membersProvideRollbackAuthority(
+	members: ts.NodeArray<ts.TypeElement>,
+	declarations: ReadonlyMap<string, RollbackAuthorityTypeDeclaration>,
+	visiting: ReadonlySet<string>
+): boolean {
+	return members.some(
+		(member) =>
+			ts.isPropertySignature(member) &&
+			member.questionToken === undefined &&
+			memberNameText(member)?.toLowerCase() === "journal" &&
+			member.type !== undefined &&
+			typeProvidesRollbackAuthority(member.type, declarations, visiting)
+	);
+}
+
+function typeProvidesRollbackAuthority(
+	node: ts.TypeNode,
+	declarations: ReadonlyMap<string, RollbackAuthorityTypeDeclaration>,
+	visiting: ReadonlySet<string> = new Set<string>()
+): boolean {
+	if (ts.isParenthesizedTypeNode(node)) {
+		return typeProvidesRollbackAuthority(node.type, declarations, visiting);
+	}
+	if (ts.isUnionTypeNode(node)) {
+		return (
+			node.types.length > 0 && node.types.every((type) => typeProvidesRollbackAuthority(type, declarations, visiting))
+		);
+	}
+	if (ts.isIntersectionTypeNode(node)) {
+		return node.types.some((type) => typeProvidesRollbackAuthority(type, declarations, visiting));
+	}
+	if (ts.isTypeLiteralNode(node)) {
+		return membersProvideRollbackAuthority(node.members, declarations, visiting);
+	}
+	if (!ts.isTypeReferenceNode(node)) return false;
+
+	const name = entityNameText(node.typeName);
+	if (name === "OperationJournal") return true;
+	if (visiting.has(name)) return false;
+	const declaration = declarations.get(name);
+	if (!declaration) return false;
+
+	const nextVisiting = new Set(visiting);
+	nextVisiting.add(name);
+	if (ts.isTypeAliasDeclaration(declaration)) {
+		return typeProvidesRollbackAuthority(declaration.type, declarations, nextVisiting);
+	}
+	if (membersProvideRollbackAuthority(declaration.members, declarations, nextVisiting)) return true;
+	return (
+		declaration.heritageClauses?.some((clause) =>
+			clause.types.some((heritageType) =>
+				typeProvidesRollbackAuthority(
+					ts.factory.createTypeReferenceNode(heritageType.expression.getText(), heritageType.typeArguments),
+					declarations,
+					nextVisiting
+				)
+			)
+		) ?? false
+	);
+}
+
+function ownsSynchronousRollbackAuthority(declaration: ts.FunctionDeclaration | ts.MethodDeclaration): boolean {
+	if (!declaration.body || hasModifier(declaration, ts.SyntaxKind.AsyncKeyword)) return false;
+	const journalClosures = new Map<string, Set<"commit" | "rollback">>();
+	let containsAwait = false;
+	const inspect = (node: ts.Node): void => {
+		if (node !== declaration.body && ts.isFunctionLike(node)) return;
+		if (ts.isAwaitExpression(node)) containsAwait = true;
+		if (
+			ts.isVariableDeclaration(node) &&
+			ts.isIdentifier(node.name) &&
+			node.initializer &&
+			ts.isNewExpression(node.initializer) &&
+			ts.isIdentifier(node.initializer.expression) &&
+			node.initializer.expression.text === "UndoJournal"
+		) {
+			journalClosures.set(node.name.text, new Set());
+		}
+		if (
+			ts.isCallExpression(node) &&
+			ts.isPropertyAccessExpression(node.expression) &&
+			ts.isIdentifier(node.expression.expression) &&
+			(node.expression.name.text === "commit" || node.expression.name.text === "rollback")
+		) {
+			journalClosures.get(node.expression.expression.text)?.add(node.expression.name.text as "commit" | "rollback");
+		}
+		ts.forEachChild(node, inspect);
+	};
+	inspect(declaration.body);
+	return (
+		!containsAwait &&
+		[...journalClosures.values()].some((closures) => closures.has("commit") && closures.has("rollback"))
+	);
+}
+
 function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<string, MutationHelperFacts> {
 	const helpers = new Map<string, MutationHelperFacts>();
-	const sharedPrimitiveCalls = new Set([
-		"addVertex",
-		"advanceCheckpointIfNeeded",
-		"deleteACLState",
-		"deleteDRPState",
-		"defineProperty",
-		"deleteProperty",
-		"initializeState",
-		"prune",
-		"replaceEnumerableState",
-		"setACLState",
-		"setDRPState",
-	]);
-	const sharedContainerMutators = new Set(["delete", "pop", "push", "set", "shift", "splice"]);
+	const rollbackAuthorityTypes = new Map<string, RollbackAuthorityTypeDeclaration>();
+	const collectRollbackAuthorityTypes = (node: ts.Node): void => {
+		if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+			rollbackAuthorityTypes.set(typeDeclarationName(node), node);
+		}
+		ts.forEachChild(node, collectRollbackAuthorityTypes);
+	};
+	collectRollbackAuthorityTypes(input);
+
+	const declaredHelpers = new Set<string>();
+	for (const statement of input.statements) {
+		if (ts.isFunctionDeclaration(statement)) {
+			const name = declarationName(statement);
+			if (name) declaredHelpers.add(name);
+		}
+		if (ts.isClassDeclaration(statement) && statement.name?.text === "DRPVertexApplier") {
+			for (const member of statement.members) {
+				if (!ts.isMethodDeclaration(member)) continue;
+				const name = declarationName(member);
+				if (name) declaredHelpers.add(name);
+			}
+		}
+	}
+
+	const canonicalStateRoots = new Set(["checkpoints", "finalityStore", "hashGraph", "states"]);
+	const mutationVerb =
+		/^(?:add|advance|assign|clear|delete|initialize|insert|pop|prune|push|remove|replace|restore|set|shift|splice|unshift|update)/;
 	const postCommitBookkeepingCalls = new Set(["enqueueNotification", "rememberInvalidVertexHash"]);
+	const thisOwnedRoot = (node: ts.Expression): string | undefined => {
+		let current = node;
+		while (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+			const propertyName = ts.isPropertyAccessExpression(current)
+				? current.name.text
+				: ts.isStringLiteral(current.argumentExpression)
+					? current.argumentExpression.text
+					: undefined;
+			if (isThisExpression(current.expression)) return propertyName;
+			current = current.expression;
+		}
+		return undefined;
+	};
 	const isPostCommitBookkeepingMutation = (node: ts.CallExpression): boolean => {
 		const call = calledName(node);
 		if (call && postCommitBookkeepingCalls.has(call)) return true;
@@ -455,19 +600,23 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 			["knownInvalidVertexHashes", "notificationQueue"].includes(receiver.name.text)
 		);
 	};
-	const isSharedContainerMutation = (node: ts.CallExpression): boolean => {
-		if (!ts.isPropertyAccessExpression(node.expression) || !sharedContainerMutators.has(node.expression.name.text)) {
+	const isDirectCanonicalMutation = (node: ts.CallExpression): boolean => {
+		const call = calledName(node);
+		if (!call || !mutationVerb.test(call)) return false;
+		if (ts.isIdentifier(node.expression)) return !declaredHelpers.has(call);
+		if (!ts.isPropertyAccessExpression(node.expression) && !ts.isElementAccessExpression(node.expression)) {
 			return false;
 		}
 		const receiver = node.expression.expression;
-		return (
-			ts.isPropertyAccessExpression(receiver) &&
-			((isThisExpression(receiver.expression) &&
-				["checkpoints", "finalityStore", "hashGraph", "states"].includes(receiver.name.text)) ||
-				(ts.isPropertyAccessExpression(receiver.expression) &&
-					isThisExpression(receiver.expression.expression) &&
-					["finalityStore", "hashGraph", "states"].includes(receiver.expression.name.text)))
-		);
+		if (
+			ts.isIdentifier(receiver) &&
+			receiver.text === "Reflect" &&
+			["defineProperty", "deleteProperty", "set"].includes(call)
+		) {
+			return true;
+		}
+		const root = thisOwnedRoot(receiver);
+		return root !== undefined && canonicalStateRoots.has(root);
 	};
 
 	const collect = (declaration: ts.FunctionDeclaration | ts.MethodDeclaration): void => {
@@ -481,13 +630,17 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 		const optionalJournalParameters = declaration.parameters
 			.filter((parameter) => isJournalName(parameter.name) && parameterIsOptional(parameter))
 			.map((parameter) => parameter.name.getText(input));
+		const hasMandatoryRollbackAuthority = declaration.parameters.some(
+			(parameter) =>
+				!parameterIsOptional(parameter) &&
+				parameter.type !== undefined &&
+				typeProvidesRollbackAuthority(parameter.type, rollbackAuthorityTypes)
+		);
 		const inspect = (node: ts.Node): void => {
 			if (ts.isCallExpression(node)) {
 				const call = calledName(node);
 				if (call) calls.add(call);
-				if ((call && sharedPrimitiveCalls.has(call)) || isSharedContainerMutation(node)) {
-					directSharedMutation = true;
-				}
+				if (isDirectCanonicalMutation(node)) directSharedMutation = true;
 				if (isPostCommitBookkeepingMutation(node)) directPostCommitBookkeeping = true;
 			}
 			if (isOptionalJournalAccess(node)) optionalJournalAccesses.push(node.getText(input));
@@ -515,8 +668,10 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 			calls,
 			directPostCommitBookkeeping,
 			directSharedMutation,
+			hasMandatoryRollbackAuthority,
 			journalGuards,
 			name,
+			ownsSynchronousRollbackAuthority: ownsSynchronousRollbackAuthority(declaration),
 			optionalJournalAccesses,
 			optionalJournalParameters,
 		});
@@ -549,7 +704,10 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 
 function mandatoryRollbackAuthorityViolations(input: ts.SourceFile = sourceFile): RollbackAuthorityViolation[] {
 	return [...collectMutationHelperFacts(input).values()]
-		.filter(({ optionalJournalParameters }) => optionalJournalParameters.length > 0)
+		.filter(
+			({ directSharedMutation, hasMandatoryRollbackAuthority, ownsSynchronousRollbackAuthority }) =>
+				directSharedMutation && !hasMandatoryRollbackAuthority && !ownsSynchronousRollbackAuthority
+		)
 		.map(({ name }) => ({ name, reason: "missing mandatory rollback authority" as const }))
 		.sort((left, right) => left.name.localeCompare(right.name));
 }
@@ -593,19 +751,20 @@ describe("Phase 0q-a structural commit gate", () => {
 			"synthetic-mandatory-rollback-authority.ts",
 			`
 				interface OperationJournal {
-					commit(): void;
-					rollback(): void;
+					record(undo: () => void): void;
 				}
 				interface JournaledOperation {
 					journal: OperationJournal;
 				}
 				interface CommitOperation extends JournaledOperation {}
+				interface Transaction {
+					commit(): void;
+					rollback(): void;
+				}
 				class UndoJournal implements OperationJournal {
+					record(_undo: () => void): void {}
 					commit(): void {}
 					rollback(): void {}
-				}
-				function missingAuthority(): void {
-					setACLState();
 				}
 				function optionalAuthority(journal?: OperationJournal): void {
 					setACLState();
@@ -619,10 +778,19 @@ describe("Phase 0q-a structural commit gate", () => {
 				function requiredCommitOperation(_operation: CommitOperation): void {
 					setACLState();
 				}
+				function updateState(_journal: OperationJournal): void {
+					setACLState();
+				}
 				function transitiveCaller(): void {
-					requiredJournal({} as OperationJournal);
+					updateState({} as OperationJournal);
+				}
+				function unrelatedTransaction(_transaction: Transaction): void {
+					setACLState();
 				}
 				class DRPVertexApplier {
+					private missingAuthority(): void {
+						this.states["setACLState"]();
+					}
 					private synchronousJournalOwner(): void {
 						const journal = new UndoJournal();
 						try {
@@ -634,6 +802,14 @@ describe("Phase 0q-a structural commit gate", () => {
 							journal.rollback();
 							throw error;
 						}
+					}
+					private deferredJournalOwner(): void {
+						const journal = new UndoJournal();
+						setACLState();
+						void Promise.resolve().then(
+							() => journal.commit(),
+							() => journal.rollback()
+						);
 					}
 					private postCommitBookkeeping(): void {
 						this.knownInvalidVertexHashes.delete("committed");
@@ -647,19 +823,32 @@ describe("Phase 0q-a structural commit gate", () => {
 		expect(
 			{
 				postCommitBookkeepingIsAuthoritative: helpers.has("postCommitBookkeeping"),
+				requiredCommitOperationHasAuthority: helpers.get("requiredCommitOperation")?.hasMandatoryRollbackAuthority,
+				requiredJournalHasAuthority: helpers.get("requiredJournal")?.hasMandatoryRollbackAuthority,
+				requiredJournaledOperationHasAuthority:
+					helpers.get("requiredJournaledOperation")?.hasMandatoryRollbackAuthority,
 				synchronousOwnerBookkeepingClassified: helpers.get("synchronousJournalOwner")?.directPostCommitBookkeeping,
+				synchronousOwnerOwnsAuthority: helpers.get("synchronousJournalOwner")?.ownsSynchronousRollbackAuthority,
+				transitiveCallerIsDirect: helpers.get("transitiveCaller")?.directSharedMutation,
 			},
 			"known-invalid and notification bookkeeping are post-commit effects, not authoritative canonical state"
 		).toEqual({
 			postCommitBookkeepingIsAuthoritative: false,
+			requiredCommitOperationHasAuthority: true,
+			requiredJournalHasAuthority: true,
+			requiredJournaledOperationHasAuthority: true,
 			synchronousOwnerBookkeepingClassified: true,
+			synchronousOwnerOwnsAuthority: true,
+			transitiveCallerIsDirect: false,
 		});
 		expect(
 			mandatoryRollbackAuthorityViolations(control),
 			"every direct authoritative mutator needs a required OperationJournal or journal-bearing operation, unless it synchronously owns construction, commit and rollback"
 		).toEqual([
+			{ name: "deferredJournalOwner", reason: "missing mandatory rollback authority" },
 			{ name: "missingAuthority", reason: "missing mandatory rollback authority" },
 			{ name: "optionalAuthority", reason: "missing mandatory rollback authority" },
+			{ name: "unrelatedTransaction", reason: "missing mandatory rollback authority" },
 		]);
 	});
 
