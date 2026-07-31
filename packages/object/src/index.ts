@@ -6,6 +6,7 @@ import {
 	type DRPObjectCallback,
 	type DRPObjectOptions,
 	type DRPState,
+	DRPStateOtherTheWire,
 	type Hash,
 	type IACL,
 	type IDRP,
@@ -14,6 +15,8 @@ import {
 	type MergeResult,
 	type Vertex,
 } from "@ts-drp/types";
+import { serializeDRPState } from "@ts-drp/utils/serialization";
+import { cloneDeep } from "es-toolkit";
 
 import { createPermissionlessACL } from "./acl/index.js";
 import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js";
@@ -188,7 +191,28 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @returns The ACL and DRP states of the vertex.
 	 */
 	getStates(vertexHash: string): [DRPState | undefined, DRPState | undefined] {
-		return [this._states.getACLState(vertexHash), this._states.getDRPState(vertexHash)];
+		const aclState = this._states.getACLState(vertexHash);
+		const drpState = this._states.getDRPState(vertexHash);
+		return [
+			aclState === undefined ? undefined : cloneDeep(aclState),
+			drpState === undefined ? undefined : cloneDeep(drpState),
+		];
+	}
+
+	/**
+	 * Gets an ACL-first pair of stored snapshot bytes without exposing internal values.
+	 * @param vertexHash - The hash of the vertex.
+	 * @returns Detached encoded snapshots, preserving explicit absence.
+	 */
+	getSerializedStates(
+		vertexHash: string
+	): readonly [aclState: Uint8Array | undefined, drpState: Uint8Array | undefined] {
+		const aclState = this._states.getACLState(vertexHash);
+		const drpState = this._states.getDRPState(vertexHash);
+		return [
+			aclState === undefined ? undefined : DRPStateOtherTheWire.encode(serializeDRPState(aclState)).finish(),
+			drpState === undefined ? undefined : DRPStateOtherTheWire.encode(serializeDRPState(drpState)).finish(),
+		];
 	}
 
 	/**
@@ -202,7 +226,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			// and is never adopted from the network or overwritten after creation.
 			throw new RootACLMutationError("Refusing to overwrite the root ACL state: genesis is derived from the object id");
 		}
-		this._states.setACLState(vertexHash, aclState);
+		this._states.setACLState(vertexHash, cloneDeep(aclState));
 	}
 
 	/**
@@ -211,7 +235,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @param drpState - The DRP state of the vertex.
 	 */
 	setDRPState(vertexHash: string, drpState: DRPState): void {
-		this._states.setDRPState(vertexHash, drpState);
+		this._states.setDRPState(vertexHash, cloneDeep(drpState));
 	}
 
 	/**

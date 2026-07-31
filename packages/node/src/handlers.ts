@@ -10,6 +10,7 @@ import {
 	type ApplyResult,
 	Attestation,
 	AttestationUpdate,
+	DRPStateOtherTheWire,
 	FetchState,
 	FetchStateResponse,
 	type IDRP,
@@ -24,7 +25,6 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { isPromise } from "@ts-drp/utils";
-import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { MessageSchema } from "@ts-drp/validation/message";
 
 import { type DRPNode } from "./index.js";
@@ -188,13 +188,13 @@ function fetchStateHandler({ node, message }: HandleParams): ReturnType<IHandler
 		return;
 	}
 
-	const [aclState, drpState] = drpObject.getStates(fetchState.vertexHash);
+	const [aclState, drpState] = drpObject.getSerializedStates(fetchState.vertexHash);
 	const response = FetchStateResponse.create({
 		vertexHash: fetchState.vertexHash,
 		// Preserve an explicit protobuf miss for pruned/nonexistent snapshots.
 		// Serializing undefined would manufacture a present-but-empty state.
-		aclState: aclState === undefined ? undefined : serializeDRPState(aclState),
-		drpState: drpState === undefined ? undefined : serializeDRPState(drpState),
+		aclState: aclState === undefined ? undefined : DRPStateOtherTheWire.decode(aclState),
+		drpState: drpState === undefined ? undefined : DRPStateOtherTheWire.decode(drpState),
 	});
 
 	const messageFetchStateResponse = Message.create({

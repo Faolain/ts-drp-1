@@ -2,6 +2,8 @@ import { Logger } from "@ts-drp/logger";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type ApplyResult,
+	DRPState,
+	DRPStateEntry,
 	DrpType,
 	type FinalityConfig,
 	type Hash,
@@ -20,6 +22,7 @@ import {
 	validateVertex,
 } from "@ts-drp/validation";
 import { cloneDeep } from "es-toolkit";
+import { deepEqual } from "fast-equals";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
 import { AdoptionCommitExhaustedError, ApplyInvariantError } from "./errors.js";
@@ -287,6 +290,7 @@ interface DRPVertexApplierBase<T extends IDRP> {
 	logConfig?: LoggerOptions;
 	finalityConfig?: FinalityConfig;
 	notify(origin: string, vertices: Vertex[]): void;
+	publicationObserver?(event: PublicationObserverEvent): unknown;
 }
 
 interface DRPVertexApplierOptions<T extends IDRP>
@@ -294,6 +298,48 @@ interface DRPVertexApplierOptions<T extends IDRP>
 	states?: DRPObjectStateManager<T>;
 	finalityStore?: FinalityStore;
 	notify?(origin: string, vertices: Vertex[]): void;
+}
+
+type SnapshotSide = "acl" | "drp";
+type PublicationFallbackReason =
+	| "non-empty-suffix"
+	| "conflict-replay"
+	| "concurrent-tail"
+	| "multi-head-local"
+	| "multi-frontier-checkpoint";
+
+interface PublicationCopyMetadata {
+	publicationId: string;
+	side: SnapshotSide;
+	key: string;
+	image: "pre" | "post";
+}
+
+interface PublicationRecord {
+	publicationId: string;
+	kind: "vertex" | "checkpoint";
+	mode: "incremental" | "fallback";
+	outcome: "published" | "rolled-back";
+	targetHash?: Hash;
+	baselineHashes: readonly Hash[];
+	frontier: readonly Hash[];
+	changed: Readonly<Record<SnapshotSide, readonly string[]>>;
+	fallbackReason?: PublicationFallbackReason;
+}
+
+type PublicationObserverEvent =
+	| { type: "copy"; value: unknown; metadata: PublicationCopyMetadata }
+	| { type: "publication"; record: PublicationRecord };
+
+interface PublicationPlan {
+	mode: "incremental" | "fallback";
+	baselineHashes: Hash[];
+	fallbackReason?: PublicationFallbackReason;
+}
+
+interface PublicationOverride {
+	baseline: DRPState;
+	instance: IDRP;
 }
 /**
  * Applies vertices to the hash graph
@@ -315,6 +361,8 @@ export class DRPVertexApplier<T extends IDRP> {
 	private readonly checkpointSuffixSize = checkpointSuffixSizeFromEnvironment();
 	private readonly notificationQueue: { origin: string; vertices: Vertex[] }[] = [];
 	private isDrainingNotifications = false;
+	private readonly publicationObserver?: (event: PublicationObserverEvent) => unknown;
+	private publicationSequence = 0;
 
 	/**
 	 * Creates a new DRPVertexApplier
@@ -326,13 +374,24 @@ export class DRPVertexApplier<T extends IDRP> {
 	 * @param options.finalityStore - The finality store
 	 * @param options.notify - The notify function
 	 * @param options.logConfig - The log config
+	 * @param options.publicationObserver - Optional deterministic publication-work observer
 	 */
-	constructor({ drp, acl, hashGraph, states, finalityStore, notify, logConfig }: DRPVertexApplierBase<T>) {
+	constructor({
+		drp,
+		acl,
+		hashGraph,
+		states,
+		finalityStore,
+		notify,
+		logConfig,
+		publicationObserver,
+	}: DRPVertexApplierBase<T>) {
 		this.hashGraph = hashGraph;
 		this.states = states;
 		this.finalityStore = finalityStore;
 		this._notify = notify;
 		this.log = new Logger("drp::object::operation", logConfig);
+		this.publicationObserver = publicationObserver;
 		const [drpState, aclState] = [states.getDRPState(HashGraph.rootHash), states.getACLState(HashGraph.rootHash)];
 		if (!drpState || !aclState) throw new Error("Root state snapshots are missing");
 		this.checkpoints = [
@@ -841,20 +900,23 @@ export class DRPVertexApplier<T extends IDRP> {
 		});
 		if (this.hashGraph.vertices.has(operation.vertex.hash)) return complete("duplicate");
 		const expectedFrontier = adoption.expectedFrontier;
-		if (!sameHashes(this.hashGraph.getFrontier(), expectedFrontier)) return complete("retry");
+		const publicationFrontier = this.hashGraph.getFrontier();
+		if (!sameHashes(publicationFrontier, expectedFrontier)) return complete("retry");
 
 		// This journal is born, used, and closed in one synchronous section after
 		// the vertex's final await. No rollback authority crosses a suspension.
 		const journal = new UndoJournal();
 		const commitOperation: CommitOperation<T> = { ...operation, journal };
+		const publicationAttempts: PublicationRecord[] = [];
 		try {
-			this.assignState(commitOperation);
+			this.assignState(commitOperation, adoption, publicationAttempts, publicationFrontier);
 			this.initializeFinalityStore(commitOperation);
 			this.addVertexToHashGraph(commitOperation);
 			if (adoption.acl) replaceEnumerableState(this.acl, adoption.acl, journal);
 			if (adoption.drp && this.drp) replaceEnumerableState(this.drp, adoption.drp, journal);
-			this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint);
+			this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint, publicationAttempts);
 			journal.commit();
+			this.reportPublications(publicationAttempts, "published");
 			this.knownInvalidVertexHashes.delete(operation.vertex.hash);
 			this.enqueueNotification(operation.isLocal ? "callFn" : "merge", [operation.vertex]);
 			return complete("committed");
@@ -862,11 +924,13 @@ export class DRPVertexApplier<T extends IDRP> {
 			try {
 				journal.rollback();
 			} catch (rollbackError) {
+				this.reportPublications(publicationAttempts, "rolled-back");
 				throw new ApplyInvariantError(
 					[error, rollbackError],
 					"Vertex commit failed and its synchronous rollback was incomplete"
 				);
 			}
+			this.reportPublications(publicationAttempts, "rolled-back");
 			throw error;
 		}
 	}
@@ -1107,7 +1171,11 @@ export class DRPVertexApplier<T extends IDRP> {
 		return [...children, pendingVertex.hash];
 	}
 
-	private advanceCheckpointIfNeeded(journal: OperationJournal, force = false): void {
+	private advanceCheckpointIfNeeded(
+		journal: OperationJournal,
+		force = false,
+		publicationAttempts: PublicationRecord[] = []
+	): void {
 		const latest = this.checkpoints[this.checkpoints.length - 1];
 		if (!force && this.hashGraph.vertices.size - latest.vertexCount < this.checkpointSuffixSize) return;
 		if (latest.vertexCount === this.hashGraph.vertices.size) {
@@ -1119,14 +1187,36 @@ export class DRPVertexApplier<T extends IDRP> {
 		}
 
 		const frontier = this.hashGraph.getFrontier();
+		const frontierHead = frontier[0];
+		const frontierACLState = frontierHead === undefined ? undefined : this.states.getACLState(frontierHead);
+		const frontierDRPState = frontierHead === undefined ? undefined : this.states.getDRPState(frontierHead);
+		const plan: PublicationPlan =
+			frontier.length === 1 && frontierACLState !== undefined && frontierDRPState !== undefined
+				? { mode: "incremental", baselineHashes: [...frontier] }
+				: {
+						mode: "fallback",
+						baselineHashes: [...frontier],
+						fallbackReason: "multi-frontier-checkpoint",
+					};
+		const publication = this.beginPublication("checkpoint", plan, undefined, frontier);
+		publicationAttempts.push(publication);
+		let checkpointState: ReplayState;
+		if (plan.mode === "incremental" && frontierACLState !== undefined && frontierDRPState !== undefined) {
+			checkpointState = {
+				aclState: frontierACLState,
+				drpState: frontierDRPState,
+			};
+		} else {
+			checkpointState = {
+				aclState: this.capturePublishedState("acl", this.acl, undefined, publication, false),
+				drpState: this.capturePublishedState("drp", this.drp, undefined, publication, false),
+			};
+		}
 		const checkpoint: LinearizationCheckpoint = {
 			frontier,
 			origin: [...frontier].sort()[0],
 			vertexCount: this.hashGraph.vertices.size,
-			state: {
-				drpState: stateFromDRP(this.drp),
-				aclState: stateFromDRP(this.acl),
-			},
+			state: checkpointState,
 		};
 		this.checkpoints.push(checkpoint);
 		journal.record(() => {
@@ -1201,7 +1291,12 @@ export class DRPVertexApplier<T extends IDRP> {
 			callDRP(tracked.proxy, peerId, opType, value),
 			(result): HandlerReturn<PostOperation<T>> => ({
 				stop: false,
-				result: { ...drpOperation, result, stateChanged: tracked.hasChanges() },
+				result: {
+					...drpOperation,
+					result,
+					stateChanged: tracked.hasChanges(),
+					mutatedKeys: [...tracked.changedKeys()],
+				},
 			})
 		);
 	}
@@ -1211,7 +1306,20 @@ export class DRPVertexApplier<T extends IDRP> {
 		return { stop: operation.stateChanged !== true, result: operation };
 	}
 
-	private assignState(operation: JournaledOperation<T>): void {
+	private assignState(
+		operation: JournaledOperation<T>,
+		adoption: PreparedAdoption<T> = operation.isACL
+			? {
+					expectedFrontier: operation.vertex.dependencies,
+					acl: operation.currentDRP as IACL | undefined,
+				}
+			: {
+					expectedFrontier: operation.vertex.dependencies,
+					drp: operation.currentDRP as T | undefined,
+				},
+		publicationAttempts: PublicationRecord[] = [],
+		publicationFrontier: Hash[] = this.hashGraph.getFrontier()
+	): void {
 		const {
 			isACL,
 			currentDRP,
@@ -1221,9 +1329,38 @@ export class DRPVertexApplier<T extends IDRP> {
 			vertex: { hash },
 		} = operation;
 
-		const [aclState, drpState] = isACL
-			? [stateFromDRP(currentDRP), stateFromDRP(drp)]
-			: [stateFromDRP(acl), stateFromDRP(currentDRP)];
+		const targetACL = adoption.acl ?? (isACL ? (currentDRP as IACL | undefined) : acl);
+		const targetDRP = adoption.drp ?? (isACL ? drp : (currentDRP as T | undefined));
+		const plan = this.vertexPublicationPlan(operation, publicationFrontier);
+		const baselineHash = plan.mode === "incremental" ? plan.baselineHashes[0] : undefined;
+		const publication = this.beginPublication("vertex", plan, hash, publicationFrontier);
+		publicationAttempts.push(publication);
+		const dependencyHash = operation.vertex.dependencies.length === 1 ? operation.vertex.dependencies[0] : undefined;
+		const concurrentOverride = plan.fallbackReason === "concurrent-tail" && dependencyHash !== undefined;
+		const dependencyACLState = dependencyHash === undefined ? undefined : this.states.getACLState(dependencyHash);
+		const dependencyDRPState = dependencyHash === undefined ? undefined : this.states.getDRPState(dependencyHash);
+		const aclState = this.capturePublishedState(
+			"acl",
+			targetACL,
+			baselineHash === undefined ? undefined : this.states.getACLState(baselineHash),
+			publication,
+			plan.mode === "incremental",
+			plan.mode === "incremental" ? new Set(isACL ? operation.mutatedKeys : []) : undefined,
+			concurrentOverride && isACL && currentDRP && dependencyACLState
+				? { instance: currentDRP, baseline: dependencyACLState }
+				: undefined
+		);
+		const drpState = this.capturePublishedState(
+			"drp",
+			targetDRP,
+			baselineHash === undefined ? undefined : this.states.getDRPState(baselineHash),
+			publication,
+			plan.mode === "incremental",
+			plan.mode === "incremental" ? new Set(isACL ? [] : operation.mutatedKeys) : undefined,
+			concurrentOverride && !isACL && currentDRP && dependencyDRPState
+				? { instance: currentDRP, baseline: dependencyDRPState }
+				: undefined
+		);
 
 		const previousACLState = this.states.getACLState(hash);
 		this.states.setACLState(hash, aclState);
@@ -1240,6 +1377,150 @@ export class DRPVertexApplier<T extends IDRP> {
 			if (previousDRPState) this.states.setDRPState(hash, previousDRPState);
 			else this.states.deleteDRPState(hash, drpState);
 		});
+	}
+
+	private vertexPublicationPlan(operation: JournaledOperation<T>, frontier: Hash[]): PublicationPlan {
+		if (operation.isLocal) {
+			if (
+				frontier.length === 1 &&
+				this.states.getACLState(frontier[0]) !== undefined &&
+				this.states.getDRPState(frontier[0]) !== undefined
+			) {
+				return { mode: "incremental", baselineHashes: [...frontier] };
+			}
+			return { mode: "fallback", baselineHashes: [...frontier], fallbackReason: "multi-head-local" };
+		}
+
+		const dependency = operation.vertex.dependencies.length === 1 ? operation.vertex.dependencies[0] : undefined;
+		const hasEmptySuffix =
+			operation.vertex.dependencies.length === 1 &&
+			operation.drpVertices.length === 0 &&
+			operation.aclVertices.length === 0;
+		const exactFrontier = dependency !== undefined && sameHashes(frontier, [dependency]);
+		if (
+			hasEmptySuffix &&
+			exactFrontier &&
+			this.states.getACLState(dependency) !== undefined &&
+			this.states.getDRPState(dependency) !== undefined
+		) {
+			return { mode: "incremental", baselineHashes: [dependency] };
+		}
+
+		const conflictReplay =
+			!exactFrontier && (this.hashGraph as HashGraph).hasCustomConflictResolver(operation.vertex.operation?.drpType);
+		return {
+			mode: "fallback",
+			baselineHashes: [...frontier],
+			fallbackReason: conflictReplay ? "conflict-replay" : hasEmptySuffix ? "concurrent-tail" : "non-empty-suffix",
+		};
+	}
+
+	private beginPublication(
+		kind: "vertex" | "checkpoint",
+		plan: PublicationPlan,
+		targetHash: Hash | undefined,
+		frontier: readonly Hash[]
+	): PublicationRecord {
+		return {
+			publicationId: `${kind}-${++this.publicationSequence}`,
+			kind,
+			mode: plan.mode,
+			outcome: "published",
+			targetHash,
+			baselineHashes: [...plan.baselineHashes],
+			frontier: [...frontier],
+			changed: { acl: [], drp: [] },
+			fallbackReason: plan.fallbackReason,
+		};
+	}
+
+	private capturePublishedState(
+		side: SnapshotSide,
+		instance: IDRP | undefined,
+		baseline: DRPState | undefined,
+		publication: PublicationRecord,
+		incremental: boolean,
+		candidateKeys?: ReadonlySet<string>,
+		override?: PublicationOverride
+	): DRPState {
+		const baselineByKey = new Map(baseline?.state.map((entry) => [entry.key, entry]) ?? []);
+		const targetKeys = new Set<string>();
+		const values = new Map<string, unknown>();
+		if (instance) {
+			for (const key of Object.keys(instance)) {
+				if (key === "context" || typeof instance[key] === "function") continue;
+				targetKeys.add(key);
+				values.set(key, instance[key]);
+			}
+		}
+		if (override) {
+			const overrideKeys = new Set<string>();
+			const overrideBaseline = new Map(override.baseline.state.map((entry) => [entry.key, entry.value]));
+			for (const key of Object.keys(override.instance)) {
+				if (key === "context" || typeof override.instance[key] === "function") continue;
+				overrideKeys.add(key);
+				const value = override.instance[key];
+				if (!overrideBaseline.has(key) || !deepEqual(overrideBaseline.get(key), value)) {
+					targetKeys.add(key);
+					values.set(key, value);
+				}
+			}
+			for (const key of overrideBaseline.keys()) {
+				if (!overrideKeys.has(key)) {
+					targetKeys.delete(key);
+					values.delete(key);
+				}
+			}
+		}
+		const entries: DRPState["state"] = [];
+		const changed = publication.changed[side] as string[];
+		if (instance || override) {
+			for (const key of targetKeys) {
+				const value = values.get(key);
+				const ownedEntry = baselineByKey.get(key);
+				if (
+					incremental &&
+					ownedEntry !== undefined &&
+					(candidateKeys === undefined || !candidateKeys.has(key) || deepEqual(ownedEntry.value, value))
+				) {
+					entries.push(ownedEntry);
+					continue;
+				}
+				changed.push(key);
+				entries.push(
+					DRPStateEntry.create({
+						key,
+						value: this.copyPublicationPayload(value, {
+							publicationId: publication.publicationId,
+							side,
+							key,
+							image: "post",
+						}),
+					})
+				);
+			}
+		}
+		if (incremental) {
+			for (const key of baselineByKey.keys()) {
+				if (!targetKeys.has(key)) changed.push(key);
+			}
+		}
+		changed.sort();
+		const snapshot = DRPState.create();
+		snapshot.state.push(...entries);
+		return snapshot;
+	}
+
+	private copyPublicationPayload(value: unknown, metadata: PublicationCopyMetadata): unknown {
+		if (this.publicationObserver) return this.publicationObserver({ type: "copy", value, metadata });
+		return cloneDeep(value);
+	}
+
+	private reportPublications(publications: readonly PublicationRecord[], outcome: PublicationRecord["outcome"]): void {
+		if (!this.publicationObserver) return;
+		for (const publication of publications) {
+			this.publicationObserver({ type: "publication", record: { ...publication, outcome } });
+		}
 	}
 
 	private addVertexToHashGraph(operation: JournaledOperation<T>): void {

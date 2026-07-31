@@ -82,6 +82,15 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	getStates(vertexHash: string): [DRPState | undefined, DRPState | undefined];
 
 	/**
+	 * Get the stored ACL and DRP snapshots as detached wire bytes.
+	 * @param vertexHash - The hash of the vertex to get the state for.
+	 * @returns ACL-first encoded snapshots, with explicit absence for a missing or pruned cut.
+	 */
+	getSerializedStates(
+		vertexHash: string
+	): readonly [aclState: Uint8Array | undefined, drpState: Uint8Array | undefined];
+
+	/**
 	 * Set the acl state for a given vertex hash.
 	 * @param vertexHash - The hash of the vertex to set the state for.
 	 * @param aclState - The acl state to set for the given vertex hash.

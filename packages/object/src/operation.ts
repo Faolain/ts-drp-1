@@ -52,6 +52,8 @@ export interface PostSplitOperation extends PostLCAOperation {
 export interface Operation<T extends IDRP> extends PostSplitOperation {
 	acl: IACL;
 	drp?: T;
+	/** Top-level snapshot keys observed as mutated by this operation. */
+	mutatedKeys?: readonly string[];
 
 	/**
 	 * Detached state used to stage the current operation before it is committed.
