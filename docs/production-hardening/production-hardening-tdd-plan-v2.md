@@ -13506,69 +13506,144 @@ is transitively blocked on it. D.73 remains unchanged: the hostile graph-side
 virtual-`Map.keys()` exploit is real, unresolved and a hard Phase-3a pre-live
 binder requirement.
 
+### D.86 — Phase 1a sync responder hash-index acceptance
+
+Phase 1a is accepted at code/test checkpoint
+`d099eb5db88a91b7cc9276c75946826f00d17fcf`.
+
+The authenticated linear TDD lineage is
+`c80c6f0 → abfaf10 → f9836e7 → 1bd65b5 → d099eb5`: original RED
+`abfaf10` and corrective RED `1bd65b5` change only
+`packages/node/tests/sync-perf-contract.test.ts`; initial GREEN `f9836e7`
+and corrective GREEN `d099eb5` change only
+`packages/node/src/handlers.ts`. The corrective test blob
+`11065f415e9f092d89f616a2a1b4da590821242b` is byte-identical across the
+corrective handoff, the plan blob
+`1de974f44c141e5875dcde567cf22f47b6b4b65e` is unchanged through all
+five checkpoints, and the accepted handler blob is
+`23390d576d33d1f7a219d6405517719b8122f14e`.
+
+D.85's statement that the materialization counter rules out building a
+fresh index inside the per-hash loop is superseded **as a causal explanation
+only**; the historical D.85 record remains intact. Capturing one materialized
+array and rebuilding from it keeps getter materializations constant while
+remaining O(V·H). The explicit temporary rebuild-inside-every-hash mutant
+demonstrated this and was killed only by the corrective per-vertex
+`Vertex.hash` accounting: `[513, 2049, 4097]` local hash reads for incoming
+counts `[1, 4, 8]` at `V = 512`.
+
+The accepted causal gates therefore retain
+`probesPerIncomingHash === 1` at 10k/50k/100k and getter-materialization
+constancy in H, and add local-inventory hash reads bounded at `V + 1` and
+invariant in H. The extra read is the first `getAttestations` hash access before
+the fixture's deliberate sentinel throw. That exact allowance is
+fixture-timing-derived: re-derive it rather than loosening it if the
+attestation path changes.
+
+The initial GREEN captured `object.vertices` before
+`await signGeneratedVertices`, but legacy behavior read inventory after that
+await and local authoring may append while signing is suspended. Corrective RED
+`1bd65b5` drove the real exported handler, suspended signing, grew the same
+object mid-await and pinned exact `SyncAccept` bytes, `requested` Set
+membership/order and `requesting` order. It failed exactly one of five rows on
+the initial GREEN; a literal legacy post-await control passed. Corrective GREEN
+`d099eb5` signs the initial getter materialization and takes one inventory
+snapshot after the await. Its single reverse-filled Map remains outside the
+incoming-hash loop and preserves legacy `Array.find` first-match behavior.
+
+One real measurement limitation is accepted rather than hidden. Production
+could cache primitive `[hash, vertex]` entries once and rebuild
+`new Map(cachedEntries)` inside every incoming-hash iteration. That stays
+O(V·H) while satisfying the observable getter, vertex-hash-read and per-hash
+probe bounds. Once production owns private primitive copies, closing that hole
+would require either a wall-clock causal gate or implementation-shaped
+instrumentation such as counting `Map.prototype.set`; both violate this plan's
+test constraints. The accepted gates cover the natural regression surfaces
+and the shipped five-line construction is directly auditable. The reverse-fill
+intent is correct but undocumented; add a one-line explanatory comment on the
+next handler touch. No separate duplicate-hash test is required:
+`HashGraph.vertices` is keyed by hash and real inventory cannot contain two
+entries with the same hash.
+
+Evidence: focused 5/5; explicit rebuild mutant killed and restored candidate
+passes; sync preservation 16/16; handler/node/finality preservation 31/31;
+node and workspace typecheck exit 0; tracked lint 0 errors (698 inherited
+warnings, and 230 on the comparable tracked-TypeScript run); Prettier,
+frozen-blob and scope audits pass; XVER is not triggered; inherited
+`sync-livelock` remains exactly 3 failed / 3 passed at all four checkpoints and
+on independent review reruns.
+
+The corrected review quorum is:
+
+- Codex-high corrective RED owner
+  `/root/phase_1a_corrective_red_codex_high`, retained at
+  `.logs/phase-1a-corrective-red-codex-high/plan-correction-result.md`:
+  `PLAN_CORRECTION_AGREE`;
+- Grok 4.5/high session
+  `019fb8bb-f754-71a0-a05c-e0bfffd272a8`:
+  `PASS_WITH_NOTES`, no further RED, `PLAN_CORRECTION_AGREE`;
+- exact Kimi 3/high/100 session
+  `session_5f5c1af3-f0b1-48ef-a85a-37a1ea17d098`:
+  `PASS`, no further RED, `PLAN_CORRECTION_AGREE`;
+- Opus/xhigh session
+  `06209fd4-5759-48c6-a79d-e819c5cfd866`:
+  `PASS_WITH_NOTES`, no further RED, `PLAN_CORRECTION_AGREE`. Every
+  substantive assistant record in the initial and resumed exactness transcript
+  is `claude-opus-5`; the initial result envelope's small Haiku usage entry has
+  no Haiku assistant record and is non-substantive bridge metadata.
+
+Scope remains exact. `syncAcceptHandlerUntraced` still has its accept-side
+linear lookup and belongs to Phase 1b. Phase 1n, optional Phase 0n and XVER
+surfaces are untouched. Phase 0n remains optional, post-golden-path and blocked
+behind D.52.4's unrun forward-plane correction quorum. D.73 is unchanged: the
+hostile graph-side virtual-`Map.keys()` exploit remains real, unresolved and a
+hard Phase-3a pre-live-binder requirement.
+
 ## Next Agent Prompt
 
-Every required Phase-0 item is complete at code/test checkpoint `d4b2508` and
-the acceptance-ledger checkpoint following D.85. Phase 0n remains open,
-optional and post-golden-path, and is blocked behind D.52.4's unrun
-forward-plane correction quorum — do not schedule it here. Begin **Phase 1a —
-sync responder hash indexing**, the first item in the plan's measured wall
-order. Start with a fresh Codex-high RED owner that may change tests only.
+Begin **Phase 1b — O(1) applied-vertex index** from accepted Phase 1a
+checkpoint `d099eb5` plus this D.86 acceptance-ledger commit. Start with a
+fresh Codex-high RED owner that may change tests only and must commit a genuine
+RED before a distinct fresh Codex-high GREEN owner receives byte-identical
+tests.
 
-Drive the real `syncHandler` path with a net-new
-`sync-perf-contract.test.ts`. Prove the responder does not perform a linear
-`vertices.find` for each incoming hash: define a probe as one candidate-vertex
-hash comparison, and separately count local-hash materializations
-(`DRPObject.vertices` / `HashGraph.getAllVertices`) per sync request. Require
-`probesPerIncomingHash === 1` and a materialization count that is constant in
-the incoming-hash count, at 10k/50k/100k local sizes. Both counters must be
-asserted. Under this definition the per-hash counter does fail at RED, because
-each `find()` compares against up to every local vertex. What it does not close
-is the reward-hack: an implementation that builds a fresh index inside the
-per-hash loop performs one comparison per incoming hash while still touching
-every local vertex per hash, so it satisfies `probesPerIncomingHash === 1` and
-stays O(V²). The materialization counter is what rules that out — note the
-responder reaches the getter at three sites on this path — once at
-`handlers.ts:372` for `signGeneratedVertices`, once at `handlers.ts:374` for
-`requested`, then once per incoming hash at `handlers.ts:377` — so the RED
-baseline is two plus one per incoming hash, and GREEN must be constant in the
-incoming-hash count. `signGeneratedVertices` receives an already-materialized
-`Vertex[]` and never re-reads the getter, so it contributes exactly one. Build
-the fixture so its per-vertex guard short-circuits — every local vertex either
-foreign-authored or already signed — because it otherwise awaits one
-`signWithSecp256k1` per self-authored unsigned vertex, an O(V) secp burst that
-would stall the 100k row and create pressure to mock the responder that the
-counter rules forbid. Do not restate the probe as a `find()` invocation count:
-the linear responder already performs exactly one `find()` per incoming hash,
-so that reading would make the RED unable to fail. Model the counter on
-`packages/object/tests/perf-contracts.test.ts:15-28`, but note that pattern
-mocks a module boundary while 1a's seam is a class getter; an equivalent
-instrumented seam is permitted provided the counter stays causal and is not
-satisfied by mocking the responder itself. Keep wall-clock measurements as
-diagnostic evidence only; they may not be the causal gate. Freeze and commit
-the genuine RED before handing byte-identical tests to a distinct fresh
-Codex-high GREEN owner.
+Re-derive the row from current code rather than trusting drifted line numbers.
+At this checkpoint `updateHandlerUntraced` materializes every vertex to rebuild
+`presentHashes` after each merge (`packages/node/src/handlers.ts:299-300`),
+while `syncAcceptHandlerUntraced` re-materializes and linearly scans inventory
+for each requested hash (`:484-489`). The public object interface currently
+exposes `vertices` but no `hasVertex(hash)`, and its deprecated
+`merge(vertices)` currently returns `MergeResult =
+[merged, missing, invalid]`, not an applied-vertex list. The RED owner must
+audit that mismatch against the Phase 1b row before prescribing a production
+shape. Tests may express the observable O(1) contract and preserved handler
+semantics, but must not silently change the row's API/return-shape assumption.
+If a plan correction is needed, stop before GREEN and obtain the required
+Codex-high + exact Kimi-3/high/100 + Opus-xhigh agreement before editing it.
 
-GREEN may only replace the responder's getter-re-materialized linear lookup
-with one request-local `Set`/`Map` built from the local hashes. Preserve wire
-bytes, response ordering, missing-hash semantics, auth/admission behavior and
-all public APIs. Do not absorb Phase 1b's applied-vertex index, Phase 1n's
-heads-exchange protocol, Phase 3a's D.73 binder, or optional Phase 0n. The slice
-table's line references have drifted: re-derive them. The responder's linear
-lookup is now `handlers.ts:377` inside `syncHandler` (362), re-materializing the
-`packages/object/src/index.ts:163` getter on every iteration. The second
-`vertices.find` at `handlers.ts:479` is inside `syncAcceptHandlerUntraced` and
-belongs to Phase 1b — do not touch it. Preserve the existing
-`requested: Set<Vertex>` semantics and the `requesting` array's contents and
-order.
+Drive the real exported `handleMessage` paths. At minimum, prove the update path
+does not call `DRPObject.vertices`/`HashGraph.getAllVertices` merely to decide
+which authenticated vertices are present after merge, and prove accept-side
+lookup work is O(V + H), not O(V·H), while pinning exact response bytes,
+request order/duplicates, signing/finality behavior, event dispatch, missing
+recovery and public API compatibility. Prefer deterministic causal counters;
+wall-clock ratios remain diagnostic only. Reuse Phase 1a instrumentation where
+it is causal, carry D.86's cached-private-entry limitation without adding an
+implementation-shaped `Map.prototype.set` gate, and add the one-line
+reverse-fill first-match comment when GREEN next touches that handler.
 
-Run the focused test, sync/node preservation suites, package/workspace
-typecheck, tracked zero-error lint, Prettier/diff/scope and any plan-triggered
-XVER gate to `.log` files at both RED and GREEN checkpoints. Then run the
+Do not absorb Phase 1n heads exchange, Phase 3a's D.73 binder, optional Phase
+0n, or unrelated finality/auth/resource work. Preserve the inherited
+`sync-livelock` 3-fail/3-pass baseline unless this slice causally owns one of
+those failures; any unexplained movement is a regression signal.
+
+Run focused RED/GREEN, relevant object/types/node preservation, package and
+workspace typecheck, tracked zero-error lint, Prettier/diff/scope and any
+plan-triggered XVER gate to `.log` files at both checkpoints. Then run the
 per-item Grok-high, exact
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus/xhigh
-review loop. Treat large-size runs as targeted contract/performance gates, not
-part of every fast unit-test loop.
+review loop. Keep large performance rows targeted rather than in every fast
+unit-test loop.
 
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
