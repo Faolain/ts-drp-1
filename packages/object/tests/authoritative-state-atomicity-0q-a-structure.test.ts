@@ -23,11 +23,17 @@ interface JournalLifetime {
 
 interface MutationHelperFacts {
 	readonly calls: Set<string>;
+	readonly directPostCommitBookkeeping: boolean;
 	readonly directSharedMutation: boolean;
 	readonly journalGuards: readonly string[];
 	readonly optionalJournalAccesses: readonly string[];
 	readonly optionalJournalParameters: readonly string[];
 	readonly name: string;
+}
+
+interface RollbackAuthorityViolation {
+	readonly name: string;
+	readonly reason: "missing mandatory rollback authority";
 }
 
 const sourcePath = new URL("../src/drp-applier.ts", import.meta.url);
@@ -437,6 +443,18 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 		"setDRPState",
 	]);
 	const sharedContainerMutators = new Set(["delete", "pop", "push", "set", "shift", "splice"]);
+	const postCommitBookkeepingCalls = new Set(["enqueueNotification", "rememberInvalidVertexHash"]);
+	const isPostCommitBookkeepingMutation = (node: ts.CallExpression): boolean => {
+		const call = calledName(node);
+		if (call && postCommitBookkeepingCalls.has(call)) return true;
+		if (!ts.isPropertyAccessExpression(node.expression)) return false;
+		const receiver = node.expression.expression;
+		return (
+			ts.isPropertyAccessExpression(receiver) &&
+			isThisExpression(receiver.expression) &&
+			["knownInvalidVertexHashes", "notificationQueue"].includes(receiver.name.text)
+		);
+	};
 	const isSharedContainerMutation = (node: ts.CallExpression): boolean => {
 		if (!ts.isPropertyAccessExpression(node.expression) || !sharedContainerMutators.has(node.expression.name.text)) {
 			return false;
@@ -445,9 +463,7 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 		return (
 			ts.isPropertyAccessExpression(receiver) &&
 			((isThisExpression(receiver.expression) &&
-				["checkpoints", "finalityStore", "hashGraph", "knownInvalidVertexHashes", "states"].includes(
-					receiver.name.text
-				)) ||
+				["checkpoints", "finalityStore", "hashGraph", "states"].includes(receiver.name.text)) ||
 				(ts.isPropertyAccessExpression(receiver.expression) &&
 					isThisExpression(receiver.expression.expression) &&
 					["finalityStore", "hashGraph", "states"].includes(receiver.expression.name.text)))
@@ -458,6 +474,7 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 		const name = declarationName(declaration);
 		if (!name || !declaration.body) return;
 		const calls = new Set<string>();
+		let directPostCommitBookkeeping = false;
 		let directSharedMutation = false;
 		const journalGuards: string[] = [];
 		const optionalJournalAccesses: string[] = [];
@@ -471,6 +488,7 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 				if ((call && sharedPrimitiveCalls.has(call)) || isSharedContainerMutation(node)) {
 					directSharedMutation = true;
 				}
+				if (isPostCommitBookkeepingMutation(node)) directPostCommitBookkeeping = true;
 			}
 			if (isOptionalJournalAccess(node)) optionalJournalAccesses.push(node.getText(input));
 			if (ts.isIfStatement(node) && isJournalGuardExpression(node.expression)) {
@@ -495,6 +513,7 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 		inspect(declaration.body);
 		helpers.set(name, {
 			calls,
+			directPostCommitBookkeeping,
 			directSharedMutation,
 			journalGuards,
 			name,
@@ -528,6 +547,13 @@ function collectMutationHelperFacts(input: ts.SourceFile = sourceFile): Map<stri
 	return authoritative;
 }
 
+function mandatoryRollbackAuthorityViolations(input: ts.SourceFile = sourceFile): RollbackAuthorityViolation[] {
+	return [...collectMutationHelperFacts(input).values()]
+		.filter(({ optionalJournalParameters }) => optionalJournalParameters.length > 0)
+		.map(({ name }) => ({ name, reason: "missing mandatory rollback authority" as const }))
+		.sort((left, right) => left.name.localeCompare(right.name));
+}
+
 describe("Phase 0q-a structural commit gate", () => {
 	it("registers every private pass-through HandlerReturn-shaped stage in a production pipeline", () => {
 		const handlers = productionPipelineHandlers();
@@ -557,11 +583,84 @@ describe("Phase 0q-a structural commit gate", () => {
 		);
 
 		expect(
-			helpers
-				.filter(({ optionalJournalParameters }) => optionalJournalParameters.length > 0)
-				.map(({ name, optionalJournalParameters }) => ({ name, optionalJournalParameters })),
+			mandatoryRollbackAuthorityViolations(),
 			"authoritative mutation helpers must not make rollback authority optional, undefined or defaultable"
 		).toEqual([]);
+	});
+
+	it("reports direct canonical mutation without mandatory rollback authority", () => {
+		const control = parseSource(
+			"synthetic-mandatory-rollback-authority.ts",
+			`
+				interface OperationJournal {
+					commit(): void;
+					rollback(): void;
+				}
+				interface JournaledOperation {
+					journal: OperationJournal;
+				}
+				interface CommitOperation extends JournaledOperation {}
+				class UndoJournal implements OperationJournal {
+					commit(): void {}
+					rollback(): void {}
+				}
+				function missingAuthority(): void {
+					setACLState();
+				}
+				function optionalAuthority(journal?: OperationJournal): void {
+					setACLState();
+				}
+				function requiredJournal(_journal: OperationJournal): void {
+					setACLState();
+				}
+				function requiredJournaledOperation(_operation: JournaledOperation): void {
+					setACLState();
+				}
+				function requiredCommitOperation(_operation: CommitOperation): void {
+					setACLState();
+				}
+				function transitiveCaller(): void {
+					requiredJournal({} as OperationJournal);
+				}
+				class DRPVertexApplier {
+					private synchronousJournalOwner(): void {
+						const journal = new UndoJournal();
+						try {
+							setACLState();
+							journal.commit();
+							this.knownInvalidVertexHashes.delete("committed");
+							this.notificationQueue.push("committed");
+						} catch (error) {
+							journal.rollback();
+							throw error;
+						}
+					}
+					private postCommitBookkeeping(): void {
+						this.knownInvalidVertexHashes.delete("committed");
+						this.notificationQueue.push("committed");
+					}
+				}
+			`
+		);
+		const helpers = collectMutationHelperFacts(control);
+
+		expect(
+			{
+				postCommitBookkeepingIsAuthoritative: helpers.has("postCommitBookkeeping"),
+				synchronousOwnerBookkeepingClassified: helpers.get("synchronousJournalOwner")?.directPostCommitBookkeeping,
+			},
+			"known-invalid and notification bookkeeping are post-commit effects, not authoritative canonical state"
+		).toEqual({
+			postCommitBookkeepingIsAuthoritative: false,
+			synchronousOwnerBookkeepingClassified: true,
+		});
+		expect(
+			mandatoryRollbackAuthorityViolations(control),
+			"every direct authoritative mutator needs a required OperationJournal or journal-bearing operation, unless it synchronously owns construction, commit and rollback"
+		).toEqual([
+			{ name: "missingAuthority", reason: "missing mandatory rollback authority" },
+			{ name: "optionalAuthority", reason: "missing mandatory rollback authority" },
+		]);
 	});
 
 	it("does not optionally record rollback for authoritative mutations", () => {
