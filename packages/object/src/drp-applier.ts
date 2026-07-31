@@ -14,6 +14,7 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { handlePromiseOrValue, processSequentially } from "@ts-drp/utils";
+import { serializedValuesEqual } from "@ts-drp/utils/serialization";
 import {
 	InvalidDependenciesError,
 	InvalidHashError,
@@ -41,7 +42,7 @@ import {
 import { createPipeline, type Pipeline } from "./pipeline/pipeline.js";
 import { type HandlerReturn } from "./pipeline/types.js";
 import { DRPProxy, type DRPProxyChainArgs, LocalMutationLane, trackMutations } from "./proxy.js";
-import { DRPObjectStateManager, stateFromDRP } from "./state.js";
+import { DRPObjectStateManager, REPLICA_LOCAL_STATE_KEYS, stateFromDRP } from "./state.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
@@ -193,6 +194,27 @@ function descriptorsEqual(left: PropertyDescriptor | undefined, right: PropertyD
 		return "value" in left && "value" in right && Object.is(left.value, right.value);
 	}
 	return left.get === right.get && left.set === right.set;
+}
+
+function effectiveStateKeys(baseline: DRPState, target: DRPState): string[] {
+	const baselineByKey = new Map(baseline.state.map((entry) => [entry.key, entry.value]));
+	const targetByKey = new Map(target.state.map((entry) => [entry.key, entry.value]));
+	const changed: string[] = [];
+	for (const key of new Set([...baselineByKey.keys(), ...targetByKey.keys()])) {
+		const baselinePresent = baselineByKey.has(key);
+		const targetPresent = targetByKey.has(key);
+		const baselineValue = baselineByKey.get(key);
+		const targetValue = targetByKey.get(key);
+		if (
+			baselinePresent === targetPresent &&
+			deepEqual(baselineValue, targetValue) &&
+			serializedValuesEqual(baselineValue, targetValue)
+		) {
+			continue;
+		}
+		changed.push(key);
+	}
+	return changed.sort();
 }
 
 function captureBatchVertexOperation(submittedVertex: Vertex): BatchVertexPreflight {
@@ -1026,17 +1048,33 @@ export class DRPVertexApplier<T extends IDRP> {
 			isLocal,
 			replayState,
 		} = operation;
-		const [drp, acl] = isLocal
-			? this.states.fromStates(stateFromDRP(this.drp), stateFromDRP(this.acl), this.drp?.context, this.acl.context)
-			: replayState
-				? this.states.fromStates(replayState.drpState, replayState.aclState, this.drp?.context, this.acl.context)
-				: this.states.fromHash(lca, drpVertices.length + aclVertices.length, this.drp?.context, this.acl.context);
+		let pair: [T | undefined, IACL];
+		let ambientMutatedKeys: Operation<T>["ambientMutatedKeys"];
+		if (isLocal) {
+			const capturedDRPState = stateFromDRP(this.drp);
+			const capturedACLState = stateFromDRP(this.acl);
+			const baselineHash = operation.vertex.dependencies.length === 1 ? operation.vertex.dependencies[0] : undefined;
+			const baselineDRPState = baselineHash === undefined ? undefined : this.states.getDRPState(baselineHash);
+			const baselineACLState = baselineHash === undefined ? undefined : this.states.getACLState(baselineHash);
+			if (baselineDRPState && baselineACLState) {
+				ambientMutatedKeys = {
+					drp: effectiveStateKeys(baselineDRPState, capturedDRPState),
+					acl: effectiveStateKeys(baselineACLState, capturedACLState),
+				};
+			}
+			pair = this.states.fromStates(capturedDRPState, capturedACLState, this.drp?.context, this.acl.context);
+		} else if (replayState) {
+			pair = this.states.fromStates(replayState.drpState, replayState.aclState, this.drp?.context, this.acl.context);
+		} else {
+			pair = this.states.fromHash(lca, drpVertices.length + aclVertices.length, this.drp?.context, this.acl.context);
+		}
+		const [drp, acl] = pair;
 		applyDeterministicReplayVertices(acl, aclVertices);
 
 		if (!drp) {
 			return {
 				stop: false,
-				result: { ...operation, acl, currentDRP: isACL ? acl : undefined },
+				result: { ...operation, acl, ambientMutatedKeys, currentDRP: isACL ? acl : undefined },
 			};
 		}
 
@@ -1048,6 +1086,7 @@ export class DRPVertexApplier<T extends IDRP> {
 					...operation,
 					drp,
 					acl,
+					ambientMutatedKeys,
 					// Reconstructed replay instances are already detached from live
 					// state and snapshots, so they are safe mutation staging areas.
 					currentDRP: isACL ? acl : drp,
@@ -1339,13 +1378,21 @@ export class DRPVertexApplier<T extends IDRP> {
 		const concurrentOverride = plan.fallbackReason === "concurrent-tail" && dependencyHash !== undefined;
 		const dependencyACLState = dependencyHash === undefined ? undefined : this.states.getACLState(dependencyHash);
 		const dependencyDRPState = dependencyHash === undefined ? undefined : this.states.getDRPState(dependencyHash);
+		const aclCandidateKeys = new Set([
+			...(operation.ambientMutatedKeys?.acl ?? []),
+			...(isACL ? (operation.mutatedKeys ?? []) : []),
+		]);
+		const drpCandidateKeys = new Set([
+			...(operation.ambientMutatedKeys?.drp ?? []),
+			...(isACL ? [] : (operation.mutatedKeys ?? [])),
+		]);
 		const aclState = this.capturePublishedState(
 			"acl",
 			targetACL,
 			baselineHash === undefined ? undefined : this.states.getACLState(baselineHash),
 			publication,
 			plan.mode === "incremental",
-			plan.mode === "incremental" ? new Set(isACL ? operation.mutatedKeys : []) : undefined,
+			plan.mode === "incremental" ? aclCandidateKeys : undefined,
 			concurrentOverride && isACL && currentDRP && dependencyACLState
 				? { instance: currentDRP, baseline: dependencyACLState }
 				: undefined
@@ -1356,7 +1403,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			baselineHash === undefined ? undefined : this.states.getDRPState(baselineHash),
 			publication,
 			plan.mode === "incremental",
-			plan.mode === "incremental" ? new Set(isACL ? [] : operation.mutatedKeys) : undefined,
+			plan.mode === "incremental" ? drpCandidateKeys : undefined,
 			concurrentOverride && !isACL && currentDRP && dependencyDRPState
 				? { instance: currentDRP, baseline: dependencyDRPState }
 				: undefined
@@ -1448,7 +1495,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		const values = new Map<string, unknown>();
 		if (instance) {
 			for (const key of Object.keys(instance)) {
-				if (key === "context" || typeof instance[key] === "function") continue;
+				if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof instance[key] === "function") continue;
 				targetKeys.add(key);
 				values.set(key, instance[key]);
 			}
@@ -1457,10 +1504,14 @@ export class DRPVertexApplier<T extends IDRP> {
 			const overrideKeys = new Set<string>();
 			const overrideBaseline = new Map(override.baseline.state.map((entry) => [entry.key, entry.value]));
 			for (const key of Object.keys(override.instance)) {
-				if (key === "context" || typeof override.instance[key] === "function") continue;
+				if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof override.instance[key] === "function") continue;
 				overrideKeys.add(key);
 				const value = override.instance[key];
-				if (!overrideBaseline.has(key) || !deepEqual(overrideBaseline.get(key), value)) {
+				if (
+					!overrideBaseline.has(key) ||
+					!deepEqual(overrideBaseline.get(key), value) ||
+					!serializedValuesEqual(overrideBaseline.get(key), value)
+				) {
 					targetKeys.add(key);
 					values.set(key, value);
 				}
@@ -1481,7 +1532,9 @@ export class DRPVertexApplier<T extends IDRP> {
 				if (
 					incremental &&
 					ownedEntry !== undefined &&
-					(candidateKeys === undefined || !candidateKeys.has(key) || deepEqual(ownedEntry.value, value))
+					(candidateKeys === undefined ||
+						!candidateKeys.has(key) ||
+						(deepEqual(ownedEntry.value, value) && serializedValuesEqual(ownedEntry.value, value)))
 				) {
 					entries.push(ownedEntry);
 					continue;

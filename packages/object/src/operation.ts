@@ -54,6 +54,8 @@ export interface Operation<T extends IDRP> extends PostSplitOperation {
 	drp?: T;
 	/** Top-level snapshot keys observed as mutated by this operation. */
 	mutatedKeys?: readonly string[];
+	/** Effective live-state deltas found during the existing local capture. */
+	ambientMutatedKeys?: Readonly<{ acl: readonly string[]; drp: readonly string[] }>;
 
 	/**
 	 * Detached state used to stage the current operation before it is committed.

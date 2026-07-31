@@ -63,6 +63,19 @@ export function serializeValue(obj: unknown): Uint8Array {
 }
 
 /**
+ * Compare the exact bytes emitted by the value codec.
+ * @param left - First value
+ * @param right - Second value
+ * @returns Whether both values have byte-identical serialized forms
+ */
+export function serializedValuesEqual(left: unknown, right: unknown): boolean {
+	const leftBytes = serializeValue(left);
+	const rightBytes = serializeValue(right);
+	if (leftBytes.byteLength !== rightBytes.byteLength) return false;
+	return leftBytes.every((byte, index) => byte === rightBytes[index]);
+}
+
+/**
  * Main entry point for deserialization.
  * Converts a Uint8Array back into the original value structure.
  * @param value - The value to deserialize
