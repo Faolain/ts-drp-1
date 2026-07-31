@@ -505,7 +505,8 @@ describe("DRPVertexApplier", () => {
 					signature: new Uint8Array([1, 2, 3]),
 				});
 
-				const result = applier["assignState"]({
+				const journal = { record: vi.fn() };
+				applier["assignState"]({
 					vertex,
 					isACL: false,
 					currentDRP: mockDRP,
@@ -514,9 +515,12 @@ describe("DRPVertexApplier", () => {
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
 
-				expect(result.stop).toBe(false);
+				expect(mockStates.getACLState(vertex.hash)).toBeDefined();
+				expect(mockStates.getDRPState(vertex.hash)).toBeDefined();
+				expect(journal.record).toHaveBeenCalledTimes(2);
 			});
 		});
 
@@ -535,17 +539,19 @@ describe("DRPVertexApplier", () => {
 					signature: new Uint8Array([1, 2, 3]),
 				});
 
-				const result = applier["addVertexToHashGraph"]({
+				const journal = { record: vi.fn() };
+				applier["addVertexToHashGraph"]({
 					vertex,
 					isACL: false,
 					acl: mockACL,
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
 
-				expect(result.stop).toBe(false);
 				expect(mockHashGraph.vertices.has(vertex.hash)).toBe(true);
+				expect(journal.record).toHaveBeenCalledOnce();
 			});
 		});
 
@@ -568,7 +574,8 @@ describe("DRPVertexApplier", () => {
 				finalitySigners.set("signer1", "signer1");
 				vi.spyOn(mockACL, "query_getFinalitySigners").mockReturnValue(finalitySigners);
 
-				const result = applier["initializeFinalityStore"]({
+				const journal = { record: vi.fn() };
+				applier["initializeFinalityStore"]({
 					vertex,
 					isACL: false,
 					acl: mockACL,
@@ -576,9 +583,11 @@ describe("DRPVertexApplier", () => {
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
 
-				expect(result.stop).toBe(false);
+				expect(applier["finalityStore"].states.has(vertex.hash)).toBe(true);
+				expect(journal.record).toHaveBeenCalledOnce();
 			});
 
 			it("should initialize finality store with LCA operation", () => {
@@ -594,7 +603,8 @@ describe("DRPVertexApplier", () => {
 				finalitySigners.set("signer2", "signer2");
 				vi.spyOn(mockACL2, "query_getFinalitySigners").mockReturnValue(finalitySigners);
 
-				const result = applier["initializeFinalityStore"]({
+				const journal = { record: vi.fn() };
+				applier["initializeFinalityStore"]({
 					vertex,
 					isACL: true,
 					acl: mockACL,
@@ -602,14 +612,13 @@ describe("DRPVertexApplier", () => {
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
-				console.log(result.result);
-
-				expect(result.stop).toBe(false);
 
 				applier["finalityStore"].states.get(hash)?.signerCredentials.forEach((signer) => {
 					expect(signer).toBe("signer2");
 				});
+				expect(journal.record).toHaveBeenCalledOnce();
 			});
 		});
 	});

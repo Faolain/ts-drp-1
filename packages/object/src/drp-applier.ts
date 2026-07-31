@@ -162,7 +162,13 @@ interface ApplyCallContext {
 	hint?: AdoptionHint<IDRP>;
 }
 
-interface CommitOperation<T extends IDRP> extends PostOperation<T> {
+type JournaledOperation<T extends IDRP, Op extends Operation<T> = Operation<T>> = Op & {
+	journal: OperationJournal;
+};
+
+type CommitOperation<T extends IDRP> = JournaledOperation<T, PostOperation<T>>;
+
+interface CommitResult<T extends IDRP> extends PostOperation<T> {
 	commitOutcome: "committed" | "duplicate" | "retry";
 }
 
@@ -218,9 +224,8 @@ function recordPropertyMutation<T extends object>(
 	target: T,
 	key: string,
 	previous: PropertyDescriptor | undefined,
-	journal?: OperationJournal
+	journal: OperationJournal
 ): void {
-	if (!journal) return;
 	const applied = Reflect.getOwnPropertyDescriptor(target, key);
 	journal.record(() => {
 		if (!descriptorsEqual(Reflect.getOwnPropertyDescriptor(target, key), applied)) return;
@@ -229,7 +234,7 @@ function recordPropertyMutation<T extends object>(
 	});
 }
 
-function replaceEnumerableState<T extends object>(target: T, source: T, journal?: OperationJournal): void {
+function replaceEnumerableState<T extends object>(target: T, source: T, journal: OperationJournal): void {
 	const targetRecord = target as Record<string, unknown>;
 	const sourceRecord = source as Record<string, unknown>;
 	for (const key of Object.keys(target)) {
@@ -818,7 +823,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	private commitPreparedState(
 		operation: PostOperation<T>,
 		preparedAdoption?: PreparedAdoption<T>
-	): HandlerReturn<CommitOperation<T>> {
+	): HandlerReturn<CommitResult<T>> {
 		const adoption =
 			preparedAdoption ??
 			(operation.isACL
@@ -830,7 +835,7 @@ export class DRPVertexApplier<T extends IDRP> {
 						expectedFrontier: operation.vertex.dependencies,
 						drp: operation.currentDRP as T | undefined,
 					});
-		const complete = (commitOutcome: "committed" | "duplicate" | "retry"): HandlerReturn<CommitOperation<T>> => ({
+		const complete = (commitOutcome: "committed" | "duplicate" | "retry"): HandlerReturn<CommitResult<T>> => ({
 			stop: commitOutcome !== "committed",
 			result: {
 				...operation,
@@ -844,7 +849,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		// This journal is born, used, and closed in one synchronous section after
 		// the vertex's final await. No rollback authority crosses a suspension.
 		const journal = new UndoJournal();
-		const commitOperation = { ...operation, journal };
+		const commitOperation: CommitOperation<T> = { ...operation, journal };
 		try {
 			this.assignState(commitOperation);
 			this.initializeFinalityStore(commitOperation);
@@ -1105,13 +1110,13 @@ export class DRPVertexApplier<T extends IDRP> {
 		return [...children, pendingVertex.hash];
 	}
 
-	private advanceCheckpointIfNeeded(journal?: OperationJournal, force = false): void {
+	private advanceCheckpointIfNeeded(journal: OperationJournal, force = false): void {
 		const latest = this.checkpoints[this.checkpoints.length - 1];
 		if (!force && this.hashGraph.vertices.size - latest.vertexCount < this.checkpointSuffixSize) return;
 		if (latest.vertexCount === this.hashGraph.vertices.size) {
 			if (!force || latest === this.checkpoints[0]) return;
 			this.checkpoints.pop();
-			journal?.record(() => {
+			journal.record(() => {
 				if (!this.checkpoints.includes(latest)) this.checkpoints.push(latest);
 			});
 		}
@@ -1127,7 +1132,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			},
 		};
 		this.checkpoints.push(checkpoint);
-		journal?.record(() => {
+		journal.record(() => {
 			const checkpointIndex = this.checkpoints.findIndex((candidate) => candidate === checkpoint);
 			if (checkpointIndex !== -1) this.checkpoints.splice(checkpointIndex, 1);
 		});
@@ -1138,7 +1143,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			const next = this.checkpoints[2];
 			const removedIndex = this.checkpoints.findIndex((candidate) => candidate === removed);
 			if (removedIndex !== -1) this.checkpoints.splice(removedIndex, 1);
-			journal?.record(() => {
+			journal.record(() => {
 				if (this.checkpoints.some((candidate) => candidate === removed)) return;
 				const nextIndex = this.checkpoints.findIndex((candidate) => candidate === next);
 				if (nextIndex !== -1) {
@@ -1152,7 +1157,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		this.pruneSnapshots(journal);
 	}
 
-	private pruneSnapshots(journal?: OperationJournal): void {
+	private pruneSnapshots(journal: OperationJournal): void {
 		const retained = new Set<Hash>([HashGraph.rootHash]);
 		for (const checkpoint of this.checkpoints) {
 			for (const hash of checkpoint.frontier) retained.add(hash);
@@ -1161,7 +1166,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		const hashes = Array.from(this.hashGraph.vertices.keys());
 		for (let index = latest.vertexCount; index < hashes.length; index++) retained.add(hashes[index]);
 		const pruned = this.states.prune(retained);
-		journal?.record(() => this.states.restorePruned(pruned));
+		journal.record(() => this.states.restorePruned(pruned));
 	}
 
 	private validateWriterPermission(operation: Operation<T>): HandlerReturn<Operation<T>> {
@@ -1209,7 +1214,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		return { stop: operation.stateChanged !== true, result: operation };
 	}
 
-	private assignState<Op extends Operation<T>>(operation: Op): HandlerReturn<Op> {
+	private assignState(operation: JournaledOperation<T>): void {
 		const {
 			isACL,
 			currentDRP,
@@ -1225,7 +1230,7 @@ export class DRPVertexApplier<T extends IDRP> {
 
 		const previousACLState = this.states.getACLState(hash);
 		this.states.setACLState(hash, aclState);
-		journal?.record(() => {
+		journal.record(() => {
 			if (this.states.getACLState(hash) !== aclState) return;
 			if (previousACLState) this.states.setACLState(hash, previousACLState);
 			else this.states.deleteACLState(hash, aclState);
@@ -1233,15 +1238,14 @@ export class DRPVertexApplier<T extends IDRP> {
 
 		const previousDRPState = this.states.getDRPState(hash);
 		this.states.setDRPState(hash, drpState);
-		journal?.record(() => {
+		journal.record(() => {
 			if (this.states.getDRPState(hash) !== drpState) return;
 			if (previousDRPState) this.states.setDRPState(hash, previousDRPState);
 			else this.states.deleteDRPState(hash, drpState);
 		});
-		return { stop: false, result: operation };
 	}
 
-	private addVertexToHashGraph<Op extends Operation<T>>(operation: Op): HandlerReturn<Op> {
+	private addVertexToHashGraph(operation: JournaledOperation<T>): void {
 		const { vertex, journal } = operation;
 		const dependencySet = new Set(vertex.dependencies);
 		const frontierBefore = this.hashGraph.frontier;
@@ -1257,27 +1261,24 @@ export class DRPVertexApplier<T extends IDRP> {
 			});
 		}
 		this.hashGraph.addVertex(vertex);
-		if (!journal) this.knownInvalidVertexHashes.delete(vertex.hash);
-		journal?.record(() => {
+		journal.record(() => {
 			(this.hashGraph as IHashGraph & Pick<HashGraph, "removeVertex">).removeVertex(vertex, frontierRestorePoints);
 		});
-		return { stop: false, result: operation };
 	}
 
-	private initializeFinalityStore<Op extends Operation<T>>(operation: Op): HandlerReturn<Op> {
+	private initializeFinalityStore(operation: JournaledOperation<T>): void {
 		const { vertex, acl, currentDRP, isACL, journal } = operation;
 		const finalitySigners = isACL ? currentDRP?.query_getFinalitySigners() : acl.query_getFinalitySigners();
 		const previous = this.finalityStore.states.get(vertex.hash);
 		this.finalityStore.initializeState(vertex.hash, finalitySigners);
 		const initialized = this.finalityStore.states.get(vertex.hash);
 		if (!previous && initialized) {
-			journal?.record(() => {
+			journal.record(() => {
 				if (this.finalityStore.states.get(vertex.hash) === initialized) {
 					this.finalityStore.states.delete(vertex.hash);
 				}
 			});
 		}
-		return { stop: false, result: operation };
 	}
 
 	private enqueueNotification(origin: string, vertices: Vertex[]): void {
