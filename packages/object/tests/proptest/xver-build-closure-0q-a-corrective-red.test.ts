@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -180,6 +180,59 @@ function revisionClosureViolations(
 	return violations.sort();
 }
 
+function resolveExtendedConfig(configPath: string, extended: string): string {
+	if (!extended.startsWith(".") && !extended.startsWith("/")) {
+		throw new Error(`Unsupported non-relative tsconfig extends ${extended} from ${configPath}`);
+	}
+	const base = resolve(dirname(configPath), extended);
+	const candidates = extname(base) === "" ? [`${base}.json`, join(base, "tsconfig.json")] : [base];
+	const resolved = candidates.find((candidate) => existsSync(candidate));
+	if (!resolved) throw new Error(`Cannot resolve tsconfig extends ${extended} from ${configPath}`);
+	return resolved;
+}
+
+function trackedConfigExtendsChain(initialConfigs: readonly string[]): string[] {
+	const tracked = new Set<string>();
+	const visited = new Set<string>();
+	const pending = [...initialConfigs];
+	while (pending.length > 0) {
+		const configPath = pending.pop();
+		if (!configPath || visited.has(configPath)) continue;
+		visited.add(configPath);
+		const parsed = ts.readConfigFile(configPath, ts.sys.readFile);
+		if (parsed.error) {
+			throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, "\n"));
+		}
+		const repositoryPath = relative(repositoryRoot, configPath);
+		if (
+			spawnSync("git", ["ls-files", "--error-unmatch", "--", repositoryPath], {
+				cwd: repositoryRoot,
+			}).status === 0
+		) {
+			tracked.add(repositoryPath);
+		}
+		const extended = (parsed.config as { extends?: string | string[] }).extends;
+		for (const parent of typeof extended === "string" ? [extended] : (extended ?? [])) {
+			pending.push(resolveExtendedConfig(configPath, parent));
+		}
+	}
+	return [...tracked].sort();
+}
+
+function missingExternalConfigTriggers(
+	configPaths: readonly string[],
+	coveredPackageDirectories: ReadonlySet<string>,
+	triggerPaths: ReadonlySet<string>
+): string[] {
+	return configPaths
+		.filter(
+			(configPath) =>
+				![...coveredPackageDirectories].some((directory) => configPath.startsWith(`${directory}/`)) &&
+				!triggerPaths.has(configPath)
+		)
+		.sort();
+}
+
 describe("Phase 0q-a corrective XVER build-closure RED", () => {
 	it("builds every in-repo runtime dependency before each selected consumer", () => {
 		const byName = workspacePackages();
@@ -205,6 +258,25 @@ describe("Phase 0q-a corrective XVER build-closure RED", () => {
 			.sort();
 
 		expect(missingTriggers, "every clean-build input must trigger the gate").toEqual([]);
+	});
+
+	it("runs XVER when a tracked config in the selected packages' extends chain changes", () => {
+		const closure = runtimeClosure(XVER_RUNTIME_ROOTS, workspacePackages());
+		const configPaths = trackedConfigExtendsChain(
+			[...closure.keys()].map((directory) => resolve(repositoryRoot, directory, "tsconfig.build.json"))
+		);
+		const workflow = parseDocument(readFileSync(workflowPath, "utf8"), { schema: "core" }).toJS() as {
+			on?: { pull_request?: { paths?: string[] } };
+		};
+
+		expect(
+			missingExternalConfigTriggers(
+				configPaths,
+				new Set(closure.keys()),
+				new Set(workflow.on?.pull_request?.paths ?? [])
+			),
+			"tracked compiler configs outside package globs are build inputs and must trigger XVER"
+		).toEqual([]);
 	});
 
 	it("declares every package absent from the pinned reference as narrowly reference-optional", () => {
@@ -270,5 +342,13 @@ describe("Phase 0q-a corrective XVER build-closure RED", () => {
 		expect(
 			revisionClosureViolations(entries, new Set(["packages/base", "packages/new"]), new Set(["packages/base"]))
 		).toEqual([]);
+	});
+
+	it("detects an uncovered external config without overclaiming package-covered configs", () => {
+		const configs = ["packages/object/tsconfig.build.json", "packages/object/tsconfig.json", "tsconfig.json"];
+		const packageDirectories = new Set(["packages/object"]);
+
+		expect(missingExternalConfigTriggers(configs, packageDirectories, new Set())).toEqual(["tsconfig.json"]);
+		expect(missingExternalConfigTriggers(configs, packageDirectories, new Set(["tsconfig.json"]))).toEqual([]);
 	});
 });

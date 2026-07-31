@@ -9,7 +9,7 @@ import {
 } from "@ts-drp/types";
 import { describe, expect, it } from "vitest";
 
-import type { AdoptionCommitExhaustedError } from "../src/errors.js";
+import { AdoptionCommitExhaustedError } from "../src/errors.js";
 import { MAX_ADOPTION_COMMIT_ATTEMPTS, type PostOperation } from "../src/operation.js";
 import { createPipeline } from "../src/pipeline/pipeline.js";
 import { DRPProxy, type DRPProxyChainArgs } from "../src/proxy.js";
@@ -63,7 +63,10 @@ const mockDRP: MockDRP = {
 
 type CommitOutcome = NonNullable<PostOperation<IDRP>["commitOutcome"]>;
 
-function controlledProxy(outcomes: readonly CommitOutcome[]): {
+function controlledProxy(
+	outcomes: readonly CommitOutcome[],
+	asynchronous = false
+): {
 	readonly calls: DRPProxyChainArgs[];
 	readonly proxy: MockDRP;
 } {
@@ -71,7 +74,7 @@ function controlledProxy(outcomes: readonly CommitOutcome[]): {
 	const pipeline = createPipeline<DRPProxyChainArgs, PostOperation<IDRP>>((request) => {
 		calls.push(request);
 		const commitOutcome = outcomes[calls.length - 1] ?? "committed";
-		return {
+		const response = {
 			stop: false,
 			result: {
 				isACL: false,
@@ -86,11 +89,16 @@ function controlledProxy(outcomes: readonly CommitOutcome[]): {
 				commitOutcome,
 			},
 		};
+		return asynchronous ? Promise.resolve(response) : response;
 	});
 	return {
 		calls,
 		proxy: new DRPProxy(mockDRP, pipeline, "drp" as DrpType).proxy,
 	};
+}
+
+function invokeAsync(controlled: ReturnType<typeof controlledProxy>, intent: string): Promise<string> {
+	return controlled.proxy.mutate(intent) as unknown as Promise<string>;
 }
 
 describe("Phase 0q-a corrective local publication outcome RED", () => {
@@ -120,6 +128,41 @@ describe("Phase 0q-a corrective local publication outcome RED", () => {
 				vertexHash: mockVertex.hash,
 			})
 		);
+		expect(controlled.calls).toHaveLength(MAX_ADOPTION_COMMIT_ATTEMPTS);
+	});
+
+	it("treats an async duplicate as terminal", async () => {
+		const controlled = controlledProxy(["duplicate", "committed"], true);
+
+		await expect(invokeAsync(controlled, "async-duplicate")).resolves.toBe("result-1");
+		expect(controlled.calls).toEqual([{ prop: "mutate", args: ["async-duplicate"], type: "drp" }]);
+	});
+
+	it("re-executes the same async intent once after a retry outcome", async () => {
+		const controlled = controlledProxy(["retry", "committed"], true);
+
+		await expect(invokeAsync(controlled, "async-retry")).resolves.toBe("result-2");
+		expect(controlled.calls).toEqual([
+			{ prop: "mutate", args: ["async-retry"], type: "drp" },
+			{ prop: "mutate", args: ["async-retry"], type: "drp" },
+		]);
+	});
+
+	it("stops after exactly three async retry outcomes", async () => {
+		const controlled = controlledProxy(["retry", "retry", "retry", "committed"], true);
+		let error: unknown;
+
+		try {
+			await invokeAsync(controlled, "async-bounded");
+		} catch (caught) {
+			error = caught;
+		}
+
+		expect(error).toBeInstanceOf(AdoptionCommitExhaustedError);
+		expect(error).toMatchObject({
+			attempts: MAX_ADOPTION_COMMIT_ATTEMPTS,
+			vertexHash: mockVertex.hash,
+		});
 		expect(controlled.calls).toHaveLength(MAX_ADOPTION_COMMIT_ATTEMPTS);
 	});
 });
