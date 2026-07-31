@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { handleMessage } from "../src/handlers.js";
 import { DRPNode } from "../src/index.js";
+import { log } from "../src/logger.js";
 
 class CounterDRP implements IDRP {
 	semanticsType: SemanticsType = SemanticsType.pair;
@@ -193,6 +194,7 @@ describe("Phase 0q-b3 rejected-boundary node consumers", () => {
 			const merge = vi.spyOn(object, "merge").mockRejectedValue(primaryError);
 			const recover = vi.spyOn(receiver, "syncObject").mockRejectedValue(recoveryError);
 			const persist = vi.spyOn(receiver, "put");
+			const report = vi.spyOn(log, "error");
 
 			try {
 				const exposedError = await captureError(() => handleMessage(receiver, message));
@@ -211,17 +213,21 @@ describe("Phase 0q-b3 rejected-boundary node consumers", () => {
 					primaryPreserved:
 						exposedError === primaryError || Reflect.get(exposedError as object, "cause") === primaryError,
 					secondaryDidNotReplacePrimary: exposedError !== recoveryError,
+					secondaryReportedExactlyOnce:
+						report.mock.calls.length === 1 && report.mock.calls[0]?.some((argument) => argument === recoveryError),
 				}).toEqual({
 					exactPartialResultConsumed: true,
 					recoveryAttemptedOnce: true,
 					persistenceStillUsedExactObject: true,
 					primaryPreserved: true,
 					secondaryDidNotReplacePrimary: true,
+					secondaryReportedExactlyOnce: true,
 				});
 			} finally {
 				merge.mockRestore();
 				recover.mockRestore();
 				persist.mockRestore();
+				report.mockRestore();
 			}
 		}
 	);
