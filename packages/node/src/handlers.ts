@@ -3,15 +3,18 @@ import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { sha256 } from "@noble/hashes/sha2";
 import { Signature } from "@noble/secp256k1";
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
+import { AdoptionCommitExhaustedError, ApplyInvariantError } from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type AggregatedAttestation,
+	type ApplyResult,
 	Attestation,
 	AttestationUpdate,
 	FetchState,
 	FetchStateResponse,
 	type IDRP,
 	type IDRPObject,
+	type MergeResult,
 	Message,
 	MessageType,
 	NodeEventName,
@@ -99,6 +102,41 @@ async function recoverMissingSync(node: DRPNode, objectId: string, sender: strin
 	episodes.set(key, { retries: retryCount + 1 });
 	syncRecoveryEpisodes.set(node, episodes);
 	await node.syncObject(objectId, sender);
+}
+
+function rejectedBoundaryResult(error: unknown): ApplyResult | undefined {
+	if (error instanceof AdoptionCommitExhaustedError || error instanceof ApplyInvariantError) {
+		return error.partialResult;
+	}
+	return undefined;
+}
+
+async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
+	node: DRPNode,
+	object: IDRPObject<T>,
+	sender: string,
+	vertices: Vertex[]
+): Promise<MergeResult> {
+	try {
+		return await object.merge(vertices);
+	} catch (error) {
+		const partialResult = rejectedBoundaryResult(error);
+		if (partialResult === undefined) throw error;
+
+		if (partialResult.missing.length !== 0) {
+			try {
+				await recoverMissingSync(node, object.id, sender, partialResult.missing);
+			} catch (recoveryError) {
+				log.error("::messageHandler: Rejected-boundary recovery failed", recoveryError);
+			}
+		}
+		try {
+			node.put(object.id, object);
+		} catch (persistenceError) {
+			log.error("::messageHandler: Rejected-boundary persistence failed", persistenceError);
+		}
+		throw error;
+	}
 }
 
 const messageHandlers: Record<MessageType, IHandlerStrategy | undefined> = {
@@ -257,7 +295,7 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 
 	const verifiedVertices = authenticateIncomingVertices(object, updateMessage.vertices);
 
-	const [, missing] = await object.merge(verifiedVertices);
+	const [, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
 	const presentHashes = new Set(object.vertices.map((vertex) => vertex.hash));
 	const appliedVertices = verifiedVertices.filter((vertex) => presentHashes.has(vertex.hash));
 
@@ -406,7 +444,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	const mergeRan = verifiedVertices.length !== 0;
 	let missing: string[] = [];
 	if (mergeRan) {
-		[, missing] = await object.merge(verifiedVertices);
+		[, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
 		object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		node.put(object.id, object);
 		await recoverMissingSync(node, object.id, sender, missing);
