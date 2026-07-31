@@ -13679,62 +13679,147 @@ No Phase 1n, D.73, optional Phase 0n, signing/finality off-switch or unrelated
 getter work is absorbed. D.86's cached-private-entry measurement limitation and
 reverse-fill-comment handoff remain unchanged.
 
+### D.88 — Phase 1b O(1) applied-vertex lookup acceptance
+
+Phase 1b is accepted at implementation checkpoint
+`c84c8b31c7de654f13999bff195c7cab96ec774a`. The governed linear chain is:
+
+- `67afac94e9611441887c5edc372ca75436be647b` — D.87 plan correction;
+- `a570f5ac167d5cd1bf6ce2da882b5789d00a2982` — tests-only RED;
+- `c84c8b31c7de654f13999bff195c7cab96ec774a` — production-only GREEN.
+
+The frozen RED test and plan blobs are
+`a16b1b5c5a880064d6d230fa38daf5fe8a7314a2` and
+`8017ab03af2444414cb84c72a4d8fe8fd7cf9944`. The accepted handler, object
+implementation and object-interface blobs are
+`882fed896980979cd86944d2b1aaf335be6afb65`,
+`0bc7c62b001e1a7bcbd691662385389d549b0cea` and
+`7fd47178b020540bbf937ae5ee788343bcac0231`.
+
+The RED fails exactly two causal rows while four semantic/wire controls pass.
+Its temporary direct-lookup control passes 6/6 and production is restored
+byte-for-byte before the RED commit. GREEN passes 6/6. UPDATE now performs
+direct post-merge stored membership for every verified input without
+materializing inventory. SYNC_ACCEPT retains exactly the two existing
+signing/finality inventory sweeps, performs one direct lookup per requested
+hash and performs zero candidate comparisons. Request order, duplicates,
+absent omission, stored identity, post-signing bytes, authentication,
+known/new/dropped/unsigned behavior, finality, attestations, recovery,
+store/event/broadcast behavior and the no-response path remain pinned.
+
+The accepted production change is limited to required
+`IDRPObject.getVertex(Hash)`, one-line delegation to the existing HashGraph
+index and the two owned handler decisions. `MergeResult`, `ApplyResult`, wire
+schemas, configuration, package versions and lockfiles are unchanged. No
+optional fallback, snapshot-plus-third-Map workaround, Phase 1n work, D.73
+binder work or optional Phase 0n work is included.
+
+The final verification ladder is green:
+
+- focused Phase 1b: 6/6;
+- Phase 1a performance preservation: 5/5;
+- sync preservation: 16/16;
+- handler/node/finality preservation: 31/31;
+- object/HashGraph preservation: 58/58;
+- types, object, node and workspace typechecks;
+- tracked lint with zero errors, Prettier, diff, scope and frozen-blob checks;
+- XVER: 108 comparisons with zero approved deltas at the exact GREEN SHA.
+
+The inherited `sync-livelock` baseline remains exactly three failures and
+three passes with the same failing rows before and after GREEN. It is not a
+Phase 1b regression. A whole-program Fable-high course review separately
+identified that this inherited red baseline has no explicit repair owner or
+expiring risk acceptance. That and its other scheduling/harness/ledger-size
+suggestions are retained under
+`.logs/fable-high-golden-path-course-review-20260730/`; they are not normative
+plan corrections and require the standing Codex-high, exact Kimi 3/high/100
+and Opus/xhigh correction quorum before any owner, ordering or plan-structure
+change.
+
+Fresh final reviews accept the slice:
+
+- Grok 4.5/high session `019fb918-0fd3-7e20-b321-4b5b49824699`,
+  effective `grok-4.5-build`: `PASS_WITH_NOTES`, no corrective RED;
+- exact Kimi 3/high/100 session
+  `session_94b8e57e-4cd6-4cac-a876-3d68e861abf6`:
+  `PASS_WITH_NOTES`, no corrective RED;
+- Opus/xhigh session `bc8ec5da-67be-4693-bd08-0a63fe13c30d`:
+  `PASS_WITH_NOTES`, no corrective RED. All 100 assistant records are
+  `claude-opus-5`; the result envelope's small Haiku usage entry authored no
+  assistant record or review content.
+
+Retained gotchas and forward bindings:
+
+1. Required `IDRPObject.getVertex` is runtime-additive for the sole in-repo
+   implementer but source-breaking for a hypothetical external structural
+   implementer of published `@ts-drp/types`. P1 owns release/version mechanics;
+   do not add an optional fallback or invent absent changeset machinery.
+2. Node typecheck consumes built declarations. Rebuild types and object
+   declarations before an acceptance rerun that depends on the new interface.
+3. The dedicated `DRPObject.getVertex` unit test suggested by Grok/Kimi is
+   optional: real-object preservation reaches the changed path, existing
+   HashGraph tests pin present/absent lookup, and Opus found no causal gap.
+4. D.86's cached-private-entry measurement limitation remains accepted.
+5. The stale untracked protocol-v2 0g2 RED files remain unrelated and must not
+   be staged or allowed into a bare workspace test selection.
+
 ## Next Agent Prompt
 
-Begin **Phase 1b — O(1) applied-vertex lookup** from accepted Phase 1a
-checkpoint `d099eb5`, acceptance-ledger checkpoint `a94a16b` and this D.87
-plan-correction commit. Start with a fresh Codex-high RED owner that may change
-tests only and must commit a genuine RED before a distinct fresh Codex-high
-GREEN owner receives byte-identical tests.
+Begin **Phase 1c — legacy attestation off-switch** from accepted Phase 1b
+checkpoint `c84c8b3` and this D.88 acceptance checkpoint. Start with a fresh
+Codex-high RED owner that may change tests only and must commit a genuine RED
+before a distinct fresh Codex-high GREEN owner receives byte-identical tests.
 
 Re-derive the row from current code rather than trusting drifted line numbers.
-At this checkpoint `updateHandlerUntraced` materializes every vertex to rebuild
-`presentHashes` after each merge (`packages/node/src/handlers.ts:299-300`),
-while `syncAcceptHandlerUntraced` re-materializes and linearly scans inventory
-for each requested hash (`:484-490`). D.87 has resolved the mismatch: required
-`IDRPObject.getVertex(hash): Vertex | undefined`, unchanged merge/apply result
-shapes and no Boolean-only membership method or fallback.
+At this checkpoint UPDATE, SYNC_ACCEPT and local object-update paths call
+`signFinalityVertices`; UPDATE and SYNC_ACCEPT may broadcast
+`ATTESTATION_UPDATE`; received UPDATE/ATTESTATION_UPDATE/SYNC_ACCEPT messages
+may merge or verify legacy attestations; and the applier initializes one
+legacy finality record per applied vertex. `FinalityConfig` currently exposes
+only `finality_threshold`. Stop before RED and invoke the correction quorum if
+one flag cannot coherently define the entire disabled-plane behavior without
+inventing migration, mixed-peer or wire semantics not owned by the row.
 
-Before writing the causal RED, capture the exact pre-change semantic and wire
-baseline. Drive the real exported `handleMessage` paths with a net-new
-`applied-vertex-lookup.test.ts`; do not extend Phase 1a merely because its
-instrumentation is nearby. The instrumented fixture must provide a semantic
-direct lookup so RED fails on production materialization/comparison work, not a
-stub-shape `TypeError`.
+The tests-only RED should create a net-new `attestation-budget.test.ts`, drive
+real exported paths and first pin the enabled default for backwards
+compatibility. With the flag disabled, prove the entire legacy attestation
+plane is off for that room: zero BLS signing and verification, zero
+`ATTESTATION_UPDATE` broadcasts, no inbound attestation mutation and no
+per-vertex finality-state growth caused by normal apply/sync. Preserve vertex
+admission, application, convergence digest, update/sync wire behavior unrelated
+to attestation payloads, dispatch/recovery behavior and room isolation. Compare
+the same admitted history with the plane enabled and disabled; convergence of
+the replicated object state must be identical even though legacy finality
+metadata is intentionally absent in the disabled room.
 
-For update, require zero `DRPObject.vertices`/`HashGraph.getAllVertices`
-materializations for post-merge membership and preserve the current verified
-input present-after-merge semantics, including already-known vertices. For
-sync accept, retain the two signing/finality sweeps, require total
-materializations invariant in H, and prove response lookup O(H) with comparison
-work independent of V. Pin exact response bytes, request order/duplicates,
-absent-hash omission, stored-Vertex identity/order, post-signing signature
-bytes, finality/attestation behavior, missing recovery, relevant dispatches and
-the no-response early return. Prefer deterministic causal counters; wall-clock
-ratios remain diagnostic only. Reuse Phase 1a instrumentation only where it is
-causal, carry D.86's cached-private-entry limitation without adding an
-implementation-shaped `Map.prototype.set` gate, and add the one-line
-reverse-fill first-match comment when GREEN next touches that handler.
+Use deterministic call/census counters rather than throughput timing. Include
+multiple signers and enough vertices to prove the work stays exactly zero
+rather than merely smaller, but keep the fast causal loop small; retain any
+larger 8-signer/100-vertex budget run as a targeted characterization if it is
+materially slower. Kill partial switches: disabling only outbound broadcasts,
+only local signing, only inbound verification or only store initialization
+must each leave a RED failure. The flag must be room/object scoped and enabled
+by default for legacy compatibility.
 
-GREEN may add the required method to `IDRPObject` and `DRPObject`, delegate to
-the private HashGraph direct lookup, and replace only the two owned handler
-decisions. It must not change `MergeResult`, `ApplyResult`, wire schemas or
-existing behavior, must not add an optional/fallback scan, and must record the
-published-interface source-compatibility caveat in the acceptance/release
-handoff without inventing package-version or changeset machinery here.
+GREEN may add the smallest explicit configuration surface and guards required
+to disable the whole legacy attestation plane. It must not delete the legacy
+implementation, redefine enabled-mode finality, alter wire schemas, weaken
+vertex signature authentication, absorb observer mode, Phase 6d retention,
+v3 trust/seal work, D.73, Phase 0n or Phase 1n, or claim that enabled legacy
+finality is bounded. Do not run legacy and v3 attestation systems concurrently.
 
-Do not absorb Phase 1n heads exchange, Phase 3a's D.73 binder, optional Phase
-0n, or unrelated finality/auth/resource work. Preserve the inherited
-`sync-livelock` 3-fail/3-pass baseline unless this slice causally owns one of
-those failures; any unexplained movement is a regression signal.
+Preserve Phase 1a/1b performance contracts and the inherited sync-livelock
+3-fail/3-pass baseline unless Phase 1c causally owns a row; any unexplained
+movement is a regression signal. Rebuild declarations before downstream
+typechecks when a published type changes.
 
-Run focused RED/GREEN, relevant object/types/node preservation, package and
+Run focused RED/GREEN, relevant finality/object/node preservation, package and
 workspace typecheck, tracked zero-error lint, Prettier/diff/scope and any
 plan-triggered XVER gate to `.log` files at both checkpoints. Then run the
-per-item Grok-high, exact
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi -m kimi-code/k3`, and final Opus/xhigh
-review loop. Keep large performance rows targeted rather than in every fast
-unit-test loop.
+per-item Grok-high, exact Kimi 3/high with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and final Opus/xhigh review loop. Do not
+apply the Fable course-review suggestions as plan corrections without their
+separate required quorum.
 
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
