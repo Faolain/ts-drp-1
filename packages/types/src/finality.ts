@@ -40,8 +40,9 @@ export interface IFinalityState {
 	 * @param peerId - The peer id of the signer.
 	 * @param signature - The signature to add.
 	 * @param verify - Whether to verify the signature.
+	 * @returns Whether the signature changed the finality state.
 	 */
-	addSignature(peerId: string, signature: Uint8Array, verify?: boolean): void;
+	addSignature(peerId: string, signature: Uint8Array, verify?: boolean): boolean;
 	/**
 	 * Merges an aggregated attestation into the finality state.
 	 * @param attestation - The aggregated attestation to merge.

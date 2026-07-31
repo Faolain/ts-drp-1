@@ -86,12 +86,10 @@ export class FinalityState implements IFinalityState {
 			}
 		}
 
+		const nextSignature = this.signature ? bls.aggregateSignatures([this.signature, signature]) : signature;
+
 		this.aggregation_bits.set(index, true);
-		if (!this.signature) {
-			this.signature = signature;
-		} else {
-			this.signature = bls.aggregateSignatures([this.signature, signature]);
-		}
+		this.signature = nextSignature;
 		this.numberOfSignatures++;
 		return true;
 	}
