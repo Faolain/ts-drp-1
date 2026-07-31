@@ -1011,7 +1011,7 @@ round 1 at all.
 | Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Class                                                           | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1a** | Responder builds a `Set`/`Map` of local hashes once instead of the getter-re-materialized linear `find()` (`handlers.ts:336-345` × `object/src/index.ts:161-163`). Wire format unchanged.                                                                                                                                                                                                                                                                                                                                                                                 | local-safe                                                      | `sync-perf-contract.test.ts` (**net-new**, not an extension): drive `syncHandler` at 10k/50k/100k; **exact instrumented probe-count assertion** via the `vi.mock` counter pattern (`perf-contracts.test.ts:15-28`): `expect(probesPerIncomingHash).toBe(1)`. Wall-clock is a soft signal only — a fast machine hides an O(V²) regression                                                                                                                                                                                                                  |
-| **1b** | **O(1) applied-vertex index.** `updateHandler` rebuilds `presentHashes` from `object.vertices` on **every message** (`handlers.ts:261`), and `syncAcceptHandler` rescans the whole vertex set per message (`:415-416`). `merge` returns applied vertices; add `hasVertex(hash)` to `IDRPObject`; remove the getter from all hot paths.                                                                                                                                                                                                                                    | local-safe                                                      | `expect(getAllVerticesCallCount).toBe(0)` on the update path; per-update time ratio(100k/10k) < 1.5                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **1b** | **O(1) applied-vertex lookup.** Required `IDRPObject.getVertex(hash): Vertex \| undefined`, backed by the existing HashGraph index, replaces update's post-merge `presentHashes` rebuild (`handlers.ts:299-300`) and accept's per-hash `vertices.find` (`:484-490`). Merge/apply result shapes stay unchanged. Getter removal covers those two decisions; accept signing/finality sweeps remain O(V), so total accept work is O(V+H). No optional fallback; record the additive public-interface caveat. See D.87.                                                        | local-safe (**additive API**)                                   | `applied-vertex-lookup.test.ts` (**net-new**), real `handleMessage`: update decision makes zero inventory materializations; accept retains a fixed signing-sweep count independent of H and performs O(H) response lookup. Pin exact bytes, order/duplicates, stored identity, post-signing signatures, finality/recovery/events and no-response behavior. Causal counters only; no Map-shaped gate or snapshot fallback.                                                                                                                                 |
 | **1c** | **Attestation off-switch.** Every applied vertex triggers a local BLS sign (`handlers.ts:584`) + `ATTESTATION_UPDATE` broadcast (`:276-292`); every receiving signer runs `bls.verify` per attestation (`finality/index.ts:83`) — all main-thread, O(signers × rate), for an `isFinalized` with **zero production callers**. Config kills it for legacy rooms.                                                                                                                                                                                                            | local-safe                                                      | `attestation-budget.test.ts`: 8-signer room, 100 vertices, flag off → `expect(blsVerifyCalls).toBe(0)` and 0 broadcasts; **convergence digests unchanged vs flag on**                                                                                                                                                                                                                                                                                                                                                                                     |
 | **1d** | **Incremental state snapshots.** The remote-apply pipeline does ≈3–4 × O(stateSize) deep clones **per vertex**: `fromStates` clone (`drp-applier.ts:383-384` → `state.ts:171-176`) + two `stateFromDRP` clones stored as per-vertex snapshots (`drp-applier.ts:595-601`). At 1 MB state and 30 vertices/s that is ~120 MB/s of cloning. Clone only keys reported mutated by `trackMutations`; share unchanged entries by reference under an immutability contract.                                                                                                        | local-safe (**assert wire bytes unchanged**)                    | **atomic** — torn sharing is an aliasing bug. `expect(clonedBytes).toBeLessThan(20 * mutatedBytes)` over 1k vertices into a 1 MB state; serialized `FetchStateResponse` bytes **identical** to the deep-clone baseline                                                                                                                                                                                                                                                                                                                                    |
 | **1e** | Unify signature authentication into `object`/`validation` so **all** ingest paths are authenticated — `applyVertices` (`object/src/index.ts:205-212`) performs no signature check today.                                                                                                                                                                                                                                                                                                                                                                                  | local-safe                                                      | **Negative-space test**: delete/bypass the node-handler auth entirely; the suite must _still_ reject forged merges through `object.merge()` — proving auth moved. Plus **reflective completeness**: iterate the `messageHandlers` registry (`handlers.ts:133`) and assert every vertex-carrying `MessageType` routes through the single authenticated ingest function; an un-tabled message type fails the test. Deeper fix: `applyVertices` accepts a branded `AuthenticatedVertex[]` produced only by the verifier, making a bypass a **compile error** |
@@ -13599,38 +13599,129 @@ behind D.52.4's unrun forward-plane correction quorum. D.73 is unchanged: the
 hostile graph-side virtual-`Map.keys()` exploit remains real, unresolved and a
 hard Phase-3a pre-live-binder requirement.
 
+### D.87 — Phase 1b pre-RED direct-lookup contract correction
+
+Phase 1b's original row was internally inconsistent and is corrected before
+RED. It said deprecated `merge()` returned applied vertices and prescribed
+`hasVertex(hash)` while also requiring accept-side getter removal. At
+checkpoint `a94a16b`, `MergeResult` is exactly
+`[merged: boolean, missing: Hash[], invalid: Hash[]]`, `ApplyResult` contains
+only an applied Boolean and rejected-hash categories, and neither identifies an
+applied `Vertex[]`. A Boolean membership method could replace update's
+`presentHashes` set but cannot return the actual stored `Vertex` values required
+in `SyncAccept.requested`. A per-message snapshot plus ephemeral Map would add
+a third O(V) inventory materialization to the two fixed signing sweeps and
+leave the owned response lookup O(V+H), rather than O(H); it would also weaken
+the row's persistent direct-index contract.
+
+The corrected contract adds required, representation-neutral
+`getVertex(hash): Vertex | undefined` to `IDRPObject`, matching the existing
+`IHashGraph.getVertex` signature. `DRPObject` delegates to its private
+HashGraph index. `MergeResult` and `ApplyResult` remain byte- and shape-identical.
+After merge, update filters authenticated inputs by direct stored lookup,
+preserving the existing “verified input present in the graph” behavior,
+including already-known vertices. Sync accept resolves each requested hash
+directly to the stored Vertex reference, preserving requesting order,
+duplicates, absent-hash omission, identity and exact response bytes.
+`hasVertex` is not added; it is redundant for update and insufficient for
+response construction.
+
+Getter removal is deliberately scoped to those membership and response-lookup
+decisions. `syncAcceptHandlerUntraced` still materializes full inventory twice
+for `signGeneratedVertices` and `signFinalityVertices`; Phase 1b does not own
+those signing/finality sweeps, so whole-handler materializations must be
+invariant in H rather than zero. Total accept work becomes O(V+H), while update
+membership makes zero inventory materializations. Other getter sites in sync
+initiation, interval sync and node operations are outside this slice.
+
+The direct method is required, not optional. An optional
+`getVertex?.(...) ?? object.vertices.find(...)` fallback would preserve the
+O(V·H) path, make omission silently slow and give the RED a reward-hack escape.
+The sole in-repo concrete implementer is `DRPObject`; test fakes predominantly
+cross an explicit `unknown` cast. The required member is nevertheless a
+source-compatibility change for a hypothetical external structural
+`IDRPObject` implementer because `@ts-drp/types` is published. Record that
+caveat in the Phase 1b acceptance/release handoff; do not invent absent
+changeset tooling or alter package versions inside RED. Package release policy
+remains owned by P1.
+
+The corrected causal RED drives exported `handleMessage` and must fail current
+production for the owned reason, never because a test stub lacks the newly
+selected method. It records a pre-change semantic/wire baseline first, gives
+its instrumented object a semantic direct-lookup control, then asserts:
+
+1. update membership performs zero `vertices`/`getAllVertices`
+   materializations;
+2. accept materializations are constant in H at the fixed signing/finality
+   count, and response lookup is O(H) with comparisons independent of V;
+3. exact `SyncAccept` bytes, requesting order/duplicates, absent-hash omission,
+   stored-Vertex identity, post-signing signature bytes, finality/attestation
+   behavior, missing recovery, `DRP_UPDATE`, `DRP_SYNC_ACCEPTED` and
+   `DRP_SYNC_MISSING` dispatch, and the no-response early return are preserved;
+4. counters stay representation-neutral: no `Map.prototype.set` assertion,
+   wall-clock causal gate or snapshot fallback.
+
+The correction quorum is complete:
+
+- Codex-high RED owner `/root/phase_1b_red_codex_high`: `BLOCK` before RED,
+  evidence
+  `.logs/phase-1b-red-codex-high-plan-correction-block.md`, SHA-256
+  `08c0786d78ac106753e089cf576061635bc9c0d8df0e86d8f117f14674c14855`;
+- exact Kimi 3/high/100 session
+  `session_90b1baf6-298e-47fb-8517-cf6e59f346bb`:
+  `PLAN_CORRECTION_AGREE`;
+- Opus/xhigh session `946d1c13-a6aa-4294-8766-6167910a4b98`:
+  `PLAN_CORRECTION_AGREE`. All substantive assistant transcript records are
+  `claude-opus-5`; the result envelope's small Haiku usage entry has no Haiku
+  assistant record and is non-substantive bridge metadata.
+
+No Phase 1n, D.73, optional Phase 0n, signing/finality off-switch or unrelated
+getter work is absorbed. D.86's cached-private-entry measurement limitation and
+reverse-fill-comment handoff remain unchanged.
+
 ## Next Agent Prompt
 
-Begin **Phase 1b — O(1) applied-vertex index** from accepted Phase 1a
-checkpoint `d099eb5` plus this D.86 acceptance-ledger commit. Start with a
-fresh Codex-high RED owner that may change tests only and must commit a genuine
-RED before a distinct fresh Codex-high GREEN owner receives byte-identical
-tests.
+Begin **Phase 1b — O(1) applied-vertex lookup** from accepted Phase 1a
+checkpoint `d099eb5`, acceptance-ledger checkpoint `a94a16b` and this D.87
+plan-correction commit. Start with a fresh Codex-high RED owner that may change
+tests only and must commit a genuine RED before a distinct fresh Codex-high
+GREEN owner receives byte-identical tests.
 
 Re-derive the row from current code rather than trusting drifted line numbers.
 At this checkpoint `updateHandlerUntraced` materializes every vertex to rebuild
 `presentHashes` after each merge (`packages/node/src/handlers.ts:299-300`),
 while `syncAcceptHandlerUntraced` re-materializes and linearly scans inventory
-for each requested hash (`:484-489`). The public object interface currently
-exposes `vertices` but no `hasVertex(hash)`, and its deprecated
-`merge(vertices)` currently returns `MergeResult =
-[merged, missing, invalid]`, not an applied-vertex list. The RED owner must
-audit that mismatch against the Phase 1b row before prescribing a production
-shape. Tests may express the observable O(1) contract and preserved handler
-semantics, but must not silently change the row's API/return-shape assumption.
-If a plan correction is needed, stop before GREEN and obtain the required
-Codex-high + exact Kimi-3/high/100 + Opus-xhigh agreement before editing it.
+for each requested hash (`:484-490`). D.87 has resolved the mismatch: required
+`IDRPObject.getVertex(hash): Vertex | undefined`, unchanged merge/apply result
+shapes and no Boolean-only membership method or fallback.
 
-Drive the real exported `handleMessage` paths. At minimum, prove the update path
-does not call `DRPObject.vertices`/`HashGraph.getAllVertices` merely to decide
-which authenticated vertices are present after merge, and prove accept-side
-lookup work is O(V + H), not O(V·H), while pinning exact response bytes,
-request order/duplicates, signing/finality behavior, event dispatch, missing
-recovery and public API compatibility. Prefer deterministic causal counters;
-wall-clock ratios remain diagnostic only. Reuse Phase 1a instrumentation where
-it is causal, carry D.86's cached-private-entry limitation without adding an
+Before writing the causal RED, capture the exact pre-change semantic and wire
+baseline. Drive the real exported `handleMessage` paths with a net-new
+`applied-vertex-lookup.test.ts`; do not extend Phase 1a merely because its
+instrumentation is nearby. The instrumented fixture must provide a semantic
+direct lookup so RED fails on production materialization/comparison work, not a
+stub-shape `TypeError`.
+
+For update, require zero `DRPObject.vertices`/`HashGraph.getAllVertices`
+materializations for post-merge membership and preserve the current verified
+input present-after-merge semantics, including already-known vertices. For
+sync accept, retain the two signing/finality sweeps, require total
+materializations invariant in H, and prove response lookup O(H) with comparison
+work independent of V. Pin exact response bytes, request order/duplicates,
+absent-hash omission, stored-Vertex identity/order, post-signing signature
+bytes, finality/attestation behavior, missing recovery, relevant dispatches and
+the no-response early return. Prefer deterministic causal counters; wall-clock
+ratios remain diagnostic only. Reuse Phase 1a instrumentation only where it is
+causal, carry D.86's cached-private-entry limitation without adding an
 implementation-shaped `Map.prototype.set` gate, and add the one-line
 reverse-fill first-match comment when GREEN next touches that handler.
+
+GREEN may add the required method to `IDRPObject` and `DRPObject`, delegate to
+the private HashGraph direct lookup, and replace only the two owned handler
+decisions. It must not change `MergeResult`, `ApplyResult`, wire schemas or
+existing behavior, must not add an optional/fallback scan, and must record the
+published-interface source-compatibility caveat in the acceptance/release
+handoff without inventing package-version or changeset machinery here.
 
 Do not absorb Phase 1n heads exchange, Phase 3a's D.73 binder, optional Phase
 0n, or unrelated finality/auth/resource work. Preserve the inherited
