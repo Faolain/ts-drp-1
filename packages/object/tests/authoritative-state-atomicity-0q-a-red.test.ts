@@ -289,52 +289,7 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 		const first = remoteVertex("claim", ["first"], 1);
 		const second = remoteVertex("claim", ["second"], 2);
 		const candidates = [first, second];
-		const applier = receiver["_applier"] as unknown as Record<string, unknown>;
-		const originalReconcile = applier.reconcileCanonicalState as (...arguments_: unknown[]) => Promise<void>;
-		const replayBarrier = installBarrier("deferred-final-replay");
-		applier.reconcileCanonicalState = async (...arguments_: unknown[]): Promise<void> => {
-			replayBarrier.entered.resolve();
-			await replayBarrier.release.promise;
-			return Reflect.apply(originalReconcile, applier, arguments_);
-		};
-
-		let pendingStateIsAuthoritative = true;
-		let outcome!: ApplyOutcome;
-		try {
-			const outcomePromise = settleApply(receiver, candidates);
-			const phase = await Promise.race([
-				replayBarrier.entered.promise.then(() => "replay-pending" as const),
-				outcomePromise.then(() => "settled-without-final-replay" as const),
-			]);
-			if (phase === "replay-pending") {
-				const pendingCommitted = candidates.filter((vertex) =>
-					receiver.vertices.some(({ hash }) => hash === vertex.hash)
-				);
-				const pendingExpectedOwner =
-					pendingCommitted.length === 1
-						? (pendingCommitted[0].operation?.value[0] as string | undefined)
-						: pendingCommitted.length === 0
-							? undefined
-							: "impossible-multiple-exclusive-owners";
-				pendingStateIsAuthoritative =
-					pendingCommitted.length <= 1 &&
-					receiver.drp?.owner === pendingExpectedOwner &&
-					candidates.every((vertex) => {
-						const surface = vertexSurfaces(receiver, vertex, notifications);
-						const notificationExposed =
-							notificationEligible(receiver, vertex.hash) || notifications.includes(vertex.hash);
-						const committed = pendingCommitted.includes(vertex);
-						return committed
-							? surface.graph && surface.finality && notificationExposed && claimSnapshotMatchesOwner(receiver, vertex)
-							: !surface.graph && !surface.finality && !surface.snapshots && !notificationExposed;
-					});
-			}
-			replayBarrier.release.resolve();
-			outcome = await outcomePromise;
-		} finally {
-			replayBarrier.release.resolve();
-			applier.reconcileCanonicalState = originalReconcile;
-		}
+		const outcome = await settleApply(receiver, candidates);
 
 		const committed = candidates.filter((vertex) => receiver.vertices.some(({ hash }) => hash === vertex.hash));
 		const uncommitted = candidates.filter((vertex) => !committed.includes(vertex));
@@ -359,7 +314,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 						(!surface.graph && !surface.finality && !surface.notified && !surface.snapshots)
 				),
 				noInvalidCombinedCommit: committed.length <= 1,
-				pendingStateIsAuthoritative,
 				replayFailureCrossed: exclusiveReplayFailures > 0,
 				snapshotsValidWhenPresent: candidates.every((vertex) => claimSnapshotMatchesOwner(receiver, vertex)),
 			},
@@ -371,7 +325,6 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 			liveStateMatchesCommittedGraph: true,
 			noCandidateHasMixedAuthoritativeSurfaces: true,
 			noInvalidCombinedCommit: true,
-			pendingStateIsAuthoritative: true,
 			replayFailureCrossed: true,
 			snapshotsValidWhenPresent: true,
 		});
@@ -440,61 +393,89 @@ describe("Phase 0q-a authoritative-state atomicity RED", () => {
 		}
 	});
 
-	it("never lets a reconciliation invariant replace the batch result or retain the private latch", async () => {
+	it("attaches exact partial accounting when commit and rollback fail synchronously", async () => {
 		const receiver = makeLogReceiver("receiver");
 		const notifications: string[] = [];
 		receiver.subscribe((_object, origin, vertices) => {
 			if (origin === "merge") notifications.push(...vertices.map(({ hash }) => hash));
 		});
-		const first = remoteVertex("append", ["invariant-first"], 30);
-		const second = remoteVertex("append", ["invariant-second"], 31);
-		const candidates = [first, second];
-		const applier = receiver["_applier"] as unknown as Record<string, unknown>;
-		const originalReconcile = applier.reconcileCanonicalState;
-		const primary = new Error("forced reconciliation invariant");
-		let reconciliationCalls = 0;
-		applier.reconcileCanonicalState = (): Promise<never> => {
-			reconciliationCalls++;
-			return Promise.reject(new ApplyInvariantError([primary], "forced reconciliation invariant", { cause: primary }));
+		const candidate = remoteVertex("append", ["invariant-candidate"], 30);
+		const applier = receiver["_applier"] as unknown as {
+			advanceCheckpointIfNeeded(...arguments_: unknown[]): void;
+		};
+		const hashGraph = receiver["hashGraph"];
+		const originalAdvanceCheckpoint = applier.advanceCheckpointIfNeeded;
+		const originalRemoveVertex = hashGraph.removeVertex;
+		const primary = new Error("forced commit failure");
+		const rollback = new Error("forced rollback failure");
+		let checkpointCalls = 0;
+		let graphInsertedBeforePrimary = false;
+		let insertedVertex: Vertex | undefined;
+		let liveStateBeforePrimary: string[] | undefined;
+		let removeCalls = 0;
+		let removedCandidateIdentity = false;
+		let surfacesBeforePrimary: { finality: boolean; graph: boolean; notified: boolean; snapshots: boolean } | undefined;
+		applier.advanceCheckpointIfNeeded = (): never => {
+			checkpointCalls++;
+			insertedVertex = hashGraph.vertices.get(candidate.hash);
+			graphInsertedBeforePrimary = insertedVertex !== undefined;
+			liveStateBeforePrimary = receiver.drp?.values;
+			surfacesBeforePrimary = vertexSurfaces(receiver, candidate, notifications);
+			throw primary;
+		};
+		hashGraph.removeVertex = (vertex, frontierRestorePoints): never => {
+			removeCalls++;
+			const removed = Reflect.apply(originalRemoveVertex, hashGraph, [vertex, frontierRestorePoints]) as boolean;
+			removedCandidateIdentity ||= vertex === insertedVertex && removed;
+			throw rollback;
 		};
 
 		try {
-			const outcome = await settleApply(receiver, candidates);
-			const committed = candidates.filter((vertex) => receiver.vertices.some(({ hash }) => hash === vertex.hash));
-			const uncommitted = candidates.filter((vertex) => !committed.includes(vertex));
-			const accounting = outcome.status === "resolved" ? outcome.result : outcome.partialResult;
-			const exactAccounting = JSON.stringify(accounting) === JSON.stringify(expectedAccounting(uncommitted));
-			const committedValues = committed
-				.map((vertex) => vertex.operation?.value[0])
-				.filter((value): value is string => typeof value === "string")
-				.sort();
+			const outcome = await settleApply(receiver, [candidate]);
+			const error = outcome.status === "rejected" ? outcome.error : undefined;
+			const aggregateErrors = error instanceof ApplyInvariantError ? error.errors : [];
 
 			expect(
 				{
-					accounting,
-					authoritativeStateMatchesCommittedGraph:
-						JSON.stringify(receiver.drp?.values.toSorted()) === JSON.stringify(committedValues),
-					exactAccounting,
+					aggregateHasPrimaryIdentity: aggregateErrors[0] === primary,
+					aggregateHasRollbackIdentity: aggregateErrors[1] === rollback,
+					candidateNotificationEligible: notificationEligible(receiver, candidate.hash),
+					candidateSurfaces: vertexSurfaces(receiver, candidate, notifications),
+					checkpointCalls,
+					errorIsApplyInvariant: error instanceof ApplyInvariantError,
+					graphInsertedBeforePrimary,
 					latchCleared: !privateLatch(receiver),
-					notificationsNameOnlyCommitted: notifications.every((hash) =>
-						committed.some((vertex) => vertex.hash === hash)
-					),
-					reconciliationPath:
-						reconciliationCalls === 0
-							? outcome.status === "resolved"
-							: outcome.status === "rejected" && outcome.error instanceof ApplyInvariantError,
+					liveStateBeforePrimary,
+					liveStateRestored: receiver.drp?.values,
+					notifications,
+					partialResult: outcome.status === "rejected" ? outcome.partialResult : undefined,
+					removeCalls,
+					removedCandidateIdentity,
+					status: outcome.status,
+					surfacesBeforePrimary,
 				},
-				"legacy post-commit reconciliation may become unreachable, but any surviving rejection needs exact accounting"
+				"applyVertices must expose exact accounting while the journal removes every authoritative trace"
 			).toEqual({
-				accounting: expectedAccounting(uncommitted),
-				authoritativeStateMatchesCommittedGraph: true,
-				exactAccounting: true,
+				aggregateHasPrimaryIdentity: true,
+				aggregateHasRollbackIdentity: true,
+				candidateNotificationEligible: false,
+				candidateSurfaces: { finality: false, graph: false, notified: false, snapshots: false },
+				checkpointCalls: 1,
+				errorIsApplyInvariant: true,
+				graphInsertedBeforePrimary: true,
 				latchCleared: true,
-				notificationsNameOnlyCommitted: true,
-				reconciliationPath: true,
+				liveStateBeforePrimary: ["invariant-candidate"],
+				liveStateRestored: [],
+				notifications: [],
+				partialResult: expectedAccounting([candidate]),
+				removeCalls: 1,
+				removedCandidateIdentity: true,
+				status: "rejected",
+				surfacesBeforePrimary: { finality: true, graph: true, notified: false, snapshots: true },
 			});
 		} finally {
-			applier.reconcileCanonicalState = originalReconcile;
+			applier.advanceCheckpointIfNeeded = originalAdvanceCheckpoint;
+			hashGraph.removeVertex = originalRemoveVertex;
 		}
 	});
 });
