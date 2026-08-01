@@ -125,6 +125,7 @@ function expectWorkspaceIntegration(
 	expect(loadedSourcePaths).toEqual(expect.arrayContaining([...REQUIRED_WORKSPACE_SOURCE_PATHS]));
 	expect([...(analysis.analyzedSourcePaths ?? [])].sort()).toEqual(loadedSourcePaths);
 	expect([...(analysis.reviewedOperations ?? [])].sort()).toEqual([...REVIEWED_WORKSPACE_OPERATIONS].sort());
+	expect(analysis.violations).toEqual([]);
 	for (const reviewed of REVIEWED_WORKSPACE_OPERATIONS) {
 		const [file, owner] = reviewed.split(":");
 		expect(analysis.violations.some((violation) => violation.includes(file) && violation.includes(owner))).toBe(false);
@@ -1759,6 +1760,217 @@ const REVIEWED_OWNER_MULTIPLICITY_MUTANTS = Object.freeze([
 	}),
 ] satisfies readonly WorkspaceMutationFixture[]);
 
+const SYMBOLIC_INVOCATION_MUTANTS = Object.freeze([
+	frozenWorkspaceFixture(
+		"Function.prototype.call on an imported callable",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture.call(undefined, state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"Function.prototype.apply on an imported callable",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture.apply(undefined, [state]);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"Function.prototype.bind followed by invocation",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const bound = capture.bind(undefined); bound(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"constructed imported helper instance method",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"new SnapshotHelper().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				}
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"constructed imported helper class-field arrow",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"new SnapshotHelper().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					capture = (value: unknown): Uint8Array => encode(value);
+				}
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"imported static helper method",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"SnapshotHelper.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					static capture(value: unknown): Uint8Array { return encode(value); }
+				}
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"exported class-expression helper",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"new SnapshotHelper().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const SnapshotHelper = class {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				};
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"variable-key computed namespace call",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		'const key = "capture"; snapshots[key](state);',
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"ternary callable alias",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const selected = state.changed ? capture : capture; selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"getter escape",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const holder = { get deferred() { return capture; } }; holder.deferred(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"namespace spread escape",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		"const holder = { ...snapshots }; holder.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"object spread escape",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const source = { capture }; const holder = { ...source }; holder.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"array-stored callback",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const callbacks = [capture]; callbacks[0](state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"IIFE wrapping direct MessagePack encode",
+		ENCODE_VIOLATION,
+		'import { encode } from "@msgpack/msgpack";',
+		"(() => encode(state))();",
+		{}
+	),
+	frozenWorkspaceFixture(
+		"globalThis.JSON stringify-parse clone",
+		ROUND_TRIP_VIOLATION,
+		"",
+		"globalThis.JSON.parse(globalThis.JSON.stringify(state));",
+		{}
+	),
+] satisfies readonly WorkspaceMutationFixture[]);
+
+const FAIL_CLOSED_MODULE_MUTANTS = Object.freeze([
+	frozenWorkspaceFixture(
+		"missing named export from a resolvable workspace module",
+		/missing|unresolved|fail.?closed|export/i,
+		'import { missingCapture } from "@ts-drp/utils/serialization";',
+		"missingCapture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: "export function available(value: unknown): unknown { return value; }",
+		}
+	),
+	frozenWorkspaceFixture(
+		"missing default export from a resolvable workspace module",
+		/missing|unresolved|fail.?closed|export/i,
+		'import missingCapture from "@ts-drp/utils/serialization";',
+		"missingCapture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: "export function available(value: unknown): unknown { return value; }",
+		}
+	),
+	frozenWorkspaceFixture(
+		"dynamic import of a resolvable internal workspace module",
+		/missing|unresolved|fail.?closed|dynamic|import/i,
+		"",
+		'void import("@ts-drp/utils/serialization").then(({ capture }) => capture(state));',
+		{
+			[UTILS_SERIALIZATION_PATH]: "export function capture(value: unknown): unknown { return value; }",
+		}
+	),
+] satisfies readonly WorkspaceMutationFixture[]);
+
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
@@ -1943,6 +2155,88 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
 		}
 	);
+
+	it.each(SYMBOLIC_INVOCATION_MUTANTS)(
+		"kills symbolic invocation or callable escape bypass: $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(FAIL_CLOSED_MODULE_MUTANTS)(
+		"fails closed rather than silently dropping provenance: $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it("retains stable literal computed namespace calls as a positive violation control", () => {
+		const fixture = frozenWorkspaceFixture(
+			"stable literal computed namespace call",
+			ENCODE_VIOLATION,
+			'import * as snapshots from "@ts-drp/utils/serialization";',
+			'snapshots["capture"](state);',
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					import { encode } from "@msgpack/msgpack";
+					export function capture(value: unknown): Uint8Array { return encode(value); }
+				`,
+			}
+		);
+		expect(analyze(fixture.sources).violations).toEqual(
+			expect.arrayContaining([expect.stringMatching(fixture.expectedViolation)])
+		);
+	});
+
+	it.each([
+		{
+			expectedViolation: false,
+			name: "JSON stringify used only as deterministic hash input",
+			source: `
+				export function computeHash(value: unknown): number {
+					return JSON.stringify(value).length;
+				}
+			`,
+		},
+		{
+			expectedViolation: true,
+			name: "JSON stringify-parse used as a payload clone",
+			source: `
+				export function computeHash(value: unknown): unknown {
+					return JSON.parse(JSON.stringify(value));
+				}
+			`,
+		},
+	] as const)("classifies $name without treating all JSON use as cloning", ({ expectedViolation, source }) => {
+		const sources = {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { computeHash } from "@ts-drp/utils/hash";',
+				"void computeHash(state);"
+			),
+			"packages/utils/src/hash/index.ts": source,
+		};
+		const hasJsonViolation = analyze(sources).violations.some((violation) => /json|round.?trip/i.test(violation));
+		expect(hasJsonViolation).toBe(expectedViolation);
+	});
+
+	it("keeps same-named callables scoped per file instead of colliding globally", () => {
+		const sources = {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { capture } from "@ts-drp/utils/serialization";',
+				"capture(state);"
+			),
+			[UTILS_SERIALIZATION_PATH]: "export function capture(value: unknown): unknown { return value; }",
+			"packages/tracer/src/index.ts": `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		};
+		expect(analyze(sources).violations).toEqual([]);
+	});
 
 	it("rejects extra serialization work inside the reviewed serializeValue owner", () => {
 		const sources = {
