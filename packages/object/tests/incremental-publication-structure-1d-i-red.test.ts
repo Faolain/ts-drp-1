@@ -1194,6 +1194,338 @@ const WORKSPACE_REACHABILITY_MUTANTS: readonly WorkspaceMutationFixture[] = [
 	},
 ];
 
+function frozenWorkspaceFixture(
+	name: string,
+	expectedViolation: RegExp,
+	imports: string,
+	mutation: string,
+	dependencies: Readonly<Record<string, string>>
+): WorkspaceMutationFixture {
+	return Object.freeze({
+		expectedViolation,
+		name,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			...dependencies,
+		}),
+	});
+}
+
+const CALLABLE_EXPORT_DISCOVERY_MUTANTS = Object.freeze([
+	frozenWorkspaceFixture(
+		"exported const arrow",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const capture = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"exported const function expression",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const capture = function (value: unknown): Uint8Array { return encode(value); };
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"local nested arrow",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array {
+					const inner = (item: unknown): Uint8Array => encode(item);
+					return inner(value);
+				}
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"local nested function expression",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array {
+					const inner = function (item: unknown): Uint8Array { return encode(item); };
+					return inner(value);
+				}
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"anonymous default export",
+		ENCODE_VIOLATION,
+		'import capture from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export default function (value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"local declaration exported by export list",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				function capture(value: unknown): Uint8Array { return encode(value); }
+				export { capture };
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"one-hop export-star barrel",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils";',
+		"capture(state);",
+		{
+			"packages/utils/src/index.ts": 'export * from "./serialization/index.js";',
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"multi-hop export-star barrel",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils";',
+		"capture(state);",
+		{
+			"packages/utils/src/index.ts": 'export * from "./bridge.js";',
+			"packages/utils/src/bridge.ts": 'export * from "./serialization/index.js";',
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	Object.freeze({
+		expectedViolation: CLONE_VIOLATION,
+		name: "class-property arrow at DRPObject.getStates",
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			"packages/object/src/index.ts": `
+				export class DRPObject {
+					private readonly detach = (value: unknown): unknown => structuredClone(value);
+					getStates(value: unknown): unknown { return this.detach(value); }
+				}
+			`,
+		}),
+	}),
+	Object.freeze({
+		expectedViolation: CLONE_VIOLATION,
+		name: "static class helper reached by DRPObject.getStates",
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			"packages/object/src/index.ts": `
+				export class DRPObject {
+					private static detach(value: unknown): unknown { return structuredClone(value); }
+					getStates(value: unknown): unknown { return DRPObject.detach(value); }
+				}
+			`,
+		}),
+	}),
+] satisfies readonly WorkspaceMutationFixture[]);
+
+const INDIRECT_CALL_MUTANTS = Object.freeze([
+	frozenWorkspaceFixture(
+		"destructured namespace alias",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		"const { capture } = snapshots; capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"destructured object alias",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		"const holder = { capture: snapshots.capture }; const { capture } = holder; capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"callback returned across a function",
+		ENCODE_VIOLATION,
+		`import { capture } from "@ts-drp/utils/serialization";
+		 function retain(callback: (value: unknown) => unknown): (value: unknown) => unknown { return callback; }`,
+		"const deferred = retain(capture); deferred(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"callback stored across a function",
+		ENCODE_VIOLATION,
+		`import { capture } from "@ts-drp/utils/serialization";
+		 let retained: ((value: unknown) => unknown) | undefined;
+		 function retain(callback: (value: unknown) => unknown): void { retained = callback; }`,
+		"retain(capture); retained?.(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"Reflect.apply indirection",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"Reflect.apply(capture, undefined, [state]);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"comma-expression call",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"(0, capture)(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function capture(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"exported helper object method",
+		ENCODE_VIOLATION,
+		'import { helpers } from "@ts-drp/utils/serialization";',
+		"helpers.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const helpers = {
+					capture(value: unknown): Uint8Array { return encode(value); },
+				};
+			`,
+		}
+	),
+] satisfies readonly WorkspaceMutationFixture[]);
+
+const MODULE_AND_PRIMITIVE_MUTANTS = Object.freeze([
+	frozenWorkspaceFixture(
+		"unresolved internal workspace import",
+		/unresolved|fail.?closed|@ts-drp\/does-not-exist/,
+		'import { capture } from "@ts-drp/does-not-exist/serialization";',
+		"capture(state);",
+		{}
+	),
+	frozenWorkspaceFixture(
+		"dynamic import of known MessagePack serializer",
+		ENCODE_VIOLATION,
+		"",
+		'void import("@msgpack/msgpack").then(({ encode }) => encode(state));',
+		{}
+	),
+	frozenWorkspaceFixture(
+		"node:v8 serialize-deserialize round trip",
+		ROUND_TRIP_VIOLATION,
+		'import { cloneThroughBytes } from "@ts-drp/utils/serialization";',
+		"cloneThroughBytes(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { deserialize, serialize } from "node:v8";
+				export function cloneThroughBytes(value: unknown): unknown {
+					return deserialize(serialize(value));
+				}
+			`,
+		}
+	),
+	frozenWorkspaceFixture(
+		"Bufbuild protobuf toBinary-fromBinary round trip",
+		ROUND_TRIP_VIOLATION,
+		'import { cloneThroughProtobuf } from "@ts-drp/utils/serialization";',
+		"cloneThroughProtobuf(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { fromBinary, toBinary } from "@bufbuild/protobuf";
+				export function cloneThroughProtobuf(schema: unknown, value: unknown): unknown {
+					return fromBinary(schema, toBinary(schema, value));
+				}
+			`,
+		}
+	),
+] satisfies readonly WorkspaceMutationFixture[]);
+
+const REVIEWED_OWNER_MULTIPLICITY_MUTANTS = Object.freeze([
+	Object.freeze({
+		expectedViolation: CLONE_VIOLATION,
+		name: "extra discarded and full clone inside reviewed publication copy owner",
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: `
+				import { cloneDeep } from "es-toolkit";
+				class DRPVertexApplier {
+					private readonly sink: (event: unknown) => unknown;
+					constructor({ publicationObserver }: { publicationObserver: (event: unknown) => unknown }) {
+						this.sink = publicationObserver;
+					}
+					assignState(): void { this.copyPublicationPayload({ value: 1 }); }
+					advanceCheckpointIfNeeded(): void { this.copyPublicationPayload({ value: 1 }); }
+					private copyPublicationPayload(value: unknown): unknown {
+						cloneDeep({ discarded: value });
+						const full = cloneDeep({ changed: value, ballast: { stable: true } });
+						this.sink({ type: "copy", value });
+						return full;
+					}
+				}
+			`,
+		}),
+	}),
+	Object.freeze({
+		expectedViolation: CLONE_VIOLATION,
+		name: "reviewed ownership path-name-body mimic",
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			"packages/object/src/index.ts": `
+				import { cloneDeep } from "es-toolkit";
+				export class DRPObject {
+					getStates(value: unknown): unknown {
+						void this.getACLState;
+						void this.getDRPState;
+						return cloneDeep(value);
+					}
+				}
+			`,
+		}),
+	}),
+] satisfies readonly WorkspaceMutationFixture[]);
+
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
@@ -1345,6 +1677,66 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
 		});
 	}
+
+	it.each(CALLABLE_EXPORT_DISCOVERY_MUTANTS)(
+		"kills callable/export discovery bypass: $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(INDIRECT_CALL_MUTANTS)("kills indirect call bypass: $name", ({ expectedViolation, sources }) => {
+		const analysis = analyze(sources);
+		expect(analysis.injectedCopyLeaves).toHaveLength(1);
+		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+	});
+
+	it.each(MODULE_AND_PRIMITIVE_MUTANTS)(
+		"fails closed on module/provenance bypass: $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(REVIEWED_OWNER_MULTIPLICITY_MUTANTS)(
+		"does not grant reviewed status by deduplication or mimicry: $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it("rejects extra serialization work inside the reviewed serializeValue owner", () => {
+		const sources = {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { serializedValuesEqual } from "@ts-drp/utils/serialization";',
+				"serializedValuesEqual(state, state.changed);"
+			),
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				const extensionCodec = {};
+				export function serializeValue(value: unknown): Uint8Array {
+					encode(value, { extensionCodec });
+					return encode(value, { extensionCodec });
+				}
+				export function serializedValuesEqual(left: unknown, right: unknown): boolean {
+					return serializeValue(left).byteLength === serializeValue(right).byteLength;
+				}
+			`,
+		};
+		expect(analyze(sources).violations).toEqual(
+			expect.arrayContaining([expect.stringMatching(/serialization|encode|extra|reviewed/)])
+		);
+	});
+
+	it("pins the exact normalized eleven-site residual clone census in workspace mode", () => {
+		expect(analyze(realGovernedWorkspaceSources()).residualCloneSites).toEqual([...RESIDUAL_CLONE_SITES].sort());
+	});
 
 	it("pins the exact excluded-copy-site census outside governed publication", () => {
 		const sources = sourceFiles(SOURCE_DIRECTORY);
