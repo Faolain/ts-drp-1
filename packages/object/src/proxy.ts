@@ -136,6 +136,47 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		return (rawValues.get(value) as V | undefined) ?? value;
 	};
 
+	const snapshotMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> =>
+		Array.from(Map.prototype.entries.call(map) as MapIterator<[unknown, unknown]>);
+
+	const snapshotSetValues = (set: Set<unknown>): unknown[] =>
+		Array.from(Set.prototype.values.call(set) as SetIterator<unknown>);
+
+	const canonicalMapSnapshot = (
+		map: Map<unknown, unknown>
+	): { entries: Array<[unknown, unknown]>; needsNormalization: boolean } => {
+		const canonical = new Map<unknown, unknown>();
+		let needsNormalization = false;
+		for (const [key, value] of snapshotMapEntries(map)) {
+			const rawKey = unwrap(key);
+			const rawValue = unwrap(value);
+			needsNormalization ||= rawKey !== key || rawValue !== value || canonical.has(rawKey);
+			Map.prototype.set.call(canonical, rawKey, rawValue);
+		}
+		return { entries: snapshotMapEntries(canonical), needsNormalization };
+	};
+
+	const canonicalSetSnapshot = (set: Set<unknown>): { values: unknown[]; needsNormalization: boolean } => {
+		const canonical = new Set<unknown>();
+		let needsNormalization = false;
+		for (const value of snapshotSetValues(set)) {
+			const rawValue = unwrap(value);
+			needsNormalization ||= rawValue !== value || canonical.has(rawValue);
+			Set.prototype.add.call(canonical, rawValue);
+		}
+		return { values: snapshotSetValues(canonical), needsNormalization };
+	};
+
+	const replaceMapEntries = (map: Map<unknown, unknown>, entries: ReadonlyArray<readonly [unknown, unknown]>): void => {
+		Map.prototype.clear.call(map);
+		for (const [key, value] of entries) Map.prototype.set.call(map, key, value);
+	};
+
+	const replaceSetValues = (set: Set<unknown>, values: readonly unknown[]): void => {
+		Set.prototype.clear.call(set);
+		for (const value of values) Set.prototype.add.call(set, value);
+	};
+
 	const addDirectOwner = (value: unknown, owner: string): void => {
 		if (!isReference(value) || REPLICA_LOCAL_STATE_KEYS.has(owner) || typeof value === "function") return;
 		const rawValue = unwrap(value);
@@ -193,15 +234,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 			nodes.push(value);
 
 			if (value instanceof Map) {
-				const normalizedEntries = new Map<unknown, unknown>();
-				let needsNormalization = false;
-				for (const [key, entryValue] of value) {
-					const rawKey = unwrap(key);
-					const rawEntryValue = unwrap(entryValue);
-					normalizedEntries.set(rawKey, rawEntryValue);
-					needsNormalization ||= rawKey !== key || rawEntryValue !== entryValue;
-				}
-				const entries = [...normalizedEntries];
+				const { entries, needsNormalization } = canonicalMapSnapshot(value);
 				for (const [rawKey, rawEntryValue] of entries) {
 					if (isReference(rawKey)) edges.push([rawKey, value]);
 					if (isReference(rawEntryValue)) edges.push([rawEntryValue, value]);
@@ -209,32 +242,19 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					discover(rawEntryValue);
 				}
 				if (needsNormalization) {
-					normalize.push(() => {
-						Map.prototype.clear.call(value);
-						for (const [key, entryValue] of entries) Map.prototype.set.call(value, key, entryValue);
-					});
+					normalize.push(() => replaceMapEntries(value, entries));
 				}
 				return;
 			}
 
 			if (value instanceof Set) {
-				const normalizedEntries = new Set<unknown>();
-				let needsNormalization = false;
-				for (const entryValue of value) {
-					const rawEntryValue = unwrap(entryValue);
-					normalizedEntries.add(rawEntryValue);
-					needsNormalization ||= rawEntryValue !== entryValue;
-				}
-				const entries = [...normalizedEntries];
-				for (const rawEntryValue of entries) {
+				const { values, needsNormalization } = canonicalSetSnapshot(value);
+				for (const rawEntryValue of values) {
 					if (isReference(rawEntryValue)) edges.push([rawEntryValue, value]);
 					discover(rawEntryValue);
 				}
 				if (needsNormalization) {
-					normalize.push(() => {
-						Set.prototype.clear.call(value);
-						for (const entryValue of entries) Set.prototype.add.call(value, entryValue);
-					});
+					normalize.push(() => replaceSetValues(value, values));
 				}
 				return;
 			}
@@ -346,14 +366,20 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		}
 	};
 
-	const snapshotMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> =>
-		Array.from(Map.prototype.entries.call(map) as MapIterator<[unknown, unknown]>);
+	const canonicalizeMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> => {
+		const { entries, needsNormalization } = canonicalMapSnapshot(map);
+		if (needsNormalization) replaceMapEntries(map, entries);
+		return entries;
+	};
 
-	const snapshotSetValues = (set: Set<unknown>): unknown[] =>
-		Array.from(Set.prototype.values.call(set) as SetIterator<unknown>);
+	const canonicalizeSetValues = (set: Set<unknown>): unknown[] => {
+		const { values, needsNormalization } = canonicalSetSnapshot(set);
+		if (needsNormalization) replaceSetValues(set, values);
+		return values;
+	};
 
 	const reconcileMapParents = (map: Map<unknown, unknown>, previous: Iterable<readonly [unknown, unknown]>): void => {
-		const next = snapshotMapEntries(map);
+		const next = canonicalizeMapEntries(map);
 		for (const [key, value] of previous) {
 			removeParent(key, map);
 			removeParent(value, map);
@@ -366,7 +392,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 	};
 
 	const reconcileSetParents = (set: Set<unknown>, previous: Iterable<unknown>): void => {
-		const next = snapshotSetValues(set);
+		const next = canonicalizeSetValues(set);
 		for (const value of previous) removeParent(value, set);
 		for (const value of next) addParent(value, set);
 		initializeGraphs(next);
