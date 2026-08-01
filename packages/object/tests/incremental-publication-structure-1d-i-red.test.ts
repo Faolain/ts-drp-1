@@ -45,6 +45,7 @@ const REVIEWED_WORKSPACE_OPERATIONS = [
 interface FunctionNode {
 	readonly body: ts.Block;
 	readonly className?: string;
+	readonly declaration: ts.FunctionLikeDeclaration;
 	readonly file: ts.SourceFile;
 	readonly id: string;
 	readonly name: string;
@@ -107,10 +108,13 @@ function normalizedWorkspaceSourceFiles(directories: readonly string[]): Record<
 }
 
 function realGovernedWorkspaceSources(): Record<string, string> {
-	return normalizedWorkspaceSourceFiles([
-		path.join(WORKSPACE_DIRECTORY, "packages/object/src"),
-		path.join(WORKSPACE_DIRECTORY, "packages/utils/src"),
-	]);
+	const packagesDirectory = path.join(WORKSPACE_DIRECTORY, "packages");
+	const sourceDirectories = fs
+		.readdirSync(packagesDirectory, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => path.join(packagesDirectory, entry.name, "src"))
+		.filter((directory) => fs.existsSync(directory));
+	return normalizedWorkspaceSourceFiles(sourceDirectories);
 }
 
 function expectWorkspaceIntegration(
@@ -140,6 +144,7 @@ function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 				result.push({
 					body: node.body,
 					className,
+					declaration: node,
 					file,
 					id: `${file.fileName}:${className ?? "<module>"}.constructor@${node.pos}`,
 					name: "constructor",
@@ -149,6 +154,7 @@ function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 				result.push({
 					body: node.body,
 					className,
+					declaration: node,
 					file,
 					id: `${file.fileName}:${className ?? "<module>"}.${name}@${node.pos}`,
 					name,
@@ -452,7 +458,7 @@ function globalViolations(
 	};
 }
 
-function analyze(sources: Readonly<Record<string, string>>): ClosureAnalysis {
+function analyzeLegacy(sources: Readonly<Record<string, string>>): ClosureAnalysis {
 	const files = Object.entries(sources).map(([name, source]) =>
 		ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 	);
@@ -520,6 +526,429 @@ function analyze(sources: Readonly<Record<string, string>>): ClosureAnalysis {
 		reachable: [...reachable.keys()].sort(),
 		residualCloneSites: global.residualCloneSites,
 		violations: [...new Set(violations)].sort(),
+	};
+}
+
+type SemanticPrimitive = "cloneDeep" | "structuredClone" | "serialization" | "json" | "stateFromDRP";
+type SemanticTarget = `function:${string}` | `primitive:${SemanticPrimitive}`;
+
+interface ImportBinding {
+	readonly exportName: string;
+	readonly moduleName?: string;
+	readonly primitive?: SemanticPrimitive;
+}
+
+interface SemanticModule {
+	readonly exports: ReadonlyMap<string, ImportBinding | SemanticTarget>;
+	readonly imports: ReadonlyMap<string, ImportBinding>;
+	readonly namespaces: ReadonlyMap<string, string>;
+}
+
+interface SemanticOperation {
+	readonly call: ts.CallExpression;
+	readonly owner: FunctionNode;
+	readonly primitive: SemanticPrimitive;
+}
+
+function resolveModuleName(fromFile: string, specifier: string, sourceNames: ReadonlySet<string>): string | undefined {
+	let stem: string;
+	if (specifier.startsWith(".")) {
+		stem = path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), specifier)).replace(/\.js$/, "");
+	} else {
+		const workspace = specifier.match(/^@ts-drp\/([^/]+)(?:\/(.*))?$/);
+		if (!workspace) return undefined;
+		stem = `packages/${workspace[1]}/src/${workspace[2] ?? "index"}`;
+	}
+	for (const candidate of [stem, `${stem}.ts`, `${stem}/index.ts`]) {
+		if (sourceNames.has(candidate)) return candidate;
+	}
+	return undefined;
+}
+
+function importedPrimitive(moduleName: string, importedName: string): SemanticPrimitive | undefined {
+	if (moduleName === "es-toolkit" && importedName === "cloneDeep") return "cloneDeep";
+	if (moduleName === "@msgpack/msgpack" && (importedName === "encode" || importedName === "decode")) {
+		return "serialization";
+	}
+	if (importedName === "stateFromDRP") return "stateFromDRP";
+	if (SERIALIZATION_PRIMITIVES.has(importedName)) return "serialization";
+	return undefined;
+}
+
+function semanticModules(
+	files: readonly ts.SourceFile[],
+	nodes: readonly FunctionNode[]
+): ReadonlyMap<string, SemanticModule> {
+	const sourceNames = new Set(files.map(({ fileName }) => fileName));
+	const functionsByFileAndName = new Map<string, FunctionNode>();
+	for (const node of nodes) {
+		if (!node.className) functionsByFileAndName.set(`${node.file.fileName}:${node.name}`, node);
+	}
+	const result = new Map<string, SemanticModule>();
+	for (const file of files) {
+		const imports = new Map<string, ImportBinding>();
+		const namespaces = new Map<string, string>();
+		const exports = new Map<string, ImportBinding | SemanticTarget>();
+		for (const statement of file.statements) {
+			if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+				const specifier = statement.moduleSpecifier.text;
+				const moduleName = resolveModuleName(file.fileName, specifier, sourceNames);
+				const clause = statement.importClause;
+				if (clause?.name) {
+					imports.set(clause.name.text, {
+						exportName: "default",
+						moduleName,
+						primitive: moduleName ? undefined : importedPrimitive(specifier, "default"),
+					});
+				}
+				const bindings = clause?.namedBindings;
+				if (bindings && ts.isNamespaceImport(bindings) && moduleName) {
+					namespaces.set(bindings.name.text, moduleName);
+				} else if (bindings && ts.isNamedImports(bindings)) {
+					for (const element of bindings.elements) {
+						const importedName = element.propertyName?.text ?? element.name.text;
+						imports.set(element.name.text, {
+							exportName: importedName,
+							moduleName,
+							primitive: moduleName ? undefined : importedPrimitive(specifier, importedName),
+						});
+					}
+				}
+				continue;
+			}
+			if (ts.isFunctionDeclaration(statement) && statement.name) {
+				const node = functionsByFileAndName.get(`${file.fileName}:${statement.name.text}`);
+				if (node && statement.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword)) {
+					exports.set(
+						statement.modifiers.some(({ kind }) => kind === ts.SyntaxKind.DefaultKeyword)
+							? "default"
+							: statement.name.text,
+						`function:${node.id}`
+					);
+				}
+				continue;
+			}
+			if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+				const specifier =
+					statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)
+						? statement.moduleSpecifier.text
+						: undefined;
+				const moduleName = specifier ? resolveModuleName(file.fileName, specifier, sourceNames) : file.fileName;
+				for (const element of statement.exportClause.elements) {
+					const importedName = element.propertyName?.text ?? element.name.text;
+					exports.set(element.name.text, {
+						exportName: importedName,
+						moduleName,
+						primitive: specifier && !moduleName ? importedPrimitive(specifier, importedName) : undefined,
+					});
+				}
+			}
+		}
+		result.set(file.fileName, { exports, imports, namespaces });
+	}
+	return result;
+}
+
+function semanticAnalysis(
+	files: readonly ts.SourceFile[],
+	nodes: readonly FunctionNode[]
+): { reviewedOperations: string[]; violations: string[] } {
+	const modules = semanticModules(files, nodes);
+	const nodesById = new Map(nodes.map((node) => [node.id, node]));
+	const moduleFunctions = new Map<string, FunctionNode>();
+	const classMethods = new Map<string, FunctionNode>();
+	const variables = new Map<string, ts.Expression>();
+	const classProperties = new Map<string, ts.Expression>();
+	const parameterTargets = new Map<string, Map<string, Set<SemanticTarget>>>();
+	for (const node of nodes) {
+		if (node.className) classMethods.set(`${node.file.fileName}:${node.className}:${node.name}`, node);
+		else moduleFunctions.set(`${node.file.fileName}:${node.name}`, node);
+		const parameters = new Map<string, Set<SemanticTarget>>();
+		for (const parameter of node.declaration.parameters) {
+			if (ts.isIdentifier(parameter.name)) parameters.set(parameter.name.text, new Set());
+		}
+		parameterTargets.set(node.id, parameters);
+		const visit = (child: ts.Node): void => {
+			if (child !== node.body && ts.isFunctionLike(child)) return;
+			if (ts.isVariableDeclaration(child) && ts.isIdentifier(child.name) && child.initializer) {
+				variables.set(`${node.id}:${child.name.text}`, child.initializer);
+			}
+			ts.forEachChild(child, visit);
+		};
+		visit(node.body);
+	}
+	for (const file of files) {
+		const visit = (child: ts.Node, className?: string): void => {
+			if (ts.isClassDeclaration(child)) {
+				const nextClass = child.name?.text;
+				for (const member of child.members) visit(member, nextClass);
+				return;
+			}
+			if (className && ts.isPropertyDeclaration(child) && child.initializer && child.name) {
+				const name = ts.isIdentifier(child.name) || ts.isStringLiteral(child.name) ? child.name.text : undefined;
+				if (name) classProperties.set(`${file.fileName}:${className}:${name}`, child.initializer);
+			}
+		};
+		for (const statement of file.statements) visit(statement);
+	}
+
+	const exportTargets = (
+		moduleName: string,
+		exportName: string,
+		seen: Set<string> = new Set()
+	): Set<SemanticTarget> => {
+		const key = `${moduleName}:${exportName}`;
+		if (seen.has(key)) return new Set();
+		seen.add(key);
+		const binding = modules.get(moduleName)?.exports.get(exportName);
+		if (typeof binding === "string") return new Set([binding]);
+		if (binding?.primitive) return new Set<SemanticTarget>([`primitive:${binding.primitive}`]);
+		if (binding?.moduleName) return exportTargets(binding.moduleName, binding.exportName, seen);
+		const local = moduleFunctions.get(key);
+		return local ? new Set<SemanticTarget>([`function:${local.id}`]) : new Set();
+	};
+	const expressionTargets = (
+		expression: ts.Expression,
+		owner: FunctionNode,
+		seen: Set<string> = new Set()
+	): Set<SemanticTarget> => {
+		const expressionKey = `${owner.id}:${expression.pos}:${expression.end}`;
+		if (seen.has(expressionKey)) return new Set();
+		seen.add(expressionKey);
+		if (ts.isParenthesizedExpression(expression)) return expressionTargets(expression.expression, owner, seen);
+		if (ts.isIdentifier(expression)) {
+			if (expression.text === "structuredClone") return new Set(["primitive:structuredClone"]);
+			if (expression.text === "JSON") return new Set(["primitive:json"]);
+			const parameter = parameterTargets.get(owner.id)?.get(expression.text);
+			if (parameter?.size) return new Set(parameter);
+			const variable = variables.get(`${owner.id}:${expression.text}`);
+			if (variable) return expressionTargets(variable, owner, seen);
+			const imported = modules.get(owner.file.fileName)?.imports.get(expression.text);
+			if (imported?.primitive) return new Set<SemanticTarget>([`primitive:${imported.primitive}`]);
+			if (imported?.moduleName) return exportTargets(imported.moduleName, imported.exportName);
+			const local = moduleFunctions.get(`${owner.file.fileName}:${expression.text}`);
+			return local ? new Set<SemanticTarget>([`function:${local.id}`]) : new Set();
+		}
+		if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+			const name = propertyName(expression);
+			if (!name) return new Set();
+			if (expression.expression.kind === ts.SyntaxKind.ThisKeyword && owner.className) {
+				const method = classMethods.get(`${owner.file.fileName}:${owner.className}:${name}`);
+				if (method) return new Set<SemanticTarget>([`function:${method.id}`]);
+				const property = classProperties.get(`${owner.file.fileName}:${owner.className}:${name}`);
+				return property ? expressionTargets(property, owner, seen) : new Set();
+			}
+			if (ts.isIdentifier(expression.expression)) {
+				const receiver = expression.expression.text;
+				if (receiver === "globalThis" && name === "structuredClone") {
+					return new Set(["primitive:structuredClone"]);
+				}
+				if (receiver === "JSON" && (name === "parse" || name === "stringify")) {
+					return new Set(["primitive:json"]);
+				}
+				const namespace = modules.get(owner.file.fileName)?.namespaces.get(receiver);
+				if (namespace) return exportTargets(namespace, name);
+				const variable = variables.get(`${owner.id}:${receiver}`);
+				if (variable && ts.isObjectLiteralExpression(variable)) {
+					const property = variable.properties.find(
+						(candidate): candidate is ts.PropertyAssignment =>
+							ts.isPropertyAssignment(candidate) &&
+							(ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
+							candidate.name.text === name
+					);
+					if (property) return expressionTargets(property.initializer, owner, seen);
+				}
+			}
+		}
+		return new Set();
+	};
+
+	const edges = new Map<string, Set<string>>();
+	const operations = new Map<string, SemanticOperation>();
+	let changed = true;
+	for (let pass = 0; changed && pass < nodes.length + 4; pass++) {
+		changed = false;
+		for (const owner of nodes) {
+			const visit = (node: ts.Node): void => {
+				if (node !== owner.body && ts.isFunctionLike(node)) return;
+				if (ts.isCallExpression(node)) {
+					for (const target of expressionTargets(node.expression, owner)) {
+						if (target.startsWith("primitive:")) {
+							const primitive = target.slice("primitive:".length) as SemanticPrimitive;
+							operations.set(`${owner.id}:${node.pos}:${primitive}`, { call: node, owner, primitive });
+							continue;
+						}
+						const targetId = target.slice("function:".length);
+						const ownerEdges = edges.get(owner.id) ?? new Set<string>();
+						if (!ownerEdges.has(targetId)) {
+							ownerEdges.add(targetId);
+							edges.set(owner.id, ownerEdges);
+							changed = true;
+						}
+						const targetNode = nodesById.get(targetId);
+						if (!targetNode) continue;
+						for (let index = 0; index < targetNode.declaration.parameters.length; index++) {
+							const parameter = targetNode.declaration.parameters[index];
+							const argument = node.arguments[index];
+							if (!argument || !ts.isIdentifier(parameter.name)) continue;
+							const targets = parameterTargets.get(targetId)?.get(parameter.name.text);
+							if (!targets) continue;
+							for (const argumentTarget of expressionTargets(argument, owner)) {
+								if (!targets.has(argumentTarget)) {
+									targets.add(argumentTarget);
+									changed = true;
+								}
+							}
+						}
+					}
+				}
+				ts.forEachChild(node, visit);
+			};
+			visit(owner.body);
+		}
+	}
+
+	const rootIds = new Set<string>();
+	for (const node of nodes) {
+		const base = path.posix.basename(node.file.fileName);
+		const globallyGoverned =
+			GLOBALLY_GOVERNED_FILES.has(base) &&
+			(!node.file.fileName.startsWith("packages/") || node.file.fileName.startsWith("packages/object/src/"));
+		const publicationRoot = ROOT_METHODS.has(node.name);
+		const ownershipRoot =
+			node.className === "DRPObject" &&
+			["getStates", "setACLState", "setDRPState"].includes(node.name) &&
+			/(?:^|\/)object\/src\/index\.ts$/.test(node.file.fileName);
+		if (globallyGoverned || publicationRoot || ownershipRoot) rootIds.add(node.id);
+	}
+	const reachable = new Set<string>();
+	const pending = [...rootIds];
+	while (pending.length) {
+		const id = pending.pop();
+		if (!id || reachable.has(id)) continue;
+		reachable.add(id);
+		pending.push(...(edges.get(id) ?? []));
+	}
+
+	const injectedLeaves = nodes.filter((node) => /(?:type|kind)\s*:\s*["']copy["']/.test(node.body.getText(node.file)));
+	const reachedByBothPublicationRoots = (owner: FunctionNode): boolean =>
+		[...ROOT_METHODS].every((rootName) => {
+			const root = nodes.find(({ name }) => name === rootName);
+			if (!root) return false;
+			const seen = new Set<string>();
+			const queue = [root.id];
+			while (queue.length) {
+				const id = queue.pop();
+				if (!id || seen.has(id)) continue;
+				if (id === owner.id) return true;
+				seen.add(id);
+				queue.push(...(edges.get(id) ?? []));
+			}
+			return false;
+		});
+	const operationId = (operation: SemanticOperation): string => {
+		const kind =
+			operation.primitive === "cloneDeep" || operation.primitive === "structuredClone" ? "clone" : "serialization";
+		return `${ownerLabel(operation.owner)}:${kind}`;
+	};
+	const residualSite = (operation: SemanticOperation): string => {
+		const owner = ownerLabel(operation.owner).replace(/^packages\/object\/src\//, "");
+		return `${owner}:${normalizedCall(operation.call)}`;
+	};
+	const qualifiesReviewed = (operation: SemanticOperation): boolean => {
+		const id = operationId(operation);
+		if (!REVIEWED_WORKSPACE_OPERATIONS.includes(id as (typeof REVIEWED_WORKSPACE_OPERATIONS)[number])) return false;
+		if (id.endsWith("DRPVertexApplier.copyPublicationPayload:clone")) {
+			return (
+				operation.primitive === "cloneDeep" &&
+				injectedLeaves.some(({ id: leafId }) => leafId === operation.owner.id) &&
+				reachedByBothPublicationRoots(operation.owner)
+			);
+		}
+		if (id.endsWith("DRPObject.getStates:clone")) {
+			const body = operation.owner.body.getText(operation.owner.file);
+			return operation.primitive === "cloneDeep" && /getACLState/.test(body) && /getDRPState/.test(body);
+		}
+		if (id.endsWith("DRPObject.setACLState:clone")) {
+			return (
+				operation.primitive === "cloneDeep" &&
+				/\.setACLState\s*\(/.test(operation.owner.body.getText(operation.owner.file))
+			);
+		}
+		if (id.endsWith("DRPObject.setDRPState:clone")) {
+			return (
+				operation.primitive === "cloneDeep" &&
+				/\.setDRPState\s*\(/.test(operation.owner.body.getText(operation.owner.file))
+			);
+		}
+		return (
+			operation.primitive === "serialization" &&
+			operation.owner.name === "serializeValue" &&
+			/returnencode\([^)]*,\{extensionCodec\}\)/.test(
+				operation.owner.body.getText(operation.owner.file).replace(/\s+/g, "")
+			)
+		);
+	};
+	const reviewedOperations = new Set<string>();
+	const violations: string[] = [];
+	for (const operation of operations.values()) {
+		if (!reachable.has(operation.owner.id)) continue;
+		if (operation.primitive === "cloneDeep" && RESIDUAL_CLONE_SITES.has(residualSite(operation))) continue;
+		if (operation.primitive === "stateFromDRP" && RESIDUAL_STATE_CAPTURE_SITES.has(residualSite(operation))) continue;
+		if (
+			operation.primitive === "cloneDeep" &&
+			injectedLeaves.some(({ id }) => id === operation.owner.id) &&
+			reachedByBothPublicationRoots(operation.owner)
+		) {
+			if (qualifiesReviewed(operation)) reviewedOperations.add(operationId(operation));
+			continue;
+		}
+		if (qualifiesReviewed(operation)) {
+			reviewedOperations.add(operationId(operation));
+			continue;
+		}
+		violations.push(
+			`${ownerLabel(operation.owner)} reaches forbidden ${operation.primitive === "json" ? "serialization round-trip" : operation.primitive} operation through the workspace module graph`
+		);
+	}
+	const qualifiedSerializationOwners = new Set(
+		[...operations.values()]
+			.filter(
+				(operation) =>
+					operation.primitive === "serialization" &&
+					operation.owner.name === "serializeValue" &&
+					qualifiesReviewed(operation)
+			)
+			.map(({ owner }) => owner.id)
+	);
+	for (const [callerId, callees] of edges) {
+		if (!reachable.has(callerId)) continue;
+		const caller = nodesById.get(callerId);
+		if (!caller || caller.name === "serializedValuesEqual") continue;
+		for (const calleeId of callees) {
+			if (!qualifiedSerializationOwners.has(calleeId)) continue;
+			violations.push(
+				`${ownerLabel(caller)} reaches forbidden serialization operation through the workspace module graph`
+			);
+		}
+	}
+	return {
+		reviewedOperations: [...reviewedOperations].sort(),
+		violations: [...new Set(violations)].sort(),
+	};
+}
+
+function analyze(sources: Readonly<Record<string, string>>): ClosureAnalysis & WorkspaceIntegrationCensus {
+	const legacy = analyzeLegacy(sources);
+	const files = Object.entries(sources).map(([name, source]) =>
+		ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+	);
+	const semantic = semanticAnalysis(files, functions(files));
+	return {
+		...legacy,
+		analyzedSourcePaths: Object.keys(sources).sort(),
+		reviewedOperations: semantic.reviewedOperations,
+		violations: [...new Set([...legacy.violations, ...semantic.violations])].sort(),
 	};
 }
 
