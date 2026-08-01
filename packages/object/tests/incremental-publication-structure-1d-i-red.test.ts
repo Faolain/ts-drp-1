@@ -43,7 +43,7 @@ const REVIEWED_WORKSPACE_OPERATIONS = [
 ] as const;
 
 interface FunctionNode {
-	readonly body: ts.Block;
+	readonly body: ts.ConciseBody;
 	readonly className?: string;
 	readonly declaration: ts.FunctionLikeDeclaration;
 	readonly file: ts.SourceFile;
@@ -134,6 +134,21 @@ function expectWorkspaceIntegration(
 function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 	const result: FunctionNode[] = [];
 	for (const file of files) {
+		const add = (
+			declaration: ts.FunctionLikeDeclaration,
+			body: ts.ConciseBody,
+			name: string,
+			className?: string
+		): void => {
+			result.push({
+				body,
+				className,
+				declaration,
+				file,
+				id: `${file.fileName}:${className ?? "<module>"}.${name}@${declaration.pos}`,
+				name,
+			});
+		};
 		const visit = (node: ts.Node, className?: string): void => {
 			if (ts.isClassDeclaration(node)) {
 				const nextClass = node.name?.text ?? `<anonymous@${node.pos}>`;
@@ -141,24 +156,32 @@ function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 				return;
 			}
 			if (ts.isConstructorDeclaration(node) && node.body) {
-				result.push({
-					body: node.body,
-					className,
-					declaration: node,
-					file,
-					id: `${file.fileName}:${className ?? "<module>"}.constructor@${node.pos}`,
-					name: "constructor",
-				});
-			} else if ((ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && node.body) {
-				const name = ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file);
-				result.push({
-					body: node.body,
-					className,
-					declaration: node,
-					file,
-					id: `${file.fileName}:${className ?? "<module>"}.${name}@${node.pos}`,
-					name,
-				});
+				add(node, node.body, "constructor", className);
+			} else if (ts.isMethodDeclaration(node) && node.name && node.body) {
+				add(node, node.body, ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file), className);
+			} else if (ts.isFunctionDeclaration(node) && node.body) {
+				const isDefault = node.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.DefaultKeyword);
+				add(node, node.body, node.name?.text ?? (isDefault ? "default" : `<anonymous@${node.pos}>`), className);
+			} else if (
+				ts.isVariableDeclaration(node) &&
+				ts.isIdentifier(node.name) &&
+				node.initializer &&
+				(ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+			) {
+				add(node.initializer, node.initializer.body, node.name.text, className);
+			} else if (
+				className &&
+				ts.isPropertyDeclaration(node) &&
+				node.name &&
+				node.initializer &&
+				(ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+			) {
+				add(
+					node.initializer,
+					node.initializer.body,
+					ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : node.name.getText(file),
+					className
+				);
 			}
 			ts.forEachChild(node, (child) => visit(child, className));
 		};
@@ -397,7 +420,7 @@ function globalViolations(
 				const primitive = forbiddenReference(node.expression, bindings, namespaces);
 				if (primitive) {
 					const owner = ownerFor(node, nodes);
-					const site = `${ownerLabel(owner)}:${normalizedCall(node)}`;
+					const site = `${ownerLabel(owner).replace(/^packages\/object\/src\//, "")}:${normalizedCall(node)}`;
 					if (primitive === "cloneDeep") {
 						if (leafIds.has(owner?.id ?? "")) {
 							// The single observed copy leaf owns any production detachment primitive.
@@ -445,7 +468,7 @@ function globalViolations(
 
 	const globallyScanned = new Set<ts.SourceFile>();
 	for (const file of files) {
-		if (!GLOBALLY_GOVERNED_FILES.has(file.fileName)) continue;
+		if (!GLOBALLY_GOVERNED_FILES.has(path.posix.basename(file.fileName))) continue;
 		globallyScanned.add(file);
 		scan(file);
 	}
@@ -529,19 +552,27 @@ function analyzeLegacy(sources: Readonly<Record<string, string>>): ClosureAnalys
 	};
 }
 
-type SemanticPrimitive = "cloneDeep" | "structuredClone" | "serialization" | "json" | "stateFromDRP";
-type SemanticTarget = `function:${string}` | `primitive:${SemanticPrimitive}`;
+type SemanticPrimitive =
+	| "cloneDeep"
+	| "structuredClone"
+	| "serialization"
+	| "json"
+	| "stateFromDRP"
+	| "unresolvedInternal";
+type SemanticTarget = `function:${string}` | `object:${string}:${string}` | `primitive:${SemanticPrimitive}`;
 
 interface ImportBinding {
 	readonly exportName: string;
 	readonly moduleName?: string;
 	readonly primitive?: SemanticPrimitive;
+	readonly unresolvedInternal?: boolean;
 }
 
 interface SemanticModule {
 	readonly exports: ReadonlyMap<string, ImportBinding | SemanticTarget>;
 	readonly imports: ReadonlyMap<string, ImportBinding>;
 	readonly namespaces: ReadonlyMap<string, string>;
+	readonly starExports: readonly string[];
 }
 
 interface SemanticOperation {
@@ -570,8 +601,12 @@ function importedPrimitive(moduleName: string, importedName: string): SemanticPr
 	if (moduleName === "@msgpack/msgpack" && (importedName === "encode" || importedName === "decode")) {
 		return "serialization";
 	}
-	if (importedName === "stateFromDRP") return "stateFromDRP";
-	if (SERIALIZATION_PRIMITIVES.has(importedName)) return "serialization";
+	if (moduleName === "node:v8" && (importedName === "serialize" || importedName === "deserialize")) {
+		return "serialization";
+	}
+	if (moduleName === "@bufbuild/protobuf" && (importedName === "toBinary" || importedName === "fromBinary")) {
+		return "serialization";
+	}
 	return undefined;
 }
 
@@ -589,6 +624,7 @@ function semanticModules(
 		const imports = new Map<string, ImportBinding>();
 		const namespaces = new Map<string, string>();
 		const exports = new Map<string, ImportBinding | SemanticTarget>();
+		const starExports: string[] = [];
 		for (const statement of file.statements) {
 			if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
 				const specifier = statement.moduleSpecifier.text;
@@ -599,11 +635,13 @@ function semanticModules(
 						exportName: "default",
 						moduleName,
 						primitive: moduleName ? undefined : importedPrimitive(specifier, "default"),
+						unresolvedInternal:
+							file.fileName.startsWith("packages/") && specifier.startsWith("@ts-drp/") && !moduleName,
 					});
 				}
 				const bindings = clause?.namedBindings;
-				if (bindings && ts.isNamespaceImport(bindings) && moduleName) {
-					namespaces.set(bindings.name.text, moduleName);
+				if (bindings && ts.isNamespaceImport(bindings)) {
+					namespaces.set(bindings.name.text, moduleName ?? specifier);
 				} else if (bindings && ts.isNamedImports(bindings)) {
 					for (const element of bindings.elements) {
 						const importedName = element.propertyName?.text ?? element.name.text;
@@ -611,21 +649,42 @@ function semanticModules(
 							exportName: importedName,
 							moduleName,
 							primitive: moduleName ? undefined : importedPrimitive(specifier, importedName),
+							unresolvedInternal:
+								file.fileName.startsWith("packages/") && specifier.startsWith("@ts-drp/") && !moduleName,
 						});
 					}
 				}
 				continue;
 			}
-			if (ts.isFunctionDeclaration(statement) && statement.name) {
-				const node = functionsByFileAndName.get(`${file.fileName}:${statement.name.text}`);
+			if (ts.isFunctionDeclaration(statement)) {
+				const exportedName = statement.name?.text ?? "default";
+				const node = functionsByFileAndName.get(`${file.fileName}:${exportedName}`);
 				if (node && statement.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword)) {
 					exports.set(
-						statement.modifiers.some(({ kind }) => kind === ts.SyntaxKind.DefaultKeyword)
-							? "default"
-							: statement.name.text,
+						statement.modifiers.some(({ kind }) => kind === ts.SyntaxKind.DefaultKeyword) ? "default" : exportedName,
 						`function:${node.id}`
 					);
 				}
+				continue;
+			}
+			if (
+				ts.isVariableStatement(statement) &&
+				statement.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword)
+			) {
+				for (const declaration of statement.declarationList.declarations) {
+					if (!ts.isIdentifier(declaration.name)) continue;
+					const node = functionsByFileAndName.get(`${file.fileName}:${declaration.name.text}`);
+					if (node) exports.set(declaration.name.text, `function:${node.id}`);
+					else if (declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
+						exports.set(declaration.name.text, `object:${file.fileName}:${declaration.name.text}`);
+					}
+				}
+				continue;
+			}
+			if (ts.isExportDeclaration(statement) && !statement.exportClause && statement.moduleSpecifier) {
+				const specifier = ts.isStringLiteral(statement.moduleSpecifier) ? statement.moduleSpecifier.text : undefined;
+				const moduleName = specifier ? resolveModuleName(file.fileName, specifier, sourceNames) : undefined;
+				if (moduleName) starExports.push(moduleName);
 				continue;
 			}
 			if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
@@ -644,7 +703,7 @@ function semanticModules(
 				}
 			}
 		}
-		result.set(file.fileName, { exports, imports, namespaces });
+		result.set(file.fileName, { exports, imports, namespaces, starExports });
 	}
 	return result;
 }
@@ -655,11 +714,17 @@ function semanticAnalysis(
 ): { reviewedOperations: string[]; violations: string[] } {
 	const modules = semanticModules(files, nodes);
 	const nodesById = new Map(nodes.map((node) => [node.id, node]));
+	const nodesByDeclaration = new Map(nodes.map((node) => [node.declaration, node]));
 	const moduleFunctions = new Map<string, FunctionNode>();
 	const classMethods = new Map<string, FunctionNode>();
 	const variables = new Map<string, ts.Expression>();
+	const destructuredVariables = new Map<string, { readonly property: string; readonly source: ts.Expression }>();
+	const moduleVariables = new Map<string, ts.Expression>();
+	const moduleBindings = new Set<string>();
 	const classProperties = new Map<string, ts.Expression>();
 	const parameterTargets = new Map<string, Map<string, Set<SemanticTarget>>>();
+	const returnedTargets = new Map<string, Set<SemanticTarget>>();
+	const storedTargets = new Map<string, Set<SemanticTarget>>();
 	for (const node of nodes) {
 		if (node.className) classMethods.set(`${node.file.fileName}:${node.className}:${node.name}`, node);
 		else moduleFunctions.set(`${node.file.fileName}:${node.name}`, node);
@@ -672,12 +737,34 @@ function semanticAnalysis(
 			if (child !== node.body && ts.isFunctionLike(child)) return;
 			if (ts.isVariableDeclaration(child) && ts.isIdentifier(child.name) && child.initializer) {
 				variables.set(`${node.id}:${child.name.text}`, child.initializer);
+			} else if (ts.isVariableDeclaration(child) && ts.isObjectBindingPattern(child.name) && child.initializer) {
+				for (const element of child.name.elements) {
+					if (!ts.isIdentifier(element.name)) continue;
+					const property = element.propertyName
+						? ts.isIdentifier(element.propertyName) || ts.isStringLiteral(element.propertyName)
+							? element.propertyName.text
+							: undefined
+						: element.name.text;
+					if (property)
+						destructuredVariables.set(`${node.id}:${element.name.text}`, { property, source: child.initializer });
+				}
 			}
 			ts.forEachChild(child, visit);
 		};
 		visit(node.body);
 	}
 	for (const file of files) {
+		for (const statement of file.statements) {
+			if (!ts.isVariableStatement(statement)) continue;
+			for (const declaration of statement.declarationList.declarations) {
+				if (ts.isIdentifier(declaration.name)) {
+					moduleBindings.add(`${file.fileName}:${declaration.name.text}`);
+					if (declaration.initializer) {
+						moduleVariables.set(`${file.fileName}:${declaration.name.text}`, declaration.initializer);
+					}
+				}
+			}
+		}
 		const visit = (child: ts.Node, className?: string): void => {
 			if (ts.isClassDeclaration(child)) {
 				const nextClass = child.name?.text;
@@ -703,9 +790,20 @@ function semanticAnalysis(
 		const binding = modules.get(moduleName)?.exports.get(exportName);
 		if (typeof binding === "string") return new Set([binding]);
 		if (binding?.primitive) return new Set<SemanticTarget>([`primitive:${binding.primitive}`]);
-		if (binding?.moduleName) return exportTargets(binding.moduleName, binding.exportName, seen);
+		if (binding?.moduleName) {
+			if (binding.moduleName === moduleName) {
+				const localBinding = moduleFunctions.get(`${moduleName}:${binding.exportName}`);
+				if (localBinding) return new Set<SemanticTarget>([`function:${localBinding.id}`]);
+			}
+			return exportTargets(binding.moduleName, binding.exportName, seen);
+		}
 		const local = moduleFunctions.get(key);
-		return local ? new Set<SemanticTarget>([`function:${local.id}`]) : new Set();
+		if (local) return new Set<SemanticTarget>([`function:${local.id}`]);
+		const targets = new Set<SemanticTarget>();
+		for (const starModule of modules.get(moduleName)?.starExports ?? []) {
+			for (const target of exportTargets(starModule, exportName, new Set(seen))) targets.add(target);
+		}
+		return targets;
 	};
 	const expressionTargets = (
 		expression: ts.Expression,
@@ -716,18 +814,40 @@ function semanticAnalysis(
 		if (seen.has(expressionKey)) return new Set();
 		seen.add(expressionKey);
 		if (ts.isParenthesizedExpression(expression)) return expressionTargets(expression.expression, owner, seen);
+		if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.CommaToken) {
+			return expressionTargets(expression.right, owner, seen);
+		}
+		if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
+			const callable = nodesByDeclaration.get(expression);
+			return callable ? new Set<SemanticTarget>([`function:${callable.id}`]) : new Set();
+		}
 		if (ts.isIdentifier(expression)) {
 			if (expression.text === "structuredClone") return new Set(["primitive:structuredClone"]);
 			if (expression.text === "JSON") return new Set(["primitive:json"]);
 			const parameter = parameterTargets.get(owner.id)?.get(expression.text);
 			if (parameter?.size) return new Set(parameter);
+			const stored = storedTargets.get(`${owner.file.fileName}:${expression.text}`);
+			if (stored?.size) return new Set(stored);
+			const destructured = destructuredVariables.get(`${owner.id}:${expression.text}`);
+			if (destructured) return propertyTargets(destructured.source, destructured.property, owner, seen);
 			const variable = variables.get(`${owner.id}:${expression.text}`);
 			if (variable) return expressionTargets(variable, owner, seen);
+			const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+			if (moduleVariable) return expressionTargets(moduleVariable, owner, seen);
 			const imported = modules.get(owner.file.fileName)?.imports.get(expression.text);
 			if (imported?.primitive) return new Set<SemanticTarget>([`primitive:${imported.primitive}`]);
+			if (imported?.unresolvedInternal) return new Set<SemanticTarget>(["primitive:unresolvedInternal"]);
 			if (imported?.moduleName) return exportTargets(imported.moduleName, imported.exportName);
 			const local = moduleFunctions.get(`${owner.file.fileName}:${expression.text}`);
 			return local ? new Set<SemanticTarget>([`function:${local.id}`]) : new Set();
+		}
+		if (ts.isCallExpression(expression)) {
+			const result = new Set<SemanticTarget>();
+			for (const target of expressionTargets(expression.expression, owner, seen)) {
+				if (!target.startsWith("function:")) continue;
+				for (const returned of returnedTargets.get(target.slice("function:".length)) ?? []) result.add(returned);
+			}
+			return result;
 		}
 		if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
 			const name = propertyName(expression);
@@ -740,6 +860,10 @@ function semanticAnalysis(
 			}
 			if (ts.isIdentifier(expression.expression)) {
 				const receiver = expression.expression.text;
+				if (owner.className && receiver === owner.className) {
+					const method = classMethods.get(`${owner.file.fileName}:${owner.className}:${name}`);
+					if (method) return new Set<SemanticTarget>([`function:${method.id}`]);
+				}
 				if (receiver === "globalThis" && name === "structuredClone") {
 					return new Set(["primitive:structuredClone"]);
 				}
@@ -747,21 +871,61 @@ function semanticAnalysis(
 					return new Set(["primitive:json"]);
 				}
 				const namespace = modules.get(owner.file.fileName)?.namespaces.get(receiver);
-				if (namespace) return exportTargets(namespace, name);
-				const variable = variables.get(`${owner.id}:${receiver}`);
-				if (variable && ts.isObjectLiteralExpression(variable)) {
-					const property = variable.properties.find(
-						(candidate): candidate is ts.PropertyAssignment =>
-							ts.isPropertyAssignment(candidate) &&
-							(ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
-							candidate.name.text === name
-					);
-					if (property) return expressionTargets(property.initializer, owner, seen);
+				if (namespace) {
+					const primitive = importedPrimitive(namespace, name);
+					return primitive ? new Set<SemanticTarget>([`primitive:${primitive}`]) : exportTargets(namespace, name);
 				}
+				const imported = modules.get(owner.file.fileName)?.imports.get(receiver);
+				if (imported?.moduleName) {
+					const result = new Set<SemanticTarget>();
+					for (const target of exportTargets(imported.moduleName, imported.exportName)) {
+						if (!target.startsWith("object:")) continue;
+						const [, objectFile, objectName] = target.match(/^object:(.*):([^:]+)$/) ?? [];
+						const object = objectFile ? moduleVariables.get(`${objectFile}:${objectName}`) : undefined;
+						if (object) for (const nested of propertyTargets(object, name, owner, seen)) result.add(nested);
+					}
+					if (result.size) return result;
+				}
+				const variable = variables.get(`${owner.id}:${receiver}`);
+				if (variable) return propertyTargets(variable, name, owner, seen);
+				const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${receiver}`);
+				if (moduleVariable) return propertyTargets(moduleVariable, name, owner, seen);
 			}
 		}
 		return new Set();
 	};
+	function propertyTargets(
+		expression: ts.Expression,
+		name: string,
+		owner: FunctionNode,
+		seen: Set<string>
+	): Set<SemanticTarget> {
+		if (ts.isIdentifier(expression)) {
+			const namespace = modules.get(owner.file.fileName)?.namespaces.get(expression.text);
+			if (namespace) {
+				const primitive = importedPrimitive(namespace, name);
+				return primitive ? new Set<SemanticTarget>([`primitive:${primitive}`]) : exportTargets(namespace, name);
+			}
+			const variable = variables.get(`${owner.id}:${expression.text}`);
+			if (variable) return propertyTargets(variable, name, owner, seen);
+			const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+			if (moduleVariable) return propertyTargets(moduleVariable, name, owner, seen);
+		}
+		if (!ts.isObjectLiteralExpression(expression)) return new Set();
+		for (const candidate of expression.properties) {
+			if (
+				(ts.isPropertyAssignment(candidate) || ts.isMethodDeclaration(candidate)) &&
+				candidate.name &&
+				(ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
+				candidate.name.text === name
+			) {
+				if (ts.isPropertyAssignment(candidate)) return expressionTargets(candidate.initializer, owner, seen);
+				const callable = nodesByDeclaration.get(candidate);
+				return callable ? new Set<SemanticTarget>([`function:${callable.id}`]) : new Set();
+			}
+		}
+		return new Set();
+	}
 
 	const edges = new Map<string, Set<string>>();
 	const operations = new Map<string, SemanticOperation>();
@@ -771,13 +935,56 @@ function semanticAnalysis(
 		for (const owner of nodes) {
 			const visit = (node: ts.Node): void => {
 				if (node !== owner.body && ts.isFunctionLike(node)) return;
-				if (ts.isCallExpression(node)) {
+				if (ts.isReturnStatement(node) && node.expression) {
+					const targets = returnedTargets.get(owner.id) ?? new Set<SemanticTarget>();
 					for (const target of expressionTargets(node.expression, owner)) {
+						if (!targets.has(target)) {
+							targets.add(target);
+							changed = true;
+						}
+					}
+					returnedTargets.set(owner.id, targets);
+				}
+				if (
+					ts.isBinaryExpression(node) &&
+					node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+					ts.isIdentifier(node.left) &&
+					moduleBindings.has(`${owner.file.fileName}:${node.left.text}`)
+				) {
+					const targets = storedTargets.get(`${owner.file.fileName}:${node.left.text}`) ?? new Set<SemanticTarget>();
+					for (const target of expressionTargets(node.right, owner)) {
+						if (!targets.has(target)) {
+							targets.add(target);
+							changed = true;
+						}
+					}
+					storedTargets.set(`${owner.file.fileName}:${node.left.text}`, targets);
+				}
+				if (ts.isCallExpression(node)) {
+					const callTargets = new Set(expressionTargets(node.expression, owner));
+					if (
+						node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+						node.arguments[0] &&
+						ts.isStringLiteral(node.arguments[0]) &&
+						["@msgpack/msgpack", "node:v8", "@bufbuild/protobuf"].includes(node.arguments[0].text)
+					) {
+						callTargets.add("primitive:serialization");
+					}
+					if (
+						ts.isPropertyAccessExpression(node.expression) &&
+						node.expression.expression.getText(owner.file) === "Reflect" &&
+						node.expression.name.text === "apply" &&
+						node.arguments[0]
+					) {
+						for (const target of expressionTargets(node.arguments[0], owner)) callTargets.add(target);
+					}
+					for (const target of callTargets) {
 						if (target.startsWith("primitive:")) {
 							const primitive = target.slice("primitive:".length) as SemanticPrimitive;
 							operations.set(`${owner.id}:${node.pos}:${primitive}`, { call: node, owner, primitive });
 							continue;
 						}
+						if (!target.startsWith("function:")) continue;
 						const targetId = target.slice("function:".length);
 						const ownerEdges = edges.get(owner.id) ?? new Set<string>();
 						if (!ownerEdges.has(targetId)) {
@@ -867,7 +1074,11 @@ function semanticAnalysis(
 		}
 		if (id.endsWith("DRPObject.getStates:clone")) {
 			const body = operation.owner.body.getText(operation.owner.file);
-			return operation.primitive === "cloneDeep" && /getACLState/.test(body) && /getDRPState/.test(body);
+			return (
+				operation.primitive === "cloneDeep" &&
+				(body.match(/\.getACLState\s*\(/g) ?? []).length === 1 &&
+				(body.match(/\.getDRPState\s*\(/g) ?? []).length === 1
+			);
 		}
 		if (id.endsWith("DRPObject.setACLState:clone")) {
 			return (
@@ -891,6 +1102,14 @@ function semanticAnalysis(
 	};
 	const reviewedOperations = new Set<string>();
 	const violations: string[] = [];
+	const reachableOperations = [...operations.values()].filter(({ owner }) => reachable.has(owner.id));
+	const operationMultiplicity = new Map<string, number>();
+	for (const operation of reachableOperations) {
+		const id = operationId(operation);
+		operationMultiplicity.set(id, (operationMultiplicity.get(id) ?? 0) + 1);
+	}
+	const expectedMultiplicity = (id: string): number => (id.endsWith("DRPObject.getStates:clone") ? 2 : 1);
+	const reportedMultiplicity = new Set<string>();
 	for (const operation of operations.values()) {
 		if (!reachable.has(operation.owner.id)) continue;
 		if (operation.primitive === "cloneDeep" && RESIDUAL_CLONE_SITES.has(residualSite(operation))) continue;
@@ -900,15 +1119,29 @@ function semanticAnalysis(
 			injectedLeaves.some(({ id }) => id === operation.owner.id) &&
 			reachedByBothPublicationRoots(operation.owner)
 		) {
-			if (qualifiesReviewed(operation)) reviewedOperations.add(operationId(operation));
+			const id = operationId(operation);
+			const legacyLeaf = !operation.owner.file.fileName.startsWith("packages/");
+			if ((legacyLeaf || qualifiesReviewed(operation)) && operationMultiplicity.get(id) === expectedMultiplicity(id)) {
+				if (!legacyLeaf) reviewedOperations.add(id);
+			} else if (!reportedMultiplicity.has(id)) {
+				reportedMultiplicity.add(id);
+				violations.push(`${id} has extra or structurally unreviewed clone operations`);
+			}
 			continue;
 		}
 		if (qualifiesReviewed(operation)) {
-			reviewedOperations.add(operationId(operation));
+			const id = operationId(operation);
+			if (operationMultiplicity.get(id) === expectedMultiplicity(id)) reviewedOperations.add(id);
+			else if (!reportedMultiplicity.has(id)) {
+				reportedMultiplicity.add(id);
+				violations.push(`${id} has extra operations beyond the reviewed multiplicity`);
+			}
 			continue;
 		}
 		violations.push(
-			`${ownerLabel(operation.owner)} reaches forbidden ${operation.primitive === "json" ? "serialization round-trip" : operation.primitive} operation through the workspace module graph`
+			operation.primitive === "unresolvedInternal"
+				? `${ownerLabel(operation.owner)} fails closed on unresolved internal workspace import`
+				: `${ownerLabel(operation.owner)} reaches forbidden ${operation.primitive === "json" ? "serialization round-trip" : operation.primitive} operation through the workspace module graph`
 		);
 	}
 	const qualifiedSerializationOwners = new Set(
