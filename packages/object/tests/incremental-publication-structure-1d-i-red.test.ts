@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
@@ -67,6 +68,8 @@ interface ClosureAnalysis {
 
 interface WorkspaceIntegrationCensus {
 	readonly analyzedSourcePaths?: readonly string[];
+	readonly architecture?: D922aArchitectureEvidence;
+	readonly residualStateCaptureSites?: readonly string[];
 	readonly reviewedOperations?: readonly string[];
 }
 
@@ -3064,6 +3067,596 @@ const UTILS_SERIALIZATION_PATH = "packages/utils/src/serialization/index.ts";
 const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
 const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
+
+// D.92.2-a ARCHITECTURE ACCEPTANCE RED
+interface D922aAliasIdentityEvidence {
+	readonly alias: ts.Symbol;
+	readonly target: ts.Symbol;
+}
+
+interface D922aArchitectureEvidence {
+	readonly aliasIdentities: readonly D922aAliasIdentityEvidence[];
+	readonly analyzedSourcePaths: readonly string[];
+	readonly authoritativeAnalysisPasses: number;
+	readonly checker: ts.TypeChecker;
+	readonly convergence: {
+		readonly arbitraryIterationCap: number | null;
+		readonly strategy: "monotone-worklist-to-fixpoint";
+	};
+	readonly identityMode: "checker-symbol";
+	readonly loadedSourcePaths: readonly string[];
+	readonly program: ts.Program;
+	readonly resolvedSourcePaths: readonly string[];
+	readonly sourceFirstResolutions: readonly {
+		readonly resolvedPath: string;
+		readonly specifier: string;
+	}[];
+	readonly sourceTextClassification: false;
+	readonly transferRelation: {
+		readonly defaultOutcome: "unresolved-violation";
+		readonly deferredSyntaxKinds: readonly ts.SyntaxKind[];
+		readonly encounteredSyntaxKinds: readonly ts.SyntaxKind[];
+		readonly hasVisibleDefault: true;
+		readonly transferredSyntaxKinds: readonly ts.SyntaxKind[];
+		readonly unresolvedOutcome: "unresolved-violation";
+	};
+}
+
+interface D922aReviewFixture {
+	readonly family: string;
+	readonly name: string;
+	readonly safeMutation: string;
+	readonly unsafeMutation: string;
+}
+
+const D922A_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export type Callback = (value: unknown) => unknown;
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const D922A_IMPORTS = 'import { capture, safe, type Callback } from "@ts-drp/utils/serialization";';
+
+const D922A_REVIEW9_FIXTURES = Object.freeze([
+	{
+		family: "later read from assignment-rest container",
+		name: "array rest written by assignment and read by a later array assignment",
+		unsafeMutation: `let rest: Callback[] = [];
+			[...rest] = [capture];
+			let selected: Callback = safe;
+			[selected] = rest;
+			selected(state);`,
+		safeMutation: `let rest: Callback[] = [];
+			[...rest] = [safe];
+			let selected: Callback = safe;
+			[selected] = rest;
+			selected(state);`,
+	},
+	{
+		family: "later read from assignment-rest container",
+		name: "object rest written by assignment and read by a later object assignment",
+		unsafeMutation: `let rest: Record<string, Callback> = {};
+			({ ...rest } = { selected: capture });
+			let selected: Callback = safe;
+			({ selected } = rest);
+			selected(state);`,
+		safeMutation: `let rest: Record<string, Callback> = {};
+			({ ...rest } = { selected: safe });
+			let selected: Callback = safe;
+			({ selected } = rest);
+			selected(state);`,
+	},
+	{
+		family: "sibling defaults in one parameter pattern",
+		name: "array sibling default follows the earlier selected default",
+		unsafeMutation: `function run(
+			[first = capture, selected = first]: readonly (Callback | undefined)[] = []
+		): unknown { return selected(state); }
+		run();`,
+		safeMutation: `function run(
+			[first = capture, selected = first]: readonly (Callback | undefined)[] = []
+		): unknown { return selected(state); }
+		run([safe]);`,
+	},
+	{
+		family: "sibling defaults in one parameter pattern",
+		name: "object sibling default follows the earlier selected default",
+		unsafeMutation: `function run(
+			{ first = capture, selected = first }: { first?: Callback; selected?: Callback } = {}
+		): unknown { return selected(state); }
+		run();`,
+		safeMutation: `function run(
+			{ first = capture, selected = first }: { first?: Callback; selected?: Callback } = {}
+		): unknown { return selected(state); }
+		run({ first: safe });`,
+	},
+	{
+		family: "parenthesized assignment target",
+		name: "parenthesized identifier target",
+		unsafeMutation: "let selected: Callback = safe; (selected) = capture; selected(state);",
+		safeMutation: "let selected: Callback = safe; (selected) = safe; selected(state);",
+	},
+	{
+		family: "parenthesized assignment target",
+		name: "parenthesized property target",
+		unsafeMutation:
+			"const holder: { selected: Callback } = { selected: safe }; (holder.selected) = capture; holder.selected(state);",
+		safeMutation:
+			"const holder: { selected: Callback } = { selected: safe }; (holder.selected) = safe; holder.selected(state);",
+	},
+	{
+		family: "parenthesized assignment target",
+		name: "double-parenthesized identifier target",
+		unsafeMutation: "let selected: Callback = safe; ((selected)) = capture; selected(state);",
+		safeMutation: "let selected: Callback = safe; ((selected)) = safe; selected(state);",
+	},
+] satisfies readonly D922aReviewFixture[]);
+
+function d922aReviewSources(mutation: string): Readonly<Record<string, string>> {
+	return {
+		[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(D922A_IMPORTS, mutation),
+		[UTILS_SERIALIZATION_PATH]: D922A_CAPTURE_UTILITY,
+	};
+}
+
+function d922aRuntimeCaptureCount(mutation: string): number {
+	const output = ts.transpileModule(
+		`let captureCount = 0;
+		 const state = { changed: { value: 1 }, unchanged: { ballast: true } };
+		 const capture = (value: unknown): unknown => { captureCount += 1; return value; };
+		 const safe = (value: unknown): unknown => value;
+		 type Callback = (value: unknown) => unknown;
+		 ${mutation}
+		 captureCount;`,
+		{
+			compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 },
+			reportDiagnostics: true,
+		}
+	);
+	expect(output.diagnostics ?? []).toEqual([]);
+	return runInNewContext(output.outputText, Object.create(null)) as number;
+}
+
+function d922aArchitectureFixture(): Readonly<Record<string, string>> {
+	return {
+		[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+			'import { capture as snapshot, safe, type Callback } from "@ts-drp/utils/serialization";',
+			`const callbacks: readonly Callback[] = [snapshot];
+			 for (const callback of callbacks) callback(state);
+			 safe(state);`
+		),
+		[UTILS_SERIALIZATION_PATH]: D922A_CAPTURE_UTILITY,
+	};
+}
+
+function d922aArchitectureEvidence(analysis: ClosureAnalysis & WorkspaceIntegrationCensus): D922aArchitectureEvidence {
+	expect(
+		analysis.architecture,
+		"checker-backed architecture evidence must be exposed by the authoritative gate"
+	).toBeDefined();
+	if (!analysis.architecture) throw new Error("missing checker-backed architecture evidence");
+	return analysis.architecture;
+}
+
+function normalizedSortedPaths(paths: readonly string[]): string[] {
+	return [...paths].map((sourcePath) => sourcePath.split(path.sep).join(path.posix.sep)).sort();
+}
+
+const D922A_PROVENANCE_LAYER_START = "// D.92.2 PROVENANCE LAYER START";
+const D922A_PROVENANCE_LAYER_END = "// D.92.2 PROVENANCE LAYER END";
+
+interface D922aMarkedLayer {
+	readonly endLine: number;
+	readonly lines: readonly string[];
+	readonly source: string;
+	readonly startLine: number;
+}
+
+function d922aGovernanceFileSource(): string {
+	return fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+}
+
+function d922aMarkedProvenanceLayer(source: string): D922aMarkedLayer | undefined {
+	const lines = source.split(/\r?\n/);
+	const starts = lines.flatMap((line, index) => (line.trim() === D922A_PROVENANCE_LAYER_START ? [index] : []));
+	const ends = lines.flatMap((line, index) => (line.trim() === D922A_PROVENANCE_LAYER_END ? [index] : []));
+	if (starts.length !== 1 || ends.length !== 1 || ends[0] <= starts[0]) return undefined;
+	const layerLines = lines.slice(starts[0] + 1, ends[0]);
+	return {
+		endLine: ends[0] + 1,
+		lines: layerLines,
+		source: layerLines.join("\n"),
+		startLine: starts[0] + 1,
+	};
+}
+
+function d922aLegacyResolverLayer(source: string): D922aMarkedLayer | undefined {
+	const file = ts.createSourceFile("governance.test.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const legacy = file.statements.find(
+		(statement): statement is ts.FunctionDeclaration =>
+			ts.isFunctionDeclaration(statement) && statement.name?.text === "semanticAnalysis"
+	);
+	if (!legacy) return undefined;
+	const startLine = file.getLineAndCharacterOfPosition(legacy.getStart(file)).line;
+	const endLine = file.getLineAndCharacterOfPosition(legacy.end).line + 1;
+	const lines = source.split(/\r?\n/).slice(startLine, endLine);
+	return { endLine, lines, source: lines.join("\n"), startLine };
+}
+
+function d922aLogicalReadableLines(lines: readonly string[]): readonly string[] {
+	let blockComment = false;
+	return lines.filter((line) => {
+		const trimmed = line.trim();
+		if (blockComment) {
+			if (trimmed.includes("*/")) blockComment = false;
+			return false;
+		}
+		if (trimmed.startsWith("/*")) {
+			blockComment = !trimmed.includes("*/");
+			return false;
+		}
+		return trimmed.length > 0 && !trimmed.startsWith("//");
+	});
+}
+
+function d922aSiblingStatementStarts(file: ts.SourceFile): number[] {
+	const duplicateLines: number[] = [];
+	const check = (statements: ts.NodeArray<ts.Statement>): void => {
+		const counts = new Map<number, number>();
+		for (const statement of statements) {
+			const line = file.getLineAndCharacterOfPosition(statement.getStart(file)).line + 1;
+			counts.set(line, (counts.get(line) ?? 0) + 1);
+		}
+		for (const [line, count] of counts) if (count > 1) duplicateLines.push(line);
+	};
+	const visit = (node: ts.Node): void => {
+		if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node)) {
+			check(node.statements);
+		} else if (ts.isCaseClause(node) || ts.isDefaultClause(node)) {
+			check(node.statements);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(file);
+	return duplicateLines;
+}
+
+function d922aChainMutation(family: string, hops: number): string {
+	if (family === "assignment") {
+		const declarations = Array.from({ length: hops }, (_value, index) => `let v${index + 1}: Callback = safe;`);
+		const assignments = Array.from({ length: hops - 1 }, (_value, index) => `v${hops - index} = v${hops - index - 1};`);
+		return `${declarations.join("\n")}\n${assignments.join("\n")}\nv1 = capture;\nv${hops}(state);`;
+	}
+	if (family === "callable") {
+		const declarations = ["const f0: Callback = capture;"];
+		for (let index = 1; index <= hops; index += 1) {
+			declarations.push(`const f${index}: Callback = (value: unknown) => f${index - 1}(value);`);
+		}
+		return `${declarations.join("\n")}\nf${hops}(state);`;
+	}
+	if (family === "parameter") {
+		const declarations = ["function f0(callback: Callback, value: unknown): unknown { return callback(value); }"];
+		for (let index = 1; index <= hops; index += 1) {
+			declarations.push(
+				`function f${index}(callback: Callback, value: unknown): unknown { return f${index - 1}(callback, value); }`
+			);
+		}
+		return `${declarations.join("\n")}\nf${hops}(capture, state);`;
+	}
+	if (family === "bind") {
+		const declarations = ["const f0: Callback = capture;"];
+		for (let index = 1; index <= hops; index += 1) {
+			declarations.push(`const f${index}: Callback = f${index - 1}.bind(undefined);`);
+		}
+		return `${declarations.join("\n")}\nf${hops}(state);`;
+	}
+	const declarations = ["function f0(...callbacks: Callback[]): unknown { return callbacks[0](state); }"];
+	for (let index = 1; index <= hops; index += 1) {
+		declarations.push(`function f${index}(...callbacks: Callback[]): unknown { return f${index - 1}(...callbacks); }`);
+	}
+	return `${declarations.join("\n")}\nf${hops}(capture);`;
+}
+
+const D922A_CHAIN_FAMILIES = ["assignment", "callable", "parameter", "bind", "rest-spread"] as const;
+const D922A_CHAIN_HOPS = [24, 64, 120] as const;
+const D922A_CONVERGENCE_PROBES = D922A_CHAIN_FAMILIES.flatMap((family) =>
+	D922A_CHAIN_HOPS.map((hops) => ({
+		name: `${family} ${hops}-hop chain`,
+		sources: d922aReviewSources(d922aChainMutation(family, hops)),
+	}))
+);
+
+const D922A_CYCLE_PROBES = [
+	{
+		name: "assignment cycle",
+		mutation:
+			"let first: Callback = capture; let second: Callback = first; first = second; second = first; first(state);",
+	},
+	{
+		name: "callable cycle",
+		mutation:
+			"function first(value: unknown): unknown { capture(value); return second(value); } function second(value: unknown): unknown { return first(value); } first(state);",
+	},
+	{
+		name: "parameter cycle",
+		mutation:
+			"function first(fn: Callback, value: unknown): unknown { return second(fn, value); } function second(fn: Callback, value: unknown): unknown { fn(value); return first(fn, value); } first(capture, state);",
+	},
+	{
+		name: "bind cycle",
+		mutation:
+			"let selected: Callback = capture; const holder: { selected: Callback } = { selected }; holder.selected = selected.bind(undefined); selected = holder.selected; selected(state);",
+	},
+	{
+		name: "rest-spread cycle",
+		mutation:
+			"function first(...callbacks: Callback[]): unknown { return second(...callbacks); } function second(...callbacks: Callback[]): unknown { callbacks[0](state); return first(...callbacks); } first(capture);",
+	},
+].map(({ mutation, name }) => ({ name, sources: d922aReviewSources(mutation) }));
+
+const D922A_ALL_CONVERGENCE_PROBES = [...D922A_CONVERGENCE_PROBES, ...D922A_CYCLE_PROBES];
+const D922A_CONVERGENCE_CHILD_ENV = "TS_DRP_D922A_CONVERGENCE_CHILD";
+const D922A_CONVERGENCE_CHILD_TEST = "D.92.2-a child convergence probe";
+
+interface D922aChildResult {
+	readonly durationMs: number;
+	readonly errorCode?: string;
+	readonly outputTail: string;
+	readonly signal: NodeJS.Signals | null;
+	readonly status: number | null;
+}
+
+async function runD922aConvergenceChild(): Promise<D922aChildResult> {
+	const { spawnSync } = await import("node:child_process");
+	const startedAt = performance.now();
+	const result = spawnSync(
+		process.execPath,
+		[
+			"--max-old-space-size=256",
+			path.join(WORKSPACE_DIRECTORY, "node_modules/vitest/vitest.mjs"),
+			"run",
+			fileURLToPath(import.meta.url),
+			"-t",
+			D922A_CONVERGENCE_CHILD_TEST,
+			"--reporter=dot",
+			"--coverage.enabled=false",
+			"--pool=threads",
+			"--maxWorkers=1",
+			"--minWorkers=1",
+			"--exclude=.logs/**",
+		],
+		{
+			cwd: WORKSPACE_DIRECTORY,
+			encoding: "utf8",
+			env: { ...process.env, FORCE_COLOR: "0", [D922A_CONVERGENCE_CHILD_ENV]: "1" },
+			killSignal: "SIGKILL",
+			maxBuffer: 512 * 1024,
+			timeout: 30_000,
+		}
+	);
+	const combinedOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+	return {
+		durationMs: Math.round(performance.now() - startedAt),
+		errorCode: (result.error as NodeJS.ErrnoException | undefined)?.code,
+		outputTail: combinedOutput.slice(-4_000),
+		signal: result.signal,
+		status: result.status,
+	};
+}
+
+if (process.env[D922A_CONVERGENCE_CHILD_ENV] === "1") {
+	describe("Phase 1d(i) D.92.2-a bounded convergence child", () => {
+		it.each(D922A_ALL_CONVERGENCE_PROBES)(
+			`${D922A_CONVERGENCE_CHILD_TEST}: $name`,
+			({ sources }) => {
+				const startedAt = performance.now();
+				const analysis = analyze(sources);
+				const durationMs = performance.now() - startedAt;
+				expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(ENCODE_VIOLATION)]));
+				expect(durationMs).toBeLessThanOrEqual(2_000);
+			},
+			2_250
+		);
+	});
+} else {
+	describe("Phase 1d(i) D.92.2-a checker-backed architecture acceptance RED", () => {
+		it.each(D922A_REVIEW9_FIXTURES)("rejects Review9 unsafe $family: $name", ({ name, unsafeMutation }) => {
+			const runtimeCaptureCount = d922aRuntimeCaptureCount(unsafeMutation);
+			console.info(`[d922a-runtime] unsafe=${JSON.stringify(name)} captureCount=${runtimeCaptureCount}`);
+			expect(runtimeCaptureCount).toBe(1);
+			expect(analyze(d922aReviewSources(unsafeMutation)).violations).toEqual(
+				expect.arrayContaining([expect.stringMatching(ENCODE_VIOLATION)])
+			);
+		});
+
+		it.each(D922A_REVIEW9_FIXTURES)(
+			"preserves same-shape Review9 safe control for $family: $name",
+			({ name, safeMutation }) => {
+				const runtimeCaptureCount = d922aRuntimeCaptureCount(safeMutation);
+				console.info(`[d922a-runtime] safe=${JSON.stringify(name)} captureCount=${runtimeCaptureCount}`);
+				expect(runtimeCaptureCount).toBe(0);
+				expect(analyze(d922aReviewSources(safeMutation)).violations).toEqual([]);
+			}
+		);
+
+		it("uses one in-memory Program and TypeChecker with checker-symbol alias identity", () => {
+			const evidence = d922aArchitectureEvidence(analyze(d922aArchitectureFixture()));
+			expect(evidence.program.getTypeChecker()).toBe(evidence.checker);
+			expect(evidence.identityMode).toBe("checker-symbol");
+			expect(evidence.aliasIdentities.length).toBeGreaterThan(0);
+			for (const { alias, target } of evidence.aliasIdentities) {
+				expect(alias.flags & ts.SymbolFlags.Alias).not.toBe(0);
+				expect(evidence.checker.getAliasedSymbol(alias)).toBe(target);
+			}
+		});
+
+		it("resolves workspace modules source-first and analyzes every loaded source without dist or node_modules", () => {
+			const sources = d922aArchitectureFixture();
+			const evidence = d922aArchitectureEvidence(analyze(sources));
+			const loaded = normalizedSortedPaths(Object.keys(sources));
+			expect(normalizedSortedPaths(evidence.loadedSourcePaths)).toEqual(loaded);
+			expect(normalizedSortedPaths(evidence.analyzedSourcePaths)).toEqual(loaded);
+			expect(
+				evidence.sourceFirstResolutions.some(
+					({ resolvedPath, specifier }) =>
+						specifier === "@ts-drp/utils/serialization" &&
+						normalizedSortedPaths([resolvedPath])[0] === UTILS_SERIALIZATION_PATH
+				)
+			).toBe(true);
+			for (const sourcePath of [
+				...evidence.loadedSourcePaths,
+				...evidence.analyzedSourcePaths,
+				...evidence.resolvedSourcePaths,
+			]) {
+				expect(sourcePath).not.toMatch(/(?:^|\/)node_modules(?:\/|$)|(?:^|\/)dist(?:\/|$)/);
+			}
+		});
+
+		it("exposes a total closed transfer relation whose default and unresolved outcomes fail closed", () => {
+			const evidence = d922aArchitectureEvidence(analyze(d922aArchitectureFixture()));
+			const transferred = new Set(evidence.transferRelation.transferredSyntaxKinds);
+			const deferred = new Set(evidence.transferRelation.deferredSyntaxKinds);
+			expect(evidence.transferRelation.hasVisibleDefault).toBe(true);
+			expect(evidence.transferRelation.defaultOutcome).toBe("unresolved-violation");
+			expect(evidence.transferRelation.unresolvedOutcome).toBe("unresolved-violation");
+			for (const syntaxKind of evidence.transferRelation.encounteredSyntaxKinds) {
+				expect(transferred.has(syntaxKind) || deferred.has(syntaxKind)).toBe(true);
+			}
+			expect(transferred.has(ts.SyntaxKind.ForOfStatement)).toBe(true);
+			expect(deferred.has(ts.SyntaxKind.ForOfStatement)).toBe(false);
+		});
+
+		it("fails closed on an unsupported governed Proxy flow instead of returning no targets", () => {
+			const sources = d922aReviewSources(`const callback = new Proxy(capture, {});
+				callback(state);`);
+			expect(analyze(sources).violations).toEqual(
+				expect.arrayContaining([expect.stringMatching(/fail.?closed|Proxy|unknown|unresolved|unsupported/i)])
+			);
+		});
+
+		it("detects a forbidden callback through for-of and keeps the same loop with safe values clean", () => {
+			const unsafe = d922aArchitectureFixture();
+			const safe = {
+				...unsafe,
+				[WORKSPACE_PUBLISHER_PATH]: unsafe[WORKSPACE_PUBLISHER_PATH].replace("[snapshot]", "[safe]"),
+			};
+			expect(analyze(unsafe).violations).toEqual(expect.arrayContaining([expect.stringMatching(ENCODE_VIOLATION)]));
+			expect(analyze(safe).violations).toEqual([]);
+		});
+
+		it("pins the discovered positive production census at exactly 0 / 5 / 11 / 4", () => {
+			const sources = realGovernedWorkspaceSources();
+			const analysis = analyze(sources);
+			expect([
+				analysis.violations.length,
+				analysis.reviewedOperations?.length,
+				analysis.residualCloneSites.length,
+				analysis.residualStateCaptureSites?.length,
+			]).toEqual([0, 5, 11, 4]);
+			expect(analysis.residualStateCaptureSites).toEqual([...RESIDUAL_STATE_CAPTURE_SITES].sort());
+
+			const withoutOneCapture = { ...sources };
+			withoutOneCapture[WORKSPACE_PUBLISHER_PATH] = withoutOneCapture[WORKSPACE_PUBLISHER_PATH].replace(
+				"const capturedACLState = stateFromDRP(this.acl);",
+				"const capturedACLState = DRPState.create();"
+			);
+			expect(withoutOneCapture[WORKSPACE_PUBLISHER_PATH]).not.toBe(sources[WORKSPACE_PUBLISHER_PATH]);
+			expect(analyze(withoutOneCapture).residualStateCaptureSites).toEqual(
+				[...RESIDUAL_STATE_CAPTURE_SITES].filter((site) => !site.endsWith("stateFromDRP(this.acl)")).sort()
+			);
+		});
+
+		it("retires both legacy semantic analyzers and keeps one checker-backed authority", () => {
+			const source = d922aGovernanceFileSource();
+			const file = ts.createSourceFile("governance.test.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+			const declarations = new Set<string>();
+			const visit = (node: ts.Node): void => {
+				if (ts.isFunctionDeclaration(node) && node.name) declarations.add(node.name.text);
+				ts.forEachChild(node, visit);
+			};
+			visit(file);
+			expect(["analyzeLegacy", "semanticAnalysis"].filter((name) => declarations.has(name))).toEqual([]);
+
+			const evidence = d922aArchitectureEvidence(analyze(d922aArchitectureFixture()));
+			expect(evidence.authoritativeAnalysisPasses).toBe(1);
+			expect(evidence.identityMode).toBe("checker-symbol");
+			expect(evidence.sourceTextClassification).toBe(false);
+		});
+
+		it("delimits the repository-specific provenance layer for independent review", () => {
+			const source = d922aGovernanceFileSource();
+			const marked = d922aMarkedProvenanceLayer(source);
+			expect(marked, "the custom provenance layer needs exact START/END review markers").toBeDefined();
+		});
+
+		it("holds the repository-specific provenance layer to a readable 600-line ceiling", () => {
+			const source = d922aGovernanceFileSource();
+			const marked = d922aMarkedProvenanceLayer(source);
+			const measured = marked ?? d922aLegacyResolverLayer(source);
+			expect(measured, "a provenance layer must be measurable").toBeDefined();
+			if (!measured) return;
+			const logicalLines = d922aLogicalReadableLines(measured.lines);
+			expect(logicalLines.length).toBeLessThanOrEqual(600);
+			expect(measured.lines.filter((line) => line.length > 140)).toEqual([]);
+
+			const file = ts.createSourceFile("provenance-layer.ts", measured.source, ts.ScriptTarget.Latest, true);
+			expect(d922aSiblingStatementStarts(file)).toEqual([]);
+			const multiDeclarationLines: number[] = [];
+			const regexLines: number[] = [];
+			const visit = (node: ts.Node): void => {
+				if (ts.isVariableDeclarationList(node) && node.declarations.length > 1) {
+					multiDeclarationLines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+				}
+				if (node.kind === ts.SyntaxKind.RegularExpressionLiteral) {
+					regexLines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+				}
+				if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "RegExp") {
+					regexLines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+				}
+				ts.forEachChild(node, visit);
+			};
+			visit(file);
+			expect(multiDeclarationLines).toEqual([]);
+			expect(regexLines, "source-text regex classification is forbidden inside the custom layer").toEqual([]);
+		});
+
+		it("uses worklist convergence without an arbitrary hop cap", () => {
+			const evidence = d922aArchitectureEvidence(analyze(d922aArchitectureFixture()));
+			expect(evidence.convergence).toEqual({
+				arbitraryIterationCap: null,
+				strategy: "monotone-worklist-to-fixpoint",
+			});
+		});
+
+		it("bounds 24/64/120-hop and representative cycle probes in an isolated child", async () => {
+			const result = await runD922aConvergenceChild();
+			console.info(`[d922a-convergence-child] ${JSON.stringify(result)}`);
+			expect(result).toMatchObject({ errorCode: undefined, signal: null, status: 0 });
+		}, 35_000);
+
+		it("keeps a stable fixture-analysis p95 at or below 50 ms", () => {
+			const sources = d922aReviewSources(D922A_REVIEW9_FIXTURES[0].safeMutation);
+			analyze(sources);
+			analyze(sources);
+			const durations = Array.from({ length: 24 }, () => {
+				const startedAt = performance.now();
+				analyze(sources);
+				return performance.now() - startedAt;
+			}).sort((left, right) => left - right);
+			const p95 = durations[Math.ceil(durations.length * 0.95) - 1];
+			expect(p95).toBeLessThanOrEqual(50);
+		});
+
+		it("keeps the memoized real-workspace census within ten seconds", () => {
+			const startedAt = performance.now();
+			const analysis = analyze(realGovernedWorkspaceSources());
+			const durationMs = performance.now() - startedAt;
+			expect(analysis.violations).toEqual([]);
+			expect(durationMs).toBeLessThanOrEqual(10_000);
+		});
+	});
+}
 
 interface StructureFlowRed9Fixture {
 	readonly expectedViolation: RegExp;
