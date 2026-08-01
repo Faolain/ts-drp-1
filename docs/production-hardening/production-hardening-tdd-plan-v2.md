@@ -14344,7 +14344,170 @@ outside the former scan boundary. The RED changes expectations/fixtures only;
 the distinct GREEN changes the test analyzer, not production behavior. This
 governance slice must be fast enough for normal iteration.
 
+#### D.92.2-A — Architecture pivot after recurring fail-open rounds
+
+GREEN9 (`97936d41c7e0078f3d51116abe6cca15a75ca23c`) is retained as
+**rejected transition evidence** and D.92.2 is **not closed**. It closed its
+frozen 13-mutant / 15-control RED9 matrix, preserved every frozen fixture
+suffix and re-asserted the exact real-workspace census, but fresh adversarial
+review found three more ordinary, runtime-causal fail-opens inside the already
+supported surface:
+
+1. Grok 4.5/high proved that assignment-pattern reads of an assignment-rest or
+   object-rest container lose provenance.
+2. Grok 4.5/high proved that sibling default chains inside one destructured
+   parameter lose provenance.
+3. Exact Kimi 3/high/100 proved that parenthesized identifier and property
+   assignment targets lose provenance.
+
+Both returned `CHANGES_REQUESTED` and `ARCHITECTURE_WORDING_AGREE=yes`. The
+GREEN9 Codex-high owner then returned `AMENDMENT_AGREE=yes`, and plan-only
+Opus/xhigh session `b29f979f-e5e1-4d87-bd99-58f11b46314d` returned
+`AMENDMENT_AGREE=yes` with the conditions below. The amendment quorum required
+for correcting this plan is therefore unanimous.
+
+**A further RED10 round of manual AST/token-spelling patches is prohibited.**
+The repeated failures are identity-by-spelling defects in a hand-built
+module/scope/binding interpreter, not three isolated missing cases. The
+corrective is an architecture pivot executed as four sub-slices before D.92.3.
+
+**Plain English — what D.92.2 is and is not.** D.92.2 is a _test-only
+governance gate_. It asks whether either stored-snapshot publication root —
+`assignState` or `advanceCheckpointIfNeeded` — can reach clone, codec or
+serialization round-trip work outside the single approved, measured
+publication-copy boundary while the intentionally excluded copies remain an
+exact reviewed census. It does not run in a deployed node, inspect an
+application's DRP at runtime or accept executable code from a peer. It protects
+the production copy-accounting/performance architecture established in D.90 §3
+from a future relocation or wrapper that would make full-state work invisible
+to the counters. It is distinct from D.91 (accepted production
+publication-order and mutation-attribution hardening), D.92.3 (production Map
+object-key detachment), D.92.4 (production raw-egress candidacy) and D.73 (the
+hostile graph-side virtual `Map.keys()` exploit before the live v3 binder).
+
+##### D.92.2-a — Architecture acceptance RED (tests only)
+
+A fresh RED owner may edit only
+`packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` and
+its test-local fixtures. Pin the three Review9 findings as architecture
+acceptance fixtures, not as requests to patch the old analyzer. Include their
+array/object twins, double-parenthesized target, runtime evidence that every
+unsafe form executes the forbidden work exactly once, and same-shape safe
+controls that execute it zero times.
+
+The RED also pins these structural acceptance conditions:
+
+- unsupported governed flow has an explicit fail-closed result rather than an
+  empty fact set;
+- the exact positive census is `0 / 5 / 11 / 4`: zero violations, five reviewed
+  operations, eleven residual clone sites and four residual `stateFromDRP`
+  capture sites;
+- no scanned or resolved path contains `/dist/` or `node_modules`, and the
+  analyzed path set equals the complete loaded source set;
+- 24/64/120-hop assignment, callable, parameter, bind and rest-spread chains,
+  plus their cycles, terminate without an arbitrary hop/iteration cap;
+- the repository-specific provenance layer has an executable review ceiling of
+  600 lines. This ceiling is only an anti-growth tripwire: compressed,
+  minified, multi-statement or otherwise less-reviewable code is rejected even
+  when it meets the count, and a low count is never acceptance evidence;
+- retirement is executable: the accepted file contains no `analyzeLegacy`, no
+  `semanticAnalysis`, no spelling-keyed binding resolver and no union of two
+  independent analyzers.
+
+The RED must fail only for its intended architecture conditions while the
+existing frozen corpus, inherited Phase 1d(i) suite, typechecks, zero-error lint
+and formatting remain green.
+
+##### D.92.2-b — Checker-backed governance GREEN (tests only)
+
+A distinct fresh GREEN owner replaces the hand-built module/scope/binding
+interpreter with an in-memory TypeScript `Program` and `TypeChecker`
+(TypeScript 5.8.2 is installed). TypeScript owns declared symbol, alias, scope,
+member and signature identity; a small custom finite analysis conservatively
+resolves repository-specific runtime value, container and call-target
+provenance. The checker-backed layer must cover module resolution,
+import/export/namespace/re-export aliases, lexical binding identity, scope and
+shadowing, class/property members, statically declared call targets, and
+normalization of parentheses, `as`, `satisfies` and non-null assertions.
+Identity must use checker symbols, never identifier spelling, source-position
+strings or regular expressions over source text.
+
+Module resolution is **source-first**. A custom
+`CompilerHost.resolveModuleNameLiterals` maps `@ts-drp/<pkg>[/<sub>]` to
+`packages/<pkg>/src/[<sub>/]index.ts`; current package exports and root
+`tsconfig.json` paths otherwise lead toward declarations or `dist` and would
+silently erase implementation provenance. No resolved/scanned path may contain
+`node_modules` or `/dist/`.
+
+The retained repository-specific layer is limited to the governed roots,
+forbidden sinks, four censuses, a monotone finite symbol-to-sink worklist and a
+total transfer relation over a closed set of syntax kinds. Its visible default
+branch emits an explicit unresolved violation. A construct may be excluded only
+through a named, reviewed deferral census. Re-declare the current deferrals:
+outer-function-local closures, TypeScript namespace value members, host
+callbacks, `Object.assign`, `eval`, `Proxy`, `Map`/`WeakMap` containers,
+dynamic `import()` and computed unknown keys. `for-of` is not deferred because
+the governed publication loop already uses it.
+
+Migration is dual-run and terminal. Over the entire frozen mutation corpus and
+real workspace, the replacement must be never weaker than the old analyzer on
+violations, identical on every control and identical on `0/5/11/4`. The
+comparison is a `.logs/` acceptance artifact produced through byte-faithful
+extraction of the parent analyzer, not a second permanent implementation. The
+old resolver is deleted in the same GREEN that makes the replacement
+authoritative; acceptance is refused if two analyzers remain.
+
+Normal-iteration budgets are executable but do not authorize reduced source
+coverage: one shared memoized real-workspace `Program` census ≤10 seconds;
+whole governance file ≤60 seconds without coverage; fixture analysis ≤50 ms
+p95; each convergence probe ≤2 seconds. The bounded 1 MB characterization stays
+a separately invoked long test. Use `skipLibCheck: true`, `types: []`, memoized
+immutable compiler inputs and no semantic-diagnostics pass where appropriate.
+
+##### D.92.2-c — Publication-copy boundary RED (tests only)
+
+After D.92.2-a/b is independently accepted, a fresh RED owner pins the narrow
+production defense-in-depth slice:
+
+- a dedicated publication-copy capability module and preserved
+  `publicationObserver` injection seam;
+- an exact architectural allowlist of modules under `packages/*/src` importing
+  clone/codec primitives, covering lint-ignored generated `_pb.ts` files;
+- absence of lint-disable suppression in governed files;
+- the `0/5/11/4` tuple and closed arithmetic between all clone sites, reviewed
+  operations and residuals; and
+- unchanged wire bytes, copy counters, per-case and aggregate
+  `clonedBytes < 20 * mutatedBytes` ratios, and the bounded 1 MB
+  characterization.
+
+##### D.92.2-d — Publication-copy capability GREEN (production + lint config)
+
+A distinct fresh GREEN owner extracts the
+`DRPVertexApplier.copyPublicationPayload` leaf into
+`packages/object/src/publication-copy.ts`, preserving injection and default
+behavior, and adds name-granular `no-restricted-imports` entries scoped by
+`files:` glob in `eslint.config.mjs`. Add no dependency.
+
+The restriction is name-granular and file-scoped, never blanket. `index.ts`
+legitimately imports `serializeDRPState`; `drp-applier.ts` and `proxy.ts`
+legitimately import the non-copying `serializedValuesEqual`; and eleven of the
+sixteen clone sites are reviewed residual copies outside the 1d(i) hard ratio.
+Both reviewed and residual sets remain exact. The boundary statically prohibits
+direct imports/re-exports; unsupported dynamic acquisition fails closed in the
+checker-backed gate. This is defense-in-depth, not a runtime sandbox and not a
+replacement for provenance analysis.
+
+D.92.2-d must not introduce the shared graph-aware detachment primitive, which
+D.92.3 owns across the governed sites. It only gives that future primitive a
+home and isolates the one approved measured publication-copy boundary.
+
 #### D.92.3 — Map object-key detachment contract
+
+**Blocked:** D.92.3 does not begin until D.92.2-a/b and D.92.2-c/d have each
+passed their fresh Codex-high RED/GREEN pair, Grok-high, exact Kimi 3/high with
+both 100-step controls, and final Opus/xhigh acceptance. No part of D.92.3,
+D.92.4 or D.73 may be folded into a D.92.2 GREEN, and no D.92.2 sub-slice may be
+skipped because D.92.3 will later rewrite the same seam.
 
 One shared graph-aware state-payload detachment primitive must replace the
 graph-incomplete ownership copies. It must clone Map keys and values through
@@ -14411,22 +14574,25 @@ shared detachment primitive. Phase 0n remains optional after the golden paths
 except for any already-recorded hard Phase 4a prerequisite. These separations
 must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
-## Next Agent Prompt — supersedes the D.90 handoff
+## Next Agent Prompt — supersedes the D.92 handoff
 
-Begin D.92.2 at exact HEAD containing `72191bd` plus this documentation-only
-checkpoint. Spawn a fresh Codex-high RED owner that may edit only the
-incremental-publication structural test and its test-local fixtures, never
-production or this plan. It must prove the current analyzer misses the exact
-cross-package relocation and every alias/wrapper mutant in D.92.2 while all
-real production sources remain unchanged. Commit the causal RED and preserve
-focused failure evidence.
+Begin D.92.2-a at exact HEAD
+`97936d41c7e0078f3d51116abe6cca15a75ca23c` plus this documentation-only
+checkpoint. GREEN9 is rejected transition evidence and stays in history
+unreverted; D.92.2 is not closed. Spawn a fresh Codex-high RED owner that may
+edit only
+`packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` and
+its test-local fixtures — never production, configuration or this plan. Do not
+write a RED10 round of AST/token-spelling patches against the existing
+analyzer.
 
-Then use a distinct fresh Codex-high GREEN owner to repair only the structural
-analyzer/test infrastructure. Run the focused gate, the inherited Phase 1d(i)
-suite, package/workspace typechecks, zero-error lint, formatting/diff/scope and
-exact-SHA verification to `.log` files. Review the governance slice with
-Grok-high, exact Kimi 3/high/100 and final Opus/xhigh before beginning the
-independent Map-key detachment RED/GREEN in D.92.3.
+Then use a distinct fresh Codex-high GREEN owner for D.92.2-b and a further
+fresh RED/GREEN pair for D.92.2-c/d. After every commit run the focused gate,
+inherited Phase 1d(i) suite, raw-child and sync-livelock baselines, package and
+workspace typechecks, zero-error lint, formatting, diff/scope and exact-SHA
+verification to `.log` files. Review each pair with Grok-high, exact Kimi
+3/high/100 and final Opus/xhigh before proceeding. D.92.3 remains blocked until
+both pairs are accepted.
 
 Never resurrect or partially retain the rejected fingerprint prototype. Never
 stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the
