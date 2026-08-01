@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../src");
+const WORKSPACE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../../..");
 const ROOT_METHODS = new Set(["assignState", "advanceCheckpointIfNeeded"]);
 const GLOBALLY_GOVERNED_FILES = new Set(["state.ts", "drp-applier.ts", "proxy.ts"]);
 const SERIALIZATION_PRIMITIVES = new Set(["serializeValue", "serializeDRPState", "deserializeDRPState"]);
@@ -28,6 +29,18 @@ const RESIDUAL_STATE_CAPTURE_SITES = new Set([
 	"drp-applier.ts:DRPVertexApplier.computeOperationUntraced:stateFromDRP(this.drp)",
 	"drp-applier.ts:DRPVertexApplier.computeOperationUntraced:stateFromDRP(this.acl)",
 ]);
+const REQUIRED_WORKSPACE_SOURCE_PATHS = [
+	"packages/object/src/drp-applier.ts",
+	"packages/object/src/index.ts",
+	"packages/utils/src/serialization/index.ts",
+] as const;
+const REVIEWED_WORKSPACE_OPERATIONS = [
+	"packages/object/src/drp-applier.ts:DRPVertexApplier.copyPublicationPayload:clone",
+	"packages/object/src/index.ts:DRPObject.getStates:clone",
+	"packages/object/src/index.ts:DRPObject.setACLState:clone",
+	"packages/object/src/index.ts:DRPObject.setDRPState:clone",
+	"packages/utils/src/serialization/index.ts:<module>.serializeValue:serialization",
+] as const;
 
 interface FunctionNode {
 	readonly body: ts.Block;
@@ -51,6 +64,11 @@ interface ClosureAnalysis {
 	readonly violations: string[];
 }
 
+interface WorkspaceIntegrationCensus {
+	readonly analyzedSourcePaths?: readonly string[];
+	readonly reviewedOperations?: readonly string[];
+}
+
 type ForbiddenPrimitive =
 	| "cloneDeep"
 	| "structuredClone"
@@ -68,6 +86,45 @@ function sourceFiles(directory: string): Record<string, string> {
 			result[path.relative(SOURCE_DIRECTORY, absolute)] = fs.readFileSync(absolute, "utf8");
 	}
 	return result;
+}
+
+function normalizedWorkspaceSourceFiles(directories: readonly string[]): Record<string, string> {
+	const result: Record<string, string> = {};
+	const collect = (directory: string): void => {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const absolute = path.join(directory, entry.name);
+			if (entry.isDirectory()) collect(absolute);
+			else if (entry.isFile() && entry.name.endsWith(".ts")) {
+				result[path.relative(WORKSPACE_DIRECTORY, absolute).split(path.sep).join(path.posix.sep)] = fs.readFileSync(
+					absolute,
+					"utf8"
+				);
+			}
+		}
+	};
+	for (const directory of directories) collect(directory);
+	return result;
+}
+
+function realGovernedWorkspaceSources(): Record<string, string> {
+	return normalizedWorkspaceSourceFiles([
+		path.join(WORKSPACE_DIRECTORY, "packages/object/src"),
+		path.join(WORKSPACE_DIRECTORY, "packages/utils/src"),
+	]);
+}
+
+function expectWorkspaceIntegration(
+	loadedSources: Readonly<Record<string, string>>,
+	analysis: ClosureAnalysis & WorkspaceIntegrationCensus
+): void {
+	const loadedSourcePaths = Object.keys(loadedSources).sort();
+	expect(loadedSourcePaths).toEqual(expect.arrayContaining([...REQUIRED_WORKSPACE_SOURCE_PATHS]));
+	expect([...(analysis.analyzedSourcePaths ?? [])].sort()).toEqual(loadedSourcePaths);
+	expect([...(analysis.reviewedOperations ?? [])].sort()).toEqual([...REVIEWED_WORKSPACE_OPERATIONS].sort());
+	for (const reviewed of REVIEWED_WORKSPACE_OPERATIONS) {
+		const [file, owner] = reviewed.split(":");
+		expect(analysis.violations.some((violation) => violation.includes(file) && violation.includes(owner))).toBe(false);
+	}
 }
 
 function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
@@ -713,6 +770,65 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
 		expect(analysis.violations).toEqual([]);
 		expect(analysis.injectedCopyLeaves).toHaveLength(1);
+	});
+
+	it("runs the semantic gate over normalized real workspace sources with the reviewed operation census", () => {
+		const sources = realGovernedWorkspaceSources();
+		const analysis = analyze(sources) as ClosureAnalysis & WorkspaceIntegrationCensus;
+		expectWorkspaceIntegration(sources, analysis);
+	});
+
+	it("rejects an object-only real-source loader even when its analyzer report claims the reviewed census", () => {
+		const sources = Object.fromEntries(
+			Object.entries(realGovernedWorkspaceSources()).filter(([sourcePath]) =>
+				sourcePath.startsWith("packages/object/src/")
+			)
+		);
+		expect(() =>
+			expectWorkspaceIntegration(sources, {
+				analyzedSourcePaths: Object.keys(sources),
+				injectedCopyLeaves: [],
+				reachable: [],
+				residualCloneSites: [],
+				reviewedOperations: REVIEWED_WORKSPACE_OPERATIONS,
+				violations: [],
+			})
+		).toThrow();
+	});
+
+	it("rejects a workspace loader when the semantic analyzer silently skips sources outside object/src", () => {
+		const sources = realGovernedWorkspaceSources();
+		const objectOnlyPaths = Object.keys(sources).filter((sourcePath) => sourcePath.startsWith("packages/object/src/"));
+		expect(() =>
+			expectWorkspaceIntegration(sources, {
+				analyzedSourcePaths: objectOnlyPaths,
+				injectedCopyLeaves: [],
+				reachable: [],
+				residualCloneSites: [],
+				reviewedOperations: REVIEWED_WORKSPACE_OPERATIONS,
+				violations: [],
+			})
+		).toThrow();
+	});
+
+	it("kills a neutral wrapper relocated beyond object/src in the real in-memory workspace graph", () => {
+		const sources = realGovernedWorkspaceSources();
+		const publisher = sources[WORKSPACE_PUBLISHER_PATH];
+		const serialization = sources[UTILS_SERIALIZATION_PATH];
+		expect(publisher).toBeDefined();
+		expect(serialization).toBeDefined();
+		sources[WORKSPACE_PUBLISHER_PATH] = publisher
+			.replace(
+				'import { serializedValuesEqual } from "@ts-drp/utils/serialization";',
+				'import { publicationSnapshotCopy, serializedValuesEqual } from "@ts-drp/utils/serialization";'
+			)
+			.replace("return cloneDeep(value);", "return publicationSnapshotCopy(value);");
+		sources[UTILS_SERIALIZATION_PATH] =
+			`${serialization}\nexport function publicationSnapshotCopy(value: unknown): Uint8Array {\n\treturn serializeValue(value);\n}\n`;
+		expect(sources[WORKSPACE_PUBLISHER_PATH]).toContain("return publicationSnapshotCopy(value);");
+		expect(analyze(sources).violations).toEqual(
+			expect.arrayContaining([expect.stringMatching(/publicationSnapshotCopy|serializeValue|serialization/)])
+		);
 	});
 
 	it("accepts an equivalent safe publisher in an arbitrary file with arbitrary internal names", () => {
