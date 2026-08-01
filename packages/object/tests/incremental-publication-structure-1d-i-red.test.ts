@@ -803,6 +803,7 @@ function semanticAnalysis(
 	const lexicalCallables = new Map<ts.Node, Map<string, FunctionNode[]>>();
 	const lexicalInitializers = new Map<ts.Node, Map<string, ts.Expression>>();
 	const lexicalValueBindings = new Map<ts.Node, Set<string>>();
+	const lexicalBindingKeys = new Map<ts.Node, Map<string, string>>();
 	const classMethods = new Map<string, FunctionNode>();
 	type DestructuredProjection =
 		| {
@@ -879,8 +880,10 @@ function semanticAnalysis(
 		ts.SyntaxKind.BarBarEqualsToken,
 		ts.SyntaxKind.QuestionQuestionEqualsToken,
 	]);
+	const bindingProjectionTarget = (owner: SemanticOwner, node: ts.Node): SemanticTarget =>
+		`object:${owner.file.fileName}:projection@${node.pos}` as SemanticTarget;
 	const projectionTarget = (owner: SemanticOwner, element: ts.BindingElement): SemanticTarget =>
-		`object:${owner.file.fileName}:projection@${element.pos}` as SemanticTarget;
+		bindingProjectionTarget(owner, element);
 	const joinTargets = (targets: Set<SemanticTarget>, additions: Iterable<SemanticTarget>): boolean => {
 		let changed = false;
 		for (const target of additions) {
@@ -1127,6 +1130,14 @@ function semanticAnalysis(
 					const bindings = lexicalValueBindings.get(scope) ?? new Set<string>();
 					bindings.add(name.text);
 					lexicalValueBindings.set(scope, bindings);
+					const keys = lexicalBindingKeys.get(scope) ?? new Map<string, string>();
+					keys.set(
+						name.text,
+						ts.isSourceFile(scope)
+							? `${name.getSourceFile().fileName}:${name.text}`
+							: `${name.getSourceFile().fileName}:binding@${name.pos}`
+					);
+					lexicalBindingKeys.set(scope, keys);
 				}
 			};
 			if (ts.isVariableDeclaration(node)) {
@@ -1165,7 +1176,26 @@ function semanticAnalysis(
 	};
 	const isParameterReference = (identifier: ts.Identifier, owner: SemanticOwner): boolean => {
 		if (!parameterTargets.get(owner.id)?.has(identifier.text)) return false;
-		const body = nodesById.get(owner.id)?.body;
+		const ownerNode = nodesById.get(owner.id);
+		const body = ownerNode?.body;
+		const declaration = ownerNode?.declaration;
+		if (declaration) {
+			let current: ts.Node | undefined = identifier.parent;
+			let containingParameter: ts.ParameterDeclaration | undefined;
+			while (current && current !== declaration) {
+				if (ts.isFunctionLike(current)) return false;
+				if (ts.isParameter(current) && current.parent === declaration) containingParameter = current;
+				current = current.parent;
+			}
+			if (current === declaration && containingParameter) {
+				const parameterIndex = declaration.parameters.indexOf(containingParameter);
+				const containsName = (name: ts.BindingName): boolean => {
+					if (ts.isIdentifier(name)) return name.text === identifier.text;
+					return name.elements.some((element) => ts.isBindingElement(element) && containsName(element.name));
+				};
+				return declaration.parameters.slice(0, parameterIndex).some((parameter) => containsName(parameter.name));
+			}
+		}
 		if (identifier === body) return true;
 		let current: ts.Node | undefined = identifier.parent;
 		while (current) {
@@ -1371,8 +1401,18 @@ function semanticAnalysis(
 		}
 		return result;
 	};
-	const bindingKey = (name: string, owner: SemanticOwner): string => {
+	const bindingKey = (name: string, owner: SemanticOwner, reference?: ts.Identifier): string => {
 		const moduleKey = `${owner.file.fileName}:${name}`;
+		if (reference) {
+			const body = nodesById.get(owner.id)?.body;
+			let current: ts.Node | undefined = reference.parent;
+			while (current) {
+				const lexicalKey = lexicalBindingKeys.get(current)?.get(name);
+				if (lexicalKey) return lexicalKey;
+				if (current === body) break;
+				current = current.parent;
+			}
+		}
 		return moduleBindings.has(moduleKey) ? moduleKey : `${owner.id}:${name}`;
 	};
 	const isCallableLikeTarget = (target: SemanticTarget): boolean =>
@@ -1389,7 +1429,8 @@ function semanticAnalysis(
 		targets.size > 0 && [...targets].every(isCallableLikeTarget);
 	const callableLikeTargets = (targets: ReadonlySet<SemanticTarget>): Set<SemanticTarget> =>
 		new Set([...targets].filter(isCallableLikeTarget));
-	const bindingContainer = (name: string, owner: SemanticOwner): string => `binding:${bindingKey(name, owner)}`;
+	const bindingContainer = (identifier: ts.Identifier, owner: SemanticOwner): string =>
+		`binding:${bindingKey(identifier.text, owner, identifier)}`;
 	const containerIds = (
 		expression: ts.Expression,
 		owner: SemanticOwner,
@@ -1406,13 +1447,13 @@ function semanticAnalysis(
 			return result;
 		}
 		if (ts.isIdentifier(expression)) {
-			const result = new Set([bindingContainer(expression.text, owner)]);
+			const result = new Set([bindingContainer(expression, owner)]);
 			const initializer =
 				localInitializer(expression, owner) ?? moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (initializer) {
 				for (const nested of containerIds(initializer, owner, new Set(seen))) result.add(nested);
 			}
-			for (const target of storedTargets.get(bindingKey(expression.text, owner)) ?? []) {
+			for (const target of storedTargets.get(bindingKey(expression.text, owner, expression)) ?? []) {
 				if (target.startsWith("object:") || target.startsWith("class:") || target.startsWith("instance:")) {
 					result.add(target);
 				}
@@ -1861,7 +1902,7 @@ function semanticAnalysis(
 				localInitializer(expression, owner) ?? moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (initializer) resolutions.push(arrayArguments(initializer, owner, new Set(seen)));
 			const containerTargets = new Set<SemanticTarget>();
-			for (const target of storedTargets.get(bindingKey(expression.text, owner)) ?? []) {
+			for (const target of storedTargets.get(bindingKey(expression.text, owner, expression)) ?? []) {
 				if (target.startsWith("object:")) containerTargets.add(target);
 			}
 			const imported = modules.get(owner.file.fileName)?.imports.get(expression.text);
@@ -1966,18 +2007,19 @@ function semanticAnalysis(
 			return callable ? new Set<SemanticTarget>([`function:${callable.id}`]) : new Set();
 		}
 		if (ts.isIdentifier(expression)) {
+			if (isParameterReference(expression, owner)) {
+				const result = new Set(parameterTargets.get(owner.id)?.get(expression.text) ?? []);
+				for (const target of storedTargets.get(bindingKey(expression.text, owner, expression)) ?? [])
+					result.add(target);
+				return result;
+			}
 			if (expression.text === "structuredClone") return new Set(["primitive:structuredClone"]);
 			if (expression.text === "JSON") return new Set(["builtin:json"]);
 			if (expression.text === "globalThis") return new Set(["builtin:globalThis"]);
 			if (expression.text === "Function") return new Set(["builtin:Function"]);
 			const result = new Set<SemanticTarget>();
 			for (const target of lexicalCallableTargets(expression, owner)) result.add(target);
-			const parameter = isParameterReference(expression, owner)
-				? parameterTargets.get(owner.id)?.get(expression.text)
-				: undefined;
-			for (const target of parameter ?? []) result.add(target);
-			for (const target of storedTargets.get(`${owner.id}:${expression.text}`) ?? []) result.add(target);
-			for (const target of storedTargets.get(`${owner.file.fileName}:${expression.text}`) ?? []) result.add(target);
+			for (const target of storedTargets.get(bindingKey(expression.text, owner, expression)) ?? []) result.add(target);
 			const projection = projectionForIdentifier(expression);
 			if (projection?.kind === "object-property") {
 				for (const target of propertyTargets(projection.source, projection.property, projection.owner, seen)) {
@@ -2317,7 +2359,7 @@ function semanticAnalysis(
 	const selectedArgument = (
 		argument: SemanticArgument | undefined,
 		initializer: ts.Expression | undefined,
-		owner: FunctionNode
+		owner: SemanticOwner
 	): SemanticArgument | undefined => {
 		if (argument && !argument.definitelyUndefined) return argument;
 		if (initializer) return semanticArgument(initializer, owner);
@@ -2338,9 +2380,25 @@ function semanticAnalysis(
 		}
 		return result;
 	};
-	const argumentProperty = (argument: SemanticArgument, name: string, owner: FunctionNode): SemanticArgument => {
+	const argumentProperty = (
+		argument: SemanticArgument,
+		name: string,
+		owner: SemanticOwner,
+		seen: Set<string> = new Set()
+	): SemanticArgument => {
 		if (argument.source && argument.owner) {
 			const source = transparentExpression(argument.source);
+			const propertyKey = `${argument.owner.id}:${source.pos}:${source.end}:${name}`;
+			if (seen.has(propertyKey)) return { targets: new Set() };
+			seen.add(propertyKey);
+			if (ts.isIdentifier(source)) {
+				const initializer =
+					localInitializer(source, argument.owner) ??
+					moduleVariables.get(`${argument.owner.file.fileName}:${source.text}`);
+				if (initializer) {
+					return argumentProperty(semanticArgument(initializer, argument.owner), name, owner, seen);
+				}
+			}
 			if (ts.isObjectLiteralExpression(source)) {
 				let hasUnknownSpread = false;
 				for (const candidate of source.properties) {
@@ -2416,78 +2474,193 @@ function semanticAnalysis(
 		}
 		return mergeArrayResolutions(resolutions);
 	};
-	const joinParameterBinding = (
-		name: ts.BindingName,
+	type BindingDestination = ts.BindingName | ts.Expression;
+	type BindingMode = "declaration" | "parameter" | "storage";
+	const joinBinding = (
+		destination: BindingDestination,
 		argument: SemanticArgument | undefined,
 		initializer: ts.Expression | undefined,
-		owner: FunctionNode,
-		unknownArgument: boolean
+		owner: SemanticOwner,
+		unknownArgument: boolean,
+		mode: BindingMode
 	): boolean => {
+		if (
+			ts.isParenthesizedExpression(destination) ||
+			ts.isAsExpression(destination) ||
+			ts.isTypeAssertionExpression(destination) ||
+			ts.isNonNullExpression(destination) ||
+			ts.isSatisfiesExpression(destination)
+		) {
+			return joinBinding(destination.expression, argument, initializer, owner, unknownArgument, mode);
+		}
+		if (ts.isBinaryExpression(destination) && destination.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+			return joinBinding(destination.left, argument, destination.right, owner, unknownArgument, mode);
+		}
 		const selected = selectedArgument(argument, initializer, owner);
-		if (ts.isIdentifier(name)) {
-			const targets = parameterTargets.get(owner.id)?.get(name.text);
-			if (!targets) return false;
+		if (ts.isIdentifier(destination)) {
+			const additions = new Set(selected?.targets ?? []);
+			if (mode === "declaration" && !unknownArgument) additions.delete("primitive:unresolvedInternal");
+			if (unknownArgument) additions.add("primitive:unresolvedInternal");
+			if (mode === "parameter") {
+				const targets = parameterTargets.get(owner.id)?.get(destination.text);
+				return targets ? joinTargets(targets, additions) : false;
+			}
+			const key = bindingKey(destination.text, owner, destination);
+			const targets = storedTargets.get(key) ?? new Set<SemanticTarget>();
+			const joined = joinTargets(targets, additions);
+			storedTargets.set(key, targets);
+			return joined;
+		}
+		if (ts.isPropertyAccessExpression(destination) || ts.isElementAccessExpression(destination)) {
 			const additions = new Set(selected?.targets ?? []);
 			if (unknownArgument) additions.add("primitive:unresolvedInternal");
-			return joinTargets(targets, additions);
-		}
-		let joined = false;
-		if (ts.isObjectBindingPattern(name)) {
-			const knownNames = selected ? argumentKnownPropertyNames(selected) : new Set<string>();
-			const excluded = new Set<string>();
-			for (const element of name.elements) {
-				if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
-					const target = projectionTarget(owner, element);
-					for (const property of knownNames) {
-						if (excluded.has(property) || !selected) continue;
-						joined =
-							joinPropertyTargets(target, property, argumentProperty(selected, property, owner).targets) || joined;
-					}
-					if (unknownArgument || !selected || selected.targets.has("primitive:unresolvedInternal")) {
-						joined = joinPropertyTargets(target, unknownProperty, ["primitive:unresolvedInternal"]) || joined;
-					}
-					continue;
-				}
-				const property = element.propertyName
-					? ts.isIdentifier(element.propertyName) || ts.isStringLiteral(element.propertyName)
-						? element.propertyName.text
-						: undefined
-					: ts.isIdentifier(element.name)
-						? element.name.text
-						: undefined;
-				if (!property) {
-					joined = joinParameterBinding(element.name, undefined, element.initializer, owner, true) || joined;
-					continue;
-				}
-				excluded.add(property);
-				const nested = selected ? argumentProperty(selected, property, owner) : undefined;
-				joined =
-					joinParameterBinding(element.name, nested, element.initializer, owner, unknownArgument || !selected) ||
-					joined;
+			const keys = accessKeys(destination, owner, new Set());
+			const slots = new Set<PropertySlot>(keys.values);
+			if (keys.unknown) slots.add(unknownProperty);
+			let joined = false;
+			for (const containerId of containerIds(destination.expression, owner)) {
+				for (const slot of slots) joined = joinPropertyTargets(containerId, slot, additions) || joined;
 			}
 			return joined;
 		}
+
+		const failClosed = (nested: BindingDestination): boolean =>
+			joinBinding(
+				nested,
+				{ targets: new Set<SemanticTarget>(["primitive:unresolvedInternal"]) },
+				undefined,
+				owner,
+				true,
+				mode
+			);
+		let joined = false;
+		if (ts.isObjectBindingPattern(destination) || ts.isObjectLiteralExpression(destination)) {
+			const knownNames = selected ? argumentKnownPropertyNames(selected) : new Set<string>();
+			const excluded = new Set<string>();
+			const bindProperty = (
+				target: BindingDestination,
+				propertyNames: KeyResolution,
+				bindingInitializer?: ts.Expression
+			): void => {
+				if (propertyNames.unknown || propertyNames.values.size === 0) {
+					joined = failClosed(target) || joined;
+					return;
+				}
+				const nestedTargets = new Set<SemanticTarget>();
+				let definitelyUndefined = true;
+				let representative: SemanticArgument | undefined;
+				for (const property of propertyNames.values) {
+					excluded.add(property);
+					const nested = selected ? argumentProperty(selected, property, owner) : undefined;
+					if (nested) {
+						representative ??= nested;
+						joinTargets(nestedTargets, nested.targets);
+						definitelyUndefined &&= nested.definitelyUndefined === true;
+					}
+				}
+				const nested = representative ? { ...representative, definitelyUndefined, targets: nestedTargets } : undefined;
+				joined = joinBinding(target, nested, bindingInitializer, owner, unknownArgument || !selected, mode) || joined;
+			};
+			const bindRest = (target: BindingDestination, identity: ts.Node): void => {
+				if (!ts.isIdentifier(target)) {
+					joined = failClosed(target) || joined;
+					return;
+				}
+				const projection = bindingProjectionTarget(owner, identity);
+				joined = joinBinding(target, { targets: new Set([projection]) }, undefined, owner, false, mode) || joined;
+				for (const property of knownNames) {
+					if (excluded.has(property) || !selected) continue;
+					joined =
+						joinPropertyTargets(projection, property, argumentProperty(selected, property, owner).targets) || joined;
+				}
+				if (
+					unknownArgument ||
+					!selected ||
+					(mode !== "declaration" && selected.targets.has("primitive:unresolvedInternal"))
+				) {
+					joined = joinPropertyTargets(projection, unknownProperty, ["primitive:unresolvedInternal"]) || joined;
+				}
+			};
+			if (ts.isObjectBindingPattern(destination)) {
+				for (const element of destination.elements) {
+					if (element.dotDotDotToken) {
+						bindRest(element.name, element);
+						continue;
+					}
+					const keys = element.propertyName
+						? ts.isComputedPropertyName(element.propertyName)
+							? keyResolution(element.propertyName.expression, owner, new Set())
+							: ts.isIdentifier(element.propertyName) ||
+								  ts.isStringLiteral(element.propertyName) ||
+								  ts.isNumericLiteral(element.propertyName)
+								? { unknown: false, values: new Set([element.propertyName.text]) }
+								: { unknown: true, values: new Set<string>() }
+						: ts.isIdentifier(element.name)
+							? { unknown: false, values: new Set([element.name.text]) }
+							: { unknown: true, values: new Set<string>() };
+					bindProperty(element.name, keys, element.initializer);
+				}
+				return joined;
+			}
+			for (const property of destination.properties) {
+				if (ts.isSpreadAssignment(property)) {
+					bindRest(property.expression, property);
+					continue;
+				}
+				if (ts.isShorthandPropertyAssignment(property)) {
+					bindProperty(
+						property.name,
+						{ unknown: false, values: new Set([property.name.text]) },
+						property.objectAssignmentInitializer
+					);
+					continue;
+				}
+				if (!ts.isPropertyAssignment(property)) continue;
+				const keys = ts.isComputedPropertyName(property.name)
+					? keyResolution(property.name.expression, owner, new Set())
+					: ts.isIdentifier(property.name) || ts.isStringLiteral(property.name) || ts.isNumericLiteral(property.name)
+						? { unknown: false, values: new Set([property.name.text]) }
+						: { unknown: true, values: new Set<string>() };
+				bindProperty(property.initializer, keys);
+			}
+			return joined;
+		}
+
+		if (!ts.isArrayBindingPattern(destination) && !ts.isArrayLiteralExpression(destination)) return false;
 		const shape = selected ? argumentArray(selected) : { arguments: [], unknown: true };
-		for (const [index, element] of name.elements.entries()) {
-			if (!ts.isBindingElement(element)) continue;
-			if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
-				const target = projectionTarget(owner, element);
+		for (const [index, element] of destination.elements.entries()) {
+			if (ts.isOmittedExpression(element)) continue;
+			const isRest = ts.isBindingElement(element) ? Boolean(element.dotDotDotToken) : ts.isSpreadElement(element);
+			const target = ts.isBindingElement(element)
+				? element.name
+				: ts.isSpreadElement(element)
+					? element.expression
+					: element;
+			if (isRest) {
+				if (!ts.isIdentifier(target)) {
+					joined = failClosed(target) || joined;
+					continue;
+				}
+				const projection = bindingProjectionTarget(owner, element);
+				joined = joinBinding(target, { targets: new Set([projection]) }, undefined, owner, false, mode) || joined;
 				for (let sourceIndex = index; sourceIndex < shape.arguments.length; sourceIndex++) {
 					joined =
-						joinPropertyTargets(target, String(sourceIndex - index), shape.arguments[sourceIndex].targets) || joined;
+						joinPropertyTargets(projection, String(sourceIndex - index), shape.arguments[sourceIndex].targets) ||
+						joined;
 				}
-				if (unknownArgument || shape.unknown) {
-					joined = joinPropertyTargets(target, unknownProperty, ["primitive:unresolvedInternal"]) || joined;
+				if (unknownArgument || (mode !== "declaration" && shape.unknown)) {
+					joined = joinPropertyTargets(projection, unknownProperty, ["primitive:unresolvedInternal"]) || joined;
 				}
 				continue;
 			}
 			joined =
-				joinParameterBinding(
-					element.name,
+				joinBinding(
+					target,
 					shape.arguments[index],
-					element.initializer,
+					ts.isBindingElement(element) ? element.initializer : undefined,
 					owner,
-					unknownArgument || shape.unknown
+					unknownArgument || (mode !== "declaration" && shape.unknown),
+					mode
 				) || joined;
 		}
 		return joined;
@@ -2510,8 +2683,12 @@ function semanticAnalysis(
 		}
 		let joined = false;
 		const assignedTargets = expressionTargets(node.right, owner);
+		const assignmentTarget = transparentExpression(node.left);
+		if (ts.isArrayLiteralExpression(assignmentTarget) || ts.isObjectLiteralExpression(assignmentTarget)) {
+			return joinBinding(assignmentTarget, semanticArgument(node.right, owner), undefined, owner, false, "storage");
+		}
 		if (ts.isIdentifier(node.left)) {
-			const targetBinding = bindingKey(node.left.text, owner);
+			const targetBinding = bindingKey(node.left.text, owner, node.left);
 			const targets = storedTargets.get(targetBinding) ?? new Set<SemanticTarget>();
 			joined = joinTargets(targets, assignedTargets) || joined;
 			storedTargets.set(targetBinding, targets);
@@ -2570,6 +2747,17 @@ function semanticAnalysis(
 					return;
 				}
 				if (ts.isBinaryExpression(node)) changed = joinAssignment(node, evaluationOwner) || changed;
+				if (ts.isVariableDeclaration(node) && !ts.isIdentifier(node.name) && node.initializer) {
+					changed =
+						joinBinding(
+							node.name,
+							semanticArgument(node.initializer, evaluationOwner),
+							undefined,
+							evaluationOwner,
+							false,
+							"declaration"
+						) || changed;
+				}
 				ts.forEachChild(node, (child) => visitModule(child, evaluationOwner));
 			};
 			visitModule(file);
@@ -2582,6 +2770,11 @@ function semanticAnalysis(
 					changed = joinReturnedExpression(node.expression, owner) || changed;
 				}
 				if (ts.isBinaryExpression(node)) changed = joinAssignment(node, owner) || changed;
+				if (ts.isVariableDeclaration(node) && !ts.isIdentifier(node.name) && node.initializer) {
+					changed =
+						joinBinding(node.name, semanticArgument(node.initializer, owner), undefined, owner, false, "declaration") ||
+						changed;
+				}
 				if (ts.isCallExpression(node)) {
 					const initialInvocations = invocations(node, owner);
 					if (
@@ -2626,14 +2819,40 @@ function semanticAnalysis(
 						if (!targetNode) continue;
 						for (let index = 0; index < targetNode.declaration.parameters.length; index++) {
 							const parameter = targetNode.declaration.parameters[index];
+							if (parameter.dotDotDotToken) {
+								const projection = bindingProjectionTarget(targetNode, parameter);
+								changed =
+									joinBinding(
+										parameter.name,
+										{ targets: new Set([projection]) },
+										undefined,
+										targetNode,
+										false,
+										"parameter"
+									) || changed;
+								for (let argumentIndex = index; argumentIndex < resolvedInvocation.arguments.length; argumentIndex++) {
+									changed =
+										joinPropertyTargets(
+											projection,
+											String(argumentIndex - index),
+											resolvedInvocation.arguments[argumentIndex].targets
+										) || changed;
+								}
+								if (resolvedInvocation.unknownArguments) {
+									changed =
+										joinPropertyTargets(projection, unknownProperty, ["primitive:unresolvedInternal"]) || changed;
+								}
+								continue;
+							}
 							const argument = resolvedInvocation.arguments[index];
 							changed =
-								joinParameterBinding(
+								joinBinding(
 									parameter.name,
 									argument,
 									parameter.initializer,
 									targetNode,
-									resolvedInvocation.unknownArguments
+									resolvedInvocation.unknownArguments,
+									"parameter"
 								) || changed;
 						}
 					}
