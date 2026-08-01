@@ -328,9 +328,14 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		initializeGraph(rawNext);
 	};
 
+	const snapshotMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> =>
+		Array.from(Map.prototype.entries.call(map) as MapIterator<[unknown, unknown]>);
+
+	const snapshotSetValues = (set: Set<unknown>): unknown[] =>
+		Array.from(Set.prototype.values.call(set) as SetIterator<unknown>);
+
 	const reconcileMapParents = (map: Map<unknown, unknown>, previous: Iterable<readonly [unknown, unknown]>): void => {
-		const next = [...map];
-		initializeGraphs(next.flatMap(([key, value]) => [key, value]));
+		const next = snapshotMapEntries(map);
 		for (const [key, value] of previous) {
 			removeParent(key, map);
 			removeParent(value, map);
@@ -339,13 +344,14 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 			addParent(key, map);
 			addParent(value, map);
 		}
+		initializeGraphs(next.flatMap(([key, value]) => [key, value]));
 	};
 
 	const reconcileSetParents = (set: Set<unknown>, previous: Iterable<unknown>): void => {
-		const next = [...set];
-		initializeGraphs(next);
+		const next = snapshotSetValues(set);
 		for (const value of previous) removeParent(value, set);
 		for (const value of next) addParent(value, set);
+		initializeGraphs(next);
 	};
 
 	const wrap = <V>(value: V, ignored = false): V => {
@@ -440,14 +446,28 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					const member = Reflect.get(map, property, map) as unknown;
 					if (typeof member !== "function") return member;
 					return (...args: unknown[]): unknown => {
-						const previous = [...map.entries()];
+						const previous = snapshotMapEntries(map);
 						let result: unknown;
+						let operationError: unknown;
+						let operationFailed = false;
 						try {
 							result = (member as (...values: unknown[]) => unknown).apply(map, args.map(unwrap));
-						} finally {
+						} catch (error) {
+							operationError = error;
+							operationFailed = true;
+						}
+						let reconciliationError: unknown;
+						let reconciliationFailed = false;
+						try {
 							reconcileMapParents(map, previous);
+						} catch (error) {
+							reconciliationError = error;
+							reconciliationFailed = true;
+						} finally {
 							markChanged(map);
 						}
+						if (operationFailed) throw operationError;
+						if (reconciliationFailed) throw reconciliationError;
 						return result === map ? proxy : wrap(result, ignored);
 					};
 				},
@@ -518,14 +538,28 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					const member = Reflect.get(set, property, set) as unknown;
 					if (typeof member !== "function") return member;
 					return (...args: unknown[]): unknown => {
-						const previous = [...set.values()];
+						const previous = snapshotSetValues(set);
 						let result: unknown;
+						let operationError: unknown;
+						let operationFailed = false;
 						try {
 							result = (member as (...values: unknown[]) => unknown).apply(set, args.map(unwrap));
-						} finally {
+						} catch (error) {
+							operationError = error;
+							operationFailed = true;
+						}
+						let reconciliationError: unknown;
+						let reconciliationFailed = false;
+						try {
 							reconcileSetParents(set, previous);
+						} catch (error) {
+							reconciliationError = error;
+							reconciliationFailed = true;
+						} finally {
 							markChanged(set);
 						}
+						if (operationFailed) throw operationError;
+						if (reconciliationFailed) throw reconciliationError;
 						return result === set ? proxy : wrap(result, ignored);
 					};
 				},
