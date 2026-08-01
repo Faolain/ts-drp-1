@@ -328,6 +328,24 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		initializeGraph(rawNext);
 	};
 
+	const finalizeCommittedWrite = (
+		owner: object,
+		property: PropertyKey,
+		previous: unknown,
+		compareValues: boolean
+	): void => {
+		try {
+			const resulting = Reflect.get(owner, property, owner);
+			updateReachability(owner, property, previous, resulting);
+			if (!compareValues || !valuesEqual(previous, resulting)) markChanged(owner, property);
+		} catch (error) {
+			// Reflection has already committed. Charge the owner even when later
+			// equality or graph discovery fails, then preserve the exact throwable.
+			markChanged(owner, property);
+			throw error;
+		}
+	};
+
 	const snapshotMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> =>
 		Array.from(Map.prototype.entries.call(map) as MapIterator<[unknown, unknown]>);
 
@@ -596,12 +614,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					const rawValue = unwrap(nextValue);
 					const previousValue = Reflect.get(object, property, object);
 					const assigned = Reflect.set(object, property, rawValue, object);
-					if (assigned) {
-						const resultingValue = Reflect.get(object, property, object);
-						updateReachability(object, property, previousValue, resultingValue);
-						const didChange = !valuesEqual(previousValue, resultingValue);
-						if (didChange) markChanged(object, property);
-					}
+					if (assigned) finalizeCommittedWrite(object, property, previousValue, true);
 					return assigned;
 				},
 				deleteProperty(object, property): boolean {
@@ -618,11 +631,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					const rawDescriptor = "value" in descriptor ? { ...descriptor, value: unwrap(descriptor.value) } : descriptor;
 					const previousValue = Reflect.get(object, property, object);
 					const defined = Reflect.defineProperty(object, property, rawDescriptor);
-					if (defined) {
-						const resultingValue = Reflect.get(object, property, object);
-						updateReachability(object, property, previousValue, resultingValue);
-						markChanged(object, property);
-					}
+					if (defined) finalizeCommittedWrite(object, property, previousValue, false);
 					return defined;
 				},
 			});
