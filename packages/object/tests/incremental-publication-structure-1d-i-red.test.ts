@@ -2518,6 +2518,256 @@ const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
 const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
 
+interface StructureFlowRed8Fixture {
+	readonly expectedViolation: RegExp;
+	readonly family: string;
+	readonly name: string;
+	readonly shouldViolate: boolean;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+function structureFlowRed8Fixture(
+	family: string,
+	name: string,
+	imports: string,
+	mutation: string,
+	shouldViolate: boolean
+): StructureFlowRed8Fixture {
+	return Object.freeze({
+		expectedViolation: ENCODE_VIOLATION,
+		family,
+		name,
+		shouldViolate,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			[UTILS_SERIALIZATION_PATH]: RED8_CAPTURE_UTILITY,
+		}),
+	});
+}
+
+const RED8_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export type Callback = (value: unknown) => unknown;
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const RED8_IMPORTS = 'import { capture, safe, type Callback } from "@ts-drp/utils/serialization";';
+
+const STRUCTURE_FLOW_RED8_MUTANTS = Object.freeze([
+	structureFlowRed8Fixture(
+		"logical assignment",
+		"identifier logical-or assignment stores the selected callback",
+		RED8_IMPORTS,
+		"let selected: Callback | undefined = undefined; selected ||= capture; selected(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"logical assignment",
+		"identifier logical-and assignment returns the selected callback",
+		RED8_IMPORTS,
+		"let selected: Callback = safe; (selected &&= capture)(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"logical assignment",
+		"object-property nullish assignment stores the selected callback",
+		RED8_IMPORTS,
+		"const bag: { selected?: Callback } = {}; bag.selected ??= capture; bag.selected(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"object-property parameter projects the caller callback",
+		RED8_IMPORTS,
+		"function run({ selected }: { selected: Callback }, value: unknown): unknown { return selected(value); } run({ selected: capture }, state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"object-rest parameter retains a non-excluded caller callback",
+		RED8_IMPORTS,
+		"function run({ safe: _ignored, ...rest }: { safe: Callback; selected: Callback }, value: unknown): unknown { return rest.selected(value); } run({ safe, selected: capture }, state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"array-property parameter projects a shifted caller callback",
+		RED8_IMPORTS,
+		"function run([_first, selected]: readonly [Callback, Callback], value: unknown): unknown { return selected(value); } run([safe, capture], state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"array-rest parameter projects a shifted caller callback",
+		RED8_IMPORTS,
+		"function run([_first, ...rest]: readonly [Callback, Callback], value: unknown): unknown { return rest[0](value); } run([safe, capture], state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"await wrapper",
+		"await transparently retains a non-Promise callback",
+		RED8_IMPORTS,
+		"async function run(value: unknown): Promise<unknown> { return (await capture)(value); } void run(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"default selection",
+		"explicit undefined selects a forbidden parameter default",
+		RED8_IMPORTS,
+		"function run(value: unknown, selected: Callback = capture): unknown { return selected(value); } run(state, undefined);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"default selection",
+		"void zero selects a forbidden parameter default",
+		RED8_IMPORTS,
+		"function run(value: unknown, selected: Callback = capture): unknown { return selected(value); } run(state, void 0);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"ordinary call property invokes its stored callback",
+		RED8_IMPORTS,
+		"const bag = { call: capture }; bag.call(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"ordinary apply property invokes its stored callback",
+		RED8_IMPORTS,
+		"const bag = { apply: capture }; bag.apply(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"ordinary bind property invokes its stored callback",
+		RED8_IMPORTS,
+		"const bag = { bind: capture }; bag.bind(state);",
+		true
+	),
+] satisfies readonly StructureFlowRed8Fixture[]);
+
+const STRUCTURE_FLOW_RED8_CONTROLS = Object.freeze([
+	structureFlowRed8Fixture(
+		"logical assignment",
+		"simple property assignment retains the same callback",
+		RED8_IMPORTS,
+		"const bag: { selected?: Callback } = {}; bag.selected = capture; bag.selected(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"logical assignment",
+		"logical-binary selection retains the same callback",
+		RED8_IMPORTS,
+		"const selected: Callback | undefined = undefined; (selected || capture)(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"logical assignment",
+		"logical assignment with a safe RHS remains allowed",
+		RED8_IMPORTS,
+		"let selected: Callback | undefined = undefined; selected ||= safe; selected(state);",
+		false
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"same-shape variable object projection retains the callback",
+		RED8_IMPORTS,
+		"const bag = { selected: capture }; const { selected } = bag; selected(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"same-shape variable array-rest projection retains the shifted callback",
+		RED8_IMPORTS,
+		"const callbacks = [safe, capture] as const; const [_first, ...rest] = callbacks; rest[0](state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"function-parameter binding pattern",
+		"object-rest parameter excludes a forbidden callback from a safe projection",
+		RED8_IMPORTS,
+		"function run({ selected: _excluded, ...rest }: { selected: Callback; safe: Callback }, value: unknown): unknown { return rest.safe(value); } run({ selected: capture, safe }, state);",
+		false
+	),
+	structureFlowRed8Fixture(
+		"await wrapper",
+		"non-await satisfies and parentheses retain the same callback",
+		RED8_IMPORTS,
+		"((capture) satisfies Callback)(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"await wrapper",
+		"awaiting a safe non-Promise callback remains allowed",
+		RED8_IMPORTS,
+		"async function run(value: unknown): Promise<unknown> { return (await safe)(value); } void run(state);",
+		false
+	),
+	structureFlowRed8Fixture(
+		"default selection",
+		"omitting the argument retains the forbidden parameter default",
+		RED8_IMPORTS,
+		"function run(value: unknown, selected: Callback = capture): unknown { return selected(value); } run(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"default selection",
+		"an explicit safe override remains allowed",
+		RED8_IMPORTS,
+		"function run(value: unknown, selected: Callback = capture): unknown { return selected(value); } run(state, safe);",
+		false
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"genuine Function-prototype call remains detected",
+		RED8_IMPORTS,
+		"capture.call(undefined, state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"genuine Function-prototype apply remains detected",
+		RED8_IMPORTS,
+		"capture.apply(undefined, [state]);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"genuine Function-prototype bind remains detected",
+		RED8_IMPORTS,
+		"const selected = capture.bind(undefined); selected(state);",
+		true
+	),
+	structureFlowRed8Fixture(
+		"ordinary reserved-name object member",
+		"same-shape safe object members remain allowed",
+		RED8_IMPORTS,
+		"const bag = { call: safe, apply: safe, bind: safe }; bag.call(state); bag.apply(state); bag.bind(state);",
+		false
+	),
+] satisfies readonly StructureFlowRed8Fixture[]);
+
+describe("Phase 1d(i) D.92.2 remaining language-flow RED8", () => {
+	it.each(STRUCTURE_FLOW_RED8_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
+		const analysis = analyze(sources);
+		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+	});
+
+	it.each(STRUCTURE_FLOW_RED8_CONTROLS)(
+		"preserves $family control: $name",
+		({ expectedViolation, shouldViolate, sources }) => {
+			const analysis = analyze(sources);
+			if (shouldViolate) {
+				expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+			} else {
+				expect(analysis.violations).toEqual([]);
+			}
+		}
+	);
+});
+
 interface StructureFlowRed7Fixture {
 	readonly expectedViolation: RegExp;
 	readonly family: string;
