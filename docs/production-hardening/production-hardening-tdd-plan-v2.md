@@ -14223,3 +14223,212 @@ corrective production change begins with another fresh tests-only RED owner.
 Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
 paths. Do not schedule Fable unless explicitly requested.
+
+### D.91 — Phase 1d(i) attribution-hardening lineage through intrinsic dispatch
+
+The initial Phase 1d(i) publication implementation and its frozen RED remain
+accepted, but adversarial review exposed mutation-attribution seams that had to
+be closed before its performance result could be treated as production-safe.
+The causal lineage through the last accepted corrective is:
+
+1. `2f446cf` / `8e8eaa1`: causal Phase 1d(i) RED and incremental publication
+   GREEN, followed by the structural closure in `753448f`;
+2. `ae1659b` through `3bf8a98`: raw identity, alias topology, context alias,
+   observation-order and mutation-time owner-attribution RED/GREEN pairs;
+3. `1d40829` / `19c3c66`: newly linked subtree initialization;
+4. `113919c` / `38f4a6a`: graph identity and initialization atomicity;
+5. `664326c` / `30c4b88`: failed collection mutation reconciliation;
+6. `80a9caa` / `91bdcba`: failed ordinary writes are still captured when the
+   JavaScript write physically commits before a later fallible discovery step;
+7. `1733134` / `d467dbb`: captured collection-proxy identity; and
+8. `c4eff4e` / `7bfaacb`: intrinsic collection dispatch, accepted by
+   Grok-high, exact Kimi 3/high/100 and final Opus/xhigh.
+
+The ordinary-write corrective is intentionally not weakened to transactional
+JavaScript semantics that the language cannot provide. If an ordinary
+assignment, `defineProperty` or Array write has physically committed before
+fallible subtree discovery throws, that committed mutation remains attributable
+and must be published by a later successful operation. A caught traversal error
+cannot leave the authored snapshot stale or the first key falsely clean.
+
+The specialized-dispatch acceptance does not close raw-child escape. Commit
+`72191bd` is the next causal tests-only RED. It pins five custom raw Map/Set
+member shapes, two non-function collection-member shapes, one frozen Proxy-
+invariant shape and three real-applier publication paths. At that checkpoint 11
+of 18 focused cases fail for the intended attribution reason while all controls,
+the 208-test inherited seam, typechecks, lint and formatting remain green.
+Evidence is under `.logs/phase-1d-i-raw-child-escape-red-codex-high/`.
+
+### D.92 — Rejected raw-escape prototype and ownership-prerequisite correction
+
+The first distinct GREEN exploration for `72191bd` is **rejected and was never
+committed**. It introduced serialized top-level preimages, graph reachability
+rebuilds and a `byteChangedKeys` bypass. Moving the serialization helper into
+`@ts-drp/utils` made the existing structural test pass, but that was a boundary
+relocation rather than governance. More importantly, the prototype first
+reached only 16/18 focused cases. Exactly `customMap` and `frozenMap` remained
+wrong; both store the escaped mutable child as a Map **object key**. The later
+18/18 result was a false green because `byteChangedKeys` merely bypassed the
+stale-baseline equality check.
+
+The installed `es-toolkit@1.30.1` `cloneDeep` implementation clones Map values
+but inserts Map keys by identity. Set entries are cloned. Consequently:
+
+- a stored snapshot and a mutable execution object can share the same Map key;
+- mutating that key changes both the live post-image and the alleged immutable
+  pre-image;
+- `deepEqual` plus exact serialized equality then reports no difference and
+  reuses the already-corrupted entry; and
+- forcing a new copy through the same `cloneDeep` still shares the key, so the
+  new snapshot remains externally mutable.
+
+This is a pre-existing D.90 §1 ownership defect, not evidence that raw escape
+requires a serialized fingerprint. It affects ordinary proxied Map-key
+mutation, public setter input, public getter output, mutable reconstruction,
+stored per-vertex snapshots and checkpoints—not only the current raw-escape
+RED. The rejected prototype was completely removed and the tracked production
+tree was restored byte-for-byte to exact HEAD `72191bd`.
+
+#### D.92.1 — Unanimous correction quorum and exact order
+
+Codex-high, exact Kimi 3/high with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus/xhigh session
+`cf328206-bcbd-4fb5-b92f-69bd673bcd61` agree that no fingerprint seam is
+justified after true ownership detachment. Opus additionally required the
+cross-package governance repair to precede the ownership rewrite. Codex-high
+and the same Kimi 3 reviewer subsequently returned `ORDERING_AGREE=yes` to
+that exact amendment.
+
+The mandatory causal order is therefore:
+
+1. reject and remove the exploratory prototype;
+2. repair the cross-package transitive structural no-bypass gate with a fresh
+   tests-only RED and a distinct GREEN owner;
+3. repair Map object-key snapshot detachment with its own fresh causal RED and
+   distinct GREEN owner;
+4. amend the raw-child RED's read-only candidacy control and add unchanged
+   ballast;
+5. implement monotone explicit all-governed-key candidacy at raw egress, using
+   the now-detached published baseline as the exact final filter; and
+6. run Grok-high, exact Kimi 3/high/100 and final Opus/xhigh over the composite
+   accepted result.
+
+No later step may be folded into an earlier GREEN merely to make the focused
+suite pass. Any new corrective production change starts with another fresh
+tests-only RED.
+
+#### D.92.2 — Cross-package structural gate correction
+
+The existing structure test is not a trustworthy transitive gate. It scans
+`packages/object/src` plus a name-based set of files/primitives, skips
+non-relative workspace imports, and omits `packages/object/src/index.ts` even
+though the public copy-in/copy-out ownership boundary lives there.
+
+The corrected analyzer must:
+
+1. include `packages/object/src/index.ts` and every stored-snapshot detachment
+   boundary in the governed roots;
+2. resolve relative imports, `@ts-drp/*` workspace imports and package subpath
+   exports across package boundaries;
+3. classify forbidden clone, encode and round-trip behavior by transitive
+   reachability, not by local identifier spelling;
+4. follow named/default/namespace imports, aliases, re-exports, property access,
+   callback passage and multi-hop wrappers; and
+5. retain an exact, reviewed census for deliberately excluded copy sites.
+
+Its mutation corpus must kill the exact rejected `snapshotValueBytes` helper
+relocated into utils, a renamed re-export, a two-hop wrapper, a third-package
+wrapper, namespace/property/callback aliases, discarded copies,
+serialization-as-clone, clone-everything-then-share and a helper placed just
+outside the former scan boundary. The RED changes expectations/fixtures only;
+the distinct GREEN changes the test analyzer, not production behavior. This
+governance slice must be fast enough for normal iteration.
+
+#### D.92.3 — Map object-key detachment contract
+
+One shared graph-aware state-payload detachment primitive must replace the
+graph-incomplete ownership copies. It must clone Map keys and values through
+the same per-top-level-payload identity stack and govern at least:
+
+- `stateFromDRP` stored capture;
+- `applyState` / `fromStates` / `fromHash` / `fromHashACL` mutable
+  reconstruction;
+- the injected publication-copy leaf and observer copy seam;
+- public `getStates` copy-out;
+- public `setACLState` and `setDRPState` copy-in;
+- `cloneEnumerableInstance` and any operation-value clone sites proven to
+  carry state payloads; and
+- per-vertex publication, checkpoint, rollback, prune, sibling and fallback
+  checkpoint paths.
+
+Within one top-level payload the copy preserves aliases and cycles: key equals
+value, one key appears in several Maps, a key also appears in a Set or ordinary
+property, and two distinct deep-equal keys remain distinct with stable Map
+size. Across independently copied top-level entries and across ACL/DRP pair
+sides, preserve the existing independent-copy semantics; do not introduce a
+global identity stack.
+
+The RED must prove input/output/reconstruction isolation, stored sibling and
+checkpoint immutability, exact unchanged-entry comparison, failed-publication
+atomicity, rollback/prune behavior and exact existing wire bytes. It must kill
+a `result.set(originalKey, clonedValue)` mutant and a one-site-only
+publication fix. Detachment must use captured collection intrinsics where
+applicable, fail closed on incompatible Proxy collection receivers and
+throwing traversal/getter shapes, preserve the primary throwable, and never
+install a partial snapshot. Existing copy counters, per-case ratios and the
+bounded 1 MB characterization remain preservation gates; the fix may not hide
+a full-state pre-copy.
+
+#### D.92.4 — Raw-egress contract after detachment
+
+After D.92.3 is accepted, forced raw egress widens candidacy monotonically to
+an explicit set containing every governed top-level key. `undefined` is
+forbidden because the current publication path interprets it as unconditional
+reuse. Governed names are collected before egress, after an unknown method
+returns or throws, and at later observations so a raw root argument cannot
+hide top-level addition or deletion.
+
+The exact final publication decision remains comparison against the genuinely
+detached `ownedEntry.value`. A read-only escape may therefore conservatively
+candidate every key while publishing zero changed keys and zero detached
+payload bytes. Add at least two unchanged ballast keys to each escape fixture
+so charge-everything publication cannot pass. Comparison failure is fail-
+closed. Add bounded `egressWidenings`, `comparedKeys` and `comparisonPasses`
+instrumentation, but forbid serialized fingerprints/preimages,
+`byteChangedKeys`, topology rebuilds, dirty-reader graph scans and O(state)
+work inside `hasChanges()` or `changedKeys()`.
+
+#### D.92.5 — Distinct retained blockers
+
+The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
+confirmed through direct tracking and the real applier, and remains a hard
+pre-3a live-v3-binder gate. It can hide a vertex from the charge keyset while a
+supplied order still indexes it. D.92 neither consumes nor repairs it.
+
+The publication-time codec/`Symbol.iterator` captured-intrinsic seam also
+remains separate unless its later causal RED explicitly assigns it to the
+shared detachment primitive. Phase 0n remains optional after the golden paths
+except for any already-recorded hard Phase 4a prerequisite. These separations
+must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
+
+## Next Agent Prompt — supersedes the D.90 handoff
+
+Begin D.92.2 at exact HEAD containing `72191bd` plus this documentation-only
+checkpoint. Spawn a fresh Codex-high RED owner that may edit only the
+incremental-publication structural test and its test-local fixtures, never
+production or this plan. It must prove the current analyzer misses the exact
+cross-package relocation and every alias/wrapper mutant in D.92.2 while all
+real production sources remain unchanged. Commit the causal RED and preserve
+focused failure evidence.
+
+Then use a distinct fresh Codex-high GREEN owner to repair only the structural
+analyzer/test infrastructure. Run the focused gate, the inherited Phase 1d(i)
+suite, package/workspace typechecks, zero-error lint, formatting/diff/scope and
+exact-SHA verification to `.log` files. Review the governance slice with
+Grok-high, exact Kimi 3/high/100 and final Opus/xhigh before beginning the
+independent Map-key detachment RED/GREEN in D.92.3.
+
+Never resurrect or partially retain the rejected fingerprint prototype. Never
+stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the
+stale untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable
+unless explicitly requested.
