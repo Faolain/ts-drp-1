@@ -134,6 +134,11 @@ function expectWorkspaceIntegration(
 
 function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 	const result: FunctionNode[] = [];
+	const immediatelyInvoked = (node: ts.ArrowFunction | ts.FunctionExpression): boolean => {
+		let expression: ts.Expression = node;
+		while (ts.isParenthesizedExpression(expression.parent)) expression = expression.parent;
+		return ts.isCallExpression(expression.parent) && expression.parent.expression === expression;
+	};
 	for (const file of files) {
 		const add = (
 			declaration: ts.FunctionLikeDeclaration,
@@ -151,14 +156,20 @@ function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 			});
 		};
 		const visit = (node: ts.Node, className?: string): void => {
-			if (ts.isClassDeclaration(node)) {
-				const nextClass = node.name?.text ?? `<anonymous@${node.pos}>`;
+			if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+				const nextClass =
+					node.name?.text ??
+					(ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)
+						? node.parent.name.text
+						: `<anonymous@${node.pos}>`);
 				for (const child of node.members) visit(child, nextClass);
 				return;
 			}
 			if (ts.isConstructorDeclaration(node) && node.body) {
 				add(node, node.body, "constructor", className);
 			} else if (ts.isMethodDeclaration(node) && node.name && node.body) {
+				add(node, node.body, ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file), className);
+			} else if (ts.isGetAccessorDeclaration(node) && node.name && node.body) {
 				add(node, node.body, ts.isIdentifier(node.name) ? node.name.text : node.name.getText(file), className);
 			} else if (ts.isFunctionDeclaration(node) && node.body) {
 				const isDefault = node.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.DefaultKeyword);
@@ -183,6 +194,13 @@ function functions(files: readonly ts.SourceFile[]): FunctionNode[] {
 					ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : node.name.getText(file),
 					className
 				);
+			} else if (
+				(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+				!ts.isVariableDeclaration(node.parent) &&
+				!ts.isPropertyDeclaration(node.parent) &&
+				immediatelyInvoked(node)
+			) {
+				add(node, node.body, `<anonymous@${node.pos}>`, className);
 			}
 			ts.forEachChild(node, (child) => visit(child, className));
 		};
@@ -340,7 +358,6 @@ function forbiddenReference(
 ): ForbiddenPrimitive | undefined {
 	if (ts.isIdentifier(node)) {
 		if (node.text === "structuredClone") return "structuredClone";
-		if (node.text === "JSON") return "json";
 		if (node.text === "stateFromDRP" && !bindings.has(node.text)) return "stateFromDRP";
 		return bindings.get(node.text);
 	}
@@ -348,9 +365,6 @@ function forbiddenReference(
 	const name = propertyName(node);
 	const receiver = node.expression.getText(node.getSourceFile()).replace(/\s+/g, "");
 	if (name === "structuredClone" && receiver === "globalThis") return "structuredClone";
-	if ((name === "parse" || name === "stringify") && (receiver === "JSON" || receiver === "globalThis.JSON")) {
-		return "json";
-	}
 	if (ts.isIdentifier(node.expression) && namespaces.has(node.expression.text) && name) {
 		if (name === "serializeValue") return "serializeValue";
 		if (SERIALIZATION_PRIMITIVES.has(name)) return "serialization";
@@ -539,9 +553,6 @@ function analyzeLegacy(sources: Readonly<Record<string, string>>): ClosureAnalys
 				violations.push(`${node.id} is an unapproved recursive helper`);
 			}
 		}
-		if (/JSON\.(?:parse|stringify)\s*\(/.test(node.body.getText(node.file))) {
-			violations.push(`${node.id} uses a JSON round trip`);
-		}
 	}
 	const global = globalViolations(files, nodes, reachable, leafIds);
 	violations.push(...global.violations);
@@ -560,7 +571,18 @@ type SemanticPrimitive =
 	| "json"
 	| "stateFromDRP"
 	| "unresolvedInternal";
-type SemanticTarget = `function:${string}` | `object:${string}:${string}` | `primitive:${SemanticPrimitive}`;
+type SemanticTarget =
+	| `function:${string}`
+	| `object:${string}:${string}`
+	| `class:${string}`
+	| `instance:${string}`
+	| `namespace:${string}`
+	| "provenance:jsonString"
+	| `primitive:${SemanticPrimitive}`;
+
+function semanticClassTarget(file: ts.SourceFile, declaration: ts.ClassLikeDeclaration): `class:${string}` {
+	return `class:${file.fileName}@${declaration.pos}`;
+}
 
 interface ImportBinding {
 	readonly exportName: string;
@@ -669,6 +691,19 @@ function semanticModules(
 				continue;
 			}
 			if (
+				ts.isClassDeclaration(statement) &&
+				statement.name &&
+				statement.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword)
+			) {
+				exports.set(
+					statement.modifiers.some(({ kind }) => kind === ts.SyntaxKind.DefaultKeyword)
+						? "default"
+						: statement.name.text,
+					semanticClassTarget(file, statement)
+				);
+				continue;
+			}
+			if (
 				ts.isVariableStatement(statement) &&
 				statement.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword)
 			) {
@@ -678,6 +713,8 @@ function semanticModules(
 					if (node) exports.set(declaration.name.text, `function:${node.id}`);
 					else if (declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
 						exports.set(declaration.name.text, `object:${file.fileName}:${declaration.name.text}`);
+					} else if (declaration.initializer && ts.isClassExpression(declaration.initializer)) {
+						exports.set(declaration.name.text, semanticClassTarget(file, declaration.initializer));
 					}
 				}
 				continue;
@@ -714,6 +751,7 @@ function semanticAnalysis(
 	nodes: readonly FunctionNode[]
 ): { reviewedOperations: string[]; violations: string[] } {
 	const modules = semanticModules(files, nodes);
+	const sourceNames = new Set(files.map(({ fileName }) => fileName));
 	const nodesById = new Map(nodes.map((node) => [node.id, node]));
 	const nodesByDeclaration = new Map(nodes.map((node) => [node.declaration, node]));
 	const moduleFunctions = new Map<string, FunctionNode>();
@@ -722,13 +760,25 @@ function semanticAnalysis(
 	const destructuredVariables = new Map<string, { readonly property: string; readonly source: ts.Expression }>();
 	const moduleVariables = new Map<string, ts.Expression>();
 	const moduleBindings = new Set<string>();
-	const classProperties = new Map<string, ts.Expression>();
+	const classes = new Map<string, ts.ClassLikeDeclaration>();
+	const localClasses = new Map<string, SemanticTarget>();
 	const parameterTargets = new Map<string, Map<string, Set<SemanticTarget>>>();
 	const returnedTargets = new Map<string, Set<SemanticTarget>>();
 	const storedTargets = new Map<string, Set<SemanticTarget>>();
+	const isModuleCallable = (node: FunctionNode): boolean => {
+		const declaration = node.declaration;
+		if (ts.isFunctionDeclaration(declaration)) return ts.isSourceFile(declaration.parent);
+		const variable = declaration.parent;
+		return (
+			ts.isVariableDeclaration(variable) &&
+			ts.isVariableDeclarationList(variable.parent) &&
+			ts.isVariableStatement(variable.parent.parent) &&
+			ts.isSourceFile(variable.parent.parent.parent)
+		);
+	};
 	for (const node of nodes) {
 		if (node.className) classMethods.set(`${node.file.fileName}:${node.className}:${node.name}`, node);
-		else moduleFunctions.set(`${node.file.fileName}:${node.name}`, node);
+		else if (isModuleCallable(node)) moduleFunctions.set(`${node.file.fileName}:${node.name}`, node);
 		const parameters = new Map<string, Set<SemanticTarget>>();
 		for (const parameter of node.declaration.parameters) {
 			if (ts.isIdentifier(parameter.name)) parameters.set(parameter.name.text, new Set());
@@ -756,34 +806,38 @@ function semanticAnalysis(
 	}
 	for (const file of files) {
 		for (const statement of file.statements) {
-			if (!ts.isVariableStatement(statement)) continue;
-			for (const declaration of statement.declarationList.declarations) {
-				if (ts.isIdentifier(declaration.name)) {
-					moduleBindings.add(`${file.fileName}:${declaration.name.text}`);
-					if (declaration.initializer) {
-						moduleVariables.set(`${file.fileName}:${declaration.name.text}`, declaration.initializer);
+			if (ts.isVariableStatement(statement)) {
+				for (const declaration of statement.declarationList.declarations) {
+					if (ts.isIdentifier(declaration.name)) {
+						moduleBindings.add(`${file.fileName}:${declaration.name.text}`);
+						if (declaration.initializer) {
+							moduleVariables.set(`${file.fileName}:${declaration.name.text}`, declaration.initializer);
+						}
 					}
 				}
 			}
 		}
-		const visit = (child: ts.Node, className?: string): void => {
-			if (ts.isClassDeclaration(child)) {
-				const nextClass = child.name?.text;
-				for (const member of child.members) visit(member, nextClass);
-				return;
+		const visitClasses = (child: ts.Node): void => {
+			if (ts.isClassDeclaration(child) || ts.isClassExpression(child)) {
+				const target = semanticClassTarget(file, child);
+				classes.set(target, child);
+				const localName =
+					child.name?.text ??
+					(ts.isVariableDeclaration(child.parent) && ts.isIdentifier(child.parent.name)
+						? child.parent.name.text
+						: undefined);
+				if (localName) localClasses.set(`${file.fileName}:${localName}`, target);
 			}
-			if (className && ts.isPropertyDeclaration(child) && child.initializer && child.name) {
-				const name = ts.isIdentifier(child.name) || ts.isStringLiteral(child.name) ? child.name.text : undefined;
-				if (name) classProperties.set(`${file.fileName}:${className}:${name}`, child.initializer);
-			}
+			ts.forEachChild(child, visitClasses);
 		};
-		for (const statement of file.statements) visit(statement);
+		visitClasses(file);
 	}
 
 	const exportTargets = (
 		moduleName: string,
 		exportName: string,
-		seen: Set<string> = new Set()
+		seen: Set<string> = new Set(),
+		failClosed = true
 	): Set<SemanticTarget> => {
 		const key = `${moduleName}:${exportName}`;
 		if (seen.has(key)) return new Set();
@@ -796,27 +850,200 @@ function semanticAnalysis(
 				const localBinding = moduleFunctions.get(`${moduleName}:${binding.exportName}`);
 				if (localBinding) return new Set<SemanticTarget>([`function:${localBinding.id}`]);
 			}
-			return exportTargets(binding.moduleName, binding.exportName, seen);
+			return exportTargets(binding.moduleName, binding.exportName, seen, failClosed);
 		}
 		const local = moduleFunctions.get(key);
 		if (local) return new Set<SemanticTarget>([`function:${local.id}`]);
 		const targets = new Set<SemanticTarget>();
 		for (const starModule of modules.get(moduleName)?.starExports ?? []) {
-			for (const target of exportTargets(starModule, exportName, new Set(seen))) targets.add(target);
+			for (const target of exportTargets(starModule, exportName, new Set(seen), false)) targets.add(target);
 		}
+		if (targets.size === 0 && failClosed && modules.has(moduleName)) targets.add("primitive:unresolvedInternal");
 		return targets;
 	};
-	const expressionTargets = (
+	const keyValue = (expression: ts.Expression, owner: FunctionNode, seen: Set<string>): string | undefined => {
+		if (
+			ts.isStringLiteral(expression) ||
+			ts.isNoSubstitutionTemplateLiteral(expression) ||
+			ts.isNumericLiteral(expression)
+		) {
+			return expression.text;
+		}
+		if (ts.isParenthesizedExpression(expression)) return keyValue(expression.expression, owner, seen);
+		if (ts.isIdentifier(expression)) {
+			const key = `${owner.id}:key:${expression.text}`;
+			if (seen.has(key)) return undefined;
+			seen.add(key);
+			const initializer =
+				variables.get(`${owner.id}:${expression.text}`) ??
+				moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+			return initializer ? keyValue(initializer, owner, seen) : undefined;
+		}
+		if (ts.isConditionalExpression(expression)) {
+			const whenTrue = keyValue(expression.whenTrue, owner, new Set(seen));
+			const whenFalse = keyValue(expression.whenFalse, owner, new Set(seen));
+			return whenTrue === whenFalse ? whenTrue : undefined;
+		}
+		return undefined;
+	};
+	const accessName = (
+		expression: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+		owner: FunctionNode,
+		seen: Set<string>
+	): string | undefined =>
+		ts.isPropertyAccessExpression(expression)
+			? expression.name.text
+			: expression.argumentExpression
+				? keyValue(expression.argumentExpression, owner, seen)
+				: undefined;
+	const jsonMethod = (
+		expression: ts.Expression,
+		owner: FunctionNode,
+		seen: Set<string>
+	): "parse" | "stringify" | undefined => {
+		if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) return undefined;
+		const name = accessName(expression, owner, seen);
+		if (name !== "parse" && name !== "stringify") return undefined;
+		const receiver = expression.expression.getText(owner.file).replace(/\s+/g, "");
+		return receiver === "JSON" || receiver === "globalThis.JSON" ? name : undefined;
+	};
+	const memberTargets = (
+		classTarget: string,
+		name: string,
+		wantStatic: boolean,
+		owner: FunctionNode,
+		seen: Set<string>
+	): Set<SemanticTarget> => {
+		const declaration = classes.get(classTarget.replace(/^instance:/, "class:"));
+		const result = new Set<SemanticTarget>();
+		for (const member of declaration?.members ?? []) {
+			if (!member.name) continue;
+			const memberName = ts.isComputedPropertyName(member.name)
+				? keyValue(member.name.expression, owner, new Set(seen))
+				: ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) || ts.isNumericLiteral(member.name)
+					? member.name.text
+					: undefined;
+			if (memberName !== name) continue;
+			const isStatic = Boolean(
+				ts.canHaveModifiers(member) && ts.getModifiers(member)?.some(({ kind }) => kind === ts.SyntaxKind.StaticKeyword)
+			);
+			if (isStatic !== wantStatic) continue;
+			if (ts.isMethodDeclaration(member)) {
+				const callable = nodesByDeclaration.get(member);
+				if (callable) result.add(`function:${callable.id}`);
+			} else if (ts.isPropertyDeclaration(member) && member.initializer) {
+				for (const target of expressionTargets(member.initializer, owner, new Set(seen))) result.add(target);
+			} else if (ts.isGetAccessorDeclaration(member)) {
+				const getter = nodesByDeclaration.get(member);
+				for (const target of returnedTargets.get(getter?.id ?? "") ?? []) result.add(target);
+			}
+		}
+		return result;
+	};
+	const propertyTargets = (
+		expression: ts.Expression,
+		name: string,
+		owner: FunctionNode,
+		seen: Set<string>
+	): Set<SemanticTarget> => {
+		if (ts.isParenthesizedExpression(expression)) return propertyTargets(expression.expression, name, owner, seen);
+		if (ts.isConditionalExpression(expression)) {
+			const result = propertyTargets(expression.whenTrue, name, owner, new Set(seen));
+			for (const target of propertyTargets(expression.whenFalse, name, owner, new Set(seen))) result.add(target);
+			return result;
+		}
+		if (ts.isIdentifier(expression)) {
+			const namespace = modules.get(owner.file.fileName)?.namespaces.get(expression.text);
+			if (namespace) {
+				const primitive = importedPrimitive(namespace, name);
+				return primitive
+					? new Set<SemanticTarget>([`primitive:${primitive}`])
+					: modules.has(namespace)
+						? exportTargets(namespace, name)
+						: new Set();
+			}
+			const variable = variables.get(`${owner.id}:${expression.text}`);
+			if (variable) return propertyTargets(variable, name, owner, seen);
+			const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+			if (moduleVariable) return propertyTargets(moduleVariable, name, owner, seen);
+		}
+		if (ts.isArrayLiteralExpression(expression)) {
+			const index = Number(name);
+			const element = Number.isInteger(index) ? expression.elements[index] : undefined;
+			return element && ts.isExpression(element) ? expressionTargets(element, owner, seen) : new Set();
+		}
+		if (ts.isObjectLiteralExpression(expression)) {
+			const result = new Set<SemanticTarget>();
+			for (const candidate of expression.properties) {
+				if (ts.isSpreadAssignment(candidate)) {
+					for (const target of propertyTargets(candidate.expression, name, owner, new Set(seen))) result.add(target);
+					continue;
+				}
+				if (!candidate.name) continue;
+				const candidateName = ts.isComputedPropertyName(candidate.name)
+					? keyValue(candidate.name.expression, owner, new Set(seen))
+					: ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name) || ts.isNumericLiteral(candidate.name)
+						? candidate.name.text
+						: undefined;
+				if (candidateName !== name) continue;
+				if (ts.isPropertyAssignment(candidate)) {
+					for (const target of expressionTargets(candidate.initializer, owner, new Set(seen))) result.add(target);
+				} else if (ts.isShorthandPropertyAssignment(candidate)) {
+					for (const target of expressionTargets(candidate.name, owner, new Set(seen))) result.add(target);
+				} else if (ts.isMethodDeclaration(candidate)) {
+					const callable = nodesByDeclaration.get(candidate);
+					if (callable) result.add(`function:${callable.id}`);
+				} else if (ts.isGetAccessorDeclaration(candidate)) {
+					const getter = nodesByDeclaration.get(candidate);
+					for (const target of returnedTargets.get(getter?.id ?? "") ?? []) result.add(target);
+				}
+			}
+			return result;
+		}
+		const result = new Set<SemanticTarget>();
+		for (const target of expressionTargets(expression, owner, new Set(seen))) {
+			if (target.startsWith("namespace:")) {
+				const moduleName = target.slice("namespace:".length);
+				const primitive = importedPrimitive(moduleName, name);
+				for (const nested of primitive
+					? new Set<SemanticTarget>([`primitive:${primitive}`])
+					: exportTargets(moduleName, name))
+					result.add(nested);
+			} else if (target.startsWith("object:")) {
+				const match = target.match(/^object:(.*):([^:]+)$/);
+				const object = match ? moduleVariables.get(`${match[1]}:${match[2]}`) : undefined;
+				if (object) for (const nested of propertyTargets(object, name, owner, new Set(seen))) result.add(nested);
+			} else if (target.startsWith("class:")) {
+				for (const nested of memberTargets(target, name, true, owner, new Set(seen))) result.add(nested);
+			} else if (target.startsWith("instance:")) {
+				for (const nested of memberTargets(target, name, false, owner, new Set(seen))) result.add(nested);
+			}
+		}
+		return result;
+	};
+	function expressionTargets(
 		expression: ts.Expression,
 		owner: FunctionNode,
 		seen: Set<string> = new Set()
-	): Set<SemanticTarget> => {
+	): Set<SemanticTarget> {
 		const expressionKey = `${owner.id}:${expression.pos}:${expression.end}`;
 		if (seen.has(expressionKey)) return new Set();
 		seen.add(expressionKey);
 		if (ts.isParenthesizedExpression(expression)) return expressionTargets(expression.expression, owner, seen);
+		if (
+			ts.isAsExpression(expression) ||
+			ts.isTypeAssertionExpression(expression) ||
+			ts.isNonNullExpression(expression)
+		) {
+			return expressionTargets(expression.expression, owner, seen);
+		}
 		if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.CommaToken) {
 			return expressionTargets(expression.right, owner, seen);
+		}
+		if (ts.isConditionalExpression(expression)) {
+			const result = expressionTargets(expression.whenTrue, owner, new Set(seen));
+			for (const target of expressionTargets(expression.whenFalse, owner, new Set(seen))) result.add(target);
+			return result;
 		}
 		if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
 			const callable = nodesByDeclaration.get(expression);
@@ -824,7 +1051,6 @@ function semanticAnalysis(
 		}
 		if (ts.isIdentifier(expression)) {
 			if (expression.text === "structuredClone") return new Set(["primitive:structuredClone"]);
-			if (expression.text === "JSON") return new Set(["primitive:json"]);
 			const parameter = parameterTargets.get(owner.id)?.get(expression.text);
 			if (parameter?.size) return new Set(parameter);
 			const stored = storedTargets.get(`${owner.file.fileName}:${expression.text}`);
@@ -839,10 +1065,27 @@ function semanticAnalysis(
 			if (imported?.primitive) return new Set<SemanticTarget>([`primitive:${imported.primitive}`]);
 			if (imported?.unresolvedInternal) return new Set<SemanticTarget>(["primitive:unresolvedInternal"]);
 			if (imported?.moduleName) return exportTargets(imported.moduleName, imported.exportName);
+			const namespace = modules.get(owner.file.fileName)?.namespaces.get(expression.text);
+			if (namespace) return new Set<SemanticTarget>([`namespace:${namespace}`]);
+			const localClass = localClasses.get(`${owner.file.fileName}:${expression.text}`);
+			if (localClass) return new Set([localClass]);
 			const local = moduleFunctions.get(`${owner.file.fileName}:${expression.text}`);
 			return local ? new Set<SemanticTarget>([`function:${local.id}`]) : new Set();
 		}
 		if (ts.isCallExpression(expression)) {
+			const wrapper =
+				ts.isPropertyAccessExpression(expression.expression) || ts.isElementAccessExpression(expression.expression)
+					? accessName(expression.expression, owner, new Set(seen))
+					: undefined;
+			if (wrapper === "bind") {
+				return ts.isPropertyAccessExpression(expression.expression) ||
+					ts.isElementAccessExpression(expression.expression)
+					? expressionTargets(expression.expression.expression, owner, seen)
+					: new Set();
+			}
+			if (jsonMethod(expression.expression, owner, new Set(seen)) === "stringify") {
+				return new Set(["provenance:jsonString"]);
+			}
 			const result = new Set<SemanticTarget>();
 			for (const target of expressionTargets(expression.expression, owner, seen)) {
 				if (!target.startsWith("function:")) continue;
@@ -850,80 +1093,35 @@ function semanticAnalysis(
 			}
 			return result;
 		}
+		if (ts.isNewExpression(expression)) {
+			const result = new Set<SemanticTarget>();
+			for (const target of expressionTargets(expression.expression, owner, seen)) {
+				if (target.startsWith("class:")) result.add(`instance:${target.slice("class:".length)}`);
+			}
+			return result;
+		}
+		if (ts.isClassExpression(expression)) return new Set([semanticClassTarget(owner.file, expression)]);
 		if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
-			const name = propertyName(expression);
+			const name = accessName(expression, owner, seen);
 			if (!name) return new Set();
+			if (["call", "apply", "bind"].includes(name)) {
+				return expressionTargets(expression.expression, owner, seen);
+			}
 			if (expression.expression.kind === ts.SyntaxKind.ThisKeyword && owner.className) {
 				const method = classMethods.get(`${owner.file.fileName}:${owner.className}:${name}`);
 				if (method) return new Set<SemanticTarget>([`function:${method.id}`]);
-				const property = classProperties.get(`${owner.file.fileName}:${owner.className}:${name}`);
-				return property ? expressionTargets(property, owner, seen) : new Set();
+				const localClass = localClasses.get(`${owner.file.fileName}:${owner.className}`);
+				return localClass
+					? memberTargets(`instance:${localClass.slice("class:".length)}`, name, false, owner, seen)
+					: new Set();
 			}
-			if (ts.isIdentifier(expression.expression)) {
-				const receiver = expression.expression.text;
-				if (owner.className && receiver === owner.className) {
-					const method = classMethods.get(`${owner.file.fileName}:${owner.className}:${name}`);
-					if (method) return new Set<SemanticTarget>([`function:${method.id}`]);
-				}
-				if (receiver === "globalThis" && name === "structuredClone") {
-					return new Set(["primitive:structuredClone"]);
-				}
-				if (receiver === "JSON" && (name === "parse" || name === "stringify")) {
-					return new Set(["primitive:json"]);
-				}
-				const namespace = modules.get(owner.file.fileName)?.namespaces.get(receiver);
-				if (namespace) {
-					const primitive = importedPrimitive(namespace, name);
-					return primitive ? new Set<SemanticTarget>([`primitive:${primitive}`]) : exportTargets(namespace, name);
-				}
-				const imported = modules.get(owner.file.fileName)?.imports.get(receiver);
-				if (imported?.moduleName) {
-					const result = new Set<SemanticTarget>();
-					for (const target of exportTargets(imported.moduleName, imported.exportName)) {
-						if (!target.startsWith("object:")) continue;
-						const [, objectFile, objectName] = target.match(/^object:(.*):([^:]+)$/) ?? [];
-						const object = objectFile ? moduleVariables.get(`${objectFile}:${objectName}`) : undefined;
-						if (object) for (const nested of propertyTargets(object, name, owner, seen)) result.add(nested);
-					}
-					if (result.size) return result;
-				}
-				const variable = variables.get(`${owner.id}:${receiver}`);
-				if (variable) return propertyTargets(variable, name, owner, seen);
-				const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${receiver}`);
-				if (moduleVariable) return propertyTargets(moduleVariable, name, owner, seen);
-			}
-		}
-		return new Set();
-	};
-	function propertyTargets(
-		expression: ts.Expression,
-		name: string,
-		owner: FunctionNode,
-		seen: Set<string>
-	): Set<SemanticTarget> {
-		if (ts.isIdentifier(expression)) {
-			const namespace = modules.get(owner.file.fileName)?.namespaces.get(expression.text);
-			if (namespace) {
-				const primitive = importedPrimitive(namespace, name);
-				return primitive ? new Set<SemanticTarget>([`primitive:${primitive}`]) : exportTargets(namespace, name);
-			}
-			const variable = variables.get(`${owner.id}:${expression.text}`);
-			if (variable) return propertyTargets(variable, name, owner, seen);
-			const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
-			if (moduleVariable) return propertyTargets(moduleVariable, name, owner, seen);
-		}
-		if (!ts.isObjectLiteralExpression(expression)) return new Set();
-		for (const candidate of expression.properties) {
 			if (
-				(ts.isPropertyAssignment(candidate) || ts.isMethodDeclaration(candidate)) &&
-				candidate.name &&
-				(ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
-				candidate.name.text === name
+				expression.expression.getText(owner.file).replace(/\s+/g, "") === "globalThis" &&
+				name === "structuredClone"
 			) {
-				if (ts.isPropertyAssignment(candidate)) return expressionTargets(candidate.initializer, owner, seen);
-				const callable = nodesByDeclaration.get(candidate);
-				return callable ? new Set<SemanticTarget>([`function:${callable.id}`]) : new Set();
+				return new Set(["primitive:structuredClone"]);
 			}
+			return propertyTargets(expression.expression, name, owner, seen);
 		}
 		return new Set();
 	}
@@ -962,14 +1160,31 @@ function semanticAnalysis(
 					storedTargets.set(`${owner.file.fileName}:${node.left.text}`, targets);
 				}
 				if (ts.isCallExpression(node)) {
-					const callTargets = new Set(expressionTargets(node.expression, owner));
+					const wrapper =
+						ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression)
+							? accessName(node.expression, owner, new Set())
+							: undefined;
+					const callTargets =
+						wrapper === "bind"
+							? new Set<SemanticTarget>()
+							: (wrapper === "call" || wrapper === "apply") &&
+								  (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression))
+								? expressionTargets(node.expression.expression, owner)
+								: new Set(expressionTargets(node.expression, owner));
 					if (
 						node.expression.kind === ts.SyntaxKind.ImportKeyword &&
 						node.arguments[0] &&
-						ts.isStringLiteral(node.arguments[0]) &&
-						["@msgpack/msgpack", "node:v8", "@bufbuild/protobuf"].includes(node.arguments[0].text)
+						ts.isStringLiteral(node.arguments[0])
 					) {
-						callTargets.add("primitive:serialization");
+						const specifier = node.arguments[0].text;
+						if (["@msgpack/msgpack", "node:v8", "@bufbuild/protobuf"].includes(specifier)) {
+							callTargets.add("primitive:serialization");
+						} else if (
+							resolveModuleName(owner.file.fileName, specifier, sourceNames) ||
+							specifier.startsWith("@ts-drp/")
+						) {
+							callTargets.add("primitive:unresolvedInternal");
+						}
 					}
 					if (
 						ts.isPropertyAccessExpression(node.expression) &&
@@ -978,6 +1193,14 @@ function semanticAnalysis(
 						node.arguments[0]
 					) {
 						for (const target of expressionTargets(node.arguments[0], owner)) callTargets.add(target);
+					}
+					if (
+						jsonMethod(node.expression, owner, new Set()) === "parse" &&
+						node.arguments.some((argument) =>
+							[...expressionTargets(argument, owner)].some((target) => target === "provenance:jsonString")
+						)
+					) {
+						callTargets.add("primitive:json");
 					}
 					for (const target of callTargets) {
 						if (target.startsWith("primitive:")) {
@@ -997,7 +1220,7 @@ function semanticAnalysis(
 						if (!targetNode) continue;
 						for (let index = 0; index < targetNode.declaration.parameters.length; index++) {
 							const parameter = targetNode.declaration.parameters[index];
-							const argument = node.arguments[index];
+							const argument = node.arguments[index + (wrapper === "call" ? 1 : 0)];
 							if (!argument || !ts.isIdentifier(parameter.name)) continue;
 							const targets = parameterTargets.get(targetId)?.get(parameter.name.text);
 							if (!targets) continue;
@@ -1142,7 +1365,7 @@ function semanticAnalysis(
 		violations.push(
 			operation.primitive === "unresolvedInternal"
 				? `${ownerLabel(operation.owner)} fails closed on unresolved internal workspace import`
-				: `${ownerLabel(operation.owner)} reaches forbidden ${operation.primitive === "json" ? "serialization round-trip" : operation.primitive} operation through the workspace module graph`
+				: `${ownerLabel(operation.owner)} reaches forbidden ${operation.primitive === "json" ? "json serialization round-trip" : operation.primitive} operation through the workspace module graph`
 		);
 	}
 	const qualifiedSerializationOwners = new Set(
