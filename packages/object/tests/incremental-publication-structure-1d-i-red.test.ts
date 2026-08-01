@@ -2308,6 +2308,382 @@ const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
 const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
 
+interface StructureFlowRed7Fixture {
+	readonly expectedViolation: RegExp;
+	readonly family: string;
+	readonly name: string;
+	readonly shouldViolate: boolean;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+function structureFlowRed7Fixture(
+	family: string,
+	name: string,
+	imports: string,
+	mutation: string,
+	dependencies: Readonly<Record<string, string>> = {},
+	shouldViolate = true
+): StructureFlowRed7Fixture {
+	return Object.freeze({
+		expectedViolation: ENCODE_VIOLATION,
+		family,
+		name,
+		shouldViolate,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			...dependencies,
+		}),
+	});
+}
+
+const RED7_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export type Callback = (value: unknown) => unknown;
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const STRUCTURE_FLOW_RED7_MUTANTS = Object.freeze([
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"logical-or concise return retains the fallback callback",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"const selected = choose(null); selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (candidate: typeof capture | null) => candidate || capture;
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"logical-and concise return retains the enabled callback",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"const selected = choose(true); if (selected) selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (enabled: boolean) => enabled && capture;
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"nullish-coalescing alias retains the fallback callback",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"const selected = choose(undefined); selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (candidate: typeof capture | undefined) => candidate ?? capture;
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"default parameter initializer",
+		"omitted callback uses the forbidden default",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"function run(value: unknown, callback: (value: unknown) => unknown = capture): unknown { return callback(value); } run(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"satisfies wrapper",
+		"satisfies retains a forbidden target alias",
+		'import { capture, type Callback } from "@ts-drp/utils/serialization";',
+		"const selected = capture satisfies Callback; selected(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"satisfies wrapper",
+		"satisfies retains a forbidden callable return",
+		'import { capture, type Callback } from "@ts-drp/utils/serialization";',
+		"const make = () => capture satisfies Callback; make()(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"satisfies wrapper",
+		"satisfies retains a forbidden object container",
+		'import { capture, type Callback } from "@ts-drp/utils/serialization";',
+		"const bag = ({ capture } satisfies Record<string, Callback>); bag.capture(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"direct call spread",
+		"spread call arguments retain the forbidden callback position",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"function run(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); } run(...[capture, state] as const);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"array-rest destructuring",
+		"shifted array rest retains the forbidden callback at rest index zero",
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"const [head, ...callbacks] = [safe, capture]; void head; callbacks[0](state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"lexical binding identity",
+		"catch binding does not suppress a sibling forwarding declaration",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"function run(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); } try { throw state; } catch (run) { void run; } run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"lexical binding identity",
+		"loop binding does not suppress a sibling forwarding declaration",
+		'import { capture, type Callback } from "@ts-drp/utils/serialization";',
+		"function run(callback: Callback, value: unknown): unknown { return callback(value); } for (const run of [] as Callback[]) { void run; } run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"object-rest projection",
+		"exported object rest retains the non-excluded forbidden callback",
+		'import { project } from "@ts-drp/utils/serialization";',
+		"project().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export function project(): Record<string, Callback> {
+					const { safe: ignored, ...remaining } = { capture, safe };
+					void ignored;
+					return remaining;
+				}
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"assignment-expression value",
+		"concise assignment return retains its assigned forbidden callback",
+		'import { install } from "@ts-drp/utils/serialization";',
+		"install()(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				const holder: Record<string, Callback> = { capture: safe };
+				export const install = () => (holder.capture = capture);
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"parameter-aliased container write",
+		"callee assignment updates the caller's passed container",
+		'import { capture, safe, type Callback } from "@ts-drp/utils/serialization";',
+		"const bag: Record<string, Callback> = { capture: safe }; function install(target: Record<string, Callback>): void { target.capture = capture; } install(bag); bag.capture(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+] satisfies readonly StructureFlowRed7Fixture[]);
+
+const STRUCTURE_FLOW_RED7_CONTROLS = Object.freeze([
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"logical-or concise return can retain only safe callbacks",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"const selected = choose(null); selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (candidate: typeof safe | null) => candidate || safe;
+			`,
+		},
+		false
+	),
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"logical-and concise return can retain only a safe callback",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"const selected = choose(true); if (selected) selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (enabled: boolean) => enabled && safe;
+			`,
+		},
+		false
+	),
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"nullish concise return can retain only safe callbacks",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"const selected = choose(undefined); selected(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (candidate: typeof safe | undefined) => candidate ?? safe;
+			`,
+		},
+		false
+	),
+	structureFlowRed7Fixture(
+		"logical and nullish value flow",
+		"ternary return remains a positive callback-flow control",
+		'import { choose } from "@ts-drp/utils/serialization";',
+		"choose(true)(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export const choose = (enabled: boolean) => enabled ? capture : safe;
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"default parameter initializer",
+		"explicit forbidden callback remains a positive arity control",
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"function run(value: unknown, callback: (value: unknown) => unknown = safe): unknown { return callback(value); } run(state, capture);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"default parameter initializer",
+		"explicit safe callback overrides a forbidden default",
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"function run(value: unknown, callback: (value: unknown) => unknown = capture): unknown { return callback(value); } run(state, safe);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+	structureFlowRed7Fixture(
+		"default parameter initializer",
+		"omitted callback can use a safe default",
+		'import { safe } from "@ts-drp/utils/serialization";',
+		"function run(value: unknown, callback: (value: unknown) => unknown = safe): unknown { return callback(value); } run(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+	structureFlowRed7Fixture(
+		"satisfies wrapper",
+		"as assertion remains a positive target-flow control",
+		'import { capture, type Callback } from "@ts-drp/utils/serialization";',
+		"const selected = capture as Callback; selected(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"satisfies wrapper",
+		"parentheses remain a positive target-flow control",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const selected = (capture); selected(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"satisfies wrapper",
+		"satisfies can wrap a safe target",
+		'import { safe, type Callback } from "@ts-drp/utils/serialization";',
+		"const selected = safe satisfies Callback; selected(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+	structureFlowRed7Fixture(
+		"direct call spread",
+		"direct callback passage remains a positive control",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"function run(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); } run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"direct call spread",
+		"spread call arguments can carry a safe callback",
+		'import { safe } from "@ts-drp/utils/serialization";',
+		"function run(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); } run(...[safe, state] as const);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+	structureFlowRed7Fixture(
+		"array-rest destructuring",
+		"direct shifted array destructuring remains a positive control",
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"const [head, callback] = [safe, capture]; void head; callback(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"array-rest destructuring",
+		"shifted array rest can retain only safe callbacks",
+		'import { safe } from "@ts-drp/utils/serialization";',
+		"const [head, ...callbacks] = [safe, safe]; void head; callbacks[0](state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+	structureFlowRed7Fixture(
+		"lexical binding identity",
+		"direct sibling forwarding declaration remains a positive control",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"function run(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); } run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"lexical binding identity",
+		"same-name catch and loop bindings do not contaminate a safe sibling declaration",
+		'import { safe, type Callback } from "@ts-drp/utils/serialization";',
+		"function run(callback: Callback, value: unknown): unknown { return callback(value); } try { throw state; } catch (run) { void run; } for (const run of [] as Callback[]) { void run; } run(safe, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+	structureFlowRed7Fixture(
+		"object-rest projection",
+		"excluded forbidden property does not contaminate the projected safe property",
+		'import { project } from "@ts-drp/utils/serialization";',
+		"project().safe(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				export function project(): Record<string, Callback> {
+					const { capture: ignored, ...remaining } = { capture, safe };
+					void ignored;
+					return remaining;
+				}
+			`,
+		},
+		false
+	),
+	structureFlowRed7Fixture(
+		"assignment-expression value",
+		"block return after assignment remains a positive control",
+		'import { install } from "@ts-drp/utils/serialization";',
+		"install()(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				const holder: Record<string, Callback> = { capture: safe };
+				export const install = () => { holder.capture = capture; return holder.capture; };
+			`,
+		}
+	),
+	structureFlowRed7Fixture(
+		"assignment-expression value",
+		"concise assignment return can retain a safe callback",
+		'import { install } from "@ts-drp/utils/serialization";',
+		"install()(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED7_CAPTURE_UTILITY}
+				const holder: Record<string, Callback> = { capture: safe };
+				export const install = () => (holder.capture = safe);
+			`,
+		},
+		false
+	),
+	structureFlowRed7Fixture(
+		"parameter-aliased container write",
+		"direct post-initializer assignment remains a positive control",
+		'import { capture, safe, type Callback } from "@ts-drp/utils/serialization";',
+		"const bag: Record<string, Callback> = { capture: safe }; bag.capture = capture; bag.capture(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY }
+	),
+	structureFlowRed7Fixture(
+		"parameter-aliased container write",
+		"callee assignment can retain a safe callback",
+		'import { safe, type Callback } from "@ts-drp/utils/serialization";',
+		"const bag: Record<string, Callback> = { capture: safe }; function install(target: Record<string, Callback>): void { target.capture = safe; } install(bag); bag.capture(state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED7_CAPTURE_UTILITY },
+		false
+	),
+] satisfies readonly StructureFlowRed7Fixture[]);
+
+describe("Phase 1d(i) D.92.2 semantic binding-flow RED7", () => {
+	it.each(STRUCTURE_FLOW_RED7_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
+		const analysis = analyze(sources);
+		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+	});
+
+	it.each(STRUCTURE_FLOW_RED7_CONTROLS)(
+		"preserves $family control: $name",
+		({ expectedViolation, shouldViolate, sources }) => {
+			const analysis = analyze(sources);
+			if (shouldViolate) {
+				expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+			} else {
+				expect(analysis.violations).toEqual([]);
+			}
+		}
+	);
+});
+
 interface StructureFlowRed6Fixture {
 	readonly expectedViolation: RegExp;
 	readonly family: string;
