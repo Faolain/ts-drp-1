@@ -2846,6 +2846,234 @@ const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
 const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
 
+interface StructureFlowRed9Fixture {
+	readonly expectedViolation: RegExp;
+	readonly family: string;
+	readonly name: string;
+	readonly shouldViolate: boolean;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+function structureFlowRed9Fixture(
+	family: string,
+	name: string,
+	mutation: string,
+	shouldViolate: boolean
+): StructureFlowRed9Fixture {
+	return Object.freeze({
+		expectedViolation: ENCODE_VIOLATION,
+		family,
+		name,
+		shouldViolate,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(RED9_IMPORTS, mutation),
+			[UTILS_SERIALIZATION_PATH]: RED9_CAPTURE_UTILITY,
+		}),
+	});
+}
+
+const RED9_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export type Callback = (value: unknown) => unknown;
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const RED9_IMPORTS = 'import { capture, safe, type Callback } from "@ts-drp/utils/serialization";';
+
+const STRUCTURE_FLOW_RED9_MUTANTS = Object.freeze([
+	structureFlowRed9Fixture(
+		"same-signature parameter default",
+		"omitted earlier parameter flows into a later default",
+		"function run(a: Callback = capture, b: Callback = a): unknown { return b(state); } run();",
+		true
+	),
+	structureFlowRed9Fixture(
+		"same-signature parameter default",
+		"explicit undefined earlier parameter flows into a later default",
+		"function run(a: Callback = capture, b: Callback = a): unknown { return b(state); } run(undefined);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"same-signature parameter default",
+		"void earlier parameter flows into a later default",
+		"function run(a: Callback = capture, b: Callback = a): unknown { return b(state); } run(void 0);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"array assignment stores a forbidden callback",
+		"let selected: Callback = safe; [selected] = [capture]; selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"object assignment stores a forbidden callback",
+		"let selected: Callback = safe; ({ selected } = { selected: capture }); selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"array-rest assignment stores a forbidden callback",
+		"let rest: Callback[] = []; [...rest] = [capture]; rest[0](state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"rest parameter gathers a forbidden head argument",
+		"function run(...callbacks: Callback[]): unknown { return callbacks[0](state); } run(capture);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"rest parameter gathers a forbidden tail argument after a fixed parameter",
+		"function run(_first: Callback, ...callbacks: Callback[]): unknown { return callbacks[0](state); } run(safe, capture);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"rest parameter preserves a shifted forbidden argument",
+		"function run(_first: Callback, ...callbacks: Callback[]): unknown { return callbacks[1](state); } run(safe, safe, capture);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"declaration binding-element default",
+		"missing object property selects a forbidden binding default",
+		"const { selected = capture }: { selected?: Callback } = {}; selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"declaration binding-element default",
+		"missing array element selects a forbidden binding default",
+		"const [selected = capture]: readonly Callback[] = []; selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"declaration binding-element default",
+		"present undefined object property selects a forbidden binding default",
+		"const { selected = capture }: { selected?: Callback } = { selected: undefined }; selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"declaration binding-element default",
+		"present undefined array element selects a forbidden binding default",
+		"const [selected = capture]: readonly (Callback | undefined)[] = [undefined]; selected(state);",
+		true
+	),
+] satisfies readonly StructureFlowRed9Fixture[]);
+
+const STRUCTURE_FLOW_RED9_CONTROLS = Object.freeze([
+	structureFlowRed9Fixture(
+		"same-signature parameter default",
+		"safe earlier parameter overrides both defaults",
+		"function run(a: Callback = capture, b: Callback = a): unknown { return b(state); } run(safe);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"same-signature parameter default",
+		"explicit safe later parameter overrides an undefined earlier parameter",
+		"function run(a: Callback = capture, b: Callback = a): unknown { return b(state); } run(undefined, safe);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"same-signature parameter default",
+		"parameter-local capture shadow remains safe",
+		"function run(capture: Callback, a: Callback = capture, b: Callback = a): unknown { return b(state); } run(safe);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"array declaration twin retains a forbidden callback",
+		"const [selected] = [capture]; selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"object declaration twin retains a forbidden callback",
+		"const { selected } = { selected: capture }; selected(state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"array-rest declaration twin retains a forbidden callback",
+		"const [...rest] = [capture]; rest[0](state);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"same-shape array assignment with a safe callback remains allowed",
+		"let selected: Callback = safe; [selected] = [safe]; selected(state);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"same-shape object assignment with a safe callback remains allowed",
+		"let selected: Callback = safe; ({ selected } = { selected: safe }); selected(state);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"assignment-position binding pattern",
+		"same-shape array-rest assignment with a safe callback remains allowed",
+		"let rest: Callback[] = [safe]; [...rest] = [safe]; rest[0](state);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"rest parameter gathering a safe head remains allowed",
+		"function run(...callbacks: Callback[]): unknown { return callbacks[0](state); } run(safe);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"rest parameter gathering a safe tail remains allowed",
+		"function run(_first: Callback, ...callbacks: Callback[]): unknown { return callbacks[0](state); } run(capture, safe);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"owned array-parameter twin retains a forbidden callback",
+		"function run([selected]: readonly [Callback]): unknown { return selected(state); } run([capture]);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"rest parameter",
+		"call-spread twin retains a forbidden callback",
+		"function run(selected: Callback): unknown { return selected(state); } const args = [capture] as const; run(...args);",
+		true
+	),
+	structureFlowRed9Fixture(
+		"declaration binding-element default",
+		"present safe object property suppresses a forbidden binding default",
+		"const { selected = capture }: { selected?: Callback } = { selected: safe }; selected(state);",
+		false
+	),
+	structureFlowRed9Fixture(
+		"declaration binding-element default",
+		"present safe array element suppresses a forbidden binding default",
+		"const [selected = capture]: readonly Callback[] = [safe]; selected(state);",
+		false
+	),
+] satisfies readonly StructureFlowRed9Fixture[]);
+
+describe("Phase 1d(i) D.92.2 residual parameter and binding-flow RED9", () => {
+	it.each(STRUCTURE_FLOW_RED9_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
+		const analysis = analyze(sources);
+		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+	});
+
+	it.each(STRUCTURE_FLOW_RED9_CONTROLS)(
+		"preserves $family control: $name",
+		({ expectedViolation, shouldViolate, sources }) => {
+			const analysis = analyze(sources);
+			if (shouldViolate) {
+				expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+			} else {
+				expect(analysis.violations).toEqual([]);
+			}
+		}
+	);
+});
+
 interface StructureFlowRed8Fixture {
 	readonly expectedViolation: RegExp;
 	readonly family: string;
