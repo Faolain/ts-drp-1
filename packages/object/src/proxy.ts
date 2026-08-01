@@ -109,6 +109,9 @@ export class LocalMutationLane {
  * charged against governed owners reachable at the mutation event. A reverse
  * object graph is maintained incrementally, so observations do not rescan the
  * owner graph and later topology changes cannot rewrite earlier attribution.
+ * Each newly linked subtree is initialized once over its newly encountered
+ * vertices; later edge changes are constant-time outside bounded collection
+ * clear and unknown-method reconciliation.
  * Blueprint operations may use ordinary nested objects, Arrays, Maps, Sets,
  * and Dates; writes through those values are tracked, while read-only work
  * does not create a vertex. Unknown collection methods conservatively count
@@ -239,10 +242,12 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		if (owner === target && typeof property === "string") {
 			removeDirectOwner(previous, property);
 			addDirectOwner(next, property);
+			initializeGraph(next);
 			return;
 		}
 		removeParent(previous, owner);
 		addParent(next, owner);
+		initializeGraph(next);
 	};
 
 	const reconcileMapParents = (map: Map<unknown, unknown>, previous: Iterable<readonly [unknown, unknown]>): void => {
@@ -253,12 +258,17 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		for (const [key, value] of map) {
 			addParent(key, map);
 			addParent(value, map);
+			initializeGraph(key);
+			initializeGraph(value);
 		}
 	};
 
 	const reconcileSetParents = (set: Set<unknown>, previous: Iterable<unknown>): void => {
 		for (const value of previous) removeParent(value, set);
-		for (const value of set) addParent(value, set);
+		for (const value of set) {
+			addParent(value, set);
+			initializeGraph(value);
+		}
 	};
 
 	const unwrap = <V>(value: V): V => {
@@ -286,7 +296,10 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							const previousValue = map.get(rawKey);
 							const didChange = !hadKey || !valuesEqual(previousValue, rawValue);
 							map.set(rawKey, rawValue);
-							if (!hadKey) addParent(rawKey, map);
+							if (!hadKey) {
+								addParent(rawKey, map);
+								initializeGraph(rawKey);
+							}
 							updateReachability(map, undefined, previousValue, rawValue);
 							if (didChange) markChanged(map);
 							return proxy as Map<unknown, unknown>;
@@ -376,6 +389,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							set.add(rawValue);
 							if (didChange) {
 								addParent(rawValue, set);
+								initializeGraph(rawValue);
 								markChanged(set);
 							}
 							return proxy as Set<unknown>;
