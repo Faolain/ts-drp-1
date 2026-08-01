@@ -2194,6 +2194,559 @@ const FAIL_CLOSED_MODULE_MUTANTS = Object.freeze([
 	),
 ] satisfies readonly WorkspaceMutationFixture[]);
 
+interface SemanticFlowFixture extends WorkspaceMutationFixture {
+	readonly family: string;
+}
+
+interface SemanticFlowControl {
+	readonly family: string;
+	readonly name: string;
+	readonly shouldViolate: boolean;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+function semanticFlowFixture(
+	family: string,
+	name: string,
+	expectedViolation: RegExp,
+	imports: string,
+	mutation: string,
+	dependencies: Readonly<Record<string, string>> = {}
+): SemanticFlowFixture {
+	return Object.freeze({
+		expectedViolation,
+		family,
+		name,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			...dependencies,
+		}),
+	});
+}
+
+const FLOW_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const SEMANTIC_FLOW_CLOSURE_MUTANTS = Object.freeze([
+	semanticFlowFixture(
+		"callback apply/bind argument flow",
+		"relay.apply with an inline argument array",
+		ENCODE_VIOLATION,
+		`import { capture } from "@ts-drp/utils/serialization";
+		 function relay(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); }`,
+		"relay.apply(null, [capture, state]);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"callback apply/bind argument flow",
+		"relay.apply with a tracked argument-array alias",
+		ENCODE_VIOLATION,
+		`import { capture } from "@ts-drp/utils/serialization";
+		 function relay(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); }`,
+		"const args = [capture, state] as const; relay.apply(null, args);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"callback apply/bind argument flow",
+		"partially bound relay invoked immediately",
+		ENCODE_VIOLATION,
+		`import { capture } from "@ts-drp/utils/serialization";
+		 function relay(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); }`,
+		"relay.bind(null, capture)(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"callback apply/bind argument flow",
+		"partially bound relay retained behind an alias",
+		ENCODE_VIOLATION,
+		`import { capture } from "@ts-drp/utils/serialization";
+		 function relay(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); }`,
+		"const boundRelay = relay.bind(null, capture); boundRelay(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"class heritage",
+		"imported derived class inherits a forbidden base member",
+		ENCODE_VIOLATION,
+		'import { DerivedCapture } from "@ts-drp/utils/serialization";',
+		"new DerivedCapture().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class BaseCapture {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				}
+				export class DerivedCapture extends BaseCapture {}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"class heritage",
+		"local derived class inherits an imported forbidden member",
+		ENCODE_VIOLATION,
+		`import { BaseCapture } from "@ts-drp/utils/serialization";
+		 class DerivedCapture extends BaseCapture {}`,
+		"new DerivedCapture().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class BaseCapture {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"class heritage",
+		"this dispatch reaches an inherited forbidden member",
+		ENCODE_VIOLATION,
+		`import { BaseCapture } from "@ts-drp/utils/serialization";
+		 class DerivedCapture extends BaseCapture {
+			publish(value: unknown): unknown { return this.capture(value); }
+		 }`,
+		"new DerivedCapture().publish(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class BaseCapture {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"class heritage",
+		"super dispatch reaches an inherited forbidden member",
+		ENCODE_VIOLATION,
+		`import { BaseCapture } from "@ts-drp/utils/serialization";
+		 class DerivedCapture extends BaseCapture {
+			publish(value: unknown): unknown { return super.capture(value); }
+		 }`,
+		"new DerivedCapture().publish(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class BaseCapture {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"class heritage",
+		"unknown heritage fails closed instead of inventing a safe member",
+		/unresolved|unknown|fail.?closed|heritage|base/i,
+		`declare const UnknownBase: new () => { capture(value: unknown): unknown };
+		 class DerivedCapture extends UnknownBase {}`,
+		"new DerivedCapture().capture(state);"
+	),
+	semanticFlowFixture(
+		"global primitive provenance",
+		"JSON namespace retained behind a local alias",
+		ROUND_TRIP_VIOLATION,
+		'import { cloneViaJson } from "@ts-drp/utils/serialization";',
+		"cloneViaJson(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				export function cloneViaJson(value: unknown): unknown {
+					const J = JSON;
+					return J.parse(J.stringify(value));
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"global primitive provenance",
+		"destructured JSON parse and stringify retain round-trip provenance",
+		ROUND_TRIP_VIOLATION,
+		'import { cloneViaJson } from "@ts-drp/utils/serialization";',
+		"cloneViaJson(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				export function cloneViaJson(value: unknown): unknown {
+					const { parse, stringify } = JSON;
+					return parse(stringify(value));
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"global primitive provenance",
+		"globalThis.JSON retained behind a local alias",
+		ROUND_TRIP_VIOLATION,
+		'import { cloneViaJson } from "@ts-drp/utils/serialization";',
+		"cloneViaJson(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				export function cloneViaJson(value: unknown): unknown {
+					const J = globalThis.JSON;
+					return J.parse(J.stringify(value));
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"global primitive provenance",
+		"destructured globalThis.structuredClone in a transitive helper",
+		CLONE_VIOLATION,
+		'import { detach } from "@ts-drp/utils/serialization";',
+		"detach(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				export function detach(value: unknown): unknown {
+					const { structuredClone: copy } = globalThis;
+					return copy(value);
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"computed-key uncertainty",
+		"divergent namespace key unions a forbidden candidate",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		'snapshots[state.changed ? "capture" : "safe"](state);',
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"computed-key uncertainty",
+		"unknown object key fails closed when a forbidden candidate is present",
+		ENCODE_VIOLATION,
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		`const holder = { capture, safe };
+		 const key = (globalThis as { publicationKey?: string }).publicationKey ?? "safe";
+		 holder[key](state);`,
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"stored callback flow",
+		"array destructuring preserves stored callback provenance",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const callbacks = [capture]; const [callback] = callbacks; callback(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"stored callback flow",
+		"mutable local assignment joins callable targets",
+		ENCODE_VIOLATION,
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"let callback = safe; callback = capture; callback(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"stored callback flow",
+		"object-property assignment joins callable targets",
+		ENCODE_VIOLATION,
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"const holder = { callback: safe }; holder.callback = capture; holder.callback(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"unsupported callback storage",
+		"module reassignment to a fresh callback arrow fails closed",
+		ENCODE_VIOLATION,
+		`import { capture, safe } from "@ts-drp/utils/serialization";
+		 let retained: (value: unknown) => unknown = safe;
+		 function install(): void { retained = (value: unknown) => capture(value); }`,
+		"install(); retained(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"unsupported callback storage",
+		"getter returning a fresh callback arrow fails closed",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		`const holder = { get deferred() { return (value: unknown) => capture(value); } };
+		 holder.deferred(state);`,
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"unsupported callback storage",
+		"object-rest storage preserves a forbidden callback",
+		ENCODE_VIOLATION,
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		"const source = { capture, safe }; const { safe: ignored, ...rest } = source; void ignored; rest.capture(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"unsupported callback storage",
+		"constant string concatenation resolves a forbidden namespace member",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		'const key = "cap" + "ture"; snapshots[key](state);',
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"nested Function.prototype invocation",
+		"Function.prototype.call.call preserves the target callable",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"Function.prototype.call.call(capture, null, state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"nested Function.prototype invocation",
+		"Function.prototype.apply.call preserves the target callable",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"Function.prototype.apply.call(capture, null, [state]);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+] satisfies readonly SemanticFlowFixture[]);
+
+const SEMANTIC_FLOW_SAFE_CONTROLS = Object.freeze([
+	{
+		family: "callback apply/bind argument flow",
+		name: "direct capture.apply remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"callback apply/bind argument flow",
+			"direct apply",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"capture.apply(null, [state]);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "callback apply/bind argument flow",
+		name: "direct capture.bind alias remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"callback apply/bind argument flow",
+			"direct bind",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const bound = capture.bind(null); bound(state);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "class heritage",
+		name: "own forbidden member remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"class heritage",
+			"own member",
+			ENCODE_VIOLATION,
+			'import { OwnCapture } from "@ts-drp/utils/serialization";',
+			"new OwnCapture().capture(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					import { encode } from "@msgpack/msgpack";
+					export class OwnCapture {
+						capture(value: unknown): Uint8Array { return encode(value); }
+					}
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "class heritage",
+		name: "safe inherited member remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"class heritage",
+			"safe inherited member",
+			ENCODE_VIOLATION,
+			'import { SafeDerived } from "@ts-drp/utils/serialization";',
+			"new SafeDerived().select(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					export class SafeBase { select(value: unknown): unknown { return value; } }
+					export class SafeDerived extends SafeBase {}
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "global primitive provenance",
+		name: "direct JSON round trip remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"global primitive provenance",
+			"direct JSON",
+			ROUND_TRIP_VIOLATION,
+			'import { cloneViaJson } from "@ts-drp/utils/serialization";',
+			"cloneViaJson(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					export function cloneViaJson(value: unknown): unknown {
+						return JSON.parse(JSON.stringify(value));
+					}
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "global primitive provenance",
+		name: "direct structuredClone remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"global primitive provenance",
+			"direct structuredClone",
+			CLONE_VIOLATION,
+			'import { detach } from "@ts-drp/utils/serialization";',
+			"detach(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]:
+					"export function detach(value: unknown): unknown { return structuredClone(value); }",
+			}
+		).sources,
+	},
+	{
+		family: "global primitive provenance",
+		name: "stringify-only hash remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"global primitive provenance",
+			"stringify-only hash",
+			ROUND_TRIP_VIOLATION,
+			'import { hashLength } from "@ts-drp/utils/serialization";',
+			"void hashLength(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]:
+					"export function hashLength(value: unknown): number { return JSON.stringify(value).length; }",
+			}
+		).sources,
+	},
+	{
+		family: "computed-key uncertainty",
+		name: "stable literal namespace member remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"computed-key uncertainty",
+			"stable literal",
+			ENCODE_VIOLATION,
+			'import * as snapshots from "@ts-drp/utils/serialization";',
+			'const key = "capture"; snapshots[key](state);',
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "computed-key uncertainty",
+		name: "unknown key on a safe-only object remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"computed-key uncertainty",
+			"safe object",
+			ENCODE_VIOLATION,
+			'import { safe } from "@ts-drp/utils/serialization";',
+			`const holder = { safe };
+			 const key = (globalThis as { publicationKey?: string }).publicationKey ?? "safe";
+			 holder[key](state);`,
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "computed-key uncertainty",
+		name: "unknown key on a safe-only namespace remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"computed-key uncertainty",
+			"safe namespace",
+			ENCODE_VIOLATION,
+			'import * as safeHelpers from "@ts-drp/utils/safe";',
+			`const key = (globalThis as { publicationKey?: string }).publicationKey ?? "select";
+			 safeHelpers[key](state);`,
+			{ "packages/utils/src/safe.ts": "export function select(value: unknown): unknown { return value; }" }
+		).sources,
+	},
+	{
+		family: "stored callback flow",
+		name: "direct callback initializer remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"stored callback flow",
+			"direct initializer",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const callback = capture; callback(state);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "stored callback flow",
+		name: "direct array index remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"stored callback flow",
+			"direct index",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const callbacks = [capture]; callbacks[0](state);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "stored callback flow",
+		name: "getter returning an existing callback remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"stored callback flow",
+			"existing getter callback",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const holder = { get deferred() { return capture; } }; holder.deferred(state);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "stored callback flow",
+		name: "same-file safe callback storage remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"stored callback flow",
+			"same-file safe storage",
+			ENCODE_VIOLATION,
+			"function select(value: unknown): unknown { return value; }",
+			"const holder = { callback: select }; holder.callback(state);"
+		).sources,
+	},
+	{
+		family: "safe encode names",
+		name: "resolved logger encode remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"safe encode names",
+			"logger encode",
+			ENCODE_VIOLATION,
+			'import { encode } from "@ts-drp/logger";',
+			"encode(state);",
+			{ "packages/logger/src/index.ts": "export function encode(value: unknown): unknown { return value; }" }
+		).sources,
+	},
+	{
+		family: "safe encode names",
+		name: "resolved tracer encode remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"safe encode names",
+			"tracer encode",
+			ENCODE_VIOLATION,
+			'import { encode } from "@ts-drp/tracer";',
+			"encode(state);",
+			{ "packages/tracer/src/index.ts": "export function encode(value: unknown): unknown { return value; }" }
+		).sources,
+	},
+	{
+		family: "safe encode names",
+		name: "local encode remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"safe encode names",
+			"local encode",
+			ENCODE_VIOLATION,
+			"function encode(value: unknown): unknown { return value; }",
+			"encode(state);"
+		).sources,
+	},
+] satisfies readonly SemanticFlowControl[]);
+
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
@@ -2394,6 +2947,24 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 			const analysis = analyze(sources);
 			expect(analysis.injectedCopyLeaves).toHaveLength(1);
 			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(SEMANTIC_FLOW_CLOSURE_MUTANTS)(
+		"closes semantic flow family '$family': $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(SEMANTIC_FLOW_SAFE_CONTROLS)(
+		"preserves discriminating control for '$family': $name",
+		({ shouldViolate, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations.length > 0).toBe(shouldViolate);
 		}
 	);
 
