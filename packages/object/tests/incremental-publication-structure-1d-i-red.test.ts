@@ -585,6 +585,7 @@ type SemanticTarget =
 	| `primitive:${SemanticPrimitive}`;
 
 interface SemanticArgument {
+	readonly definitelyUndefined?: boolean;
 	readonly owner?: SemanticOwner;
 	readonly source?: ts.Expression;
 	readonly targets: Set<SemanticTarget>;
@@ -800,9 +801,9 @@ function semanticAnalysis(
 	const nodesByDeclaration = new Map(nodes.map((node) => [node.declaration, node]));
 	const moduleFunctions = new Map<string, FunctionNode>();
 	const lexicalCallables = new Map<ts.Node, Map<string, FunctionNode[]>>();
+	const lexicalInitializers = new Map<ts.Node, Map<string, ts.Expression>>();
 	const lexicalValueBindings = new Map<ts.Node, Set<string>>();
 	const classMethods = new Map<string, FunctionNode>();
-	const variables = new Map<string, ts.Expression>();
 	type DestructuredProjection =
 		| {
 				readonly kind: "array-index";
@@ -813,7 +814,7 @@ function semanticAnalysis(
 		| {
 				readonly kind: "array-rest";
 				readonly owner: SemanticOwner;
-				readonly source: ts.Expression;
+				readonly source?: ts.Expression;
 				readonly start: number;
 				readonly target: SemanticTarget;
 		  }
@@ -827,7 +828,7 @@ function semanticAnalysis(
 				readonly excluded: ReadonlySet<string>;
 				readonly kind: "object-rest";
 				readonly owner: SemanticOwner;
-				readonly source: ts.Expression;
+				readonly source?: ts.Expression;
 				readonly target: SemanticTarget;
 		  };
 	const lexicalProjections = new Map<ts.Node, Map<string, DestructuredProjection>>();
@@ -861,12 +862,23 @@ function semanticAnalysis(
 			ts.isAsExpression(current) ||
 			ts.isTypeAssertionExpression(current) ||
 			ts.isNonNullExpression(current) ||
-			ts.isSatisfiesExpression(current)
+			ts.isSatisfiesExpression(current) ||
+			ts.isAwaitExpression(current)
 		) {
 			current = current.expression;
 		}
 		return current;
 	};
+	const logicalValueOperators = new Set<ts.SyntaxKind>([
+		ts.SyntaxKind.AmpersandAmpersandToken,
+		ts.SyntaxKind.BarBarToken,
+		ts.SyntaxKind.QuestionQuestionToken,
+	]);
+	const logicalAssignmentOperators = new Set<ts.SyntaxKind>([
+		ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+		ts.SyntaxKind.BarBarEqualsToken,
+		ts.SyntaxKind.QuestionQuestionEqualsToken,
+	]);
 	const projectionTarget = (owner: SemanticOwner, element: ts.BindingElement): SemanticTarget =>
 		`object:${owner.file.fileName}:projection@${element.pos}` as SemanticTarget;
 	const joinTargets = (targets: Set<SemanticTarget>, additions: Iterable<SemanticTarget>): boolean => {
@@ -941,9 +953,13 @@ function semanticAnalysis(
 		}
 		return undefined;
 	};
-	const registerProjection = (element: ts.BindingElement, projection: DestructuredProjection): void => {
+	const registerProjection = (
+		element: ts.BindingElement,
+		projection: DestructuredProjection,
+		scopeOverride?: ts.Node
+	): void => {
 		if (!ts.isIdentifier(element.name)) return;
-		const scope = lexicalScope(element.name);
+		const scope = scopeOverride ?? lexicalScope(element.name);
 		if (!scope) return;
 		const bindings = lexicalProjections.get(scope) ?? new Map<string, DestructuredProjection>();
 		bindings.set(element.name.text, projection);
@@ -1037,14 +1053,61 @@ function semanticAnalysis(
 			}
 		}
 		const parameters = new Map<string, Set<SemanticTarget>>();
+		const parameterScope = ts.isBlock(node.body) ? node.body : undefined;
+		const registerParameterPattern = (name: ts.BindingName): void => {
+			if (ts.isIdentifier(name)) {
+				parameters.set(name.text, new Set());
+				return;
+			}
+			if (ts.isObjectBindingPattern(name)) {
+				const excluded = new Set<string>();
+				for (const element of name.elements) {
+					if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
+						const target = projectionTarget(node, element);
+						registerProjection(
+							element,
+							{ excluded: new Set(excluded), kind: "object-rest", owner: node, target },
+							parameterScope
+						);
+						parameters.set(element.name.text, new Set([target]));
+						continue;
+					}
+					const property = element.propertyName
+						? ts.isIdentifier(element.propertyName) || ts.isStringLiteral(element.propertyName)
+							? element.propertyName.text
+							: undefined
+						: ts.isIdentifier(element.name)
+							? element.name.text
+							: undefined;
+					if (property) excluded.add(property);
+					registerParameterPattern(element.name);
+				}
+				return;
+			}
+			for (const [index, element] of name.elements.entries()) {
+				if (!ts.isBindingElement(element)) continue;
+				if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
+					const target = projectionTarget(node, element);
+					registerProjection(element, { kind: "array-rest", owner: node, start: index, target }, parameterScope);
+					parameters.set(element.name.text, new Set([target]));
+					continue;
+				}
+				registerParameterPattern(element.name);
+			}
+		};
 		for (const parameter of node.declaration.parameters) {
-			if (ts.isIdentifier(parameter.name)) parameters.set(parameter.name.text, new Set());
+			registerParameterPattern(parameter.name);
 		}
 		parameterTargets.set(node.id, parameters);
 		const visit = (child: ts.Node): void => {
 			if (child !== node.body && ts.isFunctionLike(child)) return;
 			if (ts.isVariableDeclaration(child) && ts.isIdentifier(child.name) && child.initializer) {
-				variables.set(`${node.id}:${child.name.text}`, child.initializer);
+				const scope = lexicalScope(child);
+				if (scope) {
+					const initializers = lexicalInitializers.get(scope) ?? new Map<string, ts.Expression>();
+					initializers.set(child.name.text, child.initializer);
+					lexicalInitializers.set(scope, initializers);
+				}
 			} else if (ts.isVariableDeclaration(child)) registerDestructuring(child, node);
 			ts.forEachChild(child, visit);
 		};
@@ -1076,10 +1139,11 @@ function semanticAnalysis(
 		visitBindings(file);
 	}
 	const lexicalCallableTargets = (identifier: ts.Identifier, owner: SemanticOwner): Set<SemanticTarget> => {
-		if (parameterTargets.get(owner.id)?.has(identifier.text)) return new Set();
+		const body = nodesById.get(owner.id)?.body;
 		let current: ts.Node | undefined = identifier.parent;
 		while (current) {
 			if (lexicalValueBindings.get(current)?.has(identifier.text)) return new Set();
+			if (current === body && parameterTargets.get(owner.id)?.has(identifier.text)) return new Set();
 			const declarations = lexicalCallables.get(current)?.get(identifier.text);
 			if (declarations?.length) {
 				return new Set(declarations.map(({ id }) => `function:${id}` as SemanticTarget));
@@ -1087,6 +1151,30 @@ function semanticAnalysis(
 			current = current.parent;
 		}
 		return new Set();
+	};
+	const localInitializer = (identifier: ts.Identifier, owner: SemanticOwner): ts.Expression | undefined => {
+		const body = nodesById.get(owner.id)?.body;
+		let current: ts.Node | undefined = identifier.parent;
+		while (current) {
+			const initializer = lexicalInitializers.get(current)?.get(identifier.text);
+			if (initializer) return initializer;
+			if (current === body) return undefined;
+			current = current.parent;
+		}
+		return undefined;
+	};
+	const isParameterReference = (identifier: ts.Identifier, owner: SemanticOwner): boolean => {
+		if (!parameterTargets.get(owner.id)?.has(identifier.text)) return false;
+		const body = nodesById.get(owner.id)?.body;
+		if (identifier === body) return true;
+		let current: ts.Node | undefined = identifier.parent;
+		while (current) {
+			if (current === body) return true;
+			if (lexicalValueBindings.get(current)?.has(identifier.text)) return false;
+			if (lexicalProjections.get(current)?.has(identifier.text)) return false;
+			current = current.parent;
+		}
+		return false;
 	};
 	for (const file of files) {
 		const owner = moduleOwner(file.fileName);
@@ -1168,8 +1256,7 @@ function semanticAnalysis(
 			if (seen.has(key)) return { unknown: true, values: new Set() };
 			seen.add(key);
 			const initializer =
-				variables.get(`${owner.id}:${expression.text}`) ??
-				moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+				localInitializer(expression, owner) ?? moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			return initializer ? keyResolution(initializer, owner, seen) : { unknown: true, values: new Set<string>() };
 		}
 		if (ts.isConditionalExpression(expression)) {
@@ -1288,6 +1375,20 @@ function semanticAnalysis(
 		const moduleKey = `${owner.file.fileName}:${name}`;
 		return moduleBindings.has(moduleKey) ? moduleKey : `${owner.id}:${name}`;
 	};
+	const isCallableLikeTarget = (target: SemanticTarget): boolean =>
+		target.startsWith("function:") ||
+		target.startsWith("callable:") ||
+		target.startsWith("primitive:") ||
+		target === "builtin:Function" ||
+		target === "builtin:functionCall" ||
+		target === "builtin:functionApply" ||
+		target === "builtin:functionBind" ||
+		target === "builtin:jsonParse" ||
+		target === "builtin:jsonStringify";
+	const isCallableLikeReceiver = (targets: ReadonlySet<SemanticTarget>): boolean =>
+		targets.size > 0 && [...targets].every(isCallableLikeTarget);
+	const callableLikeTargets = (targets: ReadonlySet<SemanticTarget>): Set<SemanticTarget> =>
+		new Set([...targets].filter(isCallableLikeTarget));
 	const bindingContainer = (name: string, owner: SemanticOwner): string => `binding:${bindingKey(name, owner)}`;
 	const containerIds = (
 		expression: ts.Expression,
@@ -1307,8 +1408,7 @@ function semanticAnalysis(
 		if (ts.isIdentifier(expression)) {
 			const result = new Set([bindingContainer(expression.text, owner)]);
 			const initializer =
-				variables.get(`${owner.id}:${expression.text}`) ??
-				moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+				localInitializer(expression, owner) ?? moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (initializer) {
 				for (const nested of containerIds(initializer, owner, new Set(seen))) result.add(nested);
 			}
@@ -1317,9 +1417,11 @@ function semanticAnalysis(
 					result.add(target);
 				}
 			}
-			for (const target of parameterTargets.get(owner.id)?.get(expression.text) ?? []) {
-				if (target.startsWith("object:") || target.startsWith("class:") || target.startsWith("instance:")) {
-					result.add(target);
+			if (isParameterReference(expression, owner)) {
+				for (const target of parameterTargets.get(owner.id)?.get(expression.text) ?? []) {
+					if (target.startsWith("object:") || target.startsWith("class:") || target.startsWith("instance:")) {
+						result.add(target);
+					}
 				}
 			}
 			const projection = projectionForIdentifier(expression);
@@ -1402,7 +1504,7 @@ function semanticAnalysis(
 				for (const target of storedPropertyTargets(containerId, name)) result.add(target);
 			}
 			const projection = projectionForIdentifier(expression);
-			if (projection?.kind === "object-rest" && !projection.excluded.has(name)) {
+			if (projection?.kind === "object-rest" && projection.source && !projection.excluded.has(name)) {
 				for (const target of propertyTargets(projection.source, name, projection.owner, new Set(seen)))
 					result.add(target);
 			}
@@ -1420,7 +1522,7 @@ function semanticAnalysis(
 						result.add(target);
 				}
 			}
-			const variable = variables.get(`${owner.id}:${expression.text}`);
+			const variable = localInitializer(expression, owner);
 			if (variable) for (const target of propertyTargets(variable, name, owner, seen)) result.add(target);
 			const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (moduleVariable) for (const target of propertyTargets(moduleVariable, name, owner, seen)) result.add(target);
@@ -1487,14 +1589,7 @@ function semanticAnalysis(
 				if (name === "call") result.add("builtin:functionCall");
 				if (name === "apply") result.add("builtin:functionApply");
 				if (name === "bind") result.add("builtin:functionBind");
-			} else if (
-				target.startsWith("function:") ||
-				target.startsWith("callable:") ||
-				target.startsWith("primitive:") ||
-				target === "builtin:functionCall" ||
-				target === "builtin:functionApply" ||
-				target === "builtin:functionBind"
-			) {
+			} else if (isCallableLikeTarget(target)) {
 				if (name === "call") result.add("builtin:functionCall");
 				if (name === "apply") result.add("builtin:functionApply");
 				if (name === "bind") result.add("builtin:functionBind");
@@ -1507,11 +1602,12 @@ function semanticAnalysis(
 					result.add(nested);
 			} else if (target.startsWith("object:")) {
 				const projection = projectionValues.get(target);
-				if (projection?.kind === "object-rest" && !projection.excluded.has(name)) {
+				for (const nested of storedPropertyTargets(target, name)) result.add(nested);
+				if (projection?.kind === "object-rest" && projection.source && !projection.excluded.has(name)) {
 					for (const nested of propertyTargets(projection.source, name, projection.owner, new Set(seen))) {
 						result.add(nested);
 					}
-				} else if (projection?.kind === "array-rest") {
+				} else if (projection?.kind === "array-rest" && projection.source) {
 					const index = Number(name);
 					const shape = arrayArguments(projection.source, projection.owner, new Set(seen));
 					const argument =
@@ -1564,7 +1660,9 @@ function semanticAnalysis(
 			if (namespace) return moduleMemberNames(namespace);
 			const projection = projectionForIdentifier(expression);
 			if (projection?.kind === "object-rest") {
-				const result = knownPropertyNames(projection.source, projection.owner, seen);
+				const result = projection.source
+					? knownPropertyNames(projection.source, projection.owner, seen)
+					: new Set<string>();
 				for (const excluded of projection.excluded) result.delete(excluded);
 				for (const slot of propertyFacts.get(projection.target)?.keys() ?? []) {
 					if (typeof slot === "string") result.add(slot);
@@ -1576,8 +1674,7 @@ function semanticAnalysis(
 				return new Set(shape.arguments.map((_argument, index) => String(index)));
 			}
 			const initializer =
-				variables.get(`${owner.id}:${expression.text}`) ??
-				moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+				localInitializer(expression, owner) ?? moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (initializer) return knownPropertyNames(initializer, owner, seen);
 		}
 		if (ts.isArrayLiteralExpression(expression)) {
@@ -1619,13 +1716,15 @@ function semanticAnalysis(
 			} else if (target.startsWith("object:")) {
 				const projection = projectionValues.get(target);
 				if (projection?.kind === "object-rest") {
-					for (const name of knownPropertyNames(projection.source, projection.owner, new Set(seen))) {
-						if (!projection.excluded.has(name)) result.add(name);
+					if (projection.source) {
+						for (const name of knownPropertyNames(projection.source, projection.owner, new Set(seen))) {
+							if (!projection.excluded.has(name)) result.add(name);
+						}
 					}
 					for (const slot of propertyFacts.get(projection.target)?.keys() ?? []) {
 						if (typeof slot === "string") result.add(slot);
 					}
-				} else if (projection?.kind === "array-rest") {
+				} else if (projection?.kind === "array-rest" && projection.source) {
 					const shape = arrayArguments(projection.source, projection.owner, new Set(seen));
 					for (let index = projection.start; index < shape.arguments.length; index++) {
 						result.add(String(index - projection.start));
@@ -1673,7 +1772,23 @@ function semanticAnalysis(
 		}
 		return result;
 	};
+	const isDefinitelyUndefined = (expression: ts.Expression, owner: SemanticOwner): boolean => {
+		const transparent = transparentExpression(expression);
+		if (ts.isVoidExpression(transparent)) return true;
+		if (!ts.isIdentifier(transparent) || transparent.text !== "undefined") return false;
+		if (isParameterReference(transparent, owner)) return false;
+		if (modules.get(owner.file.fileName)?.imports.has("undefined")) return false;
+		if (moduleBindings.has(`${owner.file.fileName}:undefined`)) return false;
+		if (lexicalCallableTargets(transparent, owner).size > 0) return false;
+		let current: ts.Node | undefined = transparent.parent;
+		while (current) {
+			if (lexicalValueBindings.get(current)?.has("undefined")) return false;
+			current = current.parent;
+		}
+		return true;
+	};
 	const semanticArgument = (expression: ts.Expression, owner: SemanticOwner): SemanticArgument => ({
+		definitelyUndefined: isDefinitelyUndefined(expression, owner),
 		owner,
 		source: expression,
 		targets: expressionTargets(expression, owner),
@@ -1691,7 +1806,13 @@ function semanticAnalysis(
 			const representative = candidates[0];
 			const targets = new Set<SemanticTarget>();
 			for (const candidate of candidates) joinTargets(targets, candidate.targets);
-			arguments_.push({ owner: representative?.owner, source: representative?.source, targets });
+			arguments_.push({
+				definitelyUndefined:
+					candidates.length > 0 && candidates.every(({ definitelyUndefined }) => definitelyUndefined),
+				owner: representative?.owner,
+				source: representative?.source,
+				targets,
+			});
 		}
 		return {
 			arguments: arguments_,
@@ -1714,7 +1835,9 @@ function semanticAnalysis(
 			const resolutions: ArrayResolution[] = [];
 			const projection = projectionForIdentifier(expression);
 			if (projection?.kind === "array-rest") {
-				const source = arrayArguments(projection.source, projection.owner, new Set(seen));
+				const source = projection.source
+					? arrayArguments(projection.source, projection.owner, new Set(seen))
+					: { arguments: [], unknown: false };
 				const arguments_: SemanticArgument[] = source.arguments
 					.slice(projection.start)
 					.map(({ owner: argumentOwner, source, targets }) => ({
@@ -1735,8 +1858,7 @@ function semanticAnalysis(
 				});
 			}
 			const initializer =
-				variables.get(`${owner.id}:${expression.text}`) ??
-				moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
+				localInitializer(expression, owner) ?? moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (initializer) resolutions.push(arrayArguments(initializer, owner, new Set(seen)));
 			const containerTargets = new Set<SemanticTarget>();
 			for (const target of storedTargets.get(bindingKey(expression.text, owner)) ?? []) {
@@ -1775,7 +1897,7 @@ function semanticAnalysis(
 				result.push(...spread.arguments);
 				unknown ||= spread.unknown;
 			} else if (ts.isOmittedExpression(element)) {
-				result.push({ targets: new Set() });
+				result.push({ definitelyUndefined: true, targets: new Set() });
 			} else {
 				result.push(semanticArgument(element, owner));
 			}
@@ -1824,9 +1946,8 @@ function semanticAnalysis(
 		}
 		if (
 			ts.isBinaryExpression(expression) &&
-			[ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(
-				expression.operatorToken.kind
-			)
+			(logicalValueOperators.has(expression.operatorToken.kind) ||
+				logicalAssignmentOperators.has(expression.operatorToken.kind))
 		) {
 			const result = expressionTargets(expression.left, owner, new Set(seen));
 			joinTargets(result, expressionTargets(expression.right, owner, new Set(seen)));
@@ -1851,7 +1972,9 @@ function semanticAnalysis(
 			if (expression.text === "Function") return new Set(["builtin:Function"]);
 			const result = new Set<SemanticTarget>();
 			for (const target of lexicalCallableTargets(expression, owner)) result.add(target);
-			const parameter = parameterTargets.get(owner.id)?.get(expression.text);
+			const parameter = isParameterReference(expression, owner)
+				? parameterTargets.get(owner.id)?.get(expression.text)
+				: undefined;
 			for (const target of parameter ?? []) result.add(target);
 			for (const target of storedTargets.get(`${owner.id}:${expression.text}`) ?? []) result.add(target);
 			for (const target of storedTargets.get(`${owner.file.fileName}:${expression.text}`) ?? []) result.add(target);
@@ -1867,7 +1990,7 @@ function semanticAnalysis(
 			} else if (projection?.kind === "object-rest" || projection?.kind === "array-rest") {
 				result.add(projection.target);
 			}
-			const variable = variables.get(`${owner.id}:${expression.text}`);
+			const variable = localInitializer(expression, owner);
 			if (variable) for (const target of expressionTargets(variable, owner, seen)) result.add(target);
 			const moduleVariable = moduleVariables.get(`${owner.file.fileName}:${expression.text}`);
 			if (moduleVariable) for (const target of expressionTargets(moduleVariable, owner, seen)) result.add(target);
@@ -1897,26 +2020,30 @@ function semanticAnalysis(
 				ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
 					? accessKeys(callee, owner, new Set(seen))
 					: undefined;
+			const receiverTargets =
+				ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
+					? expressionTargets(callee.expression, owner, new Set(seen))
+					: new Set<SemanticTarget>();
+			const callableReceivers = callableLikeTargets(receiverTargets);
+			const result = new Set<SemanticTarget>();
 			if (
 				keys?.values.has("bind") &&
 				!keys.unknown &&
-				(ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee))
+				(ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) &&
+				callableReceivers.size > 0
 			) {
 				const token = `${owner.id}:${expression.pos}:${expression.end}`;
 				const boundArguments = invocationArguments(expression.arguments.slice(1), owner);
 				boundCallables.set(token, {
 					arguments: boundArguments.arguments,
-					targets: expressionTargets(callee.expression, owner, new Set(seen)),
+					targets: callableReceivers,
 					thisArgument: expression.arguments[0] ? semanticArgument(expression.arguments[0], owner) : undefined,
 					unknownArguments: boundArguments.unknown,
 				});
-				return new Set<SemanticTarget>([`callable:${token}`]);
+				result.add(`callable:${token}`);
+				if (isCallableLikeReceiver(receiverTargets)) return result;
 			}
 			const calleeTargets = expressionTargets(callee, owner, new Set(seen));
-			const receiverTargets =
-				ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
-					? expressionTargets(callee.expression, owner, new Set(seen))
-					: new Set<SemanticTarget>();
 			if (!keys?.unknown && keys?.values.size === 1 && receiverTargets.has("builtin:functionBind")) {
 				const token = `${owner.id}:${expression.pos}:${expression.end}`;
 				if (keys.values.has("call")) {
@@ -1947,7 +2074,6 @@ function semanticAnalysis(
 				}
 			}
 			if (calleeTargets.has("builtin:jsonStringify")) return new Set(["provenance:jsonString"]);
-			const result = new Set<SemanticTarget>();
 			for (const target of calleeTargets) {
 				if (!target.startsWith("function:")) continue;
 				for (const returned of returnedTargets.get(target.slice("function:".length)) ?? []) result.add(returned);
@@ -2033,52 +2159,75 @@ function semanticAnalysis(
 		readonly thisArgument?: SemanticArgument;
 		readonly unknownArguments: boolean;
 	}
-	const invocation = (call: ts.CallExpression, owner: FunctionNode): Invocation => {
+	const invocations = (call: ts.CallExpression, owner: FunctionNode): Invocation[] => {
 		if (
 			ts.isPropertyAccessExpression(call.expression) &&
 			call.expression.expression.getText(owner.file).replace(/\s+/g, "") === "Reflect" &&
 			call.expression.name.text === "apply"
 		) {
 			const unpacked = call.arguments[2] ? arrayArguments(call.arguments[2], owner) : { arguments: [], unknown: true };
-			return {
-				arguments: unpacked.arguments,
-				targets: call.arguments[0] ? expressionTargets(call.arguments[0], owner) : new Set(),
-				thisArgument: call.arguments[1] ? semanticArgument(call.arguments[1], owner) : undefined,
-				unknownArguments: unpacked.unknown,
-			};
+			return [
+				{
+					arguments: unpacked.arguments,
+					targets: call.arguments[0] ? expressionTargets(call.arguments[0], owner) : new Set(),
+					thisArgument: call.arguments[1] ? semanticArgument(call.arguments[1], owner) : undefined,
+					unknownArguments: unpacked.unknown,
+				},
+			];
 		}
 		if (ts.isPropertyAccessExpression(call.expression) || ts.isElementAccessExpression(call.expression)) {
 			const keys = accessKeys(call.expression, owner, new Set());
-			if (!keys.unknown && keys.values.size === 1 && keys.values.has("bind")) {
-				return { arguments: [], targets: new Set(), unknownArguments: false };
+			const receiverTargets = expressionTargets(call.expression.expression, owner);
+			const callableReceivers = callableLikeTargets(receiverTargets);
+			const hasOrdinaryReceivers = callableReceivers.size !== receiverTargets.size;
+			const supplied = invocationArguments(call.arguments, owner);
+			const ordinaryInvocation = (): Invocation => ({
+				arguments: supplied.arguments,
+				targets: new Set(
+					[...expressionTargets(call.expression, owner)].filter(
+						(target) =>
+							target !== "builtin:functionCall" &&
+							target !== "builtin:functionApply" &&
+							target !== "builtin:functionBind"
+					)
+				),
+				unknownArguments: supplied.unknown,
+			});
+			if (callableReceivers.size > 0 && !keys.unknown && keys.values.size === 1 && keys.values.has("bind")) {
+				return hasOrdinaryReceivers
+					? [ordinaryInvocation()]
+					: [{ arguments: [], targets: new Set(), unknownArguments: false }];
 			}
-			if (!keys.unknown && keys.values.size === 1 && keys.values.has("call")) {
-				const supplied = invocationArguments(call.arguments, owner);
-				return {
+			if (callableReceivers.size > 0 && !keys.unknown && keys.values.size === 1 && keys.values.has("call")) {
+				const normalized: Invocation = {
 					arguments: supplied.arguments.slice(1),
-					targets: expressionTargets(call.expression.expression, owner),
+					targets: callableReceivers,
 					thisArgument: supplied.arguments[0],
 					unknownArguments: supplied.unknown,
 				};
+				return hasOrdinaryReceivers ? [normalized, ordinaryInvocation()] : [normalized];
 			}
-			if (!keys.unknown && keys.values.size === 1 && keys.values.has("apply")) {
+			if (callableReceivers.size > 0 && !keys.unknown && keys.values.size === 1 && keys.values.has("apply")) {
 				const unpacked = call.arguments[1]
 					? arrayArguments(call.arguments[1], owner)
 					: { arguments: [], unknown: true };
-				return {
+				const normalized: Invocation = {
 					arguments: unpacked.arguments,
-					targets: expressionTargets(call.expression.expression, owner),
+					targets: callableReceivers,
 					thisArgument: call.arguments[0] ? semanticArgument(call.arguments[0], owner) : undefined,
 					unknownArguments: unpacked.unknown,
 				};
+				return hasOrdinaryReceivers ? [normalized, ordinaryInvocation()] : [normalized];
 			}
 		}
 		const supplied = invocationArguments(call.arguments, owner);
-		return {
-			arguments: supplied.arguments,
-			targets: expressionTargets(call.expression, owner),
-			unknownArguments: supplied.unknown,
-		};
+		return [
+			{
+				arguments: supplied.arguments,
+				targets: expressionTargets(call.expression, owner),
+				unknownArguments: supplied.unknown,
+			},
+		];
 	};
 	const expandInvocation = (initial: Invocation): Invocation[] => {
 		const result: Invocation[] = [];
@@ -2165,6 +2314,184 @@ function semanticAnalysis(
 		}
 		return result;
 	};
+	const selectedArgument = (
+		argument: SemanticArgument | undefined,
+		initializer: ts.Expression | undefined,
+		owner: FunctionNode
+	): SemanticArgument | undefined => {
+		if (argument && !argument.definitelyUndefined) return argument;
+		if (initializer) return semanticArgument(initializer, owner);
+		return argument;
+	};
+	const argumentKnownPropertyNames = (argument: SemanticArgument): Set<string> => {
+		const result =
+			argument.source && argument.owner ? knownPropertyNames(argument.source, argument.owner) : new Set<string>();
+		for (const target of argument.targets) {
+			if (!target.startsWith("object:")) continue;
+			for (const slot of propertyFacts.get(target)?.keys() ?? []) {
+				if (typeof slot === "string") result.add(slot);
+			}
+			const container = containerValues.get(target);
+			if (container) {
+				for (const name of knownPropertyNames(container.expression, container.owner)) result.add(name);
+			}
+		}
+		return result;
+	};
+	const argumentProperty = (argument: SemanticArgument, name: string, owner: FunctionNode): SemanticArgument => {
+		if (argument.source && argument.owner) {
+			const source = transparentExpression(argument.source);
+			if (ts.isObjectLiteralExpression(source)) {
+				let hasUnknownSpread = false;
+				for (const candidate of source.properties) {
+					if (ts.isSpreadAssignment(candidate)) {
+						hasUnknownSpread = true;
+						continue;
+					}
+					if (!candidate.name) continue;
+					const names = ts.isComputedPropertyName(candidate.name)
+						? keyResolution(candidate.name.expression, argument.owner, new Set()).values
+						: ts.isIdentifier(candidate.name) ||
+							  ts.isStringLiteral(candidate.name) ||
+							  ts.isNumericLiteral(candidate.name)
+							? new Set([candidate.name.text])
+							: new Set<string>();
+					if (!names.has(name)) continue;
+					if (ts.isPropertyAssignment(candidate)) return semanticArgument(candidate.initializer, argument.owner);
+					if (ts.isShorthandPropertyAssignment(candidate)) return semanticArgument(candidate.name, argument.owner);
+				}
+				if (!hasUnknownSpread) return { definitelyUndefined: true, targets: new Set() };
+			}
+			if (ts.isArrayLiteralExpression(source)) {
+				const index = Number(name);
+				if (Number.isInteger(index) && index >= 0) {
+					const shape = arrayArguments(source, argument.owner);
+					const element = shape.arguments[index];
+					if (element) return element;
+					if (!shape.unknown) return { definitelyUndefined: true, targets: new Set() };
+				}
+			}
+			const targets = propertyTargets(argument.source, name, argument.owner, new Set());
+			return { targets };
+		}
+		const targets = new Set<SemanticTarget>();
+		for (const target of argument.targets) {
+			if (target.startsWith("object:")) {
+				joinTargets(targets, storedPropertyTargets(target, name));
+				const container = containerValues.get(target);
+				if (container) joinTargets(targets, propertyTargets(container.expression, name, container.owner, new Set()));
+			} else if (target.startsWith("class:")) {
+				joinTargets(targets, memberTargets(target, name, true, owner, new Set()));
+			} else if (target.startsWith("instance:")) {
+				joinTargets(targets, memberTargets(target, name, false, owner, new Set()));
+			} else if (target === "primitive:unresolvedInternal") {
+				targets.add(target);
+			}
+		}
+		return { targets };
+	};
+	const argumentArray = (argument: SemanticArgument): ArrayResolution => {
+		if (argument.source && argument.owner) return arrayArguments(argument.source, argument.owner);
+		const resolutions: ArrayResolution[] = [];
+		for (const target of argument.targets) {
+			if (!target.startsWith("object:")) continue;
+			const container = containerValues.get(target);
+			if (container && ts.isArrayLiteralExpression(container.expression)) {
+				resolutions.push(arrayArguments(container.expression, container.owner));
+				continue;
+			}
+			const arguments_: SemanticArgument[] = [];
+			let unknown = false;
+			for (const [slot, targets] of propertyFacts.get(target) ?? []) {
+				if (slot === unknownProperty) {
+					unknown = true;
+					continue;
+				}
+				const index = Number(slot);
+				if (!Number.isInteger(index) || index < 0) continue;
+				while (arguments_.length <= index) arguments_.push({ targets: new Set() });
+				joinTargets(arguments_[index].targets, targets);
+			}
+			resolutions.push({ arguments: arguments_, unknown });
+		}
+		return mergeArrayResolutions(resolutions);
+	};
+	const joinParameterBinding = (
+		name: ts.BindingName,
+		argument: SemanticArgument | undefined,
+		initializer: ts.Expression | undefined,
+		owner: FunctionNode,
+		unknownArgument: boolean
+	): boolean => {
+		const selected = selectedArgument(argument, initializer, owner);
+		if (ts.isIdentifier(name)) {
+			const targets = parameterTargets.get(owner.id)?.get(name.text);
+			if (!targets) return false;
+			const additions = new Set(selected?.targets ?? []);
+			if (unknownArgument) additions.add("primitive:unresolvedInternal");
+			return joinTargets(targets, additions);
+		}
+		let joined = false;
+		if (ts.isObjectBindingPattern(name)) {
+			const knownNames = selected ? argumentKnownPropertyNames(selected) : new Set<string>();
+			const excluded = new Set<string>();
+			for (const element of name.elements) {
+				if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
+					const target = projectionTarget(owner, element);
+					for (const property of knownNames) {
+						if (excluded.has(property) || !selected) continue;
+						joined =
+							joinPropertyTargets(target, property, argumentProperty(selected, property, owner).targets) || joined;
+					}
+					if (unknownArgument || !selected || selected.targets.has("primitive:unresolvedInternal")) {
+						joined = joinPropertyTargets(target, unknownProperty, ["primitive:unresolvedInternal"]) || joined;
+					}
+					continue;
+				}
+				const property = element.propertyName
+					? ts.isIdentifier(element.propertyName) || ts.isStringLiteral(element.propertyName)
+						? element.propertyName.text
+						: undefined
+					: ts.isIdentifier(element.name)
+						? element.name.text
+						: undefined;
+				if (!property) {
+					joined = joinParameterBinding(element.name, undefined, element.initializer, owner, true) || joined;
+					continue;
+				}
+				excluded.add(property);
+				const nested = selected ? argumentProperty(selected, property, owner) : undefined;
+				joined =
+					joinParameterBinding(element.name, nested, element.initializer, owner, unknownArgument || !selected) ||
+					joined;
+			}
+			return joined;
+		}
+		const shape = selected ? argumentArray(selected) : { arguments: [], unknown: true };
+		for (const [index, element] of name.elements.entries()) {
+			if (!ts.isBindingElement(element)) continue;
+			if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
+				const target = projectionTarget(owner, element);
+				for (let sourceIndex = index; sourceIndex < shape.arguments.length; sourceIndex++) {
+					joined =
+						joinPropertyTargets(target, String(sourceIndex - index), shape.arguments[sourceIndex].targets) || joined;
+				}
+				if (unknownArgument || shape.unknown) {
+					joined = joinPropertyTargets(target, unknownProperty, ["primitive:unresolvedInternal"]) || joined;
+				}
+				continue;
+			}
+			joined =
+				joinParameterBinding(
+					element.name,
+					shape.arguments[index],
+					element.initializer,
+					owner,
+					unknownArgument || shape.unknown
+				) || joined;
+		}
+		return joined;
+	};
 
 	const edges = new Map<string, Set<string>>();
 	const operations = new Map<string, SemanticOperation>();
@@ -2175,7 +2502,12 @@ function semanticAnalysis(
 		return changed;
 	};
 	const joinAssignment = (node: ts.BinaryExpression, owner: SemanticOwner): boolean => {
-		if (node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+		if (
+			node.operatorToken.kind !== ts.SyntaxKind.EqualsToken &&
+			!logicalAssignmentOperators.has(node.operatorToken.kind)
+		) {
+			return false;
+		}
 		let joined = false;
 		const assignedTargets = expressionTargets(node.right, owner);
 		if (ts.isIdentifier(node.left)) {
@@ -2251,7 +2583,7 @@ function semanticAnalysis(
 				}
 				if (ts.isBinaryExpression(node)) changed = joinAssignment(node, owner) || changed;
 				if (ts.isCallExpression(node)) {
-					const initialInvocation = invocation(node, owner);
+					const initialInvocations = invocations(node, owner);
 					if (
 						node.expression.kind === ts.SyntaxKind.ImportKeyword &&
 						node.arguments[0] &&
@@ -2259,15 +2591,15 @@ function semanticAnalysis(
 					) {
 						const specifier = node.arguments[0].text;
 						if (["@msgpack/msgpack", "node:v8", "@bufbuild/protobuf"].includes(specifier)) {
-							initialInvocation.targets.add("primitive:serialization");
+							for (const initial of initialInvocations) initial.targets.add("primitive:serialization");
 						} else {
 							const moduleName = resolveModuleName(owner.file.fileName, specifier, sourceNames);
 							if (moduleName || isUnresolvedInternalImport(owner.file.fileName, specifier, moduleName)) {
-								initialInvocation.targets.add("primitive:unresolvedInternal");
+								for (const initial of initialInvocations) initial.targets.add("primitive:unresolvedInternal");
 							}
 						}
 					}
-					for (const resolvedInvocation of expandInvocation(initialInvocation)) {
+					for (const resolvedInvocation of initialInvocations.flatMap(expandInvocation)) {
 						const target = [...resolvedInvocation.targets][0];
 						if (!target) continue;
 						if (target === "builtin:jsonParse") {
@@ -2295,18 +2627,14 @@ function semanticAnalysis(
 						for (let index = 0; index < targetNode.declaration.parameters.length; index++) {
 							const parameter = targetNode.declaration.parameters[index];
 							const argument = resolvedInvocation.arguments[index];
-							if (!ts.isIdentifier(parameter.name)) continue;
-							const targets = parameterTargets.get(targetId)?.get(parameter.name.text);
-							if (!targets) continue;
-							const argumentTargets = new Set(
-								argument
-									? argument.targets
-									: parameter.initializer
-										? expressionTargets(parameter.initializer, targetNode)
-										: []
-							);
-							if (resolvedInvocation.unknownArguments) argumentTargets.add("primitive:unresolvedInternal");
-							changed = joinTargets(targets, argumentTargets) || changed;
+							changed =
+								joinParameterBinding(
+									parameter.name,
+									argument,
+									parameter.initializer,
+									targetNode,
+									resolvedInvocation.unknownArguments
+								) || changed;
 						}
 					}
 				}
