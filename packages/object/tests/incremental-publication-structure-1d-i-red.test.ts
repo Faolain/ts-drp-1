@@ -2093,6 +2093,254 @@ const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
 const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
 
+interface StructureFlowRed5Fixture {
+	readonly expectedViolation: RegExp;
+	readonly family: string;
+	readonly name: string;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+interface StructureFlowRed5Control extends StructureFlowRed5Fixture {
+	readonly shouldViolate: boolean;
+}
+
+function structureFlowRed5Fixture(
+	family: string,
+	name: string,
+	imports: string,
+	mutation: string,
+	dependencies: Readonly<Record<string, string>> = {}
+): StructureFlowRed5Fixture {
+	return Object.freeze({
+		expectedViolation: ENCODE_VIOLATION,
+		family,
+		name,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			...dependencies,
+		}),
+	});
+}
+
+const RED5_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const STRUCTURE_FLOW_RED5_MUTANTS = Object.freeze([
+	structureFlowRed5Fixture(
+		"bind-of-call/apply",
+		"Function.prototype.call.bind retains the captured callable receiver",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const invoke = Function.prototype.call.bind(capture); invoke(undefined, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED5_CAPTURE_UTILITY }
+	),
+	structureFlowRed5Fixture(
+		"bind-of-call/apply",
+		"capture.call.bind retains the captured callable receiver",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const invoke = capture.call.bind(capture); invoke(undefined, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED5_CAPTURE_UTILITY }
+	),
+	structureFlowRed5Fixture(
+		"bind-of-call/apply",
+		"Function.prototype.apply.bind retains the captured callable receiver",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const invoke = Function.prototype.apply.bind(capture); invoke(undefined, [state]);",
+		{ [UTILS_SERIALIZATION_PATH]: RED5_CAPTURE_UTILITY }
+	),
+	structureFlowRed5Fixture(
+		"cross-module imported-binding mutation",
+		"separate importer mutates an exported bag consumed by the publisher",
+		'import { bag } from "@ts-drp/utils/bag"; import { install } from "@ts-drp/utils/mutator";',
+		"install(); bag.capture(state);",
+		{
+			"packages/utils/src/bag.ts": `
+				export const bag: Record<string, (value: unknown) => unknown> = {};
+			`,
+			"packages/utils/src/mutator.ts": `
+				import { encode } from "@msgpack/msgpack";
+				import { bag } from "./bag.js";
+				export function install(): void {
+					bag.capture = (value: unknown): Uint8Array => encode(value);
+				}
+			`,
+		}
+	),
+	structureFlowRed5Fixture(
+		"exported array callable identity",
+		"exported array element retains a forbidden callback",
+		'import { bag } from "@ts-drp/utils/serialization";',
+		"bag[0](state);",
+		{ [UTILS_SERIALIZATION_PATH]: `${RED5_CAPTURE_UTILITY}\nexport const bag = [capture];` }
+	),
+	structureFlowRed5Fixture(
+		"exported array callable identity",
+		"nested exported array element retains a forbidden callback",
+		'import { api } from "@ts-drp/utils/serialization";',
+		"api.helpers[0](state);",
+		{ [UTILS_SERIALIZATION_PATH]: `${RED5_CAPTURE_UTILITY}\nexport const api = { helpers: [capture] };` }
+	),
+	structureFlowRed5Fixture(
+		"class static-block assignment",
+		"static block installs a forbidden callable used by the publisher",
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"SnapshotHelper.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					static capture: (value: unknown) => unknown;
+					static {
+						SnapshotHelper.capture = (value: unknown): Uint8Array => encode(value);
+					}
+				}
+			`,
+		}
+	),
+] satisfies readonly StructureFlowRed5Fixture[]);
+
+const STRUCTURE_FLOW_RED5_CONTROLS = Object.freeze([
+	{
+		...structureFlowRed5Fixture(
+			"bind-of-call/apply",
+			"Function.prototype.call.bind with a safe target remains allowed",
+			"function safe(value: unknown): unknown { return value; }",
+			"const invoke = Function.prototype.call.bind(safe); invoke(undefined, state);"
+		),
+		shouldViolate: false,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"bind-of-call/apply",
+			"safe.call.bind with a safe target remains allowed",
+			"function safe(value: unknown): unknown { return value; }",
+			"const invoke = safe.call.bind(safe); invoke(undefined, state);"
+		),
+		shouldViolate: false,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"bind-of-call/apply",
+			"Function.prototype.apply.bind with a safe target remains allowed",
+			"function safe(value: unknown): unknown { return value; }",
+			"const invoke = Function.prototype.apply.bind(safe); invoke(undefined, [state]);"
+		),
+		shouldViolate: false,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"cross-module imported-binding mutation",
+			"separate importer can install a safe exported-bag callback",
+			'import { bag } from "@ts-drp/utils/bag"; import { install } from "@ts-drp/utils/mutator";',
+			"install(); bag.select(state);",
+			{
+				"packages/utils/src/bag.ts": `
+					export const bag: Record<string, (value: unknown) => unknown> = {};
+				`,
+				"packages/utils/src/mutator.ts": `
+					import { bag } from "./bag.js";
+					export function install(): void {
+						bag.select = (value: unknown): unknown => value;
+					}
+				`,
+			}
+		),
+		shouldViolate: false,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"exported array callable identity",
+			"direct local array retains the same forbidden callback",
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const bag = [capture]; bag[0](state);",
+			{ [UTILS_SERIALIZATION_PATH]: RED5_CAPTURE_UTILITY }
+		),
+		shouldViolate: true,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"exported array callable identity",
+			"exported array with a safe callback remains allowed",
+			'import { bag } from "@ts-drp/utils/serialization";',
+			"bag[0](state);",
+			{ [UTILS_SERIALIZATION_PATH]: "export const bag = [(value: unknown): unknown => value];" }
+		),
+		shouldViolate: false,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"exported array callable identity",
+			"nested exported array with a safe callback remains allowed",
+			'import { api } from "@ts-drp/utils/serialization";',
+			"api.helpers[0](state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					export const api = { helpers: [(value: unknown): unknown => value] };
+				`,
+			}
+		),
+		shouldViolate: false,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"class static-block assignment",
+			"ordinary static post-declaration assignment remains detected",
+			'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+			"SnapshotHelper.capture(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					import { encode } from "@msgpack/msgpack";
+					export class SnapshotHelper {
+						static capture: (value: unknown) => unknown;
+					}
+					SnapshotHelper.capture = (value: unknown): Uint8Array => encode(value);
+				`,
+			}
+		),
+		shouldViolate: true,
+	},
+	{
+		...structureFlowRed5Fixture(
+			"class static-block assignment",
+			"static block can install a safe callback",
+			'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+			"SnapshotHelper.select(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					export class SnapshotHelper {
+						static select: (value: unknown) => unknown;
+						static {
+							SnapshotHelper.select = (value: unknown): unknown => value;
+						}
+					}
+				`,
+			}
+		),
+		shouldViolate: false,
+	},
+] satisfies readonly StructureFlowRed5Control[]);
+
+describe("Phase 1d(i) D.92.2 final ordinary structure-flow RED", () => {
+	it.each(STRUCTURE_FLOW_RED5_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
+		const analysis = analyze(sources);
+		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+	});
+
+	it.each(STRUCTURE_FLOW_RED5_CONTROLS)(
+		"preserves $family control: $name",
+		({ expectedViolation, shouldViolate, sources }) => {
+			const analysis = analyze(sources);
+			if (shouldViolate) {
+				expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+			} else {
+				expect(analysis.violations).toEqual([]);
+			}
+		}
+	);
+});
+
 interface WorkspaceMutationFixture {
 	readonly expectedViolation: RegExp;
 	readonly name: string;
