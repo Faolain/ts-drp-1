@@ -492,6 +492,222 @@ function relocatedSource(relocation: string): Record<string, string> {
 	};
 }
 
+const WORKSPACE_PUBLISHER_PATH = "packages/object/src/drp-applier.ts";
+const UTILS_SERIALIZATION_PATH = "packages/utils/src/serialization/index.ts";
+const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
+const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
+const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
+
+interface WorkspaceMutationFixture {
+	readonly expectedViolation: RegExp;
+	readonly name: string;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+function workspacePublisher(imports: string, mutation: string): string {
+	return `
+		${imports}
+		class WorkspacePublisher {
+			private readonly sink: (event: unknown) => unknown;
+			constructor({ publicationObserver }: { publicationObserver: (event: unknown) => unknown }) {
+				this.sink = publicationObserver;
+			}
+			assignState(): void { this.publish(); }
+			advanceCheckpointIfNeeded(): void { this.publish(); }
+			private publish(): void {
+				const state = { changed: { value: 1 }, unchanged: { ballast: true } };
+				${mutation}
+				this.copyPayload(state.changed);
+			}
+			private copyPayload(value: unknown): unknown {
+				return this.sink({ type: "copy", value });
+			}
+		}
+	`;
+}
+
+function workspaceFixture(
+	name: string,
+	expectedViolation: RegExp,
+	imports: string,
+	mutation: string,
+	dependencies: Readonly<Record<string, string>>
+): WorkspaceMutationFixture {
+	return {
+		expectedViolation,
+		name,
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			...dependencies,
+		},
+	};
+}
+
+const WORKSPACE_REACHABILITY_MUTANTS: readonly WorkspaceMutationFixture[] = [
+	workspaceFixture(
+		"exact rejected snapshotValueBytes helper relocated into @ts-drp/utils",
+		ENCODE_VIOLATION,
+		'import { snapshotValueBytes } from "@ts-drp/utils/serialization";',
+		"snapshotValueBytes(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function serializeValue(value: unknown): Uint8Array { return encode(value); }
+				export function snapshotValueBytes(obj: unknown): Uint8Array {
+					return Uint8Array.from(serializeValue(obj));
+				}
+			`,
+		}
+	),
+	workspaceFixture(
+		"renamed re-export through the @ts-drp/utils package root",
+		ENCODE_VIOLATION,
+		'import { encodeSnapshot } from "@ts-drp/utils";',
+		"encodeSnapshot(state);",
+		{
+			"packages/utils/src/index.ts": 'export { serializeValue as encodeSnapshot } from "./serialization/index.js";',
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function serializeValue(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"two-hop wrapper with implementation-neutral names",
+		ENCODE_VIOLATION,
+		'import { captureCurrent } from "@ts-drp/utils/serialization";',
+		"captureCurrent(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				function innermost(value: unknown): Uint8Array { return encode(value); }
+				function intermediate(value: unknown): Uint8Array { return innermost(value); }
+				export function captureCurrent(value: unknown): Uint8Array { return intermediate(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"third-workspace-package wrapper",
+		ENCODE_VIOLATION,
+		'import { captureTracePayload } from "@ts-drp/tracer";',
+		"captureTracePayload(state);",
+		{
+			"packages/tracer/src/index.ts": `
+				import { snapshotValueBytes } from "@ts-drp/utils/serialization";
+				export function captureTracePayload(value: unknown): Uint8Array { return snapshotValueBytes(value); }
+			`,
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function snapshotValueBytes(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"namespace import hidden behind a property alias",
+		ENCODE_VIOLATION,
+		'import * as snapshots from "@ts-drp/utils/serialization";',
+		"const holder = { capture: snapshots.snapshotValueBytes }; holder.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function snapshotValueBytes(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"callback alias passage",
+		ENCODE_VIOLATION,
+		`import { snapshotValueBytes } from "@ts-drp/utils/serialization";
+		 function invoke(callback: (value: unknown) => unknown, value: unknown): unknown { return callback(value); }`,
+		"invoke(snapshotValueBytes, state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function snapshotValueBytes(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"default-export wrapper",
+		ENCODE_VIOLATION,
+		'import snapshotValueBytes from "@ts-drp/utils/serialization";',
+		"snapshotValueBytes(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export default function snapshotValueBytes(value: unknown): Uint8Array { return encode(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"discarded cross-package copy",
+		CLONE_VIOLATION,
+		'import { prepareSnapshot } from "@ts-drp/utils/serialization";',
+		"prepareSnapshot(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { cloneDeep } from "es-toolkit";
+				export function prepareSnapshot(value: unknown): unknown { cloneDeep(value); return value; }
+			`,
+		}
+	),
+	workspaceFixture(
+		"discarded cross-package encode",
+		ENCODE_VIOLATION,
+		'import { observeSnapshot } from "@ts-drp/utils/serialization";',
+		"observeSnapshot(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export function observeSnapshot(value: unknown): void { encode(value); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"serialization-as-clone round trip",
+		ROUND_TRIP_VIOLATION,
+		'import { cloneThroughBytes } from "@ts-drp/utils/serialization";',
+		"cloneThroughBytes(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { decode, encode } from "@msgpack/msgpack";
+				export function cloneThroughBytes(value: unknown): unknown { return decode(encode(value)); }
+			`,
+		}
+	),
+	workspaceFixture(
+		"clone-everything-then-share cross-package wrapper",
+		CLONE_VIOLATION,
+		'import { precloneState } from "@ts-drp/utils/serialization";',
+		'precloneState(state, "changed");',
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { cloneDeep } from "es-toolkit";
+				export function precloneState(state: Record<string, unknown>, key: string): unknown {
+					const cloned = cloneDeep(state);
+					return cloned[key];
+				}
+			`,
+		}
+	),
+	{
+		name: "ownership helper just outside the former globally scanned boundary",
+		expectedViolation: CLONE_VIOLATION,
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			"packages/object/src/index.ts": `
+				import { detachPublicState } from "./ownership-boundary.js";
+				export class DRPObject {
+					getStates(value: unknown): unknown { return detachPublicState(value); }
+				}
+			`,
+			"packages/object/src/ownership-boundary.ts": `
+				export function detachPublicState(value: unknown): unknown { return structuredClone(value); }
+			`,
+		},
+	},
+];
+
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
@@ -501,6 +717,19 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 
 	it("accepts an equivalent safe publisher in an arbitrary file with arbitrary internal names", () => {
 		expect(analyze(compliantSource()).violations).toEqual([]);
+	});
+
+	it("accepts a compliant cross-package wrapper after resolving its workspace package root", () => {
+		const sources = {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { selectChangedPayload } from "@ts-drp/utils";',
+				"selectChangedPayload(state.changed);"
+			),
+			"packages/utils/src/index.ts": `
+				export function selectChangedPayload(value: unknown): unknown { return value; }
+			`,
+		};
+		expect(analyze(sources).violations).toEqual([]);
 	});
 
 	it("requires both publication roots to reach the same implementation-neutral copy leaf", () => {
@@ -563,6 +792,14 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 		expect(analysis.injectedCopyLeaves).toHaveLength(1);
 		expect(analysis.violations.some((violation) => violation.includes(expected))).toBe(true);
 	});
+
+	for (const { expectedViolation, name, sources } of WORKSPACE_REACHABILITY_MUTANTS) {
+		it(`kills ${name} by following workspace exports to the forbidden primitive`, () => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		});
+	}
 
 	it("pins the exact excluded-copy-site census outside governed publication", () => {
 		const sources = sourceFiles(SOURCE_DIRECTORY);
