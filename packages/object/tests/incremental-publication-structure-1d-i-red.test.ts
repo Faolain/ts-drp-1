@@ -2157,6 +2157,286 @@ const ENCODE_VIOLATION = /encode|serialization|serializeValue/;
 const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
 
+interface StructureFlowRed6Fixture {
+	readonly expectedViolation: RegExp;
+	readonly family: string;
+	readonly name: string;
+	readonly shouldViolate: boolean;
+	readonly sources: Readonly<Record<string, string>>;
+}
+
+function structureFlowRed6Fixture(
+	family: string,
+	name: string,
+	imports: string,
+	mutation: string,
+	dependencies: Readonly<Record<string, string>> = {},
+	shouldViolate = true
+): StructureFlowRed6Fixture {
+	return Object.freeze({
+		expectedViolation: ENCODE_VIOLATION,
+		family,
+		name,
+		shouldViolate,
+		sources: Object.freeze({
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(imports, mutation),
+			...dependencies,
+		}),
+	});
+}
+
+const RED6_CAPTURE_UTILITY = `
+	import { encode } from "@msgpack/msgpack";
+	export function capture(value: unknown): Uint8Array { return encode(value); }
+	export function safe(value: unknown): unknown { return value; }
+`;
+
+const STRUCTURE_FLOW_RED6_MUTANTS = Object.freeze([
+	structureFlowRed6Fixture(
+		"array spread",
+		"cross-package spread retains a forbidden callback at index zero",
+		'import { bag } from "@ts-drp/utils/serialization";',
+		"bag[0](state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}
+				const base = [capture];
+				export const bag = [...base];
+			`,
+		}
+	),
+	structureFlowRed6Fixture(
+		"array spread",
+		"cross-package multiple spreads retain a shifted forbidden callback index",
+		'import { bag } from "@ts-drp/utils/serialization";',
+		"bag[1](state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}
+				const prefix = [safe];
+				const base = [capture];
+				export const bag = [...prefix, ...base];
+			`,
+		}
+	),
+	structureFlowRed6Fixture(
+		"nested function declaration",
+		"publication-root local declaration forwards a forbidden callback",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"function run(fn: (value: unknown) => unknown, value: unknown): unknown { return fn(value); } run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED6_CAPTURE_UTILITY }
+	),
+	structureFlowRed6Fixture(
+		"concise arrow return",
+		"cross-package concise arrow returns a forbidden callback",
+		'import { make } from "@ts-drp/utils/serialization";',
+		"make()(state);",
+		{ [UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const make = () => capture;` }
+	),
+	structureFlowRed6Fixture(
+		"concise arrow return",
+		"cross-package concise arrow returns a forbidden bound callback",
+		'import { make } from "@ts-drp/utils/serialization";',
+		"make(state)();",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const make = (value: unknown) => capture.bind(undefined, value);`,
+		}
+	),
+] satisfies readonly StructureFlowRed6Fixture[]);
+
+const STRUCTURE_FLOW_RED6_CONTROLS = Object.freeze([
+	structureFlowRed6Fixture(
+		"array spread",
+		"direct cross-package array retains the same forbidden callback",
+		'import { bag } from "@ts-drp/utils/serialization";',
+		"bag[0](state);",
+		{ [UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const bag = [capture];` }
+	),
+	structureFlowRed6Fixture(
+		"array spread",
+		"direct cross-package array retains a shifted forbidden callback index",
+		'import { bag } from "@ts-drp/utils/serialization";',
+		"bag[1](state);",
+		{ [UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const bag = [safe, capture];` }
+	),
+	structureFlowRed6Fixture(
+		"array spread",
+		"cross-package spread of a safe callback remains allowed",
+		'import { bag } from "@ts-drp/utils/serialization";',
+		"bag[0](state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}
+				const base = [safe];
+				export const bag = [...base];
+			`,
+		},
+		false
+	),
+	structureFlowRed6Fixture(
+		"nested function declaration",
+		"publication-root local function expression remains detected",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const run = function (fn: (value: unknown) => unknown, value: unknown): unknown { return fn(value); }; run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED6_CAPTURE_UTILITY }
+	),
+	structureFlowRed6Fixture(
+		"nested function declaration",
+		"publication-root local arrow remains detected",
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const run = (fn: (value: unknown) => unknown, value: unknown): unknown => fn(value); run(capture, state);",
+		{ [UTILS_SERIALIZATION_PATH]: RED6_CAPTURE_UTILITY }
+	),
+	structureFlowRed6Fixture(
+		"nested function declaration",
+		"cross-package module declaration remains detected",
+		'import { run, capture } from "@ts-drp/utils/serialization";',
+		"run(capture, state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}
+				export function run(fn: (value: unknown) => unknown, value: unknown): unknown { return fn(value); }
+			`,
+		}
+	),
+	structureFlowRed6Fixture(
+		"nested function declaration",
+		"publication-root local declaration can forward a safe callback",
+		"function safe(value: unknown): unknown { return value; }",
+		"function run(fn: (value: unknown) => unknown, value: unknown): unknown { return fn(value); } run(safe, state);",
+		{},
+		false
+	),
+	structureFlowRed6Fixture(
+		"concise arrow return",
+		"cross-package block arrow return remains detected",
+		'import { make } from "@ts-drp/utils/serialization";',
+		"make()(state);",
+		{ [UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const make = () => { return capture; };` }
+	),
+	structureFlowRed6Fixture(
+		"concise arrow return",
+		"cross-package concise arrow can return a safe callback",
+		'import { make } from "@ts-drp/utils/serialization";',
+		"make()(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const make = () => safe;`,
+		},
+		false
+	),
+	structureFlowRed6Fixture(
+		"concise arrow return",
+		"cross-package block arrow bound return remains detected",
+		'import { make } from "@ts-drp/utils/serialization";',
+		"make(state)();",
+		{
+			[UTILS_SERIALIZATION_PATH]: `${RED6_CAPTURE_UTILITY}\nexport const make = (value: unknown) => { return capture.bind(undefined, value); };`,
+		}
+	),
+] satisfies readonly StructureFlowRed6Fixture[]);
+
+const RED6_CYCLE_CHILD_ENV = "TS_DRP_STRUCTURE_FLOW_RED6_CYCLE_CHILD";
+const RED6_CYCLE_CHILD_TEST = "RED6 child detects a bound callable cycle with a leading argument";
+const RED6_CYCLE_CONTROL_CHILD_TEST = "RED6 child detects a bound callable cycle without a leading argument";
+const RED6_CYCLE_SOURCE = (leadingArgument: boolean): Readonly<Record<string, string>> => ({
+	[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+		'import { capture } from "@ts-drp/utils/serialization";',
+		`let g = capture;
+		 const holder: { f: typeof g } = { f: g };
+		 holder.f = g.bind(undefined${leadingArgument ? ", state" : ""});
+		 g = holder.f;
+		 g(state);`
+	),
+	[UTILS_SERIALIZATION_PATH]: RED6_CAPTURE_UTILITY,
+});
+
+interface Red6ChildResult {
+	readonly durationMs: number;
+	readonly errorCode?: string;
+	readonly outputTail: string;
+	readonly signal: NodeJS.Signals | null;
+	readonly status: number | null;
+}
+
+async function runRed6CycleChild(testName: string): Promise<Red6ChildResult> {
+	const { spawnSync } = await import("node:child_process");
+	const startedAt = performance.now();
+	const result = spawnSync(
+		process.execPath,
+		[
+			"--max-old-space-size=64",
+			path.join(WORKSPACE_DIRECTORY, "node_modules/vitest/vitest.mjs"),
+			"run",
+			fileURLToPath(import.meta.url),
+			"-t",
+			testName,
+			"--reporter=dot",
+			"--coverage.enabled=false",
+			"--pool=threads",
+			"--maxWorkers=1",
+			"--minWorkers=1",
+			"--exclude=.logs/**",
+		],
+		{
+			cwd: WORKSPACE_DIRECTORY,
+			encoding: "utf8",
+			env: { ...process.env, FORCE_COLOR: "0", [RED6_CYCLE_CHILD_ENV]: "1" },
+			killSignal: "SIGKILL",
+			maxBuffer: 256 * 1024,
+			timeout: 4_000,
+		}
+	);
+	const combinedOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+	return {
+		durationMs: Math.round(performance.now() - startedAt),
+		errorCode: (result.error as NodeJS.ErrnoException | undefined)?.code,
+		outputTail: combinedOutput.slice(-2_000),
+		signal: result.signal,
+		status: result.status,
+	};
+}
+
+if (process.env[RED6_CYCLE_CHILD_ENV] === "1") {
+	describe("Phase 1d(i) D.92.2 bound-callable cycle child", () => {
+		it(RED6_CYCLE_CHILD_TEST, () => {
+			const analysis = analyze(RED6_CYCLE_SOURCE(true));
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(ENCODE_VIOLATION)]));
+		});
+
+		it(RED6_CYCLE_CONTROL_CHILD_TEST, () => {
+			const analysis = analyze(RED6_CYCLE_SOURCE(false));
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(ENCODE_VIOLATION)]));
+		});
+	});
+} else {
+	describe("Phase 1d(i) D.92.2 remaining semantic-flow RED", () => {
+		it.each(STRUCTURE_FLOW_RED6_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		});
+
+		it.each(STRUCTURE_FLOW_RED6_CONTROLS)(
+			"preserves $family control: $name",
+			({ expectedViolation, shouldViolate, sources }) => {
+				const analysis = analyze(sources);
+				if (shouldViolate) {
+					expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+				} else {
+					expect(analysis.violations).toEqual([]);
+				}
+			}
+		);
+
+		it("isolates a leading-argument bound-callable cycle in a bounded child", async () => {
+			const result = await runRed6CycleChild(RED6_CYCLE_CHILD_TEST);
+			console.info(`[structure-flow-red6-child] leading=true ${JSON.stringify(result)}`);
+			expect(result).toMatchObject({ errorCode: undefined, signal: null, status: 0 });
+		});
+
+		it("proves the bounded child detects a no-leading-argument cycle", async () => {
+			const result = await runRed6CycleChild(RED6_CYCLE_CONTROL_CHILD_TEST);
+			console.info(`[structure-flow-red6-child] leading=false ${JSON.stringify(result)}`);
+			expect(result).toMatchObject({ errorCode: undefined, signal: null, status: 0 });
+		});
+	});
+}
+
 interface StructureFlowRed5Fixture {
 	readonly expectedViolation: RegExp;
 	readonly family: string;
