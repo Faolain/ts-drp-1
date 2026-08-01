@@ -3564,6 +3564,278 @@ const STRUCTURE_FLOW_RED3_POSITIVE_CONTROLS = Object.freeze([
 	),
 ] satisfies readonly SemanticFlowFixture[]);
 
+function backwardAssignmentChain(hops: number): string {
+	const declarations = Array.from({ length: hops }, (_value, index) => `let v${index + 1} = safe;`).join("\n");
+	const assignments = Array.from(
+		{ length: hops - 1 },
+		(_value, index) => `v${hops - index} = v${hops - index - 1};`
+	).join("\n");
+	return `${declarations}\n${assignments}\nv1 = snap;\nv${hops}(state);`;
+}
+
+const STRUCTURE_FLOW_RED4_MUTANTS = Object.freeze([
+	semanticFlowFixture(
+		"cross-module post-initializer object properties",
+		"empty exported bag receives a forbidden property after initialization",
+		ENCODE_VIOLATION,
+		'import { snapshots } from "@ts-drp/utils/serialization";',
+		"snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const snapshots: Record<string, (value: unknown) => unknown> = {};
+				snapshots.capture = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"cross-module post-initializer object properties",
+		"nested exported bag receives a forbidden property after initialization",
+		ENCODE_VIOLATION,
+		'import { api } from "@ts-drp/utils/serialization";',
+		"api.snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const api: any = { snapshots: {} };
+				api.snapshots.capture = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"cross-module post-initializer object properties",
+		"initialized exported bag receives a later forbidden extra property",
+		ENCODE_VIOLATION,
+		'import { snapshots } from "@ts-drp/utils/serialization";',
+		"snapshots.extra(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				function select(value: unknown): unknown { return value; }
+				export const snapshots: any = { select };
+				snapshots.extra = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"bind indirection",
+		"call through an imported callable bind method",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const bound = capture.bind.call(capture, null); bound(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"bind indirection",
+		"Function.prototype.bind.apply creates a forbidden bound callable",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const bound = Function.prototype.bind.apply(capture, [null]); bound(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"imported class static post-declaration assignment",
+		"imported class receives a forbidden static callable after declaration",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"SnapshotHelper.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					static capture: (value: unknown) => unknown;
+				}
+				SnapshotHelper.capture = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"finite fixpoint boundary",
+		"exact backward-ordered 12-hop assignment chain reaches a forbidden callable",
+		ENCODE_VIOLATION,
+		'import { capture as snap, safe } from "@ts-drp/utils/serialization";',
+		backwardAssignmentChain(12),
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"runtime-unknown computed-key write",
+		"unknown computed write can replace the later literal-read callback",
+		ENCODE_VIOLATION,
+		'import { capture, safe } from "@ts-drp/utils/serialization";',
+		`const holder: Record<string, (value: unknown) => unknown> = { capture: safe };
+		 const key = (globalThis as { publicationKey?: string }).publicationKey ?? "capture";
+		 holder[key] = capture;
+		 holder.capture(state);`,
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+] satisfies readonly SemanticFlowFixture[]);
+
+const STRUCTURE_FLOW_RED4_CONTROLS = Object.freeze([
+	{
+		family: "cross-module post-initializer object properties",
+		name: "initializer property wrapping the same forbidden helper remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"cross-module post-initializer object properties",
+			"initializer property",
+			ENCODE_VIOLATION,
+			'import { snapshots } from "@ts-drp/utils/serialization";',
+			"snapshots.capture(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					import { encode } from "@msgpack/msgpack";
+					function capture(value: unknown): Uint8Array { return encode(value); }
+					export const snapshots = { capture };
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "cross-module post-initializer object properties",
+		name: "safe post-initializer exported property remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"cross-module post-initializer object properties",
+			"safe post-initializer property",
+			ENCODE_VIOLATION,
+			'import { snapshots } from "@ts-drp/utils/serialization";',
+			"snapshots.select(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					export const snapshots: Record<string, (value: unknown) => unknown> = {};
+					snapshots.select = (value: unknown): unknown => value;
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "bind indirection",
+		name: "direct callable.bind remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"bind indirection",
+			"direct callable.bind",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const bound = capture.bind(null); bound(state);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "bind indirection",
+		name: "Function.prototype.bind.call remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"bind indirection",
+			"Function.prototype.bind.call",
+			ENCODE_VIOLATION,
+			'import { capture } from "@ts-drp/utils/serialization";',
+			"const bound = Function.prototype.bind.call(capture, null); bound(state);",
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "imported class static post-declaration assignment",
+		name: "static field initializer remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"imported class static post-declaration assignment",
+			"static field initializer",
+			ENCODE_VIOLATION,
+			'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+			"SnapshotHelper.capture(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					import { encode } from "@msgpack/msgpack";
+					export class SnapshotHelper {
+						static capture = (value: unknown): Uint8Array => encode(value);
+					}
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "imported class static post-declaration assignment",
+		name: "static method remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"imported class static post-declaration assignment",
+			"static method",
+			ENCODE_VIOLATION,
+			'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+			"SnapshotHelper.capture(state);",
+			{
+				[UTILS_SERIALIZATION_PATH]: `
+					import { encode } from "@msgpack/msgpack";
+					export class SnapshotHelper {
+						static capture(value: unknown): Uint8Array { return encode(value); }
+					}
+				`,
+			}
+		).sources,
+	},
+	{
+		family: "finite fixpoint boundary",
+		name: "exact backward-ordered 10-hop assignment chain remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"finite fixpoint boundary",
+			"exact 10-hop chain",
+			ENCODE_VIOLATION,
+			'import { capture as snap, safe } from "@ts-drp/utils/serialization";',
+			backwardAssignmentChain(10),
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "runtime-unknown computed-key write",
+		name: "statically resolvable computed write remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"runtime-unknown computed-key write",
+			"resolvable computed write",
+			ENCODE_VIOLATION,
+			'import { capture, safe } from "@ts-drp/utils/serialization";',
+			`const holder = { capture: safe };
+			 const key = "capture";
+			 holder[key] = capture;
+			 holder.capture(state);`,
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "runtime-unknown computed-key write",
+		name: "literal write followed by an unknown read remains detected",
+		shouldViolate: true,
+		sources: semanticFlowFixture(
+			"runtime-unknown computed-key write",
+			"literal write and unknown read",
+			ENCODE_VIOLATION,
+			'import { capture, safe } from "@ts-drp/utils/serialization";',
+			`const holder: Record<string, (value: unknown) => unknown> = { capture: safe };
+			 holder.capture = capture;
+			 const key = (globalThis as { publicationKey?: string }).publicationKey ?? "capture";
+			 holder[key](state);`,
+			{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+		).sources,
+	},
+	{
+		family: "runtime-unknown computed-key write",
+		name: "safe dynamic write remains allowed",
+		shouldViolate: false,
+		sources: semanticFlowFixture(
+			"runtime-unknown computed-key write",
+			"safe dynamic write",
+			ENCODE_VIOLATION,
+			"function select(value: unknown): unknown { return value; }",
+			`const holder: Record<string, (value: unknown) => unknown> = { select };
+			 const key = (globalThis as { publicationKey?: string }).publicationKey ?? "select";
+			 holder[key] = select;
+			 holder.select(state);`
+		).sources,
+	},
+] satisfies readonly SemanticFlowControl[]);
+
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
@@ -3806,6 +4078,39 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 			const analysis = analyze(sources);
 			expect(analysis.injectedCopyLeaves).toHaveLength(1);
 			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(STRUCTURE_FLOW_RED4_MUTANTS)(
+		"RED4 rejects ordinary D.92.2 structure-flow bypass '$family': $name",
+		({ expectedViolation, family, sources }) => {
+			const publisher = sources[WORKSPACE_PUBLISHER_PATH];
+			if (family === "finite fixpoint boundary") {
+				expect(publisher.match(/\blet v\d+ = safe;/g)).toHaveLength(12);
+				expect(publisher.match(/\bv\d+ = (?:v\d+|snap);/g)).toHaveLength(12);
+			}
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations, "unsafe RED4 mutant must not be accepted with no violation").not.toEqual([]);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it.each(STRUCTURE_FLOW_RED4_CONTROLS)(
+		"RED4 preserves adjacent control for '$family': $name",
+		({ family, shouldViolate, sources }) => {
+			const publisher = sources[WORKSPACE_PUBLISHER_PATH];
+			if (family === "finite fixpoint boundary") {
+				expect(publisher.match(/\blet v\d+ = safe;/g)).toHaveLength(10);
+				expect(publisher.match(/\bv\d+ = (?:v\d+|snap);/g)).toHaveLength(10);
+			}
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			if (shouldViolate) {
+				expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(ENCODE_VIOLATION)]));
+			} else {
+				expect(analysis.violations).toEqual([]);
+			}
 		}
 	);
 
