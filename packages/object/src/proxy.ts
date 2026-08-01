@@ -415,10 +415,10 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							const rawKey = unwrap(key);
 							const rawValue = unwrap(nextValue);
 							initializeGraphs([rawKey, rawValue]);
-							const hadKey = map.has(rawKey);
-							const previousValue = map.get(rawKey);
+							const hadKey = Map.prototype.has.call(map, rawKey);
+							const previousValue = Map.prototype.get.call(map, rawKey);
 							const didChange = !hadKey || !valuesEqual(previousValue, rawValue);
-							map.set(rawKey, rawValue);
+							Map.prototype.set.call(map, rawKey, rawValue);
 							if (!hadKey) {
 								addParent(rawKey, map);
 								initializeGraph(rawKey);
@@ -429,14 +429,16 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 						};
 					}
 					if (property === "get") {
-						return (key: unknown): unknown => wrap(map.get(unwrap(key)), ignored);
+						return (key: unknown): unknown => wrap(Map.prototype.get.call(map, unwrap(key)), ignored);
 					}
-					if (property === "has") return (key: unknown): boolean => map.has(unwrap(key));
+					if (property === "has") {
+						return (key: unknown): boolean => Map.prototype.has.call(map, unwrap(key));
+					}
 					if (property === "delete") {
 						return (key: unknown): boolean => {
 							const rawKey = unwrap(key);
-							const previousValue = map.get(rawKey);
-							const deleted = map.delete(rawKey);
+							const previousValue = Map.prototype.get.call(map, rawKey);
+							const deleted = Map.prototype.delete.call(map, rawKey);
 							if (deleted) {
 								removeParent(rawKey, map);
 								removeParent(previousValue, map);
@@ -447,32 +449,30 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					}
 					if (property === "clear") {
 						return (): void => {
-							const hadEntries = map.size > 0;
-							if (hadEntries) {
-								for (const [key, entryValue] of map) {
-									removeParent(key, map);
-									removeParent(entryValue, map);
-								}
+							const previous = snapshotMapEntries(map);
+							Map.prototype.clear.call(map);
+							for (const [key, entryValue] of previous) {
+								removeParent(key, map);
+								removeParent(entryValue, map);
 							}
-							map.clear();
-							if (hadEntries) markChanged(map);
+							if (previous.length > 0) markChanged(map);
 						};
 					}
 					if (property === Symbol.iterator || property === "entries") {
 						return function* (): IterableIterator<[unknown, unknown]> {
-							for (const [key, entryValue] of map.entries()) {
+							for (const [key, entryValue] of Map.prototype.entries.call(map)) {
 								yield [wrap(key, ignored), wrap(entryValue, ignored)];
 							}
 						};
 					}
 					if (property === "keys") {
 						return function* (): IterableIterator<unknown> {
-							for (const key of map.keys()) yield wrap(key, ignored);
+							for (const key of Map.prototype.keys.call(map)) yield wrap(key, ignored);
 						};
 					}
 					if (property === "values") {
 						return function* (): IterableIterator<unknown> {
-							for (const entryValue of map.values()) {
+							for (const entryValue of Map.prototype.values.call(map)) {
 								yield wrap(entryValue, ignored);
 							}
 						};
@@ -482,7 +482,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							callback: (entryValue: unknown, key: unknown, collection: Map<unknown, unknown>) => void,
 							thisArg?: unknown
 						): void => {
-							map.forEach((entryValue, key) => {
+							Map.prototype.forEach.call(map, (entryValue, key) => {
 								callback.call(thisArg, wrap(entryValue, ignored), wrap(key, ignored), proxy as Map<unknown, unknown>);
 							});
 						};
@@ -523,8 +523,8 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 						return (nextValue: unknown): Set<unknown> => {
 							const rawValue = unwrap(nextValue);
 							initializeGraph(rawValue);
-							const didChange = !set.has(rawValue);
-							set.add(rawValue);
+							const didChange = !Set.prototype.has.call(set, rawValue);
+							Set.prototype.add.call(set, rawValue);
 							if (didChange) {
 								addParent(rawValue, set);
 								initializeGraph(rawValue);
@@ -533,11 +533,13 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							return proxy as Set<unknown>;
 						};
 					}
-					if (property === "has") return (nextValue: unknown): boolean => set.has(unwrap(nextValue));
+					if (property === "has") {
+						return (nextValue: unknown): boolean => Set.prototype.has.call(set, unwrap(nextValue));
+					}
 					if (property === "delete") {
 						return (nextValue: unknown): boolean => {
 							const rawValue = unwrap(nextValue);
-							const deleted = set.delete(rawValue);
+							const deleted = Set.prototype.delete.call(set, rawValue);
 							if (deleted) {
 								removeParent(rawValue, set);
 								markChanged(set);
@@ -547,22 +549,20 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					}
 					if (property === "clear") {
 						return (): void => {
-							const hadEntries = set.size > 0;
-							if (hadEntries) {
-								for (const entryValue of set) removeParent(entryValue, set);
-							}
-							set.clear();
-							if (hadEntries) markChanged(set);
+							const previous = snapshotSetValues(set);
+							Set.prototype.clear.call(set);
+							for (const entryValue of previous) removeParent(entryValue, set);
+							if (previous.length > 0) markChanged(set);
 						};
 					}
 					if (property === Symbol.iterator || property === "values" || property === "keys") {
 						return function* (): IterableIterator<unknown> {
-							for (const entryValue of set.values()) yield wrap(entryValue, ignored);
+							for (const entryValue of Set.prototype.values.call(set)) yield wrap(entryValue, ignored);
 						};
 					}
 					if (property === "entries") {
 						return function* (): IterableIterator<[unknown, unknown]> {
-							for (const entryValue of set.values()) {
+							for (const entryValue of Set.prototype.values.call(set)) {
 								const wrapped = wrap(entryValue, ignored);
 								yield [wrapped, wrapped];
 							}
@@ -573,7 +573,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							callback: (entryValue: unknown, key: unknown, collection: Set<unknown>) => void,
 							thisArg?: unknown
 						): void => {
-							set.forEach((entryValue) => {
+							Set.prototype.forEach.call(set, (entryValue) => {
 								const wrapped = wrap(entryValue, ignored);
 								callback.call(thisArg, wrapped, wrapped, proxy as Set<unknown>);
 							});
