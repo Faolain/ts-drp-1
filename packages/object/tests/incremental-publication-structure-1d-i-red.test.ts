@@ -593,6 +593,7 @@ interface SemanticArgument {
 interface BoundCallable {
 	readonly arguments: readonly SemanticArgument[];
 	readonly targets: Set<SemanticTarget>;
+	readonly thisArgument?: SemanticArgument;
 }
 
 interface KeyResolution {
@@ -600,7 +601,9 @@ interface KeyResolution {
 	readonly values: Set<string>;
 }
 
-type SemanticOwner = Pick<FunctionNode, "className" | "file" | "id">;
+type SemanticOwner = Pick<FunctionNode, "className" | "file" | "id"> & {
+	readonly staticClassTarget?: `class:${string}`;
+};
 
 function semanticClassTarget(file: ts.SourceFile, declaration: ts.ClassLikeDeclaration): `class:${string}` {
 	return `class:${file.fileName}@${declaration.pos}`;
@@ -816,9 +819,12 @@ function semanticAnalysis(
 	type PropertySlot = string | typeof unknownProperty;
 	const propertyFacts = new Map<string, Map<PropertySlot, Set<SemanticTarget>>>();
 	const boundCallables = new Map<string, BoundCallable>();
-	const objectValues = new Map<
+	const containerValues = new Map<
 		SemanticTarget,
-		{ readonly expression: ts.ObjectLiteralExpression; readonly owner: SemanticOwner }
+		{
+			readonly expression: ts.ArrayLiteralExpression | ts.ObjectLiteralExpression;
+			readonly owner: SemanticOwner;
+		}
 	>();
 	const moduleOwner = (fileName: string): SemanticOwner | undefined => {
 		const file = filesByName.get(fileName);
@@ -1149,9 +1155,18 @@ function semanticAnalysis(
 			}
 			const localClass = localClasses.get(`${owner.file.fileName}:${expression.text}`);
 			if (localClass) result.add(localClass);
+			const imported = modules.get(owner.file.fileName)?.imports.get(expression.text);
+			if (imported?.moduleName) {
+				for (const target of exportTargets(imported.moduleName, imported.exportName)) {
+					if (target.startsWith("object:") || target.startsWith("class:") || target.startsWith("instance:")) {
+						result.add(target);
+					}
+				}
+			}
 			return result;
 		}
 		if (expression.kind === ts.SyntaxKind.ThisKeyword && owner.className) {
+			if (owner.staticClassTarget) return new Set([owner.staticClassTarget]);
 			const localClass = localClasses.get(`${owner.file.fileName}:${owner.className}`);
 			return localClass ? new Set([`instance:${localClass.slice("class:".length)}`]) : new Set();
 		}
@@ -1169,9 +1184,12 @@ function semanticAnalysis(
 		}
 		return new Set();
 	};
-	const objectTarget = (expression: ts.ObjectLiteralExpression, owner: SemanticOwner): SemanticTarget => {
+	const containerTarget = (
+		expression: ts.ArrayLiteralExpression | ts.ObjectLiteralExpression,
+		owner: SemanticOwner
+	): SemanticTarget => {
 		const target = `object:${owner.file.fileName}:container@${expression.pos}` as SemanticTarget;
-		objectValues.set(target, { expression, owner });
+		containerValues.set(target, { expression, owner });
 		return target;
 	};
 	const propertyTargets = (
@@ -1314,9 +1332,9 @@ function semanticAnalysis(
 					: exportTargets(moduleName, name))
 					result.add(nested);
 			} else if (target.startsWith("object:")) {
-				const object = objectValues.get(target);
-				if (object) {
-					for (const nested of propertyTargets(object.expression, name, object.owner, new Set(seen))) {
+				const container = containerValues.get(target);
+				if (container) {
+					for (const nested of propertyTargets(container.expression, name, container.owner, new Set(seen))) {
 						result.add(nested);
 					}
 				}
@@ -1410,9 +1428,9 @@ function semanticAnalysis(
 			if (target.startsWith("namespace:")) {
 				for (const name of moduleMemberNames(target.slice("namespace:".length))) result.add(name);
 			} else if (target.startsWith("object:")) {
-				const object = objectValues.get(target);
-				if (object) {
-					for (const name of knownPropertyNames(object.expression, object.owner, new Set(seen))) result.add(name);
+				const container = containerValues.get(target);
+				if (container) {
+					for (const name of knownPropertyNames(container.expression, container.owner, new Set(seen))) result.add(name);
 				}
 			} else if (target === "builtin:json") {
 				result.add("parse");
@@ -1577,6 +1595,7 @@ function semanticAnalysis(
 				boundCallables.set(token, {
 					arguments: expression.arguments.slice(1).map((argument) => semanticArgument(argument, owner)),
 					targets: expressionTargets(callee.expression, owner, new Set(seen)),
+					thisArgument: expression.arguments[0] ? semanticArgument(expression.arguments[0], owner) : undefined,
 				});
 				return new Set<SemanticTarget>([`callable:${token}`]);
 			}
@@ -1593,6 +1612,7 @@ function semanticAnalysis(
 						targets: expression.arguments[0]
 							? expressionTargets(expression.arguments[0], owner, new Set(seen))
 							: new Set(),
+						thisArgument: expression.arguments[1] ? semanticArgument(expression.arguments[1], owner) : undefined,
 					});
 					return new Set<SemanticTarget>([`callable:${token}`]);
 				}
@@ -1605,6 +1625,7 @@ function semanticAnalysis(
 						targets: expression.arguments[0]
 							? expressionTargets(expression.arguments[0], owner, new Set(seen))
 							: new Set(),
+						thisArgument: unpacked.arguments[0],
 					});
 					return new Set<SemanticTarget>([`callable:${token}`]);
 				}
@@ -1625,11 +1646,21 @@ function semanticAnalysis(
 			return result;
 		}
 		if (ts.isClassExpression(expression)) return new Set([semanticClassTarget(owner.file, expression)]);
-		if (ts.isObjectLiteralExpression(expression)) return new Set([objectTarget(expression, owner)]);
+		if (ts.isObjectLiteralExpression(expression) || ts.isArrayLiteralExpression(expression)) {
+			return new Set([containerTarget(expression, owner)]);
+		}
 		if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
 			const keys = accessKeys(expression, owner, seen);
 			const result = new Set<SemanticTarget>();
 			if (expression.expression.kind === ts.SyntaxKind.ThisKeyword && owner.className) {
+				if (owner.staticClassTarget) {
+					for (const name of keys.values) {
+						for (const target of memberTargets(owner.staticClassTarget, name, true, owner, new Set(seen))) {
+							result.add(target);
+						}
+					}
+					return result;
+				}
 				const localClass = localClasses.get(`${owner.file.fileName}:${owner.className}`);
 				for (const name of keys.values) {
 					const method = classMethods.get(`${owner.file.fileName}:${owner.className}:${name}`);
@@ -1750,7 +1781,7 @@ function semanticAnalysis(
 						pending.push({
 							arguments: [...bound.arguments, ...current.arguments],
 							targets: bound.targets,
-							thisArgument: current.thisArgument,
+							thisArgument: bound.thisArgument ?? current.thisArgument,
 							unknownArguments: current.unknownArguments,
 						});
 					}
@@ -1815,10 +1846,43 @@ function semanticAnalysis(
 		for (const file of files) {
 			const owner = moduleOwner(file.fileName);
 			if (!owner) continue;
-			const visitModule = (node: ts.Node): void => {
-				if (node !== file && (ts.isFunctionLike(node) || ts.isClassLike(node))) return;
-				if (ts.isBinaryExpression(node)) changed = joinAssignment(node, owner) || changed;
-				ts.forEachChild(node, visitModule);
+			const visitModule = (node: ts.Node, evaluationOwner: SemanticOwner = owner): void => {
+				if (node !== file && ts.isFunctionLike(node)) return;
+				if (ts.isClassLike(node)) {
+					for (const heritage of node.heritageClauses ?? []) {
+						for (const type of heritage.types) visitModule(type.expression, evaluationOwner);
+					}
+					const classTarget = semanticClassTarget(file, node);
+					const classOwner: SemanticOwner = {
+						className:
+							node.name?.text ??
+							(ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)
+								? node.parent.name.text
+								: undefined),
+						file,
+						id: `${classTarget}:static-evaluation`,
+						staticClassTarget: classTarget,
+					};
+					for (const member of node.members) {
+						if (member.name && ts.isComputedPropertyName(member.name)) {
+							visitModule(member.name.expression, evaluationOwner);
+						}
+						if (ts.isClassStaticBlockDeclaration(member)) {
+							visitModule(member.body, classOwner);
+							continue;
+						}
+						const isStatic = Boolean(
+							ts.canHaveModifiers(member) &&
+								ts.getModifiers(member)?.some(({ kind }) => kind === ts.SyntaxKind.StaticKeyword)
+						);
+						if (isStatic && ts.isPropertyDeclaration(member) && member.initializer) {
+							visitModule(member.initializer, classOwner);
+						}
+					}
+					return;
+				}
+				if (ts.isBinaryExpression(node)) changed = joinAssignment(node, evaluationOwner) || changed;
+				ts.forEachChild(node, (child) => visitModule(child, evaluationOwner));
 			};
 			visitModule(file);
 		}
