@@ -3214,6 +3214,250 @@ const SEMANTIC_FLOW_SAFE_CONTROLS = Object.freeze([
 	},
 ] satisfies readonly SemanticFlowControl[]);
 
+const STRUCTURE_FLOW_RED3_MUTANTS = Object.freeze([
+	semanticFlowFixture(
+		"exported object-bag identifier properties",
+		"exported shorthand property wrapping a forbidden helper",
+		ENCODE_VIOLATION,
+		'import { snapshots } from "@ts-drp/utils/serialization";',
+		"snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				function capture(value: unknown): Uint8Array { return encode(value); }
+				export const snapshots = { capture };
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"exported object-bag identifier properties",
+		"exported explicit identifier property wrapping a forbidden helper",
+		ENCODE_VIOLATION,
+		'import { snapshots } from "@ts-drp/utils/serialization";',
+		"snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				function capture(value: unknown): Uint8Array { return encode(value); }
+				export const snapshots = { capture: capture };
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"default-export object properties",
+		"default-export object method reaches a forbidden helper",
+		ENCODE_VIOLATION,
+		'import snapshots from "@ts-drp/utils/serialization";',
+		"snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export default {
+					capture(value: unknown): Uint8Array { return encode(value); },
+				};
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"default-export object properties",
+		"property access on a missing default export fails closed",
+		/unresolved|missing|fail.?closed|default|export/i,
+		'import snapshots from "@ts-drp/utils/serialization";',
+		"snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: "export function available(value: unknown): unknown { return value; }",
+		}
+	),
+	semanticFlowFixture(
+		"nested Function.prototype invocation",
+		"Function.prototype.bind.call preserves the target callable",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const bound = Function.prototype.bind.call(capture, null); bound(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"nested object property chains",
+		"nested exported object method reaches a forbidden helper",
+		ENCODE_VIOLATION,
+		'import { api } from "@ts-drp/utils/serialization";',
+		"api.snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const api = {
+					snapshots: {
+						capture(value: unknown): Uint8Array { return encode(value); },
+					},
+				};
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"module-scope callable reassignment",
+		"exported callable joins a forbidden module-scope reassignment",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export let capture = (value: unknown): unknown => value;
+				capture = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"bodyless class members",
+		"ambient base member call fails closed",
+		/unresolved|unknown|fail.?closed|ambient|declare|member/i,
+		'import { DerivedCapture } from "@ts-drp/utils/serialization";',
+		"new DerivedCapture().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				export declare class ExternalCapture {
+					capture(value: unknown): unknown;
+				}
+				export class DerivedCapture extends ExternalCapture {}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"constructor field assignment",
+		"constructor this-field callable assignment reaches a forbidden helper",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"new SnapshotHelper().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					capture: (value: unknown) => Uint8Array;
+					constructor() {
+						this.capture = (value: unknown): Uint8Array => encode(value);
+					}
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"unresolved relative imports",
+		"unresolved relative workspace import fails closed",
+		/unresolved|missing|fail.?closed|relative|import/i,
+		'import { capture } from "../missing.js";',
+		"capture(state);"
+	),
+] satisfies readonly SemanticFlowFixture[]);
+
+const STRUCTURE_FLOW_RED3_SAFE_OBJECT_BAG = semanticFlowFixture(
+	"safe object bags",
+	"shorthand, explicit, nested, and default safe bags remain allowed",
+	ENCODE_VIOLATION,
+	`import safeDefault, { safeBags } from "@ts-drp/utils/serialization";`,
+	`safeBags.shorthand(state);
+	 safeBags.explicit(state);
+	 safeBags.nested.select(state);
+	 safeDefault.select(state);`,
+	{
+		[UTILS_SERIALIZATION_PATH]: `
+			function select(value: unknown): unknown { return value; }
+			export const safeBags = {
+				shorthand: select,
+				explicit: select,
+				nested: { select(value: unknown): unknown { return value; } },
+			};
+			export default { select(value: unknown): unknown { return value; } };
+		`,
+	}
+);
+
+const STRUCTURE_FLOW_RED3_POSITIVE_CONTROLS = Object.freeze([
+	semanticFlowFixture(
+		"exported object-bag identifier properties",
+		"flat exported object method remains detected",
+		ENCODE_VIOLATION,
+		'import { snapshots } from "@ts-drp/utils/serialization";',
+		"snapshots.capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export const snapshots = {
+					capture(value: unknown): Uint8Array { return encode(value); },
+				};
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"nested Function.prototype invocation",
+		"direct bind alias remains detected",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"const bound = capture.bind(null); bound(state);",
+		{ [UTILS_SERIALIZATION_PATH]: FLOW_CAPTURE_UTILITY }
+	),
+	semanticFlowFixture(
+		"module-scope callable reassignment",
+		"forbidden exported callable initializer remains detected",
+		ENCODE_VIOLATION,
+		'import { capture } from "@ts-drp/utils/serialization";',
+		"capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export let capture = (value: unknown): Uint8Array => encode(value);
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"bodyless class members",
+		"bodyful base member remains detected",
+		ENCODE_VIOLATION,
+		'import { DerivedCapture } from "@ts-drp/utils/serialization";',
+		"new DerivedCapture().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class BaseCapture {
+					capture(value: unknown): Uint8Array { return encode(value); }
+				}
+				export class DerivedCapture extends BaseCapture {}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"default-export object properties",
+		"direct missing default call remains fail closed",
+		/unresolved|missing|fail.?closed|default|export/i,
+		'import missingCapture from "@ts-drp/utils/serialization";',
+		"missingCapture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: "export function available(value: unknown): unknown { return value; }",
+		}
+	),
+	semanticFlowFixture(
+		"constructor field assignment",
+		"class-field callable initializer remains detected",
+		ENCODE_VIOLATION,
+		'import { SnapshotHelper } from "@ts-drp/utils/serialization";',
+		"new SnapshotHelper().capture(state);",
+		{
+			[UTILS_SERIALIZATION_PATH]: `
+				import { encode } from "@msgpack/msgpack";
+				export class SnapshotHelper {
+					capture = (value: unknown): Uint8Array => encode(value);
+				}
+			`,
+		}
+	),
+	semanticFlowFixture(
+		"unresolved relative imports",
+		"unresolved workspace package import remains fail closed",
+		/unresolved|missing|fail.?closed|import/i,
+		'import { capture } from "@ts-drp/does-not-exist/serialization";',
+		"capture(state);"
+	),
+] satisfies readonly SemanticFlowFixture[]);
+
 describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
@@ -3432,6 +3676,30 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 			const analysis = analyze(sources);
 			expect(analysis.injectedCopyLeaves).toHaveLength(1);
 			expect(analysis.violations.length > 0).toBe(shouldViolate);
+		}
+	);
+
+	it.each(STRUCTURE_FLOW_RED3_MUTANTS)(
+		"closes ordinary TypeScript structure-flow family '$family': $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
+		}
+	);
+
+	it("keeps shorthand, explicit, nested, and default-export safe object bags clean", () => {
+		const analysis = analyze(STRUCTURE_FLOW_RED3_SAFE_OBJECT_BAG.sources);
+		expect(analysis.injectedCopyLeaves).toHaveLength(1);
+		expect(analysis.violations).toEqual([]);
+	});
+
+	it.each(STRUCTURE_FLOW_RED3_POSITIVE_CONTROLS)(
+		"preserves adjacent supported structure-flow control for '$family': $name",
+		({ expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(analysis.injectedCopyLeaves).toHaveLength(1);
+			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
 		}
 	);
 
