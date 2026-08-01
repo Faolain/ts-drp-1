@@ -105,7 +105,9 @@ export class LocalMutationLane {
 
 /**
  * Tracks effective writes to a cloned DRP state. Collection mutations are
- * compared at the written key/value instead of rescanning the complete state.
+ * compared at the written key/value. Raw objects that actually change are
+ * resolved against current governed reachability when changes are observed,
+ * so repeated structural writes require at most one deferred graph refresh.
  * Blueprint operations may use ordinary nested objects, Arrays, Maps, Sets,
  * and Dates; writes through those values are tracked, while read-only work
  * does not create a vertex. Unknown collection methods conservatively count
@@ -115,11 +117,14 @@ export class LocalMutationLane {
  */
 export function trackMutations<T extends object>(target: T): MutationTrackingResult<T> {
 	const changedKeys = new Set<string>();
+	const changedObjects = new Set<object>();
 	const trackedProxies = new WeakMap<object, object>();
 	const ignoredProxies = new WeakMap<object, object>();
 	const rawValues = new WeakMap<object, object>();
 	const topLevelOwners = new WeakMap<object, Set<string>>();
 	const ownerGraphs = new Map<string, Set<object>>();
+	let topologyDirty = false;
+	let resolutionDirty = false;
 
 	const ownersFor = (value: object): ReadonlySet<string> => topLevelOwners.get(value) ?? new Set<string>();
 
@@ -136,11 +141,6 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 			ownerGraphs.set(owner, graph);
 		}
 		graph.add(value);
-	};
-
-	const addOwners = (value: object, owners: string | Iterable<string> | undefined): void => {
-		if (owners === undefined) return;
-		for (const owner of typeof owners === "string" ? [owners] : owners) addOwner(value, owner);
 	};
 
 	const collectOwnerGraph = (value: unknown, graph: Set<object>): void => {
@@ -184,7 +184,12 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		for (const owner of owners) refreshOwnerGraph(owner);
 	};
 
-	for (const key of Object.keys(target)) refreshOwnerGraph(key);
+	const refreshAllOwnerGraphs = (): void => {
+		refreshOwnerGraphs(new Set([...ownerGraphs.keys(), ...Object.keys(target)]));
+		topologyDirty = false;
+	};
+
+	refreshAllOwnerGraphs();
 
 	const valuesEqual = (left: unknown, right: unknown): boolean => {
 		if (!circularDeepEqual(left, right)) return false;
@@ -208,7 +213,28 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 			if (!REPLICA_LOCAL_STATE_KEYS.has(property)) changedKeys.add(property);
 			return;
 		}
-		for (const key of ownersFor(owner)) changedKeys.add(key);
+		changedObjects.add(owner);
+		resolutionDirty = true;
+	};
+
+	const markTopologyChanged = (owner: object, property?: PropertyKey): void => {
+		if (owner === target && typeof property === "string") {
+			if (!REPLICA_LOCAL_STATE_KEYS.has(property)) topologyDirty = true;
+			return;
+		}
+		if (topologyDirty || ownersFor(owner).size > 0) topologyDirty = true;
+	};
+
+	const resolveChangedKeys = (): void => {
+		if (!resolutionDirty) return;
+		if (topologyDirty) refreshAllOwnerGraphs();
+		for (const object of changedObjects) {
+			for (const key of ownersFor(object)) {
+				if (!REPLICA_LOCAL_STATE_KEYS.has(key)) changedKeys.add(key);
+			}
+		}
+		changedObjects.clear();
+		resolutionDirty = false;
 	};
 
 	const unwrap = <V>(value: V): V => {
@@ -216,10 +242,9 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		return (rawValues.get(value as object) as V | undefined) ?? value;
 	};
 
-	const wrap = <V>(value: V, ignored = false, owners?: string | Iterable<string>): V => {
+	const wrap = <V>(value: V, ignored = false): V => {
 		if ((typeof value !== "object" && typeof value !== "function") || value === null) return value;
 		const objectValue = value as object;
-		addOwners(objectValue, owners);
 		const proxyCache = ignored ? ignoredProxies : trackedProxies;
 		const existing = proxyCache.get(objectValue);
 		if (existing) return existing as V;
@@ -232,61 +257,58 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 						return (key: unknown, nextValue: unknown): Map<unknown, unknown> => {
 							const rawKey = unwrap(key);
 							const rawValue = unwrap(nextValue);
-							const owners = [...ownersFor(map)];
 							const hadKey = map.has(rawKey);
 							const previousValue = map.get(rawKey);
 							const didChange = !hadKey || !valuesEqual(previousValue, rawValue);
 							const topologyChanged = (!hadKey && isReference(rawKey)) || changesReachability(previousValue, rawValue);
 							map.set(rawKey, rawValue);
-							if (!ignored && didChange) markChanged(map);
-							if (!ignored && topologyChanged) refreshOwnerGraphs(owners);
+							if (didChange) markChanged(map);
+							if (topologyChanged) markTopologyChanged(map);
 							return proxy as Map<unknown, unknown>;
 						};
 					}
 					if (property === "get") {
-						return (key: unknown): unknown => wrap(map.get(unwrap(key)), ignored, ownersFor(map));
+						return (key: unknown): unknown => wrap(map.get(unwrap(key)), ignored);
 					}
 					if (property === "has") return (key: unknown): boolean => map.has(unwrap(key));
 					if (property === "delete") {
 						return (key: unknown): boolean => {
 							const rawKey = unwrap(key);
-							const owners = [...ownersFor(map)];
 							const previousValue = map.get(rawKey);
 							const deleted = map.delete(rawKey);
-							if (!ignored && deleted) {
+							if (deleted) {
 								markChanged(map);
-								if (isReference(rawKey) || isReference(previousValue)) refreshOwnerGraphs(owners);
+								if (isReference(rawKey) || isReference(previousValue)) markTopologyChanged(map);
 							}
 							return deleted;
 						};
 					}
 					if (property === "clear") {
 						return (): void => {
-							const owners = [...ownersFor(map)];
 							const hadEntries = map.size > 0;
 							map.clear();
-							if (!ignored && hadEntries) {
+							if (hadEntries) {
 								markChanged(map);
-								refreshOwnerGraphs(owners);
+								markTopologyChanged(map);
 							}
 						};
 					}
 					if (property === Symbol.iterator || property === "entries") {
 						return function* (): IterableIterator<[unknown, unknown]> {
 							for (const [key, entryValue] of map.entries()) {
-								yield [wrap(key, ignored, ownersFor(map)), wrap(entryValue, ignored, ownersFor(map))];
+								yield [wrap(key, ignored), wrap(entryValue, ignored)];
 							}
 						};
 					}
 					if (property === "keys") {
 						return function* (): IterableIterator<unknown> {
-							for (const key of map.keys()) yield wrap(key, ignored, ownersFor(map));
+							for (const key of map.keys()) yield wrap(key, ignored);
 						};
 					}
 					if (property === "values") {
 						return function* (): IterableIterator<unknown> {
 							for (const entryValue of map.values()) {
-								yield wrap(entryValue, ignored, ownersFor(map));
+								yield wrap(entryValue, ignored);
 							}
 						};
 					}
@@ -296,25 +318,17 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							thisArg?: unknown
 						): void => {
 							map.forEach((entryValue, key) => {
-								callback.call(
-									thisArg,
-									wrap(entryValue, ignored, ownersFor(map)),
-									wrap(key, ignored, ownersFor(map)),
-									proxy as Map<unknown, unknown>
-								);
+								callback.call(thisArg, wrap(entryValue, ignored), wrap(key, ignored), proxy as Map<unknown, unknown>);
 							});
 						};
 					}
 					const member = Reflect.get(map, property, map) as unknown;
 					if (typeof member !== "function") return member;
 					return (...args: unknown[]): unknown => {
-						const owners = [...ownersFor(map)];
 						const result = (member as (...values: unknown[]) => unknown).apply(map, args.map(unwrap));
-						if (!ignored) {
-							markChanged(map);
-							refreshOwnerGraphs(owners);
-						}
-						return result === map ? proxy : wrap(result, ignored, ownersFor(map));
+						markChanged(map);
+						markTopologyChanged(map);
+						return result === map ? proxy : wrap(result, ignored);
 					};
 				},
 			});
@@ -324,12 +338,11 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					if (property === "add") {
 						return (nextValue: unknown): Set<unknown> => {
 							const rawValue = unwrap(nextValue);
-							const owners = [...ownersFor(set)];
 							const didChange = !set.has(rawValue);
 							set.add(rawValue);
-							if (!ignored && didChange) {
+							if (didChange) {
 								markChanged(set);
-								if (isReference(rawValue)) refreshOwnerGraphs(owners);
+								if (isReference(rawValue)) markTopologyChanged(set);
 							}
 							return proxy as Set<unknown>;
 						};
@@ -338,37 +351,33 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					if (property === "delete") {
 						return (nextValue: unknown): boolean => {
 							const rawValue = unwrap(nextValue);
-							const owners = [...ownersFor(set)];
 							const deleted = set.delete(rawValue);
-							if (!ignored && deleted) {
+							if (deleted) {
 								markChanged(set);
-								if (isReference(rawValue)) refreshOwnerGraphs(owners);
+								if (isReference(rawValue)) markTopologyChanged(set);
 							}
 							return deleted;
 						};
 					}
 					if (property === "clear") {
 						return (): void => {
-							const owners = [...ownersFor(set)];
 							const hadEntries = set.size > 0;
 							set.clear();
-							if (!ignored && hadEntries) {
+							if (hadEntries) {
 								markChanged(set);
-								refreshOwnerGraphs(owners);
+								markTopologyChanged(set);
 							}
 						};
 					}
 					if (property === Symbol.iterator || property === "values" || property === "keys") {
 						return function* (): IterableIterator<unknown> {
-							for (const entryValue of set.values()) {
-								yield wrap(entryValue, ignored, ownersFor(set));
-							}
+							for (const entryValue of set.values()) yield wrap(entryValue, ignored);
 						};
 					}
 					if (property === "entries") {
 						return function* (): IterableIterator<[unknown, unknown]> {
 							for (const entryValue of set.values()) {
-								const wrapped = wrap(entryValue, ignored, ownersFor(set));
+								const wrapped = wrap(entryValue, ignored);
 								yield [wrapped, wrapped];
 							}
 						};
@@ -379,7 +388,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							thisArg?: unknown
 						): void => {
 							set.forEach((entryValue) => {
-								const wrapped = wrap(entryValue, ignored, ownersFor(set));
+								const wrapped = wrap(entryValue, ignored);
 								callback.call(thisArg, wrapped, wrapped, proxy as Set<unknown>);
 							});
 						};
@@ -387,13 +396,10 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					const member = Reflect.get(set, property, set) as unknown;
 					if (typeof member !== "function") return member;
 					return (...args: unknown[]): unknown => {
-						const owners = [...ownersFor(set)];
 						const result = (member as (...values: unknown[]) => unknown).apply(set, args.map(unwrap));
-						if (!ignored) {
-							markChanged(set);
-							refreshOwnerGraphs(owners);
-						}
-						return result === set ? proxy : wrap(result, ignored, ownersFor(set));
+						markChanged(set);
+						markTopologyChanged(set);
+						return result === set ? proxy : wrap(result, ignored);
 					};
 				},
 			});
@@ -405,7 +411,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 					return (...args: unknown[]): unknown => {
 						const before = date.getTime();
 						const result = (member as (...values: unknown[]) => unknown).apply(date, args);
-						if (!ignored && property.toString().startsWith("set") && !Object.is(date.getTime(), before)) {
+						if (property.toString().startsWith("set") && !Object.is(date.getTime(), before)) {
 							markChanged(date);
 						}
 						return result;
@@ -422,42 +428,36 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 						if ("value" in descriptor && !descriptor.writable) return descriptor.value;
 						if ("get" in descriptor && descriptor.get === undefined) return undefined;
 					}
-					const nestedOwners = object === target && typeof property === "string" ? property : ownersFor(object);
-					return wrap(Reflect.get(object, property, receiver), nestedIgnored, nestedOwners);
+					return wrap(Reflect.get(object, property, receiver), nestedIgnored);
 				},
 				set(object, property, nextValue): boolean {
 					const rawValue = unwrap(nextValue);
-					const owners = [...ownersFor(object)];
 					const previousValue = Reflect.get(object, property, object);
 					const assigned = Reflect.set(object, property, rawValue, object);
-					if (!ignored && assigned) {
+					if (assigned) {
 						const resultingValue = Reflect.get(object, property, object);
 						const didChange = !valuesEqual(previousValue, resultingValue);
 						if (didChange) markChanged(object, property);
-						if (object === target && typeof property === "string") refreshOwnerGraph(property);
-						else if (changesReachability(previousValue, resultingValue)) refreshOwnerGraphs(owners);
+						if (changesReachability(previousValue, resultingValue)) markTopologyChanged(object, property);
 					}
 					return assigned;
 				},
 				deleteProperty(object, property): boolean {
-					const owners = [...ownersFor(object)];
 					const existed = Reflect.has(object, property);
 					const previousValue = Reflect.get(object, property, object);
 					const deleted = Reflect.deleteProperty(object, property);
-					if (!ignored && deleted && existed) {
+					if (deleted && existed) {
 						markChanged(object, property);
-						if (object === target && typeof property === "string") refreshOwnerGraph(property);
-						else if (isReference(previousValue)) refreshOwnerGraphs(owners);
+						if (isReference(previousValue)) markTopologyChanged(object, property);
 					}
 					return deleted;
 				},
 				defineProperty(object, property, descriptor): boolean {
-					const owners = [...ownersFor(object)];
 					const rawDescriptor = "value" in descriptor ? { ...descriptor, value: unwrap(descriptor.value) } : descriptor;
 					const defined = Reflect.defineProperty(object, property, rawDescriptor);
-					if (!ignored && defined) {
+					if (defined) {
 						markChanged(object, property);
-						refreshOwnerGraphs(object === target && typeof property === "string" ? [property] : owners);
+						markTopologyChanged(object, property);
 					}
 					return defined;
 				},
@@ -469,7 +469,17 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		return proxy as V;
 	};
 
-	return { proxy: wrap(target), hasChanges: () => changedKeys.size > 0, changedKeys: () => changedKeys };
+	return {
+		proxy: wrap(target),
+		hasChanges: (): boolean => {
+			resolveChangedKeys();
+			return changedKeys.size > 0;
+		},
+		changedKeys: (): ReadonlySet<string> => {
+			resolveChangedKeys();
+			return changedKeys;
+		},
+	};
 }
 
 /**
