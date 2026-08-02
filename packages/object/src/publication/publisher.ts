@@ -37,6 +37,10 @@ export interface PublicationRecord {
 	fallbackReason?: PublicationFallbackReason;
 }
 
+interface LivePublicationRecord extends PublicationRecord {
+	work: Readonly<Record<SnapshotSide, PublicationWorkCounters>>;
+}
+
 export type PublicationObserverEvent =
 	| {
 			type: "copy";
@@ -297,7 +301,7 @@ export class PublicationPublisher<T extends IDRP> {
 		plan: PublicationPlan,
 		targetHash: Hash | undefined,
 		frontier: readonly Hash[]
-	): PublicationRecord {
+	): LivePublicationRecord {
 		return {
 			publicationId: `${kind}-${++this.sequence}`,
 			kind,
@@ -349,11 +353,7 @@ export class PublicationPublisher<T extends IDRP> {
 		const changed = publication.changed[side] as string[];
 		if (rawEgress && incremental) {
 			const governedUnion = new Set([...targetKeys, ...baselineByKey.keys()]);
-			const explicitCandidates = new Set<string>();
-			for (const key of candidateKeys ?? []) {
-				if (governedUnion.has(key)) explicitCandidates.add(key);
-			}
-			for (const key of governedUnion) explicitCandidates.add(key);
+			const explicitCandidates = governedUnion;
 			const work = publication.work?.[side];
 			if (work) {
 				work.egressWidenings = 1;

@@ -7,6 +7,16 @@ import { type Pipeline } from "./pipeline/pipeline.js";
 import { proxyValuesEqual } from "./publication/copy-capability.js";
 import { REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
+const DATE_GET_TIME = Date.prototype.getTime;
+const DATE_NATIVE_MEMBERS = new Map<PropertyKey, unknown>();
+for (const property of Reflect.ownKeys(Date.prototype)) {
+	if (property === "constructor") continue;
+	const descriptor = Reflect.getOwnPropertyDescriptor(Date.prototype, property);
+	if (descriptor && "value" in descriptor && typeof descriptor.value === "function") {
+		DATE_NATIVE_MEMBERS.set(property, descriptor.value);
+	}
+}
+
 export interface DRPProxyBeforeChainArgs {
 	prop: string;
 	args: unknown[];
@@ -22,7 +32,7 @@ export interface MutationTrackingResult<T extends object> {
 	proxy: T;
 	hasChanges(): boolean;
 	changedKeys(): ReadonlySet<string>;
-	/** True after governed state has crossed an unavoidable raw-reference boundary. */
+	/** True after tracked handling observes a governed raw-reference-capable boundary. */
 	hasRawEgress(): boolean;
 	/** Record a later, explicit operation boundary without making dirty readers scan. */
 	observeRawEgressBoundary(): void;
@@ -144,6 +154,20 @@ export function trackMutations<T extends object>(
 
 	const isReference = (value: unknown): value is object =>
 		(typeof value === "object" || typeof value === "function") && value !== null;
+
+	const descriptorExposesReference = (descriptor: PropertyDescriptor): boolean =>
+		("value" in descriptor && isReference(descriptor.value)) ||
+		("get" in descriptor && (isReference(descriptor.get) || isReference(descriptor.set)));
+
+	const observeOwnDescriptor = (
+		owner: object,
+		property: PropertyKey,
+		ignored: boolean
+	): PropertyDescriptor | undefined => {
+		const descriptor = Reflect.getOwnPropertyDescriptor(owner, property);
+		if (!ignored && descriptor !== undefined && descriptorExposesReference(descriptor)) signalRawEgress();
+		return descriptor;
+	};
 
 	const observeRawEgressBoundary = (): void => {
 		if (!rawEgress) return;
@@ -479,6 +503,9 @@ export function trackMutations<T extends object>(
 		let proxy: object;
 		if (objectValue instanceof Map) {
 			proxy = new Proxy(objectValue, {
+				getOwnPropertyDescriptor(map, property): PropertyDescriptor | undefined {
+					return observeOwnDescriptor(map, property, ignored);
+				},
 				get(map, property): unknown {
 					const descriptor = Reflect.getOwnPropertyDescriptor(map, property);
 					if (descriptor && !descriptor.configurable) {
@@ -609,6 +636,9 @@ export function trackMutations<T extends object>(
 			});
 		} else if (objectValue instanceof Set) {
 			proxy = new Proxy(objectValue, {
+				getOwnPropertyDescriptor(set, property): PropertyDescriptor | undefined {
+					return observeOwnDescriptor(set, property, ignored);
+				},
 				get(set, property): unknown {
 					const descriptor = Reflect.getOwnPropertyDescriptor(set, property);
 					if (descriptor && !descriptor.configurable) {
@@ -722,21 +752,89 @@ export function trackMutations<T extends object>(
 			});
 		} else if (objectValue instanceof Date) {
 			proxy = new Proxy(objectValue, {
+				getOwnPropertyDescriptor(date, property): PropertyDescriptor | undefined {
+					return observeOwnDescriptor(date, property, ignored);
+				},
 				get(date, property): unknown {
-					const member = Reflect.get(date, property, date) as unknown;
-					if (typeof member !== "function") return member;
-					return (...args: unknown[]): unknown => {
-						const before = date.getTime();
-						const result = (member as (...values: unknown[]) => unknown).apply(date, args);
-						if (property.toString().startsWith("set") && !Object.is(date.getTime(), before)) {
-							markChanged(date);
+					const descriptor = Reflect.getOwnPropertyDescriptor(date, property);
+					if (descriptor && !descriptor.configurable) {
+						if ("value" in descriptor && !descriptor.writable) {
+							if (!ignored) signalRawEgress();
+							return descriptor.value;
 						}
-						return result;
+						if ("get" in descriptor && descriptor.get === undefined) {
+							if (!ignored) signalRawEgress();
+							return undefined;
+						}
+					}
+					const member = Reflect.get(date, property, date) as unknown;
+					if (typeof member !== "function") return wrap(member, ignored);
+					const isNativeDateMember = DATE_NATIVE_MEMBERS.get(property) === member;
+					return (...args: unknown[]): unknown => {
+						const before = Reflect.apply(DATE_GET_TIME, date, []);
+						let result: unknown;
+						let operationError: unknown;
+						let operationFailed = false;
+						try {
+							if (!ignored && !isNativeDateMember) signalRawEgress();
+							result = (member as (...values: unknown[]) => unknown).apply(date, args.map(unwrap));
+						} catch (error) {
+							operationError = error;
+							operationFailed = true;
+						}
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+						let observationError: unknown;
+						let observationFailed = false;
+						if (!isNativeDateMember) {
+							try {
+								observeRawEgressBoundary();
+							} catch (error) {
+								observationError = error;
+								observationFailed = true;
+							}
+						}
+						if (operationFailed) throw operationError;
+						if (observationFailed) throw observationError;
+						return result === date ? proxy : wrap(result, ignored);
 					};
+				},
+				set(date, property, nextValue): boolean {
+					const before = Reflect.apply(DATE_GET_TIME, date, []);
+					try {
+						return Reflect.set(date, property, unwrap(nextValue), date);
+					} finally {
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+					}
+				},
+				deleteProperty(date, property): boolean {
+					const before = Reflect.apply(DATE_GET_TIME, date, []);
+					try {
+						return Reflect.deleteProperty(date, property);
+					} finally {
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+					}
+				},
+				defineProperty(date, property, descriptor): boolean {
+					const rawDescriptor = { ...descriptor };
+					if ("value" in descriptor) rawDescriptor.value = unwrap(descriptor.value);
+					if ("get" in descriptor) rawDescriptor.get = unwrap(descriptor.get);
+					if ("set" in descriptor) rawDescriptor.set = unwrap(descriptor.set);
+					const before = Reflect.apply(DATE_GET_TIME, date, []);
+					try {
+						return Reflect.defineProperty(date, property, rawDescriptor);
+					} finally {
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+					}
 				},
 			});
 		} else {
 			proxy = new Proxy(objectValue, {
+				getOwnPropertyDescriptor(object, property): PropertyDescriptor | undefined {
+					const nestedIgnored =
+						ignored ||
+						(object === (target as object) && typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property));
+					return observeOwnDescriptor(object, property, nestedIgnored);
+				},
 				get(object, property, receiver): unknown {
 					const nestedIgnored =
 						ignored ||
