@@ -16261,6 +16261,36 @@ the accepted invariant handling plus callable classification/wrapping behavior.
 It must not solve the RED by widening every Date read, invoking a returned
 function eagerly, suppressing the getter or changing no-vertex semantics.
 
+**D.92.5-C corrective production GREEN candidate.** Distinct fresh Codex-high
+commit `74914e0e79b9c3c9f884c019ade1c27102abdb6f` changes only
+`packages/object/src/proxy.ts` by 12 additions and one replacement. The Date
+handler now samples the captured primordial timestamp immediately around
+`Reflect.get`, charges any committed timestamp change, rethrows the exact
+property-resolution error when present, and only then applies the existing
+native/custom callable classification and wrapping. It does not widen ordinary
+Date reads, eagerly invoke returned functions or add another comparison
+authority.
+
+D.92.5-C is 6/6 and the combined corrective D.92.5-C, original D.92.5-A/B and
+D.92.4 suites are 46/46. Both frozen files remain exact: 277 lines at SHA-256
+`3fcac2a7bf49e6d3f4ef0a5005f49fc149f9446e2e28b7d46999c8cf7abec98e`
+and 678 lines at SHA-256
+`9e0695755c4ed4f554aa459ace6aec464bfdc272f6cfce1d5e3f39f500235f9c`.
+Preservation is P2 33/33; P1/publication 48/48; D.92.2 64/64; D.92.3 18/18;
+inherited 147/147; specialized 93/93; and bounded 1 MiB 1/1. Four performance
+runs remained 8/8 with the state case at 653.2, 644.0, 657.8 and 666.0 ms under
+concurrent load, below the 1,000 ms contract. Sync-livelock remains exact
+3F/3P. Object/workspace typechecks, owned/tracked lint with zero errors,
+Prettier, diff, frozen hashes and scope pass. D.92.2 took 80.29 seconds under
+that concurrent run; this is recorded as iteration-time evidence, not a new
+semantic failure or a reason to repeat the long analyzer suite during every
+bounded reviewer probe. Evidence is under
+`.logs/phase-1d-i-d925-date-accessor-green-codex-high/`.
+
+This corrective candidate still requires fresh Grok 4.5/high and exact Kimi
+3/high/dual-100 acceptance before final Opus/xhigh. Review must cover the full
+`ba35ebb` plus `74914e0` D.92.5 lineage, not only the 12-line correction.
+
 **One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
 plan, lineage, review artifacts and committed candidate `ba35ebb` returned
 `ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
@@ -16318,20 +16348,18 @@ must not be used to defer D.92.2–D.92.5, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B candidate `ba35ebb` was
-rejected by Grok and exact Kimi on the frozen D.92.5-C Date-accessor RED
-`7453838`, exact 4 failures / 2 passes at the 277-line SHA-256 above. Start a
-distinct fresh Codex-high production-only corrective GREEN. Sample and
-attribute Date timestamp changes around property resolution itself, including
-the exact-throw path, without widening every read or disturbing the accepted
-descriptor/invariant/callable behavior. Preserve both frozen D.92.5 RED hashes,
-D.92.4 and the full gate matrix. If GREEN, record the candidate and rerun fresh
-Grok 4.5/high, exact Kimi 3/high with both 100-step controls and then final
-Opus/xhigh. After D.92.5 closes, start fresh P3a tests-only RED and its distinct
-loop; P3b follows separately before the composite D.92 review. Do not fold P3,
-D.73 or Phase 1d(ii) into D.92.5. Prototype-safe materialization remains
-mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it
-does not reopen P2 or D.92.4.
+P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B candidate `ba35ebb` plus
+D.92.5-C corrective GREEN `74914e0` are ready for fresh full-lineage review.
+Run fresh Grok 4.5/high and exact Kimi 3/high with both 100-step controls in
+parallel; if both accept, run final Opus/xhigh. Preserve both frozen D.92.5 RED
+hashes, D.92.4 and the full gate matrix. Probe the property-resolution timing
+and exact-throw fix together with descriptor widening/internal descriptor reads
+and Date symbol/delete/define-property expando behavior. Do not fold P3, D.73
+or Phase 1d(ii) into D.92.5. If all reviewers accept, close D.92.5 plan-only,
+then start fresh P3a tests-only RED and its distinct loop; P3b follows
+separately before the composite D.92 review. Prototype-safe materialization
+remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
+adoption, but it does not reopen P2, D.92.4 or D.92.5.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
