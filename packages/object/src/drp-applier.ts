@@ -12,7 +12,7 @@ import {
 	type LoggerOptions,
 	type Vertex,
 } from "@ts-drp/types";
-import { handlePromiseOrValue, processSequentially, serializedValuesEqual } from "@ts-drp/utils";
+import { handlePromiseOrValue, processSequentially } from "@ts-drp/utils";
 import {
 	InvalidDependenciesError,
 	InvalidHashError,
@@ -20,7 +20,6 @@ import {
 	isReceiverClockPendingValidationResult,
 	validateVertex,
 } from "@ts-drp/validation";
-import { deepEqual } from "fast-equals";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
 import { AdoptionCommitExhaustedError, ApplyInvariantError } from "./errors.js";
@@ -39,7 +38,11 @@ import {
 import { createPipeline, type Pipeline } from "./pipeline/pipeline.js";
 import { type HandlerReturn } from "./pipeline/types.js";
 import { DRPProxy, type DRPProxyChainArgs, LocalMutationLane, trackMutations } from "./proxy.js";
-import { createPublicationCapability } from "./publication/copy-capability.js";
+import {
+	type ComparisonEvent,
+	createPublicationCapability,
+	type PublicationCapability,
+} from "./publication/copy-capability.js";
 import {
 	type LinearizationCheckpoint,
 	type PublicationObserverEvent,
@@ -206,27 +209,6 @@ function descriptorsEqual(left: PropertyDescriptor | undefined, right: PropertyD
 	return left.get === right.get && left.set === right.set;
 }
 
-function effectiveStateKeys(baseline: DRPState, target: DRPState): string[] {
-	const baselineByKey = new Map(baseline.state.map((entry) => [entry.key, entry.value]));
-	const targetByKey = new Map(target.state.map((entry) => [entry.key, entry.value]));
-	const changed: string[] = [];
-	for (const key of new Set([...baselineByKey.keys(), ...targetByKey.keys()])) {
-		const baselinePresent = baselineByKey.has(key);
-		const targetPresent = targetByKey.has(key);
-		const baselineValue = baselineByKey.get(key);
-		const targetValue = targetByKey.get(key);
-		if (
-			baselinePresent === targetPresent &&
-			deepEqual(baselineValue, targetValue) &&
-			serializedValuesEqual(baselineValue, targetValue)
-		) {
-			continue;
-		}
-		changed.push(key);
-	}
-	return changed.sort();
-}
-
 function captureBatchVertexOperation(submittedVertex: Vertex): BatchVertexPreflight {
 	try {
 		return {
@@ -316,6 +298,7 @@ interface DRPVertexApplierBase<T extends IDRP> {
 	finalityConfig?: FinalityConfig;
 	notify(origin: string, vertices: Vertex[]): void;
 	publicationObserver?(event: PublicationObserverEvent): unknown;
+	comparisonObserver?(event: ComparisonEvent): unknown;
 }
 
 interface DRPVertexApplierOptions<T extends IDRP>
@@ -346,6 +329,34 @@ export class DRPVertexApplier<T extends IDRP> {
 	private readonly notificationQueue: { origin: string; vertices: Vertex[] }[] = [];
 	private isDrainingNotifications = false;
 	private readonly publicationPublisher: PublicationPublisher<T>;
+	private readonly publicationCapability: PublicationCapability;
+
+	private candidateStateKeys(
+		baseline: DRPState,
+		target: DRPState,
+		side: "acl" | "drp",
+		publicationId: string
+	): string[] {
+		const baselineByKey = new Map(baseline.state.map((entry) => [entry.key, entry.value]));
+		const targetByKey = new Map(target.state.map((entry) => [entry.key, entry.value]));
+		const candidates: string[] = [];
+		for (const key of new Set([...baselineByKey.keys(), ...targetByKey.keys()])) {
+			if (
+				baselineByKey.has(key) &&
+				targetByKey.has(key) &&
+				this.publicationCapability.equal(baselineByKey.get(key), targetByKey.get(key), {
+					publicationId,
+					phase: "applier-candidacy",
+					side,
+					key,
+				})
+			) {
+				continue;
+			}
+			candidates.push(key);
+		}
+		return candidates.sort();
+	}
 
 	/**
 	 * Creates a new DRPVertexApplier
@@ -358,6 +369,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	 * @param options.notify - The notify function
 	 * @param options.logConfig - The log config
 	 * @param options.publicationObserver - Optional deterministic publication-work observer
+	 * @param options.comparisonObserver - Optional pure comparison-work observer
 	 */
 	constructor({
 		drp,
@@ -368,6 +380,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		notify,
 		logConfig,
 		publicationObserver,
+		comparisonObserver,
 	}: DRPVertexApplierBase<T>) {
 		this.hashGraph = hashGraph;
 		this.states = states;
@@ -407,6 +420,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		if (drp) {
 			this._proxyDRP = new DRPProxy(drp, callFnPipeline, DrpType.DRP, localMutationLane);
 		}
+		this.publicationCapability = createPublicationCapability(publicationObserver, comparisonObserver ?? null);
 		this.publicationPublisher = new PublicationPublisher(
 			{
 				acl: this.acl,
@@ -417,7 +431,7 @@ export class DRPVertexApplier<T extends IDRP> {
 				checkpointSuffixSize: this.checkpointSuffixSize,
 				rootHash: HashGraph.rootHash,
 			},
-			createPublicationCapability(publicationObserver)
+			this.publicationCapability
 		);
 	}
 
@@ -1030,8 +1044,8 @@ export class DRPVertexApplier<T extends IDRP> {
 			const baselineACLState = baselineHash === undefined ? undefined : this.states.getACLState(baselineHash);
 			if (baselineDRPState && baselineACLState) {
 				ambientMutatedKeys = {
-					drp: effectiveStateKeys(baselineDRPState, capturedDRPState),
-					acl: effectiveStateKeys(baselineACLState, capturedACLState),
+					drp: this.candidateStateKeys(baselineDRPState, capturedDRPState, "drp", operation.vertex.hash),
+					acl: this.candidateStateKeys(baselineACLState, capturedACLState, "acl", operation.vertex.hash),
 				};
 			}
 			pair = this.states.fromStates(capturedDRPState, capturedACLState, this.drp?.context, this.acl.context);
@@ -1239,7 +1253,14 @@ export class DRPVertexApplier<T extends IDRP> {
 			return { stop: false, result: { ...drpOperation, result: undefined, stateChanged: false } };
 		}
 
-		const tracked = trackMutations(currentDRP);
+		const tracked = trackMutations(currentDRP, (left, right, key) =>
+			this.publicationCapability.equal(left, right, {
+				publicationId: drpOperation.vertex.hash,
+				phase: "proxy-tracking",
+				side: drpOperation.isACL ? "acl" : "drp",
+				key,
+			})
+		);
 
 		return handlePromiseOrValue(
 			callDRP(tracked.proxy, peerId, opType, value),

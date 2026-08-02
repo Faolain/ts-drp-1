@@ -632,7 +632,15 @@ const D922C_EXPECTED_TOPOLOGY = [
 	"packages/utils/src/serialization/equality.ts",
 ] as const;
 
-const D922C_CAPABILITY_EXPORTS = ["PublicationCapability", "createPublicationCapability"] as const;
+const D922C_CAPABILITY_EXPORTS = [
+	"ComparisonCounters",
+	"ComparisonEvent",
+	"ComparisonMetadata",
+	"ComparisonPhase",
+	"PublicationCapability",
+	"createPublicationCapability",
+	"proxyValuesEqual",
+] as const;
 const D922C_ROOTS = ["advanceCheckpointIfNeeded", "assignState"] as const;
 const D922D_RUNTIME_ROOTS = [
 	"packages/object/src/publication/publisher.ts",

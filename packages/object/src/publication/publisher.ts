@@ -319,7 +319,7 @@ export class PublicationPublisher<T extends IDRP> {
 		const targetKeys = new Set<string>();
 		const values = new Map<string, unknown>();
 		this.collectValues(instance, targetKeys, values);
-		if (override) this.applyOverride(override, targetKeys, values);
+		if (override) this.applyOverride(side, publication, override, targetKeys, values);
 		const entries: DRPState["state"] = [];
 		const changed = publication.changed[side] as string[];
 		if (instance || override) {
@@ -329,7 +329,14 @@ export class PublicationPublisher<T extends IDRP> {
 				if (
 					incremental &&
 					ownedEntry !== undefined &&
-					(candidateKeys === undefined || !candidateKeys.has(key) || this.valuesEqual(ownedEntry.value, value))
+					(candidateKeys === undefined ||
+						!candidateKeys.has(key) ||
+						this.capability.equal(ownedEntry.value, value, {
+							publicationId: publication.publicationId,
+							phase: "publisher-capture",
+							side,
+							key,
+						}))
 				) {
 					entries.push(ownedEntry);
 					continue;
@@ -366,14 +373,28 @@ export class PublicationPublisher<T extends IDRP> {
 		}
 	}
 
-	private applyOverride(override: PublicationOverride, targetKeys: Set<string>, values: Map<string, unknown>): void {
+	private applyOverride(
+		side: SnapshotSide,
+		publication: PublicationRecord,
+		override: PublicationOverride,
+		targetKeys: Set<string>,
+		values: Map<string, unknown>
+	): void {
 		const overrideKeys = new Set<string>();
 		const baseline = new Map(override.baseline.state.map((entry) => [entry.key, entry.value]));
 		for (const key of Object.keys(override.instance)) {
 			if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof override.instance[key] === "function") continue;
 			overrideKeys.add(key);
 			const value = override.instance[key];
-			if (!baseline.has(key) || !this.valuesEqual(baseline.get(key), value)) {
+			if (
+				!baseline.has(key) ||
+				!this.capability.equal(baseline.get(key), value, {
+					publicationId: publication.publicationId,
+					phase: "publisher-override",
+					side,
+					key,
+				})
+			) {
 				targetKeys.add(key);
 				values.set(key, value);
 			}
@@ -384,10 +405,6 @@ export class PublicationPublisher<T extends IDRP> {
 				values.delete(key);
 			}
 		}
-	}
-
-	private valuesEqual(left: unknown, right: unknown): boolean {
-		return this.capability.equal(left, right);
 	}
 
 	private removeOldCheckpoint(journal: OperationJournal): void {

@@ -1,10 +1,10 @@
 import { type DrpType, type IDRP } from "@ts-drp/types";
-import { handlePromiseOrValue, isPromise, serializedValuesEqual } from "@ts-drp/utils";
-import { circularDeepEqual } from "fast-equals";
+import { handlePromiseOrValue, isPromise } from "@ts-drp/utils";
 
 import { AdoptionCommitExhaustedError } from "./errors.js";
 import { MAX_ADOPTION_COMMIT_ATTEMPTS, type PostOperation } from "./operation.js";
 import { type Pipeline } from "./pipeline/pipeline.js";
+import { proxyValuesEqual } from "./publication/copy-capability.js";
 import { REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 export interface DRPProxyBeforeChainArgs {
@@ -23,6 +23,8 @@ export interface MutationTrackingResult<T extends object> {
 	hasChanges(): boolean;
 	changedKeys(): ReadonlySet<string>;
 }
+
+type MutationValueComparator = (left: unknown, right: unknown, key: string) => boolean;
 
 interface PendingLocalMutation {
 	execute(): unknown | Promise<unknown>;
@@ -116,9 +118,13 @@ export class LocalMutationLane {
  * does not create a vertex. Unknown collection methods conservatively count
  * as writes so new mutating platform methods cannot bypass tracking.
  * @param target - The cloned state that an operation will mutate.
+ * @param compareValues - Sole value-comparison authority
  * @returns A proxy and a cheap dirty-state reader.
  */
-export function trackMutations<T extends object>(target: T): MutationTrackingResult<T> {
+export function trackMutations<T extends object>(
+	target: T,
+	compareValues: MutationValueComparator = proxyValuesEqual
+): MutationTrackingResult<T> {
 	const changedKeys = new Set<string>();
 	const trackedProxies = new WeakMap<object, object>();
 	const ignoredProxies = new WeakMap<object, object>();
@@ -291,16 +297,26 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		initializeGraph(value);
 	}
 
-	const valuesEqual = (left: unknown, right: unknown): boolean => {
-		if (!circularDeepEqual(left, right)) return false;
-		try {
-			return serializedValuesEqual(left, right);
-		} catch {
-			// The wire codec rejects cyclic graphs. They still need deterministic,
-			// cycle-safe topology tracking before validation handles publication.
-			return true;
+	const comparisonKey = (owner: object, property?: PropertyKey): string => {
+		const rawOwner = unwrap(owner);
+		if (rawOwner === target && typeof property === "string" && !REPLICA_LOCAL_STATE_KEYS.has(property)) {
+			return property;
 		}
+		const keys = new Set<string>();
+		const visited = new Set<object>();
+		const pending = [rawOwner];
+		while (pending.length > 0) {
+			const current = pending.pop();
+			if (!current || visited.has(current)) continue;
+			visited.add(current);
+			for (const key of directOwners.get(current) ?? []) keys.add(key);
+			for (const parent of parents.get(current)?.keys() ?? []) pending.push(parent);
+		}
+		return [...keys].sort()[0] ?? (typeof property === "string" ? property : "<collection>");
 	};
+
+	const valuesEqual = (left: unknown, right: unknown, owner: object, property?: PropertyKey): boolean =>
+		compareValues(left, right, comparisonKey(owner, property));
 
 	const captureOwners = (value: object): void => {
 		const visited = new Set<object>();
@@ -356,7 +372,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 		try {
 			const resulting = Reflect.get(owner, property, owner);
 			updateReachability(owner, property, previous, resulting);
-			if (!compareValues || !valuesEqual(previous, resulting)) markChanged(owner, property);
+			if (!compareValues || !valuesEqual(previous, resulting, owner, property)) markChanged(owner, property);
 		} catch (error) {
 			// Reflection has already committed. Charge the owner even when later
 			// equality or graph discovery fails, then preserve the exact throwable.
@@ -416,7 +432,7 @@ export function trackMutations<T extends object>(target: T): MutationTrackingRes
 							initializeGraphs([rawKey, rawValue]);
 							const hadKey = Map.prototype.has.call(map, rawKey);
 							const previousValue = Map.prototype.get.call(map, rawKey);
-							const didChange = !hadKey || !valuesEqual(previousValue, rawValue);
+							const didChange = !hadKey || !valuesEqual(previousValue, rawValue, map);
 							Map.prototype.set.call(map, rawKey, rawValue);
 							if (!hadKey) {
 								addParent(rawKey, map);
