@@ -34,6 +34,16 @@ interface StateGraph {
 	members: Set<GraphKey>;
 }
 
+interface BackingAliasGraph {
+	backing: ArrayBuffer;
+	wide: Uint8Array;
+	sameView: Uint8Array;
+	overlap: Int8Array;
+	dataView: DataView;
+	aliases: Map<object, unknown>;
+	self?: BackingAliasGraph;
+}
+
 interface PublicationCopyMetadata {
 	publicationId: string;
 	side: "acl" | "drp";
@@ -90,6 +100,26 @@ function graph(label: string, cyclic = false): StateGraph {
 		secondary: new Map([[shared, shared]]),
 		members: new Set([shared]),
 	};
+}
+
+function backingAliasGraph(): BackingAliasGraph {
+	const backing = new ArrayBuffer(16);
+	new Uint8Array(backing).set(Array.from({ length: 16 }, (_, index) => index + 10));
+	const wide = new Uint8Array(backing, 2, 8);
+	const overlap = new Int8Array(backing, 5, 4);
+	const dataView = new DataView(backing, 5, 4);
+	const result: BackingAliasGraph = {
+		backing,
+		wide,
+		sameView: wide,
+		overlap,
+		dataView,
+		aliases: new Map(),
+	};
+	result.aliases.set(wide, overlap);
+	result.aliases.set(dataView, result);
+	result.self = result;
+	return result;
 }
 
 function firstKey(value: StateGraph): GraphKey {
@@ -190,6 +220,111 @@ function vertexFor(h: Harness, opType: string): Vertex {
 }
 
 describe("Phase 1d(i) D.92.3 graph-aware state-payload detachment RED", () => {
+	it("preserves one detached backing store across repeated and overlapping views within each top-level entry", () => {
+		const source = backingAliasGraph();
+		expect(source.sameView, "fixture control: repeated source view").toBe(source.wide);
+		expect(
+			new Set([source.backing, source.wide.buffer, source.overlap.buffer, source.dataView.buffer]),
+			"fixture control: every source view has one backing"
+		).toHaveLength(1);
+		expect(
+			[
+				[source.wide.byteOffset, source.wide.length],
+				[source.overlap.byteOffset, source.overlap.length],
+				[source.dataView.byteOffset, source.dataView.byteLength],
+			],
+			"fixture control: overlapping source layout"
+		).toEqual([
+			[2, 8],
+			[5, 4],
+			[5, 4],
+		]);
+
+		const instance = {
+			semanticsType: SemanticsType.pair,
+			first: source,
+			second: source,
+		} as IDRP & { first: BackingAliasGraph; second: BackingAliasGraph };
+		const captured = stateFromDRP(instance);
+		const first = captured.state.find(({ key }) => key === "first")!.value as BackingAliasGraph;
+		const second = captured.state.find(({ key }) => key === "second")!.value as BackingAliasGraph;
+
+		expect
+			.soft(
+				{
+					rootDetached: first !== source,
+					repeatedViewIdentity: first.sameView === first.wide,
+					viewLayout: [
+						[first.wide.byteOffset, first.wide.length],
+						[first.overlap.byteOffset, first.overlap.length],
+						[first.dataView.byteOffset, first.dataView.byteLength],
+					],
+					oneClonedBacking: new Set([first.backing, first.wide.buffer, first.overlap.buffer, first.dataView.buffer])
+						.size,
+					backingDetached: first.backing !== source.backing,
+					mapViewAlias: first.aliases.get(first.wide) === first.overlap,
+					mapCycleAlias: first.aliases.get(first.dataView) === first,
+					propertyCycle: first.self === first,
+				},
+				"one top-level payload must retain its complete backing/view alias graph"
+			)
+			.toEqual({
+				rootDetached: true,
+				repeatedViewIdentity: true,
+				viewLayout: [
+					[2, 8],
+					[5, 4],
+					[5, 4],
+				],
+				oneClonedBacking: 1,
+				backingDetached: true,
+				mapViewAlias: true,
+				mapCycleAlias: true,
+				propertyCycle: true,
+			});
+
+		first.wide[3] = 91;
+		expect.soft(first.overlap[0], "TypedArray mutation must reach the overlapping TypedArray").toBe(91);
+		expect.soft(first.dataView.getUint8(0), "TypedArray mutation must reach the overlapping DataView").toBe(91);
+		expect.soft(source.dataView.getUint8(0), "output mutation must not reach the source backing").toBe(15);
+
+		first.dataView.setUint8(2, 92);
+		expect.soft(first.wide[5], "DataView mutation must reach the overlapping TypedArray").toBe(92);
+		expect.soft(first.overlap[2], "DataView mutation must reach every overlapping output view").toBe(92);
+		expect.soft(source.wide[5], "DataView output mutation must not reach the source view").toBe(17);
+
+		source.overlap[1] = 77;
+		expect.soft(first.wide[4], "source mutation must not reach the output backing").toBe(16);
+		expect.soft(first.dataView.getUint8(1), "source mutation must not reach the output DataView").toBe(16);
+		expect
+			.soft(
+				{
+					secondBackingDetached: second.backing !== source.backing,
+					independentTopLevelBacking: second.backing !== first.backing,
+					secondBackingAliases: new Set([
+						second.backing,
+						second.wide.buffer,
+						second.overlap.buffer,
+						second.dataView.buffer,
+					]).size,
+					firstMutationIsolated: second.overlap[0],
+					sourceMutationIsolated: second.wide[4],
+					mapAlias: second.aliases.get(second.wide) === second.overlap,
+					cycle: second.self === second,
+				},
+				"independent snapshot entries must each own exactly one cloned backing graph"
+			)
+			.toEqual({
+				secondBackingDetached: true,
+				independentTopLevelBacking: true,
+				secondBackingAliases: 1,
+				firstMutationIsolated: 15,
+				sourceMutationIsolated: 16,
+				mapAlias: true,
+				cycle: true,
+			});
+	});
+
 	it("clones Map keys and values through one stack while keeping top-level entries independent", () => {
 		const source = graph("capture", true);
 		const instance = {
