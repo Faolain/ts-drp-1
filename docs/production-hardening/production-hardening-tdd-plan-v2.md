@@ -16180,6 +16180,54 @@ ms; and bounded 1 MiB 1/1. Object/workspace typechecks, owned/tracked lint,
 Prettier, diff, scope and production byte-identity pass. Evidence is under
 `.logs/phase-1d-i-d925-proxy-closure-red-codex-high/`.
 
+**D.92.5-A/B production GREEN candidate.** Distinct fresh Codex-high commit
+`ba35ebbd96c053c27bfc8f52d63cb611e3f021cc` changes only
+`packages/object/src/proxy.ts` and
+`packages/object/src/publication/publisher.ts`. Descriptor observation now
+signals reference-capable raw egress without rewriting the returned descriptor.
+Date handling now preserves Proxy invariants, wraps configurable reference
+members, unwraps inputs, wraps outputs, attributes timestamp changes by value
+rather than method name, and conservatively widens unknown/custom callable
+boundaries. Native Date callability is classified by module-captured primordial
+identities, so later prototype injection is not silently trusted. Real
+publication records make their work counters required internally, and the
+raw-egress publication path directly uses the all-governed union rather than a
+vestigial candidate-intersection loop.
+
+The frozen 678-line RED remains byte-identical at SHA-256
+`9e0695755c4ed4f554aa459ace6aec464bfdc272f6cfce1d5e3f39f500235f9c`
+and is 17/17; combined D.92.5 plus D.92.4 is 40/40. Candidate preservation is
+P2 33/33; P1/publication 48/48; D.92.2 64/64; D.92.3 18/18; inherited 147/147;
+specialized 93/93; and bounded 1 MiB 1/1. Four performance runs completed in
+222.1, 240.8, 207.8 and 209.7 ms. Sync-livelock remains the exact inherited
+3-failure/3-pass sentinel. Object/workspace typechecks, owned/tracked lint,
+Prettier, diff and scope pass. Bounded probes also prove that a later injected
+Date prototype method widens and charges the Date, a generic Date descriptor
+preserves descriptor kind and omitted fields, and a primary custom-method
+throwable wins over a secondary observation failure while timestamp attribution
+survives. Evidence is under
+`.logs/phase-1d-i-d925-proxy-closure-green-codex-high/`.
+
+The candidate is not accepted or closed until fresh Grok 4.5/high, exact Kimi
+3/high with both 100-step controls, and final Opus/xhigh reviews accept it.
+Those reviews must deliberately probe conservative descriptor widening and
+internal descriptor reads, plus Date symbol/delete/define-property expando
+behavior. Date expandos still intentionally do not survive reconstruction.
+
+**One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
+plan, lineage, review artifacts and committed candidate `ba35ebb` returned
+`ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
+resurrection or premature sequencing, and independently retained D.73,
+prototype-safe materialization, P3a/P3b, v3-forward/v2-frozen and optional-0n
+ownership at their existing gates. Session
+`c19b145b-5d7e-4779-88bc-8726decb0bdf` used Fable substantively; metadata also
+reported a non-substantive automatic Haiku helper of 23 output tokens. The
+audit identified two existing debts that need explicit owners no later than
+the composite-D.92/Phase-1 exit: the inherited sync-livelock 3F/3P sentinel and
+`pruneSnapshots` O(V) key materialization. Neither blocks D.92.5 or P3. This was
+an explicitly requested one-off; do not schedule more Fable reviews unless the
+user explicitly asks.
+
 The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
 confirmed through direct tracking and the real applier, and remains a hard
 pre-3a live-v3-binder gate. It can hide a vertex from the charge keyset while a
@@ -16223,21 +16271,18 @@ must not be used to defer D.92.2–D.92.5, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B tests-only RED `34eabb8`
-is frozen at 12 failures / 5 passes across 17 cases; its 678-line SHA-256 is
-`9e0695755c4ed4f554aa459ace6aec464bfdc272f6cfce1d5e3f39f500235f9c`.
-Start a distinct fresh Codex-high production-only GREEN. Reuse D.92.4's signal
-and detached-union comparison; add pure descriptor observation without
-rewriting, give Date safe member/expando/invariant/custom-method behavior, and
-keep A/B independently green. Fold only the recorded `hasRawEgress` doc,
-runtime-work typing and vestigial-loop hygiene into this candidate. Do not
-change the frozen RED, add a second comparison authority,
-fingerprints/preimages/`byteChangedKeys`, rewrite descriptors, instrument
-escaped values, scan roots in dirty readers or fold P3/D.73/Phase 1d(ii) into
-this family. After D.92.5 closes, complete P3a/P3b before the composite D.92
-review. The retained prototype-safe materialization item remains mandatory
-before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it does not
-reopen P2 or D.92.4.
+P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B frozen RED `34eabb8` and
+production GREEN candidate `ba35ebb` are complete, with candidate gates above.
+Run the fresh Grok 4.5/high review and fresh exact Kimi 3/high review with both
+100-step controls independently; if both accept, run final Opus/xhigh. Review
+the complete D.92.5 lineage and preserve the frozen RED hash. Probe descriptor
+widening/internal descriptor reads and Date symbol/delete/define-property
+expando behavior without folding P3, D.73 or Phase 1d(ii) into this family. If
+all reviewers accept, close D.92.5 in a plan-only checkpoint, then start fresh
+P3a tests-only RED followed by its distinct GREEN and full review loop; P3b
+follows separately before the composite D.92 review. The retained prototype-
+safe materialization item remains mandatory before Phase 1d(ii) closure and
+Phase 4b/6a snapshot adoption, but it does not reopen P2, D.92.4 or D.92.5.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
