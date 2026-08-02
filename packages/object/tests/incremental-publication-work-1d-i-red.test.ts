@@ -80,6 +80,14 @@ class PublicationProbe {
 	}
 }
 
+class IdentityPublicationProbe extends PublicationProbe {
+	override observe(event: PublicationObserverEvent): unknown {
+		if (event.type !== "copy") return super.observe(event);
+		this.copies.push({ ...event.metadata, bytes: serializeValue(event.value).byteLength });
+		return event.value;
+	}
+}
+
 class MatrixDRP implements IDRP {
 	semanticsType = SemanticsType.pair;
 	ballast = "b".repeat(64 * 1024);
@@ -131,6 +139,11 @@ class MatrixDRP implements IDRP {
 	setJ(value: string): void {
 		this.replacement = value;
 	}
+
+	mutateTwo(value: number, replacement: string): void {
+		this.nested.child.value = value;
+		this.replacement = replacement;
+	}
 }
 
 class ConflictMatrixDRP extends MatrixDRP {
@@ -141,12 +154,17 @@ class ConflictMatrixDRP extends MatrixDRP {
 
 interface Harness {
 	applier: DRPVertexApplier<MatrixDRP>;
+	drp: MatrixDRP;
 	hashGraph: HashGraph;
 	probe: PublicationProbe;
 	states: DRPObjectStateManager<MatrixDRP>;
 }
 
-function harness(drp = new MatrixDRP(), configure?: (drp: MatrixDRP) => void): Harness {
+function harness(
+	drp = new MatrixDRP(),
+	configure?: (drp: MatrixDRP) => void,
+	probe: PublicationProbe = new PublicationProbe()
+): Harness {
 	configure?.(drp);
 	const acl = createACL({ admins: ["local", "remote"] });
 	const hashGraph = new HashGraph(
@@ -156,7 +174,6 @@ function harness(drp = new MatrixDRP(), configure?: (drp: MatrixDRP) => void): H
 		drp.semanticsType
 	);
 	const states = new DRPObjectStateManager(acl, drp);
-	const probe = new PublicationProbe();
 	const options = {
 		drp,
 		acl,
@@ -167,7 +184,7 @@ function harness(drp = new MatrixDRP(), configure?: (drp: MatrixDRP) => void): H
 		publicationObserver: probe.observe.bind(probe),
 	};
 	const Applier = DRPVertexApplier as unknown as new (candidate: typeof options) => DRPVertexApplier<MatrixDRP>;
-	return { applier: new Applier(options), hashGraph, probe, states };
+	return { applier: new Applier(options), drp, hashGraph, probe, states };
 }
 
 function remoteVertex(opType: string, value: unknown[], dependencies: Hash[], timestamp: number): Vertex {
@@ -306,6 +323,25 @@ const DRP_CASES = [
 ] as const;
 
 describe("Phase 1d(i) eligible incremental publication work", () => {
+	it("keeps the identity observer as the sole copy result and emits exactly one event per changed key", async () => {
+		const probe = new IdentityPublicationProbe();
+		const h = harness(new MatrixDRP(), undefined, probe);
+		const vertex = remoteVertex("mutateTwo", [17, "identity"], [HashGraph.rootHash], 1);
+		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+
+		const publication = probe.publications.find((candidate) => candidate.targetHash === vertex.hash);
+		expect(publication?.changed).toEqual({ acl: [], drp: ["nested", "replacement"] });
+		const copies = publicationCopies(probe, publication?.publicationId ?? "missing");
+		expect(copies.map(({ image, key, side }) => `${side}:${key}:${image}`).sort()).toEqual([
+			"drp:nested:post",
+			"drp:replacement:post",
+		]);
+
+		const published = mapState(h.states.getDRPState(vertex.hash)!);
+		expect(published.get("nested"), "no unobserved copier may detach the observer result").toBe(h.drp.nested);
+		expect(published.get("replacement"), "the changed-key payload is exactly the live value").toBe(h.drp.replacement);
+	});
+
 	it("pins the test-owned presence, semantic, and encoded effective-delta denominator", () => {
 		const before = snapshot({
 			reverted: { nested: [1, 2] },

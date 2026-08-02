@@ -3460,7 +3460,7 @@ if (process.env[D922A_CONVERGENCE_CHILD_ENV] === "1") {
 		);
 	});
 } else {
-	describe("Phase 1d(i) D.92.2-a checker-backed architecture acceptance RED", () => {
+	describe.skip("Phase 1d(i) D.92.2-a checker-backed architecture acceptance RED (rejected transition)", () => {
 		it.each(D922A_REVIEW9_FIXTURES)("rejects Review9 unsafe $family: $name", ({ name, unsafeMutation }) => {
 			const runtimeCaptureCount = d922aRuntimeCaptureCount(unsafeMutation);
 			console.info(`[d922a-runtime] unsafe=${JSON.stringify(name)} captureCount=${runtimeCaptureCount}`);
@@ -3867,7 +3867,7 @@ const STRUCTURE_FLOW_RED9_CONTROLS = Object.freeze([
 	),
 ] satisfies readonly StructureFlowRed9Fixture[]);
 
-describe("Phase 1d(i) D.92.2 residual parameter and binding-flow RED9", () => {
+describe.skip("Phase 1d(i) D.92.2 residual parameter and binding-flow RED9 (rejected transition)", () => {
 	it.each(STRUCTURE_FLOW_RED9_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
 		const analysis = analyze(sources);
 		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
@@ -4117,7 +4117,7 @@ const STRUCTURE_FLOW_RED8_CONTROLS = Object.freeze([
 	),
 ] satisfies readonly StructureFlowRed8Fixture[]);
 
-describe("Phase 1d(i) D.92.2 remaining language-flow RED8", () => {
+describe.skip("Phase 1d(i) D.92.2 remaining language-flow RED8 (rejected transition)", () => {
 	it.each(STRUCTURE_FLOW_RED8_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
 		const analysis = analyze(sources);
 		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
@@ -4493,7 +4493,7 @@ const STRUCTURE_FLOW_RED7_CONTROLS = Object.freeze([
 	),
 ] satisfies readonly StructureFlowRed7Fixture[]);
 
-describe("Phase 1d(i) D.92.2 semantic binding-flow RED7", () => {
+describe.skip("Phase 1d(i) D.92.2 semantic binding-flow RED7 (rejected transition)", () => {
 	it.each(STRUCTURE_FLOW_RED7_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
 		const analysis = analyze(sources);
 		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
@@ -4760,7 +4760,7 @@ if (process.env[RED6_CYCLE_CHILD_ENV] === "1") {
 		});
 	});
 } else {
-	describe("Phase 1d(i) D.92.2 remaining semantic-flow RED", () => {
+	describe.skip("Phase 1d(i) D.92.2 remaining semantic-flow RED (rejected transition)", () => {
 		it.each(STRUCTURE_FLOW_RED6_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
 			const analysis = analyze(sources);
 			expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
@@ -5021,7 +5021,7 @@ const STRUCTURE_FLOW_RED5_CONTROLS = Object.freeze([
 	},
 ] satisfies readonly StructureFlowRed5Control[]);
 
-describe("Phase 1d(i) D.92.2 final ordinary structure-flow RED", () => {
+describe.skip("Phase 1d(i) D.92.2 final ordinary structure-flow RED (rejected transition)", () => {
 	it.each(STRUCTURE_FLOW_RED5_MUTANTS)("rejects $family bypass: $name", ({ expectedViolation, sources }) => {
 		const analysis = analyze(sources);
 		expect(analysis.violations).toEqual(expect.arrayContaining([expect.stringMatching(expectedViolation)]));
@@ -6862,7 +6862,7 @@ const STRUCTURE_FLOW_RED4_CONTROLS = Object.freeze([
 	},
 ] satisfies readonly SemanticFlowControl[]);
 
-describe("Phase 1d(i) publication transitive no-bypass closure", () => {
+describe.skip("Phase 1d(i) publication transitive no-bypass closure (rejected value-flow authority)", () => {
 	it("discovers one injected copy leaf from both publication roots without fixing its name or location", () => {
 		const analysis = analyze(sourceFiles(SOURCE_DIRECTORY));
 		expect(analysis.violations).toEqual([]);
@@ -7260,5 +7260,453 @@ describe("Phase 1d(i) publication transitive no-bypass closure", () => {
 			operationArgumentDetachment: 1,
 			proxyBypassCopies: 0,
 		});
+	});
+});
+
+// D.92.2-c' RED: this contract deliberately consumes the historical analyzer only as
+// a temporary oracle for the surviving module/export mutations. D.92.2-d' replaces
+// and deletes it; no expression-flow fixture below may be added.
+interface D922cAuthorityEvidence {
+	readonly analyzedSourcePaths: readonly string[];
+	readonly capabilityExports: readonly string[];
+	readonly capabilityConstructionSites: readonly string[];
+	readonly closureReferenceSites: readonly string[];
+	readonly codecReferenceSites: readonly string[];
+	readonly externalRuntimeSurface: readonly string[];
+	readonly loadedSourcePaths: readonly string[];
+	readonly measuredCopyLeaf: string;
+	readonly measuredCopyLeafRoots: readonly string[];
+	readonly packageReferenceSites: readonly string[];
+	readonly snapshotConstructionSites: readonly string[];
+	readonly unresolvedAcquisitions: readonly string[];
+}
+
+interface D922cAnalysis extends ClosureAnalysis, WorkspaceIntegrationCensus {
+	readonly authority?: D922cAuthorityEvidence;
+}
+
+const D922C_EXPECTED_TOPOLOGY = [
+	"packages/object/src/publication/copy-capability.ts",
+	"packages/object/src/publication/publisher.ts",
+	"packages/object/src/state-materialize.ts",
+	"packages/object/src/state-store.ts",
+	"packages/utils/src/serialization/equality.ts",
+] as const;
+
+const D922C_CAPABILITY_EXPORTS = ["PublicationCapability", "createPublicationCapability"] as const;
+const D922C_ROOTS = ["advanceCheckpointIfNeeded", "assignState"] as const;
+
+function d922cSites(sourcePath: string, owner: string, callee: string, count = 1): string[] {
+	return Array.from({ length: count }, (_, index) => `${sourcePath}:${owner}:${callee}#${index + 1}`);
+}
+
+// Discovered source-first from the real workspace at RED d763fad. A site is an
+// alias-resolved call node, identified by source/lexical owner/callee/ordinal rather
+// than a brittle line number. Declarations and type-only references are not calls.
+const D922C_CODEC_REFERENCE_SITES = [
+	...d922cSites("packages/interval-discovery/src/index.ts", "_broadcastDiscoveryRequest", "DRPDiscoveryRequest.encode"),
+	...d922cSites("packages/interval-discovery/src/index.ts", "_sendDiscoveryResponse", "DRPDiscoveryResponse.encode"),
+	...d922cSites("packages/network/src/node.ts", "broadcastMessage", "Message.encode"),
+	...d922cSites("packages/network/src/node.ts", "sendMessage", "Message.encode"),
+	...d922cSites("packages/network/src/node.ts", "sendGroupMessageRandomPeer", "Message.encode"),
+	...d922cSites("packages/network/src/node.ts", "handleGossipsubMessage", "Message.decode"),
+	...d922cSites("packages/network/src/node.ts", "handleStream", "Message.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "fetchStateHandler", "FetchState.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "fetchStateHandler", "DRPStateOtherTheWire.decode", 2),
+	...d922cSites("packages/node/src/handlers.ts", "fetchStateHandler", "FetchStateResponse.encode"),
+	...d922cSites("packages/node/src/handlers.ts", "fetchStateResponseHandler", "FetchStateResponse.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "attestationUpdateHandler", "AttestationUpdate.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "updateHandlerUntraced", "Update.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "updateHandlerUntraced", "AttestationUpdate.encode"),
+	...d922cSites("packages/node/src/handlers.ts", "syncHandler", "Sync.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "syncHandler", "SyncAccept.encode"),
+	...d922cSites("packages/node/src/handlers.ts", "syncAcceptHandlerUntraced", "SyncAccept.decode"),
+	...d922cSites("packages/node/src/handlers.ts", "syncAcceptHandlerUntraced", "AttestationUpdate.encode"),
+	...d922cSites("packages/node/src/handlers.ts", "syncAcceptHandlerUntraced", "SyncAccept.encode"),
+	...d922cSites("packages/node/src/handlers.ts", "drpObjectChangesHandler", "Update.encode"),
+	...d922cSites("packages/node/src/index.ts", "handleDiscoveryResponse", "DRPDiscoveryResponse.decode"),
+	...d922cSites("packages/node/src/operations.ts", "fetchState", "FetchState.encode"),
+	...d922cSites("packages/node/src/operations.ts", "syncObject", "Sync.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SubscribeDRP", "SubscribeDRPRequest.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SubscribeDRP", "GenericRespone.decode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "UnsubscribeDRP", "UnsubscribeDRPRequest.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "UnsubscribeDRP", "GenericRespone.decode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "GetDRPHashGraph", "GetDRPHashGraphRequest.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "GetDRPHashGraph", "GetDRPHashGraphResponse.decode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SyncDRPObject", "SyncDRPObjectRequest.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SyncDRPObject", "GenericRespone.decode"),
+	...d922cSites(
+		"packages/node/src/proto/drp/node/v1/rpc_pb.ts",
+		"SendCustomMessage",
+		"SendCustomMessageRequest.encode"
+	),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SendCustomMessage", "GenericRespone.decode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SendGroupMessage", "SendGroupMessageRequest.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "SendGroupMessage", "GenericRespone.decode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "AddCustomGroup", "AddCustomGroupRequest.encode"),
+	...d922cSites("packages/node/src/proto/drp/node/v1/rpc_pb.ts", "AddCustomGroup", "GenericRespone.decode"),
+	...d922cSites("packages/object/src/index.ts", "getSerializedStates", "DRPStateOtherTheWire.encode", 2),
+	...d922cSites("packages/object/src/index.ts", "getSerializedStates", "serializeDRPState", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "encode", "DRPStateOtherTheWire.encode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "decode", "DRPStateOtherTheWire.decode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "encode", "Vertex.encode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "encode", "Attestation.encode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "encode", "AggregatedAttestation.encode"),
+	...d922cSites(
+		"packages/types/src/proto/drp/v1/messages_pb.ts",
+		"encode",
+		"DRPDiscoveryResponse_SubscribersEntry.encode"
+	),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "encode", "DRPDiscoveryResponse_Subscribers.encode"),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "decode", "Vertex.decode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "decode", "Attestation.decode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "decode", "AggregatedAttestation.decode"),
+	...d922cSites(
+		"packages/types/src/proto/drp/v1/messages_pb.ts",
+		"decode",
+		"DRPDiscoveryResponse_SubscribersEntry.decode"
+	),
+	...d922cSites("packages/types/src/proto/drp/v1/messages_pb.ts", "decode", "DRPDiscoveryResponse_Subscribers.decode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "encode", "Vertex_Operation.encode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "decode", "Vertex_Operation.decode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "encode", "Value.encode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "decode", "Value.decode", 2),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "encode", "DRPStateEntry.encode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "decode", "DRPStateEntry.decode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "encode", "DRPStateEntryOtherTheWire.encode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "decode", "DRPStateEntryOtherTheWire.decode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "encode", "Vertex.encode"),
+	...d922cSites("packages/types/src/proto/drp/v1/object_pb.ts", "decode", "Vertex.decode"),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "encode", "Struct_FieldsEntry.encode"),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "decode", "Struct_FieldsEntry.decode"),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "encode", "Value.encode", 2),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "decode", "Value.decode", 2),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "encode", "Struct.encode"),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "encode", "ListValue.encode"),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "decode", "Struct.decode"),
+	...d922cSites("packages/types/src/proto/google/protobuf/struct_pb.ts", "decode", "ListValue.decode"),
+	...d922cSites("packages/utils/src/serialization/equality.ts", "<module>", "msgpack.encode", 3),
+	...d922cSites("packages/utils/src/serialization/index.ts", "<module>", "msgpack.decode", 3),
+	...d922cSites("packages/utils/src/serialization/equality.ts", "serializeValue", "msgpack.encode"),
+	...d922cSites("packages/utils/src/serialization/equality.ts", "serializedValuesEqual", "serializeValue", 2),
+	...d922cSites("packages/utils/src/serialization/index.ts", "deserializeValue", "msgpack.decode"),
+	...d922cSites("packages/utils/src/serialization/index.ts", "serializeDRPState", "serializeValue"),
+	...d922cSites("packages/utils/src/serialization/index.ts", "deserializeDRPState", "deserializeValue"),
+].sort();
+
+const D922C_COPY_CAPTURE_REFERENCE_SITES = [
+	...d922cSites("packages/object/src/publication/copy-capability.ts", "createPublicationCapability.copy", "cloneDeep"),
+	...d922cSites("packages/object/src/drp-applier.ts", "captureBatchVertexOperation", "cloneDeep"),
+	...d922cSites("packages/object/src/drp-applier.ts", "cloneEnumerableInstance", "cloneDeep"),
+	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.createVertex", "cloneDeep"),
+	...d922cSites("packages/object/src/drp-applier.ts", "callDRP", "cloneDeep"),
+	...d922cSites("packages/object/src/index.ts", "DRPObject.getStates", "cloneDeep", 2),
+	...d922cSites("packages/object/src/index.ts", "DRPObject.setACLState", "cloneDeep"),
+	...d922cSites("packages/object/src/index.ts", "DRPObject.setDRPState", "cloneDeep"),
+	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.constructor", "cloneDeep", 2),
+	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.fromStates", "cloneDeep", 2),
+	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.fromHashACL", "cloneDeep"),
+	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.applyState", "cloneDeep"),
+	...d922cSites("packages/object/src/state-materialize.ts", "stateFromDRP", "cloneDeep"),
+	...d922cSites("packages/object/src/state-store.ts", "DRPObjectStateManager.constructor", "stateFromDRP", 2),
+	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.computeOperationUntraced", "stateFromDRP", 2),
+].sort();
+
+const D922C_PACKAGE_REFERENCE_SITES = [...D922C_CODEC_REFERENCE_SITES, ...D922C_COPY_CAPTURE_REFERENCE_SITES].sort();
+
+const D922C_CLOSURE_REFERENCE_SITES = [
+	...d922cSites("packages/object/src/publication/copy-capability.ts", "createPublicationCapability.copy", "cloneDeep"),
+	...d922cSites("packages/utils/src/serialization/equality.ts", "<module>", "msgpack.encode", 3),
+	...d922cSites("packages/utils/src/serialization/equality.ts", "serializeValue", "msgpack.encode"),
+	...d922cSites("packages/utils/src/serialization/equality.ts", "serializedValuesEqual", "serializeValue", 2),
+].sort();
+
+const D922C_REEXPRESSED_MODULE_MUTANTS = [
+	...WORKSPACE_REACHABILITY_MUTANTS,
+	workspaceFixture(
+		"one-hop export-star barrel",
+		ENCODE_VIOLATION,
+		'import { snapshotValueBytes } from "@ts-drp/utils";',
+		"snapshotValueBytes(state);",
+		{
+			"packages/utils/src/index.ts": 'export * from "./serialization/index.js";',
+			[UTILS_SERIALIZATION_PATH]:
+				'import { encode } from "@msgpack/msgpack"; export const snapshotValueBytes = encode;',
+		}
+	),
+	workspaceFixture(
+		"multi-hop export-star barrel",
+		ENCODE_VIOLATION,
+		'import { snapshotValueBytes } from "@ts-drp/utils";',
+		"snapshotValueBytes(state);",
+		{
+			"packages/utils/src/index.ts": 'export * from "./barrel.js";',
+			"packages/utils/src/barrel.ts": 'export * from "./serialization/index.js";',
+			[UTILS_SERIALIZATION_PATH]:
+				'import { encode } from "@msgpack/msgpack"; export const snapshotValueBytes = encode;',
+		}
+	),
+] as const;
+
+const D922C_REFERENCE_MUTANTS = [
+	workspaceFixture(
+		"capability raw-sink re-export laundering",
+		CLONE_VIOLATION,
+		'import { rawPublicationClone } from "./publication/copy-capability.js";',
+		"rawPublicationClone(state);",
+		{
+			"packages/object/src/publication/copy-capability.ts":
+				'import { cloneDeep } from "es-toolkit"; export { cloneDeep as rawPublicationClone };',
+		}
+	),
+	workspaceFixture(
+		"generated DRPStateEntry encode/decode round trip",
+		ROUND_TRIP_VIOLATION,
+		'import { DRPStateEntry } from "@ts-drp/types";',
+		"DRPStateEntry.decode(DRPStateEntry.encode(state as never).finish());",
+		{}
+	),
+	workspaceFixture(
+		"computed generated-member acquisition",
+		ROUND_TRIP_VIOLATION,
+		'import { DRPStateEntry } from "@ts-drp/types";',
+		'const member = "encode"; DRPStateEntry[member](state as never);',
+		{}
+	),
+	workspaceFixture(
+		"callback injection imports a new package-wide clone reference",
+		CLONE_VIOLATION,
+		'import { cloneDeep } from "es-toolkit";',
+		"[state.changed].map((value) => cloneDeep(value));",
+		{}
+	),
+	workspaceFixture(
+		"Node v8 serialization bypass",
+		ROUND_TRIP_VIOLATION,
+		'import { deserialize, serialize } from "node:v8";',
+		"deserialize(serialize(state));",
+		{}
+	),
+	workspaceFixture(
+		"dynamic MessagePack acquisition",
+		ROUND_TRIP_VIOLATION,
+		"",
+		'void import("@msgpack/msgpack").then(({ encode }) => encode(state));',
+		{}
+	),
+	workspaceFixture("JSON payload round trip", ROUND_TRIP_VIOLATION, "", "JSON.parse(JSON.stringify(state));", {}),
+] as const;
+
+const D922C_SAFE_CONTROLS = [
+	workspaceFixture(
+		"type-only generated message import",
+		/never/,
+		'import type { DRPStateEntry } from "@ts-drp/types";',
+		"const value: DRPStateEntry | undefined = undefined; void value;",
+		{}
+	),
+	workspaceFixture(
+		"innocent same-name local methods",
+		/never/,
+		"",
+		"const local = { encode: (value: unknown) => value, decode: (value: unknown) => value }; local.decode(local.encode(state));",
+		{}
+	),
+	{
+		name: "unrelated JSON hashing module outside the publisher closure",
+		expectedViolation: /never/,
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			"packages/tracer/src/index.ts": "export const hash = (value: unknown): string => JSON.stringify(value);",
+		},
+	},
+] as const;
+
+function d922cMethod(source: string, name: string): ts.MethodDeclaration | undefined {
+	const file = ts.createSourceFile("drp-applier.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	let result: ts.MethodDeclaration | undefined;
+	const visit = (node: ts.Node): void => {
+		if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) result = node;
+		if (!result) ts.forEachChild(node, visit);
+	};
+	visit(file);
+	return result;
+}
+
+function d922cAuthority(analysis: D922cAnalysis): D922cAuthorityEvidence {
+	expect(analysis.authority, "D.92.2-d' must install one structural reference authority").toBeDefined();
+	if (!analysis.authority) throw new Error("D.92.2-d' structural authority is missing");
+	return analysis.authority;
+}
+
+describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () => {
+	it("discovers and pins the fifth package-wide codec/reference census at 94 exact owner-sites", () => {
+		expect(D922C_CODEC_REFERENCE_SITES).toHaveLength(94);
+		expect(new Set(D922C_CODEC_REFERENCE_SITES).size).toBe(94);
+		const authority = d922cAuthority(analyze(realGovernedWorkspaceSources()) as D922cAnalysis);
+		expect([...authority.codecReferenceSites].sort()).toEqual(D922C_CODEC_REFERENCE_SITES);
+	});
+
+	it("requires the isolated publisher, capability, state-store/materialization and equality split", () => {
+		for (const sourcePath of D922C_EXPECTED_TOPOLOGY) {
+			expect(fs.existsSync(path.join(WORKSPACE_DIRECTORY, sourcePath)), `${sourcePath} must exist`).toBe(true);
+		}
+	});
+
+	it.each([
+		[
+			"assignState",
+			["operation", "adoption", "publicationAttempts", "publicationFrontier"],
+			[
+				"operation: JournaledOperation<T>",
+				"adoption: PreparedAdoption<T> = operation.isACL ? { expectedFrontier: operation.vertex.dependencies, acl: operation.currentDRP as IACL | undefined, } : { expectedFrontier: operation.vertex.dependencies, drp: operation.currentDRP as T | undefined, }",
+				"publicationAttempts: PublicationRecord[] = []",
+				"publicationFrontier: Hash[] = this.hashGraph.getFrontier()",
+			],
+		],
+		[
+			"advanceCheckpointIfNeeded",
+			["journal", "force", "publicationAttempts"],
+			["journal: OperationJournal", "force = false", "publicationAttempts: PublicationRecord[] = []"],
+		],
+	] as const)(
+		"keeps %s as one exact publisher delegate with unchanged parameters",
+		(name, expectedArguments, expectedParameters) => {
+			const source = fs.readFileSync(path.join(SOURCE_DIRECTORY, "drp-applier.ts"), "utf8");
+			const method = d922cMethod(source, name);
+			expect(method).toBeDefined();
+			expect(method?.parameters.map((parameter) => parameter.getText().replace(/\s+/g, " "))).toEqual(
+				expectedParameters
+			);
+			const body = method?.body;
+			expect(body?.statements).toHaveLength(1);
+			const statement = body?.statements[0];
+			const expression = statement && ts.isExpressionStatement(statement) ? statement.expression : undefined;
+			expect(expression && ts.isCallExpression(expression)).toBe(true);
+			if (!expression || !ts.isCallExpression(expression)) return;
+			expect(expression.expression.getText()).toBe(`this.publicationPublisher.${name}`);
+			expect(expression.arguments.map((argument) => argument.getText())).toEqual(expectedArguments);
+		}
+	);
+
+	it("pins one private/branded capability, its exact export surface and one construction site", () => {
+		const capabilityPath = path.join(WORKSPACE_DIRECTORY, D922C_EXPECTED_TOPOLOGY[0]);
+		expect(fs.existsSync(capabilityPath)).toBe(true);
+		if (!fs.existsSync(capabilityPath)) return;
+		const source = fs.readFileSync(capabilityPath, "utf8");
+		expect(source).toMatch(/(?:unique symbol|#brand|private)/);
+		expect(source).toContain("copy");
+		expect(source).toContain("createEntry");
+		expect(source).toContain("createSnapshot");
+		expect(source).not.toMatch(/export\s+(?:const|function)\s+(?:cloneDeep|encode|decode|serializeValue)/);
+		const authority = d922cAuthority(analyze(realGovernedWorkspaceSources()) as D922cAnalysis);
+		expect(authority.capabilityExports).toEqual(D922C_CAPABILITY_EXPORTS);
+		expect(authority.capabilityConstructionSites).toEqual([
+			"packages/object/src/drp-applier.ts:DRPVertexApplier.constructor:createPublicationCapability#1",
+		]);
+		expect(authority.measuredCopyLeaf).toBe(
+			"packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy"
+		);
+		expect([...authority.measuredCopyLeafRoots].sort()).toEqual(D922C_ROOTS);
+	});
+
+	it("pins source-first loaded coverage, both reference tiers and an exact external runtime surface", () => {
+		const sources = realGovernedWorkspaceSources();
+		const authority = d922cAuthority(analyze(sources) as D922cAnalysis);
+		expect([...authority.loadedSourcePaths].sort()).toEqual(Object.keys(sources).sort());
+		expect([...authority.analyzedSourcePaths].sort()).toEqual(Object.keys(sources).sort());
+		expect(authority.analyzedSourcePaths.some((sourcePath) => sourcePath.endsWith("_pb.ts"))).toBe(true);
+		expect(authority.analyzedSourcePaths.some((sourcePath) => /(?:\/dist\/|node_modules)/.test(sourcePath))).toBe(
+			false
+		);
+		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(114);
+		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(114);
+		expect([...authority.packageReferenceSites].sort()).toEqual(D922C_PACKAGE_REFERENCE_SITES);
+		expect([...authority.closureReferenceSites].sort()).toEqual(D922C_CLOSURE_REFERENCE_SITES);
+		expect(authority.externalRuntimeSurface).toEqual([
+			"@msgpack/msgpack@3.1.1:decode",
+			"@msgpack/msgpack@3.1.1:encode",
+			"es-toolkit@1.30.1:cloneDeep",
+		]);
+		expect(authority.unresolvedAcquisitions).toEqual([]);
+	});
+
+	it("pins the exact package-wide snapshot constructors and admits no third root", () => {
+		const authority = d922cAuthority(analyze(realGovernedWorkspaceSources()) as D922cAnalysis);
+		expect(authority.snapshotConstructionSites).toEqual([
+			"packages/object/src/publication/copy-capability.ts:createPublicationCapability.createEntry:DRPStateEntry.create#1",
+			"packages/object/src/publication/copy-capability.ts:createPublicationCapability.createSnapshot:DRPState.create#1",
+			"packages/object/src/state-store.ts:DRPObjectStateManager.constructor:DRPState.create#1",
+			"packages/object/src/state-materialize.ts:stateFromDRP:DRPState.create#1",
+			"packages/object/src/state-materialize.ts:stateFromDRP:DRPStateEntry.create#1",
+			"packages/utils/src/serialization/index.ts:deserializeDRPState:DRPState.create#1",
+			"packages/utils/src/serialization/index.ts:deserializeDRPState:DRPStateEntry.create#1",
+		]);
+	});
+
+	it("pins scoped lint/glob authority without restricted-rule suppression drift", () => {
+		const lintConfig = fs.readFileSync(path.join(WORKSPACE_DIRECTORY, "eslint.config.mjs"), "utf8");
+		for (const rule of [
+			"no-restricted-globals",
+			"no-restricted-imports",
+			"no-restricted-properties",
+			"no-restricted-syntax",
+		]) {
+			expect(lintConfig).toContain(`"${rule}"`);
+		}
+		for (const sourcePath of D922C_EXPECTED_TOPOLOGY.slice(0, 2)) expect(lintConfig).toContain(sourcePath);
+
+		const suppressions = Object.entries(sourceFiles(SOURCE_DIRECTORY)).flatMap(([sourcePath, source]) =>
+			[...source.matchAll(/eslint-disable(?:-next-line)?\s+([^\n*]+)/g)].map(
+				([, rules]) => `${sourcePath}:${rules.trim()}`
+			)
+		);
+		expect(suppressions.filter((suppression) => suppression.includes("no-restricted-"))).toEqual([]);
+		expect(suppressions.sort()).toEqual(
+			[
+				"pipeline/types.ts:@typescript-eslint/no-explicit-any",
+				"state-materialize.ts:@typescript-eslint/no-explicit-any",
+				"state-materialize.ts:@typescript-eslint/no-explicit-any",
+				"state-materialize.ts:@typescript-eslint/no-explicit-any",
+				"state-materialize.ts:@typescript-eslint/no-explicit-any",
+				"state-materialize.ts:@typescript-eslint/no-explicit-any -- rightfully so this is not a problem",
+			].sort()
+		);
+	});
+
+	it("retains the exact 0 / 5 / 11 / 4 clone/capture tuple beside the fifth census", () => {
+		const analysis = analyze(realGovernedWorkspaceSources()) as D922cAnalysis;
+		expect(analysis.violations).toEqual([]);
+		expect(analysis.reviewedOperations).toEqual([...REVIEWED_WORKSPACE_OPERATIONS].sort());
+		expect(analysis.residualCloneSites).toEqual([...RESIDUAL_CLONE_SITES].sort());
+		expect(analysis.residualStateCaptureSites).toEqual([...RESIDUAL_STATE_CAPTURE_SITES].sort());
+		expect(d922cAuthority(analysis).codecReferenceSites).toHaveLength(94);
+	});
+
+	it.each(D922C_REEXPRESSED_MODULE_MUTANTS)("kills surviving module/export mutation: $name", ({ sources }) => {
+		expect(analyze(sources).violations).not.toEqual([]);
+	});
+
+	it.each(D922C_REFERENCE_MUTANTS)("kills sink/reference or fail-closed mutation: $name", ({ sources }) => {
+		expect(analyze(sources).violations).not.toEqual([]);
+	});
+
+	it.each(D922C_SAFE_CONTROLS)("keeps declaration-safe control clean: $name", ({ sources }) => {
+		expect(analyze(sources).violations).toEqual([]);
+	});
+
+	it("physically retires both value-flow analyzers and prohibits a third interpreter", () => {
+		const source = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+		expect(source).not.toContain("function analyzeLegacy(");
+		expect(source).not.toContain("function semanticAnalysis(");
+		for (const prohibited of [
+			"binding projector",
+			"callable interpreter",
+			"container interpreter",
+			"transfer relation",
+			"monotone-worklist-to-fixpoint",
+		]) {
+			expect(source.toLowerCase()).not.toContain(prohibited);
+		}
 	});
 });
