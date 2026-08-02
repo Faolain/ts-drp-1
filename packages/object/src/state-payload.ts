@@ -7,6 +7,10 @@ interface NodeBufferConstructor {
 	isBuffer(value: unknown): boolean;
 }
 
+interface ArrayBufferViewConstructor {
+	new (buffer: ArrayBufferLike, byteOffset: number, length: number): ArrayBufferView;
+}
+
 const mapEntries = Map.prototype.entries;
 const mapSet = Map.prototype.set;
 const setValues = Set.prototype.values;
@@ -19,6 +23,13 @@ const setIteratorNext = Object.getPrototypeOf(Reflect.apply(setValues, new Set()
 ) => IteratorResult<unknown>;
 const arrayBufferSlice = ArrayBuffer.prototype.slice;
 const sharedArrayBufferSlice = typeof SharedArrayBuffer === "undefined" ? undefined : SharedArrayBuffer.prototype.slice;
+const dataViewBuffer = Reflect.getOwnPropertyDescriptor(DataView.prototype, "buffer")?.get;
+const dataViewByteLength = Reflect.getOwnPropertyDescriptor(DataView.prototype, "byteLength")?.get;
+const dataViewByteOffset = Reflect.getOwnPropertyDescriptor(DataView.prototype, "byteOffset")?.get;
+const typedArrayPrototype = Reflect.getPrototypeOf(Uint8Array.prototype) as object;
+const typedArrayBuffer = Reflect.getOwnPropertyDescriptor(typedArrayPrototype, "buffer")?.get;
+const typedArrayByteOffset = Reflect.getOwnPropertyDescriptor(typedArrayPrototype, "byteOffset")?.get;
+const typedArrayLength = Reflect.getOwnPropertyDescriptor(typedArrayPrototype, "length")?.get;
 const propertyIsEnumerable = Object.prototype.propertyIsEnumerable;
 const nodeBufferConstructor = (globalThis as unknown as { Buffer?: NodeBufferConstructor }).Buffer;
 const nodeBufferFrom = nodeBufferConstructor?.from;
@@ -31,8 +42,23 @@ function enumerableKeys(value: object): PropertyKey[] {
 	];
 }
 
-function copyEnumerableProperties(target: ObjectRecord, source: ObjectRecord, stack: Map<object, unknown>): void {
+function copyEnumerableProperties(
+	target: ObjectRecord,
+	source: ObjectRecord,
+	stack: Map<object, unknown>,
+	indexedLength?: number
+): void {
 	for (const key of enumerableKeys(source)) {
+		const index = typeof key === "string" ? Number(key) : Number.NaN;
+		if (
+			indexedLength !== undefined &&
+			Number.isInteger(index) &&
+			index >= 0 &&
+			index < indexedLength &&
+			`${index}` === key
+		) {
+			continue;
+		}
 		const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
 		if (descriptor === undefined || descriptor.writable) {
 			target[key] = detachStatePayloadWithStack(source[key], stack);
@@ -120,24 +146,51 @@ function detachStatePayloadWithStack(value: unknown, stack: Map<object, unknown>
 
 	if (ArrayBuffer.isView(value)) {
 		if (value instanceof DataView) {
-			const buffer = detachStatePayloadWithStack(value.buffer, stack) as ArrayBuffer;
-			const result = new DataView(buffer, value.byteOffset, value.byteLength);
+			if (dataViewBuffer === undefined || dataViewByteLength === undefined || dataViewByteOffset === undefined) {
+				throw new TypeError("DataView intrinsics are not available");
+			}
+			const prototype = Reflect.getPrototypeOf(value) as object;
+			const sourceBuffer = Reflect.apply(dataViewBuffer, value, []) as ArrayBufferLike;
+			const byteOffset = Reflect.apply(dataViewByteOffset, value, []) as number;
+			const byteLength = Reflect.apply(dataViewByteLength, value, []) as number;
+			const buffer = detachStatePayloadWithStack(sourceBuffer, stack) as ArrayBufferLike;
+			const constructor = Reflect.get(prototype, "constructor") as ArrayBufferViewConstructor;
+			const result = Reflect.construct(constructor, [buffer, byteOffset, byteLength]) as DataView;
+			if (
+				!(result instanceof DataView) ||
+				Reflect.getPrototypeOf(result) !== prototype ||
+				Reflect.apply(dataViewBuffer, result, []) !== buffer ||
+				Reflect.apply(dataViewByteOffset, result, []) !== byteOffset ||
+				Reflect.apply(dataViewByteLength, result, []) !== byteLength
+			) {
+				throw new TypeError("Unsupported DataView constructor");
+			}
 			stack.set(value, result);
 			copyEnumerableProperties(result as unknown as ObjectRecord, value as unknown as ObjectRecord, stack);
 			return result;
 		}
-		const source = value as unknown as {
-			[index: number]: unknown;
-			readonly length: number;
-		};
-		const prototype = Reflect.getPrototypeOf(value) as {
-			constructor: new (length: number) => { [index: number]: unknown; readonly length: number };
-		};
-		const result = new prototype.constructor(source.length);
-		stack.set(value, result);
-		for (let index = 0; index < source.length; index++) {
-			result[index] = detachStatePayloadWithStack(source[index], stack);
+		if (typedArrayBuffer === undefined || typedArrayByteOffset === undefined || typedArrayLength === undefined) {
+			throw new TypeError("TypedArray intrinsics are not available");
 		}
+		const prototype = Reflect.getPrototypeOf(value) as object;
+		const sourceBuffer = Reflect.apply(typedArrayBuffer, value, []) as ArrayBufferLike;
+		const byteOffset = Reflect.apply(typedArrayByteOffset, value, []) as number;
+		const length = Reflect.apply(typedArrayLength, value, []) as number;
+		const buffer = detachStatePayloadWithStack(sourceBuffer, stack) as ArrayBufferLike;
+		const constructor = Reflect.get(prototype, "constructor") as ArrayBufferViewConstructor;
+		const result = Reflect.construct(constructor, [buffer, byteOffset, length]);
+		if (
+			!ArrayBuffer.isView(result) ||
+			result instanceof DataView ||
+			Reflect.getPrototypeOf(result) !== prototype ||
+			Reflect.apply(typedArrayBuffer, result, []) !== buffer ||
+			Reflect.apply(typedArrayByteOffset, result, []) !== byteOffset ||
+			Reflect.apply(typedArrayLength, result, []) !== length
+		) {
+			throw new TypeError("Unsupported TypedArray constructor");
+		}
+		stack.set(value, result);
+		copyEnumerableProperties(result as unknown as ObjectRecord, value as unknown as ObjectRecord, stack, length);
 		return result;
 	}
 
