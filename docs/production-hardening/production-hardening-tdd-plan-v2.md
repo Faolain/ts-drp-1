@@ -15066,7 +15066,7 @@ the frozen four typed star/namespace failures plus the two named type-only false
 positives. All behavioral, type, lint, format, scope, authority and production
 authentication remains identical to the preceding RED checkpoint.
 
-**Complete typed export-classifier GREEN checkpoint (reviews pending).** Fresh
+**Accepted complete typed export-classifier GREEN checkpoint.** Fresh
 Codex-high commit `45ec50d00c0f9653a7e0231956868cb2d6124239` changes only the
 structural authority test. One readable known-external-sink table now owns the
 two package names, member labels, wildcard labels and installed-version
@@ -15090,14 +15090,40 @@ Coverage-bearing suites ran serially. A first object typecheck exposed
 TypeScript callback narrowing of `moduleSpecifier`; capturing the node before
 the table lookup fixed the type error without changing classifier scope.
 
+Fresh Grok 4.5/high session `019fc12f-ba98-7f02-bf2e-e995534ccc47`, exact
+independent Kimi 3/high/100 session
+`a7f9716d-36a2-48a9-877a-a0863e0c242a` and final Opus/xhigh session
+`686e7a60-7fb8-4629-8675-56b99549cd26` all returned `ACCEPTED`. Grok's
+read-only sandbox could not create Vite temporary files, so it authenticated
+the recorded 64/64 result and independently exercised the extracted authority;
+Kimi and Opus each reproduced the focused 64/64 suite coverage-disabled. Opus
+also reverted the `NamespaceExport`, declaration-level `isTypeOnly` and named
+specifier type-only guards in memory; each reversal failed exactly its owned
+rows and no others. All reviewers confirmed the 12-row finite declaration
+model, exact 344-line authority and SHA-256, byte-identical production, absence
+of value-flow/interpreter regrowth and continued golden-path alignment. The
+Opus CLI disclosed a 25-output-token automatic Haiku title/helper call; it was
+non-substantive and did not inspect or influence the review.
+
+Maintenance gotchas are nonblocking and explicit. External member recognition
+and surface metadata currently have two readable touchpoints because the
+recognizer also owns `node:v8`, which has no package manifest; a future third
+external sink must update both. Fixture versions intentionally duplicate the
+installed manifests so dependency bumps fail loudly. Namespace consumers are
+deliberately rejected at the export edge instead of traced as member accesses.
+The zero-byte owned-lint artifact is superseded by the concatenated tracked-lint
+artifact, whose six zero-error warning totals are `35+28+17+44+6+96=226`.
+D.92.2 is therefore accepted and D.92.3 is unblocked without claiming any part
+of D.92.3, D.92.4 or D.73.
+
 #### D.92.3 — Map object-key detachment contract
 
-**Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
-passed fresh Codex-high RED/GREEN ownership, Grok-high, exact Kimi 3/high with
-both 100-step controls, and final Opus/xhigh acceptance. D.92.2-a/b are rejected
-transition evidence, not outstanding prerequisites. No part of D.92.3, D.92.4
-or D.73 may be folded into D.92.2-d′ merely because the production split touches
-the same seam.
+**Entry gate satisfied:** the replacement D.92.2-c′/d′ pair passed fresh
+Codex-high RED/GREEN ownership, Grok-high, exact Kimi 3/high with both 100-step
+controls, and final Opus/xhigh acceptance. D.92.2-a/b are rejected transition
+evidence, not outstanding prerequisites. No part of D.92.3, D.92.4 or D.73 may
+be folded into D.92.2-d′ merely because the production split touches the same
+seam.
 
 One shared graph-aware state-payload detachment primitive must replace the
 graph-incomplete ownership copies. It must clone Map keys and values through
@@ -15166,15 +15192,19 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Continue D.92.2-d′ with a fresh Codex-high tests-only RED over the final typed
-export-declaration gap recorded above: runtime/type-only × star/namespace for
-both known external sink packages, while freezing every accepted named
-re-export, deserializer, known-global and safe control. Do not edit the authority
-or production in RED. Then use a distinct Codex-high GREEN to implement one
-typed known-sink export classifier while keeping the authority readable, wholly
-inside its markers and production behavior unchanged. Re-run the complete gates
-and fresh Grok-high / exact Kimi 3/high/100 reviews. Final Opus/xhigh runs only
-if both accept. D.92.3 stays blocked.
+Begin D.92.3 with a fresh Codex-high tests-only RED for one shared graph-aware
+state-payload detachment primitive. Freeze the accepted D.92.2 authority and
+production topology. Prove Map object keys and values share one identity stack
+within each independently copied top-level payload, including key-equals-value,
+cross-Map/Set/property aliases, cycles and distinct deep-equal keys. Cover every
+state capture, reconstruction, publication, observer, copy-in/copy-out,
+checkpoint, rollback, prune, sibling and fallback owner listed above; kill both
+`result.set(originalKey, clonedValue)` and one-site-only publication fixes.
+Retain exact wire bytes, failure atomicity, primary throwable, copy counters,
+per-case ratios and the bounded 1 MiB characterization. RED may change tests
+only. Use a distinct Codex-high GREEN, then run the complete gates and fresh
+Grok-high / exact Kimi 3/high/100 reviews; final Opus/xhigh runs only if both
+accept. D.92.4 and D.73 remain separate later owners.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
