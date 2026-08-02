@@ -9,6 +9,8 @@ import { DRPVertexApplier } from "../src/drp-applier.js";
 import { FinalityStore } from "../src/finality/index.js";
 import { HashGraph } from "../src/hashgraph/index.js";
 import { type MutationTrackingResult, trackMutations } from "../src/proxy.js";
+import { type ComparisonEvent, createPublicationCapability } from "../src/publication/copy-capability.js";
+import { PublicationPublisher } from "../src/publication/publisher.js";
 import { DRPObjectStateManager, stateFromDRP } from "../src/state.js";
 
 interface Child {
@@ -101,6 +103,15 @@ class EscapeMap extends Map<unknown, unknown> {
 		root.frozenHolder = Object.freeze({ child });
 		Set.prototype.clear.call(root.frozenMirrorSet);
 		Set.prototype.add.call(root.frozenMirrorSet, child);
+	}
+
+	captureRawRoot<T extends object>(root: T, capture: (value: T) => void): void {
+		capture(root);
+	}
+
+	captureRawRootThenThrow<T extends object>(root: T, capture: (value: T) => void, failure: unknown): never {
+		capture(root);
+		throw failure;
 	}
 }
 
@@ -394,6 +405,76 @@ describe("Phase 1d(i) raw-child escape controls", () => {
 		expect(() => hostile.child).toThrow(TypeError);
 		expect([...tracked.changedKeys()]).toEqual([]);
 	});
+
+	it("keeps repeated dirty readers free of root census and payload traversal", () => {
+		let ownKeyPasses = 0;
+		let payloadReads = 0;
+		const ballast = (): object =>
+			Object.defineProperty({}, "value", {
+				enumerable: true,
+				get(): number {
+					payloadReads++;
+					return 1;
+				},
+			});
+		const raw = new Proxy(
+			{ map: new EscapeMap([["entry", 1]]), ballastAlpha: ballast(), ballastBeta: ballast() },
+			{
+				ownKeys(target): ArrayLike<string | symbol> {
+					ownKeyPasses++;
+					return Reflect.ownKeys(target);
+				},
+			}
+		);
+		const tracked = trackMutations(raw);
+		tracked.proxy.map.readOnly();
+		const workAfterEgress = { ownKeyPasses, payloadReads };
+
+		for (let index = 0; index < 100; index++) {
+			tracked.hasChanges();
+			tracked.changedKeys();
+		}
+
+		expect({ ownKeyPasses, payloadReads }).toEqual(workAfterEgress);
+	});
+
+	it("fails closed without copying or reusing when final candidate comparison throws", () => {
+		const failure = Object.freeze({ code: "candidate-comparison-failure" });
+		let copies = 0;
+		const capability = createPublicationCapability((event: { type: string; value?: unknown }): unknown => {
+			if (event.type !== "copy") return undefined;
+			copies++;
+			return cloneDeep(event.value);
+		});
+		capability.equal = (): never => {
+			throw failure;
+		};
+		const publisher = new PublicationPublisher({} as never, capability);
+		const publication = {
+			publicationId: "raw-egress-comparison-failure",
+			kind: "vertex" as const,
+			mode: "incremental" as const,
+			outcome: "published" as const,
+			baselineHashes: [] as Hash[],
+			frontier: [] as Hash[],
+			changed: { acl: [] as string[], drp: [] as string[] },
+		};
+
+		expect(
+			caught(() =>
+				publisher.capturePublishedState(
+					"drp",
+					{ payload: { value: 1 } } as unknown as IDRP,
+					{ state: [{ key: "payload", value: { value: 1 } }] },
+					publication,
+					true,
+					new Set(["payload"])
+				)
+			)
+		).toBe(failure);
+		expect(copies).toBe(0);
+		expect(publication.changed.drp).toEqual([]);
+	});
 });
 
 type SnapshotSide = "acl" | "drp";
@@ -405,20 +486,54 @@ interface PublicationRecord {
 	outcome: "published" | "rolled-back";
 	targetHash?: Hash;
 	changed: Readonly<Record<SnapshotSide, readonly string[]>>;
+	work?: Readonly<Record<SnapshotSide, PublicationWorkCounters>>;
+}
+
+interface PublicationWorkCounters {
+	egressWidenings: number;
+	comparedKeys: number;
+	comparisonPasses: number;
+}
+
+interface PublicationCopyMetadata {
+	publicationId: string;
+	side: SnapshotSide;
+	key: string;
+	image: "pre" | "post";
 }
 
 type PublicationObserverEvent =
-	| { type: "copy"; value: unknown; metadata: unknown }
+	| { type: "copy"; value: unknown; metadata: PublicationCopyMetadata }
 	| { type: "publication"; record: PublicationRecord };
 
 class PublicationProbe {
+	readonly comparisons: ComparisonEvent[] = [];
+	readonly copies: PublicationCopyMetadata[] = [];
 	readonly publications: PublicationRecord[] = [];
 
 	observe(event: PublicationObserverEvent): unknown {
-		if (event.type === "copy") return cloneDeep(event.value);
+		if (event.type === "copy") {
+			this.copies.push({ ...event.metadata });
+			return cloneDeep(event.value);
+		}
 		this.publications.push({
 			...event.record,
 			changed: { acl: [...event.record.changed.acl], drp: [...event.record.changed.drp] },
+			work: event.record.work
+				? {
+						acl: { ...event.record.work.acl },
+						drp: { ...event.record.work.drp },
+					}
+				: undefined,
+		});
+	}
+
+	observeComparison(event: ComparisonEvent): void {
+		this.comparisons.push({
+			...event,
+			metadata: { ...event.metadata },
+			pair: { ...event.pair },
+			counters: { ...event.counters },
 		});
 	}
 }
@@ -447,7 +562,10 @@ class RawEscapeFixture implements IDRP {
 	frozenAlias = { id: "frozen", value: 0 };
 	frozenHolder: Readonly<{ child: Child }> = Object.freeze({ child: { id: "frozen", value: 0 } });
 	frozenMirrorSet = new Set([{ id: "frozen", value: 0 }]);
-	ballast = { stable: "unchanged" };
+	ballastAlpha = { stable: "unchanged-alpha" };
+	ballastBeta = { stable: "unchanged-beta" };
+	lateRemoved = { state: "present-before-egress" };
+	declare lateAdded: { state: string };
 
 	customMethodEscape(value: number): void {
 		// Nested collection subclasses are reconstructed as native Map/Set values.
@@ -514,6 +632,49 @@ class RawEscapeFixture implements IDRP {
 			Reflect.deleteProperty(this.inheritedSet, "readOnly");
 		}
 	}
+
+	mutateRawRootAfterReturn(): void {
+		let escaped: RawEscapeFixture | undefined;
+		Object.defineProperty(this.customMap, "captureRawRoot", {
+			configurable: true,
+			value: EscapeMap.prototype.captureRawRoot,
+		});
+		try {
+			this.customMap.captureRawRoot(this, (root: RawEscapeFixture): void => {
+				escaped = root;
+			});
+		} finally {
+			Reflect.deleteProperty(this.customMap, "captureRawRoot");
+		}
+		if (!escaped) throw new Error("raw root was not captured");
+		escaped.lateAdded = { state: "added-after-return" };
+		Reflect.deleteProperty(escaped, "lateRemoved");
+	}
+
+	mutateRawRootAfterCaughtThrow(): void {
+		let escaped: RawEscapeFixture | undefined;
+		const failure = Object.freeze({ code: "raw-root-primary" });
+		Object.defineProperty(this.customMap, "captureRawRootThenThrow", {
+			configurable: true,
+			value: EscapeMap.prototype.captureRawRootThenThrow,
+		});
+		try {
+			this.customMap.captureRawRootThenThrow(
+				this,
+				(root: RawEscapeFixture): void => {
+					escaped = root;
+				},
+				failure
+			);
+		} catch (error) {
+			if (error !== failure) throw error;
+		} finally {
+			Reflect.deleteProperty(this.customMap, "captureRawRootThenThrow");
+		}
+		if (!escaped) throw new Error("raw root was not captured before throw");
+		escaped.lateAdded = { state: "added-after-caught-throw" };
+		Reflect.deleteProperty(escaped, "lateRemoved");
+	}
 }
 
 interface Harness {
@@ -538,6 +699,7 @@ function harness(): Harness {
 		finalityStore: new FinalityStore(),
 		notify: (): void => {},
 		publicationObserver: probe.observe.bind(probe),
+		comparisonObserver: probe.observeComparison.bind(probe),
 	};
 	const Applier = DRPVertexApplier as unknown as new (candidate: typeof options) => DRPVertexApplier<RawEscapeFixture>;
 	return { rawDRP, applier: new Applier(options), hashGraph, probe, states };
@@ -553,6 +715,65 @@ function encodedState(value: IDRP): Uint8Array {
 	return DRPStateOtherTheWire.encode(serializeDRPState(stateFromDRP(value))).finish();
 }
 
+function publicationFor(h: Harness, targetHash: Hash): PublicationRecord {
+	const publication = h.probe.publications.find(
+		(candidate) => candidate.kind === "vertex" && candidate.targetHash === targetHash
+	);
+	expect(publication, "the authored vertex must publish").toBeDefined();
+	return publication!;
+}
+
+function expectRawEgressWork(
+	h: Harness,
+	publication: PublicationRecord,
+	before: ReadonlyMap<string, Uint8Array>
+): void {
+	const after = frozenBytesByKey(h.rawDRP);
+	const expectedComparedKeys = [...before.keys()].filter((key) => after.has(key)).sort();
+	const expectedConsideredKeyCount = new Set([...before.keys(), ...after.keys()]).size;
+	const comparisons = h.probe.comparisons.filter(
+		(event) =>
+			event.metadata.publicationId === publication.publicationId &&
+			event.metadata.phase === "publisher-capture" &&
+			event.metadata.side === "drp"
+	);
+	const comparedKeys = comparisons.map((event) => event.metadata.key).sort();
+	const changedByBytes = new Set(byteDeltaKeys(before, h.rawDRP));
+	expect
+		.soft(comparedKeys, "raw egress must explicitly compare every baseline-present governed key")
+		.toEqual(expectedComparedKeys);
+	expect
+		.soft(new Set(comparedKeys).size, "each governed key is compared once in one bounded pass")
+		.toBe(comparedKeys.length);
+	for (const event of comparisons) {
+		expect
+			.soft(event.result, `final comparison result for ${event.metadata.key} must match byte truth`)
+			.toBe(!changedByBytes.has(event.metadata.key));
+		if (
+			event.pair.left !== null &&
+			event.pair.right !== null &&
+			typeof event.pair.left === "object" &&
+			typeof event.pair.right === "object"
+		) {
+			expect
+				.soft(event.pair.left, `comparison baseline for ${event.metadata.key} must be owned and detached`)
+				.not.toBe(event.pair.right);
+		}
+	}
+	expect.soft(publication.work, "publication must expose bounded raw-egress work").toBeDefined();
+	if (!publication.work) return;
+	expect.soft(publication.work.drp).toMatchObject({
+		egressWidenings: 1,
+		comparedKeys: expectedConsideredKeyCount,
+		comparisonPasses: 1,
+	});
+	expect.soft(publication.work.acl).toEqual({
+		egressWidenings: 0,
+		comparedKeys: 0,
+		comparisonPasses: 0,
+	});
+}
+
 function expectPublicationTruth(
 	h: Harness,
 	opType: string,
@@ -562,13 +783,18 @@ function expectPublicationTruth(
 	const vertex = vertexFor(h, opType);
 	const truth = byteDeltaKeys(before, h.rawDRP);
 	expect(truth, "full-state byte oracle must identify the intended physical owners").toEqual(expectedKeys);
-	const publication = h.probe.publications.find(
-		(candidate) => candidate.kind === "vertex" && candidate.targetHash === vertex.hash
-	);
-	expect(publication, "the authored vertex must publish").toBeDefined();
+	const publication = publicationFor(h, vertex.hash);
 	expect
 		.soft(publication, "final byte-filtered publication keys must equal byte truth")
 		.toMatchObject({ mode: "incremental", changed: { acl: [], drp: truth } });
+	const copiedKeys = h.probe.copies
+		.filter((copy) => copy.publicationId === publication.publicationId && copy.side === "drp" && copy.image === "post")
+		.map((copy) => copy.key)
+		.sort();
+	expect
+		.soft(copiedKeys, "final byte filter must detach only changed keys, never unchanged ballast")
+		.toEqual(expectedKeys.filter((key) => frozenBytesByKey(h.rawDRP).has(key)).sort());
+	expectRawEgressWork(h, publication, before);
 	const stored = h.states.getDRPState(vertex.hash)!;
 	expect
 		.soft(
@@ -623,6 +849,24 @@ describe("Phase 1d(i) raw-child escape publication", () => {
 		]);
 	});
 
+	it("widens governed names added or deleted after an unknown method returns", () => {
+		const h = harness();
+		const before = frozenBytesByKey(h.rawDRP);
+
+		h.applier.drp!.mutateRawRootAfterReturn();
+
+		expectPublicationTruth(h, "mutateRawRootAfterReturn", before, ["lateAdded", "lateRemoved"]);
+	});
+
+	it("widens governed names after an unknown method throws without replacing its primary throwable", () => {
+		const h = harness();
+		const before = frozenBytesByKey(h.rawDRP);
+
+		h.applier.drp!.mutateRawRootAfterCaughtThrow();
+
+		expectPublicationTruth(h, "mutateRawRootAfterCaughtThrow", before, ["lateAdded", "lateRemoved"]);
+	});
+
 	it("byte-filters conservative read-only custom candidates at publication", () => {
 		const h = harness();
 		const before = frozenBytesByKey(h.rawDRP);
@@ -631,8 +875,13 @@ describe("Phase 1d(i) raw-child escape publication", () => {
 
 		const vertex = vertexFor(h, "readOnlyCustomMethods");
 		expect(byteDeltaKeys(before, h.rawDRP)).toEqual([]);
-		const publication = h.probe.publications.find((candidate) => candidate.targetHash === vertex.hash);
+		const publication = publicationFor(h, vertex.hash);
 		expect(publication).toMatchObject({ mode: "incremental", changed: { acl: [], drp: [] } });
+		expect(
+			h.probe.copies.filter((copy) => copy.publicationId === publication.publicationId),
+			"read-only all-key candidacy must publish and detach zero payloads"
+		).toEqual([]);
+		expectRawEgressWork(h, publication, before);
 		expect(encodedState(h.states.fromHash(vertex.hash)[0]!)).toEqual(encodedState(h.rawDRP));
 	});
 });
