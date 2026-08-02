@@ -189,6 +189,84 @@ function observedComparison(left: unknown, right: unknown, key = "payload"): Com
 	return comparisons[0]!;
 }
 
+interface HostileTraversalAccess {
+	entries: number;
+	sentinel: Error;
+	size: number;
+	values: number;
+}
+
+class HostileMap extends Map<unknown, unknown> {
+	constructor(
+		entries: Iterable<readonly [unknown, unknown]>,
+		private readonly access: HostileTraversalAccess
+	) {
+		super(entries);
+	}
+
+	get size(): number {
+		this.access.size++;
+		throw this.access.sentinel;
+	}
+
+	entries(): MapIterator<[unknown, unknown]> {
+		this.access.entries++;
+		throw this.access.sentinel;
+	}
+
+	values(): MapIterator<unknown> {
+		this.access.values++;
+		throw this.access.sentinel;
+	}
+}
+
+class HostileSet extends Set<unknown> {
+	constructor(
+		values: Iterable<unknown>,
+		private readonly access: HostileTraversalAccess
+	) {
+		super(values);
+	}
+
+	get size(): number {
+		this.access.size++;
+		throw this.access.sentinel;
+	}
+
+	entries(): SetIterator<[unknown, unknown]> {
+		this.access.entries++;
+		throw this.access.sentinel;
+	}
+
+	values(): SetIterator<unknown> {
+		this.access.values++;
+		throw this.access.sentinel;
+	}
+}
+
+class ForgedMapTag {
+	readonly [Symbol.toStringTag] = "Map";
+}
+
+class ForgedSetTag {
+	readonly [Symbol.toStringTag] = "Set";
+}
+
+function hostileAccess(kind: "Map" | "Set"): HostileTraversalAccess {
+	return {
+		entries: 0,
+		sentinel: new Error(`${kind} hostile traversal sentinel`),
+		size: 0,
+		values: 0,
+	};
+}
+
+function expectNoHostileTraversal(access: HostileTraversalAccess): void {
+	expect(access.entries).toBe(0);
+	expect(access.size).toBe(0);
+	expect(access.values).toBe(0);
+}
+
 class CandidateDRP implements IDRP {
 	semanticsType = SemanticsType.pair;
 	ballast = { stable: true };
@@ -532,31 +610,131 @@ describe("Phase 1d(i) D.92.3-P1 single linear comparison authority RED", () => {
 		expect(accepted.encodeCalls).toBe(2);
 	});
 
-	it.each(["Map", "Set"] as const)("uses captured %s traversal intrinsics for semantic early rejection", (kind) => {
-		const sentinel = new Error(`${kind} hostile iterator`);
-		const left = kind === "Map" ? new Map([[1, "a"]]) : new Set([1]);
-		const right = kind === "Map" ? new Map([[2, "a"]]) : new Set([2]);
-		Object.defineProperties(left, {
-			[kind === "Map" ? "entries" : "values"]: {
-				value: (): never => {
-					throw sentinel;
+	it.each(["Map", "Set"] as const)(
+		"uses captured %s traversal intrinsics for semantic early rejection (kills hostile traversal)",
+		(kind) => {
+			const sentinel = new Error(`${kind} hostile iterator`);
+			let hostileCalls = 0;
+			const left = kind === "Map" ? new Map([[1, "a"]]) : new Set([1]);
+			const right = kind === "Map" ? new Map([[2, "a"]]) : new Set([2]);
+			Object.defineProperties(left, {
+				[kind === "Map" ? "entries" : "values"]: {
+					value: (): never => {
+						hostileCalls++;
+						throw sentinel;
+					},
 				},
-			},
-			[Symbol.iterator]: {
-				value: (): never => {
-					throw sentinel;
+				[Symbol.iterator]: {
+					value: (): never => {
+						hostileCalls++;
+						throw sentinel;
+					},
 				},
-			},
-		});
-		expect(() =>
-			meteredCapability([]).equal(left, right, {
+			});
+			const result = meteredCapability([]).equal(left, right, {
 				publicationId: `hostile-${kind}`,
 				phase: "publisher-capture",
 				side: "drp",
 				key: kind,
-			})
-		).not.toThrow();
-	});
+			});
+			expect(result).toBe(false);
+			expect(hostileCalls).toBe(0);
+		}
+	);
+
+	it.each(["Map", "Set"] as const)(
+		"allows equal hostile genuine %s subclasses only after exact codec arbitration (kills semantic-only accept and skipped codec)",
+		(kind) => {
+			const access = hostileAccess(kind);
+			const left =
+				kind === "Map" ? new HostileMap([["entry", { nested: 1 }]], access) : new HostileSet([{ nested: 1 }], access);
+			const right =
+				kind === "Map" ? new HostileMap([["entry", { nested: 1 }]], access) : new HostileSet([{ nested: 1 }], access);
+
+			const historical = outcome(() => deepEqual(left, right) && serializedValuesEqual(left, right));
+			expect(historical.thrown).toBe(access.sentinel);
+			access.entries = 0;
+			access.size = 0;
+			access.values = 0;
+
+			const events: ObserverEvent[] = [];
+			const result = meteredCapability(events).equal(left, right, {
+				publicationId: `equal-hostile-${kind}`,
+				phase: "publisher-capture",
+				side: "drp",
+				key: kind,
+			});
+			expect(result).toBe(true);
+			expectNoHostileTraversal(access);
+			const comparisons = comparisonEvents(events);
+			expect(comparisons).toHaveLength(1);
+			expect(comparisons[0]?.result).toBe(true);
+			expect(comparisons[0]?.counters).toMatchObject({
+				codecPasses: 1,
+				encodeCalls: 2,
+				encodedBytes: serializeValue(left).byteLength + serializeValue(right).byteLength,
+			});
+		}
+	);
+
+	it.each(["Map", "Set"] as const)(
+		"fails closed before codec work for forged %s tags (kills forged-tag fail-open)",
+		(kind) => {
+			const left = kind === "Map" ? new ForgedMapTag() : new ForgedSetTag();
+			const right = kind === "Map" ? new ForgedMapTag() : new ForgedSetTag();
+			expect(left.constructor).not.toBe(Object);
+			const nativeGetter = Object.getOwnPropertyDescriptor(kind === "Map" ? Map.prototype : Set.prototype, "size")?.get;
+			expect(nativeGetter).toBeDefined();
+			const expected = outcome(() => Reflect.apply(nativeGetter!, left, []));
+			expect(expected.thrown).toBeInstanceOf(TypeError);
+
+			const events: ObserverEvent[] = [];
+			const actual = outcome(() =>
+				meteredCapability(events).equal(left, right, {
+					publicationId: `forged-${kind}`,
+					phase: "publisher-capture",
+					side: "drp",
+					key: kind,
+				})
+			);
+			expectSameOutcome(actual, expected, `forged-${kind}`);
+			const comparisons = comparisonEvents(events);
+			expect(comparisons).toHaveLength(1);
+			expect(comparisons[0]?.result).toBe(false);
+			expect(comparisons[0]?.counters).toMatchObject({ codecPasses: 0, encodeCalls: 0, encodedBytes: 0 });
+		}
+	);
+
+	it.each(["publisher-capture", "applier-candidacy"] as const)(
+		"rejects asymmetric cycles without codec work in the %s phase (kills wrongful cycle reuse and restored cycle throw)",
+		(phase) => {
+			const selfCycle: { next?: unknown } = {};
+			selfCycle.next = selfCycle;
+			const twoNodeLeft: { next?: unknown } = {};
+			const twoNodeRight: { next?: unknown } = {};
+			twoNodeLeft.next = twoNodeRight;
+			twoNodeRight.next = twoNodeLeft;
+
+			const historical = outcome(
+				() => deepEqual(selfCycle, twoNodeLeft) && serializedValuesEqual(selfCycle, twoNodeLeft)
+			);
+			expect(historical.thrown).toBeInstanceOf(RangeError);
+			const events: ObserverEvent[] = [];
+			const actual = outcome(() =>
+				meteredCapability(events).equal(selfCycle, twoNodeLeft, {
+					publicationId: `asymmetric-cycle-${phase}`,
+					phase,
+					side: "drp",
+					key: "cycle",
+				})
+			);
+			expect(actual).toEqual({ result: false });
+			const comparisons = comparisonEvents(events);
+			expect(comparisons).toHaveLength(1);
+			expect(comparisons[0]?.result).toBe(false);
+			expect(comparisons[0]?.counters).toMatchObject({ codecPasses: 0, encodeCalls: 0, encodedBytes: 0 });
+		}
+	);
 
 	it.each([
 		[
