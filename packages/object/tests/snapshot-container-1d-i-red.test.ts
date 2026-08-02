@@ -15,6 +15,7 @@ class SnapshotFixture implements IDRP {
 
 type SnapshotSide = "acl" | "drp";
 type ReconstructionPath = "fromHash" | "fromStates";
+type EntryStageMode = "changes" | "throws";
 
 function entry(key: string, value: unknown): DRPState["state"][number] {
 	return DRPStateEntry.create({ key, value });
@@ -91,6 +92,38 @@ function reconstruct(
 
 function otherSide(side: SnapshotSide): SnapshotSide {
 	return side === "acl" ? "drp" : "acl";
+}
+
+function unstableEntry(mode: EntryStageMode): {
+	entry: DRPState["state"][number];
+	firstValue: { marker: string };
+	reads: { key: number; value: number };
+	sentinel: Error;
+} {
+	const firstValue = { marker: "first-stage" };
+	const laterValue = { marker: "later-read" };
+	const reads = { key: 0, value: 0 };
+	const sentinel = new Error("staged entry must not be read twice");
+	const entry = new Proxy(
+		{},
+		{
+			get(_target, property): unknown {
+				if (property === "key") {
+					reads.key++;
+					if (reads.key === 1) return "left";
+					if (mode === "throws") throw sentinel;
+					return "right";
+				}
+				if (property === "value") {
+					reads.value++;
+					if (reads.value === 1) return firstValue;
+					return laterValue;
+				}
+				return undefined;
+			},
+		}
+	) as DRPState["state"][number];
+	return { entry, firstValue, reads, sentinel };
 }
 
 describe("Phase 1d(i) D.92.3-P2 captured snapshot-container traversal", () => {
@@ -507,6 +540,103 @@ describe("Phase 1d(i) D.92.3-P2 raw stored snapshot-container traversal", () => 
 
 			expect(thrown).toBe(sentinel);
 			expect(raw.state).toBe(entries);
+			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
+		}
+	);
+});
+
+describe("Phase 1d(i) D.92.3-P2 reconstruction entry staging", () => {
+	it.each([
+		["fromHash", "changes"],
+		["fromHash", "throws"],
+		["fromStates", "changes"],
+		["fromStates", "throws"],
+	] as const)(
+		"stages each entry key/value exactly once before %s reconstruction when a later read %s",
+		(path, mode) => {
+			const target = object();
+			const states = manager(target);
+			const hash = `entry-staging-${path}-${mode}`;
+			const unstable = unstableEntry(mode);
+			const raw = snapshot([unstable.entry]);
+			const stableACL = snapshot([entry("stable", { marker: "acl" })]);
+			const originalDescriptor = Reflect.getOwnPropertyDescriptor(SnapshotFixture.prototype, "left");
+			const assignmentReads: { key: number; value: number }[] = [];
+			Reflect.defineProperty(SnapshotFixture.prototype, "left", {
+				configurable: true,
+				set(this: SnapshotFixture, value: unknown): void {
+					assignmentReads.push({ ...unstable.reads });
+					Object.defineProperty(this, "left", { configurable: true, enumerable: true, value, writable: true });
+				},
+			});
+			let thrown: unknown;
+			let reconstructed: SnapshotFixture | undefined;
+			try {
+				try {
+					[reconstructed] = reconstruct(path, states, hash, raw, stableACL);
+				} catch (error) {
+					thrown = error;
+				}
+			} finally {
+				if (originalDescriptor === undefined) Reflect.deleteProperty(SnapshotFixture.prototype, "left");
+				else Reflect.defineProperty(SnapshotFixture.prototype, "left", originalDescriptor);
+			}
+
+			expect(thrown).toBeUndefined();
+			expect(unstable.reads).toEqual({ key: 1, value: 1 });
+			expect(assignmentReads).toEqual([{ key: 1, value: 1 }]);
+			expect(reconstructed!.left).toMatchObject({ marker: unstable.firstValue.marker });
+			expect(reconstructed!.left).not.toBe(unstable.firstValue);
+			expect(reconstructed!.right).toBeUndefined();
+			expect(raw.state[0]).toBe(unstable.entry);
+			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
+			if (mode === "throws") expect(thrown).not.toBe(unstable.sentinel);
+		}
+	);
+
+	it.each(["fromHash", "fromStates"] as const)(
+		"rejects a later sibling entry getter before any %s reconstruction assignment",
+		(path) => {
+			const target = object();
+			const states = manager(target);
+			const hash = `entry-staging-sibling-${path}`;
+			const sentinel = new Error("later sibling entry getter sentinel");
+			const first = entry("left", { marker: "first" });
+			const sibling = new Proxy(
+				{},
+				{
+					get(_target, property): unknown {
+						if (property === "key") throw sentinel;
+						return undefined;
+					},
+				}
+			) as DRPState["state"][number];
+			const raw = snapshot([first, sibling]);
+			const stableACL = snapshot([entry("stable", { marker: "acl" })]);
+			const originalDescriptor = Reflect.getOwnPropertyDescriptor(SnapshotFixture.prototype, "left");
+			let assignments = 0;
+			Reflect.defineProperty(SnapshotFixture.prototype, "left", {
+				configurable: true,
+				set(): void {
+					assignments++;
+				},
+			});
+			let thrown: unknown;
+			try {
+				try {
+					reconstruct(path, states, hash, raw, stableACL);
+				} catch (error) {
+					thrown = error;
+				}
+			} finally {
+				if (originalDescriptor === undefined) Reflect.deleteProperty(SnapshotFixture.prototype, "left");
+				else Reflect.defineProperty(SnapshotFixture.prototype, "left", originalDescriptor);
+			}
+
+			expect(thrown).toBe(sentinel);
+			expect(assignments).toBe(0);
+			expect(raw.state[0]).toBe(first);
+			expect(raw.state[1]).toBe(sibling);
 			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
 		}
 	);
