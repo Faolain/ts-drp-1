@@ -15987,6 +15987,30 @@ egress, with the undefined-getter invariant handled symmetrically. No
 fingerprint, preimage, descriptor instrumentation, dirty-reader scan or D.73
 scope expansion is permitted.
 
+**Accepted D.92.4 Proxy-invariant corrective RED checkpoint.** Fresh
+Codex-high commit `bc1a69a8487bcf38c17635e19433f27eef0f6b0e` changes only
+`packages/object/tests/raw-child-escape-attribution-1d-i-red.test.ts` (65
+insertions / 4 deletions from `dc459ba`). The corrected file is 948 lines at
+SHA-256 `1f4e5210a54df90a75c34d33919d21f3a4e7fb991c26ba60049dbb2028f9b7ff`
+and is exact 15 failures / 8 passes across 23 cases against byte-identical
+production. The corrected frozen-holder case retains exact SameValue identity,
+independent byte truth for `alias` / `frozenHolder` / `mirrorSet`, two unchanged
+ballast keys and empty trap-observed `changedKeys()`; it fails only because the
+separate monotone `hasRawEgress()` signal is absent and `hasChanges()` does not
+yet keep raw-egress work eligible. The new multiply-aliased read-only case has
+zero byte delta and empty observed keys but requires the same monotone signal,
+defeating owner-count-shaped implementations. The original native TypeError /
+identity control remains unchanged.
+
+P2 plus P1/publication plus D.92.3 is 99/99; D.92.2 is 64/64; inherited Phase
+1d(i) is 147/147; state plus 1 MiB is 8/8; and performance is 8/8. Object and
+workspace typechecks, lint, Prettier, diff and production byte-identity pass.
+The first coverage-bearing D.92.2 preservation invocation reached 64 passes but
+then hit a Vitest coverage temporary-file `ENOENT`; the clean serialized
+coverage-disabled authority rerun is 64/64 and is the accepted preservation
+artifact. Evidence is under
+`.logs/phase-1d-i-d924-proxy-invariant-corrective-red-codex-high/`.
+
 #### D.92.5 — Distinct retained blockers
 
 The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
@@ -16032,22 +16056,21 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 and P2 are accepted and closed. D.92.4 tests-only RED `dc459ba` exposed the
-quorum-confirmed Proxy-invariant contradiction recorded above; no production
-candidate was retained. Start a fresh Codex-high tests-only corrective RED.
-Change only the impossible direct frozen-holder attribution coupling, add its
-ballast and multiply-aliased read-only controls, preserve all other cases and
-exact counters, then record the new exact hash/count/RED signature. After that
-checkpoint, start a distinct fresh Codex-high production-only GREEN: implement
-one monotone side-local raw-egress transition and explicit all-governed keyset,
-keep `changedKeys()` trap-observed and dirty readers O(1), keep raw-egress
-operations eligible, perform one final bounded publisher pass against detached
-owned entries and emit the exact work record. Do not add fingerprints/preimages/
-`byteChangedKeys`, descriptor instrumentation, dirty-reader root scans or fold
-P3/D.73/Phase 1d(ii) into this GREEN. P3 remains separate and may follow D.92.4;
-it still must close before the composite D.92 review. The retained prototype-
-safe materialization item remains mandatory before Phase 1d(ii) closure and
-Phase 4b/6a snapshot adoption, but it does not reopen P2 or D.92.4.
+P1 and P2 are accepted and closed. D.92.4 corrective tests-only RED `bc1a69a`
+is frozen at 15 failures / 8 passes across 23 cases; its 948-line SHA-256 is
+`1f4e5210a54df90a75c34d33919d21f3a4e7fb991c26ba60049dbb2028f9b7ff`.
+Start a distinct fresh Codex-high production-only GREEN: implement one monotone
+side-local raw-egress transition and explicit all-governed keyset, keep
+`changedKeys()` trap-observed and dirty readers O(1), keep raw-egress operations
+eligible, perform one final bounded publisher pass against detached owned
+entries and emit the exact work record. Honor SameValue Proxy invariants for
+ordinary objects and Map/Set own frozen data/function members. Do not change the
+frozen RED, add fingerprints/preimages/`byteChangedKeys`, instrument escaped
+descriptors, scan roots in dirty readers or fold P3/D.73/Phase 1d(ii) into this
+GREEN. P3 remains separate and may follow D.92.4; it still must close before the
+composite D.92 review. The retained prototype-safe materialization item remains
+mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it
+does not reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
