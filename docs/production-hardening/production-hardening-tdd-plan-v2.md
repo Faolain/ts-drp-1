@@ -15855,24 +15855,39 @@ encoding and reconstruction. Wire keys are strings, while direct untyped raw
 callers can still supply other key shapes; that runtime-key policy is assigned
 below rather than silently widening P2.
 
-##### D.92.3-P3 — owned TypedArray enumeration (nonblocking for D.92.4)
+##### D.92.3-P3 — owned TypedArray enumeration and receiver safety (nonblocking for D.92.4)
 
 P3 starts only after P1 and P2, may run alongside or after D.92.4, and must
-close before the composite D.92 review. Its separate RED/GREEN/review loop owns
-the unavoidable canonical-index enumeration used to preserve TypedArray
-expandos: exactly one counted enumeration per detached view, zero recursive
-per-element detachment, retained bulk backing-byte movement and an explicit
-string/symbol-expando policy. Existing expando semantics remain binding unless
-a separate semantic RED and review authorize a change. Add the counter to the
-bounded 1 MiB characterization. P3 does not reopen D.92.3 backing aliases and
-does not consume D.73 view classification or `Symbol.hasInstance` work.
+close before the composite D.92 review. It retains two separately causal
+contracts in one TypedArray family; each receives its own frozen assertions and
+both must pass before P3 closes.
+
+**P3a — owned enumeration.** Preserve the unavoidable canonical-index
+enumeration used for TypedArray expandos: exactly one counted enumeration per
+detached view, zero recursive per-element detachment, retained bulk backing-byte
+movement and an explicit string/symbol-expando policy. Existing expando
+semantics remain binding unless a separate semantic RED and review authorize a
+change. Add the counter to the bounded 1 MiB characterization.
+
+**P3b — tracking receiver safety.** TypedArrays currently fall through the
+ordinary proxy handler, so `.length`, `.byteLength` and methods such as `.set`
+receive a proxy without the required internal slots and throw. The P3 RED must
+cover receiver-safe `length`, `byteLength`, `byteOffset`, `buffer`, iterators and
+methods; numeric and bulk mutation; subview/backing-buffer aliases; DataView,
+Node Buffer and BigInt typed-array controls; zero recursive per-element wrapping;
+and preservation of P3a's enumeration and 1 MiB bounds. This is a loud
+availability/correctness defect, not evidence of stale publication, but it is a
+hard pre-composite-D.92 and golden-path gate.
+
+P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
+classification or `Symbol.hasInstance` work.
 
 **Mandatory preservation and quick iteration.** For changes touching the
 applier/publication/proxy closure, the fast inner loop is P1 comparison work +
 publication-work + `perf-contracts.test.ts`, coverage-disabled and serialized.
 Checkpoint/review gates additionally include D.92.2 64/64 and its authority,
 inherited Phase 1d(i) 147/147, specialized state/collection/atomicity 93/93,
-D.92.3 18/18, bounded 1 MiB 1/1, exact raw-child 11F/7P and sync-livelock
+D.92.3 18/18, bounded 1 MiB 1/1, D.92.4 raw-child 23/23 and sync-livelock
 3F/3P, object/workspace typecheck, tracked zero-error lint, Prettier, diff and
 scope checks. Coverage-bearing runs are serialized.
 
@@ -16055,7 +16070,88 @@ repository lint also traverses protected untracked `.logs` probes and reports
 lint is clean. Evidence is under
 `.logs/phase-1d-i-d924-corrected-green-codex-high/`.
 
+**D.92.4 accepted closure.** Fresh Grok 4.5/high session
+`019fc33c-dd75-77e3-ac23-80697a6327ca`, fresh exact Kimi 3/high session
+`ecf70727-5efb-4e77-ab81-58e476e41d2a` with both 100-step controls, and final
+Opus/xhigh session `7221ca68-9fc7-4904-a00c-ed259174ccde` all returned
+`ACCEPTED` and `D924_MAY_CLOSE=yes`. Grok ran 41 direct adversarial assertions;
+its read-only sandbox blocked a Vitest temporary-write attempt without changing
+the tree. Kimi independently reran 23/23, 74/74 and 103/103 grouped gates plus
+typecheck and Prettier; its first default-coverage invocation regenerated only
+ignored coverage artifacts. Opus used substantive `claude-opus-5`, reported no
+helper/title model, ran no Vitest/Vite and changed no file. Review evidence is
+under `.logs/phase-1d-i-d924-corrected-green-review-{grok45-high,kimi3-high-100,opus-xhigh}/`.
+
+Accepted nonblocking implementation notes are retained for the next proxy-
+closure corrective: the sampled-candidate intersection loop is vestigial before
+the mandatory union; `PublicationRecord.work` is optional at the exported type
+seam although real records always initialize it; and work on a failed comparison
+attempt remains observable on the rolled-back publication record and honestly
+describes attempted work. Promise rejection aborts the detached operation
+without publication. Raw mutation after an operation fully completes is outside
+that tracker's lifetime and later local ambient candidacy remains the existing
+boundary. None reopens D.92.4.
+
 #### D.92.5 — Distinct retained blockers
+
+##### D.92.5-A/B — residual proxy-closure egress (hard pre-composite-D.92)
+
+Final Opus found, and fresh Codex-high plus fresh exact Kimi 3/high/100
+independently reproduced, two pre-existing proxy escape families. All three
+returned `PLAN_AMENDMENT_AGREE=yes` and `D924_MAY_CLOSE=yes`. Kimi session
+`481eb5e1-4134-4b79-b94a-5c37ceb07d6e` used exact `kimi-code/k3`, thinking/high
+and both 100-step controls. The family must close before the composite D.92
+review and therefore before Phase 1d(ii), Phase 3a, Phase 4b/6a snapshot
+adoption and the Discord/MMORPG golden paths. It is not optional Phase 0n work.
+Evidence is under
+`.logs/phase-1d-i-d924-opus-retained-findings-kimi3-high-100/` and the final
+Opus directory above.
+
+**A — descriptor-read signaling.** `Object.getOwnPropertyDescriptor`,
+`Object.getOwnPropertyDescriptors` and `Reflect.getOwnPropertyDescriptor` can
+return a governed raw child through any tracked proxy without entering its
+`get` trap. The signal stays false, the later raw mutation is absent from
+candidacy, and the real incremental publisher reuses stale detached bytes with
+zero comparison, copy or changed key. The tests-only RED must cover root and
+nested ordinary, Map, Set and Date proxies; data values plus raw getter/setter
+function identities; exact unmodified descriptor compatibility; monotone
+egress with empty trap-observed keys; real-applier byte truth with two unchanged
+ballast keys; primitive-only negative controls; `context` exclusion; side
+locality; read-only spread / `Object.assign` / `JSON.stringify` widening with
+zero changed copies; failure identity; and O(1) dirty readers.
+
+The GREEN may add a pure-observation `getOwnPropertyDescriptor` trap that
+returns the unmodified `Reflect` descriptor while setting the existing
+operation-local signal. That is not forbidden descriptor instrumentation:
+descriptor rewriting/wrapping, target mutation, escaped-value instrumentation,
+polling, preimages/fingerprints and dirty-reader scans remain forbidden.
+Internal descriptor consumers may conservatively widen reference-valued reads;
+the existing detached-union comparison and exact work counters must bound and
+filter that cost. Soften the current `hasRawEgress` documentation to name the
+covered boundaries, make real publication work typing match its runtime
+presence and remove the vestigial candidate loop during this same GREEN; these
+are hygiene, not separate slices.
+
+**B — Date parity.** The Date handler returns configurable non-function members
+raw, lacks the ordinary/Map/Set frozen-member invariant handling, has no tracked
+expando writes, and recognizes mutating functions only by a `set` name prefix.
+A Date expando can share a child with a separately governed alias, leak the raw
+child and silently publish the alias's old bytes; a custom Date method can also
+change the serialized timestamp while remaining clean. Frozen own functions
+currently fail loudly with a SameValue invariant `TypeError`. The same frozen
+RED must independently pin configurable reference wrapping or conservative
+egress, expando-alias publication truth, expando-write policy, exact frozen
+function identity, undefined-getter symmetry, native Date reads/setters and a
+custom method that changes the timestamp. Preserve and document the existing
+fact that Date expandos/descriptors do not survive reconstruction.
+
+A and B are separately named and independently causal inside one D.92.5 proxy-
+closure RED/GREEN/Grok/Kimi/Opus loop with one preservation matrix. Both must
+pass before the family closes; Date may not be hidden by descriptor coverage.
+The family reuses the accepted D.92.4 signal and publisher union rather than
+adding a second comparison authority. Deterministic fixtures and exact byte/
+work oracles are sufficient; fuzzing or mutation testing is not required unless
+the RED proves the descriptor false-positive space cannot be bounded directly.
 
 The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
 confirmed through direct tracking and the real applier, and remains a hard
@@ -16096,24 +16192,25 @@ The publication-time codec/`Symbol.iterator` captured-intrinsic seam also
 remains separate unless its later causal RED explicitly assigns it to the
 shared detachment primitive. Phase 0n remains optional after the golden paths
 except for any already-recorded hard Phase 4a prerequisite. These separations
-must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
+must not be used to defer D.92.2–D.92.5, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 and P2 are accepted and closed. D.92.4 corrected production candidate
-`8bfa1ff` is 23/23 against frozen RED `bc1a69a`; its full preservation matrix is
-recorded above. Run fresh independent Grok 4.5/high and exact Kimi 3/high with
-both 100-step controls against the exact candidate tree. They must review the
-Proxy-invariant distinction, operation/side locality, explicit candidate-set
-guard, one-pass detached final decision, work counters, fallback-zero meaning,
-retained-identity reconciliation and absence of forbidden mechanisms. If both
-accept, run a final fresh Opus/xhigh adversarial review. Do not change the
-frozen RED, add fingerprints/preimages/`byteChangedKeys`, instrument escaped
-descriptors, scan roots in dirty readers or fold P3/D.73/Phase 1d(ii) into this
-candidate. P3 remains separate and may follow D.92.4; it still must close before
-the composite D.92 review. The retained prototype-safe materialization item
-remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption,
-but it does not reopen P2 or D.92.4.
+P1, P2 and D.92.4 are accepted and closed. Start a fresh Codex-high tests-only
+RED for the single D.92.5-A/B proxy-closure family recorded above. Keep A
+descriptor-read signaling and B Date parity separately causal and visible in
+the frozen file, but share one preservation matrix and review loop. The RED must
+reproduce publisher-real stale bytes, exact raw identities/invariants,
+operation/side locality, ballast reuse, bounded read-only widening and O(1)
+dirty readers without changing production or the plan. Freeze its exact
+hash/count/RED signature before starting a distinct Codex-high production-only
+GREEN. Reuse D.92.4's signal and detached-union comparison; do not add a second
+comparison authority, fingerprints/preimages/`byteChangedKeys`, rewrite
+descriptors, instrument escaped values, scan roots in dirty readers or fold
+P3/D.73/Phase 1d(ii) into this family. After D.92.5 closes, complete P3a/P3b
+before the composite D.92 review. The retained prototype-safe materialization
+item remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
+adoption, but it does not reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
