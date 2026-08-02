@@ -15771,6 +15771,52 @@ owned lint, Prettier, diff, hash and scope checks pass. Evidence is under
 `.logs/phase-1d-i-p2-snapshot-container-red-codex-high/` and its
 `-corrective/` sibling.
 
+**P2 candidate GREEN and entry-staging corrective.** Distinct Codex-high
+production commit `1ab4c2cb31f73e5916e630f098ff16731353ed7f` changes only
+`state-payload.ts` and `state-materialize.ts`. It captures `Array.isArray`,
+rejects non-array containers, captures length once, traverses by index without
+caller-owned `map`/iterator dispatch, preserves copy-out holes and validates
+both reconstruction sides before applying either. Payload detachment remains
+at the already-measured `applyState:detachStatePayload#1` boundary. An initial
+attempt detached inside the preparation helper and removed that application
+copy, making the frozen D.92.2 authority fail 2/64; it was rejected before
+commit. Likewise, a broad `eslint .` run descended into ignored `.logs/**`
+mutants and is invalid; tracked-source lint is the authoritative boundary.
+
+Local adversarial audit then found a real time-of-check/time-of-use gap: the
+first candidate read a caller-controlled entry's `key` and `value` during
+validation but retained the raw entry object, so application read the Proxy a
+second time. Fresh additive tests-only RED commit
+`71f7fece15f661d5a5412e5d3abe7d89132d0ad9` extends the same test file to 643
+formatted lines at SHA-256
+`c7de0d5cbc88971fa3fd76f39c7676a97880bd94f69ee9323386c03498ec7ddf`.
+Against exact production `1ab4c2c` it is 4 failures / 29 passes: `fromHash`
+and `fromStates` each re-read an entry that either changes after its first read
+or throws on its second read. Passing sibling-getter controls prove that all
+entries are validated before any reconstruction assignment. The assertion
+requires the first staged semantic value and detached output identity, not
+identity with the caller-owned source value.
+
+Distinct corrective production commit
+`3a69f9b73368c9497465b69eb1efa83fc17132c5` changes only
+`state-payload.ts` (3 insertions / 3 deletions): validation captures each
+entry's `key` and `value` exactly once and stages a fresh plain `{ key, value }`
+record. It does not detach a payload or add another copy authority. The
+sustainability rule is explicit: merely proving getters readable is
+insufficient when later code retains and re-reads the hostile object; validated
+primitive metadata must cross the boundary in an owned record.
+
+The corrected P2 suite is 33/33. P1 remains 27/27 and publication work 21/21;
+D.92.2 is 64/64; D.92.3 is 18/18; inherited Phase 1d(i) is 147/147;
+specialized state/collection/atomicity is 93/93; and bounded 1 MiB is 1/1.
+The unchanged performance suite is 8/8 at 198.9 ms with three serialized
+repeats at 193.5 / 190.8 / 195.7 ms. Object and workspace typechecks, owned
+lint, tracked lint at 0 errors / 249 inherited warnings, Prettier, diff, scope
+and hashes pass. Corrective RED and GREEN evidence is under
+`.logs/phase-1d-i-p2-entry-staging-{red,green}-codex-high/`. This remains a
+candidate checkpoint pending the mandatory fresh Grok-high, exact Kimi
+3/high/100 and final Opus/xhigh acceptance loop.
+
 The distinct GREEN uses an `Array.isArray` guard plus a captured array
 intrinsic or a validated index loop; it never invokes caller-controlled
 container methods. Preserve current entry order, sparse/wire behavior and
@@ -15846,20 +15892,19 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 is accepted and closed. Corrective RED
-`da339b374c7c51fafde4c1ccd30562d5d6a76c1b` superseded
-`e589f4cedcf4834311a469f366494235ba4f3a28`, and tests-only exception correction
-`f8c2b9fdaf03562a4adba1f51c7d655b33f73479` is the final P1 artifact:
-`packages/object/tests/comparison-work-1d-i-red.test.ts` is 802 formatted lines
-at SHA-256
-`8313ef999ca1f3eca30e9567e2e49164e4edb301ae3290a1fbf2710015bbcf27` at 27/27.
-Production GREEN `538269c348e827c47709e0d2cc58998213806ebf` is byte-frozen; the
-correction required no production change. Start D.92.3-P2 (captured
-snapshot-container traversal) as a distinct fresh Codex-high RED, re-freezing
-the P1 tests, counters and authority byte-identically. `perf-contracts.test.ts`
-remains 8/8 at the unchanged 1,000 ms threshold for three serialized repeats.
-Do not reopen P1, start D.92.4, or widen into D.73, fingerprints, preimages or a
-new analyzer.
+P1 is accepted and closed. Review the D.92.3-P2 candidate at exact HEAD:
+initial/corrective RED commits `76845de` and `2b3e293`, production GREEN
+`1ab4c2c`, entry-staging corrective RED `71f7fec`, and narrow production
+correction `3a69f9b`. The frozen P2 test is 643 formatted lines at SHA-256
+`c7de0d5cbc88971fa3fd76f39c7676a97880bd94f69ee9323386c03498ec7ddf` and
+is 33/33. Confirm that captured/indexed container traversal preserves sparse
+copy-out and wire-failure behavior, reconstruction validates both sides before
+application, hostile entry fields are read once into plain staging records,
+and `applyState:detachStatePayload#1` remains the sole measured application
+copy boundary. Run the mandatory fresh Grok-high, exact Kimi 3/high/100 and
+final Opus/xhigh review loop; do not call P2 accepted before all three agree.
+Until then do not start D.92.4, P3, or widen into D.73, fingerprints, preimages
+or a new analyzer.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
