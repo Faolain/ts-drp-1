@@ -15918,6 +15918,37 @@ after a successful top-level detach. The optional observer must not change
 default behavior. Do not modify the frozen tests, add per-element work, or
 implement P3b receiver safety.
 
+**P3a production GREEN candidate.** Distinct fresh Codex-high commit
+`afe353faf08d649f3d99fd1e7e9b3f8439fcd675` changes only
+`packages/object/src/state-payload.ts` by 79 additions and 25 deletions; its
+SHA-256 is
+`ae0efccbb3cf09b889c6800bd8da6a3a21b88eb8924d75f78ce47219fa01ff29`.
+One optional work record now follows the existing detachment identity stack.
+TypedArray view and canonical-index enumeration counters advance at the actual
+view-copy/enumeration boundary, and ArrayBuffer, SharedArrayBuffer and Node
+Buffer counters advance only after their physical copy succeeds. Repeated
+views/backings therefore hit the identity stack before another count. One
+copied counter snapshot is offered after successful top-level detachment;
+diagnostic observer failure cannot change the returned copy. Calls without an
+observer do not allocate or update a work record. P3b is untouched.
+
+The frozen RED is 6/6 with both hashes and blobs unchanged. Preservation is
+P2+P1+D.92.3 99/99; D.92.4-D.92.6 60/60; D.92.2 64/64; inherited 147/147;
+specialized 93/93; and bounded 1 MiB 1/1. Four performance runs remain 8/8,
+with MapDRP between 203.5 and 212.2 ms. Sync-livelock remains its authenticated
+exact 3F/3P sentinel. Object/workspace typechecks pass; owned lint is clean and
+tracked lint is zero errors / 249 inherited warnings. Prettier, diff, frozen
+hash and scope checks pass. The retained canonical-index enumeration costs
+about 1.4-1.5 seconds for the 1 MiB view on this host; this candidate measures
+the owned work and does not claim to remove it. Evidence is under
+`.logs/phase-1d-i-p3a-typedarray-enumeration-green-codex-high/`.
+
+The candidate requires fresh Grok 4.5/high and exact Kimi 3/high/dual-100
+review, followed by final Opus/xhigh only if both accept. Review counter
+causality, observer isolation, repeated-view/backing identity, Buffer and
+DataView classification, expando/cycle parity, failure paths, the 1 MiB bound
+and the P3a/P3b scope firewall. Do not infer P3a closure from green tests alone.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -16651,20 +16682,20 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4-D.92.6 are accepted and closed. P3a has an accepted frozen
-tests-only RED at `3b87ebb`; start a distinct fresh Codex-high production-only
-GREEN. Implement truthful aggregate detachment-work observation tied to the
-actual enumeration, recursive-detach and backing-copy work sites, with one
-defensive event after a successful top-level detach and no default behavior
-change. Reach 6/6 without modifying either frozen test. Run D.92.2 64/64,
-P1/P2/D.92.3, D.92.4-D.92.6, inherited/specialized suites, bounded 1 MiB,
-performance, sync sentinel, typechecks, lint, Prettier and hash/scope checks to
-logs. Then use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
-Opus/xhigh review. Do not implement P3b receiver safety, reopen backing-alias
-D.92.3, consume D.73 view classification or introduce per-element work. P3b
-starts only after P3a closes, then composite D.92 and Phase 1d(ii).
-Prototype-safe materialization remains mandatory before Phase 1d(ii) closure
-and Phase 4b/6a snapshot adoption.
+P1, P2 and D.92.4-D.92.6 are accepted and closed. P3a has frozen RED
+`3b87ebb` and production-only GREEN candidate `afe353f`. Start fresh parallel
+Grok 4.5/high and exact Kimi 3/high/dual-100 reviews of the entire P3a causal
+contract, not just the six focused assertions. Authenticate the two frozen
+hashes, production scope and logged preservation evidence; probe truthful work
+accounting, observer isolation, repeated-view/backing identity, Buffer/DataView
+classification, expando/cycle parity, failure paths, 1 MiB behavior and the
+P3a/P3b firewall. If both accept, run a fresh final Opus/xhigh adversarial
+review; if either finds a causal defect, freeze a new tests-only corrective RED
+before changing production. Do not implement P3b receiver safety, reopen
+backing-alias D.92.3, consume D.73 view classification or introduce recursive
+per-element work. P3b starts only after P3a closes, then composite D.92 and
+Phase 1d(ii). Prototype-safe materialization remains mandatory before Phase
+1d(ii) closure and Phase 4b/6a snapshot adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
