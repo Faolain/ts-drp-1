@@ -16011,6 +16011,50 @@ coverage-disabled authority rerun is 64/64 and is the accepted preservation
 artifact. Evidence is under
 `.logs/phase-1d-i-d924-proxy-invariant-corrective-red-codex-high/`.
 
+**D.92.4 corrected production GREEN candidate.** Distinct fresh Codex-high
+commit `8bfa1ff0667619cce7b8a0b6d36046dd2c2071e6` changes only
+`drp-applier.ts`, `operation.ts`, `proxy.ts` and
+`publication/publisher.ts` (221 insertions / 19 deletions). The 948-line frozen
+RED remains byte-identical at SHA-256
+`1f4e5210a54df90a75c34d33919d21f3a4e7fb991c26ba60049dbb2028f9b7ff` and
+is 23/23.
+
+The candidate adds a monotone O(1) `hasRawEgress()` signal distinct from
+trap-observed keys; `hasChanges()` conservatively keeps that operation eligible.
+Candidate-name sampling occurs only at the initial graph, unavoidable escape,
+unknown-method completion/throw and final applier boundary. The operation
+carries the signal and candidate names only for its affected ACL or DRP side.
+Incremental raw-egress capture rejects an undefined candidate set, intersects
+sampled names with the actual governed baseline/target union, decides the full
+union before copying or retaining anything, compares every common key exactly
+once through the existing capability, and handles additions/deletions without
+fake comparisons. Real publication records initialize exact per-side work;
+fallback records remain zero because fallback performs no incremental
+comparison/reuse pass.
+
+Proxy invariants are honored for ordinary objects and Map/Set own frozen data
+or function members; configurable own and inherited collection members remain
+wrapped. Frozen primitive and undefined-getter invariant paths conservatively
+signal egress without changing descriptors. Candidate samples may contain
+function-shaped names, but publisher intersection with the actual governed
+union prevents comparison/work inflation. Six inherited reconciliation
+failures caught an over-broad pre-call owner-charging draft; the committed
+candidate charges only reference identities retained across the existing
+shallow collection snapshot/reconciliation, while raw egress still forces the
+publisher's exact final truth pass.
+
+Final candidate gates are: D.92.4 23/23; P2 33/33; P1 plus publication 48/48;
+D.92.2 64/64 and combined focused plus D.92.2 87/87; D.92.3 18/18; inherited
+Phase 1d(i) 147/147; specialized state/collection/atomicity 93/93; bounded 1
+MiB 1/1; performance 8/8 at 193.2 / 194.6 / 192.6 / 193.4 ms; and the
+intentionally open sync-livelock signature remains exact 3 failures / 3 passes.
+Object and workspace typechecks, owned-file lint, tracked-file lint at 0 errors
+/ 249 inherited warnings, Prettier, diff, scope and hashes pass. A full
+repository lint also traverses protected untracked `.logs` probes and reports
+49 parser-project errors; it is non-authoritative, while the exact tracked-file
+lint is clean. Evidence is under
+`.logs/phase-1d-i-d924-corrected-green-codex-high/`.
+
 #### D.92.5 — Distinct retained blockers
 
 The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
@@ -16056,21 +16100,20 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 and P2 are accepted and closed. D.92.4 corrective tests-only RED `bc1a69a`
-is frozen at 15 failures / 8 passes across 23 cases; its 948-line SHA-256 is
-`1f4e5210a54df90a75c34d33919d21f3a4e7fb991c26ba60049dbb2028f9b7ff`.
-Start a distinct fresh Codex-high production-only GREEN: implement one monotone
-side-local raw-egress transition and explicit all-governed keyset, keep
-`changedKeys()` trap-observed and dirty readers O(1), keep raw-egress operations
-eligible, perform one final bounded publisher pass against detached owned
-entries and emit the exact work record. Honor SameValue Proxy invariants for
-ordinary objects and Map/Set own frozen data/function members. Do not change the
+P1 and P2 are accepted and closed. D.92.4 corrected production candidate
+`8bfa1ff` is 23/23 against frozen RED `bc1a69a`; its full preservation matrix is
+recorded above. Run fresh independent Grok 4.5/high and exact Kimi 3/high with
+both 100-step controls against the exact candidate tree. They must review the
+Proxy-invariant distinction, operation/side locality, explicit candidate-set
+guard, one-pass detached final decision, work counters, fallback-zero meaning,
+retained-identity reconciliation and absence of forbidden mechanisms. If both
+accept, run a final fresh Opus/xhigh adversarial review. Do not change the
 frozen RED, add fingerprints/preimages/`byteChangedKeys`, instrument escaped
 descriptors, scan roots in dirty readers or fold P3/D.73/Phase 1d(ii) into this
-GREEN. P3 remains separate and may follow D.92.4; it still must close before the
-composite D.92 review. The retained prototype-safe materialization item remains
-mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it
-does not reopen P2 or D.92.4.
+candidate. P3 remains separate and may follow D.92.4; it still must close before
+the composite D.92 review. The retained prototype-safe materialization item
+remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption,
+but it does not reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
