@@ -15230,6 +15230,42 @@ Object/workspace typecheck, owned zero-error lint, broad tracked
 exact Kimi 3/high/100 and Opus/xhigh acceptance are still required; this
 checkpoint does not begin D.92.4 or consume D.73.
 
+**First review disposition — candidate rejected pending a corrective RED.**
+Grok 4.5/high accepted the candidate in session
+`019fc176-291b-79e1-872a-f2d8b42e2d2a`, but exact Kimi 3/high/max-100 returned
+`CHANGES_REQUESTED`. Final Opus/xhigh was therefore not run. Kimi proved that
+the detacher does not preserve one cloned backing-store identity when a single
+top-level payload contains overlapping TypedArray views, a TypedArray plus a
+DataView, or a view plus the ordinary property that exposes its backing
+`ArrayBuffer`. The elements are detached, but the related views no longer
+observe one another. Prior `cloneDeep` has the same TypedArray defect; parity
+with that defect is not sufficient because D.92.3 explicitly promises alias
+preservation within one top-level payload.
+
+The correction gets a fresh Codex-high tests-only RED before production is
+changed. It must pin same-view identity, overlapping-view offsets and lengths,
+TypedArray/DataView sharing, view/backing-buffer property identity, mutations
+through either view, source/output isolation, cycles and unchanged independent
+top-level-entry behavior. The GREEN should represent each source backing store
+once in the existing per-payload identity stack and construct every view over
+that cloned store; it must not add a second graph copier or special-case only
+the reviewer probes. Existing Map-key, wire, atomicity, copy-count, 1 MiB and
+D.92.2 gates remain frozen.
+
+Kimi also corrected an initially suspected performance blocker. On this
+environment the exact parent checkpoint `55f85e4` already fails the checked-in
+MapDRP wall-clock contract at 6,769.5 ms, while the candidate's isolated run is
+8,124.3 ms; both are 1 failure / 7 passes against the same <=1,000 ms limit.
+The candidate did not newly turn that test red. The single-run ~20% difference
+is a bounded repeat/profiling follow-up, not an acceptance blocker and not a
+basis for weakening the threshold. The plan's historical claim that this test
+is currently green is stale for this environment. Attribute any regression
+only after repeated paired measurements and profiling. Authoritative evidence
+is under
+`.logs/phase-1d-i-d92-3-map-key-detachment-review-grok45-high/`,
+`.logs/phase-1d-i-d92-3-map-key-detachment-review-kimi3-high-100/` and
+`.logs/phase-1d-i-d92-3-owner-perf-contract-baseline-55f85e4-final.log`.
+
 #### D.92.4 — Raw-egress contract after detachment
 
 After D.92.3 is accepted, forced raw egress widens candidacy monotonically to
@@ -15264,15 +15300,18 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Review D.92.3 candidate `66fc0cb3b69174c30e90b23bad351b5b539a7305`
-adversarially against the frozen 17-case RED, the accepted D.92.2 least-authority
-topology and all recorded gates. Grok-high and exact Kimi 3/high/100 run as
-fresh independent reviewers; final Opus/xhigh runs only if both accept. Inspect
-the shared detacher for graph identity, captured-intrinsic traversal, supported
-state-shape parity, throwable/installation atomicity and bounded work. Reject
-per-site fixes, bypassable copy APIs, hidden observer copies, policy weakening
-or D.92.4/D.73 scope creep. If all three accept, record D.92.3 as complete and
-start D.92.4 with a fresh Codex-high tests-only RED.
+Continue D.92.3 from rejected candidate
+`66fc0cb3b69174c30e90b23bad351b5b539a7305`. A fresh Codex-high tests-only RED
+must pin shared backing-store aliases among overlapping TypedArrays, DataViews
+and an exposed ordinary `ArrayBuffer` property without changing production or
+weakening the frozen 17-case RED. A distinct Codex-high GREEN then fixes the
+one shared graph primitive, preserves every recorded D.92.2/D.92.3 gate and
+runs a bounded paired performance/profile follow-up without treating the stale
+wall-clock threshold as newly red. Run fresh Grok-high and exact Kimi
+3/high/100 reviews; final Opus/xhigh runs only if both accept. Reject per-site
+fixes, a second copier, hidden observer copies, policy weakening or D.92.4/D.73
+scope creep. If all three accept, record D.92.3 as complete and start D.92.4
+with a fresh Codex-high tests-only RED.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
