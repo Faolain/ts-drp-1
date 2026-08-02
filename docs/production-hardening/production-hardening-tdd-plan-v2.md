@@ -15949,6 +15949,47 @@ causality, observer isolation, repeated-view/backing identity, Buffer and
 DataView classification, expando/cycle parity, failure paths, the 1 MiB bound
 and the P3a/P3b scope firewall. Do not infer P3a closure from green tests alone.
 
+**P3a accepted closure.** Fresh Grok 4.5/high session
+`632877d5-edde-4e3a-b9e7-9f7b55d907af`, exact Kimi 3/high/dual-100 session
+`2043f25b-092d-4512-9fc5-5a42190b1daf`, and final Opus/xhigh session
+`45270d61-1e1d-4408-b509-3206e02575cb` each returned `ACCEPTED` and
+`P3A_MAY_CLOSE=yes`. Grok used only substantive `grok-4.5-build`; Kimi used
+exact `kimi-code/k3`, thinking/high and both 100-step controls, finishing at
+16/100 with exit zero and no fallback/helper/subagent/retry. Opus used
+substantive `claude-opus-5` at xhigh. Its primary call reported a
+non-substantive automatic Haiku title/helper of 33 output tokens; the same-
+session Opus follow-up used no helper and corrected an impossible reentry
+hypothesis without changing the verdict. No Fable review was used.
+
+All reviewers authenticated the exact RED/GREEN lineage, hashes, blobs,
+production-only scope and saved gates. Grok reran focused 6/6 plus adversarial
+20/20 and causal 4/4, for 30/30 fresh cases. Kimi reran 6/6 and added 14 cases
+with 44 assertions covering failure/no-event, observer throw/mutation/
+reentrancy, no-observer isolation, shared mixed views, repeated Buffer, BigInt
+expandos, exactly-once enumeration, DataView, Array and 1 MiB. One initial Kimi
+probe expectation accidentally let its deliberately mutating observer alter
+every captured event; correcting that oracle produced a clean rerun and no
+production finding. Opus reviewed both evidence sets and reasoned through 63
+source scenarios. Evidence is under
+`.logs/phase-1d-i-p3a-green-review-{grok45-high,kimi3-high-100,opus-xhigh}/`.
+
+Accepted nonblocking residuals remain owned rather than hidden. The recursive-
+element counter is intentionally zero by construction because canonical
+indices skip before recursion; it is a guard, not an independently active work
+site. The retained O(n) `Object.keys` enumeration remains visible at about
+1.4-1.5 seconds for the 1 MiB Vitest characterization and belongs to a later
+optimization, not this truthful-accounting slice. Buffer-to-generic-TypedArray
+cross-family backing alias fidelity and public export of the diagnostic type
+names are optional later policy/ergonomics, not regressions.
+
+A real controller probe also confirmed pre-existing hostile constructor
+behavior: an `ArrayBuffer` subclass can use `Symbol.species` to turn a 4-byte
+source into an 11-byte result. P3a truthfully reports one backing store and 11
+result bytes. Rejecting species-inflated backings, or redefining source-transfer
+versus result-allocation byte semantics, belongs to D.73 alongside hostile
+view/buffer classification and `Symbol.hasInstance`; it does not block P3a.
+P3a is accepted and closed; P3b is unblocked.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -16682,20 +16723,22 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4-D.92.6 are accepted and closed. P3a has frozen RED
-`3b87ebb` and production-only GREEN candidate `afe353f`. Start fresh parallel
-Grok 4.5/high and exact Kimi 3/high/dual-100 reviews of the entire P3a causal
-contract, not just the six focused assertions. Authenticate the two frozen
-hashes, production scope and logged preservation evidence; probe truthful work
-accounting, observer isolation, repeated-view/backing identity, Buffer/DataView
-classification, expando/cycle parity, failure paths, 1 MiB behavior and the
-P3a/P3b firewall. If both accept, run a fresh final Opus/xhigh adversarial
-review; if either finds a causal defect, freeze a new tests-only corrective RED
-before changing production. Do not implement P3b receiver safety, reopen
-backing-alias D.92.3, consume D.73 view classification or introduce recursive
-per-element work. P3b starts only after P3a closes, then composite D.92 and
-Phase 1d(ii). Prototype-safe materialization remains mandatory before Phase
-1d(ii) closure and Phase 4b/6a snapshot adoption.
+P1, P2, P3a and D.92.4-D.92.6 are accepted and closed. Start a fresh
+Codex-high P3b tests-only RED for TypedArray tracking receiver safety. Freeze
+receiver-safe `.length`, `.byteLength`, `.byteOffset`, `.buffer`, iterators and
+representative methods; numeric and bulk mutation attribution/publication;
+subview/backing-buffer aliases; DataView, Node Buffer and BigInt TypedArray
+controls; zero recursive per-element wrapping; and preservation of P3a's exact
+enumeration/backing counters plus the bounded 1 MiB characterization. Separate
+native receiver correctness from stale-publication causality and use bounded
+cases rather than a method matrix. Do not change production or the plan in the
+RED, reopen D.92.3 backing detachment, or consume D.73 hostile classification,
+`Symbol.hasInstance` or `Symbol.species`. Log the focused RED and relevant
+preservation/static gates, freeze line/hash/blob and commit tests only. A
+distinct production GREEN and fresh Grok/Kimi/Opus loop follow. Composite D.92
+starts only after P3b closes, then Phase 1d(ii); prototype-safe materialization
+remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
+adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
