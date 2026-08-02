@@ -16214,6 +16214,53 @@ Those reviews must deliberately probe conservative descriptor widening and
 internal descriptor reads, plus Date symbol/delete/define-property expando
 behavior. Date expandos still intentionally do not survive reconstruction.
 
+**D.92.5 candidate review rejection and C corrective.** Fresh Grok 4.5/high
+session `019fc38b-aa85-7790-b270-1a2efaee6578` and fresh exact Kimi 3/high/100
+adjudicator session `7913c02a-2824-41d4-ac90-87d256237f11` independently
+returned `CHANGES_REQUESTED` and `D925_MAY_CLOSE=no`. Kimi used exact
+`kimi-code/k3`, thinking/high and both 100-step controls with no fallback,
+helper or subagent. Two earlier substantive Kimi investigations were preserved
+after controller-stopped stream stalls and did not supply the verdict. Because
+both preliminary reviewers rejected the candidate, no final Opus review was
+run.
+
+The shared blocker is property-resolution timing. The Date `get` handler in
+`ba35ebb` runs `Reflect.get` before sampling the timestamp or signaling egress.
+A configurable own or inherited accessor can therefore commit a timestamp
+change while returning either a primitive or a function, yet leave
+`hasChanges() = false`, `changedKeys() = []` and `hasRawEgress() = false` merely
+by being read. Grok reproduced five direct variants plus a positive control and
+proved the real applier failure: an operation with the accessor read plus a
+second ordinary write authors a vertex whose live/input/applier Date is `1234`
+while its stored authored snapshot Date remains `0`. Kimi independently
+reproduced the four own/inherited by primitive/function direct cases and traced
+the same dropped publication. Evidence is under
+`.logs/phase-1d-i-d925-proxy-closure-green-review-grok45-high/` and
+`.logs/phase-1d-i-d925-proxy-closure-green-review-kimi3-high-100/`.
+
+Fresh Codex-high tests-only commit
+`74538383b209fd1f59efd63f7ed495c8815202da` freezes this as D.92.5-C in
+`packages/object/tests/date-accessor-resolution-1d-i-red.test.ts`. The
+277-line file has SHA-256
+`3fcac2a7bf49e6d3f4ef0a5005f49fc149f9446e2e28b7d46999c8cf7abec98e`
+and is exact 4 failures / 2 passes against `ba35ebb`. Failures cover own
+configurable primitive resolution, inherited configurable callable resolution
+before delayed invocation, exact getter-throw identity with committed timestamp
+attribution, and real stale publication with one secondary governed write.
+Controls pin idempotent direct access and idempotent accessor-only no-vertex/no-
+publication behavior. The real oracle requires exactly Date plus secondary
+comparison/copy while excluding two ballast keys and retaining zero egress
+work. The earlier 678-line RED remains byte-identical; D.92.5-A/B plus D.92.4
+preservation is 40/40. Object typecheck, focused lint, Prettier and diff pass.
+Evidence is under `.logs/phase-1d-i-d925-date-accessor-red-codex-high/`.
+
+The distinct production-only corrective GREEN must sample the Date timestamp
+around property resolution itself, charge a committed change even when the
+getter throws, preserve the getter's exact throwable as primary, and then keep
+the accepted invariant handling plus callable classification/wrapping behavior.
+It must not solve the RED by widening every Date read, invoking a returned
+function eagerly, suppressing the getter or changing no-vertex semantics.
+
 **One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
 plan, lineage, review artifacts and committed candidate `ba35ebb` returned
 `ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
@@ -16271,18 +16318,20 @@ must not be used to defer D.92.2–D.92.5, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B frozen RED `34eabb8` and
-production GREEN candidate `ba35ebb` are complete, with candidate gates above.
-Run the fresh Grok 4.5/high review and fresh exact Kimi 3/high review with both
-100-step controls independently; if both accept, run final Opus/xhigh. Review
-the complete D.92.5 lineage and preserve the frozen RED hash. Probe descriptor
-widening/internal descriptor reads and Date symbol/delete/define-property
-expando behavior without folding P3, D.73 or Phase 1d(ii) into this family. If
-all reviewers accept, close D.92.5 in a plan-only checkpoint, then start fresh
-P3a tests-only RED followed by its distinct GREEN and full review loop; P3b
-follows separately before the composite D.92 review. The retained prototype-
-safe materialization item remains mandatory before Phase 1d(ii) closure and
-Phase 4b/6a snapshot adoption, but it does not reopen P2, D.92.4 or D.92.5.
+P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B candidate `ba35ebb` was
+rejected by Grok and exact Kimi on the frozen D.92.5-C Date-accessor RED
+`7453838`, exact 4 failures / 2 passes at the 277-line SHA-256 above. Start a
+distinct fresh Codex-high production-only corrective GREEN. Sample and
+attribute Date timestamp changes around property resolution itself, including
+the exact-throw path, without widening every read or disturbing the accepted
+descriptor/invariant/callable behavior. Preserve both frozen D.92.5 RED hashes,
+D.92.4 and the full gate matrix. If GREEN, record the candidate and rerun fresh
+Grok 4.5/high, exact Kimi 3/high with both 100-step controls and then final
+Opus/xhigh. After D.92.5 closes, start fresh P3a tests-only RED and its distinct
+loop; P3b follows separately before the composite D.92 review. Do not fold P3,
+D.73 or Phase 1d(ii) into D.92.5. Prototype-safe materialization remains
+mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it
+does not reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
