@@ -15066,6 +15066,30 @@ the frozen four typed star/namespace failures plus the two named type-only false
 positives. All behavioral, type, lint, format, scope, authority and production
 authentication remains identical to the preceding RED checkpoint.
 
+**Complete typed export-classifier GREEN checkpoint (reviews pending).** Fresh
+Codex-high commit `45ec50d00c0f9653a7e0231956868cb2d6124239` changes only the
+structural authority test. One readable known-external-sink table now owns the
+two package names, member labels, wildcard labels and installed-version
+manifests. A typed `ExportDeclaration` classifier handles runtime bare-star and
+`NamespaceExport` acquisition, ignores declaration-level type-only exports, and
+canonical module identity ignores both declaration- and specifier-level
+type-only named re-exports. Exact external surfaces and acquisition violations
+are emitted from the same table.
+
+The authority is 344 formatted nonblank lines, a +30 delta justified by that
+table, typed classifier, type-only named guards and table-driven surface/
+violation emission, at SHA-256
+`ae5d8534befbfcc49111d07c6364b9987784a5bad7c4350c98447541b59f9540`.
+All logic remains between unchanged markers; no second authority, value flow or
+new scanner exists. Focused structure is 64/64, publication work 21/21,
+inherited Phase 1d(i) 147/147 and bounded 1 MiB 1/1. Raw-child and
+sync-livelock retain exact 11-fail/7-pass and 3-fail/3-pass baselines.
+Object/workspace typecheck, owned lint, tracked 0-error/226-warning lint,
+Prettier, diff and scope checks pass; production remains byte-identical.
+Coverage-bearing suites ran serially. A first object typecheck exposed
+TypeScript callback narrowing of `moduleSpecifier`; capturing the node before
+the table lookup fixed the type error without changing classifier scope.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
