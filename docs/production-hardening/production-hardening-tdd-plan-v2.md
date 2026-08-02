@@ -15630,8 +15630,11 @@ correction while keeping production commit `538269c` byte-identical. Review
 evidence is under
 `.logs/phase-1d-i-p1-comparison-work-review-grok45-high/`,
 `.logs/phase-1d-i-p1-comparison-work-review-kimi3-high-100/`,
-`.logs/phase-1d-i-p1-comparison-work-review-opus-xhigh/` and the two
-`phase-1d-i-p1-exception-amendment-*` directories.
+`.logs/phase-1d-i-p1-comparison-work-review-opus-xhigh/` and
+`.logs/phase-1d-i-p1-exception-amendment-kimi3-high-100/`. The Codex-high
+amendment adjudication was delivered through collaboration only and produced
+no artifact directory; its agreement is recorded here and in the final
+Opus/xhigh review record.
 
 The exclusive reviewed exception to item 5 is an equal pair of genuine Map or
 Set subclass instances whose ordinary `size` and `entries`/`values` members
@@ -15707,6 +15710,31 @@ evidence is under
 `.logs/phase-1d-i-p1-exception-green-codex-high/`. This is still a candidate:
 P1 awaits the required independent Grok, fresh exact Kimi 3 and final Opus
 reviews.
+
+**P1 accepted closure.** Fresh Grok 4.5/high session
+`019fc288-85eb-76d1-a114-0ebc857d2db1` and fresh exact Kimi 3/high/100 session
+`3029703e-2d8f-42d4-8f41-8d5d6070a6a8` independently returned `ACCEPTED` with
+no code or test blocker. Final Opus/xhigh session
+`cb339ebb-03d4-4b8c-8a0f-f0814bfdf332` found production and tests correct but
+returned operative `CHANGES_REQUESTED` / `P1_MAY_CLOSE=no` solely because the
+final handoff still directed the obsolete 624-line RED into an already-finished
+GREEN and the amendment evidence sentence claimed a nonexistent second
+directory. Its substantive model was `claude-opus-5`; one disclosed automatic
+Haiku helper used $0.001852 of the $2.400203 total and supplied no substantive
+ruling.
+
+The required docs-only closure quorum agreed unanimously: Opus supplied the
+exact repair, fresh Codex-high returned `DOC_AMENDMENT_AGREE=yes`, and fresh
+exact Kimi 3/high/100 retry session
+`d0e13604-d4fc-4fd0-952f-7a289ab4cc18` returned the same with both 100-step
+controls. The first Kimi docs-adjudication invocation exited before a verdict
+after its read-only command policy rejected an accidental `cd /`; it is invalid
+and superseded by the authenticated retry. This closure changes no source or
+test bytes and therefore relies on the already-authoritative full GREEN gates.
+P1 is accepted and closed; P2 is unblocked while D.92.4 remains blocked on P2.
+Final-review evidence is under the three
+`.logs/phase-1d-i-p1-exception-review-*` directories and
+`.logs/phase-1d-i-p1-closure-docs-amendment-kimi3-high-100-retry/`.
 
 ##### D.92.3-P2 — captured snapshot-container traversal (blocks D.92.4)
 
@@ -15793,19 +15821,20 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 RED `e589f4cedcf4834311a469f366494235ba4f3a28` is accepted at exact 9F/12P.
-Start a distinct fresh Codex-high GREEN with production authority plus only the
-mechanical D.92.2 comparator-topology/census update; the 624-line RED, every
-semantic test and the D.92.2 classifier logic/markers/cases remain byte-frozen.
-Establish the single linear comparison authority, captured Map/Set traversal,
-safe-superset candidacy, D.91-compatible proxy behavior and pure counters. The
-semantic-plus-byte differential corpus and exact throwables may not change.
-Run the quick and complete checkpoint gates to `.log`; P1 cannot close unless
-`perf-contracts.test.ts` is 8/8 at the unchanged 1,000 ms threshold for three
-serialized repeats. Commit only the owned GREEN, then run fresh Grok-high and
-exact Kimi 3/high/100 reviews and final Opus/xhigh only if both accept. Do not
-start P2 or D.92.4 and do not widen into D.73, fingerprints, preimages or a new
-analyzer.
+P1 is accepted and closed. Corrective RED
+`da339b374c7c51fafde4c1ccd30562d5d6a76c1b` superseded
+`e589f4cedcf4834311a469f366494235ba4f3a28`, and tests-only exception correction
+`f8c2b9fdaf03562a4adba1f51c7d655b33f73479` is the final P1 artifact:
+`packages/object/tests/comparison-work-1d-i-red.test.ts` is 802 formatted lines
+at SHA-256
+`8313ef999ca1f3eca30e9567e2e49164e4edb301ae3290a1fbf2710015bbcf27` at 27/27.
+Production GREEN `538269c348e827c47709e0d2cc58998213806ebf` is byte-frozen; the
+correction required no production change. Start D.92.3-P2 (captured
+snapshot-container traversal) as a distinct fresh Codex-high RED, re-freezing
+the P1 tests, counters and authority byte-identically. `perf-contracts.test.ts`
+remains 8/8 at the unchanged 1,000 ms threshold for three serialized repeats.
+Do not reopen P1, start D.92.4, or widen into D.73, fingerprints, preimages or a
+new analyzer.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
