@@ -14862,6 +14862,50 @@ canonical symbol labeling correctly changes one roster name from the local
 alias `DRPDiscoveryRequest` to its declared target `DRPDiscovery`; counts and
 runtime behavior are unchanged.
 
+**Corrective review rejection and final module/export gap.** Fresh Grok
+4.5/high session `019fc0ae-2865-7c23-ba72-8f584fd63823` and exact Kimi
+3/high/100 session `session_deab2dd6-8bfb-4925-8696-b8dbb250a4d9` both
+returned `CHANGES_REQUESTED`; final Opus was not run. Both authenticated the
+lineage, 299-line authority, four-file closure, gate artifacts and the fixes for
+every previously recorded finding. Both independently reproduced a remaining
+ordinary static module/export hole:
+
+- `export { encode as snapshotValueBytes } from "@msgpack/msgpack"`, an
+  external `cloneDeep` re-export and their external export-star forms introduce
+  no package reference or violation. `importIdentity` inspects only import
+  declarations, and named-declaration filtering removes the export specifier.
+  Existing re-export mutants contain an intermediate local import, so they
+  prove that import rather than the terminal external export edge.
+
+Exact Kimi also proved that `deserializeDRPState`, the exported DRP-state
+decoder, is absent from `knownSymbolLabel`, despite the ratified requirement to
+govern exported deserializers. Importing it through an already-present
+serialization edge therefore creates no new module edge, census site or
+violation. These two findings are blocking and remain inside the narrow
+module/export-symbol guarantee; neither requires value-flow interpretation.
+
+Two residuals are recorded separately. `globalThis.structuredClone` is
+package-wide invisible because the `noLib` program supplies no canonical global
+member symbol, although every publisher-closure file rejects it through ESLint.
+A following RED should pin this exact known global form if it can be classified
+structurally without a general spelling engine; otherwise narrowing the written
+global-acquisition claim requires the standing plan-correction quorum. By
+contrast, `const E = DRPStateEntry; E.encode(value)` is local value/binding
+aliasing and remains deliberately outside this structural authority. The exact
+runtime dependency closure still rejects adding a generated runtime module to
+publication; do not rebuild a binding interpreter for that spelling.
+
+The next tests-only RED is one compact module/export matrix: external named
+re-export of MessagePack encode and `cloneDeep`, external export-star, imported
+`deserializeDRPState`, the exact `globalThis.structuredClone` known-global
+form, and safe unrelated external export/global-shadow controls. The GREEN must
+extend canonical import/export/module identity and the explicit known-sink
+roster, not interpret values. It must replace enough existing logic to remain
+readable at or below 300 formatted nonblank lines; compression, marker movement
+or a new token/regex scanner is rejection. The first-party closure, production
+code and behavioral gates should remain byte-identical unless the RED proves an
+actual production change is necessary.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
@@ -14938,14 +14982,14 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Review corrective pair `93f4336d` / `ec7ba96` from this documentation
-checkpoint. Run fresh Grok-high and exact Kimi 3/high/100 independently over the
-complete RED/GREEN lineage, authenticated logs, actual closure, canonical
-symbol cases, shallow topology, lint equality, Vite alias order and preserved
-production behavior. Run final Opus/xhigh only if both accept. If either
-reviewer rejects, record findings and start another bounded tests-only RED;
-never grow a value-flow interpreter. D.92.3 stays blocked until all three
-accept.
+Continue D.92.2-d′ with a fresh Codex-high tests-only RED over the final
+module/export gap recorded above. Freeze the compact external named re-export,
+external export-star, `deserializeDRPState` and known `globalThis` cases plus
+safe controls; do not edit the authority or production in RED. Then use a
+distinct Codex-high GREEN to extend only canonical module/export/sink identity
+while keeping the authority ≤300 and production behavior unchanged. Re-run the
+complete gates and fresh Grok-high / exact Kimi 3/high/100 reviews. Final
+Opus/xhigh runs only if both accept. D.92.3 stays blocked.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
