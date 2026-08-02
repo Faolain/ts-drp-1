@@ -190,6 +190,12 @@ export function trackMutations<T extends object>(
 		return (rawValues.get(value) as V | undefined) ?? value;
 	};
 
+	const isGovernedProxy = (value: unknown): value is object => {
+		if (!isReference(value)) return false;
+		const rawValue = rawValues.get(value);
+		return rawValue !== undefined && trackedProxies.get(rawValue) === value;
+	};
+
 	const snapshotMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> =>
 		Array.from(Map.prototype.entries.call(map) as MapIterator<[unknown, unknown]>);
 
@@ -810,9 +816,16 @@ export function trackMutations<T extends object>(
 					};
 				},
 				set(date, property, nextValue): boolean {
+					const storesGovernedProxy = !ignored && isGovernedProxy(nextValue);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
 					try {
-						return Reflect.set(date, property, unwrap(nextValue), date);
+						const stored = Reflect.set(date, property, unwrap(nextValue), date);
+						if (stored && storesGovernedProxy) signalRawEgress();
+						return stored;
+					} catch (error) {
+						// An accessor may retain or mutate the raw value before throwing.
+						if (storesGovernedProxy) signalRawEgress();
+						throw error;
 					} finally {
 						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
 					}
@@ -826,13 +839,16 @@ export function trackMutations<T extends object>(
 					}
 				},
 				defineProperty(date, property, descriptor): boolean {
+					const storesGovernedProxy = !ignored && "value" in descriptor && isGovernedProxy(descriptor.value);
 					const rawDescriptor = { ...descriptor };
 					if ("value" in descriptor) rawDescriptor.value = unwrap(descriptor.value);
 					if ("get" in descriptor) rawDescriptor.get = unwrap(descriptor.get);
 					if ("set" in descriptor) rawDescriptor.set = unwrap(descriptor.set);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
 					try {
-						return Reflect.defineProperty(date, property, rawDescriptor);
+						const stored = Reflect.defineProperty(date, property, rawDescriptor);
+						if (stored && storesGovernedProxy) signalRawEgress();
+						return stored;
 					} finally {
 						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
 					}
