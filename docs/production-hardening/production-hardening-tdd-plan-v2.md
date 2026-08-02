@@ -15879,6 +15879,45 @@ and preservation of P3a's enumeration and 1 MiB bounds. This is a loud
 availability/correctness defect, not evidence of stale publication, but it is a
 hard pre-composite-D.92 and golden-path gate.
 
+**Accepted P3a tests-only RED checkpoint.** Fresh Codex-high commit `3b87ebb`
+adds `packages/object/tests/typed-array-enumeration-1d-i-red.test.ts` and extends
+only `packages/object/tests/incremental-publication-1mb-characterization-1d-i-red.test.ts`.
+The new 158-line file has SHA-256
+`48c6cc59a0aa8c727572fd95ae53bc4d12eae5cce171785441e0e8879794fd21`
+and git blob `044787e2046db396c589304fe2265b049cac7dd7`. The extended 175-line
+characterization has SHA-256
+`fa5644ae14404aa4e9ab2222b2e3c9c7212ea9f9babd48124a282ca68ba4b3a2`
+and git blob `7a0a8d342fa545ea78a0c0a497c6bae26f7e0375`.
+
+The selected RED is exact four failures / two passes. Every failure is the
+missing aggregate `state-payload-detachment` work event; the already-implemented
+semantic controls for backing identity, byte offsets, bulk byte copying and
+enumerable string/symbol expandos pass. The frozen contract observes one event
+after each successful top-level detach and derives, at the actual work sites,
+`typedArrayViewsDetached`, `typedArrayCanonicalIndexEnumerations`,
+`typedArrayElementsRecursivelyDetached`, `backingStoresCopied` and
+`backingBytesCopied`. It requires one canonical-index enumeration per detached
+TypedArray view, zero recursive element detachment and one physical backing copy
+per newly detached backing store. Overlapping/subview/shared-backing aliases,
+expando aliases and cycles remain intact. Array, DataView, BigInt TypedArray and
+Node Buffer cases bound classification without importing P3b receiver work.
+
+Preservation is P2+P1+D.92.3 99/99, D.92.4-D.92.6 60/60, bounded performance
+8/8 and sync-livelock exact 3F/3P. Object/workspace typechecks, owned/tracked
+lint with zero errors and 249 inherited warnings, Prettier, diff, scope and
+production/plan byte identity pass. The unchanged long D.92.2 64-case analyzer
+corpus is intentionally deferred to the production GREEN checkpoint rather
+than repeated during RED iteration. Evidence is under
+`.logs/phase-1d-i-p3a-typedarray-enumeration-red-codex-high/`.
+
+The distinct production-only GREEN must make the observation truthful rather
+than emit fixture-shaped constants: share one work record through the existing
+detachment recursion, increment each counter at its actual enumeration,
+recursive-detach or backing-copy boundary, and emit a defensive snapshot only
+after a successful top-level detach. The optional observer must not change
+default behavior. Do not modify the frozen tests, add per-element work, or
+implement P3b receiver safety.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -16612,19 +16651,20 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4-D.92.6 are accepted and closed. Start a fresh Codex-high P3a
-tests-only RED for owned TypedArray enumeration. Freeze exactly one counted
-canonical-index enumeration per detached view, zero recursive per-element
-detachment, retained bulk backing-byte movement and explicit string/symbol
-expando behavior under the existing semantics. Extend the bounded 1 MiB
-characterization with that counter, but do not implement P3b receiver safety,
-reopen backing-alias D.92.3, consume D.73 view classification or introduce
-per-element instrumentation. Run the relevant copy/publication/performance
-preservation gates to logs, freeze line/hash and commit tests only. A distinct
-production GREEN and full Grok/Kimi/Opus loop follow. P3b starts only after P3a
-closes, then composite D.92 and Phase 1d(ii). Prototype-safe materialization
-remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
-adoption.
+P1, P2 and D.92.4-D.92.6 are accepted and closed. P3a has an accepted frozen
+tests-only RED at `3b87ebb`; start a distinct fresh Codex-high production-only
+GREEN. Implement truthful aggregate detachment-work observation tied to the
+actual enumeration, recursive-detach and backing-copy work sites, with one
+defensive event after a successful top-level detach and no default behavior
+change. Reach 6/6 without modifying either frozen test. Run D.92.2 64/64,
+P1/P2/D.92.3, D.92.4-D.92.6, inherited/specialized suites, bounded 1 MiB,
+performance, sync sentinel, typechecks, lint, Prettier and hash/scope checks to
+logs. Then use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
+Opus/xhigh review. Do not implement P3b receiver safety, reopen backing-alias
+D.92.3, consume D.73 view classification or introduce per-element work. P3b
+starts only after P3a closes, then composite D.92 and Phase 1d(ii).
+Prototype-safe materialization remains mandatory before Phase 1d(ii) closure
+and Phase 4b/6a snapshot adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
