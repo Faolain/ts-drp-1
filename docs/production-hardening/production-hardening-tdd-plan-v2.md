@@ -14906,6 +14906,47 @@ or a new token/regex scanner is rejection. The first-party closure, production
 code and behavioral gates should remain byte-identical unless the RED proves an
 actual production change is necessary.
 
+**Corrective growth firewall.** Architecture-adjudication feedback is binding
+for this corrective. The seven rows above are one terminal structural matrix,
+not the start of another syntax-equivalence corpus. The authority may recognize
+`ImportDeclaration`, `ExportDeclaration`/`ExportSpecifier`, export-star,
+source-first first-party resolution, canonical external package/member identity
+and the one explicit unshadowed `globalThis.structuredClone` form. It must not
+follow local value aliases, receiver values, assignments, callbacks, containers,
+destructuring, call/apply/bind compositions or user-DRP execution. The benign
+external member and shadowed-global rows prevent broad spelling-based bans.
+
+If a coherent module/export implementation cannot satisfy this matrix within
+the existing readable 300-line authority, the GREEN stops without a partial
+commit and reopens architecture adjudication; it does not add helpers outside
+the measured boundary, compress code, weaken an assertion or grow a second
+analyzer. Future findings are routed by ownership: static module/sink acquisition
+gets a new bounded RED, observable publication behavior gets a runtime invariant,
+and arbitrary handwritten JavaScript remains outside this checker with the
+guarantee stated narrowly. Passing this matrix therefore closes the known
+module/export gap; it never upgrades D.92.2 into a proof about all possible copy
+implementations.
+
+**Accepted final module/export RED checkpoint.** Fresh tests-only Codex-high
+commit `a62721dcbdf751ecd5bec1886875e7110e59b9a9` adds exactly the seven-row
+matrix: five intended REDs and the benign external-member and locally shadowed
+`globalThis` controls. Against unchanged authority it is exactly 5 failures / 50
+passes; both controls and all 48 previously accepted structure cases pass. The
+authority remains 299 formatted nonblank lines at SHA-256
+`e90b81e24ae47c0ea095ca830167610191cb16855b38a978bc4c7154dc9e26f4`.
+Publication work remains 21/21 and inherited Phase 1d(i) remains 147/147; raw
+child and sync-livelock retain their exact inherited 11-fail/7-pass and
+3-fail/3-pass baselines. Object/workspace typecheck, owned zero-error lint,
+tracked-source 0-error/226-warning lint and Prettier pass after formatting.
+
+The initial focused coverage command stalled before test execution, matching the
+known governance-harness behavior. The owner terminated only that child and
+authenticated the causal RED with the bounded no-coverage command in 25.36
+seconds. This is not permission to drop coverage from ordinary suites; this
+source-analyzer gate uses the targeted no-coverage path to preserve iteration
+time, while behavioral and characterization coverage remain independently
+owned.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
