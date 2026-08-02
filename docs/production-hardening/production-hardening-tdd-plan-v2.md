@@ -14706,6 +14706,43 @@ by D.92.3. It isolates the measured publication boundary and gives that later
 primitive a home while preserving wire bytes, ordering, publication atomicity,
 copy counters, ratios and the bounded characterization.
 
+**Accepted d′ GREEN checkpoint (reviews pending).** Production/test commit
+`74af6fb5e53a5b3460df9597d2fad28486da9b39` performs the atomic topology
+correction. The old value-flow analyzer and its 305 retired syntax fixtures are
+deleted. Their replacement is a 298-formatted-logical-line, source-first
+`Program`/`TypeChecker` authority limited to module/export closure and exact
+symbol-reference census; it contains no value, binding, callback, container,
+worklist or fixpoint model. Production now has one private-brand publication
+copy capability, an isolated publisher, a sink-free state-store/materializer
+split, an encode-only equality/decode-capable serialization split and scoped
+lint feedback. Nested equality and copying both pass through the capability.
+
+The extraction retained one historical private testing seam:
+`DRPVertexApplier.capturePublishedState` is an exact one-statement delegate to
+the publisher method. An inherited anti-reward-hacking test invokes this private
+method directly to prove non-candidate payloads are not traversed. The delegate
+contains no copy implementation and is not a third publication authority.
+
+**Construction-order gotcha.** The first store/materializer split evaluated root
+snapshot arguments in `super(...)` before cloning replica-local contexts. That
+would have changed getter/Proxy traversal and primary-error order relative to
+the pre-split state manager. The accepted store instead initializes empty and
+exposes a protected `seedRoot`; materialization preserves the original order:
+constructor metadata, DRP context, ACL context, DRP root snapshot, then ACL root
+snapshot. The characterization artifact observes exactly
+`[drp-context, acl-context, drp-payload, drp-payload, acl-payload, acl-payload]`.
+
+Final GREEN evidence is under
+`.logs/phase-1d-i-d92-2-dprime-green-codex-high/`: structure 35/35 in 9.60
+seconds without coverage, publication work 21/21, inherited Phase 1d(i)
+147/147, bounded 1 MiB 1/1, object and workspace typecheck pass, owned lint
+0/0, tracked-source lint 0 errors / inherited 226 warnings, Prettier and scope
+checks pass, and full lint remains the exact unrelated 49-error / 226-warning
+baseline. Raw-child remains the inherited 11-fail/7-pass baseline and
+sync-livelock remains 3-fail/3-pass. This checkpoint remains review-pending;
+D.92.3 stays blocked until Grok-high, exact Kimi 3/high/100 and final
+Opus/xhigh accept it.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
