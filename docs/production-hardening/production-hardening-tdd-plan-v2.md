@@ -115,9 +115,13 @@ reviewers resolved correctly. These are the exceptions, and they change what get
    terminal failures. Phase 0f makes the narrow receiver-future case `pending` instead of dropping it as
    `invalid`; otherwise two honest replicas at different clock offsets can converge to different graphs
    and never repair. Live silent divergence, independent of compaction.
-6. **`perf-contracts.test.ts` is green today**, not RED (8/8 pass, ~167 ms; budgets 4.3/4.8/3.0/52.8 ms vs
-   limits 200/200/200/1000 ms). The `describe(... RED until optimized)` label is stale. Round 1's Phase 1a
-   says "extend the RED perf-contracts pattern" — there is no sync-compare perf test to extend; it is net-new.
+6. **`perf-contracts.test.ts` was green when this audit was written, but is no longer green.** Its authenticated
+   pre-regression figures were 8/8 at ~167 ms total, with the MapDRP case at 52.8 ms against a 1,000 ms
+   limit; a later 197.4 ms run was also green. Phase 1d(i) then introduced the comparison-cost regression
+   owned by D.92.3-P1 below. Current exact-parent/current medians are ~6.87/~6.64 seconds at the unchanged
+   threshold. The `describe(... RED until optimized)` label is therefore factually RED again, but for the
+   recorded regression rather than the original optimization backlog. The Phase 1a sync-compare test remains
+   net-new rather than an extension of this MapDRP case.
 7. **`benchmark.yml:88` and `benchmark-memory.yml:64` both set `fail-on-alert: false`**, and the PR
    benchmark job is `continue-on-error`. Round 1 wires the Phase-6 memory-slope gate — the single most
    important economic proof in the program — into workflows engineered never to block anything.
@@ -1977,8 +1981,9 @@ Reviewers judge rigor by exactly these.
   document title only.
 - **Round-1 integration-plan migration authorization** ("legacy creator OR current authority") → unsafe while
   current authority is replay-influenceable. Creator-only or an externally pinned quorum.
-- **`perf-contracts.test.ts:221`** `describe(... RED until optimized)` → mislabelled; the suite is green.
-  Relabel as green regression pins.
+- **`perf-contracts.test.ts:221`** `describe(... RED until optimized)` → it was a misleading label while the
+  suite was green, but Phase 1d(i) made the MapDRP contract RED again. D.92.3-P1 owns restoration to 8/8 at
+  the unchanged threshold; do not relabel or weaken it while that corrective is open.
 
 ---
 
@@ -15332,25 +15337,25 @@ hostile-graph D.73 work. Numeric-key enumeration needed to separate TypedArray
 expandos is O(n) and measured as material at 1 MiB. Opus also noted that
 `detachStateSnapshot` still invokes caller-controlled `state.state.map`.
 Captured snapshot traversal and the TypedArray enumeration cost belong in the
-proposed comparison/performance corrective below, subject to the required
-plan-amendment quorum; neither reopens D.92.3 ownership semantics.
+quorum-adopted comparison/performance corrective below; neither reopens
+D.92.3 ownership semantics.
 
 Kimi also corrected an initially suspected performance blocker. On this
 environment the exact parent checkpoint `55f85e4` already fails the checked-in
 MapDRP wall-clock contract at 6,769.5 ms, while the candidate's isolated run is
 8,124.3 ms; both are 1 failure / 7 passes against the same <=1,000 ms limit.
 The candidate did not newly turn that test red. The single-run ~20% difference
-is a bounded repeat/profiling follow-up, not an acceptance blocker and not a
-basis for weakening the threshold. The plan's historical claim that this test
-is currently green is stale for this environment. Attribute any regression
-only after repeated paired measurements and profiling. Authoritative evidence
-is under
+was a bounded repeat/profiling follow-up rather than a D.92.3 acceptance
+blocker and was not a basis for weakening the threshold. The repeated evidence
+and causal mechanism are now owned by blocking D.92.3-P1 below. Attribute any
+future regression only after repeated paired measurements and profiling.
+Authoritative evidence is under
 `.logs/phase-1d-i-d92-3-map-key-detachment-review-grok45-high/`,
 `.logs/phase-1d-i-d92-3-map-key-detachment-review-kimi3-high-100/` and
 `.logs/phase-1d-i-d92-3-owner-perf-contract-baseline-55f85e4-final.log`.
 
-**One-off Fable course review — accepted with actions, amendment not yet
-adopted.** Substantive `claude-fable-5`/high session
+**One-off Fable course review — accepted with actions; amendment later adopted
+by the required quorum.** Substantive `claude-fable-5`/high session
 `21286328-557c-447c-9542-c64eb9b0e5ba` independently concluded that the
 v3-forward ordering, D.92.2 least-authority pivot and current D.92.3 corrective
 remain the sustainable route to both golden paths. It recommended correcting
@@ -15365,13 +15370,12 @@ capture, combined with `fast-equals@5.2.2` Map equality that re-scans the other
 Map for each entry. That mechanism makes the current hot path quadratic in a
 large Map payload and matters to durable Discord sends and MMORPG durable
 operations. It is not assigned to D.92.3 and must not expand the backing-alias
-GREEN. Fable proposes a distinct pre-D.92.4 Phase 1d(i) corrective whose RED
+GREEN. Fable proposed a distinct pre-D.92.4 Phase 1d(i) corrective whose RED
 uses deterministic comparison-work/single-traversal evidence rather than a
 looser wall-clock threshold, plus mandatory same-checkpoint triage whenever a
-preservation artifact contains a new failure. This is a proposed plan change,
-not an adopted reorder: schedule the standing Codex-high + exact Kimi
-3/high/100 + Opus/xhigh correction quorum after D.92.3 acceptance before
-inserting the slice or changing the mandatory gate set.
+preservation artifact contains a new failure. The standing Codex-high + exact
+Kimi 3/high/100 + Opus/xhigh correction quorum subsequently adopted the
+bounded P1/P2/P3 partition below.
 
 Additional nonblocking detacher gotchas from the review are now explicit:
 pooled Node Buffers must retain the dedicated `Buffer.from` isolation rule
@@ -15381,14 +15385,193 @@ per-element copying where a captured bulk intrinsic preserves the same graph;
 and `instanceof`/`Symbol.hasInstance` poisoning remains hostile-graph work for
 the later D.73 ledger, not scope for this corrective GREEN.
 
+#### D.92.3-P — Phase 1d(i) comparison-cost corrective (quorum-adopted)
+
+**Ordering is binding.** D.92.3 remains accepted and closed. P1 and P2 are
+separate blocking sub-slices with independent RED, GREEN, Grok-high, exact Kimi
+3/high/100 and Opus/xhigh acceptance loops; P1 completes before P2 starts, and
+D.92.4 does not start until both are accepted. P3 has its own complete loop and
+may run alongside or after D.92.4, but it must be accepted before the composite
+D.92 review and therefore before Phase 1d(ii).
+
+The correction quorum was unanimous. Codex-high returned
+`AMENDMENT_AGREE=yes` and then `AMENDMENT_AGREE_EXACT=yes`. Fresh exact Kimi
+3/high session `234c1b9f-e53a-46c2-8d22-f7b90af98ebc` used all 100-step
+controls and returned `AMENDMENT_AGREE=yes`, then resumed without tools for
+`AMENDMENT_AGREE_EXACT=yes`. Fresh Opus/xhigh session
+`517fcf77-b122-4ab1-b70b-f6066e6f237a` used substantive `claude-opus-5` and
+returned both decisions; its initial consultation disclosed a non-substantive
+22-output-token automatic Haiku helper, while the reconciliation used Opus
+alone. A final resumed exact-Kimi turn returned
+`PERF_ACCEPTANCE_AGREE_EXACT=yes`, explicitly superseding its earlier allowance
+to close P1 with an expected-red wall-clock result. Evidence is under the
+`phase-1d-i-performance-amendment-*` and
+`phase-1d-i-performance-acceptance-reconcile-*` directories in `.logs/`.
+
+**Cause of record.** The byte-unchanged `perf-contracts.test.ts` MapDRP case
+(5,000 entries × 50 local operations, <=1,000 ms) was green at 52.8 ms when the
+plan first recorded it and at 197.4 ms in the last authenticated pre-regression
+artifact. It first appears red at 48,961.3 ms in the Phase 1d(i) preservation
+lineage. Commit `8e8eaa1` introduced the first publisher comparison;
+`10a0491` added `effectiveStateKeys` and the second full walk; `74af6fb`
+consolidated publication equality into the capability. Current paired medians
+are 6,636.9 ms at the accepted D.92.3 state and 6,867.7 ms at exact parent
+`55f85e4`, so D.92.3 did not introduce the failure.
+
+`fast-equals@5.2.2` Map/Set equality restarts the opposite iterator for every
+entry and is therefore quadratic even for matching insertion order. A bounded
+probe measured about 67.7 ms for one 5,000-entry Map walk; two sites × 50 local
+operations accounts for about 6.77 seconds. The MessagePack encode pair is
+linear and measured near 1.26 ms, so it is not the dominant cost. Production
+currently has equality acquisition in `drp-applier.ts`, `proxy.ts` and
+`publication/copy-capability.ts`, plus the `applyOverride` comparison in the
+publisher. The accepted copy counters intentionally do not charge comparison
+work, and no mandatory focused gate included `perf-contracts.test.ts`; those
+two omissions allowed the regression to survive accepted checkpoints.
+
+##### D.92.3-P1 — single linear comparison authority (blocks D.92.4)
+
+**RED — fresh Codex-high, tests only.** Add one narrow
+`packages/object/tests/comparison-work-1d-i-red.test.ts`; do not change
+production, the plan, thresholds or existing tests. The RED freezes:
+
+1. One diagnostic comparison event per exact
+   `(publication phase, side, key, value pair)` that is actually compared, and
+   zero for additions, deletions, non-candidates and fallback paths that do not
+   compare. A candidate baseline pair has exactly one semantic traversal, not
+   merely `<= 1`.
+2. Pure counters for comparison calls, recursive node/edge visits, Map/Set
+   entries visited, codec passes, encode calls and encoded bytes, tagged by
+   phase, side and key. Counters and observer return values may never influence
+   candidacy, equality, publication bytes, changed sets or copying.
+3. Causal N/2N/4N Map and Set matrices whose visit counts are linear and whose
+   unchanged-production measurement proves the current inner re-scan is
+   quadratic. Include equal, tail-different, reordered, nested-key and cycle
+   cases; freeze the linear ratio from measured RED evidence rather than wall
+   clock.
+4. The exact decision function: the semantic comparator remains a conjunct
+   with `serializedValuesEqual`. It may early-reject but never early-accept.
+   When semantic comparison succeeds, exactly one codec-equality pass encodes
+   each operand once; when it rejects, the codec is not invoked.
+5. A differential corpus against the current
+   `deepEqual(left, right) && serializedValuesEqual(left, right)` behavior for
+   ordinary supported values: Map/Set/plain-object reorder, nested objects,
+   distinct deep-equal Map keys, arrays, aliases, cycles, `NaN`, signed zero,
+   `undefined` versus `null`, missing versus present-`undefined`, differing
+   TypedArray types with equal bytes, Date, RegExp, BigInt, functions and
+   throwing getters/codec shapes. Verdicts and primary throwables are frozen;
+   any unavoidable divergence must be explicit, reviewed and never permit
+   reuse where the current conjunction rejects or throws.
+6. Captured Map/Set traversal intrinsics and hostile instance-level
+   `entries`/`values`/`Symbol.iterator` controls. Codec iterator hardening and
+   `Symbol.hasInstance` poisoning remain D.92.5/D.73 work.
+7. Conservative candidacy mutants. Ambient nested mutation, replacement,
+   addition, deletion and reorder-only changes must all reach the final
+   publisher comparison. Over-candidacy is bounded and permitted;
+   under-candidacy is forbidden. Existing ballast and exact changed/copy
+   assertions prevent charge-everything publication from passing.
+8. A static census, extending the accepted D.92.2 module/export authority
+   rather than adding a new scanner, that rejects a second production equality
+   implementation or hidden `fast-equals`, codec-equality, JSON, fingerprint
+   or byte-cache path in the applier/publication/proxy closure.
+
+The RED must kill duplicate-walk, quadratic-inner-scan, skipped-byte-arbiter,
+order-insensitive-final-verdict, counter-free-helper-relocation,
+under-candidacy and observer-controls-result mutants. It records exact
+fail/pass counts, hashes, counter schema and pre-corrective ratios. The D.92.2
+authority, D.92.3 18-case file, accepted Phase 1d(i) corpus and
+`perf-contracts.test.ts` remain byte-frozen.
+
+**GREEN — distinct fresh Codex-high, production only.** The RED is immutable.
+The GREEN must establish one comparison authority at the same composition root
+as the branded publication capability and route publisher capture,
+`applyOverride`, applier candidacy and proxy tracking through it. Direct
+`deepEqual`/`circularDeepEqual`/`serializedValuesEqual` acquisition outside
+that authority is removed and census-enforced.
+
+The semantic prefilter is cycle-safe and linear. Map and Set use lockstep
+insertion-order traversal through module-captured collection methods and
+iterator `next` invoked with `Reflect.apply`; size mismatch is an O(1) early
+exit. Arrays, enumerable object keys/symbols, typed views and primitives retain
+the frozen differential semantics. Exact codec-byte equality remains the final
+arbiter of reuse. Proxy tracking preserves the D.91-owned codec-failure
+`catch -> true` behavior verbatim; publisher comparison failures remain
+fail-closed and preserve the primary throwable.
+
+The redundant payload walk in `effectiveStateKeys` is removed or routed
+through the one metered authority. Any replacement candidacy rule must be a
+safe superset—identity/SameValueZero primitive shortcuts are permitted, but no
+genuinely changed key may bypass the final comparison. Counters are emitted
+through a least-authority injected observer seam, accumulate monotonically per
+applier and expose no production reset or result-control API.
+
+P1 cannot close until `perf-contracts.test.ts` is 8/8 at the unchanged 1,000 ms
+threshold in three serialized repeats. If deterministic counters and P1
+semantics are green but that wall-clock case remains red because of a residual
+outside P1, the residual must be attributed by counters/census rather than
+inferred from timing; stop and convene the standing correction quorum for a
+separate blocking owner before D.92.4. Do not widen P1 silently, normalize the
+red, scale the test or weaken the threshold.
+
+##### D.92.3-P2 — captured snapshot-container traversal (blocks D.92.4)
+
+P2 begins only after P1 acceptance and re-freezes P1 tests, counters and
+authority byte-identically. Its fresh tests-only RED drives public
+`setDRPState`/`setACLState`, public copy-out and internal reconstruction with a
+hijacked `state.state.map`, sparse arrays, throwing length/index getters and a
+non-array state container. It proves full source/output isolation, fresh
+top-level identity stacks, primary-throwable preservation and no partial
+snapshot installation.
+
+The distinct GREEN uses an `Array.isArray` guard plus a captured array
+intrinsic or a validated index loop; it never invokes caller-controlled
+container methods. Preserve current entry order, sparse/wire behavior and
+independent top-level copy semantics. It does not change comparison authority,
+raw egress or hostile graph classification. P2 receives its own complete
+Grok/Kimi/Opus loop; P1 acceptance cannot be reused.
+
+##### D.92.3-P3 — owned TypedArray enumeration (nonblocking for D.92.4)
+
+P3 starts only after P1 and P2, may run alongside or after D.92.4, and must
+close before the composite D.92 review. Its separate RED/GREEN/review loop owns
+the unavoidable canonical-index enumeration used to preserve TypedArray
+expandos: exactly one counted enumeration per detached view, zero recursive
+per-element detachment, retained bulk backing-byte movement and an explicit
+string/symbol-expando policy. Existing expando semantics remain binding unless
+a separate semantic RED and review authorize a change. Add the counter to the
+bounded 1 MiB characterization. P3 does not reopen D.92.3 backing aliases and
+does not consume D.73 view classification or `Symbol.hasInstance` work.
+
+**Mandatory preservation and quick iteration.** For changes touching the
+applier/publication/proxy closure, the fast inner loop is P1 comparison work +
+publication-work + `perf-contracts.test.ts`, coverage-disabled and serialized.
+Checkpoint/review gates additionally include D.92.2 64/64 and its authority,
+inherited Phase 1d(i) 147/147, specialized state/collection/atomicity 93/93,
+D.92.3 18/18, bounded 1 MiB 1/1, exact raw-child 11F/7P and sync-livelock
+3F/3P, object/workspace typecheck, tracked zero-error lint, Prettier, diff and
+scope checks. Coverage-bearing runs are serialized.
+
+Whenever a mandatory preservation artifact contains a new failure or counter
+movement, the same checkpoint classifies it as: new regression (blocking),
+authenticated expected-red with exact signature/owner/artifact, or invalid
+harness/environment evidence that must be replaced. No acceptance summary may
+call an artifact green while it contains an untriaged failure. After P1
+acceptance, its counter suite and `perf-contracts.test.ts` are must-pass gates,
+not substitutes for one another.
+
+**Scope firewall.** P1–P3 do not implement D.92.4 raw-egress name collection
+or widening, D.73 hostile graph/live-binder/virtual-`Map.keys()` work, codec
+iterator hardening, fingerprints, serialized preimages, `byteChangedKeys`,
+global caches or the rejected value-flow analyzer. D.92.3 stays closed.
+
 #### D.92.4 — Raw-egress contract after detachment
 
-After D.92.3 is accepted, forced raw egress widens candidacy monotonically to
-an explicit set containing every governed top-level key. `undefined` is
-forbidden because the current publication path interprets it as unconditional
-reuse. Governed names are collected before egress, after an unknown method
-returns or throws, and at later observations so a raw root argument cannot
-hide top-level addition or deletion.
+After D.92.3-P1 and P2 are accepted, forced raw egress widens candidacy
+monotonically to an explicit set containing every governed top-level key.
+`undefined` is forbidden because the current publication path interprets it as
+unconditional reuse. Governed names are collected before egress, after an
+unknown method returns or throws, and at later observations so a raw root
+argument cannot hide top-level addition or deletion.
 
 The exact final publication decision remains comparison against the genuinely
 detached `ownedEntry.value`. A read-only escape may therefore conservatively
@@ -15415,22 +15598,19 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-D.92.3 is accepted through `67d7917` and may close. Before starting D.92.4,
-convene the standing plan-correction quorum over Fable's proposed Phase 1d(i)
-performance corrective: one Codex-high consultation, one fresh exact Kimi
-3/high session with both 100-step controls and one fresh Opus/xhigh
-consultation. Ask whether the plan should insert a distinct owned slice before
-D.92.4 that causally pins at most one full comparison traversal per changed
-candidate key and comparison work linear in payload size, fixes the two
-quadratic Map equality walks without loosening wall-clock thresholds, captures
-snapshot traversal, owns TypedArray expando-enumeration cost, adds the
-counter-based successor to mandatory applier/publication preservation gates,
-and requires same-checkpoint triage of any new preservation-artifact failure.
-The quorum must adjudicate exact scope, RED/GREEN order, counter authority and
-false-positive/false-negative policy. Do not edit the plan to adopt or reject
-the proposal until all three agree. If unanimously adopted, checkpoint the
-amendment and begin its fresh Codex-high tests-only RED; otherwise begin D.92.4
-under the existing ratified order and record the disagreement.
+D.92.3 is accepted through `67d7917`; the unanimous correction quorum adopted
+D.92.3-P1/P2/P3. Start P1 only with a fresh Codex-high tests-only RED in
+`packages/object/tests/comparison-work-1d-i-red.test.ts`. Freeze all existing
+tests and production. The RED must causally pin the one-authority census,
+exactly one semantic traversal per compared phase/side/key/value pair,
+diagnostic counter schema, N/2N/4N Map/Set linearity, semantic-plus-byte
+differential corpus, observer independence, safe-superset candidacy and the
+listed mutants. Run the quick coverage-disabled comparison/publication/perf
+set and the full checkpoint preservation gates to `.log`, triaging the current
+perf failure under the same-checkpoint rule without changing its 1,000 ms
+threshold. Record exact hashes, counts, ratios and scope in a tests-only commit
+and plan checkpoint. A distinct Codex-high GREEN follows; do not begin P2,
+D.92.4 or production changes during the RED.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
