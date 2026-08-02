@@ -782,6 +782,26 @@ const D922D_MODULE_EXPORT_MATRIX: readonly D922dModuleExportCase[] = [
 			[UTILS_SERIALIZATION_PATH]: 'export { cloneDeep as detachSnapshot } from "es-toolkit";',
 		},
 	},
+	{
+		name: "declaration-level type-only cloneDeep re-export",
+		expectedPackageReferences: [],
+		expectedExternalRuntimeSurface: [],
+		expectedViolations: [],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			[UTILS_SERIALIZATION_PATH]: 'export type { cloneDeep as detach } from "es-toolkit";',
+		},
+	},
+	{
+		name: "specifier-level type-only MessagePack encode re-export",
+		expectedPackageReferences: [],
+		expectedExternalRuntimeSurface: [],
+		expectedViolations: [],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "void state;"),
+			[UTILS_SERIALIZATION_PATH]: 'export { type encode as pack } from "@msgpack/msgpack";',
+		},
+	},
 	...D922D_TYPED_EXPORT_DECLARATION_MATRIX,
 	{
 		name: "imported exported DRP-state deserializer",
