@@ -1,5 +1,5 @@
-import { DRPState, DRPStateEntry } from "@ts-drp/types";
-import { serializedValuesEqual } from "@ts-drp/utils";
+import { type DRPState, type DRPStateEntry } from "@ts-drp/types";
+import { serializedValuesEqual } from "@ts-drp/utils/serialization/equality";
 import { cloneDeep } from "es-toolkit";
 import { deepEqual } from "fast-equals";
 
@@ -35,12 +35,10 @@ export function createPublicationCapability<TEvent>(observer?: (event: TEvent) =
 			return observer ? emit({ type: "copy", value, metadata }) : cloneDeep(value);
 		},
 		createEntry(key, value): DRPStateEntry {
-			return DRPStateEntry.create({ key, value });
+			return { key, value };
 		},
 		createSnapshot(entries): DRPState {
-			const snapshot = DRPState.create();
-			snapshot.state.push(...entries);
-			return snapshot;
+			return { state: [...entries] };
 		},
 		equal(left, right): boolean {
 			return deepEqual(left, right) && serializedValuesEqual(left, right);

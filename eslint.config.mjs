@@ -8,6 +8,24 @@ import vitest from "eslint-plugin-vitest";
 import globals from "globals";
 import { configs, plugin, config as tsLintConfig } from "typescript-eslint";
 
+const publicationBoundaryRules = {
+	"no-restricted-globals": ["error", "structuredClone", "Buffer"],
+	"no-restricted-properties": [
+		"error",
+		{ object: "JSON", property: "parse", message: "Serialization is outside publication." },
+		{ object: "JSON", property: "stringify", message: "Serialization is outside publication." },
+		{ object: "globalThis", property: "structuredClone", message: "Copies use the measured leaf." },
+	],
+	"no-restricted-syntax": [
+		"error",
+		{ selector: "ImportExpression", message: "Dynamic acquisition is forbidden in publication." },
+		{
+			selector: "CallExpression[callee.name=/^(eval|require|Function)$/]",
+			message: "Dynamic acquisition is forbidden in publication.",
+		},
+	],
+};
+
 /** @type {import("typescript-eslint").ConfigArray} */
 const config = tsLintConfig(
 	{
@@ -171,30 +189,21 @@ const config = tsLintConfig(
 	{
 		files: ["packages/object/src/publication/publisher.ts"],
 		rules: {
+			...publicationBoundaryRules,
 			"no-restricted-imports": [
 				"error",
 				{
 					paths: [
 						{ name: "es-toolkit", message: "Publication copies must use PublicationCapability." },
 						{ name: "@msgpack/msgpack", message: "Publication equality must use PublicationCapability." },
+						{ name: "node:v8", message: "Serialization is outside publication." },
 						{ name: "@ts-drp/utils/serialization", message: "Decode-capable serialization is outside publication." },
+						{
+							name: "@ts-drp/utils/serialization/equality",
+							message: "Publication equality must use PublicationCapability.",
+						},
 						{ name: "../state-materialize.js", message: "Publication may depend only on the sink-free state store." },
 					],
-				},
-			],
-			"no-restricted-globals": ["error", "structuredClone", "Buffer"],
-			"no-restricted-properties": [
-				"error",
-				{ object: "JSON", property: "parse", message: "Serialization is outside publication." },
-				{ object: "JSON", property: "stringify", message: "Serialization is outside publication." },
-				{ object: "globalThis", property: "structuredClone", message: "Copies use PublicationCapability." },
-			],
-			"no-restricted-syntax": [
-				"error",
-				{ selector: "ImportExpression", message: "Dynamic acquisition is forbidden in publication." },
-				{
-					selector: "CallExpression[callee.name=/^(eval|require|Function)$/]",
-					message: "Dynamic acquisition is forbidden in publication.",
 				},
 			],
 		},
@@ -202,28 +211,59 @@ const config = tsLintConfig(
 	{
 		files: ["packages/object/src/publication/copy-capability.ts"],
 		rules: {
+			...publicationBoundaryRules,
 			"no-restricted-imports": [
 				"error",
 				{
 					paths: [
 						{ name: "@msgpack/msgpack", message: "The capability uses the encode-only equality export." },
+						{ name: "node:v8", message: "The capability cannot acquire a round-trip codec." },
+						{ name: "@ts-drp/utils", message: "The capability imports only the equality subpath." },
 						{ name: "@ts-drp/utils/serialization", message: "Decode-capable serialization is outside publication." },
 					],
 				},
 			],
-			"no-restricted-globals": ["error", "structuredClone", "Buffer"],
-			"no-restricted-properties": [
+		},
+	},
+	{
+		files: ["packages/object/src/state-store.ts"],
+		rules: {
+			...publicationBoundaryRules,
+			"no-restricted-imports": [
 				"error",
-				{ object: "JSON", property: "parse", message: "Serialization is outside publication." },
-				{ object: "JSON", property: "stringify", message: "Serialization is outside publication." },
-				{ object: "globalThis", property: "structuredClone", message: "Copies use the measured leaf." },
-			],
-			"no-restricted-syntax": [
-				"error",
-				{ selector: "ImportExpression", message: "Dynamic acquisition is forbidden in publication." },
 				{
-					selector: "CallExpression[callee.name=/^(eval|require|Function)$/]",
-					message: "Dynamic acquisition is forbidden in publication.",
+					paths: [
+						{ name: "es-toolkit", message: "The publication store does not copy values." },
+						{ name: "@msgpack/msgpack", message: "The publication store does not serialize values." },
+						{ name: "node:v8", message: "The publication store does not serialize values." },
+						{ name: "@ts-drp/utils", message: "The publication store has no utility runtime dependency." },
+						{ name: "@ts-drp/utils/serialization", message: "Serialization is outside the store." },
+						{
+							name: "@ts-drp/utils/serialization/equality",
+							message: "Equality belongs only in the capability.",
+						},
+					],
+				},
+			],
+		},
+	},
+	{
+		files: ["packages/utils/src/serialization/equality.ts"],
+		rules: {
+			...publicationBoundaryRules,
+			"no-restricted-imports": [
+				"error",
+				{
+					paths: [
+						{ name: "es-toolkit", message: "Equality does not copy values." },
+						{ name: "node:v8", message: "Equality is encode-only." },
+						{ name: "@ts-drp/utils/serialization", message: "Equality cannot acquire decoding." },
+						{
+							name: "@msgpack/msgpack",
+							importNames: ["decode"],
+							message: "Equality is encode-only.",
+						},
+					],
 				},
 			],
 		},

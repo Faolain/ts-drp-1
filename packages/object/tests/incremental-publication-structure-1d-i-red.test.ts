@@ -265,8 +265,7 @@ function programFor(sources: GovernedSources): { checker: ts.TypeChecker; progra
 		names.map((specifier) => {
 			const from = path.relative("/workspace", containing).split(path.sep).join(path.posix.sep);
 			const source = normalizeModule(from, specifier, sources);
-			if (source) return { resolvedFileName: path.resolve("/workspace", source), extension: ts.Extension.Ts };
-			return undefined;
+			return source ? { resolvedFileName: path.resolve("/workspace", source), extension: ts.Extension.Ts } : undefined;
 		});
 	const rootNames = Object.keys(sources).map((name) => path.resolve("/workspace", name));
 	const program = ts.createProgram(rootNames, options, host);
@@ -282,14 +281,11 @@ function lexicalOwner(node: ts.Node): string {
 		if (ts.isConstructorDeclaration(owner)) return `${owner.parent.name?.text ?? "<anonymous>"}.constructor`;
 		if (ts.isMethodDeclaration(owner) && owner.name) {
 			const name = owner.name.getText(owner.getSourceFile()).replace(/["']/g, "");
-			const parent = ts.isClassLike(owner.parent) ? owner.parent.name?.text : undefined;
-			if (!parent) {
-				const enclosing = ts.findAncestor(owner, ts.isFunctionDeclaration);
-				return enclosing?.name ? `${enclosing.name.text}.${name}` : name;
-			}
-			return parent && ["DRPObject", "DRPVertexApplier", "DRPObjectStateManager"].includes(parent)
-				? `${parent}.${name}`
-				: name;
+			const className = ts.isClassLike(owner.parent) ? owner.parent.name?.text : undefined;
+			if (className && ["DRPObject", "DRPVertexApplier", "DRPObjectStateManager"].includes(className))
+				return `${className}.${name}`;
+			const enclosing = ts.findAncestor(owner, ts.isFunctionDeclaration);
+			return enclosing?.name ? `${enclosing.name.text}.${name}` : name;
 		}
 		if (ts.isFunctionDeclaration(owner) && owner.name) return owner.name.text;
 		if (
@@ -302,8 +298,14 @@ function lexicalOwner(node: ts.Node): string {
 	return "<module>";
 }
 
-function importIdentity(node: ts.Node, checker: ts.TypeChecker): string | undefined {
-	const symbol = checker.getSymbolAtLocation(node);
+function referenceSymbol(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
+	if (ts.isIdentifier(node) && ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node) {
+		return checker.getShorthandAssignmentValueSymbol(node.parent);
+	}
+	return checker.getSymbolAtLocation(node);
+}
+
+function importIdentity(symbol: ts.Symbol | undefined): string | undefined {
 	for (const declaration of symbol?.declarations ?? []) {
 		const imported = ts.findAncestor(declaration, ts.isImportDeclaration);
 		if (!imported || !ts.isStringLiteral(imported.moduleSpecifier)) continue;
@@ -317,67 +319,68 @@ function importIdentity(node: ts.Node, checker: ts.TypeChecker): string | undefi
 	return undefined;
 }
 
+function canonicalSymbol(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): ts.Symbol | undefined {
+	if (!symbol || !(symbol.flags & ts.SymbolFlags.Alias)) return symbol;
+	return checker.getAliasedSymbol(symbol);
+}
+
 function symbolIdentity(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): string | undefined {
-	if (!symbol) return undefined;
-	while (symbol.flags & ts.SymbolFlags.Alias) {
-		const target = checker.getAliasedSymbol(symbol);
-		if (target === symbol) break;
-		symbol = target;
-	}
-	const declaration = symbol.declarations?.[0];
-	return declaration ? `${sourcePath(declaration.getSourceFile())}:${symbol.name}` : undefined;
+	const canonical = canonicalSymbol(symbol, checker);
+	const declaration = canonical?.declarations?.[0];
+	return declaration ? `${sourcePath(declaration.getSourceFile())}:${canonical.name}` : undefined;
 }
 
-function declarationIdentity(node: ts.Node, checker: ts.TypeChecker): string | undefined {
-	return symbolIdentity(checker.getSymbolAtLocation(node), checker);
+function knownSymbolLabel(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): string | undefined {
+	const canonical = canonicalSymbol(symbol, checker);
+	const identity = symbolIdentity(canonical, checker);
+	const known = [
+		"packages/object/src/state-materialize.ts:stateFromDRP",
+		"packages/object/src/publication/copy-capability.ts:createPublicationCapability",
+		"packages/object/src/publication/copy-capability.ts:copy",
+		"packages/object/src/publication/publisher.ts:assignState",
+		"packages/object/src/publication/publisher.ts:advanceCheckpointIfNeeded",
+		"packages/object/src/publication/publisher.ts:capturePublishedState",
+		"packages/utils/src/serialization/equality.ts:serializeValue",
+		"packages/utils/src/serialization/index.ts:serializeDRPState",
+		"packages/utils/src/serialization/index.ts:deserializeValue",
+	];
+	return known.includes(identity ?? "") ? canonical?.name : undefined;
 }
 
-function referenceLabel(
-	expression: ts.Expression,
-	file: ts.SourceFile,
-	checker: ts.TypeChecker,
-	includeInternal: boolean
-): string | undefined {
+function referenceLabel(expression: ts.Expression, checker: ts.TypeChecker): string | undefined {
+	if (ts.findAncestor(expression.parent, ts.isTypeNode)) return undefined;
 	if (ts.isIdentifier(expression)) {
-		const imported = importIdentity(expression, checker);
+		const symbol = referenceSymbol(expression, checker);
+		const imported = importIdentity(symbol);
 		if (imported === "es-toolkit:cloneDeep") return "cloneDeep";
 		if (imported === "@msgpack/msgpack:encode") return "msgpack.encode";
 		if (imported === "@msgpack/msgpack:decode") return "msgpack.decode";
 		if (imported === "node:v8:serialize") return "node:v8.serialize";
 		if (imported === "node:v8:deserialize") return "node:v8.deserialize";
 		if (expression.text === "structuredClone") {
-			const identity = declarationIdentity(expression, checker);
+			const identity = symbolIdentity(symbol, checker);
 			if (!identity?.startsWith("packages/")) return "structuredClone";
 		}
-		if (includeInternal) {
-			const identity = declarationIdentity(expression, checker);
-			if (identity === "packages/object/src/state-materialize.ts:stateFromDRP") return "stateFromDRP";
-			if (
-				/packages\/utils\/src\/serialization\/(?:equality|index)\.ts:(?:serializeDRPState|serializeValue|deserializeValue)$/.test(
-					identity ?? ""
-				)
-			)
-				return expression.text;
-			if (identity === "packages/object/src/publication/copy-capability.ts:createPublicationCapability")
-				return "createPublicationCapability";
-		}
+		return knownSymbolLabel(symbol, checker);
 	}
-	if (ts.isPropertyAccessExpression(expression)) {
-		const name = expression.name.text;
-		if (ts.isIdentifier(expression.expression)) {
-			const imported = importIdentity(expression.expression, checker);
-			if (imported === "@msgpack/msgpack:*" && (name === "encode" || name === "decode")) {
-				return `msgpack.${name}`;
-			}
+	if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+		const member = ts.isPropertyAccessExpression(expression) ? expression.name : expression.argumentExpression;
+		if (!ts.isIdentifier(member) && !ts.isStringLiteralLike(member)) return undefined;
+		const name = member.text;
+		const receiver = expression.expression;
+		if (ts.isIdentifier(receiver)) {
+			const imported = importIdentity(referenceSymbol(receiver, checker));
+			if (imported === "@msgpack/msgpack:*" && (name === "encode" || name === "decode")) return `msgpack.${name}`;
 			if (imported === "es-toolkit:*" && name === "cloneDeep") return "cloneDeep";
 		}
-		const receiverIdentity = declarationIdentity(expression.expression, checker);
-		if ((name === "encode" || name === "decode") && /_pb\.ts:/.test(receiverIdentity ?? "")) {
-			return `${expression.expression.getText(file)}.${name}`;
-		}
-		if (includeInternal && name === "create" && /object_pb\.ts:/.test(receiverIdentity ?? "")) {
-			return `${expression.expression.getText(file)}.create`;
-		}
+		const memberSymbol = referenceSymbol(member, checker) ?? referenceSymbol(expression, checker);
+		const known = knownSymbolLabel(memberSymbol, checker);
+		if (known) return known;
+		const canonicalReceiver = canonicalSymbol(referenceSymbol(receiver, checker), checker);
+		const receiverIdentity = symbolIdentity(canonicalReceiver, checker);
+		if ((name === "encode" || name === "decode") && /_pb\.ts:/.test(receiverIdentity ?? ""))
+			return `${canonicalReceiver?.name}.${name}`;
+		if (name === "create" && /object_pb\.ts:/.test(receiverIdentity ?? "")) return `${canonicalReceiver?.name}.create`;
 	}
 	return undefined;
 }
@@ -397,16 +400,15 @@ function sites(sources: GovernedSources, checker: ts.TypeChecker, program: ts.Pr
 		if (sources[fileName] === undefined) continue;
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node)) {
-				record(fileName, node, referenceLabel(node.expression, file, checker, true));
+				record(fileName, node, referenceLabel(node.expression, checker));
 			} else if (
-				(ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) &&
+				(ts.isIdentifier(node) || ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
 				!(ts.isCallExpression(node.parent) && node.parent.expression === node) &&
+				!(ts.isIdentifier(node) && ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) &&
+				!((node.parent as ts.NamedDeclaration).name === node && !ts.isShorthandPropertyAssignment(node.parent)) &&
 				!ts.findAncestor(node, ts.isImportDeclaration)
 			) {
-				const callee = referenceLabel(node, file, checker, false);
-				if (!fileName.endsWith("_pb.ts") || !callee?.match(/\.(?:encode|decode)$/)) {
-					record(fileName, node, callee);
-				}
+				record(fileName, node, referenceLabel(node, checker));
 			}
 			ts.forEachChild(node, visit);
 		};
@@ -439,23 +441,28 @@ function runtimeClosure(
 			if (bindings && ts.isNamedImports(bindings) && bindings.elements.every((element) => element.isTypeOnly)) continue;
 			const resolved = normalizeModule(current, statement.moduleSpecifier.text, sources);
 			if (resolved) pending.push(resolved);
-			else if (
-				statement.moduleSpecifier.text.startsWith(".") ||
-				statement.moduleSpecifier.text.startsWith("@ts-drp/")
-			) {
+			else if (statement.moduleSpecifier.text.startsWith(".") || statement.moduleSpecifier.text.startsWith("@ts-drp/"))
 				unresolved.push(`${current}:${statement.moduleSpecifier.text}`);
-			}
 		}
 	}
 	return { files: result, unresolved: unresolved.sort() };
 }
 
+function measuredCopyLeafRoots(references: readonly string[]): string[] {
+	const hasEdge = (site: string): boolean => references.includes(`${site}#1`);
+	return D922C_ROOTS.filter(
+		(root) =>
+			hasEdge("packages/object/src/publication/publisher.ts:capturePublishedState:copy") &&
+			hasEdge(`packages/object/src/drp-applier.ts:DRPVertexApplier.${root}:${root}`) &&
+			hasEdge(`packages/object/src/publication/publisher.ts:${root}:capturePublishedState`)
+	);
+}
+
 function externalSurface(references: readonly string[]): string[] {
 	const result: string[] = [];
-	const version = (relativeManifest: string): string => {
-		const text = fs.readFileSync(path.join(WORKSPACE_DIRECTORY, relativeManifest), "utf8");
-		return (JSON.parse(text) as { version: string }).version;
-	};
+	const version = (relativeManifest: string): string =>
+		(JSON.parse(fs.readFileSync(path.join(WORKSPACE_DIRECTORY, relativeManifest), "utf8")) as { version: string })
+			.version;
 	if (references.some((site) => site.includes(":msgpack.decode#")))
 		result.push(`@msgpack/msgpack@${version("packages/utils/node_modules/@msgpack/msgpack/package.json")}:decode`);
 	if (references.some((site) => site.includes(":msgpack.encode#")))
@@ -473,23 +480,14 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 	const { checker, program } = programFor(sources);
 	const allSites = sites(sources, checker, program);
 	const real = sources["packages/object/src/publication/publisher.ts"] !== undefined;
-	const closure = runtimeClosure(
-		sources,
-		real
-			? ["packages/object/src/publication/publisher.ts", "packages/object/src/publication/copy-capability.ts"]
-			: [WORKSPACE_PUBLISHER_PATH]
-	);
+	const closure = runtimeClosure(sources, real ? D922D_RUNTIME_ROOTS : [WORKSPACE_PUBLISHER_PATH]);
 	const packageReferences = allSites.filter((site) =>
 		/(?:cloneDeep|structuredClone|stateFromDRP|serializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/.test(
 			site
 		)
 	);
-	const closureReferences = packageReferences.filter((site) => {
-		const fileName = site.slice(0, site.indexOf(":"));
-		return closure.files.has(fileName) && !fileName.endsWith("_pb.ts");
-	});
-	const violations: string[] = [];
-	violations.push(...closure.unresolved.map((site) => `unresolved internal acquisition ${site}`));
+	const closureReferences = packageReferences.filter((site) => closure.files.has(site.slice(0, site.indexOf(":"))));
+	const violations = closure.unresolved.map((site) => `unresolved internal acquisition ${site}`);
 	const approved = new Set(real ? D922C_PACKAGE_REFERENCE_SITES : []);
 	for (const site of packageReferences)
 		if (!approved.has(site)) violations.push(`serialization/clone reference ${site}`);
@@ -498,9 +496,8 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 		if (/\bJSON\s*\.\s*(?:parse|stringify)\s*\(/.test(text)) violations.push(`serialization JSON in ${fileName}`);
 		if (/\b(?:eval|Function|require)\s*\(|\bimport\s*\(/.test(text))
 			violations.push(`dynamic acquisition in ${fileName}`);
-		if (/\b(?:encode|decode)\s*\]\s*\(/.test(text) || /\[[A-Za-z_$][\w$]*\]\s*\(/.test(text)) {
+		if (/\b(?:encode|decode)\s*\]\s*\(/.test(text) || /\[[A-Za-z_$][\w$]*\]\s*\(/.test(text))
 			violations.push(`computed acquisition in ${fileName}`);
-		}
 	}
 	const capabilityFile = program.getSourceFiles().find((file) => sourcePath(file).endsWith("copy-capability.ts"));
 	const capabilitySymbol = capabilityFile && checker.getSymbolAtLocation(capabilityFile);
@@ -514,13 +511,19 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 	const snapshotConstructionSites = allSites.filter((site) => /:DRPState(?:Entry)?\.create#/.test(site));
 	const cloneSites = packageReferences.filter((site) => site.includes(":cloneDeep#"));
 	const captureSites = packageReferences.filter((site) => site.includes(":stateFromDRP#"));
+	const reviewedOperations = REVIEWED_WORKSPACE_OPERATIONS.filter((operation) => {
+		const separator = operation.lastIndexOf(":");
+		const category = operation.slice(separator + 1);
+		const referencePrefix = `${operation.slice(0, separator)}:${category === "clone" ? "cloneDeep" : "msgpack.encode"}#`;
+		return packageReferences.some((site) => site.startsWith(referencePrefix));
+	}).sort();
 	const analysis: D922cAnalysis = {
 		violations: [...new Set(violations)].sort(),
 		residualCloneSites: cloneSites.filter(
 			(site) => !site.includes("copy-capability.ts") && !site.includes("src/index.ts")
 		),
 		residualStateCaptureSites: captureSites,
-		reviewedOperations: [...REVIEWED_WORKSPACE_OPERATIONS].sort(),
+		reviewedOperations,
 		analyzedSourcePaths: Object.keys(sources).sort(),
 		authority: {
 			loadedSourcePaths: Object.keys(sources).sort(),
@@ -528,7 +531,7 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 			capabilityExports,
 			capabilityConstructionSites,
 			measuredCopyLeaf: "packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy",
-			measuredCopyLeafRoots: real ? ["advanceCheckpointIfNeeded", "assignState"] : [],
+			measuredCopyLeafRoots: real ? measuredCopyLeafRoots(allSites) : [],
 			packageReferenceSites: packageReferences,
 			closureReferenceSites: closureReferences,
 			codecReferenceSites: packageReferences.filter(
@@ -690,7 +693,7 @@ function d922cSites(sourcePath: string, owner: string, callee: string, count = 1
 // alias-resolved call node, identified by source/lexical owner/callee/ordinal rather
 // than a brittle line number. Declarations and type-only references are not calls.
 const D922C_CODEC_REFERENCE_SITES = [
-	...d922cSites("packages/interval-discovery/src/index.ts", "_broadcastDiscoveryRequest", "DRPDiscoveryRequest.encode"),
+	...d922cSites("packages/interval-discovery/src/index.ts", "_broadcastDiscoveryRequest", "DRPDiscovery.encode"),
 	...d922cSites("packages/interval-discovery/src/index.ts", "_sendDiscoveryResponse", "DRPDiscoveryResponse.encode"),
 	...d922cSites("packages/network/src/node.ts", "broadcastMessage", "Message.encode"),
 	...d922cSites("packages/network/src/node.ts", "sendMessage", "Message.encode"),
@@ -1069,6 +1072,11 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 				import: "./dist/src/serialization/equality.js",
 			},
 		});
+		const viteConfig = fs.readFileSync(path.join(WORKSPACE_DIRECTORY, "vite.config.mts"), "utf8");
+		const equalityAlias = viteConfig.indexOf('"@ts-drp/utils/serialization/equality"');
+		const serializationAlias = viteConfig.indexOf('"@ts-drp/utils/serialization"');
+		expect(equalityAlias).toBeGreaterThan(-1);
+		expect(serializationAlias).toBeGreaterThan(equalityAlias);
 	});
 
 	it("keeps generated state codecs out of the capability through type-only structural shapes", () => {

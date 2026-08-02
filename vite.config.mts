@@ -17,6 +17,7 @@ export default defineConfig({
 			"@ts-drp/routing-browser": path.resolve(__dirname, "packages/routing-browser/src/index.ts"),
 			"@ts-drp/routing-node": path.resolve(__dirname, "packages/routing-node/src/index.ts"),
 			"@ts-drp/test-utils": path.resolve(__dirname, "packages/test-utils/src/index.ts"),
+			"@ts-drp/utils/serialization/equality": path.resolve(__dirname, "packages/utils/src/serialization/equality.ts"),
 			"@ts-drp/utils/serialization": path.resolve(__dirname, "packages/utils/src/serialization/index.ts"),
 			"@ts-drp/validation/message": path.resolve(__dirname, "packages/validation/src/schemas/message.ts"),
 			"@ts-drp/validation/errors": path.resolve(__dirname, "packages/validation/src/errors.ts"),
