@@ -15824,6 +15824,37 @@ independent top-level copy semantics. It does not change comparison authority,
 raw egress or hostile graph classification. P2 receives its own complete
 Grok/Kimi/Opus loop; P1 acceptance cannot be reused.
 
+**P2 accepted closure.** Fresh Grok 4.5/high session
+`019fc2d0-561e-7561-b959-19c510176a59`, fresh exact Kimi 3/high/100 session
+`51bb085b-a055-43a3-8455-048fdde08303` and final Opus/xhigh session
+`c2cee61f-cb9b-4cf2-abaf-afd625b81c8f` independently returned `ACCEPTED` and
+agreed `P2_MAY_CLOSE=yes`. Grok and Kimi found no blocker and authenticated the
+two causal RED/GREEN pairs, frozen hashes, copy authority and scope firewall;
+Kimi also re-ran P2 plus D.92.2 at 97/97. Opus independently re-ran P2 33/33,
+P1 27/27, D.92.2 64/64 and D.92.3 18/18. The corrective-GREEN artifact did not
+repeat the mandatory raw-child and sync-livelock signatures; Opus closed that
+evidence gap at exact HEAD by reproducing 11 failures / 7 passes and 3 failures
+/ 3 passes respectively. It also probed the shared `fromHashACL` path absent
+from the explicit entry-staging matrix and observed one read of each hostile
+field, the first staged value and no second read.
+
+The substantive final model was `claude-opus-5`. The top-level usage ledger
+also records an automatic non-substantive `claude-haiku-4-5-20251001` helper at
+26 output tokens / $0.002645 versus Opus at 56,324 output tokens / $5.254965;
+the same Opus session corrected its initial no-helper statement and confirmed
+the helper did not influence the ruling. Review evidence is under
+`.logs/phase-1d-i-p2-snapshot-container-review-{grok45-high,kimi3-high-100,opus-xhigh}/`.
+P2 is accepted and closed; D.92.4 is unblocked.
+
+Accepted nonblocking gotchas remain bounded. A hostile nested payload can fail
+during the one application detach after earlier properties have been assigned
+to a newly created instance, but that unreturned instance is discarded and no
+store is mutated. Copy-out's sparse-preserving `index in entries` can invoke a
+Proxy `has` trap; a lying false result creates a hole that fails closed at wire
+encoding and reconstruction. Wire keys are strings, while direct untyped raw
+callers can still supply other key shapes; that runtime-key policy is assigned
+below rather than silently widening P2.
+
 ##### D.92.3-P3 — owned TypedArray enumeration (nonblocking for D.92.4)
 
 P3 starts only after P1 and P2, may run alongside or after D.92.4, and must
@@ -15884,6 +15915,36 @@ confirmed through direct tracking and the real applier, and remains a hard
 pre-3a live-v3-binder gate. It can hide a vertex from the charge keyset while a
 supplied order still indexes it. D.92 neither consumes nor repairs it.
 
+Prototype-safe snapshot materialization is a distinct mandatory Phase 1d(ii)
+item. `applyState` currently uses ordinary property assignment, so a validated
+string key `__proto__` with an object or null value invokes the inherited legacy
+setter and replaces only the reconstructed ACL/DRP instance's prototype. This
+does not pollute `Object.prototype`, but it can strip expected methods, expose
+inherited attacker-controlled values and make re-export omit the committed key.
+The sink predates P2 and neither blocks P2 nor belongs to D.92.4 raw-egress
+attribution or D.73 graph provenance. Current unsolicited `FetchStateResponse`
+snapshots are decoded and dropped, so this is not evidence that today's raw
+peer snapshot is adopted; it remains reachable through public/raw
+reconstruction and locally computed snapshots influenced by admitted remote
+operations, and becomes a hard prerequisite before Phase 4b/6a snapshot
+adoption or any untrusted-peer golden path.
+
+Phase 1d(ii)'s fresh causal RED/GREEN must require a primitive string key at
+runtime and materialize every validated key, including `__proto__`, as an own
+data property without ordinary `[[Set]]`, inherited-setter dispatch or
+prototype mutation. Preserve wire round trips, duplicate-key/order behavior and
+ordinary state semantics; prove the target prototype, `Object.prototype`, the
+DRP/ACL constructor prototypes and sibling instances remain unchanged. Do not
+use `in`, `Reflect.has` or another caller-controlled ownership test to decide
+eligibility. Non-string direct-call keys and any hostile coercion belong to this
+same bounded item; object/symbol key identity is not a new wire feature. The
+plan-amendment quorum was unanimous: final Opus/xhigh proposed the retained
+item, fresh Codex-high returned `PLAN_AMENDMENT_AGREE=yes`, and fresh exact Kimi
+3/high/100 session `ec1e588f-8080-4a39-b516-258c2474c986` returned the same
+with both 100-step controls. Kimi evidence is under
+`.logs/phase-1d-i-p2-proto-plan-amendment-kimi3-high-100/`; the Codex
+adjudication was delivered through collaboration only.
+
 The publication-time codec/`Symbol.iterator` captured-intrinsic seam also
 remains separate unless its later causal RED explicitly assigns it to the
 shared detachment primitive. Phase 0n remains optional after the golden paths
@@ -15892,19 +15953,17 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 is accepted and closed. Review the D.92.3-P2 candidate at exact HEAD:
-initial/corrective RED commits `76845de` and `2b3e293`, production GREEN
-`1ab4c2c`, entry-staging corrective RED `71f7fec`, and narrow production
-correction `3a69f9b`. The frozen P2 test is 643 formatted lines at SHA-256
-`c7de0d5cbc88971fa3fd76f39c7676a97880bd94f69ee9323386c03498ec7ddf` and
-is 33/33. Confirm that captured/indexed container traversal preserves sparse
-copy-out and wire-failure behavior, reconstruction validates both sides before
-application, hostile entry fields are read once into plain staging records,
-and `applyState:detachStatePayload#1` remains the sole measured application
-copy boundary. Run the mandatory fresh Grok-high, exact Kimi 3/high/100 and
-final Opus/xhigh review loop; do not call P2 accepted before all three agree.
-Until then do not start D.92.4, P3, or widen into D.73, fingerprints, preimages
-or a new analyzer.
+P1 and P2 are accepted and closed. P2's frozen 643-line test at SHA-256
+`c7de0d5cbc88971fa3fd76f39c7676a97880bd94f69ee9323386c03498ec7ddf` is 33/33;
+production commits `1ab4c2c` and `3a69f9b` are accepted. Start D.92.4 raw-egress
+contract as a distinct fresh Codex-high tests-only RED, preserving P1/P2,
+D.92.2/D.92.3, performance and exact expected-RED signatures. Do not begin its
+GREEN before the RED is causally frozen. P3 remains separate and may follow
+D.92.4; it still must close before the composite D.92 review. Do not widen
+D.92.4 into D.73, fingerprints, preimages, a value-flow analyzer or the newly
+retained Phase 1d(ii) prototype-safe materialization item. That item is
+mandatory before Phase 1d(ii) closure and later Phase 4b/6a snapshot adoption,
+but it does not reopen P2.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
