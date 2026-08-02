@@ -383,14 +383,14 @@ describe("Phase 1d(i) D.92.3-P1 single linear comparison authority RED", () => {
 		expect(comparisonEvents(equalEvents)).toHaveLength(1);
 		expect(comparisonEvents(unequalEvents)).toHaveLength(1);
 		const falsePublication = capture(
-			{ payload: { value: 1 } },
+			{ semanticsType: SemanticsType.pair, payload: { value: 1 } },
 			{ semanticsType: SemanticsType.pair, payload: { value: 1 } },
 			new Set(["payload"]),
 			true,
 			false
 		);
 		const truePublication = capture(
-			{ payload: { value: 1 } },
+			{ semanticsType: SemanticsType.pair, payload: { value: 1 } },
 			{ semanticsType: SemanticsType.pair, payload: { value: 1 } },
 			new Set(["payload"]),
 			true,
