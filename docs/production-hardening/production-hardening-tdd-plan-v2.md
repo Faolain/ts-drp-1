@@ -15290,6 +15290,38 @@ is under
 `.logs/phase-1d-i-d92-3-map-key-detachment-review-kimi3-high-100/` and
 `.logs/phase-1d-i-d92-3-owner-perf-contract-baseline-55f85e4-final.log`.
 
+**One-off Fable course review — accepted with actions, amendment not yet
+adopted.** Substantive `claude-fable-5`/high session
+`21286328-557c-447c-9542-c64eb9b0e5ba` independently concluded that the
+v3-forward ordering, D.92.2 least-authority pivot and current D.92.3 corrective
+remain the sustainable route to both golden paths. It recommended correcting
+D.92.3 rather than rolling it back. The bridge recorded only a non-substantive
+21-token automatic Haiku helper in addition to Fable. Raw SHA-256 is
+`9cd4c4191977f882178777f95ed708c7cce4b2c147a0308ab4c19aa3a1023247` under
+`.logs/fable-high-d923-course-review-20260802/`.
+
+Fable traced the pre-existing MapDRP cost primarily to two full equality walks
+per local operation at the applier effective-key decision and publisher
+capture, combined with `fast-equals@5.2.2` Map equality that re-scans the other
+Map for each entry. That mechanism makes the current hot path quadratic in a
+large Map payload and matters to durable Discord sends and MMORPG durable
+operations. It is not assigned to D.92.3 and must not expand the backing-alias
+GREEN. Fable proposes a distinct pre-D.92.4 Phase 1d(i) corrective whose RED
+uses deterministic comparison-work/single-traversal evidence rather than a
+looser wall-clock threshold, plus mandatory same-checkpoint triage whenever a
+preservation artifact contains a new failure. This is a proposed plan change,
+not an adopted reorder: schedule the standing Codex-high + exact Kimi
+3/high/100 + Opus/xhigh correction quorum after D.92.3 acceptance before
+inserting the slice or changing the mandatory gate set.
+
+Additional nonblocking detacher gotchas from the review are now explicit:
+pooled Node Buffers must retain the dedicated `Buffer.from` isolation rule
+rather than sharing a cloned pool slab; TypedArray expando-property parity
+needs an explicit decision; large browser TypedArrays should avoid recursive
+per-element copying where a captured bulk intrinsic preserves the same graph;
+and `instanceof`/`Symbol.hasInstance` poisoning remains hostile-graph work for
+the later D.73 ledger, not scope for this corrective GREEN.
+
 #### D.92.4 — Raw-egress contract after detachment
 
 After D.92.3 is accepted, forced raw egress widens candidacy monotonically to
