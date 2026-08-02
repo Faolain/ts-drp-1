@@ -685,6 +685,117 @@ const D922D_STATIC_REFERENCE_CONTROLS = [
 	),
 ] as const;
 
+interface D922dModuleExportCase {
+	readonly expectedExternalRuntimeSurface: readonly string[];
+	readonly expectedPackageReferences: readonly string[];
+	readonly expectedViolations: readonly string[];
+	readonly name: string;
+	readonly sources: GovernedSources;
+}
+
+const D922D_MODULE_EXPORT_MATRIX: readonly D922dModuleExportCase[] = [
+	{
+		name: "renamed external MessagePack encode re-export with first-party consumer",
+		expectedPackageReferences: [
+			"packages/object/src/drp-applier.ts:publish:msgpack.encode#1",
+			"packages/utils/src/serialization/index.ts:<module>:msgpack.encode#1",
+		],
+		expectedExternalRuntimeSurface: ["@msgpack/msgpack@3.1.1:encode"],
+		expectedViolations: [
+			"serialization/clone reference packages/object/src/drp-applier.ts:publish:msgpack.encode#1",
+			"serialization/clone reference packages/utils/src/serialization/index.ts:<module>:msgpack.encode#1",
+		],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { snapshotValueBytes } from "@ts-drp/utils/serialization";',
+				"snapshotValueBytes(state);"
+			),
+			[UTILS_SERIALIZATION_PATH]: 'export { encode as snapshotValueBytes } from "@msgpack/msgpack";',
+		},
+	},
+	{
+		name: "renamed external cloneDeep re-export with first-party consumer",
+		expectedPackageReferences: [
+			"packages/object/src/drp-applier.ts:publish:cloneDeep#1",
+			"packages/utils/src/serialization/index.ts:<module>:cloneDeep#1",
+		],
+		expectedExternalRuntimeSurface: ["es-toolkit@1.30.1:cloneDeep"],
+		expectedViolations: [
+			"serialization/clone reference packages/object/src/drp-applier.ts:publish:cloneDeep#1",
+			"serialization/clone reference packages/utils/src/serialization/index.ts:<module>:cloneDeep#1",
+		],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { detachSnapshot } from "@ts-drp/utils/serialization";',
+				"detachSnapshot(state);"
+			),
+			[UTILS_SERIALIZATION_PATH]: 'export { cloneDeep as detachSnapshot } from "es-toolkit";',
+		},
+	},
+	{
+		name: "external MessagePack export-star acquisition",
+		expectedPackageReferences: [],
+		expectedExternalRuntimeSurface: ["@msgpack/msgpack@3.1.1:*"],
+		expectedViolations: ["external wildcard acquisition packages/utils/src/serialization/index.ts:@msgpack/msgpack"],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { encode } from "@ts-drp/utils/serialization";',
+				"encode(state);"
+			),
+			[UTILS_SERIALIZATION_PATH]: 'export * from "@msgpack/msgpack";',
+		},
+	},
+	{
+		name: "imported exported DRP-state deserializer",
+		expectedPackageReferences: ["packages/object/src/drp-applier.ts:publish:deserializeDRPState#1"],
+		expectedExternalRuntimeSurface: [],
+		expectedViolations: [
+			"serialization/clone reference packages/object/src/drp-applier.ts:publish:deserializeDRPState#1",
+		],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { deserializeDRPState as restoreState } from "@ts-drp/utils/serialization";',
+				"restoreState(state);"
+			),
+			[UTILS_SERIALIZATION_PATH]: "export function deserializeDRPState(value: unknown): unknown { return value; }",
+		},
+	},
+	{
+		name: "known globalThis structuredClone form",
+		expectedPackageReferences: ["packages/object/src/drp-applier.ts:publish:structuredClone#1"],
+		expectedExternalRuntimeSurface: [],
+		expectedViolations: ["serialization/clone reference packages/object/src/drp-applier.ts:publish:structuredClone#1"],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher("", "globalThis.structuredClone(state);"),
+		},
+	},
+	{
+		name: "benign external named member re-export with first-party consumer",
+		expectedPackageReferences: [],
+		expectedExternalRuntimeSurface: [],
+		expectedViolations: [],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { SnapshotMetadata } from "@ts-drp/utils/serialization";',
+				"void SnapshotMetadata;"
+			),
+			[UTILS_SERIALIZATION_PATH]: 'export { ExtensionCodec as SnapshotMetadata } from "@msgpack/msgpack";',
+		},
+	},
+	{
+		name: "locally shadowed globalThis object",
+		expectedPackageReferences: [],
+		expectedExternalRuntimeSurface: [],
+		expectedViolations: [],
+		sources: {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				"",
+				"const globalThis = { structuredClone: (value: unknown): unknown => value }; globalThis.structuredClone(state);"
+			),
+		},
+	},
+];
+
 function d922cSites(sourcePath: string, owner: string, callee: string, count = 1): string[] {
 	return Array.from({ length: count }, (_, index) => `${sourcePath}:${owner}:${callee}#${index + 1}`);
 }
@@ -1219,6 +1330,17 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		expect(d922cAuthority(analysis).packageReferenceSites).toEqual([]);
 		expect(analysis.violations).toEqual([]);
 	});
+
+	it.each(D922D_MODULE_EXPORT_MATRIX)(
+		"classifies causal module/export edge: $name",
+		({ expectedExternalRuntimeSurface, expectedPackageReferences, expectedViolations, sources }) => {
+			const analysis = analyze(sources);
+			const authority = d922cAuthority(analysis);
+			expect(authority.packageReferenceSites).toEqual(expectedPackageReferences);
+			expect(authority.externalRuntimeSurface).toEqual(expectedExternalRuntimeSurface);
+			expect(analysis.violations).toEqual(expectedViolations);
+		}
+	);
 
 	it.each(D922C_REEXPRESSED_MODULE_MUTANTS)("kills surviving module/export mutation: $name", ({ sources }) => {
 		expect(analyze(sources).violations).not.toEqual([]);
