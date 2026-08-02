@@ -15940,7 +15940,52 @@ inherited Phase 1d(i) is 147/147; specialized state/collection/atomicity is
 Object/workspace typechecks, owned/tracked zero-error lint, Prettier, diff,
 scope and hashes pass. Evidence is under
 `.logs/phase-1d-i-d924-raw-egress-red-codex-high/`. The GREEN must not change
-this frozen test or reinterpret the exact work counters.
+this frozen test or reinterpret the exact work counters, except for the narrow
+quorum-approved correction below.
+
+**D.92.4 Proxy-invariant RED correction (unanimous correction quorum).** The
+first production-only GREEN proved that one direct-tracker assertion in
+`dc459ba` is impossible under the same RED's constraints. For an own
+non-configurable, non-writable data property, the Proxy `get` invariant requires
+the exact raw child value. A later write through that identity crosses no Proxy
+trap. The mutating case therefore cannot conditionally appear in
+`changedKeys()` while the otherwise identical read-only control remains empty
+unless production wraps the value illegally, changes observable descriptors,
+polls/scans in a dirty reader, or retains a preimage/fingerprint. All four are
+forbidden. A temporary owner-count-shaped workaround was rejected and reverted;
+HEAD `3cea7bf` retains no production draft.
+
+Fresh Codex-high returned `PLAN_AMENDMENT_AGREE=yes`. Exact Kimi 3/high with
+both 100-step controls, session `a01658a0-a7da-4af0-b680-fe4cbe8dff0d`, and
+Opus/xhigh session `0dc98f80-b986-4947-978f-7e44568f8377` independently returned
+the same. Kimi used `kimi-code/k3`; Opus used substantive `claude-opus-5` and
+reported an automatic non-substantive 32-output-token Haiku helper with no
+influence on the ruling. Evidence is under
+`.logs/phase-1d-i-d924-contradiction-{kimi3-high-100,opus-xhigh}/` and
+`.logs/phase-1d-i-d924-raw-egress-green-codex-high/`.
+
+The corrective tests-only RED may change only the impossible direct frozen-
+holder attribution coupling. It retains the independent serialized-byte oracle
+but requires `changedKeys()` to contain only trap-observed writes, asserts a
+separate monotone raw-egress/publication-candidacy signal, and proves the raw
+escape keeps the operation eligible. Retain the native SameValue/TypeError
+control and every publication, work-counter, ballast, add/delete, failure and
+O(1) reader gate. Add unchanged ballast to the direct fixture and a multiply-
+aliased read-only invariant control so alias multiplicity cannot masquerade as
+mutation evidence. Re-freeze the corrected file with its new exact hash, line
+count and RED signature before production changes.
+
+The sustainable GREEN keeps `changedKeys()` as observed attribution and carries
+an operation- and side-local raw-egress signal separately. That signal is
+sufficient to continue authoring, even when observed keys are empty, and forces
+an explicit all-governed candidate set rather than `undefined`. The publisher
+performs the sole final fail-closed decision pass over the detached baseline /
+target union and copies only changed present values. Configurable own and
+inherited Map/Set member values remain wrapped; own non-configurable,
+non-writable data or function values must return the exact raw value and signal
+egress, with the undefined-getter invariant handled symmetrically. No
+fingerprint, preimage, descriptor instrumentation, dirty-reader scan or D.73
+scope expansion is permitted.
 
 #### D.92.5 — Distinct retained blockers
 
@@ -15987,18 +16032,22 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 and P2 are accepted and closed. D.92.4 tests-only RED `dc459ba` is frozen at
-14 failures / 8 passes across 22 cases; its 887-line SHA-256 is
-`1f2751fccfad647fd46696c4014cfff1d181c9a16f07ee28036f2b2a0126a4e1`. Start a
-distinct fresh Codex-high production-only GREEN. Implement one monotone raw-
-egress transition to an explicit all-governed keyset, retain O(1) dirty
-readers, perform one final bounded publisher pass against detached owned
-entries and emit the exact work record. Do not alter the frozen RED, add
-fingerprints/preimages/`byteChangedKeys`, rescan the root in dirty readers or
-fold P3/D.73/Phase 1d(ii) into this GREEN. P3 remains separate and may follow
-D.92.4; it still must close before the composite D.92 review. The retained
-prototype-safe materialization item remains mandatory before Phase 1d(ii)
-closure and Phase 4b/6a snapshot adoption, but it does not reopen P2 or D.92.4.
+P1 and P2 are accepted and closed. D.92.4 tests-only RED `dc459ba` exposed the
+quorum-confirmed Proxy-invariant contradiction recorded above; no production
+candidate was retained. Start a fresh Codex-high tests-only corrective RED.
+Change only the impossible direct frozen-holder attribution coupling, add its
+ballast and multiply-aliased read-only controls, preserve all other cases and
+exact counters, then record the new exact hash/count/RED signature. After that
+checkpoint, start a distinct fresh Codex-high production-only GREEN: implement
+one monotone side-local raw-egress transition and explicit all-governed keyset,
+keep `changedKeys()` trap-observed and dirty readers O(1), keep raw-egress
+operations eligible, perform one final bounded publisher pass against detached
+owned entries and emit the exact work record. Do not add fingerprints/preimages/
+`byteChangedKeys`, descriptor instrumentation, dirty-reader root scans or fold
+P3/D.73/Phase 1d(ii) into this GREEN. P3 remains separate and may follow D.92.4;
+it still must close before the composite D.92 review. The retained prototype-
+safe materialization item remains mandatory before Phase 1d(ii) closure and
+Phase 4b/6a snapshot adoption, but it does not reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
