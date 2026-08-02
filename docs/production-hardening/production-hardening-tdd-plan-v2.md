@@ -15029,6 +15029,26 @@ pre-4a dependency on the complete end-of-plan golden path, so its D.52.4 quorum
 must be scheduled before that horizon. This advisory course check does not
 replace the normal Codex/Grok/Kimi/Opus slice loop.
 
+**Accepted typed export-declaration RED checkpoint.** Fresh tests-only
+Codex-high commit `17b2d6f34aba87675099d5f474016f54ac663775` replaces the
+single MessagePack runtime-star fixture with the exact eight-cell cross-product:
+the two rostered external sink packages × runtime/type-only × bare
+star/namespace export. It therefore folds the prior passing cell instead of
+duplicating it. Against unchanged authority the focused result is exactly 4
+failures / 58 passes: both runtime namespace cells, the es-toolkit runtime star
+and the MessagePack type-only-star false positive. The other four cells and all
+previous cases pass.
+
+The authority remains 314 formatted nonblank lines at SHA-256
+`5f89a4dfadb7015dc75978479f1062a8c5f50d8ddc90d996cddcdd1e131e42e2`;
+production remains byte-identical. Publication work is 21/21 and inherited
+Phase 1d(i) is 147/147; raw-child and sync-livelock retain exact 11-fail/7-pass
+and 3-fail/3-pass baselines. Object/workspace typecheck, owned lint, tracked
+0-error/226-warning lint, Prettier and diff checks pass. The bounded 1 MiB test
+was not rerun because its test and relevant production hashes are unchanged from
+the passing GREEN base; the omission is authenticated, not reported as a new
+execution.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
