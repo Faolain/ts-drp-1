@@ -15158,6 +15158,43 @@ install a partial snapshot. Existing copy counters, per-case ratios and the
 bounded 1 MB characterization remain preservation gates; the fix may not hide
 a full-state pre-copy.
 
+**Accepted tests-only RED checkpoint.** Fresh Codex-high commit
+`778a99f53df3c425ae173c03701a15e3e6f572ba` adds only
+`packages/object/tests/map-key-detachment-1d-i-red.test.ts`: 479 formatted
+lines at SHA-256
+`accf365c1fc20f2a6dabe6c05d923ea95b8f501f155f36dd4334cd47dfbd16b9`.
+Against unchanged production it is exactly 14 failures / 3 passes across 17
+tests. One reusable topology asserts detached Map keys, key-equals-value,
+cross-Map/Set/property aliases, cycles, distinct deep-equal keys and stable Map
+size while keeping top-level entries and ACL/DRP sides independent. A compact
+boundary table and integration rows exercise `stateFromDRP`, all reconstruction
+paths, public copy-in/copy-out, default and injected publication copy,
+local/remote operation history, dependent-batch `cloneEnumerableInstance`
+adoption, sibling/concurrent fallback, retained checkpoints and real pruning.
+This directly kills `result.set(originalKey, clonedValue)` and any
+publication-only repair.
+
+The three passing controls freeze incompatible collection-Proxy and
+throwing-traversal setter atomicity, publication rollback with the primary
+throwable, and unchanged-entry identity with exact one-key copy accounting. The
+hostile instance-iterator RED proves the eventual primitive must use captured
+Map/Set intrinsics. Exact wire equality is asserted for acyclic equivalents;
+cyclic graphs are asserted semantically because the wire codec does not encode
+cycles. The 35 tiny `touch` operations are intentional and bounded: they cross
+the real `MAX_CHECKPOINTS = 32` threshold so the test proves pruning rather than
+merely constructing checkpoints.
+
+D.92.2 remains 64/64 with its authority at 344 nonblank lines / SHA-256
+`ae5d8534befbfcc49111d07c6364b9987784a5bad7c4350c98447541b59f9540`;
+publication work is 21/21 and inherited Phase 1d(i) is 147/147. Raw-child and
+sync-livelock retain exact 11-fail/7-pass and 3-fail/3-pass baselines. Object and
+workspace typecheck, owned 0-error lint, broad tracked 0-error/249-warning lint,
+Prettier, diff and scope checks pass. The broader lint scope is not represented
+as equivalent to the earlier six-shard 226-warning census. The bounded 1 MiB
+run is authenticated rather than repeated because its test and all relevant
+production hashes are unchanged. D.92.4 raw egress and D.73 hostile virtual
+`Map.keys()` remain untouched.
+
 #### D.92.4 — Raw-egress contract after detachment
 
 After D.92.3 is accepted, forced raw egress widens candidacy monotonically to
