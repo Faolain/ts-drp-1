@@ -708,6 +708,41 @@ interface D922dModuleExportCase {
 	readonly sources: GovernedSources;
 }
 
+const D922D_KNOWN_EXTERNAL_SINKS = [
+	{ module: "@msgpack/msgpack", namespace: "msgpack", member: "encode", version: "3.1.1" },
+	{ module: "es-toolkit", namespace: "toolkit", member: "cloneDeep", version: "1.30.1" },
+] as const;
+
+const D922D_TYPED_EXPORT_FORMS = [
+	{ kind: "runtime star", namespace: false, typeOnly: false },
+	{ kind: "runtime namespace", namespace: true, typeOnly: false },
+	{ kind: "type-only star", namespace: false, typeOnly: true },
+	{ kind: "type-only namespace", namespace: true, typeOnly: true },
+] as const;
+
+const D922D_TYPED_EXPORT_DECLARATION_MATRIX: readonly D922dModuleExportCase[] = D922D_KNOWN_EXTERNAL_SINKS.flatMap(
+	(sink) =>
+		D922D_TYPED_EXPORT_FORMS.map(({ kind, namespace, typeOnly }) => {
+			const exportedName = namespace ? sink.namespace : sink.member;
+			const runtime = !typeOnly;
+			return {
+				name: `${sink.module} ${kind}`,
+				expectedPackageReferences: [],
+				expectedExternalRuntimeSurface: runtime ? [`${sink.module}@${sink.version}:*`] : [],
+				expectedViolations: runtime ? [`external wildcard acquisition ${UTILS_SERIALIZATION_PATH}:${sink.module}`] : [],
+				sources: {
+					[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+						runtime ? `import { ${exportedName} } from "@ts-drp/utils/serialization";` : "",
+						runtime ? `${exportedName}${namespace ? `.${sink.member}` : ""}(state);` : "void state;"
+					),
+					[UTILS_SERIALIZATION_PATH]: `export ${typeOnly ? "type " : ""}*${
+						namespace ? ` as ${sink.namespace}` : ""
+					} from "${sink.module}";`,
+				},
+			};
+		})
+);
+
 const D922D_MODULE_EXPORT_MATRIX: readonly D922dModuleExportCase[] = [
 	{
 		name: "renamed external MessagePack encode re-export with first-party consumer",
@@ -747,19 +782,7 @@ const D922D_MODULE_EXPORT_MATRIX: readonly D922dModuleExportCase[] = [
 			[UTILS_SERIALIZATION_PATH]: 'export { cloneDeep as detachSnapshot } from "es-toolkit";',
 		},
 	},
-	{
-		name: "external MessagePack export-star acquisition",
-		expectedPackageReferences: [],
-		expectedExternalRuntimeSurface: ["@msgpack/msgpack@3.1.1:*"],
-		expectedViolations: ["external wildcard acquisition packages/utils/src/serialization/index.ts:@msgpack/msgpack"],
-		sources: {
-			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
-				'import { encode } from "@ts-drp/utils/serialization";',
-				"encode(state);"
-			),
-			[UTILS_SERIALIZATION_PATH]: 'export * from "@msgpack/msgpack";',
-		},
-	},
+	...D922D_TYPED_EXPORT_DECLARATION_MATRIX,
 	{
 		name: "imported exported DRP-state deserializer",
 		expectedPackageReferences: ["packages/object/src/drp-applier.ts:publish:deserializeDRPState#1"],
