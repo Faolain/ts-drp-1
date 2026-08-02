@@ -71,7 +71,7 @@ describe("Phase 1d(i) D.92.3-P3a owned TypedArray enumeration RED", () => {
 		});
 	});
 
-	it("preserves enumerable string and symbol expandos while omitting non-enumerable expandos", () => {
+	it("rejects every own binary expando instead of retaining replica-local-only state", () => {
 		const symbolKey = Symbol("typed-array-expando");
 		const hiddenKey = Symbol("hidden-typed-array-expando");
 		const source = new Uint8Array([3, 5, 8]) as Uint8Array & Record<PropertyKey, unknown>;
@@ -82,14 +82,9 @@ describe("Phase 1d(i) D.92.3-P3a owned TypedArray enumeration RED", () => {
 		Reflect.defineProperty(source, "hidden", { configurable: true, enumerable: false, value: shared });
 		Reflect.defineProperty(source, hiddenKey, { configurable: true, enumerable: false, value: shared });
 
-		const copy = detachStatePayload(source);
-		expect.soft([...copy], "canonical indices retain their bulk-copied bytes").toEqual([3, 5, 8]);
-		expect.soft(copy.extra).not.toBe(shared);
-		expect.soft(copy.extra).toBe(copy["01"]);
-		expect.soft(copy.extra).toBe(copy[symbolKey]);
-		expect.soft((copy.extra as { owner: unknown }).owner, "expando cycles retain the detached view").toBe(copy);
-		expect.soft(Object.hasOwn(copy, "hidden"), "non-enumerable string expandos remain omitted").toBe(false);
-		expect.soft(Object.hasOwn(copy, hiddenKey), "non-enumerable symbol expandos remain omitted").toBe(false);
+		expect(() => detachStatePayload(source)).toThrow(TypeError);
+		expect.soft([...source], "rejection does not alter canonical indices").toEqual([3, 5, 8]);
+		expect.soft(source.extra, "rejection does not silently drop invalid authored state").toBe(shared);
 	});
 
 	it("defines the counted family without widening Arrays, DataViews, or Node Buffers", () => {
@@ -126,7 +121,7 @@ describe("Phase 1d(i) D.92.3-P3a owned TypedArray enumeration RED", () => {
 		});
 		expect(onlyCounters(buffer.events, "Node Buffer")).toEqual({
 			typedArrayViewsDetached: 0,
-			typedArrayCanonicalIndexEnumerations: 0,
+			typedArrayCanonicalIndexEnumerations: 1,
 			typedArrayElementsRecursivelyDetached: 0,
 			backingStoresCopied: 1,
 			backingBytesCopied: 4,

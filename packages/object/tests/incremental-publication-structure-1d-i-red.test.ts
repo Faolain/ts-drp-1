@@ -23,14 +23,15 @@ const REVIEWED_WORKSPACE_OPERATIONS = [
 
 const RESIDUAL_CLONE_SITES = [
 	"packages/object/src/drp-applier.ts:captureBatchVertexOperation:detachStatePayload#1",
+	"packages/object/src/drp-applier.ts:cloneEnumerableInstance:detachReplicaLocalContext#1",
 	"packages/object/src/drp-applier.ts:cloneEnumerableInstance:detachStatePayload#1",
 	"packages/object/src/drp-applier.ts:DRPVertexApplier.createVertex:detachStatePayload#1",
 	"packages/object/src/drp-applier.ts:callDRP:detachStatePayload#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:detachStatePayload#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:detachStatePayload#2",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:detachStatePayload#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:detachStatePayload#2",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromHashACL:detachStatePayload#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:detachReplicaLocalContext#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:detachReplicaLocalContext#2",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:detachReplicaLocalContext#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:detachReplicaLocalContext#2",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromHashACL:detachReplicaLocalContext#1",
 	"packages/object/src/state-materialize.ts:DRPObjectStateManager.applyState:detachStatePayload#1",
 	"packages/object/src/state-materialize.ts:stateFromDRP:detachStatePayload#1",
 	"packages/object/src/state-payload.ts:detachStateSnapshot:detachStatePayload#1",
@@ -523,7 +524,7 @@ function externalSurface(references: readonly string[]): string[] {
 
 const analysisCache = new WeakMap<object, D922cAnalysis>();
 const SINK_REFERENCE =
-	/(?:cloneDeep|structuredClone|detachStatePayload|detachStateSnapshot|stateFromDRP|serializeDRPState|deserializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/;
+	/(?:cloneDeep|structuredClone|detachReplicaLocalContext|detachStatePayload|detachStateSnapshot|stateFromDRP|serializeDRPState|deserializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/;
 
 function analyze(sources: GovernedSources): D922cAnalysis {
 	const cached = analysisCache.get(sources);
@@ -572,7 +573,9 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 		violations: [...new Set(violations)].sort(),
 		residualCloneSites: packageReferences.filter(
 			(site) =>
-				(site.includes(":cloneDeep#") || site.includes(":detachStatePayload#")) &&
+				(site.includes(":cloneDeep#") ||
+					site.includes(":detachReplicaLocalContext#") ||
+					site.includes(":detachStatePayload#")) &&
 				!site.includes("copy-capability.ts") &&
 				!site.includes("src/index.ts")
 		),
@@ -1008,6 +1011,7 @@ const D922C_COPY_CAPTURE_REFERENCE_SITES = [
 		"detachStatePayload"
 	),
 	...d922cSites("packages/object/src/drp-applier.ts", "captureBatchVertexOperation", "detachStatePayload"),
+	...d922cSites("packages/object/src/drp-applier.ts", "cloneEnumerableInstance", "detachReplicaLocalContext"),
 	...d922cSites("packages/object/src/drp-applier.ts", "cloneEnumerableInstance", "detachStatePayload"),
 	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.createVertex", "detachStatePayload"),
 	...d922cSites("packages/object/src/drp-applier.ts", "callDRP", "detachStatePayload"),
@@ -1017,16 +1021,20 @@ const D922C_COPY_CAPTURE_REFERENCE_SITES = [
 	...d922cSites(
 		"packages/object/src/state-materialize.ts",
 		"DRPObjectStateManager.constructor",
-		"detachStatePayload",
+		"detachReplicaLocalContext",
 		2
 	),
 	...d922cSites(
 		"packages/object/src/state-materialize.ts",
 		"DRPObjectStateManager.fromStates",
-		"detachStatePayload",
+		"detachReplicaLocalContext",
 		2
 	),
-	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.fromHashACL", "detachStatePayload"),
+	...d922cSites(
+		"packages/object/src/state-materialize.ts",
+		"DRPObjectStateManager.fromHashACL",
+		"detachReplicaLocalContext"
+	),
 	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.applyState", "detachStatePayload"),
 	...d922cSites("packages/object/src/state-materialize.ts", "stateFromDRP", "detachStatePayload"),
 	...d922cSites("packages/object/src/state-payload.ts", "detachStateSnapshot", "detachStatePayload"),
@@ -1267,8 +1275,8 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		expect(authority.analyzedSourcePaths.some((sourcePath) => /(?:\/dist\/|node_modules)/.test(sourcePath))).toBe(
 			false
 		);
-		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(115);
-		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(115);
+		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(116);
+		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(116);
 		expect([...authority.packageReferenceSites].sort()).toEqual(D922C_PACKAGE_REFERENCE_SITES);
 		expect([...authority.closureReferenceSites].sort()).toEqual(D922C_CLOSURE_REFERENCE_SITES);
 		expect(authority.externalRuntimeSurface).toEqual([
@@ -1418,7 +1426,7 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		);
 	});
 
-	it("retains the exact 0 / 5 / 12 / 4 detach/capture tuple beside the fifth census", () => {
+	it("retains the exact 0 / 5 / 13 / 4 detach/capture tuple beside the fifth census", () => {
 		const analysis = analyze(realGovernedWorkspaceSources()) as D922cAnalysis;
 		expect(analysis.violations).toEqual([]);
 		expect(analysis.reviewedOperations).toEqual([...REVIEWED_WORKSPACE_OPERATIONS].sort());
