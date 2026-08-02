@@ -15619,6 +15619,66 @@ Authoritative evidence is under
 checkpoint only; P1 remains open pending independent Grok-high, exact Kimi
 3/high/100 and final Opus/xhigh acceptance.
 
+**P1 final-review correction quorum — tests and plan only.** Grok 4.5/high
+accepted the candidate and exact `kimi-code/k3` at high reasoning with both
+100-step controls accepted it after independent source inspection, focused
+gates and hostile probes. Final Opus/xhigh returned `CHANGES_REQUESTED` for a
+narrow characterization gap, not for a production defect. The standing plan
+amendment quorum then agreed unanimously: Opus/xhigh, fresh Codex-high and a
+fresh exact `kimi-code/k3` high/100 session all require an additive tests-only
+correction while keeping production commit `538269c` byte-identical. Review
+evidence is under
+`.logs/phase-1d-i-p1-comparison-work-review-grok45-high/`,
+`.logs/phase-1d-i-p1-comparison-work-review-kimi3-high-100/`,
+`.logs/phase-1d-i-p1-comparison-work-review-opus-xhigh/` and the two
+`phase-1d-i-p1-exception-amendment-*` directories.
+
+The exclusive reviewed exception to item 5 is an equal pair of genuine Map or
+Set subclass instances whose ordinary `size` and `entries`/`values` members
+are hostile but whose inherited `Symbol.iterator` is not poisoned. The
+captured-intrinsic semantic traversal may accept that pair only when one final
+codec pass encodes both operands and proves exact byte equality. Semantic-only
+reuse remains forbidden. This deliberate exception avoids invoking
+caller-controlled traversal merely to reproduce a historical throw, never
+adopts the hostile instance into stored state and preserves the same published
+wire bytes. Codec iterator, `Symbol.hasInstance`, Proxy and prototype-poisoning
+hardening remain D.92.5/D.73 work; this exception must not be generalized to
+those surfaces.
+
+A fresh Codex-high corrective RED must add, without weakening existing
+assertions:
+
+1. equal hostile Map and Set subclass pairs that prove the historical
+   conjunction throws the fixture sentinel, while the current authority
+   returns `true` with exactly one codec pass, two encodes and exact encoded
+   byte accounting;
+2. the unequal hostile controls strengthened to return exactly `false` while
+   retaining their non-throw and hostile-member non-invocation assertions;
+3. non-plain class instances with forged Map and Set `Symbol.toStringTag`
+   values that reproduce the native captured-intrinsic `TypeError` before any
+   codec work, without pinning an engine-specific error message; and
+4. an asymmetric self-cycle versus two-node cycle that records the historical
+   `RangeError` and the current conservative `false` result with zero codec
+   work under a publisher/applier phase.
+
+These are post-hoc characterization tests for an authority absent from the
+pre-GREEN parent, so an import failure at `da339b3` is not causal RED evidence.
+Each case instead records the historical behavior in the same fixture and must
+kill a named plausible regression mutant at `538269c`: semantic-only accept,
+skipped codec arbitration, hostile-member invocation, forged-tag fail-open,
+wrongful cycle reuse or restored cycle throw. The corrected test hash, line
+count and additive diff are recorded as audit evidence, never numeric
+acceptance thresholds. Counter wording is also clarified: every event contains
+one immutable per-comparison snapshot; the append-only event stream is what a
+caller may aggregate. There is no mutable cumulative counter object or reset
+API.
+
+After the corrective RED is frozen, a distinct Codex-high GREEN owner must
+authenticate that no production change is needed and run the complete P1 gate
+set. The ordinary Grok-high, fresh exact Kimi 3/high/100 and final Opus/xhigh
+review loop remains mandatory despite the narrow amendment. P1 stays open
+until those reviewers accept the amended artifact.
+
 ##### D.92.3-P2 — captured snapshot-container traversal (blocks D.92.4)
 
 P2 begins only after P1 acceptance and re-freezes P1 tests, counters and
