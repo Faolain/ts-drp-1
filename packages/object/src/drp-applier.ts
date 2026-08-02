@@ -1264,15 +1264,24 @@ export class DRPVertexApplier<T extends IDRP> {
 
 		return handlePromiseOrValue(
 			callDRP(tracked.proxy, peerId, opType, value),
-			(result): HandlerReturn<PostOperation<T>> => ({
-				stop: false,
-				result: {
-					...drpOperation,
-					result,
-					stateChanged: tracked.hasChanges(),
-					mutatedKeys: [...tracked.changedKeys()],
-				},
-			})
+			(result): HandlerReturn<PostOperation<T>> => {
+				tracked.observeRawEgressBoundary();
+				return {
+					stop: false,
+					result: {
+						...drpOperation,
+						result,
+						stateChanged: tracked.hasChanges(),
+						mutatedKeys: [...tracked.changedKeys()],
+						rawEgress: tracked.hasRawEgress()
+							? {
+									side: drpOperation.isACL ? "acl" : "drp",
+									candidateKeys: [...tracked.rawEgressCandidateKeys()],
+								}
+							: undefined,
+					},
+				};
+			}
 		);
 	}
 

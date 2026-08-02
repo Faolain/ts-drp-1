@@ -22,6 +22,12 @@ export interface MutationTrackingResult<T extends object> {
 	proxy: T;
 	hasChanges(): boolean;
 	changedKeys(): ReadonlySet<string>;
+	/** True after governed state has crossed an unavoidable raw-reference boundary. */
+	hasRawEgress(): boolean;
+	/** Record a later, explicit operation boundary without making dirty readers scan. */
+	observeRawEgressBoundary(): void;
+	/** Candidate names observed before the publisher applies its governed-key filter. */
+	rawEgressCandidateKeys(): ReadonlySet<string>;
 }
 
 type MutationValueComparator = (left: unknown, right: unknown, key: string) => boolean;
@@ -126,6 +132,9 @@ export function trackMutations<T extends object>(
 	compareValues: MutationValueComparator = proxyValuesEqual
 ): MutationTrackingResult<T> {
 	const changedKeys = new Set<string>();
+	const rawEgressKeys = new Set<string>();
+	const initialGovernedKeys = new Set<string>();
+	let rawEgress = false;
 	const trackedProxies = new WeakMap<object, object>();
 	const ignoredProxies = new WeakMap<object, object>();
 	const rawValues = new WeakMap<object, object>();
@@ -135,6 +144,22 @@ export function trackMutations<T extends object>(
 
 	const isReference = (value: unknown): value is object =>
 		(typeof value === "object" || typeof value === "function") && value !== null;
+
+	const observeRawEgressBoundary = (): void => {
+		if (!rawEgress) return;
+		for (const key of Object.keys(target)) {
+			if (!REPLICA_LOCAL_STATE_KEYS.has(key)) rawEgressKeys.add(key);
+		}
+	};
+
+	const signalRawEgress = (): void => {
+		if (rawEgress) return;
+		// Keep invariant handling shape-independent: primitive frozen values and
+		// undefined getters conservatively widen just like raw references.
+		rawEgress = true;
+		for (const key of initialGovernedKeys) rawEgressKeys.add(key);
+		for (const key of changedKeys) rawEgressKeys.add(key);
+	};
 
 	const unwrap = <V>(value: V): V => {
 		if (!isReference(value)) return value;
@@ -292,6 +317,7 @@ export function trackMutations<T extends object>(
 	const initializeGraph = (value: unknown): void => initializeGraphs([value]);
 
 	for (const key of Object.keys(target)) {
+		if (!REPLICA_LOCAL_STATE_KEYS.has(key)) initialGovernedKeys.add(key);
 		const value = (target as Record<string, unknown>)[key];
 		addDirectOwner(value, key);
 		initializeGraph(value);
@@ -327,6 +353,31 @@ export function trackMutations<T extends object>(
 			visited.add(current);
 			for (const key of directOwners.get(current) ?? []) changedKeys.add(key);
 			for (const parent of parents.get(current)?.keys() ?? []) pending.push(parent);
+		}
+	};
+
+	const captureRetainedMapEntryOwners = (
+		previous: ReadonlyArray<readonly [unknown, unknown]>,
+		next: ReadonlyArray<readonly [unknown, unknown]>
+	): void => {
+		const retained = new Set<object>();
+		for (const [key, value] of next) {
+			if (isReference(key)) retained.add(unwrap(key));
+			if (isReference(value)) retained.add(unwrap(value));
+		}
+		for (const [key, value] of previous) {
+			if (isReference(key) && retained.has(unwrap(key))) captureOwners(unwrap(key));
+			if (isReference(value) && retained.has(unwrap(value))) captureOwners(unwrap(value));
+		}
+	};
+
+	const captureRetainedSetEntryOwners = (previous: readonly unknown[], next: readonly unknown[]): void => {
+		const retained = new Set<object>();
+		for (const value of next) {
+			if (isReference(value)) retained.add(unwrap(value));
+		}
+		for (const value of previous) {
+			if (isReference(value) && retained.has(unwrap(value))) captureOwners(unwrap(value));
 		}
 	};
 
@@ -394,8 +445,10 @@ export function trackMutations<T extends object>(
 	};
 
 	const reconcileMapParents = (map: Map<unknown, unknown>, previous: Iterable<readonly [unknown, unknown]>): void => {
+		const previousEntries = Array.from(previous);
 		const next = canonicalizeMapEntries(map);
-		for (const [key, value] of previous) {
+		captureRetainedMapEntryOwners(previousEntries, next);
+		for (const [key, value] of previousEntries) {
 			removeParent(key, map);
 			removeParent(value, map);
 		}
@@ -407,8 +460,10 @@ export function trackMutations<T extends object>(
 	};
 
 	const reconcileSetParents = (set: Set<unknown>, previous: Iterable<unknown>): void => {
+		const previousValues = Array.from(previous);
 		const next = canonicalizeSetValues(set);
-		for (const value of previous) removeParent(value, set);
+		captureRetainedSetEntryOwners(previousValues, next);
+		for (const value of previousValues) removeParent(value, set);
 		for (const value of next) addParent(value, set);
 		initializeGraphs(next);
 	};
@@ -425,6 +480,17 @@ export function trackMutations<T extends object>(
 		if (objectValue instanceof Map) {
 			proxy = new Proxy(objectValue, {
 				get(map, property): unknown {
+					const descriptor = Reflect.getOwnPropertyDescriptor(map, property);
+					if (descriptor && !descriptor.configurable) {
+						if ("value" in descriptor && !descriptor.writable) {
+							if (!ignored) signalRawEgress();
+							return descriptor.value;
+						}
+						if ("get" in descriptor && descriptor.get === undefined) {
+							if (!ignored) signalRawEgress();
+							return undefined;
+						}
+					}
 					if (property === "set") {
 						return (key: unknown, nextValue: unknown): Map<unknown, unknown> => {
 							const rawKey = unwrap(key);
@@ -503,13 +569,14 @@ export function trackMutations<T extends object>(
 						};
 					}
 					const member = Reflect.get(map, property, map) as unknown;
-					if (typeof member !== "function") return member;
+					if (typeof member !== "function") return wrap(member, ignored);
 					return (...args: unknown[]): unknown => {
 						const previous = snapshotMapEntries(map);
 						let result: unknown;
 						let operationError: unknown;
 						let operationFailed = false;
 						try {
+							if (!ignored) signalRawEgress();
 							result = (member as (...values: unknown[]) => unknown).apply(map, args.map(unwrap));
 						} catch (error) {
 							operationError = error;
@@ -525,8 +592,17 @@ export function trackMutations<T extends object>(
 						} finally {
 							markChanged(map);
 						}
+						let observationError: unknown;
+						let observationFailed = false;
+						try {
+							observeRawEgressBoundary();
+						} catch (error) {
+							observationError = error;
+							observationFailed = true;
+						}
 						if (operationFailed) throw operationError;
 						if (reconciliationFailed) throw reconciliationError;
+						if (observationFailed) throw observationError;
 						return result === map ? proxy : wrap(result, ignored);
 					};
 				},
@@ -534,6 +610,17 @@ export function trackMutations<T extends object>(
 		} else if (objectValue instanceof Set) {
 			proxy = new Proxy(objectValue, {
 				get(set, property): unknown {
+					const descriptor = Reflect.getOwnPropertyDescriptor(set, property);
+					if (descriptor && !descriptor.configurable) {
+						if ("value" in descriptor && !descriptor.writable) {
+							if (!ignored) signalRawEgress();
+							return descriptor.value;
+						}
+						if ("get" in descriptor && descriptor.get === undefined) {
+							if (!ignored) signalRawEgress();
+							return undefined;
+						}
+					}
 					if (property === "add") {
 						return (nextValue: unknown): Set<unknown> => {
 							const rawValue = unwrap(nextValue);
@@ -595,13 +682,14 @@ export function trackMutations<T extends object>(
 						};
 					}
 					const member = Reflect.get(set, property, set) as unknown;
-					if (typeof member !== "function") return member;
+					if (typeof member !== "function") return wrap(member, ignored);
 					return (...args: unknown[]): unknown => {
 						const previous = snapshotSetValues(set);
 						let result: unknown;
 						let operationError: unknown;
 						let operationFailed = false;
 						try {
+							if (!ignored) signalRawEgress();
 							result = (member as (...values: unknown[]) => unknown).apply(set, args.map(unwrap));
 						} catch (error) {
 							operationError = error;
@@ -617,8 +705,17 @@ export function trackMutations<T extends object>(
 						} finally {
 							markChanged(set);
 						}
+						let observationError: unknown;
+						let observationFailed = false;
+						try {
+							observeRawEgressBoundary();
+						} catch (error) {
+							observationError = error;
+							observationFailed = true;
+						}
 						if (operationFailed) throw operationError;
 						if (reconciliationFailed) throw reconciliationError;
+						if (observationFailed) throw observationError;
 						return result === set ? proxy : wrap(result, ignored);
 					};
 				},
@@ -646,8 +743,14 @@ export function trackMutations<T extends object>(
 						(object === (target as object) && typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property));
 					const descriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					if (descriptor && !descriptor.configurable) {
-						if ("value" in descriptor && !descriptor.writable) return descriptor.value;
-						if ("get" in descriptor && descriptor.get === undefined) return undefined;
+						if ("value" in descriptor && !descriptor.writable) {
+							if (!nestedIgnored) signalRawEgress();
+							return descriptor.value;
+						}
+						if ("get" in descriptor && descriptor.get === undefined) {
+							if (!nestedIgnored) signalRawEgress();
+							return undefined;
+						}
 					}
 					return wrap(Reflect.get(object, property, receiver), nestedIgnored);
 				},
@@ -685,8 +788,11 @@ export function trackMutations<T extends object>(
 
 	return {
 		proxy: wrap(target),
-		hasChanges: (): boolean => changedKeys.size > 0,
+		hasChanges: (): boolean => changedKeys.size > 0 || rawEgress,
 		changedKeys: (): ReadonlySet<string> => changedKeys,
+		hasRawEgress: (): boolean => rawEgress,
+		observeRawEgressBoundary,
+		rawEgressCandidateKeys: (): ReadonlySet<string> => rawEgressKeys,
 	};
 }
 

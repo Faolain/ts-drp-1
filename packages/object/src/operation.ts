@@ -56,6 +56,8 @@ export interface Operation<T extends IDRP> extends PostSplitOperation {
 	mutatedKeys?: readonly string[];
 	/** Effective live-state deltas found during the existing local capture. */
 	ambientMutatedKeys?: Readonly<{ acl: readonly string[]; drp: readonly string[] }>;
+	/** Side-local names awaiting the publisher's governed-key filter after raw egress. */
+	rawEgress?: Readonly<{ side: "acl" | "drp"; candidateKeys: readonly string[] }>;
 
 	/**
 	 * Detached state used to stage the current operation before it is committed.

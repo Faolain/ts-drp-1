@@ -14,6 +14,12 @@ export type PublicationFallbackReason =
 	| "multi-head-local"
 	| "multi-frontier-checkpoint";
 
+export interface PublicationWorkCounters {
+	egressWidenings: number;
+	comparedKeys: number;
+	comparisonPasses: number;
+}
+
 export interface PublicationRecord {
 	publicationId: string;
 	kind: "vertex" | "checkpoint";
@@ -23,6 +29,11 @@ export interface PublicationRecord {
 	baselineHashes: readonly Hash[];
 	frontier: readonly Hash[];
 	changed: Readonly<Record<SnapshotSide, readonly string[]>>;
+	/**
+	 * Bounded raw-egress decision work. Real records always populate it; fallback
+	 * capture remains zero because it performs no incremental comparison/reuse pass.
+	 */
+	work?: Readonly<Record<SnapshotSide, PublicationWorkCounters>>;
 	fallbackReason?: PublicationFallbackReason;
 }
 
@@ -53,6 +64,7 @@ interface PublisherOperation<T extends IDRP> {
 	aclVertices: Vertex[];
 	mutatedKeys?: readonly string[];
 	ambientMutatedKeys?: { acl?: readonly string[]; drp?: readonly string[] };
+	rawEgress?: Readonly<{ side: SnapshotSide; candidateKeys: readonly string[] }>;
 }
 
 interface PreparedPublicationAdoption<T extends IDRP> {
@@ -130,10 +142,12 @@ export class PublicationPublisher<T extends IDRP> {
 		const aclCandidateKeys = new Set([
 			...(operation.ambientMutatedKeys?.acl ?? []),
 			...(isACL ? (operation.mutatedKeys ?? []) : []),
+			...(operation.rawEgress?.side === "acl" ? operation.rawEgress.candidateKeys : []),
 		]);
 		const drpCandidateKeys = new Set([
 			...(operation.ambientMutatedKeys?.drp ?? []),
 			...(isACL ? [] : (operation.mutatedKeys ?? [])),
+			...(operation.rawEgress?.side === "drp" ? operation.rawEgress.candidateKeys : []),
 		]);
 		const aclState = this.capturePublishedState(
 			"acl",
@@ -144,7 +158,8 @@ export class PublicationPublisher<T extends IDRP> {
 			plan.mode === "incremental" ? aclCandidateKeys : undefined,
 			concurrentOverride && isACL && currentDRP && dependencyACLState
 				? { instance: currentDRP, baseline: dependencyACLState }
-				: undefined
+				: undefined,
+			operation.rawEgress?.side === "acl"
 		);
 		const drpState = this.capturePublishedState(
 			"drp",
@@ -155,7 +170,8 @@ export class PublicationPublisher<T extends IDRP> {
 			plan.mode === "incremental" ? drpCandidateKeys : undefined,
 			concurrentOverride && !isACL && currentDRP && dependencyDRPState
 				? { instance: currentDRP, baseline: dependencyDRPState }
-				: undefined
+				: undefined,
+			operation.rawEgress?.side === "drp"
 		);
 		this.installState("acl", hash, aclState, journal);
 		this.installState("drp", hash, drpState, journal);
@@ -291,6 +307,10 @@ export class PublicationPublisher<T extends IDRP> {
 			baselineHashes: [...plan.baselineHashes],
 			frontier: [...frontier],
 			changed: { acl: [], drp: [] },
+			work: {
+				acl: { egressWidenings: 0, comparedKeys: 0, comparisonPasses: 0 },
+				drp: { egressWidenings: 0, comparedKeys: 0, comparisonPasses: 0 },
+			},
 			fallbackReason: plan.fallbackReason,
 		};
 	}
@@ -304,6 +324,7 @@ export class PublicationPublisher<T extends IDRP> {
 	 * @param incremental - Whether unchanged entries may be retained
 	 * @param candidateKeys - Keys eligible for equality comparison
 	 * @param override - Concurrent-tail override source
+	 * @param rawEgress - Whether candidacy widened to every governed key
 	 * @returns Independently owned published snapshot
 	 */
 	capturePublishedState(
@@ -313,8 +334,12 @@ export class PublicationPublisher<T extends IDRP> {
 		publication: PublicationRecord,
 		incremental: boolean,
 		candidateKeys?: ReadonlySet<string>,
-		override?: PublicationOverride
+		override?: PublicationOverride,
+		rawEgress = false
 	): DRPState {
+		if (rawEgress && incremental && candidateKeys === undefined) {
+			throw new Error("Raw-egress publication requires an explicit candidate keyset");
+		}
 		const baselineByKey = new Map(baseline?.state.map((entry) => [entry.key, entry]) ?? []);
 		const targetKeys = new Set<string>();
 		const values = new Map<string, unknown>();
@@ -322,6 +347,66 @@ export class PublicationPublisher<T extends IDRP> {
 		if (override) this.applyOverride(side, publication, override, targetKeys, values);
 		const entries: DRPState["state"] = [];
 		const changed = publication.changed[side] as string[];
+		if (rawEgress && incremental) {
+			const governedUnion = new Set([...targetKeys, ...baselineByKey.keys()]);
+			const explicitCandidates = new Set<string>();
+			for (const key of candidateKeys ?? []) {
+				if (governedUnion.has(key)) explicitCandidates.add(key);
+			}
+			for (const key of governedUnion) explicitCandidates.add(key);
+			const work = publication.work?.[side];
+			if (work) {
+				work.egressWidenings = 1;
+				work.comparedKeys = explicitCandidates.size;
+				work.comparisonPasses = 1;
+			}
+
+			// Decide every key before copying or retaining any entry. A comparison
+			// failure therefore cannot leave a partially materialized publication.
+			const reuse = new Map<string, boolean>();
+			for (const key of explicitCandidates) {
+				const targetPresent = targetKeys.has(key);
+				const ownedEntry = baselineByKey.get(key);
+				if (!targetPresent || ownedEntry === undefined) {
+					reuse.set(key, false);
+					continue;
+				}
+				reuse.set(
+					key,
+					this.capability.equal(ownedEntry.value, values.get(key), {
+						publicationId: publication.publicationId,
+						phase: "publisher-capture",
+						side,
+						key,
+					})
+				);
+			}
+
+			for (const key of targetKeys) {
+				const ownedEntry = baselineByKey.get(key);
+				if (ownedEntry !== undefined && reuse.get(key) === true) {
+					entries.push(ownedEntry);
+					continue;
+				}
+				changed.push(key);
+				entries.push(
+					this.capability.createEntry(
+						key,
+						this.capability.copy(values.get(key), {
+							publicationId: publication.publicationId,
+							side,
+							key,
+							image: "post",
+						})
+					)
+				);
+			}
+			for (const key of baselineByKey.keys()) {
+				if (!targetKeys.has(key)) changed.push(key);
+			}
+			changed.sort();
+			return this.capability.createSnapshot(entries);
+		}
 		if (instance || override) {
 			for (const key of targetKeys) {
 				const value = values.get(key);
