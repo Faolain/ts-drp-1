@@ -14464,6 +14464,42 @@ p95; each convergence probe ≤2 seconds. The bounded 1 MB characterization stay
 a separately invoked long test. Use `skipLibCheck: true`, `types: []`, memoized
 immutable compiler inputs and no semantic-diagnostics pass where appropriate.
 
+**Aborted first GREEN attempt and binding retry guidance.** The first D.92.2-b
+owner correctly stopped and restored exact RED HEAD `1297d7a` without a commit.
+An initial checker shell still wrapped a syntax-oriented expression/binding
+engine: it reached 265/305 on the governance suite but retained 40 frozen
+failures and exceeded 1,000 logical lines. A wholesale finite-lattice rewrite
+then typechecked, but formatted to 809 measured logical lines, passed only 8/27
+architecture tests, timed out on the convergence child and crashed the real
+census on an unnamed declaration. Neither draft is accepted or retained.
+
+Those failures reduce to six semantic owners that the retry must implement as
+coherent abstractions rather than fixture-specific cases:
+
+1. checker module/export shapes, including default, anonymous, namespace,
+   re-export and missing-export identity;
+2. one mutable container shape with sound known/unknown-key reads and writes,
+   including writes that flow to properties created later;
+3. one recursive binding projector shared by declarations, parameters,
+   defaults, rest and assignment patterns;
+4. ordinary global shapes plus one canonical invocation path for
+   `call`/`apply`/`bind` and `Reflect.apply`;
+5. class static/instance shapes with heritage, constructor `this` and
+   bodyless-member handling; and
+6. reachability separated from operation classification and exact census
+   reporting.
+
+The finite lattice must distinguish an unresolved governed provenance hazard
+from an opaque safe host value. Every abstract atom and `(callsite, atom)`
+invocation job is canonical so callable cycles reach a real fixpoint. Two
+anti-reward-hacking rules are explicit: encountering a syntax kind does not by
+itself prove that the transfer relation handled it, and semantic logic may not
+be moved outside the measured markers to satisfy the 600-line tripwire. If one
+genuine implementation of these shared abstractions still needs
+spelling-specific patches, fails unseen ordinary equivalents or cannot meet the
+readable budget, stop and adjudicate a scoped production lint boundary or a
+mature analysis framework; do not begin another syntax-by-syntax round.
+
 ##### D.92.2-c — Publication-copy boundary RED (tests only)
 
 After D.92.2-a/b is independently accepted, a fresh RED owner pins the narrow
