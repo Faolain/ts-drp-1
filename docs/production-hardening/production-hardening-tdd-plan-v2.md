@@ -16367,6 +16367,40 @@ Opus/xhigh. Review must authenticate all three frozen RED hashes and test the
 governed-provenance, failed-set and Date expando alias boundaries without
 absorbing ordinary D.92.6.
 
+**D.92.5 accepted closure.** Fresh Grok 4.5/high session
+`019fc3cb-4380-7dc1-8a80-bc7c585507c6`, fresh exact Kimi 3/high/dual-100 final
+adjudicator session `f0d81f90-5591-48c6-9396-44943d7b1a26`, and final
+Opus/xhigh session `a5109a13-ed1f-4c29-80f7-4b49b0367c24` each returned
+`ACCEPTED` and `D925_MAY_CLOSE=yes`. Grok used only substantive
+`grok-4.5-build` at high reasoning; Kimi used exact `kimi-code/k3`, high and
+both 100-step controls with no fallback/helper/subagent; Opus used only
+substantive `claude-opus-5` at xhigh with no helper/title model or permission
+denial. Kimi's substantive investigation was preserved and controller-stopped
+only after it completed current-tree evidence and drifted into unnecessary
+historical alias setup; the fresh no-tool adjudicator issued the verdict.
+
+All reviewers authenticated the three frozen REDs at 678/277/361 lines and
+their exact hashes, the 52/52 combined focused result and the full preservation
+matrix. Grok added 30/30 direct plus 10/10 real-publication source probes; its
+read-only sandbox could not create Vitest's `.vite-temp`, so authenticated
+GREEN logs supplied that runner evidence. Kimi added 13/13 independent probes
+and rejected one false generic-descriptor oracle after confirming native
+normalization. Opus added 45/45 adversarial probes and found no blocker.
+Evidence is under `.logs/phase-1d-i-d925-final-review-grok45-high/`,
+`.logs/phase-1d-i-d925-final-review-kimi3-high-100/` and
+`.logs/phase-1d-i-d925-final-review-opus-xhigh/`.
+
+Opus corrected the safety explanation for a pre-existing Date expando. State
+reconstruction is only the first gate: an empty-suffix/local incremental path
+has no replay and reconstruction erases Date expandos. A non-empty replay
+suffix can recreate one before tracking, but that suffix forces publisher
+fallback and fresh copying of every governed key. Prior-expando presence and
+stale incremental reuse are therefore mutually exclusive. Remaining notes are
+nonblocking: accessor-descriptor governed-function unwrapping is non-durable
+and non-causal; sanctioned read-only descriptor widening can author a zero-copy
+vertex; Date-shaped object TypeError timing remains native-compatible; and
+`rawEgressCandidateKeys()` is now informational. D.92.5 is accepted and closed.
+
 #### D.92.6 — Ordinary accessor receiver and bookkeeping-invocation boundary
 
 During the D.92.5-C review, an ordinary-object probe found a distinct hard
@@ -16482,18 +16516,18 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. D.92.5-D production GREEN candidate
-`c3f97fb` is complete with the full-lineage gates above. Run fresh Grok
-4.5/high and exact Kimi 3/high with both 100-step controls in parallel over
-`ba35ebb`, `74914e0` and `c3f97fb`; if both accept, run final Opus/xhigh.
-Authenticate all three frozen RED hashes and probe governed provenance,
-failed-set semantics, accessor/descriptor behavior and exact publication work.
-Do not fold ordinary D.92.6, P3, D.73 or Phase 1d(ii) into this review. If all
-reviewers accept, close D.92.5 plan-only, then start D.92.6 tests-only RED and
-its distinct full loop. P3a follows D.92.6, then P3b, composite D.92 and Phase
+P1, P2, D.92.4 and D.92.5 are accepted and closed. Start a fresh Codex-high
+D.92.6 tests-only RED for the ordinary accessor receiver/bookkeeping boundary
+defined above. Keep every reference construction inside the operation and
+prove eager definition-time invocation separately from the later tracked proxy-
+receiver read. Pin direct carrier/secondary/anchor attribution, exact real
+stored/reconstructed/exact-cut truth and bounded work, then freeze line/hash and
+run the stated preservation gates. Do not change production or the plan during
+RED, do not serialize hidden fields, and do not fold P3, D.73 or Phase 1d(ii)
+into D.92.6. A distinct production-only GREEN and the full Grok/Kimi/Opus loop
+follow. P3a starts only after D.92.6 closes, then P3b, composite D.92 and Phase
 1d(ii). Prototype-safe materialization remains mandatory before Phase 1d(ii)
-closure and Phase 4b/6a snapshot adoption, but it does not reopen P2, D.92.4 or
-D.92.5.
+closure and Phase 4b/6a snapshot adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
