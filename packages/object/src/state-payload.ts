@@ -285,9 +285,9 @@ export function validateStateSnapshotForApplication(state: DRPState): DRPState {
 	for (let index = 0; index < length; index++) {
 		const entry = entries[index];
 		if (entry === undefined) throw new TypeError("DRP state entry must be present");
-		void entry.key;
-		void entry.value;
-		prepared[index] = entry;
+		const key = entry.key;
+		const value = entry.value;
+		prepared[index] = { key, value };
 	}
 	return { state: prepared };
 }
