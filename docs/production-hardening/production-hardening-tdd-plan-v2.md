@@ -15311,6 +15311,30 @@ changed to improve the measurement. Evidence is under
 `.logs/phase-1d-i-d92-3-backing-alias-green-codex-high/`. Fresh Grok-high,
 exact Kimi 3/high/100 and, only if both accept, Opus/xhigh are still required.
 
+**D.92.3 accepted.** Fresh Grok 4.5/high session
+`019fc1b2-dbbb-7331-99d5-a1b67a91a25e` returned `ACCEPTED` with sole effective
+model `grok-4.5-build`. Fresh exact `kimi-code/k3`/high session
+`e0034d17-3e3f-44e1-a9da-5a26a3bf2a23` used both 100-step controls, completed
+28 LLM steps / 44 read-only tool calls and returned `ACCEPTED`. Final fresh
+Opus/xhigh session `da8ef44c-47b1-4235-ba92-1b5a708d7b9e` returned `ACCEPTED`
+and `D.92.3_MAY_CLOSE=yes`; the substantive model was `claude-opus-5`, with a
+disclosed non-substantive 23-output-token automatic Haiku helper. All three
+authenticated the one-file GREEN, focused 18/18, D.92.2 64/64 and its
+350-line/hash/census authority, exact deferred baselines, paired performance
+result and absence of D.92.4/D.73 scope creep. Review evidence is under the
+three `phase-1d-i-d92-3-backing-alias-review-*` directories in `.logs/`.
+
+Accepted nonblocking gotchas are retained rather than widened into this slice:
+Buffer and raw ArrayBuffer/SAB own expandos remain dropped at prior parity;
+proxied views degrade fail-closed at prior parity; resizable buffers normalize
+to fixed-size clones; constructor/prototype/`Symbol.hasInstance` poisoning is
+hostile-graph D.73 work. Numeric-key enumeration needed to separate TypedArray
+expandos is O(n) and measured as material at 1 MiB. Opus also noted that
+`detachStateSnapshot` still invokes caller-controlled `state.state.map`.
+Captured snapshot traversal and the TypedArray enumeration cost belong in the
+proposed comparison/performance corrective below, subject to the required
+plan-amendment quorum; neither reopens D.92.3 ownership semantics.
+
 Kimi also corrected an initially suspected performance blocker. On this
 environment the exact parent checkpoint `55f85e4` already fails the checked-in
 MapDRP wall-clock contract at 6,769.5 ms, while the candidate's isolated run is
@@ -15391,18 +15415,22 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Continue D.92.3 from rejected candidate
-`66fc0cb3b69174c30e90b23bad351b5b539a7305`. A fresh Codex-high tests-only RED
-must pin shared backing-store aliases among overlapping TypedArrays, DataViews
-and an exposed ordinary `ArrayBuffer` property without changing production or
-weakening the frozen 17-case RED. A distinct Codex-high GREEN then fixes the
-one shared graph primitive, preserves every recorded D.92.2/D.92.3 gate and
-runs a bounded paired performance/profile follow-up without treating the stale
-wall-clock threshold as newly red. Run fresh Grok-high and exact Kimi
-3/high/100 reviews; final Opus/xhigh runs only if both accept. Reject per-site
-fixes, a second copier, hidden observer copies, policy weakening or D.92.4/D.73
-scope creep. If all three accept, record D.92.3 as complete and start D.92.4
-with a fresh Codex-high tests-only RED.
+D.92.3 is accepted through `67d7917` and may close. Before starting D.92.4,
+convene the standing plan-correction quorum over Fable's proposed Phase 1d(i)
+performance corrective: one Codex-high consultation, one fresh exact Kimi
+3/high session with both 100-step controls and one fresh Opus/xhigh
+consultation. Ask whether the plan should insert a distinct owned slice before
+D.92.4 that causally pins at most one full comparison traversal per changed
+candidate key and comparison work linear in payload size, fixes the two
+quadratic Map equality walks without loosening wall-clock thresholds, captures
+snapshot traversal, owns TypedArray expando-enumeration cost, adds the
+counter-based successor to mandatory applier/publication preservation gates,
+and requires same-checkpoint triage of any new preservation-artifact failure.
+The quorum must adjudicate exact scope, RED/GREEN order, counter authority and
+false-positive/false-negative policy. Do not edit the plan to adopt or reject
+the proposal until all three agree. If unanimously adopted, checkpoint the
+amendment and begin its fresh Codex-high tests-only RED; otherwise begin D.92.4
+under the existing ratified order and record the disagreement.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
