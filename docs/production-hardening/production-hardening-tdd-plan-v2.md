@@ -16109,22 +16109,78 @@ unchecked cache. Positive controls retain byte/layout/backing aliases,
 canonical numeric and bulk writes, wrapper-metadata attribution, and available
 uncharged `context` binaries.
 
-The GREEN may touch only `state-payload.ts` and `proxy.ts`. Reuse P3a's one
-already-counted first-sight enumeration to validate fresh view identities; do
-not add a second canonical-index scan. Validate first, reject any pre-existing
-expando, then `Object.preventExtensions` and record the validated identity for
-O(1) later opaque-vertex handling. Sealing alone is insufficient because it
-does not remove a pre-existing expando. `Reflect.ownKeys` is not a replacement
-fast path: it also materializes every TypedArray index. Raw egress makes
-trap-only sealing insufficient. Keep the P3a work-event shape and causal
-counters, one enumeration per fresh view, zero recursive elements, backing
-counters and the 1 MiB characterization frozen.
+The GREEN production scope is `state-payload.ts`, `proxy.ts`,
+`state-materialize.ts` and the one centralized `cloneEnumerableInstance`
+helper in `drp-applier.ts`. Reuse P3a's one already-counted first-sight
+enumeration to validate fresh view identities; do not add a second canonical-
+index scan. Validate first, reject any pre-existing expando, then
+`Object.preventExtensions` and record the validated identity for O(1) later
+opaque-vertex handling. Sealing alone is insufficient because it does not
+remove a pre-existing expando. `Reflect.ownKeys` is not a replacement fast
+path: it also materializes every TypedArray index. Raw egress makes trap-only
+sealing insufficient. Keep the P3a work-event shape, zero recursive elements,
+backing counters and the Uint8Array-only 1 MiB characterization frozen.
 
-The quorum narrowly authorizes revision of only P3a's test assertion that
-requires binary string/symbol expandos and their alias/cycle graph to survive.
-Replace it with the stronger governed-rejection contract; do not silently edit
-or weaken unrelated P3a assertions. The accepted P3b RED at `b040071` remains
-byte-immutable. P3b GREEN and composite D.92 wait for P3a-prime acceptance.
+One additional counter correction is quorum-authorized. Node Buffer is handled
+before the generic view branch to copy only its visible bytes rather than its
+pooled backing, but rejecting a pre-existing string expando still requires an
+own-string-key scan that materializes every byte index. No portable expando-
+only string-key API exists. Each fresh governed Buffer validation therefore
+increments `typedArrayCanonicalIndexEnumerations` exactly once while retaining
+`typedArrayViewsDetached: 0`, zero recursive elements, one backing copy and
+exact visible `backingBytesCopied`. Hidden O(n) work under the old zero is
+forbidden. The quorum authorizes changing only the existing P3a Buffer counter
+expectation from zero to one in addition to replacing the expando-preservation
+assertion. All other P3a counters and the 1 MiB file remain byte-frozen.
+
+Replica-local `context` requires an explicit boundary rather than object-shape
+inference. The same private identity-aware graph copier gains one narrowly
+named internal replica-local entry; it is not exported from the package index,
+does not expose a boolean/options bypass, does not share a validation cache
+with governed calls, and is not a second copier. Default `detachStatePayload`
+remains governed and rejecting. Only five direct context-copy sites in
+`state-materialize.ts` (constructor DRP/ACL, `fromStates` DRP/ACL and
+`fromHashACL` ACL) and one key-conditional branch in
+`drp-applier.ts:cloneEnumerableInstance` may select the replica-local entry.
+The adoption helper branches once on `REPLICA_LOCAL_STATE_KEYS`; its four
+callers do not duplicate policy. Every other property and detachment call stays
+governed.
+
+Replica-local copying retains current family-specific behavior without new
+wire semantics: ordinary views including BigInt and DataView retain their
+currently enumerable string/symbol expandos and graph aliases; Node Buffer,
+ArrayBuffer and SharedArrayBuffer retain their native contents while own
+expandos remain omitted at existing parity. Wrapper-object metadata is the
+universal documented route. The proxy's initial discovery and later nested
+wrapping must propagate the ignored context domain so context identities are
+neither rejected, sealed nor charged. A value seen through context must not be
+globally blessed: a fresh governed traversal of the same identity still
+rejects it.
+
+The tests-only RED must cover construction and reconstruction through those
+context owners, nested ignored discovery, one real adoption/hint path through
+`cloneEnumerableInstance`, current Buffer/AB content controls, and the causal
+context-plus-governed alias twin. Receiver-independent operations keep P3b
+separate. Update only the existing finite D.92.2 exact site manifest to the new
+callee names/sites; do not extend its analyzer or add another source scanner.
+The accepted P3b RED at `b040071` remains byte-immutable. P3b GREEN and
+composite D.92 wait for P3a-prime acceptance.
+
+This feasibility correction was itself held before RED commit and approved by
+the required quorum. Codex-high authenticated the Buffer impossibility and the
+six context owners. Exact Kimi 3/high/dual-100 session
+`511a366b-7983-438b-acf0-b3e804674aac` returned
+`BUFFER_COUNTER_AMENDMENT_AGREE=yes`,
+`CONTEXT_BOUNDARY_AMENDMENT_AGREE=yes` and
+`CLONE_ENUMERABLE_CONTEXT_AMENDMENT_AGREE=yes`, corrected its initial five-site
+census to six, and finished at 56 cumulative steps with exit zero and no
+helper/fallback/subagent/Fable. Same-session Opus/xhigh
+`3fe45447-2d2e-4a42-8204-667ac8220f84` used substantive `claude-opus-5`,
+agreed there is no non-enumerating mechanism, and approved the four-file
+production scope. Its initial ledger disclosed one automatic non-substantive
+19-output-token Haiku helper; the Opus-only follow-up used no helper. Neither
+call used Fable or fallback. Evidence is under
+`.logs/phase-1d-i-p3a-prime-{buffer-counter-amendment-kimi3-high-100,buffer-counter-amendment-opus-xhigh,context-boundary-amendment-kimi3-high-100,clone-enumerable-context-amendment-kimi3-high-100}/`.
 
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
@@ -16899,9 +16955,15 @@ deterministic governed rejection across all binary families and all own
 expando key classes. Prove validation-before-sealing, already-non-extensible
 hostiles, local ingress and remote replay, tracked set/defineProperty, derived-
 view sealing, wrapper metadata, context isolation, exact existing binary
-bytes/layout/backing aliases, one counted fresh-view enumeration, zero
-recursive elements and the retained 1 MiB bound. Production and the frozen
-P3b RED at `b040071` remain byte-identical during RED.
+bytes/layout/backing aliases, one counted fresh-view enumeration, the newly
+authorized one counted Buffer validation, zero recursive elements and the
+retained Uint8Array 1 MiB bound. Add construction/reconstruction, nested ignored
+context, one real adoption-clone and context-plus-governed-alias controls. The
+same shared copier's future internal replica-local entry is limited to the five
+`state-materialize.ts` context sites and the one key-conditional
+`cloneEnumerableInstance` site; mechanically update the existing D.92.2 site
+manifest without growing its analyzer. Production and the frozen P3b RED at
+`b040071` remain byte-identical during RED.
 
 After a distinct P3a-prime GREEN and Grok/Kimi/Opus acceptance, resume P3b
 GREEN on the settled fail-closed invariant. Preserve but do not apply
