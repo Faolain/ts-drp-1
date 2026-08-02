@@ -15252,6 +15252,30 @@ that cloned store; it must not add a second graph copier or special-case only
 the reviewer probes. Existing Map-key, wire, atomicity, copy-count, 1 MiB and
 D.92.2 gates remain frozen.
 
+**Accepted corrective tests-only RED checkpoint.** Fresh Codex-high commit
+`b6bd0b2f6587245cb96ebd0cf405b1ca461df61a` adds one 135-line causal case to
+the existing RED file without changing its original 17 cases. The file is now
+614 formatted lines at SHA-256
+`47fc82fc4932f0fc05f99c67f554444febb3ed95da26d386692ed5403f8ab0c4`.
+Against unchanged candidate production it is exactly 1 failure / 17 passes.
+The failure reports three cloned backing stores instead of one, zeroed
+TypedArray offsets and lost overlapping-view mutation visibility; repeated
+view identity, source isolation, Map aliases, cycles and the frozen 17 cases
+remain green. Expected corrective GREEN is 18/18.
+
+The additive topology includes repeated view identity, overlapping
+`Uint8Array`/`Int8Array` offsets and lengths, a `DataView`, an ordinary backing
+`ArrayBuffer` property, mutations in both directions, source/output isolation,
+Map and property cycles, and independent top-level snapshot entries. It kills
+element-wise TypedArray cloning, a DataView-only identity-stack fix and one
+whole-buffer copy per view. D.92.2 remains 64/64, publication work 21/21 and
+inherited Phase 1d(i) 147/147; object/workspace typecheck, owned/workspace lint,
+Prettier, diff and scope gates pass. Production `state-payload.ts` remains the
+206-line candidate at SHA-256
+`46997c9f384c4c67c7b1e1301e96148d70012e90130f5f45c0e2ae37cd2c9f46`.
+Evidence is under
+`.logs/phase-1d-i-d92-3-backing-alias-red-codex-high/`.
+
 Kimi also corrected an initially suspected performance blocker. On this
 environment the exact parent checkpoint `55f85e4` already fails the checked-in
 MapDRP wall-clock contract at 6,769.5 ms, while the candidate's isolated run is
