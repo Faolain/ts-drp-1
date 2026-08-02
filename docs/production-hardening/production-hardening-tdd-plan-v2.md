@@ -16291,6 +16291,112 @@ This corrective candidate still requires fresh Grok 4.5/high and exact Kimi
 3/high/dual-100 acceptance before final Opus/xhigh. Review must cover the full
 `ba35ebb` plus `74914e0` D.92.5 lineage, not only the 12-line correction.
 
+**D.92.5-C review rejection and D expando-alias corrective.** Fresh Grok
+4.5/high session `019fc3a3-af05-7a90-b3ba-edb1a1451b52` and fresh exact Kimi
+3/high/dual-100 session `3972a639-e58b-4b41-8bcd-3e625bc54787`
+independently returned `CHANGES_REQUESTED` and `D925_MAY_CLOSE=no`. Grok used
+only substantive `grok-4.5-build` at high reasoning. Kimi used exact
+`kimi-code/k3`, thinking/high and both 100-step controls with no resume,
+fallback, helper, subagent or tool call in its final adjudication. Because both
+preliminary reviewers rejected `74914e0`, no final D.92.5 Opus review was run.
+
+The shared D blocker is a handler-created raw Date expando alias. In one real
+operation, assignment or `defineProperty` stores a separately governed proxy
+reference on the Date; the handler unwraps that reference into the raw expando.
+An own or inherited accessor later executes with the raw Date receiver and
+mutates the raw alias. With no timestamp change, only an unrelated anchor is
+published and the alias snapshot remains stale. Even when the getter also
+changes the timestamp, the Date is charged but the separately governed alias
+is not. Grok exercised 14 bounded cases including three real-applier failures.
+Kimi independently reproduced own and inherited real failures with raw
+secondary `1`, stored secondary `0`, changed key `anchor` only and zero egress/
+comparison work. Evidence is under
+`.logs/phase-1d-i-d925-date-accessor-green-review-grok45-high/` and
+`.logs/phase-1d-i-d925-date-accessor-green-review-kimi3-high-100/`.
+
+Fresh Codex-high tests-only commit `ed2eef7` freezes D.92.5-D in
+`packages/object/tests/date-expando-alias-egress-1d-i-red.test.ts`. The
+361-line file has SHA-256
+`1c9db7fd1789daffb6ec3fe96dc0b42d63bc3a3ac08b64b4f1970748f19f0cad`
+and is exact 4 failures / 2 passes against production identical to `74914e0`.
+The RED covers assignment plus an own getter and `defineProperty` plus an
+inherited getter diagonally, direct raw-egress candidacy, real timestamp-stable
+and timestamp-changing publication with bounded ballast/work, primitive clean
+storage and a real idempotent no-vertex control. An invalid inherited real-
+applier fixture was removed before freeze because Date reconstruction erases
+that prototype; inherited lookup remains only in the direct tracker case where
+the subclass is intact. Earlier 277- and 678-line hashes remain exact; prior
+D.92.5-C+A/B+D.92.4 is 46/46. Object/workspace typechecks, owned lint,
+Prettier, diff and scope pass. Evidence is under
+`.logs/phase-1d-i-d925-date-expando-red-codex-high/`.
+
+The distinct production-only D GREEN must raise the existing raw-egress
+candidacy when the Date handler itself unwraps a governed proxy reference into
+a raw expando through assignment or `defineProperty`. That closes later raw-
+receiver accessor mutation through the accepted all-governed union comparison
+without widening every Date accessor read, changing the frozen clean-accessor
+contract, adding another comparison authority, or making Date expandos durable.
+Keep D.92.5-D confined to the Date handler; the ordinary accessor issue below
+has a different causal moment and owner.
+
+#### D.92.6 — Ordinary accessor receiver and bookkeeping-invocation boundary
+
+During the D.92.5-C review, an ordinary-object probe found a distinct hard
+stale-publication path. Inside one real operation it defines a configurable
+alias on `carrier` pointing to separately governed `secondary`, defines a
+getter that mutates `this.alias.value`, and writes `anchor`. The defect does not
+require an external closure, descriptor-read escape or malformed bytes.
+`finalizeCommittedWrite` eagerly calls `Reflect.get(owner, property, owner)`
+after installing the accessor, so bookkeeping invokes the new getter with the
+raw carrier before the intended proxy-receiver read. Secondary changes during
+definition; the later proxy read can appear idempotent. Only carrier and anchor
+are attributed, while the stored/reconstructed secondary remains stale.
+
+Non-enumerability exposed the first oracle but is incidental; the enumerable
+variant can leave the separately governed secondary stale too. Enumerable-key
+projection remains the durable state contract. Serializing hidden aliases is
+forbidden because it changes that contract, does not itself refresh the
+separate top-level owner and can duplicate shared identity across independent
+per-key detachment maps. Existing topology maintenance is not to be replaced:
+installing a data alias must add the secondary-to-carrier parent edge even when
+secondary was already initialized, without charging or reinitializing it.
+
+D.92.6 is a distinct hard RED/GREEN/Grok/Kimi/Opus loop after D.92.5 closes and
+before P3a, composite D.92 and Phase 1d(ii). Its bounded RED must prove native
+`defineProperty` does not eagerly invoke a getter; exact direct attribution of
+carrier, secondary and anchor with no raw egress after the intended proxy-
+receiver read; real stored/reconstructed/exact-cut truth with published
+secondary plus anchor, bounded comparisons, zero widening and two reused
+ballast keys; enumerable alias parity; setter symmetry; clean/context/throw
+controls; and preservation of D.91's committed data-descriptor traversal-
+failure throwable/charging plus existing enumerable-accessor alias behavior.
+Construct all references inside the operation. One causal getter plus controls
+is sufficient; do not build a syntax matrix or add fuzzing/analyzer work.
+
+The GREEN stays inside the ordinary proxy handler. Committed-write finalization
+must be descriptor-aware and must never execute an accessor for bookkeeping.
+Use non-invoking descriptor inspection: for a data descriptor, update
+reachability from its actual post-value; for an accessor descriptor, remove or
+avoid a data-value topology edge and charge only the committed owner. Actual
+user-driven accessors continue to receive the tracked proxy receiver, allowing
+existing parent/direct-owner capture to charge secondary and conservatively
+carrier while publisher equality filters carrier. Do not broadly swap
+receivers, scan state, add fingerprints/preimages or a second comparison
+authority, always widen, serialize hidden properties, rewrite topology, or
+touch Map/Set/Date.
+
+The plan-amendment quorum was unanimous after correcting the initial diagnosis.
+Exact Kimi 3/high/dual-100 session
+`3972a639-e58b-4b41-8bcd-3e625bc54787`, fresh Codex-high and Opus/xhigh session
+`2f391dcc-9348-430b-b2ad-69fc0084a1c9` each returned
+`PLAN_AMENDMENT_AGREE=yes`. Opus used substantive `claude-opus-5` at xhigh;
+metadata also reported a non-substantive automatic Haiku helper of 21 output
+tokens. Codex and Opus localized the mutation to eager D.91-era bookkeeping,
+not missing serialization/topology, and agreed that Date D.92.5-D proceeds and
+closes independently. Kimi/controller evidence is in the corrected-candidate
+review directory above; Codex adjudication was collaboration-only. Do not begin
+D.92.6 until D.92.5 closes, and do not let it delay the Date GREEN.
+
 **One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
 plan, lineage, review artifacts and committed candidate `ba35ebb` returned
 `ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
@@ -16344,22 +16450,24 @@ The publication-time codec/`Symbol.iterator` captured-intrinsic seam also
 remains separate unless its later causal RED explicitly assigns it to the
 shared detachment primitive. Phase 0n remains optional after the golden paths
 except for any already-recorded hard Phase 4a prerequisite. These separations
-must not be used to defer D.92.2–D.92.5, P3 or D.73 beyond their stated gates.
+must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B candidate `ba35ebb` plus
-D.92.5-C corrective GREEN `74914e0` are ready for fresh full-lineage review.
-Run fresh Grok 4.5/high and exact Kimi 3/high with both 100-step controls in
-parallel; if both accept, run final Opus/xhigh. Preserve both frozen D.92.5 RED
-hashes, D.92.4 and the full gate matrix. Probe the property-resolution timing
-and exact-throw fix together with descriptor widening/internal descriptor reads
-and Date symbol/delete/define-property expando behavior. Do not fold P3, D.73
-or Phase 1d(ii) into D.92.5. If all reviewers accept, close D.92.5 plan-only,
-then start fresh P3a tests-only RED and its distinct loop; P3b follows
-separately before the composite D.92 review. Prototype-safe materialization
-remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
-adoption, but it does not reopen P2, D.92.4 or D.92.5.
+P1, P2 and D.92.4 are accepted and closed. D.92.5-D RED `ed2eef7` is frozen at
+exact 4 failures / 2 passes with the 361-line SHA-256 above. Start a distinct
+fresh Codex-high production-only GREEN. Signal the existing raw-egress boundary
+when Date assignment or `defineProperty` unwraps a governed proxy reference
+into a raw expando; do not widen every accessor read, make expandos durable or
+touch ordinary-object handling. Preserve all three D.92.5 RED hashes, D.92.4
+and the full gate matrix. If GREEN, record it and run fresh Grok 4.5/high, exact
+Kimi 3/high with both 100-step controls and final Opus/xhigh over the complete
+D.92.5 lineage. If accepted, close D.92.5 plan-only, then start the distinct
+D.92.6 tests-only RED and its own full loop. P3a follows D.92.6, then P3b,
+composite D.92 and Phase 1d(ii). Do not fold D.92.6, P3, D.73 or Phase 1d(ii)
+into the Date GREEN. Prototype-safe materialization remains mandatory before
+Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it does not reopen
+P2, D.92.4 or D.92.5.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
