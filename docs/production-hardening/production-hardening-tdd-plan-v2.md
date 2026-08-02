@@ -14625,6 +14625,33 @@ causal getter/Proxy tests and the bounded 1 MB characterization remain
 preservation gates. The ratios bound work through the measured leaf; they are
 explicitly not evidence against an uncounted copy.
 
+**Accepted c′ RED checkpoint.** Tests-only commit
+`e41c3ecf2a51870e7a6875c2b362cb2d59359777` changes exactly the structure and
+publication-work tests. Its post-commit aggregate is 10 intended failures, 45
+passes and 305 retired expression-flow skips: c′ structure is 10 failures / 24
+passes / 305 skips and runtime work is 21/21. The failures are exactly the
+absent topology, authority, delegates, capability, lint surface, census
+integration and physical legacy retirement; surviving module/reference mutants
+and safe controls pass. The
+runtime identity-observer and exact event-per-key backstops already pass on the
+pre-split implementation and are preservation tests, not manufactured REDs.
+
+The discovered fifth census is **94 exact package-source codec call
+references**, each pinned in the test by source, lexical owner, alias-resolved
+callee and duplicate ordinal. It comprises 42 generated encode-member calls,
+38 generated decode-member calls, two `serializeDRPState`, three
+`serializeValue`, one `deserializeValue`, four direct MessagePack encode and
+four direct MessagePack decode calls. The complete package sink/reference
+census is 114 and the current publisher-closure census is 7. The test source is
+the canonical roster; this plan records only the invariant and why the fifth
+dimension exists.
+
+Object and workspace typecheck, owned lint, tracked-source zero-error lint,
+Prettier, diff/scope, inherited Phase 1d(i) 147/147 and the targeted 1 MiB
+characterization pass. Raw-child remains the inherited 11-fail/7-pass baseline
+and sync-livelock remains 3/3. Full `pnpm lint` separately retains the unrelated
+49-error/226-warning workspace baseline; no unrelated lint was absorbed.
+
 ##### D.92.2-d′ — Publication capability and structural authority GREEN
 
 A distinct fresh Codex-high GREEN owner may change the owned tests, production
