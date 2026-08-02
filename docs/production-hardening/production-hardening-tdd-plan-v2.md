@@ -16182,6 +16182,57 @@ production scope. Its initial ledger disclosed one automatic non-substantive
 call used Fable or fallback. Evidence is under
 `.logs/phase-1d-i-p3a-prime-{buffer-counter-amendment-kimi3-high-100,buffer-counter-amendment-opus-xhigh,context-boundary-amendment-kimi3-high-100,clone-enumerable-context-amendment-kimi3-high-100}/`.
 
+**Accepted P3a-prime tests-only RED checkpoint.** Fresh Codex-high commit
+`9132269fbbc7e07255eb364e211acf170c482730` changes exactly three test files
+against plan parent `ae75193`. New
+`packages/object/tests/binary-expando-state-domain-1d-i-red.test.ts` is 365
+formatted lines, SHA-256
+`7325c56e0404bfd3603fe4ea925e8ccdc5f1f109f2ddb82439fa217715e0b646`
+and blob `5d6722ba5ca6a4ad7336bd8737cd18e7e1ad3534`. The surgically
+amended 153-line P3a enumeration file has SHA-256
+`536f123319b18fc55052a9e253c14593d98bca74b68dccdade72bb349003624e`
+and blob `52e1d4c5249b72183e804f517b398fa42c427dbc`. The finite D.92.2
+manifest file is 1,518 lines, SHA-256
+`24a06f9459e19ecd39bca04d1fd1fee9d8ccfc781baba3044f86b88029846df4`
+and blob `88bf456313a423c321c21453825fc9fcaee25c13`.
+
+The focused semantic signature is exact 11 failures / 7 passes across 18
+tests: the new file contributes 9F/5P and the amended P3a file contributes
+2F/2P. Failures are only missing governed rejection, validation-before-sealing,
+atomic tracked rejection, sealed governed identities, local/remote replay and
+the newly truthful Buffer enumeration count. One compact 24-row family/key-
+descriptor matrix covers each binary family against string/symbol and
+enumerable/non-enumerable expandos without multiplying syntax-shaped tests.
+Passing controls prove current construction/reconstruction context copy,
+nested ignored mutation, Buffer/ArrayBuffer contents, wrapper metadata,
+canonical numeric/bulk writes and one real dependent-batch adoption path. The
+context-plus-governed alias case remains RED so a local copy cannot bless a
+fresh governed traversal.
+
+The mechanically updated D.92.2 authority is exact 2F/62P against old
+production: its future census is 94 codec references / 116 package references /
+13 residual detachment sites / 4 capture sites, while current production still
+has 115 package references and the five old materializer callee names. Only the
+single finite sink name and exact site arrays changed; traversal, flow,
+fixpoint, fixtures and fail-closed behavior remain byte-frozen. A clean
+post-commit serialized coverage-disabled run completed in 20.35 seconds at the
+same exact signature. One discarded retry used unmatched Vitest min/max worker
+options and ran no tests; another coverage-bearing retry under concurrent
+review CPU load emitted a task-update timeout after the same 2F/62P assertions.
+Neither is acceptance evidence.
+
+Preservation is P3b's immutable exact 4F/4P, bounded 1 MiB 2/2,
+P2+P1+D.92.3 99/99, D.92.4-D.92.6 60/60, inherited 147/147,
+specialized 93/93 and performance 8/8. The sync-livelock sentinel retains its
+authenticated 3F/3P. Object/workspace typechecks, owned lint, tracked zero-error
+lint with 249 inherited warnings, Prettier, diff and scope checks pass.
+Production, plan, frozen P3b and `stash@{0}` hashes are unchanged. Evidence is
+under `.logs/phase-1d-i-p3a-prime-binary-expando-red-codex-high/`.
+
+The distinct production-only GREEN now implements the four-file scope above
+without changing the frozen tests. It must reach semantic 18/18 and D.92.2
+64/64, keep P3b at its independent 4F/4P, and preserve every accepted gate.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -16949,21 +17000,17 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 P1, P2, P3a and D.92.4-D.92.6 are accepted and closed, but the unanimous
 Codex-high + exact Kimi 3/high/dual-100 + Opus/xhigh correction quorum has
-inserted P3a-prime before P3b GREEN. Start a fresh Codex-high tests-only
-P3a-prime RED. Replace only P3a's binary-expando preservation assertion with
-deterministic governed rejection across all binary families and all own
-expando key classes. Prove validation-before-sealing, already-non-extensible
-hostiles, local ingress and remote replay, tracked set/defineProperty, derived-
-view sealing, wrapper metadata, context isolation, exact existing binary
-bytes/layout/backing aliases, one counted fresh-view enumeration, the newly
-authorized one counted Buffer validation, zero recursive elements and the
-retained Uint8Array 1 MiB bound. Add construction/reconstruction, nested ignored
-context, one real adoption-clone and context-plus-governed-alias controls. The
-same shared copier's future internal replica-local entry is limited to the five
-`state-materialize.ts` context sites and the one key-conditional
-`cloneEnumerableInstance` site; mechanically update the existing D.92.2 site
-manifest without growing its analyzer. Production and the frozen P3b RED at
-`b040071` remain byte-identical during RED.
+inserted P3a-prime before P3b GREEN. Its fresh Codex-high tests-only RED is
+frozen at `9132269`: semantic 11F/7P and D.92.2 manifest 2F/62P. Start a
+distinct fresh Codex-high production-only GREEN. Implement the shared
+governed/default versus internal replica-local detachment contract across only
+`state-payload.ts`, `proxy.ts`, the five `state-materialize.ts` context calls
+and the one key-conditional `cloneEnumerableInstance` branch. Validate before
+sealing, count one fresh view or Buffer validation truthfully, propagate
+ignored context, preserve current context family semantics, and make all
+governed local/remote/tracked boundaries fail closed. Reach semantic 18/18 and
+D.92.2 64/64 without changing the frozen tests or growing the analyzer; keep
+P3b exact 4F/4P and all preservation gates.
 
 After a distinct P3a-prime GREEN and Grok/Kimi/Opus acceptance, resume P3b
 GREEN on the settled fail-closed invariant. Preserve but do not apply
