@@ -16339,6 +16339,34 @@ contract, adding another comparison authority, or making Date expandos durable.
 Keep D.92.5-D confined to the Date handler; the ordinary accessor issue below
 has a different causal moment and owner.
 
+**D.92.5-D production GREEN candidate.** Distinct fresh Codex-high commit
+`c3f97fbd16696cfbdc84e882f43c934b7a3e73aa` changes only
+`packages/object/src/proxy.ts` by 18 additions and two replacements. A value is
+recognized as governed only when its current tracker's `trackedProxies` entry
+maps the unwrapped raw target back to that exact proxy. Ignored/context proxies,
+arbitrary raw objects and proxies from elsewhere do not widen. Date assignment
+signals after successful storage or on a throw, because a raw setter may already
+have retained or mutated the governed value; a clean `false` no-op remains
+clean. Raw-target `defineProperty` signals only after success because it does
+not invoke the installed accessor.
+
+D.92.5-D is 6/6 and combined D+C+A/B+D.92.4 is 52/52. All three frozen D.92.5
+files remain exact at their 361-, 277- and 678-line hashes above. Preservation
+is P2 33/33; P1/publication 48/48; D.92.2 64/64; D.92.3 18/18; inherited
+147/147; specialized 93/93; and bounded 1 MiB 1/1. Four performance runs remain
+8/8 with the state case at 640.3, 647.6, 650.0 and 649.7 ms. Sync-livelock is
+the exact inherited 3F/3P sentinel. Object/workspace typechecks, owned lint,
+tracked lint with zero errors/249 warnings, Prettier, diff and scope pass. A
+bounded same-seam probe proves raw/ignored/failed-false writes stay clean while
+a caught-throw raw setter mutation widens. Evidence is under
+`.logs/phase-1d-i-d925-date-expando-green-codex-high/`.
+
+The complete `ba35ebb` + `74914e0` + `c3f97fb` D.92.5 lineage now requires
+fresh Grok 4.5/high and exact Kimi 3/high/dual-100 acceptance before final
+Opus/xhigh. Review must authenticate all three frozen RED hashes and test the
+governed-provenance, failed-set and Date expando alias boundaries without
+absorbing ordinary D.92.6.
+
 #### D.92.6 — Ordinary accessor receiver and bookkeeping-invocation boundary
 
 During the D.92.5-C review, an ordinary-object probe found a distinct hard
@@ -16454,20 +16482,18 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. D.92.5-D RED `ed2eef7` is frozen at
-exact 4 failures / 2 passes with the 361-line SHA-256 above. Start a distinct
-fresh Codex-high production-only GREEN. Signal the existing raw-egress boundary
-when Date assignment or `defineProperty` unwraps a governed proxy reference
-into a raw expando; do not widen every accessor read, make expandos durable or
-touch ordinary-object handling. Preserve all three D.92.5 RED hashes, D.92.4
-and the full gate matrix. If GREEN, record it and run fresh Grok 4.5/high, exact
-Kimi 3/high with both 100-step controls and final Opus/xhigh over the complete
-D.92.5 lineage. If accepted, close D.92.5 plan-only, then start the distinct
-D.92.6 tests-only RED and its own full loop. P3a follows D.92.6, then P3b,
-composite D.92 and Phase 1d(ii). Do not fold D.92.6, P3, D.73 or Phase 1d(ii)
-into the Date GREEN. Prototype-safe materialization remains mandatory before
-Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it does not reopen
-P2, D.92.4 or D.92.5.
+P1, P2 and D.92.4 are accepted and closed. D.92.5-D production GREEN candidate
+`c3f97fb` is complete with the full-lineage gates above. Run fresh Grok
+4.5/high and exact Kimi 3/high with both 100-step controls in parallel over
+`ba35ebb`, `74914e0` and `c3f97fb`; if both accept, run final Opus/xhigh.
+Authenticate all three frozen RED hashes and probe governed provenance,
+failed-set semantics, accessor/descriptor behavior and exact publication work.
+Do not fold ordinary D.92.6, P3, D.73 or Phase 1d(ii) into this review. If all
+reviewers accept, close D.92.5 plan-only, then start D.92.6 tests-only RED and
+its distinct full loop. P3a follows D.92.6, then P3b, composite D.92 and Phase
+1d(ii). Prototype-safe materialization remains mandatory before Phase 1d(ii)
+closure and Phase 4b/6a snapshot adoption, but it does not reopen P2, D.92.4 or
+D.92.5.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
