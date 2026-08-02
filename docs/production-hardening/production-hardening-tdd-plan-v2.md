@@ -15195,6 +15195,41 @@ run is authenticated rather than repeated because its test and all relevant
 production hashes are unchanged. D.92.4 raw egress and D.73 hostile virtual
 `Map.keys()` remain untouched.
 
+**Graph-aware detachment GREEN checkpoint (reviews pending).** Distinct
+Codex-high commit `66fc0cb3b69174c30e90b23bad351b5b539a7305` adds one 206-line
+`packages/object/src/state-payload.ts` owner and migrates the object package's
+state-bearing copies to it. Map keys and values traverse one per-call identity
+stack; Map/Set methods and iterator steps are captured once and invoked with
+`Reflect.apply`. Snapshot copy-in/out deliberately starts a fresh stack for
+each top-level entry, and reconstruction keeps ACL and DRP sides independent.
+The one-argument public detacher cannot accept a bypass callback. The existing
+publication observer return remains private to the branded capability, so the
+measured seam is preserved without a hidden double copy.
+
+Materialization, reconstruction, public setters/getters, operation-history
+capture and replay, dependent adoption and default publication now share that
+primitive. Buffer copying uses captured `globalThis.Buffer.from`/`isBuffer`
+without the deprecated constructor or a restricted global reference. The local
+lint boundary extends to the new sink-owning module. D.92.2's structural
+authority receives only the mechanically derived topology/census update: it is
+350 formatted nonblank lines, +6 from the accepted 344, at SHA-256
+`d693b9075002bd5e615ea689a4afe6fb4efd9081a08e6b772406ac5bdc6f17a5`.
+The exact census is now 94 codec references / 115 package references / 12
+residual detachment sites / 4 state-capture sites. The external runtime surface
+intentionally drops `es-toolkit` because no production object-package copy
+acquires `cloneDeep`; MessagePack remains the only governed external surface.
+
+The frozen semantic RED remains byte-identical at SHA-256
+`accf365c1fc20f2a6dabe6c05d923ea95b8f501f155f36dd4334cd47dfbd16b9`
+and passes 17/17. D.92.2 is 64/64; their serialized combined run is 81/81.
+Publication work is 21/21, inherited Phase 1d(i) is 147/147, the specialized
+state/collection/atomicity group is 93/93 and bounded 1 MiB is 1/1. Raw-child
+and sync-livelock retain exact 11-fail/7-pass and 3-fail/3-pass baselines.
+Object/workspace typecheck, owned zero-error lint, broad tracked
+0-error/249-warning lint, Prettier, diff and scope checks pass. Final Grok-high,
+exact Kimi 3/high/100 and Opus/xhigh acceptance are still required; this
+checkpoint does not begin D.92.4 or consume D.73.
+
 #### D.92.4 — Raw-egress contract after detachment
 
 After D.92.3 is accepted, forced raw egress widens candidacy monotonically to
@@ -15229,19 +15264,15 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Begin D.92.3 with a fresh Codex-high tests-only RED for one shared graph-aware
-state-payload detachment primitive. Freeze the accepted D.92.2 authority and
-production topology. Prove Map object keys and values share one identity stack
-within each independently copied top-level payload, including key-equals-value,
-cross-Map/Set/property aliases, cycles and distinct deep-equal keys. Cover every
-state capture, reconstruction, publication, observer, copy-in/copy-out,
-checkpoint, rollback, prune, sibling and fallback owner listed above; kill both
-`result.set(originalKey, clonedValue)` and one-site-only publication fixes.
-Retain exact wire bytes, failure atomicity, primary throwable, copy counters,
-per-case ratios and the bounded 1 MiB characterization. RED may change tests
-only. Use a distinct Codex-high GREEN, then run the complete gates and fresh
-Grok-high / exact Kimi 3/high/100 reviews; final Opus/xhigh runs only if both
-accept. D.92.4 and D.73 remain separate later owners.
+Review D.92.3 candidate `66fc0cb3b69174c30e90b23bad351b5b539a7305`
+adversarially against the frozen 17-case RED, the accepted D.92.2 least-authority
+topology and all recorded gates. Grok-high and exact Kimi 3/high/100 run as
+fresh independent reviewers; final Opus/xhigh runs only if both accept. Inspect
+the shared detacher for graph identity, captured-intrinsic traversal, supported
+state-shape parity, throwable/installation atomicity and bounded work. Reject
+per-site fixes, bypassable copy APIs, hidden observer copies, policy weakening
+or D.92.4/D.73 scope creep. If all three accept, record D.92.3 as complete and
+start D.92.4 with a fresh Codex-high tests-only RED.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
