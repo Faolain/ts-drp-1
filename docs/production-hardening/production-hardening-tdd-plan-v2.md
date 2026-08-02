@@ -14807,6 +14807,23 @@ moved outside its measured boundary. Run the complete c′/d′ gate set again,
 then fresh Grok-high and exact Kimi 3/high/100 reviews; final Opus/xhigh runs
 only if both accept.
 
+**Accepted corrective RED checkpoint.** Tests-only commit
+`93f4336d11cf6f0b7d487c9dc56fb0c74ed78d1a` changes only the owned
+structural test and leaves production, lint, manifests and the 298-line
+authority byte-identical. Its focused result is exactly 14 intended failures /
+34 passes: five exact canonical-symbol reference shapes, two independent
+root-to-leaf cuts, one reviewed-operation mutation, four closure/equality/type-
+only/generated-dependency conditions, one structural snapshot roster and one
+lint/closure equality. The local-shadow and type-only controls pass.
+
+Publication work remains 21/21 and inherited Phase 1d(i) remains 147/147.
+Object/workspace typecheck, owned lint, tracked zero-error lint, Prettier and
+scope authentication pass; raw-child remains 11 failures / 7 passes and
+sync-livelock remains 3 failures / 3 passes. The bounded 1 MiB characterization
+was not rerun because the RED changes only the structural test and authenticates
+production byte-identical to the previously passing base. The authority SHA-256
+remains `beca7ab54564b5df5c85801355d6c98c095dfa6e87f760b33e8949a0c7470cfe`.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
@@ -14883,24 +14900,13 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Continue D.92.2-d′ from production base `74af6fb` and documentation checkpoint
-`8d7fd1d` plus this review-finding checkpoint. The first d′ acceptance candidate
-was rejected by Grok and exact Kimi 3; final Opus was correctly not run. The
-production extraction remains the base, while the structural authority and its
-closure/lint claims require one bounded corrective RED/GREEN pair. A custom
-value-flow analyzer remains prohibited.
+Continue D.92.2-d′ from corrective RED
+`93f4336d11cf6f0b7d487c9dc56fb0c74ed78d1a`. The first d′ acceptance
+candidate was rejected by Grok and exact Kimi 3; final Opus was correctly not
+run. The production extraction remains the base. A custom value-flow analyzer
+remains prohibited.
 
-Spawn a fresh Codex-high tests-only RED owner that may edit only the owned
-structure test and test-local fixtures — never production, lint config or this
-plan. Pin shorthand import packing, aliased internal serializers,
-namespace/member references, statically named element access and safe
-shadow/type-only twins using canonical symbols. Pin causal mutations for each
-root-to-copy-leaf path, remove or expose tautological `reviewedOperations`,
-require the exact unfiltered runtime dependency closure and make lint's file set
-equal that closure. Do not add expression/callback/container provenance, a
-general call graph or another list of spelling-specific regular expressions.
-
-After committing the honest RED, use a distinct fresh Codex-high GREEN owner
+Use a distinct fresh Codex-high GREEN owner
 for the smallest coherent correction. Replace brittle reference extraction
 with TypeScript alias, shorthand-value and static property symbols; derive only
 the exact shallow publication topology needed by the two roots. Narrow the
