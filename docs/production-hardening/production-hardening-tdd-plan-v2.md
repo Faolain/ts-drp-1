@@ -15551,6 +15551,74 @@ inferred from timing; stop and convene the standing correction quorum for a
 separate blocking owner before D.92.4. Do not widen P1 silently, normalize the
 red, scale the test or weaken the threshold.
 
+**P1 corrective RED and candidate GREEN checkpoint.** The first GREEN run
+reached an assertion that the accepted RED had never exercised: both
+observer-independence fixtures omitted `semanticsType` from their baseline but
+included it in the target, so the historical publisher correctly copied that
+addition while the fixture expected zero copies. The original Codex-high RED
+agent independently confirmed the latent fixture defect. Corrective tests-only
+commit `da339b374c7c51fafde4c1ccd30562d5d6a76c1b` changes only those two
+baselines (2 insertions / 2 deletions); a detached checkout at the original RED
+commit retained the exact 9 failures / 12 passes and the same nine causal
+failures. The corrected 624-line RED has SHA-256
+`974beb279662154c65a4176fdf5718290f89280d7c8c0f3e0e4566b0ba300f89`.
+Evidence is under
+`.logs/phase-1d-i-p1-comparison-work-corrective-red-codex-high/`; its first
+dependency-unlinked worktree attempt is explicitly superseded by the valid
+detached run.
+
+Distinct Codex-high candidate GREEN commit
+`538269c348e827c47709e0d2cc58998213806ebf` changes five production files and
+the mechanically permitted D.92.2 authority census (329 insertions / 56
+deletions). The branded publication capability is now the sole comparison
+owner. Applier ambient candidacy, proxy tracking, publisher capture and
+concurrent override route through it; direct equality acquisition was removed
+from the applier and proxy. Map/Set semantic comparison uses captured size,
+entries/values and iterator-next intrinsics in lockstep insertion order. The
+codec remains the final byte arbiter, with a scalar-only byte-length hook that
+never exposes or duplicates an encoded buffer. Proxy codec rejection retains
+the D.91 `catch -> true` contract, while publisher failures remain fail-closed
+with the frozen primary throwable behavior.
+
+Comparison events contain one comparison's immutable counter snapshot and are
+append-only observations that callers may aggregate per applier; no reset or
+result-control API exists. A separate optional comparison-observer channel on
+the applier prevents new diagnostic events from changing legacy
+publication/copy observer behavior. Observer returns and throws cannot affect
+the comparison result. The direct capability seam defaults comparison events
+to its supplied observer solely to retain the frozen focused-test seam.
+
+The first production candidate used every top-level key as a safe-superset
+candidate. Although fast, it made three D.92.4 raw-egress publication REDs pass
+without repairing tracker attribution, changing the frozen raw signature from
+11 failures / 7 passes to 8 failures / 10 passes. That attempt is rejected and
+uncommitted. The final candidate instead uses the plan's explicit
+`effectiveStateKeys` alternative: exact pre-operation ambient comparison is
+routed through the sole linear authority as `applier-candidacy`, while final
+publisher comparison remains a distinct temporal pair. This restored the
+exact raw 11F/7P boundary without a fixture-specific heuristic and without
+reintroducing quadratic work.
+
+The corrected focused suite is 21/21. Map and Set sizes 8/16/32 emit exactly
+16/32/64 entry visits, with ratios 2/2/4. A semantically accepted pair has one
+codec pass, two encodes and exact encoded-byte accounting; a rejected pair has
+zero codec work. The unchanged `perf-contracts.test.ts` is 8/8: corrected
+MapDRP quick time is 202.4 ms and three serialized repeats are 201.0 / 201.9 /
+206.8 ms against the frozen 1,000 ms ceiling. Logs 03/04 measured the rejected
+all-key candidate and are superseded; logs 14/15 are the authoritative
+corrected quick run and repeats. Publication work is 21/21,
+D.92.2 is 64/64, D.92.3 is 18/18, inherited Phase 1d(i) is 147/147,
+specialized state/collection/atomicity is 93/93 and bounded 1 MiB is 1/1.
+Raw-child and sync-livelock retain exact 11F/7P and 3F/3P. The utils build,
+object/workspace typechecks, owned lint, tracked lint at 0 errors / 249
+inherited warnings, Prettier, diff, hashes and scope all pass. Ignored utils
+`dist` had to be rebuilt before cross-package typecheck because package-export
+types resolve through generated declarations; no generated file was staged.
+Authoritative evidence is under
+`.logs/phase-1d-i-p1-comparison-work-green-codex-high/`. This is a candidate
+checkpoint only; P1 remains open pending independent Grok-high, exact Kimi
+3/high/100 and final Opus/xhigh acceptance.
+
 ##### D.92.3-P2 — captured snapshot-container traversal (blocks D.92.4)
 
 P2 begins only after P1 acceptance and re-freezes P1 tests, counters and
