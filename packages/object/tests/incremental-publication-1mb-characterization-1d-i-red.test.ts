@@ -9,6 +9,7 @@ import { createACL } from "../src/acl/index.js";
 import { DRPVertexApplier } from "../src/drp-applier.js";
 import { FinalityStore } from "../src/finality/index.js";
 import { HashGraph } from "../src/hashgraph/index.js";
+import { detachStatePayload } from "../src/state-payload.js";
 import { DRPObjectStateManager } from "../src/state.js";
 
 const VERTEX_COUNT = 1_000;
@@ -33,6 +34,19 @@ interface PublicationRecord {
 type PublicationObserverEvent =
 	| { type: "copy"; value: unknown; metadata: CopyMetadata }
 	| { type: "publication"; record: PublicationRecord };
+
+interface DetachmentWorkEvent {
+	type: "state-payload-detachment";
+	counters: {
+		typedArrayViewsDetached: number;
+		typedArrayCanonicalIndexEnumerations: number;
+		typedArrayElementsRecursivelyDetached: number;
+		backingStoresCopied: number;
+		backingBytesCopied: number;
+	};
+}
+
+type MeteredDetach = <T>(value: T, observer?: (event: DetachmentWorkEvent) => unknown) => T;
 
 class CharacterizationProbe {
 	readonly copies: (CopyMetadata & { bytes: number })[] = [];
@@ -71,6 +85,31 @@ function vertex(value: number, dependency: Hash): Vertex {
 }
 
 describe("Phase 1d(i) 1k-vertex / 1 MiB characterization", () => {
+	it("bounds one 1 MiB TypedArray detach to one enumeration and one bulk backing copy", () => {
+		const source = new Uint8Array(ONE_MIB);
+		source[0] = 17;
+		source[source.length - 1] = 23;
+		const events: DetachmentWorkEvent[] = [];
+		const detach = detachStatePayload as MeteredDetach;
+		const copy = detach(source, (event) => events.push(event));
+
+		expect.soft(copy).not.toBe(source);
+		expect.soft(copy.buffer).not.toBe(source.buffer);
+		expect.soft([copy.length, copy[0], copy[copy.length - 1]]).toEqual([ONE_MIB, 17, 23]);
+		expect(events).toEqual([
+			{
+				type: "state-payload-detachment",
+				counters: {
+					typedArrayViewsDetached: 1,
+					typedArrayCanonicalIndexEnumerations: 1,
+					typedArrayElementsRecursivelyDetached: 0,
+					backingStoresCopied: 1,
+					backingBytesCopied: ONE_MIB,
+				},
+			},
+		]);
+	});
+
 	it("keeps every exact linear cut and the aggregate under the deterministic publication bound", async () => {
 		const drp = new OneMiBState();
 		expect(serializeValue(drp.ballast).byteLength).toBeGreaterThanOrEqual(ONE_MIB);
