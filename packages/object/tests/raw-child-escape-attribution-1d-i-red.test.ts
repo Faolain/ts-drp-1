@@ -209,6 +209,18 @@ function expectExactAttribution<T extends object>(
 	expect(tracked.hasChanges()).toBe(truth.length > 0);
 }
 
+interface RawEgressTrackingTestSeam {
+	hasRawEgress(): boolean;
+}
+
+function hasRawEgressForTest<T extends object>(tracked: MutationTrackingResult<T>): boolean {
+	const seam = tracked as MutationTrackingResult<T> & Partial<RawEgressTrackingTestSeam>;
+	expect
+		.soft(seam.hasRawEgress, "tracker must expose a separate O(1) raw-egress candidacy signal")
+		.toBeTypeOf("function");
+	return seam.hasRawEgress?.() ?? false;
+}
+
 function caught(run: () => unknown): unknown {
 	try {
 		run();
@@ -316,15 +328,64 @@ describe("Phase 1d(i) raw children escaping collection member reads", () => {
 });
 
 describe("Phase 1d(i) Proxy-invariant raw ordinary child", () => {
-	it("charges all owners after a frozen holder must expose its raw non-writable value", () => {
+	it("keeps a frozen-holder raw write eligible without inventing observed keys", () => {
 		const child = { id: "frozen", value: 0 };
-		const state = { frozenHolder: Object.freeze({ child }), mirrorSet: new Set([child]), alias: child };
+		const state = {
+			frozenHolder: Object.freeze({ child }),
+			mirrorSet: new Set([child]),
+			alias: child,
+			ballastAlpha: { stable: "unchanged-alpha" },
+			ballastBeta: { stable: "unchanged-beta" },
+		};
 		const before = frozenBytesByKey(state);
 		const tracked = trackMutations(state);
+		expect(hasRawEgressForTest(tracked)).toBe(false);
 
-		tracked.proxy.frozenHolder.child.value = 7;
+		const escaped = tracked.proxy.frozenHolder.child;
 
-		expectExactAttribution(tracked, before, state, ["alias", "frozenHolder", "mirrorSet"]);
+		expect(escaped, "Proxy invariant must expose the exact SameValue child").toBe(child);
+		expect.soft(hasRawEgressForTest(tracked), "raw egress must widen publication candidacy monotonically").toBe(true);
+		expect.soft(tracked.hasChanges(), "raw egress alone must keep the operation eligible").toBe(true);
+
+		escaped.value = 7;
+
+		expect(byteDeltaKeys(before, state), "independently serialized top-level byte truth").toEqual([
+			"alias",
+			"frozenHolder",
+			"mirrorSet",
+		]);
+		expect([...tracked.changedKeys()], "a later raw write crosses no tracker trap").toEqual([]);
+		expect.soft(hasRawEgressForTest(tracked), "raw-egress candidacy must never narrow after the raw write").toBe(true);
+		expect.soft(tracked.hasChanges(), "the operation must remain eligible after the raw write").toBe(true);
+	});
+
+	it("does not treat multiply-aliased read-only invariant egress as observed mutation", () => {
+		const child = { id: "read-only-invariant", value: 0 };
+		const state = {
+			frozenHolder: Object.freeze({ child }),
+			mirrorMap: new Map([
+				["first", child],
+				["second", child],
+			]),
+			mirrorSet: new Set([child]),
+			aliasAlpha: child,
+			aliasBeta: child,
+		};
+		const before = frozenBytesByKey(state);
+		const tracked = trackMutations(state);
+		expect(hasRawEgressForTest(tracked)).toBe(false);
+
+		const escaped = tracked.proxy.frozenHolder.child;
+
+		expect(escaped, "read-only invariant access must preserve exact SameValue identity").toBe(child);
+		expect.soft(hasRawEgressForTest(tracked), "read-only raw egress still widens publication candidacy").toBe(true);
+		expect.soft(tracked.hasChanges(), "read-only raw egress must remain publication-eligible").toBe(true);
+		expect(byteDeltaKeys(before, state), "read-only alias multiplicity must not manufacture byte deltas").toEqual([]);
+		expect([...tracked.changedKeys()], "alias multiplicity must not masquerade as observed mutation").toEqual([]);
+		expect(tracked.proxy.frozenHolder.child).toBe(child);
+		expect
+			.soft(hasRawEgressForTest(tracked), "raw-egress candidacy must remain monotone across repeated reads")
+			.toBe(true);
 	});
 });
 
