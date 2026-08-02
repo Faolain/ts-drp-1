@@ -15908,6 +15908,40 @@ instrumentation, but forbid serialized fingerprints/preimages,
 `byteChangedKeys`, topology rebuilds, dirty-reader graph scans and O(state)
 work inside `hasChanges()` or `changedKeys()`.
 
+**Accepted D.92.4 tests-only RED checkpoint.** The inherited tests-only
+`72191bd` corpus was the correct causal base at 11 failures / 7 passes, but not
+the complete raw-egress contract. Fresh Codex-high commit
+`dc459ba0813dbbca63c39edc048d229ed01016ed` changes only
+`packages/object/tests/raw-child-escape-attribution-1d-i-red.test.ts` (257
+insertions / 8 deletions). The formatted file is 887 lines at SHA-256
+`1f2751fccfad647fd46696c4014cfff1d181c9a16f07ee28036f2b2a0126a4e1`
+and is exact 14 failures / 8 passes across 22 cases against unchanged
+production at `114c648`.
+
+The RED retains all 18 inherited cases, replaces the single ballast field with
+two independently unchanged ballast fields, and adds return/throw raw-root
+add/delete publication cases, an O(1) repeated-reader control and a final
+comparison-failure control. Per-side `PublicationRecord.work` is exact:
+affected DRP publication has `egressWidenings: 1`, `comparedKeys` equal to the
+governed baseline/target key union and `comparisonPasses: 1`; unaffected ACL is
+all zero. The one widening denotes a monotone transition to explicit
+all-governed candidacy, not the number of name samples. Comparison events
+separately prove every baseline-present target key is compared exactly once
+against the detached owned baseline. Additions and deletions are final per-key
+decisions but do not manufacture equality calls. Changed keys and post-image
+copy events remain exact byte truth, so unchanged ballast and read-only escape
+produce zero copies/changes. A throwing final comparison preserves the exact
+throwable with zero copy or reuse. One hundred repeated `hasChanges()` /
+`changedKeys()` observations perform no new root-key census or payload read.
+
+P2 is 33/33; P1 plus publication is 48/48; D.92.2 is 64/64; D.92.3 is 18/18;
+inherited Phase 1d(i) is 147/147; specialized state/collection/atomicity is
+93/93; performance is 8/8 with MapDRP at 199.3 ms; and bounded 1 MiB is 1/1.
+Object/workspace typechecks, owned/tracked zero-error lint, Prettier, diff,
+scope and hashes pass. Evidence is under
+`.logs/phase-1d-i-d924-raw-egress-red-codex-high/`. The GREEN must not change
+this frozen test or reinterpret the exact work counters.
+
 #### D.92.5 — Distinct retained blockers
 
 The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
@@ -15953,17 +15987,18 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1 and P2 are accepted and closed. P2's frozen 643-line test at SHA-256
-`c7de0d5cbc88971fa3fd76f39c7676a97880bd94f69ee9323386c03498ec7ddf` is 33/33;
-production commits `1ab4c2c` and `3a69f9b` are accepted. Start D.92.4 raw-egress
-contract as a distinct fresh Codex-high tests-only RED, preserving P1/P2,
-D.92.2/D.92.3, performance and exact expected-RED signatures. Do not begin its
-GREEN before the RED is causally frozen. P3 remains separate and may follow
-D.92.4; it still must close before the composite D.92 review. Do not widen
-D.92.4 into D.73, fingerprints, preimages, a value-flow analyzer or the newly
-retained Phase 1d(ii) prototype-safe materialization item. That item is
-mandatory before Phase 1d(ii) closure and later Phase 4b/6a snapshot adoption,
-but it does not reopen P2.
+P1 and P2 are accepted and closed. D.92.4 tests-only RED `dc459ba` is frozen at
+14 failures / 8 passes across 22 cases; its 887-line SHA-256 is
+`1f2751fccfad647fd46696c4014cfff1d181c9a16f07ee28036f2b2a0126a4e1`. Start a
+distinct fresh Codex-high production-only GREEN. Implement one monotone raw-
+egress transition to an explicit all-governed keyset, retain O(1) dirty
+readers, perform one final bounded publisher pass against detached owned
+entries and emit the exact work record. Do not alter the frozen RED, add
+fingerprints/preimages/`byteChangedKeys`, rescan the root in dirty readers or
+fold P3/D.73/Phase 1d(ii) into this GREEN. P3 remains separate and may follow
+D.92.4; it still must close before the composite D.92 review. The retained
+prototype-safe materialization item remains mandatory before Phase 1d(ii)
+closure and Phase 4b/6a snapshot adoption, but it does not reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
