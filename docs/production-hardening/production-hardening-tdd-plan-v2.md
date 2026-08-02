@@ -16520,6 +16520,41 @@ contract, including inherited descriptor lookup, no-op/throw ordering,
 data-to-accessor/accessor-to-data topology and D.91 preservation; do not absorb
 Date D.92.5 or later P3.
 
+**D.92.6 accepted closure.** Fresh Grok 4.5/high session
+`019fc409-bf74-7901-a995-7cd90db727b0`, exact Kimi 3/high/dual-100 session
+`2ff3d2aa-caa2-4cc7-95c4-6165b61bb65e`, and final no-tool Opus/xhigh session
+`3c4d7ec7-5a40-44cc-9ef6-702ff057dcf8` each returned `ACCEPTED` and
+`D926_MAY_CLOSE=yes`. Grok used only substantive `grok-4.5-build`; Kimi used
+exact `kimi-code/k3`, thinking/high and both 100-step controls with exit zero;
+Opus used substantive `claude-opus-5` at xhigh with no fallback/substitution.
+Opus metadata reported a non-substantive automatic Haiku title helper of 22
+output tokens.
+
+All reviewers authenticated the 463-line RED hash/blob and 6F/2P to 8/8
+transition. Grok reran D.91/alias 22/22 and added 15/15 adversarial probes with
+68 assertions. Kimi reproduced 8/8, 22/22, D.92.5/D.92.4 52/52 and
+P2/P1/D.92.3 99/99 plus a ten-group adversarial probe. Its first parallel
+default-coverage review commands produced one transient `coverage/.tmp`
+`ENOENT`; serialized coverage-disabled reruns supplied the clean evidence. The
+final Opus tool-enabled precursor was preserved and excluded after an `/tmp`
+`npx` probe pulled an unintended Vitest and repeatedly CPU-stalled. A fresh
+no-tool Opus/xhigh adjudicator used the authenticated source/review evidence;
+there was no broad restart.
+
+The reentrant same-key setter residual is nonblocking: an inner proxy
+`defineProperty` plus outer finalization can double-add the same parent edge,
+but counts form a per-operation superset, so later removal can only retain a
+ghost edge and conservatively over-attribute. It cannot prematurely remove a
+real edge or hide an owner; publisher equality filters the false positive and
+the tracker is rebuilt next operation. The data-to-accessor transition removes
+the exact old data edge and creates no missing real edge. Existing D.92.2
+post-completion worker timeout noise and the sync-livelock 3F/3P sentinel retain
+their recorded owners. Evidence is under
+`.logs/phase-1d-i-d926-green-review-grok45-high/`,
+`.logs/phase-1d-i-d926-green-review-kimi3-high-100/` and
+`.logs/phase-1d-i-d926-green-review-opus-xhigh/`. D.92.6 is accepted and
+closed; P3a is unblocked.
+
 **One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
 plan, lineage, review artifacts and committed candidate `ba35ebb` returned
 `ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
@@ -16577,17 +16612,19 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2, D.92.4 and D.92.5 are accepted and closed. D.92.6 RED `00afff3` and
-production GREEN candidate `ca488b1` are complete with the gates above. Run
-fresh Grok 4.5/high and exact Kimi 3/high with both 100-step controls in
-parallel; if both accept, run final Opus/xhigh. Authenticate the frozen RED and
-probe non-invoking set/delete/define bookkeeping, selective proxy receiver,
-descriptor-kind transitions, exact publication work and D.91 preservation.
-Do not fold Date D.92.5, P3, D.73 or Phase 1d(ii) into D.92.6. If all reviewers
-accept, close D.92.6 plan-only, then start P3a tests-only RED and its distinct
-loop. P3b follows, then composite D.92 and Phase 1d(ii). Prototype-safe
-materialization remains mandatory before Phase 1d(ii) closure and Phase 4b/6a
-snapshot adoption.
+P1, P2 and D.92.4-D.92.6 are accepted and closed. Start a fresh Codex-high P3a
+tests-only RED for owned TypedArray enumeration. Freeze exactly one counted
+canonical-index enumeration per detached view, zero recursive per-element
+detachment, retained bulk backing-byte movement and explicit string/symbol
+expando behavior under the existing semantics. Extend the bounded 1 MiB
+characterization with that counter, but do not implement P3b receiver safety,
+reopen backing-alias D.92.3, consume D.73 view classification or introduce
+per-element instrumentation. Run the relevant copy/publication/performance
+preservation gates to logs, freeze line/hash and commit tests only. A distinct
+production GREEN and full Grok/Kimi/Opus loop follow. P3b starts only after P3a
+closes, then composite D.92 and Phase 1d(ii). Prototype-safe materialization
+remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
+adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
