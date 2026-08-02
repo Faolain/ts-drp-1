@@ -16459,6 +16459,40 @@ closes independently. Kimi/controller evidence is in the corrected-candidate
 review directory above; Codex adjudication was collaboration-only. Do not begin
 D.92.6 until D.92.5 closes, and do not let it delay the Date GREEN.
 
+**Accepted D.92.6 tests-only RED checkpoint.** Fresh Codex-high commit
+`00afff319c9fc4a52ecbbe798f7917b21707db60` adds only
+`packages/object/tests/accessor-bookkeeping-invocation-1d-i-red.test.ts`. The
+463-line file has SHA-256
+`9ef93845d8b996b03a535c3283e55ace2c725ed0779efdc1f8f279f55c6f9256`
+and git blob `5a9a5afaf0261c60b4c07a3dd5252f9ea67e228a`. It is exact six failures / two
+passes across eight cases against production and plan bytes identical to parent
+`d24d707`.
+
+The RED covers the three same-root non-native bookkeeping reads without a
+syntax matrix: `defineProperty` post-read, `set` pre/post reads and `delete`
+pre-read. It pins native non-invocation, staged definition-versus-explicit-read
+timing, tracked getter/setter receiver attribution, exact throw timing, local
+hidden-alias stored/reconstructed truth with carrier false-positive filtering,
+and enumerable-alias exact-cut remote truth with two ballast keys, zero widening
+and bounded work. Native semantics plus clean/context controls are the two
+passes. Every causal reference is constructed inside the operation; no external
+closure, descriptor escape or malformed bytes participate.
+
+Preservation is D.92.5 plus D.92.4 52/52; D.91 plus enumerable alias topology
+22/22; and P2 plus P1 plus D.92.3 99/99. Object/workspace typechecks,
+owned/tracked lint, Prettier, diff, scope and production byte identity pass. The
+unchanged long D.92.2 64-case analyzer corpus was intentionally deferred to the
+production GREEN rather than repeated during RED iteration; this is iteration-
+time discipline, not a waived gate. Evidence is under
+`.logs/phase-1d-i-d926-accessor-bookkeeping-red-codex-high/`.
+
+The distinct production-only GREEN must make ordinary set/delete/define
+bookkeeping descriptor-aware without invoking accessors. Preserve exact native
+throw/order semantics and actual proxy-receiver user execution, while retaining
+the existing data-descriptor committed-before-discovery charging and topology
+updates. Do not change the frozen RED, serialize hidden fields, always widen,
+scan, fingerprint, add a comparison authority or touch Date/Map/Set.
+
 **One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
 plan, lineage, review artifacts and committed candidate `ba35ebb` returned
 `ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
@@ -16516,18 +16550,19 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2, D.92.4 and D.92.5 are accepted and closed. Start a fresh Codex-high
-D.92.6 tests-only RED for the ordinary accessor receiver/bookkeeping boundary
-defined above. Keep every reference construction inside the operation and
-prove eager definition-time invocation separately from the later tracked proxy-
-receiver read. Pin direct carrier/secondary/anchor attribution, exact real
-stored/reconstructed/exact-cut truth and bounded work, then freeze line/hash and
-run the stated preservation gates. Do not change production or the plan during
-RED, do not serialize hidden fields, and do not fold P3, D.73 or Phase 1d(ii)
-into D.92.6. A distinct production-only GREEN and the full Grok/Kimi/Opus loop
-follow. P3a starts only after D.92.6 closes, then P3b, composite D.92 and Phase
-1d(ii). Prototype-safe materialization remains mandatory before Phase 1d(ii)
-closure and Phase 4b/6a snapshot adoption.
+P1, P2, D.92.4 and D.92.5 are accepted and closed. D.92.6 tests-only RED
+`00afff3` is frozen at exact six failures / two passes with the 463-line SHA-256
+above. Start a distinct fresh Codex-high production-only GREEN. Make ordinary
+set/delete/define bookkeeping descriptor-aware and never invoke accessors for
+bookkeeping; actual user-driven accessors keep the proxy receiver. Preserve
+data-descriptor committed-before-discovery charging/topology, native throw/order
+semantics, the frozen RED and the stated gate matrix, including the deferred
+D.92.2 64-case run. Do not serialize hidden fields, always widen, scan,
+fingerprint, add another comparison authority or touch Date/Map/Set. If green,
+record the candidate and run fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
+final Opus/xhigh. P3a starts only after D.92.6 closes, then P3b, composite D.92
+and Phase 1d(ii). Prototype-safe materialization remains mandatory before Phase
+1d(ii) closure and Phase 4b/6a snapshot adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
