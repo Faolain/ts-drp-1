@@ -15860,7 +15860,9 @@ below rather than silently widening P2.
 P3 starts only after P1 and P2, may run alongside or after D.92.4, and must
 close before the composite D.92 review. It retains two separately causal
 contracts in one TypedArray family; each receives its own frozen assertions and
-both must pass before P3 closes.
+both must pass before P3 closes. The later quorum-adopted P3a-prime correction
+below supersedes only P3a's binary-expando semantic clause; it does not erase
+the accepted P3a accounting lineage or the frozen P3b receiver RED.
 
 **P3a — owned enumeration.** Preserve the unavoidable canonical-index
 enumeration used for TypedArray expandos: exactly one counted enumeration per
@@ -16035,6 +16037,95 @@ DataView, Buffer and BigInt behavior must follow their frozen boundaries. Do
 not modify the RED, consume D.73 hostile classification/species work, or reopen
 D.92.3 detachment semantics.
 
+**Blocked first P3b GREEN attempt and quorum-adopted P3a-prime correction.** A
+distinct Codex-high production-only attempt made native view/backing receivers
+available and reached the frozen 8/8 plus all preservation gates, but its own
+unseen causal probe found an unsupported state model before commit. A reference
+reachable both from an ordinary governed property and from an unread TypedArray
+expando loses the binary-side owner when canonical-index discovery is removed.
+More fundamentally, detachment preserved enumerable TypedArray/DataView
+expandos while `fast-equals` and MessagePack ignored them. The local stored
+snapshot could therefore retain state that equality filtered and no peer could
+reconstruct. This is a semantic contradiction, not a P3b method-binding bug.
+
+The attempt was stopped rather than rewarded for passing the frozen RED. Its
+production diff is preserved but unapplied at `stash@{0}` / stash commit
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766` and
+candidate source SHA-256
+`1cb848ee8faab9389e49c7bd542c8ac8a67be706a7d9861d667ea842b446745d`.
+It must remain unapplied through P3a-prime. It may inform the later P3b GREEN
+only after removing `linkBinaryProperty` and
+`lazilyLinkedBinaryProperties`; those lazy expando paths are invalid under the
+settled contract. Evidence is under
+`.logs/phase-1d-i-p3b-typedarray-receiver-green-codex-high/`.
+
+The required plan-correction quorum is unanimous. Fresh Codex-high returned
+`PLAN_AMENDMENT_AGREE=yes` and recommended fail-closed rejection; its result
+SHA-256 is
+`1342877303d6572f020e8d1db1ce9ed741f2d50c36c9191a7e5fe5ab106aed40`.
+Exact Kimi 3/high/dual-100 session
+`511a366b-7983-438b-acf0-b3e804674aac` first confirmed the contradiction but
+recommended silent drop. Final Opus/xhigh session
+`a6504fa6-5f29-4359-8079-700dd7f610ae` selected rejection and authenticated a
+separate binary-wire defect; substantive `claude-opus-5` used xhigh with one
+automatic non-substantive 25-output-token Haiku helper and no Fable or fallback.
+The same exact Kimi session then inspected both reviews, independently probed
+the codec and reversed its initial remedy:
+`CONTRACT_CONVERGENCE_AGREE=yes`,
+`AGREED_CONTRACT=A_FAIL_CLOSED_REJECTION`,
+`P3A_PRIME_RED_MAY_FREEZE=yes`, `PLAN_MAY_AMEND=yes` and
+`BINARY_WIRE_SLICE_REQUIRED=yes`. It completed 37 cumulative steps with exact
+`kimi-code/k3`, thinking/high, both 100-step controls, exit zero and no helper,
+fallback, subagent or Fable. The four result SHA-256s are Codex above, initial
+Kimi `e2b0d6324239018bad6b4adcbe26a726a2a803017cbb69e0d9a8176d10251fd7`,
+Opus `7d06b2e3a092827000babaffe49d027110b1bdf00283d07eab826af4cde92782`
+and reconciled Kimi
+`85ccad5888c793212d5d4cb836db13da356dd8a92f2ba5741551cf983b95729b`.
+Evidence is under
+`.logs/phase-1d-i-p3b-binary-expando-plan-amendment-{codex-high,kimi3-high-100,opus-xhigh}/`
+and
+`.logs/phase-1d-i-p3b-binary-expando-contract-reconciliation-kimi3-high-100/`.
+
+**P3a-prime — binary-expando state-domain contract (hard before P3b GREEN).**
+Binary own expandos are invalid in governed replicated state across every
+TypedArray kind including BigInt and Node Buffer, DataView, ArrayBuffer and
+SharedArrayBuffer. This includes string and symbol keys, enumerable and
+non-enumerable. Canonical TypedArray indices and native internal state are not
+expandos. Durable metadata belongs in ordinary wrapper-object properties;
+replica-local metadata belongs under `context`. Silent drop is forbidden
+because it would let blueprint code observe state locally that disappears on
+reconstruction without a charge or error.
+
+P3a-prime receives a fresh tests-only RED, distinct production-only GREEN,
+Grok 4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh loop. The RED
+must prove deterministic fail-closed rejection through governed detach/ingress,
+tracked `set` and `defineProperty`, derived views and remote replay, including
+inputs that were already non-extensible after acquiring an expando. It must
+also prove that validation precedes sealing; governed binary identities become
+non-extensible during discovery; derived views are sealed when wrapped; and
+repeat handling is justified by a validated-identity invariant rather than an
+unchecked cache. Positive controls retain byte/layout/backing aliases,
+canonical numeric and bulk writes, wrapper-metadata attribution, and available
+uncharged `context` binaries.
+
+The GREEN may touch only `state-payload.ts` and `proxy.ts`. Reuse P3a's one
+already-counted first-sight enumeration to validate fresh view identities; do
+not add a second canonical-index scan. Validate first, reject any pre-existing
+expando, then `Object.preventExtensions` and record the validated identity for
+O(1) later opaque-vertex handling. Sealing alone is insufficient because it
+does not remove a pre-existing expando. `Reflect.ownKeys` is not a replacement
+fast path: it also materializes every TypedArray index. Raw egress makes
+trap-only sealing insufficient. Keep the P3a work-event shape and causal
+counters, one enumeration per fresh view, zero recursive elements, backing
+counters and the 1 MiB characterization frozen.
+
+The quorum narrowly authorizes revision of only P3a's test assertion that
+requires binary string/symbol expandos and their alias/cycle graph to survive.
+Replace it with the stronger governed-rejection contract; do not silently edit
+or weaken unrelated P3a assertions. The accepted P3b RED at `b040071` remains
+byte-immutable. P3b GREEN and composite D.92 wait for P3a-prime acceptance.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -16059,6 +16150,38 @@ not substitutes for one another.
 or widening, D.73 hostile graph/live-binder/virtual-`Map.keys()` work, codec
 iterator hardening, fingerprints, serialized preimages, `byteChangedKeys`,
 global caches or the rejected value-flow analyzer. D.92.3 stays closed.
+
+#### D.92.7 — binary wire fidelity (hard before composite D.92)
+
+The P3a-prime quorum authenticated a separate pre-existing cross-peer defect in
+the actual MessagePack encode/decode path. Bare ArrayBuffer and
+SharedArrayBuffer encode as maps without backing bytes and decode as ordinary
+objects. Most views decode as fresh Uint8Arrays, losing constructor/element
+kind, DataView identity, byte offset/length, repeated identity and shared-
+backing topology; Node Buffer and BigInt view semantics are also lost. The
+existing P3b `fromHash` and `encodedState` controls are in-memory or encode-only
+and cannot certify a remote decode.
+
+D.92.7 is a separate serialization-authority RED/GREEN/review slice, not an
+expando-policy addition, a P3b receiver fix or D.73 hostile-classification
+task. It may run alongside or after P3b but must be accepted before composite
+D.92. Its tests-only RED must cover actual encode/decode for every supported
+TypedArray family including BigInt, DataView, conditional Node Buffer, bare
+ArrayBuffer and conditional SharedArrayBuffer; preserve constructor/element
+kind, byte content, byte offset/length, repeated-view identity and shared-
+backing/multi-view topology; and prove bare backing bytes never collapse to
+`{}`. Keep Float32Array as a working regression control and preserve ordinary
+object, Map, Set and Date wire bytes.
+
+The RED also rejects binary expandos before encode consistently with
+P3a-prime, rejects unknown or hostile extension tags fail closed, and proves
+equality-authority bytes and wire-authority bytes remain one canonical answer
+for the same supported value. The GREEN is narrowly owned by
+`packages/utils/src/serialization/equality.ts` and `index.ts` plus required
+object-package conformance wiring/tests; it must not become a general codec
+rewrite, invent expando/symbol serialization, consume D.73, or cite in-memory
+detachment as cross-peer evidence. D.92.7 gets its own Codex-high RED/GREEN,
+Grok 4.5/high, exact Kimi 3/high/dual-100 and Opus/xhigh loop.
 
 #### D.92.4 — Raw-egress contract after detachment
 
@@ -16768,22 +16891,26 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2, P3a and D.92.4-D.92.6 are accepted and closed. P3b has an accepted
-frozen tests-only RED at `b040071`; start a distinct fresh Codex-high
-production-only GREEN. Implement a coherent receiver-safe view/backing model:
-native internal-slot access, receiver-safe iteration/methods, wrapped derived
-views with shared-backing owner attribution, clean read-only behavior, exact
-effective numeric/bulk mutation charging, context isolation, and bounded
-DataView/Buffer/BigInt support. Avoid canonical-index graph traversal and
-recursive per-element wrapping. Reach 8/8 without changing the frozen RED;
-preserve P3a counters and 1 MiB bound, then run D.92.2, P1/P2/D.92.3,
-D.92.4-D.92.6, inherited/specialized, repeated performance, sync sentinel,
-typechecks, lint, Prettier and frozen scope/hashes to logs. Do not consume D.73
-hostile classification, `Symbol.hasInstance` or `Symbol.species`, and do not
-reopen D.92.3 detachment semantics. A fresh Grok/Kimi/Opus loop follows.
-Composite D.92 starts only after P3b closes, then Phase 1d(ii); prototype-safe
-materialization remains mandatory before Phase 1d(ii) closure and Phase 4b/6a
-snapshot adoption.
+P1, P2, P3a and D.92.4-D.92.6 are accepted and closed, but the unanimous
+Codex-high + exact Kimi 3/high/dual-100 + Opus/xhigh correction quorum has
+inserted P3a-prime before P3b GREEN. Start a fresh Codex-high tests-only
+P3a-prime RED. Replace only P3a's binary-expando preservation assertion with
+deterministic governed rejection across all binary families and all own
+expando key classes. Prove validation-before-sealing, already-non-extensible
+hostiles, local ingress and remote replay, tracked set/defineProperty, derived-
+view sealing, wrapper metadata, context isolation, exact existing binary
+bytes/layout/backing aliases, one counted fresh-view enumeration, zero
+recursive elements and the retained 1 MiB bound. Production and the frozen
+P3b RED at `b040071` remain byte-identical during RED.
+
+After a distinct P3a-prime GREEN and Grok/Kimi/Opus acceptance, resume P3b
+GREEN on the settled fail-closed invariant. Preserve but do not apply
+`stash@{0}` until then; any reuse must remove its lazy expando-link machinery.
+D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
+or after P3b. Composite D.92 starts only after both P3b and D.92.7 close, then
+Phase 1d(ii); prototype-safe materialization remains mandatory before Phase
+1d(ii) closure and Phase 4b/6a snapshot adoption. D.73 hostile virtual
+`Map.keys()`, `Symbol.hasInstance` and `Symbol.species` ownership is unchanged.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
