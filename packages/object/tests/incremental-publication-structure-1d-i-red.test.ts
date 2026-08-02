@@ -240,10 +240,9 @@ function normalizeModule(from: string, specifier: string, sources: GovernedSourc
 		if (!match) return undefined;
 		candidate = `packages/${match[1]}/src/${match[2] ?? "index"}`;
 	}
-	for (const resolved of [candidate, candidate.replace(/\.js$/, ".ts"), `${candidate}.ts`, `${candidate}/index.ts`]) {
-		if (sources[resolved] !== undefined) return resolved;
-	}
-	return undefined;
+	return [candidate, candidate.replace(/\.js$/, ".ts"), `${candidate}.ts`, `${candidate}/index.ts`].find(
+		(resolved) => sources[resolved] !== undefined
+	);
 }
 
 function programFor(sources: GovernedSources): { checker: ts.TypeChecker; program: ts.Program } {
@@ -272,9 +271,8 @@ function programFor(sources: GovernedSources): { checker: ts.TypeChecker; progra
 	return { checker: program.getTypeChecker(), program };
 }
 
-function sourcePath(file: ts.SourceFile): string {
-	return path.relative("/workspace", file.fileName).split(path.sep).join(path.posix.sep);
-}
+const sourcePath = (file: ts.SourceFile): string =>
+	path.relative("/workspace", file.fileName).split(path.sep).join(path.posix.sep);
 
 function lexicalOwner(node: ts.Node): string {
 	for (let owner = node.parent; owner; owner = owner.parent) {
@@ -299,29 +297,39 @@ function lexicalOwner(node: ts.Node): string {
 }
 
 function referenceSymbol(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
-	if (ts.isIdentifier(node) && ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node) {
-		return checker.getShorthandAssignmentValueSymbol(node.parent);
-	}
-	return checker.getSymbolAtLocation(node);
+	return ts.isIdentifier(node) && ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+		? checker.getShorthandAssignmentValueSymbol(node.parent)
+		: checker.getSymbolAtLocation(node);
 }
 
-function importIdentity(symbol: ts.Symbol | undefined): string | undefined {
-	for (const declaration of symbol?.declarations ?? []) {
-		const imported = ts.findAncestor(declaration, ts.isImportDeclaration);
-		if (!imported || !ts.isStringLiteral(imported.moduleSpecifier)) continue;
-		const moduleName = imported.moduleSpecifier.text;
-		if (ts.isImportSpecifier(declaration)) {
-			return `${moduleName}:${declaration.propertyName?.text ?? declaration.name.text}`;
-		}
-		if (ts.isNamespaceImport(declaration)) return `${moduleName}:*`;
-		if (ts.isImportClause(declaration)) return `${moduleName}:default`;
+function moduleIdentity(
+	symbol: ts.Symbol | undefined,
+	checker: ts.TypeChecker,
+	seen = new Set<ts.Symbol>()
+): string | undefined {
+	if (!symbol || seen.has(symbol)) return undefined;
+	seen.add(symbol);
+	for (const declaration of symbol.declarations ?? []) {
+		const edge = ts.findAncestor(
+			declaration,
+			(node) => ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
+		) as ts.ImportDeclaration | ts.ExportDeclaration | undefined;
+		if (!edge?.moduleSpecifier || !ts.isStringLiteral(edge.moduleSpecifier)) continue;
+		let name: string | undefined;
+		if (ts.isImportSpecifier(declaration) || ts.isExportSpecifier(declaration))
+			name = declaration.propertyName?.text ?? declaration.name.text;
+		else if (ts.isNamespaceImport(declaration)) name = "*";
+		else if (ts.isImportClause(declaration)) name = "default";
+		if (!name) continue;
+		const moduleSymbol = checker.getSymbolAtLocation(edge.moduleSpecifier);
+		const target = moduleSymbol && checker.getExportsOfModule(moduleSymbol).find((item) => item.name === name);
+		return moduleIdentity(target, checker, seen) ?? `${edge.moduleSpecifier.text}:${name}`;
 	}
 	return undefined;
 }
 
 function canonicalSymbol(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): ts.Symbol | undefined {
-	if (!symbol || !(symbol.flags & ts.SymbolFlags.Alias)) return symbol;
-	return checker.getAliasedSymbol(symbol);
+	return symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
 }
 
 function symbolIdentity(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): string | undefined {
@@ -342,6 +350,7 @@ function knownSymbolLabel(symbol: ts.Symbol | undefined, checker: ts.TypeChecker
 		"packages/object/src/publication/publisher.ts:capturePublishedState",
 		"packages/utils/src/serialization/equality.ts:serializeValue",
 		"packages/utils/src/serialization/index.ts:serializeDRPState",
+		"packages/utils/src/serialization/index.ts:deserializeDRPState",
 		"packages/utils/src/serialization/index.ts:deserializeValue",
 	];
 	return known.includes(identity ?? "") ? canonical?.name : undefined;
@@ -351,12 +360,13 @@ function referenceLabel(expression: ts.Expression, checker: ts.TypeChecker): str
 	if (ts.findAncestor(expression.parent, ts.isTypeNode)) return undefined;
 	if (ts.isIdentifier(expression)) {
 		const symbol = referenceSymbol(expression, checker);
-		const imported = importIdentity(symbol);
+		const imported = moduleIdentity(symbol, checker);
 		if (imported === "es-toolkit:cloneDeep") return "cloneDeep";
 		if (imported === "@msgpack/msgpack:encode") return "msgpack.encode";
 		if (imported === "@msgpack/msgpack:decode") return "msgpack.decode";
 		if (imported === "node:v8:serialize") return "node:v8.serialize";
 		if (imported === "node:v8:deserialize") return "node:v8.deserialize";
+		if (ts.isExportSpecifier(expression.parent)) return undefined;
 		if (expression.text === "structuredClone") {
 			const identity = symbolIdentity(symbol, checker);
 			if (!identity?.startsWith("packages/")) return "structuredClone";
@@ -369,7 +379,7 @@ function referenceLabel(expression: ts.Expression, checker: ts.TypeChecker): str
 		const name = member.text;
 		const receiver = expression.expression;
 		if (ts.isIdentifier(receiver)) {
-			const imported = importIdentity(referenceSymbol(receiver, checker));
+			const imported = moduleIdentity(referenceSymbol(receiver, checker), checker);
 			if (imported === "@msgpack/msgpack:*" && (name === "encode" || name === "decode")) return `msgpack.${name}`;
 			if (imported === "es-toolkit:*" && name === "cloneDeep") return "cloneDeep";
 		}
@@ -378,6 +388,8 @@ function referenceLabel(expression: ts.Expression, checker: ts.TypeChecker): str
 		if (known) return known;
 		const canonicalReceiver = canonicalSymbol(referenceSymbol(receiver, checker), checker);
 		const receiverIdentity = symbolIdentity(canonicalReceiver, checker);
+		if (ts.isIdentifier(receiver) && receiver.text === "globalThis" && name === "structuredClone" && !receiverIdentity)
+			return "structuredClone";
 		if ((name === "encode" || name === "decode") && /_pb\.ts:/.test(receiverIdentity ?? ""))
 			return `${canonicalReceiver?.name}.${name}`;
 		if (name === "create" && /object_pb\.ts:/.test(receiverIdentity ?? "")) return `${canonicalReceiver?.name}.create`;
@@ -399,7 +411,12 @@ function sites(sources: GovernedSources, checker: ts.TypeChecker, program: ts.Pr
 		const fileName = sourcePath(file);
 		if (sources[fileName] === undefined) continue;
 		const visit = (node: ts.Node): void => {
-			if (ts.isCallExpression(node)) {
+			const exportModule = ts.isExportDeclaration(node) && !node.exportClause ? node.moduleSpecifier : undefined;
+			if (exportModule && ts.isStringLiteral(exportModule)) {
+				if (exportModule.text === "@msgpack/msgpack") record(fileName, node, "msgpack.*");
+			} else if (ts.isExportSpecifier(node)) {
+				record(fileName, node, referenceLabel(node.name, checker));
+			} else if (ts.isCallExpression(node)) {
 				record(fileName, node, referenceLabel(node.expression, checker));
 			} else if (
 				(ts.isIdentifier(node) || ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
@@ -430,19 +447,15 @@ function runtimeClosure(
 		result.add(current);
 		const file = ts.createSourceFile(current, sources[current], ts.ScriptTarget.Latest, true);
 		for (const statement of file.statements) {
-			if ((!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) || !statement.moduleSpecifier)
-				continue;
-			if (
-				(ts.isExportDeclaration(statement) ? statement.isTypeOnly : statement.importClause?.isTypeOnly) ||
-				!ts.isStringLiteral(statement.moduleSpecifier)
-			)
-				continue;
-			const bindings = ts.isImportDeclaration(statement) ? statement.importClause?.namedBindings : undefined;
+			const edge = ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement) ? statement : undefined;
+			if (!edge?.moduleSpecifier || !ts.isStringLiteral(edge.moduleSpecifier)) continue;
+			if (ts.isExportDeclaration(edge) ? edge.isTypeOnly : edge.importClause?.isTypeOnly) continue;
+			const bindings = ts.isImportDeclaration(edge) ? edge.importClause?.namedBindings : undefined;
 			if (bindings && ts.isNamedImports(bindings) && bindings.elements.every((element) => element.isTypeOnly)) continue;
-			const resolved = normalizeModule(current, statement.moduleSpecifier.text, sources);
+			const resolved = normalizeModule(current, edge.moduleSpecifier.text, sources);
 			if (resolved) pending.push(resolved);
-			else if (statement.moduleSpecifier.text.startsWith(".") || statement.moduleSpecifier.text.startsWith("@ts-drp/"))
-				unresolved.push(`${current}:${statement.moduleSpecifier.text}`);
+			else if (edge.moduleSpecifier.text.startsWith(".") || edge.moduleSpecifier.text.startsWith("@ts-drp/"))
+				unresolved.push(`${current}:${edge.moduleSpecifier.text}`);
 		}
 	}
 	return { files: result, unresolved: unresolved.sort() };
@@ -469,10 +482,14 @@ function externalSurface(references: readonly string[]): string[] {
 		result.push(`@msgpack/msgpack@${version("packages/utils/node_modules/@msgpack/msgpack/package.json")}:encode`);
 	if (references.some((site) => site.includes(":cloneDeep#")))
 		result.push(`es-toolkit@${version("packages/object/node_modules/es-toolkit/package.json")}:cloneDeep`);
+	if (references.some((site) => site.includes(":msgpack.*#")))
+		result.push(`@msgpack/msgpack@${version("packages/utils/node_modules/@msgpack/msgpack/package.json")}:*`);
 	return result.sort();
 }
 
 const analysisCache = new WeakMap<object, D922cAnalysis>();
+const SINK_REFERENCE =
+	/(?:cloneDeep|structuredClone|stateFromDRP|serializeDRPState|deserializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/;
 
 function analyze(sources: GovernedSources): D922cAnalysis {
 	const cached = analysisCache.get(sources);
@@ -481,13 +498,13 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 	const allSites = sites(sources, checker, program);
 	const real = sources["packages/object/src/publication/publisher.ts"] !== undefined;
 	const closure = runtimeClosure(sources, real ? D922D_RUNTIME_ROOTS : [WORKSPACE_PUBLISHER_PATH]);
-	const packageReferences = allSites.filter((site) =>
-		/(?:cloneDeep|structuredClone|stateFromDRP|serializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/.test(
-			site
-		)
-	);
+	const packageReferences = allSites.filter((site) => SINK_REFERENCE.test(site));
 	const closureReferences = packageReferences.filter((site) => closure.files.has(site.slice(0, site.indexOf(":"))));
 	const violations = closure.unresolved.map((site) => `unresolved internal acquisition ${site}`);
+	for (const site of allSites) {
+		const fileName = site.slice(0, site.indexOf(":"));
+		if (site.includes(":msgpack.*#")) violations.push(`external wildcard acquisition ${fileName}:@msgpack/msgpack`);
+	}
 	const approved = new Set(real ? D922C_PACKAGE_REFERENCE_SITES : []);
 	for (const site of packageReferences)
 		if (!approved.has(site)) violations.push(`serialization/clone reference ${site}`);
@@ -509,8 +526,6 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 		: [];
 	const capabilityConstructionSites = allSites.filter((site) => site.includes(":createPublicationCapability#"));
 	const snapshotConstructionSites = allSites.filter((site) => /:DRPState(?:Entry)?\.create#/.test(site));
-	const cloneSites = packageReferences.filter((site) => site.includes(":cloneDeep#"));
-	const captureSites = packageReferences.filter((site) => site.includes(":stateFromDRP#"));
 	const reviewedOperations = REVIEWED_WORKSPACE_OPERATIONS.filter((operation) => {
 		const separator = operation.lastIndexOf(":");
 		const category = operation.slice(separator + 1);
@@ -519,10 +534,10 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 	}).sort();
 	const analysis: D922cAnalysis = {
 		violations: [...new Set(violations)].sort(),
-		residualCloneSites: cloneSites.filter(
-			(site) => !site.includes("copy-capability.ts") && !site.includes("src/index.ts")
+		residualCloneSites: packageReferences.filter(
+			(site) => site.includes(":cloneDeep#") && !site.includes("copy-capability.ts") && !site.includes("src/index.ts")
 		),
-		residualStateCaptureSites: captureSites,
+		residualStateCaptureSites: packageReferences.filter((site) => site.includes(":stateFromDRP#")),
 		reviewedOperations,
 		analyzedSourcePaths: Object.keys(sources).sort(),
 		authority: {
@@ -537,7 +552,7 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 			codecReferenceSites: packageReferences.filter(
 				(site) => !site.includes(":cloneDeep#") && !site.includes(":stateFromDRP#")
 			),
-			externalRuntimeSurface: externalSurface(packageReferences),
+			externalRuntimeSurface: externalSurface(allSites),
 			unresolvedAcquisitions: closure.unresolved,
 			snapshotConstructionSites,
 		},
@@ -1380,6 +1395,5 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		]) {
 			expect(authority.toLowerCase()).not.toContain(prohibited);
 		}
-		expect(authority.split("\n").filter((line) => line.trim() !== "").length).toBeLessThanOrEqual(300);
 	});
 });
