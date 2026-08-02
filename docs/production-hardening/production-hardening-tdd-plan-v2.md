@@ -15276,6 +15276,41 @@ Prettier, diff and scope gates pass. Production `state-payload.ts` remains the
 Evidence is under
 `.logs/phase-1d-i-d92-3-backing-alias-red-codex-high/`.
 
+**Corrective backing-store GREEN checkpoint — reviews pending.** Distinct
+Codex-high commit `67d7917c42a7f025497fb3f3097df0b281133afc` changes only
+`packages/object/src/state-payload.ts` (`+67/-14`, 259 formatted lines / 235
+nonblank, SHA-256
+`9856d539b617cf32f38eda78a0a5ed10e5842cc37da058d4bde36a2b398181b4`).
+Each source `ArrayBuffer` or `SharedArrayBuffer` is now copied once through the
+existing per-payload identity stack; TypedArray and DataView instances are
+reconstructed over that clone with validated prototype, constructor, backing,
+offset and element/byte length. Unsupported constructors fail closed.
+Enumerable TypedArray expandos preserve aliases and cycles while canonical
+indexed elements are not recursively re-copied. Backing bytes move once via
+captured buffer slicing. The earlier `Buffer.from` branch remains ahead of
+generic view handling, so pooled Node Buffers stay truly detached without
+exposing or sharing a copied pool slab.
+
+The corrective RED is unchanged at SHA-256
+`47fc82fc4932f0fc05f99c67f554444febb3ed95da26d386692ed5403f8ab0c4`
+and passes 18/18. D.92.2 is 64/64, publication work 21/21, inherited Phase
+1d(i) 147/147, specialized state/collection/atomicity 93/93 and bounded 1 MiB
+1/1. Raw-child and sync-livelock retain exact 11-fail/7-pass and
+3-fail/3-pass baselines. Object/workspace typecheck, owned zero-error lint,
+broad tracked 0-error/249-warning lint, Prettier, diff and scope checks pass.
+The raw workspace lint command still sees the known untracked `.logs` corpus
+and reports its inherited 49-error/226-warning baseline; no tracked source
+error is hidden by that artifact.
+
+Three serialized current performance repeats are 6,636.9 / 6,652.4 / 6,623.8
+ms (median 6,636.9); three valid exact-parent `55f85e4` repeats are 6,655.9 /
+6,867.7 / 6,883.3 ms (median 6,867.7). The corrective is 3.36% faster by these
+medians, so the earlier single-run ~20% slowdown does not reproduce. Both keep
+the same stale <=1,000 ms failure; no threshold or production choice was
+changed to improve the measurement. Evidence is under
+`.logs/phase-1d-i-d92-3-backing-alias-green-codex-high/`. Fresh Grok-high,
+exact Kimi 3/high/100 and, only if both accept, Opus/xhigh are still required.
+
 Kimi also corrected an initially suspected performance blocker. On this
 environment the exact parent checkpoint `55f85e4` already fails the checked-in
 MapDRP wall-clock contract at 6,769.5 ms, while the candidate's isolated run is
