@@ -374,6 +374,19 @@ export function trackMutations<T extends object>(
 	const valuesEqual = (left: unknown, right: unknown, owner: object, property?: PropertyKey): boolean =>
 		compareValues(left, right, comparisonKey(owner, property));
 
+	const inheritedPropertyDescriptor = (owner: object, property: PropertyKey): PropertyDescriptor | undefined => {
+		let current = Reflect.getPrototypeOf(owner) as object | null;
+		while (current !== null) {
+			const descriptor = Reflect.getOwnPropertyDescriptor(current, property);
+			if (descriptor !== undefined) return descriptor;
+			current = Reflect.getPrototypeOf(current) as object | null;
+		}
+		return undefined;
+	};
+
+	const dataDescriptorValue = (descriptor: PropertyDescriptor | undefined): unknown =>
+		descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
+
 	const captureOwners = (value: object): void => {
 		const visited = new Set<object>();
 		const pending = [unwrap(value)];
@@ -447,13 +460,22 @@ export function trackMutations<T extends object>(
 	const finalizeCommittedWrite = (
 		owner: object,
 		property: PropertyKey,
-		previous: unknown,
-		compareValues: boolean
+		previousDescriptor: PropertyDescriptor | undefined,
+		compareDataValues: boolean
 	): void => {
 		try {
-			const resulting = Reflect.get(owner, property, owner);
+			const resultingDescriptor = Reflect.getOwnPropertyDescriptor(owner, property);
+			const previous = dataDescriptorValue(previousDescriptor);
+			const resulting = dataDescriptorValue(resultingDescriptor);
 			updateReachability(owner, property, previous, resulting);
-			if (!compareValues || !valuesEqual(previous, resulting, owner, property)) markChanged(owner, property);
+			const bothDataDescriptors =
+				previousDescriptor !== undefined &&
+				"value" in previousDescriptor &&
+				resultingDescriptor !== undefined &&
+				"value" in resultingDescriptor;
+			if (!compareDataValues || !bothDataDescriptors || !valuesEqual(previous, resulting, owner, property)) {
+				markChanged(owner, property);
+			}
 		} catch (error) {
 			// Reflection has already committed. Charge the owner even when later
 			// equality or graph discovery fails, then preserve the exact throwable.
@@ -879,28 +901,34 @@ export function trackMutations<T extends object>(
 					}
 					return wrap(Reflect.get(object, property, receiver), nestedIgnored);
 				},
-				set(object, property, nextValue): boolean {
+				set(object, property, nextValue, receiver): boolean {
 					const rawValue = unwrap(nextValue);
-					const previousValue = Reflect.get(object, property, object);
-					const assigned = Reflect.set(object, property, rawValue, object);
-					if (assigned) finalizeCommittedWrite(object, property, previousValue, true);
+					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
+					const resolvedDescriptor = previousDescriptor ?? inheritedPropertyDescriptor(object, property);
+					const accessorReceiver = resolvedDescriptor !== undefined && !("value" in resolvedDescriptor);
+					const assigned = Reflect.set(object, property, rawValue, accessorReceiver ? receiver : object);
+					if (assigned) finalizeCommittedWrite(object, property, previousDescriptor, true);
 					return assigned;
 				},
 				deleteProperty(object, property): boolean {
-					const existed = Reflect.has(object, property);
-					const previousValue = Reflect.get(object, property, object);
+					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					const deleted = Reflect.deleteProperty(object, property);
-					if (deleted && existed) {
-						updateReachability(object, property, previousValue, undefined);
-						markChanged(object, property);
+					if (deleted && previousDescriptor !== undefined) {
+						try {
+							updateReachability(object, property, dataDescriptorValue(previousDescriptor), undefined);
+							markChanged(object, property);
+						} catch (error) {
+							markChanged(object, property);
+							throw error;
+						}
 					}
 					return deleted;
 				},
 				defineProperty(object, property, descriptor): boolean {
 					const rawDescriptor = "value" in descriptor ? { ...descriptor, value: unwrap(descriptor.value) } : descriptor;
-					const previousValue = Reflect.get(object, property, object);
+					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					const defined = Reflect.defineProperty(object, property, rawDescriptor);
-					if (defined) finalizeCommittedWrite(object, property, previousValue, false);
+					if (defined) finalizeCommittedWrite(object, property, previousDescriptor, false);
 					return defined;
 				},
 			});
