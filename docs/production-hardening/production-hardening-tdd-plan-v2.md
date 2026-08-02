@@ -15746,6 +15746,31 @@ non-array state container. It proves full source/output isolation, fresh
 top-level identity stacks, primary-throwable preservation and no partial
 snapshot installation.
 
+**Accepted P2 tests-only RED checkpoint.** Fresh Codex-high commit
+`76845de` first added a 217-line seven-case RED at exact 3 failures / 4 passes,
+but its hostile shapes reached public setters only; copy-out and reconstruction
+then saw normalized or ordinary arrays. That intermediate RED is retained as
+under-specified evidence and superseded by additive corrective commit
+`2b3e293`. The final dedicated test is 513 formatted lines at SHA-256
+`530f4df9bf3a9d974e4780ef5cd0da8cb41f214e474836be3396c3bf2328e0f3`
+and is exact 13 failures / 14 passes against unchanged production.
+
+The causal failures are: three original hostile-map/non-array setter failures;
+two raw copy-out own-`map` invocations; two raw non-array copy-out fail-opens;
+two raw reconstruction own-iterator invocations; two sparse reconstruction
+partial assignments before the preserved wire-equivalent `TypeError`; and two
+non-array reconstruction iterator fail-opens. Passing controls preserve raw
+length/index proxy sentinels, sparse copy-out holes and order, ordinary public
+setter/copy-out/reconstruction behavior, source/store identity after failure,
+fresh top-level payload identity stacks and the current sparse wire failure.
+No successful sparse reconstruction or silent hole normalization is
+authorized. P1 remains byte-frozen at 27/27 and SHA-256
+`8313ef999ca1f3eca30e9567e2e49164e4edb301ae3290a1fbf2710015bbcf27`;
+the quick performance gate is 8/8 with MapDRP at 209.5 ms. Object typecheck,
+owned lint, Prettier, diff, hash and scope checks pass. Evidence is under
+`.logs/phase-1d-i-p2-snapshot-container-red-codex-high/` and its
+`-corrective/` sibling.
+
 The distinct GREEN uses an `Array.isArray` guard plus a captured array
 intrinsic or a validated index loop; it never invokes caller-controlled
 container methods. Preserve current entry order, sparse/wire behavior and
