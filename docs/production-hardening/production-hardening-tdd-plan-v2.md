@@ -15990,6 +15990,51 @@ versus result-allocation byte semantics, belongs to D.73 alongside hostile
 view/buffer classification and `Symbol.hasInstance`; it does not block P3a.
 P3a is accepted and closed; P3b is unblocked.
 
+**Accepted P3b tests-only RED checkpoint.** Fresh Codex-high commit
+`b040071e4e8168746bf6808f798cd7ec81328a03` adds only
+`packages/object/tests/typed-array-receiver-safety-1d-i-red.test.ts`. The
+383-line file has SHA-256
+`0c332c56a22d1e4a2d4548523c68bdcbdc20574e8c3e498dc517cb17f53d51b3`
+and git blob `9e6575a4231ecc8271f943bac914b214ce179dfd`. It is exact four
+failures / four passes against production and plan bytes identical to parent
+`147ff69`.
+
+The four failures isolate the internal-slot receiver boundary: TypedArray
+metadata/backing/iteration/derived-subarray access; representative DataView,
+Node Buffer and BigInt TypedArray receiver-safe mutation; replica-local
+TypedArray method availability; and real-applier `subarray(...).set(...)`
+availability before a vertex can commit. Native controls pass. The other four
+passes prove receiver-independent numeric writes already have exact governed-
+owner attribution, local stored/reconstructed bytes and within-payload alias
+layout are exact, the exact remote cut is exact, and P3a remains two views/two
+enumerations/zero recursive elements/one backing/32 bytes.
+
+Backing and views intentionally live under one governed `payload`. Distinct
+top-level snapshot entries are detached independently by contract, so requiring
+cross-entry backing identity would manufacture a semantic failure unrelated to
+P3b. The derived-subview case replaces an independent `.slice()` control so a
+GREEN cannot merely bind native methods to raw receivers while losing later
+shared-view attribution. P3b remains a loud availability/correctness item, not
+evidence that the passing numeric path currently publishes stale state.
+
+Preservation is P3a 4/4 plus bounded 1 MiB 2/2; P2+P1+D.92.3 99/99;
+D.92.4-D.92.6 60/60; performance 8/8 with MapDRP at 206.3 ms; and the
+sync-livelock sentinel exact 3F/3P. Object/workspace typechecks, owned/tracked
+lint with zero errors and 249 inherited warnings, Prettier, diff and scope
+checks pass. The unchanged D.92.2 64-case corpus is intentionally deferred to
+the production GREEN checkpoint. Evidence is under
+`.logs/phase-1d-i-p3b-typedarray-receiver-red-codex-high/`.
+
+The distinct production-only GREEN must provide one coherent receiver-safe
+view/backing model rather than a list of test-named methods. Preserve native
+internal-slot receivers, wrap returned views, link shared backings so a derived
+subview mutation reaches the governed owner, and keep read-only operations
+clean while effective numeric/bulk mutations are charged. Avoid canonical-
+index graph traversal or per-element wrapping, and preserve P3a accounting.
+DataView, Buffer and BigInt behavior must follow their frozen boundaries. Do
+not modify the RED, consume D.73 hostile classification/species work, or reopen
+D.92.3 detachment semantics.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -16723,22 +16768,22 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2, P3a and D.92.4-D.92.6 are accepted and closed. Start a fresh
-Codex-high P3b tests-only RED for TypedArray tracking receiver safety. Freeze
-receiver-safe `.length`, `.byteLength`, `.byteOffset`, `.buffer`, iterators and
-representative methods; numeric and bulk mutation attribution/publication;
-subview/backing-buffer aliases; DataView, Node Buffer and BigInt TypedArray
-controls; zero recursive per-element wrapping; and preservation of P3a's exact
-enumeration/backing counters plus the bounded 1 MiB characterization. Separate
-native receiver correctness from stale-publication causality and use bounded
-cases rather than a method matrix. Do not change production or the plan in the
-RED, reopen D.92.3 backing detachment, or consume D.73 hostile classification,
-`Symbol.hasInstance` or `Symbol.species`. Log the focused RED and relevant
-preservation/static gates, freeze line/hash/blob and commit tests only. A
-distinct production GREEN and fresh Grok/Kimi/Opus loop follow. Composite D.92
-starts only after P3b closes, then Phase 1d(ii); prototype-safe materialization
-remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
-adoption.
+P1, P2, P3a and D.92.4-D.92.6 are accepted and closed. P3b has an accepted
+frozen tests-only RED at `b040071`; start a distinct fresh Codex-high
+production-only GREEN. Implement a coherent receiver-safe view/backing model:
+native internal-slot access, receiver-safe iteration/methods, wrapped derived
+views with shared-backing owner attribution, clean read-only behavior, exact
+effective numeric/bulk mutation charging, context isolation, and bounded
+DataView/Buffer/BigInt support. Avoid canonical-index graph traversal and
+recursive per-element wrapping. Reach 8/8 without changing the frozen RED;
+preserve P3a counters and 1 MiB bound, then run D.92.2, P1/P2/D.92.3,
+D.92.4-D.92.6, inherited/specialized, repeated performance, sync sentinel,
+typechecks, lint, Prettier and frozen scope/hashes to logs. Do not consume D.73
+hostile classification, `Symbol.hasInstance` or `Symbol.species`, and do not
+reopen D.92.3 detachment semantics. A fresh Grok/Kimi/Opus loop follows.
+Composite D.92 starts only after P3b closes, then Phase 1d(ii); prototype-safe
+materialization remains mandatory before Phase 1d(ii) closure and Phase 4b/6a
+snapshot adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
