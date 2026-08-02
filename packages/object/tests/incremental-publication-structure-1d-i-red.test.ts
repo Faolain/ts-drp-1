@@ -274,6 +274,31 @@ function programFor(sources: GovernedSources): { checker: ts.TypeChecker; progra
 const sourcePath = (file: ts.SourceFile): string =>
 	path.relative("/workspace", file.fileName).split(path.sep).join(path.posix.sep);
 
+const EXTERNAL_SINK_EXPORTS = [
+	{
+		module: "@msgpack/msgpack",
+		manifest: "packages/utils/node_modules/@msgpack/msgpack/package.json",
+		wildcardLabel: "msgpack.*",
+		members: [
+			["decode", "msgpack.decode"],
+			["encode", "msgpack.encode"],
+		],
+	},
+	{
+		module: "es-toolkit",
+		manifest: "packages/object/node_modules/es-toolkit/package.json",
+		wildcardLabel: "toolkit.*",
+		members: [["cloneDeep", "cloneDeep"]],
+	},
+] as const;
+
+function externalExportSink(declaration: ts.ExportDeclaration): (typeof EXTERNAL_SINK_EXPORTS)[number] | undefined {
+	const moduleSpecifier = declaration.moduleSpecifier;
+	if (declaration.isTypeOnly || !moduleSpecifier || !ts.isStringLiteral(moduleSpecifier)) return undefined;
+	if (declaration.exportClause && !ts.isNamespaceExport(declaration.exportClause)) return undefined;
+	return EXTERNAL_SINK_EXPORTS.find((sink) => sink.module === moduleSpecifier.text);
+}
+
 function lexicalOwner(node: ts.Node): string {
 	for (let owner = node.parent; owner; owner = owner.parent) {
 		if (ts.isConstructorDeclaration(owner)) return `${owner.parent.name?.text ?? "<anonymous>"}.constructor`;
@@ -315,6 +340,11 @@ function moduleIdentity(
 			(node) => ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
 		) as ts.ImportDeclaration | ts.ExportDeclaration | undefined;
 		if (!edge?.moduleSpecifier || !ts.isStringLiteral(edge.moduleSpecifier)) continue;
+		if (
+			ts.isExportDeclaration(edge) &&
+			(edge.isTypeOnly || (ts.isExportSpecifier(declaration) && declaration.isTypeOnly))
+		)
+			continue;
 		let name: string | undefined;
 		if (ts.isImportSpecifier(declaration) || ts.isExportSpecifier(declaration))
 			name = declaration.propertyName?.text ?? declaration.name.text;
@@ -411,9 +441,9 @@ function sites(sources: GovernedSources, checker: ts.TypeChecker, program: ts.Pr
 		const fileName = sourcePath(file);
 		if (sources[fileName] === undefined) continue;
 		const visit = (node: ts.Node): void => {
-			const exportModule = ts.isExportDeclaration(node) && !node.exportClause ? node.moduleSpecifier : undefined;
-			if (exportModule && ts.isStringLiteral(exportModule)) {
-				if (exportModule.text === "@msgpack/msgpack") record(fileName, node, "msgpack.*");
+			const exportSink = ts.isExportDeclaration(node) ? externalExportSink(node) : undefined;
+			if (exportSink) {
+				record(fileName, node, exportSink.wildcardLabel);
 			} else if (ts.isExportSpecifier(node)) {
 				record(fileName, node, referenceLabel(node.name, checker));
 			} else if (ts.isCallExpression(node)) {
@@ -476,14 +506,15 @@ function externalSurface(references: readonly string[]): string[] {
 	const version = (relativeManifest: string): string =>
 		(JSON.parse(fs.readFileSync(path.join(WORKSPACE_DIRECTORY, relativeManifest), "utf8")) as { version: string })
 			.version;
-	if (references.some((site) => site.includes(":msgpack.decode#")))
-		result.push(`@msgpack/msgpack@${version("packages/utils/node_modules/@msgpack/msgpack/package.json")}:decode`);
-	if (references.some((site) => site.includes(":msgpack.encode#")))
-		result.push(`@msgpack/msgpack@${version("packages/utils/node_modules/@msgpack/msgpack/package.json")}:encode`);
-	if (references.some((site) => site.includes(":cloneDeep#")))
-		result.push(`es-toolkit@${version("packages/object/node_modules/es-toolkit/package.json")}:cloneDeep`);
-	if (references.some((site) => site.includes(":msgpack.*#")))
-		result.push(`@msgpack/msgpack@${version("packages/utils/node_modules/@msgpack/msgpack/package.json")}:*`);
+	for (const sink of EXTERNAL_SINK_EXPORTS) {
+		const installedVersion = version(sink.manifest);
+		for (const [member, label] of sink.members) {
+			if (references.some((site) => site.includes(`:${label}#`)))
+				result.push(`${sink.module}@${installedVersion}:${member}`);
+		}
+		if (references.some((site) => site.includes(`:${sink.wildcardLabel}#`)))
+			result.push(`${sink.module}@${installedVersion}:*`);
+	}
 	return result.sort();
 }
 
@@ -503,7 +534,8 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 	const violations = closure.unresolved.map((site) => `unresolved internal acquisition ${site}`);
 	for (const site of allSites) {
 		const fileName = site.slice(0, site.indexOf(":"));
-		if (site.includes(":msgpack.*#")) violations.push(`external wildcard acquisition ${fileName}:@msgpack/msgpack`);
+		const externalSink = EXTERNAL_SINK_EXPORTS.find((sink) => site.includes(`:${sink.wildcardLabel}#`));
+		if (externalSink) violations.push(`external wildcard acquisition ${fileName}:${externalSink.module}`);
 	}
 	const approved = new Set(real ? D922C_PACKAGE_REFERENCE_SITES : []);
 	for (const site of packageReferences)
