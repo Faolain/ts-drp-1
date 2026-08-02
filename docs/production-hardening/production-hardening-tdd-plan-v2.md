@@ -15516,10 +15516,14 @@ shell-loop attempt reused zsh's read-only `status` variable, changed no source
 and was superseded by correctly logged runs. Evidence is under
 `.logs/phase-1d-i-p1-comparison-work-red-codex-high/`.
 
-**GREEN — distinct fresh Codex-high, production only.** The RED is immutable.
-The GREEN must establish one comparison authority at the same composition root
-as the branded publication capability and route publisher capture,
-`applyOverride`, applier candidacy and proxy tracking through it. Direct
+**GREEN — distinct fresh Codex-high, production plus one mechanical authority
+update only.** The RED and all semantic tests are immutable. The accepted
+D.92.2 structure test may change only to record the comparator module/topology
+and mechanically derived census values; its markers, classifier logic, cases
+and policy assertions remain frozen. The GREEN must establish one comparison
+authority at the same composition root as the branded publication capability
+and route publisher capture, `applyOverride`, applier candidacy and proxy
+tracking through it. Direct
 `deepEqual`/`circularDeepEqual`/`serializedValuesEqual` acquisition outside
 that authority is removed and census-enforced.
 
@@ -15633,17 +15637,18 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 ## Next Agent Prompt — supersedes the D.92 handoff
 
 P1 RED `e589f4cedcf4834311a469f366494235ba4f3a28` is accepted at exact 9F/12P.
-Start a distinct fresh Codex-high GREEN with production authority only; the
-624-line RED and every existing test remain byte-frozen. Establish the single
-linear comparison authority, captured Map/Set traversal, safe-superset
-candidacy, D.91-compatible proxy behavior, pure counters and the mechanical
-D.92.2 authority update. The semantic-plus-byte differential corpus and exact
-throwables may not change. Run the quick and complete checkpoint gates to
-`.log`; P1 cannot close unless `perf-contracts.test.ts` is 8/8 at the unchanged
-1,000 ms threshold for three serialized repeats. Commit only the owned GREEN,
-then run fresh Grok-high and exact Kimi 3/high/100 reviews and final Opus/xhigh
-only if both accept. Do not start P2 or D.92.4 and do not widen into D.73,
-fingerprints, preimages or a new analyzer.
+Start a distinct fresh Codex-high GREEN with production authority plus only the
+mechanical D.92.2 comparator-topology/census update; the 624-line RED, every
+semantic test and the D.92.2 classifier logic/markers/cases remain byte-frozen.
+Establish the single linear comparison authority, captured Map/Set traversal,
+safe-superset candidacy, D.91-compatible proxy behavior and pure counters. The
+semantic-plus-byte differential corpus and exact throwables may not change.
+Run the quick and complete checkpoint gates to `.log`; P1 cannot close unless
+`perf-contracts.test.ts` is 8/8 at the unchanged 1,000 ms threshold for three
+serialized repeats. Commit only the owned GREEN, then run fresh Grok-high and
+exact Kimi 3/high/100 reviews and final Opus/xhigh only if both accept. Do not
+start P2 or D.92.4 and do not widen into D.73, fingerprints, preimages or a new
+analyzer.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
