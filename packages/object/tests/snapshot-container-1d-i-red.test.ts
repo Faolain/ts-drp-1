@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- the RED narrows explicit state entries */
-import { type DRPState, DRPStateEntry, type IDRP, SemanticsType } from "@ts-drp/types";
+import { type DRPState, DRPStateEntry, DRPStateOtherTheWire, type IDRP, SemanticsType } from "@ts-drp/types";
+import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { describe, expect, it } from "vitest";
 
 import { createACL } from "../src/acl/index.js";
@@ -13,6 +14,7 @@ class SnapshotFixture implements IDRP {
 }
 
 type SnapshotSide = "acl" | "drp";
+type ReconstructionPath = "fromHash" | "fromStates";
 
 function entry(key: string, value: unknown): DRPState["state"][number] {
 	return DRPStateEntry.create({ key, value });
@@ -20,6 +22,10 @@ function entry(key: string, value: unknown): DRPState["state"][number] {
 
 function snapshot(entries: DRPState["state"]): DRPState {
 	return { state: entries } as DRPState;
+}
+
+function encoded(state: DRPState): Uint8Array {
+	return DRPStateOtherTheWire.encode(serializeDRPState(state)).finish();
 }
 
 function stateValue(state: DRPState, key: string): unknown {
@@ -45,6 +51,16 @@ function install(object: DRPObject<SnapshotFixture>, side: SnapshotSide, hash: s
 	else object.setDRPState(hash, value);
 }
 
+function installDirect(
+	store: DRPObjectStateManager<SnapshotFixture>,
+	side: SnapshotSide,
+	hash: string,
+	value: DRPState
+): void {
+	if (side === "acl") store.setACLState(hash, value);
+	else store.setDRPState(hash, value);
+}
+
 function publicState(object: DRPObject<SnapshotFixture>, side: SnapshotSide, hash: string): DRPState | undefined {
 	const [acl, drp] = object.getStates(hash);
 	return side === "acl" ? acl : drp;
@@ -56,6 +72,25 @@ function object(): DRPObject<SnapshotFixture> {
 		acl: createACL({ admins: ["snapshot-owner"] }),
 		drp: new SnapshotFixture(),
 	});
+}
+
+function reconstruct(
+	path: ReconstructionPath,
+	states: DRPObjectStateManager<SnapshotFixture>,
+	hash: string,
+	drpState: DRPState,
+	aclState: DRPState
+): [SnapshotFixture | undefined, unknown] {
+	if (path === "fromHash") {
+		states.setDRPState(hash, drpState);
+		states.setACLState(hash, aclState);
+		return states.fromHash(hash);
+	}
+	return states.fromStates(drpState, aclState);
+}
+
+function otherSide(side: SnapshotSide): SnapshotSide {
+	return side === "acl" ? "drp" : "acl";
 }
 
 describe("Phase 1d(i) D.92.3-P2 captured snapshot-container traversal", () => {
@@ -214,4 +249,265 @@ describe("Phase 1d(i) D.92.3-P2 captured snapshot-container traversal", () => {
 			expect.objectContaining({ state: [expect.objectContaining({ key: "left" })] }),
 		]);
 	});
+});
+
+describe("Phase 1d(i) D.92.3-P2 raw stored snapshot-container traversal", () => {
+	it.each(["acl", "drp"] as const)("does not invoke a raw stored %s array map during public copy-out", (side) => {
+		const target = object();
+		const states = manager(target);
+		const hash = `raw-copyout-map-${side}`;
+		const source = { nested: { marker: "source" } };
+		const entries = [entry("payload", source)];
+		let callerMapCalls = 0;
+		Object.defineProperty(entries, "map", {
+			configurable: true,
+			value: (): never => {
+				callerMapCalls++;
+				throw new Error("raw stored state container map must not run");
+			},
+		});
+		const raw = snapshot(entries);
+		const companion = snapshot([entry("stable", { marker: "companion" })]);
+		installDirect(states, side, hash, raw);
+		installDirect(states, otherSide(side), hash, companion);
+		const beforeBytes = encoded(raw);
+
+		const [acl, drp] = target.getStates(hash);
+		const copied = side === "acl" ? acl! : drp!;
+		const copiedValue = stateValue(copied, "payload") as typeof source;
+		expect(callerMapCalls).toBe(0);
+		expect.soft(copied).not.toBe(raw);
+		expect.soft(copied.state).not.toBe(entries);
+		expect.soft(copiedValue).not.toBe(source);
+		expect(stateFor(states, side, hash)).toBe(raw);
+		expect(encoded(raw)).toEqual(beforeBytes);
+
+		source.nested.marker = "source-mutated";
+		expect(copiedValue.nested.marker).toBe("source");
+		copiedValue.nested.marker = "copyout-mutated";
+		expect(stateValue(raw, "payload")).toMatchObject({ nested: { marker: "source-mutated" } });
+	});
+
+	it.each(["acl", "drp"] as const)(
+		"rejects a raw stored non-array %s container before its map can affect public copy-out",
+		(side) => {
+			const target = object();
+			const states = manager(target);
+			const hash = `raw-copyout-non-array-${side}`;
+			let callerMapCalls = 0;
+			const container = {
+				map(): DRPState["state"] {
+					callerMapCalls++;
+					return [entry("attacker", { marker: "replacement" })];
+				},
+			};
+			const raw = { state: container } as unknown as DRPState;
+			installDirect(states, side, hash, raw);
+			installDirect(states, otherSide(side), hash, snapshot([entry("stable", { marker: "companion" })]));
+			let thrown: unknown;
+			try {
+				target.getStates(hash);
+			} catch (error) {
+				thrown = error;
+			}
+
+			expect(thrown).toBeInstanceOf(TypeError);
+			expect(callerMapCalls).toBe(0);
+			expect(stateFor(states, side, hash)).toBe(raw);
+			expect(raw.state).toBe(container);
+		}
+	);
+
+	it.each([
+		["acl", "length"],
+		["acl", "index"],
+		["drp", "length"],
+		["drp", "index"],
+	] as const)(
+		"preserves a raw stored %s copy-out primary throwing %s access without store mutation",
+		(side, kind: "length" | "index") => {
+			const target = object();
+			const states = manager(target);
+			const hash = `raw-copyout-throwing-${side}-${kind}`;
+			const sentinel = new Error(`raw copy-out ${kind} sentinel`);
+			const entries = new Proxy([entry("payload", { marker: "source" })], {
+				get(source, property, receiver): unknown {
+					if (property === "length" && kind === "length") throw sentinel;
+					if (property === "0" && kind === "index") throw sentinel;
+					return Reflect.get(source, property, receiver);
+				},
+			});
+			const raw = snapshot(entries);
+			installDirect(states, side, hash, raw);
+			installDirect(states, otherSide(side), hash, snapshot([entry("stable", { marker: "companion" })]));
+			let thrown: unknown;
+			try {
+				target.getStates(hash);
+			} catch (error) {
+				thrown = error;
+			}
+
+			expect(thrown).toBe(sentinel);
+			expect(stateFor(states, side, hash)).toBe(raw);
+			expect(raw.state).toBe(entries);
+		}
+	);
+
+	it.each(["acl", "drp"] as const)("preserves raw stored sparse %s copy-out holes and entry order", (side) => {
+		const target = object();
+		const states = manager(target);
+		const hash = `raw-copyout-sparse-${side}`;
+		const entries = new Array<DRPState["state"][number]>(4);
+		entries[1] = entry("middle", { marker: "middle" });
+		entries[3] = entry("last", { marker: "last" });
+		const raw = snapshot(entries);
+		installDirect(states, side, hash, raw);
+		installDirect(states, otherSide(side), hash, snapshot([entry("stable", { marker: "companion" })]));
+
+		const [acl, drp] = target.getStates(hash);
+		const copied = side === "acl" ? acl! : drp!;
+		expect.soft(copied.state).toHaveLength(4);
+		expect.soft(0 in copied.state).toBe(false);
+		expect.soft(1 in copied.state).toBe(true);
+		expect.soft(2 in copied.state).toBe(false);
+		expect.soft(3 in copied.state).toBe(true);
+		expect.soft(copied.state[1]!.key).toBe("middle");
+		expect.soft(copied.state[3]!.key).toBe("last");
+		expect(stateFor(states, side, hash)).toBe(raw);
+		expect(raw.state).toBe(entries);
+	});
+
+	it.each(["fromHash", "fromStates"] as const)(
+		"does not invoke a raw stored iterator during %s reconstruction",
+		(path) => {
+			const target = object();
+			const states = manager(target);
+			const hash = `raw-reconstruction-iterator-${path}`;
+			const source = { nested: { marker: "source" } };
+			const entries = [entry("left", source)];
+			let callerIteratorCalls = 0;
+			Object.defineProperty(entries, Symbol.iterator, {
+				configurable: true,
+				value: (): never => {
+					callerIteratorCalls++;
+					throw new Error("raw stored state container iterator must not run");
+				},
+			});
+			const raw = snapshot(entries);
+			const stableACL = snapshot([entry("stable", { marker: "acl" })]);
+
+			const [reconstructed] = reconstruct(path, states, hash, raw, stableACL);
+			expect(callerIteratorCalls).toBe(0);
+			expect(reconstructed!.left).not.toBe(source);
+			expect(reconstructed!.left).toMatchObject({ nested: { marker: "source" } });
+			expect(raw.state).toBe(entries);
+			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
+		}
+	);
+
+	it.each(["fromHash", "fromStates"] as const)(
+		"keeps sparse reconstruction wire-equivalent and prevents partial %s application",
+		(path) => {
+			const target = object();
+			const states = manager(target);
+			const hash = `raw-reconstruction-sparse-${path}`;
+			const entries = new Array<DRPState["state"][number]>(3);
+			entries[0] = entry("left", { marker: "before-hole" });
+			entries[2] = entry("right", { marker: "after-hole" });
+			const raw = snapshot(entries);
+			const stableACL = snapshot([entry("stable", { marker: "acl" })]);
+			const originalDescriptor = Reflect.getOwnPropertyDescriptor(SnapshotFixture.prototype, "left");
+			let partialAssignments = 0;
+			Reflect.defineProperty(SnapshotFixture.prototype, "left", {
+				configurable: true,
+				set(): void {
+					partialAssignments++;
+				},
+			});
+			let reconstructionThrowable: unknown;
+			try {
+				try {
+					reconstruct(path, states, hash, raw, stableACL);
+				} catch (error) {
+					reconstructionThrowable = error;
+				}
+			} finally {
+				if (originalDescriptor === undefined) Reflect.deleteProperty(SnapshotFixture.prototype, "left");
+				else Reflect.defineProperty(SnapshotFixture.prototype, "left", originalDescriptor);
+			}
+
+			expect(() => encoded(raw)).toThrow(TypeError);
+			expect(reconstructionThrowable).toBeInstanceOf(TypeError);
+			expect(partialAssignments).toBe(0);
+			expect(raw.state).toBe(entries);
+			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
+		}
+	);
+
+	it.each(["fromHash", "fromStates"] as const)(
+		"rejects a non-array %s reconstruction container before caller map or iterator invocation",
+		(path) => {
+			const target = object();
+			const states = manager(target);
+			const hash = `raw-reconstruction-non-array-${path}`;
+			const calls = { map: 0, iterator: 0 };
+			const container = {
+				map(): DRPState["state"] {
+					calls.map++;
+					return [entry("attacker", { marker: "map" })];
+				},
+				[Symbol.iterator](): Iterator<DRPState["state"][number]> {
+					calls.iterator++;
+					return [entry("attacker", { marker: "iterator" })][Symbol.iterator]();
+				},
+			};
+			const raw = { state: container } as unknown as DRPState;
+			const stableACL = snapshot([entry("stable", { marker: "acl" })]);
+			let thrown: unknown;
+			try {
+				reconstruct(path, states, hash, raw, stableACL);
+			} catch (error) {
+				thrown = error;
+			}
+
+			expect(thrown).toBeInstanceOf(TypeError);
+			expect(calls).toEqual({ map: 0, iterator: 0 });
+			expect(raw.state).toBe(container);
+			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
+		}
+	);
+
+	it.each([
+		["fromHash", "length"],
+		["fromHash", "index"],
+		["fromStates", "length"],
+		["fromStates", "index"],
+	] as const)(
+		"preserves the primary %s reconstruction proxy %s throwable without mutating its source snapshot",
+		(path, kind: "length" | "index") => {
+			const target = object();
+			const states = manager(target);
+			const hash = `raw-reconstruction-throwing-${path}-${kind}`;
+			const sentinel = new Error(`raw reconstruction ${kind} sentinel`);
+			const entries = new Proxy([entry("left", { marker: "source" })], {
+				get(source, property, receiver): unknown {
+					if (property === "length" && kind === "length") throw sentinel;
+					if (property === "0" && kind === "index") throw sentinel;
+					return Reflect.get(source, property, receiver);
+				},
+			});
+			const raw = snapshot(entries);
+			const stableACL = snapshot([entry("stable", { marker: "acl" })]);
+			let thrown: unknown;
+			try {
+				reconstruct(path, states, hash, raw, stableACL);
+			} catch (error) {
+				thrown = error;
+			}
+
+			expect(thrown).toBe(sentinel);
+			expect(raw.state).toBe(entries);
+			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
+		}
+	);
 });
