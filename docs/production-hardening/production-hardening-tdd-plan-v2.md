@@ -14569,12 +14569,13 @@ The source-first `Program`/`TypeChecker` owns only module/export identity,
 static runtime dependency closure and exact alias-resolved sink references. It
 must not grow an expression lattice, binding projector, callable/container
 interpreter, transfer relation, worklist, fixpoint or hop model. The formatted
-structural authority is capped at 300 logical lines, with a structural ban on
-those interpreter constructs; moving logic outside the measured boundary or
-compressing it is rejection, not compliance. Normal budgets become fixture
-p95 ≤50 ms, one census pass ≤2 seconds, memoized real-workspace Program ≤10
-seconds and whole gate ≤30 seconds. The bounded 1 MB characterization remains
-separate.
+structural authority remains wholly between its markers, readable and subject
+to an executable structural ban on those interpreter constructs; moving logic
+outside the measured boundary or compressing it is rejection, not compliance.
+Exact count, delta and SHA-256 remain checkpoint evidence. Normal budgets become
+fixture p95 ≤50 ms, one census pass ≤2 seconds, memoized real-workspace Program
+≤10 seconds and whole gate ≤30 seconds. The bounded 1 MB characterization
+remains separate.
 
 Reference census is the primary static authority; module closure scopes it and
 lint supplies redundant fast feedback. For every forbidden imported, global or
@@ -14800,12 +14801,13 @@ test-local fixtures only. It must pin all of the general forms above, safe
 shadow/type-only controls, causal root-to-leaf mutations, honest closure and
 lint equality, and the removal or computation of tautological evidence. A
 distinct Codex-high GREEN then makes the smallest coherent production/test/lint
-change while keeping the formatted authority at or below 300 logical lines.
-If that cannot be done by replacing brittle logic with canonical symbol logic,
-the GREEN must stop; the line ceiling must not be met by compression or logic
-moved outside its measured boundary. Run the complete c′/d′ gate set again,
-then fresh Grok-high and exact Kimi 3/high/100 reviews; final Opus/xhigh runs
-only if both accept.
+change while keeping the formatted authority wholly inside its measured markers,
+readable, format-stable and limited to structural module/export/symbol identity.
+Exact line count, delta and SHA-256 are audit evidence, not acceptance thresholds.
+The GREEN must stop if it requires compression, logic outside the measured
+boundary, a second authority or any value-flow/interpreter construct. Run the
+complete c′/d′ gate set again, then fresh Grok-high and exact Kimi 3/high/100
+reviews; final Opus/xhigh runs only if both accept.
 
 **Accepted corrective RED checkpoint.** Tests-only commit
 `93f4336d11cf6f0b7d487c9dc56fb0c74ed78d1a` changes only the owned
@@ -14900,32 +14902,38 @@ re-export of MessagePack encode and `cloneDeep`, external export-star, imported
 `deserializeDRPState`, the exact `globalThis.structuredClone` known-global
 form, and safe unrelated external export/global-shadow controls. The GREEN must
 extend canonical import/export/module identity and the explicit known-sink
-roster, not interpret values. It must replace enough existing logic to remain
-readable at or below 300 formatted nonblank lines; compression, marker movement
-or a new token/regex scanner is rejection. The first-party closure, production
-code and behavioral gates should remain byte-identical unless the RED proves an
-actual production change is necessary.
+roster, not interpret values. The whole authority remains between its measured
+markers and readable; compression, marker movement, logic moved outside the
+markers or a new token/regex scanner is rejection. Its exact formatted nonblank
+line count and SHA-256 are recorded in every checkpoint without becoming a
+normative ceiling. The first-party closure, production code and behavioral gates
+should remain byte-identical unless the RED proves an actual production change
+is necessary.
 
 **Corrective growth firewall.** Architecture-adjudication feedback is binding
-for this corrective. The seven rows above are one terminal structural matrix,
-not the start of another syntax-equivalence corpus. The authority may recognize
-`ImportDeclaration`, `ExportDeclaration`/`ExportSpecifier`, export-star,
+for this corrective. The seven rows above were one bounded structural matrix,
+not the start of another syntax-equivalence corpus; later review proved its
+export-declaration dimension incomplete, so the final matrix below closes that
+dimension as a typed cross-product rather than adding value-flow cases. The
+authority may recognize `ImportDeclaration`,
+`ExportDeclaration`/`ExportSpecifier`, export-star, namespace export,
 source-first first-party resolution, canonical external package/member identity
 and the one explicit unshadowed `globalThis.structuredClone` form. It must not
 follow local value aliases, receiver values, assignments, callbacks, containers,
 destructuring, call/apply/bind compositions or user-DRP execution. The benign
-external member and shadowed-global rows prevent broad spelling-based bans.
+external member, type-only export and shadowed-global rows prevent broad
+spelling-based bans.
 
-If a coherent module/export implementation cannot satisfy this matrix within
-the existing readable 300-line authority, the GREEN stops without a partial
-commit and reopens architecture adjudication; it does not add helpers outside
-the measured boundary, compress code, weaken an assertion or grow a second
-analyzer. Future findings are routed by ownership: static module/sink acquisition
-gets a new bounded RED, observable publication behavior gets a runtime invariant,
-and arbitrary handwritten JavaScript remains outside this checker with the
-guarantee stated narrowly. Passing this matrix therefore closes the known
-module/export gap; it never upgrades D.92.2 into a proof about all possible copy
-implementations.
+If a coherent module/export implementation requires value/binding flow or cannot
+remain readable wholly inside the measured authority, the GREEN stops without a
+partial commit and reopens architecture adjudication; it does not add helpers
+outside the measured boundary, compress code, weaken an assertion or grow a
+second analyzer. Future findings are routed by ownership: static module/sink
+acquisition gets a new bounded RED, observable publication behavior gets a
+runtime invariant, and arbitrary handwritten JavaScript remains outside this
+checker with the guarantee stated narrowly. Passing the final typed declaration
+matrix therefore closes the known module/export gap; it never upgrades D.92.2
+into a proof about all possible copy implementations.
 
 **Accepted final module/export RED checkpoint.** Fresh tests-only Codex-high
 commit `a62721dcbdf751ecd5bec1886875e7110e59b9a9` adds exactly the seven-row
@@ -14946,6 +14954,80 @@ seconds. This is not permission to drop coverage from ordinary suites; this
 source-analyzer gate uses the targeted no-coverage path to preserve iteration
 time, while behavioral and characterization coverage remain independently
 owned.
+
+**First final-module GREEN and review rejection.** Distinct Codex-high commit
+`c1fe272b1cf6e5df8a1c299593fa95cfb612e1b6` changes only the structural test
+authority. It replaces import-only identity with cycle-guarded static
+import/export identity, governs direct external named re-exports, adds
+`deserializeDRPState`, records the MessagePack export-star surface and recognizes
+only unshadowed `globalThis.structuredClone`. Production, lint, manifests, Vite
+and the four-file runtime closure remain byte-identical. The authority is 314
+formatted nonblank lines, a +15 delta justified entirely by the new static
+module/export classifier, at SHA-256
+`5f89a4dfadb7015dc75978479f1062a8c5f50d8ddc90d996cddcdd1e131e42e2`.
+Its interpreter-retirement/prohibited-construct assertions remain intact; only
+the numeric ceiling assertion was removed.
+
+Focused structure is 55/55, publication work 21/21, inherited Phase 1d(i)
+147/147 and bounded 1 MiB 1/1. Raw-child and sync-livelock remain the exact
+11-fail/7-pass and 3-fail/3-pass inherited baselines. Object/workspace typecheck,
+owned zero-error lint, tracked 0-error/226-warning lint, Prettier and diff checks
+pass. Parallel coverage jobs initially collided on the shared `coverage/.tmp`
+directory; sequential reruns passed exactly, so future acceptance runs serialize
+coverage-bearing suites.
+
+Fresh Grok 4.5/high session
+`019fc0e6-12b3-7e72-b86d-76747fe3869e` and independent exact Kimi 3/high/100
+session `0708aa81-2739-457c-bf97-9fb8ad4607cf` both returned
+`CHANGES_REQUESTED`; final Opus code review was not run. The first Kimi session
+was explicitly superseded after encountering the concurrent Grok artifact; the
+session named above was relaunched with that directory forbidden. Both accepted
+the five frozen fixes, controls, unchanged production and absence of interpreter
+regrowth, then independently proved the same bounded classifier defect:
+
+1. runtime `export * from "es-toolkit"` fails open while the equivalent
+   MessagePack wildcard fails closed;
+2. runtime `export * as toolkit from "es-toolkit"`, consumed through
+   `toolkit.cloneDeep`, fails open because `NamespaceExport` is unmodeled; the
+   symmetric MessagePack namespace export also fails open; and
+3. Grok additionally proved that `export type * from "@msgpack/msgpack"` is
+   falsely classified as a runtime wildcard acquisition, while type-only
+   namespace controls remain clean.
+
+These are one static `ExportDeclaration` classification defect, not three new
+flow semantics. The corrective RED is a compact cross-product over the two
+already rostered external sink packages and the declaration-owned dimensions
+runtime/type-only × star/namespace. The GREEN implements one typed known-sink
+export classifier honoring `isTypeOnly`, absent export clauses and
+`NamespaceExport`; it does not follow the exported value after assignment or
+grow a syntax-equivalence corpus. Existing named re-export, consumer, benign
+external member, locally shadowed global and all prior controls remain frozen.
+
+**Ratified numeric-cap correction.** The user removed the exact 300-line stop.
+Codex-high GREEN ownership agreed; exact Kimi 3/high/100 session
+`0708aa81-2739-457c-bf97-9fb8ad4607cf` returned
+`LINE_CAP_AMENDMENT_AGREE=yes`; plan-only Opus/xhigh session
+`57a73d93-4b51-4c9e-8856-e2714c5b3fec` returned the same. Grok also agreed.
+Only the numeric ceiling is retired. Marker containment, readability,
+format-stability, structural-only scope, explicit interpreter/value-flow bans,
+no second authority, no outside-marker logic, exact censuses, fail-closed
+behavior and adversarial review remain normative. Every checkpoint records line
+count, SHA-256, delta and one-sentence growth justification; unjustified growth
+remains reviewer-rejectable. This plan-only quorum neither accepts `c1fe272b`
+nor authorizes its final Opus code review.
+
+**One-off whole-program course check.** User-requested Fable-high session
+`634cba43-9646-414a-9d89-c39c29484363` returned
+`ON_TRACK_WITH_COURSE_CORRECTIONS`, with substantive model `claude-fable-5` and
+separately disclosed small automatic helper usage. It independently found the
+v3-forward/v2-frozen ordering, completed mandatory Phase 0, D.91 acceptance,
+interpreter stop and replacement capability/module-closure architecture sound.
+The current export classifier is a real but proportionate stop. D.92.3 remains
+next only after D.92.2 acceptance, then the raw-child amendment and D.92.4;
+D.73 remains a hard pre-live-3a gate. Phase 0n remains optional now but is a hard
+pre-4a dependency on the complete end-of-plan golden path, so its D.52.4 quorum
+must be scheduled before that horizon. This advisory course check does not
+replace the normal Codex/Grok/Kimi/Opus slice loop.
 
 #### D.92.3 — Map object-key detachment contract
 
@@ -15023,14 +15105,15 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Continue D.92.2-d′ with a fresh Codex-high tests-only RED over the final
-module/export gap recorded above. Freeze the compact external named re-export,
-external export-star, `deserializeDRPState` and known `globalThis` cases plus
-safe controls; do not edit the authority or production in RED. Then use a
-distinct Codex-high GREEN to extend only canonical module/export/sink identity
-while keeping the authority ≤300 and production behavior unchanged. Re-run the
-complete gates and fresh Grok-high / exact Kimi 3/high/100 reviews. Final
-Opus/xhigh runs only if both accept. D.92.3 stays blocked.
+Continue D.92.2-d′ with a fresh Codex-high tests-only RED over the final typed
+export-declaration gap recorded above: runtime/type-only × star/namespace for
+both known external sink packages, while freezing every accepted named
+re-export, deserializer, known-global and safe control. Do not edit the authority
+or production in RED. Then use a distinct Codex-high GREEN to implement one
+typed known-sink export classifier while keeping the authority readable, wholly
+inside its markers and production behavior unchanged. Re-run the complete gates
+and fresh Grok-high / exact Kimi 3/high/100 reviews. Final Opus/xhigh runs only
+if both accept. D.92.3 stays blocked.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
