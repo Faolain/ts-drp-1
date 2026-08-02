@@ -2,7 +2,7 @@ import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { type DrpRuntimeContext, DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
 
 import { HashGraph } from "./hashgraph/index.js";
-import { detachStatePayload } from "./state-payload.js";
+import { detachStatePayload, validateStateSnapshotForApplication } from "./state-payload.js";
 import { DRPStateStore, REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/object/states");
@@ -97,13 +97,17 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		drpContext = this.drpContext,
 		aclContext = this.aclContext
 	): [T | undefined, IACL] {
+		const preparedACLState = validateStateSnapshotForApplication(aclState);
+		const preparedDRPState =
+			this.drpConstructor === undefined ? undefined : validateStateSnapshotForApplication(drpState);
 		const acl = Object.create(this.aclConstructor.prototype);
 		if (aclContext) acl.context = detachStatePayload(aclContext);
-		this.applyState(acl, aclState);
-		if (!this.drpConstructor) return [undefined, acl];
+		this.applyState(acl, preparedACLState);
+		if (this.drpConstructor === undefined) return [undefined, acl];
+		if (preparedDRPState === undefined) return [undefined, acl];
 		const drp = Object.create(this.drpConstructor.prototype);
 		if (drpContext) drp.context = detachStatePayload(drpContext);
-		this.applyState(drp, drpState);
+		this.applyState(drp, preparedDRPState);
 		return [drp, acl];
 	}
 
@@ -115,14 +119,17 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 	fromHashACL(hash: Hash): IACL {
 		const state = this.getACLState(hash);
 		if (!state) throw new StateNotFoundError(`State ${hash} not found`);
+		const preparedState = validateStateSnapshotForApplication(state);
 		const acl = Object.create(this.aclConstructor.prototype);
 		if (this.aclContext) acl.context = detachStatePayload(this.aclContext);
-		this.applyState(acl, state);
+		this.applyState(acl, preparedState);
 		return acl;
 	}
 
 	private applyState(instance: T | IACL, state: DRPState): void {
-		for (const entry of state.state) {
+		for (let index = 0; index < state.state.length; index++) {
+			const entry = state.state[index];
+			if (entry === undefined) throw new TypeError("DRP state entry must be present");
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- rightfully so this is not a problem
 			(instance as any)[entry.key] = detachStatePayload(entry.value);
 		}

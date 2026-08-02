@@ -34,6 +34,7 @@ const propertyIsEnumerable = Object.prototype.propertyIsEnumerable;
 const nodeBufferConstructor = (globalThis as unknown as { Buffer?: NodeBufferConstructor }).Buffer;
 const nodeBufferFrom = nodeBufferConstructor?.from;
 const nodeBufferIsBuffer = nodeBufferConstructor?.isBuffer;
+const arrayIsArray = Array.isArray;
 
 function enumerableKeys(value: object): PropertyKey[] {
 	return [
@@ -253,7 +254,40 @@ export function detachStatePayload<T>(value: T): T {
  * @returns Independently owned snapshot
  */
 export function detachStateSnapshot(state: DRPState): DRPState {
+	const entries = state.state;
+	if (!arrayIsArray(entries)) throw new TypeError("DRP state entries must be an array");
+
+	const length = entries.length;
+	const result = new Array<DRPState["state"][number]>(length);
+	for (let index = 0; index < length; index++) {
+		if (!(index in entries)) continue;
+		const entry = entries[index];
+		if (entry === undefined) throw new TypeError("DRP state entry must be present");
+		const { key, value } = entry;
+		result[index] = { key, value: detachStatePayload(value) };
+	}
 	return {
-		state: state.state.map(({ key, value }) => ({ key, value: detachStatePayload(value) })),
+		state: result,
 	};
+}
+
+/**
+ * Fully validate a snapshot before it is applied to a reconstructed instance.
+ * @param state - Snapshot to prepare
+ * @returns Plain entry container with fully readable source entries
+ */
+export function validateStateSnapshotForApplication(state: DRPState): DRPState {
+	const entries = state.state;
+	if (!arrayIsArray(entries)) throw new TypeError("DRP state entries must be an array");
+
+	const length = entries.length;
+	const prepared = new Array<DRPState["state"][number]>(length);
+	for (let index = 0; index < length; index++) {
+		const entry = entries[index];
+		if (entry === undefined) throw new TypeError("DRP state entry must be present");
+		void entry.key;
+		void entry.value;
+		prepared[index] = entry;
+	}
+	return { state: prepared };
 }
