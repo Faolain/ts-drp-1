@@ -209,7 +209,7 @@ const config = tsLintConfig(
 		},
 	},
 	{
-		files: ["packages/object/src/publication/copy-capability.ts"],
+		files: ["packages/object/src/publication/copy-capability.ts", "packages/object/src/state-payload.ts"],
 		rules: {
 			...publicationBoundaryRules,
 			"no-restricted-imports": [

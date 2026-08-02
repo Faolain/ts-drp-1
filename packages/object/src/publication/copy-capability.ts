@@ -1,7 +1,8 @@
 import { type DRPState, type DRPStateEntry } from "@ts-drp/types";
 import { serializedValuesEqual } from "@ts-drp/utils/serialization/equality";
-import { cloneDeep } from "es-toolkit";
 import { deepEqual } from "fast-equals";
+
+import { detachStatePayload } from "../state-payload.js";
 
 const publicationCapabilityBrand: unique symbol = Symbol("PublicationCapability");
 
@@ -32,7 +33,7 @@ export function createPublicationCapability<TEvent>(observer?: (event: TEvent) =
 	return {
 		[publicationCapabilityBrand]: true,
 		copy(value, metadata): unknown {
-			return observer ? emit({ type: "copy", value, metadata }) : cloneDeep(value);
+			return observer ? emit({ type: "copy", value, metadata }) : detachStatePayload(value);
 		},
 		createEntry(key, value): DRPStateEntry {
 			return { key, value };

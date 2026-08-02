@@ -20,7 +20,6 @@ import {
 	isReceiverClockPendingValidationResult,
 	validateVertex,
 } from "@ts-drp/validation";
-import { cloneDeep } from "es-toolkit";
 import { deepEqual } from "fast-equals";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
@@ -49,6 +48,7 @@ import {
 	type SnapshotSide,
 } from "./publication/publisher.js";
 import { DRPObjectStateManager, stateFromDRP } from "./state-materialize.js";
+import { detachStatePayload } from "./state-payload.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
@@ -231,7 +231,7 @@ function captureBatchVertexOperation(submittedVertex: Vertex): BatchVertexPrefli
 	try {
 		return {
 			submittedVertex,
-			operationSnapshot: { succeeded: true, operation: cloneDeep(submittedVertex.operation) },
+			operationSnapshot: { succeeded: true, operation: detachStatePayload(submittedVertex.operation) },
 		};
 	} catch (error) {
 		return { submittedVertex, operationSnapshot: { succeeded: false, error } };
@@ -293,7 +293,7 @@ function cloneEnumerableInstance<T extends object>(source: T): T {
 	const sourceRecord = source as Record<string, unknown>;
 	const cloneRecord = clone as Record<string, unknown>;
 	for (const key of Object.keys(source)) {
-		if (typeof sourceRecord[key] !== "function") cloneRecord[key] = cloneDeep(sourceRecord[key]);
+		if (typeof sourceRecord[key] !== "function") cloneRecord[key] = detachStatePayload(sourceRecord[key]);
 	}
 	return clone;
 }
@@ -935,7 +935,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			result: {
 				// Vertex payloads are immutable history. Detach them from caller-owned
 				// objects before hashing and storing the operation.
-				vertex: this.hashGraph.createVertex({ drpType, opType, value: cloneDeep(value) }),
+				vertex: this.hashGraph.createVertex({ drpType, opType, value: detachStatePayload(value) }),
 				isACL: drpType === DrpType.ACL,
 				isLocal: true,
 			},
@@ -1393,7 +1393,7 @@ function callDRP<T extends IDRP>(drp: T, caller: string, method: string, args: u
 	// A DRP may retain or mutate an argument. Never let application state alias
 	// the immutable operation payload that will be replayed by other replicas.
 	try {
-		return Reflect.apply(operation, drp, cloneDeep(args));
+		return Reflect.apply(operation, drp, detachStatePayload(args));
 	} catch (error) {
 		if (deterministicOnThrow) {
 			throw new DeterministicRejectionError(`Rejected non-application DRP operation ${method}`, { cause: error });

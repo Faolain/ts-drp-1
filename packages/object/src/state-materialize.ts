@@ -1,8 +1,8 @@
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { type DrpRuntimeContext, DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
-import { cloneDeep } from "es-toolkit";
 
 import { HashGraph } from "./hashgraph/index.js";
+import { detachStatePayload } from "./state-payload.js";
 import { DRPStateStore, REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/object/states");
@@ -45,8 +45,8 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		this.drpConstructor = drp?.constructor as { prototype: any };
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.aclConstructor = acl.constructor as { prototype: any };
-		this.drpContext = cloneDeep(drp?.context);
-		this.aclContext = cloneDeep(acl.context);
+		this.drpContext = detachStatePayload(drp?.context);
+		this.aclContext = detachStatePayload(acl.context);
 		this.seedRoot(HashGraph.rootHash, drp ? stateFromDRP(drp) : DRPState.create(), stateFromDRP(acl));
 	}
 
@@ -98,11 +98,11 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		aclContext = this.aclContext
 	): [T | undefined, IACL] {
 		const acl = Object.create(this.aclConstructor.prototype);
-		if (aclContext) acl.context = cloneDeep(aclContext);
+		if (aclContext) acl.context = detachStatePayload(aclContext);
 		this.applyState(acl, aclState);
 		if (!this.drpConstructor) return [undefined, acl];
 		const drp = Object.create(this.drpConstructor.prototype);
-		if (drpContext) drp.context = cloneDeep(drpContext);
+		if (drpContext) drp.context = detachStatePayload(drpContext);
 		this.applyState(drp, drpState);
 		return [drp, acl];
 	}
@@ -116,7 +116,7 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		const state = this.getACLState(hash);
 		if (!state) throw new StateNotFoundError(`State ${hash} not found`);
 		const acl = Object.create(this.aclConstructor.prototype);
-		if (this.aclContext) acl.context = cloneDeep(this.aclContext);
+		if (this.aclContext) acl.context = detachStatePayload(this.aclContext);
 		this.applyState(acl, state);
 		return acl;
 	}
@@ -124,7 +124,7 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 	private applyState(instance: T | IACL, state: DRPState): void {
 		for (const entry of state.state) {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- rightfully so this is not a problem
-			(instance as any)[entry.key] = cloneDeep(entry.value);
+			(instance as any)[entry.key] = detachStatePayload(entry.value);
 		}
 	}
 }
@@ -140,7 +140,7 @@ export function stateFromDRP(drp: IDRP | undefined): DRPState {
 	for (const key of Object.keys(drp)) {
 		if (REPLICA_LOCAL_STATE_KEYS.has(key)) continue;
 		if (typeof drp[key] === "function") continue;
-		state.state.push(DRPStateEntry.create({ key, value: cloneDeep(drp[key]) }));
+		state.state.push(DRPStateEntry.create({ key, value: detachStatePayload(drp[key]) }));
 	}
 	return state;
 }

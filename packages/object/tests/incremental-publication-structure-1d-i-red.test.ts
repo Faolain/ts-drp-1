@@ -14,25 +14,26 @@ const CLONE_VIOLATION = /clone|cloneDeep|structuredClone|detaches payload/;
 const ROUND_TRIP_VIOLATION = /round.?trip|serialization|serializeDRPState|deserializeDRPState|encode|decode/;
 
 const REVIEWED_WORKSPACE_OPERATIONS = [
-	"packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy:clone",
-	"packages/object/src/index.ts:DRPObject.getStates:clone",
-	"packages/object/src/index.ts:DRPObject.setACLState:clone",
-	"packages/object/src/index.ts:DRPObject.setDRPState:clone",
+	"packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy:detach",
+	"packages/object/src/index.ts:DRPObject.getStates:detach",
+	"packages/object/src/index.ts:DRPObject.setACLState:detach",
+	"packages/object/src/index.ts:DRPObject.setDRPState:detach",
 	"packages/utils/src/serialization/equality.ts:serializeValue:serialization",
 ] as const;
 
 const RESIDUAL_CLONE_SITES = [
-	"packages/object/src/drp-applier.ts:captureBatchVertexOperation:cloneDeep#1",
-	"packages/object/src/drp-applier.ts:cloneEnumerableInstance:cloneDeep#1",
-	"packages/object/src/drp-applier.ts:DRPVertexApplier.createVertex:cloneDeep#1",
-	"packages/object/src/drp-applier.ts:callDRP:cloneDeep#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:cloneDeep#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:cloneDeep#2",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:cloneDeep#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:cloneDeep#2",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromHashACL:cloneDeep#1",
-	"packages/object/src/state-materialize.ts:DRPObjectStateManager.applyState:cloneDeep#1",
-	"packages/object/src/state-materialize.ts:stateFromDRP:cloneDeep#1",
+	"packages/object/src/drp-applier.ts:captureBatchVertexOperation:detachStatePayload#1",
+	"packages/object/src/drp-applier.ts:cloneEnumerableInstance:detachStatePayload#1",
+	"packages/object/src/drp-applier.ts:DRPVertexApplier.createVertex:detachStatePayload#1",
+	"packages/object/src/drp-applier.ts:callDRP:detachStatePayload#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:detachStatePayload#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:detachStatePayload#2",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:detachStatePayload#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromStates:detachStatePayload#2",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.fromHashACL:detachStatePayload#1",
+	"packages/object/src/state-materialize.ts:DRPObjectStateManager.applyState:detachStatePayload#1",
+	"packages/object/src/state-materialize.ts:stateFromDRP:detachStatePayload#1",
+	"packages/object/src/state-payload.ts:detachStateSnapshot:detachStatePayload#1",
 ] as const;
 
 const RESIDUAL_STATE_CAPTURE_SITES = [
@@ -373,6 +374,8 @@ function knownSymbolLabel(symbol: ts.Symbol | undefined, checker: ts.TypeChecker
 	const identity = symbolIdentity(canonical, checker);
 	const known = [
 		"packages/object/src/state-materialize.ts:stateFromDRP",
+		"packages/object/src/state-payload.ts:detachStatePayload",
+		"packages/object/src/state-payload.ts:detachStateSnapshot",
 		"packages/object/src/publication/copy-capability.ts:createPublicationCapability",
 		"packages/object/src/publication/copy-capability.ts:copy",
 		"packages/object/src/publication/publisher.ts:assignState",
@@ -520,7 +523,7 @@ function externalSurface(references: readonly string[]): string[] {
 
 const analysisCache = new WeakMap<object, D922cAnalysis>();
 const SINK_REFERENCE =
-	/(?:cloneDeep|structuredClone|stateFromDRP|serializeDRPState|deserializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/;
+	/(?:cloneDeep|structuredClone|detachStatePayload|detachStateSnapshot|stateFromDRP|serializeDRPState|deserializeDRPState|serializeValue|deserializeValue|node:v8\.(?:serialize|deserialize)|msgpack\.(?:encode|decode)|[^:]+\.(?:encode|decode))#/;
 
 function analyze(sources: GovernedSources): D922cAnalysis {
 	const cached = analysisCache.get(sources);
@@ -561,13 +564,17 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 	const reviewedOperations = REVIEWED_WORKSPACE_OPERATIONS.filter((operation) => {
 		const separator = operation.lastIndexOf(":");
 		const category = operation.slice(separator + 1);
-		const referencePrefix = `${operation.slice(0, separator)}:${category === "clone" ? "cloneDeep" : "msgpack.encode"}#`;
+		const label = category === "detach" ? "detachState" : "msgpack.encode";
+		const referencePrefix = `${operation.slice(0, separator)}:${label}`;
 		return packageReferences.some((site) => site.startsWith(referencePrefix));
 	}).sort();
 	const analysis: D922cAnalysis = {
 		violations: [...new Set(violations)].sort(),
 		residualCloneSites: packageReferences.filter(
-			(site) => site.includes(":cloneDeep#") && !site.includes("copy-capability.ts") && !site.includes("src/index.ts")
+			(site) =>
+				(site.includes(":cloneDeep#") || site.includes(":detachStatePayload#")) &&
+				!site.includes("copy-capability.ts") &&
+				!site.includes("src/index.ts")
 		),
 		residualStateCaptureSites: packageReferences.filter((site) => site.includes(":stateFromDRP#")),
 		reviewedOperations,
@@ -582,7 +589,7 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 			packageReferenceSites: packageReferences,
 			closureReferenceSites: closureReferences,
 			codecReferenceSites: packageReferences.filter(
-				(site) => !site.includes(":cloneDeep#") && !site.includes(":stateFromDRP#")
+				(site) => !site.includes(":cloneDeep#") && !site.includes(":detachState") && !site.includes(":stateFromDRP#")
 			),
 			externalRuntimeSurface: externalSurface(allSites),
 			unresolvedAcquisitions: closure.unresolved,
@@ -620,6 +627,7 @@ const D922C_EXPECTED_TOPOLOGY = [
 	"packages/object/src/publication/copy-capability.ts",
 	"packages/object/src/publication/publisher.ts",
 	"packages/object/src/state-materialize.ts",
+	"packages/object/src/state-payload.ts",
 	"packages/object/src/state-store.ts",
 	"packages/utils/src/serialization/equality.ts",
 ] as const;
@@ -633,6 +641,7 @@ const D922D_RUNTIME_ROOTS = [
 const D922D_EXPECTED_RUNTIME_CLOSURE = [
 	"packages/object/src/publication/copy-capability.ts",
 	"packages/object/src/publication/publisher.ts",
+	"packages/object/src/state-payload.ts",
 	"packages/object/src/state-store.ts",
 	"packages/utils/src/serialization/equality.ts",
 ] as const;
@@ -985,19 +994,34 @@ const D922C_CODEC_REFERENCE_SITES = [
 ].sort();
 
 const D922C_COPY_CAPTURE_REFERENCE_SITES = [
-	...d922cSites("packages/object/src/publication/copy-capability.ts", "createPublicationCapability.copy", "cloneDeep"),
-	...d922cSites("packages/object/src/drp-applier.ts", "captureBatchVertexOperation", "cloneDeep"),
-	...d922cSites("packages/object/src/drp-applier.ts", "cloneEnumerableInstance", "cloneDeep"),
-	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.createVertex", "cloneDeep"),
-	...d922cSites("packages/object/src/drp-applier.ts", "callDRP", "cloneDeep"),
-	...d922cSites("packages/object/src/index.ts", "DRPObject.getStates", "cloneDeep", 2),
-	...d922cSites("packages/object/src/index.ts", "DRPObject.setACLState", "cloneDeep"),
-	...d922cSites("packages/object/src/index.ts", "DRPObject.setDRPState", "cloneDeep"),
-	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.constructor", "cloneDeep", 2),
-	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.fromStates", "cloneDeep", 2),
-	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.fromHashACL", "cloneDeep"),
-	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.applyState", "cloneDeep"),
-	...d922cSites("packages/object/src/state-materialize.ts", "stateFromDRP", "cloneDeep"),
+	...d922cSites(
+		"packages/object/src/publication/copy-capability.ts",
+		"createPublicationCapability.copy",
+		"detachStatePayload"
+	),
+	...d922cSites("packages/object/src/drp-applier.ts", "captureBatchVertexOperation", "detachStatePayload"),
+	...d922cSites("packages/object/src/drp-applier.ts", "cloneEnumerableInstance", "detachStatePayload"),
+	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.createVertex", "detachStatePayload"),
+	...d922cSites("packages/object/src/drp-applier.ts", "callDRP", "detachStatePayload"),
+	...d922cSites("packages/object/src/index.ts", "DRPObject.getStates", "detachStateSnapshot", 2),
+	...d922cSites("packages/object/src/index.ts", "DRPObject.setACLState", "detachStateSnapshot"),
+	...d922cSites("packages/object/src/index.ts", "DRPObject.setDRPState", "detachStateSnapshot"),
+	...d922cSites(
+		"packages/object/src/state-materialize.ts",
+		"DRPObjectStateManager.constructor",
+		"detachStatePayload",
+		2
+	),
+	...d922cSites(
+		"packages/object/src/state-materialize.ts",
+		"DRPObjectStateManager.fromStates",
+		"detachStatePayload",
+		2
+	),
+	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.fromHashACL", "detachStatePayload"),
+	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.applyState", "detachStatePayload"),
+	...d922cSites("packages/object/src/state-materialize.ts", "stateFromDRP", "detachStatePayload"),
+	...d922cSites("packages/object/src/state-payload.ts", "detachStateSnapshot", "detachStatePayload"),
 	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.constructor", "stateFromDRP", 2),
 	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.computeOperationUntraced", "stateFromDRP", 2),
 ].sort();
@@ -1005,7 +1029,12 @@ const D922C_COPY_CAPTURE_REFERENCE_SITES = [
 const D922C_PACKAGE_REFERENCE_SITES = [...D922C_CODEC_REFERENCE_SITES, ...D922C_COPY_CAPTURE_REFERENCE_SITES].sort();
 
 const D922C_CLOSURE_REFERENCE_SITES = [
-	...d922cSites("packages/object/src/publication/copy-capability.ts", "createPublicationCapability.copy", "cloneDeep"),
+	...d922cSites(
+		"packages/object/src/publication/copy-capability.ts",
+		"createPublicationCapability.copy",
+		"detachStatePayload"
+	),
+	...d922cSites("packages/object/src/state-payload.ts", "detachStateSnapshot", "detachStatePayload"),
 	...d922cSites("packages/utils/src/serialization/equality.ts", "<module>", "msgpack.encode", 3),
 	...d922cSites("packages/utils/src/serialization/equality.ts", "serializeValue", "msgpack.encode"),
 	...d922cSites("packages/utils/src/serialization/equality.ts", "serializedValuesEqual", "serializeValue", 2),
@@ -1230,14 +1259,13 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		expect(authority.analyzedSourcePaths.some((sourcePath) => /(?:\/dist\/|node_modules)/.test(sourcePath))).toBe(
 			false
 		);
-		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(114);
-		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(114);
+		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(115);
+		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(115);
 		expect([...authority.packageReferenceSites].sort()).toEqual(D922C_PACKAGE_REFERENCE_SITES);
 		expect([...authority.closureReferenceSites].sort()).toEqual(D922C_CLOSURE_REFERENCE_SITES);
 		expect(authority.externalRuntimeSurface).toEqual([
 			"@msgpack/msgpack@3.1.1:decode",
 			"@msgpack/msgpack@3.1.1:encode",
-			"es-toolkit@1.30.1:cloneDeep",
 		]);
 		expect(authority.unresolvedAcquisitions).toEqual([]);
 	});
@@ -1382,7 +1410,7 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		);
 	});
 
-	it("retains the exact 0 / 5 / 11 / 4 clone/capture tuple beside the fifth census", () => {
+	it("retains the exact 0 / 5 / 12 / 4 detach/capture tuple beside the fifth census", () => {
 		const analysis = analyze(realGovernedWorkspaceSources()) as D922cAnalysis;
 		expect(analysis.violations).toEqual([]);
 		expect(analysis.reviewedOperations).toEqual([...REVIEWED_WORKSPACE_OPERATIONS].sort());
@@ -1395,13 +1423,13 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		const sources = d922dMutateSource(
 			realGovernedWorkspaceSources(),
 			"packages/object/src/publication/copy-capability.ts",
-			'return observer ? emit({ type: "copy", value, metadata }) : cloneDeep(value);',
+			'return observer ? emit({ type: "copy", value, metadata }) : detachStatePayload(value);',
 			"return value;"
 		);
 		expect(analyze(sources).reviewedOperations).toEqual(
 			REVIEWED_WORKSPACE_OPERATIONS.filter(
 				(operation) =>
-					operation !== "packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy:clone"
+					operation !== "packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy:detach"
 			).sort()
 		);
 	});

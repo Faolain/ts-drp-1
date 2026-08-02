@@ -16,7 +16,6 @@ import {
 	type Vertex,
 } from "@ts-drp/types";
 import { serializeDRPState } from "@ts-drp/utils/serialization";
-import { cloneDeep } from "es-toolkit";
 
 import { createPermissionlessACL } from "./acl/index.js";
 import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js";
@@ -24,6 +23,7 @@ import { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError
 import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
 import { type DRPObjectStateManager } from "./state-materialize.js";
+import { detachStateSnapshot } from "./state-payload.js";
 
 export * from "./acl/index.js";
 export * from "./hashgraph/index.js";
@@ -194,8 +194,8 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		const aclState = this._states.getACLState(vertexHash);
 		const drpState = this._states.getDRPState(vertexHash);
 		return [
-			aclState === undefined ? undefined : cloneDeep(aclState),
-			drpState === undefined ? undefined : cloneDeep(drpState),
+			aclState === undefined ? undefined : detachStateSnapshot(aclState),
+			drpState === undefined ? undefined : detachStateSnapshot(drpState),
 		];
 	}
 
@@ -226,7 +226,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			// and is never adopted from the network or overwritten after creation.
 			throw new RootACLMutationError("Refusing to overwrite the root ACL state: genesis is derived from the object id");
 		}
-		this._states.setACLState(vertexHash, cloneDeep(aclState));
+		this._states.setACLState(vertexHash, detachStateSnapshot(aclState));
 	}
 
 	/**
@@ -235,7 +235,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @param drpState - The DRP state of the vertex.
 	 */
 	setDRPState(vertexHash: string, drpState: DRPState): void {
-		this._states.setDRPState(vertexHash, cloneDeep(drpState));
+		this._states.setDRPState(vertexHash, detachStateSnapshot(drpState));
 	}
 
 	/**
