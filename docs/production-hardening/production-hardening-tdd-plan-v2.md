@@ -15679,6 +15679,35 @@ set. The ordinary Grok-high, fresh exact Kimi 3/high/100 and final Opus/xhigh
 review loop remains mandatory despite the narrow amendment. P1 stays open
 until those reviewers accept the amended artifact.
 
+**P1 final-review correction candidate.** Fresh Codex-high tests-only commit
+`f8c2b9fdaf03562a4adba1f51c7d655b33f73479` changes only the authorized
+comparison-work test (197 insertions / 19 deletions). The deletions replace the
+old hostile-traversal `not.toThrow` block with a stronger form that retains the
+non-throw guarantee and additionally asserts exact `false` and zero hostile
+calls; no frozen behavior was removed. The corrected file is 802 formatted
+lines at SHA-256
+`8313ef999ca1f3eca30e9567e2e49164e4edb301ae3290a1fbf2710015bbcf27`.
+Its 27/27 focused run pins both equal hostile collection exceptions, both
+unequal controls, both forged-tag failures and publisher/applier asymmetric
+cycles. Evidence and causal-mutant notes are under
+`.logs/phase-1d-i-p1-exception-red-codex-high/`.
+
+The distinct Codex-high GREEN verifier returned `GREEN_ACCEPTED=yes` without
+any tracked change. Production remains byte-identical to `538269c`. The
+coverage-disabled serialized gates are: focused 27/27; publication 21/21;
+performance 8/8 with the MapDRP case at 207.0 ms and repeats 193.9 / 192.2 /
+193.3 ms against 1,000 ms; D.92.2 64/64; D.92.3 18/18; inherited 147/147;
+specialized 93/93; bounded 1 MiB 1/1; raw-child exact 11F/7P; and sync-livelock
+exact 3F/3P. The utils build, object/workspace typechecks, owned lint, tracked
+source lint at 0 errors / 249 inherited warnings, Prettier, diff, production
+hash and scope checks pass. An initial `eslint .` descended into ignored
+`.logs/**` mutants and is invalid for the tracked-source boundary; its parser
+errors are superseded by the exact tracked-file lint gate. Authoritative
+evidence is under
+`.logs/phase-1d-i-p1-exception-green-codex-high/`. This is still a candidate:
+P1 awaits the required independent Grok, fresh exact Kimi 3 and final Opus
+reviews.
+
 ##### D.92.3-P2 — captured snapshot-container traversal (blocks D.92.4)
 
 P2 begins only after P1 acceptance and re-freezes P1 tests, counters and
