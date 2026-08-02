@@ -15482,6 +15482,40 @@ fail/pass counts, hashes, counter schema and pre-corrective ratios. The D.92.2
 authority, D.92.3 18-case file, accepted Phase 1d(i) corpus and
 `perf-contracts.test.ts` remain byte-frozen.
 
+**Accepted P1 tests-only RED checkpoint.** Fresh Codex-high commit
+`e589f4cedcf4834311a469f366494235ba4f3a28` adds only
+`packages/object/tests/comparison-work-1d-i-red.test.ts`: 624 formatted lines
+at SHA-256
+`b8d55882497d9354fded66721e8363281b20974ec57503b03b1151c6a30a7d08`.
+Against unchanged production it is exactly 9 failures / 12 passes across 21
+tests. Six failures are solely absent comparison events/counters, two prove
+that hostile instance Map/Set traversal methods are still invoked and one
+proves the current three direct equality owners violate the sole-authority
+census. Passing controls freeze semantic-plus-byte verdicts and primary
+throwables, zero-work paths, observer independence, safe-superset candidacy
+and the current quadratic characterization.
+
+For both Map and Set, reordered sizes 8/16/32 produce deterministic getter
+visits 72/272/1,056: adjacent ratios 3.78/3.88 and 4N/N 14.67. The required
+production-counter sequence is 16/32/64 with ratios 2/2 and 4. The RED kills
+duplicate traversal, quadratic inner scan, skipped byte arbitration,
+order-insensitive final verdict, hidden equality relocation,
+under-candidacy, observer-controlled result and fingerprint/byte-cache
+shortcuts. Because the accepted D.92.2 classifier is file-private and frozen,
+the RED uses only a tiny declarative direct-import/reference census; the GREEN
+owns the mechanical D.92.2 authority update and may not grow a second analyzer.
+
+D.92.2 remains 64/64, D.92.3 18/18, publication work 21/21, inherited Phase
+1d(i) 147/147, specialized state/collection/atomicity 93/93 and bounded 1 MiB
+1/1. Raw-child and sync-livelock retain exact 11F/7P and 3F/3P baselines. Both
+typechecks pass; lint is 0 errors / 249 inherited warnings; Prettier, diff,
+hash and scope checks pass. `perf-contracts.test.ts` remains the triaged exact
+1F/7P baseline: 6,247.56 ms in the quick gate and three serialized repeats at
+6,261.57 / 6,277.50 / 6,329.01 ms against the frozen 1,000 ms limit. An initial
+shell-loop attempt reused zsh's read-only `status` variable, changed no source
+and was superseded by correctly logged runs. Evidence is under
+`.logs/phase-1d-i-p1-comparison-work-red-codex-high/`.
+
 **GREEN — distinct fresh Codex-high, production only.** The RED is immutable.
 The GREEN must establish one comparison authority at the same composition root
 as the branded publication capability and route publisher capture,
@@ -15598,19 +15632,18 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-D.92.3 is accepted through `67d7917`; the unanimous correction quorum adopted
-D.92.3-P1/P2/P3. Start P1 only with a fresh Codex-high tests-only RED in
-`packages/object/tests/comparison-work-1d-i-red.test.ts`. Freeze all existing
-tests and production. The RED must causally pin the one-authority census,
-exactly one semantic traversal per compared phase/side/key/value pair,
-diagnostic counter schema, N/2N/4N Map/Set linearity, semantic-plus-byte
-differential corpus, observer independence, safe-superset candidacy and the
-listed mutants. Run the quick coverage-disabled comparison/publication/perf
-set and the full checkpoint preservation gates to `.log`, triaging the current
-perf failure under the same-checkpoint rule without changing its 1,000 ms
-threshold. Record exact hashes, counts, ratios and scope in a tests-only commit
-and plan checkpoint. A distinct Codex-high GREEN follows; do not begin P2,
-D.92.4 or production changes during the RED.
+P1 RED `e589f4cedcf4834311a469f366494235ba4f3a28` is accepted at exact 9F/12P.
+Start a distinct fresh Codex-high GREEN with production authority only; the
+624-line RED and every existing test remain byte-frozen. Establish the single
+linear comparison authority, captured Map/Set traversal, safe-superset
+candidacy, D.91-compatible proxy behavior, pure counters and the mechanical
+D.92.2 authority update. The semantic-plus-byte differential corpus and exact
+throwables may not change. Run the quick and complete checkpoint gates to
+`.log`; P1 cannot close unless `perf-contracts.test.ts` is 8/8 at the unchanged
+1,000 ms threshold for three serialized repeats. Commit only the owned GREEN,
+then run fresh Grok-high and exact Kimi 3/high/100 reviews and final Opus/xhigh
+only if both accept. Do not start P2 or D.92.4 and do not widen into D.73,
+fingerprints, preimages or a new analyzer.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
