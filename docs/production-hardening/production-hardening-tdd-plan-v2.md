@@ -14386,6 +14386,25 @@ publication-order and mutation-attribution hardening), D.92.3 (production Map
 object-key detachment), D.92.4 (production raw-egress candidacy) and D.73 (the
 hostile graph-side virtual `Map.keys()` exploit before the live v3 binder).
 
+**Sustainability boundary.** Only the publication topology and capability are
+production code. The structural authority is test-only and answers a deliberately
+smaller question: which statically loaded first-party modules and known copy or
+codec references the two publication roots can acquire. It may use TypeScript's
+parser, module resolver and symbol identity, but it must not interpret application
+values, callbacks, containers, destructuring or arbitrary JavaScript execution.
+Application DRPs still execute as ordinary JavaScript; D.92.2 does not validate or
+sandbox their business logic, nor does a peer transmit TypeScript for this checker
+to execute.
+
+This distinction is the stop rule for future maintenance. A newly discovered
+ordinary TypeScript spelling is not a reason to extend a provenance interpreter.
+If it introduces a known sink or runtime dependency, add a causal tests-only RED
+and make the module/capability boundary reject or isolate that dependency. If it is
+arbitrary handwritten copying or hostile runtime behavior outside that static
+guarantee, cover the observable production invariant at runtime or explicitly
+narrow the supported contract. Never claim that copy counters prove the absence of
+an unobserved copy, and never widen an allowlist merely to turn the gate green.
+
 ##### D.92.2-a — Historical architecture RED (rejected by D.92.2-B)
 
 A fresh RED owner may edit only
