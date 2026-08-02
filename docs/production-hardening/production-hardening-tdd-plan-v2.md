@@ -14324,25 +14324,21 @@ The existing structure test is not a trustworthy transitive gate. It scans
 non-relative workspace imports, and omits `packages/object/src/index.ts` even
 though the public copy-in/copy-out ownership boundary lives there.
 
-The corrected analyzer must:
+The corrected authority must include `packages/object/src/index.ts` and every
+stored-snapshot boundary, resolve relative and `@ts-drp/*` source modules across
+package exports, and retain exact reviewed censuses for deliberately excluded
+copy and codec sites. D.92.2-A records why a transitive expression/value-flow
+analyzer was attempted; D.92.2-B records why it was rejected and replaces it
+with a production least-authority topology plus package-wide and closure-scoped
+symbol-reference censuses.
 
-1. include `packages/object/src/index.ts` and every stored-snapshot detachment
-   boundary in the governed roots;
-2. resolve relative imports, `@ts-drp/*` workspace imports and package subpath
-   exports across package boundaries;
-3. classify forbidden clone, encode and round-trip behavior by transitive
-   reachability, not by local identifier spelling;
-4. follow named/default/namespace imports, aliases, re-exports, property access,
-   callback passage and multi-hop wrappers; and
-5. retain an exact, reviewed census for deliberately excluded copy sites.
-
-Its mutation corpus must kill the exact rejected `snapshotValueBytes` helper
-relocated into utils, a renamed re-export, a two-hop wrapper, a third-package
-wrapper, namespace/property/callback aliases, discarded copies,
-serialization-as-clone, clone-everything-then-share and a helper placed just
-outside the former scan boundary. The RED changes expectations/fixtures only;
-the distinct GREEN changes the test analyzer, not production behavior. This
-governance slice must be fast enough for normal iteration.
+The surviving mutation corpus still kills the rejected `snapshotValueBytes`
+helper relocated into utils, renamed/default/namespace/re-export and
+export-star laundering, two-hop and third-package wrappers, discarded copies,
+serialization-as-clone, clone-everything-then-share, callback injection and a
+helper just outside the former scan boundary. These are re-expressed as module,
+export and exact sink-reference mutations; they no longer require a custom
+interpreter for arbitrary TypeScript value flow.
 
 #### D.92.2-A — Architecture pivot after recurring fail-open rounds
 
@@ -14369,23 +14365,28 @@ for correcting this plan is therefore unanimous.
 **A further RED10 round of manual AST/token-spelling patches is prohibited.**
 The repeated failures are identity-by-spelling defects in a hand-built
 module/scope/binding interpreter, not three isolated missing cases. The
-corrective is an architecture pivot executed as four sub-slices before D.92.3.
+initial corrective was an architecture pivot in four sub-slices; D.92.2-B
+records the later stop-condition quorum that replaced it with one atomic
+production-boundary pair before D.92.3.
 
-**Plain English — what D.92.2 is and is not.** D.92.2 is a _test-only
-governance gate_. It asks whether either stored-snapshot publication root —
-`assignState` or `advanceCheckpointIfNeeded` — can reach clone, codec or
-serialization round-trip work outside the single approved, measured
-publication-copy boundary while the intentionally excluded copies remain an
-exact reviewed census. It does not run in a deployed node, inspect an
-application's DRP at runtime or accept executable code from a peer. It protects
-the production copy-accounting/performance architecture established in D.90 §3
-from a future relocation or wrapper that would make full-state work invisible
-to the counters. It is distinct from D.91 (accepted production
+**Plain English — what D.92.2 is and is not.** The rejected analyzer was a
+_test-only governance gate_; the accepted replacement combines a small
+test-time structural authority with a production least-authority boundary. It
+asks whether either stored-snapshot publication root — `assignState` or
+`advanceCheckpointIfNeeded` — can acquire known clone, codec or serialization
+work outside the single approved, measured publication capability while the
+intentionally excluded copies remain exact reviewed censuses. The checker does
+not run in a deployed node, inspect an application's DRP at runtime or accept
+executable code from a peer. The production split constrains the reference
+topology; it does not sandbox arbitrary user JavaScript. Together they protect
+the copy-accounting/performance architecture established in D.90 §3 from a
+future relocation or wrapper that would make full-state work invisible to the
+counters. D.92.2 is distinct from D.91 (accepted production
 publication-order and mutation-attribution hardening), D.92.3 (production Map
 object-key detachment), D.92.4 (production raw-egress candidacy) and D.73 (the
 hostile graph-side virtual `Map.keys()` exploit before the live v3 binder).
 
-##### D.92.2-a — Architecture acceptance RED (tests only)
+##### D.92.2-a — Historical architecture RED (rejected by D.92.2-B)
 
 A fresh RED owner may edit only
 `packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` and
@@ -14418,7 +14419,7 @@ The RED must fail only for its intended architecture conditions while the
 existing frozen corpus, inherited Phase 1d(i) suite, typechecks, zero-error lint
 and formatting remain green.
 
-##### D.92.2-b — Checker-backed governance GREEN (tests only)
+##### D.92.2-b — Historical checker GREEN contract (retired by D.92.2-B)
 
 A distinct fresh GREEN owner replaces the hand-built module/scope/binding
 interpreter with an in-memory TypeScript `Program` and `TypeChecker`
@@ -14500,50 +14501,173 @@ spelling-specific patches, fails unseen ordinary equivalents or cannot meet the
 readable budget, stop and adjudicate a scoped production lint boundary or a
 mature analysis framework; do not begin another syntax-by-syntax round.
 
-##### D.92.2-c — Publication-copy boundary RED (tests only)
+#### D.92.2-B — Stop-condition quorum and authoritative reslice
 
-After D.92.2-a/b is independently accepted, a fresh RED owner pins the narrow
-production defense-in-depth slice:
+The first D.92.2-b attempt stopped cleanly and restored RED HEAD `1297d7a`.
+Its checker shell passed 265/305 while exceeding 1,000 readable lines; its
+finite-lattice rewrite formatted to 809 lines and passed 8/27 architecture
+tests. A distinct clean retry then reached 25/27 architecture behavior,
+including convergence, timing and `0/5/11/4`, but formatted to 760 lines and
+preserved only 152/305 frozen tests. The missing breadth remained the same
+module/export, class, global callable, unknown-key and operation-classification
+semantics that caused the earlier syntax-form rounds. Both drafts were
+discarded without a partial commit. The ratified D.92.2-A stop condition is
+therefore satisfied: no third custom value-flow interpreter attempt is allowed.
 
-- a dedicated publication-copy capability module and preserved
-  `publicationObserver` injection seam;
-- an exact architectural allowlist of modules under `packages/*/src` importing
-  clone/codec primitives, covering lint-ignored generated `_pb.ts` files;
-- absence of lint-disable suppression in governed files;
-- the `0/5/11/4` tuple and closed arithmetic between all clone sites, reviewed
-  operations and residuals; and
-- unchanged wire bytes, copy counters, per-case and aggregate
-  `clonedBytes < 20 * mutatedBytes` ratios, and the bounded 1 MB
-  characterization.
+The plan-correction quorum independently chose the production-boundary option:
 
-##### D.92.2-d — Publication-copy capability GREEN (production + lint config)
+- Codex-high architecture adjudicator
+  `/root/phase_1d_i_d92_2_architecture_adjudication_codex_high`:
+  `AMENDMENT_AGREE=yes`, `CHOICE=B`;
+- exact Kimi 3/high/100 session
+  `36317706-e868-4cc1-ad9f-8317b47834f4`:
+  `AMENDMENT_AGREE=yes`, `CHOICE=B`; and
+- Opus/xhigh session `0446f58b-71a3-46ba-b422-fbf01cb3e3ca`:
+  `AMENDMENT_AGREE=yes`, `CHOICE=B`, served solely by `claude-opus-5` with no
+  helper, network or subagent usage.
 
-A distinct fresh GREEN owner extracts the
-`DRPVertexApplier.copyPublicationPayload` leaf into
-`packages/object/src/publication-copy.ts`, preserving injection and default
-behavior, and adds name-granular `no-restricted-imports` entries scoped by
-`files:` glob in `eslint.config.mjs`. Add no dependency.
+The first architecture RED (`1297d7a`), GREEN9 and both aborted GREEN drafts
+are **rejected-transition evidence**. D.92.2-a/b's expression-flow fixtures,
+hop/cycle probes, worklist, transfer relation and 600-line interpreter ceiling
+are retired, not weakened. The surviving module/export mutations, source-first
+resolution, exact censuses, physical deletion of `analyzeLegacy` and
+`semanticAnalysis`, runtime publication behavior and timing guarantees move
+into one fresh RED/GREEN pair. A tests-only checker GREEN before the production
+split is prohibited because today's mixed modules would require the broad
+allowlists this correction forbids.
 
-The restriction is name-granular and file-scoped, never blanket. `index.ts`
-legitimately imports `serializeDRPState`; `drp-applier.ts` and `proxy.ts`
-legitimately import the non-copying `serializedValuesEqual`; and eleven of the
-sixteen clone sites are reviewed residual copies outside the 1d(i) hard ratio.
-Both reviewed and residual sets remain exact. The boundary statically prohibits
-direct imports/re-exports; unsupported dynamic acquisition fails closed in the
-checker-backed gate. This is defense-in-depth, not a runtime sandbox and not a
-replacement for provenance analysis.
+The replacement's static guarantee is narrower and exact:
 
-D.92.2-d must not introduce the shared graph-aware detachment primitive, which
-D.92.3 owns across the governed sites. It only gives that future primitive a
-home and isolates the one approved measured publication-copy boundary.
+> Statically loaded, first-party acquisition of known copy/codec sinks is
+> closed under import, re-export, alias, namespace and member reference within
+> the governed set; unresolved and dynamic acquisition fails closed. Arbitrary
+> handwritten copying, host-injected observers and hostile user getters or
+> proxies are not formally excluded and are covered only by measured runtime
+> invariants. This is an architectural least-authority boundary, not a runtime
+> sandbox.
+
+The source-first `Program`/`TypeChecker` owns only module/export identity,
+static runtime dependency closure and exact alias-resolved sink references. It
+must not grow an expression lattice, binding projector, callable/container
+interpreter, transfer relation, worklist, fixpoint or hop model. The formatted
+structural authority is capped at 300 logical lines, with a structural ban on
+those interpreter constructs; moving logic outside the measured boundary or
+compressing it is rejection, not compliance. Normal budgets become fixture
+p95 ≤50 ms, one census pass ≤2 seconds, memoized real-workspace Program ≤10
+seconds and whole gate ≤30 seconds. The bounded 1 MB characterization remains
+separate.
+
+Reference census is the primary static authority; module closure scopes it and
+lint supplies redundant fast feedback. For every forbidden imported, global or
+generated member symbol, enumerate every alias-resolved identifier and property
+reference in the governed set without asking whether a value reaches it.
+Maintain two tiers:
+
+1. package-wide `packages/*/src`, preventing relocation just outside the root
+   closure and callback injection; and
+2. the exact downward runtime dependency closure of the two publication roots,
+   preventing wrappers from re-entering publication.
+
+Both tiers pin exact site and owner multiplicity. Generated `_pb.ts` files are
+checker-governed even though ESLint ignores them; message-member sinks such as
+`encode`/`decode` and binary conversion, plus exported deserializers, are
+included. Relative/workspace named, default, namespace, re-export and
+export-star edges resolve source-first. `/dist/`, `node_modules`, unresolved
+internal modules, unknown external edges, dynamic `import()`, `require`,
+`eval`, `Function`, computed/global acquisition and new unreviewed dependency
+edges fail closed.
+
+The clone/capture tuple remains exactly `0/5/11/4`, but it is not a complete
+codec census: `DRPObject.getSerializedStates` is a reviewed codec site outside
+those four dimensions. The fresh RED discovers from the real workspace and
+pins a fifth exact package-wide codec/serialization-reference dimension rather
+than guessing its value in this plan. A module or owner is never broadly
+allowlisted because one existing reference is legitimate; an unrelated sink in
+a dependency requires module splitting.
+
+##### D.92.2-c′ — Least-authority publication boundary RED (tests only)
+
+A fresh Codex-high RED owner changes tests and test-local fixtures only. Current
+production must fail causally because both roots and residual clone/codec
+imports remain mixed, no capability exists and the old analyzer remains. Pin:
+
+- `assignState` and `advanceCheckpointIfNeeded` as exact single-statement
+  delegates with unchanged signatures, target symbol, arguments and
+  multiplicity; existing tests monkey-patch these names, so they do not move;
+- an isolated publisher whose nested payloads are opaque and one privately
+  branded publication capability constructed at one composition site, exposing
+  only measured copy, entry/snapshot construction, equality and observation —
+  never a raw sink;
+- one measured publication-copy leaf reachable positively from both roots,
+  a pinned capability export-name set and no callback/preprocessing work around
+  either delegate;
+- source-first package-wide and closure-scoped dependency/reference censuses,
+  including generated members, exact residual owner/site multiplicity, the
+  retained `0/5/11/4` tuple and the newly discovered fifth codec dimension;
+- fail-closed unresolved and dynamic acquisition, exact external export/version
+  surface, generated-source coverage, dependency/glob drift and a new
+  snapshot-construction root;
+- direct, renamed, default, namespace, re-export, export-star, two-hop and
+  third-package wrappers; helper relocation; discarded pre-copy/encode;
+  serialization-as-clone; clone-everything-then-share; capability raw re-export;
+  callback injection; computed generated-member access; protobuf/message
+  encode/decode round trip; JSON, Node v8 and MessagePack/protobuf bypasses; and
+- safe type-only imports, innocent same-name functions and unrelated modules
+  outside the closure.
+
+Static reference counting cannot recognize an import-free handwritten copier.
+The RED therefore adds two runtime invariants that do not depend on copy-event
+accounting: with an identity observer, each published changed-key payload is
+reference-identical to the live value; and there is exactly one measured copy
+event per published changed key with matching metadata. Existing wire bytes,
+publication order and atomicity, exact counters, per-case and aggregate ratios,
+causal getter/Proxy tests and the bounded 1 MB characterization remain
+preservation gates. The ratios bound work through the measured leaf; they are
+explicitly not evidence against an uncounted copy.
+
+##### D.92.2-d′ — Publication capability and structural authority GREEN
+
+A distinct fresh Codex-high GREEN owner may change the owned tests, production
+and lint configuration. It must perform one atomic topology correction:
+
+1. keep the two existing root methods as exact tiny delegates and extract their
+   publication pipeline into an isolated publisher module;
+2. extract the one publication copy/snapshot capability, preserve the
+   `publicationObserver` seam and default behavior, use a module-private brand
+   or closure, and prohibit raw-sink export;
+3. split the sink-free state store from materialization/reconstruction and its
+   reviewed residual clones, so only the store enters the publisher closure;
+4. split encode-only equality from decode-capable wire serialization, so a
+   round-trip codec cannot enter the publisher closure without a new edge;
+5. add file/name/member-granular `no-restricted-imports`,
+   `no-restricted-syntax`, `no-restricted-properties` and
+   `no-restricted-globals` feedback over the exact closure, with no
+   `no-restricted-*` suppression anywhere; freeze the unrelated pre-existing
+   suppression census rather than falsely requiring all old suppressions to
+   disappear; and
+6. replace and delete the old analyzer and its retired expression-flow fixtures
+   in the same commit. Add no dependency and never dual-run the rejected
+   interpreter.
+
+ESLint is not authoritative for generated ignored files; the checker census is.
+Overapproximation is deliberate: an unrelated sink inside a dependency forces
+module splitting, never allowlist expansion. Any new sink family, dynamic
+acquisition method, external callback surface or payload-traversal mechanism
+requires a new tests-only RED before the policy widens.
+
+D.92.2-d′ must not implement the graph-aware Map-key detachment primitive owned
+by D.92.3. It isolates the measured publication boundary and gives that later
+primitive a home while preserving wire bytes, ordering, publication atomicity,
+copy counters, ratios and the bounded characterization.
 
 #### D.92.3 — Map object-key detachment contract
 
-**Blocked:** D.92.3 does not begin until D.92.2-a/b and D.92.2-c/d have each
-passed their fresh Codex-high RED/GREEN pair, Grok-high, exact Kimi 3/high with
-both 100-step controls, and final Opus/xhigh acceptance. No part of D.92.3,
-D.92.4 or D.73 may be folded into a D.92.2 GREEN, and no D.92.2 sub-slice may be
-skipped because D.92.3 will later rewrite the same seam.
+**Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
+passed fresh Codex-high RED/GREEN ownership, Grok-high, exact Kimi 3/high with
+both 100-step controls, and final Opus/xhigh acceptance. D.92.2-a/b are rejected
+transition evidence, not outstanding prerequisites. No part of D.92.3, D.92.4
+or D.73 may be folded into D.92.2-d′ merely because the production split touches
+the same seam.
 
 One shared graph-aware state-payload detachment primitive must replace the
 graph-incomplete ownership copies. It must clone Map keys and values through
@@ -14612,25 +14736,38 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Begin D.92.2-a at exact HEAD
-`97936d41c7e0078f3d51116abe6cca15a75ca23c` plus this documentation-only
-checkpoint. GREEN9 is rejected transition evidence and stays in history
-unreverted; D.92.2 is not closed. Spawn a fresh Codex-high RED owner that may
-edit only
-`packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` and
-its test-local fixtures — never production, configuration or this plan. Do not
-write a RED10 round of AST/token-spelling patches against the existing
-analyzer.
+Begin D.92.2-c′ from this documentation-only correction checkpoint. GREEN9,
+RED `1297d7a` and both discarded checker GREEN attempts remain rejected
+transition evidence in history; D.92.2 is open, but a third custom value-flow
+analyzer attempt is prohibited.
 
-Then use a distinct fresh Codex-high GREEN owner for D.92.2-b and a further
-fresh RED/GREEN pair for D.92.2-c/d. After every commit run the focused gate,
-inherited Phase 1d(i) suite, raw-child and sync-livelock baselines, package and
-workspace typechecks, zero-error lint, formatting, diff/scope and exact-SHA
-verification to `.log` files. Review each pair with Grok-high, exact Kimi
-3/high/100 and final Opus/xhigh before proceeding. D.92.3 remains blocked until
-both pairs are accepted.
+Spawn a fresh Codex-high RED owner that may edit only the owned structure and
+publication tests plus test-local fixtures — never production, lint config or
+this plan. The RED must discover and pin the fifth package-wide
+codec/serialization-reference census from the real workspace, not guess it
+from `0/5/11/4`. It must prove the current mixed topology fails the isolated
+publisher/capability, exact reference census, generated-member, fail-closed
+closure and runtime identity/multiplicity contracts. Re-express the surviving
+wrapper/relocation mutants as import/export/reference mutations; do not port the
+retired expression-flow corpus into another analyzer.
 
-Never resurrect or partially retain the rejected fingerprint prototype. Never
-stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`, `skills-lock.json`, the
-stale untracked protocol-v2 0g2 REDs or unrelated paths. Do not schedule Fable
-unless explicitly requested.
+After committing the honest RED, use a distinct fresh Codex-high GREEN owner
+for the atomic D.92.2-d′ production split, lint rules and structural authority.
+The GREEN deletes `analyzeLegacy`, `semanticAnalysis` and the retired fixtures;
+it may not retain them for dual-run evidence. The source-first checker remains
+≤300 readable formatted logical lines and contains no expression lattice,
+binding projector, callable/container model, worklist or fixpoint. Mixed
+dependencies are split rather than allowlisted; generated sources remain under
+checker authority even when lint ignores them.
+
+At RED and GREEN run the focused gate, inherited Phase 1d(i) behavior, raw-child
+and sync-livelock baselines, package and workspace typechecks, tracked
+zero-error lint, formatting, diff/scope and exact-SHA verification to `.log`
+files. Keep the bounded 1 MB characterization targeted. Then run Grok-high,
+exact Kimi 3/high/100 and final Opus/xhigh over the complete pair. D.92.3 stays
+blocked until all three accept.
+
+Never resurrect or partially retain the rejected fingerprint/value-flow
+prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
+`skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
+paths. Do not schedule Fable unless explicitly requested.
