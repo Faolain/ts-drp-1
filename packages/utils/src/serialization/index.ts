@@ -1,18 +1,16 @@
-import { decode, encode, ExtensionCodec } from "@msgpack/msgpack";
+import { decode, ExtensionCodec } from "@msgpack/msgpack";
 import { DRPState, DRPStateEntry, DRPStateEntryOtherTheWire, DRPStateOtherTheWire } from "@ts-drp/types";
+
+import { serializeValue } from "./equality.js";
+
+export { serializedValuesEqual, serializeValue } from "./equality.js";
 
 const extensionCodec = new ExtensionCodec();
 
 const SET_EXT_TYPE = 0; // Any in 0-127
 extensionCodec.register({
 	type: SET_EXT_TYPE,
-	encode: (object: unknown): Uint8Array | null => {
-		if (object instanceof Set) {
-			return encode([...object], { extensionCodec });
-		} else {
-			return null;
-		}
-	},
+	encode: (_object: unknown): null => null,
 	decode: (data: Uint8Array) => {
 		const array = decode(data, { extensionCodec }) as Array<unknown>;
 		return new Set(array);
@@ -23,13 +21,7 @@ extensionCodec.register({
 const MAP_EXT_TYPE = 1; // Any in 0-127
 extensionCodec.register({
 	type: MAP_EXT_TYPE,
-	encode: (object: unknown): Uint8Array | null => {
-		if (object instanceof Map) {
-			return encode([...object], { extensionCodec });
-		} else {
-			return null;
-		}
-	},
+	encode: (_object: unknown): null => null,
 	decode: (data: Uint8Array) => {
 		const array = decode(data, { extensionCodec }) as Array<[unknown, unknown]>;
 		return new Map(array);
@@ -39,41 +31,12 @@ extensionCodec.register({
 const FLOAT_32_ARRAY_EXT_TYPE = 2; // Any in 0-127
 extensionCodec.register({
 	type: FLOAT_32_ARRAY_EXT_TYPE,
-	encode: (object: unknown): Uint8Array | null => {
-		if (object instanceof Float32Array) {
-			return encode([...object], { extensionCodec });
-		} else {
-			return null;
-		}
-	},
+	encode: (_object: unknown): null => null,
 	decode: (data: Uint8Array) => {
 		const array = decode(data, { extensionCodec }) as Array<number>;
 		return new Float32Array(array);
 	},
 });
-
-/**
- * Main entry point for serialization.
- * Converts any value into a Uint8Array using Protocol Buffers.
- * @param obj - The value to serialize
- * @returns The serialized value
- */
-export function serializeValue(obj: unknown): Uint8Array {
-	return encode(obj, { extensionCodec });
-}
-
-/**
- * Compare the exact bytes emitted by the value codec.
- * @param left - First value
- * @param right - Second value
- * @returns Whether both values have byte-identical serialized forms
- */
-export function serializedValuesEqual(left: unknown, right: unknown): boolean {
-	const leftBytes = serializeValue(left);
-	const rightBytes = serializeValue(right);
-	if (leftBytes.byteLength !== rightBytes.byteLength) return false;
-	return leftBytes.every((byte, index) => byte === rightBytes[index]);
-}
 
 /**
  * Main entry point for deserialization.

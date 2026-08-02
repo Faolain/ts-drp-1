@@ -23,7 +23,7 @@ import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js"
 import { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
-import { type DRPObjectStateManager } from "./state.js";
+import { type DRPObjectStateManager } from "./state-materialize.js";
 
 export * from "./acl/index.js";
 export * from "./hashgraph/index.js";

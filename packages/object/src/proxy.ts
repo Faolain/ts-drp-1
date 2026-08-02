@@ -1,12 +1,11 @@
 import { type DrpType, type IDRP } from "@ts-drp/types";
-import { handlePromiseOrValue, isPromise } from "@ts-drp/utils";
-import { serializedValuesEqual } from "@ts-drp/utils/serialization";
+import { handlePromiseOrValue, isPromise, serializedValuesEqual } from "@ts-drp/utils";
 import { circularDeepEqual } from "fast-equals";
 
 import { AdoptionCommitExhaustedError } from "./errors.js";
 import { MAX_ADOPTION_COMMIT_ATTEMPTS, type PostOperation } from "./operation.js";
 import { type Pipeline } from "./pipeline/pipeline.js";
-import { REPLICA_LOCAL_STATE_KEYS } from "./state.js";
+import { REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 export interface DRPProxyBeforeChainArgs {
 	prop: string;

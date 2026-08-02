@@ -169,6 +169,66 @@ const config = tsLintConfig(
 		},
 	},
 	{
+		files: ["packages/object/src/publication/publisher.ts"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					paths: [
+						{ name: "es-toolkit", message: "Publication copies must use PublicationCapability." },
+						{ name: "@msgpack/msgpack", message: "Publication equality must use PublicationCapability." },
+						{ name: "@ts-drp/utils/serialization", message: "Decode-capable serialization is outside publication." },
+						{ name: "../state-materialize.js", message: "Publication may depend only on the sink-free state store." },
+					],
+				},
+			],
+			"no-restricted-globals": ["error", "structuredClone", "Buffer"],
+			"no-restricted-properties": [
+				"error",
+				{ object: "JSON", property: "parse", message: "Serialization is outside publication." },
+				{ object: "JSON", property: "stringify", message: "Serialization is outside publication." },
+				{ object: "globalThis", property: "structuredClone", message: "Copies use PublicationCapability." },
+			],
+			"no-restricted-syntax": [
+				"error",
+				{ selector: "ImportExpression", message: "Dynamic acquisition is forbidden in publication." },
+				{
+					selector: "CallExpression[callee.name=/^(eval|require|Function)$/]",
+					message: "Dynamic acquisition is forbidden in publication.",
+				},
+			],
+		},
+	},
+	{
+		files: ["packages/object/src/publication/copy-capability.ts"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					paths: [
+						{ name: "@msgpack/msgpack", message: "The capability uses the encode-only equality export." },
+						{ name: "@ts-drp/utils/serialization", message: "Decode-capable serialization is outside publication." },
+					],
+				},
+			],
+			"no-restricted-globals": ["error", "structuredClone", "Buffer"],
+			"no-restricted-properties": [
+				"error",
+				{ object: "JSON", property: "parse", message: "Serialization is outside publication." },
+				{ object: "JSON", property: "stringify", message: "Serialization is outside publication." },
+				{ object: "globalThis", property: "structuredClone", message: "Copies use the measured leaf." },
+			],
+			"no-restricted-syntax": [
+				"error",
+				{ selector: "ImportExpression", message: "Dynamic acquisition is forbidden in publication." },
+				{
+					selector: "CallExpression[callee.name=/^(eval|require|Function)$/]",
+					message: "Dynamic acquisition is forbidden in publication.",
+				},
+			],
+		},
+	},
+	{
 		files: ["tests/fixtures/phase-0j-a/**/*.{ts,mjs}"],
 		rules: {
 			"@typescript-eslint/explicit-function-return-type": "off",
