@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
@@ -576,6 +576,111 @@ const D922C_EXPECTED_TOPOLOGY = [
 
 const D922C_CAPABILITY_EXPORTS = ["PublicationCapability", "createPublicationCapability"] as const;
 const D922C_ROOTS = ["advanceCheckpointIfNeeded", "assignState"] as const;
+const D922D_RUNTIME_ROOTS = [
+	"packages/object/src/publication/publisher.ts",
+	"packages/object/src/publication/copy-capability.ts",
+] as const;
+const D922D_EXPECTED_RUNTIME_CLOSURE = [
+	"packages/object/src/publication/copy-capability.ts",
+	"packages/object/src/publication/publisher.ts",
+	"packages/object/src/state-store.ts",
+	"packages/utils/src/serialization/equality.ts",
+] as const;
+
+function d922dMutateSource(
+	sources: GovernedSources,
+	sourcePath: string,
+	before: string,
+	after: string
+): Record<string, string> {
+	const source = sources[sourcePath];
+	if (source === undefined || source.split(before).length !== 2) {
+		throw new Error(`Expected one mutation target in ${sourcePath}`);
+	}
+	return { ...sources, [sourcePath]: source.replace(before, after) };
+}
+
+function d922dStaticReferenceFixture(
+	name: string,
+	expectedReference: string,
+	imports: string,
+	reference: string,
+	dependencies: Readonly<Record<string, string>>
+): WorkspaceMutationFixture & { readonly expectedReference: string } {
+	return { ...workspaceFixture(name, ENCODE_VIOLATION, imports, reference, dependencies), expectedReference };
+}
+
+const D922D_STATIC_REFERENCE_MUTANTS = [
+	d922dStaticReferenceFixture(
+		"imported shorthand packing",
+		"packages/object/src/drp-applier.ts:publish:msgpack.encode#1",
+		'import { encode } from "@msgpack/msgpack";',
+		"const hold = { encode }; void hold;",
+		{}
+	),
+	d922dStaticReferenceFixture(
+		"aliased internal serializer import",
+		"packages/object/src/drp-applier.ts:publish:serializeValue#1",
+		'import { serializeValue as sv } from "@ts-drp/utils/serialization/equality";',
+		"void sv;",
+		{
+			"packages/utils/src/serialization/equality.ts":
+				"export function serializeValue(value: unknown): unknown { return value; }",
+		}
+	),
+	d922dStaticReferenceFixture(
+		"namespace member reference to an internal serializer",
+		"packages/object/src/drp-applier.ts:publish:serializeValue#1",
+		'import * as serialization from "@ts-drp/utils/serialization/equality";',
+		"void serialization.serializeValue;",
+		{
+			"packages/utils/src/serialization/equality.ts":
+				"export function serializeValue(value: unknown): unknown { return value; }",
+		}
+	),
+	d922dStaticReferenceFixture(
+		"direct string-literal generated-member access",
+		"packages/object/src/drp-applier.ts:publish:DRPStateEntry.encode#1",
+		'import { DRPStateEntry } from "@ts-drp/types/proto/drp/v1/object_pb";',
+		'void DRPStateEntry["encode"];',
+		{
+			"packages/types/src/proto/drp/v1/object_pb.ts":
+				"export const DRPStateEntry = { encode(value: unknown): unknown { return value; } };",
+		}
+	),
+	d922dStaticReferenceFixture(
+		"namespace string-literal access to an internal serializer",
+		"packages/object/src/drp-applier.ts:publish:serializeValue#1",
+		'import * as serialization from "@ts-drp/utils/serialization/equality";',
+		'void serialization["serializeValue"];',
+		{
+			"packages/utils/src/serialization/equality.ts":
+				"export function serializeValue(value: unknown): unknown { return value; }",
+		}
+	),
+] as const;
+
+const D922D_STATIC_REFERENCE_CONTROLS = [
+	workspaceFixture(
+		"same-shape local shorthand and members",
+		/never/,
+		"",
+		'const encode = (value: unknown): unknown => value; const local = { encode, serializeValue: encode }; const hold = { encode }; void hold; void local.serializeValue; void local["serializeValue"];',
+		{}
+	),
+	workspaceFixture(
+		"type-only named, namespace and string-member references",
+		/never/,
+		'import type { DRPStateEntry } from "@ts-drp/types/proto/drp/v1/object_pb"; import type * as serialization from "@ts-drp/utils/serialization/equality";',
+		'type GeneratedEncoder = typeof DRPStateEntry["encode"]; type Serializer = typeof serialization.serializeValue; void (undefined as GeneratedEncoder | Serializer | undefined);',
+		{
+			"packages/types/src/proto/drp/v1/object_pb.ts":
+				"export const DRPStateEntry = { encode(value: unknown): unknown { return value; } };",
+			"packages/utils/src/serialization/equality.ts":
+				"export function serializeValue(value: unknown): unknown { return value; }",
+		}
+	),
+] as const;
 
 function d922cSites(sourcePath: string, owner: string, callee: string, count = 1): string[] {
 	return Array.from({ length: count }, (_, index) => `${sourcePath}:${owner}:${callee}#${index + 1}`);
@@ -891,6 +996,27 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		expect([...authority.measuredCopyLeafRoots].sort()).toEqual(D922C_ROOTS);
 	});
 
+	it.each([
+		[
+			"assignState",
+			"this.publicationPublisher.assignState(operation, adoption, publicationAttempts, publicationFrontier);",
+			["advanceCheckpointIfNeeded"],
+		],
+		[
+			"advanceCheckpointIfNeeded",
+			"this.publicationPublisher.advanceCheckpointIfNeeded(journal, force, publicationAttempts);",
+			["assignState"],
+		],
+	] as const)("derives the %s root-to-measured-copy-leaf fact from its delegate", (_, delegate, expectedRoots) => {
+		const sources = d922dMutateSource(
+			realGovernedWorkspaceSources(),
+			WORKSPACE_PUBLISHER_PATH,
+			delegate,
+			"void this.publicationPublisher;"
+		);
+		expect(d922cAuthority(analyze(sources)).measuredCopyLeafRoots).toEqual(expectedRoots);
+	});
+
 	it("pins source-first loaded coverage, both reference tiers and an exact external runtime surface", () => {
 		const sources = realGovernedWorkspaceSources();
 		const authority = d922cAuthority(analyze(sources) as D922cAnalysis);
@@ -914,22 +1040,86 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 
 	it("keeps materialization and decode-capable serialization outside the publisher runtime closure", () => {
 		const sources = realGovernedWorkspaceSources();
-		const closure = runtimeClosure(sources, [
-			"packages/object/src/publication/publisher.ts",
-			"packages/object/src/publication/copy-capability.ts",
-		]);
+		const closure = runtimeClosure(sources, D922D_RUNTIME_ROOTS);
 		expect(closure.unresolved).toEqual([]);
-		expect(closure.files.has("packages/object/src/state-store.ts")).toBe(true);
-		expect(closure.files.has("packages/object/src/state-materialize.ts")).toBe(false);
-		expect(closure.files.has("packages/utils/src/serialization/equality.ts")).toBe(true);
-		expect(closure.files.has("packages/utils/src/serialization/index.ts")).toBe(false);
+		expect([...closure.files].sort()).toEqual([...D922D_EXPECTED_RUNTIME_CLOSURE].sort());
+	});
+
+	it("uses one exported equality-only subpath from the capability", () => {
+		const capabilitySource = realGovernedWorkspaceSources()[D922D_RUNTIME_ROOTS[1]];
+		const capabilityFile = ts.createSourceFile("copy-capability.ts", capabilitySource, ts.ScriptTarget.Latest, true);
+		const runtimeUtilsImports = capabilityFile.statements
+			.filter(ts.isImportDeclaration)
+			.filter((statement) => !statement.importClause?.isTypeOnly)
+			.map((statement) =>
+				ts.isStringLiteral(statement.moduleSpecifier)
+					? statement.moduleSpecifier.text
+					: statement.moduleSpecifier.getText()
+			)
+			.filter((specifier) => specifier.startsWith("@ts-drp/utils"));
+		const manifest = JSON.parse(
+			fs.readFileSync(path.join(WORKSPACE_DIRECTORY, "packages/utils/package.json"), "utf8")
+		) as {
+			exports: Record<string, unknown>;
+		};
+		expect({ runtimeUtilsImports, equalityExport: manifest.exports["./serialization/equality"] }).toEqual({
+			runtimeUtilsImports: ["@ts-drp/utils/serialization/equality"],
+			equalityExport: {
+				types: "./dist/src/serialization/equality.d.ts",
+				import: "./dist/src/serialization/equality.js",
+			},
+		});
+	});
+
+	it("keeps generated state codecs out of the capability through type-only structural shapes", () => {
+		const sources = realGovernedWorkspaceSources();
+		const capabilitySource = sources[D922D_RUNTIME_ROOTS[1]];
+		const capabilityFile = ts.createSourceFile("copy-capability.ts", capabilitySource, ts.ScriptTarget.Latest, true);
+		const stateImports = capabilityFile.statements
+			.filter(ts.isImportDeclaration)
+			.filter(
+				(statement) =>
+					ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === "@ts-drp/types"
+			);
+		expect(
+			stateImports.every((statement) => {
+				const importClause = statement.importClause;
+				if (!importClause || importClause.isTypeOnly) return importClause?.isTypeOnly ?? false;
+				const bindings = importClause.namedBindings;
+				return (
+					bindings !== undefined &&
+					ts.isNamedImports(bindings) &&
+					bindings.elements.every((element) => element.isTypeOnly)
+				);
+			})
+		).toBe(true);
+		expect(d922cAuthority(analyze(sources)).snapshotConstructionSites).not.toEqual(
+			expect.arrayContaining([
+				"packages/object/src/publication/copy-capability.ts:createPublicationCapability.createEntry:DRPStateEntry.create#1",
+				"packages/object/src/publication/copy-capability.ts:createPublicationCapability.createSnapshot:DRPState.create#1",
+			])
+		);
+	});
+
+	it("includes generated runtime dependencies in the closure reference tier without a filename carve-out", () => {
+		const generatedPath = "packages/types/src/proto/drp/v1/review_fixture_pb.ts";
+		const sources = {
+			[WORKSPACE_PUBLISHER_PATH]: workspacePublisher(
+				'import { wireEncode } from "@ts-drp/types/proto/drp/v1/review_fixture_pb";',
+				"void wireEncode;"
+			),
+			[generatedPath]:
+				'import { encode } from "@msgpack/msgpack"; export function wireEncode(value: unknown): unknown { return encode(value); }',
+		};
+		const authority = d922cAuthority(analyze(sources));
+		const generatedReference = `${generatedPath}:wireEncode:msgpack.encode#1`;
+		expect(authority.packageReferenceSites).toContain(generatedReference);
+		expect(authority.closureReferenceSites).toContain(generatedReference);
 	});
 
 	it("pins the exact package-wide snapshot constructors and admits no third root", () => {
 		const authority = d922cAuthority(analyze(realGovernedWorkspaceSources()) as D922cAnalysis);
 		expect(authority.snapshotConstructionSites).toEqual([
-			"packages/object/src/publication/copy-capability.ts:createPublicationCapability.createEntry:DRPStateEntry.create#1",
-			"packages/object/src/publication/copy-capability.ts:createPublicationCapability.createSnapshot:DRPState.create#1",
 			"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:DRPState.create#1",
 			"packages/object/src/state-materialize.ts:stateFromDRP:DRPState.create#1",
 			"packages/object/src/state-materialize.ts:stateFromDRP:DRPStateEntry.create#1",
@@ -938,7 +1128,7 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		]);
 	});
 
-	it("pins scoped lint/glob authority without restricted-rule suppression drift", () => {
+	it("makes the restricted lint file set equal the exact first-party publisher runtime closure", async () => {
 		const lintConfig = fs.readFileSync(path.join(WORKSPACE_DIRECTORY, "eslint.config.mjs"), "utf8");
 		for (const rule of [
 			"no-restricted-globals",
@@ -948,7 +1138,22 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		]) {
 			expect(lintConfig).toContain(`"${rule}"`);
 		}
-		for (const sourcePath of D922C_EXPECTED_TOPOLOGY.slice(0, 2)) expect(lintConfig).toContain(sourcePath);
+		const closure = runtimeClosure(realGovernedWorkspaceSources(), D922D_RUNTIME_ROOTS);
+		const module = (await import(pathToFileURL(path.join(WORKSPACE_DIRECTORY, "eslint.config.mjs")).href)) as {
+			default: readonly {
+				files?: readonly string[];
+				rules?: Readonly<Record<string, unknown>>;
+			}[];
+		};
+		const lintFiles = module.default.flatMap((entry) => {
+			if (
+				!entry.files?.some((file) => closure.files.has(file)) ||
+				!Object.keys(entry.rules ?? {}).some((rule) => rule.startsWith("no-restricted-"))
+			)
+				return [];
+			return entry.files;
+		});
+		expect([...new Set(lintFiles)].sort()).toEqual([...closure.files].sort());
 
 		const suppressions = Object.entries(sourceFiles(SOURCE_DIRECTORY)).flatMap(([sourcePath, source]) =>
 			[...source.matchAll(/eslint-disable(?:-next-line)?\s+([^\n*]+)/g)].map(
@@ -975,6 +1180,36 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		expect(analysis.residualCloneSites).toEqual([...RESIDUAL_CLONE_SITES].sort());
 		expect(analysis.residualStateCaptureSites).toEqual([...RESIDUAL_STATE_CAPTURE_SITES].sort());
 		expect(d922cAuthority(analysis).codecReferenceSites).toHaveLength(94);
+	});
+
+	it("derives reviewed operations from the governed operation that remains in source", () => {
+		const sources = d922dMutateSource(
+			realGovernedWorkspaceSources(),
+			"packages/object/src/publication/copy-capability.ts",
+			'return observer ? emit({ type: "copy", value, metadata }) : cloneDeep(value);',
+			"return value;"
+		);
+		expect(analyze(sources).reviewedOperations).toEqual(
+			REVIEWED_WORKSPACE_OPERATIONS.filter(
+				(operation) =>
+					operation !== "packages/object/src/publication/copy-capability.ts:createPublicationCapability.copy:clone"
+			).sort()
+		);
+	});
+
+	it.each(D922D_STATIC_REFERENCE_MUTANTS)(
+		"counts canonical known-sink reference shape: $name",
+		({ expectedReference, expectedViolation, sources }) => {
+			const analysis = analyze(sources);
+			expect(d922cAuthority(analysis).packageReferenceSites).toContain(expectedReference);
+			expect(analysis.violations.some((violation) => expectedViolation.test(violation))).toBe(true);
+		}
+	);
+
+	it.each(D922D_STATIC_REFERENCE_CONTROLS)("keeps canonical-symbol control clean: $name", ({ sources }) => {
+		const analysis = analyze(sources);
+		expect(d922cAuthority(analysis).packageReferenceSites).toEqual([]);
+		expect(analysis.violations).toEqual([]);
 	});
 
 	it.each(D922C_REEXPRESSED_MODULE_MUTANTS)("kills surviving module/export mutation: $name", ({ sources }) => {
