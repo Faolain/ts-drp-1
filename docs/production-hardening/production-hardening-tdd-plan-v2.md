@@ -14824,6 +14824,44 @@ was not rerun because the RED changes only the structural test and authenticates
 production byte-identical to the previously passing base. The authority SHA-256
 remains `beca7ab54564b5df5c85801355d6c98c095dfa6e87f760b33e8949a0c7470cfe`.
 
+**Accepted corrective GREEN checkpoint (reviews pending).** Commit
+`ec7ba96f1172d15379de94326d3e5c2a2bdb034d` changes exactly the structural
+authority test, publication capability, utils export map, ESLint boundary and
+root Vite aliases. Canonical symbol identity now handles shorthand values,
+aliases and statically named property/element references. Root evidence is
+derived from the exact three-edge topology only: applier delegate, same-named
+publisher root, `capturePublishedState`, then capability `copy`; there is no
+general call graph or value-flow model. Reviewed operations are derived from
+real reference sites rather than echoed from their expected constant.
+
+The authority is 299 formatted nonblank lines, SHA-256
+`e90b81e24ae47c0ea095ca830167610191cb16855b38a978bc4c7154dc9e26f4`.
+Its publisher runtime closure is exactly four first-party files: publisher,
+copy capability, state store and encode-only equality. The capability imports a
+dedicated equality subpath, imports state shapes type-only and constructs plain
+`{ key, value }` / `{ state: [...] }` values, so generated protobuf runtime
+codecs are not acquired by publication. Generated sources remain governed by
+the package-wide tier with no `_pb.ts` closure-reference carve-out. Restricted
+lint coverage equals the same four-file closure.
+
+Focused structure is 48/48, publication work 21/21, inherited Phase 1d(i)
+147/147 and bounded 1 MiB 1/1. The exact censuses remain 94 codec / 114 package /
+7 closure references, `0/5/11/4`, and five remaining snapshot constructors.
+Object/workspace typecheck and package builds pass; owned lint has zero errors,
+tracked lint is 0 errors / 226 warnings and full lint retains the exact inherited
+49 errors / 226 warnings. Raw-child remains 11 failures / 7 passes and
+sync-livelock remains 3 failures / 3 passes. Prettier, diff and scope checks
+pass. Evidence is under
+`.logs/phase-1d-i-d92-2-dprime-review-green-codex-high/`.
+
+**Resolver and canonical-label gotchas.** The root Vite alias for
+`@ts-drp/utils/serialization` prefix-matched the new `/equality` subpath even
+though Node honored the package export. The exact equality alias must precede
+the broader serialization alias or tests load the decode-capable index. Also,
+canonical symbol labeling correctly changes one roster name from the local
+alias `DRPDiscoveryRequest` to its declared target `DRPDiscovery`; counts and
+runtime behavior are unchanged.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
@@ -14900,29 +14938,14 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Continue D.92.2-d′ from corrective RED
-`93f4336d11cf6f0b7d487c9dc56fb0c74ed78d1a`. The first d′ acceptance
-candidate was rejected by Grok and exact Kimi 3; final Opus was correctly not
-run. The production extraction remains the base. A custom value-flow analyzer
-remains prohibited.
-
-Use a distinct fresh Codex-high GREEN owner
-for the smallest coherent correction. Replace brittle reference extraction
-with TypeScript alias, shorthand-value and static property symbols; derive only
-the exact shallow publication topology needed by the two roots. Narrow the
-utils equality import to an exported subpath, prefer type-only state imports
-plus structural snapshot construction over generated runtime codec acquisition,
-remove `_pb.ts` closure carve-outs and cover every actual first-party closure
-file with the lint contract. The source-first checker remains ≤300 readable
-formatted logical lines; compression or moving logic outside the measured
-boundary is rejection.
-
-At RED and GREEN run the focused gate, inherited Phase 1d(i) behavior, raw-child
-and sync-livelock baselines, package and workspace typechecks, tracked
-zero-error lint, formatting, diff/scope and exact-SHA verification to `.log`
-files. Keep the bounded 1 MB characterization targeted. Then run Grok-high,
-exact Kimi 3/high/100 and final Opus/xhigh over the complete pair. D.92.3 stays
-blocked until all three accept.
+Review corrective pair `93f4336d` / `ec7ba96` from this documentation
+checkpoint. Run fresh Grok-high and exact Kimi 3/high/100 independently over the
+complete RED/GREEN lineage, authenticated logs, actual closure, canonical
+symbol cases, shallow topology, lint equality, Vite alias order and preserved
+production behavior. Run final Opus/xhigh only if both accept. If either
+reviewer rejects, record findings and start another bounded tests-only RED;
+never grow a value-flow interpreter. D.92.3 stays blocked until all three
+accept.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
