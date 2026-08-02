@@ -767,7 +767,18 @@ export function trackMutations<T extends object>(
 							return undefined;
 						}
 					}
-					const member = Reflect.get(date, property, date) as unknown;
+					const beforeResolution = Reflect.apply(DATE_GET_TIME, date, []);
+					let member: unknown;
+					let resolutionError: unknown;
+					let resolutionFailed = false;
+					try {
+						member = Reflect.get(date, property, date) as unknown;
+					} catch (error) {
+						resolutionError = error;
+						resolutionFailed = true;
+					}
+					if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), beforeResolution)) markChanged(date);
+					if (resolutionFailed) throw resolutionError;
 					if (typeof member !== "function") return wrap(member, ignored);
 					const isNativeDateMember = DATE_NATIVE_MEMBERS.get(property) === member;
 					return (...args: unknown[]): unknown => {
