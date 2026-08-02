@@ -16153,6 +16153,33 @@ adding a second comparison authority. Deterministic fixtures and exact byte/
 work oracles are sufficient; fuzzing or mutation testing is not required unless
 the RED proves the descriptor false-positive space cannot be bounded directly.
 
+**Accepted D.92.5-A/B tests-only RED checkpoint.** Fresh Codex-high commit
+`34eabb8623227415094889323264bb3277c1a97c` adds only
+`packages/object/tests/proxy-closure-descriptor-date-1d-i-red.test.ts`. The
+formatted file is 678 lines at SHA-256
+`9e0695755c4ed4f554aa459ace6aec464bfdc272f6cfce1d5e3f39f500235f9c`
+and is exact 12 failures / 5 passes across 17 cases against production and plan
+bytes identical to parent `cdd5ae9`.
+
+A's failures independently cover all three descriptor APIs over root and
+nested ordinary/Map/Set/Date proxies, data and accessor raw identities, primary
+failure preservation, O(1) readers, real stale publication and bounded
+read-only keys/spread/assign/JSON publication. B's failures independently cover
+configurable Date references, expando unwrapping, frozen function/undefined-
+getter parity, real expando-alias publication and a custom non-`set*` timestamp
+method. Green controls pin primitive descriptors, replica-local `context`, the
+native invalid-wrap TypeError, ordinary Date reads/idempotent/effective setters
+and reconstruction's Date-expando loss. Descriptor paths strictly require the
+existing all-governed egress union and exact work; Date paths permit either safe
+wrapping with precise candidates or conservative egress with full-union work.
+
+Preservation is D.92.4 23/23; P2 33/33; P1/publication 48/48; D.92.2 64/64;
+D.92.3 18/18; inherited Phase 1d(i) 147/147; specialized
+state/collection/atomicity 93/93; performance 8/8 with the state case at 211.5
+ms; and bounded 1 MiB 1/1. Object/workspace typechecks, owned/tracked lint,
+Prettier, diff, scope and production byte-identity pass. Evidence is under
+`.logs/phase-1d-i-d925-proxy-closure-red-codex-high/`.
+
 The hostile graph-side virtual `Map.keys()` exploit recorded in D.73 is real,
 confirmed through direct tracking and the real applier, and remains a hard
 pre-3a live-v3-binder gate. It can hide a vertex from the charge keyset while a
@@ -16196,21 +16223,21 @@ must not be used to defer D.92.2–D.92.5, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2 and D.92.4 are accepted and closed. Start a fresh Codex-high tests-only
-RED for the single D.92.5-A/B proxy-closure family recorded above. Keep A
-descriptor-read signaling and B Date parity separately causal and visible in
-the frozen file, but share one preservation matrix and review loop. The RED must
-reproduce publisher-real stale bytes, exact raw identities/invariants,
-operation/side locality, ballast reuse, bounded read-only widening and O(1)
-dirty readers without changing production or the plan. Freeze its exact
-hash/count/RED signature before starting a distinct Codex-high production-only
-GREEN. Reuse D.92.4's signal and detached-union comparison; do not add a second
-comparison authority, fingerprints/preimages/`byteChangedKeys`, rewrite
-descriptors, instrument escaped values, scan roots in dirty readers or fold
-P3/D.73/Phase 1d(ii) into this family. After D.92.5 closes, complete P3a/P3b
-before the composite D.92 review. The retained prototype-safe materialization
-item remains mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot
-adoption, but it does not reopen P2 or D.92.4.
+P1, P2 and D.92.4 are accepted and closed. D.92.5-A/B tests-only RED `34eabb8`
+is frozen at 12 failures / 5 passes across 17 cases; its 678-line SHA-256 is
+`9e0695755c4ed4f554aa459ace6aec464bfdc272f6cfce1d5e3f39f500235f9c`.
+Start a distinct fresh Codex-high production-only GREEN. Reuse D.92.4's signal
+and detached-union comparison; add pure descriptor observation without
+rewriting, give Date safe member/expando/invariant/custom-method behavior, and
+keep A/B independently green. Fold only the recorded `hasRawEgress` doc,
+runtime-work typing and vestigial-loop hygiene into this candidate. Do not
+change the frozen RED, add a second comparison authority,
+fingerprints/preimages/`byteChangedKeys`, rewrite descriptors, instrument
+escaped values, scan roots in dirty readers or fold P3/D.73/Phase 1d(ii) into
+this family. After D.92.5 closes, complete P3a/P3b before the composite D.92
+review. The retained prototype-safe materialization item remains mandatory
+before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption, but it does not
+reopen P2 or D.92.4.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
