@@ -14736,12 +14736,76 @@ Final GREEN evidence is under
 `.logs/phase-1d-i-d92-2-dprime-green-codex-high/`: structure 35/35 in 9.60
 seconds without coverage, publication work 21/21, inherited Phase 1d(i)
 147/147, bounded 1 MiB 1/1, object and workspace typecheck pass, owned lint
-0/0, tracked-source lint 0 errors / inherited 226 warnings, Prettier and scope
+0 errors with inherited JSDoc warnings, tracked-source lint 0 errors / inherited
+226 warnings, Prettier and scope
 checks pass, and full lint remains the exact unrelated 49-error / 226-warning
 baseline. Raw-child remains the inherited 11-fail/7-pass baseline and
-sync-livelock remains 3-fail/3-pass. This checkpoint remains review-pending;
+sync-livelock remains 3-fail/3-pass. This checkpoint is not yet accepted;
 D.92.3 stays blocked until Grok-high, exact Kimi 3/high/100 and final
 Opus/xhigh accept it.
+
+**Adversarial review rejection and bounded corrective.** Grok 4.5/high session
+`019fc061-806d-70e3-80ad-27935d2029f5` and exact Kimi 3/high/100 session
+`session_aad9bb1b-b8dc-4b37-b3ec-6171bee01e93` both returned
+`CHANGES_REQUESTED`. They independently affirmed the production extraction,
+wire behavior, publication ordering/atomicity, capability isolation, runtime
+backstops and deferred ownership of D.92.3, D.92.4 and D.73. Final Opus review
+was therefore not run. The d′ checkpoint is rejected only as an acceptance
+candidate; commit `74af6fb` remains the production base for a corrective
+RED/GREEN lineage.
+
+The blocking structural findings are:
+
+1. static references to a known sink can escape the two censuses through
+   shorthand property symbols, aliased internal serializers, namespace/member
+   access and string-literal element access. The shipped computed-member regex
+   covers only a subset and only inside the closure;
+2. `measuredCopyLeafRoots` is returned from a constant instead of being derived
+   from the two delegates' real path to the measured copy leaf;
+3. `reviewedOperations` is echoed from its expected constant rather than
+   discovered, so that assertion is tautological;
+4. the runtime closure is broader than the least-authority story: the
+   capability imports equality through the utils barrel and value-imports
+   generated protobuf constructors, while `_pb.ts` references are filtered
+   from the closure tier; and
+5. lint is pinned for only the publisher/capability pair rather than every
+   first-party source in the exact runtime closure. The plan's `owned lint 0/0`
+   wording is also corrected: the accepted final artifacts show zero errors
+   with inherited JSDoc warnings; tracked/full final totals are accurately
+   `0/226` and `49/226`.
+
+The corrective must not answer these findings by adding expression provenance,
+binding/container flow, callbacks, a general call graph or more spelling-keyed
+regular expressions. Use TypeScript's canonical symbol APIs for ordinary
+static reference shapes: alias symbols, shorthand-assignment value symbols and
+property symbols for statically named property/element access. Unknown dynamic
+acquisition still fails closed at the module/capability boundary. Derive the
+two root-to-leaf facts from the exact, shallow publication topology and kill
+each fact with a causal source mutation; do not build a general-purpose call
+model. Discover reviewed operations from syntax/symbol evidence or remove the
+tautological channel in favor of the independently computed exact rosters.
+
+Production dependencies must become at least as narrow as the asserted
+closure. Prefer a dedicated exported equality subpath over the utils barrel.
+Because `DRPState` and `DRPStateEntry` are structural interfaces, the capability
+may construct their plain shapes behind type-only imports instead of acquiring
+the generated runtime codec objects; preserve exact public shapes and wire
+bytes. The closure census must include every actual runtime dependency and may
+not hide generated modules with a filename carve-out. Lint files are derived
+from or compared exactly with that same first-party closure. An unrelated sink
+still forces module splitting, never allowlist growth.
+
+A fresh Codex-high tests-only corrective RED owns structural tests and
+test-local fixtures only. It must pin all of the general forms above, safe
+shadow/type-only controls, causal root-to-leaf mutations, honest closure and
+lint equality, and the removal or computation of tautological evidence. A
+distinct Codex-high GREEN then makes the smallest coherent production/test/lint
+change while keeping the formatted authority at or below 300 logical lines.
+If that cannot be done by replacing brittle logic with canonical symbol logic,
+the GREEN must stop; the line ceiling must not be met by compression or logic
+moved outside its measured boundary. Run the complete c′/d′ gate set again,
+then fresh Grok-high and exact Kimi 3/high/100 reviews; final Opus/xhigh runs
+only if both accept.
 
 #### D.92.3 — Map object-key detachment contract
 
@@ -14819,29 +14883,33 @@ must not be used to defer D.92.2–D.92.4 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-Begin D.92.2-c′ from this documentation-only correction checkpoint. GREEN9,
-RED `1297d7a` and both discarded checker GREEN attempts remain rejected
-transition evidence in history; D.92.2 is open, but a third custom value-flow
-analyzer attempt is prohibited.
+Continue D.92.2-d′ from production base `74af6fb` and documentation checkpoint
+`8d7fd1d` plus this review-finding checkpoint. The first d′ acceptance candidate
+was rejected by Grok and exact Kimi 3; final Opus was correctly not run. The
+production extraction remains the base, while the structural authority and its
+closure/lint claims require one bounded corrective RED/GREEN pair. A custom
+value-flow analyzer remains prohibited.
 
-Spawn a fresh Codex-high RED owner that may edit only the owned structure and
-publication tests plus test-local fixtures — never production, lint config or
-this plan. The RED must discover and pin the fifth package-wide
-codec/serialization-reference census from the real workspace, not guess it
-from `0/5/11/4`. It must prove the current mixed topology fails the isolated
-publisher/capability, exact reference census, generated-member, fail-closed
-closure and runtime identity/multiplicity contracts. Re-express the surviving
-wrapper/relocation mutants as import/export/reference mutations; do not port the
-retired expression-flow corpus into another analyzer.
+Spawn a fresh Codex-high tests-only RED owner that may edit only the owned
+structure test and test-local fixtures — never production, lint config or this
+plan. Pin shorthand import packing, aliased internal serializers,
+namespace/member references, statically named element access and safe
+shadow/type-only twins using canonical symbols. Pin causal mutations for each
+root-to-copy-leaf path, remove or expose tautological `reviewedOperations`,
+require the exact unfiltered runtime dependency closure and make lint's file set
+equal that closure. Do not add expression/callback/container provenance, a
+general call graph or another list of spelling-specific regular expressions.
 
 After committing the honest RED, use a distinct fresh Codex-high GREEN owner
-for the atomic D.92.2-d′ production split, lint rules and structural authority.
-The GREEN deletes `analyzeLegacy`, `semanticAnalysis` and the retired fixtures;
-it may not retain them for dual-run evidence. The source-first checker remains
-≤300 readable formatted logical lines and contains no expression lattice,
-binding projector, callable/container model, worklist or fixpoint. Mixed
-dependencies are split rather than allowlisted; generated sources remain under
-checker authority even when lint ignores them.
+for the smallest coherent correction. Replace brittle reference extraction
+with TypeScript alias, shorthand-value and static property symbols; derive only
+the exact shallow publication topology needed by the two roots. Narrow the
+utils equality import to an exported subpath, prefer type-only state imports
+plus structural snapshot construction over generated runtime codec acquisition,
+remove `_pb.ts` closure carve-outs and cover every actual first-party closure
+file with the lint contract. The source-first checker remains ≤300 readable
+formatted logical lines; compression or moving logic outside the measured
+boundary is rejection.
 
 At RED and GREEN run the focused gate, inherited Phase 1d(i) behavior, raw-child
 and sync-livelock baselines, package and workspace typechecks, tracked
