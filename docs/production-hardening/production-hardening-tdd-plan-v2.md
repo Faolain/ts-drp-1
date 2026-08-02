@@ -16493,6 +16493,33 @@ the existing data-descriptor committed-before-discovery charging and topology
 updates. Do not change the frozen RED, serialize hidden fields, always widen,
 scan, fingerprint, add a comparison authority or touch Date/Map/Set.
 
+**D.92.6 production GREEN candidate.** Distinct fresh Codex-high commit
+`ca488b1` changes only `packages/object/src/proxy.ts` by 43 additions and 15
+deletions. Ordinary bookkeeping now captures own descriptors without invoking
+getters. Set resolves descriptor kind across the prototype chain and uses the
+tracked receiver only for an accessor, avoiding a broad receiver change for
+ordinary data writes. Post-commit finalization derives topology only from own
+data-descriptor values; accessor descriptors create no data-value edge, and
+define/delete charge their committed owner without evaluating user code. D.91's
+post-commit traversal-failure charging remains intact.
+
+The frozen RED remains exact at 463 lines and SHA-256
+`9ef93845d8b996b03a535c3283e55ace2c725ed0779efdc1f8f279f55c6f9256`
+and is 8/8. Preservation is D.92.5+D.92.4 52/52; D.91+alias topology 22/22;
+P2+P1+D.92.3 99/99; D.92.2 64/64; inherited 147/147; specialized 93/93; and
+bounded 1 MiB 1/1. Four performance runs remain 8/8 with the state case between
+650.4 and 656.7 ms, below 1,000 ms. D.92.2 again took 80.79 seconds under load
+but passed cleanly. Sync-livelock remains exact 3F/3P. Object/workspace
+typechecks, owned/tracked lint, Prettier, diff, frozen hash and scope pass. A
+bounded inherited-accessor probe confirms the tracked receiver. Evidence is
+under `.logs/phase-1d-i-d926-accessor-bookkeeping-green-codex-high/`.
+
+The candidate requires fresh Grok 4.5/high and exact Kimi 3/high/dual-100
+review, then final Opus/xhigh if both accept. Review the entire D.92.6 causal
+contract, including inherited descriptor lookup, no-op/throw ordering,
+data-to-accessor/accessor-to-data topology and D.91 preservation; do not absorb
+Date D.92.5 or later P3.
+
 **One-off Fable course audit.** A read-only `claude-fable-5`/high audit of the
 plan, lineage, review artifacts and committed candidate `ba35ebb` returned
 `ON_TRACK`. It found no plan/code divergence, reward-hacking, analyzer
@@ -16550,19 +16577,17 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2, D.92.4 and D.92.5 are accepted and closed. D.92.6 tests-only RED
-`00afff3` is frozen at exact six failures / two passes with the 463-line SHA-256
-above. Start a distinct fresh Codex-high production-only GREEN. Make ordinary
-set/delete/define bookkeeping descriptor-aware and never invoke accessors for
-bookkeeping; actual user-driven accessors keep the proxy receiver. Preserve
-data-descriptor committed-before-discovery charging/topology, native throw/order
-semantics, the frozen RED and the stated gate matrix, including the deferred
-D.92.2 64-case run. Do not serialize hidden fields, always widen, scan,
-fingerprint, add another comparison authority or touch Date/Map/Set. If green,
-record the candidate and run fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
-final Opus/xhigh. P3a starts only after D.92.6 closes, then P3b, composite D.92
-and Phase 1d(ii). Prototype-safe materialization remains mandatory before Phase
-1d(ii) closure and Phase 4b/6a snapshot adoption.
+P1, P2, D.92.4 and D.92.5 are accepted and closed. D.92.6 RED `00afff3` and
+production GREEN candidate `ca488b1` are complete with the gates above. Run
+fresh Grok 4.5/high and exact Kimi 3/high with both 100-step controls in
+parallel; if both accept, run final Opus/xhigh. Authenticate the frozen RED and
+probe non-invoking set/delete/define bookkeeping, selective proxy receiver,
+descriptor-kind transitions, exact publication work and D.91 preservation.
+Do not fold Date D.92.5, P3, D.73 or Phase 1d(ii) into D.92.6. If all reviewers
+accept, close D.92.6 plan-only, then start P3a tests-only RED and its distinct
+loop. P3b follows, then composite D.92 and Phase 1d(ii). Prototype-safe
+materialization remains mandatory before Phase 1d(ii) closure and Phase 4b/6a
+snapshot adoption.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
