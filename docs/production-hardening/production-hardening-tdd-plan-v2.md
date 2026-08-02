@@ -15049,6 +15049,23 @@ was not rerun because its test and relevant production hashes are unchanged from
 the passing GREEN base; the omission is authenticated, not reported as a new
 execution.
 
+The first typed-classifier GREEN attempt reached 62/62 with one data-driven
+runtime star/namespace classifier, then deliberately stopped before commit. A
+pre-commit adversarial probe proved that declaration-level
+`export type { cloneDeep as detach }` and per-specifier
+`export { type encode as pack }` still recorded runtime sink references. The
+owner restored exact HEAD with authority 314 / SHA-256 `5f89a4df…42e2`; no
+partial GREEN survives.
+
+Fresh tests-only addendum commit
+`1f99ae02e9a5cb67051a4440c0b8cde9eb7e109a` adds exactly those two named
+type-only clean controls, completing the finite external declaration surface:
+two packages × named/star/namespace × runtime/type-only. Against unchanged
+authority the focused result is exactly 6 failures / 58 passes across 64 tests:
+the frozen four typed star/namespace failures plus the two named type-only false
+positives. All behavioral, type, lint, format, scope, authority and production
+authentication remains identical to the preceding RED checkpoint.
+
 #### D.92.3 — Map object-key detachment contract
 
 **Blocked:** D.92.3 does not begin until the replacement D.92.2-c′/d′ pair has
