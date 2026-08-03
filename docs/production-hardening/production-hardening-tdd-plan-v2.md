@@ -16782,6 +16782,43 @@ and commit-scope checks pass. Authoritative RED evidence is under
 distinct Codex-high agent for the production GREEN, preserving the frozen RED
 and dynamic-ownership boundaries. This checkpoint makes no policy amendment.
 
+**P3b accessor-receiver corrective GREEN candidate.** Distinct Codex-high
+production-only commit `ec841096a7893da3921b672c68c0f34e0b4d30b2`, against
+parent `89a303c94f18ccd16990a1e7a793421473760f75`, changes only
+`packages/object/src/proxy.ts` with one insertion and one deletion. The final
+1,616-line file has SHA-256
+`a3b269e893d0520dcafeffcf8ed38391cffe8208ed0eaea66e385ee2e654d084`
+and git blob `e2cf23316ddd5193daa328f65901c7405017ae1c`.
+
+The candidate preserves the raw receiver required by native internal-slot
+binary accessors, but evaluates custom accessors with the tracked proxy as
+their receiver. Nested or returned-and-bound structural calls therefore
+re-enter the existing call-time function-identity and governed-ownership
+guard. This also holds when a callable is acquired while the backing is
+context-only and invoked only after a Buffer promotes that backing into the
+governed state domain. The change does not seal or promote a backing, add a
+parent edge, or broaden policy.
+
+The exact pre-GREEN baseline is 4F/1P. Focused and postcommit runs are 5/5,
+and the combined P3b corpus is 25/25. The authoritative acquisition-time
+Vitest probe is 1/1. P3a plus bounded 1 MiB is 6/6, with the 1 MiB case at
+1,385 ms; P3a-prime/root-cycle is 20/20; D.92.2 is 64/64; inherited Phase
+1d(i) is 147/147; specialized is 93/93; P2+P1+D.92.3 is 99/99; and
+D.92.4-D.92.6 is 60/60. Performance is 8/8 with MapDRP at 228.0 ms. The sync
+sentinel retains its expected exact 3F/3P and exit 1. Object and workspace
+typechecks pass; owned lint is clean; tracked-source lint has zero errors and
+249 inherited warnings; and Prettier and diff checks pass.
+
+An initial `tsx` acquisition-time probe failed only because direct execution
+could not resolve the package export; it exercised no product behavior and is
+superseded, non-authoritative evidence. The equivalent Vitest probe above is
+the authoritative result. All candidate and gate evidence is under
+`.logs/phase-1d-i-p3b-accessor-green-codex-high/`.
+
+This remains a GREEN candidate, not an acceptance or closure of P3b. Run fresh
+Grok 4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final
+Opus/xhigh only if both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
