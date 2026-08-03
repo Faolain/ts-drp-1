@@ -76,6 +76,7 @@ const BUFFER_BRANDED_FIRST_ARGUMENT_METHODS = new Set<PropertyKey>([
 	"lastIndexOf",
 ]);
 const ARRAY_BUFFER_MUTATING_METHODS = new Set<PropertyKey>(["grow", "resize", "transfer", "transferToFixedLength"]);
+const GOVERNED_BUFFER_BACKING_MUTATION_ERROR = "Cannot structurally mutate an ArrayBuffer backing a governed Buffer";
 const BINARY_READ_ONLY_METHODS = new Set<PropertyKey>([
 	Symbol.iterator,
 	"at",
@@ -361,6 +362,7 @@ export function trackMutations<T extends object>(
 	const directOwners = new WeakMap<object, Set<string>>();
 	const parents = new WeakMap<object, Map<object, number>>();
 	const initialized = new WeakSet<object>();
+	const buffersByBacking = new WeakMap<object, Set<object>>();
 
 	const isReference = (value: unknown): value is object =>
 		(typeof value === "object" || typeof value === "function") && value !== null;
@@ -499,6 +501,16 @@ export function trackMutations<T extends object>(
 		if (!parents.get(rawValue)?.has(rawParent)) addParent(rawValue, rawParent);
 	};
 
+	const registerBufferBacking = (buffer: object): void => {
+		const backing = binaryBacking(buffer);
+		let buffers = buffersByBacking.get(backing);
+		if (!buffers) {
+			buffers = new Set<object>();
+			buffersByBacking.set(backing, buffers);
+		}
+		buffers.add(buffer);
+	};
+
 	type PreparedGraphs = { commit(): void };
 	type GovernedWritePreparation =
 		| { readonly graphs: PreparedGraphs; readonly failure?: never }
@@ -586,6 +598,7 @@ export function trackMutations<T extends object>(
 				for (const binary of binaries) {
 					Reflect.apply(OBJECT_PREVENT_EXTENSIONS, Object, [binary]);
 					initialized.add(binary);
+					if (isNodeBuffer(binary)) registerBufferBacking(binary);
 				}
 				if (!complete) return;
 				for (const apply of normalize) apply();
@@ -675,6 +688,12 @@ export function trackMutations<T extends object>(
 			visited.add(current);
 			if ((directOwners.get(current)?.size ?? 0) > 0) return true;
 			for (const parent of parents.get(current)?.keys() ?? []) pending.push(parent);
+		}
+		return false;
+	};
+	const hasGovernedBuffer = (backing: object): boolean => {
+		for (const buffer of buffersByBacking.get(backing) ?? []) {
+			if (hasGovernedOwner(buffer)) return true;
 		}
 		return false;
 	};
@@ -860,6 +879,9 @@ export function trackMutations<T extends object>(
 					const nativeMember = isNativeBinaryMember(binary, property, member);
 					return (...args: unknown[]): unknown => {
 						const operationReplicaLocalOnly = isReplicaLocalOnly(binary, ignored);
+						if (nativeMember && ARRAY_BUFFER_MUTATING_METHODS.has(property) && hasGovernedBuffer(binary)) {
+							throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
+						}
 						if (!nativeMember && !operationReplicaLocalOnly) {
 							// Custom code receives the raw internal-slot-bearing receiver. Widen
 							// publication instead of pretending its effect surface is known.
