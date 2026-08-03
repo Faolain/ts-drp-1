@@ -17541,6 +17541,99 @@ This is a GREEN candidate only; P3b remains open. Run fresh Grok 4.5/high and
 exact Kimi 3/high/dual-100 reviews. Launch final Opus/xhigh only if both
 preliminary reviewers accept.
 
+**P3b governed-backing self-alias final-review rejection — owner-only bare
+backing.** Both preliminary reviewers accepted exact reviewed HEAD
+`d3233bb4ecb87b5c722b100d3cb448f4b62c3ae5`. Fresh Grok 4.5/high session
+`019fc6f0-7e32-7531-b220-bf6217696880`, request
+`b1d5e74c-f8ef-478a-8918-bdf7c4df247b`, completed 27/27 calls on the sole
+authenticated `grok-4.5-build` key and made 45 substantive tools: 26 terminal,
+17 reads and two greps. It independently passed focused 3/3 and combined P3b
+39/39 and returned `ACCEPTED` / `P3B_MAY_CLOSE=yes`, with no helper, fallback,
+subagent, Fable or web content. Its raw envelope has SHA-256
+`f8402c4ace57bf2fafb34d98f50725bdabf42354a33be2b76d1f5a425f4deb0d`,
+its result has
+`2e1dc4e8aee37976aae8a6697d9a1b6161040a9e7643555b15d3f21f9962a490`,
+and its manifest has
+`0d00f98e55578e8d8252d0434b520a4eee697fcd7a44ffa75dc86b06175d9b47`.
+Evidence is under
+`.logs/phase-1d-i-p3b-self-alias-green-grok45-high-review/`.
+
+Fresh exact Kimi 3 session `eb05e4ec-de18-4244-ae62-1532e769298b` used the
+authenticated `kimi-code/k3` mapping with high-effort instructions and both
+100-step controls. Its substantive turn made 21 `StepBegin`/LLM requests and
+23 tools, 17 shell and six reads; a same-session one-step, zero-tool correction
+fixed terminal framing and exact counts only. Both turns reached `TurnEnd`, so
+the authenticated total is 22 LLM requests and 23 tools, neither 100-step cap
+reached. Its authoritative result remained `ACCEPTED` /
+`P3B_MAY_CLOSE=yes`, with no fallback, helper, subagent, Fable or network/web
+use. The combined raw stream has SHA-256
+`fe1164dc6aa85c3fc11f995c8563f1e0ddb52a713ffde5d030b9c18728dd576b`
+and the corrected result has
+`c6dc6b835d55937a037bb374a98f12cf292fd5556455bf8c3b7af96837cfb87f`.
+Evidence is under
+`.logs/phase-1d-i-p3b-self-alias-green-kimi3-high-100-review/`.
+
+Final Claude-skill Opus/xhigh session
+`0df270a8-d2e4-4298-9c9d-c574e2ebf697` instead returned
+`CHANGES_REQUESTED` / `P3B_MAY_CLOSE=no`. The sole substantive reviewer was
+`claude-opus-5` for 74 turns at requested xhigh effort. The final envelope also
+discloses one automatic, unrequested `claude-haiku-4-5-20251001` helper with
+only 27 output tokens; it did not perform the substantive review. Server use
+was zero web searches and zero web fetches, and no Fable or subagent was used.
+The raw envelope has SHA-256
+`b762f14a021a38aef43af797a9bddf7d2ec94615bc95a3feedfaf898e6229424`,
+the result has
+`501c4c6a43ee46e69fc8e63174831707b46e3caa7b5d5db3bf6f80ad6e94e3c7`,
+and the finalized manifest has
+`67f831657f242766d806e37fcbf7488f04406f3f808103f460b7bf5b91dc2efe`.
+Evidence is under
+`.logs/phase-1d-i-p3b-self-alias-final-opus-xhigh-review/`.
+
+Opus found one under-included ownership case. Governed state contains an
+extensible protected backing host for a Node Buffer and, separately, a
+top-level governed bare `ArrayBuffer` victim. Writing the victim proxy onto the
+host unwraps and stores the raw victim. At acquisition time the backing-store
+branch of `isGovernedBinaryValue` asks only whether that raw value backs a
+registered governed Buffer. For the bare governed victim that answer is false,
+even though the direct ownership registry says it has a live governed owner.
+The frozen own-data `get` and binary `getOwnPropertyDescriptor` paths therefore
+return the raw victim. Ordinary byte mutation and captured transfer succeed,
+the victim changes from four bytes to zero, and changes, raw-egress and both
+keysets all remain clean.
+
+The native Opus session's Bash tool was denied 24 times, so the controller
+authenticated the finding in a disposable `/tmp` copy without mutating the
+repository. Its owner-only-backing probe exited zero; the output SHA-256 is
+`3cd651a8407e6edd53154957e13f832dc4c69a2a452bbecce7a9e80f34235f78`.
+It also reconfirmed focused 3/3 and combined 39/39, proving a coverage gap
+rather than a regression visible to the frozen suite. The preliminary misses
+are bounded and recorded honestly: Grok's adjacent probe noticed the bare
+backing predicate asymmetry but tried installation only on a sealed bare
+backing, not through a distinct extensible host; Kimi's single probe covered
+the registered Buffer-backing family, not the cross-host owner-only case.
+
+This is current P3b. The tracked proxy mints the raw capability and the victim
+has a live governed owner; there is no pre-held raw capability, `context`
+laundering, hostile classification, virtual keyset or wire conversion. It is
+therefore not D.73, D.92.4 or D.92.7. Candidate
+`1272a7879db49fae627e222616702586a68eb36c` remains committed but rejected,
+and P3b remains open. Decision A is unchanged and no plan amendment is needed:
+the shared predicate is simply under-inclusive for an owner-only backing.
+
+Next use a fresh Codex-high tests-only RED with one shared cross-host fixture
+and exactly two causal egress cases: frozen own-data `get`, including the
+caught post-install Proxy-invariant error, and configurable
+`getOwnPropertyDescriptor` after ordinary set. Both must prove raw identity,
+clean tracking, byte mutation and transfer from four bytes to zero. Add bounded
+foreign and context-only controls to preserve the scope firewall, but do not
+grow a host/value/descriptor matrix. The distinct production GREEN should add
+`hasGovernedOwner(rawValue)` as a disjunct in the backing-store branch of the
+shared governed-binary predicate while retaining the registered-Buffer backing
+and governed Buffer/view branches. Run focused and combined P3b, the complete
+preservation matrix, typechecks and lint before fresh Grok 4.5/high and exact
+Kimi 3/high/dual-100 reviews; launch final Opus/xhigh only if both preliminary
+reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18346,14 +18439,25 @@ and P3b remains open. Fresh Codex-high tests-only RED `ee61544` now freezes
 exactly those two end-to-end paths at focused 2F/1P, combined 2F/37P and prior
 P3b preservation 36/36.
 
-Distinct Codex-high production-only candidate `1272a78` now applies one live
-governed-binary predicate at exactly the frozen own-data `get` and binary
-`getOwnPropertyDescriptor` egress points. It passes the frozen RED 3/3,
-combined P3b 39/39, the complete preservation matrix, typechecks and
-authoritative lint gates. Treat it as a candidate only. Run fresh Grok
-4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final Opus/xhigh
-only if both preliminary reviewers accept. The existing Decision A contract
-already owns this correction; no plan amendment is required.
+Distinct Codex-high production-only candidate `1272a78` applies one live
+governed-binary predicate at the frozen own-data `get` and binary
+`getOwnPropertyDescriptor` egress points and passes the frozen RED 3/3,
+combined P3b 39/39, preservation, typechecks and authoritative lint gates.
+Fresh Grok 4.5/high and exact Kimi 3/high/dual-100 accepted it, but final
+Opus/xhigh found a cross-host owner-only bare-backing bypass and the controller
+reproduced both egress paths: a distinct governed bare `ArrayBuffer` has a live
+owner but is not a registered governed Buffer backing, so the backing branch
+returns false and exposes the raw victim with clean tracking before transfer
+changes four bytes to zero. Candidate `1272a78` is committed but rejected and
+P3b remains open. This is one predicate under-inclusion under the existing
+Decision A contract, not a plan amendment or deferred D.73/D.92.4/D.92.7 work.
+
+Next use a fresh Codex-high tests-only RED with one shared owner-only cross-host
+fixture and exactly the frozen `get` and configurable descriptor egress cases,
+plus bounded foreign/context controls without a syntax matrix. The distinct
+GREEN should add the live-owner disjunct to the predicate's backing-store branch
+while retaining its registered-Buffer and Buffer/view branches. Then run the
+full gates and the ordinary preliminary/final review loop.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
