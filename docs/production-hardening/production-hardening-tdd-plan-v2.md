@@ -17952,19 +17952,75 @@ exception-driven binary detection with captured exact-prototype checks and
 cleared the final lint gate. Evidence is under
 `.logs/phase-1d-i-d927-binary-wire-fidelity-green-codex-high/`.
 
-This is a candidate only: D.92.7 remains open pending fresh Grok 4.5/high and
-exact Kimi 3/high/dual-100 review, then conditional final Opus/xhigh. Review
-must specifically challenge legacy extension-tag-2 compatibility, the
-public-versus-internal codec/context export boundary, pooled-slab and
-allocation-proof claims, and decoder CPU/memory denial-of-service surfaces.
-No contract or plan assumption is amended.
+**D.92.7 accepted and closed.** Fresh Grok 4.5/high session
+`019fc794-29da-7462-8303-e69ffc19092a` returned `ACCEPTED` /
+`D927_MAY_CLOSE=yes` after independently passing focused 25/25,
+serialization controls 21/21 and D.92.2 preservation 64/64 in a disposable
+exact-HEAD tree. It also authenticated ordinary object, Map, Set and Date wire
+stability; legacy tag-2 fail-closed behavior; pooled-Buffer privacy; bounded 4
+GiB rejection; and distinct sparse-backing reconstruction. Its 24/24 native
+calls used only Grok 4.5/high. Evidence and the 52-entry artifact manifest are
+under `.logs/phase-1d-i-d927-binary-wire-fidelity-green-grok45-high-review/`; the
+manifest SHA-256 is
+`92e0afb77e732323f46c93af0fae06e3dc337e1ee588919476280720f665cd37`.
 
-Two review findings remain `OPEN` D.92.7-or-dedicated candidates rather than
-adopted scope. A TypedArray backed by a resizable ArrayBuffer may reject
-`Object.preventExtensions`; support and compatibility need a future owner.
-Governed Date own expandos can remain locally visible while mutation is
-uncharged and detachment drops them. Neither finding changes scope, contract or
-status unless the required Opus/Codex/Kimi plan-amendment quorum adopts it.
+The authoritative replacement exact Kimi 3/high review used native session
+`03ca9e02-10e9-4466-bc05-374a2d59f338`, loaded `kimi-code/k3` as effective
+model `k3`, and returned `ACCEPTED` / `D927_MAY_CLOSE=yes`. Both the environment
+and CLI 100-step controls were active; the substantive turn used 20 steps and
+27 tools, followed by a zero-tool authentication correction. Its earlier
+interrupted initialization is preserved but superseded and contributes no
+verdict. Result SHA-256 is
+`b53c4910f0378bd9df2e43b4fb0a112ead3e58ba7423ffe2346eefe8198c56f3`;
+evidence is under
+`.logs/phase-1d-i-d927-binary-wire-fidelity-green-kimi3-high-100-review/`.
+
+Final same-session Opus/xhigh review used substantive `claude-opus-5` in native
+session `724f2b60-aa8a-4bc0-a206-8c8a7430b803` and returned `ACCEPTED` /
+`D927_MAY_CLOSE=yes`. Because its sandbox denied execution, the controller ran
+its exact requested command in a fresh archive of reviewed HEAD `7380a99`,
+built the workspace and passed five files / 110 tests / exit 0: D.92.7 25/25,
+serialization controls 21/21 and D.92.2 64/64. The same Opus session then read
+that evidence and superseded only its execution caveat, not its acceptance.
+The initial native envelope automatically reported a non-substantive
+27-output-token Haiku helper; it was not requested and did not replace any
+Opus reasoning. No requested helper, subagent, Fable, web, browser or MCP tool
+was used. Final result SHA-256 is
+`0ea63f813595f21fc363590ef39a3b3a94c630cd3f39e696b7911b5caf82e6e5`;
+evidence is under
+`.logs/phase-1d-i-d927-binary-wire-fidelity-final-opus-xhigh-review/`.
+
+All reviewers found no bounded D.92.7 defect. Legacy tag-2 Float32 payloads
+reject rather than decode ambiguously, so any mixed-version or durable-state
+transition requires coordinated migration or negotiation before production
+activation; the frozen contract does not require backward binary decoding.
+This acceptance changes no contract or plan assumption.
+
+The following review residuals remain nonblocking `OPEN` candidates rather
+than adopted D.92.7 scope:
+
+- pooled-Buffer equality is offset/slab-sensitive and may conservatively
+  over-report change; this can cause publication churn but remains
+  convergence-safe;
+- Buffer and SharedArrayBuffer records fail closed where those families are
+  unavailable, so browser capability negotiation and documentation are needed;
+- the new structural binary wire is unversioned and incompatible with legacy
+  tag 2, requiring coordinated migration before mixed versions communicate;
+- the per-entry 8 KiB decode allowance can multiply across a DRP state, so the
+  caller must impose a total bound before enabling the decoder in production;
+  no production caller exists currently;
+- binary expando detection performs an O(n) `Reflect.ownKeys` scan on a hot
+  equality path;
+- the mutable codec singleton is runtime-reachable through the deep equality
+  export even though `stripInternal` removes it from declarations;
+- encoding a detached backing fails with a raw but bounded `TypeError`;
+- resizable ArrayBuffer/growable SharedArrayBuffer semantics and governed Date
+  expandos remain the previously recorded `OPEN` candidates; and
+- SharedArrayBuffer copying has no atomic-snapshot promise.
+
+None of these residuals reopens D.92.7 or changes the D.73 firewall. Hostile
+Proxy graphs, virtual `Map.keys()`, `Symbol.hasInstance` and `Symbol.species`
+remain D.73-owned and hard before Phase 3a.
 
 #### D.92.4 — Raw-egress contract after detachment
 
@@ -18703,27 +18759,24 @@ falsified objection and superseded its verdict to `ACCEPTED` /
 `P3B_MAY_CLOSE=yes`. Preserve the complete evidence and model disclosure in
 the P3b acceptance section above; do not modify any frozen P3b lineage.
 
-Freeze D.92.7 tests-only RED `3614362` and production-only GREEN candidate
-`2d336c5`. The candidate changes only the two serialization owners by exact
+Freeze accepted D.92.7 tests-only RED `3614362` and production-only GREEN
+`2d336c5`. The GREEN changes only the two serialization owners by exact
 581 insertions / 56 deletions, replaces parallel registries with one shared
 codec and fresh per-call context, and is 25/25 with every mandatory
 preservation, typecheck, lint, formatting and performance gate described in
 the D.92.7 section. Do not modify either frozen lineage.
 
-Proceed directly with fresh Grok 4.5/high and exact Kimi 3/high/dual-100
-reviews in parallel; run final Opus/xhigh only if both accept. Require the
-reviewers to execute or independently inspect the strict malformed/unknown-tag
-cases, pooled Buffer visible-byte/zeroed-outside proof, 8 KiB one-pool
-allowance, 4 GiB allocation rejection and two-sparse-backing wire proof. They
-must also challenge legacy extension-tag-2 compatibility, whether the shared
-codec/context exports are truly internal, decoder CPU/memory DoS, and the
-intentional per-protobuf-entry identity boundary. Do not grow the D.92.2
-analyzer, consume D.73 hostile classification or D.92.4 raw-egress ownership,
-or widen this into a general codec rewrite. Composite D.92 starts only after
-D.92.7 closes, then Phase 1d(ii); prototype-safe materialization remains
-mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption. D.73
-hostile virtual `Map.keys()`, `Symbol.hasInstance` and `Symbol.species`
-ownership is unchanged.
+Fresh Grok 4.5/high, authoritative exact Kimi 3/high/dual-100 and final
+same-session Opus/xhigh all accepted D.92.7. The final controller rerun passed
+the exact five files / 110 tests / exit 0 required by Opus. Preserve the
+complete evidence and nonblocking residual ledger in the D.92.7 section above.
+
+Proceed directly to the composite D.92 review, then Phase 1d(ii). Do not grow
+the D.92.2 analyzer, consume D.73 hostile classification or D.92.4 raw-egress
+ownership, or widen binary serialization into a general codec rewrite.
+Prototype-safe materialization remains mandatory before Phase 1d(ii) closure
+and Phase 4b/6a snapshot adoption. D.73 hostile virtual `Map.keys()`,
+`Symbol.hasInstance` and `Symbol.species` ownership is unchanged.
 
 Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
