@@ -17250,6 +17250,60 @@ promotion/final-owner-removal behavior and the no-raw-egress contract. This is
 the existing unanimously amended Decision A contract, so no further plan
 amendment quorum is required.
 
+**Accepted P3b frozen-native-descriptor RED checkpoint.** Fresh Codex-high
+tests-only commit `ff6df9170eda569ea5bb4248af3e1b2ffd039b2b`, against parent
+`76803d1413b781c1cceddbeb49d14d31a8b8fa12`, adds only the 148-line
+`packages/object/tests/buffer-backing-frozen-native-descriptor-1d-i-red.test.ts`.
+The frozen file has SHA-256
+`e6b0f3b830e279c18dc312fe4b44ca31c607952bac2e57ac6a302a60ccf8fcb8`
+and git blob `30e9ab9721441812792ebc335591d8cd95c9f80d`.
+
+The focused RED is exactly 2F/1P and the combined P3b run is exactly 2F/34P;
+an isolated preservation rerun keeps the prior frozen P3b corpus at 33/33.
+Both failures are causal. A genuine captured `transfer` or
+`transferToFixedLength` installed through the exposed backing proxy as a
+non-configurable, non-writable own data value is returned by the frozen-
+descriptor early branch before structural-native identity and live protected-
+ownership enforcement. The initially protected case and the context-to-
+protected promotion case therefore fail the exact policy-error assertion at
+acquisition, while the backing stays attached, its bytes remain unchanged and
+tracking remains clean. The same live-ownership case also proves that context-
+only access and access after final-owner removal return the exact native
+identity. The passing control preserves ordinary frozen data and function
+identity plus an undefined-getter invariant.
+
+Arbitrary frozen functions are deliberately not asserted to be clean on
+acquisition: returning such a function can legitimately signal raw egress.
+That is distinct from a trusted captured structural native, which must reject
+before `signalRawEgress` when live protected ownership exists. Treating every
+frozen function as the structural case would hide this boundary and violate
+ordinary Proxy invariants.
+
+Object typecheck and workspace typecheck at 34/34 projects pass. Owned ESLint
+has zero diagnostics; Prettier, `git diff --check`, frozen-hash and tests-only
+scope checks pass. Production remains byte-identical at SHA-256
+`04a7627fa5312dc51b883b37be651de8dbb7c1d0fd2a1b8e609c13010418a7bc`
+and git blob `876f955374efc0e9b8488ce34d437c283d65868c`; the plan remains
+byte-identical to the RED parent at SHA-256
+`f9bdd0c2c38b4bfe6f0a69723693f6a38efdec82295cdad01ee42c0a0d2e1e02`
+and git blob `c9cfc406d52c40cad3279e9ae5a652b51182d446`. Protected untracked
+paths remain unstaged. Blocked `stash@{0}` remains
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Evidence is under
+`.logs/phase-1d-i-p3b-frozen-alias-descriptor-red-codex-high/`.
+
+The distinct Codex-high GREEN is production-only. It must recognize a captured
+structural native together with live protected backing ownership before, or
+inside, the non-configurable/non-writable descriptor early return and throw the
+exact policy error before raw-egress signaling. It must return exact identity
+in context-only state and after final-owner removal, while preserving ordinary
+frozen values and functions, undefined-getter symmetry and Proxy invariants.
+No descriptor- or syntax-matrix growth is authorized. P3b remains open until
+that GREEN passes the frozen RED and full preservation gates, then receives
+fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review; launch final
+Opus/xhigh only if both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18036,18 +18090,19 @@ tests-only RED, manifest repair and nested-wrapper refinement remain frozen at
 accepted by fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
 Claude-skill Opus/xhigh.
 
-P3b GREEN candidate `8223511` reaches its frozen 8/8 and all exact preservation
-gates, but exact Kimi 3/high/dual-100 rejected it for uncharged Buffer-backing
-transfer after Grok accepted. Its tests-only corrective RED is frozen at
-`822135e`, and distinct production-only corrective GREEN candidate `530f569`
-reaches focused 13/13 plus the full preservation matrix, but authoritative
-Grok and Kimi reviews both reject its captured-native own-alias bypass. Freeze
-a fresh Codex-high tests-only RED for same/alternate own keys, conditional
-`resize`, dynamic context/promotion/removal and the real applier, with bounded
-custom-wrapper and benign custom controls only if they clarify the single
-identity/provenance contract. Then implement a distinct production GREEN, run
-full gates and repeat fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and,
-conditionally, final Opus/xhigh review.
+P3b has progressed through the earlier frozen RED/GREEN lineages and the
+unanimous setter-contract Decision A amendment. Production candidate
+`a558e9e` removes unsound post-hoc error normalization and reaches its frozen
+8/8 plus the full preservation matrix, but exact Kimi 3/high/dual-100 found the
+frozen-own-descriptor ordering bypass after Grok accepted. Fresh Codex-high
+tests-only RED `ff6df91` now freezes that single defect at focused 2F/1P,
+combined 2F/34P and prior-corpus preservation 33/33. Implement the distinct
+production-only GREEN by applying captured structural-native identity and live
+protected-ownership enforcement before or within the frozen-descriptor early
+return, before raw-egress signaling. Preserve context-only/final-owner-removal
+identity, ordinary frozen values/functions, undefined-getter symmetry and
+Proxy invariants. Then run full gates and repeat fresh Grok 4.5/high, exact
+Kimi 3/high/dual-100 and, conditionally, final Opus/xhigh review.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
