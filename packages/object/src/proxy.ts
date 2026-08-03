@@ -5,9 +5,11 @@ import { AdoptionCommitExhaustedError } from "./errors.js";
 import { MAX_ADOPTION_COMMIT_ATTEMPTS, type PostOperation } from "./operation.js";
 import { type Pipeline } from "./pipeline/pipeline.js";
 import { proxyValuesEqual } from "./publication/copy-capability.js";
+import { BinaryStateExpandoError, validateGovernedBinaryState } from "./state-payload.js";
 import { REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 const DATE_GET_TIME = Date.prototype.getTime;
+const OBJECT_PREVENT_EXTENSIONS = Object.preventExtensions;
 const DATE_NATIVE_MEMBERS = new Map<PropertyKey, unknown>();
 for (const property of Reflect.ownKeys(Date.prototype)) {
 	if (property === "constructor") continue;
@@ -158,6 +160,8 @@ export function trackMutations<T extends object>(
 	const descriptorExposesReference = (descriptor: PropertyDescriptor): boolean =>
 		("value" in descriptor && isReference(descriptor.value)) ||
 		("get" in descriptor && (isReference(descriptor.get) || isReference(descriptor.set)));
+	const ignoresProperty = (owner: object, property: PropertyKey, ignored: boolean): boolean =>
+		ignored || (owner === (target as object) && typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property));
 
 	const observeOwnDescriptor = (
 		owner: object,
@@ -280,11 +284,18 @@ export function trackMutations<T extends object>(
 		if (counts?.size === 0) parents.delete(rawValue);
 	};
 
-	const initializeGraphs = (roots: readonly unknown[]): void => {
+	type PreparedGraphs = { commit(): void };
+	type GovernedWritePreparation =
+		| { readonly graphs: PreparedGraphs; readonly failure?: never }
+		| { readonly graphs?: never; readonly failure: unknown };
+
+	const prepareGraphs = (roots: readonly unknown[], invokeAccessors = true): PreparedGraphs => {
 		const discovered = new Set<object>();
 		const nodes: object[] = [];
+		const binaries: object[] = [];
 		const edges: Array<readonly [object, object]> = [];
 		const normalize: Array<() => void> = [];
+		let complete = true;
 
 		const discover = (candidate: unknown): void => {
 			if (!isReference(candidate)) return;
@@ -292,6 +303,10 @@ export function trackMutations<T extends object>(
 			if (initialized.has(value) || discovered.has(value)) return;
 			discovered.add(value);
 			nodes.push(value);
+			if (validateGovernedBinaryState(value)) {
+				binaries.push(value);
+				return;
+			}
 
 			if (value instanceof Map) {
 				const { entries, needsNormalization } = canonicalMapSnapshot(value);
@@ -321,11 +336,18 @@ export function trackMutations<T extends object>(
 
 			if (value instanceof Date) return;
 			for (const key of Object.keys(value)) {
-				const child = (value as Record<string, unknown>)[key];
+				const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+				if (!invokeAccessors && (descriptor === undefined || !("value" in descriptor))) {
+					complete = false;
+					continue;
+				}
+				const child =
+					descriptor !== undefined && "value" in descriptor
+						? descriptor.value
+						: (value as Record<string, unknown>)[key];
 				const rawChild = unwrap(child);
 				if (isReference(rawChild)) edges.push([rawChild, value]);
 				if (rawChild !== child) {
-					const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
 					if (descriptor && "value" in descriptor) {
 						normalize.push(() => {
 							Reflect.defineProperty(value, key, { ...descriptor, value: rawChild });
@@ -339,18 +361,43 @@ export function trackMutations<T extends object>(
 		// Discovery may invoke an enumerable accessor or collection iterator.
 		// Commit no topology metadata until every root has traversed cleanly.
 		for (const root of roots) discover(root);
-		for (const apply of normalize) apply();
-		for (const [child, parent] of edges) addParent(child, parent);
-		for (const node of nodes) initialized.add(node);
+		return {
+			commit(): void {
+				for (const binary of binaries) {
+					Reflect.apply(OBJECT_PREVENT_EXTENSIONS, Object, [binary]);
+					initialized.add(binary);
+				}
+				if (!complete) return;
+				for (const apply of normalize) apply();
+				for (const [child, parent] of edges) addParent(child, parent);
+				for (const node of nodes) initialized.add(node);
+			},
+		};
 	};
 
+	const initializeGraphs = (roots: readonly unknown[]): void => prepareGraphs(roots).commit();
 	const initializeGraph = (value: unknown): void => initializeGraphs([value]);
+	const prepareGovernedWrite = (value: unknown): GovernedWritePreparation | undefined => {
+		if (!isReference(value) || initialized.has(value)) return { graphs: { commit(): void {} } };
+		try {
+			// Data-described subtrees can be validated and staged without moving
+			// fallible accessor evaluation ahead of an ordinary physical write.
+			return { graphs: prepareGraphs([value], false) };
+		} catch (error) {
+			if (error instanceof BinaryStateExpandoError) return undefined;
+			return { failure: error };
+		}
+	};
 
+	const governedRoots: Array<readonly [string, unknown]> = [];
 	for (const key of Object.keys(target)) {
-		if (!REPLICA_LOCAL_STATE_KEYS.has(key)) initialGovernedKeys.add(key);
-		const value = (target as Record<string, unknown>)[key];
+		if (REPLICA_LOCAL_STATE_KEYS.has(key)) continue;
+		governedRoots.push([key, (target as Record<string, unknown>)[key]]);
+	}
+	initializeGraphs(governedRoots.map(([, value]) => value));
+	for (const [key, value] of governedRoots) {
+		initialGovernedKeys.add(key);
 		addDirectOwner(value, key);
-		initializeGraph(value);
 	}
 
 	const comparisonKey = (owner: object, property?: PropertyKey): string => {
@@ -398,6 +445,20 @@ export function trackMutations<T extends object>(
 			for (const parent of parents.get(current)?.keys() ?? []) pending.push(parent);
 		}
 	};
+
+	const hasGovernedOwner = (value: object): boolean => {
+		const visited = new Set<object>();
+		const pending = [unwrap(value)];
+		while (pending.length > 0) {
+			const current = pending.pop();
+			if (!current || visited.has(current)) continue;
+			visited.add(current);
+			if ((directOwners.get(current)?.size ?? 0) > 0) return true;
+			for (const parent of parents.get(current)?.keys() ?? []) pending.push(parent);
+		}
+		return false;
+	};
+	const isReplicaLocalOnly = (value: object, ignored: boolean): boolean => ignored && !hasGovernedOwner(value);
 
 	const captureRetainedMapEntryOwners = (
 		previous: ReadonlyArray<readonly [unknown, unknown]>,
@@ -484,6 +545,23 @@ export function trackMutations<T extends object>(
 		}
 	};
 
+	const finalizePreparedWrite = (
+		prepared: GovernedWritePreparation,
+		owner: object,
+		property: PropertyKey,
+		previousDescriptor: PropertyDescriptor | undefined,
+		compareDataValues: boolean
+	): void => {
+		if ("failure" in prepared) {
+			// The ordinary reflection already committed. Preserve the same
+			// post-write failure contract as discovery in finalizeCommittedWrite.
+			markChanged(owner, property);
+			throw prepared.failure;
+		}
+		prepared.graphs.commit();
+		finalizeCommittedWrite(owner, property, previousDescriptor, compareDataValues);
+	};
+
 	const canonicalizeMapEntries = (map: Map<unknown, unknown>): Array<[unknown, unknown]> => {
 		const { entries, needsNormalization } = canonicalMapSnapshot(map);
 		if (needsNormalization) replaceMapEntries(map, entries);
@@ -523,7 +601,7 @@ export function trackMutations<T extends object>(
 	const wrap = <V>(value: V, ignored = false): V => {
 		if (!isReference(value)) return value;
 		const objectValue = unwrap(value) as object;
-		if (objectValue !== (target as object)) initializeGraph(objectValue);
+		if (!ignored && objectValue !== (target as object)) initializeGraph(objectValue);
 		const proxyCache = ignored ? ignoredProxies : trackedProxies;
 		const existing = proxyCache.get(objectValue);
 		if (existing) return existing as V;
@@ -532,17 +610,18 @@ export function trackMutations<T extends object>(
 		if (objectValue instanceof Map) {
 			proxy = new Proxy(objectValue, {
 				getOwnPropertyDescriptor(map, property): PropertyDescriptor | undefined {
-					return observeOwnDescriptor(map, property, ignored);
+					return observeOwnDescriptor(map, property, isReplicaLocalOnly(map, ignored));
 				},
 				get(map, property): unknown {
+					const replicaLocalOnly = isReplicaLocalOnly(map, ignored);
 					const descriptor = Reflect.getOwnPropertyDescriptor(map, property);
 					if (descriptor && !descriptor.configurable) {
 						if ("value" in descriptor && !descriptor.writable) {
-							if (!ignored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return descriptor.value;
 						}
 						if ("get" in descriptor && descriptor.get === undefined) {
-							if (!ignored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return undefined;
 						}
 					}
@@ -550,6 +629,10 @@ export function trackMutations<T extends object>(
 						return (key: unknown, nextValue: unknown): Map<unknown, unknown> => {
 							const rawKey = unwrap(key);
 							const rawValue = unwrap(nextValue);
+							if (isReplicaLocalOnly(map, ignored)) {
+								Map.prototype.set.call(map, rawKey, rawValue);
+								return proxy as Map<unknown, unknown>;
+							}
 							initializeGraphs([rawKey, rawValue]);
 							const hadKey = Map.prototype.has.call(map, rawKey);
 							const previousValue = Map.prototype.get.call(map, rawKey);
@@ -573,6 +656,7 @@ export function trackMutations<T extends object>(
 					if (property === "delete") {
 						return (key: unknown): boolean => {
 							const rawKey = unwrap(key);
+							if (isReplicaLocalOnly(map, ignored)) return Map.prototype.delete.call(map, rawKey);
 							const previousValue = Map.prototype.get.call(map, rawKey);
 							const deleted = Map.prototype.delete.call(map, rawKey);
 							if (deleted) {
@@ -585,6 +669,10 @@ export function trackMutations<T extends object>(
 					}
 					if (property === "clear") {
 						return (): void => {
+							if (isReplicaLocalOnly(map, ignored)) {
+								Map.prototype.clear.call(map);
+								return;
+							}
 							const previous = snapshotMapEntries(map);
 							Map.prototype.clear.call(map);
 							for (const [key, entryValue] of previous) {
@@ -626,12 +714,17 @@ export function trackMutations<T extends object>(
 					const member = Reflect.get(map, property, map) as unknown;
 					if (typeof member !== "function") return wrap(member, ignored);
 					return (...args: unknown[]): unknown => {
+						const operationReplicaLocalOnly = isReplicaLocalOnly(map, ignored);
+						if (operationReplicaLocalOnly) {
+							const result = (member as (...values: unknown[]) => unknown).apply(map, args.map(unwrap));
+							return result === map ? proxy : wrap(result, true);
+						}
 						const previous = snapshotMapEntries(map);
 						let result: unknown;
 						let operationError: unknown;
 						let operationFailed = false;
 						try {
-							if (!ignored) signalRawEgress();
+							if (!operationReplicaLocalOnly) signalRawEgress();
 							result = (member as (...values: unknown[]) => unknown).apply(map, args.map(unwrap));
 						} catch (error) {
 							operationError = error;
@@ -665,23 +758,28 @@ export function trackMutations<T extends object>(
 		} else if (objectValue instanceof Set) {
 			proxy = new Proxy(objectValue, {
 				getOwnPropertyDescriptor(set, property): PropertyDescriptor | undefined {
-					return observeOwnDescriptor(set, property, ignored);
+					return observeOwnDescriptor(set, property, isReplicaLocalOnly(set, ignored));
 				},
 				get(set, property): unknown {
+					const replicaLocalOnly = isReplicaLocalOnly(set, ignored);
 					const descriptor = Reflect.getOwnPropertyDescriptor(set, property);
 					if (descriptor && !descriptor.configurable) {
 						if ("value" in descriptor && !descriptor.writable) {
-							if (!ignored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return descriptor.value;
 						}
 						if ("get" in descriptor && descriptor.get === undefined) {
-							if (!ignored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return undefined;
 						}
 					}
 					if (property === "add") {
 						return (nextValue: unknown): Set<unknown> => {
 							const rawValue = unwrap(nextValue);
+							if (isReplicaLocalOnly(set, ignored)) {
+								Set.prototype.add.call(set, rawValue);
+								return proxy as Set<unknown>;
+							}
 							initializeGraph(rawValue);
 							const didChange = !Set.prototype.has.call(set, rawValue);
 							Set.prototype.add.call(set, rawValue);
@@ -699,6 +797,7 @@ export function trackMutations<T extends object>(
 					if (property === "delete") {
 						return (nextValue: unknown): boolean => {
 							const rawValue = unwrap(nextValue);
+							if (isReplicaLocalOnly(set, ignored)) return Set.prototype.delete.call(set, rawValue);
 							const deleted = Set.prototype.delete.call(set, rawValue);
 							if (deleted) {
 								removeParent(rawValue, set);
@@ -709,6 +808,10 @@ export function trackMutations<T extends object>(
 					}
 					if (property === "clear") {
 						return (): void => {
+							if (isReplicaLocalOnly(set, ignored)) {
+								Set.prototype.clear.call(set);
+								return;
+							}
 							const previous = snapshotSetValues(set);
 							Set.prototype.clear.call(set);
 							for (const entryValue of previous) removeParent(entryValue, set);
@@ -742,12 +845,17 @@ export function trackMutations<T extends object>(
 					const member = Reflect.get(set, property, set) as unknown;
 					if (typeof member !== "function") return wrap(member, ignored);
 					return (...args: unknown[]): unknown => {
+						const operationReplicaLocalOnly = isReplicaLocalOnly(set, ignored);
+						if (operationReplicaLocalOnly) {
+							const result = (member as (...values: unknown[]) => unknown).apply(set, args.map(unwrap));
+							return result === set ? proxy : wrap(result, true);
+						}
 						const previous = snapshotSetValues(set);
 						let result: unknown;
 						let operationError: unknown;
 						let operationFailed = false;
 						try {
-							if (!ignored) signalRawEgress();
+							if (!operationReplicaLocalOnly) signalRawEgress();
 							result = (member as (...values: unknown[]) => unknown).apply(set, args.map(unwrap));
 						} catch (error) {
 							operationError = error;
@@ -781,17 +889,18 @@ export function trackMutations<T extends object>(
 		} else if (objectValue instanceof Date) {
 			proxy = new Proxy(objectValue, {
 				getOwnPropertyDescriptor(date, property): PropertyDescriptor | undefined {
-					return observeOwnDescriptor(date, property, ignored);
+					return observeOwnDescriptor(date, property, isReplicaLocalOnly(date, ignored));
 				},
 				get(date, property): unknown {
+					const replicaLocalOnly = isReplicaLocalOnly(date, ignored);
 					const descriptor = Reflect.getOwnPropertyDescriptor(date, property);
 					if (descriptor && !descriptor.configurable) {
 						if ("value" in descriptor && !descriptor.writable) {
-							if (!ignored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return descriptor.value;
 						}
 						if ("get" in descriptor && descriptor.get === undefined) {
-							if (!ignored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return undefined;
 						}
 					}
@@ -810,12 +919,17 @@ export function trackMutations<T extends object>(
 					if (typeof member !== "function") return wrap(member, ignored);
 					const isNativeDateMember = DATE_NATIVE_MEMBERS.get(property) === member;
 					return (...args: unknown[]): unknown => {
+						const operationReplicaLocalOnly = isReplicaLocalOnly(date, ignored);
+						if (operationReplicaLocalOnly) {
+							const result = (member as (...values: unknown[]) => unknown).apply(date, args.map(unwrap));
+							return result === date ? proxy : wrap(result, true);
+						}
 						const before = Reflect.apply(DATE_GET_TIME, date, []);
 						let result: unknown;
 						let operationError: unknown;
 						let operationFailed = false;
 						try {
-							if (!ignored && !isNativeDateMember) signalRawEgress();
+							if (!operationReplicaLocalOnly && !isNativeDateMember) signalRawEgress();
 							result = (member as (...values: unknown[]) => unknown).apply(date, args.map(unwrap));
 						} catch (error) {
 							operationError = error;
@@ -838,7 +952,9 @@ export function trackMutations<T extends object>(
 					};
 				},
 				set(date, property, nextValue): boolean {
-					const storesGovernedProxy = !ignored && isGovernedProxy(nextValue);
+					const replicaLocalOnly = isReplicaLocalOnly(date, ignored);
+					if (replicaLocalOnly) return Reflect.set(date, property, unwrap(nextValue), date);
+					const storesGovernedProxy = isGovernedProxy(nextValue);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
 					try {
 						const stored = Reflect.set(date, property, unwrap(nextValue), date);
@@ -853,6 +969,7 @@ export function trackMutations<T extends object>(
 					}
 				},
 				deleteProperty(date, property): boolean {
+					if (isReplicaLocalOnly(date, ignored)) return Reflect.deleteProperty(date, property);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
 					try {
 						return Reflect.deleteProperty(date, property);
@@ -861,7 +978,14 @@ export function trackMutations<T extends object>(
 					}
 				},
 				defineProperty(date, property, descriptor): boolean {
-					const storesGovernedProxy = !ignored && "value" in descriptor && isGovernedProxy(descriptor.value);
+					if (isReplicaLocalOnly(date, ignored)) {
+						const rawDescriptor = { ...descriptor };
+						if ("value" in descriptor) rawDescriptor.value = unwrap(descriptor.value);
+						if ("get" in descriptor) rawDescriptor.get = unwrap(descriptor.get);
+						if ("set" in descriptor) rawDescriptor.set = unwrap(descriptor.set);
+						return Reflect.defineProperty(date, property, rawDescriptor);
+					}
+					const storesGovernedProxy = "value" in descriptor && isGovernedProxy(descriptor.value);
 					const rawDescriptor = { ...descriptor };
 					if ("value" in descriptor) rawDescriptor.value = unwrap(descriptor.value);
 					if ("get" in descriptor) rawDescriptor.get = unwrap(descriptor.get);
@@ -879,38 +1003,43 @@ export function trackMutations<T extends object>(
 		} else {
 			proxy = new Proxy(objectValue, {
 				getOwnPropertyDescriptor(object, property): PropertyDescriptor | undefined {
-					const nestedIgnored =
-						ignored ||
-						(object === (target as object) && typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property));
-					return observeOwnDescriptor(object, property, nestedIgnored);
+					const nestedIgnored = ignoresProperty(object, property, ignored);
+					return observeOwnDescriptor(object, property, isReplicaLocalOnly(object, nestedIgnored));
 				},
 				get(object, property, receiver): unknown {
-					const nestedIgnored =
-						ignored ||
-						(object === (target as object) && typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property));
+					const nestedIgnored = ignoresProperty(object, property, ignored);
+					const replicaLocalOnly = isReplicaLocalOnly(object, nestedIgnored);
 					const descriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					if (descriptor && !descriptor.configurable) {
 						if ("value" in descriptor && !descriptor.writable) {
-							if (!nestedIgnored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return descriptor.value;
 						}
 						if ("get" in descriptor && descriptor.get === undefined) {
-							if (!nestedIgnored) signalRawEgress();
+							if (!replicaLocalOnly) signalRawEgress();
 							return undefined;
 						}
 					}
 					return wrap(Reflect.get(object, property, receiver), nestedIgnored);
 				},
 				set(object, property, nextValue, receiver): boolean {
+					const nestedIgnored = ignoresProperty(object, property, ignored);
 					const rawValue = unwrap(nextValue);
+					if (isReplicaLocalOnly(object, nestedIgnored)) return Reflect.set(object, property, rawValue, receiver);
+					const prepared = prepareGovernedWrite(rawValue);
+					if (prepared === undefined) return false;
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					const resolvedDescriptor = previousDescriptor ?? inheritedPropertyDescriptor(object, property);
 					const accessorReceiver = resolvedDescriptor !== undefined && !("value" in resolvedDescriptor);
 					const assigned = Reflect.set(object, property, rawValue, accessorReceiver ? receiver : object);
-					if (assigned) finalizeCommittedWrite(object, property, previousDescriptor, true);
+					if (assigned) {
+						finalizePreparedWrite(prepared, object, property, previousDescriptor, true);
+					}
 					return assigned;
 				},
 				deleteProperty(object, property): boolean {
+					const nestedIgnored = ignoresProperty(object, property, ignored);
+					if (isReplicaLocalOnly(object, nestedIgnored)) return Reflect.deleteProperty(object, property);
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					const deleted = Reflect.deleteProperty(object, property);
 					if (deleted && previousDescriptor !== undefined) {
@@ -926,9 +1055,17 @@ export function trackMutations<T extends object>(
 				},
 				defineProperty(object, property, descriptor): boolean {
 					const rawDescriptor = "value" in descriptor ? { ...descriptor, value: unwrap(descriptor.value) } : descriptor;
+					const nestedIgnored = ignoresProperty(object, property, ignored);
+					if (isReplicaLocalOnly(object, nestedIgnored)) {
+						return Reflect.defineProperty(object, property, rawDescriptor);
+					}
+					const prepared = prepareGovernedWrite("value" in rawDescriptor ? rawDescriptor.value : undefined);
+					if (prepared === undefined) return false;
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					const defined = Reflect.defineProperty(object, property, rawDescriptor);
-					if (defined) finalizeCommittedWrite(object, property, previousDescriptor, false);
+					if (defined) {
+						finalizePreparedWrite(prepared, object, property, previousDescriptor, false);
+					}
 					return defined;
 				},
 			});

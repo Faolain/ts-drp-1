@@ -50,8 +50,8 @@ import {
 	type PublicationRecord,
 	type SnapshotSide,
 } from "./publication/publisher.js";
-import { DRPObjectStateManager, stateFromDRP } from "./state-materialize.js";
-import { detachStatePayload } from "./state-payload.js";
+import { DRPObjectStateManager, REPLICA_LOCAL_STATE_KEYS, stateFromDRP } from "./state-materialize.js";
+import { detachReplicaLocalContext, detachStatePayload } from "./state-payload.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
@@ -275,7 +275,10 @@ function cloneEnumerableInstance<T extends object>(source: T): T {
 	const sourceRecord = source as Record<string, unknown>;
 	const cloneRecord = clone as Record<string, unknown>;
 	for (const key of Object.keys(source)) {
-		if (typeof sourceRecord[key] !== "function") cloneRecord[key] = detachStatePayload(sourceRecord[key]);
+		if (typeof sourceRecord[key] === "function") continue;
+		cloneRecord[key] = REPLICA_LOCAL_STATE_KEYS.has(key)
+			? detachReplicaLocalContext(sourceRecord[key])
+			: detachStatePayload(sourceRecord[key]);
 	}
 	return clone;
 }

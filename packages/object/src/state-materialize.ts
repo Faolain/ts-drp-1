@@ -2,7 +2,7 @@ import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { type DrpRuntimeContext, DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
 
 import { HashGraph } from "./hashgraph/index.js";
-import { detachStatePayload, validateStateSnapshotForApplication } from "./state-payload.js";
+import { detachReplicaLocalContext, detachStatePayload, validateStateSnapshotForApplication } from "./state-payload.js";
 import { DRPStateStore, REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/object/states");
@@ -45,8 +45,8 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		this.drpConstructor = drp?.constructor as { prototype: any };
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		this.aclConstructor = acl.constructor as { prototype: any };
-		this.drpContext = detachStatePayload(drp?.context);
-		this.aclContext = detachStatePayload(acl.context);
+		this.drpContext = detachReplicaLocalContext(drp?.context);
+		this.aclContext = detachReplicaLocalContext(acl.context);
 		this.seedRoot(HashGraph.rootHash, drp ? stateFromDRP(drp) : DRPState.create(), stateFromDRP(acl));
 	}
 
@@ -101,12 +101,12 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		const preparedDRPState =
 			this.drpConstructor === undefined ? undefined : validateStateSnapshotForApplication(drpState);
 		const acl = Object.create(this.aclConstructor.prototype);
-		if (aclContext) acl.context = detachStatePayload(aclContext);
+		if (aclContext) acl.context = detachReplicaLocalContext(aclContext);
 		this.applyState(acl, preparedACLState);
 		if (this.drpConstructor === undefined) return [undefined, acl];
 		if (preparedDRPState === undefined) return [undefined, acl];
 		const drp = Object.create(this.drpConstructor.prototype);
-		if (drpContext) drp.context = detachStatePayload(drpContext);
+		if (drpContext) drp.context = detachReplicaLocalContext(drpContext);
 		this.applyState(drp, preparedDRPState);
 		return [drp, acl];
 	}
@@ -121,7 +121,7 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 		if (!state) throw new StateNotFoundError(`State ${hash} not found`);
 		const preparedState = validateStateSnapshotForApplication(state);
 		const acl = Object.create(this.aclConstructor.prototype);
-		if (this.aclContext) acl.context = detachStatePayload(this.aclContext);
+		if (this.aclContext) acl.context = detachReplicaLocalContext(this.aclContext);
 		this.applyState(acl, preparedState);
 		return acl;
 	}
