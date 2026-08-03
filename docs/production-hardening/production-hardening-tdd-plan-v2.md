@@ -17174,6 +17174,82 @@ and exact Kimi 3/high/dual-100 reviews. Launch Opus/xhigh only if both accept.
 D.92.7 remains a separate, unimplemented wire-fidelity slice and is neither
 implemented nor consumed by this candidate.
 
+**P3b setter-contract GREEN review rejection — frozen own-descriptor
+ordering.** Fresh Grok 4.5/high session
+`019fc68d-44df-7633-bbf5-0f6f09968bde`, request
+`2c2af0ef-3300-4843-bc03-e30d100bf07f`, returned `ACCEPTED` /
+`P3B_MAY_CLOSE=yes`. Its 26 turns and 26 model calls used only the authenticated
+`grok-4.5-build` key at high reasoning, with 32 substantive read-only tool
+calls: 27 terminal and five file reads. It used no fallback, helper, subagent,
+Fable, web or MCP content and made no repository edit. Its authoritative
+result SHA-256 is
+`677dafd905fed3c05b9de35160ba676913925867db841849bb71856d25e6852f`,
+authenticated-envelope SHA-256 is
+`32a78b8162493bb7a47cc5355f827d50103cdd87adb85c0b9287c331548db0c8`,
+and `SHA256SUMS` manifest SHA-256 is
+`e4a663f356f499f3936fdb52616073bc3a708abe31f344bcbae0a8228926c284`.
+An initial in-repository Vitest attempt hit sandbox `EPERM` under
+`node_modules/.vite-temp`; the read-only review superseded that environmental
+artifact with HEAD-identical writable `/tmp` runs at focused 8/8 and combined
+33/33. The `/tmp` result-log SHA-256 values are
+`27c6d84f15b219020dc687695ec837c4933ade71f5c1076979ddf5e7f9d96f31`
+and
+`12c6ef01109b762003fb73dd62ec17e1705ec49384f396eff2052616b59eb1d3`.
+
+Exact Kimi 3/high/dual-100 session
+`c0842a00-6304-4c5c-a221-904041aa261b` initially returned `ACCEPTED` /
+`P3B_MAY_CLOSE=yes`, then a bounded same-session corrective proved that its own
+frozen-property gotcha was misclassified. The authoritative terminal
+supersedes that initial acceptance and returns `CHANGES_REQUESTED` /
+`P3B_MAY_CLOSE=no`. Across both normally completed exit-0 turns it used 28
+`StepBegin`/LLM requests and 29 read-only calls: 26 Shell, two Grep and one
+ReadFile. Both controller and native per-turn limits were exactly 100, neither
+was reached, and exact K3 was the sole effective model; it used no fallback,
+helper, subagent, Fable, network or repository edit. The authoritative result
+SHA-256 is
+`64dfd41771da72d0536b141aa35a9d73bfa797a3be3f707558dc9af18a82a09e`,
+the initial and corrective raw-stream SHA-256 values are
+`99f8df33119e2a5d7602960aa6500e2119d8f0831edd1a1c9e7d0cb86f077679`
+and
+`3c98b1f7319b4a6036cd14c3efb7d91c5c74389406bb5509556eaae5ac9a243f`,
+and the combined raw-stream/integrity SHA-256 is
+`7545184f93ee5b13ed8cbb890908c1ca370b1cc0a5d310b775b7fd0638bee5b8`.
+
+The blocker is a bounded real path through the exposed governed backing proxy
+alone. Ordinary supported code can use `Reflect.defineProperty` to install a
+captured genuine `transfer` as a non-configurable, non-writable own data
+property. Installation succeeds and stays clean: no tracked change and no raw
+egress. On acquisition, however, the get trap's frozen-descriptor invariant
+branch returns that raw native before structural-function identity and live
+protected-ownership checks run. Invoking it then fails closed at the engine
+brand check, so bytes stay attached and unchanged, but the caller receives the
+engine `TypeError` rather than the exact policy error required for a structural
+operation acquired through the proxy. A configurable alias control reaches the
+existing guard and throws the exact policy error. Throwing from the get trap is
+proxy-invariant-compatible; the invariant constrains an inconsistent returned
+value, not a throw.
+
+This is current P3b contract enforcement, not D.73 hostile classification or
+D.92.4 pre-held-raw-capability work: descriptor installation and acquisition
+need no raw backing alias. Candidate
+`a558e9ea317dfe765bc08abf2fe7b5d23f573099` remains committed but rejected,
+P3b remains open, and no Opus/xhigh acceptance review was launched because one
+preliminary reviewer rejects. Durable evidence is under
+`.logs/phase-1d-i-p3b-setter-contract-green-{grok45-high-review,kimi3-high-100-review}/`.
+
+Next use a fresh Codex-high tests-only RED with one descriptor-order case, not
+a descriptor or syntax matrix. It must prove that a captured structural native
+installed as a frozen own data value through the exposed protected proxy gets
+the exact policy error at acquisition while bytes and tracking remain clean;
+retain a normal frozen-value control and only the bounded dynamic/context
+control needed to prove live ownership. The distinct GREEN must apply captured
+structural identity plus live protected-ownership enforcement before or within
+the frozen-descriptor early return. It must preserve ordinary frozen values,
+undefined-getter symmetry, proxy invariants, context-only allowance,
+promotion/final-owner-removal behavior and the no-raw-egress contract. This is
+the existing unanimously amended Decision A contract, so no further plan
+amendment quorum is required.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
