@@ -76,6 +76,18 @@ const BUFFER_BRANDED_FIRST_ARGUMENT_METHODS = new Set<PropertyKey>([
 	"lastIndexOf",
 ]);
 const ARRAY_BUFFER_MUTATING_METHODS = new Set<PropertyKey>(["grow", "resize", "transfer", "transferToFixedLength"]);
+const ARRAY_BUFFER_STRUCTURAL_MUTATORS = new Set<unknown>();
+for (const prototype of [
+	ArrayBuffer.prototype,
+	typeof SharedArrayBuffer === "undefined" ? undefined : SharedArrayBuffer.prototype,
+]) {
+	if (prototype === undefined) continue;
+	const descriptors = BINARY_NATIVE_DESCRIPTORS.get(prototype);
+	for (const property of ARRAY_BUFFER_MUTATING_METHODS) {
+		const member = descriptors?.get(property)?.value;
+		if (typeof member === "function") ARRAY_BUFFER_STRUCTURAL_MUTATORS.add(member);
+	}
+}
 const GOVERNED_BUFFER_BACKING_MUTATION_ERROR = "Cannot structurally mutate an ArrayBuffer backing a governed Buffer";
 const BINARY_READ_ONLY_METHODS = new Set<PropertyKey>([
 	Symbol.iterator,
@@ -876,10 +888,12 @@ export function trackMutations<T extends object>(
 						return wrap(member, ignored);
 					}
 
+					const structuralMutator = ARRAY_BUFFER_STRUCTURAL_MUTATORS.has(member);
 					const nativeMember = isNativeBinaryMember(binary, property, member);
 					return (...args: unknown[]): unknown => {
 						const operationReplicaLocalOnly = isReplicaLocalOnly(binary, ignored);
-						if (nativeMember && ARRAY_BUFFER_MUTATING_METHODS.has(property) && hasGovernedBuffer(binary)) {
+						const protectedBacking = isBackingStore(binary) && hasGovernedBuffer(binary);
+						if (structuralMutator && protectedBacking) {
 							throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
 						}
 						if (!nativeMember && !operationReplicaLocalOnly) {
@@ -938,7 +952,8 @@ export function trackMutations<T extends object>(
 						let operationError: unknown;
 						let operationFailed = false;
 						try {
-							result = Reflect.apply(member, binary, invocationArgs);
+							const receiver = !nativeMember && protectedBacking ? proxy : binary;
+							result = Reflect.apply(member, receiver, invocationArgs);
 						} catch (error) {
 							operationError = error;
 							operationFailed = true;
