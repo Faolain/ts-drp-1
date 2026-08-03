@@ -863,6 +863,13 @@ export function trackMutations<T extends object>(
 					const ownDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
 					if (ownDescriptor && !ownDescriptor.configurable) {
 						if ("value" in ownDescriptor && !ownDescriptor.writable) {
+							if (
+								ARRAY_BUFFER_STRUCTURAL_MUTATORS.has(ownDescriptor.value) &&
+								isBackingStore(binary) &&
+								hasGovernedBuffer(binary)
+							) {
+								throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
+							}
 							if (!replicaLocalOnly && isReference(ownDescriptor.value)) signalRawEgress();
 							return ownDescriptor.value;
 						}
