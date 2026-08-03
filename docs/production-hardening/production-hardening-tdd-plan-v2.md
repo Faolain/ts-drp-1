@@ -16893,6 +16893,51 @@ under `.logs/phase-1d-i-p3b-setter-red-codex-high/`. The RED is frozen and P3b
 remains open. Next use a distinct Codex-high agent for the production GREEN;
 this checkpoint makes no plan-policy amendment.
 
+**P3b setter-receiver corrective GREEN candidate.** Distinct Codex-high
+production-only commit
+`c6aa4751b7a10fd3519a03e1c759bf75b6eb4054`, against parent
+`525e6ba404502119bf8ced249f8f29345e9d2368`, changes only
+`packages/object/src/proxy.ts` with 39 insertions and 13 deletions. This full
+commit ID is authoritative and corrects an earlier non-authoritative expansion
+of the short `c6aa475` name. The final 1,642-line file has SHA-256
+`f7c00c8c1fb86680b4081bade6e8a8b1bb69bede0a24a498a32296503a94d49b`
+and git blob `558db87ae3d3e886d77336c9e30dfee761788ea3`.
+
+The candidate classifies native binary getters and setters by the identity of
+the individual accessor captured at initialization, rather than requiring the
+descriptor's getter and setter pair to match together. Data properties and
+native accessors retain the raw receiver needed for native internal slots. A
+custom setter on a context-only backing also retains its raw receiver. When a
+Buffer currently gives that backing a governed owner, however, the same custom
+setter receives the tracked proxy. Direct and captured structural calls from
+the setter consequently re-enter the existing governed-backing guard instead
+of mutating the raw backing.
+
+Applying a captured native structural mutator to that proxy produces the
+engine's internal-slot `TypeError`. The candidate normalizes only an error
+whose runtime result matches a captured structural mutator on that same
+receiver to the exact governed-backing policy `TypeError`; other setter errors
+are rethrown unchanged. The authoritative unrelated-`TypeError` probe is 1/1
+and preserves error identity. The implementation adds no property-name matrix,
+backing seal or promotion, or parent edge.
+
+The exact pre-GREEN baseline is 4F/1P. Focused and postcommit runs are 5/5,
+and the combined and postcommit P3b corpora are 30/30. P3a plus bounded 1 MiB
+is 6/6, with the 1 MiB case at 1,372 ms; P3a-prime/root-cycle is 20/20;
+D.92.2 is 64/64; inherited Phase 1d(i) is 147/147; specialized is 93/93;
+P2+P1+D.92.3 is 99/99; and D.92.4-D.92.6 is 60/60. Performance is 8/8
+with MapDRP at 219.4 ms. The sync sentinel retains its expected exact 3F/3P
+and exit 1. Object and workspace typechecks pass; owned lint is clean;
+tracked-source lint has zero errors and 249 inherited warnings; and Prettier
+and diff checks pass. Candidate evidence is under
+`.logs/phase-1d-i-p3b-setter-green-codex-high/`.
+
+Protected untracked paths and the blocked `stash@{0}` remain unchanged. This
+is a GREEN candidate, not acceptance or closure of P3b. Run fresh Grok
+4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final Opus/xhigh
+only if both preliminary reviewers accept. Plan-checkpoint evidence is under
+`.logs/phase-1d-i-p3b-setter-green-checkpoint-docs-codex-high/`.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
