@@ -16311,6 +16311,61 @@ TSX attempts are superseded or invalid, not acceptance evidence. This remains
 a candidate until Grok 4.5/high, exact Kimi 3/high/dual-100 and final
 Opus/xhigh accept it.
 
+**Rejected first GREEN review and context-root corrective RED.** Main-agent
+adversarial probing found that a plain `context -> tracked root` cycle creates
+a second ignored proxy for the root. Because ignored ancestry was monotonic and
+the root itself has no `directOwners` entry, `set`, `defineProperty` and
+`deleteProperty` of non-context top-level keys took the replica-local raw
+reflection branch. A governed property could be physically replaced by an
+expanded binary while returning true, leaving the input unsealed and reporting
+`hasChanges=false` with no changed key. This uses ordinary data properties, so
+it is a current P3a-prime regression rather than deferred D.73 hostile-proxy
+work.
+
+Grok 4.5/high returned final `CHANGES_REQUESTED`; its same authenticated
+session explicitly retracted an initial acceptance after independently tracing
+the causal probe. Session `0e1f5fc3-942f-4206-9b35-ad855361f646` used only
+`grok-4.5-build`, no helper/fallback/subagent/Fable/network, and its result
+SHA-256 is
+`1bdcc4b062b6bb131774b887e10d9e09fcb8cdc360fbda63f253b6d1a70c77fc`.
+Exact Kimi 3/high/dual-100 independently reproduced both invalid-binary and
+plain replacements and returned `CHANGES_REQUESTED` /
+`P3A_PRIME_MAY_CLOSE=no`. Session
+`60eee7f3-03ce-4d5c-a939-96ab4eb86ca8` used exact `kimi-code/k3`, 26 LLM
+steps, 34 tool calls, exit zero and no helper/fallback/subagent/Fable/network;
+result SHA-256 is
+`4a6e2a03ecdd85396b8d971f8d5a39852ce1c413a0e792491bfb5200fda57a18`.
+No Opus review was launched because both preliminary gates rejected. Evidence
+is under `.logs/phase-1d-i-p3a-prime-binary-expando-green-{grok45-high,kimi3-high-100}/`.
+
+Fresh independent Codex-high session
+`019fc515-8173-7af1-8d4b-8d73c823c448` froze the compact tests-only correction
+at `f1adc3d`. The managed agent sandbox could edit and verify the test but not
+write `.git`; after reviewing its exact-path diff and rerunning formatting and
+lint, the main agent mechanically committed only
+`binary-expando-state-domain-1d-i-red.test.ts`. The final 461-line file has
+SHA-256
+`a8f48069a34b011621893df81b12fc77b0155f090929dbe531297066a70efc87`
+and blob `d27bcde75d815399def396587e3ce57aea57a390`. The candidate's exact focused
+signature is one failed test with 15 skipped and four causal soft failures:
+invalid replacement returns true, physical identity changes, ordinary root-
+alias writes stay clean, and changed keys remain empty. Passing assertions
+prove true context mutation remains writable/uncharged and the invalid input
+remains extensible/unsealed. One minimal ordinary sequence covers successful
+set/define/delete attribution without a syntax matrix. Evidence is under
+`.logs/phase-1d-i-p3a-prime-root-cycle-red-codex-high/`.
+
+The narrow GREEN2 rule is property-local root re-entry: when an ignored context
+edge returns to the tracked root, only keys in `REPLICA_LOCAL_STATE_KEYS`
+remain local; every other root key re-enters governed validation, topology,
+attribution and raw-egress handling. Non-root identities retain the accepted
+dynamic `ignored && !hasGovernedOwner` rule, including call-time saved-method
+reclassification. Do not broaden traversal or alter D.91 accessor timing.
+Kimi also recorded a nonblocking hostile accessor-setter case that can mutate a
+staged value between preflight and reflection; retain it explicitly in D.73's
+hostile in-operation code ledger rather than folding it into this plain-data
+root-cycle repair.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -17080,17 +17135,17 @@ P1, P2, P3a and D.92.4-D.92.6 are accepted and closed, but the unanimous
 Codex-high + exact Kimi 3/high/dual-100 + Opus/xhigh correction quorum has
 inserted P3a-prime before P3b GREEN. Its fresh Codex-high tests-only RED is
 frozen at `9132269`, surgical manifest repair `453206b` and nested-wrapper
-atomicity refinement `b165086`: the original semantic 11F/7P plus refinement
-1F/14P, and D.92.2 manifest 2F/62P against old production. Start a
-distinct fresh Codex-high production-only GREEN. Implement the shared
-governed/default versus internal replica-local detachment contract across only
-`state-payload.ts`, `proxy.ts`, the five `state-materialize.ts` context calls
-and the one key-conditional `cloneEnumerableInstance` branch. Validate before
-sealing, count one fresh view or Buffer validation truthfully, propagate
-ignored context, preserve current context family semantics, and make all
-governed local/remote/tracked boundaries fail closed. Reach semantic 18/18 and
-D.92.2 64/64 without changing the frozen tests or growing the analyzer; keep
-P3b exact 4F/4P and all preservation gates.
+atomicity refinement `b165086`. First production GREEN `aae92e4` reached all
+saved gates but was rejected by both Grok and exact Kimi for the plain
+context-root cycle. Its corrective tests-only RED is frozen at `f1adc3d` with
+exact 1F/15 skipped and four causal soft failures. Start a distinct Codex-high
+production-only GREEN2 from `aae92e4`. Change only `proxy.ts` so context-root
+re-entry is key-local: `context` remains replica-local, while every non-context
+root key uses governed validation/attribution/raw-egress handling. Preserve the
+accepted non-root dynamic ownership rule, call-time saved-method checks,
+descriptor-safe staging, D.91 accessor timing and one-scan invariant. Reach the
+updated semantic 20/20 plus D.92.2 64/64 without changing the frozen tests or
+growing the analyzer; keep P3b exact 4F/4P and all preservation gates.
 
 After a distinct P3a-prime GREEN and Grok/Kimi/Opus acceptance, resume P3b
 GREEN on the settled fail-closed invariant. Preserve but do not apply
