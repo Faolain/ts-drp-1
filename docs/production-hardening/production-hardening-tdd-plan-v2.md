@@ -19705,6 +19705,74 @@ application-setter rollback, duplicate/reserved keys, canonical checkpoint
 source and exact meter attribution. Tests and production remain frozen during
 review.
 
+**Phase 1d(ii) GREEN review rejected: application-setter input can retain a
+canonical checkpoint alias.** Fresh authenticated Grok 4.5/high session
+`019fc9c0-ad04-7960-89c1-1c30d510a940` returned
+`CHANGES_REQUESTED` / `PHASE1DII_MAY_CLOSE=no` for exact HEAD `004f48b`.
+Its sole substantive model was `grok-4.5-build` at high effort, with no helper,
+subagent or web use. The authoritative result SHA-256 is
+`82d5292d1ebd3ef5fc3531736def292c7615a998c1f374cc64bbd274133758be`;
+the 24-file `SHA256SUMS` manifest SHA-256 is
+`a13e560c55d5dab889a826b99d2078e8906f291ac8a9c8baf6a6ae8250c4459f`.
+Evidence is under
+`.logs/phase-1d-ii-ambient-causal-green-grok45-high-review/`.
+
+The blocker is inside the current GREEN owner, not later D.73/D.92.4 scope.
+`replaceEnumerableState` reads a canonical deferred value, finds an intentional
+application setter, invokes the setter with that still-borrowed value and then
+continues; only the own-data branch reaches `detachBorrowed`. Grok's isolated
+exact-HEAD causal probe installed an object-valued application-setter key,
+created concurrent remote heads and a multi-frontier checkpoint, then authored
+a local operation on that frontier. Multi-head-local publication replaced the
+key and re-fired the setter. The live setter result and the stored checkpoint's
+`nested` value were `Object.is`-identical; mutating the live value changed the
+checkpoint marker to `"via-setter-value"`. The reproduction source/result
+SHA-256 values are respectively
+`1c96ff90ac57447513cb3374b994770b7a71f7952d8439893036b989762d7ff7`
+and
+`26bf97c31ba0fc0640be79571e2dbabc56e492f60c8e9a81be6e6377af966e64`.
+The existing residual suite still passed 10/10, proving this is an unseen
+contract hole rather than a restatement of a frozen failure.
+
+The independent exact Kimi 3/high/dual-100 review did not find this blocker and
+returned `ACCEPTED` / `PHASE1DII_MAY_CLOSE=yes`. Preserve that disagreement
+honestly: passing the existing source/tests does not outweigh Grok's executable
+checkpoint-corruption counterexample. Kimi session
+`a041d462-1f4f-4eef-8aaf-1379bb2b05a4` used the exact `kimi-code/k3` model,
+`--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+`--max-steps-per-turn 100`. Its first turn reached exactly 100 steps while
+attempting redundant lint/full-suite checks; the same authenticated session's
+finalization-only turn completed normally in three steps. Its result SHA-256
+is `5bc670e5e06f4198683dbde4e21cb29849de59e8f7e74fd66a0febcf848fcc37`
+and 29-file artifact-integrity SHA-256 is
+`6ec4455328852d1b6962d1989c3018d1cb0eeffe003c54afbc8b29ecba6ce1b0`;
+evidence is under
+`.logs/phase-1d-ii-ambient-causal-green-kimi3-high-100-review/`.
+
+Because both preliminary reviewers did not accept, the conditional final
+Opus/xhigh gate is deliberately skipped for this rejected candidate. Tests,
+production, index, protected untracked files and protected stash remained
+unchanged throughout both reviews.
+
+Mandatory corrective order: commit this plan-only rejection checkpoint; spawn
+a fresh Codex-high tests-only RED owner. Add one causal regression in the
+existing Phase 1d(ii) application-setter/residual surface that proves (a) the
+setter receives an application-owned detached object rather than a canonical
+checkpoint-owned alias, (b) live mutation after setter application cannot
+change any retained checkpoint or stored vertex, (c) alias topology within the
+setter input remains correct, and (d) setter receiver identity, descriptor/key
+order rollback, deterministic retry, exact copy attribution and all frozen
+10/10, D.92.2 64/64, focused 48/48, inherited 147/147 contracts remain intact.
+The RED may change tests only; it must fail exact `281fe9f` for the reproduced
+causal reason and keep an ordinary non-borrowed application-setter control
+green. Then a distinct Codex-high production-only GREEN should detach through
+the existing per-replacement detacher before `Reflect.apply` whenever the
+source entry is borrowed. Do not add a new clone authority, analyzer syntax,
+fake copy event or setter-specific compatibility path. Run the normal
+serialized typecheck/lint/test/format gates to `.log`, checkpoint RED and GREEN
+separately, and restart fresh Grok, exact Kimi 3/high/dual-100 and conditional
+Opus/xhigh review on the corrected exact HEAD.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
