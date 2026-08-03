@@ -27,6 +27,14 @@ interface Captured<T> {
 	error?: unknown;
 }
 
+interface RootCycleState {
+	context: { local: string; root: RootCycleState };
+	governed: object;
+	assigned: string;
+	defined?: string;
+	deleted: string;
+}
+
 function capture<T>(run: () => T): Captured<T> {
 	try {
 		return { ok: true, value: run() };
@@ -86,6 +94,17 @@ function replicaLocalContext(): ReplicaLocalContext {
 		buffer: Buffer.from([4, 5, 6]),
 		backing: Uint8Array.from([7, 8, 9]).buffer,
 	};
+}
+
+function rootCycleState(): RootCycleState {
+	const state = {
+		context: { local: "before", root: undefined as unknown as RootCycleState },
+		governed: { stable: true },
+		assigned: "before",
+		deleted: "present",
+	};
+	state.context.root = state;
+	return state;
 }
 
 class BinaryExpandoFixture implements IDRP {
@@ -176,6 +195,47 @@ describe("Phase 1d(i) D.92.3-P3a-prime binary state domain", () => {
 		expect.soft(Object.isExtensible(scratch), "replica-local binaries are not governed or sealed").toBe(true);
 		expect.soft(tracked.hasChanges()).toBe(false);
 		expect([...tracked.changedKeys()]).toEqual([]);
+	});
+
+	it("re-enters governed handling when replica-local context cycles to the tracked root", () => {
+		const invalidState = rootCycleState();
+		const original = invalidState.governed;
+		const invalid = addExpando(new Uint8Array([1, 2]), "metadata", "invalid", true);
+		const invalidTracked = trackMutations(invalidState);
+
+		invalidTracked.proxy.context.local = "after";
+		expect.soft(invalidState.context.local, "the real context remains writable").toBe("after");
+		expect.soft(invalidTracked.hasChanges(), "the real context remains uncharged").toBe(false);
+		expect.soft([...invalidTracked.changedKeys()]).toEqual([]);
+
+		const rejected = capture(() => Reflect.set(invalidTracked.proxy.context.root, "governed", invalid));
+		expect.soft(rejected, "the root alias rejects an expanded governed binary").toEqual({ ok: true, value: false });
+		expect.soft(invalidState.governed, "rejection leaves the prior identity installed").toBe(original);
+		expect.soft(Object.isExtensible(invalid), "validation runs before sealing").toBe(true);
+		expect.soft(Object.isSealed(invalid), "rejected caller input remains unsealed").toBe(false);
+		expect.soft(invalidTracked.hasChanges(), "rejection creates no dirty charge").toBe(false);
+		expect.soft([...invalidTracked.changedKeys()]).toEqual([]);
+
+		const ordinaryState = rootCycleState();
+		const ordinaryTracked = trackMutations(ordinaryState);
+		const rootAlias = ordinaryTracked.proxy.context.root;
+		const results = [
+			Reflect.set(rootAlias, "assigned", "after"),
+			Reflect.defineProperty(rootAlias, "defined", {
+				configurable: true,
+				enumerable: true,
+				value: "created",
+				writable: true,
+			}),
+			Reflect.deleteProperty(rootAlias, "deleted"),
+		];
+
+		expect.soft(results, "ordinary root-alias writes still succeed").toEqual([true, true, true]);
+		expect.soft(ordinaryState.assigned).toBe("after");
+		expect.soft(ordinaryState.defined).toBe("created");
+		expect.soft("deleted" in ordinaryState).toBe(false);
+		expect.soft(ordinaryTracked.hasChanges()).toBe(true);
+		expect([...ordinaryTracked.changedKeys()].sort()).toEqual(["assigned", "defined", "deleted"]);
 	});
 
 	it("copies view metadata and Buffer/ArrayBuffer contents through construction and reconstruction", () => {
