@@ -19295,6 +19295,43 @@ and artifact-manifest SHA-256 is
 The native envelope disclosed one automatic non-substantive Haiku helper at 23
 output tokens; it authored no finding or vote.
 
+**Accepted Phase 1d(ii) zero residual capture-read tests-only RED
+checkpoint.** Fresh Codex-high commit
+`ae107cbd0844f48d352f32e782c359c4d546a5af` changes only
+`incremental-publication-identity-capture-1d-i-red.test.ts` by exact 3
+insertions / 6 deletions. The frozen file is 480 lines, SHA-256
+`bebcecec0845c0c6b30c7741202b509ab3b672087793a309c3c7a0ec320634b2`
+and git blob `5ee6f256ebdb6a6a85a40443aef51b6e50c1d7f0`. It performs exactly the
+unanimously authorized three expectation changes and one comment removal; no
+semantic assertion, test identity or production owner changed.
+
+The same production baseline passed 8/8 before the correction. Both the
+pre-commit and post-commit corrected runs are exact 2F/6P: the first local
+DRP-authored assertion observes `{ acl: 2, drp: 3 }`, which fail-fast masks the
+second local ACL-authored assertion, while the independent remote assertion
+observes `{ acl: 0, drp: 1 }`. All three frozen expectations are zero and GREEN
+must reach exact 8/8, including the masked local obligation. The original Phase
+1d(ii) RED remains exact 8F/2P, the corrected 54-case preservation set remains
+8F/46P and D.92.2 remains exact 3F/61P. Object/workspace typechecks, owned lint,
+tracked lint at zero errors / 249 inherited warnings, Prettier and diff check all
+pass. Evidence is under
+`.logs/phase-1d-ii-capture-count-red-codex-high/`; its artifact-manifest SHA-256
+is `c9dfb5d8dac408cc3da615472c57a94e0be4f4b2463cee8be4b0af04f127a878`.
+The protected stash remains object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+
+This RED is frozen. At its separate clean plan checkpoint, re-authenticate
+`/tmp/phase-1d-ii-green-paused-identity.patch` at exact size 55,474 bytes and
+SHA-256
+`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`,
+require `git apply --check` to pass, apply it and resume the same distinct
+production-only GREEN. Implement the zero-read rule as the specified shallow
+top-level primitive sentinel: unchanged enumerable live-root getters are not
+read, while all frozen publication, ambient-side, isolation, wire, rollback
+and physical-copy semantics remain real. It is neither a recursive proof nor
+authority to skip or fabricate work. No contract changes.
+
 The latest paused production-only GREEN is archived at
 `/tmp/phase-1d-ii-green-paused-identity.patch`, exact size 55,474 bytes and
 SHA-256
@@ -19375,14 +19412,12 @@ fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review, followed by final
 Opus/xhigh only after both preliminary reviewers accept. Run focused and
 proportionate preservation/typecheck/lint gates to `.log`.
 
-Before resuming production, execute the unanimously authorized identity-capture
-correction above. A fresh Codex-high tests-only RED must change only the three
-exact read expectations in
-`incremental-publication-identity-capture-1d-i-red.test.ts` and remove only its
-immediately preceding obsolete three-line comment. Prove exact 2F/6P with the
-second local assertion masked by fail-fast, preserve all semantic assertions
-and gates, commit the one-file RED, and add a separate plan-only RED checkpoint.
-Then re-authenticate `/tmp/phase-1d-ii-green-paused-identity.patch` at exact
+Freeze accepted zero residual capture-read tests-only RED
+`ae107cbd0844f48d352f32e782c359c4d546a5af`: its exact one-file +3/-6 scope,
+480-line file identity, 2F/6P causal signature with the second local assertion
+masked by fail-fast, preservation signatures and complete gates are recorded
+above. Do not alter it. Re-authenticate
+`/tmp/phase-1d-ii-green-paused-identity.patch` at exact
 55,474 bytes / SHA-256
 `fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`,
 run `git apply --check`, apply it and resume the same distinct production-only
