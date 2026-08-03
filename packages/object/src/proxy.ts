@@ -216,16 +216,11 @@ function isNativeBinaryMember(value: object, property: PropertyKey, member: unkn
 
 function isNativeBinaryAccessor(
 	property: PropertyKey,
-	resolved: { descriptor: PropertyDescriptor; owner: object }
+	resolved: { descriptor: PropertyDescriptor; owner: object },
+	accessor: "get" | "set"
 ): boolean {
 	const captured = BINARY_NATIVE_DESCRIPTORS.get(resolved.owner)?.get(property);
-	return (
-		captured !== undefined &&
-		"get" in captured &&
-		"get" in resolved.descriptor &&
-		captured.get === resolved.descriptor.get &&
-		captured.set === resolved.descriptor.set
-	);
+	return captured !== undefined && accessor in captured && captured[accessor] === resolved.descriptor[accessor];
 }
 
 function isPotentialBinaryMutation(value: object, property: PropertyKey): boolean {
@@ -238,6 +233,18 @@ function isPotentialBinaryMutation(value: object, property: PropertyKey): boolea
 	}
 	if (ARRAY_BUFFER_MUTATING_METHODS.has(property)) return true;
 	return !BINARY_READ_ONLY_METHODS.has(property);
+}
+
+function isStructuralMutatorReceiverError(error: unknown, receiver: object): boolean {
+	if (!(error instanceof TypeError)) return false;
+	for (const mutator of ARRAY_BUFFER_STRUCTURAL_MUTATORS) {
+		try {
+			Reflect.apply(mutator as (...args: unknown[]) => unknown, receiver, []);
+		} catch (expected) {
+			if (expected instanceof TypeError && expected.message === error.message) return true;
+		}
+	}
+	return false;
 }
 
 export interface DRPProxyBeforeChainArgs {
@@ -875,7 +882,7 @@ export function trackMutations<T extends object>(
 					}
 
 					const resolved = binaryMemberDescriptor(binary, property);
-					const nativeAccessor = resolved !== undefined && isNativeBinaryAccessor(property, resolved);
+					const nativeAccessor = resolved !== undefined && isNativeBinaryAccessor(property, resolved, "get");
 					if (!replicaLocalOnly && resolved !== undefined && "get" in resolved.descriptor && !nativeAccessor) {
 						signalRawEgress();
 					}
@@ -988,14 +995,33 @@ export function trackMutations<T extends object>(
 				set(binary, property, nextValue, receiver): boolean {
 					const replicaLocalOnly = isReplicaLocalOnly(binary, ignored);
 					const rawValue = unwrap(nextValue);
-					if (replicaLocalOnly) return Reflect.set(binary, property, rawValue, binary);
+					const resolved = binaryMemberDescriptor(binary, property);
+					const customSetter =
+						resolved !== undefined &&
+						"set" in resolved.descriptor &&
+						resolved.descriptor.set !== undefined &&
+						!isNativeBinaryAccessor(property, resolved, "set");
+					const protectedBacking = isBackingStore(binary) && hasGovernedBuffer(binary);
+					const setterReceiver = customSetter && (!replicaLocalOnly || protectedBacking) ? receiver : binary;
+					const applySetter = (): boolean => {
+						try {
+							return Reflect.set(binary, property, rawValue, setterReceiver);
+						} catch (error) {
+							// A proxy cannot carry native backing-store internal slots. Normalize
+							// only the engine error produced when a custom setter applies one of
+							// the captured structural natives to its protected proxy receiver.
+							if (customSetter && protectedBacking && isStructuralMutatorReceiverError(error, setterReceiver)) {
+								throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
+							}
+							throw error;
+						}
+					};
+					if (replicaLocalOnly) return applySetter();
 					const prepared = prepareGovernedWrite(rawValue);
 					if (prepared === undefined) return false;
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
 					const previousElement = snapshotBinaryElement(binary, property);
-					const resolvedDescriptor = previousDescriptor ?? inheritedPropertyDescriptor(binary, property);
-					const accessorReceiver = resolvedDescriptor !== undefined && !("value" in resolvedDescriptor);
-					const assigned = Reflect.set(binary, property, rawValue, accessorReceiver ? receiver : binary);
+					const assigned = applySetter();
 					if (assigned) {
 						const byteChanged = !binarySnapshotsEqual(previousElement, snapshotBinaryElement(binary, property));
 						try {
