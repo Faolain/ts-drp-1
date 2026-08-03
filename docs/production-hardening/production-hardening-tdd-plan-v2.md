@@ -16502,9 +16502,40 @@ The chosen corrective RED direction is safe atomic rejection of structural
 mutation on an otherwise ungoverned backing that internally backs a currently
 governed Buffer. Positive controls preserve a read-only, extensible and clean
 backing plus bare governed ArrayBuffer behavior. A distinct tests-only
-Codex-high corrective is in progress; do not grow this into an API-shaped
-syntax matrix. Production commit `8223511` remains committed but rejected, and
-P3b remains open.
+Codex-high corrective owns this without an API-shaped syntax matrix. Production
+commit `8223511` remains committed but rejected, and P3b remains open.
+
+**Accepted P3b Buffer-backing-transfer corrective RED checkpoint.** Fresh
+Codex-high commit `822135e1f1ce2a7f5e9fe1ea8a4e97ad328875c0`, against plan
+parent `4d22e2cbf6e8095539147e58c4583f94bb354b93`, changes only
+`typed-array-receiver-safety-1d-i-red.test.ts` with 157 insertions. The final
+540-line file has SHA-256
+`ed3a436ba814fed2b1d509a8c1c2babf25ed6d97e9e7de83c0813069156053bc`
+and git blob `0d6018efa365599833bc97c20143cc688fcb8bd6`.
+
+The host census is explicit: Node v22.15.0 provides both `transfer` and
+`transferToFixedLength`. The complete focused file is exact 3F/10P. A filtered
+preservation run keeps the inherited P3b corpus 8/8 with the five new
+corrective cases skipped, proving the freeze does not reinterpret the accepted
+receiver contract.
+
+Both structural calls currently detach a dedicated backing shared with a
+governed Buffer while leaving the tracker clean. Through the real applier,
+local authoring succeeds without a vertex or publication, yet the stored root
+backing is detached and cannot be serialized. The frozen safe policy requires
+pre-mutation `TypeError` with exact message
+`Cannot structurally mutate an ArrayBuffer backing a governed Buffer`, before
+any live bytes are detached. An ordinary backing read remains available,
+extensible and clean. A bare governed ArrayBuffer retains native transfer and
+charges exactly `['backing']`.
+
+Formatting, owned lint, object/workspace typechecks, commit scope, hashes and
+stash checks pass. Authoritative evidence is under
+`.logs/phase-1d-i-p3b-buffer-transfer-red-codex-high/`; the postcommit focused
+run retains exact 3F/10P and expected exit 1. The RED is frozen. Next is a
+distinct production-only Codex-high GREEN, then the full preservation matrix
+and fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final conditional
+Opus/xhigh review.
 
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
@@ -17294,12 +17325,13 @@ Claude-skill Opus/xhigh.
 
 P3b GREEN candidate `8223511` reaches its frozen 8/8 and all exact preservation
 gates, but exact Kimi 3/high/dual-100 rejected it for uncharged Buffer-backing
-transfer after Grok accepted. Complete and freeze the in-progress tests-only
-corrective RED for safe atomic rejection of structural mutation on an
-ungoverned backing that internally backs a governed Buffer, preserving the
-read-only/extensible/clean backing and bare governed ArrayBuffer controls.
-Then implement a distinct production GREEN and repeat fresh Grok 4.5/high,
-exact Kimi 3/high/dual-100 and, only if both accept, final Opus/xhigh review.
+transfer after Grok accepted. Its tests-only corrective RED is frozen at
+`822135e`: implement a distinct production-only Codex-high GREEN for safe
+atomic rejection of structural mutation on an ungoverned backing that
+internally backs a governed Buffer, preserving the read-only/extensible/clean
+backing and bare governed ArrayBuffer controls. Then run the full preservation
+matrix and repeat fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and, only if
+both accept, final Opus/xhigh review.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
