@@ -296,6 +296,42 @@ describe("Phase 1d(i) D.92.3-P3a-prime binary state domain", () => {
 		expect.soft(defineTracked.hasChanges()).toBe(false);
 	});
 
+	it("rejects nested pre-expanded values atomically at tracked assignment boundaries", () => {
+		const assignments = [
+			{
+				label: "set",
+				apply: (target: { payload: object }, value: object): boolean => Reflect.set(target, "payload", value),
+			},
+			{
+				label: "defineProperty",
+				apply: (target: { payload: object }, value: object): boolean =>
+					Reflect.defineProperty(target, "payload", {
+						configurable: true,
+						enumerable: true,
+						value,
+						writable: true,
+					}),
+			},
+		] as const;
+
+		for (const assignment of assignments) {
+			const invalid = addExpando(new Uint8Array([1, 2]), "metadata", "nested-invalid", true);
+			const wrapper = { nested: invalid };
+			const original = { stable: true };
+			const state = { payload: original };
+			const tracked = trackMutations(state);
+
+			const result = capture(() => assignment.apply(tracked.proxy, wrapper));
+			expect.soft(result, `${assignment.label} rejects without throwing`).toEqual({ ok: true, value: false });
+			expect.soft(state.payload, `${assignment.label} leaves the original state installed`).toBe(original);
+			expect
+				.soft(Object.isExtensible(invalid), `${assignment.label} rejects the invalid input before sealing`)
+				.toBe(true);
+			expect.soft(tracked.hasChanges(), `${assignment.label} does not dirty state`).toBe(false);
+			expect.soft([...tracked.changedKeys()], `${assignment.label} charges no state key`).toEqual([]);
+		}
+	});
+
 	it("seals a clean pre-derived shared view when governed discovery wraps it", () => {
 		const backing = new ArrayBuffer(8);
 		const source = new Uint8Array(backing);
