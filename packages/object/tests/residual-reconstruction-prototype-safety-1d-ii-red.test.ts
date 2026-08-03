@@ -41,6 +41,19 @@ interface ApplicationSetterEvent {
 
 const applicationSetterEvents: ApplicationSetterEvent[] = [];
 
+interface ApplicationObjectValue {
+	left: { marker: string };
+	right: { marker: string };
+	aliases: Array<{ marker: string }>;
+}
+
+interface ApplicationObjectSetterEvent {
+	receiver: unknown;
+	value: ApplicationObjectValue;
+}
+
+const applicationObjectSetterEvents: ApplicationObjectSetterEvent[] = [];
+
 function ownData(target: object, key: PropertyKey, value: unknown): void {
 	Object.defineProperty(target, key, {
 		configurable: true,
@@ -99,6 +112,30 @@ class ReconstructionFixture implements IDRP {
 
 	installApplicationValue(value: string): void {
 		ownData(this, "applicationValue", value);
+	}
+}
+
+class ApplicationObjectReconstructionFixture extends ReconstructionFixture {
+	_applicationObject: ApplicationObjectValue;
+
+	constructor() {
+		super();
+		const shared = { marker: "root" };
+		this._applicationObject = { left: shared, right: shared, aliases: [shared] };
+	}
+
+	get applicationObject(): ApplicationObjectValue {
+		return this._applicationObject;
+	}
+
+	set applicationObject(value: ApplicationObjectValue) {
+		applicationObjectSetterEvents.push({ receiver: this, value });
+		this._applicationObject = value;
+	}
+
+	installApplicationObject(marker: string): void {
+		const shared = { marker };
+		ownData(this, "applicationObject", { left: shared, right: shared, aliases: [shared] });
 	}
 }
 
@@ -541,6 +578,120 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 		expect(applicationSetterEvents).toEqual([{ receiver: h.applier.drp, value: "control-after" }]);
 		expect(h.drp._applicationValue).toBe("control-after");
 		expect(Object.hasOwn(h.drp, "applicationValue")).toBe(false);
+	});
+
+	it("detaches a checkpoint-borrowed application-setter value before local multi-frontier adoption", async () => {
+		const previousSuffix = process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+		try {
+			process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = "1";
+			applicationObjectSetterEvents.length = 0;
+			const h = harness(new ApplicationObjectReconstructionFixture());
+			const checkpoints = (): Array<{
+				frontier: Hash[];
+				state: { drpState: DRPState };
+			}> =>
+				(
+					h.applier as unknown as {
+						checkpoints: Array<{ frontier: Hash[]; state: { drpState: DRPState } }>;
+					}
+				).checkpoints;
+			const frontierId = (frontier: readonly Hash[]): string => [...frontier].sort().join(",");
+			const ownedApplicationObjects = (): Array<{
+				label: string;
+				state: DRPState;
+				value: ApplicationObjectValue;
+			}> => {
+				const owned: Array<{ label: string; state: DRPState; value: ApplicationObjectValue }> = [];
+				const hashes = new Set<Hash>([HashGraph.rootHash, ...h.hashGraph.getAllVertices().map(({ hash }) => hash)]);
+				for (const hash of hashes) {
+					const state = h.states.getDRPState(hash);
+					const value = state?.state.find(({ key }) => key === "applicationObject")?.value;
+					if (state && value) {
+						owned.push({ label: `vertex:${hash}`, state, value: value as ApplicationObjectValue });
+					}
+				}
+				for (const checkpoint of checkpoints()) {
+					const value = checkpoint.state.drpState.state.find(({ key }) => key === "applicationObject")?.value;
+					if (value) {
+						owned.push({
+							label: `checkpoint:${frontierId(checkpoint.frontier)}`,
+							state: checkpoint.state.drpState,
+							value: value as ApplicationObjectValue,
+						});
+					}
+				}
+				return owned;
+			};
+
+			const install = remoteVertex("installApplicationObject", ["installed"], [HashGraph.rootHash], 60);
+			await expect(h.applier.applyVertices([install])).resolves.toEqual({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			const left = remoteVertex("touch", ["left"], [install.hash], 61);
+			const right = remoteVertex("touch", ["right"], [install.hash], 62);
+			await expect(h.applier.applyVertices([left, right])).resolves.toEqual({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			const concurrentFrontier = h.hashGraph.getFrontier();
+			expect.soft(concurrentFrontier).toHaveLength(2);
+			expect.soft(new Set(concurrentFrontier)).toEqual(new Set([left.hash, right.hash]));
+			expect
+				.soft(
+					checkpoints().some(
+						({ frontier, state }) =>
+							frontierId(frontier) === frontierId(concurrentFrontier) &&
+							state.drpState.state.some(({ key }) => key === "applicationObject")
+					),
+					"positive control: concurrent remote heads produced the canonical multi-frontier checkpoint"
+				)
+				.toBe(true);
+
+			applicationObjectSetterEvents.length = 0;
+			const verticesBeforeLocal = new Set(h.hashGraph.getAllVertices().map(({ hash }) => hash));
+			h.applier.drp!.touch("local-on-multi-frontier");
+			const localVertex = h.hashGraph.getAllVertices().find(({ hash }) => !verticesBeforeLocal.has(hash));
+			expect(localVertex, "positive control: local authoring must commit a new vertex").toBeDefined();
+			expect.soft(localVertex!.dependencies).toEqual(concurrentFrontier);
+			expect.soft(applicationObjectSetterEvents).toHaveLength(1);
+
+			const event = applicationObjectSetterEvents[0]!;
+			const setterValue = event.value;
+			const owned = ownedApplicationObjects();
+			const retainedMultiFrontierCheckpoints = owned.filter(
+				({ label }) => label === `checkpoint:${frontierId(concurrentFrontier)}`
+			);
+			expect
+				.soft(retainedMultiFrontierCheckpoints.length, "positive control: source checkpoint remains retained")
+				.toBeGreaterThan(0);
+			expect.soft(event.receiver, "the qualified setter keeps the tracked application receiver").toBe(h.applier.drp);
+			expect
+				.soft(h.drp._applicationObject, "the setter installs its input as application-owned live state")
+				.toBe(setterValue);
+			expect.soft(setterValue.left).toBe(setterValue.right);
+			expect.soft(setterValue.left).toBe(setterValue.aliases[0]);
+
+			const borrowedAliases = owned.filter(({ value }) => value === setterValue).map(({ label }) => label);
+			expect
+				.soft(borrowedAliases, "setter input must be detached from every retained vertex/checkpoint value")
+				.toEqual([]);
+
+			const ownedBytesBeforeMutation = new Map(owned.map(({ state }) => [state, snapshotBytes(state)]));
+			setterValue.left.marker = "mutated-through-live-setter";
+			expect.soft(h.drp._applicationObject.right.marker).toBe("mutated-through-live-setter");
+			for (const { label, state } of owned) {
+				expect
+					.soft(snapshotBytes(state), `live setter mutation cannot alter ${label}`)
+					.toEqual(ownedBytesBeforeMutation.get(state));
+			}
+		} finally {
+			applicationObjectSetterEvents.length = 0;
+			if (previousSuffix === undefined) delete process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+			else process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = previousSuffix;
+		}
 	});
 
 	it("qualifies only an intentional application accessor at live replacement and rolls it back atomically", async () => {
