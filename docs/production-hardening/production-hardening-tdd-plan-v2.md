@@ -18817,6 +18817,71 @@ session `5acfe754-ac60-4202-a342-6b76c4748f58`, 39 steps / 48 tools, both
 `a40875ec7cb7d0ada36e5cefdedcd5af90a15a15613e380dc607aa6899ec7f88`.
 The fresh Codex-high assent was delivered through collaboration only.
 
+**Accepted Phase 1d(ii) tests-only RED checkpoint.** Fresh Codex-high commit
+`82703c69d53432a7ba763fdb925094c5ba0cd2ba` (tree
+`400691f9c42a11915cd31087d5ba46c8db087ae6`) adds only
+`packages/object/tests/residual-reconstruction-prototype-safety-1d-ii-red.test.ts`.
+The frozen 545-line file has SHA-256
+`21a2ba4284e840f9792f83e8e109d1b4124066fd72e784232a8397251538af83`
+and git blob `2e291c278804ba1c773019f551a660a093daaf20`. Against unchanged
+production and plan bytes it is exact 8F/2P, exit 1, with 25 causal failing
+assertions. The two passing controls pin ordinary duplicate last-write-wins,
+own-data/wire-input/alias semantics and prove both the copy meter and the
+intentional application-accessor receiver.
+
+The eight failing causal groups cover reserved-key reconstruction with ordered
+duplicates and nested isolation; primitive-string validation before hostile
+coercion or partial materialization; the governed and replica-local nested
+detachment owners; the real dependent-hint non-live clone; removal of the local
+live-capture round trip with exact 1d(i) accounting; proportional remote
+suffix/tail/checkpoint reconstruction with snapshot/live isolation; local,
+remote and conflict adoption in the presence of `__proto__` and an ambient
+inherited setter; and qualification plus atomic rollback of the intentional
+application accessor. This is one bounded phase contract, not a syntax matrix
+or a widening of serialization.
+
+Preservation is 9 files / 152 passes plus the three accepted 1d(i) alias suites
+/ 39 passes, for 191/191 total. Object and workspace typechecks, owned lint
+(0 errors / 0 warnings), tracked lint (0 errors / 249 inherited warnings),
+Prettier and diff-check all pass. The earlier raw `eslint .` result of 73 errors
+/ 226 warnings is superseded because it included protected untracked material;
+the tracked-file rerun is authoritative. Evidence is under
+`.logs/phase-1d-ii-red-codex-high/`; the artifact-manifest SHA-256 is
+`5fab02c23e345689e00e10151d87af19a05c5cef8ec6db5cce60daa2d6e06d48`.
+
+The pre-RED production/plan checkpoint is parent
+`03651f4d615d9fcf536d635b8018a5d2686adbec`, with object-source tree
+`3b7d56504dc3328114726c7c88176a5f76cdefdb` and plan blob
+`f829b458ac82e15ad710c8dbc931b535ed1d5c2d`; the RED retains that exact plan
+blob and changes no production bytes. Protected untracked paths remain
+unstaged. `stash@{0}` remains object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+
+The distinct production-only GREEN must first validate the complete incoming
+key vector as primitive strings before applying any entry, so rejection cannot
+coerce a key or leave a partial materialization. Reconstruction, nested
+detachment and every non-live clone must use one ownership-safe own-data
+primitive at all equivalent sinks, including `state-materialize.ts`,
+`state-payload.ts` and both reconstruction/live-replacement sites in
+`drp-applier.ts`; `__proto__` has no accessor exception on any path. At live
+replacement only, an ordinary non-`__proto__` key may intentionally invoke an
+application accessor, and only when that accessor comes from the actual
+application class prototype chain. Invoke it with the exposed tracked proxy as
+receiver and preserve complete journal rollback; inherited ambient setters and
+unrelated prototypes are never eligible.
+
+Replace the residual local `stateFromDRP` → `fromStates` round trip and remote
+owned-snapshot full reconstruction with an ownership-safe COW/execution overlay
+or equivalent whose deterministic copy work is proportional to the effective
+changed payload. Preserve snapshot/public/live isolation, exact wire bytes,
+duplicate/order semantics and the accepted 1d(i) publication counters. Keep
+all accepted phase firewalls and the symbol-key policy `OPEN`; do not consume
+the D.73 hostile virtual
+`Map.keys()` owner, Phase 1d(iii) checkpoint-prune work, D.92.4 raw-egress
+ownership, or the codec/`Symbol.iterator` seam. This is the already-adopted
+1d(ii) contract, not a plan amendment or phase split.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
@@ -18853,23 +18918,26 @@ same-session Opus/xhigh all accepted D.92.7. The final controller rerun passed
 the exact five files / 110 tests / exit 0 required by Opus. Preserve the
 complete evidence and nonblocking residual ledger in the D.92.7 section above.
 
-Composite D.92 is accepted and closed at this checkpoint. Begin Phase 1d(ii)
-with a fresh Codex-high tests-only RED, then a distinct Codex-high GREEN, fresh
-Grok 4.5/high and exact Kimi 3/high/dual-100 review, and final Opus/xhigh only
-after both preliminary reviewers accept. Run focused and proportionate
-preservation/typecheck/lint gates to `.log`; preserve frozen suites and exact
-expected-negative signatures.
+Composite D.92 is accepted and closed. Freeze Phase 1d(ii) tests-only RED
+`82703c69d53432a7ba763fdb925094c5ba0cd2ba`: its sole 545-line test file,
+8F/2P signature, 25 causal assertions and evidence manifest are recorded above.
+Begin a distinct fresh Codex-high production-only GREEN, then fresh Grok
+4.5/high and exact Kimi 3/high/dual-100 review, and final Opus/xhigh only after
+both preliminary reviewers accept. Run focused and proportionate
+preservation/typecheck/lint gates to `.log`; do not edit the frozen RED.
 
-The RED must causally cover residual reconstruction/COW plus the four
-ordinary-`[[Set]]` sink locations at `state-materialize.ts:134`,
-`state-payload.ts:90`, and `drp-applier.ts:267,279-281`. Require own-data
-materialization for validated primitive-string keys including `__proto__`, no
-inherited-setter or prototype mutation, unchanged prototypes/sibling instances,
-alias isolation and exact semantics/wire bytes. Pin a deliberate policy for
-intentional live application accessors and preserve proxy bookkeeping plus 0q
-journal rollback. Do not grow the D.92.2 analyzer, consume D.73 hostile
-classification or D.92.4 raw-egress ownership, widen binary serialization into
-a general codec rewrite, or claim symbol identity as a wire feature.
+Implement exactly the bounded GREEN contract above: prevalidate every key as a
+primitive string; use ownership-safe own-data materialization for reconstruction,
+nested detachment and non-live clones with no `__proto__` accessor exception;
+permit an intentional non-`__proto__` application accessor only at live
+replacement, only from the actual application class prototype chain, with the
+exposed tracked proxy receiver and complete journal rollback. Replace both the
+local `stateFromDRP` → `fromStates` round trip and remote owned-snapshot full
+reconstruction with proportional ownership-safe COW/overlay work while
+preserving isolation, exact wire bytes and accepted 1d(i) counters. Do not grow
+the D.92.2 analyzer, consume D.73 hostile classification, Phase 1d(iii) prune
+ownership or D.92.4 raw-egress ownership, widen binary serialization, or close
+the `OPEN` symbol policy.
 
 After 1d(ii) closes, Phase 1d(iii) is the next distinct TDD item and owns
 checkpoint-prune history independence. Phase 1n separately owns converting the
