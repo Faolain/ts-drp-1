@@ -17895,13 +17895,69 @@ object `ef3a53bdf318a5cea30761a9e3d203b106f16e7e` and patch SHA-256
 Evidence is under
 `.logs/phase-1d-i-d927-binary-wire-fidelity-red-codex-high/`.
 
-The distinct production-only GREEN is narrowly owned by
+**D.92.7 production GREEN candidate.** Distinct Codex-high commit
+`2d336c5939fd567a6bc4613b226ed0bb31b1ef06`, tree
+`a8e417e646e652258e7b28a00c45b6a7764b6100`, parent
+`2c989ba12cbcf575bfa46d8b0ae9c898fbf28bd5`, changes only
 `packages/utils/src/serialization/equality.ts` and
-`packages/utils/src/serialization/index.ts`. It must use one shared stateful
-binary extension/reference codec contract with fresh encode/decode context per
-public call, explicit kind/backing/view/reference records, consistent expando
-rejection and strict extension decoding. Keep the RED frozen and do not widen
-this into a general codec rewrite or consume D.73/P3b ownership.
+`packages/utils/src/serialization/index.ts` (581 insertions / 56 deletions).
+`equality.ts` is 595 lines at SHA-256
+`556388a5dddd98390517dee3ded6d536c4fa8abb607251baa1836a3e4c8ea791`
+and Git blob `167145538c845f4711e493f40ea7a436cf38f417`; `index.ts` is 73
+lines at SHA-256
+`2a861eb0a6b68ac3d807d47ffeb9f8fa9dabc065f88751c2d37c790320fb63ad`
+and Git blob `23c19f8857796b25e7b97a108360332b5cecfc96`. The frozen 341-line
+RED remains byte-identical at SHA-256
+`30a524f096acec1015873557501078917e4678741cf405d6dbe1d3b8902694b7`
+and Git blob `6620b01220ff76bb2da6ae7d2bc184621a205207`.
+
+The candidate replaces the parallel equality/wire registries with one shared
+codec owner. Every public encode or decode gets fresh identity, backing and
+allocation state; explicit reference, backing and view records preserve
+constructor kind, range, repeated identity and shared-backing topology inside
+one value graph. Decoder validation rejects unknown tags, malformed record
+shapes and IDs, duplicate declarations, missing/forward references, invalid
+view ranges/alignment/element lengths, unsupported backing or view kinds,
+non-zero allocation proof and over-budget allocation. String and symbol
+expandos reject consistently before encode. Each protobuf state entry remains
+an intentional identity boundary: it is a separate bytes field and therefore
+gets a fresh context; cross-entry identity is not claimed.
+
+Node pooled Buffer encoding carries only visible bytes and decodes every byte
+outside the visible window as zero while preserving the 8 KiB slab shape. One
+8 KiB per-call allowance accommodates that ordinary pool; every additional
+uncovered backing byte requires zero-valued allocation-proof bytes on the
+wire. Adversarial probes reject a 22-byte payload declaring a 4 GiB backing
+before allocation and encode two independent sparse 8 KiB backings in 8,241
+wire bytes while preserving their distinct decoded backings. Thus the
+allowance is neither a supported-size cap nor an unbounded allocation escape.
+
+Focused and post-commit D.92.7 are 25/25; serialization controls are 21/21;
+P3b is 42/42; P3a plus bounded 1 MiB is 6/6; P3a-prime/root-cycle is 20/20;
+D.92.2 final and post-commit are 64/64 with the exact 94-site census;
+inherited Phase 1d(i) is 147/147; specialized state/collection/atomicity is
+93/93; P2 plus P1 plus D.92.3 is 99/99; and D.92.4-D.92.6 is 60/60.
+Performance is 8/8, with MapDRP at 566.5 ms in the final gate and 209.2 ms in
+isolation. The intentionally open sync-livelock sentinel remains exact 3
+failures / 3 passes. Utils, object and workspace typechecks, final owned lint,
+tracked lint at zero errors / 249 inherited warnings, Prettier and diff checks
+pass. All 61 artifact-manifest entries verify; the manifest SHA-256 is
+`e170fe4eebf576d6c4bb63e395371ff1c60601dd69b91bc580e26bf08f383ff8`.
+
+Superseded diagnostics remain explicit: the first D.92.2 run was 61/64 after
+the static census moved from 94 to 96, the first performance run was 7/8 with
+MapDRP at 3,906.6 ms, and one interim owned-lint rerun had one error and three
+warnings. The refactor restored the exact 94-site census, replaced
+exception-driven binary detection with captured exact-prototype checks and
+cleared the final lint gate. Evidence is under
+`.logs/phase-1d-i-d927-binary-wire-fidelity-green-codex-high/`.
+
+This is a candidate only: D.92.7 remains open pending fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 review, then conditional final Opus/xhigh. Review
+must specifically challenge legacy extension-tag-2 compatibility, the
+public-versus-internal codec/context export boundary, pooled-slab and
+allocation-proof claims, and decoder CPU/memory denial-of-service surfaces.
+No contract or plan assumption is amended.
 
 Two review findings remain `OPEN` D.92.7-or-dedicated candidates rather than
 adopted scope. A TypedArray backed by a resizable ArrayBuffer may reject
@@ -18647,17 +18703,21 @@ falsified objection and superseded its verdict to `ACCEPTED` /
 `P3B_MAY_CLOSE=yes`. Preserve the complete evidence and model disclosure in
 the P3b acceptance section above; do not modify any frozen P3b lineage.
 
-Freeze D.92.7 tests-only RED `3614362`: sole 341-line test SHA-256
-`30a524f096acec1015873557501078917e4678741cf405d6dbe1d3b8902694b7`,
-Git blob `6620b01220ff76bb2da6ae7d2bc184621a205207`, exact 19 failures / 6
-passes across 25 cases with all conditional families present. Proceed directly
-with a distinct Codex-high production-only GREEN, owned narrowly by
-`packages/utils/src/serialization/equality.ts` and
-`packages/utils/src/serialization/index.ts`, using the shared stateful binary
-extension/reference contract, fresh per-call contexts, explicit
-kind/backing/view/reference records, expando rejection and strict decoding.
-Then run the normal Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional
-final Opus/xhigh review loop. Do not modify the frozen RED, grow the D.92.2
+Freeze D.92.7 tests-only RED `3614362` and production-only GREEN candidate
+`2d336c5`. The candidate changes only the two serialization owners by exact
+581 insertions / 56 deletions, replaces parallel registries with one shared
+codec and fresh per-call context, and is 25/25 with every mandatory
+preservation, typecheck, lint, formatting and performance gate described in
+the D.92.7 section. Do not modify either frozen lineage.
+
+Proceed directly with fresh Grok 4.5/high and exact Kimi 3/high/dual-100
+reviews in parallel; run final Opus/xhigh only if both accept. Require the
+reviewers to execute or independently inspect the strict malformed/unknown-tag
+cases, pooled Buffer visible-byte/zeroed-outside proof, 8 KiB one-pool
+allowance, 4 GiB allocation rejection and two-sparse-backing wire proof. They
+must also challenge legacy extension-tag-2 compatibility, whether the shared
+codec/context exports are truly internal, decoder CPU/memory DoS, and the
+intentional per-protobuf-entry identity boundary. Do not grow the D.92.2
 analyzer, consume D.73 hostile classification or D.92.4 raw-egress ownership,
 or widen this into a general codec rewrite. Composite D.92 starts only after
 D.92.7 closes, then Phase 1d(ii); prototype-safe materialization remains
