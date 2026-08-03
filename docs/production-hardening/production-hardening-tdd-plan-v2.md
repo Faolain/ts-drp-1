@@ -16938,6 +16938,68 @@ is a GREEN candidate, not acceptance or closure of P3b. Run fresh Grok
 only if both preliminary reviewers accept. Plan-checkpoint evidence is under
 `.logs/phase-1d-i-p3b-setter-green-checkpoint-docs-codex-high/`.
 
+**P3b setter GREEN review disagreement — post-hoc error normalization.** Fresh
+Grok 4.5/high session `019fc640-f7f5-7741-a888-1fec333ff615` used only
+`grok-4.5-build` at high reasoning. Initial request
+`fd9c1a91-27ce-4e41-b19a-9358d8b68836` used 16 calls; a same-session,
+zero-tool reconciliation request `ad9e3220-fafd-49c9-a59c-41707a24f96c`
+used one more. Across all 17 calls it used no fallback, helper, subagent,
+Fable, web or MCP content and made no repository edit. Its authoritative
+terminal supersedes its initial terminal and returns `CHANGES_REQUESTED` /
+`P3B_MAY_CLOSE=no`. The initial raw-stream SHA-256 is
+`08afb3025e4c2e4c6f3c4b43a4f2b944cb77e2e4885d42851e52bd7185cd9880`,
+the corrective raw-stream SHA-256 is
+`fc035b4cbf211ffc0b281bcb08fd37d9d3cd156a13b3dc06a5a3ab8e4d1f36b9`,
+the authoritative result SHA-256 is
+`11615b4ad8c2ef1a1f806f0d1c722c3f1a4ed340e3a90f3d44a665f233651292`,
+and the manifest SHA-256 is
+`864e16d8603879bcca08ea5a7c38ab9071c0e58427d6fc339b039052df2d98eb`.
+
+Grok's blocker is error attribution rather than mutation safety. Candidate
+`c6aa475` prevents the governed backing mutation, but its message-only replay
+classifier can relabel both a setter-authored `TypeError` with coincident text
+and a failure from applying a structural native to a different, non-governed
+`Proxy(ArrayBuffer)`. In neither case do governed bytes detach or resize, yet
+the original error identity or origin is lost. That conflicts with the frozen
+requirement that unrelated setter errors pass through unchanged and that only
+a real structural attempt against the protected governed backing receives the
+policy error.
+
+Exact Kimi 3/high/dual-100 session
+`5152b184-ffce-4569-b626-6f20cf0d0de9` independently returned `ACCEPTED` /
+`P3B_MAY_CLOSE=yes`. Its second terminal supersedes only the first terminal's
+formatting and informal count, not its substantive verdict. The two turns used
+31 `StepBegin` requests and 31 read-only calls: 13 Shell, 11 ReadFile and seven
+Grep. It ran one bounded file-free engine probe, reached neither exact-100
+cap, and used no fallback, helper, subagent, Fable, network or repository edit.
+The authoritative result SHA-256 is
+`1b3f97d86f736d19c5047cbc2dbe56cfb48d8c23c690da45d5c16c1d7d057a07`,
+the combined raw-stream SHA-256 is
+`371459f8ca07d975f7fb8584b35b833181c4db68080259c5c0f197c76607748a`,
+and the integrity SHA-256 is
+`4bf8f8d447b032d7faf071439cfe7caca188c7dfc452143fb62a8e68c1e77f39`.
+
+Kimi classifies exact brand-message forgery as hostile D.73/error-identity
+work and applying a genuine structural native to a foreign backing proxy as a
+pre-held-raw-capability D.92.4/D.73 case, not an ordinary P3b blocker. Evidence
+for both reviews is under
+`.logs/phase-1d-i-p3b-setter-green-{grok45-high-review,kimi3-high-100-review}/`.
+
+The preliminary reviewers therefore disagree, and Grok rejects. No
+Opus/xhigh acceptance review was launched; production candidate `c6aa475` and
+plan checkpoint `aa9bc9b` remain committed but rejected, and P3b remains open.
+The disagreement exposes a contract-feasibility question: an arbitrary
+captured native invoked by user code with a proxy receiver necessarily throws
+the engine's brand `TypeError`, while post-hoc conversion to the exact policy
+error conflicts with arbitrary-error identity. Before changing the frozen
+tests, policy text or production again, convene the required amendment triad:
+fresh Opus/xhigh, Codex-high and exact Kimi 3/high/dual-100 reviews must agree
+on a bounded contract or a sound construction. One candidate is to retain
+pre-mutation safety while permitting the engine brand `TypeError` for direct
+captured-native application, and retain the exact policy error for
+proxy-intercepted structural calls. That is a question for the triad, not an
+adopted amendment in this checkpoint.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
