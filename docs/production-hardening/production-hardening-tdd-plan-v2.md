@@ -19463,6 +19463,56 @@ candidate-kill differential and all preservation/typecheck/lint/format gates;
 commit the RED and a separate plan checkpoint; then resume the same distinct
 GREEN owner from clean HEAD and re-derive the owned-frontier implementation.
 
+**Accepted Phase 1d(ii) ambient-causal-boundary corrective tests-only RED
+checkpoint.** Fresh Codex-high commit
+`02cf3cc3c61ec3415699a229f1992567bc028d3f` changes exactly the four
+authorized test files by 215 insertions / 40 deletions and no production or
+plan file:
+
+- `comparison-work-1d-i-red.test.ts`: 805 lines, SHA-256
+  `78275fb9071605ef4152769b7ef0c163fde086341617991033ba964986400986`,
+  git blob `3fed13edc486d8defbbb41b517934cb189987d20`;
+- `incremental-publication-corrective-1d-i-red.test.ts`: 416 lines, SHA-256
+  `acad9a18176c2ae565c2595d6487995345893d958c33980cbd5877d15241f5c0`,
+  git blob `454a5b2526fb3a51f2e733f7e152642889f29b78`;
+- `incremental-publication-identity-capture-1d-i-red.test.ts`: 521 lines,
+  SHA-256
+  `a1f849f382636b2d4dc2d96fd58a6aad08487634a5c60de7b669bc0eb3dd9318`,
+  git blob `262574135fbd3de4665342e2d8d02399a68fbd11`;
+- `incremental-publication-work-1d-i-red.test.ts`: 795 lines, SHA-256
+  `35c21abd38c85b448a9675e458e84047a45517f9c286de99d78ee9d982387930`,
+  git blob `0b92d1a9a79afaf0cac7003c18490ac426f68ce6`.
+
+Before correction the same four files were exact 6F/58P. The frozen corrected
+four-file run is exact 11F/54P: the same six inherited failures plus five new
+causal ambient-isolation failures. The exact intended ambient subset is 5F
+with 11 cases skipped. The new checkpoint sentinel is separately 1P with 21
+cases skipped on clean HEAD. In a disposable exact candidate tree, applying
+authenticated d28b production while preserving these tests makes the same
+sentinel exact 1F/21 skipped because `ambientACLPoison` appears in the
+live-sourced checkpoint ACL bytes. The candidate tree was removed. Earlier
+candidate attempts 1-4 stopped during temporary dependency resolution and are
+explicitly discarded; only `checkpoint-d28b-candidate-5.log` is differential
+evidence.
+
+Proportionate preservation is 125P with the expected 11 frozen Phase 1d(ii)
+and D.92.2 RED failures. Object typecheck and the 34-package workspace
+typecheck pass. Owned-file lint is 0 errors / 0 warnings; authoritative
+Git-tracked lint is 0 errors / 249 inherited warnings. Prettier, diff, scope,
+index and frozen-hash checks pass. The production tree remains
+`3b7d56504dc3328114726c7c88176a5f76cdefdb`; protected stash object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` retains patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Evidence is under `.logs/phase-1d-ii-ambient-causal-red-codex-high/`; its
+33-file artifact-manifest SHA-256 is
+`87a14e0b6f4d9f04c78bd688d66712f1931772296ede181739f77277b84d94df`.
+
+This four-file RED is now frozen. Resume with a distinct Codex-high
+production-only GREEN from exact committed HEAD. Do not alter any test or the
+plan, and do not apply either archived candidate wholesale. Re-derive the
+owned-frontier/COW implementation and canonical checkpoint source, then reach
+GREEN across the complete frozen contract and preservation gates.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
@@ -19544,15 +19594,15 @@ the 55,474-byte identity archive or the 58,723-byte d28b adoption archive;
 retain them only as the authenticated historical/rejected continuity evidence
 described above.
 
-The immediate next action is the fresh Codex-high four-file tests-only RED
-specified in the ambient-causal-boundary correction. It must replace only the
-stale ambient expectations, preserve authored-operation positive coverage and
-add the single multi-frontier checkpoint candidate killer. Run the corrected
-files plus proportionate preservation, object/workspace typecheck, owned and
-tracked lint, Prettier/diff/scope and frozen-artifact checks to `.log`. Record
-the honest signatures: ambient corrections are RED on clean HEAD; the new
-checkpoint test is GREEN on clean HEAD and RED on the d28b proportional/live-
-checkpoint candidate.
+Freeze accepted ambient-causal-boundary tests-only RED
+`02cf3cc3c61ec3415699a229f1992567bc028d3f`: its exact four-file scope,
+11F/54P complete signature, 5F intended ambient subset, clean-HEAD checkpoint
+1/1 and d28b checkpoint 1F candidate kill, file identities and complete gates
+are recorded above. Do not alter any of the four files. The immediate next
+action is a distinct Codex-high production-only GREEN from clean HEAD. Run the
+complete frozen contract plus proportionate preservation, object/workspace
+typecheck, owned and tracked lint, Prettier/diff/scope and frozen-artifact
+checks to `.log`.
 
 Implement exactly the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
