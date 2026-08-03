@@ -16866,6 +16866,33 @@ bounded faithful real-applier case. Freeze that RED before a distinct
 production GREEN. This checkpoint records evidence only and makes no plan-policy
 amendment.
 
+**Accepted P3b setter-receiver corrective RED checkpoint.** Fresh Codex-high
+tests-only commit `43d64fb85c32fd9d087ab3419ed83f539e09bfe6` adds only
+`packages/object/tests/buffer-backing-setter-receiver-1d-i-red.test.ts`. The
+265-line file has SHA-256
+`27cd606a95c151c6206eda7a7245a45de08a8d9418f1835fd668191eb0de50e4`
+and git blob `664653187a6c35e9dfd1c0c518ce932c7c41906d`.
+
+The focused and postcommit RED signatures are exactly 4F/1P. Both direct
+`this.transfer()` and captured-native transfer invocation receive the raw
+backing as a custom setter's `this`, physically detach storage shared with a
+governed Buffer, and leave changed keys, raw-egress state and egress candidates
+clean. Where resizable ArrayBuffers are available, context-only resize remains
+allowed, but after promotion the same setter grows the backing from five to six
+bytes instead of rejecting; final governed-owner removal remains part of the
+dynamic-ownership contract. The benign custom setter reading `this.byteLength`
+is the passing control, so this RED does not impose a blanket setter ban.
+
+The faithful awaited real-applier case reaches the native `RangeError` instead
+of the exact pre-native policy `TypeError`, while the one-vertex genesis graph,
+zero publications, attached live storage and unchanged stored-root bytes all
+hold. The combined P3b run is exactly 4F/26P and preserves the frozen prior
+corpora at 25/25. Object and workspace typechecks, owned lint, Prettier, diff,
+commit-scope, protected-path and stash checks pass. Authoritative evidence is
+under `.logs/phase-1d-i-p3b-setter-red-codex-high/`. The RED is frozen and P3b
+remains open. Next use a distinct Codex-high agent for the production GREEN;
+this checkpoint makes no plan-policy amendment.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
