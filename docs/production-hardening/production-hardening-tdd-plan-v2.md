@@ -19040,6 +19040,56 @@ The native envelope disclosed one automatic non-substantive Haiku helper at 24
 output tokens; it authored no finding or vote. Neither substantive reviewer
 read prior review artifacts or used Fable.
 
+**Accepted Phase 1d(ii) D.92.2 corrective tests-only RED checkpoint.** Fresh
+Codex-high commit `0f30b07ce3cf6a27bfa43f9e59288b6bbd61240b` (parent
+`a84f116c6f1d0af4c7ff8f7fbdeb2628b3d231cf`) changes only
+`packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` by
+the unanimously authorized mechanical census correction, exact +3/-6. The
+frozen 1,520-line file has SHA-256
+`3fc50c3f82df3d84c9d31fa90015688fc45b3a3d9d4f6121eb78da1d523f24ff`
+and git blob `dd76df6af159c30a4e4350611ba3595fbdfb84c5`.
+
+Against unchanged production, the clean coverage-disabled authority is exact
+2F/62P, exit 1, in 19.45 seconds; the post-commit run is the same exact 2F/62P,
+exit 1, in 20.62 seconds, with no runner error. The first failure receives 116
+actual package references against the frozen 114 and identifies only the two
+forbidden `computeOperationUntraced` captures; the tuple failure reports those
+same two calls. This pins the GREEN obligation at exact 94 codec references /
+114 package references / 13 clone sites / 2 capture sites / zero violations.
+All other D.92.2 analyzer code, 64 cases, mutants, fixtures, fail-closed
+behavior, copy capability, closure, external surface and finite sites remain
+unchanged and frozen.
+
+Coverage-enabled diagnostics produced the same 2F/62P but took about 79 seconds
+under load and then reported Vitest's hardcoded 60-second worker
+`onTaskUpdate` RPC timeout. They are retained as diagnostics rather than clean
+authority. Investigation also found stale orphan Vitest PID 15260, PPID 1,
+using about 99% CPU after nearly 12 hours. Exact-target graceful SIGTERM did
+not stop it, so the authorized cleanup used SIGKILL and verified its removal.
+The authoritative no-coverage result remained causally identical.
+
+The original Phase 1d(ii) RED remains exact 8F/2P and the corrected 54-case
+preservation boundary remains exact 8F/46P. Object and workspace typechecks,
+owned lint at 0 errors / 0 warnings, tracked lint at 0 errors / 249 inherited
+warnings, Prettier and diff-check pass. Production remains exact object-source
+tree `3b7d56504dc3328114726c7c88176a5f76cdefdb`; the test-only commit retained
+exact pre-checkpoint plan blob `37051f7cf9e32ef20e95c4905ccf2dd7a31d1e20`.
+Evidence is under `.logs/phase-1d-ii-d922-census-red-codex-high/`; its
+artifact-manifest SHA-256 is
+`a43c5a1088825917dd026ced1bcf4bfa5790b853cefa59d03823f8fd955a524d`.
+Protected untracked paths remain unstaged. `stash@{0}` remains object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+
+This test is now frozen. Authenticate
+`/tmp/phase-1d-ii-green-paused-d922.patch` at exact size 52,305 bytes and
+SHA-256
+`5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`,
+run `git apply --check`, apply it and resume the same distinct production-only
+GREEN. Consolidate the draft's topology onto the frozen 94/114/13/2/0 boundary;
+that is an implementation obligation, not authority to amend D.92.2. Do not
+introduce a replay fast path or replay-seed special case.
+
 The correction is necessary but not sufficient for the paused GREEN. Against
 that draft the analyzer reports 119 package references, 18 residual clone
 sites and seven unapproved-reference violations: two previously approved sites
@@ -19056,13 +19106,14 @@ SHA-256
 `5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`.
 The worktree was restored to exact clean tracked HEAD
 `92ae5cd8359886af5ab89c3a9080b2a9d8575f12`; the archive is continuity only,
-not an accepted candidate. First commit the bounded D.92.2 tests-only RED and
-checkpoint its exact signature and gates in this plan. Only then authenticate
-the archive, run `git apply --check`, reapply it, and resume the same distinct
-GREEN lineage. Repair the seven prior implementation regressions, the eight
-amended failures and the census/topology failures without touching either
-corrected preservation test, the original Phase 1d(ii) RED or the newly frozen
-D.92.2 corrective RED. Adversarial review must still probe Opus's defined-only
+not an accepted candidate. The bounded D.92.2 tests-only RED is now committed
+and checkpointed above. Authenticate the archive, run `git apply --check`,
+reapply it, and resume the same distinct GREEN lineage. Repair the seven prior
+implementation regressions, the eight amended failures and the census/topology
+failures without touching either corrected preservation test, the original
+Phase 1d(ii) RED or the newly frozen D.92.2 corrective RED. Consolidating those
+topology failures is implementation, not a census amendment, and it must not
+create a replay fast path. Adversarial review must still probe Opus's defined-only
 borrowed-entry identity guard, nullish deferred values, batched construction
 atomicity and sparse-array wire bytes; these remain attack surfaces, not new
 contract or test scope absent causal evidence and any required quorum.
@@ -19143,20 +19194,21 @@ The first distinct Codex-high production-only GREEN draft reached focused
 collision quorum authorized only the two corrections recorded above. Freeze
 corrective tests-only commit `978c65947ab6baeedc08166eaa14a3da8e04a2c3`:
 its exact two-file +53/-5 scope, 8F/46P signature and preservation/gate evidence
-are recorded above. Before resuming GREEN, create a fresh Codex-high tests-only
-D.92.2 corrective RED with only the unanimously authorized 116->114 and
-0/5/13/4->0/5/13/2 stale-capture edits, prove its exact failure against clean
-HEAD, freeze it, and add a plan-only checkpoint. Do not alter the analyzer,
-64-case corpus, mutants, fixtures, copy capability, closure or any other census
-site. Then verify
-`/private/tmp/phase-1d-ii-green-paused-d922.patch` at 52,305 bytes / SHA-256
+are recorded above. Freeze D.92.2 corrective tests-only commit
+`0f30b07ce3cf6a27bfa43f9e59288b6bbd61240b`: its one-file +3/-6 scope,
+2F/62P causal signature and complete gates are recorded above. Do not alter its
+analyzer, 64-case corpus, mutants, fixtures, copy capability, closure or any
+other census site. Verify
+`/tmp/phase-1d-ii-green-paused-d922.patch` at 52,305 bytes / SHA-256
 `5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`,
 run `git apply --check`, reapply it and resume the same distinct GREEN lineage.
 Fix the seven implementation regressions, eight amended failures and the draft's
 119-reference / 18-clone / seven-violation topology without touching either
 corrected preservation test, the original Phase 1d(ii) RED, the new D.92.2 RED
 or this plan. GREEN must reach exact 94/114/13/2 with zero violations; do not
-amend the manifest to fit the draft. Only after GREEN and all gates pass run
+amend the manifest to fit the draft. Consolidate topology under the existing
+contract and do not introduce a replay fast path or seed-specific shortcut.
+Only after GREEN and all gates pass run
 fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review, followed by final
 Opus/xhigh only after both preliminary reviewers accept. Run focused and
 proportionate preservation/typecheck/lint gates to `.log`.
