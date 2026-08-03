@@ -16236,6 +16236,24 @@ no reference to the new symbol and retains the causal 2F/62P at
 94/115/12/4; the production candidate reaches 64/64 at the future
 94/116/13/4 census. This is a manifest repair, not analyzer growth.
 
+An unseen main-agent causal probe then exposed one missing recursive boundary:
+direct expanded binaries were rejected before reflection, but an ordinary
+data wrapper containing an expanded binary was physically assigned, charged
+and only then rejected by discovery. The original RED owner froze the compact
+tests-only refinement at
+`b165086e0aa4de8a6f39c15b9cd229b61986239c`. One internally parametrized test
+covers both tracked `Reflect.set` and `Reflect.defineProperty`; the pre-fix
+candidate is exact 1F/14P, with both forms proving throw, physical replacement
+and dirty charge while leaving the invalid caller input unsealed. The final
+401-line test file has SHA-256
+`664f39c342d18da758207eb949471b9fa84b864dd0acf3ab77c8b40793c31a29`
+and blob `f6369d5f77d7c7d63f9691a60281542ac01eca6d`. This refinement does not move
+ordinary accessor evaluation before reflection: the accepted D.91 contract
+still preserves and charges writes whose later fallible accessor discovery
+throws. GREEN must preflight recursively inspectable data graphs without
+invoking accessors, then retain D.91 post-write discovery for incomplete or
+accessor-bearing graphs.
+
 Preservation is P3b's immutable exact 4F/4P, bounded 1 MiB 2/2,
 P2+P1+D.92.3 99/99, D.92.4-D.92.6 60/60, inherited 147/147,
 specialized 93/93 and performance 8/8. The sync-livelock sentinel retains its
@@ -17016,8 +17034,9 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 P1, P2, P3a and D.92.4-D.92.6 are accepted and closed, but the unanimous
 Codex-high + exact Kimi 3/high/dual-100 + Opus/xhigh correction quorum has
 inserted P3a-prime before P3b GREEN. Its fresh Codex-high tests-only RED is
-frozen at `9132269` plus surgical manifest repair `453206b`: semantic 11F/7P
-and D.92.2 manifest 2F/62P against old production. Start a
+frozen at `9132269`, surgical manifest repair `453206b` and nested-wrapper
+atomicity refinement `b165086`: the original semantic 11F/7P plus refinement
+1F/14P, and D.92.2 manifest 2F/62P against old production. Start a
 distinct fresh Codex-high production-only GREEN. Implement the shared
 governed/default versus internal replica-local detachment contract across only
 `state-payload.ts`, `proxy.ts`, the five `state-materialize.ts` context calls
