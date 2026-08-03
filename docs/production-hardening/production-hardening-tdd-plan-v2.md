@@ -16637,6 +16637,37 @@ identity/provenance contract rather than an API-syntax matrix; after freezing
 the RED, implement a distinct production GREEN, run full gates and repeat fresh
 Grok/Kimi/conditional-Opus review.
 
+**Accepted P3b captured-native-alias corrective RED checkpoint.** Fresh
+Codex-high tests-only commit
+`848da07be9a0d14d4f8732dfcbb75948dcd8aa8a` adds only
+`buffer-backing-native-alias-1d-i-red.test.ts`. The 289-line file has SHA-256
+`4c8053f26a34c1a23d8628415b2a15e55beb6aa1090eed86af717ee84dfef99a`
+and git blob `d822ee438f60b7685e54903a72ef48129c703bba`.
+
+Seven bounded semantics freeze one identity/provenance contract: same-key
+captured `transfer` and `transferToFixedLength`; a captured transfer under an
+alternate key; conditional captured `resize`; context-only allowance followed
+by governed promotion rejection and last-owner-removal allowance; a custom
+wrapper receiver boundary with a benign custom-method control; and faithful,
+awaited real-applier policy ordering. Direct valid calls prove the current
+bypass detaches or resizes governed Buffer storage while the tracker remains
+clean.
+
+The faithful real-applier case deliberately uses invalid length `-1`. It proves
+that the exact policy `TypeError` must precede the native `RangeError` and keeps
+the test bounded. An exploratory valid-length authoring probe did not settle,
+so it was not encoded as a hanging RED and does not expand the frozen contract.
+This is a harness gotcha, not a plan-policy amendment.
+
+Focused and postcommit evidence is exact 7F/0P; the combined run is exact
+7F/13P, while the frozen prior P3b corpus remains 13/13. Object and workspace
+typechecks, owned lint, Prettier, diff and scope checks pass. Authoritative
+evidence is under
+`.logs/phase-1d-i-p3b-native-alias-red-codex-high/`. The RED is frozen. Next is
+a distinct Codex-high production GREEN, followed by the full preservation
+matrix and fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional final
+Opus/xhigh review.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
