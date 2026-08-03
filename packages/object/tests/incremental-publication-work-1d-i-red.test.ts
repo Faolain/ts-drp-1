@@ -261,6 +261,51 @@ function expectCountedFullCapture(h: Harness, record: PublicationRecord | undefi
 	expect([...copiedPostKeys].sort()).toEqual(completeTargetKeys.sort());
 }
 
+function expectCountedFallbackDelta(h: Harness, record: PublicationRecord | undefined, targetHash: Hash): void {
+	expect(record?.mode).toBe("fallback");
+	const copies = publicationCopies(h.probe, record?.publicationId ?? "missing");
+	expect(copies.every(({ image }) => image === "post")).toBe(true);
+
+	for (const side of ["acl", "drp"] as const) {
+		const targetEntries = stateEntries(h.states, side, targetHash);
+		const targetByKey = new Map(targetEntries.map((candidate) => [candidate.key, candidate]));
+		const baselineEntries = (record?.baselineHashes ?? []).flatMap((hash) => stateEntries(h.states, side, hash));
+		const baselineKeys = new Set(baselineEntries.map(({ key }) => key));
+		const sideCopies = copies.filter((copy) => copy.side === side);
+		expect(
+			sideCopies.every(({ key }) => targetByKey.has(key)),
+			`${side} copy events must describe present entries`
+		).toBe(true);
+
+		for (const candidate of targetEntries) {
+			const retainedCandidates = baselineEntries.filter(
+				(baseline) =>
+					baseline.key === candidate.key &&
+					deepEqual(baseline.value, candidate.value) &&
+					equalBytes(baseline.value, candidate.value)
+			);
+			const candidateCopies = copies.filter((copy) => copy.side === side && copy.key === candidate.key);
+			if (retainedCandidates.length > 0) {
+				expect(candidateCopies, `unchanged borrowed ${side}.${candidate.key} must not be copied`).toEqual([]);
+				expect(
+					retainedCandidates.includes(candidate),
+					`unchanged borrowed ${side}.${candidate.key} must retain an owned entry identity`
+				).toBe(true);
+			} else {
+				expect(candidateCopies, `present changed ${side}.${candidate.key} must be copied exactly once`).toHaveLength(1);
+			}
+		}
+
+		for (const key of baselineKeys) {
+			if (targetByKey.has(key)) continue;
+			expect(
+				copies.filter((copy) => copy.side === side && copy.key === key),
+				`deleted ${side}.${key} must not be copied`
+			).toEqual([]);
+		}
+	}
+}
+
 function assertIncrementalPublication(
 	h: Harness,
 	targetHash: Hash,
@@ -516,7 +561,7 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		expect((target.get("nested") as MatrixDRP["nested"]).stable).toBe("suffix-K");
 		expect(target.get("replacement")).toBe("pending-J");
 
-		expectCountedFullCapture(h, record, pendingJ.hash);
+		expectCountedFallbackDelta(h, record, pendingJ.hash);
 	});
 
 	it("counts multi-head local authoring as a complete fallback", async () => {
@@ -546,7 +591,7 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === join.hash);
 		expect(record).toMatchObject({ kind: "vertex", mode: "fallback", fallbackReason: "non-empty-suffix" });
-		expectCountedFullCapture(h, record, join.hash);
+		expectCountedFallbackDelta(h, record, join.hash);
 	});
 
 	it("counts concurrent-tail adoption instead of sharing against the pending vertex's stale cut", async () => {
@@ -562,7 +607,7 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const target = mapState(h.states.getDRPState(pending.hash)!);
 		expect(target.get("replacement")).toBe("tail");
 		expect((target.get("nested") as MatrixDRP["nested"]).child.value).toBe(10);
-		expectCountedFullCapture(h, record, pending.hash);
+		expectCountedFallbackDelta(h, record, pending.hash);
 	});
 
 	it("keeps resolver-bearing conflict replay in the counted full fallback", async () => {
@@ -574,7 +619,7 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === right.hash);
 		expect(record).toMatchObject({ kind: "vertex", mode: "fallback", fallbackReason: "conflict-replay" });
-		expectCountedFullCapture(h, record, right.hash);
+		expectCountedFallbackDelta(h, record, right.hash);
 	});
 
 	it("never reuses sorted origin for a multi-frontier checkpoint", async () => {

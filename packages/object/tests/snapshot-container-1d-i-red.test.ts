@@ -584,9 +584,12 @@ describe("Phase 1d(i) D.92.3-P2 reconstruction entry staging", () => {
 
 			expect(thrown).toBeUndefined();
 			expect(unstable.reads).toEqual({ key: 1, value: 1 });
-			expect(assignmentReads).toEqual([{ key: 1, value: 1 }]);
+			expect(assignmentReads).toEqual([]);
 			expect(reconstructed!.left).toMatchObject({ marker: unstable.firstValue.marker });
 			expect(reconstructed!.left).not.toBe(unstable.firstValue);
+			const leftDescriptor = Reflect.getOwnPropertyDescriptor(reconstructed!, "left");
+			expect(leftDescriptor).toMatchObject({ configurable: true, enumerable: true, writable: true });
+			expect(leftDescriptor?.value).toBe(reconstructed!.left);
 			expect(reconstructed!.right).toBeUndefined();
 			expect(raw.state[0]).toBe(unstable.entry);
 			if (path === "fromHash") expect(states.getDRPState(hash)).toBe(raw);
