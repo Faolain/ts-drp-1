@@ -16537,6 +16537,50 @@ distinct production-only Codex-high GREEN, then the full preservation matrix
 and fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final conditional
 Opus/xhigh review.
 
+**P3b Buffer-backing-transfer corrective GREEN candidate.** Distinct
+production-only Codex-high commit
+`530f569faba31eddb2110b808bdb7ea90ff34095`, against plan parent
+`d01a24bf489d45718d2e273a57ac39484e7a0824`, adds 22 lines only to
+`proxy.ts`. The final 1,601-line file has SHA-256
+`5bb0adedd88d9aada9b8ea526a3ce7864713da3db0fd846b098c968c8d738f9a`
+and git blob `26de70ec26c2cb3ee904bc5eb79f3b9bcf2947c3`.
+
+The tracker owns a local `WeakMap` from backing identity to sets of Buffer
+aliases. Registration occurs only after each governed Buffer validates and its
+own `preventExtensions` succeeds, immediately beside `initialized.add`, so a
+later commit or normalization failure cannot erase the already-established
+safety fact. Registration adds no ordinary parent edge, does not seal the
+backing and does not promote it into governed state. At call time, the tracker
+asks whether any registered Buffer alias currently has a governed owner. A
+captured native member in the full `ARRAY_BUFFER_MUTATING_METHODS` family is
+rejected before invocation whenever that answer is true.
+
+Dynamic causal probes pass: a context-only Buffer backing remains allowed; a
+later governed promotion of the Buffer makes the same backing reject; removal
+of the last governed owner makes it allowed again; and a resizable backing of
+a governed Buffer rejects structural mutation. The decision is therefore
+ownership-dynamic rather than a permanent blessing or ban.
+
+Final evidence is focused 13/13, with postcommit 13/13 in 20 ms, and inherited
+P3b 8/8 with the five corrective cases skipped. P3a plus bounded 1 MiB is 6/6,
+with the 1 MiB case at 2,231 ms; P3a-prime/root-cycle is 20/20; D.92.2 is
+64/64; inherited Phase 1d(i) is 147/147; specialized is 93/93;
+P2+P1+D.92.3 is 99/99; and D.92.4-D.92.6 is 60/60. Performance is 8/8 with
+MapDRP at 718.8 ms under coverage. The sync sentinel retains its exact expected
+3F/3P. Object/workspace typechecks, owned and tracked lint with zero errors and
+230 inherited warnings, Prettier, diff and scope checks pass. Evidence is under
+`.logs/phase-1d-i-p3b-buffer-transfer-green-codex-high/`.
+
+Frozen test and plan hashes are unchanged, including the corrective RED
+SHA-256 above and parent-plan SHA-256
+`2b4677a7a94699e61bd152980c20085e07e5d3a7a7fdde567514b9b0e681af6b`.
+`stash@{0}` remains unapplied at
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`
+unchanged. This is a candidate, not accepted or closed. Run fresh Grok
+4.5/high and exact Kimi 3/high/dual-100 reviews, then final Opus/xhigh only if
+both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -17326,12 +17370,10 @@ Claude-skill Opus/xhigh.
 P3b GREEN candidate `8223511` reaches its frozen 8/8 and all exact preservation
 gates, but exact Kimi 3/high/dual-100 rejected it for uncharged Buffer-backing
 transfer after Grok accepted. Its tests-only corrective RED is frozen at
-`822135e`: implement a distinct production-only Codex-high GREEN for safe
-atomic rejection of structural mutation on an ungoverned backing that
-internally backs a governed Buffer, preserving the read-only/extensible/clean
-backing and bare governed ArrayBuffer controls. Then run the full preservation
-matrix and repeat fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and, only if
-both accept, final Opus/xhigh review.
+`822135e`, and distinct production-only corrective GREEN candidate `530f569`
+reaches focused 13/13 plus the full preservation matrix. Run fresh Grok
+4.5/high and exact Kimi 3/high/dual-100 reviews. Only if both accept, run final
+Opus/xhigh; otherwise return to a tests-first causal correction.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
