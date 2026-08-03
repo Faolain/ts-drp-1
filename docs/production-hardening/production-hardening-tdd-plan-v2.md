@@ -17857,6 +17857,52 @@ rewrite, invent expando/symbol serialization, consume D.73, or cite in-memory
 detachment as cross-peer evidence. D.92.7 gets its own Codex-high RED/GREEN,
 Grok 4.5/high, exact Kimi 3/high/dual-100 and Opus/xhigh loop.
 
+**Accepted D.92.7 tests-only RED checkpoint.** Fresh Codex-high commit
+`3614362288149bd3243b991e2452c67aced8f0ec`, tree
+`f2abd88c2bd8c3a16260fbcbf70703f431c6dcd9`, parent
+`d41ade5ca9af198b83288f34611e3e8fdf71c066`, adds only
+`packages/object/tests/binary-wire-fidelity-1d-i-red.test.ts`. The formatted
+341-line test has SHA-256
+`30a524f096acec1015873557501078917e4678741cf405d6dbe1d3b8902694b7`
+and Git blob `6620b01220ff76bb2da6ae7d2bc184621a205207`. Against unchanged
+production it is exact 19 failures / 6 passes across 25 cases. BigInt typed
+arrays, Node Buffer and SharedArrayBuffer are conditional families; all were
+present in the checkpoint runtime, so all 15 binary-family rows ran and
+failed. The causal signature is 15 direct-plus-protobuf family shape failures,
+one repeated/shared/distinct-topology failure, one pre-encode expando-rejection
+failure and two fail-closed extension-decoding failures. A simple whole-value
+Float32Array control passes while its offset subview RED fails; ordinary
+object, Map, Set, Date and equality/wire-byte canonicality controls also pass.
+
+The installed MessagePack behavior explains the RED without weakening it.
+Bare ArrayBuffer and SharedArrayBuffer become `{}`; views lose exact kind and
+offset/length, and repeated references lose identity. Decoded binary values
+can also share the decoder's input wire buffer accidentally. That incidental
+storage reuse is not restored source topology: the RED requires an overlapping
+write to propagate among the source-overlapping views and requires the
+independent view to retain a distinct backing, preventing a false positive
+from a bare `.buffer ===` check. Unknown extension 99 currently returns an
+`ExtData`, while a hostile extension-2 scalar payload is accepted and silently
+becomes an empty Float32Array; both must reject with a bounded type-identifying
+error.
+
+Preservation remains green: serialization controls are 21/21 and accepted P3b
+is 42/42. Object, utils and workspace typechecks, owned lint, Prettier, diff
+and scope checks pass; tracked lint is exactly zero errors / 249 inherited
+warnings. The protected untracked paths and `stash@{0}` remain unchanged at
+object `ef3a53bdf318a5cea30761a9e3d203b106f16e7e` and patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Evidence is under
+`.logs/phase-1d-i-d927-binary-wire-fidelity-red-codex-high/`.
+
+The distinct production-only GREEN is narrowly owned by
+`packages/utils/src/serialization/equality.ts` and
+`packages/utils/src/serialization/index.ts`. It must use one shared stateful
+binary extension/reference codec contract with fresh encode/decode context per
+public call, explicit kind/backing/view/reference records, consistent expando
+rejection and strict extension decoding. Keep the RED frozen and do not widen
+this into a general codec rewrite or consume D.73/P3b ownership.
+
 Two review findings remain `OPEN` D.92.7-or-dedicated candidates rather than
 adopted scope. A TypedArray backed by a resizable ArrayBuffer may reject
 `Object.preventExtensions`; support and compatibility need a future owner.
@@ -18601,12 +18647,19 @@ falsified objection and superseded its verdict to `ACCEPTED` /
 `P3B_MAY_CLOSE=yes`. Preserve the complete evidence and model disclosure in
 the P3b acceptance section above; do not modify any frozen P3b lineage.
 
-Proceed directly with a fresh Codex-high tests-only RED for D.92.7 binary wire
-fidelity under the already-specified D.92.7 contract, followed by a distinct
-Codex-high GREEN and the normal Grok 4.5/high, exact Kimi 3/high/dual-100 and
-conditional final Opus/xhigh review loop. Do not grow the D.92.2 analyzer or
-consume D.73 hostile classification, D.92.4 raw-egress ownership, binary
-expando policy or general codec-rewrite scope. Composite D.92 starts only after
+Freeze D.92.7 tests-only RED `3614362`: sole 341-line test SHA-256
+`30a524f096acec1015873557501078917e4678741cf405d6dbe1d3b8902694b7`,
+Git blob `6620b01220ff76bb2da6ae7d2bc184621a205207`, exact 19 failures / 6
+passes across 25 cases with all conditional families present. Proceed directly
+with a distinct Codex-high production-only GREEN, owned narrowly by
+`packages/utils/src/serialization/equality.ts` and
+`packages/utils/src/serialization/index.ts`, using the shared stateful binary
+extension/reference contract, fresh per-call contexts, explicit
+kind/backing/view/reference records, expando rejection and strict decoding.
+Then run the normal Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional
+final Opus/xhigh review loop. Do not modify the frozen RED, grow the D.92.2
+analyzer, consume D.73 hostile classification or D.92.4 raw-egress ownership,
+or widen this into a general codec rewrite. Composite D.92 starts only after
 D.92.7 closes, then Phase 1d(ii); prototype-safe materialization remains
 mandatory before Phase 1d(ii) closure and Phase 4b/6a snapshot adoption. D.73
 hostile virtual `Map.keys()`, `Symbol.hasInstance` and `Symbol.species`
