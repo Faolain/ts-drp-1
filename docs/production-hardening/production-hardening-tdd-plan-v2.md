@@ -16429,6 +16429,49 @@ distinct tracked-root proxy identities, but property-local policy and raw
 identity are correct; this is nonblocking. P3a-prime is accepted and closed,
 and P3b GREEN is unblocked.
 
+**P3b production GREEN candidate.** Distinct Codex-high production commit
+`822351177d383fb3a3e77ac24b7356766bc27007` changes exactly `proxy.ts` with
+397 insertions and one deletion. The file has SHA-256
+`5c40722a77258dc0453d4dbe719de8e676bb1ef20aee929f0bda0a04c6e16c57`
+and git blob `ea74e7a8d06d4352a41fc4a8aa33c79325fdae4b`.
+
+The candidate implements one receiver-safe view/backing model. Same-backing
+governed binary aliases are linked and sealed, while purely local or fresh
+independent binary results remain dynamic and unowned until a governed
+assignment establishes ownership. Canonical-index writes compare exact indexed
+bytes in O(element-width) work, invoke the configured comparator once inside
+the charge-on-throw boundary, and attribute every effective backing-byte
+change. Proxy arguments remain proxies across ordinary and binary callback
+boundaries; only the finite real branded Node Buffer operand boundary unwraps
+an argument for native receiver compatibility. Governed `Buffer.buffer` does
+not promote or seal the pooled backing unless it is independently governed.
+
+Main-review causal probes corrected the candidate without growing a syntax
+matrix. Earlier revisions incorrectly sealed purely local and fresh independent
+returned binaries; canonical-index `defineProperty` missed sibling owners of a
+shared backing; ordinary and binary callback `thisArg` unwrapping leaked raw
+state; fallible value comparison and NaN value equality were insufficient for
+indexed backing-byte truth; and governed `Buffer.buffer` incorrectly sealed a
+pooled backing. The final model removes both forbidden lazy-expando mechanisms:
+`linkBinaryProperty` and `lazilyLinkedBinaryProperties` are absent.
+
+Final gates are exact: P3b 8/8 in 19 ms and postcommit 8/8 in 17 ms; P3a plus
+bounded 1 MiB 6/6 with the 1 MiB case at 1,437 ms; P3a-prime/root-cycle 20/20;
+D.92.2 64/64; inherited 147/147; specialized 93/93; P2+P1+D.92.3 99/99;
+D.92.4-D.92.6 60/60; and performance 8/8 with MapDRP at 219.0 ms. The sync
+sentinel remains its expected exact 3F/3P with exit 1. Object and workspace
+typechecks, owned and tracked-source lint, Prettier, diff and scope checks pass.
+Only artifacts `36-FINAL` through `54-FINAL` under
+`.logs/phase-1d-i-p3b-receiver-green-codex-high/` are authoritative GREEN
+evidence; earlier logs are causal or superseded.
+
+All frozen RED, P3a and P3a-prime hashes remain unchanged. `stash@{0}` remains
+unapplied at exact commit
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, and its patch remains untouched at
+SHA-256 `8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+This is a candidate, not accepted closure: run fresh Grok 4.5/high and exact
+Kimi 3/high/dual-100 reviews, then final Opus/xhigh only if both accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -17215,11 +17258,13 @@ tests-only RED, manifest repair and nested-wrapper refinement remain frozen at
 accepted by fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
 Claude-skill Opus/xhigh.
 
-Resume P3b GREEN from its frozen exact 4F/4P on the settled fail-closed
-invariant. Use `stash@{0}` only as a reference, not as an application unit, and
-remove the invalid `linkBinaryProperty` and `lazilyLinkedBinaryProperties`
-expando paths from any reused receiver-safe work. Do not modify the frozen RED,
-grow the D.92.2 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
+P3b GREEN candidate `8223511` reaches its frozen 8/8 and all exact preservation
+gates with the forbidden `linkBinaryProperty` and
+`lazilyLinkedBinaryProperties` paths absent. Run fresh Grok 4.5/high and exact
+Kimi 3/high/dual-100 reviews. If both accept, run final Opus/xhigh; if any
+rejects, return to a tests-first causal correction. Do not mark P3b accepted or
+closed, modify the frozen RED, grow the D.92.2 analyzer or consume the D.73,
+D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
 or after P3b. Composite D.92 starts only after both P3b and D.92.7 close, then
 Phase 1d(ii); prototype-safe materialization remains mandatory before Phase
