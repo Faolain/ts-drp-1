@@ -327,13 +327,13 @@ function replaceEnumerableState<T extends object>(
 		if (!keys.has(key)) continue;
 		let value = readEnumerableStateValue(source, key);
 		if (typeof value === "function") continue;
+		if (borrowedStateEntry(source, key) !== undefined) value = detachBorrowed(value);
 		const setter = applicationSetter(prototype, key);
 		if (setter !== undefined) {
 			recordSetterRollback(target, journal);
 			Reflect.apply(setter, target, [value]);
 			continue;
 		}
-		if (borrowedStateEntry(source, key) !== undefined) value = detachBorrowed(value);
 		const previous = Reflect.getOwnPropertyDescriptor(target, key);
 		defineEnumerableOwnData(target, key, value);
 		recordPropertyMutation(target, key, previous, journal);
