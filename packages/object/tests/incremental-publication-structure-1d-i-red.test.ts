@@ -1423,7 +1423,6 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 				"state-materialize.ts:@typescript-eslint/no-explicit-any",
 				"state-materialize.ts:@typescript-eslint/no-explicit-any",
 				"state-materialize.ts:@typescript-eslint/no-explicit-any",
-				"state-materialize.ts:@typescript-eslint/no-explicit-any -- rightfully so this is not a problem",
 			].sort()
 		);
 	});
