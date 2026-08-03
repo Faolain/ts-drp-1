@@ -708,7 +708,7 @@ export function trackMutations<T extends object>(
 		if (!isReference(value)) return false;
 		const rawValue = unwrap(value);
 		return isBackingStore(rawValue)
-			? hasGovernedBuffer(rawValue)
+			? hasGovernedBuffer(rawValue) || hasGovernedOwner(rawValue)
 			: ARRAY_BUFFER_IS_VIEW(rawValue) && hasGovernedOwner(rawValue);
 	};
 	const isReplicaLocalOnly = (value: object, ignored: boolean): boolean => ignored && !hasGovernedOwner(value);
