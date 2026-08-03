@@ -16754,6 +16754,34 @@ ownership and faithful real-applier controls. Freeze that RED before a
 distinct production GREEN. This records review evidence only and makes no
 plan-policy amendment.
 
+**Accepted P3b accessor-receiver corrective RED checkpoint.** Fresh
+Codex-high tests-only commit
+`ae271438d82d43dcbfcb5133e89b21ccc7221333`, against plan parent
+`9ed97d1`, adds only
+`packages/object/tests/buffer-backing-accessor-receiver-1d-i-red.test.ts`:
+269 lines, SHA-256
+`a4ce093b471bc5b226535c63f68da502f8eac265c7fb5ea08bdf31c01a1f7e7b`
+and Git blob `8802796bfe057d752fc88ceef361d8dd9acd5e58`. It freezes the
+reviewers' lookup-time receiver finding without modifying production or the
+prior native-alias corpora.
+
+The focused and postcommit RED signatures are exactly 4F/1P. A direct getter
+and a getter returning a native method bound to `this` both detach the backing
+shared with a governed Buffer while tracking remains clean. Where resizable
+ArrayBuffers are available, the dynamic-ownership getter reaches byte length
+6 instead of rejecting before mutation at 5. The faithful, awaited real
+applier case reaches a native `RangeError` instead of the exact pre-native
+policy `TypeError`. The bounded benign `this.byteLength` accessor remains the
+one passing control. Combined with the prior captured-native-alias and
+receiver corpora, the signature is exactly 4F/21P and preserves the frozen
+prior 20/20.
+
+Object and workspace typechecks pass, owned lint is clean, and Prettier, diff
+and commit-scope checks pass. Authoritative RED evidence is under
+`.logs/phase-1d-i-p3b-accessor-red-codex-high/`. P3b remains open. Next use a
+distinct Codex-high agent for the production GREEN, preserving the frozen RED
+and dynamic-ownership boundaries. This checkpoint makes no policy amendment.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
