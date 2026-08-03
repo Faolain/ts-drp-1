@@ -17000,6 +17000,95 @@ captured-native application, and retain the exact policy error for
 proxy-intercepted structural calls. That is a question for the triad, not an
 adopted amendment in this checkpoint.
 
+**P3b setter contract amendment — unanimous Decision A.** The required fresh
+amendment triad independently agrees that the exact governed-backing policy
+`TypeError` remains mandatory only where the backing proxy intercepts the
+structural member access. Calls to `transfer`, `transferToFixedLength`,
+resizable `resize` or SAB `grow` obtained through proxy property lookup must
+therefore throw the exact policy error before the native executes, including a
+captured genuine native installed as an own backing property and then obtained
+through the proxy. Direct application of a previously captured genuine native
+to the governed proxy receiver, such as `Reflect.apply(captured, this, args)`,
+performs no operation on that proxy and fires no proxy trap. It must instead
+fail closed before mutation at the engine's internal-slot brand check, and the
+engine-created `TypeError` must propagate with its object identity and message
+unchanged. No exact engine-specific string is frozen.
+
+Arbitrary setter, callee and foreign-receiver errors likewise propagate with
+their original identity and message, even when their text coincides with the
+policy text or the engine brand text. Post-hoc origin inference is forbidden:
+production may not classify by message or stack text, replay a structural
+native against any receiver, or infer causation after the throw. This is a
+contract correction at a proven-unobservable boundary, not a mutation-safety
+relaxation. A protected backing's custom setter still receives the tracked
+proxy rather than the raw backing, structural calls remain pre-mutation, and
+context-only allowance, promotion and final-owner removal remain live
+call-time decisions.
+
+The amendment quorum is unanimous. The fresh collaboration-only Codex-high
+adjudicator returned `PLAN_AMENDMENT_AGREE=yes` / Decision A and proposed the
+same contract and controls; as with prior collaboration-only adjudications, it
+has no durable session or artifact hash and none is invented here. Exact Kimi
+3/high/dual-100 session `4dfec75e-5a98-4174-97e0-de1096caa063` returned
+`PLAN_AMENDMENT_AGREE=yes`, `CHOICE=A` and
+`P3B_CORRECTIVE_RED_MAY_START=yes` after 16 authenticated LLM requests and 19
+read-only tool calls. Its result SHA-256 is
+`f66c8997db22ea542bfa8471508d99a032e65d0b53d2fb5df9f97e861ade3031`,
+raw-stream SHA-256 is
+`013e0a20706b120fe65a648a2bbe40737814e8bb1d7257eaf7adb2f449fe8732`,
+and artifact-integrity SHA-256 is
+`13ef1f6dc8084bd52624d4b97eb0c4aefc24a81f57538ff10dc2f5d7803b76d6`.
+Fresh Opus/xhigh session `8c2f1631-21bf-40e1-bb4b-ff0765659cef`, using only
+`claude-opus-5`, returned `PLAN_AMENDMENT_AGREE=yes` / `DECISION=A`; its result
+SHA-256 is
+`2045968161cfa5fbb6a4d5112a6b34613db6d55585d113354cabc9e0782cd00c`
+and byte-preserved native-envelope SHA-256 is
+`f27b20ba21487e0a2116fc97d093a2119588001b50709f22e8332dfcc539350a`.
+No reviewer edited the repository. Durable evidence is under
+`.logs/phase-1d-i-p3b-setter-contract-amendment-{kimi3-high-100,opus-xhigh}/`
+for the two authenticated external reviews; no Codex-high artifact directory
+exists for the collaboration-only verdict.
+
+Candidate `c6aa4751b7a10fd3519a03e1c759bf75b6eb4054` is therefore rejected and
+superseded, not accepted or reverted. Its message-matching replay can relabel a
+setter-authored coincident `TypeError` and the genuine engine error from a
+fresh foreign `Proxy(ArrayBuffer)` even though no governed structural attempt
+occurred. More seriously, replay during classification can itself detach a
+caller-supplied genuine foreign receiver. The latter capability can remain
+D.92.4-owned when it begins with a pre-held raw governed alias, but the replay
+side effect and false attribution were introduced by this P3b candidate and
+must be removed here. The corrective GREEN must delete
+`isStructuralMutatorReceiverError` and its set-trap catch/normalizer while
+retaining per-accessor native classification, custom-setter receiver routing,
+live ownership checks, and the get-trap's exact pre-native enforcement.
+
+The amendment narrowly authorizes a fresh Codex-high tests-only corrective RED
+to update and supersede the frozen setter RED's direct-captured expectations;
+its proxy-intercepted direct `this.transfer()` expectation remains exact and
+unchanged. The bounded semantic controls are:
+
+- direct captured-native application rejects before mutation, and the exact
+  engine `TypeError` object observed inside the setter is the object propagated
+  outward with its message unchanged, without freezing engine text;
+- user errors carrying either the policy text or live engine brand text retain
+  their original identity and metadata;
+- a captured native applied to a fresh foreign `Proxy(ArrayBuffer)` preserves
+  that original engine error, and a throwing setter reached with a genuine
+  foreign ArrayBuffer receiver neither relabels the error nor mutates, resizes
+  or detaches that receiver through replay;
+- the faithful awaited real-applier case preserves pre-detachment ordering,
+  one genesis vertex, zero publications, attached live bytes and unchanged
+  stored-root bytes; and
+- the benign `this.byteLength` setter and dynamic context-only,
+  promotion/protection and final-owner-removal behavior remain preserved.
+
+All other frozen P3b/P3a/D.92 controls remain byte-immutable. This bounded RED
+changes error provenance assertions only where direct application is
+unobservable; it may not add a syntax matrix, global patch, backing seal,
+message heuristic, raw-receiver escape or fixture special case. P3b remains
+open until that fresh RED, distinct GREEN and the normal review loop accept the
+replacement.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
