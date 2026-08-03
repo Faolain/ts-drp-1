@@ -17436,6 +17436,59 @@ preservation, typecheck and lint gates before fresh Grok 4.5/high and exact
 Kimi 3/high/dual-100 review; launch a new final Opus/xhigh review only if both
 preliminary reviewers accept.
 
+**Accepted P3b governed-backing self-alias RED checkpoint.** Fresh Codex-high
+tests-only commit `ee61544ecda4c5d5470434db092f9d48b7cdc355`, parent
+`436b845f601335a46466963c8f340d105639c47e`, adds only the 150-line
+`packages/object/tests/buffer-backing-self-alias-egress-1d-i-red.test.ts`.
+The file SHA-256 is
+`00c9eecc28d0b95aafb53131120cc99972e006bb35b680e931cc1fb41cc31d35`
+and its blob is `2808ee1c137651c3977735940408acccadf26dcd`.
+
+The RED freezes exactly two end-to-end proxy-only escapes. The frozen own-data
+case catches the ordinary post-install `defineProperty` Proxy-invariant
+`TypeError`, proves that the raw-target descriptor was nevertheless installed,
+then performs ordinary `get` and captured structural transfer. The configurable
+case performs ordinary `set`, reads the value through
+`getOwnPropertyDescriptor`, then performs the same captured transfer. At the
+rejected production candidate both acquisitions return the raw backing and
+both transfers detach the backing and governed Buffer from four bytes to zero,
+while `hasChanges()` and `hasRawEgress()` remain false and both changed-key
+sets remain empty. This preserves the important frozen-definition semantics:
+the caught invariant error occurs after physical installation, so it is not a
+substitute for guarding the later egress point.
+
+The focused run is exactly 2F/1P, the combined P3b run is exactly 2F/37P and an
+isolated rerun preserves the prior frozen P3b corpus at 36/36. The passing
+control stores a foreign `ArrayBuffer` as an invariant-compatible frozen value
+and requires exact identity, attached governed bytes and no authored key. It
+intentionally leaves raw-egress state unconstrained so P3b does not absorb the
+deferred D.92.4 foreign-reference egress contract.
+
+Both object and workspace typechecks pass, with the latter completing all
+34/34 projects. Owned lint passes with zero diagnostics; Prettier,
+`git diff --check` and tests-only scope pass. Production remains byte-identical
+at SHA-256
+`79bd7440493deb21c15483c718153fa68528915bb4c03078b727c45a1aa06c4c`
+and blob `cf134ff88e3ed25880aceab7bb4f5f39ed299142`; the pre-checkpoint plan remains
+byte-identical at SHA-256
+`de60815a3998a949b4c4d5b5a8aa62059d343509e18feef516f91ff6871f3b44`
+and blob `1a233a005ff17210a3c352012df88d7bb0d68d88`. Protected untracked paths remain
+unstaged and unchanged. Blocked `stash@{0}` remains
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Authoritative raw output and the exit-status ledger are under
+`.logs/phase-1d-i-p3b-self-alias-egress-red-codex-high/`.
+
+The distinct production-only GREEN must use one governed-binary-value predicate
+at exactly the frozen `get` early-return and `observeOwnDescriptor`/
+`getOwnPropertyDescriptor` egress points, rejecting with the exact policy
+`TypeError` before the raw value can return or raw-egress can be signaled. It
+must not seal the backing, reject a foreign backing, consume the context-only
+D.92.4 residual or change setter Decision A. Run focused and combined P3b,
+prior preservation, full tests, typechecks, lint and formatting gates before
+fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews; launch final
+Opus/xhigh only if both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18237,15 +18290,17 @@ unwrap it to the raw governed backing, and recover that raw alias through the
 frozen-own-data `get` or `getOwnPropertyDescriptor` invariant path with no
 signal. The controller reproduced both paths end-to-end and detached governed
 Buffer bytes with clean tracking. Candidate `8e3eca4` is committed but rejected
-and P3b remains open.
+and P3b remains open. Fresh Codex-high tests-only RED `ee61544` now freezes
+exactly those two end-to-end paths at focused 2F/1P, combined 2F/37P and prior
+P3b preservation 36/36.
 
-Start a fresh Codex-high tests-only RED that executes exactly those two
-three-link compositions, with a shared bounded setup plus ordinary/foreign
-invariant controls. Then use a distinct production-only GREEN to apply one
-governed-binary self-alias predicate at both egress points before return or
-signal. Do not add a descriptor/syntax matrix, seal the backing or absorb the
-D.92.4 context-laundering residual. Run full gates and repeat fresh Grok
-4.5/high, exact Kimi 3/high/dual-100 and, conditionally, final Opus/xhigh
+Use a distinct production-only GREEN to apply one governed-binary-value
+predicate at exactly the frozen `get` early-return and
+`observeOwnDescriptor`/`getOwnPropertyDescriptor` egress points, rejecting with
+the exact policy error before raw return or signal. Do not add a descriptor or
+syntax matrix, seal the backing, reject foreign backing, absorb the D.92.4
+context residual or alter setter Decision A. Run full gates and repeat fresh
+Grok 4.5/high, exact Kimi 3/high/dual-100 and, conditionally, final Opus/xhigh
 review. The existing Decision A contract already owns this correction; no plan
 amendment is required.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
