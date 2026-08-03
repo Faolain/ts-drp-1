@@ -16221,6 +16221,21 @@ options and ran no tests; another coverage-bearing retry under concurrent
 review CPU load emitted a task-update timeout after the same 2F/62P assertions.
 Neither is acceptance evidence.
 
+A surgical post-freeze RED correction is checkpointed separately at
+`453206b1b7a21920f6c99dd68ca79e388adfba89`. The original manifest added the
+new sink name to its regex and expected sites but omitted the exact canonical-
+symbol identity and corresponding copy-sink exclusion from the codec tier. No
+production spelling could satisfy that frozen file. The correction changes
+only those two finite-name mechanics in
+`incremental-publication-structure-1d-i-red.test.ts`; traversal, flow,
+fixpoints, fixtures and failure handling are unchanged. The final 1,523-line
+file has SHA-256
+`0165410fb7c80ecc78810e2cf70957765f7c71bd5799273a92cc75082bc5c3cd`
+and blob `8a8f65fa16e8cc07b4b147a15363dc2eca814a99`. Old production still has
+no reference to the new symbol and retains the causal 2F/62P at
+94/115/12/4; the production candidate reaches 64/64 at the future
+94/116/13/4 census. This is a manifest repair, not analyzer growth.
+
 Preservation is P3b's immutable exact 4F/4P, bounded 1 MiB 2/2,
 P2+P1+D.92.3 99/99, D.92.4-D.92.6 60/60, inherited 147/147,
 specialized 93/93 and performance 8/8. The sync-livelock sentinel retains its
@@ -17001,7 +17016,8 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 P1, P2, P3a and D.92.4-D.92.6 are accepted and closed, but the unanimous
 Codex-high + exact Kimi 3/high/dual-100 + Opus/xhigh correction quorum has
 inserted P3a-prime before P3b GREEN. Its fresh Codex-high tests-only RED is
-frozen at `9132269`: semantic 11F/7P and D.92.2 manifest 2F/62P. Start a
+frozen at `9132269` plus surgical manifest repair `453206b`: semantic 11F/7P
+and D.92.2 manifest 2F/62P against old production. Start a
 distinct fresh Codex-high production-only GREEN. Implement the shared
 governed/default versus internal replica-local detachment contract across only
 `state-payload.ts`, `proxy.ts`, the five `state-materialize.ts` context calls
