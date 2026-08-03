@@ -29,7 +29,10 @@ const AMBIENT_KEY = "phase1diiAmbientSetter";
 
 interface Meter {
 	reads: number;
+	readSites?: string[];
 }
+
+let activeCopySite: string | undefined;
 
 interface ApplicationSetterEvent {
 	receiver: unknown;
@@ -52,7 +55,10 @@ function meteredBallast(meter: Meter, marker = "stable"): { payload: string } {
 		{ payload: `${marker}:${"x".repeat(16 * 1024)}` },
 		{
 			get(target, key, receiver): unknown {
-				if (key === "payload") meter.reads++;
+				if (key === "payload") {
+					meter.reads++;
+					meter.readSites?.push(activeCopySite ?? "unattributed");
+				}
 				return Reflect.get(target, key, receiver);
 			},
 		}
@@ -116,7 +122,14 @@ class PublicationProbe {
 	observe(event: PublicationObserverEvent): unknown {
 		if (event.type === "copy") {
 			this.copies.push({ ...event.metadata });
-			return detachStatePayload(event.value);
+			const previousCopySite = activeCopySite;
+			const { publicationId, side, key, image } = event.metadata;
+			activeCopySite = `${publicationId}:${side}:${key}:${image}`;
+			try {
+				return detachStatePayload(event.value);
+			} finally {
+				activeCopySite = previousCopySite;
+			}
 		}
 		this.publications.push({
 			...event.record,
@@ -401,7 +414,7 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 
 	it("keeps remote suffix/tail/checkpoint reconstruction proportional to changed payload without live/snapshot aliases", async () => {
 		const previousSuffix = process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
-		const meter = { reads: 0 };
+		const meter: Meter = { reads: 0 };
 		try {
 			const h = harness(new ReconstructionFixture({ payload: "stable:" + "x".repeat(16 * 1024) }), 1);
 			const rootEntry = h.states.getDRPState(HashGraph.rootHash)!.state.find(({ key }) => key === "ballast")!;
@@ -410,6 +423,7 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			expect(meter.reads, "positive control: the injected owned-snapshot meter must be live").toBe(1);
 			rootEntry.value = ownedBallast;
 			meter.reads = 0;
+			meter.readSites = [];
 			const left = remoteVertex("touch", ["left"], [HashGraph.rootHash], 30);
 			const right = remoteVertex("touch", ["right"], [HashGraph.rootHash], 31);
 			const tail = remoteVertex("touch", ["tail"], [right.hash], 32);
@@ -421,7 +435,32 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 				missing: [],
 			});
 
-			expect.soft(meter.reads, "owned unchanged ballast is never reconstructed by value").toBe(0);
+			const successfulMultiFrontierCheckpointIds = new Set(
+				h.probe.publications
+					.filter(
+						({ kind, outcome, fallbackReason }) =>
+							kind === "checkpoint" && outcome === "published" && fallbackReason === "multi-frontier-checkpoint"
+					)
+					.map(({ publicationId }) => publicationId)
+			);
+			const expectedReadSites = h.probe.copies
+				.filter(
+					({ publicationId, side, key, image }) =>
+						successfulMultiFrontierCheckpointIds.has(publicationId) &&
+						side === "drp" &&
+						key === "ballast" &&
+						image === "post"
+				)
+				.map(({ publicationId, side, key, image }) => `${publicationId}:${side}:${key}:${image}`);
+			expect
+				.soft(expectedReadSites, "positive control: canonical checkpoint ballast copies are observed")
+				.not.toHaveLength(0);
+			expect
+				.soft(meter.reads, "only canonical multi-frontier checkpoint copies read owned unchanged ballast")
+				.toBe(expectedReadSites.length);
+			expect
+				.soft(meter.readSites, "every owned unchanged ballast read is exactly attributed")
+				.toEqual(expectedReadSites);
 			expect.soft(h.drp.revision).toBe("joined");
 			expect.soft(h.drp.ballast).not.toBe(rootEntry.value);
 			expect.soft(h.probe.publications.some(({ fallbackReason }) => fallbackReason === "concurrent-tail")).toBe(true);
