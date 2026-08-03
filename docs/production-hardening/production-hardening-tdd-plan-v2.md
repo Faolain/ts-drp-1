@@ -17304,6 +17304,52 @@ that GREEN passes the frozen RED and full preservation gates, then receives
 fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review; launch final
 Opus/xhigh only if both preliminary reviewers accept.
 
+**P3b frozen-native-descriptor GREEN candidate.** Distinct Codex-high
+production-only commit `8e3eca4f181fb6ffa5edff943b097e6172489fa0`, against
+parent `5a1a6bc97d9975a3ad590ae2cdfdeb610c7064a1`, changes only
+`packages/object/src/proxy.ts` with seven insertions and no deletion. The
+1,624-line production file has SHA-256
+`79bd7440493deb21c15483c718153fa68528915bb4c03078b727c45a1aa06c4c`
+and git blob `cf134ff88e3ed25880aceab7bb4f5f39ed299142`.
+
+The existing non-configurable, non-writable own-data-descriptor branch now
+checks the exact stored value against the captured structural-native identity
+set and checks that the receiver is a backing store with live governed Buffer
+ownership. That conjunction throws the existing exact policy `TypeError` at
+acquisition, before raw-egress signaling or the proxy-invariant exact-value
+return. Context-only access and access after final-owner removal still return
+the descriptor's exact native identity; later promotion is protected because
+ownership is evaluated at acquisition time. Ordinary frozen values, the
+bounded ordinary-function behavior, undefined-getter symmetry, Proxy
+invariants and no-raw-egress behavior remain intact. The implementation adds
+no wrapper, post-hoc error normalizer, replay or parallel classifier.
+
+The frozen descriptor file is 3/3 both before and after the production commit,
+and the combined P3b corpus is 36/36 before and after it. Preservation is exact:
+P3a plus bounded 1 MiB is 6/6, with the bounded copy at 1,429 ms;
+P3a-prime/root is 20/20; D.92.2 is 64/64; inherited Phase 1d(i) is 147/147;
+specialized state/collection/atomicity is 93/93; P2/P1/D.92.3 is 99/99;
+D.92.4-D.92.6 is 60/60; and performance is 8/8 with the 5,000-entry MapDRP
+case at 220.3 ms. The sync-livelock sentinel retains its expected exact 3F/3P.
+Object typecheck passes and workspace typecheck is 34/34. Owned ESLint is
+clean, and the authoritative tracked lint gate is zero errors with 249
+warnings. Prettier, `git diff --check`, production-only scope, frozen-test
+identity and pre-candidate plan identity all pass.
+
+The broad `pnpm lint` diagnostic exits 1 with 286 diagnostics: 60 inherited or
+generated-file errors and 226 warnings. Those diagnostics are not caused by
+this production-only candidate, but that broad command is not green and is not
+an acceptance gate. Protected untracked paths remain unstaged and unchanged.
+Blocked `stash@{0}` remains
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Authoritative raw gate output and the exit-status ledger are under
+`.logs/phase-1d-i-p3b-frozen-alias-descriptor-green-codex-high/`.
+
+This is a GREEN candidate only; P3b remains open. Run fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 reviews. Launch final Opus/xhigh only if both
+preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
