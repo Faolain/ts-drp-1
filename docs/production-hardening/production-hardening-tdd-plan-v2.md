@@ -19813,6 +19813,48 @@ boundary, setter wrapper, analyzer rule or special topology case. Reach exact
 typecheck/lint/format/integrity gates before a production-only commit and a
 separate plan checkpoint.
 
+**Checkpoint-borrowed application-setter production GREEN checkpointed for
+independent review.** Distinct Codex-high production-only commit
+`5e185afb2247156c44683024fa082d979074eabd` changes only
+`packages/object/src/drp-applier.ts` by one insertion and one deletion. The
+file SHA-256 is
+`8f7051fd640a43e09fcbcdb89dcde876f22694d31666fc9b350058dbfc3011a4`
+and git blob is `520fddd8c1f684eff834f37678dd6b50b583c584`.
+
+The correction moves the existing borrowed-entry detachment after the existing
+function-value skip but before application-setter qualification. Both the
+qualified setter and own-data branches therefore consume application-owned
+detached values through the same per-replacement detacher session. No new
+clone/copy authority, wrapper, special topology, analyzer rule or event was
+introduced; application-prototype qualification, tracked receiver, complete
+descriptor rollback, key order, alias topology and D.92.2 publication-copy
+authority remain unchanged.
+
+The frozen corrective suite is exact 11/11. D.92.2 is 64/64 with its governed
+authority tuple and zero violations; fallback/concurrent is 49/49, inherited
+Phase 1d(i) is 147/147 and the proportionate set is 137/137. Object and 34/35
+workspace typechecks pass. Owned lint is 0/0, tracked source lint is zero
+errors with 249 inherited warnings, and Prettier/diff/scope/integrity checks
+pass. Evidence is under
+`.logs/phase-1d-ii-setter-alias-green-codex-high/`; its 14-file
+artifact-manifest SHA-256 is
+`87bafacb73d57004782197442053db6cc9bb1f6692b80e4fec493cd429ec38f4`.
+The RED and plan remained byte-frozen; tracked tree/index and protected stash
+were clean after commit.
+
+Lint gotcha: pass an explicit Git-tracked source-file list. A bare ESLint scan
+also parses untracked `.logs` mutants and can report irrelevant parser errors.
+That broad invocation is non-authoritative; the final tracked-file-only log is
+the recorded zero-error result.
+
+This corrected GREEN is not accepted yet. Freeze tests, production and plan;
+run fresh Grok 4.5/high and exact Kimi 3/high/dual-100 independent reviews of
+the exact checkpoint. Review the one-line fix in the complete Phase 1d(ii)
+causal context, including setter-input isolation, multi-key alias preservation,
+receiver/rollback semantics, non-borrowed and function controls, exact meter
+attribution and D.92.2 authority. Run final Claude-skill Opus/xhigh only if both
+preliminary reviewers accept.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
