@@ -235,18 +235,6 @@ function isPotentialBinaryMutation(value: object, property: PropertyKey): boolea
 	return !BINARY_READ_ONLY_METHODS.has(property);
 }
 
-function isStructuralMutatorReceiverError(error: unknown, receiver: object): boolean {
-	if (!(error instanceof TypeError)) return false;
-	for (const mutator of ARRAY_BUFFER_STRUCTURAL_MUTATORS) {
-		try {
-			Reflect.apply(mutator as (...args: unknown[]) => unknown, receiver, []);
-		} catch (expected) {
-			if (expected instanceof TypeError && expected.message === error.message) return true;
-		}
-	}
-	return false;
-}
-
 export interface DRPProxyBeforeChainArgs {
 	prop: string;
 	args: unknown[];
@@ -1003,25 +991,12 @@ export function trackMutations<T extends object>(
 						!isNativeBinaryAccessor(property, resolved, "set");
 					const protectedBacking = isBackingStore(binary) && hasGovernedBuffer(binary);
 					const setterReceiver = customSetter && (!replicaLocalOnly || protectedBacking) ? receiver : binary;
-					const applySetter = (): boolean => {
-						try {
-							return Reflect.set(binary, property, rawValue, setterReceiver);
-						} catch (error) {
-							// A proxy cannot carry native backing-store internal slots. Normalize
-							// only the engine error produced when a custom setter applies one of
-							// the captured structural natives to its protected proxy receiver.
-							if (customSetter && protectedBacking && isStructuralMutatorReceiverError(error, setterReceiver)) {
-								throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
-							}
-							throw error;
-						}
-					};
-					if (replicaLocalOnly) return applySetter();
+					if (replicaLocalOnly) return Reflect.set(binary, property, rawValue, setterReceiver);
 					const prepared = prepareGovernedWrite(rawValue);
 					if (prepared === undefined) return false;
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
 					const previousElement = snapshotBinaryElement(binary, property);
-					const assigned = applySetter();
+					const assigned = Reflect.set(binary, property, rawValue, setterReceiver);
 					if (assigned) {
 						const byteChanged = !binarySnapshotsEqual(previousElement, snapshotBinaryElement(binary, property));
 						try {
