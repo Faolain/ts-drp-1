@@ -18965,6 +18965,58 @@ lineage. After the corrected preservation boundary is authenticated, resume
 production work against all remaining frozen failures; do not mark Phase
 1d(ii) implemented or accepted at this checkpoint.
 
+**Accepted Phase 1d(ii) corrective tests-only RED checkpoint.** Fresh
+Codex-high commit `978c65947ab6baeedc08166eaa14a3da8e04a2c3` (parent
+`e70cb847b627be1d89b3aa6d2e0dae1f6219ac69`) changes only the two authorized
+existing test files, exact +53/-5:
+
+- `packages/object/tests/incremental-publication-work-1d-i-red.test.ts` is
+  frozen at 670 lines, SHA-256
+  `422fed8c59972829596d114bb0e3ccba73802cf476e0ec49b82ecaff453f3e10`
+  and git blob `0b5a0e95f4ef445c7f3eebeadb7537961f5d2bec` (+49/-4).
+- `packages/object/tests/snapshot-container-1d-i-red.test.ts` is frozen at 646
+  lines, SHA-256
+  `91486d2d9b337230ac41a5ac356ac0cd3fdc42920d72feabd6cd385919c899a8`
+  and git blob `194fc94145f501a6aa4d7173317d25e1a864f32c` (+4/-1).
+
+The exact pre-correction two-file boundary was 54/54. The authoritative and
+post-commit corrective boundary is exact 8F/46P, exit 1: four P2 rows first
+fail because public reconstruction dispatches the inherited `left` setter
+once instead of zero times, and four remote fallback rows first fail because
+the unchanged owned `acl.semanticsType` entry emits a post-copy event instead
+of retaining an owned baseline entry identity without a copy. The honest
+multi-head-local and multi-frontier-checkpoint full-capture sites are unchanged.
+The original frozen Phase 1d(ii) RED remains exact 8F/2P, exit 1. Retained-entry
+and honest-full-capture controls are 11/11; proportionate preservation is seven
+files / 98/98; and the three alias suites are 39/39.
+
+Object and workspace typechecks, owned lint (0 errors / 0 warnings),
+authoritative tracked lint (0 errors / 249 inherited warnings), Prettier and
+diff-check pass. Production remains exact object-source tree
+`3b7d56504dc3328114726c7c88176a5f76cdefdb`; the test commit retained exact plan
+blob `f9a255a3faa4294ca32ecc67e036d19c1fab4b0b`. Evidence is under
+`.logs/phase-1d-ii-corrective-red-codex-high/`; the artifact-manifest SHA-256 is
+`69c86269857c12997da85d7e89049e73e34aef14ff04b45ac6c7a0212656acbe`.
+Protected untracked paths remain unstaged. `stash@{0}` remains object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+
+Both corrected test files are now frozen. This checkpoint implements only the
+unanimously authorized test-boundary correction; it changes no Phase 1d(ii)
+production contract. Resume the same distinct GREEN lineage only after
+re-authenticating `/private/tmp/phase-1d-ii-green-paused.patch` as SHA-256
+`2a49f72532ff89762756c708025e69ac0246fce03ffce17cc4b882764930f009`,
+running `git apply --check`, applying it, and restoring the new
+`state-ownership.ts` bytes at exact SHA-256
+`d50b42a687ace9a24e903c26671a987440b05db6d0ea3d9f08fc2e53e67df0fd`.
+Then repair all seven previously classified implementation regressions plus
+the eight now-amended failures without touching either corrected test, the
+original Phase 1d(ii) RED or this plan. Adversarial review must probe Opus's
+defined-only borrowed-entry identity guard, nullish deferred values, batched
+construction atomicity and sparse-array wire bytes; these remain attack
+surfaces, not new contract or test scope absent causal evidence and any
+required quorum.
+
 The distinct production-only GREEN must first validate the complete incoming
 key vector as primitive strings before applying any entry, so rejection cannot
 coerce a key or leave a partial materialization. Reconstruction, nested
@@ -19030,16 +19082,18 @@ Composite D.92 is accepted and closed. Freeze Phase 1d(ii) tests-only RED
 8F/2P signature, 25 causal assertions and evidence manifest are recorded above.
 The first distinct Codex-high production-only GREEN draft reached focused
 10/10 but stopped at preservation 176/191. It is not a candidate. The unanimous
-collision quorum authorized only the two corrections recorded above. Spawn a
-fresh Codex-high tests-only corrective RED before any GREEN resume: amend only
-the four P2 public-reconstruction setter cases and the four remote fallback
-copy assertions, preserving every explicitly frozen neighboring invariant.
-Commit and checkpoint that RED separately, then resume the same distinct GREEN
-lineage against the corrected frozen boundary. Only after GREEN and all gates
-pass run fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review, followed by
-final Opus/xhigh only after both preliminary reviewers accept. Run focused and
-proportionate preservation/typecheck/lint gates to `.log`; do not edit the
-original frozen Phase 1d(ii) RED.
+collision quorum authorized only the two corrections recorded above. Freeze
+corrective tests-only commit `978c65947ab6baeedc08166eaa14a3da8e04a2c3`:
+its exact two-file +53/-5 scope, 8F/46P signature and preservation/gate evidence
+are recorded above. Resume the same distinct GREEN lineage by first verifying
+the archived patch's exact SHA-256, checking it with `git apply --check`,
+applying it, and restoring `state-ownership.ts` at its recorded exact SHA-256.
+Fix the seven implementation regressions and the eight amended failures without
+touching either corrected test, the original Phase 1d(ii) RED or this plan. Only
+after GREEN and all gates pass run fresh Grok 4.5/high and exact Kimi
+3/high/dual-100 review, followed by final Opus/xhigh only after both preliminary
+reviewers accept. Run focused and proportionate preservation/typecheck/lint
+gates to `.log`.
 
 Implement exactly the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
