@@ -16819,6 +16819,53 @@ This remains a GREEN candidate, not an acceptance or closure of P3b. Run fresh
 Grok 4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final
 Opus/xhigh only if both preliminary reviewers accept.
 
+**P3b accessor GREEN review rejection — setter invocation receiver.** Fresh
+Grok 4.5/high session `019fc613-948a-7d60-8f20-e882b2365465`, request
+`7265ea2f-5181-4bbc-9670-57b39823c586`, used only
+`grok-4.5-build` at high reasoning across 12 of 12 calls and returned
+`CHANGES_REQUESTED` / `P3B_MAY_CLOSE=no`. It used no fallback, helper,
+subagent, Fable, web or MCP content. The raw-stream SHA-256 is
+`7a1a1f2a12630479c377024c4d72e05431fd722f47ed56888cd2eef5b8252bdb`,
+the result SHA-256 is
+`60f8df25cb3e1f7eb92a47c77752e01f686118cf5347ca163ea91018d609fbe5`,
+and the artifact-manifest SHA-256 is
+`8479a17a470f517370c6172f2680c7fb92ce5ef072ce5911b24d08a5457fbbed`.
+
+Exact Kimi 3/high/dual-100 session
+`7b3c9694-6aae-401d-bc80-7815e071283c` initially returned an independent
+`ACCEPTED` without running a probe. Mandatory causal evidence supersedes that
+initial terminal, which is non-citable. A same-session corrective review used
+no additional probe or tool calls and returned authoritative
+`CHANGES_REQUESTED`, `P3B_MAY_CLOSE=no` and `SUPERSEDES_INITIAL_TERMINAL=yes`.
+Across both turns it used 26 LLM steps and 32 read-only calls, ended through a
+second normal `TurnEnd` with exit 0, reached neither 100-step cap, and used no
+fallback, helper, subagent, Fable, network or repository edit. The authoritative
+result SHA-256 is
+`8ce5ba29686d0027d2763a3face5f3e98d58e6a71fd34e2bc249e53ffbc617da`
+and combined integrity SHA-256 is
+`94c81b5a81d0d4c80ca2b07f7aff2eeade77d1abc9bc1833621f24210c7bd6fb`.
+Review evidence is under
+`.logs/phase-1d-i-p3b-accessor-green-{grok45-high-review,kimi3-high-100-review}/`.
+
+Both authoritative reviews identify the same P3b-owned blocker. Commit
+`ec84109` correctly gives custom getters the tracked proxy receiver, but the
+ignored governed-Buffer backing's binary `set` fast path still calls
+`Reflect.set(binary, property, rawValue, binary)`. A custom setter installed
+only through the tracked backing therefore receives the raw backing as `this`.
+Its body can call a captured structural mutator or `this.transfer()`, detach
+the governed Buffer storage and return cleanly with no throw, changed key or
+raw-egress signal. This is an ordinary proxy-only path and needs no pre-held raw
+alias.
+
+No Opus review was launched because both authoritative preliminary reviews
+reject. Production candidate `ec84109` and plan checkpoint `8c811c3` remain
+committed but rejected; P3b remains open. Next is a fresh Codex-high tests-only
+RED covering direct and captured setter structural calls, benign-setter and
+native-fidelity controls, dynamic context/promotion/last-owner-removal, and a
+bounded faithful real-applier case. Freeze that RED before a distinct
+production GREEN. This checkpoint records evidence only and makes no plan-policy
+amendment.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
