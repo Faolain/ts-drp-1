@@ -19,6 +19,214 @@ for (const property of Reflect.ownKeys(Date.prototype)) {
 	}
 }
 
+const ARRAY_BUFFER_IS_VIEW = ArrayBuffer.isView;
+const ARRAY_BUFFER_BYTE_LENGTH_GETTER = Reflect.getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength")?.get;
+const SHARED_ARRAY_BUFFER_BYTE_LENGTH_GETTER =
+	typeof SharedArrayBuffer === "undefined"
+		? undefined
+		: Reflect.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, "byteLength")?.get;
+const NODE_BUFFER = Reflect.get(globalThis, "Buffer") as
+	| { isBuffer?(value: unknown): boolean; prototype?: object }
+	| undefined;
+const BINARY_NATIVE_PROTOTYPES = new Set<object>();
+const BINARY_NATIVE_DESCRIPTORS = new WeakMap<object, Map<PropertyKey, PropertyDescriptor>>();
+const binaryConstructors: unknown[] = [
+	ArrayBuffer,
+	typeof SharedArrayBuffer === "undefined" ? undefined : SharedArrayBuffer,
+	DataView,
+	Int8Array,
+	Uint8Array,
+	Uint8ClampedArray,
+	Int16Array,
+	Uint16Array,
+	Int32Array,
+	Uint32Array,
+	Float32Array,
+	Float64Array,
+	typeof BigInt64Array === "undefined" ? undefined : BigInt64Array,
+	typeof BigUint64Array === "undefined" ? undefined : BigUint64Array,
+	NODE_BUFFER,
+];
+for (const candidate of binaryConstructors) {
+	if (typeof candidate !== "function") continue;
+	let prototype = Reflect.get(candidate, "prototype") as object | null;
+	while (prototype !== null && prototype !== Object.prototype) {
+		BINARY_NATIVE_PROTOTYPES.add(prototype);
+		if (!BINARY_NATIVE_DESCRIPTORS.has(prototype)) {
+			const descriptors = new Map<PropertyKey, PropertyDescriptor>();
+			for (const property of Reflect.ownKeys(prototype)) {
+				const descriptor = Reflect.getOwnPropertyDescriptor(prototype, property);
+				if (descriptor !== undefined) descriptors.set(property, descriptor);
+			}
+			BINARY_NATIVE_DESCRIPTORS.set(prototype, descriptors);
+		}
+		prototype = Reflect.getPrototypeOf(prototype) as object | null;
+	}
+}
+
+const TYPED_ARRAY_MUTATING_METHODS = new Set<PropertyKey>(["copyWithin", "fill", "reverse", "set", "sort"]);
+const BUFFER_MUTATING_METHODS = new Set<PropertyKey>(["copy", "swap16", "swap32", "swap64"]);
+const BUFFER_BRANDED_FIRST_ARGUMENT_METHODS = new Set<PropertyKey>([
+	"compare",
+	"copy",
+	"equals",
+	"fill",
+	"includes",
+	"indexOf",
+	"lastIndexOf",
+]);
+const ARRAY_BUFFER_MUTATING_METHODS = new Set<PropertyKey>(["grow", "resize", "transfer", "transferToFixedLength"]);
+const BINARY_READ_ONLY_METHODS = new Set<PropertyKey>([
+	Symbol.iterator,
+	"at",
+	"compare",
+	"entries",
+	"equals",
+	"every",
+	"filter",
+	"find",
+	"findIndex",
+	"findLast",
+	"findLastIndex",
+	"forEach",
+	"includes",
+	"indexOf",
+	"join",
+	"keys",
+	"lastIndexOf",
+	"map",
+	"reduce",
+	"reduceRight",
+	"slice",
+	"some",
+	"subarray",
+	"toJSON",
+	"toLocaleString",
+	"toReversed",
+	"toSorted",
+	"toString",
+	"values",
+	"with",
+]);
+
+function backingByteLength(value: object): number | undefined {
+	for (const getter of [ARRAY_BUFFER_BYTE_LENGTH_GETTER, SHARED_ARRAY_BUFFER_BYTE_LENGTH_GETTER]) {
+		if (getter === undefined) continue;
+		try {
+			return Reflect.apply(getter, value, []) as number;
+		} catch {
+			// Try the other native backing-store brand.
+		}
+	}
+	return undefined;
+}
+
+function isBackingStore(value: object): value is ArrayBufferLike {
+	return backingByteLength(value) !== undefined;
+}
+
+function isNodeBuffer(value: object): boolean {
+	return NODE_BUFFER?.isBuffer?.(value) === true;
+}
+
+function binaryBacking(value: object): object {
+	return ARRAY_BUFFER_IS_VIEW(value) ? (Reflect.get(value, "buffer", value) as object) : value;
+}
+
+interface BinarySnapshot {
+	readonly bytes: Uint8Array;
+	readonly byteLength: number;
+}
+
+function snapshotBinary(value: object): BinarySnapshot | undefined {
+	try {
+		if (ARRAY_BUFFER_IS_VIEW(value)) {
+			const buffer = Reflect.get(value, "buffer", value) as ArrayBufferLike;
+			const byteOffset = Reflect.get(value, "byteOffset", value) as number;
+			const byteLength = Reflect.get(value, "byteLength", value) as number;
+			return { bytes: Uint8Array.from(new Uint8Array(buffer, byteOffset, byteLength)), byteLength };
+		}
+		const byteLength = backingByteLength(value);
+		if (byteLength === undefined) return undefined;
+		return { bytes: Uint8Array.from(new Uint8Array(value as ArrayBufferLike)), byteLength };
+	} catch {
+		return undefined;
+	}
+}
+
+function snapshotBinaryElement(value: object, property: PropertyKey): BinarySnapshot | undefined {
+	if (!ARRAY_BUFFER_IS_VIEW(value) || value instanceof DataView || typeof property !== "string") return undefined;
+	const index = Number(property);
+	if (!Number.isInteger(index) || index < 0 || `${index}` !== property) return undefined;
+	try {
+		const length = Reflect.get(value, "length", value) as number;
+		if (index >= length || length <= 0) return undefined;
+		const buffer = Reflect.get(value, "buffer", value) as ArrayBufferLike;
+		const byteOffset = Reflect.get(value, "byteOffset", value) as number;
+		const byteLength = Reflect.get(value, "byteLength", value) as number;
+		const elementByteLength = byteLength / length;
+		if (!Number.isInteger(elementByteLength) || elementByteLength <= 0) return undefined;
+		const bytes = Uint8Array.from(new Uint8Array(buffer, byteOffset + index * elementByteLength, elementByteLength));
+		return { bytes, byteLength: elementByteLength };
+	} catch {
+		return undefined;
+	}
+}
+
+function binarySnapshotsEqual(left: BinarySnapshot | undefined, right: BinarySnapshot | undefined): boolean {
+	if (left === undefined || right === undefined) return left === right;
+	if (left.byteLength !== right.byteLength || left.bytes.byteLength !== right.bytes.byteLength) return false;
+	return left.bytes.every((byte, index) => byte === right.bytes[index]);
+}
+
+function binaryMemberDescriptor(
+	value: object,
+	property: PropertyKey
+): { descriptor: PropertyDescriptor; owner: object } | undefined {
+	let current: object | null = value;
+	while (current !== null) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, property);
+		if (descriptor !== undefined) return { descriptor, owner: current };
+		current = Reflect.getPrototypeOf(current) as object | null;
+	}
+	return undefined;
+}
+
+function isNativeBinaryMember(value: object, property: PropertyKey, member: unknown): boolean {
+	const resolved = binaryMemberDescriptor(value, property);
+	return (
+		resolved !== undefined &&
+		BINARY_NATIVE_PROTOTYPES.has(resolved.owner) &&
+		BINARY_NATIVE_DESCRIPTORS.get(resolved.owner)?.get(property)?.value === member
+	);
+}
+
+function isNativeBinaryAccessor(
+	property: PropertyKey,
+	resolved: { descriptor: PropertyDescriptor; owner: object }
+): boolean {
+	const captured = BINARY_NATIVE_DESCRIPTORS.get(resolved.owner)?.get(property);
+	return (
+		captured !== undefined &&
+		"get" in captured &&
+		"get" in resolved.descriptor &&
+		captured.get === resolved.descriptor.get &&
+		captured.set === resolved.descriptor.set
+	);
+}
+
+function isPotentialBinaryMutation(value: object, property: PropertyKey): boolean {
+	if (ARRAY_BUFFER_IS_VIEW(value)) {
+		if (TYPED_ARRAY_MUTATING_METHODS.has(property) || BUFFER_MUTATING_METHODS.has(property)) return true;
+		if (typeof property === "string" && (property.startsWith("set") || property.startsWith("write"))) return true;
+		if (BINARY_READ_ONLY_METHODS.has(property)) return false;
+		if (typeof property === "string" && (property.startsWith("get") || property.startsWith("read"))) return false;
+		return true;
+	}
+	if (ARRAY_BUFFER_MUTATING_METHODS.has(property)) return true;
+	return !BINARY_READ_ONLY_METHODS.has(property);
+}
+
 export interface DRPProxyBeforeChainArgs {
 	prop: string;
 	args: unknown[];
@@ -284,6 +492,13 @@ export function trackMutations<T extends object>(
 		if (counts?.size === 0) parents.delete(rawValue);
 	};
 
+	const addParentOnce = (value: unknown, parent: object): void => {
+		if (!isReference(value)) return;
+		const rawValue = unwrap(value);
+		const rawParent = unwrap(parent);
+		if (!parents.get(rawValue)?.has(rawParent)) addParent(rawValue, rawParent);
+	};
+
 	type PreparedGraphs = { commit(): void };
 	type GovernedWritePreparation =
 		| { readonly graphs: PreparedGraphs; readonly failure?: never }
@@ -305,6 +520,11 @@ export function trackMutations<T extends object>(
 			nodes.push(value);
 			if (validateGovernedBinaryState(value)) {
 				binaries.push(value);
+				if (ARRAY_BUFFER_IS_VIEW(value) && !isNodeBuffer(value)) {
+					const backing = binaryBacking(value);
+					edges.push([backing, value]);
+					discover(backing);
+				}
 				return;
 			}
 
@@ -607,7 +827,183 @@ export function trackMutations<T extends object>(
 		if (existing) return existing as V;
 
 		let proxy: object;
-		if (objectValue instanceof Map) {
+		if (ARRAY_BUFFER_IS_VIEW(objectValue) || isBackingStore(objectValue)) {
+			proxy = new Proxy(objectValue, {
+				getOwnPropertyDescriptor(binary, property): PropertyDescriptor | undefined {
+					return observeOwnDescriptor(binary, property, isReplicaLocalOnly(binary, ignored));
+				},
+				get(binary, property): unknown {
+					const replicaLocalOnly = isReplicaLocalOnly(binary, ignored);
+					const ownDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
+					if (ownDescriptor && !ownDescriptor.configurable) {
+						if ("value" in ownDescriptor && !ownDescriptor.writable) {
+							if (!replicaLocalOnly && isReference(ownDescriptor.value)) signalRawEgress();
+							return ownDescriptor.value;
+						}
+						if ("get" in ownDescriptor && ownDescriptor.get === undefined) return undefined;
+					}
+
+					const resolved = binaryMemberDescriptor(binary, property);
+					const nativeAccessor = resolved !== undefined && isNativeBinaryAccessor(property, resolved);
+					if (!replicaLocalOnly && resolved !== undefined && "get" in resolved.descriptor && !nativeAccessor) {
+						signalRawEgress();
+					}
+
+					const member = Reflect.get(binary, property, binary) as unknown;
+					if (typeof member !== "function") {
+						if (isReference(member) && (ARRAY_BUFFER_IS_VIEW(member) || isBackingStore(member))) {
+							return wrap(member, replicaLocalOnly || !hasGovernedOwner(member) ? true : ignored);
+						}
+						return wrap(member, ignored);
+					}
+
+					const nativeMember = isNativeBinaryMember(binary, property, member);
+					return (...args: unknown[]): unknown => {
+						const operationReplicaLocalOnly = isReplicaLocalOnly(binary, ignored);
+						if (!nativeMember && !operationReplicaLocalOnly) {
+							// Custom code receives the raw internal-slot-bearing receiver. Widen
+							// publication instead of pretending its effect surface is known.
+							signalRawEgress();
+							markChanged(binary);
+						}
+
+						const potentiallyMutating = nativeMember && isPotentialBinaryMutation(binary, property);
+						const candidates: Array<{ charge: boolean; raw: object; snapshot: BinarySnapshot | undefined }> = [];
+						const addCandidate = (candidate: unknown, charge: boolean): void => {
+							if (!isReference(candidate)) return;
+							const raw = unwrap(candidate);
+							if (!ARRAY_BUFFER_IS_VIEW(raw) && !isBackingStore(raw)) return;
+							const existingCandidate = candidates.find((entry) => entry.raw === raw);
+							if (existingCandidate) {
+								existingCandidate.charge ||= charge;
+								return;
+							}
+							candidates.push({ charge, raw, snapshot: snapshotBinary(raw) });
+						};
+						if (potentiallyMutating) {
+							addCandidate(binary, !operationReplicaLocalOnly);
+							for (const argument of args) {
+								const rawArgument = unwrap(argument);
+								addCandidate(
+									argument,
+									isGovernedProxy(argument) || (isReference(rawArgument) && hasGovernedOwner(rawArgument))
+								);
+							}
+						}
+
+						const invocationArgs = args.map((argument, index) => {
+							const rawArgument = unwrap(argument);
+							if (typeof rawArgument !== "function") {
+								return index === 0 &&
+									isNodeBuffer(binary) &&
+									BUFFER_BRANDED_FIRST_ARGUMENT_METHODS.has(property) &&
+									isReference(rawArgument) &&
+									(ARRAY_BUFFER_IS_VIEW(rawArgument) || isBackingStore(rawArgument))
+									? rawArgument
+									: argument;
+							}
+							return function (this: unknown, ...callbackArgs: unknown[]): unknown {
+								const rawCallbackThis = unwrap(this);
+								const callbackThis = rawCallbackThis === binary ? proxy : this;
+								const wrappedArgs = callbackArgs.map((callbackArgument) =>
+									callbackArgument === binary ? proxy : callbackArgument
+								);
+								return Reflect.apply(rawArgument, callbackThis, wrappedArgs);
+							};
+						});
+
+						let result: unknown;
+						let operationError: unknown;
+						let operationFailed = false;
+						try {
+							result = Reflect.apply(member, binary, invocationArgs);
+						} catch (error) {
+							operationError = error;
+							operationFailed = true;
+						} finally {
+							for (const candidate of candidates) {
+								if (!candidate.charge || binarySnapshotsEqual(candidate.snapshot, snapshotBinary(candidate.raw))) {
+									continue;
+								}
+								markChanged(candidate.raw);
+								markChanged(binaryBacking(candidate.raw));
+							}
+						}
+
+						if (!nativeMember) observeRawEgressBoundary();
+						if (operationFailed) throw operationError;
+						if (result === binary) return proxy;
+						if (isReference(result) && (ARRAY_BUFFER_IS_VIEW(result) || isBackingStore(result))) {
+							const sharesBacking = binaryBacking(result) === binaryBacking(binary);
+							// A shared-backing result is another path into governed bytes. A
+							// fresh backing is only a local return value until later assignment.
+							if (!operationReplicaLocalOnly && sharesBacking) {
+								initializeGraph(result);
+								addParentOnce(result, binary);
+							}
+							return wrap(result, operationReplicaLocalOnly || !sharesBacking ? true : ignored);
+						}
+						// Native iterators and data-only result objects need their own
+						// internal slots and do not retain a mutable receiver alias.
+						return result;
+					};
+				},
+				set(binary, property, nextValue, receiver): boolean {
+					const replicaLocalOnly = isReplicaLocalOnly(binary, ignored);
+					const rawValue = unwrap(nextValue);
+					if (replicaLocalOnly) return Reflect.set(binary, property, rawValue, binary);
+					const prepared = prepareGovernedWrite(rawValue);
+					if (prepared === undefined) return false;
+					const previousDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
+					const previousElement = snapshotBinaryElement(binary, property);
+					const resolvedDescriptor = previousDescriptor ?? inheritedPropertyDescriptor(binary, property);
+					const accessorReceiver = resolvedDescriptor !== undefined && !("value" in resolvedDescriptor);
+					const assigned = Reflect.set(binary, property, rawValue, accessorReceiver ? receiver : binary);
+					if (assigned) {
+						const byteChanged = !binarySnapshotsEqual(previousElement, snapshotBinaryElement(binary, property));
+						try {
+							finalizePreparedWrite(prepared, binary, property, previousDescriptor, true);
+						} finally {
+							if (byteChanged) markChanged(binaryBacking(binary));
+						}
+					}
+					return assigned;
+				},
+				deleteProperty(binary, property): boolean {
+					if (isReplicaLocalOnly(binary, ignored)) return Reflect.deleteProperty(binary, property);
+					const previousDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
+					const deleted = Reflect.deleteProperty(binary, property);
+					if (deleted && previousDescriptor !== undefined) {
+						try {
+							updateReachability(binary, property, dataDescriptorValue(previousDescriptor), undefined);
+							markChanged(binary, property);
+						} catch (error) {
+							markChanged(binary, property);
+							throw error;
+						}
+					}
+					return deleted;
+				},
+				defineProperty(binary, property, descriptor): boolean {
+					const rawDescriptor = "value" in descriptor ? { ...descriptor, value: unwrap(descriptor.value) } : descriptor;
+					if (isReplicaLocalOnly(binary, ignored)) return Reflect.defineProperty(binary, property, rawDescriptor);
+					const prepared = prepareGovernedWrite("value" in rawDescriptor ? rawDescriptor.value : undefined);
+					if (prepared === undefined) return false;
+					const previousDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
+					const previousElement = snapshotBinaryElement(binary, property);
+					const defined = Reflect.defineProperty(binary, property, rawDescriptor);
+					if (defined) {
+						const byteChanged = !binarySnapshotsEqual(previousElement, snapshotBinaryElement(binary, property));
+						try {
+							finalizePreparedWrite(prepared, binary, property, previousDescriptor, true);
+						} finally {
+							if (byteChanged) markChanged(binaryBacking(binary));
+						}
+					}
+					return defined;
+				},
+			});
+		} else if (objectValue instanceof Map) {
 			proxy = new Proxy(objectValue, {
 				getOwnPropertyDescriptor(map, property): PropertyDescriptor | undefined {
 					return observeOwnDescriptor(map, property, isReplicaLocalOnly(map, ignored));
