@@ -16366,6 +16366,28 @@ staged value between preflight and reflection; retain it explicitly in D.73's
 hostile in-operation code ledger rather than folding it into this plain-data
 root-cycle repair.
 
+**P3a-prime GREEN2 candidate.** Distinct Codex-high commit
+`4c66c67891b055d836447140cd37bbf04d3a5ded` changes only `proxy.ts` by one
+insertion and one deletion; its SHA-256 is
+`626a04bc455ac3b8087c0555341ee103128938224955ca35105b02440a1c14b5`.
+At the raw tracked root, ignored classification is now property-local:
+`REPLICA_LOCAL_STATE_KEYS` remain replica-local and every other root key is
+governed. Non-root inherited context behavior is unchanged. The frozen semantic
+suite is 20/20 and an additional temporary public-operation probe is 1/1 for
+`tracked.proxy.context.self = tracked.proxy`, followed by governed attribution
+and invalid-binary rejection through `context.self`; the temporary test was
+removed. D.92.2 is 64/64, inherited 147/147, specialized 93/93,
+P2+P1+D.92.3 99/99, D.92.4-D.92.6 60/60, bounded 1 MiB 2/2 and performance
+8/8 with MapDRP at 267.9 ms. P3b remains exact 4F/4P and sync exact 3F/3P.
+Object/workspace typechecks, owned lint, tracked-source lint at zero errors and
+249 inherited warnings, Prettier, diff and scope pass. The failed `tsx -e` CJS
+probe and pre-format lint/Prettier attempts are explicitly superseded; only the
+numbered final artifacts under
+`.logs/phase-1d-i-p3a-prime-root-cycle-green2-codex-high/` are acceptance
+evidence. The tracked tree is clean, protected untracked paths and `stash@{0}`
+are untouched. This remains a candidate until fresh Grok 4.5/high, exact Kimi
+3/high/dual-100 and final Opus/xhigh accept it.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -17137,15 +17159,12 @@ inserted P3a-prime before P3b GREEN. Its fresh Codex-high tests-only RED is
 frozen at `9132269`, surgical manifest repair `453206b` and nested-wrapper
 atomicity refinement `b165086`. First production GREEN `aae92e4` reached all
 saved gates but was rejected by both Grok and exact Kimi for the plain
-context-root cycle. Its corrective tests-only RED is frozen at `f1adc3d` with
-exact 1F/15 skipped and four causal soft failures. Start a distinct Codex-high
-production-only GREEN2 from `aae92e4`. Change only `proxy.ts` so context-root
-re-entry is key-local: `context` remains replica-local, while every non-context
-root key uses governed validation/attribution/raw-egress handling. Preserve the
-accepted non-root dynamic ownership rule, call-time saved-method checks,
-descriptor-safe staging, D.91 accessor timing and one-scan invariant. Reach the
-updated semantic 20/20 plus D.92.2 64/64 without changing the frozen tests or
-growing the analyzer; keep P3b exact 4F/4P and all preservation gates.
+context-root cycle. Its corrective tests-only RED is frozen at `f1adc3d`, and
+the distinct one-file GREEN2 candidate is `4c66c67`: semantic 20/20, public-
+operation cycle probe 1/1, D.92.2 64/64 and all preserved exact signatures.
+Run fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews. If both accept,
+run final Opus/xhigh through the Claude skill; if any rejects, return to a
+tests-first correction. Do not modify frozen tests or grow the analyzer.
 
 After a distinct P3a-prime GREEN and Grok/Kimi/Opus acceptance, resume P3b
 GREEN on the settled fail-closed invariant. Preserve but do not apply
