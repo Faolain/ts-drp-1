@@ -17127,6 +17127,53 @@ live ownership checks and the get-trap's exact pre-native policy rejection.
 Acceptance requires this corrective file at 8/8, the combined P3b corpus green
 and all mandatory preservation gates green before the normal review loop.
 
+**P3b setter-contract corrective GREEN candidate.** Distinct Codex-high
+production-only commit `a558e9ea317dfe765bc08abf2fe7b5d23f573099`, against
+RED checkpoint `7aeacdeb1bee33da35bed556a572d7176c46a45c`, changes only
+`packages/object/src/proxy.ts` with two insertions and 27 deletions. The
+resulting 1,617-line file has SHA-256
+`04a7627fa5312dc51b883b37be651de8dbb7c1d0fd2a1b8e609c13010418a7bc`
+and git blob `876f955374efc0e9b8488ce34d437c283d65868c`.
+
+The bounded implementation deletes `isStructuralMutatorReceiverError` and the
+set trap's catch, diagnostic replay and error normalization. `Reflect.set` now
+propagates direct captured-native, custom-setter and foreign-receiver errors
+unchanged. It retains per-accessor native classification, live governed-owner
+checks, protected custom-setter proxy receiver routing, and the get trap's
+exact pre-native policy rejection for structural operations acquired through
+the proxy. This is the unanimous Decision A construction; it does not weaken
+pre-mutation enforcement at an observable proxy boundary.
+
+The corrective suite is exactly 8/8 before and after the production commit,
+and the combined P3b corpus is exactly 33/33 before and after it. Preservation
+gates are green: P3a plus bounded 1 MiB is 6/6, with the 1 MiB case at 1.407 s;
+P3a-prime/root is 20/20; D.92.2 is 64/64; inherited Phase 1d(i) is 147/147;
+specialized state, collection and atomicity is 93/93; P2, P1 and D.92.3 are
+99/99; D.92.4 through D.92.6 are 60/60; and performance contracts are 8/8,
+with MapDRP state equality at 215.9 ms. The sync-livelock sentinel has its
+expected exit 1 and exact 3F/3P signature. Object and workspace typechecks,
+owned lint, Prettier and `git diff --check` pass; tracked-source lint has zero
+errors and 249 inherited warnings.
+
+The plan and corrective RED are byte-identical to the GREEN parent before this
+checkpoint: the plan has SHA-256
+`332ff9459ad2822777474e591f16c4169744c20c7d0a582019bcc0d0fb6e5358`
+and git blob `d0886350cc57431d0119d53f3aa2a3673b5d0fbe`; the corrective
+RED has SHA-256
+`85b719e163ac3e1ecff50959bf6f18cbeb1b515876a1ac8a62e94fa970e146a7`
+and git blob `631a71b9f5c273137cf966a0898edec786b3ba42`. The production
+commit's tracked scope is exactly `packages/object/src/proxy.ts`. Protected
+untracked paths remain unstaged and unchanged. Blocked `stash@{0}` remains
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Evidence is under
+`.logs/phase-1d-i-p3b-setter-contract-green-codex-high/`.
+
+This is a GREEN candidate only; P3b remains open pending fresh Grok 4.5/high
+and exact Kimi 3/high/dual-100 reviews. Launch Opus/xhigh only if both accept.
+D.92.7 remains a separate, unimplemented wire-fidelity slice and is neither
+implemented nor consumed by this candidate.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
