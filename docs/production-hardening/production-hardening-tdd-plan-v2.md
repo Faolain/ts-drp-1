@@ -19634,6 +19634,77 @@ form `--coverage.enabled=false`; coverage collection is not part of those
 governance assertions. Collided or RPC-timeout logs are non-authoritative and
 must not be counted.
 
+**Phase 1d(ii) production GREEN candidate checkpointed for independent
+review.** The resumed distinct Codex-high owner completed production-only
+commit `281fe9f` from exact RED/docs HEAD `520cc30`. Its scope is exactly:
+
+- `packages/object/src/drp-applier.ts` (`+170/-85`, SHA-256
+  `661190ace4d11b15bf7124e12bbffbab41d0278b28887ae76bf3b8c82feefeab`,
+  pre-commit blob `1793bf7`);
+- `packages/object/src/proxy.ts` (`+45/-8`, SHA-256
+  `de2e87891fc19dcce5d5f1c1a3ec46983299056be803b5d72f2601a7bf85b67a`,
+  pre-commit blob `6aa552b`);
+- `packages/object/src/publication/publisher.ts` (`+204/-22`, SHA-256
+  `ff7b0daa728aae36e7fd55f9bb2dbe38a45231e6eaffd34a0c6aecc1987b9803`,
+  pre-commit blob `ea88a2d`);
+- `packages/object/src/state-materialize.ts` (`+115/-16`, SHA-256
+  `402b5d0a1fa4ee87ea1f3985a616b71525ed9354332c952a34361149874d12be`,
+  pre-commit blob `52fb478`);
+- `packages/object/src/state-payload.ts` (`+255/-8`, SHA-256
+  `ed7a0f09a0086dc8d6dd0c5815dc71219fc48582dd5c9020d74aa168e5a8a01b`,
+  pre-commit blob `38ce3df`).
+
+The implementation removes live capture and ambient-candidate production,
+executes local and remote work from deferred owned canonical overlays, detaches
+borrowed graphs on first application exposure, adopts only canonical changed
+keys, and reconciles governed property order through journaled own-data work.
+It preserves the intentional application-setter exception only from the
+captured application prototype and snapshots the complete descriptor surface
+for rollback. Multi-frontier checkpoints receive the canonical pair through a
+non-nestable callback-scoped publisher context, while the private applier
+checkpoint method remains D.92.2's exact three-argument one-statement
+delegate. Canonical checkpoint values flow through the same measured
+`capturePublishedState`/copy boundary; live hosts are never checkpoint inputs.
+
+The corrective meter is exact 10/10: the only two ballast reads are the derived
+successful multi-frontier `drp:ballast:post` copy sites. D.92.2 is 64/64 with
+the exact 94/114/13/2 authority tuple and zero violations. Focused
+fallback/concurrent preservation is 48/48, the proportionate set is 136/136,
+and inherited Phase 1d(i) is 147/147. Object typecheck and the workspace
+34/35 typecheck run pass; exact owned-file lint is 0/0, tracked lint is zero
+errors with 249 inherited warnings; Prettier, diff, scope, frozen tests/plan and
+stash checks pass. Final GREEN evidence is in
+`.logs/phase-1d-ii-ambient-causal-green-codex-high-resumed/`; its manifest
+SHA-256 is
+`d824f0e9c2ea8c92966690f4d645df4171b86539faa7556106c5336d5e4ca9a9`.
+
+Root inspection caught a real fallback-retention hazard before commit. A
+unanimous frontier entry identity does not prove equality with a replay value
+borrowed from an independently copied checkpoint. Removing the shortcut
+entirely caused two forbidden comparison reads. The accepted candidate instead
+retains the exact borrowed owned entry only while the current value still has
+that borrowed identity; any application read, nested mutation or replacement
+materializes/changes the cell and forces measured equality or copy. All later
+borrowed-retention branches apply the same identity proof. This reached focused
+48/48 without an extra read and is documented at the production decision site.
+
+Stale-work rule for the remaining plan: remove or rewrite an old path/test when
+its contract has been proven invalid or fully superseded and the replacement
+preserves its still-valid compatibility, ownership and rollback behavior. Do
+not retain obsolete code through fake events or compatibility ballast. Do not,
+however, delete D.92.2's two explicitly governed
+`cloneEnumerableInstance:{detachReplicaLocalContext,detachStatePayload}`
+rollback sites: they remain valid because they preserve symbol/non-enumerable
+descriptor rollback and are part of the frozen 114/2 census.
+
+This is a GREEN candidate, not final acceptance. Run fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 independent reviews of `281fe9f`; run final
+Claude-skill Opus/xhigh only if both preliminary reviewers accept. Reviewers
+must attack borrowed-cell ownership, raw-child egress, fallback retention,
+application-setter rollback, duplicate/reserved keys, canonical checkpoint
+source and exact meter attribution. Tests and production remain frozen during
+review.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
@@ -19719,15 +19790,14 @@ Freeze accepted ambient-causal-boundary tests-only RED
 `02cf3cc3c61ec3415699a229f1992567bc028d3f`: its exact four-file scope,
 11F/54P complete signature, 5F intended ambient subset, clean-HEAD checkpoint
 1/1 and d28b checkpoint 1F candidate kill, file identities and complete gates
-are recorded above. Do not alter any of the four files. The immediate next
-action is the fresh Codex-high one-file checkpoint-meter tests-only RED
-specified above. Production and the plan stay frozen. The parked five-file
-GREEN draft must remain unapplied until that RED and its plan checkpoint are
-committed. Run the corrected original Phase 1d(ii) file plus proportionate
-preservation, object/workspace typecheck, owned and tracked lint,
-Prettier/diff/scope and frozen-artifact checks to `.log`.
+are recorded above. Freeze checkpoint-meter tests-only RED `cb9e9b1`, its plan
+checkpoint `520cc30`, and production GREEN candidate `281fe9f` with the exact
+scope, identities, gates and fallback-retention correction recorded above. Do
+not alter tests, production or the plan during review. The immediate next
+action is fresh Grok 4.5/high and exact Kimi 3/high/dual-100 independent review,
+followed by final Claude-skill Opus/xhigh only after both accept.
 
-Implement exactly the bounded GREEN contract above: prevalidate every key as a
+Review the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
 nested detachment and non-live clones with no `__proto__` accessor exception;
 permit an intentional non-`__proto__` application accessor only at live
