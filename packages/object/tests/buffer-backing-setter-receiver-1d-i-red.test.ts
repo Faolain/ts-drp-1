@@ -21,9 +21,14 @@ interface Captured<T> {
 type StructuralMethod = (this: ArrayBuffer, newByteLength?: number) => unknown;
 type TransferCapableArrayBuffer = ArrayBuffer & { transfer(newByteLength?: number): ArrayBuffer };
 
+interface TaggedTypeError extends TypeError {
+	readonly evidence: "setter-sentinel";
+}
+
 const GOVERNED_BUFFER_TRANSFER_ERROR = "Cannot structurally mutate an ArrayBuffer backing a governed Buffer";
 const capturedTransfer = Reflect.get(ArrayBuffer.prototype, "transfer") as StructuralMethod | undefined;
 const capturedResize = Reflect.get(ArrayBuffer.prototype, "resize") as StructuralMethod | undefined;
+let faithfulApplierObservedError: unknown;
 
 function capture<T>(run: () => T): Captured<T> {
 	try {
@@ -75,6 +80,15 @@ function invokeSetter(exposedBacking: ArrayBuffer, property: PropertyKey, value:
 	return Reflect.set(exposedBacking, property, value, exposedBacking);
 }
 
+function invokeSetterWithReceiver(
+	exposedBacking: ArrayBuffer,
+	property: PropertyKey,
+	value: unknown,
+	receiver: object
+): boolean {
+	return Reflect.set(exposedBacking, property, value, receiver);
+}
+
 function expectClean(tracked: ReturnType<typeof trackMutations>): void {
 	expect.soft(tracked.hasChanges(), "setter work on the ignored backing remains clean").toBe(false);
 	expect.soft(tracked.hasRawEgress(), "the proxy-only setter path does not report raw egress").toBe(false);
@@ -96,6 +110,19 @@ function expectGovernedRejection(
 	expect.soft(capture(() => [...buffer])).toEqual({ ok: true, value: expectedBytes });
 }
 
+function expectOriginalError(result: Captured<unknown>, expectedError: unknown, expectedMessage: string): void {
+	expect.soft(result.ok).toBe(false);
+	expect.soft(result.error, "the exact error observed inside the setter must propagate").toBe(expectedError);
+	expect.soft((result.error as Error | undefined)?.message).toBe(expectedMessage);
+}
+
+function liveProxyReceiverError(method: StructuralMethod): TypeError {
+	const result = capture(() => Reflect.apply(method, new Proxy(new ArrayBuffer(1), {}), []));
+	expect.soft(result.ok, "the engine rejects a proxy without ArrayBuffer internal slots").toBe(false);
+	expect.soft(result.error).toBeInstanceOf(TypeError);
+	return result.error as TypeError;
+}
+
 class SetterFixture implements IDRP {
 	semanticsType = SemanticsType.pair;
 	context = { caller: "" };
@@ -110,8 +137,13 @@ class SetterFixture implements IDRP {
 		const exposedBacking = this.buffer.buffer;
 		defineExposedSetter(exposedBacking, "structuralSetter", function (this: ArrayBuffer): void {
 			// Invalid length keeps the awaited oracle bounded while proving that
-			// P3b policy rejection precedes native argument validation.
-			Reflect.apply(capturedTransfer!, this, [-1]);
+			// proxy receiver fails the native brand check before argument validation.
+			try {
+				Reflect.apply(capturedTransfer!, this, [-1]);
+			} catch (error) {
+				faithfulApplierObservedError = error;
+				throw error;
+			}
 		});
 		invokeSetter(exposedBacking, "structuralSetter", true);
 	}
@@ -172,19 +204,110 @@ describe("Phase 1d(i) D.92.3-P3b backing setter receiver", () => {
 	);
 
 	it.skipIf(typeof capturedTransfer !== "function")(
-		"rejects a captured native transfer called with the custom setter receiver",
+		"preserves the engine error from a captured native transfer called with the custom setter receiver",
 		() => {
 			const expectedBytes = [21, 22, 23, 24];
 			const { backing, buffer } = dedicatedBuffer(expectedBytes);
 			const tracked = trackMutations({ buffer, untouched: { marker: "stable" } });
 			const exposedBacking = tracked.proxy.buffer.buffer;
+			let observedError: unknown;
 			defineExposedSetter(exposedBacking, "capturedTransfer", function (this: ArrayBuffer): void {
-				Reflect.apply(capturedTransfer!, this, []);
+				try {
+					Reflect.apply(capturedTransfer!, this, []);
+				} catch (error) {
+					observedError = error;
+					throw error;
+				}
 			});
 
 			const result = capture(() => invokeSetter(exposedBacking, "capturedTransfer", true));
 
-			expectGovernedRejection(result, backing, buffer, expectedBytes);
+			expect.soft(observedError).toBeInstanceOf(TypeError);
+			expectOriginalError(result, observedError, (observedError as Error).message);
+			expect.soft((result.error as Error).message).not.toBe(GOVERNED_BUFFER_TRANSFER_ERROR);
+			expect.soft(backing.byteLength).toBe(expectedBytes.length);
+			expect.soft([...buffer]).toEqual(expectedBytes);
+			expectClean(tracked);
+		}
+	);
+
+	it.skipIf(typeof capturedTransfer !== "function")(
+		"preserves a setter-authored TypeError that coincides with the live engine brand text",
+		() => {
+			const { backing, buffer } = dedicatedBuffer([25, 26, 27, 28]);
+			const tracked = trackMutations({ buffer, untouched: { marker: "stable" } });
+			const exposedBacking = tracked.proxy.buffer.buffer;
+			const liveEngineError = liveProxyReceiverError(capturedTransfer!);
+			const sentinel = Object.assign(new TypeError(liveEngineError.message), {
+				evidence: "setter-sentinel" as const,
+			});
+			defineExposedSetter(exposedBacking, "coincidentError", function (): void {
+				throw sentinel;
+			});
+
+			const result = capture(() => invokeSetter(exposedBacking, "coincidentError", true));
+
+			expectOriginalError(result, sentinel, liveEngineError.message);
+			expect.soft((result.error as TaggedTypeError).evidence).toBe("setter-sentinel");
+			expect.soft(backing.byteLength).toBe(4);
+			expect.soft([...buffer]).toEqual([25, 26, 27, 28]);
+			expectClean(tracked);
+		}
+	);
+
+	it.skipIf(typeof capturedTransfer !== "function")(
+		"preserves the engine error from a captured native applied to a foreign ArrayBuffer proxy receiver",
+		() => {
+			const { backing, buffer } = dedicatedBuffer([29, 30, 31, 32]);
+			const tracked = trackMutations({ buffer, untouched: { marker: "stable" } });
+			const exposedBacking = tracked.proxy.buffer.buffer;
+			const foreignBacking = new ArrayBuffer(3);
+			const foreignProxy = new Proxy(foreignBacking, {});
+			let observedError: unknown;
+			defineExposedSetter(exposedBacking, "foreignProxy", function (this: ArrayBuffer): void {
+				try {
+					Reflect.apply(capturedTransfer!, this, []);
+				} catch (error) {
+					observedError = error;
+					throw error;
+				}
+			});
+
+			const result = capture(() => invokeSetterWithReceiver(exposedBacking, "foreignProxy", true, foreignProxy));
+
+			expect.soft(observedError).toBeInstanceOf(TypeError);
+			expectOriginalError(result, observedError, (observedError as Error).message);
+			expect.soft(foreignBacking.byteLength).toBe(3);
+			expect.soft(backing.byteLength).toBe(4);
+			expect.soft([...buffer]).toEqual([29, 30, 31, 32]);
+			expectClean(tracked);
+		}
+	);
+
+	it.skipIf(typeof capturedTransfer !== "function")(
+		"does not replay structural natives against a genuine foreign ArrayBuffer receiver after a setter throws",
+		() => {
+			const { backing, buffer } = dedicatedBuffer([33, 34, 35, 36]);
+			const tracked = trackMutations({ buffer, untouched: { marker: "stable" } });
+			const exposedBacking = tracked.proxy.buffer.buffer;
+			const foreignBacking = new ArrayBuffer(4);
+			const foreignBytes = new Uint8Array(foreignBacking);
+			foreignBytes.set([91, 92, 93, 94]);
+			const sentinel = Object.assign(new TypeError("setter failed before touching its receiver"), {
+				evidence: "setter-sentinel" as const,
+			});
+			defineExposedSetter(exposedBacking, "foreignBacking", function (): void {
+				throw sentinel;
+			});
+
+			const result = capture(() => invokeSetterWithReceiver(exposedBacking, "foreignBacking", true, foreignBacking));
+
+			expectOriginalError(result, sentinel, sentinel.message);
+			expect.soft((result.error as TaggedTypeError).evidence).toBe("setter-sentinel");
+			expect.soft(foreignBacking.byteLength, "error classification must not detach the caller's receiver").toBe(4);
+			expect.soft(capture(() => [...foreignBytes])).toEqual({ ok: true, value: [91, 92, 93, 94] });
+			expect.soft(backing.byteLength).toBe(4);
+			expect.soft([...buffer]).toEqual([33, 34, 35, 36]);
 			expectClean(tracked);
 		}
 	);
@@ -209,8 +332,14 @@ describe("Phase 1d(i) D.92.3-P3b backing setter receiver", () => {
 			const { backing, buffer } = dedicatedBuffer([41, 42, 43, 44], resizableBacking(4, 8));
 			const tracked = trackMutations({ context: { buffer }, promoted: null as Buffer | null });
 			const exposedBacking = tracked.proxy.context.buffer.buffer;
+			let observedError: unknown;
 			defineExposedSetter(exposedBacking, "requestedLength", function (this: ArrayBuffer, value: unknown): void {
-				Reflect.apply(capturedResize!, this, [value as number]);
+				try {
+					Reflect.apply(capturedResize!, this, [value as number]);
+				} catch (error) {
+					observedError = error;
+					throw error;
+				}
 			});
 
 			expect.soft(capture(() => invokeSetter(exposedBacking, "requestedLength", 5))).toMatchObject({ ok: true });
@@ -220,8 +349,8 @@ describe("Phase 1d(i) D.92.3-P3b backing setter receiver", () => {
 			tracked.proxy.promoted = tracked.proxy.context.buffer;
 			const governedResult = capture(() => invokeSetter(exposedBacking, "requestedLength", 6));
 			expect.soft(governedResult.ok, "promotion must activate setter-receiver protection").toBe(false);
-			expect.soft(governedResult.error).toBeInstanceOf(TypeError);
-			expect.soft((governedResult.error as Error | undefined)?.message).toBe(GOVERNED_BUFFER_TRANSFER_ERROR);
+			expect.soft(observedError).toBeInstanceOf(TypeError);
+			expectOriginalError(governedResult, observedError, (observedError as Error).message);
 			expect.soft(backing.byteLength, "governed setter call must not resize").toBe(5);
 			expect.soft(tracked.hasRawEgress()).toBe(false);
 
@@ -235,6 +364,7 @@ describe("Phase 1d(i) D.92.3-P3b backing setter receiver", () => {
 		"rejects awaited local authoring before native validation, detachment, vertex creation or publication",
 		async () => {
 			const h = setterHarness();
+			faithfulApplierObservedError = undefined;
 			const backing = h.rawDRP.buffer.buffer;
 			const liveBytes = [...h.rawDRP.buffer];
 			const rootBefore = DRPStateOtherTheWire.encode(
@@ -244,8 +374,8 @@ describe("Phase 1d(i) D.92.3-P3b backing setter receiver", () => {
 			const result = await captureAsync(() => h.applier.drp!.transferInSetter());
 
 			expect.soft(result.ok).toBe(false);
-			expect.soft(result.error).toBeInstanceOf(TypeError);
-			expect.soft((result.error as Error | undefined)?.message).toBe(GOVERNED_BUFFER_TRANSFER_ERROR);
+			expect.soft(faithfulApplierObservedError).toBeInstanceOf(TypeError);
+			expectOriginalError(result, faithfulApplierObservedError, (faithfulApplierObservedError as Error).message);
 			expect.soft(h.rawDRP.buffer.buffer === backing).toBe(true);
 			expect.soft(backing.byteLength, "live backing remains attached").toBe(liveBytes.length);
 			expect.soft(capture(() => [...h.rawDRP.buffer])).toEqual({ ok: true, value: liveBytes });
