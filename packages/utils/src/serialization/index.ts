@@ -1,42 +1,30 @@
-import { decode, ExtensionCodec } from "@msgpack/msgpack";
+import { decode } from "@msgpack/msgpack";
 import { DRPState, DRPStateEntry, DRPStateEntryOtherTheWire, DRPStateOtherTheWire } from "@ts-drp/types";
 
-import { serializeValue } from "./equality.js";
+import { createDecodingContext, serializationCodec, type SerializationContext, serializeValue } from "./equality.js";
 
 export { serializedValuesEqual, serializeValue } from "./equality.js";
 
-const extensionCodec = new ExtensionCodec();
+const extensionPayloadDecoders = {
+	set: (data: Uint8Array, context: SerializationContext): unknown =>
+		decode<SerializationContext>(data, { extensionCodec: serializationCodec, context }),
+	map: (data: Uint8Array, context: SerializationContext): unknown =>
+		decode<SerializationContext>(data, { extensionCodec: serializationCodec, context }),
+	binary: (data: Uint8Array): unknown => decode(data),
+};
 
-const SET_EXT_TYPE = 0; // Any in 0-127
-extensionCodec.register({
-	type: SET_EXT_TYPE,
-	encode: (_object: unknown): null => null,
-	decode: (data: Uint8Array) => {
-		const array = decode(data, { extensionCodec }) as Array<unknown>;
-		return new Set(array);
-	},
-});
-
-// Map<K, V>
-const MAP_EXT_TYPE = 1; // Any in 0-127
-extensionCodec.register({
-	type: MAP_EXT_TYPE,
-	encode: (_object: unknown): null => null,
-	decode: (data: Uint8Array) => {
-		const array = decode(data, { extensionCodec }) as Array<[unknown, unknown]>;
-		return new Map(array);
-	},
-});
-
-const FLOAT_32_ARRAY_EXT_TYPE = 2; // Any in 0-127
-extensionCodec.register({
-	type: FLOAT_32_ARRAY_EXT_TYPE,
-	encode: (_object: unknown): null => null,
-	decode: (data: Uint8Array) => {
-		const array = decode(data, { extensionCodec }) as Array<number>;
-		return new Float32Array(array);
-	},
-});
+const decodeExtensionPayload: SerializationContext["decodePayload"] = (data, extensionType, context): unknown => {
+	switch (extensionType) {
+		case 0:
+			return extensionPayloadDecoders.set(data, context);
+		case 1:
+			return extensionPayloadDecoders.map(data, context);
+		case 2:
+			return extensionPayloadDecoders.binary(data);
+		default:
+			throw new TypeError(`Unknown MessagePack extension ${extensionType}`);
+	}
+};
 
 /**
  * Main entry point for deserialization.
@@ -45,7 +33,8 @@ extensionCodec.register({
  * @returns The deserialized value
  */
 export function deserializeValue(value: Uint8Array): unknown {
-	return decode(value, { extensionCodec });
+	const context = createDecodingContext(decodeExtensionPayload, value.byteLength);
+	return decode<SerializationContext>(value, { extensionCodec: serializationCodec, context });
 }
 
 /**
@@ -68,7 +57,7 @@ export function serializeDRPState(state?: DRPState): DRPStateOtherTheWire {
 /**
  * Deserializes a DRPStateOtherTheWire object into a DRPState object.
  * @param state - The DRP state to deserialize
- * @returns The deserialized DRP state
+ * @returns The deserialized state
  */
 export function deserializeDRPState(state?: DRPStateOtherTheWire): DRPState {
 	const drpState = DRPState.create();
