@@ -19601,6 +19601,39 @@ commit the RED and a separate plan checkpoint; re-authenticate and apply the
 parked five-file draft; resume the same GREEN owner; preserve the D.92.2
 three-argument delegate and reach exact 10/10 plus every frozen gate.
 
+**Checkpoint-meter corrective RED accepted and frozen.** Fresh Codex-high
+tests-only commit `cb9e9b16e2af39ade65a3a03c3eb310d374d4039`
+changes only
+`packages/object/tests/residual-reconstruction-prototype-safety-1d-ii-red.test.ts`
+(`+43/-4`, 584 lines, blob
+`23d186531fe3d46b5734b1d3870019485715db11`, SHA-256
+`07b74566d341a520cf66780ac93dd08981849f60abf8c91c1ef15c5a536bd458`).
+It implements the authorized exact site sequence without changing production
+or any other test. Clean production remains a true 8F/2P RED: the topology
+derives two permitted successful multi-frontier checkpoint
+`drp:ballast:post` sites but observes five reads, all `"unattributed"`. This is
+the intended causal distinction GREEN must close; it may not merely make the
+aggregate count equal two.
+
+The inherited clean-production Phase 1d(i) signature is 7F/140P, not 147P:
+those seven failures are the already-frozen ambient-causal obligations owned
+by this same GREEN. D.92.2 is exact 3F/61P and the proportionate preservation
+set is exact 11F/125P. Object and 34-package workspace typechecks pass; owned
+lint is 0/0, tracked lint is zero errors with 249 inherited warnings; Prettier
+and diff checks pass. Evidence is in
+`.logs/phase-1d-ii-checkpoint-meter-red-codex-high/`; its 12-file manifest
+SHA-256 is
+`caf4f38b2415e1a2f967c2942c099573176f00b87a3436b0e3c167ff28044dc3`.
+
+Test-run gotcha: do not run coverage-bearing Vitest processes concurrently in
+one worktree. They race through `coverage/.tmp`; this repository's D.92.2
+governance suite can also exceed Vitest's worker-RPC heartbeat when coverage
+instrumentation is enabled. Serialize all test gates. For D.92.2 and the
+proportionate preservation set, use the established authoritative behavioral
+form `--coverage.enabled=false`; coverage collection is not part of those
+governance assertions. Collided or RPC-timeout logs are non-authoritative and
+must not be counted.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
