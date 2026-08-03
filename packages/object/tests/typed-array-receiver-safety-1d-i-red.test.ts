@@ -30,12 +30,40 @@ interface Captured<T> {
 	error?: unknown;
 }
 
+type StructuralTransferMethod = "transfer" | "transferToFixedLength";
+
+const GOVERNED_BUFFER_TRANSFER_ERROR = "Cannot structurally mutate an ArrayBuffer backing a governed Buffer";
+const structuralTransferMethods = (["transfer", "transferToFixedLength"] as const).filter(
+	(method): method is StructuralTransferMethod => typeof Reflect.get(ArrayBuffer.prototype, method) === "function"
+);
+const representativeStructuralTransferMethod = structuralTransferMethods[0];
+
 function capture<T>(run: () => T): Captured<T> {
 	try {
 		return { ok: true, value: run() };
 	} catch (error) {
 		return { ok: false, error };
 	}
+}
+
+async function captureAsync<T>(run: () => T | Promise<T>): Promise<Captured<T>> {
+	try {
+		return { ok: true, value: await run() };
+	} catch (error) {
+		return { ok: false, error };
+	}
+}
+
+function transferBacking(backing: ArrayBuffer, method: StructuralTransferMethod): ArrayBuffer {
+	const transfer = Reflect.get(backing, method) as (newByteLength?: number) => ArrayBuffer;
+	return Reflect.apply(transfer, backing, []);
+}
+
+function dedicatedBuffer(bytes: readonly number[] = [1, 2, 3, 4]): { backing: ArrayBuffer; buffer: Buffer } {
+	const backing = new ArrayBuffer(bytes.length);
+	const buffer = Buffer.from(backing);
+	buffer.set(bytes);
+	return { backing, buffer };
 }
 
 function bytesByKey(value: object): Map<string, Uint8Array> {
@@ -124,6 +152,21 @@ class TypedArrayFixture implements IDRP {
 	}
 }
 
+class BufferBackingFixture implements IDRP {
+	semanticsType = SemanticsType.pair;
+	context = { caller: "" };
+	buffer: Buffer;
+	untouched = { marker: "stable" };
+
+	constructor() {
+		this.buffer = dedicatedBuffer([11, 12, 13, 14]).buffer;
+	}
+
+	transferBacking(method: StructuralTransferMethod): void {
+		transferBacking(this.buffer.buffer, method);
+	}
+}
+
 class PublicationProbe {
 	readonly publications: PublicationRecord[] = [];
 
@@ -157,6 +200,33 @@ function harness(peerId: "local" | "remote"): Harness {
 		publicationObserver: probe.observe.bind(probe),
 	};
 	const Applier = DRPVertexApplier as unknown as new (candidate: typeof options) => DRPVertexApplier<TypedArrayFixture>;
+	return { rawDRP, applier: new Applier(options), hashGraph, probe, states };
+}
+
+function bufferHarness(): {
+	rawDRP: BufferBackingFixture;
+	applier: DRPVertexApplier<BufferBackingFixture>;
+	hashGraph: HashGraph;
+	probe: PublicationProbe;
+	states: DRPObjectStateManager<BufferBackingFixture>;
+} {
+	const rawDRP = new BufferBackingFixture();
+	const rawACL = createACL({ admins: ["local"] });
+	const hashGraph = new HashGraph("local", rawACL.resolveConflicts?.bind(rawACL), undefined, rawDRP.semanticsType);
+	const states = new DRPObjectStateManager(rawACL, rawDRP);
+	const probe = new PublicationProbe();
+	const options = {
+		drp: rawDRP,
+		acl: rawACL,
+		hashGraph,
+		states,
+		finalityStore: new FinalityStore(),
+		notify: (): void => {},
+		publicationObserver: probe.observe.bind(probe),
+	};
+	const Applier = DRPVertexApplier as unknown as new (
+		candidate: typeof options
+	) => DRPVertexApplier<BufferBackingFixture>;
 	return { rawDRP, applier: new Applier(options), hashGraph, probe, states };
 }
 
@@ -352,6 +422,93 @@ describe("Phase 1d(i) D.92.3-P3b mutation attribution and publication", () => {
 		expect(groundTruth).toEqual(["payload"]);
 		expectPublicationTruth(h, vertex, groundTruth);
 	});
+});
+
+describe("Phase 1d(i) D.92.3-P3b governed Buffer backing transfer", () => {
+	it("keeps ordinary backing reads available, extensible and clean", () => {
+		const { backing, buffer } = dedicatedBuffer();
+		const tracked = trackMutations({ buffer, untouched: { marker: "stable" } });
+
+		const exposed = tracked.proxy.buffer.buffer;
+
+		expect.soft(exposed).toBe(tracked.proxy.buffer.buffer);
+		expect.soft(exposed.byteLength).toBe(4);
+		expect.soft(Object.isExtensible(exposed)).toBe(true);
+		expect.soft(buffer.buffer).toBe(backing);
+		expect.soft([...buffer]).toEqual([1, 2, 3, 4]);
+		expect.soft(tracked.hasChanges()).toBe(false);
+		expect([...tracked.changedKeys()]).toEqual([]);
+	});
+
+	it.each(structuralTransferMethods)("rejects %s atomically before it can detach governed Buffer bytes", (method) => {
+		const { backing, buffer } = dedicatedBuffer();
+		const bufferBytes = [...buffer];
+		const backingBytes = [...new Uint8Array(backing)];
+		const tracked = trackMutations({ buffer, untouched: { marker: "stable" } });
+		const bufferExtensible = Object.isExtensible(buffer);
+		const backingExtensible = Object.isExtensible(backing);
+
+		const result = capture(() => transferBacking(tracked.proxy.buffer.buffer, method));
+
+		expect.soft(result.ok, "structural backing mutation must reject").toBe(false);
+		expect.soft(result.error).toBeInstanceOf(TypeError);
+		expect.soft((result.error as Error | undefined)?.message).toBe(GOVERNED_BUFFER_TRANSFER_ERROR);
+		expect.soft(buffer.buffer === backing, "Buffer/backing identity must survive rejection").toBe(true);
+		expect.soft(capture(() => [...buffer])).toEqual({ ok: true, value: bufferBytes });
+		expect.soft(capture(() => [...new Uint8Array(backing)])).toEqual({ ok: true, value: backingBytes });
+		expect.soft(Object.isExtensible(buffer)).toBe(bufferExtensible);
+		expect.soft(Object.isExtensible(backing)).toBe(backingExtensible);
+		expect.soft(tracked.hasChanges(), "rejection must not dirty governed state").toBe(false);
+		expect([...tracked.changedKeys()]).toEqual([]);
+	});
+
+	it.skipIf(representativeStructuralTransferMethod === undefined)(
+		"keeps native transfer available and exactly attributed for a bare governed ArrayBuffer",
+		() => {
+			const backing = new ArrayBuffer(4);
+			new Uint8Array(backing).set([5, 6, 7, 8]);
+			const tracked = trackMutations({ backing, untouched: { marker: "stable" } });
+
+			const result = capture(() => transferBacking(tracked.proxy.backing, representativeStructuralTransferMethod!));
+
+			expect.soft(result.ok).toBe(true);
+			expect.soft(result.value?.byteLength).toBe(4);
+			expect.soft(backing.byteLength, "the governed source backing follows native transfer semantics").toBe(0);
+			expect.soft(tracked.hasChanges()).toBe(true);
+			expect([...tracked.changedKeys()]).toEqual(["backing"]);
+		}
+	);
+
+	it.skipIf(representativeStructuralTransferMethod === undefined)(
+		"rejects local authoring before detachment, vertex creation or publication",
+		async () => {
+			const h = bufferHarness();
+			const backing = h.rawDRP.buffer.buffer;
+			const liveBytes = [...h.rawDRP.buffer];
+			const rootBefore = DRPStateOtherTheWire.encode(
+				serializeDRPState(h.states.getDRPState(HashGraph.rootHash)!)
+			).finish();
+
+			const result = await captureAsync(() => h.applier.drp!.transferBacking(representativeStructuralTransferMethod!));
+
+			expect.soft(result.ok).toBe(false);
+			expect.soft(result.error).toBeInstanceOf(TypeError);
+			expect.soft((result.error as Error | undefined)?.message).toBe(GOVERNED_BUFFER_TRANSFER_ERROR);
+			expect.soft(h.rawDRP.buffer.buffer === backing).toBe(true);
+			expect.soft(capture(() => [...h.rawDRP.buffer])).toEqual({ ok: true, value: liveBytes });
+			expect.soft(capture(() => [...new Uint8Array(backing)])).toEqual({ ok: true, value: liveBytes });
+			expect.soft(h.hashGraph.getAllVertices()).toHaveLength(1);
+			expect.soft(h.probe.publications).toEqual([]);
+			expect
+				.soft(
+					capture(() =>
+						DRPStateOtherTheWire.encode(serializeDRPState(h.states.getDRPState(HashGraph.rootHash)!)).finish()
+					),
+					"stored root bytes must remain readable and unchanged"
+				)
+				.toEqual({ ok: true, value: rootBefore });
+		}
+	);
 });
 
 describe("Phase 1d(i) D.92.3-P3b P3a accounting firewall", () => {
