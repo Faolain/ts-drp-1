@@ -16668,6 +16668,42 @@ a distinct Codex-high production GREEN, followed by the full preservation
 matrix and fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional final
 Opus/xhigh review.
 
+**P3b captured-native-alias corrective GREEN candidate.** Distinct
+production-only Codex-high commit
+`d8fc4a433ce0d6819573272a4e7c0d9154d007b0`, against parent
+`fdc34d4239079f7f5dad5619ebbb4f5c6b28aa27`, changes only
+`packages/object/src/proxy.ts` with 17 insertions and two deletions. The final
+1,616-line file has SHA-256
+`4781d90d2131fecf3fa1329067e5378d87cf63cbfd5e5ca02b57632e994ed910`
+and git blob `2487b8b7771a326b2cd64c97b7c4c9128f410ed5`.
+
+The candidate captures the callable identities of the available native
+`ArrayBuffer` and `SharedArrayBuffer` structural mutators at module
+initialization: `grow`, `resize`, `transfer` and `transferToFixedLength`. At
+call time, function identity plus current governed-Buffer backing ownership
+drives the pre-mutation rejection, independent of the alias's property key or
+descriptor owner. A custom non-native callable reached through a protected
+backing receives the proxy receiver, so an ordinary wrapper re-enters the same
+guard while a benign custom method retains proxy-safe access. The mechanism
+does not seal or promote the backing, add parent edges, or broaden the frozen
+bare-ArrayBuffer policy. A lint-only correction changed the identity set's
+element type to `unknown`; it did not alter runtime behavior.
+
+The exact pre-GREEN baseline is 7F/0P. Focused final and postcommit runs are
+7/7, with the postcommit run at 11 ms; the prior P3b corpus is 13/13 and the
+combined corpus is 20/20. P3a plus bounded 1 MiB is 6/6;
+P3a-prime/root-cycle is 20/20; D.92.2 is 64/64; inherited Phase 1d(i) is
+147/147; specialized is 93/93; P2+P1+D.92.3 is 99/99; and D.92.4-D.92.6 is
+60/60. Performance is 8/8 with MapDRP at 218.8 ms. The sync sentinel retains
+its expected exact 3F/3P and exit 1. Object and workspace typechecks pass;
+owned lint is clean; tracked-source lint has zero errors and 249 inherited
+warnings; and Prettier and diff checks are clean. Authoritative evidence is
+under `.logs/phase-1d-i-p3b-native-alias-green-codex-high/`.
+
+This remains a GREEN candidate, not an acceptance or closure of P3b. Run fresh
+Grok 4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final
+Opus/xhigh only if both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
