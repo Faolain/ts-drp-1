@@ -7,6 +7,7 @@ import {
 	DRPStateOtherTheWire,
 	DrpType,
 	type Hash,
+	type IACL,
 	type IDRP,
 	Operation,
 	type ResolveConflictsType,
@@ -153,6 +154,7 @@ class ConflictMatrixDRP extends MatrixDRP {
 }
 
 interface Harness {
+	acl: IACL;
 	applier: DRPVertexApplier<MatrixDRP>;
 	drp: MatrixDRP;
 	hashGraph: HashGraph;
@@ -184,7 +186,7 @@ function harness(
 		publicationObserver: probe.observe.bind(probe),
 	};
 	const Applier = DRPVertexApplier as unknown as new (candidate: typeof options) => DRPVertexApplier<MatrixDRP>;
-	return { applier: new Applier(options), drp, hashGraph, probe, states };
+	return { acl, applier: new Applier(options), drp, hashGraph, probe, states };
 }
 
 function remoteVertex(opType: string, value: unknown[], dependencies: Hash[], timestamp: number): Vertex {
@@ -662,6 +664,129 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 				...(checkpointState?.drpState.state ?? []).map(({ key }) => `drp:${key}`),
 			].sort();
 			expect(copiedKeys).toEqual(checkpointKeys);
+		} finally {
+			if (previousSuffix === undefined) delete process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+			else process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = previousSuffix;
+		}
+	});
+
+	it("sources a multi-frontier checkpoint from canonical history despite raw two-side drift", async () => {
+		const previousSuffix = process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+		process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = "1";
+		try {
+			const clean = harness();
+			const drifted = harness();
+			const cleanLeft = remoteVertex("setK", ["left"], [HashGraph.rootHash], 40);
+			const cleanRight = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 41);
+			const driftedLeft = remoteVertex("setK", ["left"], [HashGraph.rootHash], 40);
+			const driftedRight = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 41);
+
+			await expect(clean.applier.applyVertices([cleanLeft])).resolves.toMatchObject({ applied: true });
+			await expect(drifted.applier.applyVertices([driftedLeft])).resolves.toMatchObject({ applied: true });
+
+			const rawACL = drifted.acl as unknown as Record<string, unknown>;
+			const rawDRP = drifted.drp as unknown as Record<string, unknown>;
+			rawACL.ambientACLPoison = { source: "raw-alias" };
+			const authorizedPeers = rawACL._authorizedPeers as Map<
+				string,
+				{ blsPublicKey?: string; permissions: Set<ACLGroup>; ambient?: string }
+			>;
+			const remotePermissions = authorizedPeers.get("remote")!;
+			delete remotePermissions.blsPublicKey;
+			remotePermissions.ambient = "raw-alias";
+			const localPermissions = authorizedPeers.get("local")!;
+			authorizedPeers.delete("local");
+			authorizedPeers.set("local", localPermissions);
+			rawDRP.ambientDRPPoison = { source: "raw-alias" };
+			delete (drifted.drp.nested as unknown as { stable?: string }).stable;
+			const mapEntries = [...drifted.drp.map];
+			drifted.drp.map.clear();
+			for (const entry of mapEntries.reverse()) drifted.drp.map.set(...entry);
+			(drifted.drp.nested.child as { value: number }).value = 999;
+
+			await expect(clean.applier.applyVertices([cleanRight])).resolves.toMatchObject({ applied: true });
+			await expect(drifted.applier.applyVertices([driftedRight])).resolves.toMatchObject({ applied: true });
+
+			const cleanFrontier = clean.hashGraph.getFrontier();
+			const driftedFrontier = drifted.hashGraph.getFrontier();
+			expect(cleanFrontier).toEqual(driftedFrontier);
+			expect(cleanFrontier).toHaveLength(2);
+
+			type Checkpoint = { frontier: Hash[]; state: { aclState: DRPState; drpState: DRPState } };
+			const checkpointAt = (h: Harness, frontier: readonly Hash[]): Checkpoint | undefined =>
+				(
+					h.applier as unknown as {
+						checkpoints: Checkpoint[];
+					}
+				).checkpoints.find((candidate) => candidate.frontier.toSorted().join() === [...frontier].sort().join());
+			const cleanCheckpoint = checkpointAt(clean, cleanFrontier);
+			const driftedCheckpoint = checkpointAt(drifted, driftedFrontier);
+			expect(cleanCheckpoint).toBeDefined();
+			expect(driftedCheckpoint).toBeDefined();
+			expect(driftedCheckpoint?.frontier).toEqual(cleanCheckpoint?.frontier);
+			expect(encodedState(driftedCheckpoint!.state.aclState)).toEqual(encodedState(cleanCheckpoint!.state.aclState));
+			expect(encodedState(driftedCheckpoint!.state.drpState)).toEqual(encodedState(cleanCheckpoint!.state.drpState));
+
+			const rootACLKeys = clean.states.getACLState(HashGraph.rootHash)!.state.map(({ key }) => key);
+			const rootDRPKeys = clean.states.getDRPState(HashGraph.rootHash)!.state.map(({ key }) => key);
+			const driftedACLKeys = driftedCheckpoint!.state.aclState.state.map(({ key }) => key);
+			const driftedDRPKeys = driftedCheckpoint!.state.drpState.state.map(({ key }) => key);
+			expect(driftedACLKeys).toEqual(rootACLKeys);
+			expect(driftedDRPKeys).toEqual(rootDRPKeys);
+			expect(driftedACLKeys).not.toContain("ambientACLPoison");
+			expect(driftedDRPKeys).not.toContain("ambientDRPPoison");
+			expect(
+				(
+					driftedCheckpoint!.state.aclState.state.find(({ key }) => key === "_authorizedPeers")?.value as Map<
+						string,
+						{ blsPublicKey?: string; ambient?: string }
+					>
+				).get("remote")?.blsPublicKey
+			).toBe("");
+			expect(
+				(driftedCheckpoint!.state.drpState.state.find(({ key }) => key === "nested")?.value as MatrixDRP["nested"])
+					.stable
+			).toBe("left");
+
+			for (const h of [clean, drifted]) {
+				const publication = h.probe.publications.find(
+					(candidate) =>
+						candidate.kind === "checkpoint" &&
+						candidate.frontier.toSorted().join() === h.hashGraph.getFrontier().toSorted().join()
+				);
+				expect(publication).toMatchObject({
+					kind: "checkpoint",
+					mode: "fallback",
+					fallbackReason: "multi-frontier-checkpoint",
+				});
+				const checkpoint = checkpointAt(h, h.hashGraph.getFrontier())!;
+				const copiedKeys = publicationCopies(h.probe, publication!.publicationId)
+					.map(({ image, key, side }) => `${side}:${key}:${image}`)
+					.sort();
+				const expectedCopies = [
+					...checkpoint.state.aclState.state.map(({ key }) => `acl:${key}:post`),
+					...checkpoint.state.drpState.state.map(({ key }) => `drp:${key}:post`),
+				].sort();
+				expect(copiedKeys).toEqual(expectedCopies);
+				expect(new Set(copiedKeys).size).toBe(copiedKeys.length);
+			}
+
+			const cleanDescendant = remoteVertex("setJ", ["right"], cleanFrontier, 42);
+			const driftedDescendant = remoteVertex("setJ", ["right"], driftedFrontier, 42);
+			await expect(clean.applier.applyVertices([cleanDescendant])).resolves.toMatchObject({ applied: true });
+			await expect(drifted.applier.applyVertices([driftedDescendant])).resolves.toMatchObject({ applied: true });
+			expect(encodedState(clean.states.getACLState(cleanDescendant.hash)!)).toEqual(
+				encodedState(cleanCheckpoint!.state.aclState)
+			);
+			expect(encodedState(clean.states.getDRPState(cleanDescendant.hash)!)).toEqual(
+				encodedState(cleanCheckpoint!.state.drpState)
+			);
+			expect(encodedState(drifted.states.getACLState(driftedDescendant.hash)!)).toEqual(
+				encodedState(clean.states.getACLState(cleanDescendant.hash)!)
+			);
+			expect(encodedState(drifted.states.getDRPState(driftedDescendant.hash)!)).toEqual(
+				encodedState(clean.states.getDRPState(cleanDescendant.hash)!)
+			);
 		} finally {
 			if (previousSuffix === undefined) delete process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
 			else process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = previousSuffix;

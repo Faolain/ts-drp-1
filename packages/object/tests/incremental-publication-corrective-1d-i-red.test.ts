@@ -114,6 +114,14 @@ class CorrectiveFixture implements IDRP {
 	touch(): void {
 		this.touched++;
 	}
+
+	mutateHeldReplacementAdditionDeletion(): void {
+		const held = this.ambientNested;
+		held.value = 9;
+		this.ambientPrimitive = "authored";
+		this.ambientAdded = { value: "added" };
+		delete this.removable;
+	}
 }
 
 interface Harness {
@@ -301,31 +309,26 @@ describe("Phase 1d(i) corrective encoded-byte equality", () => {
 	});
 });
 
-describe("Phase 1d(i) corrective ambient public-live capture", () => {
-	it("includes held-reference, replacement, addition, and deletion DRP mutations at the next vertex", () => {
+describe("Phase 1d(i) corrective ambient public-live isolation", () => {
+	it("publishes held-reference, replacement, addition, and deletion mutations authored by the encoded operation", async () => {
 		const h = harness();
 		const baselineBytes = encodedState(h.states.getDRPState(HashGraph.rootHash)!);
-		const live = h.applier.drp!;
-		const held = live.ambientNested;
-		held.value = 9;
-		live.ambientPrimitive = "ambient";
-		live.ambientAdded = { value: "added" };
-		delete live.removable;
+		const vertex = remoteVertex("mutateHeldReplacementAdditionDeletion", [], 2);
 
-		live.touch();
-		const vertex = vertexFor(h, "touch");
-		const expected = stateFromDRP(live);
+		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		const [canonical] = h.states.fromHash(HashGraph.rootHash);
+		canonical!.mutateHeldReplacementAdditionDeletion();
+		const expected = stateFromDRP(canonical);
 		expect(effectiveKeys(h.states.getDRPState(HashGraph.rootHash)!, expected)).toEqual([
 			"ambientAdded",
 			"ambientNested",
 			"ambientPrimitive",
 			"removable",
-			"touched",
 		]);
 		assertExactIncrementalDRPPublication(h, vertex, baselineBytes, expected);
 	});
 
-	it("includes a direct ACL live mutation when a different ACL key creates the next vertex", () => {
+	it("isolates a direct ACL live mutation when a different ACL key creates the next vertex", () => {
 		const h = harness();
 		const baseline = h.states.getACLState(HashGraph.rootHash)!;
 		const baselineBytes = encodedState(baseline);
@@ -333,10 +336,13 @@ describe("Phase 1d(i) corrective ambient public-live capture", () => {
 
 		h.applier.acl.setKey("next-key");
 		const vertex = vertexFor(h, "setKey");
-		const expected = stateFromDRP(h.applier.acl);
+		const canonicalACL = h.states.fromHash(HashGraph.rootHash)[1];
+		canonicalACL.context = { ...canonicalACL.context, caller: "local" };
+		canonicalACL.setKey("next-key");
+		const expected = stateFromDRP(canonicalACL);
 		const delta = effectiveDelta(baseline, expected);
 		const expectedKeys = delta.keys;
-		expect(expectedKeys).toEqual(["_authorizedPeers", "permissionless"]);
+		expect(expectedKeys).toEqual(["_authorizedPeers"]);
 
 		const stored = h.states.getACLState(vertex.hash)!;
 		const publication = h.probe.publications.find(

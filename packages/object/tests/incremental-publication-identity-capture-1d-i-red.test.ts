@@ -96,6 +96,23 @@ class IdentityCaptureFixture implements IDRP {
 	mutateInitialShared(value: number): void {
 		this.shared.value = value;
 	}
+
+	mutateEveryShape(): void {
+		this.nested.child.value = 9;
+		const mapEntries = [...this.map];
+		this.map.clear();
+		for (const entry of mapEntries.reverse()) this.map.set(...entry);
+		const setValues = [...this.set];
+		this.set.clear();
+		for (const value of setValues.reverse()) this.set.add(value);
+		this.date.setUTCFullYear(2030);
+		const first = this.orderedObject.first;
+		delete this.orderedObject.first;
+		this.orderedObject.first = first;
+		this.added = { value: "added" };
+		delete this.removable;
+		this.shared.value = 11;
+	}
 }
 
 interface Harness {
@@ -246,6 +263,16 @@ function rootBytes(h: Harness): Record<SnapshotSide, Uint8Array> {
 	};
 }
 
+function canonicalExpected(
+	h: Harness,
+	mutate: (drp: IdentityCaptureFixture, acl: IACL) => void
+): Readonly<Record<SnapshotSide, DRPState>> {
+	const [drp, acl] = h.states.fromHash(HashGraph.rootHash);
+	expect(drp, "positive control: root reconstruction includes the DRP").toBeDefined();
+	mutate(drp!, acl);
+	return { acl: stateFromDRP(acl), drp: stateFromDRP(drp) };
+}
+
 describe("Phase 1d(i) raw identity and capture correction", () => {
 	it("preserves exact raw public live member identity", () => {
 		const h = harness();
@@ -272,7 +299,7 @@ describe("Phase 1d(i) raw identity and capture correction", () => {
 		expect([...tracked.changedKeys()].sort()).toEqual(["aliasA", "aliasB", "shared"]);
 	});
 
-	it("captures retained raw object, Map, Set, Date, add/delete, reorder-only, and initial aliases at the next local vertex", () => {
+	it("isolates retained raw drift while authored object, Map, Set, Date, add/delete, reorder-only, and aliases publish", () => {
 		const h = harness();
 		const baseline = h.states.getDRPState(HashGraph.rootHash)!;
 		const beforeMap = byKey(baseline).get("map");
@@ -302,14 +329,22 @@ describe("Phase 1d(i) raw identity and capture correction", () => {
 
 		h.applier.drp!.touch();
 		const vertex = vertexFor(h, "touch");
-		const expected = { acl: stateFromDRP(h.rawACL), drp: stateFromDRP(h.rawDRP) };
-		expect(deepEqual(beforeMap, byKey(expected.drp).get("map"))).toBe(true);
-		expect(deepEqual(beforeSet, byKey(expected.drp).get("set"))).toBe(true);
-		expect(equalBytes(beforeSet, byKey(expected.drp).get("set"))).toBe(false);
-		expect(deepEqual(beforeObject, byKey(expected.drp).get("orderedObject"))).toBe(true);
-		expect(equalBytes(beforeObject, byKey(expected.drp).get("orderedObject"))).toBe(false);
-		expect(equalBytes(beforeMap, byKey(expected.drp).get("map"))).toBe(false);
-		expect(effectiveDelta(baseline, expected.drp).keys).toEqual([
+		const expected = canonicalExpected(h, (canonicalDRP) => canonicalDRP.touch());
+		expect(effectiveDelta(baseline, expected.drp).keys).toEqual(["touches"]);
+
+		const authored = harness();
+		const authoredBaseline = authored.states.getDRPState(HashGraph.rootHash)!;
+		const authoredRoots = rootBytes(authored);
+		authored.applier.drp!.mutateEveryShape();
+		const authoredVertex = vertexFor(authored, "mutateEveryShape");
+		const authoredExpected = canonicalExpected(authored, (canonicalDRP) => canonicalDRP.mutateEveryShape());
+		expect(deepEqual(beforeMap, byKey(authoredExpected.drp).get("map"))).toBe(true);
+		expect(deepEqual(beforeSet, byKey(authoredExpected.drp).get("set"))).toBe(true);
+		expect(equalBytes(beforeSet, byKey(authoredExpected.drp).get("set"))).toBe(false);
+		expect(deepEqual(beforeObject, byKey(authoredExpected.drp).get("orderedObject"))).toBe(true);
+		expect(equalBytes(beforeObject, byKey(authoredExpected.drp).get("orderedObject"))).toBe(false);
+		expect(equalBytes(beforeMap, byKey(authoredExpected.drp).get("map"))).toBe(false);
+		expect(effectiveDelta(authoredBaseline, authoredExpected.drp).keys).toEqual([
 			"added",
 			"aliasA",
 			"aliasB",
@@ -320,36 +355,39 @@ describe("Phase 1d(i) raw identity and capture correction", () => {
 			"removable",
 			"set",
 			"shared",
-			"touches",
 		]);
+		assertExactPublication(authored, authoredVertex, authoredRoots, authoredExpected);
 		assertExactPublication(h, vertex, roots, expected);
 	});
 });
 
-describe("Phase 1d(i) cross-side ambient capture", () => {
-	it("publishes an ambient ACL change when a DRP vertex is the authored trigger", () => {
+describe("Phase 1d(i) cross-side ambient isolation", () => {
+	it("does not publish ambient ACL drift when a DRP vertex is the authored trigger", () => {
 		const h = harness();
 		const roots = rootBytes(h);
 		h.rawACL.permissionless = true;
 
 		h.applier.drp!.touch();
 		const vertex = vertexFor(h, "touch");
-		const expected = { acl: stateFromDRP(h.rawACL), drp: stateFromDRP(h.rawDRP) };
-		expect(effectiveDelta(h.states.getACLState(HashGraph.rootHash)!, expected.acl).keys).toEqual(["permissionless"]);
+		const expected = canonicalExpected(h, (canonicalDRP) => canonicalDRP.touch());
+		expect(effectiveDelta(h.states.getACLState(HashGraph.rootHash)!, expected.acl).keys).toEqual([]);
 		expect(effectiveDelta(h.states.getDRPState(HashGraph.rootHash)!, expected.drp).keys).toEqual(["touches"]);
 		assertExactPublication(h, vertex, roots, expected);
 	});
 
-	it("publishes an ambient DRP change when an ACL vertex is the authored trigger", () => {
+	it("does not publish ambient DRP drift when an ACL vertex is the authored trigger", () => {
 		const h = harness();
 		const roots = rootBytes(h);
 		h.rawDRP.nested.child.value = 23;
 
 		h.applier.acl.setKey("next-key");
 		const vertex = vertexFor(h, "setKey");
-		const expected = { acl: stateFromDRP(h.rawACL), drp: stateFromDRP(h.rawDRP) };
+		const expected = canonicalExpected(h, (_canonicalDRP, canonicalACL) => {
+			canonicalACL.context = { ...canonicalACL.context, caller: "local" };
+			canonicalACL.setKey("next-key");
+		});
 		expect(effectiveDelta(h.states.getACLState(HashGraph.rootHash)!, expected.acl).keys).toEqual(["_authorizedPeers"]);
-		expect(effectiveDelta(h.states.getDRPState(HashGraph.rootHash)!, expected.drp).keys).toEqual(["nested"]);
+		expect(effectiveDelta(h.states.getDRPState(HashGraph.rootHash)!, expected.drp).keys).toEqual([]);
 		assertExactPublication(h, vertex, roots, expected);
 	});
 });
@@ -444,7 +482,7 @@ describe("Phase 1d(i) live-capture and remote controls", () => {
 });
 
 describe("Phase 1d(i) ambient rollback lifecycle", () => {
-	it("publishes an ambient pre-image exactly once after rollback then success", () => {
+	it("keeps ambient drift out of a rolled-back attempt and the exactly-once successful retry", () => {
 		const h = harness();
 		const roots = rootBytes(h);
 		h.rawDRP.nested.child.value = 41;
@@ -463,13 +501,16 @@ describe("Phase 1d(i) ambient rollback lifecycle", () => {
 
 		h.applier.drp!.touch();
 		const vertex = vertexFor(h, "touch");
-		const expected = { acl: stateFromDRP(h.rawACL), drp: stateFromDRP(h.rawDRP) };
+		const expected = canonicalExpected(h, (canonicalDRP) => canonicalDRP.touch());
 		assertExactPublication(h, vertex, roots, expected);
-		const successful = h.probe.publications.find(
+		const successfulPublications = h.probe.publications.filter(
 			({ outcome, targetHash }) => outcome === "published" && targetHash === vertex.hash
 		);
+		expect(successfulPublications).toHaveLength(1);
+		const successful = successfulPublications[0];
 		const successfulCopies = h.probe.copied.filter(({ publicationId }) => publicationId === successful?.publicationId);
-		expect(successfulCopies.filter(({ side, key }) => side === "drp" && key === "nested")).toHaveLength(1);
+		expect(successfulCopies.filter(({ side, key }) => side === "drp" && key === "nested")).toEqual([]);
+		expect(successfulCopies.filter(({ side, key }) => side === "drp" && key === "touches")).toHaveLength(1);
 	});
 });
 

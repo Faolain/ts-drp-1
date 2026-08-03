@@ -282,6 +282,10 @@ class CandidateDRP implements IDRP {
 	replace(): void {
 		this.replacement = "new";
 	}
+	mutateNestedAndReplace(): void {
+		this.nested.value = 2;
+		this.replacement = "new";
+	}
 	add(): void {
 		this.added = "new";
 	}
@@ -738,10 +742,9 @@ describe("Phase 1d(i) D.92.3-P1 single linear comparison authority RED", () => {
 
 	it.each([
 		[
-			"ambient nested mutation",
+			"authored nested mutation",
 			(h: ReturnType<typeof applierHarness>): void => {
-				h.drp.nested.value = 2;
-				h.applier.drp?.replace();
+				h.applier.drp?.mutateNestedAndReplace();
 			},
 			"nested",
 		],
