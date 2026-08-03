@@ -375,6 +375,7 @@ function knownSymbolLabel(symbol: ts.Symbol | undefined, checker: ts.TypeChecker
 	const identity = symbolIdentity(canonical, checker);
 	const known = [
 		"packages/object/src/state-materialize.ts:stateFromDRP",
+		"packages/object/src/state-payload.ts:detachReplicaLocalContext",
 		"packages/object/src/state-payload.ts:detachStatePayload",
 		"packages/object/src/state-payload.ts:detachStateSnapshot",
 		"packages/object/src/publication/copy-capability.ts:createPublicationCapability",
@@ -592,7 +593,11 @@ function analyze(sources: GovernedSources): D922cAnalysis {
 			packageReferenceSites: packageReferences,
 			closureReferenceSites: closureReferences,
 			codecReferenceSites: packageReferences.filter(
-				(site) => !site.includes(":cloneDeep#") && !site.includes(":detachState") && !site.includes(":stateFromDRP#")
+				(site) =>
+					!site.includes(":cloneDeep#") &&
+					!site.includes(":detachReplicaLocalContext#") &&
+					!site.includes(":detachState") &&
+					!site.includes(":stateFromDRP#")
 			),
 			externalRuntimeSurface: externalSurface(allSites),
 			unresolvedAcquisitions: closure.unresolved,
