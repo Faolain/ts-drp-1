@@ -16704,6 +16704,56 @@ This remains a GREEN candidate, not an acceptance or closure of P3b. Run fresh
 Grok 4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final
 Opus/xhigh only if both preliminary reviewers accept.
 
+**P3b native-alias GREEN review rejection — accessor lookup receiver.** Fresh
+Grok 4.5/high session `019fc5e6-c8c7-7293-941e-0cea87a65e28`, request
+`86724fc9-f5df-4312-a5e2-f4b81a5ff392`, used only
+`grok-4.5-build` at high reasoning across 12 calls and returned
+`CHANGES_REQUESTED` / `P3B_MAY_CLOSE=no`. It used no helper, fallback,
+subagent, Fable, web or MCP content. The raw-stream SHA-256 is
+`96ecb0ba1485df35befa2c1418cf1e1a00a3f1401af24251d2223c0878159a74`,
+the result SHA-256 is
+`9e62c5565492affc23b5df2c45d79db0413bb31eb70899d23f9cf2e65c3091e2`,
+and the artifact-manifest SHA-256 is
+`221c57c9f5ad866f2d8eca1ed6637a4c9a077e9bd1dd96e27908ab3481411f85`.
+Evidence is under
+`.logs/phase-1d-i-p3b-native-alias-green-grok45-high-review/`.
+
+Fresh exact Kimi 3 session `27ca81f8-09d2-49b1-9798-d69f2d8cd0a7`
+requested `kimi-code/k3`, resolved to managed K3, and ran with thinking/high
+plus both the environment and CLI step controls set to exactly 100. It
+returned `CHANGES_REQUESTED` / `P3B_MAY_CLOSE=no`. The session reached maximum
+`StepBegin`/LLM index 37 and used 36 read-only calls: 28 Shell and eight
+ReadFile. It reached neither cap and used no fallback, helper, subagent, Fable,
+network or peer-review artifact. Its native terminal informally conflated tool
+calls with LLM turns; the controller metadata above is authoritative from the
+wire. The result SHA-256 is
+`f3db058ee4e29baadc16be83d37a28b76da77e211ad23af8681f34eeba27912e`,
+the raw-stream SHA-256 is
+`f45b71cadba2b1bf9bf91cd881613b6c02a4aaf8db88105975f32010e2154c2d`,
+and the integrity-manifest SHA-256 is
+`e277220f873ee064bb545155d6f8f1b56ea0a621502945de61c9491d92979fe9`.
+Evidence is under
+`.logs/phase-1d-i-p3b-native-alias-green-kimi3-high-100-review/`.
+
+Both reviews identified the same causal blocker. An own accessor installed
+through the tracked backing is evaluated by
+`Reflect.get(binary, property, binary)`, so the getter receives the raw backing
+as `this`. A direct getter that calls `this.transfer()`, or a getter that
+returns a captured `transfer.bind(this)`, can therefore detach or resize
+storage shared with a governed Buffer while `dirty=false`. The equivalent
+custom method is correctly blocked, isolating the defect to the lookup-time
+accessor receiver. The reproductions need neither a pre-held raw alias nor an
+out-of-scope closure over raw state.
+
+No Opus review was launched because both authoritative preliminary reviewers
+reject. Production candidate `d8fc4a4` remains committed but rejected, and
+P3b remains open; checkpoint `0632259` records only its candidate evidence.
+Next is a fresh Codex-high tests-only RED that pins the direct getter and
+bound-return getter while preserving bounded benign-accessor, dynamic-
+ownership and faithful real-applier controls. Freeze that RED before a
+distinct production GREEN. This records review evidence only and makes no
+plan-policy amendment.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
