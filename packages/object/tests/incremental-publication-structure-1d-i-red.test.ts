@@ -40,8 +40,6 @@ const RESIDUAL_CLONE_SITES = [
 const RESIDUAL_STATE_CAPTURE_SITES = [
 	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:stateFromDRP#1",
 	"packages/object/src/state-materialize.ts:DRPObjectStateManager.constructor:stateFromDRP#2",
-	"packages/object/src/drp-applier.ts:DRPVertexApplier.computeOperationUntraced:stateFromDRP#1",
-	"packages/object/src/drp-applier.ts:DRPVertexApplier.computeOperationUntraced:stateFromDRP#2",
 ] as const;
 
 interface ClosureAnalysis {
@@ -1044,7 +1042,6 @@ const D922C_COPY_CAPTURE_REFERENCE_SITES = [
 	...d922cSites("packages/object/src/state-materialize.ts", "stateFromDRP", "detachStatePayload"),
 	...d922cSites("packages/object/src/state-payload.ts", "detachStateSnapshot", "detachStatePayload"),
 	...d922cSites("packages/object/src/state-materialize.ts", "DRPObjectStateManager.constructor", "stateFromDRP", 2),
-	...d922cSites("packages/object/src/drp-applier.ts", "DRPVertexApplier.computeOperationUntraced", "stateFromDRP", 2),
 ].sort();
 
 const D922C_PACKAGE_REFERENCE_SITES = [...D922C_CODEC_REFERENCE_SITES, ...D922C_COPY_CAPTURE_REFERENCE_SITES].sort();
@@ -1280,8 +1277,8 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		expect(authority.analyzedSourcePaths.some((sourcePath) => /(?:\/dist\/|node_modules)/.test(sourcePath))).toBe(
 			false
 		);
-		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(116);
-		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(116);
+		expect(D922C_PACKAGE_REFERENCE_SITES).toHaveLength(114);
+		expect(new Set(D922C_PACKAGE_REFERENCE_SITES).size).toBe(114);
 		expect([...authority.packageReferenceSites].sort()).toEqual(D922C_PACKAGE_REFERENCE_SITES);
 		expect([...authority.closureReferenceSites].sort()).toEqual(D922C_CLOSURE_REFERENCE_SITES);
 		expect(authority.externalRuntimeSurface).toEqual([
@@ -1431,7 +1428,7 @@ describe("Phase 1d(i) D.92.2-c' least-authority publication boundary RED", () =>
 		);
 	});
 
-	it("retains the exact 0 / 5 / 13 / 4 detach/capture tuple beside the fifth census", () => {
+	it("retains the exact 0 / 5 / 13 / 2 detach/capture tuple beside the fifth census", () => {
 		const analysis = analyze(realGovernedWorkspaceSources()) as D922cAnalysis;
 		expect(analysis.violations).toEqual([]);
 		expect(analysis.reviewedOperations).toEqual([...REVIEWED_WORKSPACE_OPERATIONS].sort());
