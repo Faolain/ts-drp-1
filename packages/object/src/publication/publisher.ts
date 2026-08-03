@@ -1,6 +1,12 @@
 import { type DRPState, type Hash, type IACL, type IDRP, type IHashGraph, type Vertex } from "@ts-drp/types";
 
 import { type OperationJournal } from "../operation.js";
+import {
+	borrowedStateEntry,
+	defineEnumerableOwnData,
+	materializeEnumerableStateValue,
+	readEnumerableStateValue,
+} from "../state-payload.js";
 import { type DRPStateStore, REPLICA_LOCAL_STATE_KEYS } from "../state-store.js";
 import { type PublicationCapability } from "./copy-capability.js";
 
@@ -67,7 +73,6 @@ interface PublisherOperation<T extends IDRP> {
 	drpVertices: Vertex[];
 	aclVertices: Vertex[];
 	mutatedKeys?: readonly string[];
-	ambientMutatedKeys?: { acl?: readonly string[]; drp?: readonly string[] };
 	rawEgress?: Readonly<{ side: SnapshotSide; candidateKeys: readonly string[] }>;
 }
 
@@ -101,6 +106,7 @@ interface PublicationOverride {
 /** Isolated incremental snapshot publisher. Nested payload values stay opaque. */
 export class PublicationPublisher<T extends IDRP> {
 	private sequence = 0;
+	private canonicalCheckpointState?: { aclState: DRPState; drpState: DRPState };
 
 	/**
 	 * Create a publisher over injected storage and copy authority.
@@ -111,6 +117,26 @@ export class PublicationPublisher<T extends IDRP> {
 		private readonly host: PublisherHost<T>,
 		private readonly capability: PublicationCapability
 	) {}
+
+	/**
+	 * Supply the canonical frontier pair to one synchronous checkpoint attempt.
+	 * The context cannot survive the delegate call or be nested accidentally.
+	 * @param state - Canonical state published for the pending frontier
+	 * @param state.aclState - Canonical ACL state for the pending frontier
+	 * @param state.drpState - Canonical DRP state for the pending frontier
+	 * @param advance - Synchronous checkpoint attempt
+	 */
+	withCanonicalCheckpointState(state: { aclState: DRPState; drpState: DRPState }, advance: () => void): void {
+		if (this.canonicalCheckpointState !== undefined) {
+			throw new Error("Canonical checkpoint state is already active");
+		}
+		this.canonicalCheckpointState = state;
+		try {
+			advance();
+		} finally {
+			this.canonicalCheckpointState = undefined;
+		}
+	}
 
 	/**
 	 * Publish the snapshots produced by an accepted vertex.
@@ -144,15 +170,27 @@ export class PublicationPublisher<T extends IDRP> {
 		const dependencyACLState = dependencyHash === undefined ? undefined : this.host.states.getACLState(dependencyHash);
 		const dependencyDRPState = dependencyHash === undefined ? undefined : this.host.states.getDRPState(dependencyHash);
 		const aclCandidateKeys = new Set([
-			...(operation.ambientMutatedKeys?.acl ?? []),
 			...(isACL ? (operation.mutatedKeys ?? []) : []),
 			...(operation.rawEgress?.side === "acl" ? operation.rawEgress.candidateKeys : []),
 		]);
 		const drpCandidateKeys = new Set([
-			...(operation.ambientMutatedKeys?.drp ?? []),
 			...(isACL ? [] : (operation.mutatedKeys ?? [])),
 			...(operation.rawEgress?.side === "drp" ? operation.rawEgress.candidateKeys : []),
 		]);
+		const retainFallbackEntries =
+			plan.mode === "fallback" &&
+			plan.fallbackReason !== "multi-head-local" &&
+			plan.fallbackReason !== "multi-frontier-checkpoint";
+		const aclRetentionBaselines = retainFallbackEntries
+			? plan.baselineHashes
+					.map((candidateHash) => this.host.states.getACLState(candidateHash))
+					.filter((state): state is DRPState => state !== undefined)
+			: undefined;
+		const drpRetentionBaselines = retainFallbackEntries
+			? plan.baselineHashes
+					.map((candidateHash) => this.host.states.getDRPState(candidateHash))
+					.filter((state): state is DRPState => state !== undefined)
+			: undefined;
 		const aclState = this.capturePublishedState(
 			"acl",
 			targetACL,
@@ -163,7 +201,8 @@ export class PublicationPublisher<T extends IDRP> {
 			concurrentOverride && isACL && currentDRP && dependencyACLState
 				? { instance: currentDRP, baseline: dependencyACLState }
 				: undefined,
-			operation.rawEgress?.side === "acl"
+			operation.rawEgress?.side === "acl",
+			aclRetentionBaselines
 		);
 		const drpState = this.capturePublishedState(
 			"drp",
@@ -175,7 +214,8 @@ export class PublicationPublisher<T extends IDRP> {
 			concurrentOverride && !isACL && currentDRP && dependencyDRPState
 				? { instance: currentDRP, baseline: dependencyDRPState }
 				: undefined,
-			operation.rawEgress?.side === "drp"
+			operation.rawEgress?.side === "drp",
+			drpRetentionBaselines
 		);
 		this.installState("acl", hash, aclState, journal);
 		this.installState("drp", hash, drpState, journal);
@@ -192,6 +232,7 @@ export class PublicationPublisher<T extends IDRP> {
 		force = false,
 		publicationAttempts: PublicationRecord[] = []
 	): void {
+		const canonicalState = this.canonicalCheckpointState;
 		const { checkpoints, hashGraph } = this.host;
 		const latest = checkpoints[checkpoints.length - 1];
 		if (!force && hashGraph.vertices.size - latest.vertexCount < this.host.checkpointSuffixSize) return;
@@ -216,10 +257,26 @@ export class PublicationPublisher<T extends IDRP> {
 		const checkpointState =
 			plan.mode === "incremental" && frontierACLState !== undefined && frontierDRPState !== undefined
 				? { aclState: frontierACLState, drpState: frontierDRPState }
-				: {
-						aclState: this.capturePublishedState("acl", this.host.acl, undefined, publication, false),
-						drpState: this.capturePublishedState("drp", this.host.drp, undefined, publication, false),
-					};
+				: canonicalState === undefined
+					? ((): never => {
+							throw new Error("A multi-frontier checkpoint requires canonical frontier state");
+						})()
+					: {
+							aclState: this.capturePublishedState(
+								"acl",
+								this.materializeCanonicalCheckpointSource(canonicalState.aclState),
+								undefined,
+								publication,
+								false
+							),
+							drpState: this.capturePublishedState(
+								"drp",
+								this.materializeCanonicalCheckpointSource(canonicalState.drpState),
+								undefined,
+								publication,
+								false
+							),
+						};
 		const checkpoint: LinearizationCheckpoint = {
 			frontier,
 			origin: [...frontier].sort()[0],
@@ -233,6 +290,15 @@ export class PublicationPublisher<T extends IDRP> {
 		});
 		if (checkpoints.length > MAX_CHECKPOINTS) this.removeOldCheckpoint(journal);
 		this.pruneSnapshots(journal);
+	}
+
+	private materializeCanonicalCheckpointSource(state: DRPState): IDRP {
+		for (const entry of state.state) {
+			if (typeof entry.key !== "string") throw new TypeError("DRP state key must be a primitive string");
+		}
+		const source = Object.create(null) as IDRP;
+		for (const entry of state.state) defineEnumerableOwnData(source, entry.key, entry.value);
+		return source;
 	}
 
 	/**
@@ -329,6 +395,7 @@ export class PublicationPublisher<T extends IDRP> {
 	 * @param candidateKeys - Keys eligible for equality comparison
 	 * @param override - Concurrent-tail override source
 	 * @param rawEgress - Whether candidacy widened to every governed key
+	 * @param retentionBaselines - Additional owned snapshots eligible for entry retention
 	 * @returns Independently owned published snapshot
 	 */
 	capturePublishedState(
@@ -339,7 +406,8 @@ export class PublicationPublisher<T extends IDRP> {
 		incremental: boolean,
 		candidateKeys?: ReadonlySet<string>,
 		override?: PublicationOverride,
-		rawEgress = false
+		rawEgress = false,
+		retentionBaselines?: readonly DRPState[]
 	): DRPState {
 		if (rawEgress && incremental && candidateKeys === undefined) {
 			throw new Error("Raw-egress publication requires an explicit candidate keyset");
@@ -347,8 +415,17 @@ export class PublicationPublisher<T extends IDRP> {
 		const baselineByKey = new Map(baseline?.state.map((entry) => [entry.key, entry]) ?? []);
 		const targetKeys = new Set<string>();
 		const values = new Map<string, unknown>();
-		this.collectValues(instance, targetKeys, values);
-		if (override) this.applyOverride(side, publication, override, targetKeys, values);
+		const borrowedEntries = new Map<string, DRPState["state"][number]>();
+		this.collectValues(instance, targetKeys, values, borrowedEntries, rawEgress && incremental);
+		if (override) this.applyOverride(side, publication, override, targetKeys, values, borrowedEntries);
+		const fallbackRetention = this.selectFallbackRetention(
+			side,
+			publication,
+			targetKeys,
+			values,
+			borrowedEntries,
+			retentionBaselines
+		);
 		const entries: DRPState["state"] = [];
 		const changed = publication.changed[side] as string[];
 		if (rawEgress && incremental) {
@@ -388,6 +465,15 @@ export class PublicationPublisher<T extends IDRP> {
 					entries.push(ownedEntry);
 					continue;
 				}
+				const borrowedEntry = borrowedEntries.get(key);
+				if (
+					borrowedEntry !== undefined &&
+					Object.is(values.get(key), borrowedEntry.value) &&
+					(incremental || retentionBaselines !== undefined)
+				) {
+					entries.push(borrowedEntry);
+					continue;
+				}
 				changed.push(key);
 				entries.push(
 					this.capability.createEntry(
@@ -410,6 +496,11 @@ export class PublicationPublisher<T extends IDRP> {
 		if (instance || override) {
 			for (const key of targetKeys) {
 				const value = values.get(key);
+				const retainedEntry = fallbackRetention.get(key);
+				if (retainedEntry !== undefined) {
+					entries.push(retainedEntry);
+					continue;
+				}
 				const ownedEntry = baselineByKey.get(key);
 				if (
 					incremental &&
@@ -424,6 +515,15 @@ export class PublicationPublisher<T extends IDRP> {
 						}))
 				) {
 					entries.push(ownedEntry);
+					continue;
+				}
+				const borrowedEntry = borrowedEntries.get(key);
+				if (
+					borrowedEntry !== undefined &&
+					Object.is(value, borrowedEntry.value) &&
+					(incremental || retentionBaselines !== undefined)
+				) {
+					entries.push(borrowedEntry);
 					continue;
 				}
 				changed.push(key);
@@ -449,12 +549,86 @@ export class PublicationPublisher<T extends IDRP> {
 		return this.capability.createSnapshot(entries);
 	}
 
-	private collectValues(instance: IDRP | undefined, targetKeys: Set<string>, values: Map<string, unknown>): void {
+	private selectFallbackRetention(
+		side: SnapshotSide,
+		publication: PublicationRecord,
+		targetKeys: ReadonlySet<string>,
+		values: ReadonlyMap<string, unknown>,
+		borrowedEntries: ReadonlyMap<string, DRPState["state"][number]>,
+		baselines: readonly DRPState[] | undefined
+	): Map<string, DRPState["state"][number]> {
+		const retained = new Map<string, DRPState["state"][number]>();
+		if (baselines === undefined || baselines.length === 0) return retained;
+
+		const candidatesByKey = new Map<string, DRPState["state"]>();
+		for (const baseline of baselines) {
+			for (const entry of baseline.state) {
+				const candidates = candidatesByKey.get(entry.key);
+				if (candidates === undefined) candidatesByKey.set(entry.key, [entry]);
+				else candidates.push(entry);
+			}
+		}
+
+		for (const key of targetKeys) {
+			const candidates = candidatesByKey.get(key);
+			if (candidates === undefined) continue;
+			const borrowed = borrowedEntries.get(key);
+			if (borrowed !== undefined && Object.is(values.get(key), borrowed.value)) {
+				// The current identity proves the deferred cell remained unmaterialized, so
+				// replay neither observed nor replaced this key. A semantic change between
+				// the replay source and every frontier state would require such an access;
+				// publication-only copies may change identity but preserve value. Therefore
+				// unanimous frontier identity is a safe no-read retention proof.
+				const exactEntry = candidates.find(
+					(candidate) => candidate === borrowed || Object.is(candidate.value, borrowed.value)
+				);
+				if (exactEntry !== undefined) {
+					retained.set(key, exactEntry);
+					continue;
+				}
+				const consensus = candidates[0];
+				if (
+					consensus !== undefined &&
+					candidates.every((candidate) => candidate === consensus || Object.is(candidate.value, consensus.value))
+				) {
+					retained.set(key, consensus);
+					continue;
+				}
+			}
+			for (const candidate of candidates) {
+				if (
+					this.capability.equal(candidate.value, values.get(key), {
+						publicationId: publication.publicationId,
+						phase: "publisher-capture",
+						side,
+						key,
+					})
+				) {
+					retained.set(key, candidate);
+					break;
+				}
+			}
+		}
+		return retained;
+	}
+
+	private collectValues(
+		instance: IDRP | undefined,
+		targetKeys: Set<string>,
+		values: Map<string, unknown>,
+		borrowedEntries: Map<string, DRPState["state"][number]>,
+		materializeBorrowed = false
+	): void {
 		if (!instance) return;
 		for (const key of Object.keys(instance)) {
-			if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof instance[key] === "function") continue;
+			const value = materializeBorrowed
+				? materializeEnumerableStateValue(instance, key)
+				: readEnumerableStateValue(instance, key);
+			if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof value === "function") continue;
 			targetKeys.add(key);
-			values.set(key, instance[key]);
+			values.set(key, value);
+			const borrowed = borrowedStateEntry(instance, key) as DRPState["state"][number] | undefined;
+			if (borrowed?.key === key) borrowedEntries.set(key, borrowed);
 		}
 	}
 
@@ -463,17 +637,23 @@ export class PublicationPublisher<T extends IDRP> {
 		publication: PublicationRecord,
 		override: PublicationOverride,
 		targetKeys: Set<string>,
-		values: Map<string, unknown>
+		values: Map<string, unknown>,
+		borrowedEntries: Map<string, DRPState["state"][number]>
 	): void {
 		const overrideKeys = new Set<string>();
-		const baseline = new Map(override.baseline.state.map((entry) => [entry.key, entry.value]));
+		const baselineEntries = new Map(override.baseline.state.map((entry) => [entry.key, entry]));
 		for (const key of Object.keys(override.instance)) {
-			if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof override.instance[key] === "function") continue;
+			const value = readEnumerableStateValue(override.instance, key);
+			if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof value === "function") continue;
 			overrideKeys.add(key);
-			const value = override.instance[key];
+			const baselineEntry = baselineEntries.get(key);
+			const borrowed = borrowedStateEntry(override.instance, key) as DRPState["state"][number] | undefined;
+			if (borrowed !== undefined && (borrowed === baselineEntry || Object.is(borrowed.value, baselineEntry?.value))) {
+				continue;
+			}
 			if (
-				!baseline.has(key) ||
-				!this.capability.equal(baseline.get(key), value, {
+				baselineEntry === undefined ||
+				!this.capability.equal(baselineEntry.value, value, {
 					publicationId: publication.publicationId,
 					phase: "publisher-override",
 					side,
@@ -482,12 +662,14 @@ export class PublicationPublisher<T extends IDRP> {
 			) {
 				targetKeys.add(key);
 				values.set(key, value);
+				borrowedEntries.delete(key);
 			}
 		}
-		for (const key of baseline.keys()) {
+		for (const key of baselineEntries.keys()) {
 			if (!overrideKeys.has(key)) {
 				targetKeys.delete(key);
 				values.delete(key);
+				borrowedEntries.delete(key);
 			}
 		}
 	}

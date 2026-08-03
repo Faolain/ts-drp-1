@@ -2,7 +2,19 @@ import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { type DrpRuntimeContext, DRPState, DRPStateEntry, type Hash, type IACL, type IDRP } from "@ts-drp/types";
 
 import { HashGraph } from "./hashgraph/index.js";
-import { detachReplicaLocalContext, detachStatePayload, validateStateSnapshotForApplication } from "./state-payload.js";
+import {
+	borrowedStateEntry,
+	createReplicaLocalContextDetacher,
+	createStatePayloadDetacher,
+	defineDeferredEnumerableState,
+	defineEnumerableOwnData,
+	detachReplicaLocalContext,
+	detachStatePayload,
+	readEnumerableStateValue,
+	readValidatedStateSnapshot,
+	type ValidatedStateSnapshotKeys,
+	validateStateSnapshotKeysForApplication,
+} from "./state-payload.js";
 import { DRPStateStore, REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/object/states");
@@ -84,31 +96,79 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 	}
 
 	/**
+	 * Reconstruct an execution-only overlay from one owned snapshot pair.
+	 * @param hash - Snapshot hash
+	 * @param replayDepth - Replay depth recorded for tracing
+	 * @param drpContext - Replica-local DRP context
+	 * @param aclContext - Replica-local ACL context
+	 * @returns Execution-only DRP and ACL overlays
+	 */
+	fromHashForExecution(
+		hash: Hash,
+		replayDepth = 0,
+		drpContext = this.drpContext,
+		aclContext = this.aclContext
+	): [T | undefined, IACL] {
+		const drpState = this.getDRPState(hash);
+		const aclState = this.getACLState(hash);
+		if (!drpState || !aclState) throw new StateNotFoundError(`State ${hash} not found`);
+		if (isTracingEnabled()) {
+			return metrics.traceFunc(
+				"states.fromHashForExecution",
+				() => this.fromStatesForExecution(drpState, aclState, drpContext, aclContext),
+				(span) => span.setAttribute("drp.replay.depth", replayDepth)
+			)();
+		}
+		return this.fromStatesForExecution(drpState, aclState, drpContext, aclContext);
+	}
+
+	/**
 	 * Reconstruct instances from explicit snapshots.
 	 * @param drpState - DRP snapshot
 	 * @param aclState - ACL snapshot
 	 * @param drpContext - Replica-local DRP context
 	 * @param aclContext - Replica-local ACL context
+	 * @param executionOnly - Whether reconstruction should defer governed value detachment
 	 * @returns Reconstructed DRP and ACL
 	 */
 	fromStates(
 		drpState: DRPState,
 		aclState: DRPState,
 		drpContext = this.drpContext,
+		aclContext = this.aclContext,
+		executionOnly = false
+	): [T | undefined, IACL] {
+		const validatedACLState = validateStateSnapshotKeysForApplication(aclState);
+		const validatedDRPState =
+			this.drpConstructor === undefined ? undefined : validateStateSnapshotKeysForApplication(drpState);
+		const acl = Object.create(this.aclConstructor.prototype);
+		if (aclContext) defineEnumerableOwnData(acl, "context", detachReplicaLocalContext(aclContext));
+		if (executionOnly) this.applyDeferredState(acl, validatedACLState);
+		else this.applyState(acl, readValidatedStateSnapshot(validatedACLState));
+		if (this.drpConstructor === undefined) return [undefined, acl];
+		if (validatedDRPState === undefined) return [undefined, acl];
+		const drp = Object.create(this.drpConstructor.prototype);
+		if (drpContext) defineEnumerableOwnData(drp, "context", detachReplicaLocalContext(drpContext));
+		if (executionOnly) this.applyDeferredState(drp, validatedDRPState);
+		else this.applyState(drp, readValidatedStateSnapshot(validatedDRPState));
+		return [drp, acl];
+	}
+
+	/**
+	 * Reconstruct execution-only COW overlays from explicit snapshots.
+	 * @param drpState - DRP snapshot
+	 * @param aclState - ACL snapshot
+	 * @param drpContext - Replica-local DRP context
+	 * @param aclContext - Replica-local ACL context
+	 * @returns Execution-only DRP and ACL overlays
+	 */
+	fromStatesForExecution(
+		drpState: DRPState,
+		aclState: DRPState,
+		drpContext = this.drpContext,
 		aclContext = this.aclContext
 	): [T | undefined, IACL] {
-		const preparedACLState = validateStateSnapshotForApplication(aclState);
-		const preparedDRPState =
-			this.drpConstructor === undefined ? undefined : validateStateSnapshotForApplication(drpState);
-		const acl = Object.create(this.aclConstructor.prototype);
-		if (aclContext) acl.context = detachReplicaLocalContext(aclContext);
-		this.applyState(acl, preparedACLState);
-		if (this.drpConstructor === undefined) return [undefined, acl];
-		if (preparedDRPState === undefined) return [undefined, acl];
-		const drp = Object.create(this.drpConstructor.prototype);
-		if (drpContext) drp.context = detachReplicaLocalContext(drpContext);
-		this.applyState(drp, preparedDRPState);
-		return [drp, acl];
+		return this.fromStates(drpState, aclState, drpContext, aclContext, true);
 	}
 
 	/**
@@ -119,19 +179,29 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 	fromHashACL(hash: Hash): IACL {
 		const state = this.getACLState(hash);
 		if (!state) throw new StateNotFoundError(`State ${hash} not found`);
-		const preparedState = validateStateSnapshotForApplication(state);
+		const preparedState = readValidatedStateSnapshot(validateStateSnapshotKeysForApplication(state));
 		const acl = Object.create(this.aclConstructor.prototype);
-		if (this.aclContext) acl.context = detachReplicaLocalContext(this.aclContext);
+		if (this.aclContext) defineEnumerableOwnData(acl, "context", detachReplicaLocalContext(this.aclContext));
 		this.applyState(acl, preparedState);
 		return acl;
 	}
 
 	private applyState(instance: T | IACL, state: DRPState): void {
+		const detachedValues = detachStatePayload(state.state.map((entry) => entry.value));
 		for (let index = 0; index < state.state.length; index++) {
 			const entry = state.state[index];
 			if (entry === undefined) throw new TypeError("DRP state entry must be present");
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- rightfully so this is not a problem
-			(instance as any)[entry.key] = detachStatePayload(entry.value);
+			defineEnumerableOwnData(instance, entry.key, detachedValues[index]);
+		}
+	}
+
+	private applyDeferredState(instance: T | IACL, validated: ValidatedStateSnapshotKeys): void {
+		const detach = createStatePayloadDetacher();
+		for (let index = 0; index < validated.entries.length; index++) {
+			const entry = validated.entries[index];
+			const key = validated.keys[index];
+			if (entry === undefined || key === undefined) throw new TypeError("DRP state entry must be present");
+			defineDeferredEnumerableState(instance, key, entry.value, detach, entry);
 		}
 	}
 }
@@ -144,10 +214,39 @@ export class DRPObjectStateManager<T extends IDRP> extends DRPStateStore {
 export function stateFromDRP(drp: IDRP | undefined): DRPState {
 	const state = DRPState.create();
 	if (!drp) return state;
+	const staged: { key: string; value: unknown }[] = [];
 	for (const key of Object.keys(drp)) {
 		if (REPLICA_LOCAL_STATE_KEYS.has(key)) continue;
-		if (typeof drp[key] === "function") continue;
-		state.state.push(DRPStateEntry.create({ key, value: detachStatePayload(drp[key]) }));
+		const value = drp[key];
+		if (typeof value === "function") continue;
+		staged.push({ key, value });
+	}
+	const detachedValues = detachStatePayload(staged.map(({ value }) => value));
+	for (let index = 0; index < staged.length; index++) {
+		const entry = staged[index];
+		if (entry === undefined) throw new TypeError("DRP state entry must be present");
+		state.state.push(DRPStateEntry.create({ key: entry.key, value: detachedValues[index] }));
 	}
 	return state;
+}
+
+/**
+ * Clone one instance as an execution-only deferred overlay.
+ * @param source - Instance whose enumerable state should be borrowed lazily
+ * @returns Execution-only clone with deferred governed values
+ */
+export function cloneEnumerableExecutionInstance<T extends object>(source: T): T {
+	const clone = Object.create(Reflect.getPrototypeOf(source)) as T;
+	const detach = createStatePayloadDetacher();
+	const detachContext = createReplicaLocalContextDetacher();
+	for (const key of Object.keys(source)) {
+		const value = readEnumerableStateValue(source, key);
+		if (typeof value === "function") continue;
+		if (REPLICA_LOCAL_STATE_KEYS.has(key)) {
+			defineEnumerableOwnData(clone, key, detachContext(value));
+			continue;
+		}
+		defineDeferredEnumerableState(clone, key, value, detach, borrowedStateEntry(source, key));
+	}
+	return clone;
 }

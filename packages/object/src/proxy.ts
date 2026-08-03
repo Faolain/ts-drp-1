@@ -5,11 +5,20 @@ import { AdoptionCommitExhaustedError } from "./errors.js";
 import { MAX_ADOPTION_COMMIT_ATTEMPTS, type PostOperation } from "./operation.js";
 import { type Pipeline } from "./pipeline/pipeline.js";
 import { proxyValuesEqual } from "./publication/copy-capability.js";
-import { BinaryStateExpandoError, validateGovernedBinaryState } from "./state-payload.js";
+import {
+	BinaryStateExpandoError,
+	isDeferredEnumerableState,
+	readEnumerableStateValue,
+	registerGovernedStateProxy,
+	unwrapGovernedStateValue,
+	validateGovernedBinaryState,
+} from "./state-payload.js";
 import { REPLICA_LOCAL_STATE_KEYS } from "./state-store.js";
 
 const DATE_GET_TIME = Date.prototype.getTime;
 const OBJECT_PREVENT_EXTENSIONS = Object.preventExtensions;
+const ARRAY_CONSTRUCTOR = Array;
+const ARRAY_IS_ARRAY = Array.isArray;
 const DATE_NATIVE_MEMBERS = new Map<PropertyKey, unknown>();
 for (const property of Reflect.ownKeys(Date.prototype)) {
 	if (property === "constructor") continue;
@@ -408,7 +417,7 @@ export function trackMutations<T extends object>(
 
 	const unwrap = <V>(value: V): V => {
 		if (!isReference(value)) return value;
-		return (rawValues.get(value) as V | undefined) ?? value;
+		return (rawValues.get(value) as V | undefined) ?? unwrapGovernedStateValue(value);
 	};
 
 	const isGovernedProxy = (value: unknown): value is object => {
@@ -632,10 +641,10 @@ export function trackMutations<T extends object>(
 	const governedRoots: Array<readonly [string, unknown]> = [];
 	for (const key of Object.keys(target)) {
 		if (REPLICA_LOCAL_STATE_KEYS.has(key)) continue;
-		governedRoots.push([key, (target as Record<string, unknown>)[key]]);
+		governedRoots.push([key, readEnumerableStateValue(target, key)]);
 	}
-	initializeGraphs(governedRoots.map(([, value]) => value));
 	for (const [key, value] of governedRoots) {
+		if (!isDeferredEnumerableState(target, key)) initializeGraph(value);
 		initialGovernedKeys.add(key);
 		addDirectOwner(value, key);
 	}
@@ -1472,6 +1481,11 @@ export function trackMutations<T extends object>(
 				get(object, property, receiver): unknown {
 					const nestedIgnored = ignoresProperty(object, property, ignored);
 					const replicaLocalOnly = isReplicaLocalOnly(object, nestedIgnored);
+					const deferred =
+						object === (target as object) &&
+						typeof property === "string" &&
+						isDeferredEnumerableState(object, property);
+					const borrowed = deferred ? readEnumerableStateValue(object, property) : undefined;
 					const descriptor = Reflect.getOwnPropertyDescriptor(object, property);
 					if (descriptor && !descriptor.configurable) {
 						if ("value" in descriptor && !descriptor.writable) {
@@ -1483,7 +1497,17 @@ export function trackMutations<T extends object>(
 							return undefined;
 						}
 					}
-					return wrap(Reflect.get(object, property, receiver), nestedIgnored);
+					const result = Reflect.get(object, property, receiver);
+					if (property === "constructor" && ARRAY_IS_ARRAY(object) && result === ARRAY_CONSTRUCTOR) return result;
+					if (deferred) {
+						for (const [ownerKey, initialValue] of governedRoots) {
+							if (!Object.is(initialValue, borrowed)) continue;
+							removeDirectOwner(initialValue, ownerKey);
+							addDirectOwner(result, ownerKey);
+						}
+						initializeGraph(result);
+					}
+					return wrap(result, nestedIgnored);
 				},
 				set(object, property, nextValue, receiver): boolean {
 					const nestedIgnored = ignoresProperty(object, property, ignored);
@@ -1492,11 +1516,15 @@ export function trackMutations<T extends object>(
 					const prepared = prepareGovernedWrite(rawValue);
 					if (prepared === undefined) return false;
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
+					const reachabilityDescriptor =
+						object === (target as object) && typeof property === "string" && isDeferredEnumerableState(object, property)
+							? { ...previousDescriptor, value: readEnumerableStateValue(object, property) }
+							: previousDescriptor;
 					const resolvedDescriptor = previousDescriptor ?? inheritedPropertyDescriptor(object, property);
 					const accessorReceiver = resolvedDescriptor !== undefined && !("value" in resolvedDescriptor);
 					const assigned = Reflect.set(object, property, rawValue, accessorReceiver ? receiver : object);
 					if (assigned) {
-						finalizePreparedWrite(prepared, object, property, previousDescriptor, true);
+						finalizePreparedWrite(prepared, object, property, reachabilityDescriptor, true);
 					}
 					return assigned;
 				},
@@ -1504,10 +1532,14 @@ export function trackMutations<T extends object>(
 					const nestedIgnored = ignoresProperty(object, property, ignored);
 					if (isReplicaLocalOnly(object, nestedIgnored)) return Reflect.deleteProperty(object, property);
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
+					const reachabilityDescriptor =
+						object === (target as object) && typeof property === "string" && isDeferredEnumerableState(object, property)
+							? { ...previousDescriptor, value: readEnumerableStateValue(object, property) }
+							: previousDescriptor;
 					const deleted = Reflect.deleteProperty(object, property);
 					if (deleted && previousDescriptor !== undefined) {
 						try {
-							updateReachability(object, property, dataDescriptorValue(previousDescriptor), undefined);
+							updateReachability(object, property, dataDescriptorValue(reachabilityDescriptor), undefined);
 							markChanged(object, property);
 						} catch (error) {
 							markChanged(object, property);
@@ -1525,9 +1557,13 @@ export function trackMutations<T extends object>(
 					const prepared = prepareGovernedWrite("value" in rawDescriptor ? rawDescriptor.value : undefined);
 					if (prepared === undefined) return false;
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(object, property);
+					const reachabilityDescriptor =
+						object === (target as object) && typeof property === "string" && isDeferredEnumerableState(object, property)
+							? { ...previousDescriptor, value: readEnumerableStateValue(object, property) }
+							: previousDescriptor;
 					const defined = Reflect.defineProperty(object, property, rawDescriptor);
 					if (defined) {
-						finalizePreparedWrite(prepared, object, property, previousDescriptor, false);
+						finalizePreparedWrite(prepared, object, property, reachabilityDescriptor, false);
 					}
 					return defined;
 				},
@@ -1536,6 +1572,7 @@ export function trackMutations<T extends object>(
 
 		proxyCache.set(objectValue, proxy);
 		rawValues.set(proxy, objectValue);
+		if (!ignored) registerGovernedStateProxy(proxy, objectValue);
 		return proxy as V;
 	};
 

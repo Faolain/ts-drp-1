@@ -50,8 +50,19 @@ import {
 	type PublicationRecord,
 	type SnapshotSide,
 } from "./publication/publisher.js";
-import { DRPObjectStateManager, REPLICA_LOCAL_STATE_KEYS, stateFromDRP } from "./state-materialize.js";
-import { detachReplicaLocalContext, detachStatePayload } from "./state-payload.js";
+import {
+	cloneEnumerableExecutionInstance,
+	DRPObjectStateManager,
+	REPLICA_LOCAL_STATE_KEYS,
+} from "./state-materialize.js";
+import {
+	borrowedStateEntry,
+	createStatePayloadDetacher,
+	defineEnumerableOwnData,
+	detachReplicaLocalContext,
+	detachStatePayload,
+	readEnumerableStateValue,
+} from "./state-payload.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
@@ -251,36 +262,120 @@ function recordPropertyMutation<T extends object>(
 	});
 }
 
-function replaceEnumerableState<T extends object>(target: T, source: T, journal: OperationJournal): void {
-	const targetRecord = target as Record<string, unknown>;
-	const sourceRecord = source as Record<string, unknown>;
-	for (const key of Object.keys(target)) {
-		if (typeof targetRecord[key] !== "function" && !Object.hasOwn(source, key)) {
-			const previous = Reflect.getOwnPropertyDescriptor(target, key);
+function applicationSetter(prototype: object | undefined, key: string): ((value: unknown) => void) | undefined {
+	if (prototype === undefined || key === "__proto__") return undefined;
+	let current: object | null = prototype;
+	while (current !== null && current !== Object.prototype) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+		if (descriptor !== undefined) return "set" in descriptor ? descriptor.set : undefined;
+		current = Reflect.getPrototypeOf(current) as object | null;
+	}
+	return undefined;
+}
+
+function cloneEnumerableInstance(target: object): Map<PropertyKey, PropertyDescriptor> {
+	const snapshot = new Map<PropertyKey, PropertyDescriptor>();
+	for (const key of Reflect.ownKeys(target)) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+		if (descriptor === undefined) continue;
+		if ("value" in descriptor && typeof descriptor.value !== "function") {
+			descriptor.value = REPLICA_LOCAL_STATE_KEYS.has(key as string)
+				? detachReplicaLocalContext(descriptor.value)
+				: detachStatePayload(descriptor.value);
+		}
+		snapshot.set(key, descriptor);
+	}
+	return snapshot;
+}
+
+function recordSetterRollback(target: object, journal: OperationJournal): void {
+	const before = cloneEnumerableInstance(target);
+	journal.record(() => {
+		for (const key of Reflect.ownKeys(target)) {
+			if (!before.has(key) && !Reflect.deleteProperty(target, key)) {
+				throw new TypeError(`Cannot roll back added state property ${String(key)}`);
+			}
+		}
+		for (const [key, descriptor] of before) {
+			if (!Reflect.defineProperty(target, key, descriptor)) {
+				throw new TypeError(`Cannot roll back state property ${String(key)}`);
+			}
+		}
+	});
+}
+
+function replaceEnumerableState<T extends object>(
+	target: T,
+	source: T,
+	keys: ReadonlySet<string>,
+	prototype: object | undefined,
+	journal: OperationJournal
+): void {
+	const orderedSourceKeys = Object.keys(source);
+	const sourceKeys = new Set(orderedSourceKeys);
+	const detachBorrowed = createStatePayloadDetacher();
+	for (const key of keys) {
+		if (sourceKeys.has(key)) continue;
+		const previous = Reflect.getOwnPropertyDescriptor(target, key);
+		if (previous !== undefined) {
 			if (!Reflect.deleteProperty(target, key)) throw new TypeError(`Cannot delete state property ${key}`);
 			recordPropertyMutation(target, key, previous, journal);
 		}
 	}
-	for (const key of Object.keys(source)) {
-		if (typeof sourceRecord[key] !== "function") {
-			const previous = Reflect.getOwnPropertyDescriptor(target, key);
-			if (!Reflect.set(target, key, sourceRecord[key])) throw new TypeError(`Cannot assign state property ${key}`);
-			recordPropertyMutation(target, key, previous, journal);
+
+	for (const key of orderedSourceKeys) {
+		if (!keys.has(key)) continue;
+		let value = readEnumerableStateValue(source, key);
+		if (typeof value === "function") continue;
+		const setter = applicationSetter(prototype, key);
+		if (setter !== undefined) {
+			recordSetterRollback(target, journal);
+			Reflect.apply(setter, target, [value]);
+			continue;
 		}
+		if (borrowedStateEntry(source, key) !== undefined) value = detachBorrowed(value);
+		const previous = Reflect.getOwnPropertyDescriptor(target, key);
+		defineEnumerableOwnData(target, key, value);
+		recordPropertyMutation(target, key, previous, journal);
 	}
 }
 
-function cloneEnumerableInstance<T extends object>(source: T): T {
-	const clone = Object.create(Reflect.getPrototypeOf(source)) as T;
-	const sourceRecord = source as Record<string, unknown>;
-	const cloneRecord = clone as Record<string, unknown>;
-	for (const key of Object.keys(source)) {
-		if (typeof sourceRecord[key] === "function") continue;
-		cloneRecord[key] = REPLICA_LOCAL_STATE_KEYS.has(key)
-			? detachReplicaLocalContext(sourceRecord[key])
-			: detachStatePayload(sourceRecord[key]);
+function reconcileEnumerableStateOrder<T extends object>(target: T, source: T, journal: OperationJournal): void {
+	const desired = Object.keys(source).filter(
+		(key) => !REPLICA_LOCAL_STATE_KEYS.has(key) && Reflect.getOwnPropertyDescriptor(target, key)?.enumerable === true
+	);
+	const desiredKeys = new Set(desired);
+	const current = Object.keys(target).filter((key) => !REPLICA_LOCAL_STATE_KEYS.has(key) && desiredKeys.has(key));
+	if (current.length === desired.length && current.every((key, index) => key === desired[index])) return;
+
+	const descriptors = desired.map((key) => {
+		const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+		if (descriptor === undefined || !descriptor.configurable)
+			throw new TypeError(`Cannot reorder state property ${key}`);
+		return { descriptor, key };
+	});
+	for (const { key } of descriptors) {
+		const previous = Reflect.getOwnPropertyDescriptor(target, key);
+		if (previous === undefined || !Reflect.deleteProperty(target, key)) {
+			throw new TypeError(`Cannot reorder state property ${key}`);
+		}
+		recordPropertyMutation(target, key, previous, journal);
 	}
-	return clone;
+	for (const { descriptor, key } of descriptors) {
+		const previous = Reflect.getOwnPropertyDescriptor(target, key);
+		if (!Reflect.defineProperty(target, key, descriptor)) throw new TypeError(`Cannot reorder state property ${key}`);
+		recordPropertyMutation(target, key, previous, journal);
+	}
+}
+
+function canonicalReplacementKeys(previous: DRPState, next: DRPState): Set<string> {
+	const previousEntries = new Map(previous.state.map((entry) => [entry.key, entry]));
+	const nextEntries = new Map(next.state.map((entry) => [entry.key, entry]));
+	const keys = new Set<string>();
+	for (const key of new Set([...previousEntries.keys(), ...nextEntries.keys()])) {
+		if (previousEntries.get(key) !== nextEntries.get(key)) keys.add(key);
+	}
+	return keys;
 }
 
 function checkpointSuffixSizeFromEnvironment(): number {
@@ -321,6 +416,8 @@ export class DRPVertexApplier<T extends IDRP> {
 
 	private _proxyDRP?: DRPProxy<T>;
 	private _proxyACL: DRPProxy<IACL>;
+	private readonly drpApplicationPrototype?: object;
+	private readonly aclApplicationPrototype: object;
 
 	private applyVertexPipeline: Pipeline<BaseOperation, PostOperation<T>>;
 	private readonly finalityStore: FinalityStore;
@@ -333,33 +430,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	private isDrainingNotifications = false;
 	private readonly publicationPublisher: PublicationPublisher<T>;
 	private readonly publicationCapability: PublicationCapability;
-
-	private candidateStateKeys(
-		baseline: DRPState,
-		target: DRPState,
-		side: "acl" | "drp",
-		publicationId: string
-	): string[] {
-		const baselineByKey = new Map(baseline.state.map((entry) => [entry.key, entry.value]));
-		const targetByKey = new Map(target.state.map((entry) => [entry.key, entry.value]));
-		const candidates: string[] = [];
-		for (const key of new Set([...baselineByKey.keys(), ...targetByKey.keys()])) {
-			if (
-				baselineByKey.has(key) &&
-				targetByKey.has(key) &&
-				this.publicationCapability.equal(baselineByKey.get(key), targetByKey.get(key), {
-					publicationId,
-					phase: "applier-candidacy",
-					side,
-					key,
-				})
-			) {
-				continue;
-			}
-			candidates.push(key);
-		}
-		return candidates.sort();
-	}
+	private liveCanonicalState: { aclState: DRPState; drpState: DRPState };
 
 	/**
 	 * Creates a new DRPVertexApplier
@@ -387,11 +458,14 @@ export class DRPVertexApplier<T extends IDRP> {
 	}: DRPVertexApplierBase<T>) {
 		this.hashGraph = hashGraph;
 		this.states = states;
+		this.drpApplicationPrototype = drp ? (Reflect.getPrototypeOf(drp) as object) : undefined;
+		this.aclApplicationPrototype = Reflect.getPrototypeOf(acl) as object;
 		this.finalityStore = finalityStore;
 		this._notify = notify;
 		this.log = new Logger("drp::object::operation", logConfig);
 		const [drpState, aclState] = [states.getDRPState(HashGraph.rootHash), states.getACLState(HashGraph.rootHash)];
 		if (!drpState || !aclState) throw new Error("Root state snapshots are missing");
+		this.liveCanonicalState = { aclState, drpState };
 		this.checkpoints = [
 			{
 				frontier: [HashGraph.rootHash],
@@ -712,8 +786,8 @@ export class DRPVertexApplier<T extends IDRP> {
 		hint: AdoptionHint<T>
 	): Promise<PreparedAdoption<T>> {
 		if (hint.canonicalACL) {
-			const acl = cloneEnumerableInstance(hint.canonicalACL);
-			const drp = hint.canonicalDRP ? cloneEnumerableInstance(hint.canonicalDRP) : undefined;
+			const acl = cloneEnumerableExecutionInstance(hint.canonicalACL);
+			const drp = hint.canonicalDRP ? cloneEnumerableExecutionInstance(hint.canonicalDRP) : undefined;
 			const target = operation.isACL ? acl : drp;
 			if (target) await applyVertex(target, operation.vertex);
 			return {
@@ -732,7 +806,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		if (!operation.currentDRP || !hint.tail) {
 			throw new ApplyInvariantError([new Error("Prepared operation state is missing")], "Adoption hint is invalid");
 		}
-		const adopted = cloneEnumerableInstance(operation.currentDRP);
+		const adopted = cloneEnumerableExecutionInstance(operation.currentDRP);
 		await (operation.isACL ? applyDeterministicReplayVertices(adopted, hint.tail) : applyVertices(adopted, hint.tail));
 		const nextHint = this.createTailAdoptionHint(
 			operation.vertex,
@@ -776,7 +850,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		if (incremental) return incremental;
 
 		const [drpVertices, aclVertices] = splitOperation(replay.linearizedVertices);
-		const [drp, acl] = this.states.fromStates(
+		const [drp, acl] = this.states.fromStatesForExecution(
 			replay.state.drpState,
 			replay.state.aclState,
 			this.drp?.context,
@@ -820,7 +894,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			return undefined;
 		}
 
-		const adopted = cloneEnumerableInstance(operation.currentDRP);
+		const adopted = cloneEnumerableExecutionInstance(operation.currentDRP);
 		const tail = sameTypeVertices.slice(pendingIndex + 1);
 		await (operation.isACL ? applyDeterministicReplayVertices(adopted, tail) : applyVertices(adopted, tail));
 		const nextHint = this.createTailAdoptionHint(vertex, expectedFrontier, tail, replay.requiresConflictResolution);
@@ -921,12 +995,35 @@ export class DRPVertexApplier<T extends IDRP> {
 		const publicationAttempts: PublicationRecord[] = [];
 		try {
 			this.assignState(commitOperation, adoption, publicationAttempts, publicationFrontier);
+			const nextACLState = this.states.getACLState(operation.vertex.hash);
+			const nextDRPState = this.states.getDRPState(operation.vertex.hash);
+			if (!nextACLState || !nextDRPState) {
+				throw new Error("Published canonical state is missing");
+			}
+			const nextCanonicalState = { aclState: nextACLState, drpState: nextDRPState };
+			const aclReplacementKeys = canonicalReplacementKeys(
+				this.liveCanonicalState.aclState,
+				nextCanonicalState.aclState
+			);
+			const drpReplacementKeys = canonicalReplacementKeys(
+				this.liveCanonicalState.drpState,
+				nextCanonicalState.drpState
+			);
 			this.initializeFinalityStore(commitOperation);
 			this.addVertexToHashGraph(commitOperation);
-			if (adoption.acl) replaceEnumerableState(this.acl, adoption.acl, journal);
-			if (adoption.drp && this.drp) replaceEnumerableState(this.drp, adoption.drp, journal);
-			this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint, publicationAttempts);
+			if (adoption.acl) {
+				replaceEnumerableState(this.acl, adoption.acl, aclReplacementKeys, this.aclApplicationPrototype, journal);
+				reconcileEnumerableStateOrder(this.acl, adoption.acl, journal);
+			}
+			if (adoption.drp && this.drp) {
+				replaceEnumerableState(this.drp, adoption.drp, drpReplacementKeys, this.drpApplicationPrototype, journal);
+				reconcileEnumerableStateOrder(this.drp, adoption.drp, journal);
+			}
+			this.publicationPublisher.withCanonicalCheckpointState(nextCanonicalState, () => {
+				this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint, publicationAttempts);
+			});
 			journal.commit();
+			this.liveCanonicalState = nextCanonicalState;
 			this.publicationPublisher.reportPublications(publicationAttempts, "published");
 			this.knownInvalidVertexHashes.delete(operation.vertex.hash);
 			this.enqueueNotification(operation.isLocal ? "callFn" : "merge", [operation.vertex]);
@@ -975,12 +1072,6 @@ export class DRPVertexApplier<T extends IDRP> {
 
 	private getLCA(operation: BaseOperation): HandlerReturn<PostLCAOperation> {
 		const { vertex } = operation;
-		if (operation.isLocal) {
-			return {
-				stop: false,
-				result: { ...operation, lcaResult: { lca: HashGraph.rootHash, linearizedVertices: [] } },
-			};
-		}
 		if (
 			vertex.dependencies.length === 1 &&
 			this.states.getDRPState(vertex.dependencies[0]) !== undefined &&
@@ -1034,28 +1125,23 @@ export class DRPVertexApplier<T extends IDRP> {
 			drpVertices,
 			aclVertices,
 			isACL,
-			isLocal,
 			replayState,
 		} = operation;
 		let pair: [T | undefined, IACL];
-		let ambientMutatedKeys: Operation<T>["ambientMutatedKeys"];
-		if (isLocal) {
-			const capturedDRPState = stateFromDRP(this.drp);
-			const capturedACLState = stateFromDRP(this.acl);
-			const baselineHash = operation.vertex.dependencies.length === 1 ? operation.vertex.dependencies[0] : undefined;
-			const baselineDRPState = baselineHash === undefined ? undefined : this.states.getDRPState(baselineHash);
-			const baselineACLState = baselineHash === undefined ? undefined : this.states.getACLState(baselineHash);
-			if (baselineDRPState && baselineACLState) {
-				ambientMutatedKeys = {
-					drp: this.candidateStateKeys(baselineDRPState, capturedDRPState, "drp", operation.vertex.hash),
-					acl: this.candidateStateKeys(baselineACLState, capturedACLState, "acl", operation.vertex.hash),
-				};
-			}
-			pair = this.states.fromStates(capturedDRPState, capturedACLState, this.drp?.context, this.acl.context);
-		} else if (replayState) {
-			pair = this.states.fromStates(replayState.drpState, replayState.aclState, this.drp?.context, this.acl.context);
+		if (replayState) {
+			pair = this.states.fromStatesForExecution(
+				replayState.drpState,
+				replayState.aclState,
+				this.drp?.context,
+				this.acl.context
+			);
 		} else {
-			pair = this.states.fromHash(lca, drpVertices.length + aclVertices.length, this.drp?.context, this.acl.context);
+			pair = this.states.fromHashForExecution(
+				lca,
+				drpVertices.length + aclVertices.length,
+				this.drp?.context,
+				this.acl.context
+			);
 		}
 		const [drp, acl] = pair;
 		applyDeterministicReplayVertices(acl, aclVertices);
@@ -1063,7 +1149,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		if (!drp) {
 			return {
 				stop: false,
-				result: { ...operation, acl, ambientMutatedKeys, currentDRP: isACL ? acl : undefined },
+				result: { ...operation, acl, currentDRP: isACL ? acl : undefined },
 			};
 		}
 
@@ -1075,7 +1161,6 @@ export class DRPVertexApplier<T extends IDRP> {
 					...operation,
 					drp,
 					acl,
-					ambientMutatedKeys,
 					// Reconstructed replay instances are already detached from live
 					// state and snapshots, so they are safe mutation staging areas.
 					currentDRP: isACL ? acl : drp,

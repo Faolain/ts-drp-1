@@ -3,6 +3,167 @@ import { type DRPState } from "@ts-drp/types";
 type ObjectRecord = Record<PropertyKey, unknown>;
 type DetachmentDomain = "governed" | "replica-local";
 
+interface DeferredStateCell {
+	get(): unknown;
+	value: unknown;
+	detach: StatePayloadDetacher;
+	readonly ownedEntry?: unknown;
+	materialized: boolean;
+}
+
+const deferredState = new WeakMap<object, Map<string, DeferredStateCell>>();
+const governedProxyTargets = new WeakMap<object, object>();
+
+/**
+ * Register one execution-only governed proxy with the ownership layer.
+ * @param proxy - Governed proxy exposed to application code
+ * @param target - Canonical target wrapped by the proxy
+ */
+export function registerGovernedStateProxy(proxy: object, target: object): void {
+	governedProxyTargets.set(proxy, target);
+}
+
+/**
+ * Return the canonical target behind an execution-only governed proxy.
+ * @param value - Potential governed proxy
+ * @returns Canonical target, or the original value when it is not governed
+ */
+export function unwrapGovernedStateValue<T>(value: T): T {
+	if ((typeof value !== "object" && typeof value !== "function") || value === null) return value;
+	return (governedProxyTargets.get(value) as T | undefined) ?? value;
+}
+
+/**
+ * Define a writable enumerable own data property without ordinary [[Set]].
+ * @param target - Object receiving the property
+ * @param key - Property key to define
+ * @param value - Property value
+ */
+export function defineEnumerableOwnData(target: object, key: PropertyKey, value: unknown): void {
+	if (
+		!Reflect.defineProperty(target, key, {
+			configurable: true,
+			enumerable: true,
+			value,
+			writable: true,
+		})
+	) {
+		throw new TypeError(`Cannot define state property ${String(key)}`);
+	}
+}
+
+/**
+ * Install an execution-only value that detaches on first application read.
+ * @param target - Execution-only object receiving the deferred property
+ * @param key - Governed state key
+ * @param value - Borrowed snapshot value
+ * @param detach - Shared detachment session
+ * @param ownedEntry - Exact owned snapshot entry eligible for retention
+ */
+export function defineDeferredEnumerableState(
+	target: object,
+	key: string,
+	value: unknown,
+	detach: StatePayloadDetacher,
+	ownedEntry?: unknown
+): void {
+	let cells = deferredState.get(target);
+	if (cells === undefined) {
+		cells = new Map();
+		deferredState.set(target, cells);
+	}
+	const cell: DeferredStateCell = {
+		detach,
+		get(): unknown {
+			if (!cell.materialized) {
+				cell.value = cell.detach(cell.value);
+				cell.materialized = true;
+			}
+			return cell.value;
+		},
+		materialized: false,
+		ownedEntry,
+		value,
+	};
+	cells.set(key, cell);
+	if (
+		!Reflect.defineProperty(target, key, {
+			configurable: true,
+			enumerable: true,
+			get: cell.get,
+			set(next: unknown): void {
+				cells?.delete(key);
+				defineEnumerableOwnData(target, key, next);
+			},
+		})
+	) {
+		cells.delete(key);
+		throw new TypeError(`Cannot define deferred state property ${key}`);
+	}
+}
+
+function activeCell(target: object, key: string): DeferredStateCell | undefined {
+	const cell = deferredState.get(target)?.get(key);
+	if (cell === undefined) return undefined;
+	const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+	if (descriptor?.get === cell.get) return cell;
+	deferredState.get(target)?.delete(key);
+	return undefined;
+}
+
+function synchronizeDeferredAlias(cell: DeferredStateCell): void {
+	if (cell.materialized) return;
+	const cached = cell.detach.peek(cell.value);
+	if (!cached.found) return;
+	cell.value = cached.value;
+	cell.materialized = true;
+}
+
+/**
+ * Read top-level state without forcing execution-overlay detachment.
+ * @param target - State-bearing object
+ * @param key - Enumerable state key
+ * @returns Current canonical value without forcing a deferred copy
+ */
+export function readEnumerableStateValue(target: object, key: string): unknown {
+	const cell = activeCell(target, key);
+	if (cell !== undefined) synchronizeDeferredAlias(cell);
+	return unwrapGovernedStateValue(cell === undefined ? Reflect.get(target, key, target) : cell.value);
+}
+
+/**
+ * Materialize one borrowed execution value for a conservative egress check.
+ * @param target - State-bearing object
+ * @param key - Enumerable state key
+ * @returns Detached value visible through the execution overlay
+ */
+export function materializeEnumerableStateValue(target: object, key: string): unknown {
+	const cell = activeCell(target, key);
+	return unwrapGovernedStateValue(cell === undefined ? Reflect.get(target, key, target) : cell.get());
+}
+
+/**
+ * Whether a top-level execution value is still deferred.
+ * @param target - State-bearing object
+ * @param key - Enumerable state key
+ * @returns Whether the value still borrows an owned snapshot entry
+ */
+export function isDeferredEnumerableState(target: object, key: string): boolean {
+	return activeCell(target, key) !== undefined;
+}
+
+/**
+ * Return the exact owned entry while its deferred value remains unexposed.
+ * @param target - State-bearing object
+ * @param key - Enumerable state key
+ * @returns Exact owned entry, or undefined after materialization
+ */
+export function borrowedStateEntry(target: object, key: string): unknown | undefined {
+	const cell = activeCell(target, key);
+	if (cell !== undefined) synchronizeDeferredAlias(cell);
+	return cell?.materialized === false ? cell.ownedEntry : undefined;
+}
+
 /** Raised when a governed binary carries unsupported own metadata. */
 export class BinaryStateExpandoError extends TypeError {}
 
@@ -87,7 +248,7 @@ function copyEnumerableProperties(
 		}
 		const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
 		if (descriptor === undefined || descriptor.writable) {
-			target[key] = detachStatePayloadWithStack(source[key], stack, work, domain);
+			defineEnumerableOwnData(target, key, detachStatePayloadWithStack(source[key], stack, work, domain));
 		}
 	}
 }
@@ -168,6 +329,8 @@ function detachStatePayloadWithStack(
 	domain: DetachmentDomain
 ): unknown {
 	if ((typeof value !== "object" && typeof value !== "function") || value === null) return value;
+	value = unwrapGovernedStateValue(value);
+	if ((typeof value !== "object" && typeof value !== "function") || value === null) return value;
 	if (typeof value === "function") return value;
 	if (stack.has(value)) return stack.get(value);
 
@@ -176,10 +339,16 @@ function detachStatePayloadWithStack(
 		const result = new Array(value.length) as unknown[] & { index?: unknown; input?: unknown };
 		stack.set(value, result);
 		for (let index = 0; index < value.length; index++) {
-			result[index] = detachStatePayloadWithStack(value[index], stack, work, domain);
+			if (index in value) {
+				defineEnumerableOwnData(result, String(index), detachStatePayloadWithStack(value[index], stack, work, domain));
+			}
 		}
-		if (Object.hasOwn(value, "index")) result.index = detachStatePayloadWithStack(source.index, stack, work, domain);
-		if (Object.hasOwn(value, "input")) result.input = detachStatePayloadWithStack(source.input, stack, work, domain);
+		if (Object.hasOwn(value, "index")) {
+			defineEnumerableOwnData(result, "index", detachStatePayloadWithStack(source.index, stack, work, domain));
+		}
+		if (Object.hasOwn(value, "input")) {
+			defineEnumerableOwnData(result, "input", detachStatePayloadWithStack(source.input, stack, work, domain));
+		}
 		return result;
 	}
 
@@ -400,6 +569,48 @@ export function detachStatePayload<T>(value: T, observer?: DetachmentWorkObserve
 	return detachGraph(value, "governed", observer);
 }
 
+/** Create one governed detachment graph shared by a top-level batch. */
+export interface StatePayloadDetacher {
+	<T>(value: T): T;
+	peek<T>(value: T): { found: boolean; value?: T };
+}
+
+/**
+ * Create one governed detachment graph shared by a top-level batch.
+ * @returns Stateful detacher preserving aliases across calls
+ */
+export function createStatePayloadDetacher(): StatePayloadDetacher {
+	const stack = new Map<object, unknown>();
+	const detach = (<T>(value: T): T =>
+		detachStatePayloadWithStack(value, stack, undefined, "governed") as T) as StatePayloadDetacher;
+	detach.peek = <T>(value: T): { found: boolean; value?: T } => {
+		if ((typeof value !== "object" && typeof value !== "function") || value === null) return { found: false };
+		const canonical = unwrapGovernedStateValue(value);
+		return stack.has(canonical as object)
+			? { found: true, value: stack.get(canonical as object) as T }
+			: { found: false };
+	};
+	return detach;
+}
+
+/**
+ * Create one replica-local detachment graph shared by a top-level batch.
+ * @returns Stateful detacher preserving aliases across calls
+ */
+export function createReplicaLocalContextDetacher(): StatePayloadDetacher {
+	const stack = new Map<object, unknown>();
+	const detach = (<T>(value: T): T =>
+		detachStatePayloadWithStack(value, stack, undefined, "replica-local") as T) as StatePayloadDetacher;
+	detach.peek = <T>(value: T): { found: boolean; value?: T } => {
+		if ((typeof value !== "object" && typeof value !== "function") || value === null) return { found: false };
+		const canonical = unwrapGovernedStateValue(value);
+		return stack.has(canonical as object)
+			? { found: true, value: stack.get(canonical as object) as T }
+			: { found: false };
+	};
+	return detach;
+}
+
 /**
  * Detach replica-local runtime context through the shared graph copier.
  * @param value - Context payload to copy
@@ -437,18 +648,54 @@ export function detachStateSnapshot(state: DRPState): DRPState {
  * @param state - Snapshot to prepare
  * @returns Plain entry container with fully readable source entries
  */
-export function validateStateSnapshotForApplication(state: DRPState): DRPState {
+export interface ValidatedStateSnapshotKeys {
+	readonly entries: DRPState["state"];
+	readonly keys: readonly string[];
+}
+
+/**
+ * Validate every key before observing any state value.
+ * @param state - Snapshot whose entry keys must be primitive strings
+ * @returns Validated entries paired with their pre-read key vector
+ */
+export function validateStateSnapshotKeysForApplication(state: DRPState): ValidatedStateSnapshotKeys {
 	const entries = state.state;
 	if (!arrayIsArray(entries)) throw new TypeError("DRP state entries must be an array");
 
 	const length = entries.length;
-	const prepared = new Array<DRPState["state"][number]>(length);
+	const keys = new Array<string>(length);
 	for (let index = 0; index < length; index++) {
 		const entry = entries[index];
 		if (entry === undefined) throw new TypeError("DRP state entry must be present");
 		const key = entry.key;
-		const value = entry.value;
-		prepared[index] = { key, value };
+		if (typeof key !== "string") throw new TypeError("DRP state key must be a primitive string");
+		keys[index] = key;
+	}
+	return { entries, keys };
+}
+
+/**
+ * Read snapshot values only after the full key vector has validated.
+ * @param root0 - Prevalidated snapshot key view
+ * @param root0.entries - Source snapshot entries
+ * @param root0.keys - Prevalidated primitive-string keys
+ * @returns Snapshot with values read only after key validation
+ */
+export function readValidatedStateSnapshot({ entries, keys }: ValidatedStateSnapshotKeys): DRPState {
+	const prepared = new Array<DRPState["state"][number]>(entries.length);
+	for (let index = 0; index < entries.length; index++) {
+		const entry = entries[index];
+		if (entry === undefined) throw new TypeError("DRP state entry must be present");
+		prepared[index] = { key: keys[index], value: entry.value };
 	}
 	return { state: prepared };
+}
+
+/**
+ * Fully validate and read one public reconstruction snapshot.
+ * @param state - Public reconstruction snapshot
+ * @returns Snapshot safe for reconstruction reads
+ */
+export function validateStateSnapshotForApplication(state: DRPState): DRPState {
+	return readValidatedStateSnapshot(validateStateSnapshotKeysForApplication(state));
 }
