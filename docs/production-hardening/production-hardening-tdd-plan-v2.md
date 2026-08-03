@@ -17681,6 +17681,46 @@ combined P3b 42/42, the complete preservation/typecheck/lint gates, then fresh
 Grok 4.5/high and exact Kimi 3/high/dual-100 reviews; launch final Opus/xhigh
 only if both preliminary reviewers accept.
 
+**P3b owner-only bare-backing GREEN candidate.** Distinct Codex-high
+production-only commit `63952d14365d50715bfa7df2ebfd290ae406a607`, parent
+`ee040909fb549b69198f1c9c2717ff083dd337d0`, changes only
+`packages/object/src/proxy.ts` by one insertion and one deletion. The shared
+governed-binary predicate now adds `hasGovernedOwner(rawValue)` as the sole
+disjunct beside `hasGovernedBuffer(rawValue)` in its backing-store branch. The
+Buffer/view branch, both egress consumers, context/foreign allowance and setter
+Decision A are unchanged. The resulting 1,646-line source has SHA-256
+`74c8d245605544eccb954dde1f240235edf1cf0d21019ad68220b4f8bf9e7e34`
+and Git blob `a9b1fe5df562cc3b160ad79dc735b4d89f53f5bd`. The frozen owner-only RED
+remains byte-identical at SHA-256
+`f37e0596d2ccaacdf910375a7a6c888993cc45ee7c37cd95e65ed83bf7942ac7`
+and blob `dcc8c6826282cfd86e8a5dd4078726842b4b5a56`; the pre-checkpoint plan was
+byte-identical at SHA-256
+`d3e0116527777861480077aa895e777bdb58d748a8ff7b642455097de8401a20`
+and blob `b880f5c63cc7e736c40fdec0e873266f7c728db6`.
+
+The focused frozen RED is 3/3 and the combined P3b corpus is 42/42 both before
+and after the production commit. Preservation is exact: P3a plus bounded 1 MiB
+is 6/6, with the 1 MiB detach completing in 1,427 ms; P3a-prime/root-cycle is
+20/20; D.92.2 is 64/64; inherited Phase 1d(i) is 147/147; specialized
+state/collection/atomicity is 93/93; P2+P1+D.92.3 is 99/99; D.92.4-D.92.6 is
+60/60; and performance is 8/8, with the 5,000-entry MapDRP case at 210.0 ms.
+The sync-livelock sentinel retains its authenticated expected-negative
+signature exactly: three named failures, three passes and exit 1.
+
+Object and workspace typechecks pass, with the workspace completing 34/34
+projects. Owned-file lint is zero diagnostics. Authoritative tracked-source
+lint is zero errors and 249 warnings. Prettier, `git diff --check`, source scope
+and frozen-test/plan identity checks pass. Protected untracked paths remain
+unstaged and unchanged. Blocked `stash@{0}` remains
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Authoritative raw gate output and the exit-status ledger are under
+`.logs/phase-1d-i-p3b-owner-only-backing-green-codex-high/`.
+
+This is a GREEN candidate only; P3b remains open. Run fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 reviews against this exact source-and-plan
+checkpoint. Launch final Opus/xhigh only if both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18503,12 +18543,14 @@ Fresh Codex-high tests-only commit `284a66d` now freezes the shared owner-only
 cross-host fixture and exactly the frozen `get` and configurable descriptor
 egress paths at focused 2F/1P and combined P3b 2F/40P, while preserving the
 prior P3b corpus at 39/39. Its context-only control preserves proxy/raw identity
-without constraining D.92.4. Next use a distinct Codex-high production-only
-GREEN to add `hasGovernedOwner(rawValue)` as the sole disjunct beside
-`hasGovernedBuffer(rawValue)` in the backing-store branch. Retain the
-Buffer/view branch, both egress consumers, context/foreign allowance and
-Decision A; do not add a matrix. Then run the full gates and the ordinary
-preliminary/final review loop.
+without constraining D.92.4. Distinct Codex-high production-only commit
+`63952d1` adds `hasGovernedOwner(rawValue)` as the sole disjunct beside
+`hasGovernedBuffer(rawValue)` in the backing-store branch and changes no other
+production behavior. It passes focused 3/3 and combined P3b 42/42 before and
+after commit, the complete preservation matrix, object/workspace typechecks,
+both authoritative lint gates, formatting and scope checks. P3b remains open:
+run fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews against this exact
+source-and-plan checkpoint, then launch final Opus/xhigh only if both accept.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
