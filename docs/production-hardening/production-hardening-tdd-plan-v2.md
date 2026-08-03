@@ -19126,8 +19126,50 @@ GREEN. The archive changes only `drp-applier.ts`, `proxy.ts`,
 continuity, not an accepted candidate. The worktree was restored to clean
 tracked HEAD before this amendment. Re-derive and verify every resumed change.
 
-The prior D.92.2 census test is frozen except for this separately authorized
-one-string RED. Consolidate the candidate's topology onto the frozen
+**Accepted Phase 1d(ii) D.92.2 stale-suppression tests-only RED
+checkpoint.** Fresh Codex-high commit
+`a027653cce41d0cebc733262e1b48978b7d1fed1` (parent
+`d22f1658da0f222644ee2d382077b48d78e2ce1b`, tree
+`96628e3d660b29b41b0eb9ec169a250839ad9978`) changes only
+`packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` by
+the unanimously authorized exact one-line deletion. The frozen 1,519-line file
+has SHA-256
+`a18b746bbbe983a3dea30b9c24ee0c212c8327ef6972cb2222e977b4e4391240`
+and git blob `011b83d03313e97d616ae24b5451314fe0595b0d`.
+
+The clean pre-RED authority was exact 2F/62P. The authoritative pre-commit and
+post-commit RED are both exact 3F/61P, exit 1. The sole additional failure says
+the current production source still contains six suppressions while the now-
+frozen expectation permits exactly five; the two earlier stale-capture failures
+remain unchanged. This is a causal one-deletion RED, not a wider D.92.2
+amendment. The original Phase 1d(ii) RED remains exact 8F/2P and the corrected
+54-case preservation boundary remains exact 8F/46P. An initial 43-test pairing
+used the wrong preservation files and is explicitly superseded by those two
+authoritative frozen boundaries.
+
+Object and workspace typechecks, owned lint at 0 errors / 0 warnings,
+authoritative tracked lint at 0 errors / 249 inherited warnings, Prettier and
+diff-check pass. Production remains exact object-source tree
+`3b7d56504dc3328114726c7c88176a5f76cdefdb`; the tests-only commit retained
+exact plan blob `e2ebb4f5aba52f694153840187659e957189a2ae`. Evidence is under
+`.logs/phase-1d-ii-d922-suppression-red-codex-high/`; its artifact-manifest
+SHA-256 is
+`9b10b6790f50b46089cec7ec07d63f44768eee2a437318f6be3411aba7944529`.
+Protected untracked paths remain unstaged. `stash@{0}` remains object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+
+The paused GREEN archive has been re-authenticated at exact size 52,535 bytes
+and SHA-256
+`d110f6dd0b403e2f389aa31123ab911d999645c54da1e48b82b56a88bddc3893`;
+`git apply --check` passes at this checkpoint. Resume the same distinct
+production-only GREEN by applying that archive after this plan-only checkpoint,
+then re-derive and verify every resumed change. Remove the now-obsolete
+production suppression naturally with its stale `as any` use; do not add dead
+ballast or weaken the frozen exact-five suppression census.
+
+The D.92.2 census test is now frozen at the checkpoint above. Consolidate the
+candidate's topology onto the frozen
 94/114/13/2/0 boundary; that is an implementation obligation, not authority to
 amend D.92.2. Do not introduce a replay fast path or replay-seed special case.
 
@@ -19239,15 +19281,15 @@ are recorded above. Freeze D.92.2 corrective tests-only commit
 `0f30b07ce3cf6a27bfa43f9e59288b6bbd61240b`: its one-file +3/-6 scope,
 2F/62P causal signature and complete gates are recorded above. Do not alter its
 analyzer, 64-case corpus, mutants, fixtures, copy capability, closure or any
-other census site except the unanimously authorized obsolete-suppression
-expectation. First spawn a fresh Codex-high tests-only RED to delete exactly
-`state-materialize.ts:@typescript-eslint/no-explicit-any -- rightfully so this is not a problem`
-from that test's expected suppression multiset, prove the causal 3F/61P result
-against unchanged production and checkpoint it. Then spawn a fresh Codex-high
-plan-only checkpoint for that RED. Only after both commits authenticate
+other census site. Freeze the accepted stale-suppression tests-only RED
+`a027653cce41d0cebc733262e1b48978b7d1fed1`: its exact one-deletion scope,
+3F/61P causal signature, frozen 1,519-line file and complete gates are recorded
+above. Its separate plan-only checkpoint re-authenticated
 `/tmp/phase-1d-ii-green-paused-suppression.patch` at 52,535 bytes / SHA-256
 `d110f6dd0b403e2f389aa31123ab911d999645c54da1e48b82b56a88bddc3893`,
-run `git apply --check`, reapply it and resume the same distinct GREEN lineage.
+and `git apply --check` passed. Reapply it and resume the same distinct GREEN
+lineage; naturally remove the obsolete production suppression and its stale
+`as any` use rather than adding compatibility ballast.
 Fix the remaining implementation failures and topology without touching either
 corrected preservation test, the original Phase 1d(ii) RED, any other D.92.2
 authority or this plan. GREEN must reach exact 94/114/13/2 with zero violations,
