@@ -19003,19 +19003,77 @@ Protected untracked paths remain unstaged. `stash@{0}` remains object
 
 Both corrected test files are now frozen. This checkpoint implements only the
 unanimously authorized test-boundary correction; it changes no Phase 1d(ii)
-production contract. Resume the same distinct GREEN lineage only after
-re-authenticating `/private/tmp/phase-1d-ii-green-paused.patch` as SHA-256
-`2a49f72532ff89762756c708025e69ac0246fce03ffce17cc4b882764930f009`,
-running `git apply --check`, applying it, and restoring the new
-`state-ownership.ts` bytes at exact SHA-256
-`d50b42a687ace9a24e903c26671a987440b05db6d0ea3d9f08fc2e53e67df0fd`.
-Then repair all seven previously classified implementation regressions plus
-the eight now-amended failures without touching either corrected test, the
-original Phase 1d(ii) RED or this plan. Adversarial review must probe Opus's
-defined-only borrowed-entry identity guard, nullish deferred values, batched
-construction atomicity and sparse-array wire bytes; these remain attack
-surfaces, not new contract or test scope absent causal evidence and any
-required quorum.
+production contract.
+
+**D.92.2 stale-capture census correction — unanimously authorized before a
+fresh corrective RED.** Phase 1d(ii)'s already-adopted removal of the local
+`stateFromDRP` -> `fromStates` round trip makes exactly two finite-manifest
+entries stale:
+`drp-applier.ts:DRPVertexApplier.computeOperationUntraced:stateFromDRP#1/#2`.
+Keeping them would require either restoring the forbidden full-state capture
+or adding dead ballast. The fresh tests-only corrective RED may therefore
+remove only those two entries from `RESIDUAL_STATE_CAPTURE_SITES`, remove only
+their one two-site `d922cSites(...)` generator, change both exact package
+reference assertions from 116 to 114, and change the truthful tuple/title from
+0/5/13/4 to 0/5/13/2. All 64 cases, analyzer code, mutants, fixtures,
+fail-closed behavior, runtime closure, copy capability, external surface, 94
+codec sites, 13 clone sites, five reviewed operations and every other finite
+site remain frozen. Exact equality stays load-bearing: reintroducing either
+capture or adding an unapproved site remains RED.
+
+The required amendment quorum agreed unanimously to only that mechanical
+correction and to freezing a fresh one-file tests-only RED before GREEN resumes.
+Fresh Codex-high supplied both assents through collaboration. Exact Kimi
+3/high/dual-100 session `b1c8a46e-af86-427b-b291-92aba264fc10` completed at 14
+steps / 22 read-only calls, exit zero, with no helper, fallback, subagent,
+Fable, web or MCP use; its result SHA-256 is
+`6f540eb8fe69f47a0eac43c052ef14941c8b93da72fa0f1542ed0ab293def3dc`
+and artifact-manifest SHA-256 is
+`1ad02743d9df6ced04454c5786a16ead8ebec353fc03054f24021ce7be5ebaff`.
+Final Opus/xhigh session `fce43ef1-baf4-4956-83e3-47b6ec5955b7` used effective
+`claude-opus-5`, returned the same two assents and authorized no other change;
+its result SHA-256 is
+`eb175697b0f82484a7cc889628bf6d1b64e2fb2c39cd900e8b3f78f60f1220af`
+and artifact-manifest SHA-256 is
+`76c6d8025a74f283936c0e7ea5fcc0a26004315c5eb19111155e3092b0d0d8d3`.
+The native envelope disclosed one automatic non-substantive Haiku helper at 24
+output tokens; it authored no finding or vote. Neither substantive reviewer
+read prior review artifacts or used Fable.
+
+The correction is necessary but not sufficient for the paused GREEN. Against
+that draft the analyzer reports 119 package references, 18 residual clone
+sites and seven unapproved-reference violations: two previously approved sites
+were removed, seven new sites were added, and one expected suppression was
+also removed. These are production-topology obligations, not authority to
+expand or weaken the manifest. GREEN must consolidate onto the frozen
+94/114/13/2, zero-violation ownership boundary. If that proves causally
+impossible, stop for a separate correction quorum; never absorb the draft's
+shape into this amendment.
+
+The current five-file diagnostic draft is archived at
+`/private/tmp/phase-1d-ii-green-paused-d922.patch`, exact size 52,305 bytes and
+SHA-256
+`5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`.
+The worktree was restored to exact clean tracked HEAD
+`92ae5cd8359886af5ab89c3a9080b2a9d8575f12`; the archive is continuity only,
+not an accepted candidate. First commit the bounded D.92.2 tests-only RED and
+checkpoint its exact signature and gates in this plan. Only then authenticate
+the archive, run `git apply --check`, reapply it, and resume the same distinct
+GREEN lineage. Repair the seven prior implementation regressions, the eight
+amended failures and the census/topology failures without touching either
+corrected preservation test, the original Phase 1d(ii) RED or the newly frozen
+D.92.2 corrective RED. Adversarial review must still probe Opus's defined-only
+borrowed-entry identity guard, nullish deferred values, batched construction
+atomicity and sparse-array wire bytes; these remain attack surfaces, not new
+contract or test scope absent causal evidence and any required quorum.
+
+One separate inherited performance debt remains factual but is not part of
+this census correction or a Phase 1d(ii) fast-path requirement. The exact-parent
+deep-concurrency control at seed 7 can exceed 120 seconds on current hardware;
+the behavior was inherited after `2259f29`, before this GREEN lineage. Record
+the timed evidence without hiding or relabeling it, but do not add a seed-7
+special case or expand Phase 1d(ii) to optimize it. Its existing performance
+owner and later dedicated optimization gate remain responsible.
 
 The distinct production-only GREEN must first validate the complete incoming
 key vector as primitive strings before applying any entry, so rejection cannot
@@ -19085,15 +19143,23 @@ The first distinct Codex-high production-only GREEN draft reached focused
 collision quorum authorized only the two corrections recorded above. Freeze
 corrective tests-only commit `978c65947ab6baeedc08166eaa14a3da8e04a2c3`:
 its exact two-file +53/-5 scope, 8F/46P signature and preservation/gate evidence
-are recorded above. Resume the same distinct GREEN lineage by first verifying
-the archived patch's exact SHA-256, checking it with `git apply --check`,
-applying it, and restoring `state-ownership.ts` at its recorded exact SHA-256.
-Fix the seven implementation regressions and the eight amended failures without
-touching either corrected test, the original Phase 1d(ii) RED or this plan. Only
-after GREEN and all gates pass run fresh Grok 4.5/high and exact Kimi
-3/high/dual-100 review, followed by final Opus/xhigh only after both preliminary
-reviewers accept. Run focused and proportionate preservation/typecheck/lint
-gates to `.log`.
+are recorded above. Before resuming GREEN, create a fresh Codex-high tests-only
+D.92.2 corrective RED with only the unanimously authorized 116->114 and
+0/5/13/4->0/5/13/2 stale-capture edits, prove its exact failure against clean
+HEAD, freeze it, and add a plan-only checkpoint. Do not alter the analyzer,
+64-case corpus, mutants, fixtures, copy capability, closure or any other census
+site. Then verify
+`/private/tmp/phase-1d-ii-green-paused-d922.patch` at 52,305 bytes / SHA-256
+`5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`,
+run `git apply --check`, reapply it and resume the same distinct GREEN lineage.
+Fix the seven implementation regressions, eight amended failures and the draft's
+119-reference / 18-clone / seven-violation topology without touching either
+corrected preservation test, the original Phase 1d(ii) RED, the new D.92.2 RED
+or this plan. GREEN must reach exact 94/114/13/2 with zero violations; do not
+amend the manifest to fit the draft. Only after GREEN and all gates pass run
+fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review, followed by final
+Opus/xhigh only after both preliminary reviewers accept. Run focused and
+proportionate preservation/typecheck/lint gates to `.log`.
 
 Implement exactly the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
@@ -19118,6 +19184,10 @@ deferred values, batched construction atomicity and sparse-array wire bytes as
 review attack surfaces, not additions to this corrective RED or its contract
 without causal evidence and any required quorum. The archived paused patch is
 diagnostic only; re-derive and verify every resumed production change.
+
+Keep the inherited seed-7 exact-parent runtime above 120 seconds visible as
+pre-existing post-`2259f29` performance debt. It authorizes neither a seed
+special case nor a Phase 1d(ii) fast path.
 
 After 1d(ii) closes, Phase 1d(iii) is the next distinct TDD item and owns
 checkpoint-prune history independence. Phase 1n separately owns converting the
