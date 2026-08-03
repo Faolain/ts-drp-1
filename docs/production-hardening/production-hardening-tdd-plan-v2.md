@@ -19081,14 +19081,55 @@ Protected untracked paths remain unstaged. `stash@{0}` remains object
 `ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
 `8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
 
-This test is now frozen. Authenticate
-`/tmp/phase-1d-ii-green-paused-d922.patch` at exact size 52,305 bytes and
-SHA-256
-`5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`,
+**D.92.2 stale suppression census correction — unanimously authorized before
+a fresh one-file RED.** The safe current GREEN candidate removes both the
+`as any` assignment and its adjacent lint suppression from
+`state-materialize.ts`; object and workspace typechecks pass without either.
+The finite suppression expectation must therefore delete exactly the string
+`state-materialize.ts:@typescript-eslint/no-explicit-any -- rightfully so this is not a problem`.
+Its exact remaining five-entry multiset is one
+`pipeline/types.ts:@typescript-eslint/no-explicit-any` entry and four
+`state-materialize.ts:@typescript-eslint/no-explicit-any` entries. The
+`no-restricted-*` suppression result remains exact `[]`. All 64 cases, analyzer
+code, mutants, fixtures, fail-closed behavior, runtime closure, copy
+capability, external surface, 94 codec sites, 114 package references, 13 clone
+sites, two capture sites, five reviewed operations and zero violations remain
+unchanged and frozen. This authorizes no other contract, census or allowlist
+change.
+
+Fresh Codex-high supplied assent through collaboration. Exact Kimi
+3/high/dual-100 session `05a1c192-8c3a-4883-b9d5-8ee04e135e4e` ratified only
+this one-string deletion; its result SHA-256 is
+`0dc25e38d5aa0af7068b667608f2b5c1ce21472cfaf5b19620f5beeb61d80d22`
+and artifact-manifest SHA-256 is
+`d43311202198e559c27d643745d0cf7898c608e9707d3d08cf4a81efa83d34a2`.
+Final same-session Opus 5/xhigh session
+`36c057b7-905d-4f06-a5d5-9de57a9cced7` ratified the same bounded change after
+controller execution measured the exact clean baseline at 2F/62P in 19.22
+seconds and a disposable one-line expectation deletion at 3F/61P in 12.60
+seconds, with the only new failure reporting six actual suppressions against
+five expected. The native envelope disclosed one automatic non-substantive
+Haiku helper at 21 output tokens; it authored no finding or vote. Opus
+artifact-manifest SHA-256 is
+`308149b9fd017966031cf9ab6ec9a88c120dc77929f9fbae6bcb56f2013f323b`.
+
+The mandatory next action is a fresh Codex-high tests-only RED changing only
+`packages/object/tests/incremental-publication-structure-1d-i-red.test.ts` by
+that exact one-string deletion. Freeze and checkpoint its causal 3F/61P result
+before production resumes. Then add a separate plan-only RED checkpoint,
+authenticate `/tmp/phase-1d-ii-green-paused-suppression.patch` at exact size
+52,535 bytes and SHA-256
+`d110f6dd0b403e2f389aa31123ab911d999645c54da1e48b82b56a88bddc3893`,
 run `git apply --check`, apply it and resume the same distinct production-only
-GREEN. Consolidate the draft's topology onto the frozen 94/114/13/2/0 boundary;
-that is an implementation obligation, not authority to amend D.92.2. Do not
-introduce a replay fast path or replay-seed special case.
+GREEN. The archive changes only `drp-applier.ts`, `proxy.ts`,
+`publication/publisher.ts`, `state-materialize.ts` and `state-payload.ts`; it is
+continuity, not an accepted candidate. The worktree was restored to clean
+tracked HEAD before this amendment. Re-derive and verify every resumed change.
+
+The prior D.92.2 census test is frozen except for this separately authorized
+one-string RED. Consolidate the candidate's topology onto the frozen
+94/114/13/2/0 boundary; that is an implementation obligation, not authority to
+amend D.92.2. Do not introduce a replay fast path or replay-seed special case.
 
 The correction is necessary but not sufficient for the paused GREEN. Against
 that draft the analyzer reports 119 package references, 18 residual clone
@@ -19100,7 +19141,7 @@ expand or weaken the manifest. GREEN must consolidate onto the frozen
 impossible, stop for a separate correction quorum; never absorb the draft's
 shape into this amendment.
 
-The current five-file diagnostic draft is archived at
+The earlier five-file diagnostic draft is archived at
 `/private/tmp/phase-1d-ii-green-paused-d922.patch`, exact size 52,305 bytes and
 SHA-256
 `5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`.
@@ -19198,16 +19239,22 @@ are recorded above. Freeze D.92.2 corrective tests-only commit
 `0f30b07ce3cf6a27bfa43f9e59288b6bbd61240b`: its one-file +3/-6 scope,
 2F/62P causal signature and complete gates are recorded above. Do not alter its
 analyzer, 64-case corpus, mutants, fixtures, copy capability, closure or any
-other census site. Verify
-`/tmp/phase-1d-ii-green-paused-d922.patch` at 52,305 bytes / SHA-256
-`5d263d77d3781cc7405234314d035f53a080ce378497a2ab7b0035c66ada90e4`,
+other census site except the unanimously authorized obsolete-suppression
+expectation. First spawn a fresh Codex-high tests-only RED to delete exactly
+`state-materialize.ts:@typescript-eslint/no-explicit-any -- rightfully so this is not a problem`
+from that test's expected suppression multiset, prove the causal 3F/61P result
+against unchanged production and checkpoint it. Then spawn a fresh Codex-high
+plan-only checkpoint for that RED. Only after both commits authenticate
+`/tmp/phase-1d-ii-green-paused-suppression.patch` at 52,535 bytes / SHA-256
+`d110f6dd0b403e2f389aa31123ab911d999645c54da1e48b82b56a88bddc3893`,
 run `git apply --check`, reapply it and resume the same distinct GREEN lineage.
-Fix the seven implementation regressions, eight amended failures and the draft's
-119-reference / 18-clone / seven-violation topology without touching either
-corrected preservation test, the original Phase 1d(ii) RED, the new D.92.2 RED
-or this plan. GREEN must reach exact 94/114/13/2 with zero violations; do not
-amend the manifest to fit the draft. Consolidate topology under the existing
-contract and do not introduce a replay fast path or seed-specific shortcut.
+Fix the remaining implementation failures and topology without touching either
+corrected preservation test, the original Phase 1d(ii) RED, any other D.92.2
+authority or this plan. GREEN must reach exact 94/114/13/2 with zero violations,
+the exact five-entry suppression multiset and exact empty `no-restricted-*`
+result; do not amend the manifest to fit the draft. Consolidate topology under
+the existing contract and do not introduce a replay fast path or seed-specific
+shortcut.
 Only after GREEN and all gates pass run
 fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review, followed by final
 Opus/xhigh only after both preliminary reviewers accept. Run focused and
