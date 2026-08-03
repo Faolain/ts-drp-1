@@ -880,7 +880,7 @@ export function trackMutations<T extends object>(
 						signalRawEgress();
 					}
 
-					const member = Reflect.get(binary, property, binary) as unknown;
+					const member = Reflect.get(binary, property, nativeAccessor ? binary : proxy) as unknown;
 					if (typeof member !== "function") {
 						if (isReference(member) && (ARRAY_BUFFER_IS_VIEW(member) || isBackingStore(member))) {
 							return wrap(member, replicaLocalOnly || !hasGovernedOwner(member) ? true : ignored);
