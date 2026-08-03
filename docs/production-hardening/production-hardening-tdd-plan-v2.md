@@ -19513,6 +19513,94 @@ plan, and do not apply either archived candidate wholesale. Re-derive the
 owned-frontier/COW implementation and canonical checkpoint source, then reach
 GREEN across the complete frozen contract and preservation gates.
 
+**Phase 1d(ii) canonical-checkpoint copy-meter collision — unanimously
+authorized one-file attribution correction before GREEN resumes.** The paused
+production draft makes the original Phase 1d(ii) suite exact 1F/9P. Its only
+failure is not avoidable production work: the remote suffix/tail/checkpoint
+test installs an owned metered `drp.ballast`, sets checkpoint suffix `1` and
+then creates two multi-frontier cuts. Each cut must physically copy every
+present canonical payload through the sole copy capability, and the probe's
+observer return is `detachStatePayload`. The frozen positive control proves
+that detaching this proxy performs one `payload` read. A blanket
+`meter.reads === 0` across both execution and checkpoint publication therefore
+contradicts the separately frozen truthful checkpoint-copy contract.
+
+No production escape is permitted. GREEN may not retain the entry while
+fabricating a copy event, ignore the observer result, clone by descriptor to
+avoid the getter, source from live state, suppress/merge a checkpoint or
+hardcode this topology's observed total of two. The intended zero applies to
+execution reconstruction, vertex publication, single-head checkpoint work and
+all other unobserved work. Required canonical multi-frontier checkpoint copies
+must instead be positively and exactly attributed.
+
+A fresh Codex-high tests-only RED may change only
+`residual-reconstruction-prototype-safety-1d-ii-red.test.ts`. Keep every other
+test and every other assertion in the amended case frozen. The authorized
+observable is per-read site attribution:
+
+1. add optional `readSites?: string[]` to the test meter and one module-local
+   active-copy-site label;
+2. keep the getter's numeric increment and, when present, append the active
+   label or `"unattributed"` once per read;
+3. only around the probe-owned `detachStatePayload(event.value)` copy call,
+   set the label to
+   `` `${publicationId}:${side}:${key}:${image}` `` and restore the previous
+   label in `finally`; do not change copy recording or the returned value;
+4. only in the remote suffix/tail/checkpoint case, enable and reset
+   `readSites`, derive the ordered expected site list from actual
+   `drp:ballast:post` copy events whose publication is a successful
+   `multi-frontier-checkpoint`, require the list to be non-empty and require
+   the meter's exact read-site array to equal it.
+
+Exact array equality is deliberately stronger than aggregate count equality.
+It rejects a forbidden comparison/reconstruction read paired with a missing or
+pre-detached checkpoint copy, and it names the offending site. It also derives
+the topology count from production publication/copy records rather than a
+literal. Preserve apply success, revision, concurrent-tail and checkpoint
+presence, alias isolation, stored/wire truth, environment cleanup, the meter
+reset and both positive detach controls.
+
+Fresh Codex-high returned
+`PHASE1DII_CHECKPOINT_METER_AMENDMENT_AGREE=yes`. Fresh exact Kimi 3/high/
+dual-100 session `d92dbeac-559b-4ca9-a3b3-9da8332d865e` returned the same flag;
+its result SHA-256 is
+`e90d0912926d48e96b859b5f3a8c16f2a4e453276c8b1d44be95766cb2f56560`
+and artifact-integrity SHA-256 is
+`71a9a95414a6cba8054d40acde9134b166b5114b232173ea306416d3ece3a6a7`.
+Final Claude-skill Opus 5/xhigh session
+`43342ae3-aa40-46a4-8f17-d01033555fac` agreed and selected the exact per-read
+site observable above; its full result SHA-256 is
+`3735ec0b43eba5efc6a585cb1fc814b8baa66b949a3239d42e9d952d682e2f2b`
+and artifact-integrity SHA-256 is
+`ebefcc39559ab2fe0c952d97e2f70637b19ad1a5eb01f60df24d7a390f744f2b`.
+The native envelope disclosed one automatic non-substantive Haiku helper at 24
+output tokens; it authored no finding or vote.
+
+The five-file production draft is parked at
+`/tmp/phase-1d-ii-green-paused-checkpoint-meter.patch`, exact size 54,547 bytes
+and SHA-256
+`598e9b945dce404d9139f70bc5681f38dd96599d97368a6d89da71bcdefec3cf`;
+`git apply --check` passes at this clean amendment checkpoint. It is continuity,
+not an accepted candidate. Do not apply it until the fresh one-file RED and its
+separate plan checkpoint are committed, then re-authenticate and reapply it to
+resume the same paused GREEN owner.
+
+Opus found one additional production-only blocker in that draft. D.92.2's
+frozen census mutant matches the exact three-argument delegate text
+`this.publicationPublisher.advanceCheckpointIfNeeded(journal, force, publicationAttempts);`.
+The draft changed it to a four-argument call. GREEN must preserve the exact
+three-argument delegate while conveying canonical checkpoint state through a
+census-compatible internal channel. Do not amend or grow D.92.2. If any
+read-site remains outside the derived checkpoint list after the test correction,
+repair the borrowed/identity fast path rather than weakening the observable.
+
+Mandatory order: commit this plan-only amendment; spawn a fresh Codex-high
+one-file tests-only RED against clean production; measure the expected original
+Phase 1d(ii) 8F/2P signature and all preservation/typecheck/lint/format gates;
+commit the RED and a separate plan checkpoint; re-authenticate and apply the
+parked five-file draft; resume the same GREEN owner; preserve the D.92.2
+three-argument delegate and reach exact 10/10 plus every frozen gate.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
@@ -19599,10 +19687,12 @@ Freeze accepted ambient-causal-boundary tests-only RED
 11F/54P complete signature, 5F intended ambient subset, clean-HEAD checkpoint
 1/1 and d28b checkpoint 1F candidate kill, file identities and complete gates
 are recorded above. Do not alter any of the four files. The immediate next
-action is a distinct Codex-high production-only GREEN from clean HEAD. Run the
-complete frozen contract plus proportionate preservation, object/workspace
-typecheck, owned and tracked lint, Prettier/diff/scope and frozen-artifact
-checks to `.log`.
+action is the fresh Codex-high one-file checkpoint-meter tests-only RED
+specified above. Production and the plan stay frozen. The parked five-file
+GREEN draft must remain unapplied until that RED and its plan checkpoint are
+committed. Run the corrected original Phase 1d(ii) file plus proportionate
+preservation, object/workspace typecheck, owned and tracked lint,
+Prettier/diff/scope and frozen-artifact checks to `.log`.
 
 Implement exactly the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
