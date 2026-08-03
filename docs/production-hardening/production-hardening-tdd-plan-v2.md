@@ -16469,8 +16469,42 @@ All frozen RED, P3a and P3a-prime hashes remain unchanged. `stash@{0}` remains
 unapplied at exact commit
 `ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, and its patch remains untouched at
 SHA-256 `8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
-This is a candidate, not accepted closure: run fresh Grok 4.5/high and exact
-Kimi 3/high/dual-100 reviews, then final Opus/xhigh only if both accept.
+This candidate was not accepted or closed; its preliminary reviews follow.
+
+**P3b candidate review rejection and Buffer-transfer corrective.** Fresh Grok
+4.5/high session `019fc56c-637b-7103-9f5b-451f10d8615f` returned `ACCEPTED`
+and `P3B_MAY_CLOSE=yes`; its result SHA-256 is
+`8f69745ce1184e2d5a03b2e78f2ae67f37ce9f33bf09702ee62d65b9f81400e6`.
+The sole substantive model was `grok-4.5-build` at high reasoning across 14
+calls, with no helper, fallback, subagent, Fable or web content. The runtime
+auto-started MCPs but invoked no MCP content.
+
+Replacement exact Kimi 3/high/dual-100 session
+`fdacb87a-e966-425b-8b01-3ab7a2cf90f9` completed the causal trace through 30
+steps and 35 read-only calls, then stalled without a native terminal verdict.
+The controller-authenticated disposition of that trace is `CHANGES_REQUESTED`
+and `P3B_MAY_CLOSE=no`; its citable result SHA-256 is
+`8da8d60c6803bbc0ebe9e856b85cf55f12b4123cb4c0f86d611ae98b5bdfbdd3`.
+The native session was terminated after the post-probe stall without
+pretending that the runtime emitted a native `TurnEnd`. The earlier
+`.logs/phase-1d-i-p3b-receiver-green-kimi3-high-100-review-superseded-incomplete/`
+directory is non-citable; the replacement review directory is authoritative.
+
+Kimi's exact blocker uses ordinary documented APIs. Node Buffer discovery
+omits its backing owner edge, so `.buffer` returns an ignored proxy.
+`transfer()` and `transferToFixedLength()` are recognized mutators, but the
+candidate computes `charge=false`; the raw call detaches the live governed
+Buffer bytes and finalization skips attribution. No current D.73, D.92.4 or
+D.92.7 owner covers this P3b backing-ownership hole. No Opus review was
+launched because the preliminary Kimi gate rejected the candidate.
+
+The chosen corrective RED direction is safe atomic rejection of structural
+mutation on an otherwise ungoverned backing that internally backs a currently
+governed Buffer. Positive controls preserve a read-only, extensible and clean
+backing plus bare governed ArrayBuffer behavior. A distinct tests-only
+Codex-high corrective is in progress; do not grow this into an API-shaped
+syntax matrix. Production commit `8223511` remains committed but rejected, and
+P3b remains open.
 
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
@@ -17259,12 +17293,15 @@ accepted by fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
 Claude-skill Opus/xhigh.
 
 P3b GREEN candidate `8223511` reaches its frozen 8/8 and all exact preservation
-gates with the forbidden `linkBinaryProperty` and
-`lazilyLinkedBinaryProperties` paths absent. Run fresh Grok 4.5/high and exact
-Kimi 3/high/dual-100 reviews. If both accept, run final Opus/xhigh; if any
-rejects, return to a tests-first causal correction. Do not mark P3b accepted or
-closed, modify the frozen RED, grow the D.92.2 analyzer or consume the D.73,
-D.92.4 or D.92.7 ledgers.
+gates, but exact Kimi 3/high/dual-100 rejected it for uncharged Buffer-backing
+transfer after Grok accepted. Complete and freeze the in-progress tests-only
+corrective RED for safe atomic rejection of structural mutation on an
+ungoverned backing that internally backs a governed Buffer, preserving the
+read-only/extensible/clean backing and bare governed ArrayBuffer controls.
+Then implement a distinct production GREEN and repeat fresh Grok 4.5/high,
+exact Kimi 3/high/dual-100 and, only if both accept, final Opus/xhigh review.
+Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
+analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
 or after P3b. Composite D.92 starts only after both P3b and D.92.7 close, then
 Phase 1d(ii); prototype-safe materialization remains mandatory before Phase
