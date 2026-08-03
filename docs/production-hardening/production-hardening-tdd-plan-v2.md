@@ -17634,6 +17634,53 @@ preservation matrix, typechecks and lint before fresh Grok 4.5/high and exact
 Kimi 3/high/dual-100 reviews; launch final Opus/xhigh only if both preliminary
 reviewers accept.
 
+**Accepted P3b owner-only bare-backing RED checkpoint.** Fresh Codex-high
+tests-only commit `284a66dcb9cf13c483c13a1181812e82d305af34`, parent
+`407f92fab817c591a26975ba185318f5013e02fb`, adds only the 173-line
+`packages/object/tests/buffer-backing-owner-only-egress-1d-i-red.test.ts`.
+Its SHA-256 is
+`f37e0596d2ccaacdf910375a7a6c888993cc45ee7c37cd95e65ed83bf7942ac7`
+and its Git blob is `dcc8c6826282cfd86e8a5dd4078726842b4b5a56`.
+Production remained byte-identical at SHA-256
+`ceb3b850f30014c69ef7e1d3012604e2fd971779dd042005924eab994dfe32b7`
+and blob `0a2625e6f3d1da0648f6f10c73a446a0baf4b280`; the pre-checkpoint plan
+remained byte-identical at SHA-256
+`d6445c4134bdee14d26935a16369a52dea2b4efde4b367a4c8194aff2dfd4353`
+and blob `30108de5027f3345aa0fa96cc8d5a4814575c534`.
+
+One shared cross-host fixture gives an extensible top-level governed Node
+Buffer backing host and a distinct top-level bare `ArrayBuffer` victim with a
+live governed owner. The two causal cases freeze the victim onto the host and
+exercise ordinary `get` after the caught post-install Proxy-invariant error,
+then ordinary-set installation followed by configurable
+`getOwnPropertyDescriptor`. At the rejected predicate both egress paths expose
+the raw victim; captured transfer changes the victim from four bytes to zero
+while changes, raw egress and both keysets remain clean. The bounded passing
+control gives the same victim context-only ownership: descriptor egress retains
+raw identity, ordinary `get` retains proxy identity, and raw-egress state is
+deliberately unconstrained so this RED does not consume D.92.4.
+
+The focused RED is exactly 2F/1P and the combined P3b run is exactly 2F/40P;
+the isolated prior P3b corpus remains 39/39. Both object and workspace
+typechecks pass, with the latter completing 34/34 projects. Owned lint is zero
+diagnostics, and Prettier, `git diff --check`, scope and post-commit identity
+checks pass. Protected untracked paths remain unstaged. Blocked `stash@{0}`
+remains `ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Evidence is under
+`.logs/phase-1d-i-p3b-owner-only-backing-red-codex-high/`.
+
+The distinct production-only GREEN is exactly the existing predicate repair:
+in the shared governed-binary predicate, change only the backing-store branch
+from `hasGovernedBuffer(rawValue)` to
+`hasGovernedBuffer(rawValue) || hasGovernedOwner(rawValue)`. Retain the
+Buffer/view branch, both frozen `get` and descriptor egress consumers,
+foreign/context allowance and setter Decision A. Do not add a descriptor,
+host or value matrix. Acceptance requires the frozen focused file at 3/3,
+combined P3b 42/42, the complete preservation/typecheck/lint gates, then fresh
+Grok 4.5/high and exact Kimi 3/high/dual-100 reviews; launch final Opus/xhigh
+only if both preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18452,12 +18499,16 @@ changes four bytes to zero. Candidate `1272a78` is committed but rejected and
 P3b remains open. This is one predicate under-inclusion under the existing
 Decision A contract, not a plan amendment or deferred D.73/D.92.4/D.92.7 work.
 
-Next use a fresh Codex-high tests-only RED with one shared owner-only cross-host
-fixture and exactly the frozen `get` and configurable descriptor egress cases,
-plus bounded foreign/context controls without a syntax matrix. The distinct
-GREEN should add the live-owner disjunct to the predicate's backing-store branch
-while retaining its registered-Buffer and Buffer/view branches. Then run the
-full gates and the ordinary preliminary/final review loop.
+Fresh Codex-high tests-only commit `284a66d` now freezes the shared owner-only
+cross-host fixture and exactly the frozen `get` and configurable descriptor
+egress paths at focused 2F/1P and combined P3b 2F/40P, while preserving the
+prior P3b corpus at 39/39. Its context-only control preserves proxy/raw identity
+without constraining D.92.4. Next use a distinct Codex-high production-only
+GREEN to add `hasGovernedOwner(rawValue)` as the sole disjunct beside
+`hasGovernedBuffer(rawValue)` in the backing-store branch. Retain the
+Buffer/view branch, both egress consumers, context/foreign allowance and
+Decision A; do not add a matrix. Then run the full gates and the ordinary
+preliminary/final review loop.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
