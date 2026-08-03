@@ -12371,6 +12371,15 @@ Accepted limitation and forward binding:
    prove every indexed hash has exactly one authenticated charge. A non-3a byte-cap caller, foreign
    graph Map or Phase-5 use without this chain of custody is blocked until a successor governed
    primitive cross-check lands.
+5. P3a-prime's final review quorum independently accepted a hostile accessor-setter window as real
+   but nonblocking for its plain-data contract: reentrancy can mutate a staged binary after validation
+   and before reflection/sealing. This remains an unconsumed hard pre-3a hostile-reentrancy ledger
+   item. The live RED must cover the validated-but-unsealed transition without moving ordinary D.91
+   accessor timing into P3a-prime.
+6. Final P3a-prime Opus review also retained commit-time `preventExtensions` or normalization failure
+   after a physical write as a hostile in-operation candidate: the throw may escape the existing
+   charge-on-throw path. D.73 owns the causal RED and adjudication; this note neither asserts a proven
+   production bypass nor broadens the accepted P3a-prime fix.
 
 The binding decision is substantively unanimous. Opus accepted it in the final review; a read-only
 Codex-high consultation returned `AGREE_ACCEPT_WITH_BINDING`; fresh exact Kimi 3/high session
@@ -16385,8 +16394,40 @@ probe and pre-format lint/Prettier attempts are explicitly superseded; only the
 numbered final artifacts under
 `.logs/phase-1d-i-p3a-prime-root-cycle-green2-codex-high/` are acceptance
 evidence. The tracked tree is clean, protected untracked paths and `stash@{0}`
-are untouched. This remains a candidate until fresh Grok 4.5/high, exact Kimi
-3/high/dual-100 and final Opus/xhigh accept it.
+are untouched.
+
+**P3a-prime accepted closure.** Fresh Grok 4.5/high session
+`019fc525-b58b-76a2-85a9-0dbf5cbae601` returned `ACCEPTED` and
+`P3A_PRIME_MAY_CLOSE=yes`; its result SHA-256 is
+`f49e74dfd25775483d0a2b4c87fec75a67cde6bd442a76d1be2a53d96fb1ce39`.
+It used no helper, fallback, subagent, Fable or web content. The runtime's
+failed `react-grab` MCP handshake produced no review content. Fresh exact Kimi
+3/high/dual-100 retry session `5f3d9407-4e9d-4b6f-a5f6-0bc7f4bd9a11`
+completed 13 steps and 18 read-only calls, returned `ACCEPTED` and
+`P3A_PRIME_MAY_CLOSE=yes`, and produced result SHA-256
+`f2efa0f3ac8211730dc8e7916f8cca5ea48adce26bc57273f283c8870108de4d`.
+The prior stalled directory
+`.logs/phase-1d-i-p3a-prime-root-cycle-green2-kimi3-high-100-review/` is
+superseded and non-citable; only the `-review-retry` directory is final Kimi
+evidence.
+
+Final Claude-skill Opus session `3e37455c-280b-4e7b-9d35-f6bfa70401db`
+used native `claude-opus-5` at xhigh, returned `ACCEPTED` and
+`P3A_PRIME_MAY_CLOSE=yes`, and produced result SHA-256
+`a33912b0acae39dea6d454f7a9afa3480a3c42056e510a6101bc595258395c92`.
+There was no fallback, Agent/subagent, Fable, web/network use or repository
+mutation. One automatic non-substantive Haiku helper used 2,233 input and 27
+output tokens and authored no review finding. Review evidence is under
+`.logs/phase-1d-i-p3a-prime-root-cycle-green2-{grok45-high-review,kimi3-high-100-review-retry,opus-xhigh-final}/`.
+
+All three reviewers independently accepted the hostile accessor-setter
+validated-but-unsealed window as real but nonblocking and retained it in the
+hard pre-3a D.73 hostile-reentrancy ledger. Opus additionally retained the
+commit-time throw, resizable-ArrayBuffer and Date-expando considerations in
+their durable owners below. A context cycle may still expose cosmetically
+distinct tracked-root proxy identities, but property-local policy and raw
+identity are correct; this is nonblocking. P3a-prime is accepted and closed,
+and P3b GREEN is unblocked.
 
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
@@ -16444,6 +16485,13 @@ object-package conformance wiring/tests; it must not become a general codec
 rewrite, invent expando/symbol serialization, consume D.73, or cite in-memory
 detachment as cross-peer evidence. D.92.7 gets its own Codex-high RED/GREEN,
 Grok 4.5/high, exact Kimi 3/high/dual-100 and Opus/xhigh loop.
+
+Two review findings remain `OPEN` D.92.7-or-dedicated candidates rather than
+adopted scope. A TypedArray backed by a resizable ArrayBuffer may reject
+`Object.preventExtensions`; support and compatibility need a future owner.
+Governed Date own expandos can remain locally visible while mutation is
+uncharged and detachment drops them. Neither finding changes scope, contract or
+status unless the required Opus/Codex/Kimi plan-amendment quorum adopts it.
 
 #### D.92.4 — Raw-egress contract after detachment
 
@@ -16632,6 +16680,13 @@ describes attempted work. Promise rejection aborts the detached operation
 without publication. Raw mutation after an operation fully completes is outside
 that tracker's lifetime and later local ambient candidacy remains the existing
 boundary. None reopens D.92.4.
+
+A pre-existing root-referential governed alias reached through `context` can
+still under-attribute some non-root mutation paths. This is an `OPEN`
+D.92.4-domain corrective or successor candidate, not work adopted by the
+accepted slice. P3a-prime's narrower property-local tracked-root re-entry does
+not reopen D.92.4; any scope or status change requires the plan-amendment
+quorum.
 
 #### D.92.5 — Distinct retained blockers
 
@@ -17153,22 +17208,18 @@ must not be used to defer D.92.2–D.92.6, P3 or D.73 beyond their stated gates.
 
 ## Next Agent Prompt — supersedes the D.92 handoff
 
-P1, P2, P3a and D.92.4-D.92.6 are accepted and closed, but the unanimous
-Codex-high + exact Kimi 3/high/dual-100 + Opus/xhigh correction quorum has
-inserted P3a-prime before P3b GREEN. Its fresh Codex-high tests-only RED is
-frozen at `9132269`, surgical manifest repair `453206b` and nested-wrapper
-atomicity refinement `b165086`. First production GREEN `aae92e4` reached all
-saved gates but was rejected by both Grok and exact Kimi for the plain
-context-root cycle. Its corrective tests-only RED is frozen at `f1adc3d`, and
-the distinct one-file GREEN2 candidate is `4c66c67`: semantic 20/20, public-
-operation cycle probe 1/1, D.92.2 64/64 and all preserved exact signatures.
-Run fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews. If both accept,
-run final Opus/xhigh through the Claude skill; if any rejects, return to a
-tests-first correction. Do not modify frozen tests or grow the analyzer.
+P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
+tests-only RED, manifest repair and nested-wrapper refinement remain frozen at
+`9132269`, `453206b` and `b165086`; its root-cycle corrective RED is frozen at
+`f1adc3d`. GREEN lineage `aae92e4` plus property-local GREEN2 `4c66c67` is
+accepted by fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
+Claude-skill Opus/xhigh.
 
-After a distinct P3a-prime GREEN and Grok/Kimi/Opus acceptance, resume P3b
-GREEN on the settled fail-closed invariant. Preserve but do not apply
-`stash@{0}` until then; any reuse must remove its lazy expando-link machinery.
+Resume P3b GREEN from its frozen exact 4F/4P on the settled fail-closed
+invariant. Use `stash@{0}` only as a reference, not as an application unit, and
+remove the invalid `linkBinaryProperty` and `lazilyLinkedBinaryProperties`
+expando paths from any reused receiver-safe work. Do not modify the frozen RED,
+grow the D.92.2 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
 or after P3b. Composite D.92 starts only after both P3b and D.92.7 close, then
 Phase 1d(ii); prototype-safe materialization remains mandatory before Phase
