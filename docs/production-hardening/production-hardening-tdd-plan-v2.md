@@ -19233,6 +19233,78 @@ the D.73 hostile virtual
 ownership, or the codec/`Symbol.iterator` seam. This is the already-adopted
 1d(ii) contract, not a plan amendment or phase split.
 
+**Phase 1d(ii) obsolete identity-capture counters — unanimously authorized
+before a fresh one-file RED.** One preservation test still pins three reads
+performed by implementation work that the already-adopted Phase 1d(ii)
+contract requires GREEN to remove. A fresh tests-only corrective RED may change
+only `incremental-publication-identity-capture-1d-i-red.test.ts`: local
+DRP-authored `{ acl: 2, drp: 3 }` becomes `{ acl: 0, drp: 0 }`, local
+ACL-authored `{ acl: 3, drp: 2 }` becomes `{ acl: 0, drp: 0 }`, and linear
+remote `{ acl: 0, drp: 1 }` becomes `{ acl: 0, drp: 0 }`. Remove only the
+three-line comment immediately before the first local assertion that attributes
+those reads to `stateFromDRP` and the inherited replacement commit. Do not
+split, soften, skip, condition, rename or otherwise restructure a test, and do
+not change another line.
+
+The two local nonzero pairs measure the residual `computeOperationUntraced`
+live `stateFromDRP` captures plus the authored-side replacement scan. Keeping
+them would require restoring the two captures already removed from the frozen
+D.92.2 manifest or adding dead work. The remote nonzero pair has a distinct,
+equally load-bearing explanation: its one DRP read is the unchanged-key scan in
+`replaceEnumerableState`, not a local `stateFromDRP` capture. Phase 1d(ii)'s
+proportional changed-key-only replacement must not read an unchanged enumerable
+getter merely to adopt a small remote delta. Zero is therefore the safety
+sentinel for the implementation primitive on all three paths; it is not
+authority to skip publication or to hide real copy work.
+
+Every semantic assertion in the file remains frozen: complete stored state and
+wire equality, exact publication accounting and changed-key sets, physical
+copy events, retained-entry identity, snapshot/public/live isolation, alias
+charging, ambient cross-side publication and rollback lifecycle. In
+particular, the separate ambient-ACL authored-trigger test remains an untouched
+production obligation. GREEN must satisfy it through the ownership/tracking or
+overlay primitive while preserving zero unchanged-root getter reads; it may not
+recover that behavior with a fallback full capture, an unchanged-key scan or a
+fabricated counter/event.
+
+Against unchanged production, the corrected eight-test file is inferred exact
+2F/6P, exit 1. The first local test fails at the first ordinary hard assertion,
+so its second local-ACL assertion is masked in the RED run but remains a live
+GREEN gate; the independent remote assertion supplies the second failure. The
+archived GREEN is expected to expose only the distinct ambient-ACL production
+gap at 1F/7P after this correction, but that forward prediction is not an
+acceptance gate. The required order is amendment authorization, a fresh
+one-file tests-only RED commit, exact RED and preservation proof, a separate
+plan-only RED checkpoint, and only then resumption of the same distinct
+production-only GREEN.
+
+Fresh Codex-high supplied
+`PHASE1DII_REMOVED_CAPTURE_COUNT_AMENDMENT_AGREE=yes` through collaboration.
+Exact Kimi 3/high/dual-100 session
+`51b46f33-611d-45f6-b1b4-7e9d0bac83ed` returned the same flag after 15 native
+steps and 19 read-only tool calls; its result SHA-256 is
+`284cc678a05a632b3d17ec11e11291184868b7870e46bb7eae6b9b4d86f914ba`
+and artifact-manifest SHA-256 is
+`6cd976800e435d9e3f69a6fae163450f9161dac58411e913e9cebafe770f73f8`.
+Final Opus 5/xhigh session `8cc834bd-59f6-4266-ae12-97d20d7cb415`
+returned agreement, exact inferred 2F/6P with the second local assertion masked,
+and `OTHER: none`; its result SHA-256 is
+`7c6025592794b3a3796b70daf8fbc27c5d683a544abb731d85a10f3f3ec3816d`
+and artifact-manifest SHA-256 is
+`517a096aa002ca85b2310d646b78546bcce11504dca458add0b3b5967dd76f3b`.
+The native envelope disclosed one automatic non-substantive Haiku helper at 23
+output tokens; it authored no finding or vote.
+
+The latest paused production-only GREEN is archived at
+`/tmp/phase-1d-ii-green-paused-identity.patch`, exact size 55,474 bytes and
+SHA-256
+`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`;
+`git apply --check` passes at this clean checkpoint. The archive changes only
+the same five production owners already assigned to this GREEN. It is
+continuity, not an accepted candidate: do not apply it until after the fresh
+corrective RED and its plan-only checkpoint, then re-authenticate it, apply it
+and re-derive every change while resuming the same GREEN lineage.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
@@ -19287,10 +19359,11 @@ other census site. Freeze the accepted stale-suppression tests-only RED
 above. Its separate plan-only checkpoint re-authenticated
 `/tmp/phase-1d-ii-green-paused-suppression.patch` at 52,535 bytes / SHA-256
 `d110f6dd0b403e2f389aa31123ab911d999645c54da1e48b82b56a88bddc3893`,
-and `git apply --check` passed. Reapply it and resume the same distinct GREEN
-lineage; naturally remove the obsolete production suppression and its stale
-`as any` use rather than adding compatibility ballast.
-Fix the remaining implementation failures and topology without touching either
+and `git apply --check` passed. That archive is an earlier continuity
+checkpoint and must not be reapplied now; the latest paused identity archive
+below supersedes it for GREEN resumption. Naturally remove the obsolete
+production suppression and its stale `as any` use rather than adding
+compatibility ballast. Fix the remaining implementation failures and topology without touching either
 corrected preservation test, the original Phase 1d(ii) RED, any other D.92.2
 authority or this plan. GREEN must reach exact 94/114/13/2 with zero violations,
 the exact five-entry suppression multiset and exact empty `no-restricted-*`
@@ -19301,6 +19374,20 @@ Only after GREEN and all gates pass run
 fresh Grok 4.5/high and exact Kimi 3/high/dual-100 review, followed by final
 Opus/xhigh only after both preliminary reviewers accept. Run focused and
 proportionate preservation/typecheck/lint gates to `.log`.
+
+Before resuming production, execute the unanimously authorized identity-capture
+correction above. A fresh Codex-high tests-only RED must change only the three
+exact read expectations in
+`incremental-publication-identity-capture-1d-i-red.test.ts` and remove only its
+immediately preceding obsolete three-line comment. Prove exact 2F/6P with the
+second local assertion masked by fail-fast, preserve all semantic assertions
+and gates, commit the one-file RED, and add a separate plan-only RED checkpoint.
+Then re-authenticate `/tmp/phase-1d-ii-green-paused-identity.patch` at exact
+55,474 bytes / SHA-256
+`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`,
+run `git apply --check`, apply it and resume the same distinct production-only
+GREEN. The archive is diagnostic continuity, not authority; re-derive and
+verify every production change.
 
 Implement exactly the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
@@ -19317,6 +19404,13 @@ retained owned entry. Do not grow
 the D.92.2 analyzer, consume D.73 hostile classification, Phase 1d(iii) prune
 ownership or D.92.4 raw-egress ownership, widen binary serialization, or close
 the `OPEN` symbol policy.
+
+Treat exact zero reads of unchanged enumerable live-root getters as the hard
+implementation-primitive sentinel for local DRP-authored, local ACL-authored
+and linear remote work. Preserve and make GREEN the separate ambient-ACL
+authored-trigger semantic test through ownership tracking or the execution
+overlay; never reintroduce a full capture, scan unchanged keys, fabricate copy
+events or omit real publication work merely to satisfy the sentinel.
 
 Keep the seven implementation-only failures frozen: one dependent-hint live
 ownership migration and six raw-child governed-representation comparison
