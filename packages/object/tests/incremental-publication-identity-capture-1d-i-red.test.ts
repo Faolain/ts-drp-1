@@ -387,15 +387,12 @@ describe("Phase 1d(i) live-capture and remote controls", () => {
 		reads.drp = 0;
 
 		h.applier.drp!.touch();
-		// stateFromDRP reads each enumerable getter for the function guard and
-		// again for its value. The authored side has one additional live read
-		// from the inherited replacement commit, but no second full capture.
-		expect(reads).toEqual({ acl: 2, drp: 3 });
+		expect(reads).toEqual({ acl: 0, drp: 0 });
 
 		reads.acl = 0;
 		reads.drp = 0;
 		h.applier.acl.setKey("counted");
-		expect(reads).toEqual({ acl: 3, drp: 2 });
+		expect(reads).toEqual({ acl: 0, drp: 0 });
 	});
 
 	it("keeps linear remote replay independent of ambient live state and local comparison work", async () => {
@@ -433,7 +430,7 @@ describe("Phase 1d(i) live-capture and remote controls", () => {
 		const vertex = remoteVertex("touch", [], 1);
 
 		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
-		expect(reads).toEqual({ acl: 0, drp: 1 });
+		expect(reads).toEqual({ acl: 0, drp: 0 });
 		const rootDRP = byKey(h.states.getDRPState(HashGraph.rootHash)!);
 		const rootACL = byKey(h.states.getACLState(HashGraph.rootHash)!);
 		const storedDRP = byKey(h.states.getDRPState(vertex.hash)!);
