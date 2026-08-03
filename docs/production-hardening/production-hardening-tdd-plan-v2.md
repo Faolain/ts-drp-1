@@ -16581,6 +16581,62 @@ unchanged. This is a candidate, not accepted or closed. Run fresh Grok
 4.5/high and exact Kimi 3/high/dual-100 reviews, then final Opus/xhigh only if
 both preliminary reviewers accept.
 
+**P3b corrective GREEN review rejection — captured-native own alias.** Fresh
+Grok 4.5/high session `019fc5a3-3f39-7361-a112-c6308cc33ea1` used only
+`grok-4.5-build` at high reasoning and returned final `CHANGES_REQUESTED` /
+`P3B_MAY_CLOSE=no`. Initial request
+`b6fc146e-3693-43b7-afe7-e6924f5ac41d` used 16 calls; same-session follow-up
+`fbf224ea-3c8d-44fc-9a7f-0eea9818cb03` used four. Final result SHA-256 is
+`ef49c24a523ad336a956563421058387c4f92ba3fd2478fecaada4bfa0611be3`
+and follow-up raw SHA-256 is
+`99e374f66567cfcfe88afac6b63887208eb89fc5b38ed9a9320d2665b02f74e2`.
+No helper, fallback, subagent, Fable or web content was used. Runtime MCPs
+auto-started, but the reviewer invoked no MCP content. Evidence is under
+`.logs/phase-1d-i-p3b-buffer-transfer-green2-grok45-high-review/`.
+
+Exact Kimi 3/high/dual-100 session
+`f9957473-b9a3-4f9d-ad80-ec1407b187de` used K3 with thinking/high. Its initial
+native terminal `ACCEPTED / P3B_MAY_CLOSE=yes` is superseded and non-citable:
+the sync-capped probe did not await settlement, its copy observer returned
+`undefined`, and it missed the blocker below. A same-session corrective native
+terminal returned authoritative `CHANGES_REQUESTED`, `P3B_MAY_CLOSE=no` and
+`SUPERSEDES_INITIAL_TERMINAL=yes`. The two turns used 57 plus two steps, 59 LLM
+events total, and 58 read-only calls. Final result SHA-256 is
+`a3b99f4a7c25e79ab7def09f257470407ba6e6098614795e272c78ad982b1ea5`,
+combined raw SHA-256 is
+`d2aec2d69769b42f6c80cf018a6d72604185a3795f09e4d4ec3d41d1df42f8c0`,
+and integrity SHA-256 is
+`a2f9b212d780c718143f0a3685809bf0efe0a57c2c99cdd244b2842a335df22f`.
+Evidence is under
+`.logs/phase-1d-i-p3b-buffer-transfer-green2-kimi3-high-100-review/`.
+
+The exact B1 blocker is an ordinary proxy path. A governed Buffer backing stays
+unsealed and ignored. Installing a captured genuine native `transfer`,
+`transferToFixedLength` or conditional `resize` as an own property succeeds
+cleanly. On invocation, descriptor ownership is the backing instance, so
+`nativeMember=false`. The governed-Buffer guard and the custom/raw-egress and
+charge paths all skip because `operationReplicaLocalOnly=true`; raw
+`Reflect.apply` then structurally mutates the governed Buffer bytes while
+`dirty=false` and `rawEgress=false`. This is not D.73, D.92.4, D.92.7 or a
+pre-held raw-alias limitation.
+
+The reconciled oracle does not change policy. With the faithful default
+detaching copy observer and awaited settlement, discard-transfer fails during
+copy before graph or live-state adoption and rolls back. The contrary probe
+was invalid because its publication observer returned `undefined` for copy and
+the caller did not await settlement. The frozen bare governed ArrayBuffer
+positive remains nonblocking; no plan-policy amendment is adopted.
+
+No Opus review was launched because both authoritative preliminary reviewers
+reject. Production candidate `530f569` remains committed but rejected and P3b
+remains open. Next is a fresh Codex-high tests-only RED covering captured-native
+own aliases under same and alternate keys, conditional `resize`, dynamic
+context/promotion/last-owner removal and the real applier. If bounded, include
+the custom-wrapper receiver boundary and a benign custom control. Keep one
+identity/provenance contract rather than an API-syntax matrix; after freezing
+the RED, implement a distinct production GREEN, run full gates and repeat fresh
+Grok/Kimi/conditional-Opus review.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -17371,9 +17427,14 @@ P3b GREEN candidate `8223511` reaches its frozen 8/8 and all exact preservation
 gates, but exact Kimi 3/high/dual-100 rejected it for uncharged Buffer-backing
 transfer after Grok accepted. Its tests-only corrective RED is frozen at
 `822135e`, and distinct production-only corrective GREEN candidate `530f569`
-reaches focused 13/13 plus the full preservation matrix. Run fresh Grok
-4.5/high and exact Kimi 3/high/dual-100 reviews. Only if both accept, run final
-Opus/xhigh; otherwise return to a tests-first causal correction.
+reaches focused 13/13 plus the full preservation matrix, but authoritative
+Grok and Kimi reviews both reject its captured-native own-alias bypass. Freeze
+a fresh Codex-high tests-only RED for same/alternate own keys, conditional
+`resize`, dynamic context/promotion/removal and the real applier, with bounded
+custom-wrapper and benign custom controls only if they clarify the single
+identity/provenance contract. Then implement a distinct production GREEN, run
+full gates and repeat fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and,
+conditionally, final Opus/xhigh review.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
