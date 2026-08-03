@@ -17089,6 +17089,44 @@ message heuristic, raw-receiver escape or fixture special case. P3b remains
 open until that fresh RED, distinct GREEN and the normal review loop accept the
 replacement.
 
+**Accepted P3b setter-contract corrective RED checkpoint.** Fresh Codex-high
+tests-only commit `0aad0197bc0db375ddce5054abeccdea93ccc3f5`, against parent
+`7bfb2511b1df59a3ed34ebc30fcfe045899bf31c`, updates only the authorized
+`packages/object/tests/buffer-backing-setter-receiver-1d-i-red.test.ts` with
+140 insertions and 10 deletions. The resulting 395-line file has SHA-256
+`85b719e163ac3e1ecff50959bf6f18cbeb1b515876a1ac8a62e94fa970e146a7`
+and git blob `631a71b9f5c273137cf966a0898edec786b3ba42`.
+
+The focused RED is exactly 6F/2P and the combined P3b run is exactly 6F/27P.
+The captured transfer, live-brand-text setter sentinel, foreign-proxy captured
+native, captured resize and faithful awaited real-applier paths all preserve
+the protected bytes but fail because candidate `c6aa475` replaces the original
+engine or setter error with the policy error. The genuine foreign raw-receiver
+case exposes the stronger defect: post-hoc diagnostic replay physically
+detaches that caller-supplied receiver. The unchanged direct
+proxy-intercepted `this.transfer()` exact-policy case and benign
+`this.byteLength` setter control pass. A sequential preservation rerun keeps
+the three prior frozen P3b files at 25/25.
+
+Object and workspace typechecks, owned-file lint, Prettier, `git diff --check`
+and commit-scope checks pass. Production and plan bytes match the RED parent at
+SHA-256
+`f7c00c8c1fb86680b4081bade6e8a8b1bb69bede0a24a498a32296503a94d49b`
+and `521f2a0c6685564df8638dbd530a12f86a0b683da1e9561c42fd8a5f6a675686`
+respectively. Protected untracked paths and blocked `stash@{0}` remain
+unchanged. The first prior-frozen invocation overlapped another Vitest process:
+the tests reached 25/25, then shared `coverage/.tmp` cleanup raised `ENOENT`.
+That concurrent artifact is superseded by the authoritative sequential 25/25
+exit-0 rerun; subsequent Vitest gates were serialized. Evidence is under
+`.logs/phase-1d-i-p3b-setter-contract-corrective-red-codex-high/`.
+
+The distinct Codex-high GREEN must delete only
+`isStructuralMutatorReceiverError` and its set-trap catch/normalizer. It must
+retain per-accessor native classification, custom-setter receiver routing,
+live ownership checks and the get-trap's exact pre-native policy rejection.
+Acceptance requires this corrective file at 8/8, the combined P3b corpus green
+and all mandatory preservation gates green before the normal review loop.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
