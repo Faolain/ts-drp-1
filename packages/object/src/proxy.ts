@@ -161,7 +161,7 @@ export function trackMutations<T extends object>(
 		("value" in descriptor && isReference(descriptor.value)) ||
 		("get" in descriptor && (isReference(descriptor.get) || isReference(descriptor.set)));
 	const ignoresProperty = (owner: object, property: PropertyKey, ignored: boolean): boolean =>
-		ignored || (owner === (target as object) && typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property));
+		owner === (target as object) ? typeof property === "string" && REPLICA_LOCAL_STATE_KEYS.has(property) : ignored;
 
 	const observeOwnDescriptor = (
 		owner: object,
