@@ -17489,6 +17489,58 @@ prior preservation, full tests, typechecks, lint and formatting gates before
 fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews; launch final
 Opus/xhigh only if both preliminary reviewers accept.
 
+**P3b governed-backing self-alias GREEN candidate.** Distinct Codex-high
+production-only commit `1272a7879db49fae627e222616702586a68eb36c`, against
+parent `530acda2b6e59552d78afe60f0a14f12052e46c2`, changes only
+`packages/object/src/proxy.ts` with 23 insertions and one deletion. The
+1,646-line production file has SHA-256
+`ceb3b850f30014c69ef7e1d3012604e2fd971779dd042005924eab994dfe32b7`
+and git blob `0a2625e6f3d1da0648f6f10c73a446a0baf4b280`.
+
+One live governed-binary predicate now protects exactly the two frozen egress
+points: the non-configurable, non-writable own-data `get` return and the binary
+`getOwnPropertyDescriptor` observer before raw-egress signaling or descriptor
+return. It recognizes both a raw backing with a live governed Buffer and a
+governed Buffer/view with a live owner. It excludes foreign and context-only
+values because ownership is evaluated at acquisition time. The earlier
+captured-structural-native guard remains intact; ordinary descriptor behavior,
+setter Decision A and deferred D.92.4 behavior are unchanged. This is one
+ownership rule shared by both egress points, not a new descriptor or syntax
+matrix.
+
+The focused frozen RED is 3/3 and the combined P3b corpus is 39/39 both before
+and after the production commit. Preservation is exact: P3a plus bounded 1 MiB
+is 6/6, with the bounded copy at 1,377 ms; P3a-prime/root is 20/20; D.92.2 is
+64/64; inherited Phase 1d(i) is 147/147; specialized
+state/collection/atomicity is 93/93; P2/P1/D.92.3 is 99/99; D.92.4-D.92.6 is
+60/60; and performance is 8/8 with the 5,000-entry MapDRP case at 215.5 ms.
+The sync-livelock sentinel retains its expected exact 3F/3P. Object typecheck
+passes and workspace typecheck is 34/34. Owned ESLint is clean and the
+authoritative tracked-source lint gate is zero errors with 249 warnings.
+Prettier, `git diff --check`, production-only scope and frozen test/plan byte
+identity all pass.
+
+The file-free governed Buffer/view descriptor probe returns the exact policy
+rejection while both byte lengths remain four and all tracker signals remain
+clean. Its initial `tsx -e` attempt failed only because package exports were
+unavailable in that execution mode and is superseded by the authoritative
+ESM-loader probe. An initial all-tracked-file lint diagnostic included
+non-source files and returned zero errors with 698 warnings; the established
+tracked-source command supersedes it. Optional broad `pnpm lint` was not rerun;
+the preceding production-only checkpoint's inherited diagnostic remains 60
+errors and 226 warnings, while both authoritative lint gates for this candidate
+are green.
+
+Protected untracked paths remain unstaged and unchanged. Blocked `stash@{0}`
+remains `ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, with patch SHA-256
+`8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
+Authoritative raw gate output and the exit-status ledger are under
+`.logs/phase-1d-i-p3b-self-alias-egress-green-codex-high/`.
+
+This is a GREEN candidate only; P3b remains open. Run fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 reviews. Launch final Opus/xhigh only if both
+preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18294,15 +18346,14 @@ and P3b remains open. Fresh Codex-high tests-only RED `ee61544` now freezes
 exactly those two end-to-end paths at focused 2F/1P, combined 2F/37P and prior
 P3b preservation 36/36.
 
-Use a distinct production-only GREEN to apply one governed-binary-value
-predicate at exactly the frozen `get` early-return and
-`observeOwnDescriptor`/`getOwnPropertyDescriptor` egress points, rejecting with
-the exact policy error before raw return or signal. Do not add a descriptor or
-syntax matrix, seal the backing, reject foreign backing, absorb the D.92.4
-context residual or alter setter Decision A. Run full gates and repeat fresh
-Grok 4.5/high, exact Kimi 3/high/dual-100 and, conditionally, final Opus/xhigh
-review. The existing Decision A contract already owns this correction; no plan
-amendment is required.
+Distinct Codex-high production-only candidate `1272a78` now applies one live
+governed-binary predicate at exactly the frozen own-data `get` and binary
+`getOwnPropertyDescriptor` egress points. It passes the frozen RED 3/3,
+combined P3b 39/39, the complete preservation matrix, typechecks and
+authoritative lint gates. Treat it as a candidate only. Run fresh Grok
+4.5/high and exact Kimi 3/high/dual-100 reviews, then launch final Opus/xhigh
+only if both preliminary reviewers accept. The existing Decision A contract
+already owns this correction; no plan amendment is required.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
