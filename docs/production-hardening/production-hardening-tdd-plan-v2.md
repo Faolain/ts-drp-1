@@ -17350,6 +17350,92 @@ This is a GREEN candidate only; P3b remains open. Run fresh Grok 4.5/high and
 exact Kimi 3/high/dual-100 reviews. Launch final Opus/xhigh only if both
 preliminary reviewers accept.
 
+**P3b frozen-native-descriptor GREEN final-review rejection — governed binary
+self-alias egress.** Both fresh preliminary reviewers accepted exact HEAD
+`3eb6d5e7f4bc193fcf6b5db253ffb91494a5483d`. Grok 4.5/high session
+`019fc6b0-f7ef-7252-9feb-8ee3cbb76db9` completed 25 model calls and 35
+substantive native tool calls, independently passed focused 3/3 and combined
+36/36 in a writable copy, and returned `ACCEPTED` / `P3B_MAY_CLOSE=yes`.
+Its result, raw envelope and manifest SHA-256 values are respectively
+`f2ab3ae26e0685ea6273500eb88691d31b8953c2e031471087c91aceea548dd3`,
+`1636f5d2c041f03e1e0e919cc60557be90509ba5762b8dce93beaa7846fe6042`
+and `8db3bf4a8a35722468a9b19afb3630315d874a5992970b67b4b281efab61e52c`.
+Exact Kimi 3/high used both independent 100-step controls in fresh session
+`5b73c456-cfb6-4d45-bdbd-a11aa330c152`; its substantive turn plus zero-tool
+format correction completed 26 LLM steps and 34 read-only tool calls and
+returned authoritative `ACCEPTED` / `P3B_MAY_CLOSE=yes`. Its result, combined
+raw stream and artifact-manifest SHA-256 values are respectively
+`dbc2533e713ab4dc473620b0749e437f35e56ab539bebe1821a0bb3faa1fa33c`,
+`c11d75162160f24e93e34ed1a60014a2d9eadcf568cba3184b7c5ce08ed7dce4`
+and `519a4ed635c5ffa6357e77fc767c746e567bea164f03789c128307aff0e720f6`.
+Evidence is under
+`.logs/phase-1d-i-p3b-frozen-alias-green-{grok45-high-review,kimi3-high-100-review}/`.
+
+The conditional final Claude-skill Opus/xhigh review rejected the candidate.
+Fresh session `5de86d60-a0a6-4d35-ad28-a98beea06bb8` used substantive
+`claude-opus-5` at xhigh for 53 turns and returned `CHANGES_REQUESTED` /
+`P3B_MAY_CLOSE=no`. The native envelope also reports an automatic,
+non-substantive `claude-haiku-4-5-20251001` helper with only 30 output tokens;
+it did not supply the ruling. Result, raw envelope and manifest SHA-256 values
+are respectively
+`90af8b5d036160c2dd453d8792be411f0d8d6f08e7191f85f6d0423c0addb559`,
+`3d35a265a04d6ccca8e306241233ae1d702f159c0bb2f4948a1a7381afc9828f`
+and `b93e1b0423b5c894e044b4a05872d8566a772b21fe19d6d7b4d86b5dcc713c31`.
+Opus made no repository edit. Its sandbox denied local probe/test execution and
+file creation, so it authenticated recorded gates and source paths but did not
+claim an in-session end-to-end reproducer.
+
+The authoritative F1 blocker is a three-link composition that starts with only
+the exposed protected backing proxy. First, an ordinary `set` or
+`defineProperty` stores that proxy as a value on itself; the write trap unwraps
+the value and physically stores the raw backing. Second, the frozen own-data
+`get` branch or `getOwnPropertyDescriptor` returns that stored raw value without
+wrapping, rejection or raw-egress signaling because the invariant path gates
+only on `replicaLocalOnly`. Third, a captured `transfer` on the returned raw
+backing detaches the live governed Buffer while `hasChanges()` and
+`hasRawEgress()` stay false and both changed-key sets stay empty. The frozen
+`defineProperty` call itself raises the ordinary Proxy-invariant `TypeError`,
+but its raw-target descriptor has already committed; catching that error and
+then reading the property still completes the escape.
+
+The controller independently executed the exact composition at the reviewed
+HEAD after Opus returned. The caught frozen-definition plus ordinary `get`
+path and the successful `set` plus `getOwnPropertyDescriptor` path each proved
+that the acquired value is the raw backing and that captured transfer changes
+both backing and Buffer byte length from four to zero with all tracker signals
+clean. The final reproducer log has SHA-256
+`ff3b9f6cf13a67ebe4848dc8535e768815cb5e72c3664334dda599d16ccdccfc`.
+The superseded uncaught first attempt, final exit-0 probe and controller
+authentication are under
+`.logs/phase-1d-i-p3b-final-opus-xhigh-adversarial-review/`.
+
+F1 is current P3b: no pre-held raw capability exists, because the protected
+proxy itself mints the alias. It uses no hostile graph classification,
+serialization or wire conversion, so it is not D.73, D.92.4 or D.92.7. The
+analogous laundering shape through replica-local `context`, without the binary
+self-alias ownership conjunction, remains nonblocking D.92.4 work and must not
+be silently absorbed by this corrective.
+
+Production candidate `8e3eca4f181fb6ffa5edff943b097e6172489fa0` remains
+committed but rejected; P3b stays open. The existing unanimously amended
+Decision A contract is sufficient, so this finding does not authorize another
+plan amendment. Next use a fresh Codex-high tests-only RED that executes the
+three-link composition end-to-end for exactly two distinct egress points:
+frozen own-data `get`, with the expected caught definition-invariant error, and
+`getOwnPropertyDescriptor` after ordinary set. Prefer one shared setup or small
+table, and retain bounded foreign-value and ordinary Proxy-invariant controls.
+Do not grow a descriptor/syntax matrix or seal the backing. The causal RED must
+prove raw identity/escape and clean detachment against `8e3eca4`, rather than
+relying only on the individual source links or prior reviewer probes.
+
+The distinct GREEN should apply one governed-binary self-alias predicate at
+both egress points and reject before returning or signaling the alias. It must
+preserve ordinary/foreign invariant values and must not broaden into the
+D.92.4 context residual. Run the focused and combined P3b corpus plus the full
+preservation, typecheck and lint gates before fresh Grok 4.5/high and exact
+Kimi 3/high/dual-100 review; launch a new final Opus/xhigh review only if both
+preliminary reviewers accept.
+
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
 
@@ -18143,12 +18229,25 @@ unanimous setter-contract Decision A amendment. Production candidate
 frozen-own-descriptor ordering bypass after Grok accepted. Fresh Codex-high
 tests-only RED `ff6df91` now freezes that single defect at focused 2F/1P,
 combined 2F/34P and prior-corpus preservation 33/33. Implement the distinct
-production-only GREEN by applying captured structural-native identity and live
-protected-ownership enforcement before or within the frozen-descriptor early
-return, before raw-egress signaling. Preserve context-only/final-owner-removal
-identity, ordinary frozen values/functions, undefined-getter symmetry and
-Proxy invariants. Then run full gates and repeat fresh Grok 4.5/high, exact
-Kimi 3/high/dual-100 and, conditionally, final Opus/xhigh review.
+production-only GREEN `8e3eca4` applied captured structural-native identity and
+live protected-ownership enforcement within the frozen-descriptor early
+return, and both preliminary reviewers accepted it. Final Opus/xhigh instead
+found that the protected backing proxy can store itself, have the write trap
+unwrap it to the raw governed backing, and recover that raw alias through the
+frozen-own-data `get` or `getOwnPropertyDescriptor` invariant path with no
+signal. The controller reproduced both paths end-to-end and detached governed
+Buffer bytes with clean tracking. Candidate `8e3eca4` is committed but rejected
+and P3b remains open.
+
+Start a fresh Codex-high tests-only RED that executes exactly those two
+three-link compositions, with a shared bounded setup plus ordinary/foreign
+invariant controls. Then use a distinct production-only GREEN to apply one
+governed-binary self-alias predicate at both egress points before return or
+signal. Do not add a descriptor/syntax matrix, seal the backing or absorb the
+D.92.4 context-laundering residual. Run full gates and repeat fresh Grok
+4.5/high, exact Kimi 3/high/dual-100 and, conditionally, final Opus/xhigh
+review. The existing Decision A contract already owns this correction; no plan
+amendment is required.
 Do not mark P3b accepted or closed, modify earlier frozen REDs, grow the D.92.2
 analyzer or consume the D.73, D.92.4 or D.92.7 ledgers.
 D.92.7 binary wire fidelity receives a separate RED/GREEN/review loop alongside
