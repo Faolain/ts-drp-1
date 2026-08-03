@@ -16262,9 +16262,54 @@ lint with 249 inherited warnings, Prettier, diff and scope checks pass.
 Production, plan, frozen P3b and `stash@{0}` hashes are unchanged. Evidence is
 under `.logs/phase-1d-i-p3a-prime-binary-expando-red-codex-high/`.
 
-The distinct production-only GREEN now implements the four-file scope above
-without changing the frozen tests. It must reach semantic 18/18 and D.92.2
-64/64, keep P3b at its independent 4F/4P, and preserve every accepted gate.
+**P3a-prime production GREEN candidate.** Distinct Codex-high commit
+`aae92e4bcb7f93503c4c1e7c06c2f7a2194d7e97` changes exactly the four
+authorized production files, with 318 insertions and 71 deletions. Their
+SHA-256s are `drp-applier.ts`
+`8a51fa7ee474815cd7f6b204039455cae14978b24873b563451bd4a235e170c6`,
+`proxy.ts`
+`3364d004e065879f4114232806eac4d88ae324ead4f206203bfb72b8f2170aa8`,
+`state-materialize.ts`
+`ceb4c667ee1b9aa3ecd9c644b8da908c6053e1c84626f4b0678256e91d58059e`
+and `state-payload.ts`
+`1dc4be7e295d70bda3b02a55e29160531f94317dd33c81c90eee25b2072c8a6a`.
+
+The governed detacher and proxy discovery reject every binary own expando,
+then make validated binary identities non-extensible. Ordinary tracked writes
+use recursive descriptor-safe staging: data-described subtrees reject before
+reflection, while accessor-bearing subtrees retain D.91 post-write discovery
+and conservative charge semantics. An incomplete staged graph still commits
+its independently validated binary identities after a successful write, so
+later accessor discovery skips them without a second canonical-index scan.
+The main-agent instrumentation observes exactly one binary `Reflect.ownKeys`
+call through that mixed path.
+
+Replica-local context uses the single shared copier but no governed validation
+cache. The proxy boundary is ownership-dynamic: a pure-context identity is not
+validated, sealed, charged or treated as raw governed egress, while the same
+identity currently reachable from governed state uses governed mutation,
+attribution and raw-egress handling even through a cached context proxy. The
+decision is recomputed when saved Map, Set and Date method closures execute;
+the causal saved-`Map.set` probe rejects an expanded binary after later
+governed attachment without inserting or sealing the invalid input. A Node
+Buffer validates only its own keys and visible bytes; its native pooled backing
+is not implicitly promoted to a separate governed vertex unless that backing
+is independently reachable.
+
+Final GREEN evidence is semantic 19/19, D.92.2 64/64 at 94/116/13/4,
+inherited 147/147, specialized 93/93, P2+P1+D.92.3 99/99,
+D.92.4-D.92.6 60/60, dynamic context/raw-egress/D.91 focus 89/89, bounded
+1 MiB 2/2 and performance 8/8 with MapDRP at 466.4 ms. P3b remains its
+independent exact 4F/4P and the sync sentinel its authenticated exact 3F/3P.
+Object/workspace typechecks, owned lint, tracked-source lint at zero errors and
+249 inherited warnings, Prettier, diff, scope and hashes pass. The tracked tree
+is clean, protected untracked paths are untouched, and `stash@{0}` remains
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`. Evidence is under
+`.logs/phase-1d-i-p3a-prime-binary-expando-green-codex-high/`; early manifest,
+literal full-preflight, package-filter startup, pre-dynamic-context and direct
+TSX attempts are superseded or invalid, not acceptance evidence. This remains
+a candidate until Grok 4.5/high, exact Kimi 3/high/dual-100 and final
+Opus/xhigh accept it.
 
 P3 does not reopen D.92.3 backing aliases and does not consume D.73 view
 classification or `Symbol.hasInstance` work.
