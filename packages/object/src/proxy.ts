@@ -704,7 +704,26 @@ export function trackMutations<T extends object>(
 		}
 		return false;
 	};
+	const isGovernedBinaryValue = (value: unknown): boolean => {
+		if (!isReference(value)) return false;
+		const rawValue = unwrap(value);
+		return isBackingStore(rawValue)
+			? hasGovernedBuffer(rawValue)
+			: ARRAY_BUFFER_IS_VIEW(rawValue) && hasGovernedOwner(rawValue);
+	};
 	const isReplicaLocalOnly = (value: object, ignored: boolean): boolean => ignored && !hasGovernedOwner(value);
+	const observeBinaryOwnDescriptor = (
+		owner: object,
+		property: PropertyKey,
+		ignored: boolean
+	): PropertyDescriptor | undefined => {
+		const descriptor = Reflect.getOwnPropertyDescriptor(owner, property);
+		if (descriptor !== undefined && "value" in descriptor && isGovernedBinaryValue(descriptor.value)) {
+			throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
+		}
+		if (!ignored && descriptor !== undefined && descriptorExposesReference(descriptor)) signalRawEgress();
+		return descriptor;
+	};
 
 	const captureRetainedMapEntryOwners = (
 		previous: ReadonlyArray<readonly [unknown, unknown]>,
@@ -856,13 +875,16 @@ export function trackMutations<T extends object>(
 		if (ARRAY_BUFFER_IS_VIEW(objectValue) || isBackingStore(objectValue)) {
 			proxy = new Proxy(objectValue, {
 				getOwnPropertyDescriptor(binary, property): PropertyDescriptor | undefined {
-					return observeOwnDescriptor(binary, property, isReplicaLocalOnly(binary, ignored));
+					return observeBinaryOwnDescriptor(binary, property, isReplicaLocalOnly(binary, ignored));
 				},
 				get(binary, property): unknown {
 					const replicaLocalOnly = isReplicaLocalOnly(binary, ignored);
 					const ownDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
 					if (ownDescriptor && !ownDescriptor.configurable) {
 						if ("value" in ownDescriptor && !ownDescriptor.writable) {
+							if (isGovernedBinaryValue(ownDescriptor.value)) {
+								throw new TypeError(GOVERNED_BUFFER_BACKING_MUTATION_ERROR);
+							}
 							if (
 								ARRAY_BUFFER_STRUCTURAL_MUTATORS.has(ownDescriptor.value) &&
 								isBackingStore(binary) &&
