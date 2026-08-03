@@ -19321,26 +19321,147 @@ The protected stash remains object
 `ef3a53bdf318a5cea30761a9e3d203b106f16e7e` with patch SHA-256
 `8f0bcfaff74a730d6107652b2ad73a5624840926fd836b767731335173f18766`.
 
-This RED is frozen. At its separate clean plan checkpoint, re-authenticate
-`/tmp/phase-1d-ii-green-paused-identity.patch` at exact size 55,474 bytes and
-SHA-256
-`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`,
-require `git apply --check` to pass, apply it and resume the same distinct
-production-only GREEN. Implement the zero-read rule as the specified shallow
-top-level primitive sentinel: unchanged enumerable live-root getters are not
-read, while all frozen publication, ambient-side, isolation, wire, rollback
-and physical-copy semantics remain real. It is neither a recursive proof nor
-authority to skip or fabricate work. No contract changes.
+This RED is frozen, but its earlier handoff to the shallow ambient sentinel and
+paused identity archive is superseded by the causal-boundary correction below.
 
-The latest paused production-only GREEN is archived at
-`/tmp/phase-1d-ii-green-paused-identity.patch`, exact size 55,474 bytes and
-SHA-256
-`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`;
-`git apply --check` passes at this clean checkpoint. The archive changes only
-the same five production owners already assigned to this GREEN. It is
-continuity, not an accepted candidate: do not apply it until after the fresh
-corrective RED and its plan-only checkpoint, then re-authenticate it, apply it
-and re-derive every change while resuming the same GREEN lineage.
+**Phase 1d(ii) ambient-capture causal boundary and canonical checkpoint-source
+correction — unanimously authorized before a fresh corrective RED.** The
+accepted ambient-publication expectations are not replayable. Current local
+authoring can stage from `stateFromDRP(this.drp)` / `stateFromDRP(this.acl)`,
+compare that live capture to the dependency snapshot and publish mutations
+made earlier through a caller-retained raw alias. A remote peer receives only
+the dependency frontier plus encoded operation and reconstructs from stored
+state, so it cannot reproduce those ambient bytes. Identical admitted history
+can therefore acquire different stored state according to local alias history
+and arrival order. The zero-read RED and D.92.2 census independently forbid the
+full live capture needed to discover that drift.
+
+The normative rule is now explicit: governed ACL/DRP state is a deterministic
+function of the canonical owned dependency frontier and the encoded operation.
+Local and remote operations execute from the same canonical frontier state;
+only governed mutations attributable during that operation, plus already-
+accepted raw-egress candidates, may affect stored state. Out-of-band governed
+writes through retained constructor, member or collection aliases are never
+charged to an unrelated vertex and never affect stored snapshots, wire bytes,
+checkpoint state or descendant replay. Replica-local `context` remains
+separately detached and excluded.
+
+This rule does not replace one impossible promise with another. JavaScript
+cannot simultaneously preserve exact retained raw member identity, intercept
+arbitrary raw Object/Array/Map/Set/Date additions, deletions and nested writes,
+avoid scans/fingerprints and fully restore every unobservable drifted live key.
+GREEN must make every key it authoritatively adopts canonical, but untouched
+out-of-band live drift is best-effort, replica-local view state: it may remain
+visible through a stale raw alias and must be ignored by later operation
+staging. No recursive scan, fingerprint or fabricated candidate is permitted.
+A future dedicated API slice may reject interceptable out-of-operation public
+membrane writes; Phase 1d(ii) must not broaden its proxy surface merely to
+simulate observability of raw aliases.
+
+Checkpoint state is itself a consensus artifact. A single-head checkpoint may
+retain the exact stored frontier pair. A multi-frontier fallback must use the
+complete canonical merged-frontier ACL/DRP pair reconstructed from admitted
+history; it must not enumerate, read, compare, copy or invoke accessors on live
+`host.acl`, live `host.drp` or caller-retained aliases. Ambient additions,
+deletions, replacements, nested drift, descriptors and key reordering cannot
+change checkpoint presence, order, values, bytes, work events or descendant
+replay. Preserve complete canonical key order and truthful physical-copy
+events: one event per present copied payload, none for deletion or unchanged
+identity retention. Qualified application accessors remain live-adoption-only.
+This source correction does not consume Phase 1d(iii)'s checkpoint-prune owner.
+
+A fresh Codex-high tests-only corrective RED may change exactly four test
+files and no production or plan file:
+
+1. In `incremental-publication-identity-capture-1d-i-red.test.ts`, replace the
+   four bulk/cross-side/rollback ambient-publication cases with raw-alias
+   isolation cases. Preserve exact initial public/raw identity, alias charging
+   inside `trackMutations`, zero-read and remote-replay controls. The bulk
+   object/Map/Set/Date/add/delete/reorder/alias case must derive its oracle from
+   the canonical baseline plus authored operation effect, not live
+   `stateFromDRP`, and retain a positive authored-operation case over the same
+   shapes. The rollback replacement keeps rolled-back outcomes, immutable root
+   state and exactly-once retry publication while proving ambient drift never
+   becomes the retry pre-image.
+2. In `incremental-publication-corrective-1d-i-red.test.ts`, move the legitimate
+   held-reference/replacement/addition/deletion DRP mutations into an encoded
+   fixture operation and replace the direct ambient ACL publication case with
+   non-publication/isolation. Preserve byte-exact, changed-key and physical-copy
+   assertions.
+3. In `comparison-work-1d-i-red.test.ts`, replace only the ambient nested row
+   with an authored in-operation nested mutation. Preserve the remaining
+   comparison mutants and keep `"applier-candidacy"` in `ComparisonPhase` as a
+   test-facing phase even when its production caller is removed.
+4. In `incremental-publication-work-1d-i-red.test.ts`, add exactly one
+   candidate-killing multi-frontier checkpoint case without changing existing
+   cases or helpers unnecessarily. Clean and drifted harnesses apply identical
+   root-dependent concurrent heads with checkpoint suffix `1`; inject ordinary
+   raw ACL/DRP addition, deletion and order drift between head commits. Clean
+   HEAD must remain GREEN because full concurrent adoption replaces both sides.
+   The proportional-adoption candidate remains RED while checkpoint fallback
+   reads live state. The canonical-checkpoint GREEN must restore equality of
+   frontier, checkpoint ACL/DRP bytes and order, poison exclusion, canonical
+   present keys, clean physical-copy accounting and a state-neutral descendant
+   replay. Do not use a post-adoption wrapper or test-only seam.
+
+The identity-observer sole-copy test, all D.92 authority, existing deletion,
+order, accessor, brand, wire, context, operation-time tracking and rollback
+tests remain frozen. The fresh RED's ambient inversions must fail unchanged
+production causally; the checkpoint addition is a mutation/candidate killer
+that passes unchanged production and fails the proportional candidate until
+checkpoint sourcing is fixed. Record both signatures rather than pretending
+the checkpoint control is independently red on HEAD.
+
+The diagnostic `/tmp/phase-1d-ii-green-adoption-optin.patch` is authenticated
+at 58,723 bytes, SHA-256
+`d28b7828c431569c7a29840ffb6f549b424c27a7ceeef0b31dbf1d5b2b1dfbbc`;
+`git apply --check` passes at this amendment checkpoint. It is rejected-
+authority continuity evidence, not a candidate and not a GREEN resumption
+archive. Reject its persistent live `trackMutations`, root-child proxy
+normalization, ambient observation/reset, ambient-derived candidates and
+live-sourced checkpoint authority. Its primitive-string prevalidation,
+ownership-safe own-data materialization, deferred/COW overlay, changed-key
+replacement, qualified application-accessor rollback and descriptor-only order
+ideas may be re-derived from clean HEAD. The older 55,474-byte identity archive
+at SHA-256
+`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`
+remains historical continuity only; the instruction to apply it is
+superseded. Neither archive may be applied wholesale.
+
+Fresh Codex-high returned
+`PHASE1DII_AMBIENT_CAUSAL_BOUNDARY_AMENDMENT_AGREE=yes`. Exact Kimi 3/high/
+dual-100 session `30f99520-f691-4458-afa6-a868063ccbbb` returned the same flag;
+its result SHA-256 is
+`a3f50aa9e9c4eb8a84087f2414112f42e8add0b3cefd37e1917feb0b8b2780f7`
+and artifact-manifest SHA-256 is
+`6ca0a8b4b2d83ec88c38b981c1f3641a47daf02dc8da4870ab936e595e53e2b5`.
+Final Claude-skill Opus 5/xhigh session
+`51f6d751-6d5a-4720-bafd-2b9be71b7026` agreed and found the live checkpoint
+fallback; its result SHA-256 is
+`95e2e947344acf08cb33a19d365b7f92eed49a3fd8a99ef550b6d6ca0f437fe4`
+and artifact-manifest SHA-256 is
+`5c7a7c9bf95d8e0a1b0c2603a913158eece91e9e4924e75070b535a4e9a3d29b`.
+The native envelope disclosed one automatic non-substantive Haiku helper at 26
+output tokens; it authored no finding or vote.
+
+Because the checkpoint finding widened the amendment, fresh Codex-high then
+returned `PHASE1DII_AMBIENT_CHECKPOINT_SCOPE_AGREE=yes`. A fresh exact Kimi
+3/high/dual-100 review and same-session correction returned the same flag and
+`SUPERSEDES_PRELIMINARY_TEST_TIMING=yes`: clean HEAD passes the checkpoint
+sentinel, while proportional adoption plus live checkpoint sourcing fails it.
+Session `fdaba2b6-901b-43e4-8f26-e23d75b1d89d` used two native turns; its final
+result SHA-256 is
+`5d526dfff94ee7ad70726f7830e93c65a06f218e601dc412961ca9cb863bfe27`
+and artifact-manifest SHA-256 is
+`8ca6875728e3313e715f0ab53fb586549e0a426a1fbb36890890b97affb4280f`.
+The repository, index and protected stash remained unchanged throughout both
+quorums.
+
+Mandatory order: commit this plan-only amendment; spawn a fresh Codex-high
+four-file tests-only RED; prove the expected HEAD RED plus the checkpoint
+candidate-kill differential and all preservation/typecheck/lint/format gates;
+commit the RED and a separate plan checkpoint; then resume the same distinct
+GREEN owner from clean HEAD and re-derive the owned-frontier implementation.
 
 ## Next Agent Prompt — Phase 1d(ii)
 
@@ -19416,13 +19537,22 @@ Freeze accepted zero residual capture-read tests-only RED
 `ae107cbd0844f48d352f32e782c359c4d546a5af`: its exact one-file +3/-6 scope,
 480-line file identity, 2F/6P causal signature with the second local assertion
 masked by fail-fast, preservation signatures and complete gates are recorded
-above. Do not alter it. Re-authenticate
-`/tmp/phase-1d-ii-green-paused-identity.patch` at exact
-55,474 bytes / SHA-256
-`fcb4d45faa81c12ef2ffd82d0937d06a94336c2bcd7648112c2bfd438c3a7b91`,
-run `git apply --check`, apply it and resume the same distinct production-only
-GREEN. The archive is diagnostic continuity, not authority; re-derive and
-verify every production change.
+above. Its three count changes remain authoritative, but the later unanimous
+ambient-causal-boundary correction explicitly supersedes its promise to keep
+the four non-replayable ambient-publication assertions unchanged. Do not apply
+the 55,474-byte identity archive or the 58,723-byte d28b adoption archive;
+retain them only as the authenticated historical/rejected continuity evidence
+described above.
+
+The immediate next action is the fresh Codex-high four-file tests-only RED
+specified in the ambient-causal-boundary correction. It must replace only the
+stale ambient expectations, preserve authored-operation positive coverage and
+add the single multi-frontier checkpoint candidate killer. Run the corrected
+files plus proportionate preservation, object/workspace typecheck, owned and
+tracked lint, Prettier/diff/scope and frozen-artifact checks to `.log`. Record
+the honest signatures: ambient corrections are RED on clean HEAD; the new
+checkpoint test is GREEN on clean HEAD and RED on the d28b proportional/live-
+checkpoint candidate.
 
 Implement exactly the bounded GREEN contract above: prevalidate every key as a
 primitive string; use ownership-safe own-data materialization for reconstruction,
@@ -19432,28 +19562,35 @@ replacement, only from the actual application class prototype chain, with the
 exposed tracked proxy receiver and complete journal rollback. Replace both the
 local `stateFromDRP` → `fromStates` round trip and remote owned-snapshot full
 reconstruction with proportional ownership-safe COW/overlay work while
-preserving isolation and exact wire bytes. Keep fallback mode/reason and
-complete state semantics while copy events report only actual physical work:
-one per present copied entry, none for deletion or an unchanged identity-
-retained owned entry. Do not grow
+preserving isolation and exact wire bytes. Stage local work only from the
+canonical owned frontier; out-of-band raw drift never becomes an ambient
+candidate. Make every authoritatively adopted changed key canonical without
+claiming full restoration of unobservable untouched raw drift. Source every
+checkpoint from the canonical exact frontier, never live hosts. Keep fallback
+mode/reason and complete state semantics while copy events report only actual
+physical work: one per present copied entry, none for deletion or an unchanged
+identity-retained owned entry. Keep `"applier-candidacy"` in the test-facing
+`ComparisonPhase` union even after removing its production call site. Do not grow
 the D.92.2 analyzer, consume D.73 hostile classification, Phase 1d(iii) prune
 ownership or D.92.4 raw-egress ownership, widen binary serialization, or close
 the `OPEN` symbol policy.
 
 Treat exact zero reads of unchanged enumerable live-root getters as the hard
 implementation-primitive sentinel for local DRP-authored, local ACL-authored
-and linear remote work. Preserve and make GREEN the separate ambient-ACL
-authored-trigger semantic test through ownership tracking or the execution
-overlay; never reintroduce a full capture, scan unchanged keys, fabricate copy
-events or omit real publication work merely to satisfy the sentinel.
+and linear remote work. The prior ambient-ACL authored-trigger publication
+obligation is stale and must be replaced by the authorized isolation test.
+Never reintroduce a full capture, scan unchanged keys, fingerprint live state,
+fabricate copy events or omit real authored publication work merely to satisfy
+the sentinel.
 
 Keep the seven implementation-only failures frozen: one dependent-hint live
 ownership migration and six raw-child governed-representation comparison
 failures. Treat the defined-only borrowed-entry identity guard, nullish
 deferred values, batched construction atomicity and sparse-array wire bytes as
 review attack surfaces, not additions to this corrective RED or its contract
-without causal evidence and any required quorum. The archived paused patch is
-diagnostic only; re-derive and verify every resumed production change.
+without causal evidence and any required quorum. Both archived paused patches
+are diagnostic only; re-derive and verify every resumed production change from
+clean HEAD.
 
 Keep the inherited seed-7 exact-parent runtime above 120 seconds visible as
 pre-existing post-`2259f29` performance debt. It authorizes neither a seed
