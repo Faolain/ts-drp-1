@@ -19773,6 +19773,46 @@ serialized typecheck/lint/test/format gates to `.log`, checkpoint RED and GREEN
 separately, and restart fresh Grok, exact Kimi 3/high/dual-100 and conditional
 Opus/xhigh review on the corrected exact HEAD.
 
+**Checkpoint-borrowed application-setter corrective RED accepted and frozen.**
+Fresh Codex-high tests-only commit
+`b54fbf92d810c61b395e69db8ddcfa2f5ec35706` changes only
+`packages/object/tests/residual-reconstruction-prototype-safety-1d-ii-red.test.ts`
+by 151 insertions (735 lines total), SHA-256
+`cd7b8caa64328f819e74e493995b73d4bc81a8c54e1e4177a4854bdc9a28884d`,
+git blob `0b3ed512df029297c8eac3156f8b7db91bb78873`. Production and the
+plan were unchanged.
+
+The exact focused signature is 1F/10P. The case derives its concurrent
+frontier and retained multi-frontier checkpoint from runtime state, then proves
+the setter input is identity-equal to that checkpoint's value and that a live
+mutation changes the checkpoint's encoded bytes. Receiver identity, the
+setter-input three-way alias topology, retained-frontier/checkpoint controls,
+stored-vertex byte isolation and the ordinary scalar application-setter control
+all pass. This is the intended causal RED against production `281fe9f`, not a
+harness failure or hard-coded checkpoint index.
+
+D.92.2 remains 64/64. Fallback/concurrent preservation is exact 1F/48P and
+the proportionate set is exact 1F/136P, both with only the new RED; inherited
+Phase 1d(i) remains 147/147. Object and 34/35 workspace typechecks pass. Owned
+lint is 0/0, tracked lint is zero errors with 249 inherited warnings, and
+Prettier/diff checks pass. Evidence is under
+`.logs/phase-1d-ii-setter-alias-red-codex-high/`; its 18-file artifact-manifest
+SHA-256 is
+`006c4e77d234da88daefb84e625f6ffc491bfe2c376bf07bc21748454b6c2b46`.
+The tracked tree and index were clean after commit; protected untracked paths
+and stash object `ef3a53bdf318a5cea30761a9e3d203b106f16e7e` remained
+untouched.
+
+Resume with a distinct Codex-high production-only GREEN owner from this exact
+committed RED. Keep every test and the plan frozen. Reuse the existing
+per-replacement detacher so a borrowed application-setter value is detached
+before the qualified `Reflect.apply`; preserve one shared detachment session
+across replaced keys so aliases remain aliases. Do not create another copy
+boundary, setter wrapper, analyzer rule or special topology case. Reach exact
+11/11 plus all frozen D.92.2, focused, inherited, proportionate,
+typecheck/lint/format/integrity gates before a production-only commit and a
+separate plan checkpoint.
+
 ## Next Agent Prompt — Phase 1d(ii)
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
