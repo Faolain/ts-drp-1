@@ -22177,24 +22177,60 @@ lint has zero errors and no 100k test ran. Evidence is under
 `.logs/phase-1i-a-branch-order-divergence-red-codex-high/`; ledger SHA-256 is
 `e1288b32ef1d911649524cb324642625b6769d31e1e519a20378d8688ae3da8c`.
 
-## Next Agent Prompt — Phase 1i-a branch-checkpoint corrective GREEN
+**Phase 1i-a branch-checkpoint corrective GREEN checkpoint.** Distinct fresh
+Codex-high committed production-only `37b99fb` on plan checkpoint `8ff7b5a`.
+Only `packages/object/src/drp-applier.ts` and
+`packages/object/src/publication/publisher.ts` change. Stored concurrent-vertex
+snapshots remain causal branch-local cuts. The adoption transaction now carries
+the prior true whole-frontier canonical baseline and publishes a separately
+attributed internal `canonical-live` image only when the already-governed
+concurrent comparison identifies keys whose canonical values differ from the
+stored branch snapshot. That canonical pair, rather than the just-stored
+per-vertex pair, owns live replacement, multi-frontier checkpoint construction
+and `liveCanonicalState`; ordinary-observer deletion still uses the actual
+per-vertex snapshots. This preserves causal replay while making both seven-
+vertex arrival orders converge to `[1,2,4,5,7]`.
 
-Use a distinct fresh Codex-high production-only GREEN on tests-only RED
-`8d48b97`. Repair the Phase 1d/D.92 publication owner: a branch-local
-per-vertex snapshot must never become the canonical multi-frontier checkpoint
-state merely because a root replay forces a checkpoint inside one batch. Both
-writer branch orders must equal the graph-derived full replay and full observer
-without disabling incremental publication, forcing an artificial early
-checkpoint, changing the configured suffix, resetting the batch, or making the
-observer shortcut a writer path. Preserve exact authenticated payload bytes,
-ACL state, rollback, copy-attribution truth, checkpoint/frontier retention,
-all frozen Phase 1d/D.92 suites, the remaining Phase 1i-a contracts, and the
-tests-only 1i-b RED at `fb0f662`. Do not alter tests or the plan, do not run a
-100k gate, and do not add a syntax/source analyzer, compatibility shim or
-threshold-shaped bypass. Run focused and proportional preservation,
-typecheck-error classification, tracked lint and format/diff gates to `.log`;
-commit only the minimum production owner. Then run the normal fresh Grok 4.5,
-exact Kimi 3/high/100 and final Opus/xhigh review loop. Do not schedule Fable.
+The focused corrective suite is 9/9, Phase 1i-a is 16 passed / 1 opt-in 100k
+skip, focused D.92 is 62/62, D.92 copy/setter/rollback is 41/41, residual
+reconstruction plus focused is 21/21, object/node preservation is 11/11 and
+41/41, direct object/applier is 35/35, and direct node/handlers is 10/10. The
+frozen 1i-b RED remains exactly 10 failed / 3 passed / 1 skipped after a forced
+fresh build; its positive controls are 3 passed / 11 skipped. Validation
+typecheck passes; types/object/node typechecks contain only the committed 1i-b
+missing-capability diagnostics (13/35/16) and no production-source diagnostic.
+Tracked lint has zero errors and 226 inherited warnings; owned format and diff
+checks pass. No 100k gate ran. Evidence is under
+`.logs/phase-1i-a-branch-checkpoint-green-codex-high/`; evidence-ledger SHA-256
+is `062c2897fdfd823222ff4378642652cdefc0d1c2bb64945b2e0cbe6175fb6270`.
+
+This checkpoint does not erase six starting-HEAD failures. A detached worktree
+at `8ff7b5a` reproduces the broader Phase 1d result of 406 passes / 4 failures:
+three `map-key-detachment-1d-i-red.test.ts` assertions and one
+`proxy-closure-descriptor-date-1d-i-red.test.ts` assertion. It also reproduces
+the D.92 structure result of 62 passes / 2 failures, both caused by the untouched
+`vertex-authentication.ts:snapshotVertex:detachStatePayload#1` census site.
+They are not regressions from `37b99fb`, but they remain explicit debt: do not
+claim those suites green, grow the frozen test-only source analyzer, or silently
+fold unrelated repairs into this corrective. The review loop must classify
+their production owners and retain a separate TDD obligation before the golden
+paths.
+
+## Next Agent Prompt — review and close Phase 1i-a corrective GREEN
+
+Review exact production commit `37b99fb` against tests-only causal RED
+`8d48b97` with fresh Grok 4.5/high, exact Kimi 3/high/100 and final
+Claude-skill Opus/xhigh. Challenge the separation between causal stored vertex
+cuts and the transaction-local canonical-live image, completeness of governed
+changed-key discovery for addition/deletion/raw-egress/tail-order cases,
+publication accounting, rollback/journal behavior, and absence of duplicate or
+unattributed state reads/copies. Independently verify that observer cleanup uses
+the stored per-vertex pair while live replacement and checkpointing use the
+true canonical pair. Attribute the six broader-suite failures against detached
+starting HEAD and name a later production owner; do not suppress them or expand
+this GREEN. Run proportional gates to `.log`, never the closed one-shot 100k
+gate. Only unanimous acceptance may reclose Phase 1i-a and unblock the distinct
+Phase 1i-b GREEN. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
