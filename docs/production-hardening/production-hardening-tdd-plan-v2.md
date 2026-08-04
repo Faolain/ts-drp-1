@@ -20547,33 +20547,85 @@ formatting and diff check pass. Result SHA-256 is
 and verifies under
 `.logs/phase-1e-auth-unification-corrective-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1e GREEN
+**Phase 1e implementation GREEN checkpoint.** Distinct Codex-high GREEN
+commit `8a268c94837758aeeabc69cdaaad453f5ae0e14b` changes 47 files by
+623 insertions and 168 deletions. `packages/object/src/vertex-authentication.ts`
+now owns stable submitted-vertex capture, secp256k1 recovery, claimed-author
+verification and a module-private `WeakMap` provenance registry. It returns
+detached public handles backed by verifier-owned canonical snapshots. The
+public object `applyVertices(Vertex[])` and legacy `merge(Vertex[])` signatures
+remain source-compatible and mandatory-verifying; the internal applier accepts
+the internal `AuthenticatedVertex` brand and also checks runtime provenance,
+so a cast or a mutated exported handle cannot choose the applied snapshot.
+Root and already-known hashes are trusted skips, while authentication failures
+remain retryable and do not enter the applier's invalid-hash tombstone.
 
-Freeze tests-only RED commits `c680543` and `bd15d47` plus this unanimous
-contract-amendment checkpoint. Start one distinct Codex-high implementation
-GREEN. Move signature recovery and stable submitted-vertex capture into a
-single object/validation-owned verifier that returns snapshots carrying a
-module-owned runtime provenance capability plus internal
-`AuthenticatedVertex` brand. Keep public `DRPObject.applyVertices(Vertex[])`
-and legacy `merge(Vertex[])` source-compatible and mandatory-verifying; make
-the remote applier fail closed for raw/cast-only input. Route UPDATE and
-SYNC_ACCEPT through the same object boundary without duplicate crypto, while
-keeping local pre-sign creation/replay and root/already-known handling as
-separate private lanes. Preserve input-ordered invalid/missing/quarantine
-results, all-clear `applied`, valid sibling commits, retry without invalid
-tombstone poisoning, attestation behavior and exact state/wire semantics.
+UPDATE and SYNC_ACCEPT now pass decoded offers to the object boundary without
+node-side signature recovery. A controller audit before commit found that the
+first draft still read raw offer hashes in UPDATE before and after the
+boundary. The corrected GREEN binds each exact legacy merge tuple to
+object-owned ingest metadata, so UPDATE signs only stored canonical snapshots
+without re-reading a wire offer. The same metadata separately records whether
+the batch contained a root/known or cryptographically authenticated offer;
+SYNC_ACCEPT uses that fact to preserve the prior attestation-merge behavior
+even when a crypto-valid offer is later missing or rejected by graph
+semantics. A new preservation case pins that distinction. Node helper exports
+delegate to the same object verifier, and the handler registry identifies the
+two vertex-carrying message types without installing a second authentication
+pass.
 
-Before broad gates, use the 35-file caller ledger to migrate unsigned test
-fixtures coherently to signed fixtures or a non-shipping test-owned harness;
-never add a production/configurable bypass and never delete valid assertions
-to make GREEN. Change production and necessary test-fixture plumbing only; do
-not modify the frozen RED assertions or this plan. Run focused 19-case RED,
-node auth/object ingest and proportionate preservation, object/node/workspace
-typecheck, owned/tracked lint and formatting to `.log`, avoiding unrelated
-long property/5k suites. Commit the distinct GREEN and fixture migration, then
-checkpoint before fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
-conditional final Claude-skill Opus/xhigh. Do not schedule Fable, consume
-D.73/Phase 1n/optional 0n, or stage protected untracked paths.
+The finite fixture ledger migrated 39 overlapping object test/benchmark files
+to `packages/object/tests/helpers/trusted-vertex-ingest.ts`, a Vitest-only
+module mock. Thirteen low-level files wrap 77 direct-applier batches with the
+internal type. This is not a shipping or configurable trust bypass: the helper
+lives under `tests/`, must be the first runtime import so the mock is hoisted
+before object modules, and the focused Phase 1e suite does not import it.
+Existing replay, rollback, state and publication assertions remain present.
+The only intentionally superseded node fixture expectation is that UPDATE's
+fake object sees prefiltered input; the replacement asserts that the object
+boundary receives the complete raw batch and that known offers produce no new
+local attestation.
+
+Authoritative post-correction gates are focused Phase 1e 19/19 (from exact
+15F/4P RED), node authentication/preservation 20/20, object ingest 6/6,
+direct-applier preservation 54/54 and public-fixture preservation 177/177.
+Object, node and the 34/35-project workspace typechecks pass. Owned lint is
+0/0; tracked lint has zero errors and 249 pre-existing warnings. Formatting,
+the pnpm-writer-normalized nine-line lockfile delta and `git diff --check` are
+clean. The frozen RED file SHA-256 and Git blobs remain exact, and the plan was
+untouched by GREEN. Result SHA-256 is
+`06398ff159ff424792dfb47b3c96997a202eca8cf3071e6a5a3169151385f777`;
+the 16-entry evidence manifest verifies and has SHA-256
+`ad4ba1dc912f976bfddc968ae016ec6c422cbc78d1e1e9761304203ca19a4b77`
+under `.logs/phase-1e-auth-unification-green-codex-high/`.
+
+The three Map-identity expectations and one rollback result-shape expectation
+owned by Phase 1 exit remain unchanged and excluded. `HashGraph > Vertex state
+tests > Tricky merging` also remains unchanged and was reproduced as 1F/24
+skipped from clean base `ba41e20`; it is a pre-existing diagnostic rather than
+Phase 1e acceptance evidence. No D.73, D.92.4-D.92.6, Phase 1n or optional 0n
+scope was consumed. No Fable review is scheduled: the earlier explicitly
+requested closure audit was one-off and is already complete.
+
+## Next Agent Prompt — Phase 1e preliminary reviews
+
+Freeze tests-only RED commits `c680543` and `bd15d47`, contract checkpoint
+`ba41e20`, implementation GREEN `8a268c9` and this plan-only GREEN checkpoint.
+Run a fresh read-only Grok 4.5/high review and then an independent exact Kimi
+3/high review with `--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+`--max-steps-per-turn 100`. Both must authenticate the exact checkpoint and
+evidence before reviewing.
+
+Adversarially inspect whether runtime provenance can be forged or confused by
+handle mutation; whether verification and application consume the same stable
+snapshot; root/known skips and same-hash retry; mixed invalid ordering and
+all-clear `applied`; UPDATE/SYNC_ACCEPT completeness and exactly-once crypto;
+result-bound metadata and preserved finality behavior; test-helper isolation;
+direct dependency/lockfile correctness; and assertion-neutral fixture
+migration. Rerun focused and proportionate gates only where needed. If both
+preliminary reviewers accept, checkpoint their artifacts before one final
+Claude-skill Opus/xhigh adversarial review. Do not schedule Fable or consume
+D.73, Phase 1n or optional 0n scope.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
