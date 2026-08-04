@@ -20825,38 +20825,94 @@ the 23-entry manifest SHA-256 is
 and verifies under
 `.logs/phase-1e-auth-unification-classifier-mock-shape-red-codex-high-one-read-corrective/`.
 
-## Next Agent Prompt — Phase 1e corrective GREEN
+**Phase 1e B1-B4 corrective production GREEN checkpoint (reviews pending).**
+Distinct Codex-high production-only commit
+`9b493e5034c1b4a96b52f50610ffd75fc2da8075` changes exactly four source
+owners by +197/-101:
+
+- `packages/node/src/handlers.ts`: SHA-256
+  `287956ac828f7c0feaef62ab29559c1530b346adba8885e58a4ff5a3d11e4774`,
+  Git blob `a930de443f6a31518d5713bef35c1347ab4d280d`;
+- `packages/object/src/drp-applier.ts`: SHA-256
+  `5124c78308b3e861444748e495e6760d4f49bacde85e1dc283e4c6dfb61730a9`,
+  Git blob `588fd66cf55f31c27f9063b758ee40dea322befe`;
+- `packages/object/src/index.ts`: SHA-256
+  `5d9451c77ed2762eaa94325b08dea3074fbb9b074d0d35024a932b4b872df225`,
+  Git blob `4431fe534333bf7f8266b43f42781915a0da1203`;
+- `packages/object/src/vertex-authentication.ts`: SHA-256
+  `11626f802c6d275463d891cb59b092c0c815e1f4701e8a34a3270ce06fae0d39`,
+  Git blob `bd176bc2ca1d373f54acbf8dfb9bbed4e22a70fd`.
+
+The object package now owns one authenticated remote-merge boundary. A
+module-private `WeakSet` capability distinguishes concrete `DRPObject`
+instances without `instanceof`, duck typing or configuration. Concrete objects
+retain mandatory-verifying public `merge(Vertex[])`; every structural fallback
+receives only detached verifier-issued novel handles. Root and already-known
+hashes remain zero-crypto trusted skips. Provenanced re-entry reissues a fresh
+handle from the canonical snapshot, preventing caller mutation from becoming
+the applied value without repeating recovery.
+
+The discriminated occurrence ledger keeps exact offer order without hash-count
+reconstruction. Invalid occurrences retain their captured hash; authenticated
+occurrences index verifier-owned canonical handles; trusted occurrences carry
+no caller-controlled hash. The public object and private applier both keep an
+unprovenanced occurrence invalid and `applied:false` while committing genuine
+authenticated siblings. Structural results also combine authentication and
+downstream invalids truthfully. Canonical resolution after structural `await`
+fails closed on impossible index/provenance loss, so a structural merge cannot
+mutate a public handle to steer invalid attribution or finality.
+
+Node handlers consume the module-owned `AuthenticatedMergeOutcome`; the two
+spoofable result-bound object methods are deleted. UPDATE finality is derived
+from canonical stored committed vertices. SYNC_ACCEPT persistence, recovery,
+attestation merge and accepted publication require at least one trusted or
+authenticated offer, so an all-auth-invalid batch has no lifecycle side effect.
+
+Final authoritative gates after the last private-order refinement are focused
+16/16, frozen Phase 1e 19/19, node authentication/preservation 20/20, object
+ingest 6/6, direct applier 54/54, public fixtures 177/177 and isolated hostile
+accessor 4/4. Object, node and 34/35-project workspace typechecks pass. Object
+and node package builds pass and create no tracked generated change. Owned lint
+is 0/0; tracked lint has zero errors and 249 existing warnings. Formatting and
+`git diff --check` are clean. Frozen tests, fixtures, plan, manifests, lockfile
+and protected paths were not changed by GREEN.
+
+Result SHA-256 is
+`cffe8f8b2c3698bf46296f70f5e394ef60f021f20522342fd7d349846afad224`;
+the 18-entry manifest SHA-256 is
+`9db2224ca4e7a3aca20c57af2558c02ac4df1d8b857163253d405206d446038d`
+and all entries verify under
+`.logs/phase-1e-auth-unification-corrective-b1-b4-green-codex-high/`.
+No blocking implementation residual is accepted before review.
+
+## Next Agent Prompt — Phase 1e corrective GREEN preliminary reviews
 
 Freeze accepted REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`
 `1c90778` and `f02ad50`; rejected
 implementation GREEN `8a268c9`, checkpoint `78fcb80` and preliminary-review
-checkpoint `178a265` remain lineage, not acceptance. Start a distinct fresh
-Codex-high production GREEN. Do not edit any frozen RED, test fixture or this
-plan. Make the exact nine-case B1-B4 suite 9/9 and corrected structural fixture
-7/7 with one coherent authentication boundary:
+checkpoint `178a265` remain rejected lineage, not acceptance. Review exact
+candidate/checkpoint HEAD after this section with two fresh independent
+read-only reviewers: Grok 4.5 at high reasoning and exact Kimi 3 at high
+reasoning with `--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+`--max-steps-per-turn 100`. Authenticate model/session metadata, raw streams,
+turn completion, result hashes and integrity manifests. Review source, tests,
+candidate diff and authoritative logs; independently rerun bounded probes when
+needed.
 
-1. Derive SYNC_ACCEPT persistence/event lifecycle from accepted verified work,
-   not non-empty raw input.
-2. Treat every unprovenanced occurrence truthfully while preserving the
-   authenticated-sibling partial-commit contract.
-3. Preserve invalid occurrence order even when valid and invalid occurrences
-   share a hash; do not reconstruct classification from hash counts.
-4. Ensure every node-installed structural `IDRPObject` receives detached,
-   verifier-issued values with exactly-once crypto and preserved UPDATE local
-   finality/SYNC_ACCEPT attestation behavior. Do not trust `instanceof`, duck
-   typing, lookalike properties or configuration switches.
+Attack B1-B4 and adjacent ordinary forms: invalid-only and known-only handler
+lifecycle; mixed unprovenanced/authenticated partial commit; equal-hash
+occurrence order across both public surfaces and the private applier; mutated
+or forged authenticated handles; structural objects that mutate received
+handles, lie in merge tuples or expose lookalike methods; exactly-once recovery;
+root/known skips; finality attribution; missing/retry paths; and public/package
+surface compatibility. Check that the module-private concrete capability cannot
+be forged and that no test-only fallback ships. Do not demand speculative
+Cartesian syntax matrices or consume D.73, Phase 1n or optional 0n scope.
 
-Prefer deleting or consolidating result-bound hidden metadata if the unified
-boundary makes it obsolete; do not layer a second recovery pass or keep stale
-compatibility ballast. Preserve root/known zero-crypto lanes, retryability,
-canonical stored/wire bytes and existing state/rollback semantics. Run the
-corrective 9-case suite, all prior Phase 1e and named preservation suites,
-object/node/workspace typechecks, tracked lint, formatting, diff checks and
-final object/node package builds to `.log`. Avoid unrelated property/5k suites.
-Commit production only, checkpoint the candidate, then request fresh Grok
-4.5/high and exact Kimi 3/high/dual-100 reviews. Final Opus/xhigh remains
-conditional on both preliminary reviewers accepting. Do not schedule Fable or
-consume D.73, Phase 1n or optional 0n scope.
+If either preliminary reviewer returns `CHANGES_REQUESTED`, checkpoint the
+executable finding and start a fresh bounded Codex-high RED; skip Opus. Only if
+both independently accept may final Claude-skill Opus/xhigh adversarial review
+run. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
