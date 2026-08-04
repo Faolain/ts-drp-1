@@ -28,8 +28,7 @@ vi.mock("../../src/vertex-authentication.js", () => {
 			return {
 				authenticated: vertices as AuthenticatedVertex[],
 				invalid: [],
-				occurrences: vertices.map(({ hash }) => ({ hash, status: "authenticated" })),
-				offeredHashes: vertices.map(({ hash }) => hash),
+				occurrences: vertices.map((_, authenticatedIndex) => ({ authenticatedIndex, status: "authenticated" })),
 			};
 		},
 		hasAuthenticatedVertexProvenance: (): boolean => true,
