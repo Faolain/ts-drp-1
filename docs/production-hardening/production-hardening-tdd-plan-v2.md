@@ -20792,10 +20792,43 @@ the 20-entry manifest SHA-256 is
 and all entries verify under
 `.logs/phase-1e-auth-unification-classifier-mock-shape-red-codex-high/`.
 
+The first mock-shape commit projected the hostile `hash` twice to populate
+`occurrences` and `offeredHashes`. The public-fixture gate caught this as an
+exact 176/177 regression: the frozen accessor test observed four reads instead
+of two. A one-loop projection reduced it to three and was not committed; a
+proxy, wrapper, frozen-test change or production fallback would have obscured
+the low-level applier invariant.
+
+The sustainable correction moves authenticated occurrence identity to its
+verifier-issued array position. Production now represents occurrences as
+`authenticated + authenticatedIndex`, `invalid + captured hash`, or `trusted`;
+the unused `offeredHashes` duplicate is removed. This is occurrence-precise for
+equal hashes and allows the trusted low-level mock to describe order without
+reading any vertex field. Production invalid ordering resolves an authenticated
+index through module-owned canonical provenance and fails closed on an
+impossible index/provenance loss, so a structural object cannot mutate its
+public handle after `await` to steer classification or finality.
+
+Same-owner tests-only follow-up
+`f02ad502ce0195b9ea19eab29acc286901f4a704` changes only the helper by
++1/-2. The 37-line file has SHA-256
+`ed5e4b16411dd9c010807f305be6b2ecfab173f1c0364ded3193117632aa3e79`
+and Git blob `1657f7e1181f9d779e74d594b50887b3abbae014`. The exact
+accessor suite is 4/4 with its historical two-read assertion; public fixtures
+are 177/177, object ingest 6/6, focused 16/16, frozen Phase 1e 19/19 and node
+authentication 20/20. Object/node typechecks, owned lint, formatting and diff
+checks pass; the four GREEN production files remained byte-identical and
+unstaged throughout. Result SHA-256 is
+`a95995dc06928cdf99ad0737cb67b1e78150a961ad25072adf53983a526b2597`;
+the 23-entry manifest SHA-256 is
+`0157db250f802e13cf4348717539438db7ba9308c3ddfb0ec1cd659e2724ea02`
+and verifies under
+`.logs/phase-1e-auth-unification-classifier-mock-shape-red-codex-high-one-read-corrective/`.
+
 ## Next Agent Prompt — Phase 1e corrective GREEN
 
 Freeze accepted REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`
-and `1c90778`; rejected
+`1c90778` and `f02ad50`; rejected
 implementation GREEN `8a268c9`, checkpoint `78fcb80` and preliminary-review
 checkpoint `178a265` remain lineage, not acceptance. Start a distinct fresh
 Codex-high production GREEN. Do not edit any frozen RED, test fixture or this
