@@ -22440,41 +22440,48 @@ pass. No 100k gate ran. Evidence is under
 and the verified manifest SHA-256 is
 `e2fc74eb8292d2b587cb94c56ec3a1d650188e628bafe560bc31b7043d88642d`.
 
-## Next Agent Prompt — Phase 1i-a/D.92 causal-publication GREEN
+**Causal-publication GREEN checkpoint.** Distinct fresh Codex-high
+production-only commit `8bc3755` changes exactly `drp-applier.ts` and
+`publication/publisher.ts` by 97 insertions / 124 deletions. Stored vertex ACL
+and DRP sides now come from the pending operation's causal state; separately
+prepared adoption state owns only canonical live/checkpoint publication. The
+applier records actual top-level changed/raw-egress keys while replaying
+tail/full suffixes through the existing mutation tracker and unions them with
+the pending operation's attribution, so a cross-key X-to-Y replay reaches
+canonical capture without a history scan or blanket full copy. Fallback
+consensus retention is permitted only when every pre-commit frontier-antichain
+baseline is a direct declared dependency. The obsolete partial
+`applyOverride` and publisher `currentDRP` seams are removed.
 
-Use a distinct fresh Codex-high production-only GREEN on tests-only RED
-`20a156e` (which extends `ea946c3` and `d658aea`). For every committed vertex, publish both
-stored sides from the exact causal closure of its declared dependencies plus
-its own operation. Do not seed
-that vertex-addressed pair from a whole-frontier adoption image or retain a
-noncausal frontier entry merely because it is identical/unanimous. When a
-causal dependency entry is not among the publication record's exact
-whole-frontier `baselineHashes`, either declare truthful attribution allowed by
-the frozen contract or perform the required counted copy; never identity-retain
-an undeclared source. Preserve the separately attributed canonical-live image
-for live replacement and frontier checkpointing, including empty deltas,
-additions, deletions, key order and both ACL/DRP sides. A child must reconstruct
-and authorize from its causal dependency pair, independent of sibling arrival
-order. Canonical-live comparison/capture must account for governed keys changed
-by replayed tail operations, including a tail changing key Y as a function of a
-pending change to distinct key X; considering only the pending operation's keys
-is insufficient. Preserve the bounded direct-dependency retention proof, but do
-not replay the preserved candidate unchanged.
+Post-commit causal/prototype/cross-key is 47/47, Phase 1i-a is 20 passed / 1
+opt-in 100k skip, proportional D.92 is 53/53, fallback/conflict/replay is 50/50,
+comparison is 27/27, raw-child is 23/23, and object/node/direct preservation is
+97/97. Publication work/meter assertions pass without a delta. The broad
+preservation surface is 136 passed plus the exact two inherited D.92.2
+failures; Map-key detachment remains its exact three inherited D.92.3 failures
+/ 15 passes. Those residuals retain their separate owners. Classified Phase
+1i-b typechecks remain exactly 13/35/16, validation and the object production
+build pass, and lint/format/diff checks are clean. No 100k gate ran. Evidence is
+under `.logs/phase-1i-a-d92-causal-publication-green3-codex-high/`; ledger
+SHA-256 is
+`269f5586edf4b3c6d7114300623af2a255f2b3940c88970f7ed1e34ab833a8f7`
+and the verified 24-entry manifest SHA-256 is
+`a0fed0290556ee6747737b9c103fe0b136e795b6b275a501498155f43b295277`.
 
-Repair the semantic source flow, not method names, no-op spelling, fixture keys,
-thresholds or one failing branch. The exploratory clear-and-rebuild candidate
-was rejected because it assumed `operation.currentDRP` was a universally pure
-and complete source, yet the public B/child RED remained contaminated. The
-older sibling-tail stored-value failure from that experiment is now superseded
-and must not be cited as a reason to restore noncausal storage; prove the precise
-source for each stored side instead. Do not change tests or the plan, grow the
-test-only analyzer, fold in the six inherited residuals, or run 100k. Run the
-combined causal RED, the corrected prototype-safety file, Phase 1i-a aggregate,
-proportional D.92 and
-copy/order/raw/rollback suites, object/node/direct preservation, classified
-1i-b typechecks, tracked lint and format/diff gates serially to `.log`. Commit
-only the minimum production owners. Then restart fresh Grok 4.5/high, exact
-Kimi 3/high/100 and final Opus/xhigh acceptance. Do not schedule Fable.
+## Next Agent Prompt — Phase 1i-a/D.92 causal-publication acceptance
+
+Review production-only GREEN `8bc3755` against tests-only lineage `d658aea`,
+`ea946c3` and `20a156e` plus formal contract amendment `c0d8fb1`. Start with a
+fresh Grok 4.5/high review. If it accepts, run exact Kimi 3/high with both
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `--max-steps-per-turn 100`; only after
+that accepts run final Claude-skill Opus/xhigh. Require each reviewer to inspect
+the causal stored-versus-whole-frontier live split, direct-dependency retention
+proof, cross-key tail replay attribution, zero-delta path, ACL authorization,
+prototype-safe serialized bytes, key additions/deletions/order, copy meter,
+rollback/raw/setter preservation and the exact inherited residual ledger.
+Reviewers may run bounded tests/probes but must not change tracked state or run
+100k. A blocking finding returns to a fresh tests-only RED; do not patch during
+review. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
