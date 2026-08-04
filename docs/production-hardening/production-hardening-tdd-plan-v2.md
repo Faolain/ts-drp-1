@@ -19951,18 +19951,18 @@ census was incomplete: borrowed exposure was closed while journal dependency
 ordering still had an unexamined sink. Phase closure therefore requires both
 finite ledgers below, not reviewer exhaustion.
 
-| Closure group                                                    | Current owner/status                                           | Representative proof or next action                                                         |
-| ---------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Key validation and own-data materialization                      | `state-payload.ts` / `state-materialize.ts`; implemented       | Original Phase 1d(ii) RED; duplicate/reserved/`__proto__` and hostile-key controls          |
-| Deferred COW execution overlay                                   | deferred cells plus `state-materialize.ts`; implemented        | Original RED, zero-read sentinel and inherited 147/147                                      |
-| Canonical causal source; ambient drift excluded                  | `drp-applier.ts`; implemented                                  | ambient-causal RED `02cf3cc`, canonical checkpoint sentinel                                 |
-| Publication/checkpoint ownership and copy truth                  | `publisher.ts`; implemented                                    | D.92.2 64/64, meter RED `cb9e9b1`, 49/49 and 137/137                                        |
-| Borrowed value to live exposure                                  | `replaceEnumerableState`; implemented including `5e185af`      | setter-alias RED `b54fbf9` 11/11 plus Grok's reverse-differential and 4/4 probe             |
-| Application-setter receiver, descriptor/order rollback and retry | `recordSetterRollback` plus property journal; **open blocker** | next bounded two-setter/backing-key RED; do not call Phase 1d(ii) complete before it closes |
-| Whole-graph checkpoint pruning                                   | Phase 1d(iii), not 1d(ii)                                      | `publisher.ts:701`; next distinct item only after 1d(ii) acceptance                         |
-| Hostile virtual collection classification                        | D.73, hard pre-3a                                              | virtual `Map.keys()`, `Symbol.hasInstance`, `Symbol.species`; unchanged                     |
-| Sync-livelock exit gate                                          | Phase 1n                                                       | convert the standing sentinel to 6/6 by Phase 1 exit                                        |
-| Optional deterministic math expansion                            | optional post-golden-path 0n                                   | retain existing `@ts-drp/math` scope; use prior art, do not block golden paths              |
+| Closure group                                                    | Current owner/status                                      | Representative proof or next action                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Key validation and own-data materialization                      | `state-payload.ts` / `state-materialize.ts`; implemented  | Original Phase 1d(ii) RED; duplicate/reserved/`__proto__` and hostile-key controls         |
+| Deferred COW execution overlay                                   | deferred cells plus `state-materialize.ts`; implemented   | Original RED, zero-read sentinel and inherited 147/147                                     |
+| Canonical causal source; ambient drift excluded                  | `drp-applier.ts`; implemented                             | ambient-causal RED `02cf3cc`, canonical checkpoint sentinel                                |
+| Publication/checkpoint ownership and copy truth                  | `publisher.ts`; implemented                               | D.92.2 64/64, meter RED `cb9e9b1`, 49/49 and 137/137                                       |
+| Borrowed value to live exposure                                  | `replaceEnumerableState`; implemented including `5e185af` | setter-alias RED `b54fbf9` 11/11 plus Grok's reverse-differential and 4/4 probe            |
+| Application-setter receiver, descriptor/order rollback and retry | `recordSetterRollback` plus property journal; implemented | RED `6f26f3e` + identity correction `1028087`, GREEN `a9b8e92`, accepted by Grok/Kimi/Opus |
+| Whole-graph checkpoint pruning                                   | Phase 1d(iii), not 1d(ii)                                 | `publisher.ts:701`; next distinct item only after 1d(ii) acceptance                        |
+| Hostile virtual collection classification                        | D.73, hard pre-3a                                         | virtual `Map.keys()`, `Symbol.hasInstance`, `Symbol.species`; unchanged                    |
+| Sync-livelock exit gate                                          | Phase 1n                                                  | convert the standing sentinel to 6/6 by Phase 1 exit                                       |
+| Optional deterministic math expansion                            | optional post-golden-path 0n                              | retain existing `@ts-drp/math` scope; use prior art, do not block golden paths             |
 
 The borrowed-value consumer census is six groups: live adoption in
 `replaceEnumerableState`; publisher collection/override; fallback retention;
@@ -20177,15 +20177,78 @@ review. Opus must review the complete two-ledger closure and all preliminary
 caveats, distinguish impossible hostile restoration from ordinary supported
 rollback, and supply an executable exact-HEAD counterexample for any rejection.
 
-## Next Agent Prompt — Phase 1d(ii) rollback corrective
+**Phase 1d(ii) accepted and closed.** Final Claude-skill Opus/xhigh session
+`08547751-ab8d-4779-8594-63d54ad3899b` reviewed exact HEAD `8e82256` and
+returned `ACCEPTED` / `PHASE1DII_MAY_CLOSE=yes` with no blocker. Native exit
+was 0 / `end_turn` after 62 turns and 61 read-only tool uses. Requested selector
+`opus` resolved only to substantive `claude-opus-5` at xhigh; no Haiku helper,
+fallback, subagent, web, Chrome or MCP activity occurred. The controller first
+passed invalid empty MCP JSON `{}`; the CLI rejected it before any model
+session, then the authenticated session launched with
+`{"mcpServers":{}}`. That pre-model argument correction is documented and is
+not a fallback review.
 
-Freeze tests-only RED lineage `6f26f3e` + `1028087`, production-only GREEN
-`a9b8e92` and the plan checkpoints immediately above. Fresh Grok 4.5/high and
-exact Kimi 3/high/dual-100 accepted. The immediate next action is final
-Claude-skill Opus/xhigh review of the exact checkpoint containing this record.
-Do not schedule Fable again unless explicitly requested. Do not consume Phase
-1d(iii), D.73, Phase 1n or optional 0n scope, and never stage protected
-untracked paths.
+Opus independently completed source, plan, test and lineage reasoning before
+authenticating Codex/Grok/Kimi evidence. It verified the one-pre-image
+architecture, rollback LIFO/guards, setter qualification and receiver,
+borrowed-input detachment, no-setter work bound, canonical checkpoint source,
+D.92.2 authority and the complete 12/12 closure. It found no executable
+cross-side co-fire counterexample and accepted the explicit fail-closed
+`ApplyInvariantError` behavior for impossible non-configurable restoration.
+Result SHA-256 is
+`ee4b4280af0c08c060cbc9b6874c673f1356d4dc1849980abf333001cbea5dcd`,
+raw JSON SHA-256 is
+`0cd11fc7e75d7f4cec31978c7abe34fb4040d2f9069d5142b6f5cdf4d18354b8`
+and the 38-entry artifact-integrity SHA-256 is
+`9963cbc1ad153ec161b0ddbc1efc4691e74747f19cf0fcd9e2d0d23be97225af`;
+verification is `ok` under
+`.logs/phase-1d-ii-rollback-order-green-opus-xhigh-review/`.
+
+The final accepted Phase 1d(ii) closure freezes tests-only RED lineage
+`6f26f3e` + `1028087`, borrowed-input GREEN `5e185af`, rollback GREEN
+`a9b8e92`, and all earlier frozen Phase 1d(ii)/D.92.2 causal contracts.
+Grok 4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh unanimously
+accept the complete candidate. No further Phase 1d(ii) slice is authorized
+without a new borrowed consumer, a new rollback journal dependency edge or an
+executable exact-HEAD counterexample under the two-ledger stop rule.
+
+Accepted nonblocking residuals:
+
+- setter transactions intentionally pay one `O(liveInstanceSize)` detached
+  descriptor pre-image; ordinary no-setter replacements do not;
+- a function-valued changed key with a qualified setter can conservatively pay
+  that pre-image even though the function is later skipped;
+- detached rollback preserves descriptor content and isolation, not
+  cross-top-level-key object identity;
+- if future production permits ACL and DRP qualified setters to co-fire, move
+  authority outward and capture both side pre-images before either setter;
+- the internal helper name `recordSetterRollback` is narrower than its new
+  transaction-wide role and may be renamed in a later cleanup without semantic
+  change.
+
+Phase 1d(ii) therefore hands off directly to the already-planned distinct
+Phase 1d(iii) history-independence item. It does not close or consume D.73,
+Phase 1n, optional 0n or any other later owner.
+
+## Next Agent Prompt — Phase 1d(iii)
+
+Freeze the complete accepted Phase 1d(ii) lineage and this closure checkpoint.
+Start one fresh Codex-high tests-only RED for Phase 1d(iii). The causal RED must
+pin the pre-existing `publisher.ts:701`
+`Array.from(hashGraph.vertices.keys())` whole-history materialization and prove
+work at checkpoint pruning is proportional to the retained root/checkpoint
+frontiers plus post-checkpoint tail/prune write set, not total vertex history.
+Preserve checkpoint-frontier/tail retention, root retention, missing-snapshot
+behavior, owner-store identity, journal rollback and byte-exact current
+semantics. Instrument the actual graph key-enumeration/prune boundary without
+hardcoded history size or timing-only assertions; include a small control and
+one bounded large-history/small-tail differential. Run serialized focused and
+proportionate tests, typechecks, tracked/owned lint and formatting to `.log`.
+Commit tests only, then checkpoint the RED before a distinct production-only
+GREEN. Use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional final
+Claude-skill Opus/xhigh for this separate item. Do not schedule Fable unless
+explicitly requested. Do not consume D.73, Phase 1n or optional 0n, and never
+stage protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
