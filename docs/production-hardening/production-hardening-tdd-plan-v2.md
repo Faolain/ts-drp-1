@@ -21368,19 +21368,62 @@ SHA-256 is
 `c377e00a9f5468eb1c1422e729c0779968085db2ec548bf22fccf3d567dfc92f`
 under `.logs/phase-1g-preexisting-node-failures-codex-high-audit/`.
 
-## Next Agent Prompt — Phase 1g stale-fixture baseline repair
+**Phase 1g stale-fixture baseline repaired.** Fresh Codex-high tests-only
+commit `cc361a713b3f0be341b0a48485cca457ecd7ad13` has exact parent `c9fdaef`,
+tree `493a9a65df08a6f9f270cd32a1e3a133f44e620e` and changes only the three
+authorized old test files (+39/-22). Anti-entropy and initial-sync now create
+history through real creator nodes, sign with the production secp256k1 owner
+and assert exact successful remote merges. The BLS cases use independent ACL
+and DRP instances with the same creator-bound object identity; every transfer
+is signed by its actual author and asserted successful. Authentication,
+creator authority, finality-signer qualification, ownership isolation and all
+behavioral counts remain intact.
 
-Assign a fresh Codex-high tests-only owner. Change only the stale fixtures in
-`anti-entropy.test.ts`, `initial-sync.test.ts` and `node.test.ts`; do not touch
-production, the frozen Phase 1g RED, the sync-livelock sentinel or this plan.
-Use real signed history and independent creator-bound replica construction, not
-casts, hooks, fake production compatibility, expectation deletion or weakened
-counts. The required focused transition is exact 8F/23P to the unchanged Phase
-1n 3F/3P only; separately prove the five repaired cases pass. Preserve the
-126/126 network and 42/42 handler/authentication baselines plus typecheck,
-owned/tracked lint, format and diff gates in `.log`. Freeze the test-only repair
-before assigning the distinct Phase 1g production GREEN. Do not schedule
-Fable.
+Freeze the repaired blobs: `anti-entropy.test.ts`
+`b229333d7dcab8620f7cdd88bf252fb1e80c82a4` / SHA-256
+`115932750b8c52d424b4126effd696c1f995c59200c931bb671c9fba2c028382`;
+`initial-sync.test.ts` `f9a67a1ca166aaf9098a1161526e9937f2553a1a` / SHA-256
+`98b9c59c65c09c4db1dfa6e8ab06bceca3658b41064d8ae7b6cb7e27036c7039`;
+`node.test.ts` `52539cfc5f8292cac5b6cb04354da353a63c9b11` / SHA-256
+`5f5c50364d91bbe313ff7a5eb131608b06edfe607c0bf6e406e9e838e1bd84d6`.
+The five repaired cases pass 5/5 before and after commit; all three files pass
+25/25. The four-file baseline is now exact 3 failed / 28 passed, solely the
+unchanged Phase 1n sync-livelock 3F/3P sentinel. Handler/authentication 42/42
+and network 126/126 pass; node/network/workspace typecheck, owned lint, tracked
+lint (zero errors / 249 inherited warnings), format and diff gates pass.
+Result SHA-256 is
+`86a2c23c3b0870016e9c8b206d87f20c8b9ec387292e94ae15bb39a28f1da7c5`;
+the verified 14-entry manifest SHA-256 is
+`2849af8debb0e618f757d61c6372766336f7f0ca66eb473022b8b6a222d7cd2d`
+under `.logs/phase-1g-stale-node-fixtures-codex-high/`.
+
+## Next Agent Prompt — Phase 1g production GREEN
+
+Assign a distinct fresh Codex-high production owner from the exact clean
+checkpoint containing frozen RED `9745e8f` and fixture repair `cc361a7`. Modify
+only the smallest production owners needed for Phase 1g; do not edit any test,
+this plan, generated output, Phase 1n sync behavior or broader resource policy.
+
+At the transport reader, configure `lpStream` with explicit
+`maxDataLength = 4 * 1024 * 1024` so a 4,194,305 declaration fails from its
+prefix before body buffering while 4,194,304 remains accepted. Account for the
+dependency's separate byte-buffer ceiling and varint-prefix headroom without
+raising the declared frame limit or relying on test-only stream shape. At the
+UPDATE handler, after decode and before object lookup or any authentication,
+reject `vertices.length > 32` once, with no per-vertex log/recovery, merge,
+persistence, broadcast, dispatch or sync side effect. Do not apply this UPDATE
+limit to SYNC_ACCEPT; Phase 1o owns its distinct sync-response policy. Use
+stable module-local constants unless an existing public configuration owner
+clearly requires an export; do not invent consensus negotiation, timers, hooks
+or compatibility shims.
+
+Reach focused 4/4, preserve fixture 25/25, handler/authentication 42/42,
+network 126/126 and the exact Phase 1n-only four-file 3F/28P baseline. Run
+package/workspace typecheck, owned/tracked lint, formatting, diff and a clean
+source/package build or equivalent export gate to `.log`, ensuring ignored
+generated output never becomes source authority or a tracked change. Commit
+production only and seal exact blobs/evidence for fresh Grok and exact Kimi 3
+review. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
