@@ -15,6 +15,15 @@ export class ChannelClosedError extends Error {
 	}
 }
 
+/** Error raised when a channel cannot retain another pending send. */
+export class ChannelCapacityError extends Error {
+	/** Create a channel-capacity error. */
+	constructor() {
+		super("Channel pending send capacity exceeded");
+		this.name = "ChannelCapacityError";
+	}
+}
+
 /**
  * Channel is a class that implements a simple message queue.
  * It provides methods to send and receive messages.
@@ -64,13 +73,19 @@ export class Channel<T> {
 			return;
 		}
 
-		// if there is space in the buffer, add the value
-		if (this.values.length < this.options.capacity) {
+		// Preserve older blocked sends before admitting a new value to the buffer.
+		if (this.sends.length === 0 && this.values.length < this.options.capacity) {
 			this.values.push(value);
 			return;
 		}
 
-		// if there is no space in the buffer, wait for a receive
+		// Bound pending sends to one buffer-capacity, while retaining one rendezvous
+		// sender for a capacity-zero channel.
+		const pendingSendCapacity = Math.max(1, this.options.capacity);
+		if (this.sends.length >= pendingSendCapacity) {
+			throw new ChannelCapacityError();
+		}
+
 		const signal = new Deferred<void>();
 		this.sends.push({ value, signal });
 		await signal.promise;
@@ -90,6 +105,14 @@ export class Channel<T> {
 			const value = this.values.shift();
 			if (value === undefined) {
 				throw new Error("Unexpected undefined value in channel");
+			}
+
+			// Refill the freed slot from the oldest blocked sender before a newer
+			// send can consume it.
+			const send = this.sends.shift();
+			if (send) {
+				this.values.push(send.value);
+				send.signal.resolve();
 			}
 			return value;
 		}
