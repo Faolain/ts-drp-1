@@ -20999,9 +20999,11 @@ Codex-high tests-only commit
 `packages/node/tests/authenticated-object-ingress-1e-red.test.ts` by +3/-6. The
 forged-UPDATE test removes the `merge` spy/raw-input dispatch assertions and
 retains exactly-once cryptographic recovery, no stored vertex and no DRP state
-mutation, while adding direct rejection-side-effect assertions: zero node puts
-and zero broadcasts. No security assertion was deleted without a replacement;
-the superseding capability RED owns the stronger no-raw-dispatch rule.
+mutation, while pinning the established UPDATE lifecycle: one node put and zero
+broadcasts. No security assertion was deleted without a replacement; the
+superseding capability RED owns the stronger no-raw-dispatch rule. This corrects
+the earlier checkpoint's factual “zero puts” typo; B1's no-lifecycle rule is
+specifically the all-auth-invalid SYNC_ACCEPT path, not UPDATE.
 
 The corrected original Phase 1e suite is 19/19 on current production, while the
 new capability RED remains exact 2F/1P. Preservation is focused 16/16, node
@@ -21050,32 +21052,83 @@ the verified 26-entry manifest SHA-256 is
 `5487071b5c87bc2bb855cfaa17a0e7e858c7396aa5c6e1d8600e5d23f3c24922`
 under `.logs/phase-1e-concrete-execution-capability-green2-codex-high/`.
 
-## Next Agent Prompt — Phase 1e capability GREEN2 preliminary reviews
+**Phase 1e capability GREEN2 preliminary reviews accepted.** Fresh independent
+Grok 4.5/high and exact Kimi 3/high/dual-100 both return `ACCEPTED` with no
+blocker for exact production `1c09c0f` at checkpoint HEAD `0c16117`. Both
+authenticate the frozen RED/correction/source identities and conclude that raw
+remote input is classified before overridable dispatch, concrete re-entry is
+zero-crypto provenance recognition, committed/finality attribution remains
+module-owned and UPDATE/SYNC_ACCEPT behavior preserves the adopted split.
+
+Grok used native session `b1893f4f-d790-4466-951b-6deabc6f6897`, effective
+`grok-4.5-build` at high reasoning, 20 model calls and natural completed
+`end_turn`. Result SHA-256 is
+`feb44eaa3b54aed4097c67649fac6e508d1cc034f44cb670608a9779f5445fe6`;
+the verified 18-entry manifest SHA-256 is
+`7f5a4725de28cb42397302b074816b35c761d7a2d507a312c585490a5447538b`
+under
+`.logs/phase-1e-concrete-execution-capability-green2-grok45-high-review/`.
+Its read-only sandbox prevented Vitest's Vite temp write; independent no-file
+built-package probes and authenticated GREEN logs supplied executable review
+evidence. One overstrict empty-signature recovery expectation was explicitly
+retracted in the same session.
+
+Exact Kimi 3 used fresh native session
+`3d30c8b9-2c5f-4366-9f7c-a0e34d9cf1fb`, provider `managed:kimi-code`, effective
+model `k3`, `--thinking` and both 100-step controls. It recorded 45
+`StepBegin`, 59 `ToolCall`, 59 `ToolResult` and one normal `TurnEnd`, with no
+fallback, helper, subagent, web, MCP or write tool. Six coverage-disabled
+Vitest invocations executed 288 actual tests and reproduced every requested
+signature through public fixtures 177/177. Result SHA-256 is
+`74b12955d2e600069563665e1fc04de513a14b16e37f292ba2cff532f5f4c940`;
+the verified 49-entry manifest SHA-256 is
+`31c638eb28be8d92114a4b9f3376e0c56496c00784f749e32cd1d6bccddd843c`
+under
+`.logs/phase-1e-concrete-execution-capability-green2-kimi3-high-100-review/`.
+Both reviews kept HEAD, tracked/index tree and stash invariant.
+
+The accepted nonblocking ledger is:
+
+1. the corrected forged-UPDATE test preserves one unconditional UPDATE put and
+   zero broadcasts; the checkpoint prose is corrected above;
+2. the boundary passes its internal authenticated array to `object.merge`; a
+   hostile local implementation can clear/replace elements and cause a
+   fail-closed provenance error or under-reported `committed`, but cannot gain
+   raw remote input or invent canonical committed membership. Defensive array
+   copying is optional hardening unless final review demonstrates a network or
+   state-integrity consequence;
+3. structural implementations retain authority over their declared
+   `MergeResult` tuple when all offers authenticate, while module-owned ledgers
+   still own invalid augmentation, trusted/authenticated lifecycle and canonical
+   committed membership. This is inherited interface trust, not a GREEN2 auth
+   bypass.
+
+## Next Agent Prompt — Phase 1e capability GREEN2 final Opus review
 
 Freeze capability RED `740e180`, observer correction `0075b5a`, production
-GREEN2 `1c09c0f` and every earlier accepted Phase 1e test/correction. Review the
-exact checkpoint HEAD after this section with two fresh independent read-only
-reviewers: Grok 4.5 at high reasoning and exact Kimi 3 at high reasoning with
-`--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
-`--max-steps-per-turn 100`. Authenticate native model/session metadata, raw
-streams, natural turn completion, result hashes and integrity manifests.
+GREEN2 `1c09c0f`, both accepted preliminary reviews and every earlier accepted
+Phase 1e test/correction. Use the `claude` skill for one fresh native
+Claude Opus/xhigh read-only adversarial review of exact checkpoint HEAD after
+this section. Authenticate session/model/effort, full result, completion,
+result hash, integrity manifest and any automatic helper-model usage. A small
+automatic Haiku envelope is acceptable if disclosed and non-substantive; the
+verdict and findings must be Opus-authored.
 
-Attack the corrected ownership boundary rather than repeating syntax matrices:
-subclass and instance `merge` replacement; valid signed input delivered only as
-a detached verifier-issued handle; mutation during overridden dispatch;
-unmodified exactly-once crypto; root/known skips; mixed valid/invalid partial
-commit and exact occurrence order; structural tuple lies/mutation; canonical
-committed/finality attribution; UPDATE/SYNC_ACCEPT lifecycle; public merge
-compatibility; and absence of stale WeakSet/outcome-map authority or test-only
-shipping code. Check that universal verify-first dispatch does not introduce a
-double-verification, double-apply, missing/retry or notification regression.
-Do not demand a speculative Cartesian matrix or consume D.73, Phase 1n or
-optional 0n.
+Attack the complete B1-B4 and capability correction as a finite semantic
+boundary. Reproduce any proposed blocker against exact source before rejecting.
+Specifically adjudicate whether mutation of the authenticated array during an
+overridden merge can cross from local fail-closed/under-reporting into remote
+acceptance, canonical-state corruption, finality error or durable divergence;
+do not promote it merely because a defensive copy is inexpensive. Recheck
+signed-handle detachment, subclass/instance replacement, exactly-once crypto,
+mixed/equal-hash occurrence order, trusted skips, canonical committed/finality,
+UPDATE versus SYNC_ACCEPT lifecycle, retry/missing/quarantine, public API and
+absence of test-framework/WeakSet/outcome-map trust. Keep D.73, Phase 1n and
+optional 0n out of scope.
 
-If either preliminary reviewer returns `CHANGES_REQUESTED`, checkpoint its
-executable finding, skip Opus and begin a bounded fresh Codex-high RED. Only if
-both accept may the final Claude-skill Opus/xhigh adversarial review run. Do not
-schedule Fable.
+If Opus returns changes requested, checkpoint the executable finding and start a
+bounded fresh Codex-high RED. If Opus accepts, checkpoint all review evidence,
+close Phase 1e and continue the next ordered plan item. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
