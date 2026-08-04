@@ -21976,16 +21976,52 @@ Haiku use was small/non-substantive. Exact Kimi used selector `kimi-code/k3`,
 thinking enabled and both 100-step controls. No Fable review was scheduled for
 this amendment.
 
-## Next Agent Prompt — Phase 1i-a corrective tests-only RED
+**Phase 1i-a corrective RED checkpoint.** Freeze tests-only commit `4ea89e9`
+on parent `e275134`. It changes only the two existing Phase 1i node tests/helpers
+and two new object test-owned files; the rejected seven-file production
+candidate remained byte-identical with aggregate binary-diff SHA-256
+`6f7a8eace186f2c1bc0888fa5c3284217ce7dd3921623855767353468e395934`.
+The final focused shape is exactly 5 failed / 10 passed / 1 skipped. Four
+untouched public writer/observer `applyVertices()`/`merge()` paths fail only at
+the orphaned `hasVertex()` or `enableHistoryCompaction()` calls. The fifth RED
+proves observer `finalityStore` reads return and construct/attach a store instead
+of failing explicitly. Behind a bounded descriptor-restoring pre-drift causal
+control, the deeper complete-history, checkpoint/branch sync, linear and
+out-of-order convergence, snapshot rollback, authorized secp256k1 authorship,
+unauthorized rejection and zero-BLS obligations all pass. The control supplies
+only the exact former no-compaction lookup behavior and becomes inert after the
+production repair; it is not a compatibility hook or production adapter.
 
-Use a fresh Codex-high RED agent against tracked HEAD and the rejected unstaged
-functional candidate. It may change only test-owned files and this already
-authorized plan checkpoint; it must not repair production. Freeze the eight
-bounded obligations above with real public ownership and causal controls. Keep
-the long 100k comparison opt-in. Prove the failures are caused by the exact
-orphaned-call, implicit-finality and observer-only replay contract gaps, not by
-stale package artifacts, then run proportional preservation/typecheck/lint
-gates to `.log` and checkpoint the tests-only RED separately.
+Exact object preservation is 11/11. The rejected orphan calls mask 27 of 41
+node preservation assertions without the control; with the per-test control the
+same node corpus is 41/41. Types and validation typechecks pass. Object, node and
+workspace typechecks fail only on the rejected production contracts/orphan
+calls, with no test-owned errors. Owned lint passes, tracked plus new-test lint
+passes at zero errors / 249 inherited warnings, and format/diff checks pass. The
+64-vertex provenance smoke resolves the exact shared
+`packages/object/dist/src/index.js` artifact and identical writer/observer
+digests, while correctly exposing that artifact as older than source. The 100k
+gate was not run in RED and remains opt-in until a fresh GREEN build exists.
+Protected untracked paths remained an exact 54,453-path match. Evidence is under
+`.logs/phase-1i-a-corrective-red-codex-high/`; the evidence-ledger SHA-256 is
+`8b06eb9c29265f5e7ca947b94f16857441da91730dde43a7b191616ced11c7fd`.
+
+## Next Agent Prompt — Phase 1i-a corrective GREEN
+
+Use a distinct fresh Codex-high GREEN against frozen RED `4ea89e9` and the
+rejected unstaged seven-file functional candidate. Change production only as
+required to remove the orphaned `enableHistoryCompaction()` call, restore
+novelty lookup to `this.hashGraph.vertices.has(hash)`, observer-gate the
+live-frontier replay shortcut, and make public observer `finalityStore` access
+throw explicitly without construction or attachment. Preserve writer behavior,
+complete signed observer history, authenticated sync/authorship, rollback and
+all earlier Phase 1i tests. Do not introduce a fake store, compact-history
+placeholder, test-detection hook or compatibility adapter. Run the fast focused
+and proportional preservation suites, package/workspace typecheck, tracked lint,
+format/diff and fresh-build provenance gates to `.log`. Only after those pass,
+build the exact candidate artifacts and run the opt-in 100k `<60%` acceptance
+gate once. If it misses, stop and reconvene the amendment quorum rather than
+shaping implementation to the threshold.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
