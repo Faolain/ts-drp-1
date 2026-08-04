@@ -20936,38 +20936,67 @@ under
 Both reviews kept HEAD, tracked/index state, index tree and the protected stash
 unchanged.
 
-## Next Agent Prompt — Phase 1e concrete execution-capability RED
+**Phase 1e concrete execution-capability tests-only RED accepted and frozen.**
+Fresh Codex-high commit `740e180de9d27dee4d27e0d455579df309054228`
+adds only
+`packages/node/tests/concrete-execution-capability-1e-red.test.ts`: 127 lines,
+SHA-256
+`190187b1f8858658fea3c7a453dfbbfce8d12ac31a5d36cb57ceb4c1bad84d17`,
+Git blob `cf207bdda249379e22e1a08471fb6f6481530ce9`. Production, fixtures,
+earlier frozen tests, this plan, manifests and protected paths were not changed.
 
-Freeze accepted REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`,
-`1c90778` and `f02ad50`. Treat production GREEN `9b493e5` and its checkpoint as
-rejected lineage pending this correction; do not revert its still-valid B1-B3
-work. Spawn one fresh Codex-high tests-only RED owner. It may change only the
-smallest coherent Phase 1e test owner and ignored `.logs` evidence, not
-production, fixtures or this plan.
+The focused and post-commit signatures are exact 2F/1P. The subclass override
+and post-construction replacement each record one invocation, the exact raw
+unsigned input reference and one observable effect before the later outcome
+throw is caught; each requires zero invocation, no raw reference and no effect.
+The failures are therefore causal to pre-authentication virtual dispatch, not
+to the later fail-closed exception. The unmodified concrete positive control is
+green: one `Signature.fromCompact` recovery, one valid commit, result
+`[true, [], []]`, trusted/authenticated offer true and Set state `[103]`.
 
-Pin exactly the capability-ownership boundary:
+All preservation remained green: prior corrective focus 16/16, original frozen
+Phase 1e 19/19, node authentication 20/20, object ingest 6/6, direct applier
+54/54 and public fixtures 177/177. Object and node package typechecks pass;
+workspace typecheck passes all 34/35 projects that expose the script. Owned
+lint/format are clean; tracked lint is zero errors with 249 existing warnings.
+The accepted production sources and protected stash are invariant. Result
+SHA-256 is
+`0b615745f68f0e354d43be8f453e9dd9156f8b4dbc26d5d9e30718b855084cbd`;
+the verified 25-entry manifest SHA-256 is
+`0c184687cee296df5fbafbb1745e6c9be6ff9f0c8ecb6b53b2c8d35f88ed5872`
+under `.logs/phase-1e-concrete-execution-capability-red-codex-high/`.
 
-1. a `DRPObject` subclass overriding public `merge` must never receive raw
-   unauthenticated remote input through `mergeAuthenticatedVertices` or the
-   real node ingress;
-2. post-construction replacement of a normal instance's `merge` must obey the
-   same invariant; and
-3. an unmodified concrete `DRPObject` positive control must preserve
-   exactly-once authentication and existing valid merge behavior.
+## Next Agent Prompt — Phase 1e concrete execution-capability GREEN
 
-The RED must fail for the two raw-before-throw paths because of the production
-boundary, while the positive control and all frozen Phase 1e suites remain
-green. Do not expand into an override syntax matrix or amend the contract.
-Record focused/full gate logs, exact failure/pass counts, source/test hashes and
-an integrity manifest. After a controller audit and RED checkpoint, hand the
-frozen RED to a distinct Codex-high production GREEN owner. The sustainable
-GREEN invariant is a module-owned non-overridable authenticated ingress (or an
-equivalent capability bound to the exact secure implementation), never WeakSet
-construction identity followed by raw virtual dispatch. Preserve public
-`merge(Vertex[])` source compatibility and structural verified-handle behavior.
-Then run the normal fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews,
-with final Claude-skill Opus/xhigh only if both preliminary reviewers accept.
-Do not schedule Fable.
+Freeze tests-only RED `740e180` byte-for-byte together with accepted earlier
+REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`, `1c90778` and
+`f02ad50`. Treat production GREEN `9b493e5` as rejected-but-partially-valid
+lineage: preserve its B1-B3 behavior, occurrence ordering and structural
+verified-handle guarantees. Spawn a distinct fresh Codex-high production GREEN
+owner. It may change only the smallest coherent production owners and ignored
+`.logs` evidence, not any test, fixture, this plan, package manifest, lockfile,
+generated file, protected path or stash.
+
+Make raw remote vertices cross a module-owned, non-overridable authentication
+entry point before any caller-overridable dispatch. WeakSet construction
+identity must no longer authorize `object.merge(raw)`. An ordinary subclass
+override and a post-construction replacement must either receive no invalid
+input or receive only detached verifier-issued authenticated handles; neither
+may observe the raw unsigned object or act before authentication. Preserve the
+unmodified concrete path's exactly-once crypto and valid merge result, public
+`merge(Vertex[])` source compatibility, trusted root/already-known skips,
+structural-object behavior, canonical committed/finality attribution and all
+B1-B3 semantics. Do not fix only the later missing-outcome throw, disable public
+overrides silently, create a configuration trust switch or expand scope into
+D.73, Phase 1n or optional 0n.
+
+Run the 3-test frozen RED plus all recorded Phase 1e preservation,
+package/workspace typecheck, build, lint and formatting gates to `.log`.
+Authenticate the exact production diff, source hashes/blobs, test invariance,
+result digest and integrity manifest. After controller audit and a production
+checkpoint, run fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100
+reviews; final Claude-skill Opus/xhigh runs only if both accept. Do not schedule
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
