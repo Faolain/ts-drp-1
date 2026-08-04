@@ -21561,24 +21561,89 @@ Phase 1n, and D.73 remains a hard pre-3a obligation. Decode-before-UPDATE-count
 is the explicit bounded Phase 1g contract rather than a claim of pre-decode
 protobuf admission.
 
-## Next Agent Prompt — Phase 1g final Opus review
+**Phase 1g accepted and closed.** Final Claude-skill Opus/xhigh reviewed exact
+checkpoint `d69d32b528bb0ae1b67a76ae5062e49ad2061985` and returned
+`ACCEPTED` / `PHASE1G_MAY_CLOSE=yes`, severity none, with no blocking finding.
+The authenticated native session is `0f89be70-337e-4f90-aaf9-6d6014fd9f47`;
+the requested invocation was `--model opus --effort xhigh`, and the effective
+substantive model was `claude-opus-5`. An automatic Haiku envelope contributed
+only 20 output tokens and no substantive reasoning; preserve that disclosure.
 
-Use the Claude skill to run one fresh native Opus/xhigh adversarial review
-against exact checkpoint `bb96760`, corrective RED `997cdc2` and production
-GREEN `37e2fdc`. The reviewer is read-only and may write ignored evidence only;
-it must not invoke Fable/subagents or alter the plan, source, tests, index,
-stash, generated output or protected paths.
+Opus authenticated all 28 recorded commit/blob/diff values, nine prior
+manifests covering 295 artifacts and 14 result/wire digests. Independent
+frame/decoder/body/write/current-build/browser probes pass; exact 4 MiB accepts
+and 4 MiB+1 rejects from its prefix. UPDATE probes pass 8/8: 31/32 preserve the
+ordinary path, while 33/64/512/5000 decode once and perform zero lookup,
+recovery, merge, persistence, broadcast, dispatch or sync. Focused passes 6/6,
+network 130/130, handler/authentication 42/42, all typechecks and tracked lint
+at zero errors / 249 inherited warnings; Phase 1n remains exact 3F/3P.
 
-Authenticate every Phase 1g blob, diff and evidence manifest. Independently
-inspect the installed dependency and bounded decoder, then run executable
-current-source probes for paced incomplete/complete prefixes, decoder parity,
-exact/near frame limits, fragmentation/combined delivery, cleanup/no-UPR and
-write behavior. Recheck real UPDATE admission above/below 32, producer
-compatibility, the Phase 1o SYNC_ACCEPT residual, Phase 1n exact 3F/3P and D.73.
-Require explicit `ACCEPTED` or `CHANGES_REQUESTED`,
-`PHASE1G_MAY_CLOSE=yes/no`, severity, executable evidence and residual ledger.
-If accepted, checkpoint the review and close Phase 1g before starting the next
-dependency-ordered plan item. Do not schedule Fable.
+Preserve the final INFO/gotcha ledger:
+
+1. `lpStream` still appends a transport event before checking its byte buffer
+   and does not unwrap its listener after a rejected read. The corrected prefix
+   accumulator is capped at five bytes; post-rejection byte state is bounded by
+   `maxBufferSize` plus one transport event (about 4.06 MiB for a 64 KiB yamux
+   event), and Phase 1g changes that ceiling by only four bytes. This is
+   pre-existing stream-lifecycle/resource governance, assigned to Phase 1o; it
+   is not the former unbounded prefix-retention defect.
+2. `MAX_FRAME_PREFIX_BYTES = 4` is coupled to the current 4 MiB cap. The current
+   headroom is 64x, but any future frame-cap change must update/prove both
+   constants together.
+3. The write path remains uncapped; Phase 1g is the inbound admission boundary.
+4. The first GREEN result prose overstated a full-lint result: its 84 errors
+   came only from ignored/untracked `.logs`; authoritative tracked lint is
+   clean at zero errors / 249 inherited warnings.
+5. A stray `$HOME/node_modules` can shadow out-of-tree harness imports; review
+   probes must resolve from the repository/package boundary.
+6. The existing esbuild `index.min.js` configuration does not actually produce
+   a bundled artifact. Opus separately proved the corrected decoder through a
+   real browser-target bundle, so this is a build-tooling residual, not a
+   Phase 1g portability gap.
+
+Preserve two reviewer-harness failures without treating them as product
+findings. A 48 MiB stock-decoder comparison attempted one RangeError per byte
+and OOMed near 4 GiB; the bounded replacement proved the same stock linear
+growth at 4 KiB-256 KiB without repeating the OOM. A later check incorrectly
+tried to infer the configured buffer ceiling from traffic that never reached
+it. Both logs remain evidence of why resource probes must be bounded and why
+configuration should be inspected directly.
+
+Native result SHA-256 is
+`94ea297ac410dc6a3e2e4e3a34be7446f100fff3eba15d6e15f0a2088bc64573`;
+raw JSON SHA-256 is
+`a217a2cac53fb1d0b9dce406c96604ee4cdd844aa4c9c7afd49b19925b90c76b`;
+native summary SHA-256 is
+`ed0a76c3c49eb7b2fdc072ae66582727da773695d7c672840f80d349eb54a94a`.
+The native text's in-turn 128-entry manifest hashed `raw.json` before bridge
+completion and is superseded by the controller-sealed, fully verified 136-entry
+manifest SHA-256
+`bb0290269054afe3782154a478e915b7a4d56d485cf82d2362c18d354b35968c`
+under `.logs/phase-1g-unterminated-prefix-green-opus-xhigh-review/`.
+
+## Next Agent Prompt — Phase 1h queue-isolation RED
+
+Assign a fresh Codex-high tests-only owner from the exact clean Phase 1g closure
+checkpoint. Do not edit production, this plan, lockfiles, generated output,
+Phase 1n or protected paths. First reconcile the Phase 1h wording with the live
+two-level path: `DRPNetworkNode` owns one central `MessageQueue`, its subscriber
+calls `DRPNode.dispatchMessage`, and that awaits the per-object
+`MessageQueueManager.enqueue`. Per-object handlers must remain serial; the RED
+must pin only cross-object isolation, not weaken ordered delivery within a room.
+
+Use the real queue/channel/manager path or the narrowest public network-to-node
+equivalent. Block object A's handler, fill A through capacity so its next
+enqueue remains pending or receives the Phase 1f typed capacity result, then
+deliver object B through the same central fanout loop. Assert B reaches its own
+handler before A is released and within the plan's <50 ms budget, while A
+remains blocked; also prove A's messages retain FIFO/serial delivery after
+release, B is delivered exactly once, no unhandled rejection occurs, and
+close/start does not duplicate a fanout generation. Include a no-pressure
+control so the test cannot pass by dropping all dispatches. Prefer causal
+latches/counters with the 50 ms threshold as the explicit contract, not timing
+alone. Freeze the smallest exact RED and run message-queue/network/node focused
+baselines, typechecks, lint, format and diff gates serially to `.log`. Do not
+schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
