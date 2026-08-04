@@ -22406,10 +22406,44 @@ SHA-256 is
 and the verified 26-entry manifest SHA-256 is
 `a953035f2612dae4875f341ed16558f0fc984a1fe7051c03d47fc259afa3e6f4`.
 
+**Cross-key concurrent-tail GREEN diagnostic.** The next distinct Codex-high
+GREEN audited the preserved candidate before accepting it and found a second,
+orthogonal source-flow gap. D sets `x=1`; concurrent B sets `x=2` and A derives
+distinct `y` from `x`; fixed signed timestamps order canonical replay as
+D-to-B-to-A while arrival is D,A,B. The committed baseline leaves immediate
+live and a suffix-1 B/A checkpoint correctly at `x=2,y=2`, but contaminates B's
+stored pair with noncausal `y=2`. The preserved candidate makes B correctly
+causal at `y=0`, but its canonical-live comparison considers only pending B's
+key `x`; replayed tail A changes `y`, so the candidate incorrectly retains old
+live `y=1` and propagates it through a joined child C. This is a real semantic
+cross-key tail dependency, not another value-type or syntax variant. The agent
+restored production clean and stopped without a commit. Its bounded untracked
+probe, baseline/candidate logs and replayed patch are under
+`.logs/phase-1i-a-d92-causal-publication-green2-codex-high/`; ledger SHA-256 is
+`4b9c7899a21231e8e3dfed05c20be31ed53269ab1a76f633ab63032bb8b216d4`.
+
+**Cross-key concurrent-tail tests-only RED checkpoint.** Fresh Codex-high
+commit `20a156e` adds one real signed D/B/A/C semantic fixture to the existing
+Phase 1i-a causal-control owner, changing one test file by 136 insertions / 1
+deletion. It freezes pure D-to-B `y=0`, exact canonical D-to-B-to-A order,
+arrival D,A,B, B stored pair/serialized bytes equal to the pure causal oracle,
+immediate live `x=2,y=2`, the suffix-1 B/A checkpoint, and joined C live/stored
+pair/bytes `y=2`. Current production fails only the two views of B's one causal
+defect; all hard live, replay, checkpoint and join controls pass. Phase 1i-a is
+4 failed / 16 passed / 1 opt-in 100k skip, proportional D.92 is 3 failed / 50
+passed, and object/node preservation remains 46/46 and 51/51. Typechecks retain
+the exact known 13/35/16 Phase 1i-b diagnostics, validation passes, tracked lint
+has zero errors / 226 inherited warnings, and owned format/lint/diff checks
+pass. No 100k gate ran. Evidence is under
+`.logs/phase-1i-a-cross-key-tail-red-codex-high/`; ledger SHA-256 is
+`2d43839964389d580ad0619fe31bef37c7c4efc2560525e660c4e66580fe2ec5`
+and the verified manifest SHA-256 is
+`e2fc74eb8292d2b587cb94c56ec3a1d650188e628bafe560bc31b7043d88642d`.
+
 ## Next Agent Prompt — Phase 1i-a/D.92 causal-publication GREEN
 
 Use a distinct fresh Codex-high production-only GREEN on tests-only RED
-`ea946c3` (which extends `d658aea`). For every committed vertex, publish both
+`20a156e` (which extends `ea946c3` and `d658aea`). For every committed vertex, publish both
 stored sides from the exact causal closure of its declared dependencies plus
 its own operation. Do not seed
 that vertex-addressed pair from a whole-frontier adoption image or retain a
@@ -22421,7 +22455,11 @@ an undeclared source. Preserve the separately attributed canonical-live image
 for live replacement and frontier checkpointing, including empty deltas,
 additions, deletions, key order and both ACL/DRP sides. A child must reconstruct
 and authorize from its causal dependency pair, independent of sibling arrival
-order.
+order. Canonical-live comparison/capture must account for governed keys changed
+by replayed tail operations, including a tail changing key Y as a function of a
+pending change to distinct key X; considering only the pending operation's keys
+is insufficient. Preserve the bounded direct-dependency retention proof, but do
+not replay the preserved candidate unchanged.
 
 Repair the semantic source flow, not method names, no-op spelling, fixture keys,
 thresholds or one failing branch. The exploratory clear-and-rebuild candidate
