@@ -1045,14 +1045,16 @@ round 1 at all.
 | Full inventory wire                                                                                                                                                            | **O(V)** bytes                                                                                                                 | 100k vertices ≈ 6 MB of hashes per sync probe                                                                                                        | 1n                                                                                |
 | Browser mesh                                                                                                                                                                   | —                                                                                                                              | 50–200 connections                                                                                                                                   | Track T                                                                           |
 | **Whole-container clone per merge** (staging-by-copy — introduced by the first L3 fix, **not** baseline; removed)                                                              | O(retained graph + snapshot bytes + finality entries) per `applyVertices`                                                      | 112 ms measured for a 1-vertex merge at V=3000; ~3.7 s at V=100k at the measured slope; 50 ms crossing near V≈1400 by interpolation, p99 not sampled | 0q — **forbidden mechanism**, see Phase 0                                         |
-| **`pruneSnapshots` key materialization** (`Array.from(hashGraph.vertices.keys())`, currently `packages/object/src/publication/publisher.ts:701`, **pre-existing at baseline**) | O(V) burst per checkpoint advance; amortized **O(V/256)** per merge                                                            | not yet measured at scale                                                                                                                            | **1d(iii) — hard before atomic apply may be called history-independent** (D.5(j)) |
+| **`pruneSnapshots` key materialization** (baseline `Array.from(hashGraph.vertices.keys())`; removed by `a0ff979`)                                                            | closed: zero publisher graph traversal at the guarded current-checkpoint boundary                                             | RED 13/13 versus 193/193 yields; GREEN 0/0, with root/checkpoint retention and rollback preserved                                                    | **1d(iii) — accepted and closed**                                                 |
 
 ### Exit gate (Phase 1)
 
 Probe counters flat 10k→1M; zero unauthenticated ingest paths proven **reflectively**, not by a hand list;
 backpressure and frame caps hold under flood; observer heap ratio met; kill-switch drill log exists;
 1d(iii) has removed or bounded whole-graph checkpoint-prune key materialization; and 1n has converted the
-exact inherited sync-livelock 3F/3P sentinel to 6/6 without weakening its assertions.
+exact inherited sync-livelock 3F/3P sentinel to 6/6 without weakening its assertions. Phase 1 exit evidence
+cleanup has also executed and dispositioned the four known stale legacy expectations at its own exact HEAD,
+preserving their still-valid coverage without fake compatibility or coupling the inner loop to the 5k case.
 
 ---
 
@@ -19959,7 +19961,7 @@ finite ledgers below, not reviewer exhaustion.
 | Publication/checkpoint ownership and copy truth                  | `publisher.ts`; implemented                               | D.92.2 64/64, meter RED `cb9e9b1`, 49/49 and 137/137                                       |
 | Borrowed value to live exposure                                  | `replaceEnumerableState`; implemented including `5e185af` | setter-alias RED `b54fbf9` 11/11 plus Grok's reverse-differential and 4/4 probe            |
 | Application-setter receiver, descriptor/order rollback and retry | `recordSetterRollback` plus property journal; implemented | RED `6f26f3e` + identity correction `1028087`, GREEN `a9b8e92`, accepted by Grok/Kimi/Opus |
-| Whole-graph checkpoint pruning                                   | Phase 1d(iii), not 1d(ii)                                 | `publisher.ts:701`; next distinct item only after 1d(ii) acceptance                        |
+| Whole-graph checkpoint pruning                                   | Phase 1d(iii); accepted and closed                        | RED `b5213e9`, GREEN `a0ff979`; current-boundary guard plus zero publisher graph traversal  |
 | Hostile virtual collection classification                        | D.73, hard pre-3a                                         | virtual `Map.keys()`, `Symbol.hasInstance`, `Symbol.species`; unchanged                    |
 | Sync-livelock exit gate                                          | Phase 1n                                                  | convert the standing sentinel to 6/6 by Phase 1 exit                                       |
 | Optional deterministic math expansion                            | optional post-golden-path 0n                              | retain existing `@ts-drp/math` scope; use prior art, do not block golden paths             |
@@ -20376,21 +20378,101 @@ and 45-entry integrity-manifest SHA-256 is
 all entries verify. Persisted native wire corrects the model's approximate
 prose tool count; this is an administrative disclosure, not a review defect.
 
-## Next Agent Prompt — Phase 1d(iii) final review
+**Phase 1d(iii) accepted and closed.** Final Claude-skill Opus/xhigh session
+`7326c4af-85e9-4a47-8a02-6a00393d62df` returned `ACCEPTED` /
+`PHASE1DIII_MAY_CLOSE=yes` / `WORKFLOW_AMENDMENT_AGREE=yes` for exact HEAD
+`2bd138e`, with no blocking finding. The completed turn used only substantive
+`claude-opus-5` at xhigh, ended normally after 58 turns, and made 50 Bash plus
+11 Read requests. The initial `dontAsk` turn denied read-only Bash and stopped
+before a conclusion; the same session resumed with Bash enabled under the
+unchanged no-write/no-web/no-subagent constraints. That aborted envelope
+records one automatic `claude-haiku-4-5-20251001` helper with 25 output tokens;
+it supplied no finding or vote. No fallback, Fable, Sonnet, replacement
+reviewer, MCP or web use occurred.
 
-Freeze Phase 1d(iii) RED `b5213e9`, GREEN `a0ff979`, plan checkpoint
-`4f91449` and both accepted preliminary review artifacts. Commit this
-plan-only preliminary checkpoint, then run one final Claude-skill Opus/xhigh
-adversarial review. Opus must independently authenticate the exact lineage and
-causal differential; challenge the current-checkpoint boundary, its explicit
-silent-retention-to-fail-closed narrowing, `MAX_CHECKPOINTS`, journal rollback,
-retention/identity/wire semantics and work-relocation escapes; keep D.73
-separate; and either ratify or reject the proposed Phase 1 closure owner and
-future contract-adoption stale-inventory sweep. A rejection must give an
-executable exact-HEAD counterexample or concrete violated contract. Only
-unanimous acceptance may close Phase 1d(iii) and adopt the workflow addition.
-Do not schedule another Fable review, consume D.73/Phase 1n/optional 0n, or
-stage protected untracked paths.
+Opus independently authenticated the complete lineage, scopes, source/blob
+hashes and every RED/GREEN manifest entry. It derived the 13/193 RED yields and
+21 bound before reading the logs, matched GREEN 0/0, proved all supported paths
+install the current-boundary checkpoint before the sole private prune call,
+and verified that `removeOldCheckpoint` cannot remove the just-pushed last
+checkpoint. It accepted the explicit future-call narrowing because the guard
+throws before store mutation and the journal unwinds forced pop, push and
+eviction in LIFO order. Root/constructor, multi-frontier, missing-snapshot,
+retained identity, wire bytes, retry and `MAX_CHECKPOINTS` remain preserved;
+no history-sized work was moved into publisher indexing or maintained
+frontier lookup. D.73 remains a separate hard pre-3a obligation.
+
+Result SHA-256 is
+`07e6ee8f35e8a5a9c1623ab7741d45a392d1ddc9c843e599a224e4b7783c9acd`,
+raw stream SHA-256 is
+`f521fc81ca19811d791be9e35ad44c4091886098736017c80b5eff2d9fa7939c`
+and 15-entry integrity-manifest SHA-256 is
+`351bea27cec6d38ddeb2ab15893766f15daf44abbf135a264a3f6fd3d288dfeb`;
+all entries verify under
+`.logs/phase-1d-iii-prune-history-green-opus-xhigh-review/`.
+
+Accepted nonblocking residuals are explicit: hostile/foreign
+`states.prune` can partially delete before throwing because its restore undo is
+recorded only after return; the frozen causal fixture exercises the
+single-frontier path while Kimi's probes and inherited gates cover
+multi-frontier; its observer meters only `hashGraph.vertices`, so a future
+relocation to another graph collection needs a new counterexample/test; and
+store-owned prune history-independence is analytically bounded rather than
+directly metered by this fixture. None is introduced by `a0ff979`, and none
+reopens Phase 1d(iii) without a changed production path or executable
+exact-HEAD counterexample.
+
+### Adopted contract-adoption inventory rule
+
+The Fable, Codex/Grok, exact Kimi 3 and Opus/xhigh agreement adopts this
+bounded workflow rule. Whenever a future contract amendment deletes or
+replaces behavior, perform one grep-driven sweep of the finite frozen-test set
+for expectations, counters, censuses, manifests and suppressions that pin the
+deleted behavior before GREEN resumes. If the sweep finds stale pins, batch
+them into one coherent tests-only corrective RED and one candidate-level
+review quorum. Do not create speculative Cartesian matrix suites and do not
+run the full review ceremony per assertion.
+
+The named owner for the already-observed three Map-detachment identity
+expectations and one rollback result-shape expectation is **Phase 1 exit
+evidence cleanup**. At its own exact HEAD it must execute and record each
+expectation independently of the known synchronous 5k case, classify it
+against the adopted ownership/rollback contracts, prove obsolete then remove
+or repair it, and preserve every still-valid assertion. Fake compatibility is
+forbidden. This cleanup does not reopen 1d(ii) or 1d(iii), but Phase 1 exit
+must not be declared while the four expectations remain only an unexecuted
+`known_stale_slow_bundle` note.
+
+The frozen accepted Phase 1d(iii) lineage is tests-only RED `b5213e9`, RED
+plan checkpoint `7c13b8c`, production-only GREEN `a0ff979`, GREEN plan
+checkpoint `4f91449`, preliminary-review checkpoint `2bd138e` and this final
+closure. Do not reopen it absent an executable counterexample or a production
+change that invalidates the sole-call/current-boundary proof.
+
+## Next Agent Prompt — Phase 1e RED
+
+Freeze the complete accepted Phase 1d lineage and start one fresh Codex-high
+tests-only RED for Phase 1e authentication unification. Current public
+`packages/object/src/index.ts:246` accepts raw `Vertex[]` through
+`applyVertices`, and legacy `merge` reaches the same applier, while signature
+recovery remains in `packages/node/src/handlers.ts:666-706`. The RED must prove
+that direct object-layer ingest rejects unsigned, malformed-signature and
+claimed-author-mismatch vertices even when every node handler is bypassed or
+deleted, while valid signed local/remote/retry behavior and exact result
+ordering remain unchanged. Add a reflective registry-completeness control over
+every vertex-carrying `MessageType`, but do not make that hand list the primary
+security boundary. Evaluate the planned branded `AuthenticatedVertex[]`
+compile-time boundary against all legitimate object callers and record the
+additive public-interface compatibility consequence; RED changes tests/types
+only, not production or this plan. Apply the adopted stale-inventory sweep to
+the finite authentication tests/counters before freezing the RED, batching
+any real stale pins once rather than serially. Run focused negative-space,
+proportionate preservation, object/node/workspace typecheck, owned/tracked
+lint and formatting to `.log`; avoid unrelated long property/5k suites. Commit
+tests only and checkpoint the RED before a distinct production-only GREEN.
+Use the normal fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional
+final Claude-skill Opus/xhigh loop. Do not schedule Fable, consume D.73,
+Phase 1n or optional 0n, or stage protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
