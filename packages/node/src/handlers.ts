@@ -48,6 +48,7 @@ interface HandlerRegistryEntry {
 }
 
 const MAX_SYNC_RECOVERY_RETRIES = 3;
+const MAX_UPDATE_VERTICES = 32;
 export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
 
 interface SyncRecoveryEpisode {
@@ -296,6 +297,10 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	const { sender, data } = message;
 
 	const updateMessage = Update.decode(data);
+	if (updateMessage.vertices.length > MAX_UPDATE_VERTICES) {
+		log.error("::updateHandler: Too many vertices");
+		return;
+	}
 	const object = node.get(message.objectId);
 	if (!object) {
 		log.error("::updateHandler: Object not found");

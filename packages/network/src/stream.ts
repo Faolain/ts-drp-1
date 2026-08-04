@@ -21,6 +21,11 @@
 import type { Stream } from "@libp2p/interface";
 import { lpStream } from "@libp2p/utils";
 
+const MAX_FRAME_BYTES = 4 * 1024 * 1024;
+// The maximum frame length uses a four-byte varint. The byte-stream limit sees
+// prefix and body together when a transport delivers them in one event.
+const MAX_FRAME_PREFIX_BYTES = 4;
+
 /**
  * Convert a Uint8Array to a stream.
  * @param stream - The stream to write to.
@@ -38,7 +43,10 @@ export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Pro
  * @returns The Uint8Array.
  */
 export async function streamToUint8Array(stream: Stream): Promise<Uint8Array> {
-	return lpStream(stream)
+	return lpStream(stream, {
+		maxBufferSize: MAX_FRAME_BYTES + MAX_FRAME_PREFIX_BYTES,
+		maxDataLength: MAX_FRAME_BYTES,
+	})
 		.read()
 		.then((data) => data.subarray());
 }
