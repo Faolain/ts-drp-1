@@ -568,15 +568,19 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const suffixK = remoteVertex("setK", ["suffix-K"], [HashGraph.rootHash], 1);
 		const pendingJ = remoteVertex("setJ", ["pending-J"], [HashGraph.rootHash], 2);
 		await expect(h.applier.applyVertices(trustedTestVertices([suffixK]))).resolves.toMatchObject({ applied: true });
+		const wholeFrontier = h.hashGraph.getFrontier();
 		await expect(h.applier.applyVertices(trustedTestVertices([pendingJ]))).resolves.toMatchObject({ applied: true });
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === pendingJ.hash);
 		expect(record?.mode).toBe("fallback");
 		expect(["non-empty-suffix", "concurrent-tail"]).toContain(record?.fallbackReason);
 		expect(record?.baselineHashes).not.toEqual([HashGraph.rootHash]);
+		expect(record?.baselineHashes).toEqual(wholeFrontier);
 		const target = mapState(h.states.getDRPState(pendingJ.hash)!);
-		expect((target.get("nested") as MatrixDRP["nested"]).stable).toBe("suffix-K");
+		expect.soft((target.get("nested") as MatrixDRP["nested"]).stable).toBe("stable");
 		expect(target.get("replacement")).toBe("pending-J");
+		expect(h.drp.nested.stable).toBe("suffix-K");
+		expect(h.drp.replacement).toBe("pending-J");
 
 		expectCountedFallbackDelta(h, record, pendingJ.hash);
 	});
@@ -617,13 +621,17 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const right = remoteVertex("setJ", ["tail"], [HashGraph.rootHash], 16);
 		await h.applier.applyVertices(trustedTestVertices([left, right]));
 		const pending = remoteVertex("mutateNested", [10], [left.hash], 17);
+		const wholeFrontier = h.hashGraph.getFrontier();
 		await h.applier.applyVertices(trustedTestVertices([pending]));
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === pending.hash);
 		expect(record).toMatchObject({ kind: "vertex", mode: "fallback", fallbackReason: "concurrent-tail" });
+		expect(record?.baselineHashes).toEqual(wholeFrontier);
 		const target = mapState(h.states.getDRPState(pending.hash)!);
-		expect(target.get("replacement")).toBe("tail");
+		expect.soft(target.get("replacement")).toBe("old");
 		expect((target.get("nested") as MatrixDRP["nested"]).child.value).toBe(10);
+		expect(h.drp.replacement).toBe("tail");
+		expect(h.drp.nested.child.value).toBe(10);
 		expectCountedFallbackDelta(h, record, pending.hash);
 	});
 

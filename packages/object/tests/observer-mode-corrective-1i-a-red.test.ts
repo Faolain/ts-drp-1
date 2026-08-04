@@ -25,6 +25,8 @@ type PublicIngest = "applyVertices" | "merge";
 type HistoryFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex];
 type BranchJoinFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex];
 type ZeroDeltaBranchFixture = [Vertex, Vertex, Vertex, Vertex, Vertex];
+type CausalKeySetFixture = [Vertex, Vertex];
+type CausalACLFixture = [Vertex, Vertex, Vertex, Vertex];
 
 interface SigningIdentity {
 	keychain: Keychain;
@@ -81,7 +83,28 @@ class ZeroDeltaBranchDRP implements IDRP {
 	}
 }
 
+class CausalKeySetDRP implements IDRP {
+	semanticsType = SemanticsType.pair;
+	marker = "root";
+	removable?: string = "present";
+	declare added?: string;
+
+	changeSiblingKeySet(): void {
+		this.added = "sibling-added";
+		delete this.removable;
+	}
+
+	mark(value: string): void {
+		this.marker = value;
+	}
+
+	query_state(): { added?: string; marker: string; removable?: string } {
+		return { added: this.added, marker: this.marker, removable: this.removable };
+	}
+}
+
 let author: SigningIdentity;
+let guest: SigningIdentity;
 
 async function identity(seed: string): Promise<SigningIdentity> {
 	const keychain = new Keychain({ private_key_seed: seed });
@@ -109,15 +132,25 @@ function zeroDeltaReplica(): DRPObject<ZeroDeltaBranchDRP> {
 	});
 }
 
+function causalKeySetReplica(): DRPObject<CausalKeySetDRP> {
+	return new DRPObject({
+		peerId: "causal-key-set-writer",
+		acl: createACL({ admins: [author.peerId] }),
+		drp: new CausalKeySetDRP(),
+		config: { log_config: { level: "silent" }, replica_mode: "writer" },
+	});
+}
+
 async function signedVertex(
 	opType: string,
 	value: unknown[],
 	dependencies: string[],
 	timestamp: number,
-	drpType = DrpType.DRP
+	drpType = DrpType.DRP,
+	signer = author
 ): Promise<Vertex> {
-	const vertex = createVertex(author.peerId, Operation.create({ drpType, opType, value }), dependencies, timestamp);
-	vertex.signature = await author.keychain.signWithSecp256k1(vertex.hash);
+	const vertex = createVertex(signer.peerId, Operation.create({ drpType, opType, value }), dependencies, timestamp);
+	vertex.signature = await signer.keychain.signWithSecp256k1(vertex.hash);
 	return vertex;
 }
 
@@ -195,6 +228,32 @@ async function zeroDeltaBranchFixture(): Promise<ZeroDeltaBranchFixture> {
 	return [dependency, changedSibling, zeroDeltaSibling, causalChild, join];
 }
 
+async function causalKeySetFixture(): Promise<CausalKeySetFixture> {
+	const changedSibling = await signedVertex("changeSiblingKeySet", [], [HashGraph.rootHash], 1_700_000_031_001);
+	const target = await signedVertex("mark", ["target-B"], [HashGraph.rootHash], 1_700_000_031_002);
+	return [changedSibling, target];
+}
+
+async function causalACLFixture(): Promise<CausalACLFixture> {
+	const grant = await signedVertex(
+		"grant",
+		[guest.peerId, ACLGroup.Writer],
+		[HashGraph.rootHash],
+		1_700_000_041_001,
+		DrpType.ACL
+	);
+	const revoke = await signedVertex(
+		"revoke",
+		[guest.peerId, ACLGroup.Writer],
+		[grant.hash],
+		1_700_000_041_002,
+		DrpType.ACL
+	);
+	const target = await signedVertex("mark", ["target-B"], [grant.hash], 1_700_000_041_003);
+	const child = await signedVertex("mark", ["authorized-child"], [target.hash], 1_700_000_041_004, DrpType.DRP, guest);
+	return [grant, revoke, target, child];
+}
+
 function storedDRPState(object: DRPObject<ZeroDeltaBranchDRP>, hash: string): Record<string, unknown> {
 	const state = (object as unknown as ObjectReflection)._states.getDRPState(hash);
 	expect(state, `stored DRP snapshot for ${hash}`).toBeDefined();
@@ -223,6 +282,7 @@ function convergenceSnapshot(object: DRPObject<ObserverHistoryDRP>): {
 
 beforeAll(async () => {
 	author = await identity("phase-1i-a-corrective-object-author");
+	guest = await identity("phase-1i-a-causal-acl-guest");
 });
 
 afterEach(() => {
@@ -480,6 +540,83 @@ describe("Phase 1i-a contracts behind the bounded pre-drift causal control", () 
 			governed: 99,
 			marker: "child-of-no-op",
 		});
+	});
+
+	it("keeps a sibling-only key addition and deletion out of B's stored pair and serialized bytes", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "256");
+		const [changedSibling, target] = await causalKeySetFixture();
+		const pureCausal = causalKeySetReplica();
+		await expect(pureCausal.applyVertices([target])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		const expectedPair = pureCausal.getStates(target.hash);
+		const expectedBytes = pureCausal.getSerializedStates(target.hash);
+
+		for (const arrivalOrder of [
+			[changedSibling, target],
+			[target, changedSibling],
+		] as const) {
+			const subject = causalKeySetReplica();
+			for (const vertex of arrivalOrder) {
+				await expect(subject.applyVertices([vertex])).resolves.toMatchObject({
+					applied: true,
+					invalid: [],
+					missing: [],
+				});
+			}
+
+			expect.soft(subject.getStates(target.hash)).toEqual(expectedPair);
+			expect.soft(subject.getSerializedStates(target.hash)).toEqual(expectedBytes);
+			expect(subject.drp?.query_state(), "live state retains both whole-frontier key-set effects").toEqual({
+				added: "sibling-added",
+				marker: "target-B",
+				removable: undefined,
+			});
+		}
+	});
+
+	it("excludes a concurrent revoke from B's stored ACL and authorizes B's child identically across arrival orders", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "256");
+		const [grant, revoke, target, child] = await causalACLFixture();
+		const pureCausal = causalKeySetReplica();
+		await expect(pureCausal.applyVertices([grant, target])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		const expectedACL = pureCausal.getStates(target.hash)[0];
+		const expectedACLBytes = pureCausal.getSerializedStates(target.hash)[0];
+
+		for (const arrivalOrder of [
+			[revoke, target],
+			[target, revoke],
+		] as const) {
+			const subject = causalKeySetReplica();
+			await expect(subject.applyVertices([grant])).resolves.toMatchObject({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			for (const vertex of arrivalOrder) {
+				await expect(subject.applyVertices([vertex])).resolves.toMatchObject({
+					applied: true,
+					invalid: [],
+					missing: [],
+				});
+			}
+
+			expect(subject.acl.query_isWriter(guest.peerId), "live whole-frontier ACL includes the revoke").toBe(false);
+			expect.soft(subject.getStates(target.hash)[0]).toEqual(expectedACL);
+			expect.soft(subject.getSerializedStates(target.hash)[0]).toEqual(expectedACLBytes);
+			await expect(subject.applyVertices([child])).resolves.toMatchObject({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			expect(subject.getVertex(child.hash)).toEqual(child);
+		}
 	});
 
 	it("rolls back both observer snapshot sides when DRP discard rejects after ACL discard", async () => {
