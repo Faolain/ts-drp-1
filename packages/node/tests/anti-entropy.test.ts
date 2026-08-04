@@ -7,7 +7,6 @@
  * therefore send no vertices/full-state traffic.
  */
 import { peerIdFromString } from "@libp2p/peer-id";
-import { createObject } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -20,7 +19,7 @@ import {
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { gossipSubOf } from "./default-network.js";
-import { handleMessage } from "../src/handlers.js";
+import { handleMessage, signGeneratedVertices } from "../src/handlers.js";
 import { createDRPIntervalSync, DRPNode } from "../src/index.js";
 
 class CounterDRP implements IDRP {
@@ -168,8 +167,10 @@ describe("periodic anti-entropy", () => {
 		// signers" — the creator is a finality signer at genesis. The joiner is
 		// unsynced because it has no remotely authored history yet, and must
 		// still probe the first peer that appears.
-		const creatorPeerId = "anti-entropy-first-peer-creator";
-		const creatorObject = createObject({ peerId: creatorPeerId, drp: new CounterDRP() });
+		const creator = await makeNode("anti-entropy-first-peer-creator");
+		nodes.push(creator);
+		const creatorPeerId = creator.networkNode.peerId;
+		const creatorObject = await creator.createObject({ drp: new CounterDRP() });
 		const objectId = creatorObject.id;
 		const node = await makeNode("anti-entropy-first-peer");
 		nodes.push(node);
@@ -206,7 +207,8 @@ describe("periodic anti-entropy", () => {
 		// Once real history has been merged the object is synced; later peers are
 		// left to periodic anti-entropy instead of an immediate probe.
 		creatorObject.drp?.increment();
-		await object.merge(creatorObject.vertices);
+		await signGeneratedVertices(creator, creatorObject.vertices);
+		await expect(object.merge(creatorObject.vertices)).resolves.toEqual([true, [], []]);
 		const secondPeer = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
 		groupPeers.mockReturnValue([firstPeer, secondPeer]);
 		pubsub.safeDispatchEvent("subscription-change", {

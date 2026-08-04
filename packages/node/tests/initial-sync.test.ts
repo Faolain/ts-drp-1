@@ -19,6 +19,7 @@ import {
 } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { signGeneratedVertices } from "../src/handlers.js";
 import { DRPNode, INITIAL_SYNC_RETRY_INTERVAL_MS } from "../src/index.js";
 
 class CounterDRP implements IDRP {
@@ -63,9 +64,10 @@ describe("initial fast sync retry", () => {
 	});
 
 	test("an unsynced object with a group peer retries SYNC each short interval and stops once history arrives", async () => {
-		const creatorObject = createObject({ peerId: "initial-sync-retry-creator", drp: new CounterDRP() });
+		const creator = await makeNode("initial-sync-retry-creator");
 		const node = await makeNode("initial-sync-retry-joiner");
-		nodes.push(node);
+		nodes.push(creator, node);
+		const creatorObject = await creator.createObject({ drp: new CounterDRP() });
 		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
 		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
 		vi.spyOn(node.networkNode, "sendGroupMessageRandomPeer").mockResolvedValue();
@@ -97,7 +99,8 @@ describe("initial fast sync retry", () => {
 		// Remote history arrives; the object is no longer unsynced, so the fast
 		// retry must stop and leave further repair to periodic anti-entropy.
 		creatorObject.drp?.increment();
-		await object.merge(creatorObject.vertices);
+		await signGeneratedVertices(creator, creatorObject.vertices);
+		await expect(object.merge(creatorObject.vertices)).resolves.toEqual([true, [], []]);
 		sendMessage.mockClear();
 		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 3);
 

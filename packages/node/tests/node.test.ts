@@ -97,21 +97,33 @@ describe("DRPNode voting tests", () => {
 	});
 
 	beforeEach(() => {
-		const acl = createACL({ admins: [nodeA.networkNode.peerId] });
-
+		// Replica state is independently owned. Only the creator-bound object id
+		// and the intended genesis administrator are shared across replicas.
 		obj1 = new DRPObject({
 			peerId: nodeA.networkNode.peerId,
-			acl,
+			acl: createACL({ admins: [nodeA.networkNode.peerId] }),
 			drp: new SetDRP(),
 		});
 		obj1.acl.setKey(nodeA.keychain.blsPublicKey);
 
 		obj2 = new DRPObject({
 			peerId: nodeB.networkNode.peerId,
-			acl,
+			id: obj1.id,
+			acl: createACL({ admins: [nodeA.networkNode.peerId] }),
 			drp: new SetDRP(),
 		});
+		expect(obj2.id).toBe(obj1.id);
+		expect(obj2.acl).not.toBe(obj1.acl);
 	});
+
+	async function mergeSigned(
+		author: DRPNode,
+		source: DRPObject<SetDRP<number>>,
+		target: DRPObject<SetDRP<number>>
+	): Promise<void> {
+		await signGeneratedVertices(author, source.vertices);
+		await expect(target.merge(source.vertices)).resolves.toEqual([true, [], []]);
+	}
 
 	test("Nodes in writer set are able to sign", async () => {
 		/*
@@ -121,15 +133,15 @@ describe("DRPNode voting tests", () => {
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Finality);
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Admin);
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Writer);
-		await obj2.merge(obj1.vertices);
+		await mergeSigned(nodeA, obj1, obj2);
 
 		obj2.acl.setKey(nodeB.keychain.blsPublicKey);
-		await obj1.merge(obj2.vertices);
+		await mergeSigned(nodeB, obj2, obj1);
 
-		await obj1.merge(obj2.vertices);
+		await mergeSigned(nodeB, obj2, obj1);
 		obj1.drp?.add(1);
 
-		await obj2.merge(obj1.vertices);
+		await mergeSigned(nodeA, obj1, obj2);
 		const V1 = obj2.vertices.find((v) => v.operation?.value && v.operation?.value[0] === 1) as Vertex;
 		expect(V1 !== undefined).toBe(true);
 
@@ -148,15 +160,15 @@ describe("DRPNode voting tests", () => {
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Finality);
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Writer);
 
-		await obj2.merge(obj1.vertices);
+		await mergeSigned(nodeA, obj1, obj2);
 		obj2.acl.setKey(nodeB.keychain.blsPublicKey);
 
-		await obj1.merge(obj2.vertices);
+		await mergeSigned(nodeB, obj2, obj1);
 		obj1.drp?.add(1);
 		obj1.acl.revoke(nodeB.networkNode.peerId, ACLGroup.Finality);
 		obj1.drp?.add(2);
 
-		await obj2.merge(obj1.vertices);
+		await mergeSigned(nodeA, obj1, obj2);
 		const V2 = obj2.vertices.find((v) => v.operation?.value && v.operation?.value[0] === 2) as Vertex;
 		expect(V2 !== undefined).toBe(true);
 
@@ -176,13 +188,13 @@ describe("DRPNode voting tests", () => {
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Finality);
 		obj1.acl.grant(nodeB.networkNode.peerId, ACLGroup.Writer);
 
-		await obj2.merge(obj1.vertices);
+		await mergeSigned(nodeA, obj1, obj2);
 		obj2.acl.setKey(nodeB.keychain.blsPublicKey);
 
-		await obj1.merge(obj2.vertices);
+		await mergeSigned(nodeB, obj2, obj1);
 		obj1.drp?.add(1);
 
-		await obj2.merge(obj1.vertices);
+		await mergeSigned(nodeA, obj1, obj2);
 		const V1 = obj2.vertices.find((v) => v.operation?.value && v.operation?.value[0] === 1) as Vertex;
 		expect(V1 !== undefined).toBe(true);
 
