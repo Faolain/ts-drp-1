@@ -20267,24 +20267,47 @@ and one stale rollback result-shape expectation; its synchronous 5k case ran
 past 75 seconds and was stopped. Those stale expectations are diagnostic only,
 were not changed, and are not acceptance gates for this RED.
 
-## Next Agent Prompt — Phase 1d(iii) GREEN
+**Phase 1d(iii) production-only GREEN checkpoint.** Distinct Codex-high commit
+`a0ff97992c7e393151b4e2d2eb3a4db104100300` changes only
+`packages/object/src/publication/publisher.ts` by +4/-3 (SHA-256
+`52cc8aa1b592ea54b6c02babd2259caa2ddf1c6e2b51e048b37a37aeda14c4b3`;
+Git blob `82a7b3eca33ea14ab7624342c3047fdf0958f9a9`). The sole real
+caller synchronously installs a checkpoint whose `vertexCount` equals the
+current graph size immediately before pruning. `pruneSnapshots` now checks
+that invariant and fails closed if a future caller presents an unindexed
+post-checkpoint tail; it then retains root plus every checkpoint frontier and
+invokes the owner store's prune without traversing graph vertices. The removed
+tail loop was vacuous at every current call, while the guard makes that timing
+assumption executable rather than silently relying on it.
 
-Freeze the complete accepted Phase 1d(ii) lineage, closure checkpoint and
-tests-only Phase 1d(iii) RED `b5213e9`. Start one distinct Codex-high
-production-only GREEN. Remove the pre-existing `publisher.ts:701`
-`Array.from(hashGraph.vertices.keys())` whole-history materialization so the
-frozen RED's publisher-side work is proportional to root/checkpoint frontiers
-plus the post-checkpoint tail/prune write set, not total vertex history. Do not
-substitute another full `Map` traversal spelling or move equivalent O(V) work
-to every merge. Preserve checkpoint-frontier/tail retention, root retention,
-missing-snapshot behavior, owner-store identity, journal rollback, exact
-retained snapshot identities and byte-exact checkpoint/wire semantics. Run
-the frozen focused differential and serialized proportionate tests,
-typechecks, tracked/owned lint and formatting to `.log`; commit production
-only, then checkpoint the GREEN before fresh Grok 4.5/high, exact Kimi
-3/high/dual-100 and conditional final Claude-skill Opus/xhigh. Do not schedule
-another Fable review unless explicitly requested. Do not consume D.73, Phase
-1n or optional 0n, and never stage protected untracked paths.
+The frozen differential changes from 1F/1P at 13/13 versus 193/193 graph-map
+yields to 2/2 with 0/0 publisher graph-map iteration. Preservation is Phase
+1d(ii) 12/12, inherited Phase 1d(i) 147/147, proportionate 138/138 (including
+D.92.2 64/64 with coverage disabled), checkpoint interleaving 1/1 and stored
+snapshot ownership 5/5. Object/workspace typecheck (34/35 projects),
+formatting, owned lint 0/0 and tracked lint across 739 files with zero errors
+and 249 inherited warnings pass. Evidence is under
+`.logs/phase-1d-iii-prune-history-green-codex-high/`; its 15-entry manifest
+SHA-256 is
+`ec320d1373e680725a7cc9279a0f7680688e72cca7865ea059c67cc062989458`
+and verifies from the repository root. Protected untracked paths and the
+preserved stash remain unchanged.
+
+## Next Agent Prompt — Phase 1d(iii) preliminary reviews
+
+Freeze Phase 1d(iii) RED `b5213e9`, GREEN `a0ff979` and this plan checkpoint.
+Run one fresh native Grok 4.5/high adversarial review and, only after its
+artifact finalizes, one fresh exact Kimi 3/high/dual-100 review. Both must
+authenticate the causal red-to-green signature and preservation evidence,
+inspect the sole call site and prove or refute the current-checkpoint boundary,
+challenge empty-checkpoint, future-call, rollback and exception behavior, and
+reject any hidden history-sized work. A rejection must include an executable
+exact-HEAD counterexample or a concrete violated contract. If both preliminary
+reviewers accept, checkpoint their evidence before final Claude-skill
+Opus/xhigh. Do not schedule another Fable review unless explicitly requested;
+the currently running one-off closure-ledger audit is advisory and must finish
+separately. Do not consume D.73, Phase 1n or optional 0n, and never stage
+protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
