@@ -21686,31 +21686,71 @@ the verified 76-entry manifest SHA-256 is
 `e6640ea9161548f76600f2f2cdca0bee9c9612c662a3ca9a3ec025d279207571`
 under `.logs/phase-1h-queue-isolation-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1h preliminary reviews
+**Phase 1h preliminary reviews accepted.** Fresh native Grok 4.5/high session
+`019fccff-88fd-72f0-8c00-8cd88e0fe1b3` authenticated effective
+`grok-4.5-build`, ten calls and `end_turn`, then returned `ACCEPTED` /
+`PHASE1H_MAY_CLOSE=yes`, severity none. Its independent causal probe delivered
+B 0.055 ms after enqueue and before A release; A completed FIFO `[1,2,3]` with
+maximum concurrency one; the real capacity-one object Channel held one buffered
+plus one pending send; direct overflow returned exact `ChannelCapacityError`;
+closed/missing queues rejected; same-instance restart subscribed once; a clean
+stop/network-swap/start subscribed the new instance once; and no unhandled
+rejection occurred. Result SHA-256 is
+`99ba8f212f92e6eb89e989ddb969b0cf9a89f2a2a02356cc66ceac7bdc59ff35`;
+the verified 49-entry manifest SHA-256 is
+`e59b49ca4d7e145591bbda9cfd70e85e18a45358a4b2e7c441e7ed81c6f5135a`
+under `.logs/phase-1h-queue-isolation-green-grok45-high-review/`.
 
-Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
-exact clean checkpoint containing RED `0b9a9fa`, GREEN `9bcdfbc` and this
-record. Kimi must authenticate selector `kimi-code/k3`, effective `k3`,
-`--thinking`, environment `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI
-`--max-steps-per-turn 100`. Neither reviewer may edit the repository or invoke
-Fable/subagents.
+Fresh exact Kimi 3/high session `ae6112aa-b053-4bc0-82f2-71c0dde8ebfd`
+authenticated selector `kimi-code/k3`, effective `k3`, `--thinking` and both
+100-step controls, then returned `ACCEPTED` / `PHASE1H_MAY_CLOSE=yes`, severity
+none. Its disposable-copy causal check passed exact GREEN 2/2 and reproduced
+the sole pre-GREEN 1F/1P by reverting only `packages/node/src/index.ts`, then
+restored the GREEN blob. The controller stopped Turn 1 at step 36 after the
+promised evidence boundary and used one same-session, zero-tool Turn 2 for the
+explicit verdict; preserve that disclosed interruption. Result SHA-256 is
+`bbe6f00d4ecf23c345c0985dc863b32caaa7cb1f6c717b5e36cfcbe821bcc1a7`;
+the verified 24-entry manifest SHA-256 is
+`4b14832fe5d2833bd9efa58a3d42a7c6e1c65f6be7ac7c3c7e66e66d4d8b05bf`
+under `.logs/phase-1h-queue-isolation-green-kimi3-high-100-review/`.
 
-Authenticate the RED/GREEN blobs and manifests. Independently exercise the
-actual production registration path with A blocked at/over capacity and B
-healthy; prove B's causal delivery before A release, the <50 ms contract,
-same-object FIFO/one-active-handler order, exactly-once delivery and zero
-unhandled rejection. Probe typed capacity rejection, closed/missing queues,
-normal no-pressure traffic, node restart and a changed network-node instance.
-Inspect whether detached same-object calls preserve Channel send ordering and
-whether per-object caps bound outstanding promises rather than moving the leak
-from the central queue. Do not demand generic queue concurrency or preemptive
-protobuf parsing; Phase 1o owns aggregate per-peer/object resource policy.
+The global collaboration lifetime-thread quota prevented a separate Kimi
+controller and also blocked a grandchild. One controller therefore orchestrated
+the native Grok and conclusion-blind fresh K3 sessions sequentially with
+separate original-facts prompts, processes, evidence and verdicts. This is a
+controller-level workflow compromise, not native reviewer/session reuse. The
+finished Kimi disposable copy was moved recoverably from `/tmp` to Trash after
+sealing. Shared HEAD/tree/index/stash/protected state remained unchanged.
 
-Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1H_MAY_CLOSE=yes/no`,
-severity, executable evidence and a residual ledger. Preserve HEAD/tree/index,
-stash and protected paths; seal native session/model/tool evidence. Run final
-Claude-skill Opus/xhigh only if both preliminary reviewers accept. Do not
-schedule Fable.
+All controller gates match: focused 2/2, node aggregate 18/18, message-queue
+46/46, network focused 15/15 and full 130/130; typechecks/lint pass; the
+Phase 1n focused sentinel remains 3F/3P and broader four-file baseline 3F/28P.
+Residual ownership is unchanged: Phase 1o owns aggregate per-peer/object
+resource policy, Phase 1n owns sync livelock, and network-node hot-swap
+unsubscribe lifecycle is pre-existing and nonblocking for this start/stop
+contract.
+
+## Next Agent Prompt — Phase 1h final Opus review
+
+Use the Claude skill for one fresh native Opus/xhigh adversarial review against
+exact checkpoint `9765b5c`, RED `0b9a9fa` and GREEN `9bcdfbc`. The sidecar is
+read-only and may write ignored evidence only; it must not invoke Fable or alter
+source, tests, this plan, index, stash, generated output or protected paths.
+
+Authenticate all Phase 1h blobs, diffs and manifests. Independently exercise
+the actual registered callback with blocked/capacity A and healthy B; prove
+causal <50 ms B isolation, same-object FIFO/serial order, exact typed capacity
+rejection, closed/missing containment, no-pressure, restart/network-swap and
+zero unhandled rejection. Adversarially inspect outstanding-promise bounds,
+shutdown/restart races, log/error containment and whether the synchronous
+prefix before each first await is enough to preserve Channel send order. Keep
+aggregate resource policy in Phase 1o unless executable evidence shows this
+change introduced a new unbounded path.
+
+Require explicit `ACCEPTED` or `CHANGES_REQUESTED`,
+`PHASE1H_MAY_CLOSE=yes/no`, severity, executable evidence and a residual ledger.
+If accepted, checkpoint and close Phase 1h before beginning the next
+dependency-ordered slice. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
