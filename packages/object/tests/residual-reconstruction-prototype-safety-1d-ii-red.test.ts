@@ -787,18 +787,24 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 					changed: { acl: [...record.changed.acl], drp: [...record.changed.drp] },
 					work: record.work ? { acl: { ...record.work.acl }, drp: { ...record.work.drp } } : undefined,
 				}));
-			const expectInputsDetached = (events: RollbackSetterEvent[]): void => {
+			const retainedRollbackValues = (): RollbackSetterValue[] => {
 				const retainedValues = checkpoints().flatMap(({ state }) => state.drpState.state.map(({ value }) => value));
 				for (const hash of [HashGraph.rootHash, ...h.hashGraph.getAllVertices().map(({ hash }) => hash)]) {
 					retainedValues.push(...(h.states.getDRPState(hash)?.state.map(({ value }) => value) ?? []));
 				}
+				return retainedValues.filter(
+					(value): value is RollbackSetterValue => value !== null && typeof value === "object" && "shared" in value
+				);
+			};
+			const expectInputsDetached = (events: RollbackSetterEvent[]): void => {
+				const retainedValues = retainedRollbackValues();
 				for (const event of events) {
 					expect.soft(event.receiver, `${event.key} setter receiver`).toBe(h.applier.drp);
 					for (const retained of retainedValues) {
-						if (retained === null || typeof retained !== "object" || !("shared" in retained)) continue;
-						const value = retained as RollbackSetterValue;
-						expect.soft(event.value, `${event.key} input cannot alias a retained value`).not.toBe(value);
-						expect.soft(event.value.shared, `${event.key} child cannot alias a retained child`).not.toBe(value.shared);
+						expect.soft(event.value, `${event.key} input cannot alias a retained value`).not.toBe(retained);
+						expect
+							.soft(event.value.shared, `${event.key} child cannot alias a retained child`)
+							.not.toBe(retained.shared);
 					}
 				}
 			};
@@ -889,22 +895,26 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			expect.soft(descriptorsAfter.revision, "caught apply restores the revision descriptor").toEqual(revisionBefore);
 			expect
 				.soft(
-					[
-						{
-							descriptor: descriptorsAfter._left,
-							sameValue: descriptorsAfter._left?.value === leftBefore,
-						},
-						{
-							descriptor: descriptorsAfter._right,
-							sameValue: descriptorsAfter._right?.value === rightBefore,
-						},
-					],
+					[descriptorsAfter._left, descriptorsAfter._right],
 					"caught apply must restore true pre-attempt backing descriptors, not mid-commit canonical values"
 				)
-				.toEqual([
-					{ descriptor: descriptorsBefore._left, sameValue: true },
-					{ descriptor: descriptorsBefore._right, sameValue: true },
-				]);
+				.toEqual([descriptorsBefore._left, descriptorsBefore._right]);
+			const restoredValues = [descriptorsAfter._left?.value, descriptorsAfter._right?.value] as RollbackSetterValue[];
+			for (const [index, restored] of restoredValues.entries()) {
+				const failed = failedEvents[index]!;
+				expect
+					.soft(restored, `${failed.key} rollback value cannot alias its failed setter input`)
+					.not.toBe(failed.value);
+				expect
+					.soft(restored.shared, `${failed.key} rollback child cannot alias its failed setter child`)
+					.not.toBe(failed.value.shared);
+				for (const retained of retainedRollbackValues()) {
+					expect.soft(restored, `${failed.key} rollback value cannot alias retained state`).not.toBe(retained);
+					expect
+						.soft(restored.shared, `${failed.key} rollback child cannot alias retained state`)
+						.not.toBe(retained.shared);
+				}
+			}
 			expect
 				.soft(
 					h.hashGraph.getAllVertices().map(({ hash }) => hash),
