@@ -21621,28 +21621,60 @@ manifest SHA-256
 `bb0290269054afe3782154a478e915b7a4d56d485cf82d2362c18d354b35968c`
 under `.logs/phase-1g-unterminated-prefix-green-opus-xhigh-review/`.
 
-## Next Agent Prompt — Phase 1h queue-isolation RED
+**Phase 1h tests-only RED frozen.** Fresh Codex-high commit
+`0b9a9fa18ef3309c44c6e7c72954bea06cf9e992` has exact parent `4b00681`,
+tree `4c5686ff` and adds only
+`packages/node/tests/queue-isolation.test.ts`. Freeze blob
+`bd70797bed9dd19603e4870247ef88038c55260e` / SHA-256
+`164946ca0d36e83006ed10f005508bd3a1ec3db65defb5460ef618d4b15f0c97`;
+binary diff SHA-256 is
+`a520c28a81e214c3626bf01edfe6e9c50de2fb403a69177f346b7100714d5eb4`.
 
-Assign a fresh Codex-high tests-only owner from the exact clean Phase 1g closure
-checkpoint. Do not edit production, this plan, lockfiles, generated output,
-Phase 1n or protected paths. First reconcile the Phase 1h wording with the live
-two-level path: `DRPNetworkNode` owns one central `MessageQueue`, its subscriber
-calls `DRPNode.dispatchMessage`, and that awaits the per-object
-`MessageQueueManager.enqueue`. Per-object handlers must remain serial; the RED
-must pin only cross-object isolation, not weaken ordered delivery within a room.
+The final harness uses a fake `DRPNetworkNode` whose
+`subscribeToMessageQueue` installs the production-registered callback into a
+real central `MessageQueue<Message>`; `emit` only calls that queue's public
+`enqueue`. Production `DRPNode.start()` owns callback registration, and the
+actual `dispatchMessage` reaches a real replacement `MessageQueueManager` plus
+real capacity-one per-object channels. The blocked A handler remains serial;
+A3 is causally pending; after release A completes FIFO with maximum handler
+concurrency one; B is exactly once; no-pressure and node restart controls pass
+and prove the central subscription registers once.
 
-Use the real queue/channel/manager path or the narrowest public network-to-node
-equivalent. Block object A's handler, fill A through capacity so its next
-enqueue remains pending or receives the Phase 1f typed capacity result, then
-deliver object B through the same central fanout loop. Assert B reaches its own
-handler before A is released and within the plan's <50 ms budget, while A
-remains blocked; also prove A's messages retain FIFO/serial delivery after
-release, B is delivered exactly once, no unhandled rejection occurs, and
-close/start does not duplicate a fanout generation. Include a no-pressure
-control so the test cannot pass by dropping all dispatches. Prefer causal
-latches/counters with the 50 ms threshold as the explicit contract, not timing
-alone. Freeze the smallest exact RED and run message-queue/network/node focused
-baselines, typechecks, lint, format and diff gates serially to `.log`. Do not
+Preserve the test-owner correction. The first draft was a pure package
+composition whose test-authored subscriber itself used
+`async => await manager.enqueue`; no production boundary fix could make that
+wrapper nonblocking without weakening Phase 1f channel/backpressure semantics.
+It was fully removed, not retained as compatibility ballast. The final RED is
+exact 1 failed / 1 passed focused and 1 failed / 17 passed in the node focused
+aggregate, solely because B misses the 50 ms isolation budget. Message-queue
+passes 46/46, network focused 15/15, node/workspace typechecks, format/diff and
+tracked lint at zero errors / 249 inherited warnings pass. Result SHA-256 is
+`5f831cebc5e62df52c12aa7ad8ac42e3348f97d6ab93b175658d9dc0b6b9dc4d`;
+the verified 26-entry manifest SHA-256 is
+`015221b0f64fe46fa6c1e797b779b06fdb11fc403ae6c72699c2aa45c0ec439c`
+under `.logs/phase-1h-queue-isolation-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1h production GREEN
+
+Assign a distinct fresh Codex-high production owner from the exact clean
+checkpoint containing RED `0b9a9fa`. Do not edit the frozen test, this plan,
+lockfiles, generated output, Phase 1n or protected paths. Change the smallest
+natural owner at the `DRPNode.start()` → `DRPNetworkNode.subscribeToMessageQueue`
+boundary so a pending/rejected per-object enqueue cannot block the central
+network fanout. Keep `dispatchMessage` itself awaitable for direct callers and
+keep every per-object `MessageQueue` handler FIFO/serial; do not make generic
+`MessageQueue` fanout concurrent, remove Channel bounds, add hidden overflow,
+or weaken Phase 1f typed rejection/lifecycle behavior.
+
+The registered boundary must contain every detached promise rejection with the
+existing logger/error policy, including closed/missing/full object queues, so
+there is no unhandled rejection. It must not duplicate subscriptions across
+node restart, reorder messages within one object, drop normal B delivery or
+invent timers/configuration/compatibility hooks. Reach focused 2/2, node
+aggregate 18/18, preserve message-queue 46/46 and network focused 15/15, then
+run node/network/message-queue/workspace typechecks, owned/tracked lint,
+format/diff and clean build/import gates serially to `.log`. Commit production
+only and seal exact evidence for fresh Grok and exact Kimi 3 review. Do not
 schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
