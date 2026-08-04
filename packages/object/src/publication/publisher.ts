@@ -66,7 +66,6 @@ export interface LinearizationCheckpoint {
 interface PublisherOperation<T extends IDRP> {
 	isACL: boolean;
 	isLocal?: boolean;
-	currentDRP?: T | IACL;
 	acl: IACL;
 	drp?: T;
 	journal: OperationJournal;
@@ -81,6 +80,7 @@ interface PreparedPublicationAdoption<T extends IDRP> {
 	expectedFrontier: Hash[];
 	drp?: T;
 	acl?: IACL;
+	canonicalCandidateKeys?: Readonly<Partial<Record<SnapshotSide, readonly string[]>>>;
 	canonicalBaseline?: ReplayState;
 	canonicalState?: ReplayState;
 }
@@ -99,12 +99,6 @@ interface PublicationPlan {
 	mode: "incremental" | "fallback";
 	baselineHashes: Hash[];
 	fallbackReason?: PublicationFallbackReason;
-}
-
-interface PublicationOverride {
-	baseline: DRPState;
-	instance: IDRP;
-	changedKeys?: Set<string>;
 }
 
 /** Isolated incremental snapshot publisher. Nested payload values stay opaque. */
@@ -157,22 +151,26 @@ export class PublicationPublisher<T extends IDRP> {
 	): void {
 		const {
 			isACL,
-			currentDRP,
 			acl,
 			drp,
 			journal,
 			vertex: { hash },
 		} = operation;
-		const targetACL = adoption.acl ?? (isACL ? (currentDRP as IACL | undefined) : acl);
-		const targetDRP = adoption.drp ?? (isACL ? drp : (currentDRP as T | undefined));
+		// Operation state is the pending vertex's causal cut. Adoption state is the
+		// separately prepared whole-frontier image used only for live/checkpoint state.
+		const causalACL = acl;
+		const causalDRP = drp;
+		const targetACL = adoption.acl ?? causalACL;
+		const targetDRP = adoption.drp ?? causalDRP;
 		const plan = this.vertexPublicationPlan(operation, publicationFrontier);
 		const baselineHash = plan.mode === "incremental" ? plan.baselineHashes[0] : undefined;
 		const publication = this.beginPublication("vertex", plan, hash, publicationFrontier);
 		publicationAttempts.push(publication);
-		const dependencyHash = operation.vertex.dependencies.length === 1 ? operation.vertex.dependencies[0] : undefined;
-		const concurrentOverride = plan.fallbackReason === "concurrent-tail" && dependencyHash !== undefined;
-		const dependencyACLState = dependencyHash === undefined ? undefined : this.host.states.getACLState(dependencyHash);
-		const dependencyDRPState = dependencyHash === undefined ? undefined : this.host.states.getDRPState(dependencyHash);
+		// Publication baselines are pre-commit frontier heads, hence an antichain. A
+		// baseline covered by a declared dependency can therefore only be that direct
+		// dependency; a strict ancestor could not remain a frontier head.
+		const dependencyHashes = new Set(operation.vertex.dependencies);
+		const allowConsensusRetention = plan.baselineHashes.every((candidateHash) => dependencyHashes.has(candidateHash));
 		const aclCandidateKeys = new Set([
 			...(isACL ? (operation.mutatedKeys ?? []) : []),
 			...(operation.rawEgress?.side === "acl" ? operation.rawEgress.candidateKeys : []),
@@ -195,35 +193,27 @@ export class PublicationPublisher<T extends IDRP> {
 					.map((candidateHash) => this.host.states.getDRPState(candidateHash))
 					.filter((state): state is DRPState => state !== undefined)
 			: undefined;
-		const aclOverride =
-			concurrentOverride && isACL && currentDRP && dependencyACLState
-				? { instance: currentDRP, baseline: dependencyACLState, changedKeys: new Set<string>() }
-				: undefined;
-		const drpOverride =
-			concurrentOverride && !isACL && currentDRP && dependencyDRPState
-				? { instance: currentDRP, baseline: dependencyDRPState, changedKeys: new Set<string>() }
-				: undefined;
 		const aclState = this.capturePublishedState(
 			"acl",
-			targetACL,
+			causalACL,
 			baselineHash === undefined ? undefined : this.host.states.getACLState(baselineHash),
 			publication,
 			plan.mode === "incremental",
 			plan.mode === "incremental" ? aclCandidateKeys : undefined,
-			aclOverride,
 			operation.rawEgress?.side === "acl",
-			aclRetentionBaselines
+			aclRetentionBaselines,
+			allowConsensusRetention
 		);
 		const drpState = this.capturePublishedState(
 			"drp",
-			targetDRP,
+			causalDRP,
 			baselineHash === undefined ? undefined : this.host.states.getDRPState(baselineHash),
 			publication,
 			plan.mode === "incremental",
 			plan.mode === "incremental" ? drpCandidateKeys : undefined,
-			drpOverride,
 			operation.rawEgress?.side === "drp",
-			drpRetentionBaselines
+			drpRetentionBaselines,
+			allowConsensusRetention
 		);
 		this.installState("acl", hash, aclState, journal);
 		this.installState("drp", hash, drpState, journal);
@@ -232,14 +222,14 @@ export class PublicationPublisher<T extends IDRP> {
 			aclState:
 				adoption.acl === undefined
 					? (canonicalBaseline?.aclState ?? aclState)
-					: aclOverride === undefined
+					: targetACL === causalACL
 						? aclState
 						: this.captureCanonicalLiveState(
 								"acl",
 								targetACL,
 								aclState,
 								canonicalBaseline?.aclState ?? aclState,
-								aclOverride.changedKeys,
+								new Set(adoption.canonicalCandidateKeys?.acl ?? aclCandidateKeys),
 								publication,
 								publicationAttempts,
 								publicationFrontier
@@ -247,14 +237,14 @@ export class PublicationPublisher<T extends IDRP> {
 			drpState:
 				adoption.drp === undefined
 					? (canonicalBaseline?.drpState ?? drpState)
-					: drpOverride === undefined
+					: targetDRP === causalDRP
 						? drpState
 						: this.captureCanonicalLiveState(
 								"drp",
 								targetDRP,
 								drpState,
 								canonicalBaseline?.drpState ?? drpState,
-								drpOverride.changedKeys,
+								new Set(adoption.canonicalCandidateKeys?.drp ?? drpCandidateKeys),
 								publication,
 								publicationAttempts,
 								publicationFrontier
@@ -272,7 +262,8 @@ export class PublicationPublisher<T extends IDRP> {
 		publicationAttempts: PublicationRecord[],
 		frontier: Hash[]
 	): DRPState {
-		if (instance === undefined || candidateKeys.size === 0) return published;
+		if (instance === undefined) return published;
+		if (candidateKeys.size === 0) return baseline;
 		const publication = this.beginPublication(
 			"canonical-live",
 			{ mode: "incremental", baselineHashes: [...frontier] },
@@ -280,17 +271,7 @@ export class PublicationPublisher<T extends IDRP> {
 			frontier
 		);
 		publicationAttempts.push(publication);
-		const canonical = this.capturePublishedState(
-			side,
-			instance,
-			baseline,
-			publication,
-			true,
-			candidateKeys,
-			undefined,
-			false,
-			[published]
-		);
+		const canonical = this.capturePublishedState(side, instance, baseline, publication, true, candidateKeys);
 		return canonical.state.length === published.state.length &&
 			canonical.state.every((entry, index) => entry === published.state[index])
 			? published
@@ -469,9 +450,9 @@ export class PublicationPublisher<T extends IDRP> {
 	 * @param publication - Publication accounting record
 	 * @param incremental - Whether unchanged entries may be retained
 	 * @param candidateKeys - Keys eligible for equality comparison
-	 * @param override - Concurrent-tail override source
 	 * @param rawEgress - Whether candidacy widened to every governed key
 	 * @param retentionBaselines - Additional owned snapshots eligible for entry retention
+	 * @param allowConsensusRetention - Whether every retention baseline is a direct causal dependency
 	 * @returns Independently owned published snapshot
 	 */
 	capturePublishedState(
@@ -481,9 +462,9 @@ export class PublicationPublisher<T extends IDRP> {
 		publication: PublicationRecord,
 		incremental: boolean,
 		candidateKeys?: ReadonlySet<string>,
-		override?: PublicationOverride,
 		rawEgress = false,
-		retentionBaselines?: readonly DRPState[]
+		retentionBaselines?: readonly DRPState[],
+		allowConsensusRetention = false
 	): DRPState {
 		if (rawEgress && incremental && candidateKeys === undefined) {
 			throw new Error("Raw-egress publication requires an explicit candidate keyset");
@@ -493,14 +474,14 @@ export class PublicationPublisher<T extends IDRP> {
 		const values = new Map<string, unknown>();
 		const borrowedEntries = new Map<string, DRPState["state"][number]>();
 		this.collectValues(instance, targetKeys, values, borrowedEntries, rawEgress && incremental);
-		if (override) this.applyOverride(side, publication, override, targetKeys, values, borrowedEntries);
 		const fallbackRetention = this.selectFallbackRetention(
 			side,
 			publication,
 			targetKeys,
 			values,
 			borrowedEntries,
-			retentionBaselines
+			retentionBaselines,
+			allowConsensusRetention
 		);
 		const entries: DRPState["state"] = [];
 		const changed = publication.changed[side] as string[];
@@ -569,7 +550,7 @@ export class PublicationPublisher<T extends IDRP> {
 			changed.sort();
 			return this.capability.createSnapshot(entries);
 		}
-		if (instance || override) {
+		if (instance) {
 			for (const key of targetKeys) {
 				const value = values.get(key);
 				const retainedEntry = fallbackRetention.get(key);
@@ -594,11 +575,7 @@ export class PublicationPublisher<T extends IDRP> {
 					continue;
 				}
 				const borrowedEntry = borrowedEntries.get(key);
-				if (
-					borrowedEntry !== undefined &&
-					Object.is(value, borrowedEntry.value) &&
-					(incremental || retentionBaselines !== undefined)
-				) {
+				if (borrowedEntry !== undefined && Object.is(value, borrowedEntry.value) && incremental) {
 					entries.push(borrowedEntry);
 					continue;
 				}
@@ -631,7 +608,8 @@ export class PublicationPublisher<T extends IDRP> {
 		targetKeys: ReadonlySet<string>,
 		values: ReadonlyMap<string, unknown>,
 		borrowedEntries: ReadonlyMap<string, DRPState["state"][number]>,
-		baselines: readonly DRPState[] | undefined
+		baselines: readonly DRPState[] | undefined,
+		allowConsensusRetention: boolean
 	): Map<string, DRPState["state"][number]> {
 		const retained = new Map<string, DRPState["state"][number]>();
 		if (baselines === undefined || baselines.length === 0) return retained;
@@ -650,11 +628,9 @@ export class PublicationPublisher<T extends IDRP> {
 			if (candidates === undefined) continue;
 			const borrowed = borrowedEntries.get(key);
 			if (borrowed !== undefined && Object.is(values.get(key), borrowed.value)) {
-				// The current identity proves the deferred cell remained unmaterialized, so
-				// replay neither observed nor replaced this key. A semantic change between
-				// the replay source and every frontier state would require such an access;
-				// publication-only copies may change identity but preserve value. Therefore
-				// unanimous frontier identity is a safe no-read retention proof.
+				// Borrowed identity is a retention proof only when that exact entry or value
+				// belongs to a declared baseline. Frontier consensus alone says nothing
+				// about a causal value which those frontier heads exclude.
 				const exactEntry = candidates.find(
 					(candidate) => candidate === borrowed || Object.is(candidate.value, borrowed.value)
 				);
@@ -664,6 +640,7 @@ export class PublicationPublisher<T extends IDRP> {
 				}
 				const consensus = candidates[0];
 				if (
+					allowConsensusRetention &&
 					consensus !== undefined &&
 					candidates.every((candidate) => candidate === consensus || Object.is(candidate.value, consensus.value))
 				) {
@@ -705,50 +682,6 @@ export class PublicationPublisher<T extends IDRP> {
 			values.set(key, value);
 			const borrowed = borrowedStateEntry(instance, key) as DRPState["state"][number] | undefined;
 			if (borrowed?.key === key) borrowedEntries.set(key, borrowed);
-		}
-	}
-
-	private applyOverride(
-		side: SnapshotSide,
-		publication: PublicationRecord,
-		override: PublicationOverride,
-		targetKeys: Set<string>,
-		values: Map<string, unknown>,
-		borrowedEntries: Map<string, DRPState["state"][number]>
-	): void {
-		const overrideKeys = new Set<string>();
-		const baselineEntries = new Map(override.baseline.state.map((entry) => [entry.key, entry]));
-		for (const key of Object.keys(override.instance)) {
-			const value = readEnumerableStateValue(override.instance, key);
-			if (REPLICA_LOCAL_STATE_KEYS.has(key) || typeof value === "function") continue;
-			overrideKeys.add(key);
-			const baselineEntry = baselineEntries.get(key);
-			const borrowed = borrowedStateEntry(override.instance, key) as DRPState["state"][number] | undefined;
-			if (borrowed !== undefined && (borrowed === baselineEntry || Object.is(borrowed.value, baselineEntry?.value))) {
-				continue;
-			}
-			if (
-				baselineEntry === undefined ||
-				!this.capability.equal(baselineEntry.value, value, {
-					publicationId: publication.publicationId,
-					phase: "publisher-override",
-					side,
-					key,
-				})
-			) {
-				override.changedKeys?.add(key);
-				targetKeys.add(key);
-				values.set(key, value);
-				borrowedEntries.delete(key);
-			}
-		}
-		for (const key of baselineEntries.keys()) {
-			if (!overrideKeys.has(key)) {
-				override.changedKeys?.add(key);
-				targetKeys.delete(key);
-				values.delete(key);
-				borrowedEntries.delete(key);
-			}
 		}
 	}
 

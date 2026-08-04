@@ -38,7 +38,13 @@ import {
 } from "./operation.js";
 import { createPipeline, type Pipeline } from "./pipeline/pipeline.js";
 import { type HandlerReturn } from "./pipeline/types.js";
-import { DRPProxy, type DRPProxyChainArgs, LocalMutationLane, trackMutations } from "./proxy.js";
+import {
+	DRPProxy,
+	type DRPProxyChainArgs,
+	LocalMutationLane,
+	type MutationTrackingResult,
+	trackMutations,
+} from "./proxy.js";
 import {
 	type ComparisonEvent,
 	createPublicationCapability,
@@ -86,11 +92,6 @@ class ReceiverClockPendingValidationError extends Error {
 	constructor(readonly vertex: Vertex) {
 		super(`Vertex ${vertex.hash} is pending receiver-clock validation`);
 	}
-}
-
-interface PublicationOverride {
-	baseline: DRPState;
-	instance: IDRP;
 }
 
 class AttributedDeterministicRejectionError extends DeterministicRejectionError {
@@ -182,6 +183,7 @@ interface PreparedAdoption<T extends IDRP> {
 	expectedFrontier: Hash[];
 	drp?: T;
 	acl?: IACL;
+	canonicalCandidateKeys?: Readonly<Partial<Record<SnapshotSide, readonly string[]>>>;
 	nextHint?: AdoptionHint<T>;
 	forceCheckpoint?: boolean;
 	canonicalBaseline?: ReplayState;
@@ -864,11 +866,14 @@ export class DRPVertexApplier<T extends IDRP> {
 			const acl = cloneEnumerableExecutionInstance(hint.canonicalACL);
 			const drp = hint.canonicalDRP ? cloneEnumerableExecutionInstance(hint.canonicalDRP) : undefined;
 			const target = operation.isACL ? acl : drp;
-			if (target) await applyVertex(target, operation.vertex);
+			const replayKeys = target
+				? await this.applyAttributedReplay(target, [operation.vertex], operation.isACL ? "acl" : "drp")
+				: [];
 			return {
 				expectedFrontier,
 				drp,
 				acl,
+				canonicalCandidateKeys: this.operationCandidateKeys(operation, replayKeys),
 				nextHint: this.createCanonicalAdoptionHint(
 					operation.vertex,
 					expectedFrontier,
@@ -882,16 +887,17 @@ export class DRPVertexApplier<T extends IDRP> {
 			throw new ApplyInvariantError([new Error("Prepared operation state is missing")], "Adoption hint is invalid");
 		}
 		const adopted = cloneEnumerableExecutionInstance(operation.currentDRP);
-		await (operation.isACL ? applyDeterministicReplayVertices(adopted, hint.tail) : applyVertices(adopted, hint.tail));
+		const replayKeys = await this.applyAttributedReplay(adopted, hint.tail, operation.isACL ? "acl" : "drp");
 		const nextHint = this.createTailAdoptionHint(
 			operation.vertex,
 			expectedFrontier,
 			hint.tail,
 			hint.replayRequiresConflictResolution
 		);
+		const canonicalCandidateKeys = this.operationCandidateKeys(operation, replayKeys);
 		return operation.isACL
-			? { expectedFrontier, acl: adopted as IACL, nextHint }
-			: { expectedFrontier, drp: adopted as T, nextHint };
+			? { expectedFrontier, acl: adopted as IACL, canonicalCandidateKeys, nextHint }
+			: { expectedFrontier, drp: adopted as T, canonicalCandidateKeys, nextHint };
 	}
 
 	private descendsFromWholeFrontier(vertex: Vertex, expectedFrontier: Hash[]): boolean {
@@ -931,8 +937,8 @@ export class DRPVertexApplier<T extends IDRP> {
 			this.drp?.context,
 			this.acl.context
 		);
-		await applyDeterministicReplayVertices(acl, aclVertices);
-		if (drp && this.drp) await applyVertices(drp, drpVertices);
+		const aclCandidateKeys = await this.applyAttributedReplay(acl, aclVertices, "acl");
+		const drpCandidateKeys = drp && this.drp ? await this.applyAttributedReplay(drp, drpVertices, "drp") : [];
 		const drpType = vertex.operation?.drpType;
 		const sameTypeVertices = replay.linearizedVertices.filter((candidate) => candidate.operation?.drpType === drpType);
 		const pendingIndex = sameTypeVertices.findIndex((candidate) => candidate.hash === vertex.hash);
@@ -944,6 +950,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			expectedFrontier,
 			drp,
 			acl,
+			canonicalCandidateKeys: { acl: aclCandidateKeys, drp: drpCandidateKeys },
 			nextHint,
 			// A root replay has already paid the batch ceiling. Pin its canonical
 			// result immediately so later arrivals can extend that causal cut.
@@ -971,11 +978,38 @@ export class DRPVertexApplier<T extends IDRP> {
 
 		const adopted = cloneEnumerableExecutionInstance(operation.currentDRP);
 		const tail = sameTypeVertices.slice(pendingIndex + 1);
-		await (operation.isACL ? applyDeterministicReplayVertices(adopted, tail) : applyVertices(adopted, tail));
+		const replayKeys = await this.applyAttributedReplay(adopted, tail, operation.isACL ? "acl" : "drp");
 		const nextHint = this.createTailAdoptionHint(vertex, expectedFrontier, tail, replay.requiresConflictResolution);
+		const canonicalCandidateKeys = this.operationCandidateKeys(operation, replayKeys);
 		return operation.isACL
-			? { expectedFrontier, acl: adopted as IACL, nextHint }
-			: { expectedFrontier, drp: adopted as T, nextHint };
+			? { expectedFrontier, acl: adopted as IACL, canonicalCandidateKeys, nextHint }
+			: { expectedFrontier, drp: adopted as T, canonicalCandidateKeys, nextHint };
+	}
+
+	private async applyAttributedReplay(target: IDRP, vertices: Vertex[], side: SnapshotSide): Promise<string[]> {
+		if (vertices.length === 0) return [];
+		const tracked = trackMutations(target);
+		await (side === "acl"
+			? applyDeterministicReplayVertices(tracked.proxy, vertices)
+			: applyVertices(tracked.proxy, vertices));
+		tracked.observeRawEgressBoundary();
+		return mutationCandidateKeys(tracked);
+	}
+
+	private operationCandidateKeys(
+		operation: PostOperation<T>,
+		replayKeys: readonly string[] = []
+	): {
+		acl?: string[];
+		drp?: string[];
+	} {
+		const side: SnapshotSide = operation.isACL ? "acl" : "drp";
+		const keys = new Set([
+			...(operation.mutatedKeys ?? []),
+			...(operation.rawEgress?.side === side ? operation.rawEgress.candidateKeys : []),
+			...replayKeys,
+		]);
+		return side === "acl" ? { acl: [...keys] } : { drp: [...keys] };
 	}
 
 	private createTailAdoptionHint(
@@ -1394,8 +1428,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		baseline: DRPState | undefined,
 		publication: PublicationRecord,
 		incremental: boolean,
-		candidateKeys?: ReadonlySet<string>,
-		override?: PublicationOverride
+		candidateKeys?: ReadonlySet<string>
 	): DRPState {
 		return this.publicationPublisher.capturePublishedState(
 			side,
@@ -1403,8 +1436,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			baseline,
 			publication,
 			incremental,
-			candidateKeys,
-			override
+			candidateKeys
 		);
 	}
 
@@ -1701,6 +1733,14 @@ function splitOperation(vertices: Vertex[]): [Vertex[], Vertex[]] {
 	}
 
 	return [drpVertices, aclVertices];
+}
+
+function mutationCandidateKeys(tracked: MutationTrackingResult<IDRP>): string[] {
+	const keys = new Set(tracked.changedKeys());
+	if (tracked.hasRawEgress()) {
+		for (const key of tracked.rawEgressCandidateKeys()) keys.add(key);
+	}
+	return [...keys];
 }
 
 function sameHashes(left: Hash[], right: Hash[]): boolean {
