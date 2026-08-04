@@ -21174,32 +21174,60 @@ the verified 13-entry manifest SHA-256 is
 `906fd02cb351e3085597f0448ce0c9ff02dd85b9dd22f801d7a9f45c5645dcae`
 under `.logs/phase-1f-channel-backpressure-red2-codex-high/`.
 
-## Next Agent Prompt — Phase 1f channel-backpressure GREEN
+**Phase 1f channel-backpressure GREEN implemented; preliminary review
+pending.** Distinct Codex-high production owner commit
+`af638ff3dee349cf018b3a766edb8c8758d86140` changes only
+`packages/message-queue/src/channel.ts` (+26/-3), blob
+`4821b3ca08c38d129df0b89a0b70f04ea48d1f08`, SHA-256
+`8466e2acd041cf9fc0b1922b31b37341eec8e4c754a3ba47785b69564cf5141b`.
+The frozen RED remains byte-identical at blob `b84502e`, SHA-256
+`88001d20aad54290c52096561ca21c70f1c5c275c589cc01d5d33f6ddda8176b`.
 
-Start from the controller checkpoint immediately after tests-only RED
-`5cf8835`. Spawn a distinct Codex-high production GREEN owner. It may change
-only the smallest production owner under `packages/message-queue/src/`
-(expected `channel.ts`) plus ignored GREEN evidence. Do not edit the frozen RED,
-other tests/fixtures, this plan, package manifests, lockfiles, generated or
-protected paths, or stash.
+The candidate exports stable `ChannelCapacityError`. Positive-capacity
+channels retain at most one capacity of buffered values and one capacity of
+blocked sends, then reject excess work promptly. A receive from the buffer
+promotes and resolves the oldest blocked sender before a newer sender can use
+the slot; capacity zero retains one waiting rendezvous sender. There are no
+timers, polling paths or test hooks. Frozen/post-commit tests pass 3/3 and the
+complete message-queue suite passes 46/46. The post-commit 100k signal is exact:
+peak pending 32; prompt 32 fulfilled, 32 pending and 99,936 typed rejections;
+FIFO, complete settlement and empty cleanup all pass.
 
-Implement a stable exported typed capacity/backpressure error and a finite
-pending-send bound while retaining established channel semantics. The frozen
-positive-capacity contract admits at most one buffer-capacity of values and one
-capacity of blocked senders, then rejects every excess send promptly. Preserve
-FIFO when capacity is reused: an older blocked sender must be promoted before a
-new sender can use a newly freed buffer slot. Preserve existing capacity-zero
-rendezvous, close/start rejection and cleanup behavior unless the frozen tests
-prove a direct conflict; do not solve this with timers, polling, production test
-hooks or caller-specific duck typing.
+Package/workspace typecheck pass; owned lint is clean; tracked lint has zero
+errors and the existing 249 warnings; format and diff checks pass. Raw
+workspace lint has only the already-recorded ignored-`.logs` parser pollution.
+Result SHA-256 is
+`da4fb1c171ae33a3859968363ea5d039235fcef18876efa702193c068cfeb751`;
+the verified 14-entry manifest SHA-256 is
+`655e799c05d5ba9cbf8d5fdb2c37798a5afc3b0be2010957272281747bae792d`
+under `.logs/phase-1f-channel-backpressure-green-codex-high/`. Tracked/index
+state is clean and the protected stash is unchanged.
 
-Make the frozen RED pass, keep the complete existing message-queue suite green,
-and add no new tests in GREEN. Run focused and package suites, package/workspace
-typecheck, lint, format and diff checks to `.log`; record exact counts and the
-100k diagnostics, freeze source/test identities, commit only production, and
-seal result plus integrity manifest. Then return to the controller for fresh
-Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional final Claude-skill
-Opus/xhigh review. Do not schedule Fable.
+## Next Agent Prompt — Phase 1f preliminary acceptance reviews
+
+Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
+controller checkpoint containing production `af638ff`. Both are read-only and
+must authenticate RED/GREEN identities, inspect the complete `Channel` state
+machine plus `MessageQueue`/network producer consumers, and independently run
+the focused and complete message-queue tests where the sandbox permits.
+
+Adversarially probe positive capacities (especially one), capacity-zero
+rendezvous, close/start with blocked/rejected sends, receiver-first handoff,
+FIFO during interleaved send/receive, prompt typed rejection, promise
+settlement, and whether a newly arriving send can bypass an older accepted
+sender. Distinguish the intentional bounded rejection policy from a leak and
+look for an executable compatibility or liveness consequence. Timing/RSS stay
+diagnostic. Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, findings with
+severity and causal reproduction, and a phase-closure recommendation.
+
+Kimi must be effective model `k3` with `--thinking`, environment
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI `--max-steps-per-turn 100`; record
+both controls and the native session transcript. Seal each review's raw/native
+artifacts, result and integrity manifest. Keep HEAD, tracked/index tree, stash
+and protected paths invariant. If both accept with no executable blocker, use
+the Claude skill for a fresh final Opus/xhigh adversarial acceptance review. If
+either rejects, skip Opus and return to a fresh bounded corrective RED/GREEN.
+Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
