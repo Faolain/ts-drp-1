@@ -21730,27 +21730,73 @@ resource policy, Phase 1n owns sync livelock, and network-node hot-swap
 unsubscribe lifecycle is pre-existing and nonblocking for this start/stop
 contract.
 
-## Next Agent Prompt — Phase 1h final Opus review
+**Phase 1h final Opus review accepted; slice closed.** Fresh native Opus/xhigh
+session `0c601304-9258-47dd-a9b4-8f4fe72973f2` authenticated effective
+`claude-opus-5`, returned `ACCEPTED` / `PHASE1H_MAY_CLOSE=yes`, severity none,
+and required no corrective RED. Automatic Haiku usage was limited to 18 output
+tokens and performed no substantive review. Fable and subagents were not
+available to the sidecar.
 
-Use the Claude skill for one fresh native Opus/xhigh adversarial review against
-exact checkpoint `9765b5c`, RED `0b9a9fa` and GREEN `9bcdfbc`. The sidecar is
-read-only and may write ignored evidence only; it must not invoke Fable or alter
-source, tests, this plan, index, stash, generated output or protected paths.
+Opus reproduced the defect with the pre-GREEN
+`central.subscribe(node.dispatchMessage.bind(node))` shape: healthy B remained
+absent past 50 ms while A was blocked. With the GREEN callback, B crossed the
+real central queue in 0.058 ms before A release; A later drained `[1,2,3]` FIFO
+with maximum concurrency one and B delivered exactly once. A single-tick burst
+with no interleaved awaits exercised both the Channel buffer and pending-send
+refill paths and preserved strict `[1..9]` order. Independent causal, ordering,
+bounded-work and non-silent-logging probes passed 44/44.
 
-Authenticate all Phase 1h blobs, diffs and manifests. Independently exercise
-the actual registered callback with blocked/capacity A and healthy B; prove
-causal <50 ms B isolation, same-object FIFO/serial order, exact typed capacity
-rejection, closed/missing containment, no-pressure, restart/network-swap and
-zero unhandled rejection. Adversarially inspect outstanding-promise bounds,
-shutdown/restart races, log/error containment and whether the synchronous
-prefix before each first await is enough to preserve Channel send order. Keep
-aggregate resource policy in Phase 1o unless executable evidence shows this
-change introduced a new unbounded path.
+The review also proved that detachment introduced no new unbounded collection.
+For five capacity-one object queues and 60 dispatches, pending sends were exactly
+`objects * max(1, capacity) = 5`; 45 excess sends raised exact
+`ChannelCapacityError`, all 60 promises settled after release, and the manager
+retained no per-message collection. The GREEN changes who may block, not the
+pre-existing overflow policy. Aggregate cross-object/per-peer resource policy
+therefore remains Phase 1o rather than reopening Phase 1h.
 
-Require explicit `ACCEPTED` or `CHANGES_REQUESTED`,
-`PHASE1H_MAY_CLOSE=yes/no`, severity, executable evidence and a residual ledger.
-If accepted, checkpoint and close Phase 1h before beginning the next
-dependency-ordered slice. Do not schedule Fable.
+All acceptance gates passed: frozen focused 2/2, node aggregate 18/18,
+message-queue 46/46, network focused 15/15, full network 263 passed / 2 skipped,
+package and workspace typechecks, formatting, and tracked lint at zero errors /
+249 inherited warnings. Phase 1n's intentional sentinel remains exact 3F/3P
+focused and 3F/28P broader. Preserve the review's nonblocking residual ledger:
+Phase 1o owns aggregate queue-resource governance; Phase 1n owns sync livelock;
+network hot-swap unsubscribe and the module-level logger singleton predate this
+GREEN.
+
+Preserve harness disclosures. One standalone `.logs` probe failed workspace
+module resolution and was corrected under Vitest; zsh/BSD command differences
+were corrected without changing a gate; one mislabeled prior-log read was
+self-detected and replaced by absolute-path reruns; `eslint .` findings were
+confined to ignored probe files while the tracked gate remained clean; and
+typecheck refreshed only ignored incremental caches. The plan's prior “full
+network 130/130” label was a 17-file subset; the final 263/2 run is the actual
+full package and a strict green superset.
+
+Native result SHA-256 is
+`60279d0029e4c133edb7e1c1238c9350317456b12e23a8819baf58b9207df73e`;
+raw JSON SHA-256 is
+`ef786171ecb785ac7a5450185e48114b16697863420a2b87b970d674bd8250c2`.
+The sidecar's verified 55-entry manifest SHA-256 is
+`d1c38ef5ff4e42a5012a5c05c2baac93d28a8d18b58c747f0a1fd45ffcc38f2f`;
+the controller-sealed, fully verified 61-entry manifest SHA-256 is
+`5de09ba5483cde3e57fcf44afb53ab8c29b6d8474c5f0adad7bc24aa7d22d71c`
+under `.logs/phase-1h-queue-isolation-green-opus-xhigh-review/`.
+
+## Next Agent Prompt — Phase 1i tests-only RED
+
+Begin the next dependency-ordered slice, Phase 1i observer mode, with one fresh
+Codex-high tests-only RED. First inventory the current writer-only initialization,
+attestation and snapshot owners and the existing Discord/MMORPG golden-path
+fixtures. Freeze a bounded, production-causal contract showing that an observer
+still verifies vertex signatures and converges identically while skipping
+attestation generation/verification, per-vertex `assignState` snapshots and
+eager finality-store initialization. Include a bounded heap/retention acceptance
+harness aimed at the plan's 100k-vertex, <25%-of-writer target, but keep the fast
+focused RED suitable for iteration and reserve the expensive scale run for the
+acceptance gate. Do not change production or broaden observer semantics in RED.
+Run focused preservation, typecheck and tracked lint to logged evidence. Do not
+schedule Fable; after the frozen RED, use a distinct Codex-high GREEN followed
+by Grok 4.5/high, exact Kimi 3/high/100 and final Opus/xhigh.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
