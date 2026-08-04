@@ -22537,22 +22537,51 @@ and diff checks pass. No 100k gate ran. Evidence is under
 and verified manifest SHA-256 is
 `f8cd72abe0e30def43eeb081adc4d5a402671a1e080d5be4fae797f8a6cb3db7`.
 
-## Next Agent Prompt — value-equal replay canonical-live GREEN
+**Value-equal replay canonical-live GREEN checkpoint.** Distinct fresh
+Codex-high production-only commit `ff5dc7e` changes exactly `proxy.ts` and
+`drp-applier.ts` by 47 insertions / 22 deletions. The existing mutation tracker
+now has a non-exported internal `effective-writes` default and an
+`attempted-writes` mode selected only by adoption replay. Replay attribution
+therefore records every successful governed mutation attempt, including
+value-equal assignment, existing Set addition, absent object/Map/Set deletion,
+empty clear and same-value Date/binary forms. Normal authored tracking and its
+measured comparator remain unchanged; canonical publication remains the sole
+semantic comparison/copy owner against the previous live baseline. The causal
+stored-pair split, cross-key replay and direct-dependency retention proof are
+unchanged. The unrelated dead raw-egress condition was deliberately left for
+its own cleanup owner.
 
-Use a distinct fresh Codex-high production-only GREEN on `bcdbd21`. Make
-canonical-live capture complete relative to the previous live baseline while
-preserving the causal stored-pair split, direct-dependency retention proof,
-cross-key tail replay, copy/meter bounds and rollback/raw/setter behavior. A
-replay-scoped write-attribution mode that records attempted writes regardless
-of equality, or a bounded complete top-level instance/baseline comparison, are
-valid design directions. Blindly restoring causal `[published]` retention is
-insufficient. Decide whether replay comparisons belong in the comparison meter
-and keep that decision explicit; remove the dead raw-egress condition only if
-it follows naturally from the fix. Do not change tests or plan, add variants,
-touch inherited D.92.2/D.92.3/D.73 owners, or run 100k. Run the full focused and
-proportional gates to `.log`, commit only minimum production owners, then
-restart fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh. Do
-not schedule Fable.
+Post-commit owner is 14/14, combined causal is 48/48, Phase 1i-a is 21 passed /
+1 opt-in 100k skip, D.92 is 53/53, fallback/conflict/replay is 50/50,
+comparison is 27/27, raw-child is 23/23 and direct object/node preservation is
+97/97. Raw/setter/rollback/prototype is 69 passed plus the exact three inherited
+D.92.3 Map-key failures. Proxy adjacency is 116 passed plus the exact inherited
+descriptor-publication failure; broad D.92.2 is the exact two inherited
+failures / 136 passes. The latter emitted a Vitest worker `onTaskUpdate`
+timeout only after both known assertions completed; it was recorded rather
+than reward-hacked with a long rerun. Classified typechecks remain exact
+13/35/16, validation/build pass, tracked lint is zero errors / 230 inherited
+warnings, and format/diff pass. No 100k gate ran. Evidence is under
+`.logs/phase-1i-a-value-equal-replay-green-codex-high/`; ledger SHA-256 is
+`8d1f424ca5421e8ccf487cc259dd5549de69715358931b5574cb0d4cd5997599`
+and verified 32-entry manifest SHA-256 is
+`d6c670099d4f40551b0c0e6f719f1885c6c5422da3487dc69f51634a21467057`.
+
+## Next Agent Prompt — value-equal replay GREEN acceptance
+
+Review production commit `ff5dc7e` together with causal-publication GREEN
+`8bc3755`, tests-only RED `bcdbd21`, earlier causal lineage and amendment
+`c0d8fb1`. Start with fresh Grok 4.5/high; only if accepted run exact Kimi
+3/high with both 100-step controls; only if accepted run final Claude-skill
+Opus/xhigh. Adversarially inspect attempted-write completeness across all
+existing mutation traps, equality against causal target versus previous live
+baseline, both replay/full suffix paths, ACL/DRP sides, canonical checkpoint
+propagation, causal stored pairs, copy/comparison meters, raw egress,
+setter/rollback/failure atomicity and the six exact inherited residuals. Run a
+bounded counterexample only when it tests a distinct semantic gap; do not grow
+a value-type or syntax matrix. Reviewers must not modify tracked state or run
+100k. A blocking finding returns to a fresh tests-only RED. Do not schedule
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
