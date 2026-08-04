@@ -22517,24 +22517,42 @@ meter attribution explicitly; remove dead residue only if it follows naturally
 from the bounded fix. Do not widen this corrective into D.92.2, D.92.3, D.73,
 an analyzer, or a performance rewrite.
 
-## Next Agent Prompt — value-equal replay canonical-live RED
+**Value-equal replay canonical-live tests-only RED checkpoint.** Fresh
+Codex-high commit `bcdbd21` adds one semantic case to the existing Phase 1i-a
+owner, changing one test file by 119 insertions / 1 deletion. It reuses
+`CrossKeyTailDRP` with D=`setX(1)`, B=`setX(0)`, A=`deriveY()` as
+equal-timestamp siblings, subject arrival D,A,B, oracle arrival D,B,A, exact
+canonical order D-to-B-to-A, and C=`mark("joined")` over `[B,A]` with checkpoint
+suffix size one. Equal signed vertices, frontier and order are hard controls;
+B's stored pair/bytes remain pure causal `y=0`. Current `8bc3755` fails only
+subject live after B and C plus C stored pair/bytes, all at stale `y=1` versus
+oracle `y=0`. Final owner shape is 1 failed / 13 passed; combined causal is 1
+failed / 47 passed; Phase 1i-a is 1 failed / 20 passed / 1 opt-in 100k skip;
+D.92 is 53/53 and object/node preservation is 46/46 and 51/51. Classified
+typechecks retain exact 13/35/16 Phase 1i-b diagnostics, validation passes,
+tracked lint has zero errors / 230 inherited warnings, and owned format/lint
+and diff checks pass. No 100k gate ran. Evidence is under
+`.logs/phase-1i-a-value-equal-replay-red-codex-high/`; ledger SHA-256 is
+`17781b4e8bfcf820e13a9232830e140f19cd04942deb3dd4dfe31d6b60d27854`
+and verified manifest SHA-256 is
+`f8cd72abe0e30def43eeb081adc4d5a402671a1e080d5be4fae797f8a6cb3db7`.
 
-Use a fresh Codex-high tests-only RED on `8bc3755`. Reuse the existing
-`CrossKeyTailDRP` semantic fixture with D=`setX(1)`, B=`setX(0)`, A=`deriveY()`
-as equal-timestamp siblings of D, subject arrival D,A,B, canonical order
-D-to-B-to-A and joined C=`mark("joined")` over `[B,A]` under checkpoint suffix
+## Next Agent Prompt — value-equal replay canonical-live GREEN
 
-1. Compare subject with oracle arrival D,B,A. Freeze equal vertex/frontier/order,
-   immediate live state, stored B causal pair/bytes, and C live/stored pair/bytes;
-   only the subject live and downstream checkpoint result should expose the
-   candidate regression. Do not add value-type, setter or syntax variants. Do not
-   modify production or plan, and do not run 100k. After the RED, use a distinct
-   Codex-high GREEN that makes canonical-live capture complete relative to the
-   previous live baseline. A replay-scoped write-attribution mode or a bounded
-   complete top-level instance/baseline comparison are valid design directions;
-   blindly restoring causal `[published]` retention is insufficient. Then restart
-   fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh. Do not
-   schedule Fable.
+Use a distinct fresh Codex-high production-only GREEN on `bcdbd21`. Make
+canonical-live capture complete relative to the previous live baseline while
+preserving the causal stored-pair split, direct-dependency retention proof,
+cross-key tail replay, copy/meter bounds and rollback/raw/setter behavior. A
+replay-scoped write-attribution mode that records attempted writes regardless
+of equality, or a bounded complete top-level instance/baseline comparison, are
+valid design directions. Blindly restoring causal `[published]` retention is
+insufficient. Decide whether replay comparisons belong in the comparison meter
+and keep that decision explicit; remove the dead raw-egress condition only if
+it follows naturally from the fix. Do not change tests or plan, add variants,
+touch inherited D.92.2/D.92.3/D.73 owners, or run 100k. Run the full focused and
+proportional gates to `.log`, commit only minimum production owners, then
+restart fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh. Do
+not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
