@@ -988,7 +988,11 @@ export class DRPVertexApplier<T extends IDRP> {
 
 	private async applyAttributedReplay(target: IDRP, vertices: Vertex[], side: SnapshotSide): Promise<string[]> {
 		if (vertices.length === 0) return [];
-		const tracked = trackMutations(target);
+		// Canonical replay starts from the causal cut but publishes relative to the
+		// previous live image. Attribute every replayed mutation attempt, including a
+		// value-equal write, and leave semantic comparison to canonical capture where
+		// the correct live baseline and publication meter are available.
+		const tracked = trackMutations(target, () => false, "attempted-writes");
 		await (side === "acl"
 			? applyDeterministicReplayVertices(tracked.proxy, vertices)
 			: applyVertices(tracked.proxy, vertices));

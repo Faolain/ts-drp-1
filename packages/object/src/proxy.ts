@@ -269,6 +269,8 @@ export interface MutationTrackingResult<T extends object> {
 
 type MutationValueComparator = (left: unknown, right: unknown, key: string) => boolean;
 
+type MutationTrackingMode = "effective-writes" | "attempted-writes";
+
 interface PendingLocalMutation {
 	execute(): unknown | Promise<unknown>;
 	resolve(value: unknown): void;
@@ -362,12 +364,15 @@ export class LocalMutationLane {
  * as writes so new mutating platform methods cannot bypass tracking.
  * @param target - The cloned state that an operation will mutate.
  * @param compareValues - Sole value-comparison authority
+ * @param mode - Whether value-equal mutation attempts remain attributable
  * @returns A proxy and a cheap dirty-state reader.
  */
 export function trackMutations<T extends object>(
 	target: T,
-	compareValues: MutationValueComparator = proxyValuesEqual
+	compareValues: MutationValueComparator = proxyValuesEqual,
+	mode: MutationTrackingMode = "effective-writes"
 ): MutationTrackingResult<T> {
+	const attributesAttempts = mode === "attempted-writes";
 	const changedKeys = new Set<string>();
 	const rawEgressKeys = new Set<string>();
 	const initialGovernedKeys = new Set<string>();
@@ -668,7 +673,7 @@ export function trackMutations<T extends object>(
 	};
 
 	const valuesEqual = (left: unknown, right: unknown, owner: object, property?: PropertyKey): boolean =>
-		compareValues(left, right, comparisonKey(owner, property));
+		attributesAttempts ? false : compareValues(left, right, comparisonKey(owner, property));
 
 	const inheritedPropertyDescriptor = (owner: object, property: PropertyKey): PropertyDescriptor | undefined => {
 		let current = Reflect.getPrototypeOf(owner) as object | null;
@@ -992,7 +997,10 @@ export function trackMutations<T extends object>(
 							operationFailed = true;
 						} finally {
 							for (const candidate of candidates) {
-								if (!candidate.charge || binarySnapshotsEqual(candidate.snapshot, snapshotBinary(candidate.raw))) {
+								if (
+									!candidate.charge ||
+									(!attributesAttempts && binarySnapshotsEqual(candidate.snapshot, snapshotBinary(candidate.raw)))
+								) {
 									continue;
 								}
 								markChanged(candidate.raw);
@@ -1049,7 +1057,7 @@ export function trackMutations<T extends object>(
 					if (isReplicaLocalOnly(binary, ignored)) return Reflect.deleteProperty(binary, property);
 					const previousDescriptor = Reflect.getOwnPropertyDescriptor(binary, property);
 					const deleted = Reflect.deleteProperty(binary, property);
-					if (deleted && previousDescriptor !== undefined) {
+					if (deleted && (previousDescriptor !== undefined || attributesAttempts)) {
 						try {
 							updateReachability(binary, property, dataDescriptorValue(previousDescriptor), undefined);
 							markChanged(binary, property);
@@ -1115,7 +1123,7 @@ export function trackMutations<T extends object>(
 								initializeGraph(rawKey);
 							}
 							updateReachability(map, undefined, previousValue, rawValue);
-							if (didChange) markChanged(map);
+							if (didChange || attributesAttempts) markChanged(map);
 							return proxy as Map<unknown, unknown>;
 						};
 					}
@@ -1134,8 +1142,8 @@ export function trackMutations<T extends object>(
 							if (deleted) {
 								removeParent(rawKey, map);
 								removeParent(previousValue, map);
-								markChanged(map);
 							}
+							if (deleted || attributesAttempts) markChanged(map);
 							return deleted;
 						};
 					}
@@ -1151,7 +1159,7 @@ export function trackMutations<T extends object>(
 								removeParent(key, map);
 								removeParent(entryValue, map);
 							}
-							if (previous.length > 0) markChanged(map);
+							if (previous.length > 0 || attributesAttempts) markChanged(map);
 						};
 					}
 					if (property === Symbol.iterator || property === "entries") {
@@ -1258,8 +1266,8 @@ export function trackMutations<T extends object>(
 							if (didChange) {
 								addParent(rawValue, set);
 								initializeGraph(rawValue);
-								markChanged(set);
 							}
+							if (didChange || attributesAttempts) markChanged(set);
 							return proxy as Set<unknown>;
 						};
 					}
@@ -1271,10 +1279,8 @@ export function trackMutations<T extends object>(
 							const rawValue = unwrap(nextValue);
 							if (isReplicaLocalOnly(set, ignored)) return Set.prototype.delete.call(set, rawValue);
 							const deleted = Set.prototype.delete.call(set, rawValue);
-							if (deleted) {
-								removeParent(rawValue, set);
-								markChanged(set);
-							}
+							if (deleted) removeParent(rawValue, set);
+							if (deleted || attributesAttempts) markChanged(set);
 							return deleted;
 						};
 					}
@@ -1287,7 +1293,7 @@ export function trackMutations<T extends object>(
 							const previous = snapshotSetValues(set);
 							Set.prototype.clear.call(set);
 							for (const entryValue of previous) removeParent(entryValue, set);
-							if (previous.length > 0) markChanged(set);
+							if (previous.length > 0 || attributesAttempts) markChanged(set);
 						};
 					}
 					if (property === Symbol.iterator || property === "values" || property === "keys") {
@@ -1407,7 +1413,12 @@ export function trackMutations<T extends object>(
 							operationError = error;
 							operationFailed = true;
 						}
-						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+						if (
+							!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before) ||
+							(attributesAttempts && isNativeDateMember && typeof property === "string" && property.startsWith("set"))
+						) {
+							markChanged(date);
+						}
 						let observationError: unknown;
 						let observationFailed = false;
 						if (!isNativeDateMember) {
@@ -1428,8 +1439,9 @@ export function trackMutations<T extends object>(
 					if (replicaLocalOnly) return Reflect.set(date, property, unwrap(nextValue), date);
 					const storesGovernedProxy = isGovernedProxy(nextValue);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
+					let stored = false;
 					try {
-						const stored = Reflect.set(date, property, unwrap(nextValue), date);
+						stored = Reflect.set(date, property, unwrap(nextValue), date);
 						if (stored && storesGovernedProxy) signalRawEgress();
 						return stored;
 					} catch (error) {
@@ -1437,16 +1449,22 @@ export function trackMutations<T extends object>(
 						if (storesGovernedProxy) signalRawEgress();
 						throw error;
 					} finally {
-						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before) || (attributesAttempts && stored)) {
+							markChanged(date);
+						}
 					}
 				},
 				deleteProperty(date, property): boolean {
 					if (isReplicaLocalOnly(date, ignored)) return Reflect.deleteProperty(date, property);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
+					let deleted = false;
 					try {
-						return Reflect.deleteProperty(date, property);
+						deleted = Reflect.deleteProperty(date, property);
+						return deleted;
 					} finally {
-						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before) || (attributesAttempts && deleted)) {
+							markChanged(date);
+						}
 					}
 				},
 				defineProperty(date, property, descriptor): boolean {
@@ -1463,12 +1481,15 @@ export function trackMutations<T extends object>(
 					if ("get" in descriptor) rawDescriptor.get = unwrap(descriptor.get);
 					if ("set" in descriptor) rawDescriptor.set = unwrap(descriptor.set);
 					const before = Reflect.apply(DATE_GET_TIME, date, []);
+					let stored = false;
 					try {
-						const stored = Reflect.defineProperty(date, property, rawDescriptor);
+						stored = Reflect.defineProperty(date, property, rawDescriptor);
 						if (stored && storesGovernedProxy) signalRawEgress();
 						return stored;
 					} finally {
-						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before)) markChanged(date);
+						if (!Object.is(Reflect.apply(DATE_GET_TIME, date, []), before) || (attributesAttempts && stored)) {
+							markChanged(date);
+						}
 					}
 				},
 			});
@@ -1537,7 +1558,7 @@ export function trackMutations<T extends object>(
 							? { ...previousDescriptor, value: readEnumerableStateValue(object, property) }
 							: previousDescriptor;
 					const deleted = Reflect.deleteProperty(object, property);
-					if (deleted && previousDescriptor !== undefined) {
+					if (deleted && (previousDescriptor !== undefined || attributesAttempts)) {
 						try {
 							updateReachability(object, property, dataDescriptorValue(reachabilityDescriptor), undefined);
 							markChanged(object, property);
