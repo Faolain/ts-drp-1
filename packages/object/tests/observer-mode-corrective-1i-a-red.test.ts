@@ -24,6 +24,7 @@ type ReplicaMode = "observer" | "writer";
 type PublicIngest = "applyVertices" | "merge";
 type HistoryFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex];
 type BranchJoinFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex];
+type ZeroDeltaBranchFixture = [Vertex, Vertex, Vertex, Vertex, Vertex];
 
 interface SigningIdentity {
 	keychain: Keychain;
@@ -60,6 +61,26 @@ class ObserverHistoryDRP implements IDRP {
 	}
 }
 
+class ZeroDeltaBranchDRP implements IDRP {
+	semanticsType = SemanticsType.pair;
+	governed = 0;
+	marker = "root";
+
+	setGoverned(value: number): void {
+		this.governed = value;
+	}
+
+	semanticNoOp(): void {}
+
+	mark(value: string): void {
+		this.marker = value;
+	}
+
+	query_state(): { governed: number; marker: string } {
+		return { governed: this.governed, marker: this.marker };
+	}
+}
+
 let author: SigningIdentity;
 
 async function identity(seed: string): Promise<SigningIdentity> {
@@ -76,6 +97,15 @@ function replica(mode: ReplicaMode): DRPObject<ObserverHistoryDRP> {
 		acl: createACL({ admins: [author.peerId] }),
 		drp: new ObserverHistoryDRP(),
 		config,
+	});
+}
+
+function zeroDeltaReplica(): DRPObject<ZeroDeltaBranchDRP> {
+	return new DRPObject({
+		peerId: "zero-delta-writer",
+		acl: createACL({ admins: [author.peerId] }),
+		drp: new ZeroDeltaBranchDRP(),
+		config: { log_config: { level: "silent" }, replica_mode: "writer" },
 	});
 }
 
@@ -154,6 +184,21 @@ async function branchJoinFixture(): Promise<BranchJoinFixture> {
 	);
 	const final = await signedVertex("append", [7], [revoke.hash], 1_700_000_011_007);
 	return [first, grant, second, left, right, revoke, final];
+}
+
+async function zeroDeltaBranchFixture(): Promise<ZeroDeltaBranchFixture> {
+	const dependency = await signedVertex("setGoverned", [1], [HashGraph.rootHash], 1_700_000_021_001);
+	const changedSibling = await signedVertex("setGoverned", [99], [dependency.hash], 1_700_000_021_002);
+	const zeroDeltaSibling = await signedVertex("semanticNoOp", [], [dependency.hash], 1_700_000_021_003);
+	const causalChild = await signedVertex("mark", ["child-of-no-op"], [zeroDeltaSibling.hash], 1_700_000_021_004);
+	const join = await signedVertex("semanticNoOp", [], [changedSibling.hash, causalChild.hash], 1_700_000_021_005);
+	return [dependency, changedSibling, zeroDeltaSibling, causalChild, join];
+}
+
+function storedDRPState(object: DRPObject<ZeroDeltaBranchDRP>, hash: string): Record<string, unknown> {
+	const state = (object as unknown as ObjectReflection)._states.getDRPState(hash);
+	expect(state, `stored DRP snapshot for ${hash}`).toBeDefined();
+	return Object.fromEntries(state?.state.map(({ key, value }) => [key, value]) ?? []);
 }
 
 function convergenceSnapshot(object: DRPObject<ObserverHistoryDRP>): {
@@ -375,6 +420,66 @@ describe("Phase 1i-a contracts behind the bounded pre-drift causal control", () 
 			expect.soft(writer.drp?.query_values()).toEqual(canonicalValues);
 			expect.soft(writer.acl.query_isWriter("branch-join-guest")).toBe(false);
 		}
+	});
+
+	it("keeps a zero-delta concurrent tail on its own causal cut through its child and whole-frontier join", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "256");
+		const [dependency, changedSibling, zeroDeltaSibling, causalChild, join] = await zeroDeltaBranchFixture();
+
+		const control = zeroDeltaReplica();
+		await expect(control.applyVertices([dependency, zeroDeltaSibling, changedSibling])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect(control.drp?.query_state(), "positive control: the whole frontier retains sibling A").toEqual({
+			governed: 99,
+			marker: "root",
+		});
+		expect(storedDRPState(control, zeroDeltaSibling.hash)).toMatchObject({ governed: 1, marker: "root" });
+
+		const subject = zeroDeltaReplica();
+		await expect(subject.applyVertices([dependency, changedSibling, zeroDeltaSibling])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect(subject.drp?.query_state(), "positive control: immediate whole-frontier state is canonical").toEqual({
+			governed: 99,
+			marker: "root",
+		});
+		expect
+			.soft(
+				storedDRPState(subject, zeroDeltaSibling.hash),
+				"sibling B is the pure dependency-to-B causal cut and excludes sibling A"
+			)
+			.toMatchObject({ governed: 1, marker: "root" });
+
+		await expect(subject.applyVertices([causalChild])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect
+			.soft(
+				storedDRPState(subject, causalChild.hash),
+				"B's child inherits B's causal value when it mutates only another key"
+			)
+			.toMatchObject({ governed: 1, marker: "child-of-no-op" });
+		expect(subject.drp?.query_state(), "the concurrent whole frontier still includes sibling A").toEqual({
+			governed: 99,
+			marker: "child-of-no-op",
+		});
+
+		await expect(subject.applyVertices([join])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect(subject.drp?.query_state(), "the explicit join deterministically combines both causal branches").toEqual({
+			governed: 99,
+			marker: "child-of-no-op",
+		});
 	});
 
 	it("rolls back both observer snapshot sides when DRP discard rejects after ACL discard", async () => {
