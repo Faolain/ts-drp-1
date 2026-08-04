@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- positive controls narrow required characterization vertices */
 import { DrpType, type Hash, type IDRP, Operation, SemanticsType, type Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
@@ -138,7 +141,11 @@ describe("Phase 1d(i) 1k-vertex / 1 MiB characterization", () => {
 			mutatedBytes += Math.max(serializeValue(value - 1).byteLength, serializeValue(value).byteLength);
 		}
 
-		await expect(applier.applyVertices(vertices)).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(applier.applyVertices(trustedTestVertices(vertices))).resolves.toEqual({
+			applied: true,
+			missing: [],
+			invalid: [],
+		});
 		const vertexPublications = probe.publications.filter(({ kind }) => kind === "vertex");
 		expect(vertexPublications).toHaveLength(VERTEX_COUNT);
 		for (const publication of vertexPublications) {

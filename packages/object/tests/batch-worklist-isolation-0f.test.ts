@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 /**
  * Phase 0f truthful batch contract:
  * - The caller's submitted element references are copied into a dense worklist

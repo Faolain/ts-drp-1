@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- authored vertices and stored snapshots are positively narrowed */
 import { type DRPState, DRPStateOtherTheWire, type Hash, type IDRP, SemanticsType, type Vertex } from "@ts-drp/types";
 import { serializeDRPState, serializeValue } from "@ts-drp/utils/serialization";
@@ -443,7 +446,7 @@ describe("Phase 1d(i) D.92.6 real accessor publication RED", () => {
 		const receiver = harness("remote");
 		const before = bytesByKey(receiver.rawDRP);
 
-		await expect(receiver.applier.applyVertices([vertex])).resolves.toEqual({
+		await expect(receiver.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
 			applied: true,
 			missing: [],
 			invalid: [],

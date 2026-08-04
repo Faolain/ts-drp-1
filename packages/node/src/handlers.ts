@@ -1,9 +1,5 @@
-import { publicKeyFromRaw } from "@libp2p/crypto/keys";
-import { peerIdFromPublicKey } from "@libp2p/peer-id";
-import { sha256 } from "@noble/hashes/sha2";
-import { Signature } from "@noble/secp256k1";
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
-import { AdoptionCommitExhaustedError, ApplyInvariantError } from "@ts-drp/object";
+import { AdoptionCommitExhaustedError, ApplyInvariantError, authenticateVertices } from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type AggregatedAttestation,
@@ -39,6 +35,26 @@ interface HandleParams {
 
 interface IHandlerStrategy {
 	(handleParams: HandleParams): Promise<void> | void;
+}
+
+interface HandlerRegistryEntry {
+	handler: IHandlerStrategy;
+	vertexIngress: false | typeof authenticateVertices;
+}
+
+interface AuthenticatedMergeResultOwner {
+	appliedVerticesForMergeResult(result: MergeResult): readonly Vertex[] | undefined;
+	mergeHadTrustedOrAuthenticatedOffers(result: MergeResult): boolean | undefined;
+}
+
+function appliedVerticesForMergeResult<T extends IDRP>(object: IDRPObject<T>, result: MergeResult): Vertex[] {
+	const owner = object as IDRPObject<T> & Partial<AuthenticatedMergeResultOwner>;
+	return [...(owner.appliedVerticesForMergeResult?.(result) ?? [])];
+}
+
+function mergeHadTrustedOrAuthenticatedOffers<T extends IDRP>(object: IDRPObject<T>, result: MergeResult): boolean {
+	const owner = object as IDRPObject<T> & Partial<AuthenticatedMergeResultOwner>;
+	return owner.mergeHadTrustedOrAuthenticatedOffers?.(result) ?? false;
 }
 
 const MAX_SYNC_RECOVERY_RETRIES = 3;
@@ -139,18 +155,20 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 	}
 }
 
-const messageHandlers: Record<MessageType, IHandlerStrategy | undefined> = {
+export const messageHandlers: Record<MessageType, HandlerRegistryEntry | undefined> = {
 	[MessageType.MESSAGE_TYPE_UNSPECIFIED]: undefined,
-	[MessageType.MESSAGE_TYPE_FETCH_STATE]: fetchStateHandler,
-	[MessageType.MESSAGE_TYPE_FETCH_STATE_RESPONSE]: fetchStateResponseHandler,
-	[MessageType.MESSAGE_TYPE_UPDATE]: updateHandler,
-	[MessageType.MESSAGE_TYPE_SYNC]: syncHandler,
-	[MessageType.MESSAGE_TYPE_SYNC_ACCEPT]: syncAcceptHandler,
-	[MessageType.MESSAGE_TYPE_SYNC_REJECT]: syncRejectHandler,
-	[MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE]: attestationUpdateHandler,
-	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY]: drpDiscoveryHandler,
-	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE]: ({ node, message }) =>
-		node.handleDiscoveryResponse(message.sender, message),
+	[MessageType.MESSAGE_TYPE_FETCH_STATE]: { handler: fetchStateHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_FETCH_STATE_RESPONSE]: { handler: fetchStateResponseHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_UPDATE]: { handler: updateHandler, vertexIngress: authenticateVertices },
+	[MessageType.MESSAGE_TYPE_SYNC]: { handler: syncHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_SYNC_ACCEPT]: { handler: syncAcceptHandler, vertexIngress: authenticateVertices },
+	[MessageType.MESSAGE_TYPE_SYNC_REJECT]: { handler: syncRejectHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE]: { handler: attestationUpdateHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY]: { handler: drpDiscoveryHandler, vertexIngress: false },
+	[MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE]: {
+		handler: ({ node, message }) => node.handleDiscoveryResponse(message.sender, message),
+		vertexIngress: false,
+	},
 	[MessageType.MESSAGE_TYPE_CUSTOM]: undefined,
 	[MessageType.UNRECOGNIZED]: undefined,
 };
@@ -168,12 +186,12 @@ export async function handleMessage(node: DRPNode, message: Message): Promise<vo
 	}
 	const validatedMessage = validation.data;
 
-	const handler = messageHandlers[validatedMessage.type];
-	if (!handler) {
+	const entry = messageHandlers[validatedMessage.type];
+	if (!entry) {
 		log.error("::messageHandler: Invalid operation");
 		return;
 	}
-	const result = handler({ node, message: validatedMessage });
+	const result = entry.handler({ node, message: validatedMessage });
 	if (isPromise(result)) {
 		await result;
 	}
@@ -294,10 +312,9 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 		return;
 	}
 
-	const verifiedVertices = authenticateIncomingVertices(object, updateMessage.vertices);
-
-	const [, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
-	const appliedVertices = verifiedVertices.filter((vertex) => object.getVertex(vertex.hash) !== undefined);
+	const mergeResult = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
+	const [, missing] = mergeResult;
+	const appliedVertices = appliedVerticesForMergeResult(object, mergeResult);
 
 	if (appliedVertices.length !== 0 && object.finalityStore.enabled !== false) {
 		// add their signatures — only if the sender is a finality signer on the LIVE
@@ -447,13 +464,12 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		return;
 	}
 
-	const verifiedVertices = authenticateIncomingVertices(object, syncAcceptMessage.requested);
-
-	const mergeRan = verifiedVertices.length !== 0;
+	const mergeRan = syncAcceptMessage.requested.length !== 0;
 	let missing: string[] = [];
 	if (mergeRan) {
-		[, missing] = await mergeWithRejectedBoundaryRecovery(node, object, sender, verifiedVertices);
-		if (object.finalityStore.enabled !== false) {
+		const mergeResult = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
+		[, missing] = mergeResult;
+		if (mergeHadTrustedOrAuthenticatedOffers(object, mergeResult) && object.finalityStore.enabled !== false) {
 			object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		}
 		node.put(object.id, object);
@@ -667,7 +683,7 @@ export function authenticateIncomingVertices<T extends IDRP>(
 	_object: IDRPObject<T>,
 	incomingVertices: Vertex[]
 ): Vertex[] {
-	return verifyACLIncomingVertices(incomingVertices);
+	return authenticateVertices(incomingVertices);
 }
 
 /**
@@ -676,28 +692,5 @@ export function authenticateIncomingVertices<T extends IDRP>(
  * @returns The verified vertices
  */
 export function verifyACLIncomingVertices(incomingVertices: Vertex[]): Vertex[] {
-	const verifiedVertices = incomingVertices
-		.map((vertex) => {
-			if (vertex.signature.length === 0) {
-				return null;
-			}
-
-			try {
-				const hashData = sha256.create().update(vertex.hash).digest();
-				const recovery = vertex.signature[0];
-				const compactSignature = vertex.signature.slice(1);
-				const signatureWithRecovery = Signature.fromCompact(compactSignature).addRecoveryBit(recovery);
-				const rawSecp256k1PublicKey = signatureWithRecovery.recoverPublicKey(hashData).toRawBytes(true);
-				const secp256k1PublicKey = publicKeyFromRaw(rawSecp256k1PublicKey);
-				const expectedPeerId = peerIdFromPublicKey(secp256k1PublicKey).toString();
-				const isValid = expectedPeerId === vertex.peerId;
-				return isValid ? vertex : null;
-			} catch (error) {
-				console.error("Error verifying signature:", error);
-				return null;
-			}
-		})
-		.filter((vertex: Vertex | null): vertex is Vertex => vertex !== null);
-
-	return verifiedVertices;
+	return authenticateVertices(incomingVertices);
 }

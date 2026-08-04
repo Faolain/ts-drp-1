@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import { SetDRP } from "@ts-drp/blueprints";
 import { ACLGroup, DrpType, Operation, type Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";

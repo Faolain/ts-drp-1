@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- positive controls narrow required snapshots and vertices */
 import {
 	DRPState,

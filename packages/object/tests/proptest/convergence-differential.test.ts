@@ -1,3 +1,5 @@
+import "../helpers/trusted-vertex-ingest.js";
+
 /**
  * Gate-0 differential convergence harness.
  *

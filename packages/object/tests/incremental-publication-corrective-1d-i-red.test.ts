@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- positive controls narrow committed vertices and snapshots */
 import {
 	DRPState,
@@ -279,7 +282,11 @@ describe("Phase 1d(i) corrective alias attribution", () => {
 		const baselineBytes = encodedState(h.states.getDRPState(HashGraph.rootHash)!);
 		const vertex = remoteVertex("aliasAndMutate", [11], 1);
 
-		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+			applied: true,
+			missing: [],
+			invalid: [],
+		});
 		const expected = stateFromDRP(h.applier.drp);
 		expect(effectiveKeys(h.states.getDRPState(HashGraph.rootHash)!, expected)).toContain("a");
 		expect(effectiveKeys(h.states.getDRPState(HashGraph.rootHash)!, expected)).toContain("b");
@@ -315,7 +322,11 @@ describe("Phase 1d(i) corrective ambient public-live isolation", () => {
 		const baselineBytes = encodedState(h.states.getDRPState(HashGraph.rootHash)!);
 		const vertex = remoteVertex("mutateHeldReplacementAdditionDeletion", [], 2);
 
-		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+			applied: true,
+			missing: [],
+			invalid: [],
+		});
 		const [canonical] = h.states.fromHash(HashGraph.rootHash);
 		canonical!.mutateHeldReplacementAdditionDeletion();
 		const expected = stateFromDRP(canonical);

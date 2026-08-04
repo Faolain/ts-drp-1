@@ -63,6 +63,13 @@ import {
 	detachStatePayload,
 	readEnumerableStateValue,
 } from "./state-payload.js";
+import {
+	type AuthenticatedVertex,
+	hasAuthenticatedVertexProvenance,
+	resolveAuthenticatedVertex,
+} from "./vertex-authentication.js";
+
+export type { AuthenticatedVertex } from "./vertex-authentication.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
@@ -205,21 +212,6 @@ interface BatchVertexPreflight {
 	operationSnapshot: { succeeded: true; operation: Vertex["operation"] } | { succeeded: false; error: unknown };
 }
 
-function descriptorsEqual(left: PropertyDescriptor | undefined, right: PropertyDescriptor | undefined): boolean {
-	if (left === undefined || right === undefined) return left === right;
-	if (
-		left.configurable !== right.configurable ||
-		left.enumerable !== right.enumerable ||
-		("writable" in left && left.writable !== right.writable)
-	) {
-		return false;
-	}
-	if ("value" in left || "value" in right) {
-		return "value" in left && "value" in right && Object.is(left.value, right.value);
-	}
-	return left.get === right.get && left.set === right.set;
-}
-
 function captureBatchVertexOperation(submittedVertex: Vertex): BatchVertexPreflight {
 	try {
 		return {
@@ -237,15 +229,22 @@ function snapshotSubmittedVertex(vertex: Vertex, operation: Vertex["operation"])
 	const dependencies = [...vertex.dependencies];
 	const timestamp = vertex.timestamp;
 	const signature = new Uint8Array(vertex.signature);
+	return { hash, peerId, operation, dependencies, timestamp, signature };
+}
 
-	return {
-		hash,
-		peerId,
-		operation,
-		dependencies,
-		timestamp,
-		signature,
-	};
+function descriptorsEqual(left: PropertyDescriptor | undefined, right: PropertyDescriptor | undefined): boolean {
+	if (left === undefined || right === undefined) return left === right;
+	if (
+		left.configurable !== right.configurable ||
+		left.enumerable !== right.enumerable ||
+		("writable" in left && left.writable !== right.writable)
+	) {
+		return false;
+	}
+	if ("value" in left || "value" in right) {
+		return "value" in left && "value" in right && Object.is(left.value, right.value);
+	}
+	return left.get === right.get && left.set === right.set;
 }
 
 function recordPropertyMutation<T extends object>(
@@ -561,12 +560,29 @@ export class DRPVertexApplier<T extends IDRP> {
 	 * @param vertices - The vertices to apply
 	 * @returns The result of the apply
 	 */
-	async applyVertices(vertices: Vertex[]): Promise<ApplyResult> {
-		if (!isTracingEnabled()) return this.applyVerticesUntraced(vertices);
+	async applyVertices(vertices: AuthenticatedVertex[]): Promise<ApplyResult> {
+		const unauthenticated = vertices.filter((vertex) => !hasAuthenticatedVertexProvenance(vertex));
+		if (unauthenticated.length !== 0) {
+			return this.createApplyResult(
+				[],
+				unauthenticated.map((vertex) => vertex.hash),
+				[]
+			);
+		}
+		const canonical = vertices.map((vertex) => resolveAuthenticatedVertex(vertex));
+		if (canonical.some((vertex) => vertex === undefined)) {
+			return this.createApplyResult(
+				[],
+				vertices.map((vertex) => vertex.hash),
+				[]
+			);
+		}
+		const authenticated = canonical as AuthenticatedVertex[];
+		if (!isTracingEnabled()) return this.applyVerticesUntraced(authenticated);
 
 		return metrics.traceFunc(
 			"drp.applyVertices",
-			(batch: Vertex[]) => this.applyVerticesUntraced(batch),
+			(batch: AuthenticatedVertex[]) => this.applyVerticesUntraced(batch),
 			(span, batch) => {
 				span.setAttribute("drp.vertex.count", batch.length);
 			},
@@ -574,13 +590,13 @@ export class DRPVertexApplier<T extends IDRP> {
 				span.setAttribute("drp.vertex.missing_count", result.missing.length);
 				span.setAttribute("drp.vertex.invalid_count", result.invalid.length);
 			}
-		)(vertices);
+		)(authenticated);
 	}
 
-	private async applyVerticesUntraced(vertices: Vertex[]): Promise<ApplyResult> {
+	private async applyVerticesUntraced(vertices: AuthenticatedVertex[]): Promise<ApplyResult> {
 		const submittedVertices = [...vertices];
 		const worklist = submittedVertices.filter(
-			(submittedVertex): submittedVertex is Vertex => submittedVertex !== undefined
+			(submittedVertex): submittedVertex is AuthenticatedVertex => submittedVertex !== undefined
 		);
 		const preflightByIdentity = new WeakMap<Vertex, BatchVertexPreflight>();
 		const preflight = worklist.map((submittedVertex) => {

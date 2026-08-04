@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import { DrpType, type IDRP, Operation, SemanticsType } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
 import {

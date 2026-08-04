@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import { DRPStateOtherTheWire, DrpType, type IDRP, Operation, SemanticsType, type Vertex } from "@ts-drp/types";
 import { serializeDRPState } from "@ts-drp/utils/serialization";
 import { describe, expect, it } from "vitest";

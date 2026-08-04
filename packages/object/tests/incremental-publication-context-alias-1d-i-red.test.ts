@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- committed vertices and snapshots are narrowed by positive controls */
 import { type DRPState, DRPStateOtherTheWire, type Hash, type IDRP, SemanticsType, type Vertex } from "@ts-drp/types";
 import { serializeDRPState, serializeValue } from "@ts-drp/utils/serialization";
@@ -538,7 +541,7 @@ describe("Phase 1d(i) context-alias publication boundaries", () => {
 		const receiver = harness("remote");
 		const before = receiver.states.getDRPState(HashGraph.rootHash)!;
 
-		await expect(receiver.applier.applyVertices([vertex])).resolves.toEqual({
+		await expect(receiver.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
 			applied: true,
 			missing: [],
 			invalid: [],

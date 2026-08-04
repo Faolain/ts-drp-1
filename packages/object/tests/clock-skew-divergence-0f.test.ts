@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import { SetDRP } from "@ts-drp/blueprints";
 import { DrpType, Operation, type Vertex } from "@ts-drp/types";
 import { DRP_VERTEX_FUTURE_TOLERANCE_MS } from "@ts-drp/validation";

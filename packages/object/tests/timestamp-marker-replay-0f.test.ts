@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import { DrpType, type IDRP, Operation, SemanticsType, type Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
 import { DRP_VERTEX_FUTURE_TOLERANCE_MS, InvalidTimestampError, validateVertex } from "@ts-drp/validation";

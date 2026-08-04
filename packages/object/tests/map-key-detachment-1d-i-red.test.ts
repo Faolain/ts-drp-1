@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- positive controls narrow required snapshots and vertices */
 import {
 	DRPState,
@@ -454,7 +457,11 @@ describe("Phase 1d(i) D.92.3 graph-aware state-payload detachment RED", () => {
 				vertex = vertexFor(h, "replacePayload");
 			} else {
 				vertex = remoteVertex("replacePayload", [source], [HashGraph.rootHash], 10);
-				await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, invalid: [], missing: [] });
+				await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+					applied: true,
+					invalid: [],
+					missing: [],
+				});
 				vertex = h.hashGraph.getVertex(vertex.hash)!;
 			}
 			const historical = vertex.operation!.value[0] as StateGraph;
@@ -467,7 +474,7 @@ describe("Phase 1d(i) D.92.3 graph-aware state-payload detachment RED", () => {
 		const h = harness(source);
 		const first = remoteVertex("touch", ["one"], [HashGraph.rootHash], 20);
 		const second = remoteVertex("touch", ["two"], [first.hash], 21);
-		await expect(h.applier.applyVertices([first, second])).resolves.toEqual({
+		await expect(h.applier.applyVertices(trustedTestVertices([first, second]))).resolves.toEqual({
 			applied: true,
 			invalid: [],
 			missing: [],
@@ -481,7 +488,11 @@ describe("Phase 1d(i) D.92.3 graph-aware state-payload detachment RED", () => {
 		const h = harness(source);
 		const left = remoteVertex("touch", ["left"], [HashGraph.rootHash], 30);
 		const right = remoteVertex("touch", ["right"], [HashGraph.rootHash], 31);
-		await expect(h.applier.applyVertices([left, right])).resolves.toEqual({ applied: true, invalid: [], missing: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([left, right]))).resolves.toEqual({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
 		const rootBefore = encodedState(h.states.getDRPState(HashGraph.rootHash)!);
 		const leftBefore = encodedState(h.states.getDRPState(left.hash)!);
 		const rightBefore = encodedState(h.states.getDRPState(right.hash)!);

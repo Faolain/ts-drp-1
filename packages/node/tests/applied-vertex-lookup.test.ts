@@ -1,6 +1,7 @@
 import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { Keychain } from "@ts-drp/keychain";
+import { authenticateVertices } from "@ts-drp/object";
 import {
 	AggregatedAttestation,
 	type Attestation,
@@ -129,6 +130,10 @@ class InstrumentedAppliedVertexObject {
 		[];
 	readonly mergedAttestationCalls: AggregatedAttestation[][] = [];
 	readonly mergedVertexCalls: Vertex[][] = [];
+	private readonly mergeMetadata = new WeakMap<
+		[boolean, string[], string[]],
+		{ applied: readonly Vertex[]; hasTrustedOrAuthenticatedOffers: boolean }
+	>();
 
 	private readonly directIndex = new Map<string, Vertex>();
 	private readonly dropHashes: Set<string>;
@@ -197,7 +202,11 @@ class InstrumentedAppliedVertexObject {
 	merge(vertices: Vertex[]): Promise<[boolean, string[], string[]]> {
 		this.mergedVertexCalls.push([...vertices]);
 		const invalid: string[] = [];
-		for (const vertex of vertices) {
+		const verified = authenticateVertices(vertices);
+		const verifiedHashes = new Set(verified.map(({ hash }) => hash));
+		for (const vertex of vertices) if (!verifiedHashes.has(vertex.hash)) invalid.push(vertex.hash);
+		const applied: Vertex[] = [];
+		for (const vertex of verified) {
 			if (this.dropHashes.has(vertex.hash)) {
 				invalid.push(vertex.hash);
 				continue;
@@ -205,8 +214,22 @@ class InstrumentedAppliedVertexObject {
 			if (this.directIndex.has(vertex.hash)) continue;
 			this.inventory.push(vertex);
 			this.directIndex.set(vertex.hash, vertex);
+			applied.push(vertex);
 		}
-		return Promise.resolve([true, [...this.missing], invalid]);
+		const result: [boolean, string[], string[]] = [true, [...this.missing], invalid];
+		this.mergeMetadata.set(result, {
+			applied,
+			hasTrustedOrAuthenticatedOffers: verified.length !== 0,
+		});
+		return Promise.resolve(result);
+	}
+
+	appliedVerticesForMergeResult(result: [boolean, string[], string[]]): readonly Vertex[] | undefined {
+		return this.mergeMetadata.get(result)?.applied;
+	}
+
+	mergeHadTrustedOrAuthenticatedOffers(result: [boolean, string[], string[]]): boolean | undefined {
+		return this.mergeMetadata.get(result)?.hasTrustedOrAuthenticatedOffers;
 	}
 }
 
@@ -271,7 +294,12 @@ describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
 		await handleMessage(node, message);
 
 		expect(object.mergedVertexCalls).toHaveLength(1);
-		expect(object.mergedVertexCalls[0].map(({ hash }) => hash)).toEqual([known.hash, added.hash, dropped.hash]);
+		expect(object.mergedVertexCalls[0].map(({ hash }) => hash)).toEqual([
+			known.hash,
+			added.hash,
+			dropped.hash,
+			unauthenticated.hash,
+		]);
 		expect(object.getVertex(known.hash)).toBe(known);
 		expect(object.getVertex(added.hash)?.hash).toBe(added.hash);
 		expect(object.getVertex(dropped.hash)).toBeUndefined();
@@ -283,7 +311,9 @@ describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
 			attestations: [remoteAttestation],
 			verify: undefined,
 		});
-		const generated = [known.hash, added.hash].map((hash) => ({
+		// Known hashes are trusted skips at the object boundary. They are not
+		// reauthenticated and therefore cannot trigger a new local attestation.
+		const generated = [added.hash].map((hash) => ({
 			data: hash,
 			signature: Uint8Array.of(0xb0, hash.length),
 		}));
@@ -396,6 +426,21 @@ describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
 		expect(result.direct).toHaveLength(1);
 	});
 
+	test("SYNC_ACCEPT preserves attestation merge for an authenticated offer rejected after authentication", async () => {
+		const rejected = await remoteVertex("authenticated-sync-rejected-after-auth");
+		const incoming = aggregate(rejected.hash, 0x71);
+		const object = new InstrumentedAppliedVertexObject([], observations(), {
+			canSign: false,
+			dropHashes: [rejected.hash],
+		});
+		const { node } = makeHarness(object);
+
+		await handleMessage(node, syncAcceptMessage([rejected], [], [incoming]));
+
+		expect(object.getVertex(rejected.hash)).toBeUndefined();
+		expect(object.mergedAttestationCalls).toEqual([[incoming]]);
+	});
+
 	test("empty SYNC_ACCEPT keeps both inventory sweeps but sends, persists, recovers, and dispatches nothing", async () => {
 		const object = new InstrumentedAppliedVertexObject([localVertex("empty-stored")], observations(), {
 			canSign: false,
@@ -416,7 +461,7 @@ describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
 });
 
 describe("applied-vertex direct-lookup causal contracts", () => {
-	test("UPDATE performs no inventory materialization for post-merge membership", async () => {
+	test("UPDATE consumes object-owned merge metadata without inventory or raw-offer lookups", async () => {
 		const known = await remoteVertex("causal-update-known");
 		const lookup = observations();
 		const object = new InstrumentedAppliedVertexObject([known], lookup, { canSign: false });
@@ -425,7 +470,7 @@ describe("applied-vertex direct-lookup causal contracts", () => {
 		await handleMessage(node, updateMessage([known]));
 
 		expect.soft(lookup.materializations).toBe(0);
-		expect.soft(lookup.directLookups).toBe(1);
+		expect.soft(lookup.directLookups).toBe(0);
 	});
 
 	test("SYNC_ACCEPT keeps exactly two sweeps and makes response comparison work independent of V", async () => {

@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- committed vertices and snapshots are narrowed by positive controls */
 import {
 	type DRPState,
@@ -467,7 +470,11 @@ describe("Phase 1d(i) live-capture and remote controls", () => {
 		reads.drp = 0;
 		const vertex = remoteVertex("touch", [], 1);
 
-		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+			applied: true,
+			missing: [],
+			invalid: [],
+		});
 		expect(reads).toEqual({ acl: 0, drp: 0 });
 		const rootDRP = byKey(h.states.getDRPState(HashGraph.rootHash)!);
 		const rootACL = byKey(h.states.getACLState(HashGraph.rootHash)!);

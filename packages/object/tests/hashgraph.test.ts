@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 import { SetDRP } from "@ts-drp/blueprints";
 import {
 	ACLGroup,
@@ -321,12 +324,12 @@ describe("HashGraph for SetDRP tests", () => {
 		                    \__ V3:ADD(1)
 		*/
 		obj1.drp?.add(1);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 		expect(obj1.drp?.query_has(1)).toBe(true);
 		obj1.drp?.delete(1);
 		obj2.drp?.add(1);
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		// Adding 1 again does not change the state
 		expect(obj1.drp?.query_has(1)).toBe(false);
@@ -350,13 +353,13 @@ describe("HashGraph for SetDRP tests", () => {
 
 		obj1.drp?.add(1);
 		vi.advanceTimersByTime(1000);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.delete(1);
 		vi.advanceTimersByTime(1000);
 		obj2.drp?.add(2);
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 		expect(obj1.drp?.query_has(1)).toBe(false);
 		expect(obj1.drp?.query_has(2)).toBe(true);
 		expect(obj2.drp?.query_has(1)).toBe(false);
@@ -380,15 +383,15 @@ describe("HashGraph for SetDRP tests", () => {
 		*/
 
 		obj1.drp?.add(1);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.delete(1);
 		obj2.drp?.add(1);
 		obj1.drp?.add(10);
 		// Removing 5 does not change the state
 		obj2.drp?.delete(5);
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		expect(obj1.drp?.query_has(1)).toBe(false);
 		expect(obj1.drp?.query_has(10)).toBe(true);
@@ -412,14 +415,14 @@ describe("HashGraph for SetDRP tests", () => {
 		*/
 
 		obj1.drp?.add(1);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.delete(1);
 		obj2.drp?.delete(2);
 		obj1.drp?.add(2);
 		obj2.drp?.add(1);
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		expect(obj1.drp?.query_has(1)).toBe(false);
 		expect(obj1.drp?.query_has(2)).toBe(true);
@@ -441,16 +444,16 @@ describe("HashGraph for SetDRP tests", () => {
 		                    \__ V3:RM(2) -- V4:RM(2) --/
 		*/
 		obj1.drp?.add(1);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.add(2);
 		obj2.drp?.delete(2);
 		obj2.drp?.delete(2);
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.delete(2);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		expect(obj1.drp?.query_has(1)).toBe(true);
 		expect(obj1.drp?.query_has(2)).toBe(false);
@@ -467,16 +470,16 @@ describe("HashGraph for SetDRP tests", () => {
 
 	test("Should return topological sort order when linearizing vertices", async () => {
 		obj1.drp?.add(1);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.add(2);
 		obj2.drp?.delete(2);
 		obj2.drp?.delete(2);
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		obj1.drp?.delete(2);
-		await obj2.applyVertices(hg1.getAllVertices());
+		await obj2.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 
 		const order1 = hg1.topologicalSort();
 		const linearizedVertices1 = hg1.linearizeVertices();
@@ -526,7 +529,7 @@ describe("HashGraph for undefined operations tests", () => {
 		const vertices = hg1.getAllVertices();
 		vertices[1].operation = undefined;
 
-		await obj2.applyVertices(vertices);
+		await obj2.applyVertices(trustedTestVertices(vertices));
 		const linearizedVertices = hg2.linearizeVertices();
 		// Should only have one, since we skipped the undefined operations
 		expect(linearizedVertices.map((vertex) => vertex.operation)).toEqual([
@@ -672,16 +675,16 @@ describe("Vertex state tests", () => {
 		obj2.drp?.add(2);
 		obj3.drp?.add(3);
 
-		await obj1.applyVertices(hg2.getAllVertices());
-		await obj3.applyVertices(hg2.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg2.getAllVertices()));
+		await obj3.applyVertices(trustedTestVertices(hg2.getAllVertices()));
 
 		obj1.drp?.add(4);
 		obj3.drp?.add(5);
 		const hashA4 = hg1.getFrontier()[0];
 		const hashC5 = hg3.getFrontier()[0];
 
-		await obj1.applyVertices(hg3.getAllVertices());
-		await obj3.applyVertices(hg1.getAllVertices());
+		await obj1.applyVertices(trustedTestVertices(hg3.getAllVertices()));
+		await obj3.applyVertices(trustedTestVertices(hg1.getAllVertices()));
 		obj1.drp?.add(6);
 		const hashA6 = hg1.getFrontier()[0];
 

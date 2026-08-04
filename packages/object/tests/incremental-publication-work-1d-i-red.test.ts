@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- positive controls narrow required snapshots and vertices */
 import {
 	ACLGroup,
@@ -374,7 +377,11 @@ describe("Phase 1d(i) eligible incremental publication work", () => {
 		const probe = new IdentityPublicationProbe();
 		const h = harness(new MatrixDRP(), undefined, probe);
 		const vertex = remoteVertex("mutateTwo", [17, "identity"], [HashGraph.rootHash], 1);
-		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+			applied: true,
+			missing: [],
+			invalid: [],
+		});
 
 		const publication = probe.publications.find((candidate) => candidate.targetHash === vertex.hash);
 		expect(publication?.changed).toEqual({ acl: [], drp: ["nested", "replacement"] });
@@ -438,7 +445,11 @@ describe("Phase 1d(i) eligible incremental publication work", () => {
 		async (_label, opType, args) => {
 			const h = harness();
 			const vertex = remoteVertex(opType, [...args], [HashGraph.rootHash], 1);
-			await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+			await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+				applied: true,
+				missing: [],
+				invalid: [],
+			});
 			assertIncrementalPublication(h, vertex.hash, HashGraph.rootHash, "drp");
 		}
 	);
@@ -457,7 +468,11 @@ describe("Phase 1d(i) eligible incremental publication work", () => {
 		try {
 			const h = harness();
 			const vertex = remoteVertex("replace", ["checkpoint"], [HashGraph.rootHash], 4);
-			await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+			await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+				applied: true,
+				missing: [],
+				invalid: [],
+			});
 			assertIncrementalPublication(h, vertex.hash, HashGraph.rootHash, "drp");
 			const publication = h.probe.publications.find(
 				(candidate) =>
@@ -509,7 +524,7 @@ describe("Phase 1d(i) eligible incremental publication work", () => {
 			const [, opType, args] = DRP_CASES[index];
 			const h = harness();
 			const vertex = remoteVertex(opType, [...args], [HashGraph.rootHash], index + 10);
-			await h.applier.applyVertices([vertex]);
+			await h.applier.applyVertices(trustedTestVertices([vertex]));
 			const result = assertIncrementalPublication(h, vertex.hash, HashGraph.rootHash, "drp");
 			aggregateClonedBytes += result.clonedBytes;
 			aggregateMutatedBytes += result.mutatedBytes;
@@ -527,7 +542,7 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 			throw new Error("controlled post-publication failure");
 		};
 		try {
-			await expect(h.applier.applyVertices([candidate])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([candidate]))).resolves.toEqual({
 				applied: false,
 				missing: [],
 				invalid: [],
@@ -552,8 +567,8 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const h = harness();
 		const suffixK = remoteVertex("setK", ["suffix-K"], [HashGraph.rootHash], 1);
 		const pendingJ = remoteVertex("setJ", ["pending-J"], [HashGraph.rootHash], 2);
-		await expect(h.applier.applyVertices([suffixK])).resolves.toMatchObject({ applied: true });
-		await expect(h.applier.applyVertices([pendingJ])).resolves.toMatchObject({ applied: true });
+		await expect(h.applier.applyVertices(trustedTestVertices([suffixK]))).resolves.toMatchObject({ applied: true });
+		await expect(h.applier.applyVertices(trustedTestVertices([pendingJ]))).resolves.toMatchObject({ applied: true });
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === pendingJ.hash);
 		expect(record?.mode).toBe("fallback");
@@ -570,7 +585,7 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const h = harness();
 		const left = remoteVertex("setK", ["left"], [HashGraph.rootHash], 10);
 		const right = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 11);
-		await h.applier.applyVertices([left, right]);
+		await h.applier.applyVertices(trustedTestVertices([left, right]));
 		expect(
 			h.hashGraph.getFrontier().length,
 			"positive control: local authoring starts at multiple heads"
@@ -587,9 +602,9 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const h = harness();
 		const left = remoteVertex("setK", ["left"], [HashGraph.rootHash], 12);
 		const right = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 13);
-		await h.applier.applyVertices([left, right]);
+		await h.applier.applyVertices(trustedTestVertices([left, right]));
 		const join = remoteVertex("mutateNested", [9], [left.hash, right.hash], 14);
-		await h.applier.applyVertices([join]);
+		await h.applier.applyVertices(trustedTestVertices([join]));
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === join.hash);
 		expect(record).toMatchObject({ kind: "vertex", mode: "fallback", fallbackReason: "non-empty-suffix" });
@@ -600,9 +615,9 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const h = harness();
 		const left = remoteVertex("setK", ["left"], [HashGraph.rootHash], 15);
 		const right = remoteVertex("setJ", ["tail"], [HashGraph.rootHash], 16);
-		await h.applier.applyVertices([left, right]);
+		await h.applier.applyVertices(trustedTestVertices([left, right]));
 		const pending = remoteVertex("mutateNested", [10], [left.hash], 17);
-		await h.applier.applyVertices([pending]);
+		await h.applier.applyVertices(trustedTestVertices([pending]));
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === pending.hash);
 		expect(record).toMatchObject({ kind: "vertex", mode: "fallback", fallbackReason: "concurrent-tail" });
@@ -616,8 +631,8 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 		const h = harness(new ConflictMatrixDRP());
 		const left = remoteVertex("setK", ["left"], [HashGraph.rootHash], 20);
 		const right = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 21);
-		await h.applier.applyVertices([left]);
-		await h.applier.applyVertices([right]);
+		await h.applier.applyVertices(trustedTestVertices([left]));
+		await h.applier.applyVertices(trustedTestVertices([right]));
 
 		const record = h.probe.publications.find((candidate) => candidate.targetHash === right.hash);
 		expect(record).toMatchObject({ kind: "vertex", mode: "fallback", fallbackReason: "conflict-replay" });
@@ -631,8 +646,8 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 			const h = harness();
 			const left = remoteVertex("setK", ["left"], [HashGraph.rootHash], 30);
 			const right = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 31);
-			await h.applier.applyVertices([left]);
-			await h.applier.applyVertices([right]);
+			await h.applier.applyVertices(trustedTestVertices([left]));
+			await h.applier.applyVertices(trustedTestVertices([right]));
 			const frontier = h.hashGraph.getFrontier();
 			expect(frontier.length, "positive control: checkpoint cut has multiple heads").toBeGreaterThan(1);
 			const checkpoint = h.probe.publications.find(
@@ -681,8 +696,12 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 			const driftedLeft = remoteVertex("setK", ["left"], [HashGraph.rootHash], 40);
 			const driftedRight = remoteVertex("setJ", ["right"], [HashGraph.rootHash], 41);
 
-			await expect(clean.applier.applyVertices([cleanLeft])).resolves.toMatchObject({ applied: true });
-			await expect(drifted.applier.applyVertices([driftedLeft])).resolves.toMatchObject({ applied: true });
+			await expect(clean.applier.applyVertices(trustedTestVertices([cleanLeft]))).resolves.toMatchObject({
+				applied: true,
+			});
+			await expect(drifted.applier.applyVertices(trustedTestVertices([driftedLeft]))).resolves.toMatchObject({
+				applied: true,
+			});
 
 			const rawACL = drifted.acl as unknown as Record<string, unknown>;
 			const rawDRP = drifted.drp as unknown as Record<string, unknown>;
@@ -704,8 +723,12 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 			for (const entry of mapEntries.reverse()) drifted.drp.map.set(...entry);
 			(drifted.drp.nested.child as { value: number }).value = 999;
 
-			await expect(clean.applier.applyVertices([cleanRight])).resolves.toMatchObject({ applied: true });
-			await expect(drifted.applier.applyVertices([driftedRight])).resolves.toMatchObject({ applied: true });
+			await expect(clean.applier.applyVertices(trustedTestVertices([cleanRight]))).resolves.toMatchObject({
+				applied: true,
+			});
+			await expect(drifted.applier.applyVertices(trustedTestVertices([driftedRight]))).resolves.toMatchObject({
+				applied: true,
+			});
 
 			const cleanFrontier = clean.hashGraph.getFrontier();
 			const driftedFrontier = drifted.hashGraph.getFrontier();
@@ -773,8 +796,12 @@ describe("Phase 1d(i) exact-cut fallback publication", () => {
 
 			const cleanDescendant = remoteVertex("setJ", ["right"], cleanFrontier, 42);
 			const driftedDescendant = remoteVertex("setJ", ["right"], driftedFrontier, 42);
-			await expect(clean.applier.applyVertices([cleanDescendant])).resolves.toMatchObject({ applied: true });
-			await expect(drifted.applier.applyVertices([driftedDescendant])).resolves.toMatchObject({ applied: true });
+			await expect(clean.applier.applyVertices(trustedTestVertices([cleanDescendant]))).resolves.toMatchObject({
+				applied: true,
+			});
+			await expect(drifted.applier.applyVertices(trustedTestVertices([driftedDescendant]))).resolves.toMatchObject({
+				applied: true,
+			});
 			expect(encodedState(clean.states.getACLState(cleanDescendant.hash)!)).toEqual(
 				encodedState(cleanCheckpoint!.state.aclState)
 			);

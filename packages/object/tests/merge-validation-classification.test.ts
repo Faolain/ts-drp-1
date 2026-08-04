@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 /**
  * Contract B: ApplyResult gains `invalid: Hash[]`, and MergeResult gains the
  * corresponding third tuple element: `[merged, missing, invalid]`. `missing`

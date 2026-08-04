@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import {
 	type DrpRuntimeContext,
 	type DRPState,

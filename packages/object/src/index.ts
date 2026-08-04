@@ -24,10 +24,12 @@ import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
 import { type DRPObjectStateManager } from "./state-materialize.js";
 import { detachStateSnapshot } from "./state-payload.js";
+import { classifyNovelVertices } from "./vertex-authentication.js";
 
 export * from "./acl/index.js";
 export * from "./hashgraph/index.js";
 export { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError };
+export { authenticateVertices } from "./vertex-authentication.js";
 
 /**
  * Object ids are creator-bound: `<creatorPeerId>:<randomHexSalt>`.
@@ -97,6 +99,10 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 
 	private _applier: DRPVertexApplier<T>;
 	private _states: DRPObjectStateManager<T>;
+	private readonly mergeIngestMetadata = new WeakMap<
+		MergeResult,
+		{ committed: readonly Vertex[]; hasTrustedOrAuthenticatedOffers: boolean }
+	>();
 
 	private subscriptions: DRPObjectCallback<T>[] = [];
 	private _finalityStore: FinalityStore;
@@ -244,7 +250,44 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @returns The result of the application.
 	 */
 	async applyVertices(vertices: Vertex[]): Promise<ApplyResult> {
-		return this._applier.applyVertices(vertices);
+		return (await this.authenticateAndApplyVertices(vertices)).result;
+	}
+
+	private async authenticateAndApplyVertices(vertices: Vertex[]): Promise<{
+		authenticated: readonly Vertex[];
+		hasTrustedOrAuthenticatedOffers: boolean;
+		result: ApplyResult;
+	}> {
+		const {
+			authenticated,
+			invalid: authenticationInvalid,
+			offeredHashes,
+		} = classifyNovelVertices(vertices, (hash) => hash === HashGraph.rootHash || this.hashGraph.vertices.has(hash));
+		const applied =
+			authenticated.length === 0
+				? { applied: true, invalid: [], missing: [] }
+				: await this._applier.applyVertices(authenticated);
+		const hasTrustedOrAuthenticatedOffers = offeredHashes.length > authenticationInvalid.length;
+		if (authenticationInvalid.length === 0) {
+			return { authenticated, hasTrustedOrAuthenticatedOffers, result: applied };
+		}
+
+		const invalidCounts = new Map<string, number>();
+		for (const hash of [...authenticationInvalid, ...applied.invalid]) {
+			invalidCounts.set(hash, (invalidCounts.get(hash) ?? 0) + 1);
+		}
+		const invalid: string[] = [];
+		for (const hash of offeredHashes) {
+			const count = invalidCounts.get(hash) ?? 0;
+			if (count === 0) continue;
+			invalid.push(hash);
+			invalidCounts.set(hash, count - 1);
+		}
+		return {
+			authenticated,
+			hasTrustedOrAuthenticatedOffers,
+			result: { ...applied, applied: false, invalid },
+		};
 	}
 
 	/**
@@ -265,8 +308,39 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 				"Refusing to adopt a root ACL from the network: genesis is derived from the object id"
 			);
 		}
-		const { applied, missing, invalid } = await this._applier.applyVertices(vertices);
-		return [applied, missing, invalid];
+		const { authenticated, hasTrustedOrAuthenticatedOffers, result } =
+			await this.authenticateAndApplyVertices(vertices);
+		const mergeResult: MergeResult = [result.applied, result.missing, result.invalid];
+		const committed: Vertex[] = [];
+		const committedHashes = new Set<string>();
+		for (const vertex of authenticated) {
+			if (committedHashes.has(vertex.hash)) continue;
+			const stored = this.hashGraph.vertices.get(vertex.hash);
+			if (stored === undefined) continue;
+			committedHashes.add(vertex.hash);
+			committed.push(stored);
+		}
+		this.mergeIngestMetadata.set(mergeResult, { committed, hasTrustedOrAuthenticatedOffers });
+		return mergeResult;
+	}
+
+	/**
+	 * Resolve the object-owned snapshots newly committed by one merge result.
+	 * @param result - Exact tuple returned by this object's merge call.
+	 * @returns Newly committed snapshots, or undefined for an unrelated result.
+	 */
+	appliedVerticesForMergeResult(result: MergeResult): readonly Vertex[] | undefined {
+		return this.mergeIngestMetadata.get(result)?.committed;
+	}
+
+	/**
+	 * Report whether a merge contained any root/known or cryptographically
+	 * authenticated offer, independent of later graph classification.
+	 * @param result - Exact tuple returned by this object's merge call.
+	 * @returns The offer-authentication verdict, or undefined for an unrelated result.
+	 */
+	mergeHadTrustedOrAuthenticatedOffers(result: MergeResult): boolean | undefined {
+		return this.mergeIngestMetadata.get(result)?.hasTrustedOrAuthenticatedOffers;
 	}
 
 	/**

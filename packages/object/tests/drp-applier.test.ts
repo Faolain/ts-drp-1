@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 import { DrpType, type IACL, type IDRP, type IHashGraph, Operation, SemanticsType, Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -80,7 +83,7 @@ describe("DRPVertexApplier", () => {
 				const dependencies = [HashGraph.rootHash];
 				const vertex = Vertex.create({ hash, peerId, dependencies, operation, timestamp });
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				console.log(result);
 				expect(result.applied).toBe(true);
 				expect(result.missing).toHaveLength(0);
@@ -135,7 +138,7 @@ describe("DRPVertexApplier", () => {
 					timestamp: timestamp + 1,
 				});
 
-				await expect(failClosedApplier.applyVertices([first, second])).resolves.toMatchObject({
+				await expect(failClosedApplier.applyVertices(trustedTestVertices([first, second]))).resolves.toMatchObject({
 					applied: true,
 					missing: [],
 					invalid: [],
@@ -158,7 +161,7 @@ describe("DRPVertexApplier", () => {
 					signature: new Uint8Array([1, 2, 3]),
 				});
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				expect(result.applied).toBe(false);
 				expect(result.missing).toHaveLength(0);
 				expect(result.invalid).toContain("test-hash");
@@ -171,7 +174,7 @@ describe("DRPVertexApplier", () => {
 				const hash = computeHash(peerId, operation, dependencies, timestamp);
 				const vertex = Vertex.create({ hash, peerId, dependencies, operation, timestamp });
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				expect(result.applied).toBe(false);
 				expect(result.missing).toEqual([hash]);
 				expect(result.invalid).toHaveLength(0);
@@ -187,7 +190,7 @@ describe("DRPVertexApplier", () => {
 					timestamp: Date.now(),
 				});
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				expect(result.applied).toBe(false);
 				expect(result.missing).toHaveLength(0);
 				expect(result.invalid).toEqual([vertex.hash]);

@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- committed vertices and stored snapshots are narrowed by positive controls */
 import { DRPStateOtherTheWire, DrpType, type IDRP, Operation, SemanticsType, type Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
@@ -416,7 +419,11 @@ describe("Phase 1d(i) D.92.3-P3b mutation attribution and publication", () => {
 		const before = bytesByKey(h.rawDRP);
 		const vertex = remoteVertex("numericWrite", [94]);
 
-		await expect(h.applier.applyVertices([vertex])).resolves.toEqual({ applied: true, missing: [], invalid: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([vertex]))).resolves.toEqual({
+			applied: true,
+			missing: [],
+			invalid: [],
+		});
 
 		const groundTruth = byteDeltaKeys(before, h.rawDRP);
 		expect(groundTruth).toEqual(["payload"]);

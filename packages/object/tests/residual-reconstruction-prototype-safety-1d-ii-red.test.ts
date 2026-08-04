@@ -1,3 +1,6 @@
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- causal fixtures positively narrow committed state */
 import {
 	ActionType,
@@ -522,7 +525,7 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			const tail = remoteVertex("touch", ["tail"], [right.hash], 32);
 			const join = remoteVertex("touch", ["joined"], [left.hash, tail.hash], 33);
 
-			await expect(h.applier.applyVertices([left, right, tail, join])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([left, right, tail, join]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
@@ -600,7 +603,7 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 				40
 			);
 			const ambient = remoteVertex("installAmbient", ["remote-ambient"], [HashGraph.rootHash], 41);
-			await expect(remote.applier.applyVertices([reserved, ambient])).resolves.toEqual({
+			await expect(remote.applier.applyVertices(trustedTestVertices([reserved, ambient]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
@@ -630,7 +633,11 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 		applicationSetterEvents.length = 0;
 		const h = harness(new ReconstructionFixture());
 		const pending = remoteVertex("installApplicationValue", ["control-after"], [HashGraph.rootHash], 49);
-		await expect(h.applier.applyVertices([pending])).resolves.toEqual({ applied: true, invalid: [], missing: [] });
+		await expect(h.applier.applyVertices(trustedTestVertices([pending]))).resolves.toEqual({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
 		expect(applicationSetterEvents).toEqual([{ receiver: h.applier.drp, value: "control-after" }]);
 		expect(h.drp._applicationValue).toBe("control-after");
 		expect(Object.hasOwn(h.drp, "applicationValue")).toBe(false);
@@ -680,14 +687,14 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			};
 
 			const install = remoteVertex("installApplicationObject", ["installed"], [HashGraph.rootHash], 60);
-			await expect(h.applier.applyVertices([install])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([install]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
 			});
 			const left = remoteVertex("touch", ["left"], [install.hash], 61);
 			const right = remoteVertex("touch", ["right"], [install.hash], 62);
-			await expect(h.applier.applyVertices([left, right])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([left, right]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
@@ -810,14 +817,14 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			};
 
 			const install = remoteVertex("installBoth", ["installed"], [HashGraph.rootHash], 70);
-			await expect(h.applier.applyVertices([install])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([install]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
 			});
 			const left = remoteVertex("touch", ["left"], [install.hash], 71);
 			const right = remoteVertex("touch", ["right"], [install.hash], 72);
-			await expect(h.applier.applyVertices([left, right])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([left, right]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
@@ -848,7 +855,7 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 				.toBe("right");
 
 			const widen = remoteVertex("touch", ["widen"], [left.hash], 73);
-			await expect(h.applier.applyVertices([widen])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([widen]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
 				missing: [],
@@ -984,7 +991,7 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			throw new Error("phase-1d-ii forced post-adoption rollback");
 		};
 		try {
-			await expect(h.applier.applyVertices([pending])).resolves.toEqual({
+			await expect(h.applier.applyVertices(trustedTestVertices([pending]))).resolves.toEqual({
 				applied: false,
 				invalid: [],
 				missing: [],

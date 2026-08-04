@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 import { ACLGroup, DrpType, type IDRP, Operation, SemanticsType, type Vertex } from "@ts-drp/types";
 import { describe, expect, it } from "vitest";
 
