@@ -22567,21 +22567,59 @@ warnings, and format/diff pass. No 100k gate ran. Evidence is under
 and verified 32-entry manifest SHA-256 is
 `d6c670099d4f40551b0c0e6f719f1885c6c5422da3487dc69f51634a21467057`.
 
-## Next Agent Prompt — value-equal replay GREEN acceptance
+**Value-equal replay GREEN acceptance rejection.** Fresh native Grok 4.5/high
+session `755882c3-0fbb-48b5-bdbe-55c3c4f31c30` accepted `ff5dc7e` with both
+Phase 1i closure flags `yes`. Grok first challenged direct indexed binary writes
+but retracted the objection after tracing `finalizePreparedWrite` and proving
+that a same-value Uint8Array write yields no effective key yet does yield the
+attempted top-level key; failed non-writable writes yield neither, and attempted
+mode performs no comparator calls. Native final SHA-256 is
+`ca20b271fc8eb4e5e13bd5bd56a3be701c6c3b286b5ea324e0f39af2ebfe4e22`;
+the 24-entry artifact-manifest SHA-256 is
+`8763d79525d845b15bdb35a5f75b3ba4718378f21120beab552cdd0b14a0dc1a`.
 
-Review production commit `ff5dc7e` together with causal-publication GREEN
-`8bc3755`, tests-only RED `bcdbd21`, earlier causal lineage and amendment
-`c0d8fb1`. Start with fresh Grok 4.5/high; only if accepted run exact Kimi
-3/high with both 100-step controls; only if accepted run final Claude-skill
-Opus/xhigh. Adversarially inspect attempted-write completeness across all
-existing mutation traps, equality against causal target versus previous live
-baseline, both replay/full suffix paths, ACL/DRP sides, canonical checkpoint
-propagation, causal stored pairs, copy/comparison meters, raw egress,
-setter/rollback/failure atomicity and the six exact inherited residuals. Run a
-bounded counterexample only when it tests a distinct semantic gap; do not grow
-a value-type or syntax matrix. Reviewers must not modify tracked state or run
-100k. A blocking finding returns to a fresh tests-only RED. Do not schedule
-Fable.
+Exact Kimi 3/high/dual-100 session
+`4fee27ef-f6b5-4009-8150-8cc14b852ce7` then found a more fundamental gap and
+returned `CHANGES_REQUESTED`, `PHASE1I_A_MAY_RECLOSE=no` and
+`PHASE1I_B_GREEN_MAY_RESUME=no`. D initializes `x=1,y=0`; sibling A executes
+`if (x===1) y=1` and arrives before sibling B=`x=0`; deterministic canonical
+order remains D-to-B-to-A. Replaying A after B now takes the no-write branch, so
+no proxy trap can add `y` to the candidate set. Subject arrival D,A,B retains
+prior-live `y=1`, while oracle D,B,A is `y=0`; the B/A checkpoint and joined C's
+live, stored pair and serialized bytes retain the same divergence under equal
+signed hashes/frontier/order. B's causal pair/bytes remain equal, isolating
+canonical-live completeness. Kimi reproduced this through the signed real
+applier. Final SHA-256 is
+`d33a4a043742b2f2dd242b92ab354486ef8ed94dc533a910ef56d68f15e58a4b`;
+the verified 30-entry manifest SHA-256 is
+`3fa189ebdd8b77483f6e097624d8e83f83b60bd87133167baeabf1592a65be62`.
+No reviewer changed tracked state or ran 100k. Opus was correctly skipped after
+the blocking Kimi gate.
+
+Attempted-write attribution is therefore useful but cannot be the completeness
+oracle: canonical replay may deliberately perform no mutation based on the new
+causal state, while the corresponding key differs from prior live state. The
+sustainable owner is a bounded complete comparison of the prepared canonical
+instance against the previous live/checkpoint baseline over their union of
+top-level governed keys. It may use replay attribution only as an optimization
+that cannot suppress completeness. This remains a top-level state comparison,
+not a graph/history scan or value-type matrix.
+
+## Next Agent Prompt — conditional no-write canonical-live RED
+
+Use a fresh Codex-high tests-only RED on `ff5dc7e`. Add one signed semantic
+case beside the existing CrossKeyTail fixtures: D establishes `x=1,y=0`; A
+conditionally writes `y=1` only when `x===1`; concurrent B writes `x=0`;
+subject arrival D,A,B and oracle D,B,A share identical hashes, frontier and
+canonical D-to-B-to-A order; joined C depends `[B,A]` under checkpoint suffix
+size one. Freeze subject/oracle immediate live equality, B causal pair/bytes,
+B/A checkpoint state and C live/stored pair/bytes. Current production must fail
+only the stale canonical-live/checkpoint views. Do not add branch, collection,
+setter or syntax variants, modify production/plan, or run 100k. Then use a
+distinct Codex-high GREEN implementing bounded complete top-level
+instance-versus-baseline capture while preserving causal stored pairs, copy
+truth, rollback/raw/setter behavior and quick-iteration meters. Restart Grok,
+exact Kimi 3 and Opus only after GREEN. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
