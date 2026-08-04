@@ -20966,36 +20966,55 @@ the verified 25-entry manifest SHA-256 is
 `0c184687cee296df5fbafbb1745e6c9be6ff9f0c8ecb6b53b2c8d35f88ed5872`
 under `.logs/phase-1e-concrete-execution-capability-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1e concrete execution-capability GREEN
+**Phase 1e concrete execution-capability GREEN diagnostic stopped on a stale
+observer.** The first distinct production owner tried the smallest sustainable
+shape: remove the WeakSet/raw fast lane and send every implementation only
+detached verifier-issued handles. That diagnostic made the new capability RED
+3/3, prior corrective focus 16/16, node authentication 20/20, object ingest 6/6
+and direct applier 54/54. The original Phase 1e suite, however, became 18/19.
 
-Freeze tests-only RED `740e180` byte-for-byte together with accepted earlier
-REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`, `1c90778` and
-`f02ad50`. Treat production GREEN `9b493e5` as rejected-but-partially-valid
-lineage: preserve its B1-B3 behavior, occurrence ordering and structural
-verified-handle guarantees. Spawn a distinct fresh Codex-high production GREEN
-owner. It may change only the smallest coherent production owners and ignored
-`.logs` evidence, not any test, fixture, this plan, package manifest, lockfile,
-generated file, protected path or stash.
+The sole failure is
+`authenticated-object-ingress-1e-red.test.ts`'s forged-UPDATE test. It installs
+`vi.spyOn(object, "merge")`, then requires that wrapper to be called once with
+the invalid claimed-author-mismatch hash. A post-construction Vitest spy is
+observably the same production shape as the hostile post-construction
+replacement frozen by `740e180`. Satisfying both assertions would require
+test-framework duck typing or would again deliver invalid input to a
+caller-overridable method. The old assertion's goal—one cryptographic recovery,
+rejection and no state mutation—remains valid; its requirement that invalid raw
+input reach public `merge` is a stale implementation observer after ownership
+of the authentication boundary moved outward. This is a fixture/test
+correction, not a production compatibility requirement or contract amendment.
 
-Make raw remote vertices cross a module-owned, non-overridable authentication
-entry point before any caller-overridable dispatch. WeakSet construction
-identity must no longer authorize `object.merge(raw)`. An ordinary subclass
-override and a post-construction replacement must either receive no invalid
-input or receive only detached verifier-issued authenticated handles; neither
-may observe the raw unsigned object or act before authentication. Preserve the
-unmodified concrete path's exactly-once crypto and valid merge result, public
-`merge(Vertex[])` source compatibility, trusted root/already-known skips,
-structural-object behavior, canonical committed/finality attribution and all
-B1-B3 semantics. Do not fix only the later missing-outcome throw, disable public
-overrides silently, create a configuration trust switch or expand scope into
-D.73, Phase 1n or optional 0n.
+No diagnostic production change was committed. `packages/object/src/index.ts`
+was restored byte-for-byte to SHA-256
+`5d9451c77ed2762eaa94325b08dea3074fbb9b074d0d35024a932b4b872df225`,
+Git blob `4431fe534333bf7f8266b43f42781915a0da1203`; tracked/index state is clean
+at HEAD `63ac6ae`. The seven-entry diagnostic hash ledger verifies under
+`.logs/phase-1e-concrete-execution-capability-green-codex-high/`.
 
-Run the 3-test frozen RED plus all recorded Phase 1e preservation,
-package/workspace typecheck, build, lint and formatting gates to `.log`.
-Authenticate the exact production diff, source hashes/blobs, test invariance,
-result digest and integrity manifest. After controller audit and a production
-checkpoint, run fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100
-reviews; final Claude-skill Opus/xhigh runs only if both accept. Do not schedule
+## Next Agent Prompt — Phase 1e stale forged-UPDATE observer correction
+
+Freeze new RED `740e180` and every accepted earlier test except the one stale
+observer assertion identified above. Spawn a fresh Codex-high tests-only owner.
+It may change only
+`packages/node/tests/authenticated-object-ingress-1e-red.test.ts` plus ignored
+evidence logs, not production, other tests/fixtures, this plan, manifests,
+lockfiles, protected paths or stash.
+
+Correct only the forged-UPDATE test so it proves the enduring behavior without
+requiring invalid raw input to reach an overridable public method: exactly one
+cryptographic recovery at the authenticated object boundary, rejection/no
+stored vertex, no DRP state mutation and no acceptance side effect already
+owned by that test. Prefer observing the public authenticated boundary or
+outcome, not an internal dispatch count. First demonstrate that the corrected
+test remains green on current production for the enduring invariant, while the
+new capability RED remains exact 2F/1P; do not weaken or delete security
+coverage. Preserve the rest of the 19-test file byte-for-byte where practical.
+Run the corrected 19-test suite, new RED, focused/preservation gates,
+typechecks, lint and formatting to `.log`; commit only the bounded test
+correction and seal hashes/manifest. Then checkpoint it and restart a distinct
+production GREEN owner on the already-frozen capability RED. Do not schedule
 Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
