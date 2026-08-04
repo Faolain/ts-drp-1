@@ -22121,27 +22121,80 @@ Opus also found that Codex's intermediate `/tmp` seven-file identity artifacts
 were mid-session working bytes rather than exact pre-GREEN bytes. They remain
 non-authoritative disclosed diagnostics; exact Git ancestry, writer-path
 identity and the sealed Phase 1e baseline independently establish attribution.
-No blocking finding remains. Phase 1i-a is closed at production GREEN `6fc9c55`
-plus docs checkpoint `91f0956`; do not rerun its one-shot 100k gate.
+At that checkpoint no blocking finding remained and Phase 1i-a closed at
+production GREEN `6fc9c55` plus docs checkpoint `91f0956`. The later causal RED
+below supersedes only that closure status; do not rerun its one-shot 100k gate.
 
-## Next Agent Prompt — Phase 1i-b compact-history observer RED
+**Phase 1i-b tests-only RED checkpoint.** Freeze commit `fb0f662` on parent
+`55e8a0b`. It adds exactly six test/fixture paths and no production, plan,
+generated or protected-user change. The explicit capability is additive
+`history_storage: "full" | "compact"`, separate from the unchanged
+`replica_mode`; compact storage requires an explicit observer. The RED owns one
+authenticated inventory vocabulary for known hashes versus locally available
+complete payloads, typed unavailable/unknown history results, compact
+authorship/finality denial, authenticated live and sync admission, truthful
+`SYNC_REJECT`, and atomic complete rehydration back to the existing full-history
+observer capability without writer promotion. Its authoritative fast shape is
+10 failed / 3 passed / 1 skipped: all failures are absent 1i-b capability, the
+passes preserve omitted writer/full-observer behavior and a freshly built
+signed 64-vertex digest, and the sole skip is the opt-in 100k `<25%` gate. The
+100k gate was not run. Frozen 1i-a is 15 passed / 1 skipped; node preservation is
+41/41 and object preservation is 11/11. Owned lint/format pass, tracked lint has
+zero errors, and typecheck failures are only the deliberately absent public
+1i-b types/methods. Evidence is under
+`.logs/phase-1i-b-compact-history-red-codex-high/`; ledger SHA-256 is
+`f7006be19fc9a954cde26fcc39a73074e7a91bfd7bfff1b8a0a0b69873505e46`.
 
-Use a fresh Codex-high tests-only RED. Freeze an explicit capability boundary
-separate from full-history `replica_mode: "observer"`: authenticated inventory
-must distinguish known hashes from locally available complete payloads;
-`vertices`/`getVertex`/sync must never fabricate or advertise pruned `Vertex`
-values; a request for unavailable history must return an explicit capability
-result. A compact observer must authenticate every newly received full vertex,
-must not author ACL/DRP operations, serve pruned history or promote to
-writer/full-history mode, and may re-enable those capabilities only after
-complete rehydration reverifies signatures, hashes, ancestry and convergence.
-Preserve all Phase 1i-a writer/full-history behavior and record the existing
-non-compacted candidate's exact causal REDs without a production shim. Keep the
-fresh-build 100k `<25%` gate opt-in and do not run it in RED. Separately pin the
-non-public applier-factory observer/store residual only if a bounded test can do
-so without broadening the compact-history capability contract. After RED,
-checkpoint typecheck, lint, format/diff and fast tests to `.log`; then hand to a
-distinct fresh Codex-high GREEN. Do not schedule Fable.
+**Phase 1i-a convergence reopened by a Phase 1d/D.92 checkpoint-publication
+defect.** The 1i-b RED's first concurrent positive-control fixture exposed a
+valid, broader writer defect and was correctly made linear so it would not hide
+inside the compact-history contract. Fresh Codex-high then froze the separate
+public-API corrective RED as tests-only commit `8d48b97` on `fb0f662`, changing
+one existing 1i-a test file by 72 lines. With the production-default checkpoint
+suffix 256, one seven-vertex signed graph has canonical DRP state
+`[1,2,4,5,7]`: a full observer and the hashgraph linearization agree, while a
+writer receiving left then right publishes `[1,2,5,7]` and the opposite order
+publishes `[1,2,4,7]`. All seven full payloads authenticate, commit and remain
+byte-identical on every replica; ACL state also agrees. The writer is therefore
+not an oracle and arrival order changes live state.
+
+The causal boundary is not the observer-only live-frontier shortcut: neither
+the concurrent branch nor its two-parent ACL join uses it. In one public
+`applyVertices` call, concurrent-tail execution contains both branches, but
+writer publication records a branch-local per-vertex snapshot as the canonical
+state for the forced multi-frontier checkpoint. The later cross-type join
+replays from that poisoned checkpoint and permanently loses the other branch.
+Resetting the call boundary or creating an earlier suffix checkpoint can mask
+the defect, which is why the RED explicitly freezes the production default and
+both branch orders. Acceptance ownership reopens Phase 1i-a's required
+writer/observer convergence; production ownership is the already load-bearing
+Phase 1d/D.92 snapshot/checkpoint-publication lineage. Do not start 1i-b GREEN
+until this corrective RED is green and passes the normal Grok, exact Kimi 3 and
+Opus review loop. Do not rerun the closed 1i-a 100k gate for this bounded
+corrective. Focused shape is 8 passed / 1 intended failure; preservation is
+11/11, owned typecheck adds zero errors beyond the committed 1i-b RED, tracked
+lint has zero errors and no 100k test ran. Evidence is under
+`.logs/phase-1i-a-branch-order-divergence-red-codex-high/`; ledger SHA-256 is
+`e1288b32ef1d911649524cb324642625b6769d31e1e519a20378d8688ae3da8c`.
+
+## Next Agent Prompt — Phase 1i-a branch-checkpoint corrective GREEN
+
+Use a distinct fresh Codex-high production-only GREEN on tests-only RED
+`8d48b97`. Repair the Phase 1d/D.92 publication owner: a branch-local
+per-vertex snapshot must never become the canonical multi-frontier checkpoint
+state merely because a root replay forces a checkpoint inside one batch. Both
+writer branch orders must equal the graph-derived full replay and full observer
+without disabling incremental publication, forcing an artificial early
+checkpoint, changing the configured suffix, resetting the batch, or making the
+observer shortcut a writer path. Preserve exact authenticated payload bytes,
+ACL state, rollback, copy-attribution truth, checkpoint/frontier retention,
+all frozen Phase 1d/D.92 suites, the remaining Phase 1i-a contracts, and the
+tests-only 1i-b RED at `fb0f662`. Do not alter tests or the plan, do not run a
+100k gate, and do not add a syntax/source analyzer, compatibility shim or
+threshold-shaped bypass. Run focused and proportional preservation,
+typecheck-error classification, tracked lint and format/diff gates to `.log`;
+commit only the minimum production owner. Then run the normal fresh Grok 4.5,
+exact Kimi 3/high/100 and final Opus/xhigh review loop. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
