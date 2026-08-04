@@ -1,6 +1,6 @@
 import { type DRPState, type Hash, type IACL, type IDRP, type IHashGraph, type Vertex } from "@ts-drp/types";
 
-import { type OperationJournal } from "../operation.js";
+import { type OperationJournal, type ReplayState } from "../operation.js";
 import {
 	borrowedStateEntry,
 	defineEnumerableOwnData,
@@ -28,7 +28,8 @@ export interface PublicationWorkCounters {
 
 export interface PublicationRecord {
 	publicationId: string;
-	kind: "vertex" | "checkpoint";
+	/** `canonical-live` is the transaction-local whole-frontier image, not a stored per-vertex cut. */
+	kind: "vertex" | "checkpoint" | "canonical-live";
 	mode: "incremental" | "fallback";
 	outcome: "published" | "rolled-back";
 	targetHash?: Hash;
@@ -59,7 +60,7 @@ export interface LinearizationCheckpoint {
 	frontier: Hash[];
 	origin: Hash;
 	vertexCount: number;
-	state: { aclState: DRPState; drpState: DRPState };
+	state: ReplayState;
 }
 
 interface PublisherOperation<T extends IDRP> {
@@ -80,6 +81,8 @@ interface PreparedPublicationAdoption<T extends IDRP> {
 	expectedFrontier: Hash[];
 	drp?: T;
 	acl?: IACL;
+	canonicalBaseline?: ReplayState;
+	canonicalState?: ReplayState;
 }
 
 interface PublisherHost<T extends IDRP> {
@@ -101,12 +104,13 @@ interface PublicationPlan {
 interface PublicationOverride {
 	baseline: DRPState;
 	instance: IDRP;
+	changedKeys?: Set<string>;
 }
 
 /** Isolated incremental snapshot publisher. Nested payload values stay opaque. */
 export class PublicationPublisher<T extends IDRP> {
 	private sequence = 0;
-	private canonicalCheckpointState?: { aclState: DRPState; drpState: DRPState };
+	private canonicalCheckpointState?: ReplayState;
 
 	/**
 	 * Create a publisher over injected storage and copy authority.
@@ -126,7 +130,7 @@ export class PublicationPublisher<T extends IDRP> {
 	 * @param state.drpState - Canonical DRP state for the pending frontier
 	 * @param advance - Synchronous checkpoint attempt
 	 */
-	withCanonicalCheckpointState(state: { aclState: DRPState; drpState: DRPState }, advance: () => void): void {
+	withCanonicalCheckpointState(state: ReplayState, advance: () => void): void {
 		if (this.canonicalCheckpointState !== undefined) {
 			throw new Error("Canonical checkpoint state is already active");
 		}
@@ -191,6 +195,14 @@ export class PublicationPublisher<T extends IDRP> {
 					.map((candidateHash) => this.host.states.getDRPState(candidateHash))
 					.filter((state): state is DRPState => state !== undefined)
 			: undefined;
+		const aclOverride =
+			concurrentOverride && isACL && currentDRP && dependencyACLState
+				? { instance: currentDRP, baseline: dependencyACLState, changedKeys: new Set<string>() }
+				: undefined;
+		const drpOverride =
+			concurrentOverride && !isACL && currentDRP && dependencyDRPState
+				? { instance: currentDRP, baseline: dependencyDRPState, changedKeys: new Set<string>() }
+				: undefined;
 		const aclState = this.capturePublishedState(
 			"acl",
 			targetACL,
@@ -198,9 +210,7 @@ export class PublicationPublisher<T extends IDRP> {
 			publication,
 			plan.mode === "incremental",
 			plan.mode === "incremental" ? aclCandidateKeys : undefined,
-			concurrentOverride && isACL && currentDRP && dependencyACLState
-				? { instance: currentDRP, baseline: dependencyACLState }
-				: undefined,
+			aclOverride,
 			operation.rawEgress?.side === "acl",
 			aclRetentionBaselines
 		);
@@ -211,14 +221,80 @@ export class PublicationPublisher<T extends IDRP> {
 			publication,
 			plan.mode === "incremental",
 			plan.mode === "incremental" ? drpCandidateKeys : undefined,
-			concurrentOverride && !isACL && currentDRP && dependencyDRPState
-				? { instance: currentDRP, baseline: dependencyDRPState }
-				: undefined,
+			drpOverride,
 			operation.rawEgress?.side === "drp",
 			drpRetentionBaselines
 		);
 		this.installState("acl", hash, aclState, journal);
 		this.installState("drp", hash, drpState, journal);
+		const canonicalBaseline = adoption.canonicalBaseline;
+		adoption.canonicalState = {
+			aclState:
+				adoption.acl === undefined
+					? (canonicalBaseline?.aclState ?? aclState)
+					: aclOverride === undefined
+						? aclState
+						: this.captureCanonicalLiveState(
+								"acl",
+								targetACL,
+								aclState,
+								canonicalBaseline?.aclState ?? aclState,
+								aclOverride.changedKeys,
+								publication,
+								publicationAttempts,
+								publicationFrontier
+							),
+			drpState:
+				adoption.drp === undefined
+					? (canonicalBaseline?.drpState ?? drpState)
+					: drpOverride === undefined
+						? drpState
+						: this.captureCanonicalLiveState(
+								"drp",
+								targetDRP,
+								drpState,
+								canonicalBaseline?.drpState ?? drpState,
+								drpOverride.changedKeys,
+								publication,
+								publicationAttempts,
+								publicationFrontier
+							),
+		};
+	}
+
+	private captureCanonicalLiveState(
+		side: SnapshotSide,
+		instance: IDRP | undefined,
+		published: DRPState,
+		baseline: DRPState,
+		candidateKeys: ReadonlySet<string>,
+		vertexPublication: PublicationRecord,
+		publicationAttempts: PublicationRecord[],
+		frontier: Hash[]
+	): DRPState {
+		if (instance === undefined || candidateKeys.size === 0) return published;
+		const publication = this.beginPublication(
+			"canonical-live",
+			{ mode: "incremental", baselineHashes: [...frontier] },
+			vertexPublication.targetHash,
+			frontier
+		);
+		publicationAttempts.push(publication);
+		const canonical = this.capturePublishedState(
+			side,
+			instance,
+			baseline,
+			publication,
+			true,
+			candidateKeys,
+			undefined,
+			false,
+			[published]
+		);
+		return canonical.state.length === published.state.length &&
+			canonical.state.every((entry, index) => entry === published.state[index])
+			? published
+			: canonical;
 	}
 
 	/**
@@ -363,7 +439,7 @@ export class PublicationPublisher<T extends IDRP> {
 	}
 
 	private beginPublication(
-		kind: "vertex" | "checkpoint",
+		kind: "vertex" | "checkpoint" | "canonical-live",
 		plan: PublicationPlan,
 		targetHash: Hash | undefined,
 		frontier: readonly Hash[]
@@ -660,6 +736,7 @@ export class PublicationPublisher<T extends IDRP> {
 					key,
 				})
 			) {
+				override.changedKeys?.add(key);
 				targetKeys.add(key);
 				values.set(key, value);
 				borrowedEntries.delete(key);
@@ -667,6 +744,7 @@ export class PublicationPublisher<T extends IDRP> {
 		}
 		for (const key of baselineEntries.keys()) {
 			if (!overrideKeys.has(key)) {
+				override.changedKeys?.add(key);
 				targetKeys.delete(key);
 				values.delete(key);
 				borrowedEntries.delete(key);

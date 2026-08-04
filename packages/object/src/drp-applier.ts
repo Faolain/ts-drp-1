@@ -184,6 +184,8 @@ interface PreparedAdoption<T extends IDRP> {
 	acl?: IACL;
 	nextHint?: AdoptionHint<T>;
 	forceCheckpoint?: boolean;
+	canonicalBaseline?: ReplayState;
+	canonicalState?: ReplayState;
 }
 
 interface AdoptionHint<T extends IDRP> {
@@ -1067,13 +1069,15 @@ export class DRPVertexApplier<T extends IDRP> {
 		const commitOperation: CommitOperation<T> = { ...operation, journal };
 		const publicationAttempts: PublicationRecord[] = [];
 		try {
+			adoption.canonicalBaseline = this.liveCanonicalState;
 			this.assignState(commitOperation, adoption, publicationAttempts, publicationFrontier);
-			const nextACLState = this.states.getACLState(operation.vertex.hash);
-			const nextDRPState = this.states.getDRPState(operation.vertex.hash);
-			if (!nextACLState || !nextDRPState) {
-				throw new Error("Published canonical state is missing");
+			const publishedACLState = this.states.getACLState(operation.vertex.hash);
+			const publishedDRPState = this.states.getDRPState(operation.vertex.hash);
+			if (!publishedACLState || !publishedDRPState) {
+				throw new Error("Published vertex state is missing");
 			}
-			const nextCanonicalState = { aclState: nextACLState, drpState: nextDRPState };
+			const nextCanonicalState = adoption.canonicalState;
+			if (nextCanonicalState === undefined) throw new Error("Canonical live state is missing");
 			const aclReplacementKeys = canonicalReplacementKeys(
 				this.liveCanonicalState.aclState,
 				nextCanonicalState.aclState
@@ -1095,7 +1099,10 @@ export class DRPVertexApplier<T extends IDRP> {
 			this.publicationPublisher.withCanonicalCheckpointState(nextCanonicalState, () => {
 				this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint, publicationAttempts);
 			});
-			this.discardOrdinaryObserverSnapshots(commitOperation, nextCanonicalState);
+			this.discardOrdinaryObserverSnapshots(commitOperation, {
+				aclState: publishedACLState,
+				drpState: publishedDRPState,
+			});
 			journal.commit();
 			this.liveCanonicalState = nextCanonicalState;
 			this.publicationPublisher.reportPublications(publicationAttempts, "published");
