@@ -21315,31 +21315,72 @@ Freeze RED `5cf8835`, production GREEN `af638ff`, their tests and the complete
 accepted review lineage. Do not reopen Phase 1f without a changed production
 path and an executable causal failure.
 
-## Next Agent Prompt — Phase 1g tests-only RED
+**Phase 1g tests-only RED frozen.** Fresh Codex-high commit
+`9745e8fc041abb57756fa6a5d5c2d87856c8d669` has exact parent `d834445`, tree
+`13d80837e10a2414110e4cc14d7b41dd36110423` and only two added test files
+(295 lines). Freeze `packages/network/tests/frame-cap-1g.test.ts`, blob
+`0bcdc017faeb50db87ec97e3838a68af7c0f4eb1`, SHA-256
+`93fc227f84638fea3379e050bb6bb1b8f471942d035434bca5725c489b9334a3`, and
+`packages/node/tests/update-batch-cap.test.ts`, blob
+`6d03a8a551730c6ae59096f3e88bd493fd05fe82`, SHA-256
+`2ba7e8f5ec75b2156a5bbab329f1021570be5eb2ea9d10264cb5ab7d38018515`.
 
-Assign a fresh Codex-high tests-only owner against the exact clean Phase 1f
-closure checkpoint. Phase 1g remains the single atomic plan item: pin both the
-transport pre-decode length-prefix cap and the node UPDATE batch-cardinality
-cap, while editing no production file or plan text.
+The focused signature is exact 2 failed / 2 passed. Declaring 4,194,305
+transport bytes from the prefix alone remains pending until the cleanup stream
+error because production has no explicit `maxDataLength`; the RED requires
+immediate `InvalidDataLengthError` / `ERR_MSG_DATA_TOO_LONG` without a body.
+The exact 4,194,304-byte control passes. A decoded 33-vertex UPDATE performs 33
+real secp256k1 recoveries, 34 object lookups, one merge, one persistence and one
+update dispatch; the RED requires all to remain zero. The exact 32-vertex
+control traverses the existing authentication path and passes. The 4 MiB cap
+preserves the installed dependency's nominal byte-buffer ceiling while moving
+failure to prefix decode. The 32-vertex cap is grounded by the measured
+approximately 1.3 ms synchronous recovery cost and current one-vertex local
+UPDATE formation, rather than the unrelated queue capacity. The old row's
+`verifyACLIncomingVertices` name is stale wording; the live owner is
+`mergeAuthenticatedVertices` / `classifyNovelVertices` and the causal spy is
+`Signature.fromCompact`. SYNC_ACCEPT remains the later Phase 1o sync-response
+governance owner; do not silently expand 1g.
 
-The RED must prove an oversized length prefix is rejected before its body is
-read, accumulated or allocated, with an exact-boundary positive control. It
-must also prove an oversized decoded `Update.vertices` batch is rejected before
-the first authentication/signature-recovery call and before merge, storage,
-broadcast, dispatch, sync recovery or per-vertex error logging, again with an
-exact-boundary positive control. Prefer stable public behavior and existing
-seams; a bounded call/read counter is authoritative, while elapsed time and
-heap/RSS are diagnostics only. Pin stable typed/local errors and finite limits
-only where the present architecture exposes the corresponding owner; do not
-invent a consensus rule, test hook, timer, wall-clock oracle or production
-compatibility shim in RED.
+Existing network tests pass 126/126 and directly affected node
+handler/authentication tests pass 42/42. Network/node/workspace typecheck,
+owned lint, tracked lint (zero errors / 249 inherited warnings), format and
+diff gates pass. RED result SHA-256 is
+`21a974fa16099a9ae314310d10b9beee7c7c47d50754ecf473efa9264d3dbde7`;
+the verified 21-entry integrity manifest SHA-256 is
+`344e28f2536e449d25d2f62d9d1cd2b16dd3af19a719ce613c579ceed85b037d`
+under `.logs/phase-1g-frame-update-caps-red-codex-high/`.
 
-Capture focused failing signatures plus existing network/node suites, package
-and workspace typecheck, owned/tracked lint, format and diff checks to `.log`.
-The focused RED should fail only because current `lpStream(stream)` uses its
-default maximum and `Update.decode(data)` reaches per-vertex authentication
-without a Phase 1g cardinality guard. Freeze exact test blobs and an evidence
-manifest for the distinct GREEN owner. Do not schedule Fable.
+**Phase 1g pre-existing node-baseline audit.** A broad run exposed exact four
+files / 8 failed / 23 passed even when neither new RED file is loaded. The
+separate read-only Codex-high audit classified five as stale fixtures, not
+production regressions: anti-entropy and initial-sync inject unsigned novel
+`createObject()` history that accepted Phase 1e authentication correctly
+rejects; three old BLS-voting cases share one mutable ACL instance across two
+unrelated object identities, relying on aliasing removed by accepted Phase
+1d(i) ownership isolation and contradicted by creator-bound authority. Repair
+those fixtures with genuinely signed remote history and independent replica
+state sharing the intended creator-bound identity. Do not relax authentication,
+the finality-signer guard, ownership isolation or behavioral assertions. The
+remaining exact sync-livelock 3 failed / 3 passed sentinel is genuine known
+production debt owned by Phase 1n and must remain unchanged. Audit summary
+SHA-256 is
+`c377e00a9f5468eb1c1422e729c0779968085db2ec548bf22fccf3d567dfc92f`
+under `.logs/phase-1g-preexisting-node-failures-codex-high-audit/`.
+
+## Next Agent Prompt — Phase 1g stale-fixture baseline repair
+
+Assign a fresh Codex-high tests-only owner. Change only the stale fixtures in
+`anti-entropy.test.ts`, `initial-sync.test.ts` and `node.test.ts`; do not touch
+production, the frozen Phase 1g RED, the sync-livelock sentinel or this plan.
+Use real signed history and independent creator-bound replica construction, not
+casts, hooks, fake production compatibility, expectation deletion or weakened
+counts. The required focused transition is exact 8F/23P to the unchanged Phase
+1n 3F/3P only; separately prove the five repaired cases pass. Preserve the
+126/126 network and 42/42 handler/authentication baselines plus typecheck,
+owned/tracked lint, format and diff gates in `.log`. Freeze the test-only repair
+before assigning the distinct Phase 1g production GREEN. Do not schedule
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
