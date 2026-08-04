@@ -1034,18 +1034,18 @@ round 1 at all.
 
 ### Measured wall order (fix in this order; numbers are per-object)
 
-| Wall                                                                                                                                                                 | Complexity                                                                                                                     | Approx. failure point                                                                                                                                | Slice                                                                             |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Sync compare `vertices.find`                                                                                                                                         | **O(V_local·V_remote)**                                                                                                        | painful by 5–10k vertices; multi-second by 50k                                                                                                       | 1a                                                                                |
-| `presentHashes` rebuild per UPDATE                                                                                                                                   | **O(V)** per message                                                                                                           | jank by ~10k vertices at multi-Hz                                                                                                                    | 1b                                                                                |
-| BLS attestation plane                                                                                                                                                | O(signers × rate), main thread                                                                                                 | ~40 vtx/s at 8 signers; **~10/s at 32**                                                                                                              | 1c                                                                                |
-| Stored per-vertex/checkpoint publication payload cloning                                                                                                             | up to **2 × O(stateSize)** on eligible paths; explicit fallback on inexact cuts, with copy counters tied to actual detach work | remains a material wall until eligible-path publication is incremental                                                                               | 1d(i)                                                                             |
-| Mutable reconstruction + local live-capture round trip                                                                                                               | remaining **O(stateSize)** per applicable vertex                                                                               | the original >~100 KB/p99 wall is not closed until this residual is removed                                                                          | 1d(ii)                                                                            |
-| secp recover + hash recompute                                                                                                                                        | ~1.3 ms/vertex measured                                                                                                        | mobile p99 > 50 ms at ~50–150 vertices/batch                                                                                                         | 1g + Worker (Phase 2)                                                             |
-| Full inventory wire                                                                                                                                                  | **O(V)** bytes                                                                                                                 | 100k vertices ≈ 6 MB of hashes per sync probe                                                                                                        | 1n                                                                                |
-| Browser mesh                                                                                                                                                         | —                                                                                                                              | 50–200 connections                                                                                                                                   | Track T                                                                           |
-| **Whole-container clone per merge** (staging-by-copy — introduced by the first L3 fix, **not** baseline; removed)                                                    | O(retained graph + snapshot bytes + finality entries) per `applyVertices`                                                      | 112 ms measured for a 1-vertex merge at V=3000; ~3.7 s at V=100k at the measured slope; 50 ms crossing near V≈1400 by interpolation, p99 not sampled | 0q — **forbidden mechanism**, see Phase 0                                         |
-| **`pruneSnapshots` key materialization** (`Array.from(hashGraph.vertices.keys())`, `packages/object/src/publication/publisher.ts:519`, **pre-existing at baseline**) | O(V) burst per checkpoint advance; amortized **O(V/256)** per merge                                                            | not yet measured at scale                                                                                                                            | **1d(iii) — hard before atomic apply may be called history-independent** (D.5(j)) |
+| Wall                                                                                                                                                                           | Complexity                                                                                                                     | Approx. failure point                                                                                                                                | Slice                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Sync compare `vertices.find`                                                                                                                                                   | **O(V_local·V_remote)**                                                                                                        | painful by 5–10k vertices; multi-second by 50k                                                                                                       | 1a                                                                                |
+| `presentHashes` rebuild per UPDATE                                                                                                                                             | **O(V)** per message                                                                                                           | jank by ~10k vertices at multi-Hz                                                                                                                    | 1b                                                                                |
+| BLS attestation plane                                                                                                                                                          | O(signers × rate), main thread                                                                                                 | ~40 vtx/s at 8 signers; **~10/s at 32**                                                                                                              | 1c                                                                                |
+| Stored per-vertex/checkpoint publication payload cloning                                                                                                                       | up to **2 × O(stateSize)** on eligible paths; explicit fallback on inexact cuts, with copy counters tied to actual detach work | remains a material wall until eligible-path publication is incremental                                                                               | 1d(i)                                                                             |
+| Mutable reconstruction + local live-capture round trip                                                                                                                         | remaining **O(stateSize)** per applicable vertex                                                                               | the original >~100 KB/p99 wall is not closed until this residual is removed                                                                          | 1d(ii)                                                                            |
+| secp recover + hash recompute                                                                                                                                                  | ~1.3 ms/vertex measured                                                                                                        | mobile p99 > 50 ms at ~50–150 vertices/batch                                                                                                         | 1g + Worker (Phase 2)                                                             |
+| Full inventory wire                                                                                                                                                            | **O(V)** bytes                                                                                                                 | 100k vertices ≈ 6 MB of hashes per sync probe                                                                                                        | 1n                                                                                |
+| Browser mesh                                                                                                                                                                   | —                                                                                                                              | 50–200 connections                                                                                                                                   | Track T                                                                           |
+| **Whole-container clone per merge** (staging-by-copy — introduced by the first L3 fix, **not** baseline; removed)                                                              | O(retained graph + snapshot bytes + finality entries) per `applyVertices`                                                      | 112 ms measured for a 1-vertex merge at V=3000; ~3.7 s at V=100k at the measured slope; 50 ms crossing near V≈1400 by interpolation, p99 not sampled | 0q — **forbidden mechanism**, see Phase 0                                         |
+| **`pruneSnapshots` key materialization** (`Array.from(hashGraph.vertices.keys())`, currently `packages/object/src/publication/publisher.ts:701`, **pre-existing at baseline**) | O(V) burst per checkpoint advance; amortized **O(V/256)** per merge                                                            | not yet measured at scale                                                                                                                            | **1d(iii) — hard before atomic apply may be called history-independent** (D.5(j)) |
 
 ### Exit gate (Phase 1)
 
@@ -2713,7 +2713,7 @@ approves it.
 D.3(a) requires that any slice introducing a per-message O(V) term add a row to the Phase 1 wall table.
 D.4.1 found such a term and did not add the row. `pruneSnapshots` does
 `Array.from(this.host.hashGraph.vertices.keys())`
-(`packages/object/src/publication/publisher.ts:519`, present verbatim at baseline) — an O(V) burst per
+(`packages/object/src/publication/publisher.ts:701` at current HEAD, present verbatim at baseline) — an O(V) burst per
 checkpoint advance, amortized O(V/256) per merge. Independently confirmed by two agents. The row is added
 in D.5(k), marked pre-existing-at-baseline. **"Merge staging MUST cost O(the batch's write set)" is not yet
 met** while that scan exists; Phase 1d(iii) owns its removal or proved bound before atomic apply may be
@@ -18762,7 +18762,7 @@ quorum were each unanimous among final Opus/xhigh, fresh Codex-high and exact
 Kimi 3/high/dual-100.
 
 Phase 1d(iii) begins only after 1d(ii) closes. Its fresh causal RED must pin the
-current `publisher.ts:519` whole-vertex-key materialization, and its GREEN must
+current `publisher.ts:701` whole-vertex-key materialization, and its GREEN must
 remove it or prove a bound independent of retained history while preserving
 root/checkpoint-frontier/tail retention, missing-snapshot behavior, journal
 rollback and owner-store identity. This is unimplemented: atomic apply remains
@@ -18827,8 +18827,9 @@ slice or hard gate:
   first production decoder activation, but this is not an adopted slice or a
   new hard gate.
 - **F5 — pointer correction.** The live `pruneSnapshots` materialization is
-  `packages/object/src/publication/publisher.ts:519`, not the stale
-  `drp-applier.ts:753` pointer. Phase 1d(iii) owns the existing debt.
+  currently `packages/object/src/publication/publisher.ts:701`; earlier
+  `publisher.ts:519` and `drp-applier.ts:753` pointers drifted. Phase 1d(iii)
+  owns the existing debt.
 
 The standing amendment quorum was unanimous among Opus/xhigh, fresh
 Codex-high and fresh exact Kimi 3/high/dual-100 for exactly three normative
@@ -19855,7 +19856,179 @@ receiver/rollback semantics, non-borrowed and function controls, exact meter
 attribution and D.92.2 authority. Run final Claude-skill Opus/xhigh only if both
 preliminary reviewers accept.
 
-## Next Agent Prompt — Phase 1d(ii)
+**Corrected setter-alias GREEN preliminary review rejected: complete
+application-setter rollback remains incomplete.** Fresh Grok 4.5/high accepted
+exact HEAD `a03cc5c`. Native session
+`019fc9fc-e658-70f3-8aaf-f68500ed852f` used only
+`grok-4.5-build` at high effort with no helper, subagent or web use. It reran
+11/11, reversed the one-line move to reproduce retained-checkpoint corruption,
+restored it to GREEN, and passed an unseen four-case dual-setter/shared-alias,
+function, non-borrowed and ambient probe. Its result SHA-256 is
+`00ba4c381c8e4469ac2be7400a963d9a5bc115e718605e872740178ad9573c7e`
+and 19-file manifest SHA-256 is
+`ee763583b44f9e36e6b7c71bc69a41df3ce2e670540807ac3cd47bf5413e7630`.
+
+Fresh exact Kimi 3/high/dual-100 session
+`3418a576-e283-42f1-998d-a7ab9dedd26b` returned the authoritative corrected
+verdict `CHANGES_REQUESTED` / `PHASE1DII_MAY_CLOSE=no`. Its first native turn
+initially accepted after judging the one-line delta and treating older
+canonicalization-on-failure as nonblocking. A same-authenticated-session
+one-step clarification quoted the adopted whole-phase requirement for
+"complete journal rollback"; Kimi explicitly retracted that classification
+without new tools or investigation. Combined wire is two `TurnBegin`, two
+`TurnEnd`, 96 reasoning steps/LLM requests and 96 read-only tool calls/results;
+neither turn reached the 100-step cap and no fallback, helper, subagent or web
+was used. Result SHA-256 is
+`46111e403d1594718f9d6b82bb6da8eca550a18fdb6bb3ea7f4bdfe8b1aa2361`,
+native-wire SHA-256 is
+`8d914758a797bcaaac73fc88e38a19a50363962a64b16bdcd327eab00eb581e9`,
+probe-ledger SHA-256 is
+`31c50a006762234edc7358ec8463464cf8222454e07f37b1ca93fbff1d6eb0cc`
+and 52-file artifact-manifest SHA-256 is
+`3ae2da76fc0d564ea40debc1766b1296d7c0b881885f53c8ba50dd917ecd9059`.
+Evidence is under the corresponding Grok and Kimi setter-alias GREEN review
+directories in `.logs/`.
+
+The executable blocker is ordinary and in Phase 1d(ii)'s existing rollback
+owner. A full-replacement state order of
+`semanticsType, revision, _left, _right, left, right` replaces the two own-data
+backing keys before invoking two qualified application setters. The first
+setter succeeds and the second throws. Before the attempt the observable live
+backings are `left/right`; after caught rollback they are
+`left-root/right-root`, while revision, graph and stored/checkpoint bytes roll
+back. Each setter's complete-descriptor snapshot captures the mid-commit
+canonical backing values. Restoring those snapshots changes descriptor
+identity, so the earlier `recordPropertyMutation` compare guards skip the
+undo that should restore the true pre-attempt backing values. This behavior is
+also present at `281fe9f`; pre-existence does not waive the adopted complete
+journal-rollback contract. The `5e185af` one-line borrowed-input detachment is
+independently valid, prevents checkpoint corruption on this throwing path and
+must remain frozen.
+
+Because Kimi rejected, the conditional final Opus/xhigh review is skipped for
+this candidate. Grok's acceptance remains valid evidence about setter-input
+isolation, but cannot close a whole-phase candidate disproved by Kimi's
+executable rollback counterexample.
+
+**GREEN artifact-integrity correction.** The original 14-entry manifest SHA
+`87bafacb73d57004782197442053db6cc9bb1f6692b80e4fec493cd429ec38f4`
+is preserved unchanged. It was sealed at 19:33:38 before the final tracked-lint
+stream closed at 19:34:13, so its recorded lint SHA `de44be...` mismatched the
+completed log SHA `582a22...`. The completed log contains four coherent chunks
+totalling 249 warnings and zero errors. Correction note
+`artifact-manifest-correction-v2.md` has SHA-256
+`a233df6de63bd5f355b87c71d71af1bce01b7c8b725d0571eb23a5bd720536c0`.
+The new 15-entry `artifact-manifest-v2-final.sha256` has SHA-256
+`f79fc35435aa03564e411a39005c495c1b2fc3b8ec69e860b7b599fa4a55d298`;
+its separate digest file SHA-256 is
+`6107893f09c9e74e325204c33717af49e7cd965d28f1b4a8287efc364a7ba6be`
+and the verification log is 16/16 with SHA-256
+`87f103193e09f1cf8767934aaacc3d63233e9059ff6c0918be5ae60fb38c92b5`.
+The historical manifest was not silently overwritten.
+
+### Phase 1d(ii) closure ledger and stop condition
+
+The user-requested one-off Fable/xhigh closure audit ran read-only against
+`a03cc5c`. Its substantive model was `claude-fable-5` at xhigh. The outer
+envelope disclosed one automatic non-substantive Haiku helper at 26 output
+tokens; it authored no finding or vote. Result SHA-256 is
+`1d2d34097866fd11c6b7340abdf6374b013151814fd91d7d272e7d62db30c94d`,
+raw-result SHA-256 is
+`28f08b1e5474d3a82e0c26937118329d947dad2fe42611132728752d03f5e176`
+and artifact-hash manifest SHA-256 is
+`5a53267c1bdac028743c4316c87a739afbada61c11bc68beab6986be4a90cd26`.
+Two Git shell requests were permission-denied, so its commit scopes were
+cross-checked from the plan/reflog rather than regenerated. It ran no tests,
+builds, lint, network or subagents. The repository stayed unchanged.
+
+Fable correctly identified that four prior iterations were mechanical stale
+test/census collisions that one semantic closure pass could have batched, two
+were genuine causal boundary corrections and the checkpoint-borrowed setter
+alias was a real implementation defect. It recommended no speculative batch
+RED and a finite six-group borrowed-value consumer census. Kimi's later
+executable counterexample does not invalidate that discipline, but proves the
+census was incomplete: borrowed exposure was closed while journal dependency
+ordering still had an unexamined sink. Phase closure therefore requires both
+finite ledgers below, not reviewer exhaustion.
+
+| Closure group                                                    | Current owner/status                                           | Representative proof or next action                                                         |
+| ---------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Key validation and own-data materialization                      | `state-payload.ts` / `state-materialize.ts`; implemented       | Original Phase 1d(ii) RED; duplicate/reserved/`__proto__` and hostile-key controls          |
+| Deferred COW execution overlay                                   | deferred cells plus `state-materialize.ts`; implemented        | Original RED, zero-read sentinel and inherited 147/147                                      |
+| Canonical causal source; ambient drift excluded                  | `drp-applier.ts`; implemented                                  | ambient-causal RED `02cf3cc`, canonical checkpoint sentinel                                 |
+| Publication/checkpoint ownership and copy truth                  | `publisher.ts`; implemented                                    | D.92.2 64/64, meter RED `cb9e9b1`, 49/49 and 137/137                                        |
+| Borrowed value to live exposure                                  | `replaceEnumerableState`; implemented including `5e185af`      | setter-alias RED `b54fbf9` 11/11 plus Grok's reverse-differential and 4/4 probe             |
+| Application-setter receiver, descriptor/order rollback and retry | `recordSetterRollback` plus property journal; **open blocker** | next bounded two-setter/backing-key RED; do not call Phase 1d(ii) complete before it closes |
+| Whole-graph checkpoint pruning                                   | Phase 1d(iii), not 1d(ii)                                      | `publisher.ts:701`; next distinct item only after 1d(ii) acceptance                         |
+| Hostile virtual collection classification                        | D.73, hard pre-3a                                              | virtual `Map.keys()`, `Symbol.hasInstance`, `Symbol.species`; unchanged                     |
+| Sync-livelock exit gate                                          | Phase 1n                                                       | convert the standing sentinel to 6/6 by Phase 1 exit                                        |
+| Optional deterministic math expansion                            | optional post-golden-path 0n                                   | retain existing `@ts-drp/math` scope; use prior art, do not block golden paths              |
+
+The borrowed-value consumer census is six groups: live adoption in
+`replaceEnumerableState`; publisher collection/override; fallback retention;
+deferred propagation in `state-materialize`; the `borrowedStateEntry` accessor;
+and proxy deferred reads. Each consumer must be classified as
+detach-before-exposure, comparison-only, copy-through-capability or
+owned-entry-to-stored retention. A new borrowed-ownership slice requires a new
+consumer or an executable exact-HEAD counterexample showing a classification
+is wrong.
+
+The rollback ledger is separately finite. For every mutation owner in one
+transaction, record its pre-image time, undo order and guard dependency. A
+setter snapshot must not capture a backing property after that property has
+already been replaced, and restoring a broad snapshot must not invalidate the
+identity guard of an earlier property-specific undo. The smallest equivalence
+classes are: one setter/no sibling backing mutation; multiple setters with
+backing keys ordered before accessors; setter throws after an earlier setter;
+post-adoption checkpoint failure; and deterministic retry. A new rollback
+slice requires a new journal owner/dependency edge or an executable exact-HEAD
+counterexample, not a speculative Cartesian matrix cell.
+
+Git diff is therefore useful but not a complete oracle. It could have batched
+the stale tests and exposed the setter branch's early `continue`; it cannot by
+itself prove peer-replayable causal boundaries. For rollback, the semantic diff
+must include journal ordering and pre-image timing, not merely changed lines.
+This two-ledger census is the sustainable stop condition against both endless
+review-driven slices and reward-hacked test accumulation.
+
+Fable also modified the pre-existing external note
+`/Users/aristotle/.claude/projects/-Users-aristotle-Documents-Projects-ts-drp-1/memory/production-hardening-phase-status.md`
+during the explicitly requested sidecar run. It was not newly created (birth
+time 2026-07-25), no pre-run backup/hash exists, and its current SHA-256 is
+`41778a18074b1df01efe257d9988d3a8351f81c9a26c38445f1efa665e76524f`.
+Do not attempt a lossy rollback. This external write and the automatic helper
+are disclosed here; no repository file was changed by Fable.
+
+Mandatory corrective order: commit this plan-only review/ledger checkpoint;
+spawn one fresh Codex-high tests-only RED owner. Add one coherent case to the
+existing Phase 1d(ii) residual surface with two qualified setters and backing
+keys ordered before them. Force a runtime-derived full-replacement
+multi-frontier path, let the first setter run and the second throw, and freeze
+the exact pre-attempt live own descriptors/values, key order, prototype,
+revision, graph, stored/checkpoint bytes and publication record. Current
+production must fail only because backing values restore to
+`left-root/right-root` instead of `left/right`. Preserve 11/11 setter-input
+isolation and prove the failed setter inputs never alias stored/checkpoint or
+restored live state. Then prove a deterministic retry commits once. Run the
+complete serialized preservation/typecheck/lint/format/integrity gates to
+`.log`; commit tests only and checkpoint the RED separately. A distinct
+Codex-high production-only GREEN may then consolidate rollback pre-images or
+undo ordering without reverting `5e185af`, weakening descriptor rollback,
+removing compare guards blindly or adding setter/topology special cases.
+
+## Next Agent Prompt — Phase 1d(ii) rollback corrective
+
+Start from the exact plan-only checkpoint that records the rejected
+`a03cc5c` candidate. Production `5e185af` and tests-only RED `b54fbf9` remain
+valid and frozen. The sole current Phase 1d(ii) blocker is the executable
+two-setter/backing-key complete-rollback violation specified immediately
+above. Run one fresh Codex-high tests-only RED, one distinct Codex-high
+production-only GREEN, fresh Grok 4.5/high and exact Kimi 3/high/dual-100, and
+final Claude-skill Opus/xhigh only if both preliminary reviewers accept. Do not
+schedule Fable again unless explicitly requested. Do not consume Phase 1d(iii),
+D.73, Phase 1n or optional 0n scope, and never stage protected untracked paths.
+
+## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
 tests-only RED, manifest repair and nested-wrapper refinement remain frozen at
