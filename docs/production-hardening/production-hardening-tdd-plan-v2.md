@@ -21019,38 +21019,63 @@ the verified 37-entry manifest SHA-256 is
 under
 `.logs/phase-1e-stale-forged-update-observer-correction-codex-high/`.
 
-## Next Agent Prompt — Phase 1e concrete execution-capability GREEN restart
+**Phase 1e concrete execution-capability production GREEN2 checkpoint (reviews
+pending).** Distinct fresh Codex-high commit
+`1c09c0f232c5d042a0bfed2035595d76905f1c87` changes only
+`packages/object/src/index.ts` by +12/-47. The source SHA-256 is
+`7a9c4aa9a1e7ac51686b3e37ddd6b214acafa57c29f6800257bb66942eb741bf`,
+Git blob `461a4f62df390bb078da1f75cb424c0abfaf1388`; exact diff SHA-256 is
+`3f67040841dcd71f75b7bab07e28b6339e2d271c73817a68e48744d257875e0c`.
 
-Freeze capability RED `740e180` and stale-observer correction `0075b5a`
-byte-for-byte together with earlier accepted Phase 1e tests/corrections. Spawn a
-new distinct Codex-high production-only GREEN owner. It may change only the
-smallest coherent production owners plus ignored evidence logs, not tests,
-fixtures, this plan, manifests, lockfiles, generated/protected paths or stash.
+The object boundary now always classifies raw remote offers before dispatching
+to any implementation. Both concrete and structural receivers get only
+detached verifier-issued novel handles; the genuine concrete public `merge`
+recognizes their provenance and therefore performs no second cryptographic
+recovery. The WeakSet construction-identity authorization, merge-result WeakMap
+and the concrete public merge's now-dead committed/outcome computation are
+removed. The outer boundary still resolves canonical authenticated hashes after
+the dispatch and builds the node-owned `AuthenticatedMergeOutcome`, preserving
+committed/finality attribution and occurrence ordering.
 
-Make raw remote vertices cross a module-owned authentication/classification
-boundary before every caller-overridable dispatch. The diagnostic universal
-verify-first lane is the smallest known coherent direction: remove WeakSet
-construction identity as permission for `object.merge(raw)` and deliver only
-detached verifier-issued novel handles to both concrete and structural
-implementations. The concrete public `merge` may recognize provenance and must
-not repeat cryptographic recovery. Remove any outcome-publication state and
-committed-value computation made dead by that design rather than retaining
-security sediment.
+The frozen capability RED is 3/3 and the corrected original Phase 1e suite is
+19/19. Preservation is corrective focus 16/16, node authentication 20/20,
+object ingest 6/6, direct applier 54/54 and exact public fixtures 177/177.
+Post-commit capability/focus are 3/3 and 16/16. Object, node and workspace
+typechecks pass; object/node builds pass with no tracked generated change.
+Owned lint is clean; tracked lint has zero errors and 249 existing warnings.
+Format and diff checks pass. All six frozen Phase 1e test/fixture identities,
+tracked/index state and the protected stash remain invariant. Result SHA-256 is
+`0379ad1eff31cddfdfe39646694b3c533ae6bc7de4bdc45d0658b3f469f46fbb`;
+the verified 26-entry manifest SHA-256 is
+`5487071b5c87bc2bb855cfaa17a0e7e858c7396aa5c6e1d8600e5d23f3c24922`
+under `.logs/phase-1e-concrete-execution-capability-green2-codex-high/`.
 
-The frozen capability suite must become 3/3; corrected original Phase 1e must
-remain 19/19. Preserve public `merge(Vertex[])` compatibility, unmodified
-concrete exactly-once crypto and valid behavior, root/already-known skips,
-structural verified handles, canonical committed/finality attribution,
-occurrence order, B1-B3 and mixed partial commit. Do not detect Vitest spies,
-silently disable overrides, add configuration/duck/`instanceof` trust, fix only
-the later throw or expand into D.73, Phase 1n or optional 0n.
+## Next Agent Prompt — Phase 1e capability GREEN2 preliminary reviews
 
-Run all recorded Phase 1e suites, package/workspace typechecks, object/node
-builds with generated-diff check, lint and formatting to `.log`. Authenticate
-the exact production diff, frozen test hashes/blobs, result and integrity
-manifest; commit only production. After controller checkpoint, run fresh Grok
-4.5/high and exact Kimi 3/high/dual-100 preliminary reviews, followed by final
-Claude-skill Opus/xhigh only if both accept. Do not schedule Fable.
+Freeze capability RED `740e180`, observer correction `0075b5a`, production
+GREEN2 `1c09c0f` and every earlier accepted Phase 1e test/correction. Review the
+exact checkpoint HEAD after this section with two fresh independent read-only
+reviewers: Grok 4.5 at high reasoning and exact Kimi 3 at high reasoning with
+`--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+`--max-steps-per-turn 100`. Authenticate native model/session metadata, raw
+streams, natural turn completion, result hashes and integrity manifests.
+
+Attack the corrected ownership boundary rather than repeating syntax matrices:
+subclass and instance `merge` replacement; valid signed input delivered only as
+a detached verifier-issued handle; mutation during overridden dispatch;
+unmodified exactly-once crypto; root/known skips; mixed valid/invalid partial
+commit and exact occurrence order; structural tuple lies/mutation; canonical
+committed/finality attribution; UPDATE/SYNC_ACCEPT lifecycle; public merge
+compatibility; and absence of stale WeakSet/outcome-map authority or test-only
+shipping code. Check that universal verify-first dispatch does not introduce a
+double-verification, double-apply, missing/retry or notification regression.
+Do not demand a speculative Cartesian matrix or consume D.73, Phase 1n or
+optional 0n.
+
+If either preliminary reviewer returns `CHANGES_REQUESTED`, checkpoint its
+executable finding, skip Opus and begin a bounded fresh Codex-high RED. Only if
+both accept may the final Claude-skill Opus/xhigh adversarial review run. Do not
+schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
