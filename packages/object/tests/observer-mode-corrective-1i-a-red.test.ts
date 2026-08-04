@@ -23,6 +23,7 @@ import { installObserverPreDriftControl } from "./helpers/observer-pre-drift-con
 type ReplicaMode = "observer" | "writer";
 type PublicIngest = "applyVertices" | "merge";
 type HistoryFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex];
+type BranchJoinFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex];
 
 interface SigningIdentity {
 	keychain: Keychain;
@@ -130,6 +131,29 @@ async function historyFixture(): Promise<HistoryFixture> {
 	const concurrentTail = await signedVertex("append", [8], [join.hash], 1_700_000_001_008);
 	const final = await signedVertex("append", [9], [revokeBranch.hash, concurrentTail.hash], 1_700_000_001_009);
 	return [first, grantGuest, second, left, grantBranch, join, revokeBranch, concurrentTail, final];
+}
+
+async function branchJoinFixture(): Promise<BranchJoinFixture> {
+	const first = await signedVertex("append", [1], [HashGraph.rootHash], 1_700_000_011_001);
+	const grant = await signedVertex(
+		"grant",
+		["branch-join-guest", ACLGroup.Writer],
+		[first.hash],
+		1_700_000_011_002,
+		DrpType.ACL
+	);
+	const second = await signedVertex("append", [2], [grant.hash], 1_700_000_011_003);
+	const left = await signedVertex("append", [4], [second.hash], 1_700_000_011_004);
+	const right = await signedVertex("append", [5], [second.hash], 1_700_000_011_005);
+	const revoke = await signedVertex(
+		"revoke",
+		["branch-join-guest", ACLGroup.Writer],
+		[left.hash, right.hash],
+		1_700_000_011_006,
+		DrpType.ACL
+	);
+	const final = await signedVertex("append", [7], [revoke.hash], 1_700_000_011_007);
+	return [first, grant, second, left, right, revoke, final];
 }
 
 function convergenceSnapshot(object: DRPObject<ObserverHistoryDRP>): {
@@ -303,6 +327,54 @@ describe("Phase 1i-a contracts behind the bounded pre-drift causal control", () 
 		const expected = convergenceSnapshot(writer);
 		expect(convergenceSnapshot(observerLinear)).toEqual(expected);
 		expect(convergenceSnapshot(observerNonFrontier)).toEqual(expected);
+	});
+
+	it("keeps both concurrent DRP branches after an ACL join instead of checkpointing one causal branch", async () => {
+		// Freeze the production default: the root replay forces its first checkpoint
+		// on the two branch heads instead of checkpointing their shared parent early.
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "256");
+		const [first, grant, second, left, right, revoke, final] = await branchJoinFixture();
+		const common = [first, grant, second];
+		const writerLeftRight = replica("writer");
+		const writerRightLeft = replica("writer");
+		const observer = replica("observer");
+
+		for (const [target, history] of [
+			[writerLeftRight, [...common, left, right, revoke, final]],
+			[writerRightLeft, [...common, right, left, revoke, final]],
+		] as const) {
+			await expect(target.applyVertices([...history])).resolves.toMatchObject({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+		}
+		await expect(observer.applyVertices([...common, left, right, revoke, final])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+
+		const canonicalValues = (observer as unknown as ObjectReflection).hashGraph
+			.linearizeVertices()
+			.filter(({ operation }) => operation?.drpType === DrpType.DRP && operation.opType === "append")
+			.map(({ operation }) => operation?.value[0]);
+		expect(observer.drp?.query_values()).toEqual(canonicalValues);
+		expect(observer.acl.query_isWriter("branch-join-guest")).toBe(false);
+		for (const target of [observer, writerLeftRight, writerRightLeft]) {
+			for (const vertex of [first, grant, second, left, right, revoke, final]) {
+				const retained = target.getVertex(vertex.hash);
+				expect.soft(retained).toBeDefined();
+				expect
+					.soft(retained === undefined ? undefined : VertexCodec.encode(retained).finish())
+					.toEqual(VertexCodec.encode(vertex).finish());
+			}
+		}
+
+		for (const writer of [writerLeftRight, writerRightLeft]) {
+			expect.soft(writer.drp?.query_values()).toEqual(canonicalValues);
+			expect.soft(writer.acl.query_isWriter("branch-join-guest")).toBe(false);
+		}
 	});
 
 	it("rolls back both observer snapshot sides when DRP discard rejects after ACL discard", async () => {
