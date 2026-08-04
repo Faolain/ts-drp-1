@@ -430,7 +430,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const reconnectInterval = this.getReconnectInterval();
 		if (reconnectInterval) this._intervals.set("interval::reconnect", reconnectInterval);
 		if (this._subscribedNetworkNode !== this.networkNode) {
-			this.networkNode.subscribeToMessageQueue(this.dispatchMessage.bind(this));
+			this.networkNode.subscribeToMessageQueue((message) => {
+				this.dispatchMessage(message).catch((error: unknown) => {
+					log.error("::dispatchMessage: Failed to enqueue message", error);
+				});
+			});
 			this.networkNode.subscribeToGroupPeerChanges(this.handleGroupPeerChange.bind(this));
 			this._subscribedNetworkNode = this.networkNode;
 		}
