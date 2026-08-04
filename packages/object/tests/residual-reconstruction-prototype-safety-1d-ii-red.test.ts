@@ -594,15 +594,17 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			expect.soft(Reflect.getOwnPropertyDescriptor(local.drp, AMBIENT_KEY)?.value).toBe("local-ambient");
 
 			const remote = harness(new ConflictReconstructionFixture());
+			const causal = harness(new ConflictReconstructionFixture());
 			const sibling = new ConflictReconstructionFixture();
 			const remotePrototype = Reflect.getPrototypeOf(remote.drp);
-			const reserved = remoteVertex(
-				"installReservedPrototype",
-				[{ inheritedAttack: "remote" }],
-				[HashGraph.rootHash],
-				40
-			);
+			const remoteAttack = { inheritedAttack: "remote" };
+			const reserved = remoteVertex("installReservedPrototype", [remoteAttack], [HashGraph.rootHash], 40);
 			const ambient = remoteVertex("installAmbient", ["remote-ambient"], [HashGraph.rootHash], 41);
+			await expect(causal.applier.applyVertices(trustedTestVertices([ambient]))).resolves.toEqual({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
 			await expect(remote.applier.applyVertices(trustedTestVertices([reserved, ambient]))).resolves.toEqual({
 				applied: true,
 				invalid: [],
@@ -610,12 +612,21 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			});
 			expect.soft(Reflect.getPrototypeOf(remote.drp)).toBe(remotePrototype);
 			expect.soft(Object.hasOwn(remote.drp, "__proto__")).toBe(true);
+			expect.soft(Reflect.getOwnPropertyDescriptor(remote.drp, "__proto__")?.value).toEqual(remoteAttack);
 			expect.soft(Reflect.getOwnPropertyDescriptor(remote.drp, AMBIENT_KEY)?.value).toBe("remote-ambient");
 			expect.soft(ambientCalls).toBe(0);
 			expect.soft(Reflect.getPrototypeOf(sibling)).toBe(ConflictReconstructionFixture.prototype);
 			expect.soft(Reflect.getPrototypeOf(Object.prototype)).toBeNull();
 			const stored = remote.states.getDRPState(ambient.hash)!;
-			expect.soft(snapshotBytes(stored)).toEqual(snapshotBytes(stateFromDRP(remote.drp)));
+			const causalStored = causal.states.getDRPState(ambient.hash)!;
+			expect.soft(Object.hasOwn(causal.drp, "__proto__")).toBe(false);
+			expect.soft(Reflect.getOwnPropertyDescriptor(causal.drp, AMBIENT_KEY)?.value).toBe("remote-ambient");
+			expect
+				.soft(snapshotBytes(causalStored), "positive control: pure root-to-B replay is its stored wire image")
+				.toEqual(snapshotBytes(stateFromDRP(causal.drp)));
+			expect
+				.soft(snapshotBytes(stored), "B's stored wire image excludes nondependency A")
+				.toEqual(snapshotBytes(causalStored));
 		} finally {
 			if (previousAmbient) Reflect.defineProperty(Object.prototype, AMBIENT_KEY, previousAmbient);
 			else Reflect.deleteProperty(Object.prototype, AMBIENT_KEY);
