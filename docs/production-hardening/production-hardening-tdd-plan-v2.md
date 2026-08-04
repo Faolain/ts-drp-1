@@ -20719,14 +20719,57 @@ the 14-entry manifest SHA-256 is
 and every entry verifies under
 `.logs/phase-1e-auth-unification-corrective-b1-b4-red-codex-high/`.
 
+**Phase 1e stale structural-fixture correction accepted and frozen.** The
+distinct GREEN owner stopped before editing after finding one real frozen-test
+collision. `packages/node/tests/applied-vertex-lookup.test.ts` still required
+its structural object to authenticate the complete raw wire batch internally,
+exposed the exact two lookalike merge-result metadata methods that B4 forbids
+trusting, and required zero node-side membership lookups. A universal verified
+node boundary cannot also deliver unsigned raw offers or trust those methods;
+distinguishing this fixture by class, shape, configuration or content would be
+reward hacking.
+
+This does not amend the adopted contract. It activates the already-adopted
+finite stale-inventory rule above. A fresh Codex-high bounded sweep found no
+second node-test owner of that superseded mechanism outside the frozen B1-B4
+RED. Tests-only commit `671993717150cc2bf81bbe6995c0760334218d22`
+changes only `packages/node/tests/applied-vertex-lookup.test.ts` by +76/-75.
+The 504-line result has SHA-256
+`ab5599eb7955ee8c3e10c5560be1edad9f1b65eaeb59fb7cb33ed5a9b4db3c5f`
+and Git blob `a5ac47250498226f2918db9d6ad31ab2c061730c`.
+
+The structural merge is now a verified-ingress observer: it performs no
+cryptography and publishes no hidden metadata. UPDATE expects only detached
+novel authenticated `[added, dropped]`, with the known offer retained as a
+zero-crypto skip and unsigned input excluded. The fixture preserves committed
+membership, graph rejection, missing recovery, persistence/events, remote and
+local finality, attestation bytes, SYNC response bytes/duplicates/identity,
+empty-input behavior and authenticated-but-graph-rejected attestation merge.
+Its complexity assertion now permits one to two direct lookups for a one-offer
+batch while requiring zero inventory materialization and candidate comparison;
+this preserves the no-`V`-scan property without pinning obsolete work
+placement.
+
+On rejected production the corrected fixture is exact 4F/3P, all four failures
+caused by B4. Frozen B1-B4 remains exact 6F/3P, frozen Phase 1e remains 19/19,
+and the three unchanged node-preservation siblings remain 13/13. Node and
+34/35-project workspace typechecks pass; owned lint is clean; tracked lint has
+zero errors and 249 existing warnings; formatting and diff checks pass. Result
+SHA-256 is
+`4ffba718a302ec42367cd2be84f36cedec571ed27c77bca14b52a1f0e978ed8c`;
+the 15-entry manifest SHA-256 is
+`def6dc07bbba0602dc6de9895d912bdba326474fe07b2c6357c1ccc59aa6e00f`
+and all entries verify under
+`.logs/phase-1e-auth-unification-stale-structural-fixture-red-codex-high/`.
+
 ## Next Agent Prompt — Phase 1e corrective GREEN
 
-Freeze accepted REDs `c680543`, `bd15d47` and `484c83f`; rejected
+Freeze accepted REDs `c680543`, `bd15d47`, `484c83f` and `6719937`; rejected
 implementation GREEN `8a268c9`, checkpoint `78fcb80` and preliminary-review
 checkpoint `178a265` remain lineage, not acceptance. Start a distinct fresh
 Codex-high production GREEN. Do not edit any frozen RED, test fixture or this
-plan. Make the exact nine-case B1-B4 suite 9/9 with one coherent authentication
-boundary:
+plan. Make the exact nine-case B1-B4 suite 9/9 and corrected structural fixture
+7/7 with one coherent authentication boundary:
 
 1. Derive SYNC_ACCEPT persistence/event lifecycle from accepted verified work,
    not non-empty raw input.
