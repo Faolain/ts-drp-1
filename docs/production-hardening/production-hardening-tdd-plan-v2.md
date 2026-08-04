@@ -20762,9 +20762,40 @@ the 15-entry manifest SHA-256 is
 and all entries verify under
 `.logs/phase-1e-auth-unification-stale-structural-fixture-red-codex-high/`.
 
+**Phase 1e trusted classifier-mock shape correction.** The resumed GREEN first
+reached focused 16/16, then the object-preservation gate failed 0/6 because the
+Vitest-only `trusted-vertex-ingest.ts` mock still returned the pre-occurrence
+classifier record. A briefly considered production fallback would have existed
+solely for that test double; it was removed before continuation as forbidden
+shipping ballast. This is a test-harness interface correction, not a behavioral
+contract amendment or authentication bypass.
+
+Fresh Codex-high tests-only commit
+`1c90778c7bd0669d8b1b95c8f40d3edf4733fa44` changes only
+`packages/object/tests/helpers/trusted-vertex-ingest.ts` by +4/-3. The 38-line
+file has SHA-256
+`6fc8c4977e60e6d78eec44e2078267807024dccde0a54eccab49f090c0240414`
+and Git blob `406fe4ae42396a0a624b6d880c2ca48c8a94dd37`. Its erased
+type-only mock now returns the complete `VertexAuthenticationResult`: every
+trusted synthetic input has same-order `occurrences` and `offeredHashes`
+entries with status `authenticated`. No expectation or production trust rule
+was weakened.
+
+The formerly failing object-preservation gate is 6/6; focused remains 16/16,
+frozen Phase 1e 19/19 and node authentication preservation 20/20. Object/node
+typechecks, owned lint, formatting and diff checks pass. The four uncommitted
+GREEN production sources were hash-identical before and after the isolated
+commit. Result SHA-256 is
+`6ace5f196bb8865b52be883d0115450a45af6874ab70c05c06d1d31999eaf81b`;
+the 20-entry manifest SHA-256 is
+`a7f755e7061eded8c6c3b4cfc08429a4c4e8da1a72a7d5c9d1fa7cd8de34c90b`
+and all entries verify under
+`.logs/phase-1e-auth-unification-classifier-mock-shape-red-codex-high/`.
+
 ## Next Agent Prompt — Phase 1e corrective GREEN
 
-Freeze accepted REDs `c680543`, `bd15d47`, `484c83f` and `6719937`; rejected
+Freeze accepted REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`
+and `1c90778`; rejected
 implementation GREEN `8a268c9`, checkpoint `78fcb80` and preliminary-review
 checkpoint `178a265` remain lineage, not acceptance. Start a distinct fresh
 Codex-high production GREEN. Do not edit any frozen RED, test fixture or this
