@@ -60,6 +60,52 @@ function sourceBytes(stream: SourceProbeStream): number {
 }
 
 describe("Phase 1g pre-decode frame cap", () => {
+	it("rejects an unterminated prefix once it exceeds the four-byte limit", async () => {
+		const stream = new SourceProbeStream();
+		const cleanupError = new Error("unterminated-prefix-cleanup");
+		const readOutcome = streamToUint8Array(stream as unknown as Stream).then(
+			(value) => ({ kind: "resolved" as const, value }),
+			(error: unknown) => ({ error, kind: "rejected" as const })
+		);
+		let timeout: ReturnType<typeof setTimeout> | undefined;
+		const deadline = new Promise<{ kind: "timed-out" }>((resolve) => {
+			timeout = setTimeout(() => resolve({ kind: "timed-out" }), 100);
+		});
+
+		stream.pushSource(Uint8Array.of(0x80, 0x80, 0x80, 0x80, 0x80));
+		const outcome = await Promise.race([readOutcome, deadline]);
+		if (timeout !== undefined) clearTimeout(timeout);
+
+		// Cleanup happens after the bounded classification. Its rejection is
+		// already observed by readOutcome and cannot turn a timeout into a pass.
+		if (outcome.kind === "timed-out") {
+			stream.closeSource(cleanupError);
+			await readOutcome;
+		}
+
+		expect.soft(outcome.kind).toBe("rejected");
+		if (outcome.kind === "rejected") {
+			expect.soft(outcome.error).toMatchObject({
+				code: "ERR_MSG_LENGTH_TOO_LONG",
+				name: "InvalidDataLengthLengthError",
+			});
+		}
+		expect.soft(sourceBytes(stream)).toBe(5);
+	});
+
+	it("rejects a completed five-byte length prefix", async () => {
+		const stream = new SourceProbeStream();
+		const read = streamToUint8Array(stream as unknown as Stream);
+
+		stream.pushSource(Uint8Array.of(0x80, 0x80, 0x80, 0x80, 1));
+
+		await expect(read).rejects.toMatchObject({
+			code: "ERR_MSG_LENGTH_TOO_LONG",
+			name: "InvalidDataLengthLengthError",
+		});
+		expect.soft(sourceBytes(stream)).toBe(5);
+	});
+
 	it("rejects an oversized declaration from the prefix alone", async () => {
 		const stream = new SourceProbeStream();
 		const declaredLength = MAX_FRAME_BYTES + 1;
