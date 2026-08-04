@@ -21782,21 +21782,80 @@ the controller-sealed, fully verified 61-entry manifest SHA-256 is
 `5de09ba5483cde3e57fcf44afb53ab8c29b6d8474c5f0adad7bc24aa7d22d71c`
 under `.logs/phase-1h-queue-isolation-green-opus-xhigh-review/`.
 
-## Next Agent Prompt — Phase 1i tests-only RED
+**Phase 1i tests-only RED frozen.** Fresh Codex-high candidate commit
+`03ad7352cb7a410673504544a8b1cece466d653f` has exact parent `8310e4c`,
+tree `d4faa1eb97652b60e4b72e28bff73b9405de8d39` and changes only three
+test-owned paths: the existing public node object-configuration test, a bounded
+scale worker, and one public type contract. Freeze blobs `aec4ede34ed906447696d4768cd1aa58b5153b17`,
+`5203880898d53da931f04c20c3ffb8cf4650d949` and
+`3e81775afad5952324235bd46fbbc0c0415633dd`; exact binary diff SHA-256 is
+`fc8cc595fa38a69da5c898836c65f5bf103a77efa1826f5f7275d70c43c9bf06`.
 
-Begin the next dependency-ordered slice, Phase 1i observer mode, with one fresh
-Codex-high tests-only RED. First inventory the current writer-only initialization,
-attestation and snapshot owners and the existing Discord/MMORPG golden-path
-fixtures. Freeze a bounded, production-causal contract showing that an observer
-still verifies vertex signatures and converges identically while skipping
-attestation generation/verification, per-vertex `assignState` snapshots and
-eager finality-store initialization. Include a bounded heap/retention acceptance
-harness aimed at the plan's 100k-vertex, <25%-of-writer target, but keep the fast
-focused RED suitable for iteration and reserve the expensive scale run for the
-acceptance gate. Do not change production or broaden observer semantics in RED.
-Run focused preservation, typecheck and tracked lint to logged evidence. Do not
-schedule Fable; after the frozen RED, use a distinct Codex-high GREEN followed
-by Grok 4.5/high, exact Kimi 3/high/100 and final Opus/xhigh.
+The RED follows real production ownership. `DRPNode.createObject` constructs the
+writer/observer replicas; object ingress performs secp256k1 author recovery;
+UPDATE handling owns legacy BLS verification/generation; object publication owns
+per-vertex serialized states; and `DRPObject` owns eager `FinalityStore`
+construction. The focused contract uses three signed writer vertices crossing a
+real checkpoint boundary. It requires the observer to retain no pre-checkpoint
+snapshot pairs, verify/generate no legacy BLS attestations and construct no
+writer finality store, while positively proving three secp recoveries, forged
+author-signature rejection, writer snapshots/attestations, checkpoint snapshot
+availability, identical vertex hashes/state and no observer UPDATE rebroadcast.
+
+Focused RED is stable at 1 failed / 3 passed / 1 skipped in one file, with the
+sole failing scenario reporting exactly four soft failures: retained snapshot
+pairs `2 != 0`, BLS verifications `3 != 0`, BLS signatures `3 != 0`, and finality
+constructions `2 != 1`. Public types/workspace typecheck is independently RED at
+only the three missing optional `replica_mode: "writer" | "observer"` contracts;
+node, object and validation typechecks pass. Exact-HEAD baseline remains 2/2 and
+the types baseline is green. Node preservation passes 41/41, object preservation
+11/11, owned/tracked lint passes at zero errors / 249 inherited warnings, and
+format/diff checks pass.
+
+The 100k heap ratio is an explicit opt-in acceptance test using isolated
+`--expose-gc` writer and observer processes; it was deliberately not selected in
+RED iteration. A bounded 64-vertex smoke completed in under one second per
+process and produced identical convergence digests. It currently measures the
+expected near-1.0 ratio because production ignores observer mode; the acceptance
+gate will require 100,000 non-root vertices on both sides and observer retained
+heap below 25% of writer retained heap.
+
+Preserve the harness ledger. Concurrent Vitest processes first raced on their
+shared coverage temp directory after both had executed; the affected node suite
+was rerun alone. The first isolated archive lacked package-level `node_modules`
+links and was corrected only in a disposable copy. A package-local rerun briefly
+looked for a nonexistent `packages/node/vite.config.mts`; the authoritative
+root-scoped rerun is the recorded 1F/3P/1S result. The sandbox could not acquire
+`.git/index.lock`, so the controller authenticated the exact patch and created
+the commit without modifying test content. The agent's 40-entry manifest was
+sealed before its final raw/result streams closed and consequently has two
+self-changing entries; it is superseded by the controller-sealed, fully verified
+45-entry manifest SHA-256
+`f0fc68797be70f4325beae939ddce27c29b592e6c738aa71349b9107c530e29c`.
+Final result SHA-256 is
+`31f0097697a3872d2572a8d22b95b66c4ca89ea982965fd4f8bf19e572793575`
+under `.logs/phase-1i-observer-mode-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1i production GREEN
+
+Use a distinct fresh Codex-high GREEN agent against frozen RED `03ad735`. Follow
+the production ownership chain rather than adding a test adapter: define and
+validate the optional replica mode at the public node/object boundary with
+writer as the compatibility default; propagate it through create/connect and
+object construction; keep secp256k1 vertex authentication identical; bypass the
+legacy BLS attestation plane for observers; retain only checkpoint serialized
+states; and make finality-store initialization genuinely lazy/absent for an
+observer unless a writer-only operation actually requires it. Keep writer
+behavior byte-for-byte compatible where practical and do not add parallel state
+owners, fake stores, test detection or source analyzers.
+
+Make the fast focused contract and all preservation/type/lint gates green first.
+Then run the isolated 100k heap comparison once as the acceptance gate, diagnose
+the retained owners if it misses <25%, and optimize only production state the
+observer contract permits removing. Record runtime and peak/retained evidence;
+do not place the scale gate in ordinary package runs. After checkpointing the
+production-only GREEN, run fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
+final Opus/xhigh reviews. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
