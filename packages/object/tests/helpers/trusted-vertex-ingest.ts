@@ -1,7 +1,7 @@
 import { type Vertex } from "@ts-drp/types";
 import { vi } from "vitest";
 
-import { type AuthenticatedVertex } from "../../src/drp-applier.js";
+import { type AuthenticatedVertex, type VertexAuthenticationResult } from "../../src/vertex-authentication.js";
 
 /**
  * Batch adapter paired with this module's test-only provenance mock.
@@ -24,11 +24,12 @@ vi.mock("../../src/vertex-authentication.js", () => {
 		classifyNovelVertices: (
 			vertices: Vertex[],
 			_isTrustedHash: (hash: string) => boolean
-		): { authenticated: AuthenticatedVertex[]; invalid: string[]; offeredHashes: string[] } => {
+		): VertexAuthenticationResult => {
 			return {
 				authenticated: vertices as AuthenticatedVertex[],
 				invalid: [],
-				offeredHashes: [],
+				occurrences: vertices.map(({ hash }) => ({ hash, status: "authenticated" })),
+				offeredHashes: vertices.map(({ hash }) => hash),
 			};
 		},
 		hasAuthenticatedVertexProvenance: (): boolean => true,
