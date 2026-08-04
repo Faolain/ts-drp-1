@@ -693,13 +693,14 @@ export class PublicationPublisher<T extends IDRP> {
 	}
 
 	private pruneSnapshots(journal: OperationJournal): void {
+		const latest = this.host.checkpoints[this.host.checkpoints.length - 1];
+		if (latest.vertexCount !== this.host.hashGraph.vertices.size) {
+			throw new Error("Snapshot pruning requires a checkpoint at the current graph boundary");
+		}
 		const retained = new Set<Hash>([this.host.rootHash]);
 		for (const checkpoint of this.host.checkpoints) {
 			for (const hash of checkpoint.frontier) retained.add(hash);
 		}
-		const latest = this.host.checkpoints[this.host.checkpoints.length - 1];
-		const hashes = Array.from(this.host.hashGraph.vertices.keys());
-		for (let index = latest.vertexCount; index < hashes.length; index++) retained.add(hashes[index]);
 		const pruned = this.host.states.prune(retained);
 		journal.record(() => this.host.states.restorePruned(pruned));
 	}
