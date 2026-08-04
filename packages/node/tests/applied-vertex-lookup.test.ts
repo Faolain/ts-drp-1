@@ -1,7 +1,7 @@
 import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
+import { Signature } from "@noble/secp256k1";
 import { Keychain } from "@ts-drp/keychain";
-import { authenticateVertices } from "@ts-drp/object";
 import {
 	AggregatedAttestation,
 	type Attestation,
@@ -16,7 +16,7 @@ import {
 	Vertex,
 } from "@ts-drp/types";
 import { fromString as uint8ArrayFromString } from "uint8arrays/from-string";
-import { beforeAll, describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 
 import { handleMessage } from "../src/handlers.js";
 import { type DRPNode } from "../src/index.js";
@@ -130,10 +130,6 @@ class InstrumentedAppliedVertexObject {
 		[];
 	readonly mergedAttestationCalls: AggregatedAttestation[][] = [];
 	readonly mergedVertexCalls: Vertex[][] = [];
-	private readonly mergeMetadata = new WeakMap<
-		[boolean, string[], string[]],
-		{ applied: readonly Vertex[]; hasTrustedOrAuthenticatedOffers: boolean }
-	>();
 
 	private readonly directIndex = new Map<string, Vertex>();
 	private readonly dropHashes: Set<string>;
@@ -202,11 +198,7 @@ class InstrumentedAppliedVertexObject {
 	merge(vertices: Vertex[]): Promise<[boolean, string[], string[]]> {
 		this.mergedVertexCalls.push([...vertices]);
 		const invalid: string[] = [];
-		const verified = authenticateVertices(vertices);
-		const verifiedHashes = new Set(verified.map(({ hash }) => hash));
-		for (const vertex of vertices) if (!verifiedHashes.has(vertex.hash)) invalid.push(vertex.hash);
-		const applied: Vertex[] = [];
-		for (const vertex of verified) {
+		for (const vertex of vertices) {
 			if (this.dropHashes.has(vertex.hash)) {
 				invalid.push(vertex.hash);
 				continue;
@@ -214,22 +206,8 @@ class InstrumentedAppliedVertexObject {
 			if (this.directIndex.has(vertex.hash)) continue;
 			this.inventory.push(vertex);
 			this.directIndex.set(vertex.hash, vertex);
-			applied.push(vertex);
 		}
-		const result: [boolean, string[], string[]] = [true, [...this.missing], invalid];
-		this.mergeMetadata.set(result, {
-			applied,
-			hasTrustedOrAuthenticatedOffers: verified.length !== 0,
-		});
-		return Promise.resolve(result);
-	}
-
-	appliedVerticesForMergeResult(result: [boolean, string[], string[]]): readonly Vertex[] | undefined {
-		return this.mergeMetadata.get(result)?.applied;
-	}
-
-	mergeHadTrustedOrAuthenticatedOffers(result: [boolean, string[], string[]]): boolean | undefined {
-		return this.mergeMetadata.get(result)?.hasTrustedOrAuthenticatedOffers;
+		return Promise.resolve([invalid.length === 0 && this.missing.length === 0, [...this.missing], invalid]);
 	}
 }
 
@@ -277,8 +255,8 @@ beforeAll(async () => {
 	remotePeerId = peerIdFromPublicKey(publicKey).toString();
 });
 
-describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
-	test("UPDATE preserves verified present-after-merge membership, finality, recovery, persistence, and dispatch", async () => {
+describe("applied-vertex lookup semantic and wire baselines", () => {
+	test("UPDATE preserves verified structural ingress, membership, finality, recovery, persistence, and dispatch", async () => {
 		const known = await remoteVertex("update-known");
 		const added = await remoteVertex("update-added");
 		const dropped = await remoteVertex("update-dropped");
@@ -290,52 +268,73 @@ describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
 		});
 		const { node, result } = makeHarness(object);
 		const message = updateMessage([known, added, dropped, unauthenticated], [remoteAttestation]);
-
-		await handleMessage(node, message);
-
-		expect(object.mergedVertexCalls).toHaveLength(1);
-		expect(object.mergedVertexCalls[0].map(({ hash }) => hash)).toEqual([
-			known.hash,
-			added.hash,
-			dropped.hash,
-			unauthenticated.hash,
-		]);
-		expect(object.getVertex(known.hash)).toBe(known);
-		expect(object.getVertex(added.hash)?.hash).toBe(added.hash);
-		expect(object.getVertex(dropped.hash)).toBeUndefined();
-		expect(result.syncs).toEqual([{ id: OBJECT_ID, peerId: remotePeerId }]);
-		expect(result.puts).toEqual([{ id: OBJECT_ID, object }]);
-
-		expect(object.addedSignatureCalls[0]).toEqual({
-			peerId: remotePeerId,
-			attestations: [remoteAttestation],
-			verify: undefined,
+		const originalDecode = Update.decode;
+		let decodedInput: Vertex[] | undefined;
+		const decode = vi.spyOn(Update, "decode").mockImplementation((input, length) => {
+			const decoded = originalDecode(input, length);
+			decodedInput = decoded.vertices;
+			return decoded;
 		});
-		// Known hashes are trusted skips at the object boundary. They are not
-		// reauthenticated and therefore cannot trigger a new local attestation.
-		const generated = [added.hash].map((hash) => ({
-			data: hash,
-			signature: Uint8Array.of(0xb0, hash.length),
-		}));
-		expect(object.addedSignatureCalls[1]).toEqual({
-			peerId: LOCAL_PEER_ID,
-			attestations: generated,
-			verify: false,
-		});
-		expect(result.broadcasts).toHaveLength(1);
-		expect(result.broadcasts[0].to).toBe(OBJECT_ID);
-		expect(result.broadcasts[0].message).toMatchObject({
-			sender: LOCAL_PEER_ID,
-			type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
-			objectId: OBJECT_ID,
-		});
-		expect(result.broadcasts[0].message.data).toEqual(
-			AttestationUpdate.encode(AttestationUpdate.create({ attestations: generated })).finish()
-		);
+		const recover = vi.spyOn(Signature, "fromCompact");
 
-		const updates = dispatchDetails<{ id: string; update: Update }>(result, NodeEventName.DRP_UPDATE);
-		expect(updates).toHaveLength(1);
-		expect(updates[0]).toEqual({ id: OBJECT_ID, update: Update.decode(message.data) });
+		try {
+			await handleMessage(node, message);
+
+			expect.soft(recover).toHaveBeenCalledTimes(2);
+			expect.soft(object.mergedVertexCalls).toHaveLength(1);
+			const received = object.mergedVertexCalls[0];
+			expect.soft(received.map(({ hash }) => hash)).toEqual([added.hash, dropped.hash]);
+			const decodedByHash = new Map(decodedInput?.map((vertex) => [vertex.hash, vertex]));
+			for (const vertex of received) {
+				const decodedVertex = decodedByHash.get(vertex.hash);
+				expect.soft(decodedVertex).toBeDefined();
+				expect.soft(vertex).not.toBe(decodedVertex);
+				if (decodedVertex !== undefined) {
+					expect.soft(Vertex.encode(vertex).finish()).toEqual(Vertex.encode(decodedVertex).finish());
+				}
+			}
+			expect.soft(object.getVertex(known.hash)).toBe(known);
+			expect.soft(object.getVertex(added.hash)?.hash).toBe(added.hash);
+			expect.soft(object.getVertex(dropped.hash)).toBeUndefined();
+			expect.soft(object.getVertex(unauthenticated.hash)).toBeUndefined();
+			expect.soft(result.syncs).toEqual([{ id: OBJECT_ID, peerId: remotePeerId }]);
+			expect.soft(result.puts).toEqual([{ id: OBJECT_ID, object }]);
+
+			expect.soft(object.addedSignatureCalls[0]).toEqual({
+				peerId: remotePeerId,
+				attestations: [remoteAttestation],
+				verify: undefined,
+			});
+			// Known hashes are trusted skips at the node boundary. They are not
+			// reauthenticated and therefore cannot trigger a new local attestation.
+			const generated = [added.hash].map((hash) => ({
+				data: hash,
+				signature: Uint8Array.of(0xb0, hash.length),
+			}));
+			expect.soft(object.addedSignatureCalls[1]).toEqual({
+				peerId: LOCAL_PEER_ID,
+				attestations: generated,
+				verify: false,
+			});
+			expect.soft(result.broadcasts).toHaveLength(1);
+			const broadcast = result.broadcasts[0];
+			expect.soft(broadcast?.to).toBe(OBJECT_ID);
+			expect.soft(broadcast?.message).toMatchObject({
+				sender: LOCAL_PEER_ID,
+				type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
+				objectId: OBJECT_ID,
+			});
+			expect
+				.soft(broadcast?.message.data)
+				.toEqual(AttestationUpdate.encode(AttestationUpdate.create({ attestations: generated })).finish());
+
+			const updates = dispatchDetails<{ id: string; update: Update }>(result, NodeEventName.DRP_UPDATE);
+			expect.soft(updates).toHaveLength(1);
+			expect.soft(updates[0]).toEqual({ id: OBJECT_ID, update: originalDecode(message.data) });
+		} finally {
+			decode.mockRestore();
+			recover.mockRestore();
+		}
 	});
 
 	test("SYNC_ACCEPT pins exact response bytes, duplicates, stored identity, signing, finality, and events", async () => {
@@ -461,7 +460,7 @@ describe("applied-vertex lookup pre-change semantic and wire baselines", () => {
 });
 
 describe("applied-vertex direct-lookup causal contracts", () => {
-	test("UPDATE consumes object-owned merge metadata without inventory or raw-offer lookups", async () => {
+	test("UPDATE bounds structural applied-membership lookups by batch without inventory scans", async () => {
 		const known = await remoteVertex("causal-update-known");
 		const lookup = observations();
 		const object = new InstrumentedAppliedVertexObject([known], lookup, { canSign: false });
@@ -470,7 +469,9 @@ describe("applied-vertex direct-lookup causal contracts", () => {
 		await handleMessage(node, updateMessage([known]));
 
 		expect.soft(lookup.materializations).toBe(0);
-		expect.soft(lookup.directLookups).toBe(0);
+		expect.soft(lookup.candidateComparisons).toBe(0);
+		expect.soft(lookup.directLookups).toBeGreaterThanOrEqual(1);
+		expect.soft(lookup.directLookups).toBeLessThanOrEqual(2);
 	});
 
 	test("SYNC_ACCEPT keeps exactly two sweeps and makes response comparison work independent of V", async () => {
