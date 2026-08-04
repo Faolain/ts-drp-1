@@ -21516,30 +21516,69 @@ the verified 37-entry manifest SHA-256 is
 `2cd7c9ec12051b2fe7d235d9ff26bf493cd555528bea0ea231ef2fd7842828f0`
 under `.logs/phase-1g-unterminated-prefix-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1g corrective GREEN preliminary reviews
+**Phase 1g corrective GREEN preliminary reviews accepted.** Fresh native Grok
+4.5/high reviewed checkpoint `bb967602245d35887548ef20de8c9412c3a5fb24`
+and returned `ACCEPTED` / `PHASE1G_MAY_CLOSE=yes` with no blocker. Its decoder
+parity and frame matrix covered incomplete lengths 1-4, immediate rejection at
+5/8/64, terminators and noncanonical forms, maximum values, all body
+boundaries, the combined 4,194,308-byte event, unchanged writes, cleanup and
+zero unhandled rejections. Focused passes 6/6, UPDATE probes 4/4, network
+130/130, handler/authentication 42/42, all typechecks and tracked lint at zero
+errors / 249 inherited warnings; Phase 1n remains exact 3F/3P. Preserve the
+cancelled first native invocation, sandbox-denied `git hash-object -w` and
+Vitest attempts, wrong-directory manifest attempt and untracked-`.logs` lint
+scope error as reviewer/harness disclosures; sandbox and post-state evidence
+prove no candidate mutation. Native result SHA-256 is
+`6e8b59bfddfa040bd40aaca94b03ed5955881db20c8fd5b98182513d11530eef`;
+controller summary SHA-256 is
+`7ac7a90431c5ddee3736b720d8b448b3bc7bce1a90645761a7c53a5d44395b18`;
+the verified 50-entry manifest SHA-256 is
+`380a278d75e6ad611d8f8d6bc8edfc8d32cc27cd08001981f728d1325f27c7cc`
+under `.logs/phase-1g-unterminated-prefix-green-grok45-high-review/`.
 
-Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
-exact checkpoint containing corrective RED `997cdc2`, production GREEN
-`37e2fdc` and this record. Kimi must authenticate selector `kimi-code/k3`,
-effective `k3`, `--thinking`, environment
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI `--max-steps-per-turn 100`. Neither
-reviewer may edit the repository or invoke Fable/subagents.
+Fresh exact Kimi 3/high authenticated selector `kimi-code/k3`, effective `k3`,
+thinking and both 100-step controls, and returned `ACCEPTED` /
+`PHASE1G_MAY_CLOSE=yes` with no blocker. Its isolated disposable-copy stream
+matrix passes 17/17 and real UPDATE probes pass 4/4 at 31/32/33/128; focused is
+6/6, network 130/130, handler/authentication 42/42, broader preservation 57/57,
+owned lint and typechecks pass, and Phase 1n remains exact 3F/3P. Preserve the
+copy-only missing-example-node_modules and missing-built-dist setup incidents,
+plus the later full-lint import-resolution artifact. After all product gates
+completed, the controller stopped an expanding clone-only lint diagnosis; a
+same-session one-step, zero-tool continuation emitted the explicit verdict.
+The disposable copy was moved recoverably to Trash and the repository
+post-state remained unchanged. Native result SHA-256 is
+`002ee390ffb28196b2bf3f1d5c8f9d6d4f6190d4cbed389b32eb3809fb01c9c6`;
+native wire SHA-256 is
+`7f774a87223dffc926c00626152d9d060827e59567efbb47e6b6317b5335f7ac`;
+the verified 18-entry manifest SHA-256 is
+`24cfad79d24e5b8ccb2b5c95a4dc0019406df7a883c6a43fc1fcac035ddb4e6b`
+under `.logs/phase-1g-unterminated-prefix-green-kimi3-high-100-review/`.
 
-Authenticate all Phase 1g blobs and manifests. Independently exercise paced,
-open-peer incomplete prefixes at lengths 1-5 and beyond, completed terminators
-at positions 1-5, malformed/overlong and maximum-value varints, fragmented and
-combined delivery, early body-cap rejection, exact 4 MiB acceptance, cleanup
-and unhandled-rejection behavior. Inspect the bounded decoder for arithmetic,
-canonicality or dependency-contract divergence rather than accepting the frozen
-test alone. Re-probe UPDATE at 31/32/33 and a large batch through real
-`handleMessage`, confirm zero downstream work above cap, inspect actual
-producers, and preserve the Phase 1o SYNC_ACCEPT and Phase 1n 3F/3P residuals.
+Both reviewers preserve the same nonblocking ownership ledger: SYNC_ACCEPT
+batch governance remains Phase 1o, the exact sync-livelock sentinel remains
+Phase 1n, and D.73 remains a hard pre-3a obligation. Decode-before-UPDATE-count
+is the explicit bounded Phase 1g contract rather than a claim of pre-decode
+protobuf admission.
 
-Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1G_MAY_CLOSE=yes/no`,
-severity, executable evidence and a residual ledger. Preserve HEAD/tree/index,
-stash and protected paths; seal native session/model/tool evidence. Run final
-Claude-skill Opus/xhigh only if both preliminary reviewers accept. Do not
-schedule Fable.
+## Next Agent Prompt — Phase 1g final Opus review
+
+Use the Claude skill to run one fresh native Opus/xhigh adversarial review
+against exact checkpoint `bb96760`, corrective RED `997cdc2` and production
+GREEN `37e2fdc`. The reviewer is read-only and may write ignored evidence only;
+it must not invoke Fable/subagents or alter the plan, source, tests, index,
+stash, generated output or protected paths.
+
+Authenticate every Phase 1g blob, diff and evidence manifest. Independently
+inspect the installed dependency and bounded decoder, then run executable
+current-source probes for paced incomplete/complete prefixes, decoder parity,
+exact/near frame limits, fragmentation/combined delivery, cleanup/no-UPR and
+write behavior. Recheck real UPDATE admission above/below 32, producer
+compatibility, the Phase 1o SYNC_ACCEPT residual, Phase 1n exact 3F/3P and D.73.
+Require explicit `ACCEPTED` or `CHANGES_REQUESTED`,
+`PHASE1G_MAY_CLOSE=yes/no`, severity, executable evidence and residual ledger.
+If accepted, checkpoint the review and close Phase 1g before starting the next
+dependency-ordered plan item. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
