@@ -1020,7 +1020,7 @@ round 1 at all.
 | **1d(i)**   | **Incremental stored-snapshot publication.** Remove full-state payload cloning from stored per-vertex and checkpoint publication only when an already-published owned snapshot is provably the exact pre-image. Public state setters/getters become detached copy-in/copy-out; unchanged entries may share references only among ownership-immutable internal snapshots. Non-empty replay suffixes, conflict/tail replay, multi-head local cuts and merged-frontier checkpoints remain explicit fallbacks unless exact-cut equality is proved. A fallback preserves the complete logical state but, after 1d(ii), may identity-retain unchanged already-owned entries; copy events always report physical detach/copy work rather than the fallback label. Mutable execution reconstruction remains a measured `O(stateSize)` residual and is not claimed fixed here. See D.90.                                                                                                             | local-safe (**behavioral/API compatibility note; assert wire bytes unchanged**) | **atomic and causal** — per eligible mutation case and in aggregate, test-owned `clonedBytes < 20 * mutatedBytes` over the focused matrix and the separate 1k-vertex/1 MB characterization; ineligible fallbacks retain their exact mode/reason and complete state while every actual copy is counted and no copy event is fabricated for an unchanged identity-retained owned entry. Stored semantics and exact `FetchStateResponse` bytes remain identical to the deep-clone baseline.                                                                                                                                    |
 | **1d(ii)**  | **Residual mutable reconstruction/COW and prototype-safe materialization.** After 1d(i), remove the remaining full-state `fromStates`/`applyState` reconstruction and local live-capture round trip with an ownership-safe copy-on-write or equivalent execution overlay. Every equivalent ordinary-`[[Set]]` materialization sink in `state-materialize.ts`, `state-payload.ts` and `drp-applier.ts` must materialize validated keys as own data without inherited-setter dispatch or prototype mutation. Public `fromHash`/`fromStates` reconstruction has no accessor exception. Only live `replaceEnumerableState` may invoke an intentional ordinary non-`__proto__` application accessor, with the qualified tracked-proxy receiver and complete journal rollback. This is a distinct TDD/review item because reconstruction detachment becomes the load-bearing barrier protecting every structurally shared snapshot and the design must preserve Phase 0q-a synchronous atomicity. | local-safe (**separate post-1d(i) item**)                                       | A fresh causal RED must keep snapshot/public/live aliases isolated across local, remote, suffix, conflict, tail, checkpoint, quarantine and rollback paths while pinning exact semantics/wire bytes; cover `state-materialize.ts:134`, `state-payload.ts:90`, and `drp-applier.ts:267,279-281` under one own-data/prototype-safety contract; preserve only the qualified live application accessor plus mutation journaling; prove deterministic reconstruction-copy work scales with effective changed payload and copy events remain exact physical-work truth while the 1d(i) publication counters retain their meaning. |
 | **1d(iii)** | **Checkpoint-pruning history independence.** Remove or prove a bound for `pruneSnapshots` whole-graph key materialization without expanding closed 0q or diluting 1d(ii). Preserve root/checkpoint-frontier/tail retention, missing-snapshot behavior, journal rollback and owner-store identity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | local-safe (**separate post-1d(ii) item; hard before Phase 1 exit**)            | A fresh causal RED pins the current O(V) full-vertex-key materialization and proves the GREEN's work is proportional to the checkpoint/prune write set. Atomic apply cannot be called history-independent, and Phase 1 scale plus Phase 4b/6a snapshot-adoption claims stay blocked, until this slice closes.                                                                                                                                                                                                                                                                                                               |
-| **1e**      | Unify signature authentication into `object`/`validation` so **all** ingest paths are authenticated — `applyVertices` (`object/src/index.ts:205-212`) performs no signature check today.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | local-safe                                                                      | **Negative-space test**: delete/bypass the node-handler auth entirely; the suite must _still_ reject forged merges through `object.merge()` — proving auth moved. Plus **reflective completeness**: iterate the `messageHandlers` registry (`handlers.ts:133`) and assert every vertex-carrying `MessageType` routes through the single authenticated ingest function; an un-tabled message type fails the test. Deeper fix: `applyVertices` accepts a branded `AuthenticatedVertex[]` produced only by the verifier, making a bypass a **compile error**                                                                   |
+| **1e**      | Unify signature authentication into `object`/`validation` so **all** ingest paths are authenticated — public `applyVertices(Vertex[])` and legacy `merge(Vertex[])` remain source-compatible but must runtime-authenticate every novel raw offer. A single verifier stabilizes each submitted vertex and issues genuine runtime provenance plus the internal `AuthenticatedVertex` brand; only the module-private remote-ingest applier accepts that provenance. Local pre-sign creation/replay and root/already-known skips remain separately named trusted lanes, never signature exceptions on raw remote input. Node handlers may preverify only through the same verifier-issued snapshots; no duplicate crypto and no public/configurable bypass.                                                                                                                                                | local-safe (**source-compatible public API; stricter forged-input result classification**) | **Negative-space and provenance tests**: bypass/delete node prefiltering and direct object ingest must still reject unsigned, malformed and claimed-author-mismatch offers; a cast brand cannot enter the private sink; verifier and applier consume the same detached snapshot; rejected hashes do not poison a later correctly signed same-hash offer. Reflectively cover every vertex-carrying handler and assert one verification through node flow, input-ordered invalid results, mixed-batch `applied:false` even when valid siblings commit, signed quarantine preservation, root/known skips and zero new attestation for forged known duplicates. Runtime provenance makes a production bypass fail closed; the internal brand makes an accidental typed bypass a compile error. |
 | **1f**      | Bound `Channel.sends`. At capacity (default 1000) `send` pushes into an **unbounded** `this.sends` array (`message-queue/src/channel.ts:73-76`), and the network producers do not await — `node.ts:1762,1774` both `.catch()` fire-and-forget. Every message beyond capacity appends an un-GC'able pending send.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | local-safe                                                                      | **atomic** (a half-bounded queue is still a leak). `channel-backpressure.test.ts`: 10⁵ fire-and-forget sends with no receiver → `expect(sends.length).toBeLessThanOrEqual(cap)`, excess rejected with a typed error                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **1g**      | Pre-decode frame cap + `Update` batch cap. `stream.ts:41` uses `lpStream`'s default `maxDataLength`; `handlers.ts:251` decodes then runs a **synchronous secp256k1 recover per vertex** (`:626-651`) with a `console.error` per failure — one UPDATE with N forged vertices freezes the tab.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | local-safe                                                                      | `update-batch-cap.test.ts`: oversize batch rejected **before any signature recover** — `expect(verifyACLIncomingVerticesSpy).not.toHaveBeenCalled()`                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **1h**      | Queue isolation: per-object enqueue never blocks the single network fanout loop (`node.ts:384`; `message-queue.ts:79-108` awaits each handler serially). One slow room stalls **every** room today.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe                                                                      | Fill object-A's queue to capacity → `expect(objectBDeliveryMs).toBeLessThan(50)`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -20449,30 +20449,131 @@ checkpoint `4f91449`, preliminary-review checkpoint `2bd138e` and this final
 closure. Do not reopen it absent an executable counterexample or a production
 change that invalidates the sole-call/current-boundary proof.
 
-## Next Agent Prompt — Phase 1e RED
+**Phase 1e initial tests-only RED and finite inventory.** Fresh Codex-high
+commit `c6805437653fa5edb1c449ff4a29ff20607f3f9c` added only
+`packages/node/tests/authenticated-object-ingress-1e-red.test.ts` and
+`packages/object/tests/authenticated-vertex-boundary-1e-red.types.ts` (222
+lines). Their initial SHA-256 values are
+`847bad7db82fdc0d157f8493c1522ad43745b6f03e2c96b2b771907a09d17027`
+and
+`96ded7576c8349413f0ee67cdb94d1662a9cbf4e0a9e22709179b175a9326a3e`.
+The initial behavioral signature was 8F/2P: direct `applyVertices` and legacy
+`merge` accepted unsigned, malformed-signature and claimed-author-mismatch
+vertices; mixed classification and reflective handler metadata also failed;
+valid signed state/wire parity and signed missing retry passed. The type RED
+failed on the absent brand/verifier boundary. Node authentication preservation
+was 19/19, object ingest preservation 6/6, node typecheck passed, and
+object/workspace typecheck failed only on the intended type RED. Result
+SHA-256 is
+`cde45858189f02fd186b1f4bbca05fab8db41bf3a16f78de61f334a11425b630`;
+17-entry manifest SHA-256 is
+`21e26c704a5d609035c0f8d159c789be23538d4e100faf98e5a21265d921caf1`
+and verifies.
 
-Freeze the complete accepted Phase 1d lineage and start one fresh Codex-high
-tests-only RED for Phase 1e authentication unification. Current public
-`packages/object/src/index.ts:246` accepts raw `Vertex[]` through
-`applyVertices`, and legacy `merge` reaches the same applier, while signature
-recovery remains in `packages/node/src/handlers.ts:666-706`. The RED must prove
-that direct object-layer ingest rejects unsigned, malformed-signature and
-claimed-author-mismatch vertices even when every node handler is bypassed or
-deleted, while valid signed local/remote/retry behavior and exact result
-ordering remain unchanged. Add a reflective registry-completeness control over
-every vertex-carrying `MessageType`, but do not make that hand list the primary
-security boundary. Evaluate the planned branded `AuthenticatedVertex[]`
-compile-time boundary against all legitimate object callers and record the
-additive public-interface compatibility consequence; RED changes tests/types
-only, not production or this plan. Apply the adopted stale-inventory sweep to
-the finite authentication tests/counters before freezing the RED, batching
-any real stale pins once rather than serially. Run focused negative-space,
-proportionate preservation, object/node/workspace typecheck, owned/tracked
-lint and formatting to `.log`; avoid unrelated long property/5k suites. Commit
-tests only and checkpoint the RED before a distinct production-only GREEN.
-Use the normal fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional
-final Claude-skill Opus/xhigh loop. Do not schedule Fable, consume D.73,
-Phase 1n or optional 0n, or stage protected untracked paths.
+The adopted stale-inventory sweep found no obsolete semantic authentication
+assertion, counter, manifest or suppression. It did find a finite migration
+surface: 60 tracked raw public-ingest callers, including 35 probable object
+test files that construct unsigned fixtures. Therefore the earlier table's
+simultaneous `local-safe`/additive compatibility and branded-only public
+parameter were contradictory. The RED commit completed just before root's
+collision pause reached its owner; production and plan remained untouched,
+and the commit was not rewritten.
+
+**Phase 1e public-brand collision — unanimous correction.** The Codex-high RED
+owner, exact Kimi 3/high/dual-100 and Claude-skill Opus/xhigh agree with the
+corrected table contract above. Public raw arrays remain source-compatible and
+are mandatorily verified at the object boundary; only verifier-stabilized
+snapshots carrying module-owned runtime provenance and an internal brand may
+enter the remote applier. A TypeScript cast cannot confer provenance. Local
+pre-sign creation/replay, root and already-known vertices are distinct trusted
+lanes. The node path must reuse genuine verifier output rather than repeat
+secp256k1 recovery, and neither production nor package configuration may
+expose a trusted bypass. Unsigned fixtures must migrate to signed fixtures or
+a non-shipping test-owned harness without deleting their valid state/rollback
+assertions.
+
+Fresh exact Kimi session `5ce5313c-351e-4470-aa8b-2630b8990c55` used
+`kimi-code/k3`, `--thinking`, explicit high instruction and both 100-step
+controls. It ended naturally after 16 steps and 29 read-only calls/results,
+with no fallback, helper, subagent, web or write. Verdict was
+`PUBLIC_COLLISION: AGREES` / `PROPOSED_CORRECTION: AGREES`, blockers none.
+Result SHA-256 is
+`bfdccc9d905d487d0ce6a2f3b313370691d090c0b114672d64adad7df1be3d7f`,
+raw SHA-256 is
+`a03fddf5fdb509a679752320e6b94b96265954dbf8d5376b835eaa8d60ddec20`
+and 19-entry manifest SHA-256 is
+`6d846937578876b1765a3a6eab0845bcf3b5d27380cbfa12c9fdacfcf19b8f15`;
+all entries verify.
+
+Claude-skill Opus/xhigh session `d3efa226-2927-4913-a0b6-3be2067a4210`
+returned `AGREES` / `PLAN_COLLISION=yes` /
+`PLAN_AMENDMENT_REQUIRED=yes` / `RED_STATUS=CORRECT_BEFORE_GREEN` using
+substantive `claude-opus-5` at xhigh. One automatic Haiku envelope used 23
+output tokens and supplied no finding; no substantive helper, Fable, Sonnet,
+subagent, web or MCP use occurred. Opus caught the initial mixed-batch
+expectation: `ApplyResult.applied` is all-clear and must be `false` when any
+offered item is invalid even though a valid sibling commits. Result SHA-256 is
+`b9331235f86fe632b03aa48d7edabcff0314bfa7d494b06998b8840300bd0534`,
+raw SHA-256 is
+`19d542eea9df0165219d6c9df5b956e9b0800d1cc2cc50e7a37b04ff9f03c1bf`
+and 18-entry manifest SHA-256 is
+`023cbe91ef3236d25965d3ea083c820af04421ea0f55e2d8f9a80bbccd5dbc68`;
+all entries verify.
+
+**Phase 1e corrective tests-only RED accepted and frozen.** The original RED
+owner corrected and batched the complete finite collision set in commit
+`bd15d47eebd7b209a9d28db995d42b9b5807606f`, changing only the same two
+test/type files by +301/-5. Current file SHA-256 values are
+`29427197d4f903e3ecf859eebbbd072163779ad20b55239698d4593c24be7299`
+and
+`9ab912ce5de460a6f8c1ae06a8405c9001037919e900bcaaca4c10148791f372`;
+Git blobs are `205f04cca308cbf7034f3497dc01098bb4371fb6` and
+`4a0ac07138a398c66f35d71ec49c167d163fb675`. The exact behavioral signature
+is 15F/4P. It pins corrected mixed apply and legacy-merge ordering; real UPDATE
+without handler-owned rejection and exactly-once recovery; signed quarantine;
+unsigned rejection followed by correctly signed same-hash retry; one-read
+detached verification/applier input; root/known skips; forged-known UPDATE
+with zero new crypto/attestation; and runtime provenance at the internal
+applier. The type RED keeps public raw signatures and rejects raw internal
+applier input.
+
+Node auth remains 19/19, object ingest 6/6, node typecheck passes, and
+object/workspace typecheck fails only on the absent internal brand/public
+verifier plus consequent unused negative assertions. Owned/tracked lint,
+formatting and diff check pass. Result SHA-256 is
+`293ac97c92079b6c74f6b2541455206fcbe87b1cf8ca5d25db6c06bba8273a3c`;
+12-entry manifest SHA-256 is
+`32ee2aaacbf5f5559f079eef17959bd75b4ed1ef08c3a1150b5299169a021d3e`
+and verifies under
+`.logs/phase-1e-auth-unification-corrective-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1e GREEN
+
+Freeze tests-only RED commits `c680543` and `bd15d47` plus this unanimous
+contract-amendment checkpoint. Start one distinct Codex-high implementation
+GREEN. Move signature recovery and stable submitted-vertex capture into a
+single object/validation-owned verifier that returns snapshots carrying a
+module-owned runtime provenance capability plus internal
+`AuthenticatedVertex` brand. Keep public `DRPObject.applyVertices(Vertex[])`
+and legacy `merge(Vertex[])` source-compatible and mandatory-verifying; make
+the remote applier fail closed for raw/cast-only input. Route UPDATE and
+SYNC_ACCEPT through the same object boundary without duplicate crypto, while
+keeping local pre-sign creation/replay and root/already-known handling as
+separate private lanes. Preserve input-ordered invalid/missing/quarantine
+results, all-clear `applied`, valid sibling commits, retry without invalid
+tombstone poisoning, attestation behavior and exact state/wire semantics.
+
+Before broad gates, use the 35-file caller ledger to migrate unsigned test
+fixtures coherently to signed fixtures or a non-shipping test-owned harness;
+never add a production/configurable bypass and never delete valid assertions
+to make GREEN. Change production and necessary test-fixture plumbing only; do
+not modify the frozen RED assertions or this plan. Run focused 19-case RED,
+node auth/object ingest and proportionate preservation, object/node/workspace
+typecheck, owned/tracked lint and formatting to `.log`, avoiding unrelated
+long property/5k suites. Commit the distinct GREEN and fixture migration, then
+checkpoint before fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
+conditional final Claude-skill Opus/xhigh. Do not schedule Fable, consume
+D.73/Phase 1n/optional 0n, or stage protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
