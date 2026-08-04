@@ -21815,10 +21815,11 @@ format/diff checks pass.
 The 100k heap ratio is an explicit opt-in acceptance test using isolated
 `--expose-gc` writer and observer processes; it was deliberately not selected in
 RED iteration. A bounded 64-vertex smoke completed in under one second per
-process and produced identical convergence digests. It currently measures the
-expected near-1.0 ratio because production ignores observer mode; the acceptance
-gate will require 100,000 non-root vertices on both sides and observer retained
-heap below 25% of writer retained heap.
+process and produced identical convergence digests. The original RED froze a
+`<25%` functional-observer threshold. The unanimous amendment below supersedes
+that threshold without rewriting RED commit `03ad735`: a later tests-only
+corrective RED changes the functional threshold to `<60%`, while a separately
+frozen compact-history slice retains the original `<25%` obligation.
 
 Preserve the harness ledger. Concurrent Vitest processes first raced on their
 shared coverage temp directory after both had executed; the affected node suite
@@ -21836,26 +21837,155 @@ Final result SHA-256 is
 `31f0097697a3872d2572a8d22b95b66c4ca89ea982965fd4f8bf19e572793575`
 under `.logs/phase-1i-observer-mode-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1i production GREEN
+**Phase 1i contract amendment — unanimous Option A.** The original assumption
+that a full-history functional observer could use `<25%` of writer retained heap
+was incorrect. The first 100k run, writer `162,076,136` bytes versus observer
+`162,573,632` bytes, ratio `1.0030695`, resolved stale shared
+`packages/object/dist` and is not candidate evidence. A correctly built isolated
+10k candidate measured writer `17,412,720` bytes, observer `9,116,384` bytes,
+ratio `0.52355`, with identical digest. The remaining dominant owner is complete
+HashGraph vertex/edge/distance/order history rather than writer-only snapshot or
+legacy-finality state.
 
-Use a distinct fresh Codex-high GREEN agent against frozen RED `03ad735`. Follow
-the production ownership chain rather than adding a test adapter: define and
-validate the optional replica mode at the public node/object boundary with
-writer as the compatibility default; propagate it through create/connect and
-object construction; keep secp256k1 vertex authentication identical; bypass the
-legacy BLS attestation plane for observers; retain only checkpoint serialized
-states; and make finality-store initialization genuinely lazy/absent for an
-observer unless a writer-only operation actually requires it. Keep writer
-behavior byte-for-byte compatible where practical and do not add parallel state
-owners, fake stores, test detection or source analyzers.
+Fresh Codex-high, exact Kimi 3/high/dual-100 and native Opus/xhigh unanimously
+approved the following split after a same-session conference:
 
-Make the fast focused contract and all preservation/type/lint gates green first.
-Then run the isolated 100k heap comparison once as the acceptance gate, diagnose
-the retained owners if it misses <25%, and optimize only production state the
-observer contract permits removing. Record runtime and peak/retained evidence;
-do not place the scale gate in ordinary package runs. After checkpointing the
-production-only GREEN, run fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
-final Opus/xhigh reviews. Do not schedule Fable.
+> **Phase 1i-a — full-history functional observer.** Add optional
+> `replica_mode: "writer" | "observer"` at the public node/object/type/validation
+> boundaries, with `"writer"` as the compatibility default. An observer
+> authenticates every novel vertex under the same secp256k1 author-recovery and
+> causal ACL rules as a writer; it does not generate, verify, merge or rebroadcast
+> legacy BLS attestations. It retains serialized state only at root and valid
+> checkpoint boundaries, converges to the same live ACL/DRP state and ordered
+> history, exposes complete signed historical `Vertex` payloads through
+> `vertices`/`getVertex`, and remains an honest full-history sync source. Remote
+> merge does not rebroadcast UPDATE. ACL-authorized local operations remain
+> permitted, secp256k1-signed and free of observer-generated BLS attestations;
+> unauthorized authorship remains rejected. Reading `finalityStore` on an
+> observer fails explicitly at the public boundary and constructs or attaches no
+> store; it must never activate partial future-only finality retention. Promotion
+> to writer/finality behavior is outside this slice and cannot happen implicitly.
+> The isolated, freshly built 100k acceptance gate requires exactly 100,000
+> non-root vertices on both sides, identical convergence digests, and observer
+> retained heap `<60%` of writer retained heap. If that gate misses, do not add a
+> threshold-shaped shortcut: reconvene the amendment quorum.
+>
+> **Phase 1i-b — compact-history observer capability.** This is a later,
+> separately frozen slice distinct from full-history `replica_mode: "observer"`.
+> It owns the original 100k `<25%` gate. Count and digest come from an explicit
+> authenticated inventory API, never fabricated `Vertex` values. A compact
+> observer may consume sync/live UPDATE only after authenticating each novel full
+> vertex. Once payload history is pruned it cannot advertise or serve that history,
+> author ACL/DRP operations, expose synthetic/partial vertices, or promote to
+> writer/full-history service. A request for pruned history returns an explicit
+> history-unavailable capability result or triggers authenticated complete
+> rehydration from a full-history writer/archive. Rehydration must reverify signed
+> payloads, hashes, ancestry and convergence before full-history APIs, sync service,
+> authorship or promotion are enabled. Hash-only placeholders are forbidden.
+
+The `<60%` functional gate is provisional but binding: it is supported by the
+correctly built 10k `0.52355` ratio and must be proved by the actual freshly
+built 100k run before 1i-a closes. Opus measured a conservative lower bound of
+`546.9` bytes per full `Vertex` even after removing every auxiliary HashGraph
+index, versus a `435.32` bytes-per-vertex budget at 25% of the measured writer.
+That makes the old full-history `<25%` pair of requirements contradictory on the
+available evidence. A hash-only placeholder measured `131.2` bytes per vertex,
+showing why `<25%` remains plausible only after honest capability-specified
+compaction.
+
+Reject the terminated placeholder prototype as negative evidence. Its
+`getAllVertices()` returned `Vertex.create({ hash })`, preserving exactly the
+scale test's count/hash read-set while discarding author, operation,
+dependencies, timestamp and signature. Such values would be malformed sync
+payloads, would make `hasVertex` disagree with `getVertex`, would distort sync
+scheduling and could pass the prior placeholder-blind digest. A compact replica
+must instead tell the truth about payload availability through a distinct
+inventory/capability boundary.
+
+The exact current seven-file production bytes are not a candidate, although the
+functional design is salvageable. A partial prototype revert left
+`packages/object/src/index.ts` calling undefined
+`HashGraph.enableHistoryCompaction()` and `HashGraph.hasVertex()`. Current focused
+behavior is therefore 2 failed / 2 passed / 1 skipped and source typecheck cannot
+pass after fresh dependency builds. Earlier 4/1, preservation and 10k evidence
+belongs to the pre-drift candidate. The object preservation suite did not catch
+the public-ingest break because its shared trusted-ingest helper mocks
+`classifyNovelVertices` and does not invoke the supplied trust predicate. This is
+a test-boundary gotcha, not evidence that the missing methods are safe.
+
+The amendment quorum also found two independent contract gaps. First, merely
+reading the current observer `finalityStore` lazily constructs and attaches a
+store, so later vertices acquire incomplete future-only finality state without a
+mode transition. Second, the new live-frontier replay shortcut applies to writer
+and observer even though it exists only to let an observer advance after
+discarding ordinary snapshots. Writer behavior must remain unchanged, so the
+shortcut is observer-gated and its non-frontier/concurrent fallback must prove
+digest and live-state convergence against a writer rather than merely avoid an
+exception.
+
+Before any production repair, freeze one bounded tests-only corrective RED. It
+must:
+
+1. Amend the existing opt-in scale test's title and threshold from `<25%` to
+   `<60%`; do not rewrite frozen commit `03ad735`. Preserve `<25%` in the later
+   1i-b RED.
+2. Exercise public `DRPObject.applyVertices()` and deprecated `merge()` without
+   the trusted-ingest mock, in writer and observer modes, so the real novelty
+   predicate is invoked.
+3. Prove complete signed `Vertex`/`getVertex` fidelity and successful
+   full-history sync from an observer to a fresh peer across multiple checkpoints
+   and concurrent branches.
+4. Pin observer `finalityStore` access to an explicit public failure and prove
+   zero `FinalityStore` construction/attachment across the observer lifetime.
+5. Prove snapshot-discard rollback restores both ACL and DRP snapshots after an
+   aborted commit.
+6. Prove observer linear, out-of-order and concurrent/non-frontier replay reaches
+   the same ordered hashes, digest and live ACL/DRP state as a writer.
+7. Prove authorized observer authorship emits one secp256k1-signed UPDATE without
+   BLS, while unauthorized authorship remains rejected.
+8. Prove the scale worker resolves freshly built candidate artifacts rather than
+   shared stale `dist`; the long 100k run remains opt-in and runs once after fast
+   GREEN gates.
+
+Then use a distinct fresh Codex-high GREEN. Remove the orphaned
+`enableHistoryCompaction()` call, restore `this.hashGraph.vertices.has(hash)`,
+gate the live-frontier shortcut to observer mode, implement the explicit
+unsupported observer-finality boundary without a fake store, and retain the
+functional production ownership chain. Run focused, proportional preservation,
+workspace typecheck, tracked lint, format/diff and freshly built 100k `<60%`
+gates to `.log` before checkpoint. Only after GREEN passes run fresh Grok
+4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh review. Do not schedule
+Fable.
+
+The amendment evidence is under
+`.logs/phase-1i-observer-mode-amendment-{codex-high,kimi3-high-100,opus-xhigh}/`.
+Codex initial result SHA-256 is
+`d63b0483a238783794456a1f05d32da865aa9bb149b22e060f6f41a03354f60e`
+and conference stream SHA-256 is
+`fcb300f6d3cd4b7b1708cf3b8bba397bd6c3d8a520c21c42c991b3c757290cbb`.
+Exact Kimi 3 initial/resumed/conference streams are
+`b859541c48488f3766b0db6d02ddc22abfa2052c772393e95746ade73700c4d6`,
+`4eb4e93ce483b2c5543727e5854ff7b4a0f6ba1e91d0e4a790e7f4a607e0f30f`
+and `f7beecba221066846c3de024539cc6ff2f94325d48ce73358e7c03c05c047164`.
+Opus initial result/raw/conference SHAs are
+`c56f188e837d41e985392ab40eeb692a30b40a370489117d813f46cf2cf380eb`,
+`1aa879cd025de09b751ab89a1ec566734b822a820d27c8550443566003f21590`
+and `7039e18ee9ca0486a3d95c0fb3a6ac5543829bd0640278c215c10cc600fd6319`.
+Native Opus authenticated effective `claude-opus-5`; its initial automatic
+Haiku use was small/non-substantive. Exact Kimi used selector `kimi-code/k3`,
+thinking enabled and both 100-step controls. No Fable review was scheduled for
+this amendment.
+
+## Next Agent Prompt — Phase 1i-a corrective tests-only RED
+
+Use a fresh Codex-high RED agent against tracked HEAD and the rejected unstaged
+functional candidate. It may change only test-owned files and this already
+authorized plan checkpoint; it must not repair production. Freeze the eight
+bounded obligations above with real public ownership and causal controls. Keep
+the long 100k comparison opt-in. Prove the failures are caused by the exact
+orphaned-call, implicit-finality and observer-only replay contract gaps, not by
+stale package artifacts, then run proportional preservation/typecheck/lint
+gates to `.log` and checkpoint the tests-only RED separately.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
