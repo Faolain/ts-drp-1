@@ -22468,20 +22468,73 @@ SHA-256 is
 and the verified 24-entry manifest SHA-256 is
 `a0fed0290556ee6747737b9c103fe0b136e795b6b275a501498155f43b295277`.
 
-## Next Agent Prompt — Phase 1i-a/D.92 causal-publication acceptance
+**Causal-publication GREEN acceptance rejection.** Fresh native Grok 4.5/high
+session `019fcec6-c80c-7df1-b8f6-152fd7d5bb2e` accepted `8bc3755` after source
+inspection, with no blocking finding and both Phase 1i closure flags `yes`.
+Native final SHA-256 is
+`7b58cfd6a60d15f957a670569dafd94676ac26e5156e9c48569c92fff2712721`;
+the artifact-manifest file SHA-256 is
+`2d0d9c5b0425e55a5e859925673cf293084a24ebb6e72cd8e7d2b3da42cedafa`.
+Exact Kimi 3/high/dual-100 session
+`9f9da230-f76c-4614-a82c-d17927849546` resumed after a transient OAuth DNS
+failure and independently accepted after 38 K3 requests, focused 47/47 and a
+bounded 69/69 applier/ACL/checkpoint/setter/rollback/atomicity surface. Kimi
+explicitly retracted its candidate-key completeness concern after proving
+sorted-neighbor DFS stability plus add/delete/nested attribution. Its final
+SHA-256 is
+`272ae988fa3c6444bfaa69f0568cff1fc84d888e899e3b940a3d7bd8070bb1f6`.
 
-Review production-only GREEN `8bc3755` against tests-only lineage `d658aea`,
-`ea946c3` and `20a156e` plus formal contract amendment `c0d8fb1`. Start with a
-fresh Grok 4.5/high review. If it accepts, run exact Kimi 3/high with both
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `--max-steps-per-turn 100`; only after
-that accepts run final Claude-skill Opus/xhigh. Require each reviewer to inspect
-the causal stored-versus-whole-frontier live split, direct-dependency retention
-proof, cross-key tail replay attribution, zero-delta path, ACL authorization,
-prototype-safe serialized bytes, key additions/deletions/order, copy meter,
-rollback/raw/setter preservation and the exact inherited residual ledger.
-Reviewers may run bounded tests/probes but must not change tracked state or run
-100k. A blocking finding returns to a fresh tests-only RED; do not patch during
-review. Do not schedule Fable.
+Final Claude-skill Opus 5/xhigh session
+`cf0cd64a-15c8-4920-86b1-bd051239a5ba` nevertheless found and executed one
+candidate-caused counterexample. D sets `x=1`; sibling B sets `x=0`; concurrent
+sibling A derives `y` from `x`; canonical order is D-to-B-to-A while subject
+arrival is D,A,B. Replay A writes `y=0`, equal to the causal target's current
+`y`, so `trackMutations` suppresses the write even though the prior live
+baseline contains `y=1`. Canonical-live capture then retains that stale live
+entry. Oracle and subject have the same vertices, frontier and deterministic
+linearization but diverge at live `y=0` versus `y=1`; with checkpoint suffix 1,
+joined C stores `y=0` versus `y=1` under the same vertex hash. Stored B remains
+correctly causal, isolating the regression to canonical-live/checkpoint
+capture. Restoring the parent's retention argument fixes this probe but is not
+a general solution because `published` is now causal rather than
+whole-frontier. Opus returned `CHANGES_REQUESTED`,
+`PHASE1I_A_MAY_RECLOSE=no` and `PHASE1I_B_GREEN_MAY_RESUME=no`. Native final
+SHA-256 is
+`1c257223781622443410f39c92fb6a084580050e9814fc918f0bad5a149147fc`;
+raw-envelope SHA-256 is
+`e8c57522f7dbc3ca15543da784c6eed289671130ccb480aae647add03f79da43`.
+The envelope disclosed 18 output tokens from an automatic Haiku helper absent
+from the substantive transcript; it supplied no finding or vote. No reviewer
+changed tracked state or ran 100k.
+
+Opus accepted the direct-dependency frontier-antichain proof and classified the
+exact two D.92.2 census failures and three D.92.3 Map-key failures as unchanged,
+separately owned residuals. It also recorded two nonblocking cleanup decisions
+for the eventual GREEN: replay tracking currently uses the default comparator
+and is therefore absent from the comparison/copy meter, and one raw-egress
+condition contains an incremental branch that is now always true. Decide the
+meter attribution explicitly; remove dead residue only if it follows naturally
+from the bounded fix. Do not widen this corrective into D.92.2, D.92.3, D.73,
+an analyzer, or a performance rewrite.
+
+## Next Agent Prompt — value-equal replay canonical-live RED
+
+Use a fresh Codex-high tests-only RED on `8bc3755`. Reuse the existing
+`CrossKeyTailDRP` semantic fixture with D=`setX(1)`, B=`setX(0)`, A=`deriveY()`
+as equal-timestamp siblings of D, subject arrival D,A,B, canonical order
+D-to-B-to-A and joined C=`mark("joined")` over `[B,A]` under checkpoint suffix
+
+1. Compare subject with oracle arrival D,B,A. Freeze equal vertex/frontier/order,
+   immediate live state, stored B causal pair/bytes, and C live/stored pair/bytes;
+   only the subject live and downstream checkpoint result should expose the
+   candidate regression. Do not add value-type, setter or syntax variants. Do not
+   modify production or plan, and do not run 100k. After the RED, use a distinct
+   Codex-high GREEN that makes canonical-live capture complete relative to the
+   previous live baseline. A replay-scoped write-attribution mode or a bounded
+   complete top-level instance/baseline comparison are valid design directions;
+   blindly restoring causal `[published]` retention is insufficient. Then restart
+   fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final Opus/xhigh. Do not
+   schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
