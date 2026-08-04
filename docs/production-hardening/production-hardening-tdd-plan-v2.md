@@ -22362,11 +22362,56 @@ diff checks pass. No 100k gate ran. Evidence is under
 70-entry verified manifest SHA-256 is
 `21501e0847f192b769193fbcaaaf6fa26dc93d0b984e5c7faa2620ade61b6eb2`.
 
+**Causal-publication GREEN diagnostic paused on one superseded proxy.** A
+distinct Codex-high production attempt separated the per-vertex causal
+operation pair from the transaction-local whole-frontier adoption pair,
+removed the partial `applyOverride` flow, and permitted unanimous fallback
+identity retention only when every exact frontier baseline is a direct declared
+dependency. Direct membership is sufficient here without an ancestry walk:
+the baselines are the pre-commit frontier antichain, so a baseline causally
+covered by another declared dependency could not remain a frontier head. The
+bounded candidate passed its focused 34/34 and the ballast/copy meter; the
+proportional D.92 run was 52 passed / 1 failed. Its sole failure was the older
+prototype-safety fixture requiring B's stored bytes to equal live A+B bytes and
+therefore to include concurrent nondependency A's own `__proto__` data. A
+finite semantic audit of the Phase 1d/1i stored-versus-live comparisons found
+no second equivalent proxy. The agent preserved the uncommitted production
+patch at
+`.logs/phase-1i-a-d92-causal-publication-green-codex-high/final-candidate-direct-membership.patch`
+(SHA-256
+`67260c17986dd0f0895e8084a0f786e3585834cb76be0dab1b411c7805eaca6f`),
+then restored production clean rather than accepting a GREEN against a known
+superseded assertion. The evidence ledger SHA-256 is
+`a3a665812af8fa17ece02f2a16310b69ec0ac3d164df7b4c1f619296e8754d26`
+and the verified 67-entry manifest SHA-256 is
+`72e915fa359530149edee8740f5a13864e84c971ce314e72c1831cb2fb3be74d`.
+
+**Prototype-safety causal-snapshot tests-only RED checkpoint.** Fresh
+Codex-high commit `ea946c3` corrects only
+`residual-reconstruction-prototype-safety-1d-ii-red.test.ts` by 18 insertions /
+7 deletions. B/ambient depends only on root, so its stored serialized bytes must
+equal an explicit root-to-B replay and omit concurrent sibling A's
+`inheritedAttack`; the final live whole-frontier state separately must retain
+A's safe own `__proto__` data. On the committed production baseline the file is
+exactly 1 failed / 11 passed: only the stored-byte causal oracle fails, while
+the pure replay, inherited-setter safety and live controls pass. The combined
+causal surface is 6 failed / 40 passed, proportional D.92 is 3 failed / 50
+passed, Phase 1i-a remains 3 failed / 16 passed / 1 opt-in 100k skip, and object
+and node preservation remain 46/46 and 51/51. The classified Phase 1i-b
+typechecks remain exactly 13/35/16 with validation passing; tracked lint is zero
+errors / 249 inherited warnings and owned format/lint pass. No 100k gate ran.
+Evidence is under `.logs/phase-1i-a-d92-stale-proxy-red-codex-high/`; ledger
+SHA-256 is
+`f3a3f3fa3e5e26d1fe8d22e4a92c9e7c7d0c43c0745676f51537d1a4d5c8a5f1`
+and the verified 26-entry manifest SHA-256 is
+`a953035f2612dae4875f341ed16558f0fc984a1fe7051c03d47fc259afa3e6f4`.
+
 ## Next Agent Prompt — Phase 1i-a/D.92 causal-publication GREEN
 
 Use a distinct fresh Codex-high production-only GREEN on tests-only RED
-`d658aea`. For every committed vertex, publish both stored sides from the exact
-causal closure of its declared dependencies plus its own operation. Do not seed
+`ea946c3` (which extends `d658aea`). For every committed vertex, publish both
+stored sides from the exact causal closure of its declared dependencies plus
+its own operation. Do not seed
 that vertex-addressed pair from a whole-frontier adoption image or retain a
 noncausal frontier entry merely because it is identical/unanimous. When a
 causal dependency entry is not among the publication record's exact
@@ -22385,8 +22430,9 @@ and complete source, yet the public B/child RED remained contaminated. The
 older sibling-tail stored-value failure from that experiment is now superseded
 and must not be cited as a reason to restore noncausal storage; prove the precise
 source for each stored side instead. Do not change tests or the plan, grow the
-test-only analyzer, fold in the six inherited residuals, or run 100k. Run
-focused 34-test RED, Phase 1i-a aggregate, proportional D.92 and
+test-only analyzer, fold in the six inherited residuals, or run 100k. Run the
+combined causal RED, the corrected prototype-safety file, Phase 1i-a aggregate,
+proportional D.92 and
 copy/order/raw/rollback suites, object/node/direct preservation, classified
 1i-b typechecks, tracked lint and format/diff gates serially to `.log`. Commit
 only the minimum production owners. Then restart fresh Grok 4.5/high, exact
