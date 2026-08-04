@@ -54,6 +54,20 @@ interface ApplicationObjectSetterEvent {
 
 const applicationObjectSetterEvents: ApplicationObjectSetterEvent[] = [];
 
+interface RollbackSetterValue {
+	shared: { marker: string };
+	tag: string;
+}
+
+interface RollbackSetterEvent {
+	key: "left" | "right";
+	receiver: unknown;
+	value: RollbackSetterValue;
+}
+
+const rollbackSetterEvents: RollbackSetterEvent[] = [];
+let throwingRollbackSetter: "left" | "right" | undefined;
+
 function ownData(target: object, key: PropertyKey, value: unknown): void {
 	Object.defineProperty(target, key, {
 		configurable: true,
@@ -136,6 +150,48 @@ class ApplicationObjectReconstructionFixture extends ReconstructionFixture {
 	installApplicationObject(marker: string): void {
 		const shared = { marker };
 		ownData(this, "applicationObject", { left: shared, right: shared, aliases: [shared] });
+	}
+}
+
+class RollbackSetterReconstructionFixture extends ReconstructionFixture {
+	_left: RollbackSetterValue = { shared: { marker: "root-left" }, tag: "left-root" };
+	_right: RollbackSetterValue = { shared: { marker: "root-right" }, tag: "right-root" };
+
+	constructor() {
+		super();
+		const shared = { marker: "root-setter-input" };
+		ownData(this, "left", { shared, tag: "left" });
+		ownData(this, "right", { shared, tag: "right" });
+	}
+
+	get left(): RollbackSetterValue {
+		return this._left;
+	}
+
+	set left(value: RollbackSetterValue) {
+		rollbackSetterEvents.push({ key: "left", receiver: this, value });
+		if (throwingRollbackSetter === "left") throw new Error("left setter failure");
+		this._left = value;
+	}
+
+	get right(): RollbackSetterValue {
+		return this._right;
+	}
+
+	set right(value: RollbackSetterValue) {
+		rollbackSetterEvents.push({ key: "right", receiver: this, value });
+		if (throwingRollbackSetter === "right") throw new Error("right setter failure");
+		this._right = value;
+	}
+
+	installBoth(marker: string): void {
+		const shared = { marker };
+		ownData(this, "left", { shared, tag: "left" });
+		ownData(this, "right", { shared, tag: "right" });
+	}
+
+	resolveConflicts(_vertices: Vertex[]): ResolveConflictsType {
+		return { action: ActionType.Nop };
 	}
 }
 
@@ -689,6 +745,218 @@ describe("Phase 1d(ii) COW/reconstruction work and live adoption RED", () => {
 			}
 		} finally {
 			applicationObjectSetterEvents.length = 0;
+			if (previousSuffix === undefined) delete process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+			else process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = previousSuffix;
+		}
+	});
+
+	it("restores the true pre-attempt setter backing descriptors after a later setter throws", async () => {
+		const previousSuffix = process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
+		try {
+			process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = "1";
+			rollbackSetterEvents.length = 0;
+			throwingRollbackSetter = undefined;
+			const h = harness(new RollbackSetterReconstructionFixture());
+			type Checkpoint = {
+				frontier: Hash[];
+				state: { aclState: DRPState; drpState: DRPState };
+			};
+			const checkpoints = (): Checkpoint[] => (h.applier as unknown as { checkpoints: Checkpoint[] }).checkpoints;
+			const frontierId = (frontier: readonly Hash[]): string => [...frontier].sort().join(",");
+			const storedImages = (): Array<{ label: string; bytes: Uint8Array }> => {
+				const images: Array<{ label: string; bytes: Uint8Array }> = [];
+				const hashes = new Set<Hash>([HashGraph.rootHash, ...h.hashGraph.getAllVertices().map(({ hash }) => hash)]);
+				for (const hash of hashes) {
+					const aclState = h.states.getACLState(hash);
+					const drpState = h.states.getDRPState(hash);
+					if (aclState) images.push({ label: `vertex:${hash}:acl`, bytes: snapshotBytes(aclState) });
+					if (drpState) images.push({ label: `vertex:${hash}:drp`, bytes: snapshotBytes(drpState) });
+				}
+				for (const [index, checkpoint] of checkpoints().entries()) {
+					const label = `checkpoint:${frontierId(checkpoint.frontier)}:${index}`;
+					images.push({ label: `${label}:acl`, bytes: snapshotBytes(checkpoint.state.aclState) });
+					images.push({ label: `${label}:drp`, bytes: snapshotBytes(checkpoint.state.drpState) });
+				}
+				return images;
+			};
+			const publicationImages = (): PublicationRecord[] =>
+				h.probe.publications.map((record) => ({
+					...record,
+					baselineHashes: [...record.baselineHashes],
+					frontier: [...record.frontier],
+					changed: { acl: [...record.changed.acl], drp: [...record.changed.drp] },
+					work: record.work ? { acl: { ...record.work.acl }, drp: { ...record.work.drp } } : undefined,
+				}));
+			const expectInputsDetached = (events: RollbackSetterEvent[]): void => {
+				const retainedValues = checkpoints().flatMap(({ state }) => state.drpState.state.map(({ value }) => value));
+				for (const hash of [HashGraph.rootHash, ...h.hashGraph.getAllVertices().map(({ hash }) => hash)]) {
+					retainedValues.push(...(h.states.getDRPState(hash)?.state.map(({ value }) => value) ?? []));
+				}
+				for (const event of events) {
+					expect.soft(event.receiver, `${event.key} setter receiver`).toBe(h.applier.drp);
+					for (const retained of retainedValues) {
+						if (retained === null || typeof retained !== "object" || !("shared" in retained)) continue;
+						const value = retained as RollbackSetterValue;
+						expect.soft(event.value, `${event.key} input cannot alias a retained value`).not.toBe(value);
+						expect.soft(event.value.shared, `${event.key} child cannot alias a retained child`).not.toBe(value.shared);
+					}
+				}
+			};
+
+			const install = remoteVertex("installBoth", ["installed"], [HashGraph.rootHash], 70);
+			await expect(h.applier.applyVertices([install])).resolves.toEqual({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			const left = remoteVertex("touch", ["left"], [install.hash], 71);
+			const right = remoteVertex("touch", ["right"], [install.hash], 72);
+			await expect(h.applier.applyVertices([left, right])).resolves.toEqual({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			const concurrentFrontier = h.hashGraph.getFrontier();
+			expect
+				.soft(new Set(concurrentFrontier), "positive control: runtime concurrent heads")
+				.toEqual(new Set([left.hash, right.hash]));
+			expect
+				.soft(
+					checkpoints().some(
+						({ frontier, state }) =>
+							frontierId(frontier) === frontierId(concurrentFrontier) &&
+							state.drpState.state.some(({ key }) => key === "left") &&
+							state.drpState.state.some(({ key }) => key === "right")
+					),
+					"positive control: the concurrent heads produced a canonical checkpoint"
+				)
+				.toBe(true);
+
+			rollbackSetterEvents.length = 0;
+			h.applier.drp!.touch("local-on-multi-frontier");
+			expect.soft(rollbackSetterEvents.map(({ key }) => key)).toEqual(["left", "right"]);
+			expectInputsDetached(rollbackSetterEvents);
+			expect.soft(h.drp._left.tag, "positive control: live left differs from the older canonical backing").toBe("left");
+			expect
+				.soft(h.drp._right.tag, "positive control: live right differs from the older canonical backing")
+				.toBe("right");
+
+			const widen = remoteVertex("touch", ["widen"], [left.hash], 73);
+			await expect(h.applier.applyVertices([widen])).resolves.toEqual({
+				applied: true,
+				invalid: [],
+				missing: [],
+			});
+			const failingFrontier = h.hashGraph.getFrontier();
+			expect.soft(failingFrontier, "positive control: a remote head re-widens the live frontier").toHaveLength(2);
+
+			const keysBefore = Object.keys(h.drp);
+			const leftBackingIndex = keysBefore.indexOf("_left");
+			const rightBackingIndex = keysBefore.indexOf("_right");
+			expect.soft(leftBackingIndex).toBeGreaterThanOrEqual(0);
+			expect.soft(rightBackingIndex).toBeGreaterThanOrEqual(0);
+			expect.soft(leftBackingIndex).toBeLessThan(keysBefore.indexOf("left"));
+			expect.soft(rightBackingIndex).toBeLessThan(keysBefore.indexOf("right"));
+			const prototypeBefore = Reflect.getPrototypeOf(h.drp);
+			const descriptorsBefore = Object.getOwnPropertyDescriptors(h.drp);
+			const leftBefore = descriptorsBefore._left!.value as RollbackSetterValue;
+			const rightBefore = descriptorsBefore._right!.value as RollbackSetterValue;
+			const revisionBefore = descriptorsBefore.revision;
+			expect.soft([leftBefore.tag, rightBefore.tag]).toEqual(["left", "right"]);
+			const hashesBefore = h.hashGraph.getAllVertices().map(({ hash }) => hash);
+			const vertexCountBefore = hashesBefore.length;
+			const storedBefore = storedImages();
+			const publicationsBefore = publicationImages();
+
+			rollbackSetterEvents.length = 0;
+			throwingRollbackSetter = "right";
+			expect(() => h.applier.drp!.touch("local-throw")).toThrow("right setter failure");
+			throwingRollbackSetter = undefined;
+			const failedEvents = [...rollbackSetterEvents];
+			expect
+				.soft(
+					failedEvents.map(({ key }) => key),
+					"first setter runs before the second throws"
+				)
+				.toEqual(["left", "right"]);
+			expectInputsDetached(failedEvents);
+
+			const descriptorsAfter = Object.getOwnPropertyDescriptors(h.drp);
+			expect.soft(keysBefore, "caught apply restores exact own-key order").toEqual(Object.keys(h.drp));
+			expect
+				.soft(Reflect.getPrototypeOf(h.drp), "caught apply restores the application prototype")
+				.toBe(prototypeBefore);
+			expect.soft(descriptorsAfter.revision, "caught apply restores the revision descriptor").toEqual(revisionBefore);
+			expect
+				.soft(
+					[
+						{
+							descriptor: descriptorsAfter._left,
+							sameValue: descriptorsAfter._left?.value === leftBefore,
+						},
+						{
+							descriptor: descriptorsAfter._right,
+							sameValue: descriptorsAfter._right?.value === rightBefore,
+						},
+					],
+					"caught apply must restore true pre-attempt backing descriptors, not mid-commit canonical values"
+				)
+				.toEqual([
+					{ descriptor: descriptorsBefore._left, sameValue: true },
+					{ descriptor: descriptorsBefore._right, sameValue: true },
+				]);
+			expect
+				.soft(
+					h.hashGraph.getAllVertices().map(({ hash }) => hash),
+					"graph hashes roll back atomically"
+				)
+				.toEqual(hashesBefore);
+			expect.soft(h.hashGraph.getAllVertices(), "vertex count rolls back atomically").toHaveLength(vertexCountBefore);
+			expect.soft(h.hashGraph.getFrontier(), "frontier rolls back atomically").toEqual(failingFrontier);
+			expect.soft(storedImages(), "all stored and checkpoint byte images roll back atomically").toEqual(storedBefore);
+
+			const publicationsAfterFailure = publicationImages();
+			expect
+				.soft(publicationsAfterFailure.slice(0, publicationsBefore.length), "prior publication records are immutable")
+				.toEqual(publicationsBefore);
+			const failedPublications = publicationsAfterFailure.slice(publicationsBefore.length);
+			expect.soft(failedPublications, "the failed full-replacement attempt remains observable").not.toHaveLength(0);
+			expect
+				.soft(
+					failedPublications.every(({ outcome }) => outcome === "rolled-back"),
+					"no failed fragment publishes"
+				)
+				.toBe(true);
+			expect
+				.soft(
+					failedPublications.some(({ mode }) => mode === "fallback"),
+					"the failing path is full replacement"
+				)
+				.toBe(true);
+
+			for (const event of failedEvents) {
+				event.value.shared.marker = `mutated-failed-${event.key}`;
+			}
+			expect.soft(storedImages(), "failed setter inputs cannot mutate stored/checkpoint bytes").toEqual(storedBefore);
+			expect.soft(h.drp._left.shared.marker).not.toBe("mutated-failed-left");
+			expect.soft(h.drp._right.shared.marker).not.toBe("mutated-failed-right");
+
+			rollbackSetterEvents.length = 0;
+			const hashesBeforeRetry = new Set(h.hashGraph.getAllVertices().map(({ hash }) => hash));
+			h.applier.drp!.touch("local-retry");
+			const retryVertices = h.hashGraph.getAllVertices().filter(({ hash }) => !hashesBeforeRetry.has(hash));
+			expect.soft(retryVertices, "deterministic retry commits exactly one vertex").toHaveLength(1);
+			expect.soft(h.drp.revision).toBe("local-retry");
+			expect.soft(rollbackSetterEvents.map(({ key }) => key)).toEqual(["left", "right"]);
+			expectInputsDetached(rollbackSetterEvents);
+			const retryPublications = h.probe.publications.filter(
+				({ kind, outcome, targetHash }) =>
+					kind === "vertex" && outcome === "published" && targetHash === retryVertices[0]?.hash
+			);
+			expect.soft(retryPublications, "retry publishes its vertex exactly once").toHaveLength(1);
+		} finally {
+			throwingRollbackSetter = undefined;
+			rollbackSetterEvents.length = 0;
 			if (previousSuffix === undefined) delete process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE;
 			else process.env.TS_DRP_CHECKPOINT_SUFFIX_SIZE = previousSuffix;
 		}
