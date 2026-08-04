@@ -42,9 +42,6 @@ export interface AuthenticatedMergeOutcome {
 	readonly result: MergeResult;
 }
 
-const concreteObjects = new WeakSet<object>();
-const mergeOutcomes = new WeakMap<MergeResult, AuthenticatedMergeOutcome>();
-
 function canonicalAuthenticatedHash(authenticated: readonly AuthenticatedVertex[], index: number): string {
 	const handle = authenticated[index];
 	if (handle === undefined) throw new Error("Authenticated occurrence points outside its verified batch");
@@ -55,8 +52,7 @@ function canonicalAuthenticatedHash(authenticated: readonly AuthenticatedVertex[
 
 /**
  * Apply remotely supplied vertices through the single authenticated object boundary.
- * Concrete objects retain their public mandatory-verifying merge surface; structural
- * implementations receive only detached verifier-issued novel vertices.
+ * Every implementation receives only detached verifier-issued novel vertices.
  * @param object - Installed object receiving the remote batch.
  * @param vertices - Raw decoded wire vertices.
  * @returns Node-consumable outcome derived without reflective object metadata.
@@ -65,22 +61,15 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 	object: IDRPObject<T>,
 	vertices: Vertex[]
 ): Promise<AuthenticatedMergeOutcome> {
-	if (concreteObjects.has(object)) {
-		const result = await object.merge(vertices);
-		const outcome = mergeOutcomes.get(result);
-		if (outcome === undefined) throw new Error("Concrete object merge did not publish its authenticated outcome");
-		return outcome;
-	}
-
 	const { authenticated, occurrences } = classifyNovelVertices(
 		vertices,
 		(hash) => hash === HashGraph.rootHash || object.getVertex(hash) !== undefined
 	);
 	const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
-	const structuralResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
+	const dispatchedResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
 	const result: MergeResult = occurrences.some(({ status }) => status === "invalid")
-		? [false, structuralResult[1], orderAuthenticatedVertexFailures(occurrences, authenticated, structuralResult[2])]
-		: structuralResult;
+		? [false, dispatchedResult[1], orderAuthenticatedVertexFailures(occurrences, authenticated, dispatchedResult[2])]
+		: dispatchedResult;
 	const committed: Vertex[] = [];
 	const committedHashes = new Set<string>();
 	for (let index = 0; index < authenticated.length; index++) {
@@ -175,7 +164,6 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @param options.config - The config of the DRPObject.
 	 */
 	constructor(options: DRPObjectOptions<T>) {
-		concreteObjects.add(this);
 		const {
 			peerId,
 			id = defaultIDFromPeerID(peerId),
@@ -309,14 +297,10 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @returns The result of the application.
 	 */
 	async applyVertices(vertices: Vertex[]): Promise<ApplyResult> {
-		return (await this.authenticateAndApplyVertices(vertices)).result;
+		return this.authenticateAndApplyVertices(vertices);
 	}
 
-	private async authenticateAndApplyVertices(vertices: Vertex[]): Promise<{
-		authenticated: readonly Vertex[];
-		hasTrustedOrAuthenticatedOffers: boolean;
-		result: ApplyResult;
-	}> {
+	private async authenticateAndApplyVertices(vertices: Vertex[]): Promise<ApplyResult> {
 		const { authenticated, occurrences } = classifyNovelVertices(
 			vertices,
 			(hash) => hash === HashGraph.rootHash || this.hashGraph.vertices.has(hash)
@@ -325,18 +309,11 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			authenticated.length === 0
 				? { applied: true, invalid: [], missing: [] }
 				: await this._applier.applyVertices(authenticated);
-		const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
-		if (!occurrences.some(({ status }) => status === "invalid")) {
-			return { authenticated, hasTrustedOrAuthenticatedOffers, result: applied };
-		}
+		if (!occurrences.some(({ status }) => status === "invalid")) return applied;
 		return {
-			authenticated,
-			hasTrustedOrAuthenticatedOffers,
-			result: {
-				...applied,
-				applied: false,
-				invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
-			},
+			...applied,
+			applied: false,
+			invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
 		};
 	}
 
@@ -358,20 +335,8 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 				"Refusing to adopt a root ACL from the network: genesis is derived from the object id"
 			);
 		}
-		const { authenticated, hasTrustedOrAuthenticatedOffers, result } =
-			await this.authenticateAndApplyVertices(vertices);
-		const mergeResult: MergeResult = [result.applied, result.missing, result.invalid];
-		const committed: Vertex[] = [];
-		const committedHashes = new Set<string>();
-		for (const vertex of authenticated) {
-			if (committedHashes.has(vertex.hash)) continue;
-			const stored = this.hashGraph.vertices.get(vertex.hash);
-			if (stored === undefined) continue;
-			committedHashes.add(vertex.hash);
-			committed.push(stored);
-		}
-		mergeOutcomes.set(mergeResult, { committed, hasTrustedOrAuthenticatedOffers, result: mergeResult });
-		return mergeResult;
+		const result = await this.authenticateAndApplyVertices(vertices);
+		return [result.applied, result.missing, result.invalid];
 	}
 
 	/**
