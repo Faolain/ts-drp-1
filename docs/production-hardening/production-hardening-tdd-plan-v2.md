@@ -14070,6 +14070,16 @@ Their compatible required edits establish the following normative contract.
 
 #### 2. Exact-cut eligibility for structural sharing
 
+Every stored ACL/DRP pair addressed by a vertex hash is the deterministic image
+of that vertex's causal closure—its declared ancestry plus its own operation—and
+of nothing else. A nondependency vertex may not affect any key, value, key-set
+membership or key order in that pair. A checkpoint is instead addressed by its
+frontier and represents the union of those heads' causal closures. A current
+whole-frontier image which is not identified by a stored address remains
+transaction-local `canonical-live` state; it may drive live replacement but may
+not be installed under a vertex hash. This address-to-causal-closure rule takes
+precedence over the superseded sibling-value proxies described below.
+
 Sharing is allowed only against an already-published owned ACL/DRP pair whose
 causal cut is provably the exact pre-image of every mutation represented in the
 target snapshot. Every change from that pair to the target must have been
@@ -14085,9 +14095,15 @@ observed by the governed top-level-key attribution.
 - Non-empty suffix replay, conflict replay, concurrent-tail adoption and
   multi-head local authoring are ineligible unless GREEN proves and RED pins a
   different exact-cut baseline. Otherwise they perform a complete detached
-  capture inside the governed counter. A test with a suffix mutating key `K`
-  and a pending operation mutating key `J` must reject a naive LCA-only
-  baseline that publishes stale `K`.
+  capture inside the governed counter. The test with a noncausal sibling
+  mutating key `K` and a pending operation mutating key `J` continues to reject
+  unsafe incremental sharing through `mode: "fallback"`, the exact fallback
+  reason, whole-frontier `baselineHashes` and counted work. Its stored vertex
+  pair must nevertheless retain the causal pre-`K` value; the whole-frontier
+  live image independently retains `K`. The former sibling-value assertion is
+  superseded because it made bytes under one vertex hash depend on peer arrival
+  order and violated the deep-clone stored-semantics parity promised by this
+  phase.
 - A checkpoint has a merged frontier state, not a state identified by its
   sorted `origin`. Reuse is permitted only for a single-head frontier whose
   published pair is byte- and semantically identical to the checkpoint cut.
@@ -22253,24 +22269,81 @@ errors, and format/diff checks pass. No 100k gate ran. Evidence is under
 `.logs/phase-1i-a-zero-delta-causal-snapshot-red-codex-high/`; ledger SHA-256 is
 `5fb0c2de25d2b07ffd80e0b28fa7cb08179acb0a6be0e6aae21f2bd72a0a08dc`.
 
-## Next Agent Prompt — Phase 1i-a zero-delta causal-snapshot GREEN
+**Phase 1i-a/D.92 snapshot-address contract amendment — unanimous.** The first
+Codex-high GREEN attempt correctly stopped without a commit after discovering
+that the new causal RED and two older Phase 1d assertions demanded opposite
+stored snapshots. Its clean-tree assessment is under
+`.logs/phase-1i-a-zero-delta-causal-snapshot-green-codex-high/`; ledger SHA-256
+is `5b4fabd0b44833a94a8793e6bd1a8eb068371a337fcadc10cfb440fd1db6ca33`.
+Codex concluded that vertex-addressed snapshots must exclude nondependencies
+and that the older sibling-value assertions must move to live-state checks.
 
-Use a distinct fresh Codex-high production-only GREEN on tests-only RED
-`61dc37a`. Concurrent-tail vertex publication must reconstruct the new vertex's
-true causal branch-local cut even when its operation changes no governed value;
-values seeded by the whole-frontier adoption instance must not leak from a
-non-causal sibling into that stored cut. Separately preserve the true canonical
-whole-frontier image for live replacement and checkpointing, including the
-zero-delta case: an empty causal delta is not evidence that the stored vertex
-snapshot and canonical image are interchangeable. Keep existing copy/equality
-attribution, borrowed-entry retention, additions/deletions, raw-egress,
-property-order, rollback and observer cleanup contracts. Do not alter tests or
-the plan, grow the test-only analyzer, add a compatibility shim, fold in the six
-inherited residuals, or run 100k. Run the focused RED, both Phase 1i-a causal
-fixtures, proportional Phase 1d/D.92 and object/node preservation, classified
-1i-b typechecks, tracked lint and format/diff gates to `.log`; commit only the
-minimum production owner. Then restart fresh Grok 4.5/high, exact Kimi
-3/high/100 and final Opus/xhigh acceptance. Do not schedule Fable.
+Exact Kimi 3/high/100 and Claude-skill Opus 5/xhigh independently inspected the
+production consumers, commit history and plan authority. Both agree that no
+safe scope exists for storing a noncausal sibling under another vertex's hash:
+the result varies by arrival order, becomes a child's execution and ACL
+authorization base, can be retained by checkpoint pruning, and is served as if
+it were hash-addressed state. Opus proved with `git log -S` that the expectations
+now near `incremental-publication-work-1d-i-red.test.ts:578` and `:625` were
+deliberately introduced in Phase 1d against then-causal production and implement
+a recorded plan clause. They are therefore plan-backed but incorrect, so this
+is a formal bounded amendment rather than incidental test cleanup. Opus session
+`51eee829-9719-40e1-9d1c-e921b47f60f6` returned
+`AGREE_STALE_TEST=yes`, `TESTS_ONLY_CORRECTION_PERMITTED=yes` and
+`PLAN_AMENDMENT_MAY_PROCEED=yes`; result SHA-256 is
+`9b34be7d4ca928ae3f58e2a1fad5e95e4f6515df4476bb4dbddee1db9f88700e`.
+Its only auxiliary service usage was a 24-output-token automatic Haiku envelope
+with no substantive transcript contribution. Kimi first agreed with the
+semantics and exact correction, then independently reproduced the history proof
+and explicitly returned `KIMI_CONSENTS_TO_PLAN_AMENDMENT=yes`; follow-up
+SHA-256 is `9e720e4790ebfff2fd2b07158bfb630f3f098fa05b055d5f7594684ecdc3a55d`.
+No reviewer changed tracked state or ran tests or 100k.
+
+The governing rule is now the amended Exact-cut section above: a stored pair
+under vertex `v` is exactly the deterministic image of `deps*(v) ∪ {v}`; a
+frontier checkpoint is the closure union of its heads; a whole-frontier image
+with no stored address remains transaction-local canonical-live state. The
+Phase 1d anti-sharing contract survives. Concurrent-tail remains a counted
+fallback, uses the exact whole-frontier `baselineHashes`, and may not masquerade
+as an exact dependency share. Only its sibling-value proxy is superseded.
+
+The permitted tests-only correction is exact and bounded. In the existing
+fallback-work test, stored `replacement: "tail"` becomes causal `"old"` while
+live remains `"tail"`; the other stored sibling value `nested.stable:
+"suffix-K"` becomes causal `"stable"` while live remains `"suffix-K"`. Preserve
+each pending operation's own mutation, fallback kind/mode/reason, counted work,
+and existing negative baseline assertion; add exact whole-frontier
+`baselineHashes` equality as the anti-sharing discriminator. The latter case
+also pins a second production channel: `selectFallbackRetention` can retain a
+frontier sibling by identity/unanimity when the causal dependency is not itself
+a frontier head, so fixing only `applyOverride` is insufficient.
+
+Before production GREEN, one bounded RED must also pin key-set rather than only
+scalar contamination. Combine a sibling-only addition and deletion in one
+fixture; compare the stored ACL/DRP pair and serialized bytes at B against pure
+causal replay across both arrival orders, while independently proving live state
+includes the whole-frontier effects. Add one ACL causality/authorization case:
+a noncausal concurrent grant/revoke may not enter B's stored ACL half or change
+whether a child is accepted across arrival orders. These are semantic source-
+to-sink dimensions, not a value-type syntax matrix. Do not add Map/Set/Date,
+raw-egress, setter, analyzer or threshold variants; their existing suites remain
+the preservation gates.
+
+## Next Agent Prompt — correct stale D.92 proxies and extend causal RED
+
+Use a fresh Codex-high tests-only RED on this amendment checkpoint; production
+remains `37b99fb`. Make only the exact existing D.92 corrections and bounded
+key-set/ACL additions authorized above; do not modify production or the plan.
+Prove the current production candidate
+`37b99fb` fails because vertex-addressed stored bytes incorporate nondependency
+state, while whole-frontier live state remains correct. Preserve the frozen
+zero-delta value/child/join RED, all work-accounting assertions and a positive
+causal/control path. Run focused RED shape, prior Phase 1i-a, proportional
+Phase 1d/D.92 and object/node preservation, classified 1i-b typechecks, tracked
+lint and format/diff gates to `.log`; never run 100k. Commit tests only. Then use
+a distinct fresh Codex-high production GREEN; only after it passes restart
+fresh Grok 4.5/high, exact Kimi 3/high/100 and final Opus/xhigh. Do not schedule
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
