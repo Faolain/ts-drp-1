@@ -20068,17 +20068,59 @@ order, unrelated descriptors, failure isolation, deterministic retry and all
 copy/governance counters. Do not remove compare guards blindly or add names,
 topology hashes or setter-count special cases.
 
+**Complete application-setter rollback-order production GREEN checkpointed for
+independent review.** Distinct Codex-high production-only commit
+`a9b8e92ea26b97ed9b1b714af6e4221538881507` changes only
+`packages/object/src/drp-applier.ts` by 30 insertions and two deletions. The
+source SHA-256 is
+`77e92357c425e71e0eb39fc6d0570361fdefce221efaac70e72c028500ad5b65`
+and git blob is `e484b45a6b0bff4e4bf19c6e3b108c9dd42cb6c8`.
+
+The GREEN discovers qualified setters only among changed keys that remain
+present, without reading source values. If none exist, ordinary replacement
+pays only `O(changedKeys × applicationPrototypeDepth)` discovery and performs
+no whole-instance rollback copy. If any exist, it captures exactly one
+detached complete own-descriptor/key-order/prototype pre-image before the first
+live deletion or write and registers that rollback before all property-local
+undo entries. Rollback therefore executes the guarded property-local undos
+first and the authoritative complete pre-image last. Per-setter mid-commit
+whole-surface snapshots are removed. Restoration deletes added/configurable
+keys as needed, redefines the captured descriptors in original order, verifies
+the complete key order, and restores the captured prototype or fails
+explicitly when restoration is impossible. The `5e185af` borrowed-input
+detachment, shared detacher session and both D.92.2-governed rollback detacher
+sites remain unchanged.
+
+The complete residual surface is exact 12/12. D.92.2 is 64/64,
+fallback/concurrent is 50/50, inherited Phase 1d(i) is 147/147 and the
+proportionate set is 138/138. Exact committed-byte object typecheck and 34/35
+workspace typecheck pass. Owned lint is 0/0. Explicit tracked lint covers the
+current 746 Git-tracked JS/TS-family files in eight stdin-isolated batches with
+zero errors and 250 warnings; the earlier 738-file count was stale. Prettier,
+diff, frozen test/plan, status/index and stash checks pass. Evidence is under
+`.logs/phase-1d-ii-rollback-order-green-codex-high/`; every entry verifies and
+its 20-entry manifest SHA-256 is
+`14d8caa14dcf6d99e52fe5ae5f995f288a3636668fe9184f70dedfcc1c942050`.
+
+This is a candidate, not acceptance. Freeze tests, production and plan; run
+fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews of this exact
+checkpoint. Review the complete two-ledger closure, not only the 30-line delta:
+attack pre-image timing, rollback action order and guard interactions; one and
+multiple setters; setters mutating/deleting/reordering unrelated own
+properties; setter throw and later checkpoint throw; qualified-setter caching;
+non-configurable restoration failure; prototype mutation; no-setter fast-path
+cost; borrowed-input isolation; D.92.2 census/meter authority; and deterministic
+retry. Run final Claude-skill Opus/xhigh only if both preliminary reviewers
+accept.
+
 ## Next Agent Prompt — Phase 1d(ii) rollback corrective
 
-Start from the exact plan-only checkpoint that records the rejected
-`a03cc5c` candidate. Production `5e185af` and tests-only RED `b54fbf9` remain
-valid and frozen. The sole current Phase 1d(ii) blocker is the executable
-two-setter/backing-key complete-rollback violation specified immediately
-above. Run one fresh Codex-high tests-only RED, one distinct Codex-high
-production-only GREEN, fresh Grok 4.5/high and exact Kimi 3/high/dual-100, and
-final Claude-skill Opus/xhigh only if both preliminary reviewers accept. Do not
-schedule Fable again unless explicitly requested. Do not consume Phase 1d(iii),
-D.73, Phase 1n or optional 0n scope, and never stage protected untracked paths.
+Freeze tests-only RED lineage `6f26f3e` + `1028087`, production-only GREEN
+`a9b8e92` and the plan checkpoint immediately above. The immediate next action
+is fresh Grok 4.5/high and exact Kimi 3/high/dual-100 independent review,
+followed by final Claude-skill Opus/xhigh only if both accept. Do not schedule
+Fable again unless explicitly requested. Do not consume Phase 1d(iii), D.73,
+Phase 1n or optional 0n scope, and never stage protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
