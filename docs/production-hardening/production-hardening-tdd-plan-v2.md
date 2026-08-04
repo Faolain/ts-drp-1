@@ -22329,21 +22329,68 @@ to-sink dimensions, not a value-type syntax matrix. Do not add Map/Set/Date,
 raw-egress, setter, analyzer or threshold variants; their existing suites remain
 the preservation gates.
 
-## Next Agent Prompt — correct stale D.92 proxies and extend causal RED
+## Phase 1i-a/D.92 causal-snapshot RED checkpoint
 
-Use a fresh Codex-high tests-only RED on this amendment checkpoint; production
-remains `37b99fb`. Make only the exact existing D.92 corrections and bounded
-key-set/ACL additions authorized above; do not modify production or the plan.
-Prove the current production candidate
-`37b99fb` fails because vertex-addressed stored bytes incorporate nondependency
-state, while whole-frontier live state remains correct. Preserve the frozen
-zero-delta value/child/join RED, all work-accounting assertions and a positive
-causal/control path. Run focused RED shape, prior Phase 1i-a, proportional
-Phase 1d/D.92 and object/node preservation, classified 1i-b typechecks, tracked
-lint and format/diff gates to `.log`; never run 100k. Commit tests only. Then use
-a distinct fresh Codex-high production GREEN; only after it passes restart
-fresh Grok 4.5/high, exact Kimi 3/high/100 and final Opus/xhigh. Do not schedule
-Fable.
+**Tests-only RED complete.** Fresh Codex-high commit `d658aea` on amendment
+checkpoint `c0d8fb1` changes exactly the two existing object test owners by 150
+insertions / 5 deletions; no production, plan, generated, dependency or
+protected path changes. The two stale D.92 proxies now require stored causal
+`stable` / `old`, independently preserve live `suffix-K` / `tail`, retain the
+pending operation's own mutation, and pass exact whole-frontier baseline,
+fallback reason and counted-work controls before reporting their soft REDs.
+This behaviorally pins both concurrent-tail override and
+`selectFallbackRetention` when the causal dependency is absent from the
+frontier baselines.
+
+The bounded Phase 1i-a fixture adds sibling-only key addition/deletion and
+compares B's stored pair plus serialized bytes to pure B across A-to-B and
+B-to-A schedules while live state includes A+B. Its ACL fixture grants at D,
+concurrently revokes at A, stores DRP B from D, and applies a guest-authored
+child of B; it compares B's stored ACL half/bytes to pure D-to-B and requires
+identical child authorization across orders while live ACL remains revoked.
+Final focused shape is 5 failed / 29 passed: D.92 contributes exactly the two
+corrected stored values, and Phase 1i-a contributes exactly zero-delta value,
+key-set/bytes and ACL/authorization causality failures. Phase 1i-a aggregate is
+3 failed / 16 passed / 1 opt-in 100k skip; proportional D.92 is 2 failed / 51
+passed; object and node preservation are 46/46 and 51/51. The Phase 1i-b
+sentinel remains intentionally 11 failed / 2 passed / 1 skipped, with unchanged
+types/object/node typecheck classification 13/35/16 and passing validation.
+Tracked lint has zero errors / 249 inherited warnings; owned lint, format and
+diff checks pass. No 100k gate ran. Evidence is under
+`.logs/phase-1i-a-d92-causal-snapshot-red-codex-high/`; ledger SHA-256 is
+`25ed64159c0f41c3b827359081b71efe177c39d8ab7f1f46cecfdaf9dd05a174` and the
+70-entry verified manifest SHA-256 is
+`21501e0847f192b769193fbcaaaf6fa26dc93d0b984e5c7faa2620ade61b6eb2`.
+
+## Next Agent Prompt — Phase 1i-a/D.92 causal-publication GREEN
+
+Use a distinct fresh Codex-high production-only GREEN on tests-only RED
+`d658aea`. For every committed vertex, publish both stored sides from the exact
+causal closure of its declared dependencies plus its own operation. Do not seed
+that vertex-addressed pair from a whole-frontier adoption image or retain a
+noncausal frontier entry merely because it is identical/unanimous. When a
+causal dependency entry is not among the publication record's exact
+whole-frontier `baselineHashes`, either declare truthful attribution allowed by
+the frozen contract or perform the required counted copy; never identity-retain
+an undeclared source. Preserve the separately attributed canonical-live image
+for live replacement and frontier checkpointing, including empty deltas,
+additions, deletions, key order and both ACL/DRP sides. A child must reconstruct
+and authorize from its causal dependency pair, independent of sibling arrival
+order.
+
+Repair the semantic source flow, not method names, no-op spelling, fixture keys,
+thresholds or one failing branch. The exploratory clear-and-rebuild candidate
+was rejected because it assumed `operation.currentDRP` was a universally pure
+and complete source, yet the public B/child RED remained contaminated. The
+older sibling-tail stored-value failure from that experiment is now superseded
+and must not be cited as a reason to restore noncausal storage; prove the precise
+source for each stored side instead. Do not change tests or the plan, grow the
+test-only analyzer, fold in the six inherited residuals, or run 100k. Run
+focused 34-test RED, Phase 1i-a aggregate, proportional D.92 and
+copy/order/raw/rollback suites, object/node/direct preservation, classified
+1i-b typechecks, tracked lint and format/diff gates serially to `.log`. Commit
+only the minimum production owners. Then restart fresh Grok 4.5/high, exact
+Kimi 3/high/100 and final Opus/xhigh acceptance. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
