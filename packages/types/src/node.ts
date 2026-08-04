@@ -18,6 +18,7 @@ import { type KeychainOptions } from "./keychain.js";
 import { type LoggerOptions } from "./logger.js";
 import { type IMetrics } from "./metrics.js";
 import { type DRPNetworkNode, type DRPNetworkNodeConfig } from "./network.js";
+import { type ReplicaMode } from "./object.js";
 
 export interface DRPNodeConfig {
 	log_config?: LoggerOptions;
@@ -35,6 +36,7 @@ interface NodeObjectOptionsBase<T> {
 	metrics?: IMetrics;
 	log_config?: LoggerOptions;
 	finality_config?: FinalityConfig;
+	replica_mode?: ReplicaMode;
 }
 
 export interface NodeCreateObjectOptions<T extends IDRP> extends NodeObjectOptionsBase<T> {

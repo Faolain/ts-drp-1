@@ -10,6 +10,7 @@ import {
 	type IDRP,
 	type IHashGraph,
 	type LoggerOptions,
+	type ReplicaMode,
 	type Vertex,
 } from "@ts-drp/types";
 import { handlePromiseOrValue, processSequentially } from "@ts-drp/utils";
@@ -419,7 +420,8 @@ interface DRPVertexApplierBase<T extends IDRP> {
 	drp?: T;
 	acl: IACL;
 	hashGraph: IHashGraph;
-	finalityStore: FinalityStore;
+	finalityStore?: FinalityStore;
+	replicaMode?: ReplicaMode;
 	states: DRPObjectStateManager<T>;
 	logConfig?: LoggerOptions;
 	finalityConfig?: FinalityConfig;
@@ -449,7 +451,8 @@ export class DRPVertexApplier<T extends IDRP> {
 	private readonly aclApplicationPrototype: object;
 
 	private applyVertexPipeline: Pipeline<BaseOperation, PostOperation<T>>;
-	private readonly finalityStore: FinalityStore;
+	private readonly optionalFinalityStore?: FinalityStore;
+	private readonly replicaMode: ReplicaMode;
 	private _notify: (origin: string, vertices: Vertex[]) => void;
 	private log: Logger;
 	private readonly knownInvalidVertexHashes = new KnownInvalidHashes();
@@ -469,6 +472,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	 * @param options.hashGraph - The hash graph
 	 * @param options.states - The state manager for the DRP object. If not provided, a new one will be created.
 	 * @param options.finalityStore - The finality store
+	 * @param options.replicaMode - Whether this replica retains writer-only state
 	 * @param options.notify - The notify function
 	 * @param options.logConfig - The log config
 	 * @param options.publicationObserver - Optional deterministic publication-work observer
@@ -480,6 +484,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		hashGraph,
 		states,
 		finalityStore,
+		replicaMode = "writer",
 		notify,
 		logConfig,
 		publicationObserver,
@@ -489,7 +494,8 @@ export class DRPVertexApplier<T extends IDRP> {
 		this.states = states;
 		this.drpApplicationPrototype = drp ? (Reflect.getPrototypeOf(drp) as object) : undefined;
 		this.aclApplicationPrototype = Reflect.getPrototypeOf(acl) as object;
-		this.finalityStore = finalityStore;
+		this.optionalFinalityStore = finalityStore;
+		this.replicaMode = replicaMode;
 		this._notify = notify;
 		this.log = new Logger("drp::object::operation", logConfig);
 		const [drpState, aclState] = [states.getDRPState(HashGraph.rootHash), states.getACLState(HashGraph.rootHash)];
@@ -539,6 +545,13 @@ export class DRPVertexApplier<T extends IDRP> {
 			},
 			this.publicationCapability
 		);
+	}
+
+	private get finalityStore(): FinalityStore {
+		if (this.optionalFinalityStore === undefined) {
+			throw new Error("Observer replicas do not support finalityStore access");
+		}
+		return this.optionalFinalityStore;
 	}
 
 	/**
@@ -1082,6 +1095,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			this.publicationPublisher.withCanonicalCheckpointState(nextCanonicalState, () => {
 				this.advanceCheckpointIfNeeded(journal, adoption.forceCheckpoint, publicationAttempts);
 			});
+			this.discardOrdinaryObserverSnapshots(commitOperation, nextCanonicalState);
 			journal.commit();
 			this.liveCanonicalState = nextCanonicalState;
 			this.publicationPublisher.reportPublications(publicationAttempts, "published");
@@ -1140,6 +1154,21 @@ export class DRPVertexApplier<T extends IDRP> {
 			return {
 				stop: false,
 				result: { ...operation, lcaResult: { lca: vertex.dependencies[0], linearizedVertices: [] } },
+			};
+		}
+		const dependency = vertex.dependencies.length === 1 ? vertex.dependencies[0] : undefined;
+		if (
+			this.replicaMode === "observer" &&
+			dependency !== undefined &&
+			sameHashes(this.hashGraph.getFrontier(), [dependency])
+		) {
+			return {
+				stop: false,
+				result: {
+					...operation,
+					lcaResult: { lca: dependency, linearizedVertices: [] },
+					replayState: this.liveCanonicalState,
+				},
 			};
 		}
 		const replay = this.getReplay(vertex.dependencies);
@@ -1477,19 +1506,46 @@ export class DRPVertexApplier<T extends IDRP> {
 	}
 
 	private initializeFinalityStore(operation: JournaledOperation<T>): void {
-		if (!this.finalityStore.enabled) return;
+		const finalityStore = this.optionalFinalityStore;
+		if (!finalityStore?.enabled) return;
 		const { vertex, acl, currentDRP, isACL, journal } = operation;
 		const finalitySigners = isACL ? currentDRP?.query_getFinalitySigners() : acl.query_getFinalitySigners();
-		const previous = this.finalityStore.states.get(vertex.hash);
-		this.finalityStore.initializeState(vertex.hash, finalitySigners);
-		const initialized = this.finalityStore.states.get(vertex.hash);
+		const previous = finalityStore.states.get(vertex.hash);
+		finalityStore.initializeState(vertex.hash, finalitySigners);
+		const initialized = finalityStore.states.get(vertex.hash);
 		if (!previous && initialized) {
 			journal.record(() => {
-				if (this.finalityStore.states.get(vertex.hash) === initialized) {
-					this.finalityStore.states.delete(vertex.hash);
+				if (finalityStore.states.get(vertex.hash) === initialized) {
+					finalityStore.states.delete(vertex.hash);
 				}
 			});
 		}
+	}
+
+	private discardOrdinaryObserverSnapshots(
+		operation: JournaledOperation<T>,
+		state: { aclState: DRPState; drpState: DRPState }
+	): void {
+		if (this.replicaMode !== "observer") return;
+		const { vertex, journal } = operation;
+		if (this.checkpoints.some(({ frontier }) => frontier.includes(vertex.hash))) return;
+
+		if (!this.states.deleteACLState(vertex.hash, state.aclState)) {
+			throw new Error("Observer ACL snapshot was replaced before release");
+		}
+		journal.record(() => {
+			if (this.states.getACLState(vertex.hash) === undefined) {
+				this.states.setACLState(vertex.hash, state.aclState);
+			}
+		});
+		if (!this.states.deleteDRPState(vertex.hash, state.drpState)) {
+			throw new Error("Observer DRP snapshot was replaced before release");
+		}
+		journal.record(() => {
+			if (this.states.getDRPState(vertex.hash) === undefined) {
+				this.states.setDRPState(vertex.hash, state.drpState);
+			}
+		});
 	}
 
 	private enqueueNotification(origin: string, vertices: Vertex[]): void {
@@ -1532,7 +1588,9 @@ export function createDRPVertexApplier<T extends IDRP>(
 		throw new Error("hashGraph is undefined");
 	}
 	const states = options.states ?? new DRPObjectStateManager(options.acl, options.drp);
-	const finalityStore = options.finalityStore ?? new FinalityStore(options.finalityConfig, options.logConfig);
+	const finalityStore =
+		options.finalityStore ??
+		(options.replicaMode === "observer" ? undefined : new FinalityStore(options.finalityConfig, options.logConfig));
 
 	const obj = new DRPVertexApplier({
 		...options,

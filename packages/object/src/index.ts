@@ -13,6 +13,7 @@ import {
 	type IDRPObject,
 	type IFinalityStore,
 	type MergeResult,
+	type ReplicaMode,
 	type Vertex,
 } from "@ts-drp/types";
 import { serializeDRPState } from "@ts-drp/utils/serialization";
@@ -96,6 +97,12 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 const OBJECT_ID_SEPARATOR = ":";
 const OBJECT_ID_SALT_BYTES = 16;
 
+function resolveReplicaMode(mode: ReplicaMode | undefined): ReplicaMode {
+	if (mode === undefined || mode === "writer") return "writer";
+	if (mode === "observer") return "observer";
+	throw new TypeError(`Unsupported replica mode: ${String(mode)}`);
+}
+
 function defaultIDFromPeerID(peerId: string): string {
 	return `${peerId}${OBJECT_ID_SEPARATOR}${bytesToHex(randomBytes(OBJECT_ID_SALT_BYTES))}`;
 }
@@ -146,13 +153,14 @@ export function createObject<T extends IDRP>(options: CreateObjectOptions<T>): I
  */
 export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	readonly id: string;
+	readonly replicaMode: ReplicaMode;
 	private readonly log: Logger;
 	private readonly hashGraph: HashGraph;
 
 	private _applier: DRPVertexApplier<T>;
 	private _states: DRPObjectStateManager<T>;
 	private subscriptions: DRPObjectCallback<T>[] = [];
-	private _finalityStore: FinalityStore;
+	private _optionalFinalityStore?: FinalityStore;
 
 	/**
 	 * Creates a DRPObject.
@@ -173,6 +181,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			//metrics,
 		} = options;
 		this.id = id;
+		this.replicaMode = resolveReplicaMode(config?.replica_mode);
 		this.log = new Logger(`drp::object::${this.id}`, config?.log_config);
 
 		this.hashGraph = new HashGraph(
@@ -185,12 +194,14 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			drp?.semanticsType ?? acl.semanticsType
 		);
 
-		this._finalityStore = new FinalityStore(config?.finality_config, config?.log_config);
+		this._optionalFinalityStore =
+			this.replicaMode === "writer" ? new FinalityStore(config?.finality_config, config?.log_config) : undefined;
 		[this._applier, this._states] = createDRPVertexApplier({
 			drp,
 			acl,
 			hashGraph: this.hashGraph,
-			finalityStore: this._finalityStore,
+			finalityStore: this._optionalFinalityStore,
+			replicaMode: this.replicaMode,
 			notify: this._notify.bind(this),
 			finalityConfig: config?.finality_config,
 			logConfig: config?.log_config,
@@ -236,6 +247,13 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 */
 	get finalityStore(): IFinalityStore {
 		return this._finalityStore;
+	}
+
+	private get _finalityStore(): FinalityStore {
+		if (this._optionalFinalityStore === undefined) {
+			throw new Error("Observer replicas do not support finalityStore access");
+		}
+		return this._optionalFinalityStore;
 	}
 
 	/**

@@ -17,6 +17,7 @@ import {
 	FetchStateResponse,
 	type IDRP,
 	type IDRPObject,
+	type IFinalityStore,
 	Message,
 	MessageType,
 	NodeEventName,
@@ -50,6 +51,12 @@ interface HandlerRegistryEntry {
 const MAX_SYNC_RECOVERY_RETRIES = 3;
 const MAX_UPDATE_VERTICES = 32;
 export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
+
+function legacyFinalityStore<T extends IDRP>(object: IDRPObject<T>): IFinalityStore | undefined {
+	if (object.replicaMode === "observer") return undefined;
+	const finalityStore = object.finalityStore;
+	return finalityStore.enabled === false ? undefined : finalityStore;
+}
 
 interface SyncRecoveryEpisode {
 	retries?: number;
@@ -264,10 +271,11 @@ function attestationUpdateHandler({ node, message }: HandleParams): ReturnType<I
 		log.error("::attestationUpdateHandler: Object not found");
 		return;
 	}
-	if (object.finalityStore.enabled === false) return;
+	const finalityStore = legacyFinalityStore(object);
+	if (finalityStore === undefined) return;
 
 	if (object.acl.query_isFinalitySigner(sender)) {
-		object.finalityStore.addSignatures(sender, attestationUpdate.attestations);
+		finalityStore.addSignatures(sender, attestationUpdate.attestations);
 		node.safeDispatchEvent(NodeEventName.DRP_ATTESTATION_UPDATE, {
 			detail: {
 				id: object.id,
@@ -311,17 +319,18 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	const [, missing] = mergeOutcome.result;
 	const appliedVertices = [...mergeOutcome.committed];
 
-	if (appliedVertices.length !== 0 && object.finalityStore.enabled !== false) {
+	const finalityStore = appliedVertices.length === 0 ? undefined : legacyFinalityStore(object);
+	if (finalityStore !== undefined) {
 		// add their signatures — only if the sender is a finality signer on the LIVE
 		// ACL. Mirrors attestationUpdateHandler; without this gate a non-signer could
 		// piggyback forged attestations on an UPDATE and have them counted toward
 		// finality (finality-integrity bypass).
 		if (object.acl.query_isFinalitySigner(sender)) {
-			object.finalityStore.addSignatures(sender, updateMessage.attestations);
+			finalityStore.addSignatures(sender, updateMessage.attestations);
 		}
 
 		// add my signatures
-		const attestations = signFinalityVertices(node, object, appliedVertices);
+		const attestations = signFinalityVerticesWithStore(node, finalityStore, appliedVertices);
 
 		if (attestations.length !== 0) {
 			// broadcast the attestations
@@ -461,12 +470,13 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 
 	let mergeRan = false;
 	let missing: string[] = [];
+	const finalityStore = legacyFinalityStore(object);
 	if (syncAcceptMessage.requested.length !== 0) {
 		const mergeOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
 		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
 		[, missing] = mergeOutcome.result;
-		if (mergeRan && object.finalityStore.enabled !== false) {
-			object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
+		if (mergeRan && finalityStore !== undefined) {
+			finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		}
 		if (mergeRan) {
 			node.put(object.id, object);
@@ -475,8 +485,8 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	}
 
 	await signGeneratedVertices(node, object.vertices);
-	if (object.finalityStore.enabled !== false) {
-		const addedAttestations = signFinalityVertices(node, object, object.vertices);
+	if (finalityStore !== undefined) {
+		const addedAttestations = signFinalityVerticesWithStore(node, finalityStore, object.vertices);
 		if (addedAttestations.length !== 0) {
 			// Vertices learned through sync must still propagate our finality
 			// signatures; otherwise a sync that front-runs the gossip UPDATE would
@@ -629,19 +639,26 @@ export function signFinalityVertices<T extends IDRP>(
 	obj: IDRPObject<T>,
 	vertices: Vertex[]
 ): Attestation[] {
-	if (obj.finalityStore.enabled === false) return [];
-	const attestations = generateAttestations(node, obj, vertices);
-	return obj.finalityStore.addSignatures(node.networkNode.peerId, attestations, false);
+	const finalityStore = legacyFinalityStore(obj);
+	return finalityStore === undefined ? [] : signFinalityVerticesWithStore(node, finalityStore, vertices);
 }
 
-function generateAttestations<T extends IDRP>(node: DRPNode, object: IDRPObject<T>, vertices: Vertex[]): Attestation[] {
+function signFinalityVerticesWithStore(
+	node: DRPNode,
+	finalityStore: IFinalityStore,
+	vertices: Vertex[]
+): Attestation[] {
+	const attestations = generateAttestations(node, finalityStore, vertices);
+	return finalityStore.addSignatures(node.networkNode.peerId, attestations, false);
+}
+
+function generateAttestations(node: DRPNode, finalityStore: IFinalityStore, vertices: Vertex[]): Attestation[] {
 	// Two condition:
 	// - The node can sign the vertex
 	// - The node hasn't signed for the vertex
 	const goodVertices = vertices.filter(
 		(v) =>
-			object.finalityStore.canSign(node.networkNode.peerId, v.hash) &&
-			!object.finalityStore.signed(node.networkNode.peerId, v.hash)
+			finalityStore.canSign(node.networkNode.peerId, v.hash) && !finalityStore.signed(node.networkNode.peerId, v.hash)
 	);
 	return goodVertices.map((v) =>
 		Attestation.create({
@@ -652,10 +669,11 @@ function generateAttestations<T extends IDRP>(node: DRPNode, object: IDRPObject<
 }
 
 function getAttestations<T extends IDRP>(object: IDRPObject<T>, vertices: Vertex[]): AggregatedAttestation[] {
-	if (object.finalityStore.enabled === false) return [];
+	const finalityStore = legacyFinalityStore(object);
+	if (finalityStore === undefined) return [];
 	return (
 		vertices
-			.map((v) => object.finalityStore.getAttestation(v.hash))
+			.map((v) => finalityStore.getAttestation(v.hash))
 			.filter((a): a is AggregatedAttestation => a !== undefined) ?? []
 	);
 }

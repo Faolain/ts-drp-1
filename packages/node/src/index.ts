@@ -1237,6 +1237,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			config: {
 				finality_config: options.finality_config,
 				log_config: options.log_config,
+				replica_mode: options.replica_mode,
 			},
 		});
 
@@ -1275,6 +1276,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			config: {
 				finality_config: options.finality_config,
 				log_config: options.log_config,
+				replica_mode: options.replica_mode,
 			},
 		});
 

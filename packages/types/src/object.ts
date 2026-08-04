@@ -11,10 +11,13 @@ export interface LowestCommonAncestorResult {
 	linearizedVertices: Vertex[];
 }
 
+export type ReplicaMode = "writer" | "observer";
+
 // snake_casing to match the JSON config
 export interface DRPObjectConfig {
 	log_config?: LoggerOptions;
 	finality_config?: FinalityConfig;
+	replica_mode?: ReplicaMode;
 }
 
 export interface DRPObjectOptions<T extends IDRP> {
@@ -46,6 +49,12 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	 * The id of the DRP object.
 	 */
 	readonly id: string;
+
+	/**
+	 * The storage/work profile used by this replica. Implementations predating
+	 * observer mode may omit it and are treated as writers by consumers.
+	 */
+	readonly replicaMode?: ReplicaMode;
 
 	/**
 	 * The ACL of the DRP object.
