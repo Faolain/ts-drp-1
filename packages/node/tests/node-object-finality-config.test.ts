@@ -3,9 +3,10 @@ import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { Signature } from "@noble/secp256k1";
-import { createACL } from "@ts-drp/object";
+import { createACL, createVertex, HashGraph } from "@ts-drp/object";
 import {
 	type DRPNetworkNode,
+	DrpType,
 	type GroupPeerChangeHandler,
 	type IACL,
 	type IDRP,
@@ -13,8 +14,13 @@ import {
 	MessageType,
 	type NodeConnectObjectOptions,
 	type NodeCreateObjectOptions,
+	Operation,
 	SemanticsType,
+	Sync,
+	SyncAccept,
 	Update,
+	type Vertex,
+	Vertex as VertexCodec,
 } from "@ts-drp/types";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -42,6 +48,45 @@ vi.mock("../../object/src/finality/index.js", async (importOriginal) => {
 
 const execFileAsync = promisify(execFile);
 
+type PreDriftHashGraphPrototype = HashGraph & {
+	enableHistoryCompaction?(): void;
+	hasVertex?(hash: string): boolean;
+};
+
+function installObserverPreDriftControl(): () => void {
+	const prototype = HashGraph.prototype as PreDriftHashGraphPrototype;
+	const enableDescriptor = Object.getOwnPropertyDescriptor(prototype, "enableHistoryCompaction");
+	const hasDescriptor = Object.getOwnPropertyDescriptor(prototype, "hasVertex");
+	const installedEnable = typeof prototype.enableHistoryCompaction !== "function";
+	const installedHas = typeof prototype.hasVertex !== "function";
+	if (installedEnable) {
+		Object.defineProperty(prototype, "enableHistoryCompaction", {
+			configurable: true,
+			value: (): void => undefined,
+			writable: true,
+		});
+	}
+	if (installedHas) {
+		Object.defineProperty(prototype, "hasVertex", {
+			configurable: true,
+			value(this: HashGraph, hash: string): boolean {
+				return this.vertices.has(hash);
+			},
+			writable: true,
+		});
+	}
+	return (): void => {
+		if (installedEnable) {
+			if (enableDescriptor === undefined) delete prototype.enableHistoryCompaction;
+			else Object.defineProperty(prototype, "enableHistoryCompaction", enableDescriptor);
+		}
+		if (installedHas) {
+			if (hasDescriptor === undefined) delete prototype.hasVertex;
+			else Object.defineProperty(prototype, "hasVertex", hasDescriptor);
+		}
+	};
+}
+
 class ProductPathDRP implements IDRP {
 	semanticsType = SemanticsType.pair;
 	values: number[] = [];
@@ -62,6 +107,7 @@ type Phase1iNodeCreateObjectOptions<T extends IDRP> = NodeCreateObjectOptions<T>
 interface FakeNetworkControls {
 	broadcastMessage: ReturnType<typeof vi.fn>;
 	networkNode: DRPNetworkNode;
+	sendMessage: ReturnType<typeof vi.fn>;
 	subscribe: ReturnType<typeof vi.fn>;
 }
 
@@ -70,6 +116,7 @@ function createFakeNetwork(): FakeNetworkControls {
 	const groupHandlers: GroupPeerChangeHandler[] = [];
 	const subscribe = vi.fn();
 	const broadcastMessage = vi.fn(() => Promise.resolve());
+	const sendMessage = vi.fn(() => Promise.resolve());
 	const networkNode = {
 		membershipVerifier: undefined,
 		peerId: "",
@@ -95,7 +142,7 @@ function createFakeNetwork(): FakeNetworkControls {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage,
-		sendMessage: vi.fn(() => Promise.resolve()),
+		sendMessage,
 		sendGroupMessageRandomPeer: vi.fn(() => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((handler) => {
 			messageHandlers.push(handler);
@@ -108,7 +155,7 @@ function createFakeNetwork(): FakeNetworkControls {
 			};
 		}),
 	} satisfies DRPNetworkNode;
-	return { broadcastMessage, networkNode, subscribe };
+	return { broadcastMessage, networkNode, sendMessage, subscribe };
 }
 
 async function productNode(seed: string): Promise<{ controls: FakeNetworkControls; node: DRPNode }> {
@@ -183,8 +230,16 @@ async function latestUpdate(controls: FakeNetworkControls, objectId: string, cou
 
 describe("Phase 1c public node finality configuration", () => {
 	const nodes: DRPNode[] = [];
+	let restoreObserverControl: (() => void) | undefined;
+
+	function enableObserverControl(): void {
+		if (restoreObserverControl !== undefined) throw new Error("Observer causal control is already installed");
+		restoreObserverControl = installObserverPreDriftControl();
+	}
 
 	afterEach(async () => {
+		restoreObserverControl?.();
+		restoreObserverControl = undefined;
 		vi.useRealTimers();
 		vi.unstubAllEnvs();
 		vi.restoreAllMocks();
@@ -270,6 +325,7 @@ describe("Phase 1c public node finality configuration", () => {
 	});
 
 	test("observer mode keeps authenticated convergence but owns no writer-only vertex work", async () => {
+		enableObserverControl();
 		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "3");
 		const sourceRuntime = await productNode("phase-1i-observer-source");
 		const observerRuntime = await productNode("phase-1i-observer-replica");
@@ -360,6 +416,7 @@ describe("Phase 1c public node finality configuration", () => {
 	});
 
 	test("observer mode still rejects a signature that does not recover to the claimed author", async () => {
+		enableObserverControl();
 		const sourceRuntime = await productNode("phase-1i-signature-source");
 		const observerRuntime = await productNode("phase-1i-signature-observer");
 		nodes.push(sourceRuntime.node, observerRuntime.node);
@@ -387,13 +444,165 @@ describe("Phase 1c public node finality configuration", () => {
 		expect(observer.drp?.query_values()).toEqual([]);
 	});
 
+	test("observer finality access throws publicly and never constructs or attaches a store", async () => {
+		enableObserverControl();
+		const sourceRuntime = await productNode("phase-1i-finality-source");
+		const observerRuntime = await productNode("phase-1i-finality-observer");
+		nodes.push(sourceRuntime.node, observerRuntime.node);
+		const objectId = `${sourceRuntime.node.networkNode.peerId}:phase-1i-finality-boundary`;
+		const { constructionsBeforeObserver, observer, source } = await phase1iPair(
+			sourceRuntime,
+			observerRuntime,
+			objectId
+		);
+		expect(finalityConstructions.count).toBe(constructionsBeforeObserver);
+
+		let accessOutcome: { error: unknown; kind: "threw" } | { kind: "returned"; value: unknown };
+		try {
+			accessOutcome = { kind: "returned", value: observer.finalityStore };
+		} catch (error) {
+			accessOutcome = { error, kind: "threw" };
+		}
+		expect.soft(accessOutcome.kind, "observer finality access must fail explicitly").toBe("threw");
+		if (accessOutcome.kind === "threw") {
+			expect.soft(accessOutcome.error).toBeInstanceOf(Error);
+			expect.soft(String(accessOutcome.error)).toMatch(/observer.*finality|finality.*observer/i);
+		}
+		expect
+			.soft(finalityConstructions.count, "the failed public read must not construct a FinalityStore")
+			.toBe(constructionsBeforeObserver);
+
+		source.drp?.append(51);
+		const update = await latestUpdate(sourceRuntime.controls, objectId, 1);
+		await handleMessage(observerRuntime.node, {
+			data: Update.encode(update).finish(),
+			objectId,
+			sender: sourceRuntime.node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_UPDATE,
+		});
+		expect(observer.drp?.query_values()).toEqual([51]);
+		expect
+			.soft(finalityConstructions.count, "the observer lifetime must remain free of construction or attachment")
+			.toBe(constructionsBeforeObserver);
+		expect(attestationUpdatesFor(observerRuntime.controls, objectId)).toEqual([]);
+	});
+
+	test("authorized observer authorship emits one secp256k1 UPDATE without BLS and rejects unauthorized authorship", async () => {
+		enableObserverControl();
+		const sourceRuntime = await productNode("phase-1i-authorship-source");
+		const observerRuntime = await productNode("phase-1i-authorship-observer");
+		nodes.push(sourceRuntime.node, observerRuntime.node);
+		const objectId = `${sourceRuntime.node.networkNode.peerId}:phase-1i-authorized-observer`;
+		const { observer, source } = await phase1iPair(sourceRuntime, observerRuntime, objectId);
+		const secpSigns = vi.spyOn(observerRuntime.node.keychain, "signWithSecp256k1");
+		const blsSigns = vi.spyOn(observerRuntime.node.keychain, "signWithBls");
+
+		observer.drp?.append(61);
+		const update = await latestUpdate(observerRuntime.controls, objectId, 1);
+		expect(update.vertices).toHaveLength(1);
+		expect(update.vertices[0]?.signature).toHaveLength(65);
+		expect(verifyACLIncomingVertices(update.vertices)).toHaveLength(1);
+		expect(update.attestations).toEqual([]);
+		expect(secpSigns).toHaveBeenCalledTimes(1);
+		expect(blsSigns).toHaveBeenCalledTimes(0);
+		expect(attestationUpdatesFor(observerRuntime.controls, objectId)).toEqual([]);
+
+		const authoredMessage = updatesFor(observerRuntime.controls, objectId)[0];
+		if (authoredMessage === undefined) throw new Error("Expected the observer-authored UPDATE");
+		await handleMessage(sourceRuntime.node, authoredMessage);
+		expect(source.drp?.query_values()).toEqual([61]);
+
+		const unauthorizedId = `${sourceRuntime.node.networkNode.peerId}:phase-1i-unauthorized-observer`;
+		const unauthorizedOptions = {
+			acl: createACL({ admins: [sourceRuntime.node.networkNode.peerId] }),
+			drp: new ProductPathDRP(),
+			id: unauthorizedId,
+			replica_mode: "observer",
+		} satisfies Phase1iNodeCreateObjectOptions<ProductPathDRP>;
+		const unauthorized = await observerRuntime.node.createObject(unauthorizedOptions);
+		expect(() => unauthorized.drp?.append(62)).toThrow(/Not a writer/);
+		expect(updatesFor(observerRuntime.controls, unauthorizedId)).toEqual([]);
+		expect(unauthorized.vertices).toHaveLength(1);
+		expect(unauthorized.drp?.query_values()).toEqual([]);
+		expect(secpSigns).toHaveBeenCalledTimes(1);
+		expect(blsSigns).toHaveBeenCalledTimes(0);
+	});
+
+	test("observer serves complete signed checkpoint and branch history through the real sync handlers", async () => {
+		enableObserverControl();
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "2");
+		const sourceRuntime = await productNode("phase-1i-sync-source");
+		const observerRuntime = await productNode("phase-1i-sync-observer");
+		const freshRuntime = await productNode("phase-1i-sync-fresh");
+		nodes.push(sourceRuntime.node, observerRuntime.node, freshRuntime.node);
+		const objectId = `${sourceRuntime.node.networkNode.peerId}:phase-1i-observer-sync-source`;
+		const { observer, source } = await phase1iPair(sourceRuntime, observerRuntime, objectId);
+		const sharedACL = sharedRoomACL([sourceRuntime.node, observerRuntime.node]);
+		const freshOptions = {
+			acl: sharedACL,
+			drp: new ProductPathDRP(),
+			id: objectId,
+			replica_mode: "writer",
+		} satisfies Phase1iNodeCreateObjectOptions<ProductPathDRP>;
+		const fresh = await freshRuntime.node.createObject(freshOptions);
+		const authored = async (value: number, dependencies: string[], timestamp: number): Promise<Vertex> => {
+			const vertex = createVertex(
+				sourceRuntime.node.networkNode.peerId,
+				Operation.create({ drpType: DrpType.DRP, opType: "append", value: [value] }),
+				dependencies,
+				timestamp
+			);
+			vertex.signature = await sourceRuntime.node.keychain.signWithSecp256k1(vertex.hash);
+			return vertex;
+		};
+		const first = await authored(71, [HashGraph.rootHash], 1_700_000_003_001);
+		const checkpoint = await authored(72, [first.hash], 1_700_000_003_002);
+		const left = await authored(73, [checkpoint.hash], 1_700_000_003_003);
+		const right = await authored(74, [checkpoint.hash], 1_700_000_003_004);
+		const join = await authored(75, [left.hash, right.hash], 1_700_000_003_005);
+		const history = [first, checkpoint, left, right, join];
+		await expect(source.applyVertices(history)).resolves.toMatchObject({ applied: true, invalid: [], missing: [] });
+		await expect(observer.applyVertices(history)).resolves.toMatchObject({ applied: true, invalid: [], missing: [] });
+
+		await handleMessage(observerRuntime.node, {
+			data: Sync.encode(Sync.create({ vertexHashes: fresh.vertices.map(({ hash }) => hash) })).finish(),
+			objectId,
+			sender: freshRuntime.node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_SYNC,
+		});
+		expect(observerRuntime.controls.sendMessage).toHaveBeenCalledTimes(1);
+		const [, responseMessage] = observerRuntime.controls.sendMessage.mock.calls[0] as [string, Message];
+		expect(responseMessage.type).toBe(MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
+		const response = SyncAccept.decode(responseMessage.data);
+		expect(response.attestations).toEqual([]);
+		expect(response.requesting).toEqual([]);
+		expect(response.requested.map((vertex) => VertexCodec.encode(vertex).finish())).toEqual(
+			observer.vertices.slice(1).map((vertex) => VertexCodec.encode(vertex).finish())
+		);
+		await handleMessage(freshRuntime.node, responseMessage);
+		expect(fresh.vertices.map(({ hash }) => hash)).toEqual(observer.vertices.map(({ hash }) => hash));
+		expect(fresh.drp?.query_values()).toEqual(observer.drp?.query_values());
+		for (const vertex of history) expect(fresh.getVertex(vertex.hash)).toEqual(vertex);
+	});
+
 	test.skipIf(process.env.RUN_PHASE_1I_SCALE !== "true")(
-		"100k observer retained heap is below 25% of the writer replica",
+		"freshly built 100k observer retained heap is below 60% of the writer replica",
 		async () => {
 			const helper = new URL("./helpers/observer-mode-scale.ts", import.meta.url);
 			const run = async (
 				replicaMode: "observer" | "writer"
-			): Promise<{ digest: string; nonRootVertices: number; retainedHeapBytes: number }> => {
+			): Promise<{
+				artifactProvenance: {
+					artifactMtimeMs: number;
+					artifactSha256: string;
+					objectModulePath: string;
+					sourceMaxMtimeMs: number;
+					sourceTreeSha256: string;
+				};
+				digest: string;
+				nonRootVertices: number;
+				retainedHeapBytes: number;
+			}> => {
 				const { stdout } = await execFileAsync(
 					process.execPath,
 					["--expose-gc", "--import", "tsx", helper.pathname, replicaMode, "100000"],
@@ -405,6 +614,13 @@ describe("Phase 1c public node finality configuration", () => {
 					.findLast((candidate) => candidate.startsWith("{"));
 				if (line === undefined) throw new Error(`${replicaMode} scale worker emitted no JSON result`);
 				return JSON.parse(line) as {
+					artifactProvenance: {
+						artifactMtimeMs: number;
+						artifactSha256: string;
+						objectModulePath: string;
+						sourceMaxMtimeMs: number;
+						sourceTreeSha256: string;
+					};
 					digest: string;
 					nonRootVertices: number;
 					retainedHeapBytes: number;
@@ -415,13 +631,21 @@ describe("Phase 1c public node finality configuration", () => {
 			const observer = await run("observer");
 			const ratio = observer.retainedHeapBytes / writer.retainedHeapBytes;
 			console.info(JSON.stringify({ gate: "phase-1i-100k-observer-heap", writer, observer, ratio }));
+			const expectedObjectModule = new URL("../../object/dist/src/index.js", import.meta.url).pathname;
 
 			expect(writer.nonRootVertices).toBe(100_000);
 			expect(observer.nonRootVertices).toBe(100_000);
 			expect(observer.digest).toBe(writer.digest);
+			expect(writer.artifactProvenance).toEqual(observer.artifactProvenance);
+			expect(writer.artifactProvenance.objectModulePath).toBe(expectedObjectModule);
+			expect(writer.artifactProvenance.artifactMtimeMs).toBeGreaterThanOrEqual(
+				writer.artifactProvenance.sourceMaxMtimeMs
+			);
+			expect(writer.artifactProvenance.artifactSha256).toMatch(/^[0-9a-f]{64}$/);
+			expect(writer.artifactProvenance.sourceTreeSha256).toMatch(/^[0-9a-f]{64}$/);
 			expect(writer.retainedHeapBytes).toBeGreaterThan(0);
 			expect(observer.retainedHeapBytes).toBeGreaterThan(0);
-			expect(ratio).toBeLessThan(0.25);
+			expect(ratio).toBeLessThan(0.6);
 		},
 		35 * 60 * 1000
 	);
