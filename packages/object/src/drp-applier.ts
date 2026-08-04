@@ -290,16 +290,34 @@ function cloneEnumerableInstance(target: object): Map<PropertyKey, PropertyDescr
 
 function recordSetterRollback(target: object, journal: OperationJournal): void {
 	const before = cloneEnumerableInstance(target);
+	const beforeKeys = [...before.keys()];
+	const beforePrototype = Reflect.getPrototypeOf(target);
 	journal.record(() => {
 		for (const key of Reflect.ownKeys(target)) {
 			if (!before.has(key) && !Reflect.deleteProperty(target, key)) {
 				throw new TypeError(`Cannot roll back added state property ${String(key)}`);
 			}
 		}
+		const remainingKeys = Reflect.ownKeys(target);
+		if (remainingKeys.length !== beforeKeys.length || remainingKeys.some((key, index) => key !== beforeKeys[index])) {
+			for (const key of remainingKeys) {
+				const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+				if (descriptor?.configurable && !Reflect.deleteProperty(target, key)) {
+					throw new TypeError(`Cannot restore state property order for ${String(key)}`);
+				}
+			}
+		}
 		for (const [key, descriptor] of before) {
 			if (!Reflect.defineProperty(target, key, descriptor)) {
 				throw new TypeError(`Cannot roll back state property ${String(key)}`);
 			}
+		}
+		const restoredKeys = Reflect.ownKeys(target);
+		if (restoredKeys.length !== beforeKeys.length || restoredKeys.some((key, index) => key !== beforeKeys[index])) {
+			throw new TypeError("Cannot restore state property order");
+		}
+		if (Reflect.getPrototypeOf(target) !== beforePrototype && !Reflect.setPrototypeOf(target, beforePrototype)) {
+			throw new TypeError("Cannot restore state prototype");
 		}
 	});
 }
@@ -314,6 +332,17 @@ function replaceEnumerableState<T extends object>(
 	const orderedSourceKeys = Object.keys(source);
 	const sourceKeys = new Set(orderedSourceKeys);
 	const detachBorrowed = createStatePayloadDetacher();
+	const setters = new Map<string, (value: unknown) => void>();
+	for (const key of keys) {
+		if (!sourceKeys.has(key)) continue;
+		const setter = applicationSetter(prototype, key);
+		if (setter !== undefined) setters.set(key, setter);
+	}
+	// A setter may mutate any part of the live instance. Capture one detached
+	// pre-image before replacement starts so its rollback authority cannot be
+	// based on backing properties that earlier replacement keys already changed.
+	// Ordinary replacements avoid this whole-instance copy.
+	if (setters.size !== 0) recordSetterRollback(target, journal);
 	for (const key of keys) {
 		if (sourceKeys.has(key)) continue;
 		const previous = Reflect.getOwnPropertyDescriptor(target, key);
@@ -328,9 +357,8 @@ function replaceEnumerableState<T extends object>(
 		let value = readEnumerableStateValue(source, key);
 		if (typeof value === "function") continue;
 		if (borrowedStateEntry(source, key) !== undefined) value = detachBorrowed(value);
-		const setter = applicationSetter(prototype, key);
+		const setter = setters.get(key);
 		if (setter !== undefined) {
-			recordSetterRollback(target, journal);
 			Reflect.apply(setter, target, [value]);
 			continue;
 		}
