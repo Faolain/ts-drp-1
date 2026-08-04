@@ -21397,33 +21397,73 @@ the verified 14-entry manifest SHA-256 is
 `2849af8debb0e618f757d61c6372766336f7f0ca66eb473022b8b6a222d7cd2d`
 under `.logs/phase-1g-stale-node-fixtures-codex-high/`.
 
-## Next Agent Prompt — Phase 1g production GREEN
+**Phase 1g production GREEN implemented; preliminary review pending.** Distinct
+Codex-high commit `0afeb0a8944b3792782ad2878086230aaa244c9e` has exact parent
+`0889be5`, tree `039aacf1593c0a1eac517c40a7d060f4d93c664c` and changes only
+`packages/network/src/stream.ts` plus `packages/node/src/handlers.ts` (+14/-1).
+The binary diff SHA-256 is
+`11d8d9058298a77285b0dab30adb4b4a04d932285bb5d55a4b2d1b6c8be33cd1`.
+Freeze production blobs `38d365c132bb9a55c7687c6d9b1785bb4a4bfce3` / SHA-256
+`318e036e77189dd544db5d5947a5bbac82e46cc1fcf19c75aebb4aa94a48fb98`
+for `stream.ts` and `827c7eea3442bc775734a99c191cd3506d7f104b` / SHA-256
+`a38c2bbc5ae602999b5316c60bf70cf565612a4b6bf9fc812e0b608bb9b6c977`
+for `handlers.ts`. Both frozen RED blobs remain byte-identical.
 
-Assign a distinct fresh Codex-high production owner from the exact clean
-checkpoint containing frozen RED `9745e8f` and fixture repair `cc361a7`. Modify
-only the smallest production owners needed for Phase 1g; do not edit any test,
-this plan, generated output, Phase 1n sync behavior or broader resource policy.
+The reader now supplies `lpStream` an explicit 4 MiB `maxDataLength` and an
+independent buffer ceiling of body plus its four-byte maximum prefix. An
+oversized declaration therefore fails after prefix decode without reading its
+body, while a single real transport event containing the four-byte prefix plus
+the exact 4,194,304-byte body (4,194,308 bytes total) decodes with both boundary
+sentinels intact. The UPDATE handler rejects more than 32 decoded vertices
+immediately after `Update.decode`, before object lookup, authentication,
+recovery, merge, persistence, broadcast, dispatch or sync. SYNC_ACCEPT and
+consensus/configuration surfaces remain unchanged.
 
-At the transport reader, configure `lpStream` with explicit
-`maxDataLength = 4 * 1024 * 1024` so a 4,194,305 declaration fails from its
-prefix before body buffering while 4,194,304 remains accepted. Account for the
-dependency's separate byte-buffer ceiling and varint-prefix headroom without
-raising the declared frame limit or relying on test-only stream shape. At the
-UPDATE handler, after decode and before object lookup or any authentication,
-reject `vertices.length > 32` once, with no per-vertex log/recovery, merge,
-persistence, broadcast, dispatch or sync side effect. Do not apply this UPDATE
-limit to SYNC_ACCEPT; Phase 1o owns its distinct sync-response policy. Use
-stable module-local constants unless an existing public configuration owner
-clearly requires an export; do not invent consensus negotiation, timers, hooks
-or compatibility shims.
+Frozen Phase 1g tests pass 4/4 before and after commit; repaired fixtures pass
+25/25; handler/authentication passes 42/42; existing network passes 126/126.
+The four-file node baseline remains exact 3 failed / 28 passed solely because
+the unchanged Phase 1n sync-livelock sentinel remains 3F/3P. Node, network and
+workspace typecheck; owned lint; tracked lint (zero errors / 249 inherited
+warnings); format and diff gates pass. Both package builds and built-root
+imports pass with no generated tracked change.
 
-Reach focused 4/4, preserve fixture 25/25, handler/authentication 42/42,
-network 126/126 and the exact Phase 1n-only four-file 3F/28P baseline. Run
-package/workspace typecheck, owned/tracked lint, formatting, diff and a clean
-source/package build or equivalent export gate to `.log`, ensuring ignored
-generated output never becomes source authority or a tracked change. Commit
-production only and seal exact blobs/evidence for fresh Grok and exact Kimi 3
-review. Do not schedule Fable.
+Preserve two disclosed harness incidents. The first focused wrapper used zsh's
+reserved `status` variable after a passing test and could not write its marker;
+independent final and post-commit runs pass 4/4. An attempted parallel
+fixture/network/handler run contended for shared `coverage/.tmp`; collision logs
+are retained, and authoritative serial reruns pass exact 25/25, 126/126 and
+42/42. Neither incident changed source or verdict. GREEN result SHA-256 is
+`7b658150493b23c5fea0e6ca29e9ebf4b17bd3f69856490f668115de87997b30`;
+the verified 52-entry manifest SHA-256 is
+`8e404fb9fc7ad703c940463690a5f113d7661812214e864902d48a95d57bd906`
+under `.logs/phase-1g-frame-update-caps-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1g preliminary reviews
+
+Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
+exact clean checkpoint containing production `0afeb0a` and this GREEN record.
+Kimi must authenticate selector `kimi-code/k3`, effective `k3`, `--thinking`,
+environment `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI
+`--max-steps-per-turn 100`. Neither reviewer may edit the repository or invoke
+Fable/subagents.
+
+Authenticate RED/GREEN/fixture blobs and evidence, then inspect installed
+`@libp2p/utils` 7.2.4 behavior independently. Adversarially probe prefix-only
+oversize rejection, exact and nearby boundaries, fragmented and combined-event
+delivery, overlong varints, cleanup/unhandled rejection behavior, and ensure
+the buffer headroom does not raise the declared-body cap. For UPDATE, probe
+31/32/33 and much larger decoded batches through real `handleMessage`, proving
+zero authentication or side effects above the cap and ordinary behavior at or
+below it; inspect decode-before-guard cost and confirm it matches the explicit
+Phase 1g contract rather than claiming a pre-decode batch parser. Check actual
+network producers and compatibility, including that SYNC_ACCEPT is deliberately
+deferred to Phase 1o and Phase 1n's 3F/3P sentinel is unchanged.
+
+Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1G_MAY_CLOSE=yes/no`,
+severity, executable evidence and a residual ledger. Preserve HEAD/tree/index,
+stash and protected paths; seal native session/model/tool evidence. Run final
+Claude-skill Opus/xhigh only if both preliminary reviewers accept. Do not
+schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
