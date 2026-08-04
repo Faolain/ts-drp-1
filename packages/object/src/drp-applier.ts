@@ -66,7 +66,9 @@ import {
 import {
 	type AuthenticatedVertex,
 	hasAuthenticatedVertexProvenance,
+	orderAuthenticatedVertexFailures,
 	resolveAuthenticatedVertex,
+	type VertexAuthenticationOccurrence,
 } from "./vertex-authentication.js";
 
 export type { AuthenticatedVertex } from "./vertex-authentication.js";
@@ -561,24 +563,38 @@ export class DRPVertexApplier<T extends IDRP> {
 	 * @returns The result of the apply
 	 */
 	async applyVertices(vertices: AuthenticatedVertex[]): Promise<ApplyResult> {
-		const unauthenticated = vertices.filter((vertex) => !hasAuthenticatedVertexProvenance(vertex));
-		if (unauthenticated.length !== 0) {
-			return this.createApplyResult(
-				[],
-				unauthenticated.map((vertex) => vertex.hash),
-				[]
-			);
+		const authenticated: AuthenticatedVertex[] = [];
+		const occurrences: VertexAuthenticationOccurrence[] = [];
+		for (const vertex of vertices) {
+			if (!hasAuthenticatedVertexProvenance(vertex)) {
+				let hash: string;
+				try {
+					hash = vertex.hash;
+				} catch {
+					hash = "<unreadable-vertex>";
+				}
+				occurrences.push({ hash, status: "invalid" });
+				continue;
+			}
+			const canonical = resolveAuthenticatedVertex(vertex);
+			if (canonical === undefined) {
+				occurrences.push({ hash: "<lost-provenance>", status: "invalid" });
+				continue;
+			}
+			authenticated.push(canonical);
+			occurrences.push({ authenticatedIndex: authenticated.length - 1, status: "authenticated" });
 		}
-		const canonical = vertices.map((vertex) => resolveAuthenticatedVertex(vertex));
-		if (canonical.some((vertex) => vertex === undefined)) {
-			return this.createApplyResult(
-				[],
-				vertices.map((vertex) => vertex.hash),
-				[]
-			);
-		}
-		const authenticated = canonical as AuthenticatedVertex[];
-		if (!isTracingEnabled()) return this.applyVerticesUntraced(authenticated);
+		const applied = await this.applyAuthenticatedVertices(authenticated);
+		if (!occurrences.some(({ status }) => status === "invalid")) return applied;
+		return {
+			...applied,
+			applied: false,
+			invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
+		};
+	}
+
+	private async applyAuthenticatedVertices(vertices: AuthenticatedVertex[]): Promise<ApplyResult> {
+		if (!isTracingEnabled()) return this.applyVerticesUntraced(vertices);
 
 		return metrics.traceFunc(
 			"drp.applyVertices",
@@ -590,7 +606,7 @@ export class DRPVertexApplier<T extends IDRP> {
 				span.setAttribute("drp.vertex.missing_count", result.missing.length);
 				span.setAttribute("drp.vertex.invalid_count", result.invalid.length);
 			}
-		)(authenticated);
+		)(vertices);
 	}
 
 	private async applyVerticesUntraced(vertices: AuthenticatedVertex[]): Promise<ApplyResult> {

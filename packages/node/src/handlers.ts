@@ -1,5 +1,11 @@
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
-import { AdoptionCommitExhaustedError, ApplyInvariantError, authenticateVertices } from "@ts-drp/object";
+import {
+	AdoptionCommitExhaustedError,
+	ApplyInvariantError,
+	type AuthenticatedMergeOutcome,
+	authenticateVertices,
+	mergeAuthenticatedVertices,
+} from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type AggregatedAttestation,
@@ -11,7 +17,6 @@ import {
 	FetchStateResponse,
 	type IDRP,
 	type IDRPObject,
-	type MergeResult,
 	Message,
 	MessageType,
 	NodeEventName,
@@ -40,21 +45,6 @@ interface IHandlerStrategy {
 interface HandlerRegistryEntry {
 	handler: IHandlerStrategy;
 	vertexIngress: false | typeof authenticateVertices;
-}
-
-interface AuthenticatedMergeResultOwner {
-	appliedVerticesForMergeResult(result: MergeResult): readonly Vertex[] | undefined;
-	mergeHadTrustedOrAuthenticatedOffers(result: MergeResult): boolean | undefined;
-}
-
-function appliedVerticesForMergeResult<T extends IDRP>(object: IDRPObject<T>, result: MergeResult): Vertex[] {
-	const owner = object as IDRPObject<T> & Partial<AuthenticatedMergeResultOwner>;
-	return [...(owner.appliedVerticesForMergeResult?.(result) ?? [])];
-}
-
-function mergeHadTrustedOrAuthenticatedOffers<T extends IDRP>(object: IDRPObject<T>, result: MergeResult): boolean {
-	const owner = object as IDRPObject<T> & Partial<AuthenticatedMergeResultOwner>;
-	return owner.mergeHadTrustedOrAuthenticatedOffers?.(result) ?? false;
 }
 
 const MAX_SYNC_RECOVERY_RETRIES = 3;
@@ -132,9 +122,9 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 	object: IDRPObject<T>,
 	sender: string,
 	vertices: Vertex[]
-): Promise<MergeResult> {
+): Promise<AuthenticatedMergeOutcome> {
 	try {
-		return await object.merge(vertices);
+		return await mergeAuthenticatedVertices(object, vertices);
 	} catch (error) {
 		const partialResult = rejectedBoundaryResult(error);
 		if (partialResult === undefined) throw error;
@@ -312,9 +302,9 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 		return;
 	}
 
-	const mergeResult = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
-	const [, missing] = mergeResult;
-	const appliedVertices = appliedVerticesForMergeResult(object, mergeResult);
+	const mergeOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
+	const [, missing] = mergeOutcome.result;
+	const appliedVertices = [...mergeOutcome.committed];
 
 	if (appliedVertices.length !== 0 && object.finalityStore.enabled !== false) {
 		// add their signatures — only if the sender is a finality signer on the LIVE
@@ -464,16 +454,19 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		return;
 	}
 
-	const mergeRan = syncAcceptMessage.requested.length !== 0;
+	let mergeRan = false;
 	let missing: string[] = [];
-	if (mergeRan) {
-		const mergeResult = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
-		[, missing] = mergeResult;
-		if (mergeHadTrustedOrAuthenticatedOffers(object, mergeResult) && object.finalityStore.enabled !== false) {
+	if (syncAcceptMessage.requested.length !== 0) {
+		const mergeOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
+		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
+		[, missing] = mergeOutcome.result;
+		if (mergeRan && object.finalityStore.enabled !== false) {
 			object.finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		}
-		node.put(object.id, object);
-		await recoverMissingSync(node, object.id, sender, missing);
+		if (mergeRan) {
+			node.put(object.id, object);
+			await recoverMissingSync(node, object.id, sender, missing);
+		}
 	}
 
 	await signGeneratedVertices(node, object.vertices);

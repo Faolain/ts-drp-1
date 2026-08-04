@@ -11,13 +11,53 @@ declare const authenticatedVertexBrand: unique symbol;
 /** A detached vertex whose signature recovered to its claimed author. */
 export type AuthenticatedVertex = Vertex & { readonly [authenticatedVertexBrand]: true };
 
+export type VertexAuthenticationOccurrence =
+	| { readonly authenticatedIndex: number; readonly status: "authenticated" }
+	| { readonly hash: string; readonly status: "invalid" }
+	| { readonly status: "trusted" };
+
 export interface VertexAuthenticationResult {
 	readonly authenticated: AuthenticatedVertex[];
 	readonly invalid: string[];
-	readonly offeredHashes: string[];
+	readonly occurrences: VertexAuthenticationOccurrence[];
 }
 
 const authenticatedSnapshots = new WeakMap<object, AuthenticatedVertex>();
+
+/**
+ * Combine authentication failures with downstream failures in original offer order.
+ * @param occurrences - Stable classification ledger for the offered batch.
+ * @param authenticated - Verifier-issued handles referenced by the ledger.
+ * @param downstreamInvalid - Invalid hashes reported after authentication.
+ * @returns Invalid failure occurrences in offer order.
+ */
+export function orderAuthenticatedVertexFailures(
+	occurrences: readonly VertexAuthenticationOccurrence[],
+	authenticated: readonly AuthenticatedVertex[],
+	downstreamInvalid: readonly string[]
+): string[] {
+	const downstreamCounts = new Map<string, number>();
+	for (const hash of downstreamInvalid) {
+		downstreamCounts.set(hash, (downstreamCounts.get(hash) ?? 0) + 1);
+	}
+	const invalid: string[] = [];
+	for (const occurrence of occurrences) {
+		if (occurrence.status === "invalid") {
+			invalid.push(occurrence.hash);
+			continue;
+		}
+		if (occurrence.status !== "authenticated") continue;
+		const handle = authenticated[occurrence.authenticatedIndex];
+		if (handle === undefined) throw new Error("Authenticated occurrence points outside its verified batch");
+		const canonical = resolveAuthenticatedVertex(handle);
+		if (canonical === undefined) throw new Error("Authenticated occurrence lost verifier provenance");
+		const count = downstreamCounts.get(canonical.hash) ?? 0;
+		if (count === 0) continue;
+		invalid.push(canonical.hash);
+		downstreamCounts.set(canonical.hash, count - 1);
+	}
+	return invalid;
+}
 
 function snapshotVertex(vertex: Vertex, hash: string): Vertex {
 	const peerId = vertex.peerId;
@@ -64,7 +104,7 @@ export function authenticateVertices(vertices: Vertex[]): AuthenticatedVertex[] 
 /**
  * Authenticate a batch while preserving invalid input order.
  * @param vertices - Raw remotely supplied vertices.
- * @returns Authenticated handles, invalid hashes, and offered hashes.
+ * @returns Authenticated handles, invalid hashes, and an occurrence ledger.
  */
 export function classifyAuthenticatedVertices(vertices: Vertex[]): VertexAuthenticationResult {
 	return classifyNovelVertices(vertices, () => false);
@@ -76,7 +116,7 @@ export function classifyAuthenticatedVertices(vertices: Vertex[]): VertexAuthent
  * of a potentially hostile submitted object.
  * @param vertices - Raw remotely supplied vertices.
  * @param isTrustedHash - Whether a hash belongs to a root or already-known vertex.
- * @returns Authenticated handles, invalid hashes, and offered hashes.
+ * @returns Authenticated handles, invalid hashes, and an occurrence ledger.
  */
 export function classifyNovelVertices(
 	vertices: Vertex[],
@@ -84,32 +124,48 @@ export function classifyNovelVertices(
 ): VertexAuthenticationResult {
 	const authenticated: AuthenticatedVertex[] = [];
 	const invalid: string[] = [];
-	const offeredHashes: string[] = [];
+	const occurrences: VertexAuthenticationOccurrence[] = [];
 	for (const submitted of vertices) {
+		const provenSnapshot = authenticatedSnapshots.get(submitted);
+		if (provenSnapshot !== undefined) {
+			const hash = provenSnapshot.hash;
+			if (isTrustedHash(hash)) {
+				occurrences.push({ status: "trusted" });
+				continue;
+			}
+			authenticated.push(issueAuthenticatedVertex(provenSnapshot));
+			occurrences.push({ authenticatedIndex: authenticated.length - 1, status: "authenticated" });
+			continue;
+		}
 		let hash: string;
 		try {
 			hash = submitted.hash;
 		} catch {
 			invalid.push("<unreadable-vertex>");
-			offeredHashes.push("<unreadable-vertex>");
+			occurrences.push({ hash: "<unreadable-vertex>", status: "invalid" });
 			continue;
 		}
-		offeredHashes.push(hash);
-		if (isTrustedHash(hash)) continue;
+		if (isTrustedHash(hash)) {
+			occurrences.push({ status: "trusted" });
+			continue;
+		}
 		let snapshot: Vertex;
 		try {
 			snapshot = snapshotVertex(submitted, hash);
 		} catch {
 			invalid.push(hash);
+			occurrences.push({ hash, status: "invalid" });
 			continue;
 		}
 		if (!verifySnapshot(snapshot)) {
 			invalid.push(snapshot.hash);
+			occurrences.push({ hash: snapshot.hash, status: "invalid" });
 			continue;
 		}
 		authenticated.push(issueAuthenticatedVertex(snapshot));
+		occurrences.push({ authenticatedIndex: authenticated.length - 1, status: "authenticated" });
 	}
-	return { authenticated, invalid, offeredHashes };
+	return { authenticated, invalid, occurrences };
 }
 
 /**

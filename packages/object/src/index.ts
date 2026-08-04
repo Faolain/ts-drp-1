@@ -24,12 +24,75 @@ import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
 import { type DRPObjectStateManager } from "./state-materialize.js";
 import { detachStateSnapshot } from "./state-payload.js";
-import { classifyNovelVertices } from "./vertex-authentication.js";
+import {
+	type AuthenticatedVertex,
+	classifyNovelVertices,
+	orderAuthenticatedVertexFailures,
+	resolveAuthenticatedVertex,
+} from "./vertex-authentication.js";
 
 export * from "./acl/index.js";
 export * from "./hashgraph/index.js";
 export { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError };
 export { authenticateVertices } from "./vertex-authentication.js";
+
+export interface AuthenticatedMergeOutcome {
+	readonly committed: readonly Vertex[];
+	readonly hasTrustedOrAuthenticatedOffers: boolean;
+	readonly result: MergeResult;
+}
+
+const concreteObjects = new WeakSet<object>();
+const mergeOutcomes = new WeakMap<MergeResult, AuthenticatedMergeOutcome>();
+
+function canonicalAuthenticatedHash(authenticated: readonly AuthenticatedVertex[], index: number): string {
+	const handle = authenticated[index];
+	if (handle === undefined) throw new Error("Authenticated occurrence points outside its verified batch");
+	const canonical = resolveAuthenticatedVertex(handle);
+	if (canonical === undefined) throw new Error("Authenticated occurrence lost verifier provenance");
+	return canonical.hash;
+}
+
+/**
+ * Apply remotely supplied vertices through the single authenticated object boundary.
+ * Concrete objects retain their public mandatory-verifying merge surface; structural
+ * implementations receive only detached verifier-issued novel vertices.
+ * @param object - Installed object receiving the remote batch.
+ * @param vertices - Raw decoded wire vertices.
+ * @returns Node-consumable outcome derived without reflective object metadata.
+ */
+export async function mergeAuthenticatedVertices<T extends IDRP>(
+	object: IDRPObject<T>,
+	vertices: Vertex[]
+): Promise<AuthenticatedMergeOutcome> {
+	if (concreteObjects.has(object)) {
+		const result = await object.merge(vertices);
+		const outcome = mergeOutcomes.get(result);
+		if (outcome === undefined) throw new Error("Concrete object merge did not publish its authenticated outcome");
+		return outcome;
+	}
+
+	const { authenticated, occurrences } = classifyNovelVertices(
+		vertices,
+		(hash) => hash === HashGraph.rootHash || object.getVertex(hash) !== undefined
+	);
+	const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
+	const structuralResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
+	const result: MergeResult = occurrences.some(({ status }) => status === "invalid")
+		? [false, structuralResult[1], orderAuthenticatedVertexFailures(occurrences, authenticated, structuralResult[2])]
+		: structuralResult;
+	const committed: Vertex[] = [];
+	const committedHashes = new Set<string>();
+	for (let index = 0; index < authenticated.length; index++) {
+		const hash = canonicalAuthenticatedHash(authenticated, index);
+		if (committedHashes.has(hash)) continue;
+		const stored = object.getVertex(hash);
+		if (stored === undefined) continue;
+		committedHashes.add(hash);
+		committed.push(stored);
+	}
+	return { committed, hasTrustedOrAuthenticatedOffers, result };
+}
 
 /**
  * Object ids are creator-bound: `<creatorPeerId>:<randomHexSalt>`.
@@ -99,11 +162,6 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 
 	private _applier: DRPVertexApplier<T>;
 	private _states: DRPObjectStateManager<T>;
-	private readonly mergeIngestMetadata = new WeakMap<
-		MergeResult,
-		{ committed: readonly Vertex[]; hasTrustedOrAuthenticatedOffers: boolean }
-	>();
-
 	private subscriptions: DRPObjectCallback<T>[] = [];
 	private _finalityStore: FinalityStore;
 
@@ -117,6 +175,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 * @param options.config - The config of the DRPObject.
 	 */
 	constructor(options: DRPObjectOptions<T>) {
+		concreteObjects.add(this);
 		const {
 			peerId,
 			id = defaultIDFromPeerID(peerId),
@@ -258,35 +317,26 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		hasTrustedOrAuthenticatedOffers: boolean;
 		result: ApplyResult;
 	}> {
-		const {
-			authenticated,
-			invalid: authenticationInvalid,
-			offeredHashes,
-		} = classifyNovelVertices(vertices, (hash) => hash === HashGraph.rootHash || this.hashGraph.vertices.has(hash));
+		const { authenticated, occurrences } = classifyNovelVertices(
+			vertices,
+			(hash) => hash === HashGraph.rootHash || this.hashGraph.vertices.has(hash)
+		);
 		const applied =
 			authenticated.length === 0
 				? { applied: true, invalid: [], missing: [] }
 				: await this._applier.applyVertices(authenticated);
-		const hasTrustedOrAuthenticatedOffers = offeredHashes.length > authenticationInvalid.length;
-		if (authenticationInvalid.length === 0) {
+		const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
+		if (!occurrences.some(({ status }) => status === "invalid")) {
 			return { authenticated, hasTrustedOrAuthenticatedOffers, result: applied };
-		}
-
-		const invalidCounts = new Map<string, number>();
-		for (const hash of [...authenticationInvalid, ...applied.invalid]) {
-			invalidCounts.set(hash, (invalidCounts.get(hash) ?? 0) + 1);
-		}
-		const invalid: string[] = [];
-		for (const hash of offeredHashes) {
-			const count = invalidCounts.get(hash) ?? 0;
-			if (count === 0) continue;
-			invalid.push(hash);
-			invalidCounts.set(hash, count - 1);
 		}
 		return {
 			authenticated,
 			hasTrustedOrAuthenticatedOffers,
-			result: { ...applied, applied: false, invalid },
+			result: {
+				...applied,
+				applied: false,
+				invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
+			},
 		};
 	}
 
@@ -320,27 +370,8 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			committedHashes.add(vertex.hash);
 			committed.push(stored);
 		}
-		this.mergeIngestMetadata.set(mergeResult, { committed, hasTrustedOrAuthenticatedOffers });
+		mergeOutcomes.set(mergeResult, { committed, hasTrustedOrAuthenticatedOffers, result: mergeResult });
 		return mergeResult;
-	}
-
-	/**
-	 * Resolve the object-owned snapshots newly committed by one merge result.
-	 * @param result - Exact tuple returned by this object's merge call.
-	 * @returns Newly committed snapshots, or undefined for an unrelated result.
-	 */
-	appliedVerticesForMergeResult(result: MergeResult): readonly Vertex[] | undefined {
-		return this.mergeIngestMetadata.get(result)?.committed;
-	}
-
-	/**
-	 * Report whether a merge contained any root/known or cryptographically
-	 * authenticated offer, independent of later graph classification.
-	 * @param result - Exact tuple returned by this object's merge call.
-	 * @returns The offer-authentication verdict, or undefined for an unrelated result.
-	 */
-	mergeHadTrustedOrAuthenticatedOffers(result: MergeResult): boolean | undefined {
-		return this.mergeIngestMetadata.get(result)?.hasTrustedOrAuthenticatedOffers;
 	}
 
 	/**
