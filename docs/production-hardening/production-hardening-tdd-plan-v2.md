@@ -21103,32 +21103,75 @@ The accepted nonblocking ledger is:
    committed membership. This is inherited interface trust, not a GREEN2 auth
    bypass.
 
-## Next Agent Prompt — Phase 1e capability GREEN2 final Opus review
+**Phase 1e capability GREEN2 final review accepted; Phase 1e closed.** Fresh
+native Claude-skill Opus/xhigh session
+`f90626fb-3556-4ed3-95cd-6380897a4b41` returns `ACCEPTED` and
+`PHASE1E_MAY_CLOSE=yes` with executable blockers `none` for exact checkpoint
+HEAD `42e3aa3` and production `1c09c0f`. The CLI completed normally at
+`end_turn` after 60 turns. Every substantive assistant/tool/finding/verdict
+record is `claude-opus-5` at `xhigh`. Its 59 read-only tool calls were 42 Bash,
+16 Read and one Grep; there was no agent/subagent, write/edit, web, MCP, Chrome,
+fallback or permission denial. The native envelope discloses an automatic
+Haiku title helper using 21 output tokens; it authored no substantive record.
 
-Freeze capability RED `740e180`, observer correction `0075b5a`, production
-GREEN2 `1c09c0f`, both accepted preliminary reviews and every earlier accepted
-Phase 1e test/correction. Use the `claude` skill for one fresh native
-Claude Opus/xhigh read-only adversarial review of exact checkpoint HEAD after
-this section. Authenticate session/model/effort, full result, completion,
-result hash, integrity manifest and any automatic helper-model usage. A small
-automatic Haiku envelope is acceptable if disclosed and non-substantive; the
-verdict and findings must be Opus-authored.
+Opus independently exercised six no-file probe groups against the built
+packages and exact source. These covered capability RED equivalents, real
+UPDATE/SYNC_ACCEPT paths, B1-B4, retry/missing, equal-hash order, handle
+detachment through subclass-then-super, exactly-once apply and 18 authenticated
+array mutation variants. It confirmed the array residual is local
+implementation self-harm only: raw insertion/replacement fails closed on
+provenance, while clear/pop/reverse/duplicate variants can only shrink or
+permute `committed`, which remains a subset of actually stored canonical
+verifier-issued hashes. The unshared occurrence ledger still owns
+SYNC_ACCEPT lifecycle; node handlers do not consume the implementation's
+invalid tuple. No remote peer can obtain the array reference or induce the
+mutation. Defensive copying remains optional nonblocking hardening.
 
-Attack the complete B1-B4 and capability correction as a finite semantic
-boundary. Reproduce any proposed blocker against exact source before rejecting.
-Specifically adjudicate whether mutation of the authenticated array during an
-overridden merge can cross from local fail-closed/under-reporting into remote
-acceptance, canonical-state corruption, finality error or durable divergence;
-do not promote it merely because a defensive copy is inexpensive. Recheck
-signed-handle detachment, subclass/instance replacement, exactly-once crypto,
-mixed/equal-hash occurrence order, trusted skips, canonical committed/finality,
-UPDATE versus SYNC_ACCEPT lifecycle, retry/missing/quarantine, public API and
-absence of test-framework/WeakSet/outcome-map trust. Keep D.73, Phase 1n and
-optional 0n out of scope.
+Final Opus result SHA-256 is
+`048ca9a80521374718479eff798ab0e6a7884859cd3befbdf29192cba1f5ad08`;
+raw-envelope SHA-256 is
+`269a266e599b6521dfb46848a5a46ba2b05176e8a9e786ebd44e1f946aa30fd7`;
+native-session SHA-256 is
+`d2f5dc14deb6616e7c30f3cb3e2dd8bb5c66df34b1cb002d25d7970d688b1f1a`.
+The verified 30-entry manifest SHA-256 is
+`80182bc3efaaf7cd5edf05c57f7aab59355813be21f711d471916d5003cf704c`
+under
+`.logs/phase-1e-concrete-execution-capability-green2-final-opus-xhigh-review/`.
+HEAD, HEAD/index tree, tracked/index state and protected stash remained
+byte-identical. Freeze the complete accepted Phase 1e lineage and its
+nonblocking ledger; do not reopen it without a changed production path and an
+executable causal failure.
 
-If Opus returns changes requested, checkpoint the executable finding and start a
-bounded fresh Codex-high RED. If Opus accepts, checkpoint all review evidence,
-close Phase 1e and continue the next ordered plan item. Do not schedule Fable.
+## Next Agent Prompt — Phase 1f channel-backpressure RED
+
+Phase 1d(i-iii) and Phase 1e are accepted and closed. The next ordered Phase 1
+item is 1f. Spawn a fresh Codex-high tests-only RED owner. It may add only the
+smallest coherent `packages/message-queue` test owner (prefer the planned
+`channel-backpressure.test.ts`) plus ignored evidence logs, not production,
+existing tests/fixtures, this plan, package manifests, lockfiles, generated or
+protected paths, or stash.
+
+Pin the actual leak boundary atomically. With a channel at finite capacity and
+no receiver draining it, drive 100,000 fire-and-forget `send` calls in the same
+shape used by network producers. The internal pending-send population must
+never exceed the configured cap, every excess send must reject promptly with a
+stable typed backpressure/capacity error, accepted sends must retain FIFO order,
+and no unresolved promise or listener/timer accumulation may remain after
+bounded cleanup. Include a small positive control proving normal send/receive
+behavior and capacity reuse after a receive. Inspect current public API and
+existing queue tests before choosing an observation seam; do not expose mutable
+internals or add production hooks in RED merely to count the queue.
+
+The RED must fail causally on current unbounded `Channel.sends` growth while
+controls and existing message-queue behavior remain green. Use 100,000 sends
+only in the focused leak contract; keep ordinary iteration fast with a smaller
+control and justify any longer gate. Record exact failure/pass counts, peak
+pending count, elapsed time and memory signal without making wall-clock/RSS a
+hard flaky oracle. Run package/workspace typecheck, relevant tests, lint and
+format to `.log`; freeze test SHA/blob, result and integrity manifest. After
+controller checkpoint, hand the immutable RED to a distinct Codex-high
+production GREEN owner, then run fresh Grok 4.5/high, exact Kimi 3/high/dual-100
+and conditional final Claude-skill Opus/xhigh. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
