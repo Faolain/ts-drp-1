@@ -21203,30 +21203,82 @@ the verified 14-entry manifest SHA-256 is
 under `.logs/phase-1f-channel-backpressure-green-codex-high/`. Tracked/index
 state is clean and the protected stash is unchanged.
 
-## Next Agent Prompt — Phase 1f preliminary acceptance reviews
+**Phase 1f preliminary reviews accepted.** Fresh Grok 4.5/high session
+`6d522a8d-ee6d-4c11-8832-6d7a08409af8` returned `ACCEPTED` and
+`PHASE1F_MAY_CLOSE=yes`, with no blocker. The requested model was `grok-4.5`,
+the native session reports `grok-4.5`, and the usage ledger reports effective
+`grok-4.5-build`; completion was normal `end_turn`. Native read-only Vitest was
+denied only because Vite attempted a sandboxed temp write, so Grok used no-file
+probes. The controller independently reran focused 3/3 and complete 46/46 plus
+a separate capacity-one/zero/lifecycle/FIFO probe, all passing. The 28 native
+tools were 11 Read and 17 Bash, with no prohibited, write, web, subagent, MCP
+tool-call or Fable use. A stale first launcher remained after its initial
+60-turn budget and was explicitly terminated once detected; only the sealed
+same-session continuation remained and completed. Preserve this disclosed
+launcher incident in the evidence rather than treating the empty initial raw
+file as a second verdict.
 
-Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
-controller checkpoint containing production `af638ff`. Both are read-only and
-must authenticate RED/GREEN identities, inspect the complete `Channel` state
-machine plus `MessageQueue`/network producer consumers, and independently run
-the focused and complete message-queue tests where the sandbox permits.
+Grok result SHA-256 is
+`eb5369d29374e8615905c478adae435f8e3bca3e58711b64e7f292fc86150b13`;
+raw continuation SHA-256 is
+`b2078bbd1229b25cc0e6b7349d5ea3465fe77b49f69cce76b1644ed52ed6f058`;
+the verified 27-entry manifest SHA-256 is
+`731d20746f2edeb267eabcee90a26d2343e1a94c49984e55cb5160ff92872cf6`
+under `.logs/phase-1f-channel-backpressure-green-grok45-high-review/`.
 
-Adversarially probe positive capacities (especially one), capacity-zero
-rendezvous, close/start with blocked/rejected sends, receiver-first handoff,
-FIFO during interleaved send/receive, prompt typed rejection, promise
-settlement, and whether a newly arriving send can bypass an older accepted
-sender. Distinguish the intentional bounded rejection policy from a leak and
-look for an executable compatibility or liveness consequence. Timing/RSS stay
-diagnostic. Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, findings with
-severity and causal reproduction, and a phase-closure recommendation.
+Fresh exact Kimi 3 session `5d3a63cf-2f12-4eff-97fa-b6ee431a0a15`
+also returned `ACCEPTED`, `PHASE1F_MAY_CLOSE=yes` and blockers none. Native
+configuration authenticates selector `kimi-code/k3`, provider
+`managed:kimi-code`, effective `k3`, `--thinking`, environment 100 and CLI 100.
+It completed with exit 0, one normal `TurnEnd`, 24 `StepBegin` and 37 Shell
+tool-call/result pairs. Kimi independently reran focused 3/3 and complete 46/46
+and passed capacity-one/zero, close/start, interleaved FIFO, exact 1/1/998
+storm, settlement and slow-subscriber MessageQueue probes. Its first inline
+attempts failed on top-level-await/CJS resolution, and its first storm report
+was a false sparse-array count; it explicitly retracted the latter and reran a
+dense count to exact PASS. One errant shell redirect created
+`/tmp/plan-1f.txt`, then deleted it immediately. A controller-only finalizer
+also briefly used zsh's reserved lowercase `path` variable and regenerated the
+resulting false ignore report. Preserve all four workflow disclosures; none
+changed repository/protected state or the substantive verdict.
 
-Kimi must be effective model `k3` with `--thinking`, environment
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI `--max-steps-per-turn 100`; record
-both controls and the native session transcript. Seal each review's raw/native
-artifacts, result and integrity manifest. Keep HEAD, tracked/index tree, stash
-and protected paths invariant. If both accept with no executable blocker, use
-the Claude skill for a fresh final Opus/xhigh adversarial acceptance review. If
-either rejects, skip Opus and return to a fresh bounded corrective RED/GREEN.
+Kimi result SHA-256 is
+`99db24ef2d2c4e4b2a35a99be7a85fd335a58be2b8c8ebb9f024709b36928425`;
+native-wire SHA-256 is
+`c2620599f54eda7a18f24f26eed174206c315d2428418861732fbddae9ca3f93`;
+the verified 49-entry manifest SHA-256 is
+`8bb7f3fcc8ba49a4d3d1b0b6d04ff626444001929a47193624a4aa066e09fceb`
+under
+`.logs/phase-1f-channel-backpressure-green-kimi3-high-100-review/artifacts.log/`.
+Both reviews kept HEAD/tree/index/tracked diffs and the protected stash
+invariant.
+
+The shared nonblocking ledger is: excess work is intentionally rejected and
+the two network producers already catch/log it; a permanently undrained
+accepted sender can remain pending but retention is now bounded; `close()`
+discarding buffered values and plain closed-`MessageQueue` errors are inherited
+semantics; queue-level error documentation is optional. No reviewer found an
+executable compatibility, memory or liveness blocker.
+
+## Next Agent Prompt — Phase 1f final Opus acceptance review
+
+Use the Claude skill to start a fresh native Opus/xhigh read-only review of
+exact checkpoint HEAD containing `af638ff` and this preliminary-review record.
+Authenticate the frozen RED, production blob, plan lineage, both preliminary
+review artifacts and their disclosed harness incidents. Inspect the full
+Channel/MessageQueue/consumer state machine independently; do not merely vote
+on Grok/Kimi.
+
+Adversarially attempt an executable counterexample for retention bounds,
+capacity-one or capacity-zero liveness, receiver-first handoff, close/start
+settlement, FIFO/fairness, typed prompt rejection, producer rejection handling,
+or unhandled promises. Run focused/full tests or bounded no-file probes where
+the sandbox permits. Treat intentional overload drops and bounded waiting as
+the declared policy, but reject any silent loss of already-accepted work,
+unbounded retained state, newer-sender bypass, cross-generation settlement, or
+production consumer breakage. Require explicit `ACCEPTED` or
+`CHANGES_REQUESTED` plus `PHASE1F_MAY_CLOSE=yes/no`, severity and executable
+evidence. Keep repository state invariant and seal native/model/tool evidence.
 Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
