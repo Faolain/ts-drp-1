@@ -20293,21 +20293,104 @@ SHA-256 is
 and verifies from the repository root. Protected untracked paths and the
 preserved stash remain unchanged.
 
-## Next Agent Prompt — Phase 1d(iii) preliminary reviews
+**Phase 1d closure-method one-off Fable audit.** The explicitly requested
+read-only sidecar returned `AGREE_WITH_CORRECTIONS`. Its sole substantive model
+was `claude-fable-5` at xhigh in session
+`90436038-669a-4f4f-b03a-3f3616098f2e`; no helper, subagent, fallback or web
+model was used. It established the finite Phase 1d(ii) production surface as
+five object-source files and three production commits from `03651f4` through
+`b5213e9`. A raw diff locates that surface and would have let one
+contract-adoption stale-inventory sweep collapse roughly four mechanical
+test/census corrections, but it cannot prove causal replayability, detached
+ownership or rollback pre-image/undo ordering. The real ambient-causal,
+copy-meter, setter-alias and rollback-order findings were not diff-only noise.
+The existing two-ledger stop rule is therefore retained: do not reopen closed
+1d(ii) without a new borrowed consumer, new journal dependency edge or
+executable exact-HEAD counterexample, and do not build a standing Cartesian
+matrix suite.
 
-Freeze Phase 1d(iii) RED `b5213e9`, GREEN `a0ff979` and this plan checkpoint.
-Run one fresh native Grok 4.5/high adversarial review and, only after its
-artifact finalizes, one fresh exact Kimi 3/high/dual-100 review. Both must
-authenticate the causal red-to-green signature and preservation evidence,
-inspect the sole call site and prove or refute the current-checkpoint boundary,
-challenge empty-checkpoint, future-call, rollback and exception behavior, and
-reject any hidden history-sized work. A rejection must include an executable
-exact-HEAD counterexample or a concrete violated contract. If both preliminary
-reviewers accept, checkpoint their evidence before final Claude-skill
-Opus/xhigh. Do not schedule another Fable review unless explicitly requested;
-the currently running one-off closure-ledger audit is advisory and must finish
-separately. Do not consume D.73, Phase 1n or optional 0n, and never stage
-protected untracked paths.
+Fable authenticated the frozen 1d(iii) RED and independently identified the
+GREEN's only contract narrowing: an unreachable silent tail-retention path now
+fails closed if a future caller violates the current-checkpoint boundary. It
+required the ordinary reviewers to test that boundary, `MAX_CHECKPOINTS`,
+rollback and possible O(V) relocation; all are covered below. It also found an
+administrative evidence gap: the three stale Map-detachment identity
+expectations and one stale rollback result-shape expectation in the
+non-authoritative broad legacy bundle need a named prove-obsolete-then-remove
+owner that preserves valid coverage and never adds fake compatibility. Pending
+final Opus agreement, assign that bounded stale-inventory sweep to Phase 1
+closure administration before Phase 1 exit; it does not reopen 1d(ii), block
+1d(iii), or justify running the known synchronous 5k case in every inner loop.
+For later contract adoptions, a grep-driven sweep of frozen expectations,
+censuses, counters, manifests and suppressions that pin deleted behavior is
+the proposed default before GREEN resumes; batch found stale pins into one
+corrective RED/quorum, never speculatively.
+
+Fable's result SHA-256 is
+`30feeb2f45fbdba51a378836e7e62ce17b5d35238f969ddb42c608acb7463d5a`,
+final raw SHA-256 is
+`72a69978f627a3f55fb5e1525f42fa8fb5ceb2292f4f224f0ee9a91e7bc45a79`
+and 10-entry integrity-manifest SHA-256 is
+`5ccb9ba795c3b07ca755c26e65179e72aeff1e4648511cae06f657cac27d2e54`;
+all entries verify. An initial permission denial was corrected by resuming the
+same session. A concurrent uncommitted GREEN contaminated its first worktree
+read; all baseline claims were re-derived from exact `b5213e9` Git blobs and
+the contaminated observation was discarded. This was the requested one-off;
+do not schedule Fable again unless explicitly requested.
+
+**Phase 1d(iii) preliminary reviews accepted.** Fresh native Grok 4.5/high
+session `019fcab1-9de4-78c3-9d44-9bbaccdc8063` returned `ACCEPTED` /
+`PHASE1DIII_MAY_CLOSE=yes` for exact HEAD `4f91449`. Its only substantive
+model was `grok-4.5-build` at high effort, with 27/27 calls and no helper,
+subagent or web use. In a disposable exact-HEAD tree it passed focused 2/2,
+five adversarial probes 5/5 and checkpoint/ownership preservation 6/6. It
+proved the sole-call boundary, forced-checkpoint and rollback behavior,
+retention, and absence of a moved publisher graph scan. Result SHA-256 is
+`bfd4a293837af6e80ae9738cdfd210bd24accf3fc6f9688b761ef9a03bb76ee3`,
+raw SHA-256 is
+`429c64d11338024add8b4de18b1a9708da02a7d9431f6151a89167183b217b60`
+and 19-entry manifest SHA-256 is
+`64d5aebb97255b6953b95c9d35a52b2f7f2dd042d45e7f3f8e80713d0d0b031b`;
+all entries verify. Hostile monkey-patching of `states.prune`, TypeScript-private
+reflection and an invalid empty-checkpoint host are unsupported, pre-existing
+nonblocking cases, not accepted production paths.
+
+Fresh exact Kimi 3/high/dual-100 session
+`c11d04ea-07ea-495c-b39a-5e304470a163` independently returned `ACCEPTED` /
+`PHASE1DIII_MAY_CLOSE=yes`. Selector `kimi-code/k3` resolved to effective
+model `k3`; the invocation used `--thinking`, explicit high-review instruction,
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `--max-steps-per-turn 100`. It ended
+naturally at exit 0 after 51 steps/LLM requests and 62 read-only calls/results,
+with no cap, fallback, helper, subagent, web, network or MCP use. It reproduced
+the reverse RED at 1F/1P and 13/13 versus 193/193 yields, passed GREEN 2/2,
+nine adversarial probes 9/9, targeted preservation 18/18 and proportionate
+preservation 138/138. The probes cover both off-boundary directions,
+prune-throw and earlier-journal rollback, forced pop/re-push,
+`MAX_CHECKPOINTS` eviction/order/restore, multi-frontier canonical checkpoint
+and retry. Result SHA-256 is
+`b51c8d82f64ab7f2467b578ee69f2dab664beef48410dc3d84e6452071d9642f`,
+raw SHA-256 is
+`de851e05ebebdbbc8d104c3b58620966dae45695523e8c671499216a2abdf3e9`
+and 45-entry integrity-manifest SHA-256 is
+`765e1740f7dab3634ccab1aa9f1aea0540e12147fda62b5fc91ef15d69b863a8`;
+all entries verify. Persisted native wire corrects the model's approximate
+prose tool count; this is an administrative disclosure, not a review defect.
+
+## Next Agent Prompt — Phase 1d(iii) final review
+
+Freeze Phase 1d(iii) RED `b5213e9`, GREEN `a0ff979`, plan checkpoint
+`4f91449` and both accepted preliminary review artifacts. Commit this
+plan-only preliminary checkpoint, then run one final Claude-skill Opus/xhigh
+adversarial review. Opus must independently authenticate the exact lineage and
+causal differential; challenge the current-checkpoint boundary, its explicit
+silent-retention-to-fail-closed narrowing, `MAX_CHECKPOINTS`, journal rollback,
+retention/identity/wire semantics and work-relocation escapes; keep D.73
+separate; and either ratify or reject the proposed Phase 1 closure owner and
+future contract-adoption stale-inventory sweep. A rejection must give an
+executable exact-HEAD counterexample or concrete violated contract. Only
+unanimous acceptance may close Phase 1d(iii) and adopt the workflow addition.
+Do not schedule another Fable review, consume D.73/Phase 1n/optional 0n, or
+stage protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
