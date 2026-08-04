@@ -20993,29 +20993,64 @@ Git blob `4431fe534333bf7f8266b43f42781915a0da1203`; tracked/index state is clea
 at HEAD `63ac6ae`. The seven-entry diagnostic hash ledger verifies under
 `.logs/phase-1e-concrete-execution-capability-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1e stale forged-UPDATE observer correction
+**Phase 1e stale forged-UPDATE observer correction accepted and frozen.** Fresh
+Codex-high tests-only commit
+`0075b5a20a3508e6293ce87d184290aacd5ddcc3` changes only
+`packages/node/tests/authenticated-object-ingress-1e-red.test.ts` by +3/-6. The
+forged-UPDATE test removes the `merge` spy/raw-input dispatch assertions and
+retains exactly-once cryptographic recovery, no stored vertex and no DRP state
+mutation, while adding direct rejection-side-effect assertions: zero node puts
+and zero broadcasts. No security assertion was deleted without a replacement;
+the superseding capability RED owns the stronger no-raw-dispatch rule.
 
-Freeze new RED `740e180` and every accepted earlier test except the one stale
-observer assertion identified above. Spawn a fresh Codex-high tests-only owner.
-It may change only
-`packages/node/tests/authenticated-object-ingress-1e-red.test.ts` plus ignored
-evidence logs, not production, other tests/fixtures, this plan, manifests,
-lockfiles, protected paths or stash.
+The corrected original Phase 1e suite is 19/19 on current production, while the
+new capability RED remains exact 2F/1P. Preservation is focused 16/16, node
+authentication 20/20, object ingest 6/6, direct applier 54/54 and public
+fixtures 177/177. Object, node and workspace typechecks pass. Owned lint/format
+are clean; tracked lint has zero errors and 249 existing warnings. The final
+477-line file has SHA-256
+`4a5c07db1e531291757c61c16baffcaef55c4216fc24022a347f6a194eac753c`
+and Git blob `6111caacb3cdc259592d4a6591eb7df8250a98c5`. Production, new RED,
+plan, manifests, lockfile, tracked/index state and stash are invariant. Result
+SHA-256 is
+`a4a4d8168d6dcbf35925f3ccc07245b205675e9756553af066d6ad2090f56c36`;
+the verified 37-entry manifest SHA-256 is
+`bb07fd29df25c9e1348d5fea28ae8cfa13e425790d18d33c494371fcf3fafb0a`
+under
+`.logs/phase-1e-stale-forged-update-observer-correction-codex-high/`.
 
-Correct only the forged-UPDATE test so it proves the enduring behavior without
-requiring invalid raw input to reach an overridable public method: exactly one
-cryptographic recovery at the authenticated object boundary, rejection/no
-stored vertex, no DRP state mutation and no acceptance side effect already
-owned by that test. Prefer observing the public authenticated boundary or
-outcome, not an internal dispatch count. First demonstrate that the corrected
-test remains green on current production for the enduring invariant, while the
-new capability RED remains exact 2F/1P; do not weaken or delete security
-coverage. Preserve the rest of the 19-test file byte-for-byte where practical.
-Run the corrected 19-test suite, new RED, focused/preservation gates,
-typechecks, lint and formatting to `.log`; commit only the bounded test
-correction and seal hashes/manifest. Then checkpoint it and restart a distinct
-production GREEN owner on the already-frozen capability RED. Do not schedule
-Fable.
+## Next Agent Prompt — Phase 1e concrete execution-capability GREEN restart
+
+Freeze capability RED `740e180` and stale-observer correction `0075b5a`
+byte-for-byte together with earlier accepted Phase 1e tests/corrections. Spawn a
+new distinct Codex-high production-only GREEN owner. It may change only the
+smallest coherent production owners plus ignored evidence logs, not tests,
+fixtures, this plan, manifests, lockfiles, generated/protected paths or stash.
+
+Make raw remote vertices cross a module-owned authentication/classification
+boundary before every caller-overridable dispatch. The diagnostic universal
+verify-first lane is the smallest known coherent direction: remove WeakSet
+construction identity as permission for `object.merge(raw)` and deliver only
+detached verifier-issued novel handles to both concrete and structural
+implementations. The concrete public `merge` may recognize provenance and must
+not repeat cryptographic recovery. Remove any outcome-publication state and
+committed-value computation made dead by that design rather than retaining
+security sediment.
+
+The frozen capability suite must become 3/3; corrected original Phase 1e must
+remain 19/19. Preserve public `merge(Vertex[])` compatibility, unmodified
+concrete exactly-once crypto and valid behavior, root/already-known skips,
+structural verified handles, canonical committed/finality attribution,
+occurrence order, B1-B3 and mixed partial commit. Do not detect Vitest spies,
+silently disable overrides, add configuration/duck/`instanceof` trust, fix only
+the later throw or expand into D.73, Phase 1n or optional 0n.
+
+Run all recorded Phase 1e suites, package/workspace typechecks, object/node
+builds with generated-diff check, lint and formatting to `.log`. Authenticate
+the exact production diff, frozen test hashes/blobs, result and integrity
+manifest; commit only production. After controller checkpoint, run fresh Grok
+4.5/high and exact Kimi 3/high/dual-100 preliminary reviews, followed by final
+Claude-skill Opus/xhigh only if both accept. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
