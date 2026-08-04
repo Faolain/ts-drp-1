@@ -20016,6 +20016,58 @@ Codex-high production-only GREEN may then consolidate rollback pre-images or
 undo ordering without reverting `5e185af`, weakening descriptor rollback,
 removing compare guards blindly or adding setter/topology special cases.
 
+**Complete application-setter rollback-order RED accepted and frozen.** Fresh
+Codex-high tests-only commit
+`6f26f3ef0e5bd98cb7d8bf09a617876ca9da8ff2` added the causal fixture/case to
+only
+`packages/object/tests/residual-reconstruction-prototype-safety-1d-ii-red.test.ts`.
+Root review then caught one unnecessary identity assertion before plan freeze:
+the two D.92.2-governed `cloneEnumerableInstance` rollback detachers
+intentionally restore isolated descriptor values, so complete rollback requires
+exact descriptor attributes and deep pre-attempt value content, not the same
+backing object identity. The same RED owner corrected only that expectation in
+tests-only commit `1028087138fd689886365cb8042f04b27197d638` while adding
+explicit non-alias checks against failed setter inputs and retained
+stored/checkpoint values. The final 1,013-line test file has SHA-256
+`9ae3c03599ed55f9235d8d95e972a0f316079e4803a70138e0ef113ec038deb3`
+and git blob `e5b56cee73cb1e83c2191da266ef7b5e7b177364`.
+
+The final focused signature is exact 1F with 11 skipped; the complete residual
+surface is exact 1F/11P. Current production's sole failure is the combined
+backing-descriptor pre-image: expected configurable/enumerable/writable
+descriptors containing marker `installed` and tags `left/right`, but received
+marker `root-left/root-right` and tags `left-root/right-root`. Exact backing
+identity is not required. All setup controls, setter receiver and input
+detachment, own-key order, prototype, revision, graph/frontier/vertex count,
+all stored/checkpoint ACL+DRP byte images, publication prefix and rolled-back
+delta, failed-input mutation isolation and exactly-once deterministic retry
+pass.
+
+D.92.2 remains 64/64; fallback/concurrent is exact 1F/49P; inherited Phase
+1d(i) is 147/147; and the proportionate set is exact 1F/137P, each with only
+the new causal RED. Object and 34/35 workspace typechecks pass. Owned lint is
+0/0. The authoritative explicit 738-file tracked lint is zero errors with 250
+warnings; its one-warning difference from earlier evidence is reported rather
+than normalized. Prettier, diff, scope and frozen production/plan/stash checks
+pass. Original RED evidence is under
+`.logs/phase-1d-ii-rollback-order-red-codex-high/`; its 16-file manifest
+SHA-256 is
+`27f231a0f199ce908022b71a0f5fd91ba32decd3f73ef825b2428f189373bbe8`.
+The identity-contract correction evidence is under
+`.logs/phase-1d-ii-rollback-order-red-contract-correction-codex-high/`; its
+nine-file manifest SHA-256 is
+`d9a3dbed8aa2fc5ca2ddebded816c64c6a3edf162f96f13868cec6a6f0cc1117`.
+
+Resume with a distinct Codex-high production-only GREEN from this exact
+committed RED. Keep tests and the plan frozen, retain `5e185af`, and fix the
+journal model coherently. Prefer one pre-adoption descriptor snapshot or one
+ordered rollback authority for the live replacement transaction over nested
+whole-surface snapshots whose restoration invalidates property-specific undo
+guards. Preserve detached rollback values, setter order/receiver, property
+order, unrelated descriptors, failure isolation, deterministic retry and all
+copy/governance counters. Do not remove compare guards blindly or add names,
+topology hashes or setter-count special cases.
+
 ## Next Agent Prompt — Phase 1d(ii) rollback corrective
 
 Start from the exact plan-only checkpoint that records the rejected
