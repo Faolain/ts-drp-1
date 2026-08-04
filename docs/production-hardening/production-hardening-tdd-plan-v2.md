@@ -21142,36 +21142,64 @@ byte-identical. Freeze the complete accepted Phase 1e lineage and its
 nonblocking ledger; do not reopen it without a changed production path and an
 executable causal failure.
 
-## Next Agent Prompt — Phase 1f channel-backpressure RED
+**Phase 1f channel-backpressure RED frozen.** The first assigned RED agent was
+interrupted after repeated monitoring showed no response, filesystem artifact
+or child process; it made no change. A fresh Codex-high replacement completed
+the tests-only RED at commit `5cf8835215889320013df98a86e2b3744a53b947`
+against exact parent `dc7e6b4`. Its sole committed path is
+`packages/message-queue/tests/channel-backpressure.test.ts`, blob
+`b84502ec4b1bd11dd026a6addd5046ae219e625d`, SHA-256
+`88001d20aad54290c52096561ca21c70f1c5c275c589cc01d5d33f6ddda8176b`.
+Freeze that test for GREEN and acceptance review.
 
-Phase 1d(i-iii) and Phase 1e are accepted and closed. The next ordered Phase 1
-item is 1f. Spawn a fresh Codex-high tests-only RED owner. It may add only the
-smallest coherent `packages/message-queue` test owner (prefer the planned
-`channel-backpressure.test.ts`) plus ignored evidence logs, not production,
-existing tests/fixtures, this plan, package manifests, lockfiles, generated or
+The focused result is exact 1 failed / 2 passed. At capacity 32, 100,000
+fire-and-forget sends leave peak/current `sends` at 99,968 rather than at most
+32; prompt outcomes are 32 fulfilled, 99,968 pending and zero rejected rather
+than 32 fulfilled, 32 pending and 99,936 typed rejections. No stable exported
+`ChannelCapacityError` exists. After one receive, the oldest pending send is
+not admitted and a new value 100000 overtakes accepted values 32..63. The two
+small positive controls pass. Unconditional close plus joining every observed
+promise proves cleanup; the explicit settlement oracle uses
+`Array.from(outcomes)` so sparse holes cannot pass. Elapsed time and heap/RSS
+deltas remain diagnostics only.
+
+Existing message-queue tests pass 43/43; package and workspace typecheck pass;
+owned lint and tracked-plus-owned lint pass with zero errors and the existing
+249 warnings; format and diff checks pass. Raw `pnpm lint` remains an
+environmental non-gate because ignored `.logs/**/*.ts` review artifacts are
+outside the ESLint parser project (81 errors / 226 warnings); the repository
+tracked-plus-owned gate is green. Result SHA-256 is
+`2ad8cf38edd6a39cb9f5e5c97b8c9a99729818a8774cc13b6a21a6f447d86c8e`;
+the verified 13-entry manifest SHA-256 is
+`906fd02cb351e3085597f0448ce0c9ff02dd85b9dd22f801d7a9f45c5645dcae`
+under `.logs/phase-1f-channel-backpressure-red2-codex-high/`.
+
+## Next Agent Prompt — Phase 1f channel-backpressure GREEN
+
+Start from the controller checkpoint immediately after tests-only RED
+`5cf8835`. Spawn a distinct Codex-high production GREEN owner. It may change
+only the smallest production owner under `packages/message-queue/src/`
+(expected `channel.ts`) plus ignored GREEN evidence. Do not edit the frozen RED,
+other tests/fixtures, this plan, package manifests, lockfiles, generated or
 protected paths, or stash.
 
-Pin the actual leak boundary atomically. With a channel at finite capacity and
-no receiver draining it, drive 100,000 fire-and-forget `send` calls in the same
-shape used by network producers. The internal pending-send population must
-never exceed the configured cap, every excess send must reject promptly with a
-stable typed backpressure/capacity error, accepted sends must retain FIFO order,
-and no unresolved promise or listener/timer accumulation may remain after
-bounded cleanup. Include a small positive control proving normal send/receive
-behavior and capacity reuse after a receive. Inspect current public API and
-existing queue tests before choosing an observation seam; do not expose mutable
-internals or add production hooks in RED merely to count the queue.
+Implement a stable exported typed capacity/backpressure error and a finite
+pending-send bound while retaining established channel semantics. The frozen
+positive-capacity contract admits at most one buffer-capacity of values and one
+capacity of blocked senders, then rejects every excess send promptly. Preserve
+FIFO when capacity is reused: an older blocked sender must be promoted before a
+new sender can use a newly freed buffer slot. Preserve existing capacity-zero
+rendezvous, close/start rejection and cleanup behavior unless the frozen tests
+prove a direct conflict; do not solve this with timers, polling, production test
+hooks or caller-specific duck typing.
 
-The RED must fail causally on current unbounded `Channel.sends` growth while
-controls and existing message-queue behavior remain green. Use 100,000 sends
-only in the focused leak contract; keep ordinary iteration fast with a smaller
-control and justify any longer gate. Record exact failure/pass counts, peak
-pending count, elapsed time and memory signal without making wall-clock/RSS a
-hard flaky oracle. Run package/workspace typecheck, relevant tests, lint and
-format to `.log`; freeze test SHA/blob, result and integrity manifest. After
-controller checkpoint, hand the immutable RED to a distinct Codex-high
-production GREEN owner, then run fresh Grok 4.5/high, exact Kimi 3/high/dual-100
-and conditional final Claude-skill Opus/xhigh. Do not schedule Fable.
+Make the frozen RED pass, keep the complete existing message-queue suite green,
+and add no new tests in GREEN. Run focused and package suites, package/workspace
+typecheck, lint, format and diff checks to `.log`; record exact counts and the
+100k diagnostics, freeze source/test identities, commit only production, and
+seal result plus integrity manifest. Then return to the controller for fresh
+Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional final Claude-skill
+Opus/xhigh review. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
