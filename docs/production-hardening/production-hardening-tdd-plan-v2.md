@@ -21654,27 +21654,62 @@ the verified 26-entry manifest SHA-256 is
 `015221b0f64fe46fa6c1e797b779b06fdb11fc403ae6c72699c2aa45c0ec439c`
 under `.logs/phase-1h-queue-isolation-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1h production GREEN
+**Phase 1h production GREEN implemented; preliminary review pending.** Distinct
+Codex-high commit `9bcdfbc8a3b4bf6d84ec98772e5114d7ddc67a86` has exact parent
+`f4c1e56`, tree `87ccdc312bec015079343808727751c53ce30f12` and changes only
+`packages/node/src/index.ts` (+5/-1). Freeze blob
+`35dd886a55ff675a4bbffa1c182478923fc66374` / SHA-256
+`37aa443f05405b4688e4917edd59ec8825d671dce9a4528a0b0ddb0e73462af1`;
+binary commit diff SHA-256 is
+`d37eca94cd002d4b3ed5dda3259d4713f6580cc1d554667f7133a602d6addf38`.
+The frozen RED blob and SHA remain byte-identical.
 
-Assign a distinct fresh Codex-high production owner from the exact clean
-checkpoint containing RED `0b9a9fa`. Do not edit the frozen test, this plan,
-lockfiles, generated output, Phase 1n or protected paths. Change the smallest
-natural owner at the `DRPNode.start()` → `DRPNetworkNode.subscribeToMessageQueue`
-boundary so a pending/rejected per-object enqueue cannot block the central
-network fanout. Keep `dispatchMessage` itself awaitable for direct callers and
-keep every per-object `MessageQueue` handler FIFO/serial; do not make generic
-`MessageQueue` fanout concurrent, remove Channel bounds, add hidden overflow,
-or weaken Phase 1f typed rejection/lifecycle behavior.
+`DRPNode.start()` now registers one synchronous network callback which invokes
+the still-public/awaitable `dispatchMessage(message)` and contains its detached
+rejection with existing module logging. The central network `MessageQueue`
+therefore never awaits a pending per-object enqueue, while direct callers,
+generic queue fanout, real per-object channels, FIFO/one-active-handler order,
+Phase 1f capacity and typed rejection remain unchanged. There is no new timer,
+configuration, public API, wrapper, overflow buffer or second dispatch owner.
 
-The registered boundary must contain every detached promise rejection with the
-existing logger/error policy, including closed/missing/full object queues, so
-there is no unhandled rejection. It must not duplicate subscriptions across
-node restart, reorder messages within one object, drop normal B delivery or
-invent timers/configuration/compatibility hooks. Reach focused 2/2, node
-aggregate 18/18, preserve message-queue 46/46 and network focused 15/15, then
-run node/network/message-queue/workspace typechecks, owned/tracked lint,
-format/diff and clean build/import gates serially to `.log`. Commit production
-only and seal exact evidence for fresh Grok and exact Kimi 3 review. Do not
+Frozen focused passes 2/2 and node aggregate 18/18; message-queue passes 46/46,
+network focused 15/15 and full network 130/130. Phase 1n remains exact 3F/3P.
+Node, network, message-queue and workspace typechecks; owned/tracked lint at
+zero errors / 249 inherited warnings; format/diff; builds and package imports
+pass. Preserve two non-authoritative harness incidents: an optional broad
+all-node sweep was interrupted before Vitest emitted a summary, and an initial
+package smoke used the repository root rather than the package boundary before
+the corrected import pass. Neither incident changed source or the bounded
+acceptance gates. Result SHA-256 is
+`f241bbdb53629d9ad6bd33f002ac53bbbe43ee6fd4786d196878dd9ded0e2d56`;
+the verified 76-entry manifest SHA-256 is
+`e6640ea9161548f76600f2f2cdca0bee9c9612c662a3ca9a3ec025d279207571`
+under `.logs/phase-1h-queue-isolation-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1h preliminary reviews
+
+Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
+exact clean checkpoint containing RED `0b9a9fa`, GREEN `9bcdfbc` and this
+record. Kimi must authenticate selector `kimi-code/k3`, effective `k3`,
+`--thinking`, environment `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI
+`--max-steps-per-turn 100`. Neither reviewer may edit the repository or invoke
+Fable/subagents.
+
+Authenticate the RED/GREEN blobs and manifests. Independently exercise the
+actual production registration path with A blocked at/over capacity and B
+healthy; prove B's causal delivery before A release, the <50 ms contract,
+same-object FIFO/one-active-handler order, exactly-once delivery and zero
+unhandled rejection. Probe typed capacity rejection, closed/missing queues,
+normal no-pressure traffic, node restart and a changed network-node instance.
+Inspect whether detached same-object calls preserve Channel send ordering and
+whether per-object caps bound outstanding promises rather than moving the leak
+from the central queue. Do not demand generic queue concurrency or preemptive
+protobuf parsing; Phase 1o owns aggregate per-peer/object resource policy.
+
+Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1H_MAY_CLOSE=yes/no`,
+severity, executable evidence and a residual ledger. Preserve HEAD/tree/index,
+stash and protected paths; seal native session/model/tool evidence. Run final
+Claude-skill Opus/xhigh only if both preliminary reviewers accept. Do not
 schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
