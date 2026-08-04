@@ -21260,26 +21260,86 @@ discarding buffered values and plain closed-`MessageQueue` errors are inherited
 semantics; queue-level error documentation is optional. No reviewer found an
 executable compatibility, memory or liveness blocker.
 
-## Next Agent Prompt — Phase 1f final Opus acceptance review
+**Phase 1f final Opus review accepted; slice closed.** Fresh Claude-skill
+session `2628455e-0703-40c6-860e-03232f32ba9f` ran native Opus/xhigh in
+read-only plan mode and returned `ACCEPTED`, `PHASE1F_MAY_CLOSE=yes` and no
+executable blocker. Every substantive model event reports `claude-opus-5` at
+xhigh effort. The only Haiku use was Claude's automatic 21-output-token title
+helper and made no substantive contribution. The session ended normally after
+69 turns and 68 successful Bash calls, with no denied, failed, non-Bash,
+subagent, web or write tool call.
 
-Use the Claude skill to start a fresh native Opus/xhigh read-only review of
-exact checkpoint HEAD containing `af638ff` and this preliminary-review record.
-Authenticate the frozen RED, production blob, plan lineage, both preliminary
-review artifacts and their disclosed harness incidents. Inspect the full
-Channel/MessageQueue/consumer state machine independently; do not merely vote
-on Grok/Kimi.
+Opus independently exercised source bytes with Node 22
+`--experimental-strip-types`: the 100,000-send/capacity-32 case retained exact
+32 buffered values plus 32 blocked sends, promptly rejected 99,936 sends with
+the exported typed error, drained every accepted value in FIFO order and left
+no unhandled rejection. Capacity-one/zero, receiver-first handoff,
+close/restart generations, `undefined`, error identity, MessageQueue/Manager
+and both network producer shapes passed. A decisive 6,000-call producer probe
+with a blocked consumer retained a bounded 1,995 accepted items while 4,000
+typed overloads were caught, kept the producer loop alive and drained fully
+after release. A corrected 400-trial/24,000-operation fuzz run found zero
+unexplained loss or invariant violation.
 
-Adversarially attempt an executable counterexample for retention bounds,
-capacity-one or capacity-zero liveness, receiver-first handoff, close/start
-settlement, FIFO/fairness, typed prompt rejection, producer rejection handling,
-or unhandled promises. Run focused/full tests or bounded no-file probes where
-the sandbox permits. Treat intentional overload drops and bounded waiting as
-the declared policy, but reject any silent loss of already-accepted work,
-unbounded retained state, newer-sender bypass, cross-generation settlement, or
-production consumer breakage. Require explicit `ACCEPTED` or
-`CHANGES_REQUESTED` plus `PHASE1F_MAY_CLOSE=yes/no`, severity and executable
-evidence. Keep repository state invariant and seal native/model/tool evidence.
-Do not schedule Fable.
+Preserve two probe corrections: the first fuzz counter counted only the final
+close and falsely labeled values discarded by intermediate inherited closes as
+silent loss; the corrected run captured every close and attributed all 1,254
+drops solely to that byte-identical inherited contract. The first
+capacity-zero close subprobe accidentally consumed the sender it intended to
+leave pending; the corrected probe passed. The controller initially placed
+review files in the parent evidence directory, then moved the complete set
+intact into ignored `artifacts.log/` and regenerated all path-dependent hashes.
+None of these harness corrections changed the verdict or repository state.
+
+The final nonblocking ledger is explicit: `close()` still discards buffered
+values whose sends already fulfilled, as it did before this slice; an accepted
+sender may wait indefinitely until receive/close, but retained state is bounded;
+capacity zero intentionally admits one rendezvous sender and rejects the next;
+queue-level typed-error documentation is optional. A stale gitignored
+`packages/message-queue/dist/src/channel.js` was environmental generated output,
+not a tracked release artifact; a normal package build regenerates it. Future
+relevant release gates should validate built package exports without treating
+stale ignored output as source authority.
+
+Final result SHA-256 is
+`4daf23520eb607abbec5781e7a108b9c41f8a70ece1ff51613359213c37c2f0a`;
+raw-envelope SHA-256 is
+`6f3c311af79c0bc46d53a46c9e22a629ea52152d2bbab50d748e8d05a0a9e5c0`;
+native-session SHA-256 is
+`cc55cfd5c7448f0ceebd6039b7803873bfe7c8de75f78a30b20c3b8dc8ae4123`.
+The verified 46-entry manifest SHA-256 is
+`6f2c564cacdb3c308ad90ab077c7316d6d2e9ab53bac00c471ed788fd4e55ddf`
+under
+`.logs/phase-1f-channel-backpressure-green-final-opus-xhigh-review/artifacts.log/`.
+Freeze RED `5cf8835`, production GREEN `af638ff`, their tests and the complete
+accepted review lineage. Do not reopen Phase 1f without a changed production
+path and an executable causal failure.
+
+## Next Agent Prompt — Phase 1g tests-only RED
+
+Assign a fresh Codex-high tests-only owner against the exact clean Phase 1f
+closure checkpoint. Phase 1g remains the single atomic plan item: pin both the
+transport pre-decode length-prefix cap and the node UPDATE batch-cardinality
+cap, while editing no production file or plan text.
+
+The RED must prove an oversized length prefix is rejected before its body is
+read, accumulated or allocated, with an exact-boundary positive control. It
+must also prove an oversized decoded `Update.vertices` batch is rejected before
+the first authentication/signature-recovery call and before merge, storage,
+broadcast, dispatch, sync recovery or per-vertex error logging, again with an
+exact-boundary positive control. Prefer stable public behavior and existing
+seams; a bounded call/read counter is authoritative, while elapsed time and
+heap/RSS are diagnostics only. Pin stable typed/local errors and finite limits
+only where the present architecture exposes the corresponding owner; do not
+invent a consensus rule, test hook, timer, wall-clock oracle or production
+compatibility shim in RED.
+
+Capture focused failing signatures plus existing network/node suites, package
+and workspace typecheck, owned/tracked lint, format and diff checks to `.log`.
+The focused RED should fail only because current `lpStream(stream)` uses its
+default maximum and `Update.decode(data)` reaches per-vertex authentication
+without a Phase 1g cardinality guard. Freeze exact test blobs and an evidence
+manifest for the distinct GREEN owner. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
