@@ -22006,22 +22006,72 @@ Protected untracked paths remained an exact 54,453-path match. Evidence is under
 `.logs/phase-1i-a-corrective-red-codex-high/`; the evidence-ledger SHA-256 is
 `8b06eb9c29265f5e7ca947b94f16857441da91730dde43a7b191616ced11c7fd`.
 
-## Next Agent Prompt — Phase 1i-a corrective GREEN
+**Phase 1i-a corrective GREEN checkpoint.** Production-only commit `6fc9c55`
+on parent `7de466d` changes exactly the seven public/type/validation/node/object
+files named by the rejected functional candidate. It removes the two orphaned
+history-compaction calls, restores novelty lookup through
+`hashGraph.vertices.has(hash)`, gates the live-frontier replay optimization to
+observer mode, and makes observer `finalityStore` access fail explicitly without
+constructing or attaching a store. Writer remains the compatibility default and
+retains eager finality and the pre-existing replay path. Observer replicas keep
+complete authenticated `Vertex` history while releasing ordinary ACL/DRP state
+snapshots transactionally after publication; checkpoint/non-frontier replay and
+rollback remain functional.
 
-Use a distinct fresh Codex-high GREEN against frozen RED `4ea89e9` and the
-rejected unstaged seven-file functional candidate. Change production only as
-required to remove the orphaned `enableHistoryCompaction()` call, restore
-novelty lookup to `this.hashGraph.vertices.has(hash)`, observer-gate the
-live-frontier replay shortcut, and make public observer `finalityStore` access
-throw explicitly without construction or attachment. Preserve writer behavior,
-complete signed observer history, authenticated sync/authorship, rollback and
-all earlier Phase 1i tests. Do not introduce a fake store, compact-history
-placeholder, test-detection hook or compatibility adapter. Run the fast focused
-and proportional preservation suites, package/workspace typecheck, tracked lint,
-format/diff and fresh-build provenance gates to `.log`. Only after those pass,
-build the exact candidate artifacts and run the opt-in 100k `<60%` acceptance
-gate once. If it misses, stop and reconvene the amendment quorum rather than
-shaping implementation to the threshold.
+The fast focused suite is 15 passed / 1 opt-in scale test skipped both before
+and after the fresh build. Node preservation is 41/41, object preservation is
+11/11, the bounded object/applier corpus is 35/35 and direct node/handler tests
+are 10/10. Types, validation, object, node and workspace typechecks pass after
+the ordered types → validation → object → node build. Owned/frozen lint
+is clean; tracked lint is zero errors / 249 inherited warnings; Prettier and
+`git diff --check` pass. The fresh shared object artifact SHA-256 is
+`e60d18d25452fb8e2c25aad355e845d86048e47ecbc15640a5f1c0156a01ad4d`
+and its mtime and source-tree fingerprint prove it is newer than the candidate
+source.
+
+The exact opt-in 100k gate ran once and passed: writer and observer each retain
+100,000 non-root vertices and converge on digest
+`434919d1fad4d8d9ae4692cf46e1d317601dc67bb6992fbb27df47bb85b2bf1f`;
+writer retained heap is `162,611,952` bytes, observer retained heap is
+`79,983,672` bytes, and the ratio is `0.4918683467990102`, below the frozen
+`<0.60` threshold. Do not rerun or reinterpret that one-shot acceptance sample
+during preliminary review; reviewers may use the recorded provenance and fast
+behavioral gates.
+
+Two bounded gotchas are explicit. Existing writer tests reflect the private
+`_finalityStore`/applier `finalityStore` shape, so GREEN retains read-only getters
+that return the constructor-supplied writer store or throw for an observer. It
+does not restore the rejected mutable/lazy attachment seam; removing reflective
+private-shape tests is a separate future refactor. Also, an over-broad pair of
+legacy object tests remains 19 failed / 15 passed on both exact pre-GREEN HEAD
+and the candidate because those fixtures bypass the now-required signed public
+ingest boundary. The authoritative bounded replacement corpus passes 35/35;
+the inherited fixture debt is not attributed to Phase 1i-a.
+
+The first protected-manifest comparison was non-authoritative because the RED
+baseline included this Codex run's own live `raw-stream.jsonl` and `stderr.log`,
+while the after-manifest excluded the run directory. After excluding that same
+authorized evidence directory from both sides, all 65,093 other protected
+entries match byte-for-byte. The tracked tree and index are clean and stash
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` remains. Evidence is under
+`.logs/phase-1i-a-corrective-green-codex-high/`; the ledger SHA-256 is
+`df4e32a624dc1226cfd7a245129c3e2382f92ad0dc66e99f3bf1dfe9f9802791`
+and the 94-entry evidence-manifest SHA-256 is
+`8ea8908d6bda48005e830fe530862c8bc85d01c4c9502f7b4f4a5984cb4bf7c4`.
+
+## Next Agent Prompt — Phase 1i-a corrective preliminary reviews
+
+Review frozen RED `4ea89e9`, RED docs `7de466d` and production GREEN `6fc9c55`
+as one Phase 1i-a candidate. First run a fresh Grok 4.5/high review, then an
+independent exact Kimi 3/high review with thinking enabled and both 100-step
+controls. Verify the seven-file scope, writer compatibility, observer
+authenticated full-history fidelity, zero finality construction/attachment,
+transactional snapshot release/rollback, observer-only live-frontier shortcut,
+fresh-build provenance and the recorded single 100k `<60%` result. Treat the
+private read-only compatibility getters and inherited signed-ingest fixture debt
+according to the bounded gotchas above. Only if both preliminary reviewers
+accept may a final Claude-skill Opus/xhigh adversarial review run. Do not
+schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
