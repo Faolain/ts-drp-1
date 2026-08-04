@@ -20113,14 +20113,79 @@ cost; borrowed-input isolation; D.92.2 census/meter authority; and deterministic
 retry. Run final Claude-skill Opus/xhigh only if both preliminary reviewers
 accept.
 
+**Rollback-order GREEN preliminary reviews accepted.** Fresh native Grok
+4.5/high session `019fca57-58f2-70a0-9121-b31337ab1ebf` returned
+`ACCEPTED` / `PHASE1DII_MAY_CLOSE=yes` for exact HEAD `fab81a6`. Its sole
+substantive model was `grok-4.5-build` at high effort, with no helper,
+subagent, web or memory use. It independently passed the frozen residual 12/12
+and five corrected adversarial probes covering qualification hijack, unrelated
+own mutation, multi-setter throw/retry, no-setter snapshot gating and
+structural timing. Invalid disposable dependency setup and one probe whose
+throw flag was enabled during frontier construction are excluded. Result
+SHA-256 is
+`5580dbac4db7bb84f884c36efd4e3d22752b033fc24bf378d1eb78ecb5cbd148`,
+raw-result SHA-256 is
+`957908b9d013709f60cd09585cc1ead571a80a28b2677a6e7b666587a9cf3714`
+and manifest SHA-256 is
+`749df3bd351a87b8a38548dc1110fa2059dcf4f753c73e7535c9bbd471174101`.
+
+Fresh exact Kimi 3/high/dual-100 session
+`412efd7d-7c94-4be2-bfd2-f5b72b0b81a0` independently returned
+`ACCEPTED` / `PHASE1DII_MAY_CLOSE=yes`, exit 0, before either cap. It used 83
+native reasoning/assistant records and 98/100 read-only tool calls, exact
+`kimi-code/k3`, `--thinking`, both 100 controls, and no fallback, helper,
+subagent or web. It reran 12/12, D.92.2 64/64, 50/50, 147/147, 138/138 and
+both typechecks; authenticated the RED 1F/11P differential and current
+lineage/evidence. Result SHA-256 is
+`a75fa6d06182a077796c12c0ef0390d3ea3a960ea3fb13e6f2b6eb46727168c0`;
+the 33-entry artifact-integrity SHA-256 is
+`dbb33ced2c48106744a95aae6df92bc24fd1b72a6812a08266bcbe22c155c462`
+and verifies `ok`.
+
+Both reviewers classify hostile irreversible setter mutations consistently.
+If a setter makes an existing property non-configurable, complete physical
+live restoration can be impossible; rollback raises the explicit
+`ApplyInvariantError`/retry barrier, graph and publication roll back, and later
+stored state excludes the live poison. This is fail-closed publication, not a
+successful atomic commit claim. Extensibility is not part of the adopted
+descriptor snapshot contract.
+
+Kimi also traced ACL-before-DRP pre-image timing. Natural concurrent and hinted
+dual-side paths identity-retain the unchanged side, so neither bounded probe
+co-fired both qualified setters and no executable exact-HEAD corruption was
+produced. Treat the asymmetry as a nonblocking ledger observation: a future
+production change that permits both side setters to fire in one transaction
+must capture both pre-images before either side can run. It is not a new slice
+without that consumer/edge or an executable counterexample.
+
+Administrative evidence note: Kimi's independent tracked lint saw zero errors
+and 249 warnings, while the GREEN's explicit eight-batch command saw zero
+errors and 250 warnings across 746 files. The difference is command/reporting
+shape, not a changed-file or acceptance failure; both zero-error results are
+preserved. Do not normalize either log.
+
+The reused Kimi controller mistakenly interpreted the already-fulfilled
+one-off Fable request as new and briefly spawned a duplicate Fable child. Root
+immediately ordered it stopped. The child was interrupted before returning a
+result, created no new review artifact directory or repository change, and no
+output was inspected or adopted. This controller error is recorded in Kimi's
+`controller-note.md`; do not repeat it.
+
+Both required preliminary reviewers accept this exact candidate. Commit this
+plan-only checkpoint, then run the final Claude-skill Opus/xhigh adversarial
+review. Opus must review the complete two-ledger closure and all preliminary
+caveats, distinguish impossible hostile restoration from ordinary supported
+rollback, and supply an executable exact-HEAD counterexample for any rejection.
+
 ## Next Agent Prompt — Phase 1d(ii) rollback corrective
 
 Freeze tests-only RED lineage `6f26f3e` + `1028087`, production-only GREEN
-`a9b8e92` and the plan checkpoint immediately above. The immediate next action
-is fresh Grok 4.5/high and exact Kimi 3/high/dual-100 independent review,
-followed by final Claude-skill Opus/xhigh only if both accept. Do not schedule
-Fable again unless explicitly requested. Do not consume Phase 1d(iii), D.73,
-Phase 1n or optional 0n scope, and never stage protected untracked paths.
+`a9b8e92` and the plan checkpoints immediately above. Fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 accepted. The immediate next action is final
+Claude-skill Opus/xhigh review of the exact checkpoint containing this record.
+Do not schedule Fable again unless explicitly requested. Do not consume Phase
+1d(iii), D.73, Phase 1n or optional 0n scope, and never stage protected
+untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
