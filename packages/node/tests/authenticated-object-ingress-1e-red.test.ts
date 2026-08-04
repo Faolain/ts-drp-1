@@ -373,21 +373,18 @@ describe("Phase 1e object-layer authentication boundary", () => {
 	});
 
 	it("routes a forged UPDATE through the object boundary with exactly one cryptographic verification", async () => {
-		const object = receiver();
+		const object = receiver(true);
 		const mismatch = (await rejectedCandidates())[2].vertex;
-		const merge = vi.spyOn(object, "merge");
 		const recover = vi.spyOn(Signature, "fromCompact");
-		const { node } = nodeHarness(object);
+		const { node, result } = nodeHarness(object);
 
 		try {
 			await handlerModule.handleMessage(node, updateMessage([mismatch]));
-			expect(merge).toHaveBeenCalledOnce();
-			expect(merge.mock.calls[0][0].map(({ hash }) => hash)).toEqual([mismatch.hash]);
 			expect(recover).toHaveBeenCalledOnce();
 			expect(object.getVertex(mismatch.hash)).toBeUndefined();
 			expect(object.drp?.query_getValues()).toEqual([]);
+			expect(result).toEqual({ broadcasts: [], puts: 1 });
 		} finally {
-			merge.mockRestore();
 			recover.mockRestore();
 		}
 	});
