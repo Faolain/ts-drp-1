@@ -21438,26 +21438,102 @@ the verified 52-entry manifest SHA-256 is
 `8e404fb9fc7ad703c940463690a5f113d7661812214e864902d48a95d57bd906`
 under `.logs/phase-1g-frame-update-caps-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1g preliminary reviews
+**Phase 1g first preliminary review rejected; corrective RED/GREEN complete.**
+Fresh Grok 4.5/high found that installed `@libp2p/utils` 7.2.4 checks
+`maxLengthLength` only after a successful varint decode. A hostile peer can
+therefore trickle unterminated `0x80` bytes: `byteStream.read()` consumes each
+byte from its capped read buffer, while `lpStream.read()` retains it in a
+separate uncapped `lengthBuffer`; `uint8-varint` throws `RangeError`, and
+`lpStream` continues before consulting the four-byte limit. The same native
+Grok session retracted its initial INFO classification after a controller
+challenge and superseded its verdict to `CHANGES_REQUESTED` /
+`PHASE1G_MAY_CLOSE=no`, blocker severity. Result SHA-256 is
+`c86be758acd6bc08da7086ceee9c2293882ea52fe6c1235154e260b3b73d76fa`;
+the verified 49-entry manifest SHA-256 is
+`017e6b99ffba834be29efdada8b3bba69457d06abcf7c7d1af8ba177af90c65f`
+under `.logs/phase-1g-frame-update-caps-green-grok45-high-review/`.
+
+Exact Kimi 3/high authenticated selector `kimi-code/k3`, effective `k3`,
+`--thinking` and both 100-step controls. Its same session independently proved
+that five and eight paced continuation bytes remain pending, a terminator at
+byte nine cannot recover the poisoned prefix, and retained memory/work grows
+one byte per attacker byte while the peer stays open. Preserve its dissent:
+the native model nevertheless returned `ACCEPTED` / `PHASE1G_MAY_CLOSE=yes` by
+classifying the issue as Phase 1o. The controller did not rewrite that native
+answer; it recorded a separate `CHANGES_REQUESTED` / `PHASE1G_MAY_CLOSE=no`
+disposition because Phase 1g itself promises a bounded four-byte prefix and the
+executable path violates it. Native result SHA-256 is
+`77356eb9b28b206958ca7d6ee1ebce8e8e47366047c01d343854fad419bbcb50`;
+the verified 43-entry manifest SHA-256 is
+`c6d6c534dcf39209a8edd38a166fa9321b3aea887d9dd93e392a963ef6e68b5b`
+under
+`.logs/phase-1g-frame-update-caps-green-kimi3-high-100-review/artifacts.log/`.
+No Opus review ran at this rejected gate.
+
+Fresh Codex-high corrective tests-only commit
+`997cdc21119370a974d478b92b7249e016fa3a3e` has parent `1259eff`, tree
+`8d9e972b6a662cc992c9e9e3f8d2238721934e89` and changes only
+`packages/network/tests/frame-cap-1g.test.ts` (+46). Freeze blob
+`ef8585b55cc169691aa10477ec897962f5221d6e` / SHA-256
+`a3d6babeb453736407aa201500cfbb403179ac1f88fdb9c7fb3466de7e3fccc7`.
+Its causal minimum pushes exactly five continuation bytes while the peer stays
+open, classifies the bounded race before cleanup, and requires public error
+identity `InvalidDataLengthLengthError` / `ERR_MSG_LENGTH_TOO_LONG`. A completed
+five-byte prefix, the oversized declaration and exact 4 MiB positive control
+remain green. RED is exact 1 failed / 3 passed focused and 1 failed / 129 passed
+across network; typecheck, lint, format and diff gates pass. Result SHA-256 is
+`c28f590e87f963faee6c15e67df9c306414d47e4f3fb68d5bcd402e951ceb2fb`;
+the verified 11-entry manifest SHA-256 is
+`fddee3149906682d16d650aca72a204fb4e1bf5bc407c06c1ebf608885cb7f87`
+under `.logs/phase-1g-unterminated-prefix-red-codex-high/`.
+
+Distinct Codex-high production-only GREEN
+`37e2fdc110904a647f4c26290792c55d8d24fe0a` has parent `997cdc2`, tree
+`823eec6744bc80a7096361464c6ea2b3f657f66f` and changes only
+`packages/network/src/stream.ts` (+21/-1). Freeze blob
+`0ed27b9c4ad70473a29f5920218ceb06e04dfb71` / SHA-256
+`a3ec07ec95f9f0761623e0b050ec06d145fc8f961c0222029dd66a169c225f50`;
+binary diff SHA-256 is
+`2cda295fae4e4263749304d4e6f9662548f5825c1388cdc5da32ac8340872755`.
+One production-owned `lpStream` length decoder now checks the four-byte limit
+before returning the dependency's `RangeError` incomplete signal, uses the
+dependency's public prefix-too-long error, and otherwise decodes the same
+bounded unsigned varint. There is no new dependency, lockfile change, timer,
+compatibility path or second framing owner.
+
+Corrective focused passes 4/4 and network passes 130/130; handler/authentication
+passes 42/42; Phase 1n remains exact 3F/3P. Network/workspace typecheck, owned
+and full lint, format/diff, build/import and emitted-build adversarial probes
+pass. The probes cover incomplete prefixes of lengths 1-4, terminators at
+positions 1-4, both fifth-byte forms, fragmented and combined delivery, the
+exact 4,194,308-byte prefix-plus-4-MiB event, prefix-only 4-MiB+1 rejection and
+unchanged write framing. Preserve one harness-only first run where a one-byte
+body used two incompatible sentinel expectations; the corrected expectation
+and both logs are retained and do not affect the candidate. GREEN result
+SHA-256 is
+`9d884d6fcc60c0b6bc5ee003dbe76d17db13cbf2aa0cd88536537d0e7df46df3`;
+the verified 37-entry manifest SHA-256 is
+`2cd7c9ec12051b2fe7d235d9ff26bf493cd555528bea0ea231ef2fd7842828f0`
+under `.logs/phase-1g-unterminated-prefix-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1g corrective GREEN preliminary reviews
 
 Run fresh independent Grok 4.5/high and exact Kimi 3/high reviews against the
-exact clean checkpoint containing production `0afeb0a` and this GREEN record.
-Kimi must authenticate selector `kimi-code/k3`, effective `k3`, `--thinking`,
-environment `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI
-`--max-steps-per-turn 100`. Neither reviewer may edit the repository or invoke
-Fable/subagents.
+exact checkpoint containing corrective RED `997cdc2`, production GREEN
+`37e2fdc` and this record. Kimi must authenticate selector `kimi-code/k3`,
+effective `k3`, `--thinking`, environment
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and CLI `--max-steps-per-turn 100`. Neither
+reviewer may edit the repository or invoke Fable/subagents.
 
-Authenticate RED/GREEN/fixture blobs and evidence, then inspect installed
-`@libp2p/utils` 7.2.4 behavior independently. Adversarially probe prefix-only
-oversize rejection, exact and nearby boundaries, fragmented and combined-event
-delivery, overlong varints, cleanup/unhandled rejection behavior, and ensure
-the buffer headroom does not raise the declared-body cap. For UPDATE, probe
-31/32/33 and much larger decoded batches through real `handleMessage`, proving
-zero authentication or side effects above the cap and ordinary behavior at or
-below it; inspect decode-before-guard cost and confirm it matches the explicit
-Phase 1g contract rather than claiming a pre-decode batch parser. Check actual
-network producers and compatibility, including that SYNC_ACCEPT is deliberately
-deferred to Phase 1o and Phase 1n's 3F/3P sentinel is unchanged.
+Authenticate all Phase 1g blobs and manifests. Independently exercise paced,
+open-peer incomplete prefixes at lengths 1-5 and beyond, completed terminators
+at positions 1-5, malformed/overlong and maximum-value varints, fragmented and
+combined delivery, early body-cap rejection, exact 4 MiB acceptance, cleanup
+and unhandled-rejection behavior. Inspect the bounded decoder for arithmetic,
+canonicality or dependency-contract divergence rather than accepting the frozen
+test alone. Re-probe UPDATE at 31/32/33 and a large batch through real
+`handleMessage`, confirm zero downstream work above cap, inspect actual
+producers, and preserve the Phase 1o SYNC_ACCEPT and Phase 1n 3F/3P residuals.
 
 Require explicit `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1G_MAY_CLOSE=yes/no`,
 severity, executable evidence and a residual ledger. Preserve HEAD/tree/index,
