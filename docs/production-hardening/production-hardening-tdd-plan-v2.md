@@ -20885,34 +20885,89 @@ and all entries verify under
 `.logs/phase-1e-auth-unification-corrective-b1-b4-green-codex-high/`.
 No blocking implementation residual is accepted before review.
 
-## Next Agent Prompt — Phase 1e corrective GREEN preliminary reviews
+**Phase 1e B1-B4 corrective GREEN preliminary rejection.** Fresh independent
+Grok 4.5/high and exact Kimi 3/high/dual-100 reviews both initially accepted the
+broad candidate, then independently reran the same bounded capability challenge
+and explicitly superseded their acceptances with `CHANGES_REQUESTED`. The final
+Opus/xhigh gate is therefore skipped as required.
 
-Freeze accepted REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`
-`1c90778` and `f02ad50`; rejected
-implementation GREEN `8a268c9`, checkpoint `78fcb80` and preliminary-review
-checkpoint `178a265` remain rejected lineage, not acceptance. Review exact
-candidate/checkpoint HEAD after this section with two fresh independent
-read-only reviewers: Grok 4.5 at high reasoning and exact Kimi 3 at high
-reasoning with `--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
-`--max-steps-per-turn 100`. Authenticate model/session metadata, raw streams,
-turn completion, result hashes and integrity manifests. Review source, tests,
-candidate diff and authoritative logs; independently rerun bounded probes when
-needed.
+The executable blocker is narrower than B1-B3. `concreteObjects.has(object)`
+proves that the receiver passed through the base constructor, but the next
+operation is virtual `object.merge(vertices)` with the raw decoded wire batch.
+An ordinary `DRPObject` subclass override inherits WeakSet membership, and an
+ordinary instance retains membership after post-construction `merge`
+replacement. Both forms receive an unsigned vertex and may perform effects
+before the later `mergeOutcomes.get(result)` miss throws. That throw suppresses
+node persistence/publication but cannot retract the earlier exposure or
+mutation. Construction identity is therefore not an unforgeable capability for
+execution of the mandatory-verifying method. The structural lane remains
+verify-first; B1, B2 and B3 otherwise remain accepted by both reviews.
 
-Attack B1-B4 and adjacent ordinary forms: invalid-only and known-only handler
-lifecycle; mixed unprovenanced/authenticated partial commit; equal-hash
-occurrence order across both public surfaces and the private applier; mutated
-or forged authenticated handles; structural objects that mutate received
-handles, lie in merge tuples or expose lookalike methods; exactly-once recovery;
-root/known skips; finality attribution; missing/retry paths; and public/package
-surface compatibility. Check that the module-private concrete capability cannot
-be forged and that no test-only fallback ships. Do not demand speculative
-Cartesian syntax matrices or consume D.73, Phase 1n or optional 0n scope.
+The neutral subclass probe under
+`.logs/phase-1e-controller-probes/concrete-capability-override.test.ts` is exact
+1F/0P on the candidate. Kimi independently added and ran the analogous
+post-construction replacement probe; their combined signature is exact 2F/0P
+with coverage disabled. Grok also reproduced subclass, instance replacement,
+subclass-then-super and real UPDATE/SYNC_ACCEPT reachability using a read-only
+one-shot built-package probe. Both reviewers agree that a stricter
+post-`merge` outcome throw is insufficient: raw authentication/classification
+must precede any caller-overridable dispatch.
 
-If either preliminary reviewer returns `CHANGES_REQUESTED`, checkpoint the
-executable finding and start a fresh bounded Codex-high RED; skip Opus. Only if
-both independently accept may final Claude-skill Opus/xhigh adversarial review
-run. Do not schedule Fable.
+Grok used native session `019fcb94-519a-7483-adc3-3aa90be2eef1`, effective
+`grok-4.5-build` at high reasoning, and completed both turns normally. Its final
+result SHA-256 is
+`91fbd206723238c34d52fe1ecf2cbceb7fc574bcb10dac98419cdb32c0daf621`;
+the verified 18-entry review-manifest SHA-256 is
+`c749c103f81f12819fdb8296dcbde77f91f818d10870863bf66e75f9df8c452e`
+under
+`.logs/phase-1e-auth-unification-corrective-b1-b4-green-grok45-high-review/`.
+Exact Kimi 3 used one native session
+`e5968dd2-8889-4bb9-87b6-de3d0e4a716a`, `--thinking`, provider
+`managed:kimi-code`, effective model `k3`, and both environment and CLI
+100-step controls. Its initial/challenge turns recorded respectively 37/5
+`StepBegin`, 51/6 `ToolCall`, 51/6 `ToolResult` and one normal `TurnEnd` each,
+with no fallback, helper, subagent, web or write tool. Its superseding result
+SHA-256 is
+`4a14da6163fcad5930afb192b627f0a95400649ef248c68fb54eadd215bdc504`;
+the verified 46-entry review-manifest SHA-256 is
+`9a15247ef6a74bdc543c6a82dc5987b808d44fa5c6d7dcdecc2d049829a0ad1d`
+under
+`.logs/phase-1e-auth-unification-corrective-b1-b4-green-kimi3-high-100-review/`.
+Both reviews kept HEAD, tracked/index state, index tree and the protected stash
+unchanged.
+
+## Next Agent Prompt — Phase 1e concrete execution-capability RED
+
+Freeze accepted REDs/corrections `c680543`, `bd15d47`, `484c83f`, `6719937`,
+`1c90778` and `f02ad50`. Treat production GREEN `9b493e5` and its checkpoint as
+rejected lineage pending this correction; do not revert its still-valid B1-B3
+work. Spawn one fresh Codex-high tests-only RED owner. It may change only the
+smallest coherent Phase 1e test owner and ignored `.logs` evidence, not
+production, fixtures or this plan.
+
+Pin exactly the capability-ownership boundary:
+
+1. a `DRPObject` subclass overriding public `merge` must never receive raw
+   unauthenticated remote input through `mergeAuthenticatedVertices` or the
+   real node ingress;
+2. post-construction replacement of a normal instance's `merge` must obey the
+   same invariant; and
+3. an unmodified concrete `DRPObject` positive control must preserve
+   exactly-once authentication and existing valid merge behavior.
+
+The RED must fail for the two raw-before-throw paths because of the production
+boundary, while the positive control and all frozen Phase 1e suites remain
+green. Do not expand into an override syntax matrix or amend the contract.
+Record focused/full gate logs, exact failure/pass counts, source/test hashes and
+an integrity manifest. After a controller audit and RED checkpoint, hand the
+frozen RED to a distinct Codex-high production GREEN owner. The sustainable
+GREEN invariant is a module-owned non-overridable authenticated ingress (or an
+equivalent capability bound to the exact secure implementation), never WeakSet
+construction identity followed by raw virtual dispatch. Preserve public
+`merge(Vertex[])` source compatibility and structural verified-handle behavior.
+Then run the normal fresh Grok 4.5/high and exact Kimi 3/high/dual-100 reviews,
+with final Claude-skill Opus/xhigh only if both preliminary reviewers accept.
+Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
