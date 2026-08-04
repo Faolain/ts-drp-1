@@ -27,6 +27,7 @@ type BranchJoinFixture = [Vertex, Vertex, Vertex, Vertex, Vertex, Vertex, Vertex
 type ZeroDeltaBranchFixture = [Vertex, Vertex, Vertex, Vertex, Vertex];
 type CausalKeySetFixture = [Vertex, Vertex];
 type CausalACLFixture = [Vertex, Vertex, Vertex, Vertex];
+type CrossKeyTailFixture = [Vertex, Vertex, Vertex, Vertex];
 
 interface SigningIdentity {
 	keychain: Keychain;
@@ -103,6 +104,29 @@ class CausalKeySetDRP implements IDRP {
 	}
 }
 
+class CrossKeyTailDRP implements IDRP {
+	semanticsType = SemanticsType.pair;
+	x = 0;
+	y = 0;
+	marker = "root";
+
+	setX(value: number): void {
+		this.x = value;
+	}
+
+	deriveY(): void {
+		this.y = this.x;
+	}
+
+	mark(value: string): void {
+		this.marker = value;
+	}
+
+	query_state(): { marker: string; x: number; y: number } {
+		return { marker: this.marker, x: this.x, y: this.y };
+	}
+}
+
 let author: SigningIdentity;
 let guest: SigningIdentity;
 
@@ -137,6 +161,15 @@ function causalKeySetReplica(): DRPObject<CausalKeySetDRP> {
 		peerId: "causal-key-set-writer",
 		acl: createACL({ admins: [author.peerId] }),
 		drp: new CausalKeySetDRP(),
+		config: { log_config: { level: "silent" }, replica_mode: "writer" },
+	});
+}
+
+function crossKeyTailReplica(): DRPObject<CrossKeyTailDRP> {
+	return new DRPObject({
+		peerId: "cross-key-tail-writer",
+		acl: createACL({ admins: [author.peerId] }),
+		drp: new CrossKeyTailDRP(),
 		config: { log_config: { level: "silent" }, replica_mode: "writer" },
 	});
 }
@@ -254,7 +287,17 @@ async function causalACLFixture(): Promise<CausalACLFixture> {
 	return [grant, revoke, target, child];
 }
 
-function storedDRPState(object: DRPObject<ZeroDeltaBranchDRP>, hash: string): Record<string, unknown> {
+async function crossKeyTailFixture(): Promise<CrossKeyTailFixture> {
+	const dependency = await signedVertex("setX", [1], [HashGraph.rootHash], 1_700_000_051_001);
+	// These fixed signed inputs make B's child hash sort before A's; the test
+	// independently asserts the resulting canonical D, B, A order.
+	const pending = await signedVertex("setX", [2], [dependency.hash], 1_700_000_051_004);
+	const tail = await signedVertex("deriveY", [], [dependency.hash], 1_700_000_051_002);
+	const join = await signedVertex("mark", ["joined"], [pending.hash, tail.hash], 1_700_000_051_005);
+	return [dependency, pending, tail, join];
+}
+
+function storedDRPState<T extends IDRP>(object: DRPObject<T>, hash: string): Record<string, unknown> {
 	const state = (object as unknown as ObjectReflection)._states.getDRPState(hash);
 	expect(state, `stored DRP snapshot for ${hash}`).toBeDefined();
 	return Object.fromEntries(state?.state.map(({ key, value }) => [key, value]) ?? []);
@@ -617,6 +660,98 @@ describe("Phase 1i-a contracts behind the bounded pre-drift causal control", () 
 			});
 			expect(subject.getVertex(child.hash)).toEqual(child);
 		}
+	});
+
+	it("keeps a causal B snapshot while replaying A's distinct-key derivation into live and joined state", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "1");
+		const [dependency, pending, tail, join] = await crossKeyTailFixture();
+
+		const pureCausal = crossKeyTailReplica();
+		await expect(pureCausal.applyVertices([dependency, pending])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		const expectedPendingPair = pureCausal.getStates(pending.hash);
+		const expectedPendingBytes = pureCausal.getSerializedStates(pending.hash);
+		expect(storedDRPState(pureCausal, pending.hash)).toMatchObject({ marker: "root", x: 2, y: 0 });
+
+		const canonical = crossKeyTailReplica();
+		await expect(canonical.applyVertices([dependency, pending, tail])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		const fixtureHashes = new Set([dependency.hash, pending.hash, tail.hash]);
+		const canonicalOrder = (canonical as unknown as ObjectReflection).hashGraph
+			.linearizeVertices()
+			.filter(({ hash }) => fixtureHashes.has(hash))
+			.map(({ hash }) => hash);
+		expect(canonicalOrder, "positive control: deterministic order is D, B, A").toEqual([
+			dependency.hash,
+			pending.hash,
+			tail.hash,
+		]);
+		expect(canonical.drp?.query_state(), "positive control: canonical tail A derives y from B's x").toEqual({
+			marker: "root",
+			x: 2,
+			y: 2,
+		});
+		await expect(canonical.applyVertices([join])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		const expectedJoinPair = canonical.getStates(join.hash);
+		const expectedJoinBytes = canonical.getSerializedStates(join.hash);
+		expect(storedDRPState(canonical, join.hash)).toMatchObject({ marker: "joined", x: 2, y: 2 });
+
+		const subject = crossKeyTailReplica();
+		await expect(subject.applyVertices([dependency, tail])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		await expect(subject.applyVertices([pending])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect
+			.soft(subject.getStates(pending.hash), "B's stored pair is the pure D-to-B causal image")
+			.toEqual(expectedPendingPair);
+		expect
+			.soft(subject.getSerializedStates(pending.hash), "B's stored bytes exclude nondependency A's derived y")
+			.toEqual(expectedPendingBytes);
+		expect(subject.drp?.query_state(), "immediate live state replays tail A after newly arrived B").toEqual({
+			marker: "root",
+			x: 2,
+			y: 2,
+		});
+		const checkpointFrontiers = (subject as unknown as ObjectReflection)._applier.checkpoints.map(
+			({ frontier }) => frontier
+		);
+		expect(
+			checkpointFrontiers.some(
+				(frontier) => frontier.length === 2 && frontier.includes(pending.hash) && frontier.includes(tail.hash)
+			),
+			"positive control: suffix one checkpoints the B/A frontier before join C"
+		).toBe(true);
+
+		await expect(subject.applyVertices([join])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect(subject.drp?.query_state(), "the forced checkpoint join preserves the whole-frontier image").toEqual({
+			marker: "joined",
+			x: 2,
+			y: 2,
+		});
+		expect.soft(subject.getStates(join.hash), "join C stores the canonical union of B and A").toEqual(expectedJoinPair);
+		expect
+			.soft(subject.getSerializedStates(join.hash), "join C's bytes preserve A's derivation from B")
+			.toEqual(expectedJoinBytes);
 	});
 
 	it("rolls back both observer snapshot sides when DRP discard rejects after ACL discard", async () => {
