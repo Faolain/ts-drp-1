@@ -20607,25 +20607,97 @@ Phase 1e acceptance evidence. No D.73, D.92.4-D.92.6, Phase 1n or optional 0n
 scope was consumed. No Fable review is scheduled: the earlier explicitly
 requested closure audit was one-off and is already complete.
 
-## Next Agent Prompt — Phase 1e preliminary reviews
+**Phase 1e preliminary reviews reject the first GREEN.** Fresh Grok 4.5/high
+and exact Kimi 3/high/dual-100 both initially returned `ACCEPTED` without
+exercising four ordinary boundary combinations. The controller supplied only
+the executable probe sources and raw outputs, and each reviewer resumed its
+same authenticated session, independently reran the probes against candidate
+source and explicitly superseded the initial verdict with
+`CHANGES_REQUESTED`. Neither initial acceptance is acceptance evidence. Final
+Opus/xhigh is correctly skipped while the preliminary gate rejects.
 
-Freeze tests-only RED commits `c680543` and `bd15d47`, contract checkpoint
-`ba41e20`, implementation GREEN `8a268c9` and this plan-only GREEN checkpoint.
-Run a fresh read-only Grok 4.5/high review and then an independent exact Kimi
-3/high review with `--thinking`, `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
-`--max-steps-per-turn 100`. Both must authenticate the exact checkpoint and
-evidence before reviewing.
+The finite corrective ledger is:
 
-Adversarially inspect whether runtime provenance can be forged or confused by
-handle mutation; whether verification and application consume the same stable
-snapshot; root/known skips and same-hash retry; mixed invalid ordering and
-all-clear `applied`; UPDATE/SYNC_ACCEPT completeness and exactly-once crypto;
-result-bound metadata and preserved finality behavior; test-helper isolation;
-direct dependency/lockfile correctness; and assertion-neutral fixture
-migration. Rerun focused and proportionate gates only where needed. If both
-preliminary reviewers accept, checkpoint their artifacts before one final
-Claude-skill Opus/xhigh adversarial review. Do not schedule Fable or consume
-D.73, Phase 1n or optional 0n scope.
+1. **B1 — invalid-only SYNC_ACCEPT lifecycle.** Candidate `78fcb80` derives
+   `mergeRan` from non-empty raw input. A real unsigned-only SYNC_ACCEPT stores
+   no vertex yet calls `node.put` and emits public `DRP_SYNC_ACCEPTED`.
+   Pre-GREEN `ba41e20` derived the lifecycle gate from non-empty verified
+   input and did neither. Corrective RED must pin zero put/accepted/recovery
+   for an all-auth-invalid batch and preserve the valid-signed control.
+2. **B2 — provenance rejection truthfulness and siblings.** The internal
+   applier routes unprovenanced hashes through graph-aware
+   `createApplyResult`; a raw cast using an already-known hash is normalized
+   away. Mixed `[rawKnown, genuineNovelHandle]` therefore returns
+   `applied:true`, reports no invalid item and silently drops the genuine
+   sibling. Corrective RED must keep the known raw occurrence invalid,
+   `applied:false`, and pin an explicit genuine-sibling policy; the existing
+   partial-commit contract favors applying the genuine sibling.
+3. **B3 — occurrence order, not hash-count order.** Replaying invalid counts
+   across every offered hash cannot distinguish a successful occurrence from
+   a later failed occurrence with the same hash. Public input
+   `[valid(h), invalid(x), invalidSignatureClone(h)]` commits valid `h` but
+   reports `[h,x]` instead of failure occurrence order `[x,h]`. Corrective RED
+   must pin apply and legacy-merge ordering plus the existing distinct-hash
+   controls; GREEN needs occurrence-aware classification, not another
+   hash-special case.
+4. **B4 — structural `IDRPObject` omitted ingress.** Public
+   `IDRPNode.put(id, IDRPObject)` accepts structural implementations. The new
+   node registry's `vertexIngress` value is descriptive only; handlers invoke
+   `entry.handler`, and raw decoded vertices reach a custom object's `merge`.
+   A real UPDATE probe stores an unsigned vertex. Valid custom objects also
+   lose prior UPDATE local-finality work and SYNC_ACCEPT attestation merge
+   because the new hidden metadata methods fall back to empty/false. The RED
+   must cover UPDATE and SYNC_ACCEPT invalid rejection, detached verified
+   input, exactly-once crypto and both finality controls. A lookalike property
+   must not confer trust. GREEN may use the same verifier-issued snapshots for
+   every node object, or a module-owned unforgeable concrete-object capability
+   plus exactly-once fallback; `instanceof`, duck typing and configuration
+   switches are forbidden.
+
+Grok session `019fcb34-4c0c-78d1-a166-ec733bd801b9` used only
+`grok-4.5-build` at high reasoning. Its corrected result SHA-256 is
+`7e39dd715ed3af2ef75dd21fcbd6586a2ce615a7e3b6af267e440e9675aef844`,
+resumed raw SHA-256 is
+`f084fa43a33bb082c1cf1d6285064c3597d547eeb304d4b10abe89ce99c508ff`
+and the corrected 26-entry manifest SHA-256 is
+`1d55fe77041b89fbbba1c3bdca0825b7a22325e7895c3c89eb3ff4c4368a186b`.
+The controller corrected an extraction error where the first finalized
+`result.md` contained JSON `null`; the current artifact contains the actual
+10,538-byte resumed model response and all entries verify.
+
+Exact Kimi session `c58dc8fc-e05f-4260-afe8-c15a24a4af90` used selector
+`kimi-code/k3`, provider `managed:kimi-code`, effective K3, `--thinking`, the
+high-reasoning prompt and both 100-step controls. Its initial turn used 31
+steps/47 calls and its same-session challenge used 15 steps/17 calls, both
+ending normally. Corrected result SHA-256 is
+`611cf1a26055eb0ebf1e5b98d07c36d0b35c0c8af585d2a51529c5a1ef24a36c`;
+31-entry manifest SHA-256 is
+`053487c0a3aa33489810e5c74a0b85346b883e7b35598a70ef4e263ea8fc0a79`
+and verifies. The challenge read the probes as neutral evidence and did not
+read Grok's opinions. Its initial bounded Vitest commands refreshed ignored
+coverage output; challenge reruns disabled coverage and no tracked path
+changed. Both reviewers confirmed Vitest's root alias exercises source rather
+than ignored generated `dist`; require a final package build after corrective
+GREEN so distributable artifacts are also checked.
+
+## Next Agent Prompt — Phase 1e corrective RED
+
+Freeze accepted REDs `c680543` and `bd15d47`, rejected implementation GREEN
+`8a268c9`, checkpoint `78fcb80` and the B1-B4 evidence above. Start one fresh
+Codex-high tests-only corrective RED. Do not edit production, the frozen REDs
+or this plan. Batch B1-B4 and their named positive controls into the smallest
+coherent new test surface; tests must fail causally on exact HEAD and pass on
+the intended semantics, not merely grep implementation shapes. Keep custom
+objects genuinely structural and exercise real `handleMessage`; prove
+UPDATE/SYNC_ACCEPT, crypto count, detachment, finality and event/persistence
+effects. Pin occurrence order with equal-hash valid/invalid copies and pin the
+partial-commit sibling policy at the private provenance gate.
+
+Run the new RED, frozen 19-case suite, node/object preservation, typecheck,
+owned lint, formatting and diff checks to `.log`; avoid property/5k suites.
+Commit tests only, checkpoint, then start a distinct Codex-high corrective
+GREEN. Do not schedule Fable or Opus and do not consume D.73, Phase 1n or
+optional 0n scope.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
