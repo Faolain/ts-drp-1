@@ -20230,25 +20230,61 @@ Phase 1d(ii) therefore hands off directly to the already-planned distinct
 Phase 1d(iii) history-independence item. It does not close or consume D.73,
 Phase 1n, optional 0n or any other later owner.
 
-## Next Agent Prompt — Phase 1d(iii)
+**Phase 1d(iii) causal RED checkpoint.** Fresh Codex-high tests-only commit
+`b5213e9d01f7aa0b45cd70d7616b9058fa46afe5` adds only
+`checkpoint-pruning-history-independence-1d-iii-red.test.ts` (285 lines;
+SHA-256
+`c3536734dd9975e3bf8626ab3c25535e698ab0249f7eb17238307f22ba2b5d3e`;
+Git blob `53cc989843953ab456a672be53dd023468adc9ea`). The transparent
+`Map` observer wraps the real `HashGraph.vertices` and counts completed
+`keys`, `values`, `entries`, default-iterator and `forEach` traversal, so a
+spelling-only replacement of the whole-history scan cannot satisfy the RED.
+The transparent `DRPStateStore.prune` observer records the retained set and
+the work performed at the actual prune boundary without charging the
+store-owned snapshot scan to the publisher.
 
-Freeze the complete accepted Phase 1d(ii) lineage and this closure checkpoint.
-Start one fresh Codex-high tests-only RED for Phase 1d(iii). The causal RED must
-pin the pre-existing `publisher.ts:701`
-`Array.from(hashGraph.vertices.keys())` whole-history materialization and prove
-work at checkpoint pruning is proportional to the retained root/checkpoint
-frontiers plus post-checkpoint tail/prune write set, not total vertex history.
-Preserve checkpoint-frontier/tail retention, root retention, missing-snapshot
-behavior, owner-store identity, journal rollback and byte-exact current
-semantics. Instrument the actual graph key-enumeration/prune boundary without
-hardcoded history size or timing-only assertions; include a small control and
-one bounded large-history/small-tail differential. Run serialized focused and
-proportionate tests, typechecks, tracked/owned lint and formatting to `.log`.
-Commit tests only, then checkpoint the RED before a distinct production-only
-GREEN. Use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and conditional final
-Claude-skill Opus/xhigh for this separate item. Do not schedule Fable unless
-explicitly requested. Do not consume D.73, Phase 1n or optional 0n, and never
-stage protected untracked paths.
+The frozen differential compares a 12-vertex history with a 192-vertex
+history while holding the retained set at four hashes, the pre-checkpoint tail
+at two vertices and the pruned write set at two snapshot pairs. The semantic
+control passes; the causal assertion fails exactly because current production
+performs 13/13 and 193/193 graph traversal yields, exceeding the permitted
+maximum of 21 in the large case. Postcommit focused runtime was 16 ms. The
+same test preserves root, every checkpoint frontier and the current frontier;
+missing-snapshot behavior; exact retained snapshot identities; checkpoint and
+wire bytes; and journal rollback restoration.
+
+Recorded gates are Phase 1d(ii) 12/12, inherited Phase 1d(i) 147/147,
+proportionate preservation 138/138, D.92.2 64/64 with coverage disabled,
+checkpoint interleaving 1/1, stored-snapshot ownership 5/5, object and
+workspace typecheck (34/35 projects), owned lint 0/0, tracked lint across 670
+files with zero errors and 226 inherited warnings, and formatting. Evidence is
+under `.logs/phase-1d-iii-prune-history-red-codex-high/`; the 18-entry
+manifest SHA-256 is
+`11f30001e678ba2c5a200320bf9bd140b2fd3717b9ec6d4c8cd179aab21a2ed7`
+and verifies from the repository root. A non-authoritative broad legacy
+checkpoint bundle exposed three stale Map-detachment identity expectations
+and one stale rollback result-shape expectation; its synchronous 5k case ran
+past 75 seconds and was stopped. Those stale expectations are diagnostic only,
+were not changed, and are not acceptance gates for this RED.
+
+## Next Agent Prompt — Phase 1d(iii) GREEN
+
+Freeze the complete accepted Phase 1d(ii) lineage, closure checkpoint and
+tests-only Phase 1d(iii) RED `b5213e9`. Start one distinct Codex-high
+production-only GREEN. Remove the pre-existing `publisher.ts:701`
+`Array.from(hashGraph.vertices.keys())` whole-history materialization so the
+frozen RED's publisher-side work is proportional to root/checkpoint frontiers
+plus the post-checkpoint tail/prune write set, not total vertex history. Do not
+substitute another full `Map` traversal spelling or move equivalent O(V) work
+to every merge. Preserve checkpoint-frontier/tail retention, root retention,
+missing-snapshot behavior, owner-store identity, journal rollback, exact
+retained snapshot identities and byte-exact checkpoint/wire semantics. Run
+the frozen focused differential and serialized proportionate tests,
+typechecks, tracked/owned lint and formatting to `.log`; commit production
+only, then checkpoint the GREEN before fresh Grok 4.5/high, exact Kimi
+3/high/dual-100 and conditional final Claude-skill Opus/xhigh. Do not schedule
+another Fable review unless explicitly requested. Do not consume D.73, Phase
+1n or optional 0n, and never stage protected untracked paths.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
