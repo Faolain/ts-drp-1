@@ -24244,22 +24244,53 @@ and artifact-manifest SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-restore-old-ack-corrective-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a high-water corrected preliminary reviews
+## Phase 1m-a high-water preliminary reviews — accepted
 
-Run new fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100
-read-only reviews at the fixed documented HEAD. Authenticate the complete
-three-correction RED/GREEN lineage and evidence. Try to falsify the scalar
-high-water plus retained-restore-token mechanism with single/shared
-controllers, arbitrary honest CAS acknowledgment order, restore capture and
-completion order, reject/throw/malformed outcomes, same/equal/different
-counters, losing CAS, reentrancy and mutable input. Check transient blocked/
-published behavior, ensure high-water cannot regress or strand a supported
-retry, and ensure a stale restore cannot overwrite a newer acknowledgment nor
-an old acknowledgment suppress a newer restore. Recheck canonical/crypto,
-detachment, bounded state, API/dependency/lock and browser boundaries without
-demanding deferred durability/transport/compactor/version-runtime/fleet-drill
-work. No edits, delegation/Fable, web, sealed 100k or unbounded stress. Final
-Opus/xhigh begins only if both fresh preliminary reviewers accept.
+Fresh native Grok 4.5/high session
+`7ca84d77-ad3c-4465-8e2b-43ee47566e55` returned `ACCEPTED` /
+`PHASE1MA_MAY_CLOSE: yes` / `OPUS_MAY_START: yes`. It authenticated the full
+lineage/evidence and found scalar high-water plus retained restore-token
+publication monotonic under honest single/shared-port schedules. In particular
+the evidence-only shared case is a monotone `blocked → 1 → 2` local sequence,
+does not steal the restore token and does not strand replay or next-counter
+liveness. Two raw probe failures used wrong expected values; both are preserved
+and explicitly retracted in the review adjudication rather than omitted.
+Result SHA-256 is
+`c00f6036a8292647752abf452c902a3d5d50d85783e232743efc5383b3bdc151`
+and evidence-manifest SHA-256 is
+`8384b6664113ddc9e2b9720bb33a20134883f51ba503e0600fef4fd407babde6`.
+
+Fresh exact Kimi 3/high/dual-100 session
+`770ae75d-2672-485e-a1af-4835eb83e86b` independently returned the same
+acceptance with no finding. It authenticated all four RED/GREEN owners and
+manifests, then passed 29/29 corrected bounded concurrency assertions. Two
+initial probe failures and two hangs were fixture bookkeeping/scheduling
+mistakes; raw evidence preserves them and the final report explicitly retracts
+them. Final SHA-256 is
+`5eb30448f6db3375dd9be5a3cf16cbbdf40f9296145ffe71bde63494b4626c8d`
+and artifact-manifest-file SHA-256 is
+`b62b651e2d8f4c781fc0d265cc995785c0b5edae336d9b7b44b95074369687c5`.
+Kimi authenticated CLI 1.49.0, exact selector `kimi-code/k3`, effective `k3`,
+thinking and both 100-step caps. Both reviews used no delegation/Fable/web or
+sealed workload and preserved fixed HEAD/tree/index/status/stash/protected-
+untracked invariance. Evidence is under
+`.logs/phase-1m-a-high-water-corrected-green-{grok45-high,kimi3-high-100}-review/`.
+
+## Next Agent Prompt — Phase 1m-a high-water final Opus review
+
+Run one fresh Claude-skill Opus/xhigh read-only adversarial review at the fixed
+documented HEAD. Authenticate the complete original and three corrective
+RED/GREEN lineages, all evidence, and the two accepted preliminary results.
+Try to falsify scalar publication high-water and retained restore-token
+semantics across honest single/shared-port commit/ack/load orderings, including
+stale success/reject/throw, transient blocked-to-disabled publication, equal/
+different counters, losing/malformed outcomes, reentrancy and mutable inputs.
+Demand a causal supported-contract failure, not a lying port or transient
+monotone state, before rejection. Recheck commit-before-effective, canonical/
+crypto, detachment, bounded state, API/dependency/lock and browser safety.
+Respect documented durability/transport/compactor/version-runtime/fleet-drill
+deferrals. No edits, Task/Agent/Fable helpers, web, sealed 100k or unbounded
+stress. Close Phase 1m-a only on explicit final acceptance.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
