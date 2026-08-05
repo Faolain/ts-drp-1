@@ -24020,18 +24020,58 @@ Both reviews preserved fixed HEAD/index/status/stash/protected-untracked
 invariance, used no delegation/Fable/web or sealed workload, and are under
 `.logs/phase-1m-a-restore-race-corrected-green-{grok45-high,kimi3-high-100}-review/`.
 
-## Next Agent Prompt — Phase 1m-a final Opus review
+## Phase 1m-a final Opus finding — corrective delayed-ack RED required
 
-Run one fresh Claude-skill Opus/xhigh read-only adversarial review at the fixed
-documented HEAD. Authenticate the complete RED/GREEN/corrective lineage and
-the two accepted preliminary results. Try to falsify publication-token
-monotonicity across restore/CAS schedules and recheck commit-before-effective,
-canonical/crypto binding, detachment, bounded state, exports/dependencies and
-browser safety. Treat the injected port's honest atomic-CAS semantics as a
-required host contract; do not demand a default durable adapter, transport,
-compactor, runtime version coexistence or fleet drill from 1m-a. No edits,
-Task/Agent/Fable helpers, web, sealed 100k or unbounded stress. Close Phase
-1m-a only on explicit final acceptance.
+Fresh Claude-skill Opus/xhigh session
+`b0d1c07f-1a1c-4ec2-90f6-afb7d91f194a` returned
+`CHANGES_REQUESTED` / `PHASE1MA_MAY_CLOSE: no`. It authenticated the full
+lineage, preliminary reviews and evidence, retained all previously accepted
+canonical/crypto/API/browser boundaries, and found one distinct in-scope
+publication race at
+`packages/control-plane/src/signed-disable.ts:259-260`.
+
+An honest atomic port may linearize compare-and-commit immediately while its
+truthful committed acknowledgment resolves later. Opus reproduced this
+schedule twice: apply envelope E1 commits counter 1 with a delayed
+acknowledgment; `restore()` loads and publishes counter 1; apply E2 commits and
+publishes counter 2; then E1's older acknowledgment resolves and the current
+unconditional post-await assignment republishes counter 1 while the port
+remains at counter 2. E3 and exact E2 subsequently return
+`state-commit-failed` rather than advancing and classifying replay until
+another restore. This is neither a lying port nor ordinary losing-CAS
+contention. It violates the local monotonic latch and commit/publication
+contract owned by 1m-a.
+
+Opus confirmed only in an isolated review bundle that a narrow monotonic
+post-ack publication guard can retain the frozen restore matrix and close this
+schedule; no tracked production was changed, so that observation is guidance
+rather than accepted GREEN evidence. Result SHA-256 is
+`f324964f97185a51d35ff116324cbb07b761f2377bff8017133a5c325f6a2bf3`
+and full-manifest SHA-256 is
+`9e61a3dca1d9236193af0ad00deaaf298b11d6f5b335fc71a918dcf12d52af95`.
+The effective model was `claude-opus-5` at xhigh; native metadata records only
+a tiny automatic Haiku envelope/helper use of 2,346 input / 26 output tokens,
+with no substantive helper, Agent/Task/Fable delegation or web use. Fixed
+HEAD/tree/index/status/stash/protected-untracked invariance held. Evidence is
+under
+`.logs/phase-1m-a-restore-race-corrected-green-final-opus-xhigh-review/`.
+
+## Next Agent Prompt — Phase 1m-a delayed-ack corrective RED
+
+Start a fresh Codex-high tests-only RED at the documented HEAD. Add the
+smallest bounded honest atomic-port fixture that separates commit
+linearization from acknowledgment resolution and freezes the exact
+E1-commit/delayed-ack → restore/publish-E1 → E2-commit/publish → E1-ack
+schedule. Positively prove storage remains at E2 while the current controller
+regresses to E1, then require local E2 retention, exact-E2 replay and E3
+progress without a repair restore. Include both deliberate deferred
+acknowledgments and a natural unequal-latency form so the RED is not tautology,
+plus safe controls for ordinary loser/retry and the frozen restore-race owner.
+Do not change production, existing tests, the plan, dependencies, generated
+files or lockfile; do not add a queue, scheduler, compatibility layer or
+general concurrency framework. Run focused RED, complete control-plane
+preservation, ordered build/typecheck, lint, formatting and exact-diff gates
+to `.logs`; no sealed 100k or unbounded stress.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
