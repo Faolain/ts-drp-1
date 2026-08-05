@@ -23181,36 +23181,72 @@ verified manifest SHA-256 is
 and patch SHA-256 is
 `86e296097118a0d3c6e775b7ff1f4ab0cb342047e0d679bc655ce61c673b2bdd`.
 
-## Next Agent Prompt — Phase 1k production GREEN, transport-bound
+## Phase 1k transport-bound production GREEN checkpoint — awaiting review
 
-Start a distinct fresh Codex-high production-only GREEN against both frozen
-REDs `b5b1d95` and `1516430`. Bind direct ingress to authenticated
-`connection.remotePeer` and signed gossipsub ingress to authenticated original
-publisher `msg.from` before the node queue/handler sees the message; never use
-the claimed application sender for resource attribution or disconnect. Preserve
-honest equality and current routing/object semantics.
+Freeze distinct fresh Codex-high production-only GREEN
+`d1a8c27010d7ba987d65f0efa52008182783c32f` against tests-only REDs
+`b5b1d95` and `1516430`. Its exact three-file production scope is 94 insertions
+/ 16 deletions across `packages/network/src/node.ts`,
+`packages/node/src/handlers.ts` and `packages/node/src/index.ts`.
 
-At the authenticated handler/object boundary, aggregate only authentication
-failures and deterministic-invalid `result[2]` occurrences across UPDATE,
-SYNC_ACCEPT and object IDs. Disconnect exactly on occurrence 10,000, publish
-exhaustion before the fallible asynchronous call, suppress later exhausted-peer
-ingress/recovery, and catch disconnect failure without retry storms. Do not
-charge missing or transient quarantine, shrink/expose the object tombstone
-cache, or change non-exhausted sync-recovery semantics. Bound invalid-debt
-cardinality at no more than 256 peers with fail-closed admission for a new
-invalid debtor; never evict an active peer's accumulated debt merely to admit
-another. Clear node-lifetime state at stop without turning reconnect into an
-in-process budget bypass. Do not add test hooks, special-case fixtures or alter
-tests, the plan, generated files, locks or protected untracked assets.
+Network ingress now overwrites self-declared application sender data at the
+first authenticated boundary. Direct protocol messages use libp2p
+`connection.remotePeer`; explicit StrictSign gossipsub accepts only a signed
+message and uses its original publisher `msg.from`, never the claimed payload
+sender or propagation relay. One shared decode helper feeds the existing
+message queue, preserving honest equality and routing semantics.
 
-Run both focused RED owners, real network/node preservation, sync recovery,
-authenticated ingress and sync-livelock preservation, ordered builds,
-typecheck, tracked lint, formatting and diff gates to
-`.logs/phase-1k-invalid-vertex-budget-green2-codex-high/`. Preserve the exact
-three inherited Phase 1n sentinel failures and exact object 5 / node 2
-typecheck diagnostics; do not rerun either sealed 100k workload. Commit
-production only, then use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
-final Claude-skill Opus/xhigh review; no Fable.
+The node handler owns one node-lifetime `WeakMap` whose inner map is capped at
+256 invalid-debt peers. It counts only authenticated merge `result[2]`
+occurrences (including authentication and deterministic application failures)
+across UPDATE, SYNC_ACCEPT and object identifiers. Missing, trusted duplicate
+and handler-invisible transient quarantine are not charged. Occurrence 10,000
+saturates the counter and publishes exhaustion before one caught asynchronous
+disconnect. Later messages from a stored exhausted peer are dropped before
+schema/handler work. The current exhausting message still completes any valid
+mixed-batch persistence, event, finality and signing bookkeeping; only missing
+recovery is suppressed. All node-owned accounting is cleared after stop.
+
+At full ledger capacity, a previously untracked proven-invalid sender is
+dropped and disconnected without evicting an active debtor and without adding
+unbounded overflow state. Because it is deliberately not remembered, repeated
+test-level bypass injection after a completed/failed hangup can cause another
+disconnect attempt; real transport hangup normally removes that ingress. This
+fixed-space tradeoff is an explicit acceptance-review target, not silently
+treated as proven one-shot behavior for untracked overflow identities.
+
+Both focused RED owners are 6/6. Proportional network/node/sync/authentication
+preservation is 49 passed plus the exact three inherited Phase 1n
+sync-livelock failures; extra lifecycle and rejected-boundary preservation is
+26/26. Ordered `types`, `object`, `validation`, `network` and `node` builds
+pass. Workspace/package typecheck retains exactly the inherited object 5 /
+node 2 diagnostics. Touched and git-tracked lint have zero errors, and
+format/diff gates pass. Neither sealed 100k workload was rerun. Evidence is
+under `.logs/phase-1k-invalid-vertex-budget-green2-codex-high/`; verified
+manifest SHA-256 is
+`2260d263de2875b9d1eb997f05d31c97bfe633076e4a7066300b1569b4be2d04`,
+production patch SHA-256 is
+`325f2889ac275d7af2a90b455abe54f9e86d99f3527203ece9e43c3c8c7cba4d`,
+focused log SHA-256 is
+`f078752bc233b590b78e2810bc06b0753adfc5a60e8063e04792b61946dc72ad`
+and preservation log SHA-256 is
+`94b81f226e7425ce48eca4b87ef6514baa73b158f09dda03ffb026e8cf2e5998`.
+
+## Next Agent Prompt — Phase 1k acceptance
+
+Review frozen REDs `b5b1d95` / `1516430` and production GREEN `d1a8c27` as
+one Phase 1k candidate using fresh Grok 4.5/high and exact Kimi
+3/high/dual-100, followed by final Claude-skill Opus/xhigh only if both
+preliminary reviewers accept. Require source tracing of direct and gossipsub
+authenticated identity, forged-victim resistance, exact 9,999/10,000
+thresholds, cross-object/message aggregation, charged classification taxonomy,
+mixed-batch publication truth, stop lifecycle, finite peer-key cardinality,
+fail-closed capacity behavior, disconnect rejection handling and the explicit
+unremembered-overflow tradeoff. Probe for bypass through malformed messages,
+empty/known batches, partial-result exception paths, repeated overflow senders,
+restarts, pubsub relays and direct handler calls without expanding Phase 1k
+into Phase 1n sync redesign. Reviewers may run bounded focused tests but must
+not rerun either sealed 100k workload. Do not use Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
