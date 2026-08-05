@@ -22890,23 +22890,47 @@ under `.logs/phase-1i-b-stale-applier-race-red-codex-high/`; ledger SHA-256 is
 and verified manifest SHA-256 is
 `7abbf81d12aba265f72f27c3b551780bb8577136096a99c53519fd16fd32abac`.
 
-## Next Agent Prompt — Phase 1i-b stale-applier race GREEN
+**Phase 1i-b stale-applier race production GREEN checkpoint.** Distinct fresh
+Codex-high commit `74fa960` changes only `packages/object/src/index.ts` by 46
+insertions / 3 deletions. Every applier notification is bound to the identity
+of its owning runtime. At the synchronous post-commit boundary, an installed
+compact applier admits committed hashes and increments the capability revision
+before external notification. Commit-first therefore invalidates an in-flight
+rehydration candidate. If full-runtime adoption wins first, the stale applier's
+notification is suppressed and its absent committed hashes are returned as a
+transient `quarantined` result with `applied:false`; arbitrary DRP code is not
+re-executed against the replacement runtime. The public result/event stream
+therefore describes the installed runtime without holding a broad lock across
+authentication or candidate replay.
 
-Use a distinct fresh Codex-high production-only GREEN on frozen RED `d74b56e`.
-Close the admit/rehydrate replacement window at the runtime owner: a commit
-raced against successful rehydration must either join the installed runtime or
-fail without a success result or notification. Preserve the passing
-state-changing and non-racing controls, complete authenticated rehydration,
-private capability ownership, compact inventory/payload truth, sync,
-authorship/finality denial and all Phase 1i-a behavior. Do not add public test
-hooks, compatibility setters, polling sleeps or eventual-sync repair. Keep the
-change narrowly production-owned and avoid holding a broad lock across
-cryptographic verification/replay if a bounded commit barrier suffices. Run
-the focused Phase 1i-b, Phase 1i-a, proportional, direct, build, typecheck,
-lint, format and diff gates sequentially to `.log`; authenticate but do not
-rerun either sealed 100k workload. Commit production only, then restart fresh
-Grok 4.5/high, exact Kimi 3/high/dual-100 and final Claude-skill Opus/xhigh.
-Do not schedule Fable.
+The frozen focused suite is 17 passed / 1 opt-in skip, reclosed Phase 1i-a is
+22 passed / 1 skip, proportional preservation is 69/69 and direct object/node
+is 49/49. Fresh ordered four-package builds pass; types/validation typechecks
+are clean; object/node retain exactly the frozen 5+2 correlated-fixture
+diagnostics. Touched production lint is clean, tracked lint is zero errors / 230
+inherited warnings, and format/diff checks pass. An initial focused run correctly
+rejected stale pre-patch object `dist`; it is superseded by the final run after
+the ordered build. Both sealed 100k evidence manifests reverified byte-for-byte
+without rerunning either workload. Evidence is under
+`.logs/phase-1i-b-stale-applier-race-green-codex-high/`; ledger SHA-256 is
+`381c732cc7443085cd86edfa4642c8b4a4bd486fb1e3d1d0ee7648b3d434fb6a`
+and verified manifest SHA-256 is
+`a35c845e1fe3a4db19e8544e333530e7997d7df39e5ebdebbb9e366950c9a7a8`.
+
+## Next Agent Prompt — Phase 1i-b stale-applier final acceptance
+
+Review production lineage `54c894e`, `683b86a` and `74fa960` against frozen
+REDs `fb0f662`, `823b337` and `d74b56e`. Start fresh Grok 4.5/high; only after
+acceptance use exact Kimi 3/high/dual-100, then final Claude-skill Opus/xhigh.
+Independently attack both commit-first and adoption-first schedules, nested or
+multi-vertex batches, partial failures, callback exceptions, duplicate/known
+hashes, capability revision ordering, notification/result truth and the
+semantic suitability of transient quarantine. Confirm no stale applier can
+mutate installed inventory after adoption and no installed compact commit can
+escape the final rehydration guard. Reaudit private capability, complete
+rehydration, sync/authorship/finality and sealed evidence applicability. Do not
+rerun either 100k workload, mutate tracked files or schedule Fable. A blocker
+returns to a fresh RED; Opus runs only after Grok and Kimi both accept.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
