@@ -22862,19 +22862,51 @@ explicitly retracted. The exact Kimi session was
 SHA-256 `9ebe5f567166e4096d75bb597fb9b885fe345e3e7f11e01addc329fcfd9718fc`.
 Final Opus was correctly skipped.
 
-## Next Agent Prompt — Phase 1i-b stale-applier race RED
+**Phase 1i-b stale-applier race tests-only RED checkpoint.** Fresh Codex-high
+commit `d74b56e` changes only the existing object Phase 1i-b test owner by 210
+insertions / 1 deletion. A real asynchronous DRP operation and explicit
+entered/release promises deterministically pause a signed value-equal vertex
+after the compact runtime is selected. Complete authenticated rehydration then
+installs the full replacement runtime before the old operation resumes. The
+authoritative sequential focused result is exactly 1 failed / 16 passed / 1
+opt-in skip: current production reports `applied:true` and notifies the raced
+hash while installed `historyInventory` and `readHistory` omit it. A
+state-changing overlap remains truthful by rejecting stale rehydration while
+the application succeeds, notifies, remains inventoried/readable and retains
+its state change. A non-racing value-equal operation likewise succeeds,
+notifies, is inventoried/readable and participates in a later complete
+rehydration. These controls forbid disabling notifications, rejecting all
+concurrency/value-equal work or weakening rehydration as a superficial GREEN.
 
-Use a fresh Codex-high tests-only RED on the rejection checkpoint. Reproduce the
-value-equal old-applier/rehydration interleaving through the public object path
-with deterministic barriers, not timing sleeps. Prove that the current
-candidate can report `applied:true` and notify for a hash absent from
-`historyInventory`/`readHistory` after successful complete rehydration. Include
-state-changing and non-racing controls so the test cannot pass by rejecting all
-concurrency or weakening rehydration. Change no production or plan files, do
-not rerun either sealed 100k workload, and run the focused Phase 1i-b,
-Phase 1i-a, proportional, direct, typecheck and touched-lint gates to `.log`.
-Commit the minimum tests-only RED before assigning a distinct fresh Codex-high
-GREEN. Do not schedule Fable.
+Reclosed Phase 1i-a is 22 passed / 1 skip, proportional preservation is 69/69
+and direct object/node is 49/49. Ordered four-package builds pass;
+types/validation typechecks are clean; object/node retain exactly the frozen
+5+2 correlated-type diagnostics and the new race code adds none. Touched and
+tracked lint, Prettier and diff checks pass. Initial parallel Vitest logs with
+shared `coverage/.tmp` collisions are explicitly superseded by later clean
+sequential authoritative runs. Neither sealed 100k workload ran. Evidence is
+under `.logs/phase-1i-b-stale-applier-race-red-codex-high/`; ledger SHA-256 is
+`55fa7fc1d799d60675d14840876dd4098aa0b4e1eb037c52fc4ad9ecb6f55c31`
+and verified manifest SHA-256 is
+`7abbf81d12aba265f72f27c3b551780bb8577136096a99c53519fd16fd32abac`.
+
+## Next Agent Prompt — Phase 1i-b stale-applier race GREEN
+
+Use a distinct fresh Codex-high production-only GREEN on frozen RED `d74b56e`.
+Close the admit/rehydrate replacement window at the runtime owner: a commit
+raced against successful rehydration must either join the installed runtime or
+fail without a success result or notification. Preserve the passing
+state-changing and non-racing controls, complete authenticated rehydration,
+private capability ownership, compact inventory/payload truth, sync,
+authorship/finality denial and all Phase 1i-a behavior. Do not add public test
+hooks, compatibility setters, polling sleeps or eventual-sync repair. Keep the
+change narrowly production-owned and avoid holding a broad lock across
+cryptographic verification/replay if a bounded commit barrier suffices. Run
+the focused Phase 1i-b, Phase 1i-a, proportional, direct, build, typecheck,
+lint, format and diff gates sequentially to `.log`; authenticate but do not
+rerun either sealed 100k workload. Commit production only, then restart fresh
+Grok 4.5/high, exact Kimi 3/high/dual-100 and final Claude-skill Opus/xhigh.
+Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
