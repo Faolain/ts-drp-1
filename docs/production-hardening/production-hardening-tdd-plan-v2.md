@@ -23553,20 +23553,64 @@ interrupted it; it made no edits, returned no finding and reached neither
 sealed 100k workload. Only the bounded coverage-disabled artifacts above are
 authoritative.
 
-## Next Agent Prompt — Phase 1l custom-ID corrective GREEN
+## Phase 1l first corrective GREEN attempt — superseded before commit
 
-Implement a distinct production-only GREEN against `8923bae8`. Before creating
-an omitted-ACL product object with a caller-supplied ID, require
-`creatorFromObjectID(id)` to equal the local peer; reject plain or foreign-bound
-IDs before constructing/storing/subscribing/scheduling the object. Generated
-IDs and explicitly self-bound IDs retain the creator-only default. Explicitly
-supplied ACL remains authoritative for arbitrary IDs, and connect behavior from
-`29bce202` remains unchanged. Add no mode flag, low-level change, migration,
-test hook or remote-root adoption. Turn the corrective 2F/2P into 4/4, preserve
-the frozen 6/6 owner, exact 41P+Phase1n-3F census and 30/30 controls, and rerun
-ordered builds/typecheck/lint/format/diff gates without sealed 100k. Then start
-fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and gated final Opus/xhigh. No
-Fable.
+The first distinct Codex-high production draft added only the intended
+seven-line pre-publication guard to `packages/node/src/index.ts`. It was not
+committed. It turned the corrective owner 4/4, preserved the frozen Phase 1l
+owner 6/6 and retained the six-file census at 41 passed plus the inherited
+Phase 1n 3F sentinel. The broader nearby preservation gate, however, was only
+19 passed / 11 failed: eight rejected-boundary-consumer cases and one case each
+in dependencies, validation and room-presence retraction still created plain
+custom IDs with omitted ACL. All eleven fail at the newly required boundary.
+
+The draft was restored cleanly to HEAD `c949c01`; no production candidate or
+commit exists. Its exact superseded patch SHA-256 is
+`d267b06d1a50408a0bf5894f174185c88ef2a4806ae9ab54487a9cb9c501a637`,
+ledger SHA-256 is
+`15c1691a6050dc3d6f1c6f0709666d6fff1cb38c1ce2c2d3f08f6f1545c9449b`,
+`SHA256SUMS` SHA-256 is
+`f9a0fd56e7c451666da72eb6e9b30a34322da6ce5e2a0eeb4f905452e7317cf3`
+and verified manifest-file SHA-256 is
+`82bac1ebb011c24d35e0aac8513c7ffbd3b5752d3cdaf093fdd889f81f92a02b`.
+Ordered builds and types typecheck passed; object retained exactly its five
+inherited diagnostics. Remaining gates stopped at the preservation blocker,
+and neither sealed 100k workload ran. Evidence is under
+`.logs/phase-1l-custom-id-corrective-green-codex-high/`.
+
+This is a census defect, not permission to restore unsafe inference. Before
+another GREEN, perform one bounded repository-wide semantic call-site audit of
+public `DRPNode.createObject` calls that supply `id`. Classify each as already
+explicit-ACL, generated/self-bound, outside the affected public API, or an
+omitted-ACL custom-ID fixture requiring migration. Use `rg` plus direct source
+inspection; do not build an AST/source analyzer. Preserve each fixture's
+authorization purpose with fresh equivalent ACL instances on every replica,
+and report product/example source callers separately instead of silently
+changing them in a tests-only RED.
+
+## Next Agent Prompt — Phase 1l comprehensive call-site migration RED
+
+Start a fresh Codex-high tests-only corrective RED from `c949c01`. Inspect and
+classify every repository call site of public `DRPNode.createObject` that
+supplies an explicit `id`; do not stop at the eleven failures above. Migrate
+all affected test, benchmark and property-fixture callers with omitted ACL to
+fresh explicit equivalent ACLs at every create/connect replica. Preserve
+permissionless multi-writer fixtures as explicitly permissionless, preserve
+keyed/multi-admin finality fixtures with fresh equivalent keyed ACLs, and use
+creator-only ACL only where authorization is the test's purpose. Never reuse a
+mutable ACL instance between replicas.
+
+Do not modify production, this plan, generated files, lockfiles, the frozen
+original Phase 1l owner or the frozen custom-ID causal owner. If a real
+production/example/network-spike source caller needs migration, record its
+path and semantics as a GREEN blocker rather than changing it. The causal RED
+must remain exactly the missing plain/foreign omitted-ACL rejection on current
+production, while the comprehensive affected-caller census preserves its
+prior outcomes apart from already documented inherited sentinels. Run ordered
+builds, proportional typecheck/lint/format/diff and every classified bounded
+owner coverage-disabled to `.logs`; do not run either sealed 100k workload.
+Commit only the tests-only migration and evidence ledger. Then hand off to a
+distinct fresh Codex-high production GREEN. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
