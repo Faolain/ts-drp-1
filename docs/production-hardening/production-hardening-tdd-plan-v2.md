@@ -23299,22 +23299,56 @@ preservation SHA-256 is
 and verified 27-entry manifest SHA-256 is
 `a3fad74fca7c41b0101dc3153677ee3281399db129dc90ce989bfe44a59a8922`.
 
-## Next Agent Prompt — Phase 1k key/publisher corrective GREEN
+## Phase 1k key/publisher corrective production GREEN checkpoint — awaiting review
 
-Implement the smallest production-only binding at the gossipsub event boundary
-against frozen RED `77a6e16`. A delivered signed message is attributable to
-`msg.from` only when its public key derives that exact peer ID; otherwise drop
-it before application decode/queueing. Preserve direct
-`connection.remotePeer`, matched non-inline RSA, matched inline Ed25519/
-secp256k1, relay-vs-publisher semantics and all previously frozen Phase 1k
-budget behavior. Prefer installed peer-id/crypto primitives over a local hash
-reimplementation. Do not patch the dependency, add a test hook, weaken the
-RED, add a second accounting identity, or expand into Phase 1n. Run the focused
-1F/2P owner to green, the complete Phase 1k focused owners, proportional
-network/node preservation, ordered builds, relevant typecheck/lint/format/diff
-gates, and no sealed 100k workload. Then restart fresh Grok 4.5/high, exact
-Kimi 3/high/dual-100 and final Claude-skill Opus/xhigh acceptance. Do not use
-Fable.
+Freeze distinct fresh Codex-high production-only GREEN
+`46a70c782d3ef49ebf2022aae386ef98bd77b3c4` against corrective RED
+`77a6e16`. Its exact scope is `packages/network/src/node.ts`, six insertions /
+one deletion. The existing StrictSign listener now derives a peer ID from the
+delivered message key with the installed `peerIdFromPublicKey` primitive,
+requires exact equality with `msg.from`, and catches/drops invalid or
+unsupported forms before application decode and queueing. It does not alter
+the direct `connection.remotePeer` path, publisher-vs-relay selection, payload
+sender overwrite, accounting state or dependency source.
+
+The corrective owner is 3/3 and all three frozen Phase 1k focused owners are
+9/9. Network/node/authentication/sync preservation is 49 passed plus the exact
+three inherited Phase 1n sync-livelock failures; lifecycle, handler and
+rejected-boundary preservation is 26/26. Ordered `types`, `object`,
+`validation`, `network` and `node` builds pass. Network typecheck passes;
+workspace recursive typecheck reaches only the five inherited compact-history
+object diagnostics. Touched and git-tracked lint have zero errors, and
+format/diff gates pass. Neither sealed 100k workload ran. The first combined
+focused log was captured before the long budget worker printed its footer; the
+authoritative sealed rerun has the complete three-file / nine-test footer.
+
+Evidence is under
+`.logs/phase-1k-key-publisher-binding-green-codex-high/`. Production patch
+SHA-256 is
+`e94dcfc41330fc6e849ed103030e16352452010054ecc9e2d921626742d06ef7`,
+ledger SHA-256 is
+`d905e4837a9f15bcea0e636cc32322ac909e82d5cb6e6c4432933f73fe2b8417`
+and verified 36-entry manifest SHA-256 is
+`4e8b6988b86e5583b54fa722b2677507ba54b5bb16dddc5d501ea0ad3ad09884`.
+All frozen tests and 66,983 protected entries remained byte-identical; the
+protected stash object is unchanged.
+
+## Next Agent Prompt — Phase 1k corrected acceptance
+
+Review the complete Phase 1k lineage, with special focus on frozen corrective
+RED `77a6e16` and production GREEN `46a70c78`, using fresh Grok 4.5/high and
+exact Kimi 3/high/dual-100 in parallel. Only if both accept, run final
+Claude-skill Opus/xhigh. Re-authenticate the installed StrictSign behavior and
+prove that every delivered signed message now binds its key to `msg.from`
+before attribution, including matched/mismatched RSA non-inline and ordinary
+inline identities. Preserve the direct authenticated remote peer, original
+publisher rather than relay, payload overwrite, exact 9,999/10,000 budget,
+cross-object/message aggregation, mixed/partial publication truth, finite 256
+ledger, stop cleanup and honest path. Treat unsupported key forms and binding
+exceptions as fail-closed. Probe for a second queue listener, alternate pubsub
+event, or decode path that bypasses the check, but do not expand into Phase 1n
+or rerun either sealed 100k workload. Require repository invariance and full
+model/session/artifact authentication. Do not use Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
