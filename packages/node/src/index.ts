@@ -19,7 +19,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
-import { createPermissionlessACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
+import { createACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	AddressPolicy,
 	createCompositeRendezvousDirectory,
@@ -1240,7 +1240,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				: ({ history_storage: "full", replica_mode: options.replica_mode } as const);
 		const object = new DRPObject<T>({
 			peerId: this.networkNode.peerId,
-			acl: options.acl ?? createPermissionlessACL(this.networkNode.peerId),
+			acl: options.acl ?? createACL({ admins: this.networkNode.peerId }),
 			drp: options.drp,
 			id: options.id,
 			metrics: options.metrics,
@@ -1282,9 +1282,18 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			options.history_storage === "compact"
 				? ({ history_storage: "compact", replica_mode: "observer" } as const)
 				: ({ history_storage: "full", replica_mode: options.replica_mode } as const);
+		let acl = options.acl;
+		if (acl === undefined) {
+			const creator = creatorFromObjectID(options.id);
+			if (creator === undefined) {
+				throw new Error("A creator-bound object id must be provided when acl is omitted");
+			}
+			acl = createACL({ admins: creator });
+		}
 		const object = new DRPObject<T>({
 			peerId: this.networkNode.peerId,
 			id: options.id,
+			acl,
 			drp: options.drp,
 			metrics: options.metrics,
 			config: {
