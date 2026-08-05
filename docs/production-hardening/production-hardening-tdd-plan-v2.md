@@ -23022,18 +23022,77 @@ verified manifest SHA-256 is
 and production patch SHA-256 is
 `ad6c57076b38c48ff10a7321b7b38dcc8bdd6d6b6ebf60ca7a06ab320f9f4a6f`.
 
-## Next Agent Prompt — Phase 1j acceptance
+## Phase 1j final acceptance and closure
 
-Review frozen RED `77ca8c40` and production GREEN `55fac22` as one Phase 1j
-candidate using the normal fresh sequence: Grok 4.5/high, exact Kimi 3 with
-thinking and both 100-step controls, then final Claude-skill Opus/xhigh. Require
-each reviewer to verify the validated handler path, zero non-root serialized
-state work/payload, root join preservation, shared header-only response and
-event dispatch, wire truthfulness, tests' causal strength, scope purity and the
-recorded inherited diagnostics. A reviewer may run bounded focused tests but
-must not rerun either sealed 100k workload. Do not begin Opus unless Grok and
-Kimi accept. Do not fold Phase 1d(iii), D.73, 1k/1n/1o, optional 0n or Fable
-into this acceptance.
+Fresh native Grok 4.5/high, exact Kimi 3/high/dual-100 and final
+Claude-skill Opus 5/xhigh independently accepted tests-only RED `77ca8c40` and
+production GREEN `55fac22`. All returned `VERDICT: ACCEPTED`,
+`PHASE1J_MAY_CLOSE=yes` and `NEXT_PHASE_MAY_RESUME=yes`. They verified the real
+validated handler path, zero non-root serialized-state reads, codec work and
+snapshot payload, preservation of the root join payload, the shared
+header-only response/event path, wire truthfulness, causal test strength,
+scope purity and the recorded inherited diagnostics. No candidate-caused
+blocker remains, and neither sealed 100k workload was rerun.
+
+Grok session `5da373d9-b805-433e-872c-e306d2892fd0` used effective sole model
+`grok-4.5-build` at high effort. Native-final SHA-256 is
+`68d74370d0769eeaf1455a3145d024b612cab8c67c47c5422ab207144644bd2a`
+and verified manifest SHA-256 is
+`b3f68046bac1129324601471e70ac658e64c2bc0a2d5d0e1a407181d791264eb`.
+Exact Kimi session `ca9ae11c-835f-44cd-9ec8-10f07fcbb1e6` used legacy
+`kimi-cli`, selector `kimi-code/k3`, thinking and both 100-step controls; native
+final SHA-256 is
+`477f3b98edb9353c20e8d51127889e2d51d1e1720d83a1e4ddc6c733e0b399e7`
+and verified manifest SHA-256 is
+`479c58d7e54117498624c2dbef017ffead095fe22401a313a92fde341823dd29`.
+Its initial manifest executions from the wrong working directory were
+explicitly retracted and superseded by clean repository-root reruns that
+authenticated RED and GREEN. Final Opus session
+`1c52d3c6-bae9-47cf-96ad-a006f095ebd5` used substantive `claude-opus-5` at
+requested xhigh effort; native-final SHA-256 is
+`4e9a922ac2cc773debfd97d01dc5f9a81c617b1ae81b60f05521eb1198a27d88`
+and verified manifest SHA-256 is
+`d73a637afaf3c080b1c630f570ccdce0811054fd6f0345262fc908f73ec6cc41`.
+Native metering disclosed a non-substantive automatic Haiku helper with 20
+output tokens; it produced no assistant/tool/analysis/verdict event and is
+permitted by the user. Review worktree, index, protected stash and untracked
+state remained invariant. Evidence is under
+`.logs/phase-1j-fetch-state-amplification-green-{grok45-high,kimi3-high-100,opus-xhigh}-review/`.
+
+Keep the accepted nonblocking ledger visible: header-only receiver handling
+still emits the inherited `No state found` diagnostic; the two superseded
+tests retain harmless unused `getVertex` mock scaffolding; the GREEN source
+binding is independently reproduced through its authenticated patch digest;
+object/node retain exactly the inherited 5+2 correlated-fixture type
+diagnostics; and the untouched legacy object owner retains 18 inherited
+failures. O(1) header/event work is intentionally outside this amplification
+boundary. Live root-request budgets belong to later resource-governance work.
+Phase 1j closes at production `55fac22`.
+
+## Next Agent Prompt — Phase 1k invalid-vertex budget RED
+
+Start a fresh Codex-high tests-only RED for the Phase 1k row. First audit the
+existing `recoverMissingSync` episode limiter and `sync-recovery.test.ts`: they
+already bound retries per `(objectId, sender)` and emit `DRP_SYNC_REJECTED`, so
+the RED must neither duplicate that partial protection nor mistake it for the
+required per-peer invalid-vertex budget and disconnect boundary. Drive the real
+validated message-handler path with one attacker rotating distinct invalid
+vertices/hashes, including across object identifiers where applicable. Prove
+with causal counters that recovery/re-request work stays bounded for that peer
+and that budget exhaustion disconnects it exactly once, while an honest peer
+remains usable and trusted duplicate, signed-missing or transient-quarantine
+inputs are not falsely charged. The 10k case is a behavioral characterization,
+not a heap-memory assertion; keep normal iteration bounded and do not rerun
+either sealed 100k workload.
+
+RED may change tests only, must not change production or this plan, and should
+reuse public/real seams rather than add a test hook. Run focused preservation,
+ordered builds, typecheck, lint, formatting and diff gates to
+`.logs/phase-1k-invalid-vertex-budget-red-codex-high/`, separating inherited
+diagnostics from new failures. If the current partial limiter makes the exact
+Phase 1k contract pass, or source inspection reveals that the contract itself
+needs amendment, stop without changing the plan: amendment requires fresh
+agreement from Opus/xhigh, Codex-high and exact Kimi 3/high/dual-100.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
