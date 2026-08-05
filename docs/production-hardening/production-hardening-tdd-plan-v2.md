@@ -22605,21 +22605,43 @@ top-level governed keys. It may use replay attribution only as an optimization
 that cannot suppress completeness. This remains a top-level state comparison,
 not a graph/history scan or value-type matrix.
 
-## Next Agent Prompt — conditional no-write canonical-live RED
+**Conditional no-write canonical-live tests-only RED checkpoint.** Fresh
+Codex-high commit `52a84bc` adds one operation and one signed semantic test to
+the existing Phase 1i-a owner, changing exactly that test file by 135
+insertions / 1 deletion. D establishes `x=1,y=0`; A conditionally writes `y=1`
+only when `x===1`; sibling B writes `x=0`; subject D,A,B and oracle D,B,A share
+identical signed hashes, frontier and canonical D-to-B-to-A order; C joins
+`[B,A]` with checkpoint suffix size one. Current `ff5dc7e` fails one test with
+exactly five stale-`y` views: immediate subject live, B/A checkpoint, C live, C
+stored pair and C serialized bytes. B's causal pair/bytes, the oracle, signed
+identity/order and the subject D-to-A `y=1` precondition all pass. Final owner is
+1 failed / 14 passed; combined causal is 1 failed / 48 passed; Phase 1i-a is 1
+failed / 21 passed / 1 opt-in 100k skip; D.92 is 53/53; object/node/direct is
+46/46, 51/51, 35/35 and 10/10. Typechecks retain exact 13/35/16 inherited
+diagnostics, validation passes, tracked lint is zero errors / 230 inherited
+warnings, and owned format/lint/diff pass. An initial parallel Vitest batch hit
+a shared coverage/temp collision; only the clean sequential replacement logs
+are acceptance evidence. No 100k ran. Evidence is under
+`.logs/phase-1i-a-conditional-no-write-red-codex-high/`; ledger SHA-256 is
+`3aaa87799f19394250dbace8e4d9d89cf349a0c80e2425d9a64a77dee2b7ccb2`
+and verified manifest SHA-256 is
+`cc76daf5c3fade6bf6ee9d36af3cdb18b9564b4ee6c4731acd5c036862e45fb6`.
 
-Use a fresh Codex-high tests-only RED on `ff5dc7e`. Add one signed semantic
-case beside the existing CrossKeyTail fixtures: D establishes `x=1,y=0`; A
-conditionally writes `y=1` only when `x===1`; concurrent B writes `x=0`;
-subject arrival D,A,B and oracle D,B,A share identical hashes, frontier and
-canonical D-to-B-to-A order; joined C depends `[B,A]` under checkpoint suffix
-size one. Freeze subject/oracle immediate live equality, B causal pair/bytes,
-B/A checkpoint state and C live/stored pair/bytes. Current production must fail
-only the stale canonical-live/checkpoint views. Do not add branch, collection,
-setter or syntax variants, modify production/plan, or run 100k. Then use a
-distinct Codex-high GREEN implementing bounded complete top-level
-instance-versus-baseline capture while preserving causal stored pairs, copy
-truth, rollback/raw/setter behavior and quick-iteration meters. Restart Grok,
-exact Kimi 3 and Opus only after GREEN. Do not schedule Fable.
+## Next Agent Prompt — complete canonical-live capture GREEN
+
+Use a distinct fresh Codex-high production-only GREEN on `52a84bc`. Replace
+replay candidate keys as the canonical-live completeness oracle with a bounded
+complete comparison of the prepared canonical instance and previous
+live/checkpoint baseline over the union of their governed top-level keys.
+Replay attribution may remain as a truthful optimization or be simplified, but
+it may not suppress keys from completeness. Preserve causal stored pairs,
+direct-dependency retention, key order/addition/deletion, both ACL/DRP sides,
+copy/comparison attribution, rollback/raw/setter semantics and failure
+atomicity. This must remain O(top-level governed state), not O(history), a graph
+scan, blanket clone or threshold shortcut. Validate ballast/meter quick
+iteration explicitly. Do not change tests/plan, touch inherited residuals or
+run 100k. After a green commit restart Grok, exact Kimi 3 and Opus. Do not
+schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
