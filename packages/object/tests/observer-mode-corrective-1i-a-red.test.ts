@@ -45,7 +45,7 @@ interface StateStoreReflection {
 
 interface ObjectReflection {
 	_applier: {
-		checkpoints: Array<{ frontier: string[] }>;
+		checkpoints: Array<{ frontier: string[]; state: { drpState: DRPState } }>;
 	};
 	_states: StateStoreReflection;
 	hashGraph: {
@@ -120,6 +120,10 @@ class CrossKeyTailDRP implements IDRP {
 
 	deriveY(): void {
 		this.y = this.x;
+	}
+
+	deriveYConditionally(): void {
+		if (this.x === 1) this.y = 1;
 	}
 
 	mark(value: string): void {
@@ -298,6 +302,14 @@ async function crossKeyTailFixture(): Promise<CrossKeyTailFixture> {
 	const pending = await signedVertex("setX", [2], [dependency.hash], 1_700_000_051_004);
 	const tail = await signedVertex("deriveY", [], [dependency.hash], 1_700_000_051_002);
 	const join = await signedVertex("mark", ["joined"], [pending.hash, tail.hash], 1_700_000_051_005);
+	return [dependency, pending, tail, join];
+}
+
+async function conditionalNoWriteFixture(): Promise<CrossKeyTailFixture> {
+	const dependency = await signedVertex("setX", [1], [HashGraph.rootHash], 1_700_000_061_001);
+	const pending = await signedVertex("setX", [0], [dependency.hash], 1_700_000_061_004);
+	const tail = await signedVertex("deriveYConditionally", [], [dependency.hash], 1_700_000_061_002);
+	const join = await signedVertex("mark", ["joined"], [pending.hash, tail.hash], 1_700_000_061_005);
 	return [dependency, pending, tail, join];
 }
 
@@ -772,6 +784,7 @@ describe("Phase 1i-a contracts behind the bounded pre-drift causal control", () 
 			invalid: [],
 			missing: [],
 		});
+
 		const expectedPendingPair = pureCausal.getStates(pending.hash);
 		const expectedPendingBytes = pureCausal.getSerializedStates(pending.hash);
 		expect(storedDRPState(pureCausal, pending.hash), "positive control: B's causal cut is D-to-B only").toMatchObject({
@@ -858,6 +871,127 @@ describe("Phase 1i-a contracts behind the bounded pre-drift causal control", () 
 		await expect(subject.applyVertices([join])).resolves.toMatchObject({ applied: true, invalid: [], missing: [] });
 		expect
 			.soft(subject.drp?.query_state(), "joined live state matches canonical-order replay")
+			.toEqual(oracle.drp?.query_state());
+		expect
+			.soft(subject.getStates(join.hash), "C's stored pair is independent of B/A arrival order")
+			.toEqual(oracle.getStates(join.hash));
+		expect
+			.soft(subject.getSerializedStates(join.hash), "C's stored bytes are independent of B/A arrival order")
+			.toEqual(oracle.getSerializedStates(join.hash));
+		expect(storedDRPState(oracle, join.hash), "positive control: canonical C stores y=0").toMatchObject({
+			marker: "joined",
+			x: 0,
+			y: 0,
+		});
+	});
+
+	it("replaces stale live state when canonical tail replay conditionally performs no write", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "1");
+		const [dependency, pending, tail, join] = await conditionalNoWriteFixture();
+		const fixtureHashes = new Set([dependency.hash, pending.hash, tail.hash]);
+
+		const oracle = crossKeyTailReplica();
+		await expect(oracle.applyVertices([dependency, pending, tail])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect(
+			oracle.drp?.query_state(),
+			"positive control: canonical D-to-B-to-A state takes A's no-write branch"
+		).toEqual({
+			marker: "root",
+			x: 0,
+			y: 0,
+		});
+		const expectedPendingPair = oracle.getStates(pending.hash);
+		const expectedPendingBytes = oracle.getSerializedStates(pending.hash);
+		expect(storedDRPState(oracle, pending.hash), "positive control: B's causal cut is D-to-B only").toMatchObject({
+			marker: "root",
+			x: 0,
+			y: 0,
+		});
+
+		const subject = crossKeyTailReplica();
+		await expect(subject.applyVertices([dependency, tail])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		expect(subject.drp?.query_state(), "positive control: A first writes y=1 from D").toEqual({
+			marker: "root",
+			x: 1,
+			y: 1,
+		});
+		await expect(subject.applyVertices([pending])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+
+		const oracleGraph = (oracle as unknown as ObjectReflection).hashGraph;
+		const subjectGraph = (subject as unknown as ObjectReflection).hashGraph;
+		expect(
+			subjectGraph
+				.getAllVertices()
+				.map(({ hash }) => hash)
+				.sort(),
+			"positive control: subject and oracle contain identical signed vertices"
+		).toEqual(
+			oracleGraph
+				.getAllVertices()
+				.map(({ hash }) => hash)
+				.sort()
+		);
+		expect(
+			[...subjectGraph.getFrontier()].sort(),
+			"positive control: subject and oracle have the same frontier"
+		).toEqual([...oracleGraph.getFrontier()].sort());
+		const expectedLinearization = [dependency.hash, pending.hash, tail.hash];
+		for (const graph of [oracleGraph, subjectGraph]) {
+			expect(
+				graph
+					.linearizeVertices()
+					.filter(({ hash }) => fixtureHashes.has(hash))
+					.map(({ hash }) => hash),
+				"positive control: fixed signed siblings linearize as D, B, A"
+			).toEqual(expectedLinearization);
+		}
+		expect
+			.soft(subject.getStates(pending.hash), "B's stored pair remains its pure causal image")
+			.toEqual(expectedPendingPair);
+		expect
+			.soft(subject.getSerializedStates(pending.hash), "B's stored bytes remain its pure causal image")
+			.toEqual(expectedPendingBytes);
+		expect
+			.soft(subject.drp?.query_state(), "canonical replay removes A's stale prior-live y=1")
+			.toEqual(oracle.drp?.query_state());
+
+		const frontier = [pending.hash, tail.hash].sort();
+		const checkpointState = (object: DRPObject<CrossKeyTailDRP>): Record<string, unknown> | undefined => {
+			const checkpoint = (object as unknown as ObjectReflection)._applier.checkpoints.find(
+				(candidate) => JSON.stringify([...candidate.frontier].sort()) === JSON.stringify(frontier)
+			);
+			return checkpoint === undefined
+				? undefined
+				: Object.fromEntries(checkpoint.state.drpState.state.map(({ key, value }) => [key, value]));
+		};
+		const expectedCheckpoint = checkpointState(oracle);
+		expect(expectedCheckpoint, "positive control: suffix one checkpoints the B/A frontier before join C").toMatchObject(
+			{
+				marker: "root",
+				x: 0,
+				y: 0,
+			}
+		);
+		expect
+			.soft(checkpointState(subject), "the B/A checkpoint is independent of sibling arrival order")
+			.toEqual(expectedCheckpoint);
+
+		await expect(oracle.applyVertices([join])).resolves.toMatchObject({ applied: true, invalid: [], missing: [] });
+		await expect(subject.applyVertices([join])).resolves.toMatchObject({ applied: true, invalid: [], missing: [] });
+		expect
+			.soft(subject.drp?.query_state(), "C live state matches canonical-order replay")
 			.toEqual(oracle.drp?.query_state());
 		expect
 			.soft(subject.getStates(join.hash), "C's stored pair is independent of B/A arrival order")
