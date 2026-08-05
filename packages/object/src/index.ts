@@ -251,6 +251,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			finalityConfig: config?.finality_config,
 			logConfig: config?.log_config,
 		});
+		this.bindInstalledApplierNotifications(this._applier);
 	}
 
 	/**
@@ -419,12 +420,12 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			return { reason: "interrupted", status: "rejected" };
 		}
 
-		candidate._applier.setNotify(this._notify.bind(this));
 		this.hashGraph = candidate.hashGraph;
 		this._states = candidate._states;
 		this._applier = candidate._applier;
 		this._optionalFinalityStore = undefined;
 		this.#historyCapability = { storage: "full" };
+		this.bindInstalledApplierNotifications(this._applier);
 		return { historyStorage: "full", status: "complete" };
 	}
 
@@ -507,6 +508,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 
 	private async authenticateAndApplyVertices(vertices: Vertex[]): Promise<ApplyResult> {
 		const capability = this.#historyCapability;
+		const applier = this._applier;
 		const { authenticated, occurrences } = classifyNovelVertices(
 			vertices,
 			(hash) =>
@@ -518,10 +520,27 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			capability.storage === "full"
 				? { executable: authenticated, unavailable: [] }
 				: this.classifyCompactAdmission(authenticated);
-		const applied =
+		let applied =
 			compactAdmission.executable.length === 0
 				? { applied: true, invalid: [], missing: [] }
-				: await this._applier.applyVertices(compactAdmission.executable);
+				: await applier.applyVertices(compactAdmission.executable);
+		if (this._applier !== applier) {
+			const failedHashes = new Set([...applied.invalid, ...applied.missing, ...(applied.quarantined ?? [])]);
+			const staleCommittedHashes = compactAdmission.executable.flatMap((handle) => {
+				const vertex = resolveAuthenticatedVertex(handle);
+				if (vertex === undefined || failedHashes.has(vertex.hash) || this.hashGraph.vertices.has(vertex.hash)) {
+					return [];
+				}
+				return [vertex.hash];
+			});
+			if (staleCommittedHashes.length !== 0) {
+				applied = {
+					...applied,
+					applied: false,
+					quarantined: [...new Set([...(applied.quarantined ?? []), ...staleCommittedHashes])],
+				};
+			}
+		}
 		if (compactAdmission.unavailable.length !== 0) {
 			applied.applied = false;
 			applied.missing.push(...compactAdmission.unavailable);
@@ -647,5 +666,29 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 				this.log.error("DRPObject subscriber callback failed", error);
 			}
 		}
+	}
+
+	private bindInstalledApplierNotifications(applier: DRPVertexApplier<T>): void {
+		applier.setNotify((origin, vertices) => {
+			// Committing through an applier that lost the rehydration race must not
+			// publish an event for a runtime that is no longer installed.
+			if (this._applier !== applier) return;
+
+			const capability = this.#historyCapability;
+			if (capability.storage === "compact") {
+				let admitted = false;
+				for (const { hash } of vertices) {
+					if (capability.knownHashes.has(hash)) continue;
+					capability.knownHashes.add(hash);
+					admitted = true;
+				}
+				// The applier invokes this callback synchronously after its graph commit.
+				// Publish that commit to the capability before any subscriber or
+				// rehydration continuation can observe it.
+				if (admitted) capability.revision++;
+			}
+
+			this._notify(origin, vertices);
+		});
 	}
 }
