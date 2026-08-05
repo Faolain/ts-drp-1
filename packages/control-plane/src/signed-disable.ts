@@ -142,6 +142,7 @@ export class SignedDisableController {
 	readonly #publicKey: Uint8Array;
 	readonly #scope: string;
 	readonly #statePort: DisableLatchStatePort;
+	#publicationToken: object = {};
 	#state: DisableLatchState | undefined;
 
 	/** @param options - Pinned authority/scope and the mandatory atomic state port. */
@@ -186,12 +187,15 @@ export class SignedDisableController {
 	 * @returns The restored fail-closed consumer state.
 	 */
 	async restore(): Promise<DisableConsumerState> {
+		const publicationToken = {};
+		this.#publicationToken = publicationToken;
 		this.#state = undefined;
 		try {
 			const restored = await this.#statePort.load();
-			this.#state = this.#validateRestoredState(restored);
+			const validated = this.#validateRestoredState(restored);
+			if (this.#publicationToken === publicationToken) this.#state = validated;
 		} catch {
-			this.#state = undefined;
+			if (this.#publicationToken === publicationToken) this.#state = undefined;
 		}
 		return this.consumerState();
 	}
@@ -252,6 +256,7 @@ export class SignedDisableController {
 			return { applied: false, reason: "state-commit-failed" };
 		}
 
+		this.#publicationToken = {};
 		this.#state = cloneState(next);
 		return { applied: true, counter: command.counter };
 	}
