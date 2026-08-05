@@ -256,8 +256,12 @@ export class SignedDisableController {
 			return { applied: false, reason: "state-commit-failed" };
 		}
 
-		this.#publicationToken = {};
-		this.#state = cloneState(next);
+		const effective = this.#state;
+		// A truthful older acknowledgment stays applied without reclaiming publication ownership.
+		if (effective === undefined || next.highestCounter > effective.highestCounter) {
+			this.#publicationToken = {};
+			this.#state = cloneState(next);
+		}
 		return { applied: true, counter: command.counter };
 	}
 
