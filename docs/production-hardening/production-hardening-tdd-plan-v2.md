@@ -1771,6 +1771,13 @@ wire and almost none for anything around them.
 | **P7 privacy DR**    | 1           | Deletion-semantics + retention decision record (consumed by 7c and P5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Merged before any chat-profile deployment                                                                                                                                                         |
 | **P8 distribution**  | Track S era | `sideEffects` audit, conditional exports, per-package size budgets in CI, **BLS-WASM extraction to an optional dep** once FinalityStore is deprecated — a browser-first library should not ship WASM it no longer uses                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Size check fails over budget; BLS WASM absent from the default browser graph                                                                                                                      |
 
+> **P5 authorization handoff from accepted Phase 1l.** The greenfield product path is creator-only
+> when ACL is omitted. Golden-path chat step 2 must therefore make the invite or membership flow install
+> a coordinated ACL and grant the joining peer Writer before step 3; the durable game-zone rerun inherits
+> the same requirement. An intentionally open fixture or demo may opt in with an explicit permissionless
+> ACL, but permissionlessness must never reappear as an inferred default. Purely ephemeral movement later
+> belongs to Track E rather than this durable-room ACL boundary.
+
 ---
 
 ## Research gates — what remains genuinely unknown
@@ -23714,21 +23721,67 @@ because ACL mode is not encoded in the object ID.
 Evidence is under
 `.logs/phase-1l-comprehensive-green-{grok45-high,kimi3-high-100}-review/`.
 
-## Next Agent Prompt — Phase 1l final Opus/xhigh acceptance review
+## Phase 1l final Opus/xhigh acceptance and closure
 
-Use the Claude skill to run one fresh Opus/xhigh read-only adversarial review
-of the complete Phase 1l lineage at fixed HEAD. Authenticate the requested
-model/effort and disclose any automatic helper usage; no Task/Agent/Fable
-delegation. Inspect production, package/lockfile and all frozen RED/GREEN
-evidence plus both accepted preliminary reviews. Recount callers and seek a
-causal bypass or semantic mismatch rather than proposing legacy support.
-Specifically challenge rejection-before-publication, schema ordering,
-generated/self-bound root agreement, explicit-ACL authority, mutable ACL
-aliasing, keyed-finality preservation, network-spike create/connect parity,
-package ownership and lockfile minimality. Bounded coverage-disabled probes
-only if needed; do not run sealed 100k. Preserve HEAD/index/status/stash and
-return `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1L_MAY_CLOSE=yes/no`, and exact
-causal evidence. No Fable.
+Fresh Claude-skill Opus 5/xhigh session
+`711d49bc-1eda-4087-b68e-6526317a18fd` returned `VERDICT: ACCEPTED` and
+`PHASE1L_MAY_CLOSE: yes`. It independently reconciled all 80 affected public
+API callers, rejected two abstract `GridNodePort` calls as false positives,
+and found no omitted-ACL custom-ID escape. It accepted schema-first validation,
+rejection before construction or any publication side effect, generated and
+self-bound root agreement, explicit-ACL authority, fresh mutable ACL ownership,
+keyed/finality preservation, and the network-spike direct dependency and
+minimal lockfile edge. Its coverage-disabled owner rerun passed 10/10; both
+frozen manifests verified; neither sealed 100k workload ran.
+
+Result SHA-256 is
+`11c17e4dd20537eb5a4295566b7322e3d6e66d8191a5c4f223917b5e760449c3`,
+native-stream SHA-256 is
+`ed7b746aa4c9a8807ad7ab571ac5162be45e0cd9a5d348e4dd18b700eb040ab7`,
+and verified artifact-integrity SHA-256 is
+`73909fe5c293bb77ebb6e17b72491f886b15b0ee0857e8c7d29fec9dcc1cc191`.
+All eight invariance diffs are empty; HEAD `7c128bf`, index, protected untracked
+state and protected stash object
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` remained unchanged. Native
+metering authenticates substantive `claude-opus-5` at xhigh and discloses an
+automatic non-substantive Haiku helper at 2,260 input / 21 output tokens. The
+review used no Task/Agent/Fable/Grok/Kimi/Codex delegation. Its Claude-owned
+plan-mode report under `~/.claude/plans/` is permitted and did not modify the
+repository. Evidence is under
+`.logs/phase-1l-comprehensive-green-opus-xhigh-review/`.
+
+Phase 1l closes at production `423cb25bce3a8352299cbbee27715c9973f60aa7`.
+Its greenfield boundary is deliberate: omitted ACL accepts only generated or
+creator-bound IDs; arbitrary/plain IDs require an explicit coordinated ACL;
+and the narrower RPC subscribe wrapper, which has no ACL parameter, supports
+creator-bound IDs only. There is no legacy plain-ID compatibility obligation,
+shim or deferred compatibility debt.
+
+Keep the nonblocking handoff visible. `examples/grid`, `examples/canvas` and
+`examples/chat` now fail closed as creator-only when ACL is omitted, so joined
+peers are read-only until the existing P5 reference-app work implements an
+explicit grant/membership flow or deliberately opts an open demo into an
+explicit permissionless ACL. The Discord/chat golden path should grant Writer
+as part of invite before concurrent sending; the durable MMORPG zone inherits
+that rule, while its later ephemeral movement plane belongs to Track E. This is
+not a reason to weaken Phase 1l. Zero-admin permissionless fixtures remain
+correct only for intentionally open multiwriter tests; callers needing
+Finality retain keyed/creator ACLs. Low-level explicitly constructed object
+paths remain outside the product-default boundary.
+
+## Next Agent Prompt — Phase 1m tests-only RED
+
+Start Phase 1m as a fresh Codex-high tests-only RED. First perform a bounded
+read-only census of existing feature/version negotiation, control-message,
+signature and compaction-stop seams so the RED extends production owners
+rather than inventing a parallel control plane. Pin a signed kill-switch
+message whose authenticated disable decision propagates through a real
+multi-node path and stops compaction within a bounded interval, plus a
+v(next)-to-legacy coexistence case on one topic. Keep implementation, plan,
+generated files and unrelated tests unchanged. Run proportionate focused and
+preservation tests, ordered typecheck and lint to `.logs`; do not run either
+sealed 100k workload. Return the causal RED signature, exact scope, evidence
+hashes and any assumption conflict before a distinct GREEN begins. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
