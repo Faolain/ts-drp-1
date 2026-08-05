@@ -3,7 +3,7 @@
  * the existing per-(objectId, sender) missing-sync retry episode.
  */
 import { SetDRP } from "@ts-drp/blueprints";
-import { createVertex, HashGraph } from "@ts-drp/object";
+import { createPermissionlessACL, createVertex, HashGraph } from "@ts-drp/object";
 import { DrpType, Message, MessageType, NodeEventName, Operation, Update, Vertex } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -102,6 +102,7 @@ describe("Phase 1k per-peer invalid-vertex budget", () => {
 		const receiverObjects = await Promise.all(
 			objectIds.map((id) =>
 				receiver.node.createObject({
+					acl: createPermissionlessACL(),
 					drp: new SetDRP<number>(),
 					finality_config: { enabled: false },
 					id,
@@ -140,6 +141,7 @@ describe("Phase 1k per-peer invalid-vertex budget", () => {
 		const attackerPeerId = String(attacker.node.networkNode.peerId);
 		const objectId = "phase-1k-peer-capacity-object";
 		const object = await receiver.node.createObject({
+			acl: createPermissionlessACL(),
 			drp: new SetDRP<number>(),
 			finality_config: { enabled: false },
 			id: objectId,
@@ -183,6 +185,7 @@ describe("Phase 1k per-peer invalid-vertex budget", () => {
 		await Promise.all(
 			[tombstoneObjectId, ...recoveryObjectIds].map((id) =>
 				receiver.node.createObject({
+					acl: createPermissionlessACL(),
 					drp: new SetDRP<number>(),
 					finality_config: { enabled: false },
 					id,
@@ -223,6 +226,7 @@ describe("Phase 1k per-peer invalid-vertex budget", () => {
 		running.push(receiver, sender);
 		const objectId = "phase-1k-safe-control-object";
 		const object = await receiver.node.createObject({
+			acl: createPermissionlessACL(),
 			drp: new SetDRP<number>(),
 			finality_config: { enabled: false },
 			id: objectId,

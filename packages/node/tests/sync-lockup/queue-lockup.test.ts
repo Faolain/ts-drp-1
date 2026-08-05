@@ -1,4 +1,5 @@
 import { MessageQueueManager } from "@ts-drp/message-queue";
+import { createPermissionlessACL } from "@ts-drp/object";
 import { type IDRP, type IDRPObject, IntervalRunnerState, Message, MessageType } from "@ts-drp/types";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -38,7 +39,7 @@ describe("DRPNode lifecycle restoration", () => {
 		const node = makeNode("restart-lockup");
 		nodes.push(node);
 		await node.start();
-		await node.createObject({ id: objectId });
+		await node.createObject({ id: objectId, acl: createPermissionlessACL() });
 
 		const objectHandler = vi.fn<(message: Message) => void>();
 		const discoveryHandler = vi.fn<(message: Message) => void>();
@@ -74,7 +75,7 @@ describe("DRPNode lifecycle restoration", () => {
 		const node = makeNode("stop-start-lockup");
 		nodes.push(node);
 		await node.start();
-		await node.createObject({ id: objectId });
+		await node.createObject({ id: objectId, acl: createPermissionlessACL() });
 		const handler = vi.fn<(message: Message) => void>();
 		node.messageQueueManager.subscribe(objectId, handler);
 
@@ -94,7 +95,7 @@ describe("DRPNode lifecycle restoration", () => {
 		const node = makeNode("resubscribe-lockup");
 		nodes.push(node);
 		await node.start();
-		const object = await node.createObject({ id: objectId });
+		const object = await node.createObject({ id: objectId, acl: createPermissionlessACL() });
 		node.unsubscribeObject(objectId);
 
 		node.subscribeObject(object);

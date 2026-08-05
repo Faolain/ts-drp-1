@@ -1,4 +1,10 @@
-import { AdoptionCommitExhaustedError, ApplyInvariantError, createVertex, HashGraph } from "@ts-drp/object";
+import {
+	AdoptionCommitExhaustedError,
+	ApplyInvariantError,
+	createPermissionlessACL,
+	createVertex,
+	HashGraph,
+} from "@ts-drp/object";
 import {
 	ActionType,
 	type ApplyResult,
@@ -99,7 +105,11 @@ describe("Phase 0q-b3 rejected-boundary node consumers", () => {
 		object: Awaited<ReturnType<typeof receiver.createObject<CounterDRP>>>;
 	}> {
 		const objectId = `phase-0q-b3-${surface.toLowerCase()}-${fixtureSequence++}`;
-		const object = await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		const object = await receiver.createObject({
+			acl: createPermissionlessACL(),
+			id: objectId,
+			drp: new CounterDRP(),
+		});
 		const vertex = createVertex(
 			sender.networkNode.peerId,
 			Operation.create({ drpType: DrpType.DRP, opType: "increment" }),

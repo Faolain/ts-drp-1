@@ -7,6 +7,7 @@
  * therefore send no vertices/full-state traffic.
  */
 import { peerIdFromString } from "@libp2p/peer-id";
+import { createACL, createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -95,8 +96,16 @@ describe("periodic anti-entropy", () => {
 		nodes.push(receiver, sender);
 		const receiverOutbox = captureOutbound(receiver);
 		const senderOutbox = captureOutbound(sender);
-		const receiverObject = await receiver.createObject({ id: objectId, drp: new CounterDRP() });
-		const senderObject = await sender.createObject({ id: objectId, drp: new CounterDRP() });
+		const receiverObject = await receiver.createObject({
+			id: objectId,
+			drp: new CounterDRP(),
+			acl: createPermissionlessACL(),
+		});
+		const senderObject = await sender.createObject({
+			id: objectId,
+			drp: new CounterDRP(),
+			acl: createPermissionlessACL(),
+		});
 
 		// Gossip is suppressed by the broadcast spies: this UPDATE is intentionally dropped.
 		senderObject.drp?.increment();
@@ -146,7 +155,11 @@ describe("periodic anti-entropy", () => {
 		vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue(["remote-peer"]);
 		vi.useFakeTimers();
 
-		await node.createObject({ id: "auto-anti-entropy-object", drp: new CounterDRP() });
+		await node.createObject({
+			id: "auto-anti-entropy-object",
+			drp: new CounterDRP(),
+			acl: createPermissionlessACL(),
+		});
 		await vi.advanceTimersByTimeAsync(0);
 
 		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
@@ -168,17 +181,32 @@ describe("periodic anti-entropy", () => {
 		// unsynced because it has no remotely authored history yet, and must
 		// still probe the first peer that appears.
 		const creator = await makeNode("anti-entropy-first-peer-creator");
-		nodes.push(creator);
-		const creatorPeerId = creator.networkNode.peerId;
-		const creatorObject = await creator.createObject({ drp: new CounterDRP() });
-		const objectId = creatorObject.id;
 		const node = await makeNode("anti-entropy-first-peer");
-		nodes.push(node);
+		nodes.push(creator, node);
+		const creatorPeerId = creator.networkNode.peerId;
+		const sharedACL = (): ReturnType<typeof createACL> => {
+			const acl = createACL({ admins: [creatorPeerId, node.networkNode.peerId] });
+			for (const replica of [creator, node]) {
+				acl.context = { caller: replica.networkNode.peerId };
+				acl.setKey(replica.keychain.blsPublicKey);
+			}
+			acl.context = { caller: "" };
+			return acl;
+		};
+		const creatorObject = await creator.createObject({
+			acl: sharedACL(),
+			drp: new CounterDRP(),
+		});
+		const objectId = creatorObject.id;
 		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
 		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
 		vi.useFakeTimers();
 
-		const connecting = node.connectObject({ id: objectId, drp: new CounterDRP() });
+		const connecting = node.connectObject({
+			acl: sharedACL(),
+			id: objectId,
+			drp: new CounterDRP(),
+		});
 		await vi.advanceTimersByTimeAsync(5_000);
 		const object = await connecting;
 		// Genesis authority exists locally before any peer answered anything.
@@ -227,7 +255,11 @@ describe("periodic anti-entropy", () => {
 	test("unsubscribeObject stops and deletes both per-object intervals", async () => {
 		const node = await makeNode("anti-entropy-unsubscribe");
 		nodes.push(node);
-		await node.createObject({ id: "unsubscribe-interval-object", drp: new CounterDRP() });
+		await node.createObject({
+			id: "unsubscribe-interval-object",
+			drp: new CounterDRP(),
+			acl: createPermissionlessACL(),
+		});
 
 		const intervals = node["_intervals"];
 		expect([...intervals.keys()].filter((key) => key.endsWith("::unsubscribe-interval-object"))).toHaveLength(2);
@@ -300,8 +332,8 @@ describe("periodic anti-entropy", () => {
 		nodes.push(nodeA, nodeB);
 		const outA = captureOutbound(nodeA);
 		const outB = captureOutbound(nodeB);
-		await nodeA.createObject({ id: objectId, drp: new CounterDRP() });
-		await nodeB.createObject({ id: objectId, drp: new CounterDRP() });
+		await nodeA.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
+		await nodeB.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 
 		const groupPeers = vi.spyOn(nodeA.networkNode, "getGroupPeers").mockReturnValue([]);
 		vi.useFakeTimers();

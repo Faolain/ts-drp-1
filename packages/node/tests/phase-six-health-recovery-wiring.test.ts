@@ -6,6 +6,7 @@ import {
 	type ControlPlaneScheduler,
 	type RecoveryMechanismResult,
 } from "@ts-drp/control-plane";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	AddressPolicy,
 	AdmissionPolicy,
@@ -57,7 +58,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		const object = await node.createObject({ id: "local-object" });
+		const object = await node.createObject({ id: "local-object", acl: createPermissionlessACL() });
 		await node.start();
 		const [firstGroupPeer] = groupPeers;
 		if (firstGroupPeer !== undefined) {
@@ -97,7 +98,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		expect(fake.connect).not.toHaveBeenCalled();
 
-		const object = await node.createObject({ id: "live-health-count-object" });
+		const object = await node.createObject({ id: "live-health-count-object", acl: createPermissionlessACL() });
 		scheduler.advanceBy(100);
 		await vi.waitFor(() => expect(fake.connect).toHaveBeenCalled());
 		await flushMicrotasks();
@@ -132,7 +133,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		seedFreshControlPlane(node);
 
 		await node.start();
-		const object = await node.createObject({ id: "local-sole-writer-object" });
+		const object = await node.createObject({ id: "local-sole-writer-object", acl: createPermissionlessACL() });
 		fake.emit({ peerId: "member-a", subscribed: true, topic: object.id });
 		await flushMicrotasks();
 		scheduler.advanceBy(100);
@@ -165,7 +166,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		await node.createObject({ id: "default-recovery-object" });
+		await node.createObject({ id: "default-recovery-object", acl: createPermissionlessACL() });
 		await node.start();
 		await vi.waitFor(() => expect(fake.redialBootstraps).toHaveBeenCalledOnce());
 
@@ -202,7 +203,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		await node.createObject({ id: "stop-during-recovery-object" });
+		await node.createObject({ id: "stop-during-recovery-object", acl: createPermissionlessACL() });
 		await node.start();
 		await vi.waitFor(() => expect(ports.rendezvousBootstrap).toHaveBeenCalledOnce());
 		const stopping = node.stop();
@@ -227,7 +228,7 @@ describe("Phase 6 DRPNode real-coordinator wiring", () => {
 		});
 		seedFreshControlPlane(node);
 
-		await node.createObject({ id: "failed-operation-history-object" });
+		await node.createObject({ id: "failed-operation-history-object", acl: createPermissionlessACL() });
 		await node.start();
 		await vi.waitFor(() => expect(events).toContainEqual({ kind: "terminal", reason: "exhausted" }));
 		scheduler.advanceBy(500);

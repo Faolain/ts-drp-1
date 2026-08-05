@@ -1,3 +1,4 @@
+import { createACL } from "@ts-drp/object";
 import { type IDRP, Message, MessageType, SemanticsType, Sync, SyncAccept } from "@ts-drp/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -45,6 +46,7 @@ describe("Phase 0k-a ancient finality sync completeness", () => {
 		});
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 		const object = await node.createObject({
+			acl: createACL({ admins: node.networkNode.peerId }),
 			id: "phase-0k-a-sync-retention-object",
 			drp: new SyncRetentionProbeDRP(),
 		});

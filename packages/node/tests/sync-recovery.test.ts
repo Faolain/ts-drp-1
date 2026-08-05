@@ -3,6 +3,7 @@
  * that same sender at most three times. A fourth incomplete round must send no
  * further SYNC and must emit the existing DRP_SYNC_REJECTED diagnostic event.
  */
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -68,7 +69,7 @@ async function makeNode(seed: string): Promise<DRPNode> {
 }
 
 async function makeIncompleteAccept(sender: DRPNode, objectId: string): Promise<Message> {
-	const object = await sender.createObject({ id: objectId, drp: new CounterDRP() });
+	const object = await sender.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 	object.drp?.increment();
 	object.drp?.increment();
 
@@ -131,7 +132,11 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		const receiverObject = await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		const receiverObject = await receiver.createObject({
+			id: objectId,
+			drp: new CounterDRP(),
+			acl: createPermissionlessACL(),
+		});
 		const mergeResults: MergeResult[] = [];
 		const merge = receiverObject.merge.bind(receiverObject);
 		vi.spyOn(receiverObject, "merge").mockImplementation(async (vertices) => {
@@ -156,7 +161,7 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		const rejected = vi.fn();
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
@@ -182,7 +187,7 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		let now = 1_000_000;
 		vi.spyOn(Date, "now").mockImplementation(() => now);
@@ -203,7 +208,7 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		const accepted = vi.fn();
 		const rejected = vi.fn();
@@ -228,7 +233,7 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 		const incompleteUpdate = makeIncompleteUpdate(incompleteAccept);
 		let now = 2_000_000;
@@ -251,12 +256,12 @@ describe("SYNC_ACCEPT recovery", () => {
 		nodes.push(receiver, sender);
 		const outbox = captureDirectMessages(receiver);
 		captureDirectMessages(sender);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 
 		for (let round = 0; round < 3; round++) await handleMessage(receiver, incompleteAccept);
 		receiver.unsubscribeObject(objectId);
-		await receiver.createObject({ id: objectId, drp: new CounterDRP() });
+		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		await handleMessage(receiver, incompleteAccept);
 
 		expect(syncMessages(outbox)).toHaveLength(4);

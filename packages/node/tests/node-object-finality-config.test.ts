@@ -3,7 +3,7 @@ import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { Signature } from "@noble/secp256k1";
-import { createACL, createVertex, HashGraph } from "@ts-drp/object";
+import { createACL, createPermissionlessACL, createVertex, HashGraph } from "@ts-drp/object";
 import {
 	type DRPNetworkNode,
 	DrpType,
@@ -263,6 +263,7 @@ describe("Phase 1c public node finality configuration", () => {
 
 		const disabled = await node.createObject(options);
 		const enabledSibling = await node.createObject({
+			acl: createPermissionlessACL(),
 			drp: new ProductPathDRP(),
 			id: "phase-1c-public-create-enabled",
 		});
