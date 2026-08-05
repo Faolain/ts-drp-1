@@ -1,4 +1,5 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion -- decoded presence is asserted by the frozen present fixture */
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- decoded presence is asserted by the frozen root fixture */
+import { HashGraph } from "@ts-drp/object";
 import {
 	DRPState,
 	DRPStateEntry,
@@ -18,8 +19,8 @@ import { type DRPNode } from "../src/index.js";
 
 const FROZEN_ACL_NESTED_HEX = "0a160a0361636c120f81a661646d696e7391a56f776e6572";
 const FROZEN_DRP_NESTED_HEX = "0a1b0a036472701214c711019192a36b657981a676616c756573920102";
-const FROZEN_PRESENT_RESPONSE_HEX =
-	"0a0b70726573656e742d63757412180a160a0361636c120f81a661646d696e7391a56f776e65721a1d0a1b0a036472701214c711019192a36b657981a676616c756573920102";
+const FROZEN_ROOT_RESPONSE_HEX =
+	"0a403432356432623166353234336462663233633638353037383033346230366662666137316463333164636365333066363134653238303233663134306666313312180a160a0361636c120f81a661646d696e7391a56f776e65721a1d0a1b0a036472701214c711019192a36b657981a676616c756573920102";
 
 type SerializedSnapshotReader = IDRPObject<IDRP> & {
 	getSerializedStates(vertexHash: string): readonly [Uint8Array | undefined, Uint8Array | undefined];
@@ -49,7 +50,12 @@ async function request(
 		throw new Error("public getStates must not be used by FetchState");
 	});
 	const getSerializedStates = vi.fn(() => serializedPair);
-	const object = { id: "serialized-object", getStates, getSerializedStates } as unknown as SerializedSnapshotReader;
+	const object = {
+		id: "serialized-object",
+		getStates,
+		getSerializedStates,
+		getVertex: vi.fn(() => undefined),
+	} as unknown as SerializedSnapshotReader;
 	const node = {
 		get: vi.fn(() => object),
 		networkNode: {
@@ -80,22 +86,22 @@ describe("Phase 1d(i) serialized snapshot seam", () => {
 		expect(compileTimeOnly).toBeUndefined();
 	});
 
-	it("performs one pair read, zero getStates reads, and preserves exact existing response bytes", async () => {
+	it("performs one pair read, zero getStates reads, and preserves exact root response bytes", async () => {
 		const aclBytes = nestedBytes({ acl: { admins: ["owner"] } });
 		const drpBytes = nestedBytes({ drp: new Map([["key", { values: [1, 2] }]]) });
 		expect(hex(aclBytes), "frozen pre-1d(i) ACL nested bytes").toBe(FROZEN_ACL_NESTED_HEX);
 		expect(hex(drpBytes), "frozen pre-1d(i) DRP nested bytes").toBe(FROZEN_DRP_NESTED_HEX);
 		const expected = FetchStateResponse.encode(
 			FetchStateResponse.create({
-				vertexHash: "present-cut",
+				vertexHash: HashGraph.rootHash,
 				aclState: DRPStateOtherTheWire.decode(aclBytes),
 				drpState: DRPStateOtherTheWire.decode(drpBytes),
 			})
 		).finish();
-		expect(hex(expected), "frozen pre-1d(i) FetchStateResponse bytes").toBe(FROZEN_PRESENT_RESPONSE_HEX);
-		const result = await request([aclBytes, drpBytes], "present-cut");
+		expect(hex(expected), "frozen pre-1d(i) root FetchStateResponse bytes").toBe(FROZEN_ROOT_RESPONSE_HEX);
+		const result = await request([aclBytes, drpBytes], HashGraph.rootHash);
 
-		expect(result.getSerializedStates).toHaveBeenCalledExactlyOnceWith("present-cut");
+		expect(result.getSerializedStates).toHaveBeenCalledExactlyOnceWith(HashGraph.rootHash);
 		expect(result.getStates).not.toHaveBeenCalled();
 		expect(result.wire).toEqual(expected);
 		const decoded = FetchStateResponse.decode(result.wire);
@@ -103,11 +109,11 @@ describe("Phase 1d(i) serialized snapshot seam", () => {
 		expect(DRPStateOtherTheWire.encode(decoded.drpState!).finish()).toEqual(drpBytes);
 	});
 
-	it("preserves requesting hash and explicit missing/pruned presence with one pair read", async () => {
+	it("preserves requesting hash and explicit missing/pruned presence with zero pair reads", async () => {
 		const result = await request([undefined, undefined], "pruned-cut");
 		const decoded = FetchStateResponse.decode(result.wire);
 
-		expect(result.getSerializedStates).toHaveBeenCalledExactlyOnceWith("pruned-cut");
+		expect(result.getSerializedStates).not.toHaveBeenCalled();
 		expect(result.getStates).not.toHaveBeenCalled();
 		expect(decoded).toEqual({ vertexHash: "pruned-cut", aclState: undefined, drpState: undefined });
 	});
