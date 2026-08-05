@@ -23141,34 +23141,76 @@ dependency-index helper named by the local skill was absent, so exact installed
 package source was inspected directly instead of using web or version-agnostic
 documentation.
 
-## Next Agent Prompt — Phase 1k transport-attribution corrective RED
+## Phase 1k transport-attribution corrective RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only corrective RED before resuming GREEN. Pin
-both real ingress paths: a direct protocol message whose claimed
-`Message.sender` names a victim must be delivered to the node layer with the
-authenticated `connection.remotePeer`; a signed gossipsub message with a
-spoofed application sender must be attributed to its authenticated original
-publisher, not blindly trusted or charged to the victim. Prefer real
-network-node integration over a source-shape assertion or test-only production
-hook. Prove the honest claimed-sender-equals-transport path remains unchanged.
+Freeze fresh Codex-high tests-only corrective RED `1516430`. It adds the
+118-line real-network owner
+`packages/network/tests/transport-attribution-1k-red.test.ts` and minimally
+strengthens frozen node RED `b5b1d95` by 47 net lines. Started
+`DRPNetworkNode` instances and the public message queue prove that direct
+protocol ingress currently retains a victim named by the payload instead of
+authenticated `connection.remotePeer`. A separate deterministic two-node
+StrictSign gossipsub case proves the raw event's authenticated
+`msg.from === publisher` while the public queue still retains the victim named
+by the payload. In both cases the honest claimed-sender-equals-transport
+control passes. A three-hop mesh attempt was deliberately removed because
+readiness was nondeterministic; no flaky relay topology, private-source shape
+assertion or bespoke production hook was frozen.
 
-Extend the causal budget owner only as needed to freeze the two already-known
-closure gaps: exhaustion occurs on invalid occurrence 10,000, and sender-key
-cardinality cannot grow without bound. Express cardinality as externally
-observable fail-closed behavior at a finite tracked-peer capacity, not a heap
-measurement or private-map inspection; a new untracked invalid peer at
-capacity must be rejected/disconnected rather than evicting an active
-attacker's accumulated debt. Do not alter production, the plan, frozen RED
-`b5b1d95`, generated files, lockfiles or protected untracked assets. If exact
-installed APIs make authenticated publisher attribution impossible, stop and
-report an assumption conflict rather than weakening the contract.
+The node owner now also proves no disconnect after 9,999 invalid occurrences,
+disconnect exactly on occurrence 10,000 and exactly one disconnect after an
+extra offer. Its externally observable capacity sweep permits at most 256
+concurrently indebted invalid peers: a newcomer must fail closed rather than
+evicting the original attacker's 9,999 accumulated debt, the original
+attacker's 10,000th occurrence must still disconnect it, and an honest signed
+update must continue to apply under capacity pressure. This cap governs
+invalid-debt ledgers, not room membership or the 1,000-member golden path.
 
-Run focused network/node preservation, ordered builds, typecheck, tracked
-lint, formatting and diff gates to
-`.logs/phase-1k-transport-attribution-red-codex-high/`. Do not rerun either
-sealed 100k workload. Commit tests only, then resume a distinct fresh
-production GREEN against both Phase 1k RED commits before the normal Grok,
-exact Kimi 3 and final Opus sequence.
+The final combined focused signature is 5 failed / 1 passed in 31.08 seconds:
+two causal transport-attribution failures, three causal budget/capacity
+failures, and the trusted-duplicate plus signed-missing positive control green.
+Preservation is 43 passed plus the exact three inherited Phase 1n
+sync-livelock failures. Ordered builds pass; workspace typecheck retains only
+the exact inherited object 5 / node 2 diagnostics. Touched and git-tracked lint
+have zero errors, and formatting/diff checks pass. Neither sealed 100k workload
+was rerun. Evidence is under
+`.logs/phase-1k-transport-attribution-red-codex-high/`; ledger SHA-256 is
+`f47dc2c181bbaba73f52e0f11647c037e2694099b59bec4b2907a1a8acda8e51`,
+verified manifest SHA-256 is
+`309fee30598e16d431e9be6ec36799ae7bda405a3cb3fa5f9eb2669b11e634cd`
+and patch SHA-256 is
+`86e296097118a0d3c6e775b7ff1f4ab0cb342047e0d679bc655ce61c673b2bdd`.
+
+## Next Agent Prompt — Phase 1k production GREEN, transport-bound
+
+Start a distinct fresh Codex-high production-only GREEN against both frozen
+REDs `b5b1d95` and `1516430`. Bind direct ingress to authenticated
+`connection.remotePeer` and signed gossipsub ingress to authenticated original
+publisher `msg.from` before the node queue/handler sees the message; never use
+the claimed application sender for resource attribution or disconnect. Preserve
+honest equality and current routing/object semantics.
+
+At the authenticated handler/object boundary, aggregate only authentication
+failures and deterministic-invalid `result[2]` occurrences across UPDATE,
+SYNC_ACCEPT and object IDs. Disconnect exactly on occurrence 10,000, publish
+exhaustion before the fallible asynchronous call, suppress later exhausted-peer
+ingress/recovery, and catch disconnect failure without retry storms. Do not
+charge missing or transient quarantine, shrink/expose the object tombstone
+cache, or change non-exhausted sync-recovery semantics. Bound invalid-debt
+cardinality at no more than 256 peers with fail-closed admission for a new
+invalid debtor; never evict an active peer's accumulated debt merely to admit
+another. Clear node-lifetime state at stop without turning reconnect into an
+in-process budget bypass. Do not add test hooks, special-case fixtures or alter
+tests, the plan, generated files, locks or protected untracked assets.
+
+Run both focused RED owners, real network/node preservation, sync recovery,
+authenticated ingress and sync-livelock preservation, ordered builds,
+typecheck, tracked lint, formatting and diff gates to
+`.logs/phase-1k-invalid-vertex-budget-green2-codex-high/`. Preserve the exact
+three inherited Phase 1n sentinel failures and exact object 5 / node 2
+typecheck diagnostics; do not rerun either sealed 100k workload. Commit
+production only, then use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and
+final Claude-skill Opus/xhigh review; no Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
