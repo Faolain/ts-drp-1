@@ -23588,29 +23588,73 @@ authorization purpose with fresh equivalent ACL instances on every replica,
 and report product/example source callers separately instead of silently
 changing them in a tests-only RED.
 
-## Next Agent Prompt — Phase 1l comprehensive call-site migration RED
+## Phase 1l comprehensive call-site migration RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only corrective RED from `c949c01`. Inspect and
-classify every repository call site of public `DRPNode.createObject` that
-supplies an explicit `id`; do not stop at the eleven failures above. Migrate
-all affected test, benchmark and property-fixture callers with omitted ACL to
-fresh explicit equivalent ACLs at every create/connect replica. Preserve
-permissionless multi-writer fixtures as explicitly permissionless, preserve
-keyed/multi-admin finality fixtures with fresh equivalent keyed ACLs, and use
-creator-only ACL only where authorization is the test's purpose. Never reuse a
-mutable ACL instance between replicas.
+Freeze fresh Codex-high tests-only commit
+`bef5950a9e5bc66c8ed30810650783e1159ae161`, parent `95ec099`. Its exact
+13-file node-test/benchmark scope is 113 insertions / 50 deletions. Direct
+source inspection, not an analyzer, classified 80 public explicit-ID
+`DRPNode.createObject` call expressions: 37 migrated here, 36 already using
+fresh explicit ACLs, one safe self-bound omission, two intentional omissions
+for causal rejection and invalid-empty-ID validation, and four coherent
+network-spike GREEN blockers. The frozen original and causal Phase 1l owners,
+production, plan, generated files and lockfiles are unchanged.
 
-Do not modify production, this plan, generated files, lockfiles, the frozen
-original Phase 1l owner or the frozen custom-ID causal owner. If a real
-production/example/network-spike source caller needs migration, record its
-path and semantics as a GREEN blocker rather than changing it. The causal RED
-must remain exactly the missing plain/foreign omitted-ACL rejection on current
-production, while the comprehensive affected-caller census preserves its
-prior outcomes apart from already documented inherited sentinels. Run ordered
-builds, proportional typecheck/lint/format/diff and every classified bounded
-owner coverage-disabled to `.logs`; do not run either sealed 100k workload.
-Commit only the tests-only migration and evidence ledger. Then hand off to a
-distinct fresh Codex-high production GREEN. No Fable.
+Migration preserves authorization semantics rather than flattening every
+fixture to permissionless. Shared multiwriter and lifecycle fixtures construct
+fresh permissionless ACLs per replica. The finality-retention owner constructs
+a fresh creator-admin ACL so its BLS-key operation retains Finality rights.
+Anti-entropy and handler owners construct fresh byte-equivalent multi-admin
+keyed ACLs wherever multiple replicas author. The node benchmark no longer
+shares one mutable ACL instance across its replica loop.
+
+The authoritative causal result remains exactly 2 failed / 2 passed on current
+production. Modified bounded owners are 76 passed / two skips; frozen/prior
+Phase 1l preservation is 44/44; the inherited Phase 1n sentinel remains exact
+3 failed / 3 passed. Ordered `types`, `object`, `node` and `network-spike`
+builds pass. Types and restored network-spike typecheck pass; object/node retain
+only the inherited five/two Phase 1i-b diagnostics. Touched lint, formatting
+and diff gates pass. Neither sealed 100k workload ran.
+
+The remaining boundary is explicit. `@ts-drp/network-spike` does not declare
+the ACL-owning `@ts-drp/object` package, so tests-only migration would require
+an invalid relative, deep, transitive or built-dist import. GREEN must add the
+direct workspace dependency and lockfile edge, then coherently install fresh
+permissionless ACLs in `src/grid/fixture.ts` create/connect,
+`tests/public-only-node-publisher.test.ts`, and both replicas in
+`tests/public-convergence-live.test.ts`. This is one package/source migration,
+not four newly undiscovered behavioral slices.
+
+Evidence is under
+`.logs/phase-1l-comprehensive-caller-red-codex-high/`; exact patch SHA-256 is
+`2047cbd4210e41c1f2067d913532e8ef24a9302a23316cee89932acf2924f786`,
+census SHA-256 is
+`644c58d64227dede6057bb12fcb1bd3d8e67c42353170897a296a454e1cd7f15`,
+results SHA-256 is
+`6996d9c445b148b9d08f8c1177171daaabe8594111e4d103bdf8f1f43efdf167`
+and verified 50-entry manifest SHA-256 is
+`eef1ad37d29aee8d7a14771ec1d45ab401329c0611149d75fcc64007019c9cea`.
+
+## Next Agent Prompt — Phase 1l comprehensive corrective GREEN
+
+Start a distinct fresh Codex-high GREEN from `bef5950a`. In
+`DRPNode.createObject`, reject an omitted-ACL caller-supplied ID unless
+`creatorFromObjectID(id)` equals the local peer, before object construction or
+publication side effects. Preserve generated/self-bound omission and explicit
+ACL authority. Keep connect behavior from `29bce202` unchanged.
+
+Also complete the single frozen network-spike package migration above: declare
+`@ts-drp/object` as a direct workspace dependency, update only the necessary
+lockfile edge, and use fresh permissionless ACLs for the shared grid create and
+connect paths plus the two affected tests. Do not re-export ACL factories from
+node, use a transitive/deep import, add a mode flag, alter the low-level object
+default, adopt remote roots, or change any frozen RED. The exact causal owner
+must become 4/4; rerun the comprehensive 76P/2S owners, restored network-spike
+4P/1S, prior 44/44, frozen 6/6 and inherited Phase 1n 3F/3P sentinel. Run
+ordered builds/typecheck/lint/format/diff coverage-disabled to `.logs`, without
+either sealed 100k workload. Commit the bounded GREEN candidate, then start
+fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and gated final Opus/xhigh. No
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
