@@ -24205,21 +24205,61 @@ and evidence-manifest SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-restore-old-ack-corrective-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a restore × old-ack corrective GREEN
+## Phase 1m-a restore × old-ack corrective GREEN checkpoint — review pending
 
-Start a distinct fresh Codex-high production GREEN from this frozen RED. Make
-the smallest coherent change that preserves publication high-water ownership
-through an in-progress restore, so blocked state is not unconditional
-permission for an older acknowledgment to publish. Preserve all earlier
-restore and delayed-ack fixes, commit-before-effective, exact honest-CAS
-results, replay/stale/equivocation, retry liveness, latest-only bounded state,
-detachment and public API/browser safety. Do not add a queue, scheduler,
-history log, compatibility layer, default adapter or general concurrency
-runtime; do not weaken/edit frozen tests. Run the new owner, all prior frozen
-owners, complete control-plane, ordered build/typecheck, lint, formatting,
-exact production diff, browser bundle and built-export smoke to `.logs`.
-Commit production only and rerun causal/complete suites postcommit; no sealed
-100k, workspace-wide, fuzz or unbounded stress.
+Freeze distinct fresh Codex-high production-only commit
+`c363f2ec3c1f6cddc21c419e026eda8861135012` on documented RED HEAD
+`85c4819`. Its exact scope is 12 insertions / six deletions in
+`packages/control-plane/src/signed-disable.ts`. Every frozen test, the plan,
+exports/dependencies/lockfile, generated files and protected untracked files
+remain byte-identical.
+
+The controller now retains one scalar publication high-water independently of
+temporarily blocked consumer state. A restore remains the active token owner
+until a later restore supersedes it. A truthful committed acknowledgment may
+advance high-water and effective state but cannot steal that restore token.
+Restore completion publishes only when its validated counter is at least the
+retained high-water, so stale loads cannot regress a newer acknowledged
+disable. Restore rejection/throw remains blocked unless a newer committed
+acknowledgment published while it was pending.
+
+A bounded evidence-only shared-port probe covers the adjacent two-controller
+case: A commits E1 with delayed ack; B restores E1 and commits E2; A starts a
+restore capturing E2 before E1 acknowledges. E1 may expose disabled/counter-1
+while the restore remains pending but cannot invalidate its token; E2 then
+publishes, exact E2 is replay and E3 commits. No queue, scheduler, history,
+compatibility path, adapter, durability, transport, compactor or general
+concurrency runtime was added.
+
+Authoritative and postcommit results are new owner 1/1, delayed-ack 3/3,
+restore-race 3/3, original owner 23/23 and complete control-plane 78/78.
+Ordered `types` → `canonical` → `control-plane` builds and typechecks pass.
+Changed-owner ESLint has zero output; complete control-plane has zero errors
+and six unchanged warnings. Prettier, exact production-only diff, 94.8 KB
+browser bundle and built-export smoke pass. Neither sealed 100k, workspace-
+wide, fuzz nor unbounded stress ran. Production SHA-256 is
+`bebd53d9878e890a6e09828f8af35126f923f7e2f387e34c8feea2072e3b9677`
+and artifact-manifest SHA-256 is
+`491c77260ec4e7c4bbdc115ef4dcf0728d1456bf1464aae042282df1deeb4e4b`.
+Evidence is under
+`.logs/phase-1m-a-restore-old-ack-corrective-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a high-water corrected preliminary reviews
+
+Run new fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100
+read-only reviews at the fixed documented HEAD. Authenticate the complete
+three-correction RED/GREEN lineage and evidence. Try to falsify the scalar
+high-water plus retained-restore-token mechanism with single/shared
+controllers, arbitrary honest CAS acknowledgment order, restore capture and
+completion order, reject/throw/malformed outcomes, same/equal/different
+counters, losing CAS, reentrancy and mutable input. Check transient blocked/
+published behavior, ensure high-water cannot regress or strand a supported
+retry, and ensure a stale restore cannot overwrite a newer acknowledgment nor
+an old acknowledgment suppress a newer restore. Recheck canonical/crypto,
+detachment, bounded state, API/dependency/lock and browser boundaries without
+demanding deferred durability/transport/compactor/version-runtime/fleet-drill
+work. No edits, delegation/Fable, web, sealed 100k or unbounded stress. Final
+Opus/xhigh begins only if both fresh preliminary reviewers accept.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
