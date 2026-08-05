@@ -1,6 +1,7 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	type AdmissionCredential,
 	AdmissionPolicy,
@@ -57,7 +58,7 @@ describe("room presence rendezvous publishing", () => {
 	it("publishes a room record alongside the main record after createObject", async () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
-		const object = await fixture.node.createObject({ id: "created-room" });
+		const object = await fixture.node.createObject({ id: "created-room", acl: createPermissionlessACL() });
 
 		const cycle = await fixture.runCycle();
 		const roomRecord = cycle.find(({ record }) => record.namespace.startsWith(ROOM_NAMESPACE_PREFIX))?.record;
@@ -74,7 +75,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
 		const id = "joined-room";
-		const connecting = fixture.node.connectObject({ id });
+		const connecting = fixture.node.connectObject({ id, acl: createPermissionlessACL() });
 		pending.push(connecting);
 		await flushMicrotasks();
 
@@ -94,7 +95,9 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true, max_rooms: 2 });
 		nodes.push(fixture.node);
 		const ids = ["capped-room-a", "capped-room-b", "capped-room-c"];
-		await expect(Promise.all(ids.map((id) => fixture.node.createObject({ id })))).resolves.toHaveLength(3);
+		await expect(
+			Promise.all(ids.map((id) => fixture.node.createObject({ id, acl: createPermissionlessACL() })))
+		).resolves.toHaveLength(3);
 
 		const cycle = await fixture.runCycle();
 		const roomNamespaces = [
@@ -111,7 +114,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
 		const ids = Array.from({ length: 8 }, (_, index) => `default-capped-room-${index}`);
-		await Promise.all(ids.map((id) => fixture.node.createObject({ id })));
+		await Promise.all(ids.map((id) => fixture.node.createObject({ id, acl: createPermissionlessACL() })));
 
 		const cycle = await fixture.runCycle();
 		const roomNamespaces = new Set(
@@ -126,8 +129,8 @@ describe("room presence rendezvous publishing", () => {
 		nodes.push(fixture.node);
 		const firstId = "backfill-room-a";
 		const waitingId = "backfill-room-b";
-		await fixture.node.createObject({ id: firstId });
-		await fixture.node.createObject({ id: waitingId });
+		await fixture.node.createObject({ id: firstId, acl: createPermissionlessACL() });
+		await fixture.node.createObject({ id: waitingId, acl: createPermissionlessACL() });
 
 		const cappedCycle = await fixture.runCycle();
 		expect(cappedCycle.map(({ record }) => record.namespace)).toContain(roomNamespace(firstId));
@@ -148,7 +151,7 @@ describe("room presence rendezvous publishing", () => {
 		);
 		nodes.push(fixture.node);
 		const ids = ["slow-room-a", "fast-room-b"];
-		await Promise.all(ids.map((id) => fixture.node.createObject({ id })));
+		await Promise.all(ids.map((id) => fixture.node.createObject({ id, acl: createPermissionlessACL() })));
 
 		const startedAtMs = performance.now();
 		const cycle = await fixture.runCycle();
@@ -173,7 +176,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true });
 		nodes.push(fixture.node);
 		const id = "unsubscribed-room";
-		await fixture.node.createObject({ id });
+		await fixture.node.createObject({ id, acl: createPermissionlessACL() });
 
 		const subscribedCycle = await fixture.runCycle();
 		const advertisedRecord = subscribedCycle.find(({ record }) =>
@@ -216,9 +219,9 @@ describe("room presence rendezvous publishing", () => {
 		const absent = await publishingHarness(undefined);
 		nodes.push(enabled.node, disabled.node, absent.node);
 
-		await enabled.node.createObject({ id: "enabled-control-room" });
-		await disabled.node.createObject({ id: "disabled-room" });
-		await absent.node.createObject({ id: "absent-room" });
+		await enabled.node.createObject({ id: "enabled-control-room", acl: createPermissionlessACL() });
+		await disabled.node.createObject({ id: "disabled-room", acl: createPermissionlessACL() });
+		await absent.node.createObject({ id: "absent-room", acl: createPermissionlessACL() });
 
 		const [enabledCycle, disabledCycle, absentCycle] = await Promise.all([
 			enabled.runCycle(),
@@ -237,7 +240,7 @@ describe("room presence rendezvous publishing", () => {
 	it("treats disabled room presence with max_rooms zero as inert configuration", async () => {
 		const fixture = await publishingHarness({ enabled: false, max_rooms: 0 });
 		nodes.push(fixture.node);
-		await fixture.node.createObject({ id: "disabled-zero-room" });
+		await fixture.node.createObject({ id: "disabled-zero-room", acl: createPermissionlessACL() });
 
 		const cycle = await fixture.runCycle();
 
@@ -249,7 +252,7 @@ describe("room presence rendezvous publishing", () => {
 		const fixture = await publishingHarness({ enabled: true, max_rooms: 1 }, () => false, installRealRegistryTransport);
 		nodes.push(fixture.node);
 		const id = "rejoined-room";
-		const object = await fixture.node.createObject({ id });
+		const object = await fixture.node.createObject({ id, acl: createPermissionlessACL() });
 
 		const firstCycle = await fixture.runCycle();
 		const firstRoom = firstCycle.find(({ record }) => record.namespace === roomNamespace(id));
@@ -274,8 +277,8 @@ describe("room presence rendezvous publishing", () => {
 			record.namespace.startsWith(ROOM_NAMESPACE_PREFIX)
 		);
 		nodes.push(fixture.node);
-		await fixture.node.createObject({ id: failedId });
-		await fixture.node.createObject({ id: healthyId });
+		await fixture.node.createObject({ id: failedId, acl: createPermissionlessACL() });
+		await fixture.node.createObject({ id: healthyId, acl: createPermissionlessACL() });
 
 		const cycle = await fixture.runCycle();
 		const attemptedNamespaces = cycle.map(({ record }) => record.namespace);

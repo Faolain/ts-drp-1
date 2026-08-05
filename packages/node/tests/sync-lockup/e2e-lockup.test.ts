@@ -5,6 +5,7 @@
  */
 import { type IdentifyResult, type Libp2p } from "@libp2p/interface";
 import { DRPNetworkNode } from "@ts-drp/network";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -122,14 +123,16 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 			{ timeout: 30_000, interval: 250 }
 		);
 
-		obj1 = await node1.createObject({ id: OBJ_ID, drp: new PosMapDRP() });
+		obj1 = await node1.createObject({ id: OBJ_ID, acl: createPermissionlessACL(), drp: new PosMapDRP() });
 		obj2 = await node2.connectObject({
 			id: OBJ_ID,
+			acl: createPermissionlessACL(),
 			drp: new PosMapDRP(),
 			sync: { peerId: node1.networkNode.peerId },
 		});
 		obj3 = await node3.connectObject({
 			id: OBJ_ID,
+			acl: createPermissionlessACL(),
 			drp: new PosMapDRP(),
 			sync: { peerId: node1.networkNode.peerId },
 		});

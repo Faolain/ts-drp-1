@@ -3,7 +3,7 @@ import { type Connection, type IdentifyResult, type Libp2p } from "@libp2p/inter
 import { SetDRP } from "@ts-drp/blueprints";
 import { Logger } from "@ts-drp/logger";
 import { DRPNetworkNode } from "@ts-drp/network";
-import { createACL, DRPObject } from "@ts-drp/object";
+import { createACL, createPermissionlessACL, DRPObject } from "@ts-drp/object";
 import { ACLGroup, type DRPNetworkNodeConfig, DrpType, Operation, Vertex } from "@ts-drp/types";
 import { raceEvent } from "race-event";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -388,6 +388,7 @@ describe("DRPObject connection tests", () => {
 		const logSpy = vi.spyOn(log, "error").mockImplementation(() => {});
 		await node1.connectObject({
 			id: "fake-id",
+			acl: createPermissionlessACL(),
 			sync: {
 				peerId: node2.networkNode.peerId,
 			},

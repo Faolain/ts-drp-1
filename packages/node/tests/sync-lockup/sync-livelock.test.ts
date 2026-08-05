@@ -2,7 +2,7 @@
  * Handler-level clock-skew regressions. Outbound messages are captured and
  * delivered directly so convergence and sync requests are deterministic.
  */
-import { createACL } from "@ts-drp/object";
+import { createACL, createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -127,8 +127,8 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		const OBJ = "control-object";
 		const outA = captureOutbound(nodeA);
 		const outB = captureOutbound(nodeB);
-		const objA = await nodeA.createObject({ id: OBJ, drp: new PosMapDRP() });
-		const objB = await nodeB.createObject({ id: OBJ, drp: new PosMapDRP() });
+		const objA = await nodeA.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
+		const objB = await nodeB.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
 
 		// B moves twice; the first UPDATE is dropped by the network (simulated),
 		// the second is delivered out of order.
@@ -158,8 +158,8 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		const OBJ = "skew-object";
 		const outA = captureOutbound(nodeA);
 		const outB = captureOutbound(nodeB);
-		const objA = await nodeA.createObject({ id: OBJ, drp: new PosMapDRP() });
-		const objB = await nodeB.createObject({ id: OBJ, drp: new PosMapDRP() });
+		const objA = await nodeA.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
+		const objB = await nodeB.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
 
 		const ROUNDS = 5;
 		for (let round = 1; round <= ROUNDS; round++) {
@@ -183,7 +183,7 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 	test("a backward clock step within tolerance does not lock local operations", async () => {
 		const OBJ = "backward-clock-object";
 		captureOutbound(nodeB);
-		const objB = await nodeB.createObject({ id: OBJ, drp: new PosMapDRP() });
+		const objB = await nodeB.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
 
 		onSkewedClock(() => objB.drp?.move("B", 1, 1));
 		expect(() => objB.drp?.move("B", 2, 2)).not.toThrow();
@@ -194,8 +194,8 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		const OBJ = "invalid-skew-object";
 		const outA = captureOutbound(nodeA);
 		const outB = captureOutbound(nodeB);
-		const objA = await nodeA.createObject({ id: OBJ, drp: new PosMapDRP() });
-		const objB = await nodeB.createObject({ id: OBJ, drp: new PosMapDRP() });
+		const objA = await nodeA.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
+		const objB = await nodeB.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
 
 		onSkewedClock(() => objB.drp?.move("B", 1, 1), BEYOND_TOLERANCE_SKEW);
 		await vi.waitFor(() => expect(updatesOf(outB).filter((message) => message.objectId === OBJ)).toHaveLength(1));
@@ -215,8 +215,8 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		const OBJ = "invalid-skew-cascade-object";
 		const outA = captureOutbound(nodeA);
 		const outB = captureOutbound(nodeB);
-		const objA = await nodeA.createObject({ id: OBJ, drp: new PosMapDRP() });
-		const objB = await nodeB.createObject({ id: OBJ, drp: new PosMapDRP() });
+		const objA = await nodeA.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
+		const objB = await nodeB.createObject({ id: OBJ, acl: createPermissionlessACL(), drp: new PosMapDRP() });
 		const mergeResults: MergeResult[] = [];
 		const merge = objA.merge.bind(objA);
 		vi.spyOn(objA, "merge").mockImplementation(async (vertices) => {
@@ -269,13 +269,16 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		const outA = captureOutbound(nodeA);
 		const outB = captureOutbound(nodeB);
 		const syncObject = vi.spyOn(nodeA, "syncObject");
-		const acl = createACL({ admins: [nodeA.networkNode.peerId, nodeB.networkNode.peerId] });
-		acl.context = { caller: nodeA.networkNode.peerId };
-		acl.setKey(nodeA.keychain.blsPublicKey);
-		acl.context = { caller: nodeB.networkNode.peerId };
-		acl.setKey(nodeB.keychain.blsPublicKey);
-		const objA = await nodeA.createObject({ id: OBJ, acl, drp: new PosMapDRP() });
-		const objB = await nodeB.createObject({ id: OBJ, acl, drp: new PosMapDRP() });
+		const finalityACL = (): ReturnType<typeof createACL> => {
+			const acl = createACL({ admins: [nodeA.networkNode.peerId, nodeB.networkNode.peerId] });
+			acl.context = { caller: nodeA.networkNode.peerId };
+			acl.setKey(nodeA.keychain.blsPublicKey);
+			acl.context = { caller: nodeB.networkNode.peerId };
+			acl.setKey(nodeB.keychain.blsPublicKey);
+			return acl;
+		};
+		const objA = await nodeA.createObject({ id: OBJ, acl: finalityACL(), drp: new PosMapDRP() });
+		const objB = await nodeB.createObject({ id: OBJ, acl: finalityACL(), drp: new PosMapDRP() });
 
 		objB.drp?.move("B", 1, 1);
 		await vi.waitFor(() => expect(updatesOf(outB).filter((message) => message.objectId === OBJ)).toHaveLength(1));
