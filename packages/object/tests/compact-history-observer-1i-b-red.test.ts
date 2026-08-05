@@ -338,6 +338,10 @@ describe("Phase 1i-b atomic rehydration", () => {
 				expect(VertexCodec.encode(result.vertex).finish()).toEqual(VertexCodec.encode(vertex).finish());
 			}
 		}
+		expect(compact.readHistory(compact.historyInventory.knownHashes)).toEqual({
+			status: "available",
+			vertices: compact.vertices,
+		});
 
 		expect(() => compact.drp?.append(99)).not.toThrow();
 		expect(compact.drp?.query_values()).toContain(99);

@@ -284,6 +284,116 @@ describe("Phase 1i-b compact observer network boundaries", () => {
 		});
 		expect(response.type).not.toBe(MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
 	});
+
+	it("keeps compact capability truth after public history-mode mutation attempts", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "2");
+		const objectId = `${author.peerId}:phase-1i-b-capability-state`;
+		const { controls, node, object } = await compactNodeObject("phase-1i-b-capability-state-observer", objectId);
+		const history = await signedCompactHistory(author);
+		await expect(object.applyVertices([...history])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+
+		const before = {
+			historyInventory: structuredClone(object.historyInventory),
+			historyStorage: object.historyStorage,
+		};
+		const missingHashes = before.historyInventory.knownHashes.filter(
+			(hash) => !before.historyInventory.availablePayloadHashes.includes(hash)
+		);
+		expect(before.historyStorage).toBe("compact");
+		expect(before.historyInventory.knownHashes.length).toBeGreaterThan(
+			before.historyInventory.availablePayloadHashes.length
+		);
+		expect(missingHashes.length, "fixture must honestly prune authenticated payloads").toBeGreaterThan(0);
+		for (const hash of missingHashes) {
+			expect(object.getVertexPayload(hash)).toEqual({
+				missingHashes: [hash],
+				status: "history-unavailable",
+			});
+		}
+
+		const mutableCapability: { historyStorage: "compact" | "full" } = object;
+		try {
+			mutableCapability.historyStorage = "full";
+		} catch {
+			// A getter-only public capability may reject ordinary strict-mode assignment.
+		}
+		const afterOrdinaryAssignment = object.historyStorage;
+		let reflectiveMutationSucceeded = false;
+		try {
+			reflectiveMutationSucceeded = Reflect.set(object, "historyStorage", "full");
+		} catch {
+			// A hardened proxy may reject the reflective write rather than return false.
+		}
+
+		const rehydration = await object.rehydrateHistory([]);
+		let authorshipDenied = false;
+		try {
+			object.drp?.append(99);
+		} catch (error) {
+			authorshipDenied = /compact.*author|author.*compact/i.test(String(error));
+		}
+		let finalityDenied = false;
+		try {
+			void object.finalityStore;
+		} catch (error) {
+			finalityDenied = /observer.*finality|finality.*observer/i.test(String(error));
+		}
+
+		controls.sendMessage.mockClear();
+		await handleMessage(node, {
+			data: Sync.encode(Sync.create({ vertexHashes: [HashGraph.rootHash] })).finish(),
+			objectId,
+			sender: "phase-1i-b-capability-state-requester",
+			type: MessageType.MESSAGE_TYPE_SYNC,
+		});
+		const response = controls.sendMessage.mock.calls[0]?.[1] as Message | undefined;
+		const decodedRejection =
+			response?.type === MessageType.MESSAGE_TYPE_SYNC_REJECT ? SyncReject.decode(response.data) : undefined;
+		const after = object.historyInventory;
+
+		expect({
+			authorshipDenied,
+			availablePayloadsUnchanged:
+				after.availablePayloadHashes.length === before.historyInventory.availablePayloadHashes.length &&
+				after.availablePayloadHashes.every(
+					(hash, index) => hash === before.historyInventory.availablePayloadHashes[index]
+				),
+			capabilityInternallyConsistent:
+				object.historyStorage === "compact" || after.availablePayloadHashes.length === after.knownHashes.length,
+			decodedRejection,
+			finalityDenied,
+			historyInventory: after,
+			historyStorageAfterOrdinaryAssignment: afterOrdinaryAssignment,
+			historyStorageAfterRehydration: object.historyStorage,
+			missingPayloadsRemainUnavailable: missingHashes.every(
+				(hash) => object.getVertexPayload(hash).status === "history-unavailable"
+			),
+			reflectiveMutationSucceeded,
+			rehydrationStatus: rehydration.status,
+			replicaMode: object.replicaMode,
+			syncResponseCount: controls.sendMessage.mock.calls.length,
+			syncResponseType: response?.type,
+		}).toEqual({
+			authorshipDenied: true,
+			availablePayloadsUnchanged: true,
+			capabilityInternallyConsistent: true,
+			decodedRejection: { missingHashes, reason: "history-unavailable" },
+			finalityDenied: true,
+			historyInventory: before.historyInventory,
+			historyStorageAfterOrdinaryAssignment: "compact",
+			historyStorageAfterRehydration: "compact",
+			missingPayloadsRemainUnavailable: true,
+			reflectiveMutationSucceeded: false,
+			rehydrationStatus: "rejected",
+			replicaMode: "observer",
+			syncResponseCount: 1,
+			syncResponseType: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		});
+	});
 });
 
 it("keeps the freshly built signed 64-vertex writer/full-observer provenance control green", async () => {
