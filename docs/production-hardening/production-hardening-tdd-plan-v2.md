@@ -1030,9 +1030,12 @@ round 1 at all.
 | **1k**      | Per-peer invalid-vertex budget + disconnect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | local-safe                                                                                 | After an attacker rotates 10k distinct invalid hashes, the honest peer's **re-request count** for evicted-parent descendants stays bounded (assert against `DRP_SYNC_REJECTED`/retry counters). _Not_ a memory assertion — §0.3.4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **1l**      | Default **permissioned** ACL for the product path. `createObject` defaults to `createPermissionlessACL` (`node/src/index.ts:1229`; `acl/index.ts:33-34`), so `query_isWriter` returns `true` for anyone. Scale tests against a permissionless default measure attacker bandwidth, not product.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | coordinated (genesis behaviour)                                                            | 100 Sybil keys cannot write without a grant; growth stays inside budget                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **1m-a**    | **Local signed-disable contract.** Build the operational primitive that exists before transport and compaction integration: a versioned, canonically encoded, domain-separated, disable-only envelope; configured/pinned operator authority; exact signed scope/capability; monotonic counter; bounded replay state; and a required injected `DisableLatchStatePort`. One atomic port transaction owns authority-set version, scope, envelope version, highest counter, envelope bytes/digest and latch. The effective local latch changes only after a successful commit; rejection, stale input, throw or ambiguous commit changes neither stored nor observable state. No default store, network propagation, compaction-stop or version-coexistence claim. An in-memory test model is explicitly non-production/ephemeral. Phase 2 owns real durable adapters, restore-before-activation and crash closure. See the Phase 1m assumption-correction quorum below.                        | local-safe (**security-visible API/contract; production durability blocked on Phase 2**)   | Causal verifier/state-machine RED rejects forged, wrong-authority, wrong-scope/capability, unknown-version, stale, replayed and equivocated envelopes; commit failure leaves the prior counter/latch exact; a valid disable becomes observable only after the injected atomic commit resolves. Unreadable/unknown restored state blocks a consumer rather than silently enabling. No fake transport or compactor.                                                                                                                                                                                                                                                                                                                                                                          |
-| **1m-b**    | **Integrated kill-switch and version coexistence — deferred owner, not a Phase 1 exit claim.** After 1n provides one generic per-connection feature-negotiation stack, Phase 3 supplies the live v(next) runtime/identity and Phase 4 supplies the first real compaction scheduler/action boundary, propagate the verified 1m-a latch through the real multi-node path, keep ordinary supported-version traffic live, and halt actual compaction at a named atomic boundary. P3/Phase 6 owns the fleet drill, restart/late-join behavior, rollback telemetry and final adoption/pruning integration.                                                                                                                                                                                                                                                                                                                                                                                        | coordinated (**requires 1n + Phase 3 + Phase 4; full drill in Phase 6/P3**)                | Real mixed-version multi-node harness on one topic: authenticated disable propagates and actual compaction halts within N seconds; forged/stale/unsupported controls are inert; supported legacy and v(next) traffic coexist; drill log and rollback telemetry are emitted. Golden-path step 16 remains unchanged and first becomes fully assertable at Phase 6.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **1m-b**    | **Integrated kill-switch and version coexistence — deferred owner, not a Phase 1 exit claim.** After 1n-c provides one generic per-connection feature-negotiation stack, Phase 3 supplies the live v(next) runtime/identity and Phase 4 supplies the first real compaction scheduler/action boundary, propagate the verified 1m-a latch through the real multi-node path, keep ordinary supported-version traffic live, and halt actual compaction at a named atomic boundary. P3/Phase 6 owns the fleet drill, restart/late-join behavior, rollback telemetry and final adoption/pruning integration.                                                                                                                                                                                                                                                                                                                                                                                      | coordinated (**requires 1n-c + Phase 3 + Phase 4; full drill in Phase 6/P3**)              | Real mixed-version multi-node harness on one topic: authenticated disable propagates and actual compaction halts within N seconds; forged/stale/unsupported controls are inert; supported legacy and v(next) traffic coexist; drill log and rollback telemetry are emitted. Golden-path step 16 remains unchanged and first becomes fully assertable at Phase 6.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **1o**      | **Complete resource governance table** (per peer **and** per object), anchored where consensus-relevant: vertex rate, branch/antichain width, dependency fan-out, argument bytes, pending bytes, sync-response bytes, decode work, replay-work budget, per-object storage quota, and admission control. Cryptographic validity must never imply unlimited resource entitlement. Consensus-affecting caps (dep fan-out, argument bytes, epoch capacity) live in `parametersDigest`; purely local caps (pending bytes, decode work, sync-response size) are replica policy.                                                                                                                                                                                                                                                                                                                                                                                                                   | **split**: consensus caps → Phase 3; local caps local-safe here                            | Branch-spam at antichain width 128, oversized args, dependency bombs, slow-drip peers and 100 Sybils each stay within fixed CPU/RAM/queue budgets without quadratic blowup, and cannot starve an honest room. **NOP/dropped vertices count toward their author's epoch capacity** so dropped spam still costs the spammer                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **1n**      | Heads-exchange sync with recursive missing-dep retrieval, per-peer shared-head tracking, chunking, backpressure, max-response caps. Feature-flagged, per-connection negotiable. This slice also owns the inherited sync-livelock correction; Phase 1k remains only the complementary invalid-peer abuse budget. (PRIBLT stays a later optimization with a mandatory hash-list fallback.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | local-safe                                                                                 | Convergence under adversarial partition/rejoin with old-branch injection; byte cost proportional to the delta, not history size; a causal RED/GREEN turns the frozen exact 3F/3P sync-livelock sentinel into 6/6 without weakening assertions. Hard by Phase 1 exit and before production-ready mixed-peer sync or either untrusted-peer golden path.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **1n-a**    | **Truthful sync-recovery classification and livelock closure.** Preserve Phase 0f finite receiver-clock-future vertices as pending/re-offerable, but carry narrow internal object→node provenance that distinguishes them from genuinely absent dependencies. Pending-only offers trigger neither missing-dependency recovery nor invalid-peer accounting. This supersedes exactly the stale terminal-invalid array expectations in the pre-0f node sentinel; every stronger no-sync/state/finality/recovery control remains.                                                                                                                                                                                                                                                                                                                                                                                                                                                               | local-safe (**internal additive outcome seam; no public error/enum leak**)                 | The corrected sentinel proves zero `syncObject`, `SYNC` and `SYNC_ACCEPT` for clock-pending-only input; unchanged state/graph until eligible; no invalid-memory or Phase 1k budget charge; pending-only input neither consumes nor resets retry/cooldown state; valid-sibling finality remains exact; re-offering the exact hashes after clock eligibility converges. Genuine absent-dependency input still performs bounded recovery and heals. See the Phase 1n assumption-correction quorum.                                                                                                                                                                                                                                                                                            |
+| **1n-b**    | **Core heads sync.** Replace full-inventory recovery with heads exchange, recursive true-missing-dependency retrieval and per-peer shared-head tracking. Keep a mandatory hash-list fallback; PRIBLT remains a later optimization. Depends on 1n-a's truthful recovery classification.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | local-safe                                                                                 | Deterministic causal RED/GREEN proves only true missing hashes recurse, shared heads advance without forgetting old branches, duplicate/out-of-order chunks are idempotent, and recovery work is bounded by requested delta rather than retained history.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **1n-c**    | **Generic per-connection negotiation and bounded flow.** Negotiate supported sync features per connection, retain the hash-list fallback, and add chunking, awaited backpressure and maximum request/response caps. This is the generic negotiation prerequisite consumed later by 1m-b; it is not a legacy plain-ID or protocol emulation shim.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | local-safe (**additive feature negotiation with mandatory fallback**)                      | Mixed supported/unsupported peers select one mutually supported mode without split-brain; unsupported or malformed negotiation falls back or fails closed as specified; chunk and byte caps hold under adversarial responses; send completion is awaited and bounded; pending-only input does not consume or reset recovery budgets.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **1n-d**    | **Aggregate convergence and cost acceptance.** Compose 1n-a/b/c under partition/rejoin with old-branch injection and mixed negotiated peers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | local-safe (**aggregate acceptance**)                                                      | All Phase 1n causal owners pass; adversarial partition/rejoin converges; old branches are recursively recovered; byte/probe work is proportional to the delta rather than history size; full-inventory fallback occurs only for an explicitly negotiated/bounded compatibility case. Hard by Phase 1 exit and before production-ready mixed-peer sync or either untrusted-peer golden path.                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### Measured wall order (fix in this order; numbers are per-object)
 
@@ -1055,8 +1058,9 @@ Probe counters flat 10k→1M; zero unauthenticated ingest paths proven **reflect
 backpressure and frame caps hold under flood; observer heap ratio met; the 1m-a signed-disable verifier,
 atomic state-port contract and fail-closed local latch are complete, while the real drill remains a
 1m-b/P3/Phase-6 gate after its transport and compaction prerequisites exist;
-1d(iii) has removed or bounded whole-graph checkpoint-prune key materialization; and 1n has converted the
-exact inherited sync-livelock 3F/3P sentinel to 6/6 without weakening its assertions. Phase 1 exit evidence
+1d(iii) has removed or bounded whole-graph checkpoint-prune key materialization; 1n-a has corrected the
+pre-0f sync-livelock sentinel without terminalizing finite clock-pending vertices or weakening its still-valid
+no-sync/state/finality controls; and 1n-d has closed the aggregate convergence and delta-cost gates. Phase 1 exit evidence
 cleanup has also executed and dispositioned the four known stale legacy expectations at its own exact HEAD,
 preserving their still-valid coverage without fake compatibility or coupling the inner loop to the 5k case.
 
@@ -18798,11 +18802,14 @@ rollback and owner-store identity. This is unimplemented: atomic apply remains
 forbidden from claiming history independence, and Phase 1 scale plus Phase
 4b/6a snapshot-adoption claims remain blocked, until 1d(iii) closes.
 
-Phase 1n is likewise the future implementation owner, not an accepted fix, for
-the exact current sync-livelock 3F/3P sentinel. Its own causal RED/GREEN must
-reach 6/6 without weakening assertions; Phase 1k remains complementary abuse-
-budget work. The gate is Phase 1 exit and any production-ready mixed-peer sync
-or untrusted-peer Discord/MMORPG golden path, whichever comes first.
+At this checkpoint Phase 1n remained the future implementation owner for the
+exact sync-livelock 3F/3P sentinel. The later Phase 1n assumption-correction
+quorum found that the pre-0f node sentinel had missed Phase 0f's test migration:
+four terminal-invalid array expectations are stale and are superseded by
+1n-a's stronger pending/re-offerable contract. Every no-sync, state, finality
+and genuine-missing recovery assertion remains. Phase 1k remains complementary
+abuse-budget work. The gate is Phase 1 exit and any production-ready mixed-peer
+sync or untrusted-peer Discord/MMORPG golden path, whichever comes first.
 
 The publication-time codec/`Symbol.iterator` captured-intrinsic seam also
 remains separate unless its later causal RED explicitly assigns it to the
@@ -18862,10 +18869,13 @@ slice or hard gate:
 
 The standing amendment quorum was unanimous among Opus/xhigh, fresh
 Codex-high and fresh exact Kimi 3/high/dual-100 for exactly three normative
-edits: Phase 1n owns 3F/3P→6/6 by Phase 1 exit; Phase 1d(iii) owns checkpoint-
-prune history independence immediately after 1d(ii); and Phase 1d(ii) covers
-all equivalent ordinary-`[[Set]]` sinks. No other finding changed an owner,
-order, gate or frozen contract. The exact Kimi amendment adjudication used
+edits at that checkpoint: Phase 1n owned the then-understood 3F/3P→6/6 gate;
+Phase 1d(iii) owned checkpoint-prune history independence immediately after
+1d(ii); and Phase 1d(ii) covered all equivalent ordinary-`[[Set]]` sinks. The
+later Phase 1n assumption-correction quorum supersedes only the stale
+terminal-invalid sentinel expectations; it does not relax the Phase 1 exit or
+golden-path gate. No other finding changed an owner, order, gate or frozen
+contract. The exact Kimi amendment adjudication used
 session `5acfe754-ac60-4202-a342-6b76c4748f58`, 39 steps / 48 tools, both
 100-step controls and exit 0; its artifact-manifest SHA-256 is
 `a40875ec7cb7d0ada36e5cefdedcd5af90a15a15613e380dc607aa6899ec7f88`.
@@ -24321,7 +24331,7 @@ Nonblocking handoffs remain explicit rather than compatibility debt:
   version may widen the encoded counter only through the normal negotiated
   protocol-version path.
 - There is no legacy plain-ID, unsigned control, default-store or v(old)
-  compatibility requirement in this greenfield slice. Phase 1n owns generic
+  compatibility requirement in this greenfield slice. Phase 1n-c owns generic
   per-connection feature negotiation; 1m-b later consumes it for genuine
   mixed-version runtime integration.
 
@@ -24329,22 +24339,78 @@ Phase 1m-a is closed. Its accepted production lineage ends at `c363f2e`; this
 docs-only closure does not claim persistence, propagation, actual compaction
 halt, runtime version coexistence or the fleet drill assigned to later phases.
 
-## Next Agent Prompt — Phase 1n tests-only RED
+## Phase 1n assumption-correction quorum — accepted
 
-Start a fresh Codex-high tests-only Phase 1n RED. First authenticate the
-standing exact 3 failed / 3 passed sync-livelock sentinel and census its real
-production owners. Freeze the smallest causal contract for heads exchange,
-recursive missing-dependency retrieval, per-peer shared-head tracking,
-feature-flagged per-connection negotiation, chunking/backpressure and maximum
-response caps, while retaining mandatory hash-list fallback and leaving RIBLT
-as a later optimization. The RED must turn the existing sentinel toward 6/6
-without weakening its assertions and prove delta-proportional wire work under
-partition/rejoin plus old-branch injection. Keep Phase 1k's invalid-peer abuse
-budget and Phase 1o's aggregate queue governance separate. Do not implement
-production or legacy shims. Run focused/preservation build, typecheck, lint and
-tests sequentially to `.logs`; do not rerun either sealed 100k workload unless
-the plan's explicit Phase 1n acceptance boundary truly requires it after the
-fast causal owner is frozen.
+Fresh Codex-high authenticated the standing sentinel at exact 3 failed / 3
+passed and traced the causal chain before making any edit. The pre-0f node test
+expects finite receiver-clock-future parent/descendant hashes in
+`MergeResult.invalid` with `missing=[]`. Accepted Phase 0f instead requires the
+same finite offers to remain result-bound pending, untombstoned and exactly
+re-offerable because terminalizing them can make honest receivers at different
+wall times diverge. Current production privately distinguishes
+`ReceiverClockPendingValidationError` but folds it into the public legacy
+`missing` tuple; `IDRPObject.merge` drops the richer provenance, and node
+recovery mistakes clock-pending for an absent dependency and starts futile
+full-inventory sync. Literal unchanged 6/6 is therefore impossible without
+breaking Phase 0f.
+
+Fresh Claude-skill Opus/xhigh session
+`319325dd-c785-41bc-a04c-67dd9b607445` returned
+`AMENDMENT_AGREED: yes`. It confirmed the sentinel predates Phase 0f and
+supersedes exactly the four stale classification expectations currently at
+`sync-livelock.test.ts:259,260,262,263`. It preserves or strengthens no-SYNC
+at `:211,:264,:295`, zero `syncObject` at `:294`, unchanged state at
+`:209-210`, valid-sibling finality at `:292-293`, and the genuine-missing
+SYNC/heal plus retry/cooldown controls. It additionally requires exact-hash
+re-offer or anti-entropy convergence after clock eligibility and warns that
+filtering pending to `[]` must not call recovery because the existing empty
+path deletes/reopens its budget. Prefer a narrow internal
+`AuthenticatedMergeOutcome`-style provenance seam rather than a public
+error/enum leak. Opus report SHA-256 is
+`868db205a2623b2846dc5b2d592f138bd9cf1f50c2c3cd5b636f589642a3dec0`.
+The effective substantive model was `claude-opus-5` at xhigh; automatic
+non-substantive Haiku bookkeeping used 24 output tokens. Evidence is under
+`.logs/phase-1n-sentinel-conflict-opus-xhigh-quorum/`.
+
+Fresh exact Kimi 3/high/dual-100 session
+`62c050d8-44cf-416a-99e7-19b79fb06a30` independently returned
+`AMENDMENT_AGREED: yes` / `CONTRADICTION: yes`. It requires pending-only input
+to trigger no `syncObject`, `SYNC` or `SYNC_ACCEPT`, no invalid-memory/Phase 1k
+budget charge and neither consumption nor reset of retry/cooldown state, while
+preserving unchanged state/graph, valid-sibling finality and exact-hash re-offer
+convergence. True absent dependencies alone drive recursive recovery. Kimi
+final SHA-256 is
+`7ee15f3297fe61179b263bfc89d46a880a1f8dcede614b008e75e480ebdbfbdb`
+and verified artifact-manifest-file SHA-256 is
+`e11f3eeeb9f46cf4b1c8d54a425f73a256deedf2cfab0a40973154a4c41b2335`.
+It authenticated absolute CLI 1.49.0, exact `kimi-code/k3`/K3, thinking and
+both 100-step caps; its model's unqualified `kimi --version` self-report hit a
+different PATH shim and is explicitly superseded by controller/native-session
+authentication. Evidence is under
+`.logs/phase-1n-sentinel-conflict-kimi3-high-100-quorum/`.
+
+The quorum unanimously accepts sustainable within-row slicing: 1n-a owns the
+truthful classification/livelock correction and hard-precedes 1n-b; 1n-b owns
+heads/recursive true-missing/shared-head/hash fallback; 1n-c owns generic
+per-connection negotiation plus bounded chunks/backpressure/caps and is the
+specific 1m-b prerequisite; 1n-d owns partition/rejoin/old-branch/delta-cost
+aggregate acceptance. All original Phase 1 and golden-path gates remain.
+
+## Next Agent Prompt — Phase 1n-a tests-only RED
+
+Resume the fresh Codex-high RED owner from its authenticated census. Make only
+the quorum-approved sentinel migration plus the smallest new tests that freeze
+the internal pending-vs-true-missing recovery provenance across all three node
+recovery call sites. Supersede exactly the four stale invalid/missing array
+expectations; do not weaken any no-sync/state/finality/genuine-missing control.
+Require pending-only offers to emit zero `syncObject`/`SYNC`/`SYNC_ACCEPT`,
+leave state/graph and invalid memory/budget unchanged, neither consume nor
+reset retry/cooldown state, preserve valid-sibling finality, and converge when
+the exact hashes are re-offered after receiver-clock eligibility. Require true
+absent dependencies to retain bounded recovery and healing. No production,
+public enum/error leak, compatibility shim, 1n-b/c/d implementation or sealed
+100k run. Commit tests-only and run focused/preservation build, typecheck, lint
+and tests sequentially to `.logs`.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
