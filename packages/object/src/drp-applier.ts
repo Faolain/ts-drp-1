@@ -38,13 +38,7 @@ import {
 } from "./operation.js";
 import { createPipeline, type Pipeline } from "./pipeline/pipeline.js";
 import { type HandlerReturn } from "./pipeline/types.js";
-import {
-	DRPProxy,
-	type DRPProxyChainArgs,
-	LocalMutationLane,
-	type MutationTrackingResult,
-	trackMutations,
-} from "./proxy.js";
+import { DRPProxy, type DRPProxyChainArgs, LocalMutationLane, trackMutations } from "./proxy.js";
 import {
 	type ComparisonEvent,
 	createPublicationCapability,
@@ -183,7 +177,6 @@ interface PreparedAdoption<T extends IDRP> {
 	expectedFrontier: Hash[];
 	drp?: T;
 	acl?: IACL;
-	canonicalCandidateKeys?: Readonly<Partial<Record<SnapshotSide, readonly string[]>>>;
 	nextHint?: AdoptionHint<T>;
 	forceCheckpoint?: boolean;
 	canonicalBaseline?: ReplayState;
@@ -866,14 +859,15 @@ export class DRPVertexApplier<T extends IDRP> {
 			const acl = cloneEnumerableExecutionInstance(hint.canonicalACL);
 			const drp = hint.canonicalDRP ? cloneEnumerableExecutionInstance(hint.canonicalDRP) : undefined;
 			const target = operation.isACL ? acl : drp;
-			const replayKeys = target
-				? await this.applyAttributedReplay(target, [operation.vertex], operation.isACL ? "acl" : "drp")
-				: [];
+			if (target) {
+				await (operation.isACL
+					? applyDeterministicReplayVertices(target, [operation.vertex])
+					: applyVertices(target, [operation.vertex]));
+			}
 			return {
 				expectedFrontier,
 				drp,
 				acl,
-				canonicalCandidateKeys: this.operationCandidateKeys(operation, replayKeys),
 				nextHint: this.createCanonicalAdoptionHint(
 					operation.vertex,
 					expectedFrontier,
@@ -887,17 +881,16 @@ export class DRPVertexApplier<T extends IDRP> {
 			throw new ApplyInvariantError([new Error("Prepared operation state is missing")], "Adoption hint is invalid");
 		}
 		const adopted = cloneEnumerableExecutionInstance(operation.currentDRP);
-		const replayKeys = await this.applyAttributedReplay(adopted, hint.tail, operation.isACL ? "acl" : "drp");
+		await (operation.isACL ? applyDeterministicReplayVertices(adopted, hint.tail) : applyVertices(adopted, hint.tail));
 		const nextHint = this.createTailAdoptionHint(
 			operation.vertex,
 			expectedFrontier,
 			hint.tail,
 			hint.replayRequiresConflictResolution
 		);
-		const canonicalCandidateKeys = this.operationCandidateKeys(operation, replayKeys);
 		return operation.isACL
-			? { expectedFrontier, acl: adopted as IACL, canonicalCandidateKeys, nextHint }
-			: { expectedFrontier, drp: adopted as T, canonicalCandidateKeys, nextHint };
+			? { expectedFrontier, acl: adopted as IACL, nextHint }
+			: { expectedFrontier, drp: adopted as T, nextHint };
 	}
 
 	private descendsFromWholeFrontier(vertex: Vertex, expectedFrontier: Hash[]): boolean {
@@ -937,8 +930,8 @@ export class DRPVertexApplier<T extends IDRP> {
 			this.drp?.context,
 			this.acl.context
 		);
-		const aclCandidateKeys = await this.applyAttributedReplay(acl, aclVertices, "acl");
-		const drpCandidateKeys = drp && this.drp ? await this.applyAttributedReplay(drp, drpVertices, "drp") : [];
+		await applyDeterministicReplayVertices(acl, aclVertices);
+		if (drp && this.drp) await applyVertices(drp, drpVertices);
 		const drpType = vertex.operation?.drpType;
 		const sameTypeVertices = replay.linearizedVertices.filter((candidate) => candidate.operation?.drpType === drpType);
 		const pendingIndex = sameTypeVertices.findIndex((candidate) => candidate.hash === vertex.hash);
@@ -950,7 +943,6 @@ export class DRPVertexApplier<T extends IDRP> {
 			expectedFrontier,
 			drp,
 			acl,
-			canonicalCandidateKeys: { acl: aclCandidateKeys, drp: drpCandidateKeys },
 			nextHint,
 			// A root replay has already paid the batch ceiling. Pin its canonical
 			// result immediately so later arrivals can extend that causal cut.
@@ -978,42 +970,11 @@ export class DRPVertexApplier<T extends IDRP> {
 
 		const adopted = cloneEnumerableExecutionInstance(operation.currentDRP);
 		const tail = sameTypeVertices.slice(pendingIndex + 1);
-		const replayKeys = await this.applyAttributedReplay(adopted, tail, operation.isACL ? "acl" : "drp");
+		await (operation.isACL ? applyDeterministicReplayVertices(adopted, tail) : applyVertices(adopted, tail));
 		const nextHint = this.createTailAdoptionHint(vertex, expectedFrontier, tail, replay.requiresConflictResolution);
-		const canonicalCandidateKeys = this.operationCandidateKeys(operation, replayKeys);
 		return operation.isACL
-			? { expectedFrontier, acl: adopted as IACL, canonicalCandidateKeys, nextHint }
-			: { expectedFrontier, drp: adopted as T, canonicalCandidateKeys, nextHint };
-	}
-
-	private async applyAttributedReplay(target: IDRP, vertices: Vertex[], side: SnapshotSide): Promise<string[]> {
-		if (vertices.length === 0) return [];
-		// Canonical replay starts from the causal cut but publishes relative to the
-		// previous live image. Attribute every replayed mutation attempt, including a
-		// value-equal write, and leave semantic comparison to canonical capture where
-		// the correct live baseline and publication meter are available.
-		const tracked = trackMutations(target, () => false, "attempted-writes");
-		await (side === "acl"
-			? applyDeterministicReplayVertices(tracked.proxy, vertices)
-			: applyVertices(tracked.proxy, vertices));
-		tracked.observeRawEgressBoundary();
-		return mutationCandidateKeys(tracked);
-	}
-
-	private operationCandidateKeys(
-		operation: PostOperation<T>,
-		replayKeys: readonly string[] = []
-	): {
-		acl?: string[];
-		drp?: string[];
-	} {
-		const side: SnapshotSide = operation.isACL ? "acl" : "drp";
-		const keys = new Set([
-			...(operation.mutatedKeys ?? []),
-			...(operation.rawEgress?.side === side ? operation.rawEgress.candidateKeys : []),
-			...replayKeys,
-		]);
-		return side === "acl" ? { acl: [...keys] } : { drp: [...keys] };
+			? { expectedFrontier, acl: adopted as IACL, nextHint }
+			: { expectedFrontier, drp: adopted as T, nextHint };
 	}
 
 	private createTailAdoptionHint(
@@ -1737,14 +1698,6 @@ function splitOperation(vertices: Vertex[]): [Vertex[], Vertex[]] {
 	}
 
 	return [drpVertices, aclVertices];
-}
-
-function mutationCandidateKeys(tracked: MutationTrackingResult<IDRP>): string[] {
-	const keys = new Set(tracked.changedKeys());
-	if (tracked.hasRawEgress()) {
-		for (const key of tracked.rawEgressCandidateKeys()) keys.add(key);
-	}
-	return [...keys];
 }
 
 function sameHashes(left: Hash[], right: Hash[]): boolean {

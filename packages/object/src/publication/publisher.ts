@@ -80,7 +80,6 @@ interface PreparedPublicationAdoption<T extends IDRP> {
 	expectedFrontier: Hash[];
 	drp?: T;
 	acl?: IACL;
-	canonicalCandidateKeys?: Readonly<Partial<Record<SnapshotSide, readonly string[]>>>;
 	canonicalBaseline?: ReplayState;
 	canonicalState?: ReplayState;
 }
@@ -229,7 +228,6 @@ export class PublicationPublisher<T extends IDRP> {
 								targetACL,
 								aclState,
 								canonicalBaseline?.aclState ?? aclState,
-								new Set(adoption.canonicalCandidateKeys?.acl ?? aclCandidateKeys),
 								publication,
 								publicationAttempts,
 								publicationFrontier
@@ -244,7 +242,6 @@ export class PublicationPublisher<T extends IDRP> {
 								targetDRP,
 								drpState,
 								canonicalBaseline?.drpState ?? drpState,
-								new Set(adoption.canonicalCandidateKeys?.drp ?? drpCandidateKeys),
 								publication,
 								publicationAttempts,
 								publicationFrontier
@@ -257,13 +254,11 @@ export class PublicationPublisher<T extends IDRP> {
 		instance: IDRP | undefined,
 		published: DRPState,
 		baseline: DRPState,
-		candidateKeys: ReadonlySet<string>,
 		vertexPublication: PublicationRecord,
 		publicationAttempts: PublicationRecord[],
 		frontier: Hash[]
 	): DRPState {
 		if (instance === undefined) return published;
-		if (candidateKeys.size === 0) return baseline;
 		const publication = this.beginPublication(
 			"canonical-live",
 			{ mode: "incremental", baselineHashes: [...frontier] },
@@ -271,7 +266,7 @@ export class PublicationPublisher<T extends IDRP> {
 			frontier
 		);
 		publicationAttempts.push(publication);
-		const canonical = this.capturePublishedState(side, instance, baseline, publication, true, candidateKeys);
+		const canonical = this.capturePublishedState(side, instance, baseline, publication, true);
 		return canonical.state.length === published.state.length &&
 			canonical.state.every((entry, index) => entry === published.state[index])
 			? published
@@ -474,35 +469,33 @@ export class PublicationPublisher<T extends IDRP> {
 		const values = new Map<string, unknown>();
 		const borrowedEntries = new Map<string, DRPState["state"][number]>();
 		this.collectValues(instance, targetKeys, values, borrowedEntries, rawEgress && incremental);
-		const fallbackRetention = this.selectFallbackRetention(
-			side,
-			publication,
-			targetKeys,
-			values,
-			borrowedEntries,
-			retentionBaselines,
-			allowConsensusRetention
-		);
 		const entries: DRPState["state"] = [];
 		const changed = publication.changed[side] as string[];
-		if (rawEgress && incremental) {
+		if (incremental && (rawEgress || publication.kind === "canonical-live")) {
 			const governedUnion = new Set([...targetKeys, ...baselineByKey.keys()]);
-			const explicitCandidates = governedUnion;
 			const work = publication.work?.[side];
-			if (work) {
+			if (work && rawEgress) {
 				work.egressWidenings = 1;
-				work.comparedKeys = explicitCandidates.size;
+				work.comparedKeys = governedUnion.size;
 				work.comparisonPasses = 1;
 			}
 
 			// Decide every key before copying or retaining any entry. A comparison
 			// failure therefore cannot leave a partially materialized publication.
 			const reuse = new Map<string, boolean>();
-			for (const key of explicitCandidates) {
+			for (const key of governedUnion) {
 				const targetPresent = targetKeys.has(key);
 				const ownedEntry = baselineByKey.get(key);
 				if (!targetPresent || ownedEntry === undefined) {
 					reuse.set(key, false);
+					continue;
+				}
+				const borrowedEntry = borrowedEntries.get(key);
+				if (!rawEgress && borrowedEntry === ownedEntry && Object.is(values.get(key), ownedEntry.value)) {
+					// An unmaterialized deferred cell still names this exact owned
+					// baseline entry, so neither a value read nor a comparison can add
+					// information. Raw egress deliberately keeps its conservative pass.
+					reuse.set(key, true);
 					continue;
 				}
 				reuse.set(
@@ -523,11 +516,7 @@ export class PublicationPublisher<T extends IDRP> {
 					continue;
 				}
 				const borrowedEntry = borrowedEntries.get(key);
-				if (
-					borrowedEntry !== undefined &&
-					Object.is(values.get(key), borrowedEntry.value) &&
-					(incremental || retentionBaselines !== undefined)
-				) {
+				if (borrowedEntry !== undefined && Object.is(values.get(key), borrowedEntry.value)) {
 					entries.push(borrowedEntry);
 					continue;
 				}
@@ -550,6 +539,15 @@ export class PublicationPublisher<T extends IDRP> {
 			changed.sort();
 			return this.capability.createSnapshot(entries);
 		}
+		const fallbackRetention = this.selectFallbackRetention(
+			side,
+			publication,
+			targetKeys,
+			values,
+			borrowedEntries,
+			retentionBaselines,
+			allowConsensusRetention
+		);
 		if (instance) {
 			for (const key of targetKeys) {
 				const value = values.get(key);
