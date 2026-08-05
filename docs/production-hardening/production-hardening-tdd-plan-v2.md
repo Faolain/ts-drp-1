@@ -23386,22 +23386,65 @@ rotating ghost debt; and the exact inherited Phase 1n/type/lint ledger remains.
 Opus retracted self-emission and duplicate-package-instance concerns after
 source tracing. Phase 1k closes at production `46a70c78`.
 
-## Next Agent Prompt — Phase 1l tests-only RED
+## Phase 1l product-path permissioned-default RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only RED for the product-path default
-permissioned ACL in table row 1l. First trace the ordinary public
-`DRPNode.createObject` and join/rehydration paths plus the Discord/MMORPG golden
-paths; do not assume every low-level or explicitly permissionless API should
-change. Freeze the current unsafe default causally: without an explicit ACL,
-the creator can write, an ungranted peer cannot author an accepted operation,
-and an explicit grant restores that peer's write. Include the row's bounded
-100-Sybil control without turning the normal focused loop into a long-running
-scale suite. Preserve explicit `createPermissionlessACL` behavior as an opt-in
-positive control, deterministic creator-bound genesis, restart/join agreement
-and existing ACL/finality semantics. If the public API lacks a way to express
-an explicit permissionless opt-in distinctly from omission, stop and report
-the API ambiguity before changing production or the plan. Run proportional
-typecheck/lint/tests/builds to logs; no sealed 100k and no Fable.
+Freeze fresh Codex-high tests-only RED
+`bdf82aa968bfb43b54fc44075f25041e5bf3833b`. Its sole new 233-line node test
+owner binds the ordinary public `DRPNode.createObject` and `connectObject`
+paths, not every low-level constructor. The public API is unambiguous:
+`NodeCreateObjectOptions.acl` and `NodeConnectObjectOptions.acl` distinguish
+omission from an explicit `createPermissionlessACL` opt-in. Object identifiers
+encode the creator, not ACL mode, so create and connect must make the same
+coordinated choice.
+
+The authoritative focused RED is 5 failed / 1 passed in 3.03 seconds. With ACL
+omitted, current production is permissionless: a correctly authenticated
+ungranted operation applies, and 100 distinct real Sybil keypairs produce
+accepted graph growth +100 and Set-state growth +100 where both must be zero.
+Creator-only admin/writer/finality membership, invalid outsider admission,
+post-grant outsider admission and permissioned restart/join agreement all
+fail. The sole passing control explicitly supplies `createPermissionlessACL`
+and proves arbitrary writing plus explicit permissionless connect agreement
+remain supported.
+
+The production ownership trace is finite. `DRPNode.createObject` currently
+owns `options.acl ?? createPermissionlessACL(localPeer)`. `connectObject`
+exposes `options.acl` but currently ignores it and lets `DRPObject` derive a
+permissionless creator-bound genesis. The existing `createACL({ admins:
+creator })` primitive supplies creator Admin, Finality and Writer membership
+while denying ungranted peers; GREEN need not invent a new ACL type or encode
+mode into the object ID.
+
+Proportional preservation is 51 passed / one existing sealed-100k observer
+heap skip. Ordered `types`, `object` and `node` builds pass; types typecheck,
+focused lint, formatting and diff gates pass. Object/node typecheck retain only
+the inherited compact-history 1i-b diagnostics, with no Phase 1l error.
+Neither sealed 100k workload ran. Evidence is under
+`.logs/phase-1l-permissioned-default-red-codex-high/`; exact patch SHA-256 is
+`7cbe86b98e67caeea12d9b783725d9e00d54eba502f34d6fdc0e9061c622fac0`,
+focused result SHA-256 is
+`b6a2d1b4a11a3b5af7aa77621ba431a9faaf5d7c5fc4827636299a7d7f633708`,
+preservation SHA-256 is
+`1281e49484adcb410b41373f2f965493782b3f8029f59b848418574610c355d1`,
+ledger SHA-256 is
+`b9e15c0240f5ab3a20e19e586737b5d7a60b37b38364258d5cfd3dd451801402`
+and verified manifest SHA-256 is
+`8714af866a85bed8d298116098ffbbb042594592b8222ef6e5102553cfe1fb8d`.
+
+## Next Agent Prompt — Phase 1l production GREEN
+
+Implement a distinct production-only GREEN against `bdf82aa9`. On the ordinary
+product create path, omitted ACL deterministically means
+`createACL({ admins: localCreator })`; an explicitly supplied ACL remains
+authoritative. On connect, honor `options.acl` when supplied, otherwise derive
+the same permissioned ACL from `creatorFromObjectID(options.id)`. Reject an
+invalid/non-creator-bound ID rather than silently making the joiner admin. Do
+not alter explicit permissionless behavior, low-level constructor defaults,
+object-ID format, ACL conflict semantics, finality, wire format or historical
+objects. Run the frozen 5F/1P owner to 6/6, creator-bound join/restart and ACL
+preservation, ordered builds, relevant typecheck/lint/format/diff gates and no
+sealed 100k. Then use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
+Claude-skill Opus/xhigh. Do not use Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
