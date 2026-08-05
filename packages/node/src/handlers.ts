@@ -52,6 +52,8 @@ interface HandlerRegistryEntry {
 
 const MAX_SYNC_RECOVERY_RETRIES = 3;
 const MAX_UPDATE_VERTICES = 32;
+const MAX_INVALID_VERTICES_PER_PEER = 10_000;
+const MAX_INVALID_PEER_BUDGETS = 256;
 export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
 
 function legacyFinalityStore<T extends IDRP>(object: IDRPObject<T>): IFinalityStore | undefined {
@@ -68,6 +70,44 @@ interface SyncRecoveryEpisode {
 // SYNC/SYNC_ACCEPT have no correlation id, so stale accepts from the same peer
 // necessarily share the current (objectId, sender) recovery episode budget.
 const syncRecoveryEpisodes = new WeakMap<DRPNode, Map<string, SyncRecoveryEpisode>>();
+
+interface InvalidPeerBudget {
+	exhausted: boolean;
+	invalidOccurrences: number;
+}
+
+const invalidPeerBudgets = new WeakMap<DRPNode, Map<string, InvalidPeerBudget>>();
+
+function disconnectInvalidPeer(node: DRPNode, sender: string): void {
+	void node.networkNode.disconnect(sender).catch((error: unknown) => {
+		log.error("::messageHandler: Failed to disconnect invalid peer", error);
+	});
+}
+
+function isInvalidPeerExhausted(node: DRPNode, sender: string): boolean {
+	return invalidPeerBudgets.get(node)?.get(sender)?.exhausted === true;
+}
+
+function accountInvalidVertices(node: DRPNode, sender: string, invalidOccurrences: number): boolean {
+	const budgets = invalidPeerBudgets.get(node) ?? new Map<string, InvalidPeerBudget>();
+	const existing = budgets.get(sender);
+	if (existing?.exhausted === true) return true;
+	if (invalidOccurrences === 0) return false;
+
+	if (existing === undefined && budgets.size >= MAX_INVALID_PEER_BUDGETS) {
+		// Remembering overflow identities would move the unbounded sender-key surface.
+		// Drop this invalid offer, disconnect, and leave valid traffic ledger-free.
+		disconnectInvalidPeer(node, sender);
+		return true;
+	}
+
+	const total = Math.min(MAX_INVALID_VERTICES_PER_PEER, (existing?.invalidOccurrences ?? 0) + invalidOccurrences);
+	const exhausted = total >= MAX_INVALID_VERTICES_PER_PEER;
+	budgets.set(sender, { exhausted, invalidOccurrences: total });
+	invalidPeerBudgets.set(node, budgets);
+	if (exhausted) disconnectInvalidPeer(node, sender);
+	return exhausted;
+}
 
 function recoveryKey(objectId: string, sender: string): string {
 	return JSON.stringify([objectId, sender]);
@@ -87,6 +127,14 @@ export function clearSyncRecoveryEpisodes(node: DRPNode, objectId: string): void
 		if (episodeObjectId === objectId) episodes.delete(key);
 	}
 	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+}
+
+/**
+ * Clear node-lifetime invalid-peer accounting after the node has stopped.
+ * @param node - Node whose invalid-peer accounting has ended
+ */
+export function clearInvalidPeerBudgets(node: DRPNode): void {
+	invalidPeerBudgets.delete(node);
 }
 
 async function recoverMissingSync(node: DRPNode, objectId: string, sender: string, missing: string[]): Promise<void> {
@@ -132,14 +180,19 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 	object: IDRPObject<T>,
 	sender: string,
 	vertices: Vertex[]
-): Promise<AuthenticatedMergeOutcome> {
+): Promise<{ exhausted: boolean; outcome: AuthenticatedMergeOutcome }> {
 	try {
-		return await mergeAuthenticatedVertices(object, vertices);
+		const outcome = await mergeAuthenticatedVertices(object, vertices);
+		return {
+			exhausted: accountInvalidVertices(node, sender, outcome.result[2].length),
+			outcome,
+		};
 	} catch (error) {
 		const partialResult = rejectedBoundaryResult(error);
 		if (partialResult === undefined) throw error;
+		const exhausted = accountInvalidVertices(node, sender, partialResult.invalid.length);
 
-		if (partialResult.missing.length !== 0) {
+		if (!exhausted && partialResult.missing.length !== 0) {
 			try {
 				await recoverMissingSync(node, object.id, sender, partialResult.missing);
 			} catch (recoveryError) {
@@ -179,13 +232,13 @@ export const messageHandlers: Record<MessageType, HandlerRegistryEntry | undefin
  * @param message - The incoming message
  */
 export async function handleMessage(node: DRPNode, message: Message): Promise<void> {
+	if (isInvalidPeerExhausted(node, message.sender)) return;
 	const validation = MessageSchema.safeParse(message);
 	if (!validation.success) {
 		log.error(`::messageHandler: Invalid message format ${validation.error.message}`);
 		return;
 	}
 	const validatedMessage = validation.data;
-
 	const entry = messageHandlers[validatedMessage.type];
 	if (!entry) {
 		log.error("::messageHandler: Invalid operation");
@@ -320,7 +373,8 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 		return;
 	}
 
-	const mergeOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
+	const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
+	const mergeOutcome = governedOutcome.outcome;
 	const [, missing] = mergeOutcome.result;
 	const appliedVertices = [...mergeOutcome.committed];
 
@@ -356,7 +410,9 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 		}
 	}
 
-	if (missing.length !== 0) {
+	// The merge may have committed valid siblings before this batch exhausted the
+	// peer. Publish those commits normally; only attacker-driven recovery stops.
+	if (!governedOutcome.exhausted && missing.length !== 0) {
 		await recoverMissingSync(node, message.objectId, sender, missing);
 	}
 
@@ -496,9 +552,12 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 
 	let mergeRan = false;
 	let missing: string[] = [];
+	let suppressMissingRecovery = false;
 	const finalityStore = legacyFinalityStore(object);
 	if (syncAcceptMessage.requested.length !== 0) {
-		const mergeOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
+		const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
+		const mergeOutcome = governedOutcome.outcome;
+		suppressMissingRecovery = governedOutcome.exhausted;
 		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
 		[, missing] = mergeOutcome.result;
 		if (mergeRan && finalityStore !== undefined) {
@@ -506,7 +565,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		}
 		if (mergeRan) {
 			node.put(object.id, object);
-			await recoverMissingSync(node, object.id, sender, missing);
+			if (!suppressMissingRecovery) await recoverMissingSync(node, object.id, sender, missing);
 		}
 	}
 

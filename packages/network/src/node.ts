@@ -6,7 +6,7 @@ import { bootstrap, type BootstrapComponents } from "@libp2p/bootstrap";
 import { circuitRelayServer, circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { dcutr } from "@libp2p/dcutr";
-import { type GossipSub, gossipsub, type GossipsubOpts } from "@libp2p/gossipsub";
+import { type GossipSub, gossipsub, type GossipsubOpts, StrictSign } from "@libp2p/gossipsub";
 import {
 	createPeerScoreParams,
 	createTopicScoreParams,
@@ -1259,6 +1259,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		const baseConfig: Partial<GossipsubOpts> = {
 			doPX,
 			fallbackToFloodsub: false,
+			globalSignaturePolicy: StrictSign,
 			allowPublishToZeroTopicPeers: true,
 			scoreParams: this.getGossipSubPeerScoreParams(),
 		};
@@ -1751,14 +1752,26 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private async startEnqueueMessages(): Promise<void> {
 		this._pubsub?.addEventListener("gossipsub:message", (e) => {
 			if (e.detail.msg.topic === DRP_DISCOVERY_TOPIC) return;
-			this.handleGossipsubMessage(e.detail.msg.data);
+			if (e.detail.msg.type !== "signed") {
+				log.error("::startEnqueueMessages::handleGossipsubMessage: unsigned message on StrictSign ingress");
+				return;
+			}
+			this.handleGossipsubMessage(e.detail.msg.data, e.detail.msg.from.toString());
 		});
-		await this._node?.handle(DRP_MESSAGE_PROTOCOL, (stream) => this.handleStream(stream));
+		await this._node?.handle(DRP_MESSAGE_PROTOCOL, (stream, connection) =>
+			this.handleStream(stream, connection.remotePeer.toString())
+		);
 	}
 
-	private handleGossipsubMessage(data: Uint8Array): void {
+	private decodeAttributedMessage(data: Uint8Array, authenticatedSender: string): Message {
+		const message = Message.decode(data);
+		message.sender = authenticatedSender;
+		return message;
+	}
+
+	private handleGossipsubMessage(data: Uint8Array, authenticatedSender: string): void {
 		try {
-			const message = Message.decode(data);
+			const message = this.decodeAttributedMessage(data, authenticatedSender);
 			this._messageQueue.enqueue(message).catch((e) => {
 				log.error("::startEnqueueMessages::enqueue:", e);
 			});
@@ -1767,10 +1780,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		}
 	}
 
-	private async handleStream(stream: Stream): Promise<void> {
+	private async handleStream(stream: Stream, authenticatedSender: string): Promise<void> {
 		try {
 			const data = await streamToUint8Array(stream);
-			const message = Message.decode(data);
+			const message = this.decodeAttributedMessage(data, authenticatedSender);
 			this._messageQueue.enqueue(message).catch((e) => {
 				log.error("::startEnqueueMessages::enqueue:", e);
 			});

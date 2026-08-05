@@ -83,7 +83,12 @@ import { NodeConnectObjectOptionsSchema, NodeCreateObjectOptionsSchema } from "@
 import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
-import { clearSyncRecoveryEpisodes, drpObjectChangesHandler, handleMessage } from "./handlers.js";
+import {
+	clearInvalidPeerBudgets,
+	clearSyncRecoveryEpisodes,
+	drpObjectChangesHandler,
+	handleMessage,
+} from "./handlers.js";
 import { createDRPIntervalSync, DRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
@@ -483,6 +488,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		try {
 			await Promise.all([routing?.stop(), rendezvousBootstrap, rendezvousRegistration, this._stopNetwork()]);
 		} finally {
+			clearInvalidPeerBudgets(this);
 			this.messageQueueManager.closeAll();
 		}
 	}
