@@ -23927,22 +23927,49 @@ HEAD/index/status/stash/protected-untracked invariance; evidence is under
 `.logs/phase-1m-a-signed-disable-green-{grok45-high,kimi3-high-100}-review/`.
 Final Opus is correctly skipped.
 
-## Next Agent Prompt — Phase 1m-a restore-race corrective RED
+## Phase 1m-a restore-race corrective RED checkpoint — frozen
 
-Use a fresh Codex-high tests-only owner. Preserve both original frozen RED
-files, production, plan, generated files and manifests/lockfile. Add one narrow
-causal owner using the real `SignedDisableController` and an explicitly
-non-production deferred-load/atomic-CAS fixture. Pin that a valid disable which
-commits after an older restore begins can never be overwritten by the late
-enabled/counter-0 load; after both operations settle, consumer and port remain
-disabled/counter-1 and the same envelope classifies as replay rather than
-`state-commit-failed`. Cover the adjacent late load-rejection/throw case only
-to prove it cannot block or re-enable a newer committed latch. Do not prescribe
-serialization versus an operation-generation guard, add general concurrency
-infrastructure, or reopen durability/transport/compaction/version-runtime
-scope. Run the causal RED, frozen owner, full control-plane preservation and
-affected build/typecheck/lint/format/diff gates to `.logs`; no sealed 100k.
-Commit tests only with exact evidence. No Fable.
+Freeze fresh Codex-high tests-only commit
+`b66c475537c403f3ba1275653c94084842fc27d7`. Its sole 182-line file
+`packages/control-plane/tests/signed-disable-restore-race-1m-a-red.test.ts`
+adds one bounded explicitly non-production deferred-load/atomic-CAS fixture.
+Original RED files, production, plan, generated files, manifests/lockfile and
+unrelated tests remain byte-identical.
+
+The corrective owner is exact 3 failed / zero passed. Each case begins an old
+enabled/counter-0 load while a valid disable CAS is pending, then positively
+observes the port and controller at disabled/counter-1 after commit. A late
+successful load regresses only the controller to enabled/counter-0 and changes
+same-envelope classification from replay to `state-commit-failed`; late load
+rejection or throw regresses only the controller to blocked. The atomic port
+remains disabled/counter-1 throughout, isolating lifecycle publication as the
+only defect. Full control-plane is exact 3 failed / 71 passed; the original
+frozen owner remains 23/23.
+
+Ordered `types` → `canonical` → `control-plane` builds and typechecks pass;
+targeted ESLint has zero output; Prettier and exact one-file diff gates pass.
+Neither sealed 100k workload ran. Test SHA-256 is
+`0f9978b9ced3d06e122cd53ed055309491f8c9f9226363992f46169a5d0b5911`,
+postcommit causal RED SHA-256 is
+`be0dcbd124526c1d5cce853bc8923d6548d65653f4f576cd4f49cf5c4e0aa363`
+and evidence-manifest SHA-256 is
+`bd18410bad5c1bd604a826045cbc40f28f35c8873baf6fe30ac11b56d7cda05c`.
+Evidence is under
+`.logs/phase-1m-a-restore-race-corrective-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a restore-race corrective GREEN
+
+Use a distinct fresh Codex-high production-only owner. Keep all three RED
+files, plan, manifests/lockfile and unrelated production frozen. Change only
+the existing signed-disable production owner with the smallest coherent
+lifecycle-ordering primitive so an older overlapping restore result or failure
+cannot overwrite/block a newer committed local latch. Do not encode a test
+fixture check, prescribe a seed/interleaving, or broaden into general
+concurrency, persistence, restart, transport, compaction or version-runtime
+infrastructure. The corrective owner must become 3/3, original owner stay
+23/23 and complete control-plane become 74/74. Run ordered affected
+build/typecheck/lint/format/diff/browser gates to `.logs`; no sealed 100k.
+Commit production only with exact evidence. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
