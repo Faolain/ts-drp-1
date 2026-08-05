@@ -23181,7 +23181,7 @@ verified manifest SHA-256 is
 and patch SHA-256 is
 `86e296097118a0d3c6e775b7ff1f4ab0cb342047e0d679bc655ce61c673b2bdd`.
 
-## Phase 1k transport-bound production GREEN checkpoint — awaiting review
+## Phase 1k transport-bound production GREEN checkpoint — corrective binding required
 
 Freeze distinct fresh Codex-high production-only GREEN
 `d1a8c27010d7ba987d65f0efa52008182783c32f` against tests-only REDs
@@ -23232,21 +23232,89 @@ focused log SHA-256 is
 and preservation log SHA-256 is
 `94b81f226e7425ce48eca4b87ef6514baa73b158f09dda03ffb026e8cf2e5998`.
 
-## Next Agent Prompt — Phase 1k acceptance
+## Phase 1k preliminary/final review finding — do not close the unbound candidate
 
-Review frozen REDs `b5b1d95` / `1516430` and production GREEN `d1a8c27` as
-one Phase 1k candidate using fresh Grok 4.5/high and exact Kimi
-3/high/dual-100, followed by final Claude-skill Opus/xhigh only if both
-preliminary reviewers accept. Require source tracing of direct and gossipsub
-authenticated identity, forged-victim resistance, exact 9,999/10,000
-thresholds, cross-object/message aggregation, charged classification taxonomy,
-mixed-batch publication truth, stop lifecycle, finite peer-key cardinality,
-fail-closed capacity behavior, disconnect rejection handling and the explicit
-unremembered-overflow tradeoff. Probe for bypass through malformed messages,
-empty/known batches, partial-result exception paths, repeated overflow senders,
-restarts, pubsub relays and direct handler calls without expanding Phase 1k
-into Phase 1n sync redesign. Reviewers may run bounded focused tests but must
-not rerun either sealed 100k workload. Do not use Fable.
+Fresh Grok 4.5/high accepted `d1a8c27` in native session
+`4df2c669-cdc7-41d0-9029-f97ba635b4dc`; its verified review-manifest SHA-256
+is `c7cbb886f75c67fa737622a2bbf7ea44f83cceb117d92af2758b92e49ced13bd`.
+Exact Kimi 3/high/dual-100 also emitted `ACCEPTED` in session
+`01e14848-cf09-408d-8922-4b5e57f729c3`; its verified 49-entry manifest is
+`a0941f61c4b220bf591173abf3701c2716ed3e9b8329d59adb0e046f094d1d43`.
+The Kimi transcript nevertheless raised and did not resolve whether installed
+gossipsub binds a supplied public key to a non-inline `from` peer ID. Preserve
+that contradiction rather than relying on its later unconditional StrictSign
+claim.
+
+Final Claude-skill Opus/xhigh session
+`ee1811b5-0d80-47bb-8d22-dbe962af5d00` independently confirmed the missing
+binding in installed gossipsub 16.0.4 but still emitted `ACCEPTED`, reasoning
+that the ordinary `DRPNode` keychain is secp256k1-only. Its result SHA-256 is
+`1cc16c21f0a02f19058681bcb1897cef9defbc17bc001506f0ac49e01cb6cfc7`
+and sealed manifest SHA-256 is
+`c543f2bcd64e0b597bdda6edb3d3013b8201ccfb5b1fd2700f10db4c87018ba4`.
+The native envelope disclosed a small automatic Haiku helper use (2,047 input
+/ 20 output tokens); it performed no substantive delegation. All three
+reviews preserved repository invariance and ran neither sealed 100k workload.
+
+The controller does not close the candidate on those verdicts because the
+confirmed finding supplies a direct counterexample to the phase invariant.
+Remote publishers are not constrained to construct this repository's local
+`DRPNode`. For a SHA-256/RSA peer ID, `peerIdFromMultihash` has no embedded
+public key. Installed StrictSign therefore verifies the signature with the
+message-supplied key but does not establish that the key derives `msg.from`.
+One signing key can rotate arbitrary ghost SHA-256 publishers; the receiver
+charges and disconnects those unbound IDs rather than the signing identity.
+After filling the fixed 256-entry ledger, each new ghost still receives one
+full merge and an ineffective, unremembered disconnect. This defeats the
+promised 10,000-occurrence remembered-publisher boundary even though memory
+remains O(256). Local secp256k1 identity generation is not an adequate inbound
+trust proof. This is a production correctness blocker, not a plan-contract
+amendment or a request to expand identity support.
+
+## Phase 1k non-inline key/publisher corrective RED checkpoint — frozen
+
+Freeze fresh Codex-high tests-only RED
+`77a6e160ff7c5beabea2dfa53626063560b70106`. Its one new 194-line owner uses
+the exact installed gossipsub 16.0.4 validator followed by the supported
+network host-factory seam and the real started `DRPNetworkNode` message queue;
+it adds no production test hook and does not modify either earlier Phase 1k
+RED. The focused result is exactly 1 failed / 2 passed in 2.75 seconds.
+StrictSign admits an RSA-signed message whose supplied key does not derive its
+non-inline `from`, and production queues it under that ghost ID where the RED
+requires a drop. Matched RSA/non-inline and matched Ed25519/inline controls
+both pass.
+
+Proportional preservation is 17/17. Ordered `types`, `object`, `validation`,
+`network` and `node` builds pass; network typecheck, touched/git-tracked lint,
+formatting and diff checks pass. Workspace recursive typecheck reaches only
+the five inherited compact-history object diagnostics before first-fail. No
+sealed 100k workload ran. Evidence is under
+`.logs/phase-1k-key-publisher-binding-red-codex-high/`; the tests-only patch
+SHA-256 is
+`d615f73a80d00368bdd54f213cd3eab3184008ae60e9e0c515de1cfd86916727`,
+focused RED SHA-256 is
+`13159be1a3a752cd38a29f199263a775167473e2f175e7069b90ea2af803ee8e`,
+preservation SHA-256 is
+`847300622286e1397d4eaca35e8d2b667e9e891c513c0336bc5ed110ffc8d9ad`
+and verified 27-entry manifest SHA-256 is
+`a3fad74fca7c41b0101dc3153677ee3281399db129dc90ce989bfe44a59a8922`.
+
+## Next Agent Prompt — Phase 1k key/publisher corrective GREEN
+
+Implement the smallest production-only binding at the gossipsub event boundary
+against frozen RED `77a6e16`. A delivered signed message is attributable to
+`msg.from` only when its public key derives that exact peer ID; otherwise drop
+it before application decode/queueing. Preserve direct
+`connection.remotePeer`, matched non-inline RSA, matched inline Ed25519/
+secp256k1, relay-vs-publisher semantics and all previously frozen Phase 1k
+budget behavior. Prefer installed peer-id/crypto primitives over a local hash
+reimplementation. Do not patch the dependency, add a test hook, weaken the
+RED, add a second accounting identity, or expand into Phase 1n. Run the focused
+1F/2P owner to green, the complete Phase 1k focused owners, proportional
+network/node preservation, ordered builds, relevant typecheck/lint/format/diff
+gates, and no sealed 100k workload. Then restart fresh Grok 4.5/high, exact
+Kimi 3/high/dual-100 and final Claude-skill Opus/xhigh acceptance. Do not use
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
