@@ -4,6 +4,7 @@ import {
 	ApplyInvariantError,
 	type AuthenticatedMergeOutcome,
 	authenticateVertices,
+	HashGraph,
 	mergeAuthenticatedVertices,
 } from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
@@ -205,10 +206,13 @@ function fetchStateHandler({ node, message }: HandleParams): ReturnType<IHandler
 		return;
 	}
 
-	const [aclState, drpState] = drpObject.getSerializedStates(fetchState.vertexHash);
+	const [aclState, drpState] =
+		fetchState.vertexHash === HashGraph.rootHash
+			? drpObject.getSerializedStates(fetchState.vertexHash)
+			: [undefined, undefined];
 	const response = FetchStateResponse.create({
 		vertexHash: fetchState.vertexHash,
-		// Preserve an explicit protobuf miss for pruned/nonexistent snapshots.
+		// Preserve explicit absence for cost-gated non-root requests and unavailable snapshots.
 		// Serializing undefined would manufacture a present-but-empty state.
 		aclState: aclState === undefined ? undefined : DRPStateOtherTheWire.decode(aclState),
 		drpState: drpState === undefined ? undefined : DRPStateOtherTheWire.decode(drpState),
