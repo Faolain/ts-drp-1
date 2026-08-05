@@ -24276,21 +24276,75 @@ sealed workload and preserved fixed HEAD/tree/index/status/stash/protected-
 untracked invariance. Evidence is under
 `.logs/phase-1m-a-high-water-corrected-green-{grok45-high,kimi3-high-100}-review/`.
 
-## Next Agent Prompt — Phase 1m-a high-water final Opus review
+## Phase 1m-a final Opus acceptance — closed
 
-Run one fresh Claude-skill Opus/xhigh read-only adversarial review at the fixed
-documented HEAD. Authenticate the complete original and three corrective
-RED/GREEN lineages, all evidence, and the two accepted preliminary results.
-Try to falsify scalar publication high-water and retained restore-token
-semantics across honest single/shared-port commit/ack/load orderings, including
-stale success/reject/throw, transient blocked-to-disabled publication, equal/
-different counters, losing/malformed outcomes, reentrancy and mutable inputs.
-Demand a causal supported-contract failure, not a lying port or transient
-monotone state, before rejection. Recheck commit-before-effective, canonical/
-crypto, detachment, bounded state, API/dependency/lock and browser safety.
-Respect documented durability/transport/compactor/version-runtime/fleet-drill
-deferrals. No edits, Task/Agent/Fable helpers, web, sealed 100k or unbounded
-stress. Close Phase 1m-a only on explicit final acceptance.
+Fresh Claude-skill Opus/xhigh session
+`7573e53a-ee73-4339-9911-564685a6818b` returned `VERDICT: ACCEPTED` /
+`PHASE1MA_MAY_CLOSE: yes` after authenticating the complete original plus
+three corrective RED/GREEN lineages, every evidence manifest and both fresh
+preliminary acceptances. It found no supported-contract route for an honest
+single/shared atomic port to regress publication high-water, suppress a newer
+restore, violate commit-before-effective or strand replay/next-counter
+liveness. It also reaccepted canonical/crypto binding, detachment, latest-only
+bounded state, public exports/dependencies/lockfile and browser safety.
+
+The effective model was `claude-opus-5` at xhigh in one session, using only
+Read/Grep/Glob and bounded read-only Bash. There was no Task/Agent/Fable/helper
+delegation or network use. Native harness metadata records an automatic
+non-substantive Haiku 4.5 call of 23 output tokens; Opus itself produced 54,901
+output tokens. Result SHA-256 is
+`fce917f84954d9a2f811b91d18a6bd409b46e1359e0dd1b32f5b918ecf494395`
+and verified 10-entry manifest SHA-256 is
+`c5bda3cab86d6378c21cfefd64f700ff019db7fadc7bf0a6f1f8fb6790bbed20`.
+Fixed HEAD/tree/index/diffs/status/stash/protected-untracked invariance held.
+Evidence is under
+`.logs/phase-1m-a-high-water-corrected-green-final-opus-xhigh-review/`.
+
+Nonblocking handoffs remain explicit rather than compatibility debt:
+
+- Phase 2 owns a rollback-resistant durable state-port adapter and restore-
+  before-activation/crash closure; the current injected port is the trusted
+  atomic boundary and restored tuples intentionally do not carry a second
+  signature.
+- When 1m-b gains a real transport input, perform the wire-size precheck before
+  detaching/copying canonical bytes; the local API's strict decoder caps the
+  accepted command at 4096 bytes but may transiently copy a larger direct-call
+  input before rejection.
+- Hostile constructor option accessors may be read more than once during local
+  construction. This is not an untrusted wire path; a later API cleanup may
+  snapshot the options record if the constructor becomes exposed to hostile
+  objects.
+- A port that lies about atomic CAS, mutates through hostile proxies or keys
+  different authorities/scopes into the same tuple violates the injected port
+  contract. Phase 2 adapter tests own those integration properties.
+- Counter exhaustion at `Number.MAX_SAFE_INTEGER` fails closed. A future
+  version may widen the encoded counter only through the normal negotiated
+  protocol-version path.
+- There is no legacy plain-ID, unsigned control, default-store or v(old)
+  compatibility requirement in this greenfield slice. Phase 1n owns generic
+  per-connection feature negotiation; 1m-b later consumes it for genuine
+  mixed-version runtime integration.
+
+Phase 1m-a is closed. Its accepted production lineage ends at `c363f2e`; this
+docs-only closure does not claim persistence, propagation, actual compaction
+halt, runtime version coexistence or the fleet drill assigned to later phases.
+
+## Next Agent Prompt — Phase 1n tests-only RED
+
+Start a fresh Codex-high tests-only Phase 1n RED. First authenticate the
+standing exact 3 failed / 3 passed sync-livelock sentinel and census its real
+production owners. Freeze the smallest causal contract for heads exchange,
+recursive missing-dependency retrieval, per-peer shared-head tracking,
+feature-flagged per-connection negotiation, chunking/backpressure and maximum
+response caps, while retaining mandatory hash-list fallback and leaving RIBLT
+as a later optimization. The RED must turn the existing sentinel toward 6/6
+without weakening its assertions and prove delta-proportional wire work under
+partition/rejoin plus old-branch injection. Keep Phase 1k's invalid-peer abuse
+budget and Phase 1o's aggregate queue governance separate. Do not implement
+production or legacy shims. Run focused/preservation build, typecheck, lint and
+tests sequentially to `.logs`; do not rerun either sealed 100k workload unless
+the plan's explicit Phase 1n acceptance boundary truly requires it after the
+fast causal owner is frozen.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
