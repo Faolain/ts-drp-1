@@ -22994,23 +22994,46 @@ Evidence is under
 and verified manifest SHA-256 is
 `4b1af9cc415e4ccb5a4fda56cf65b855d8a818a61aeb81d418b330f1b000d891`.
 
-## Next Agent Prompt — Phase 1j FETCH_STATE amplification GREEN
+## Phase 1j production GREEN checkpoint — awaiting review
 
-Use a distinct fresh Codex-high production-only GREEN from frozen RED
-`77ca8c40ad0b3430de489bbf4f468e55cad3d614`. Gate non-root `FETCH_STATE`
-requests before `getSerializedStates` or any state codec work. Preserve the
-root payload response used by the join handshake and preserve inbound
-`DRP_FETCH_STATE` dispatch. For a non-root request, choose the smallest truthful
-protocol behavior allowed by the RED: no response or a header-only response;
-do not add history lookup, compatibility branches or test-specific hooks merely
-to distinguish an existing hash from a miss. Change production only, run the
-focused 4F/4P owner to GREEN plus relevant handler/join and object/node
-preservation, ordered builds, typecheck, lint, formatting and diff gates
-sequentially to `.log`, and do not rerun either sealed 100k workload. Apply the
-refactor-clean check, commit the minimum GREEN, then hand the candidate to fresh
-Grok 4.5/high, exact Kimi 3/high/dual-100 and final Claude-skill Opus/xhigh
-acceptance. Do not fold Phase 1d(iii), D.73, 1k/1n/1o, optional 0n or Fable into
-this slice.
+Freeze production-only GREEN `55fac22bf66bca27ecccfd966ec8fb10f8376776`
+on tests-only RED `77ca8c40ad0b3430de489bbf4f468e55cad3d614`.
+The six-line production addition imports the existing `HashGraph` owner and
+gates serialized snapshot access on exact `HashGraph.rootHash`. Non-root
+requests share the existing header-only response/send/event path without a
+history lookup, serialized-state read, state-codec operation or snapshot
+payload. Root requests retain the existing payload response used by honest
+join. The adjacent comment now describes both cost-gated non-root absence and
+unavailable root snapshots; no compatibility branch, new abstraction or
+test-specific hook was introduced.
+
+The authoritative focused boundary is 8/8 green. Relevant node handler/history
+preservation is 7 passed / 1 sealed-scale skip; accepted object preservation is
+25/25, and the untouched legacy owner retains its inherited 18 failures / 15
+passes. Ordered `types`, `validation`, `object` and `node` builds pass. Exact
+inherited object 5 / node 2 compact-history fixture diagnostics remain the only
+typecheck failures. ESLint reports zero errors and 230 inherited warnings;
+formatting and diff checks pass. Neither sealed 100k workload was rerun.
+Evidence is under
+`.logs/phase-1j-fetch-state-amplification-green-codex-high/`; ledger SHA-256 is
+`6e72e0933c218ec5b8da04e0155525d8b82f52b2908f64e24c5a8d771cbb3b70`,
+verified manifest SHA-256 is
+`887ae93e16e6a73f159a88e942eee77d3ccb687937dc9d2f3347776b77e6ac8e`,
+and production patch SHA-256 is
+`ad6c57076b38c48ff10a7321b7b38dcc8bdd6d6b6ebf60ca7a06ab320f9f4a6f`.
+
+## Next Agent Prompt — Phase 1j acceptance
+
+Review frozen RED `77ca8c40` and production GREEN `55fac22` as one Phase 1j
+candidate using the normal fresh sequence: Grok 4.5/high, exact Kimi 3 with
+thinking and both 100-step controls, then final Claude-skill Opus/xhigh. Require
+each reviewer to verify the validated handler path, zero non-root serialized
+state work/payload, root join preservation, shared header-only response and
+event dispatch, wire truthfulness, tests' causal strength, scope purity and the
+recorded inherited diagnostics. A reviewer may run bounded focused tests but
+must not rerun either sealed 100k workload. Do not begin Opus unless Grok and
+Kimi accept. Do not fold Phase 1d(iii), D.73, 1k/1n/1o, optional 0n or Fable
+into this acceptance.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
