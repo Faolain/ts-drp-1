@@ -24126,22 +24126,61 @@ and evidence-manifest SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-delayed-ack-corrective-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a delayed-ack corrected preliminary reviews
+## Phase 1m-a delayed-ack preliminary finding — composed restore RED required
 
-Run new fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100
-read-only reviews at the fixed documented HEAD. Authenticate the complete
-original, restore-race and delayed-ack RED/GREEN lineage and evidence. Try to
-falsify the strict-counter post-ack publication guard under multiple pending
-applies, restores between commit and acknowledgment, same/different/equal-
-counter commands, losing CAS completion, failed/malformed outcomes, reentrant
-ports and mutable inputs. Prove an older truthful committed acknowledgment
-cannot regress a newer local tuple or reclaim its publication token, while a
-blocked/current advancing commit still publishes and liveness/replay remain
-correct. Recheck canonical/crypto, detachment, bounded state, API/dependency/
-lock and browser boundaries without demanding deferred durability, transport,
-compactor, version-runtime or fleet-drill work. No edits, delegation/Fable,
-web, sealed 100k or unbounded stress. Final Opus/xhigh begins only if both
-fresh preliminary reviewers accept.
+Fresh native Grok 4.5/high session
+`5c2ca757-751a-4230-9d4b-484d69af6c56` returned
+`CHANGES_REQUESTED` / `PHASE1MA_MAY_CLOSE: no` / `OPUS_MAY_START: no`.
+Fresh exact Kimi 3/high/dual-100 session
+`d0c854fd-7b9f-4f35-ac88-1f5bb4b15e95` independently returned the same
+authoritative verdict, explicitly superseding its own initial acceptance after
+a bounded probe. Final Opus is correctly skipped.
+
+Both reviewers reproduced one single-controller honest-port composition at
+`signed-disable.ts:189-200,259-264`. E1 commits with a delayed truthful
+acknowledgment; restore publishes E1; E2 (and Grok's stronger E3 variant)
+commits, acknowledges and publishes; then another restore begins, captures the
+newer stored tuple and intentionally makes the local consumer blocked. E1's
+older acknowledgment observes `effective === undefined`, treats blocked as
+unconditional publication permission, republishes E1 and replaces the restore
+token. The newer restore completion is therefore suppressed. Local state
+remains E1 while the atomic port remains E2/E3, and exact-current plus next
+commands return `state-commit-failed` until yet another restore. This is not a
+lying port, durability concern or ordinary losing-CAS contention: the blocked
+window erased the publication high-water information needed to reject an old
+acknowledgment.
+
+Grok result SHA-256 is
+`191ef1a36356cab680dbdf621326e4c557347b15cf70dbeb4a964fc3c9c61087`
+and artifact-manifest SHA-256 is
+`29a727df994bebb696d612086006353e63ecff3ec30e63783c11941400d38067`.
+Exact Kimi final SHA-256 is
+`2445345e1d3a1670c3fc18debda094e1ffbcd2ce7e0f3dceb3f228da37410366`
+and artifact-manifest-file SHA-256 is
+`68d4482b335e4afe988f5545f62f862b1dbd8eedc602c86a0c8b754960cb20bb`.
+Kimi authenticated CLI 1.49.0, selector `kimi-code/k3`, effective model `k3`,
+thinking and dual 100-step caps. Both reviews preserved HEAD/tree/index/status/
+stash/protected-untracked invariance and used no delegation/Fable/web. Evidence
+is under
+`.logs/phase-1m-a-delayed-ack-corrected-green-{grok45-high,kimi3-high-100}-review/`.
+
+## Next Agent Prompt — Phase 1m-a restore × old-ack corrective RED
+
+Start a fresh Codex-high tests-only RED from the documented rejected GREEN.
+Pin the smallest bounded honest atomic-port schedule in which a newer tuple is
+already committed and published, a later restore captures that tuple and
+enters blocked state, and an older truthful committed acknowledgment arrives
+before the restore completes. Positively prove the restore token/captured
+newer tuple, stored newer tuple and old acknowledgment ordering; require the
+old acknowledgment to leave publication ownership untouched, the pending
+restore to publish the newer tuple, exact-current to classify replay and the
+next counter to progress without a repair restore. Add only a bounded
+reject/throw sibling or safe control if it distinguishes token ownership; do
+not build another schedule matrix. Do not edit production, existing tests,
+plan, dependencies/lockfile or generated files. Run focused RED, all frozen
+Phase 1m-a owners, complete control-plane, ordered build/typecheck, lint,
+formatting and exact tests-only scope gates to `.logs`; no sealed 100k,
+workspace-wide, fuzz or unbounded stress.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
