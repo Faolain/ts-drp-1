@@ -25,7 +25,7 @@ import {
 	type PeerId,
 	type Stream,
 } from "@libp2p/interface";
-import { peerIdFromString } from "@libp2p/peer-id";
+import { peerIdFromPublicKey, peerIdFromString } from "@libp2p/peer-id";
 import { ping } from "@libp2p/ping";
 import { pubsubPeerDiscovery, type PubSubPeerDiscoveryComponents } from "@libp2p/pubsub-peer-discovery";
 import { webRTC } from "@libp2p/webrtc";
@@ -1754,6 +1754,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (e.detail.msg.topic === DRP_DISCOVERY_TOPIC) return;
 			if (e.detail.msg.type !== "signed") {
 				log.error("::startEnqueueMessages::handleGossipsubMessage: unsigned message on StrictSign ingress");
+				return;
+			}
+			try {
+				if (!peerIdFromPublicKey(e.detail.msg.key).equals(e.detail.msg.from)) return;
+			} catch {
 				return;
 			}
 			this.handleGossipsubMessage(e.detail.msg.data, e.detail.msg.from.toString());
