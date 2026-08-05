@@ -23508,21 +23508,65 @@ ACL on both create and connect, preserving their original authorization and
 sync purpose rather than merely changing expected errors. This is the already
 stated creator-bound Phase 1l contract, not a plan amendment.
 
-## Next Agent Prompt — Phase 1l custom-ID corrective RED
+## Phase 1l custom-ID corrective RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only corrective slice. Add a narrow causal owner
-that requires omitted-ACL create to accept auto-generated/self-bound IDs but
-reject plain and foreign-bound custom IDs before object-store publication;
-prove self-bound omitted create/connect root equality and explicit ACL escape
-for custom IDs. Then audit and minimally migrate the confirmed affected
-plain-ID fixtures so each supplies the same explicit ACL wherever the test's
-intent is legacy permissionless/custom-ID coordination. Preserve their
-original convergence, timeout, rendezvous, room-presence and lockup assertions;
-do not turn them into error tests or weaken Phase 1n sentinels. Against current
-production the new rejection owner must be RED while migrated preservation
-owners retain their substantive behavior. Run the exact affected-file census,
-the frozen 6/6 Phase 1l owner, ordered builds and relevant typecheck/lint/
-format/diff gates to logs. No Fable and no sealed 100k.
+Freeze fresh Codex-high tests-only corrective RED
+`8923bae8fe59421d5c35a8cbac195620adc87a74`. Its exact seven-file node-test
+scope is 182 insertions / 35 deletions: one new causal owner plus the six
+confirmed plain-ID callers. It does not modify the frozen original Phase 1l
+owner, production, plan, generated files or lockfiles.
+
+The new owner is exactly 2 failed / 2 passed on production `29bce202`. Omitted
+ACL correctly preserves generated and explicitly self-bound create/connect
+genesis, and fresh coordinated explicit ACL instances remain the escape hatch
+for plain/foreign custom IDs. Only the missing pre-publication rejection for a
+plain custom create ID and a foreign-creator-bound create ID fails. The RED
+checks object store, subscription, message queue and interval side effects;
+GREEN must reject before any are installed.
+
+The fixture migration is semantic rather than an expectation rewrite.
+Sync-livelock/e2e use fresh permissionless roots for their shared multi-writer
+objects; the mixed-finality case uses fresh equivalent two-admin keyed ACLs;
+node timeout, targeted legacy rendezvous, interval discovery and every
+room-presence plain-ID path now explicitly request the permissionless behavior
+they previously received implicitly. The exact six-file census is 41 passed
+plus the unchanged Phase 1n 3F/3P sync-livelock sentinel. The frozen Phase 1l
+owner is 6/6 and nearby create-only controls are 30/30.
+
+Ordered `types`, `object` and `node` builds pass; types typecheck passes;
+object/node retain only the inherited five/two Phase 1i-b diagnostics. Lint,
+formatting and diff gates pass. No sealed 100k workload ran. Evidence is under
+`.logs/phase-1l-custom-id-corrective-red-codex-high/`; exact patch SHA-256 is
+`5e4953d6198d372391a92437a2f5884b7bc3915410412da6aed7c93cd682eca6`,
+new-owner SHA-256 is
+`f6de70e82d374243c3e53e460372230970a5ef9c5dac39494866fd20d5e04eea`,
+focused RED log SHA-256 is
+`4749caec73c52b6b942f88fcc05b7f576865c3b76ceeb28b48a1324d45d47e8f`,
+affected census SHA-256 is
+`e60d3bd837f16894ec7ead82448fa6d1274dab43daa75c527b07d15bf9618319`
+and verified manifest SHA-256 is
+`d5e7d482ca248406f6e3457282b2b4ae02e75a3e68a741a0ee08135723920a3c`.
+
+Tooling gotcha: the optional Codex review command expanded `--uncommitted` into
+protected untracked files and began extra coverage-enabled runs. The agent
+interrupted it; it made no edits, returned no finding and reached neither
+sealed 100k workload. Only the bounded coverage-disabled artifacts above are
+authoritative.
+
+## Next Agent Prompt — Phase 1l custom-ID corrective GREEN
+
+Implement a distinct production-only GREEN against `8923bae8`. Before creating
+an omitted-ACL product object with a caller-supplied ID, require
+`creatorFromObjectID(id)` to equal the local peer; reject plain or foreign-bound
+IDs before constructing/storing/subscribing/scheduling the object. Generated
+IDs and explicitly self-bound IDs retain the creator-only default. Explicitly
+supplied ACL remains authoritative for arbitrary IDs, and connect behavior from
+`29bce202` remains unchanged. Add no mode flag, low-level change, migration,
+test hook or remote-root adoption. Turn the corrective 2F/2P into 4/4, preserve
+the frozen 6/6 owner, exact 41P+Phase1n-3F census and 30/30 controls, and rerun
+ordered builds/typecheck/lint/format/diff gates without sealed 100k. Then start
+fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and gated final Opus/xhigh. No
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
