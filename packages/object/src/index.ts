@@ -127,6 +127,10 @@ function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+type HistoryCapabilityState =
+	| { readonly storage: "full" }
+	| { readonly knownHashes: Set<Hash>; revision: number; readonly storage: "compact" };
+
 function defaultIDFromPeerID(peerId: string): string {
 	return `${peerId}${OBJECT_ID_SEPARATOR}${bytesToHex(randomBytes(OBJECT_ID_SALT_BYTES))}`;
 }
@@ -178,12 +182,10 @@ export function createObject<T extends IDRP>(options: CreateObjectOptions<T>): I
 export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	readonly id: string;
 	readonly replicaMode: ReplicaMode;
-	historyStorage: HistoryStorage;
+	#historyCapability: HistoryCapabilityState;
 	private readonly log: Logger;
 	private hashGraph: HashGraph;
 	private readonly peerId: string;
-	private authenticatedHistoryHashes?: Set<Hash>;
-	private historyRevision = 0;
 
 	private _applier: DRPVertexApplier<T>;
 	private _states: DRPObjectStateManager<T>;
@@ -211,10 +213,19 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		this.id = id;
 		this.peerId = peerId;
 		this.replicaMode = resolveReplicaMode(config?.replica_mode);
-		this.historyStorage = resolveHistoryStorage(config?.history_storage, this.replicaMode);
-		if (this.historyStorage === "compact") {
-			this.authenticatedHistoryHashes = new Set([HashGraph.rootHash]);
-		}
+		const historyStorage = resolveHistoryStorage(config?.history_storage, this.replicaMode);
+		this.#historyCapability =
+			historyStorage === "compact"
+				? { knownHashes: new Set([HashGraph.rootHash]), revision: 0, storage: "compact" }
+				: { storage: "full" };
+		// The public capability is an observation, not a transition seam. Defining
+		// the accessor on the instance prevents JavaScript callers from shadowing
+		// the prototype getter with Object.defineProperty.
+		Object.defineProperty(this, "historyStorage", {
+			configurable: false,
+			enumerable: true,
+			get: () => this.#historyCapability.storage,
+		});
 		this.log = new Logger(`drp::object::${this.id}`, config?.log_config);
 
 		this.hashGraph = new HashGraph(
@@ -235,11 +246,20 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			hashGraph: this.hashGraph,
 			finalityStore: this._optionalFinalityStore,
 			replicaMode: this.replicaMode,
-			allowLocalAuthorship: this.historyStorage === "full",
+			allowLocalAuthorship: this.#historyCapability.storage === "full",
 			notify: this._notify.bind(this),
 			finalityConfig: config?.finality_config,
 			logConfig: config?.log_config,
 		});
+	}
+
+	/**
+	 * Reports the installed history capability. Only complete authenticated
+	 * rehydration may replace the private capability state.
+	 * @returns The installed history storage capability
+	 */
+	get historyStorage(): HistoryStorage {
+		return this.#historyCapability.storage;
 	}
 
 	/**
@@ -274,7 +294,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		const availablePayloadHashes = this.hashGraph.getAllVertices().map(({ hash }) => hash);
 		return {
 			knownHashes:
-				this.authenticatedHistoryHashes === undefined ? availablePayloadHashes : [...this.authenticatedHistoryHashes],
+				this.#historyCapability.storage === "full" ? availablePayloadHashes : [...this.#historyCapability.knownHashes],
 			availablePayloadHashes,
 		};
 	}
@@ -296,7 +316,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	getVertexPayload(hash: Hash): VertexPayloadResult {
 		const vertex = this.hashGraph.getVertex(hash);
 		if (vertex !== undefined) return { status: "available", vertex };
-		if (this.authenticatedHistoryHashes?.has(hash)) {
+		if (this.#historyCapability.storage === "compact" && this.#historyCapability.knownHashes.has(hash)) {
 			return { missingHashes: [hash], status: "history-unavailable" };
 		}
 		return { hash, status: "unknown" };
@@ -335,10 +355,11 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		vertices: readonly Vertex[],
 		options: { readonly signal?: AbortSignal } = {}
 	): Promise<HistoryRehydrationResult> {
-		if (this.historyStorage === "full") return { historyStorage: "full", status: "complete" };
+		const capability = this.#historyCapability;
+		if (capability.storage === "full") return { historyStorage: "full", status: "complete" };
 		if (options.signal?.aborted) return { reason: "interrupted", status: "rejected" };
 
-		const expectedHashes = [...(this.authenticatedHistoryHashes ?? [])].filter((hash) => hash !== HashGraph.rootHash);
+		const expectedHashes = [...capability.knownHashes].filter((hash) => hash !== HashGraph.rootHash);
 		const expectedSet = new Set(expectedHashes);
 		const offeredHashes: Hash[] = [];
 		try {
@@ -363,7 +384,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			canonicalOffer.push(vertex);
 		}
 
-		const revision = this.historyRevision;
+		const revision = capability.revision;
 		const [rootDRP, rootACL] = this._states.fromHash(HashGraph.rootHash);
 		const candidate = new DRPObject<T>({
 			peerId: this.peerId,
@@ -394,7 +415,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		) {
 			return { reason: "wrong-history", status: "rejected" };
 		}
-		if (this.historyStorage !== "compact" || this.historyRevision !== revision || options.signal?.aborted) {
+		if (this.#historyCapability !== capability || capability.revision !== revision || options.signal?.aborted) {
 			return { reason: "interrupted", status: "rejected" };
 		}
 
@@ -403,9 +424,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		this._states = candidate._states;
 		this._applier = candidate._applier;
 		this._optionalFinalityStore = undefined;
-		this.authenticatedHistoryHashes = undefined;
-		this.historyStorage = "full";
-		this.historyRevision++;
+		this.#historyCapability = { storage: "full" };
 		return { historyStorage: "full", status: "complete" };
 	}
 
@@ -487,15 +506,16 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	}
 
 	private async authenticateAndApplyVertices(vertices: Vertex[]): Promise<ApplyResult> {
+		const capability = this.#historyCapability;
 		const { authenticated, occurrences } = classifyNovelVertices(
 			vertices,
 			(hash) =>
 				hash === HashGraph.rootHash ||
 				this.hashGraph.vertices.has(hash) ||
-				this.authenticatedHistoryHashes?.has(hash) === true
+				(capability.storage === "compact" && capability.knownHashes.has(hash))
 		);
 		const compactAdmission =
-			this.authenticatedHistoryHashes === undefined
+			capability.storage === "full"
 				? { executable: authenticated, unavailable: [] }
 				: this.classifyCompactAdmission(authenticated);
 		const applied =
@@ -513,15 +533,15 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 					applied: false,
 					invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
 				};
-		if (this.authenticatedHistoryHashes !== undefined) {
+		if (this.#historyCapability === capability && capability.storage === "compact") {
 			let admitted = false;
 			for (const { hash } of this.hashGraph.getAllVertices()) {
-				if (this.authenticatedHistoryHashes.has(hash)) continue;
-				this.authenticatedHistoryHashes.add(hash);
+				if (capability.knownHashes.has(hash)) continue;
+				capability.knownHashes.add(hash);
 				admitted = true;
 			}
 			this._applier.compactPayloadHistory();
-			if (admitted) this.historyRevision++;
+			if (admitted) capability.revision++;
 		}
 		return result;
 	}
