@@ -23856,21 +23856,52 @@ and postcommit SHA-256 is
 `fcfac55fcf25b47421e1b04fd4c4dcbaadb670bff95355f5acf9f82fd757a394`.
 Evidence is under `.logs/phase-1m-a-signed-disable-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a production GREEN
+## Phase 1m-a production GREEN checkpoint — review pending
 
-Use a distinct fresh Codex-high GREEN owner. Keep both RED files frozen and
-implement the smallest coherent browser-safe production owner in
-`@ts-drp/control-plane`, reusing the existing canonical and Ed25519 prior art
-through declared direct package dependencies rather than copying the test
-reference. Export the exact controller, domain, envelope/state/result and
-state-port contracts needed by the RED. Preserve commit-before-effective
-ordering, fail-closed restore, byte detachment and latest-only bounded state.
-No default store or durability claim; no transport, message enum, compactor,
-version coexistence, restart/crash proof, drill logging or unrelated
-control-plane refactor. Run the frozen 23-test owner, all control-plane
-preservation, ordered affected build/typecheck/lint/format/diff gates to
-`.logs`; do not run either sealed 100k workload. Commit only a production and
-necessary direct-dependency/lockfile GREEN with exact evidence. No Fable.
+Freeze distinct fresh Codex-high GREEN
+`d3529540de6879cf03ba29b4d34734c64d499bd3` on documented RED HEAD
+`8720cbd`. Its exact four-file, 457-line scope adds the browser-safe
+`packages/control-plane/src/signed-disable.ts` owner, public exports, direct
+`@ts-drp/canonical` and `@noble/curves` dependencies, and only the matching
+control-plane lockfile importer entries. Both frozen RED files and the plan are
+byte-identical. Production reuses canonical strict decoding/domain-framed
+SHA-256 and Noble Ed25519 verification with `zip215:false`; it does not copy the
+test reference or introduce a parallel codec/crypto owner.
+
+The controller starts blocked, requires an injected state port, detaches the
+pinned public key and submitted envelope bytes, validates the exact canonical
+v1 shape/domain/suite/authority/set/scope/capability and safe counter, and
+classifies replay, stale counter and same-counter equivocation. It retains one
+latest-only tuple. Only exact `{outcome:"committed"}` advances the observable
+latch; rejection, throw or malformed/ambiguous outcome is inert. Corrupt,
+unknown or unreadable load remains blocked. There is no default state store,
+transport/message integration, compactor, durability/restart/crash claim,
+version-coexistence path or drill logger.
+
+The frozen owner and postcommit rerun are 23/23. Complete control-plane is
+71/71, retaining the prior 48/48. Ordered `types` → `canonical` →
+`control-plane` builds and typechecks pass; targeted ESLint has zero output;
+Prettier, browser bundling, built-export smoke and frozen-lockfile install pass.
+Neither sealed 100k workload ran. Production-owner SHA-256 is
+`8e74b89487d4dccda919244ef5d7b7caa9e5c5b344e22bf29d570d16090d8c28`
+and evidence-manifest SHA-256 is
+`8d4a4fd93bec08febcdca9697e54ccc68d2d6d626a218cb00ab35c0d888253cd`.
+Evidence is under `.logs/phase-1m-a-signed-disable-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a preliminary reviews
+
+Run fresh independent Grok 4.5/high and exact legacy-CLI Kimi 3/high/dual-100
+read-only reviews at the fixed candidate HEAD. Authenticate candidate/evidence
+identity and frozen RED invariance. Adversarially inspect strict canonical
+shape/limits, signature/domain/suite binding, raw-key and envelope detachment,
+constructor validation, counter/replay/equivocation semantics, restored-state
+validation, concurrent CAS outcomes, commit-before-effective ordering,
+latest-only bounded state, direct dependency/lockfile ownership and browser
+compatibility. Seek causal bypasses beyond the frozen matrix with bounded
+coverage-disabled probes only when needed. Reject any implicit durability,
+propagation, compaction or version-runtime claim. Do not edit, delegate/Fable
+or run sealed 100k workloads. Opus/xhigh starts only if both preliminary
+reviewers accept.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
