@@ -23299,7 +23299,7 @@ preservation SHA-256 is
 and verified 27-entry manifest SHA-256 is
 `a3fad74fca7c41b0101dc3153677ee3281399db129dc90ce989bfe44a59a8922`.
 
-## Phase 1k key/publisher corrective production GREEN checkpoint — awaiting review
+## Phase 1k key/publisher corrective production GREEN checkpoint — accepted
 
 Freeze distinct fresh Codex-high production-only GREEN
 `46a70c782d3ef49ebf2022aae386ef98bd77b3c4` against corrective RED
@@ -23333,22 +23333,75 @@ and verified 36-entry manifest SHA-256 is
 All frozen tests and 66,983 protected entries remained byte-identical; the
 protected stash object is unchanged.
 
-## Next Agent Prompt — Phase 1k corrected acceptance
+## Phase 1k corrected acceptance — closed
 
-Review the complete Phase 1k lineage, with special focus on frozen corrective
-RED `77a6e16` and production GREEN `46a70c78`, using fresh Grok 4.5/high and
-exact Kimi 3/high/dual-100 in parallel. Only if both accept, run final
-Claude-skill Opus/xhigh. Re-authenticate the installed StrictSign behavior and
-prove that every delivered signed message now binds its key to `msg.from`
-before attribution, including matched/mismatched RSA non-inline and ordinary
-inline identities. Preserve the direct authenticated remote peer, original
-publisher rather than relay, payload overwrite, exact 9,999/10,000 budget,
-cross-object/message aggregation, mixed/partial publication truth, finite 256
-ledger, stop cleanup and honest path. Treat unsupported key forms and binding
-exceptions as fail-closed. Probe for a second queue listener, alternate pubsub
-event, or decode path that bypasses the check, but do not expand into Phase 1n
-or rerun either sealed 100k workload. Require repository invariance and full
-model/session/artifact authentication. Do not use Fable.
+Fresh Grok 4.5/high session `af570a06-1f82-483c-931f-045560f58fc1`
+returned `ACCEPTED` / close=yes / next=yes. It independently reproduced the
+installed 16.0.4 non-inline omission, confirmed the corrective check precedes
+decode/queue, and found no alternate production listener or enqueue path. Its
+native final SHA-256 is
+`4e31afad0d2b63c74d1f4fbefeb80601afeb53839fa1462e802f025ed01f6acb`
+and verified 17-entry manifest SHA-256 is
+`894f14721ed72858dd9451ed3f419d08bce27b8bf9dc2e7aeaab29433b745b93`.
+
+Exact Kimi 3/high/dual-100 session
+`41b64448-7d26-4ed6-ab35-4eea4d5eb755` returned the same acceptance and
+explicitly retracted its earlier unconditional acceptance of the unbound
+candidate. Its final SHA-256 is
+`7a58c633a9c062971329ee19bedcc25b5927a57ec027c73b7ea626095cc483de`
+and verified 19-entry manifest SHA-256 is
+`8eb4dbaa693ab4a0f85f10de64a3bb371b90933a27ade1a58b9cb4d35c88bd77`.
+
+Final Claude-skill Opus 5/xhigh session
+`0cf8904c-26f6-4d28-a746-f96e53e330c0` returned `ACCEPTED` /
+`PHASE1K_MAY_CLOSE=yes` / `NEXT_PHASE_MAY_RESUME=yes`. It confirmed exact
+key-derived multihash equality for RSA and inline identities; mismatch,
+absent, malformed, unsupported, URL and thrown forms fail closed; and no
+self-emission, interval-topic, relay, listener, decode or queue bypass remains.
+It also reaccepted the exact threshold, taxonomy, aggregation, mixed/partial
+publication, lifecycle, honest-path and fixed-space ledger behavior. Result
+SHA-256 is
+`a1be322ae42fa080fe4e4ed704554ba01db6c16a5b50107eecaf98effbfdfe50`
+and verified 38-entry manifest SHA-256 is
+`18ae266eecf0fd993e145de2123f946cdffe4368787904ab17b687864a0d3b82`.
+The review was controller-bounded after the relevant trace and completed in
+the same session with tools disabled. Its envelope disclosed non-substantive
+automatic Haiku use of 2,480 input / 25 output tokens; no Task, Agent or Fable
+delegation occurred.
+
+All three review bundles preserve HEAD, tracked status, index, protected stash
+and relevant source hashes. They reran neither tests nor either sealed 100k
+workload. Evidence is under
+`.logs/phase-1k-key-publisher-binding-green-{grok45-high,kimi3-high-100,opus-xhigh}-review/`.
+
+Keep the accepted nonblocking ledger visible: the RED intentionally pins the
+installed pnpm gossipsub 16.0.4 dist path and must be refreshed on a dependency
+or layout bump; a public embedder can misuse low-level `dispatchMessage`, while
+the repository's sole production caller is gated; the deterministic two-node
+publisher fixture does not pretend to be a three-hop mesh lab; an oversized
+SYNC_ACCEPT can cross the budget in one message and belongs to later batch
+governance; the deliberately unremembered 257th debtor can retry a disconnect
+after hangup settles, but truthful publisher binding prevents one key from
+rotating ghost debt; and the exact inherited Phase 1n/type/lint ledger remains.
+Opus retracted self-emission and duplicate-package-instance concerns after
+source tracing. Phase 1k closes at production `46a70c78`.
+
+## Next Agent Prompt — Phase 1l tests-only RED
+
+Start a fresh Codex-high tests-only RED for the product-path default
+permissioned ACL in table row 1l. First trace the ordinary public
+`DRPNode.createObject` and join/rehydration paths plus the Discord/MMORPG golden
+paths; do not assume every low-level or explicitly permissionless API should
+change. Freeze the current unsafe default causally: without an explicit ACL,
+the creator can write, an ungranted peer cannot author an accepted operation,
+and an explicit grant restores that peer's write. Include the row's bounded
+100-Sybil control without turning the normal focused loop into a long-running
+scale suite. Preserve explicit `createPermissionlessACL` behavior as an opt-in
+positive control, deterministic creator-bound genesis, restart/join agreement
+and existing ACL/finality semantics. If the public API lacks a way to express
+an explicit permissionless opt-in distinctly from omission, stop and report
+the API ambiguity before changing production or the plan. Run proportional
+typecheck/lint/tests/builds to logs; no sealed 100k and no Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
