@@ -114,7 +114,12 @@ describe("Phase 1k per-peer invalid-vertex budget", () => {
 		receiver.node.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 		const forged = Array.from({ length: INVALID_HASH_CAPACITY }, (_, index) => forgedVertex(attackerPeerId, index));
-		await deliverBatches(receiver.node, attackerPeerId, objectIds, forged);
+		await deliverBatches(receiver.node, attackerPeerId, objectIds, forged.slice(0, -1));
+		expect.soft(disconnect).not.toHaveBeenCalled();
+		const finalForged = forged.at(-1);
+		if (finalForged === undefined) throw new Error("Phase 1k exact-capacity fixture is empty");
+		await handleMessage(receiver.node, update(attackerPeerId, objectIds[0], [finalForged]));
+		expect.soft(disconnect).toHaveBeenCalledTimes(1);
 		await handleMessage(receiver.node, update(attackerPeerId, objectIds[0], [forgedVertex(attackerPeerId, 10_001)]));
 
 		const honestVertex = await signedVertex(honest.node, 42);
@@ -125,6 +130,47 @@ describe("Phase 1k per-peer invalid-vertex budget", () => {
 		expect.soft(syncObject).not.toHaveBeenCalled();
 		expect.soft(rejected.mock.calls.length).toBe(0);
 		expect.soft(receiverObjects[0].drp?.query_has(42)).toBe(true);
+	}, 60_000);
+
+	test("fails closed for a new invalid peer at bounded debt capacity without evicting active debt", async () => {
+		const receiver = await makeNode("phase-1k-peer-capacity-receiver");
+		const attacker = await makeNode("phase-1k-peer-capacity-attacker");
+		const honest = await makeNode("phase-1k-peer-capacity-honest");
+		running.push(receiver, attacker, honest);
+		const attackerPeerId = String(attacker.node.networkNode.peerId);
+		const objectId = "phase-1k-peer-capacity-object";
+		const object = await receiver.node.createObject({
+			drp: new SetDRP<number>(),
+			finality_config: { enabled: false },
+			id: objectId,
+		});
+		const disconnect = vi.spyOn(receiver.node.networkNode, "disconnect").mockResolvedValue();
+
+		const activeDebt = Array.from({ length: INVALID_HASH_CAPACITY - 1 }, (_, index) =>
+			forgedVertex(attackerPeerId, index)
+		);
+		await deliverBatches(receiver.node, attackerPeerId, [objectId], activeDebt);
+		expect.soft(disconnect).not.toHaveBeenCalled();
+
+		// This is a cap on concurrently indebted invalid peers, not room members.
+		// A production owner needing more than 256 live attacker ledgers is itself
+		// an unbounded-abuse surface; a new debtor must fail closed by this point.
+		const newcomerPeerIds = Array.from({ length: 256 }, (_, index) => `phase-1k-new-invalid-peer-${index}`);
+		for (let index = 0; index < newcomerPeerIds.length; index++) {
+			const newcomer = newcomerPeerIds[index];
+			await handleMessage(receiver.node, update(newcomer, objectId, [forgedVertex(newcomer, 20_000 + index)]));
+		}
+		expect.soft(disconnect.mock.calls.some(([peerId]) => newcomerPeerIds.includes(String(peerId)))).toBe(true);
+
+		const honestVertex = await signedVertex(honest.node, 30_000);
+		await handleMessage(receiver.node, update(String(honest.node.networkNode.peerId), objectId, [honestVertex]));
+		expect.soft(object.drp?.query_has(30_000)).toBe(true);
+
+		await handleMessage(
+			receiver.node,
+			update(attackerPeerId, objectId, [forgedVertex(attackerPeerId, INVALID_HASH_CAPACITY - 1)])
+		);
+		expect.soft(disconnect.mock.calls.map(([peerId]) => String(peerId))).toContain(attackerPeerId);
 	}, 60_000);
 
 	test("stops evicted-parent recovery across object ids after the peer exhausts its invalid budget", async () => {
