@@ -24164,23 +24164,62 @@ stash/protected-untracked invariance and used no delegation/Fable/web. Evidence
 is under
 `.logs/phase-1m-a-delayed-ack-corrected-green-{grok45-high,kimi3-high-100}-review/`.
 
-## Next Agent Prompt — Phase 1m-a restore × old-ack corrective RED
+## Phase 1m-a restore × old-ack corrective RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only RED from the documented rejected GREEN.
-Pin the smallest bounded honest atomic-port schedule in which a newer tuple is
-already committed and published, a later restore captures that tuple and
-enters blocked state, and an older truthful committed acknowledgment arrives
-before the restore completes. Positively prove the restore token/captured
-newer tuple, stored newer tuple and old acknowledgment ordering; require the
-old acknowledgment to leave publication ownership untouched, the pending
-restore to publish the newer tuple, exact-current to classify replay and the
-next counter to progress without a repair restore. Add only a bounded
-reject/throw sibling or safe control if it distinguishes token ownership; do
-not build another schedule matrix. Do not edit production, existing tests,
-plan, dependencies/lockfile or generated files. Run focused RED, all frozen
-Phase 1m-a owners, complete control-plane, ordered build/typecheck, lint,
-formatting and exact tests-only scope gates to `.logs`; no sealed 100k,
-workspace-wide, fuzz or unbounded stress.
+Freeze fresh Codex-high tests-only commit
+`103e625548329cd0319608484de4a726bc7e77fd` on documented parent
+`f917cb6`. Its exact scope is one new 218-line file,
+`packages/control-plane/tests/signed-disable-restore-old-ack-1m-a-red.test.ts`.
+Production, every existing test, the plan, dependencies/lockfile, generated
+files and protected untracked files remain unchanged.
+
+The explicitly non-production fixture owns only the composed schedule. Its
+compare-and-commit atomically checks and replaces a detached tuple before
+returning the captured truthful outcome; only E1's acknowledgment and the
+final restore completion are held. The test proves E1 committed while its ack
+was pending; restore captured/published E1; E2 committed, acknowledged and
+published; and the final restore captured stored E2 and entered blocked state
+before E1 acknowledged. Storage and the pending restore snapshot are exact E2,
+load captures are `[0, 1, 2]`, commit order is `[1, 2]` and acknowledgment
+order is `[2, 1]`.
+
+The rejected GREEN lets the old E1 acknowledgment replace the pending restore
+publication token and publish E1; the E2 restore is suppressed, local remains
+E1 while storage is E2, and exact E2 plus next E3 both return
+`state-commit-failed`. Desired assertions require the old acknowledgment to
+leave the blocked restore owner untouched, the pending restore to publish E2,
+exact E2 to classify replay and E3 to commit without another restore.
+
+Focused and postcommit results are exact 1 failed / zero passed. Complete
+control-plane is exact 1 failed / 77 passed; delayed-ack remains 3/3,
+restore-race remains 3/3 and the original owner remains 23/23. Ordered
+`types` → `canonical` → `control-plane` builds and typechecks pass. New-owner
+ESLint has zero output; complete control-plane retains zero errors and six
+unchanged warnings. Prettier, cached diff and exact tests-only scope pass. A
+refactor-clean audit found no added abstraction or compatibility sediment.
+Neither sealed 100k, workspace-wide, fuzz nor unbounded stress ran. Test
+SHA-256 is
+`c540ca37573098561f53f496a293fd1a3c575fe26ac1c8871b7dc86e7f4fac58`
+and evidence-manifest SHA-256 is
+`7f2a93e560ba4c6c9a869a55ceb9ea09653414f4b5e0e74d46665b518affaa2b`.
+Evidence is under
+`.logs/phase-1m-a-restore-old-ack-corrective-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a restore × old-ack corrective GREEN
+
+Start a distinct fresh Codex-high production GREEN from this frozen RED. Make
+the smallest coherent change that preserves publication high-water ownership
+through an in-progress restore, so blocked state is not unconditional
+permission for an older acknowledgment to publish. Preserve all earlier
+restore and delayed-ack fixes, commit-before-effective, exact honest-CAS
+results, replay/stale/equivocation, retry liveness, latest-only bounded state,
+detachment and public API/browser safety. Do not add a queue, scheduler,
+history log, compatibility layer, default adapter or general concurrency
+runtime; do not weaken/edit frozen tests. Run the new owner, all prior frozen
+owners, complete control-plane, ordered build/typecheck, lint, formatting,
+exact production diff, browser bundle and built-export smoke to `.logs`.
+Commit production only and rerun causal/complete suites postcommit; no sealed
+100k, workspace-wide, fuzz or unbounded stress.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
