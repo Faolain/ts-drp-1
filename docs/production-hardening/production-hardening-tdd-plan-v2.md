@@ -22781,20 +22781,43 @@ and it may report complete only after every authenticated inventory hash has a
 verified complete payload in the adopted full observer. Failed/empty/partial
 rehydration preserves compact denial and truthful sync rejection.
 
-## Next Agent Prompt — Phase 1i-b capability-state corrective RED
+**Phase 1i-b capability-state tests-only corrective RED checkpoint.** Fresh
+Codex-high commit `823b337` changes exactly the two existing compact-history
+test owners by 114 insertions. The real node scenario authenticates history and
+hard-controls eight known hashes, two available payloads and six exact typed
+unavailable results. On `54c894e`, ordinary assignment leaves
+`historyStorage="full"`, `Reflect.set` returns true, empty rehydration reports
+complete, the capability becomes inconsistent and sync emits `SYNC_ACCEPT`
+type 5 instead of an exact `SYNC_REJECT` type 6. Inventory/payload bytes and
+missing statuses remain unchanged, while compact authorship and observer
+finality denial remain true. Existing complete rehydration, including full
+`readHistory` service, is the passing positive control.
 
-Use a fresh Codex-high tests-only RED against `54c894e`. Add one bounded public
-real-object case that compacts authenticated history, proves a non-empty
-known-minus-available set, attempts ordinary and reflective history-mode
-mutation, calls empty/partial rehydration and verifies the mode/inventory/
-availability are unchanged. Node sync must continue returning truthful
-`SYNC_REJECT` with the missing hashes, and authorship/finality must remain
-denied. Preserve the existing successful complete rehydration as a positive
-control that alone restores full-observer read/service/authorship behavior
-without writer/finality promotion. Do not add mutation-spelling variants or
-rerun 100k. Do not edit production/plan. After RED, use a distinct Codex-high
-GREEN with one private capability-state owner and no compatibility setter, then
-restart Grok, exact Kimi 3 and Opus. Do not schedule Fable.
+Authoritative focused shape is 1 failed / 13 passed / 1 opt-in skip. The
+positive split is 4/4, reclosed Phase 1i-a is 22 passed / 1 skip, proportional
+preservation is 69/69 and direct object/node is 49/49. Types/validation
+typechecks pass; object/node retain only the exact frozen 5+2 test-helper
+diagnostics and workspace retains the same node 2. Tracked lint is zero errors /
+226 inherited warnings; format/diff pass. No 100k ran. Evidence is under
+`.logs/phase-1i-b-capability-state-red-codex-high/`; ledger SHA-256 is
+`17509114aac290a72d0826820cefa6ffa7dfca47f11b3aecb3b56986527f48c5`
+and verified 41-entry manifest SHA-256 is
+`87779561e625b7fe78d706317c4d139d592137a70278d6bf1fe87154953a3b50`.
+
+## Next Agent Prompt — Phase 1i-b private capability-state GREEN
+
+Use a distinct fresh Codex-high production-only GREEN on `823b337`. Make
+history storage a private, externally immutable capability state with a
+read-only public observation; do not keep a compatibility setter. Empty,
+partial, invalid or failed rehydration cannot change mode, inventory, payload
+availability, service/authorship/finality permissions or sync rejection. Only
+successful complete authenticated rehydration may atomically install full
+observer runtime and change the observation to `full`; replica mode remains
+observer and finality absent. Preserve all Phase 1i-b/1i-a behavior, protobuf
+wire and memory ownership. Run focused/proportional/typecheck/lint/build gates
+to `.log`; authenticate the sealed one-shot evidence but do not rerun 100k.
+Commit minimum production owners, then restart Grok, exact Kimi 3 and Opus. Do
+not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
