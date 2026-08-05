@@ -23957,7 +23957,7 @@ and evidence-manifest SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-restore-race-corrective-red-codex-high/`.
 
-## Phase 1m-a restore-race corrective GREEN checkpoint — review pending
+## Phase 1m-a restore-race corrective GREEN checkpoint — preliminary reviews accepted
 
 Freeze distinct fresh Codex-high production-only GREEN
 `865b2dbf8e9b61efb2a657d643ddfaff57788f5e` on documented RED HEAD
@@ -23986,19 +23986,52 @@ and evidence-manifest SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-restore-race-corrective-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a corrected preliminary reviews
+Fresh native Grok 4.5/high session
+`7c8520ee-8fa8-4db4-88a5-4a6f2341f4ce` returned `ACCEPTED` /
+`PHASE1MA_MAY_CLOSE: yes` / `OPUS_MAY_START: yes`. It reauthenticated the
+complete lineage and four evidence sets, reproduced corrective 3/3 and the
+original behavior through isolated probes after its sandbox denied Vitest's
+temporary write, and passed 131 additional bounded race cases. Multiple
+restore completion orders, restore during a pending CAS, same/different
+concurrent commands, losing CAS completions, hostile thenables and reentrant
+port behavior did not let an older async completion regress a newer committed
+latch. Its only product-contract residual is that a port which lies about
+atomic compare-and-commit can make any controller publication untruthful; that
+is explicitly outside the required injected atomic-port contract rather than
+a controller bypass. Result SHA-256 is
+`122d1773a72e9a731fd342fec75429741eddd4d26861a838254af0e7aec57ceb`
+and artifact-manifest-file SHA-256 is
+`d43388201d60d51ba48554e668c907f4d6fa43741fbaaad7f650b615417dad6c`.
 
-Run new fresh independent Grok 4.5/high and exact legacy-CLI Kimi
-3/high/dual-100 read-only reviews at fixed HEAD. Reauthenticate the complete
-RED/GREEN/corrective lineage and evidence. Concentrate adversarial probes on
-overlapping restore success/rejection/throw, multiple restore ordering,
-concurrent successful/losing CAS calls, token invalidation timing,
-commit-before-effective and inability of any older async completion to regress
-a newer committed latch. Recheck the previously accepted canonical/crypto,
-detachment, bounded-state, API, dependency/lock and browser boundaries without
-reopening deferred durability/transport/compaction/version-runtime work. No
-edits, delegation/Fable or sealed 100k. Final Opus/xhigh begins only if both
-fresh preliminary reviewers accept the corrected candidate.
+Fresh exact Kimi 3/high/dual-100 session
+`b68b1930-94e3-45ab-aaee-8b22f84cab3b` independently returned `ACCEPTED` /
+`PHASE1MA_MAY_CLOSE: yes` / `OPUS_MAY_START: yes`. It found the publication
+token monotonic for late restore success/rejection/throw, latest-started
+restore ordering and competing honest-CAS callers, with token replacement and
+committed-state publication synchronous after exact committed outcome. It
+reauthenticated the canonical, crypto, detachment, bounded-state, API,
+dependency/lock and browser boundaries plus all four Codex-high evidence
+manifests. Nonblocking residuals are the intentional fail-closed blocked view
+during restore, retry after apply-during-restore or a stale concurrent CAS,
+trusted-port treatment of restored tuples, and latest-only history. Final
+SHA-256 is
+`8677b5ef88b820a0daf9517acdded40092d45d45a237ac73685f52914788ece5`.
+Both reviews preserved fixed HEAD/index/status/stash/protected-untracked
+invariance, used no delegation/Fable/web or sealed workload, and are under
+`.logs/phase-1m-a-restore-race-corrected-green-{grok45-high,kimi3-high-100}-review/`.
+
+## Next Agent Prompt — Phase 1m-a final Opus review
+
+Run one fresh Claude-skill Opus/xhigh read-only adversarial review at the fixed
+documented HEAD. Authenticate the complete RED/GREEN/corrective lineage and
+the two accepted preliminary results. Try to falsify publication-token
+monotonicity across restore/CAS schedules and recheck commit-before-effective,
+canonical/crypto binding, detachment, bounded state, exports/dependencies and
+browser safety. Treat the injected port's honest atomic-CAS semantics as a
+required host contract; do not demand a default durable adapter, transport,
+compactor, runtime version coexistence or fleet drill from 1m-a. No edits,
+Task/Agent/Fable helpers, web, sealed 100k or unbounded stress. Close Phase
+1m-a only on explicit final acceptance.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
