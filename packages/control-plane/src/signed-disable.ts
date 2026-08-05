@@ -142,6 +142,7 @@ export class SignedDisableController {
 	readonly #publicKey: Uint8Array;
 	readonly #scope: string;
 	readonly #statePort: DisableLatchStatePort;
+	#publicationHighWater: number | undefined;
 	#publicationToken: object = {};
 	#state: DisableLatchState | undefined;
 
@@ -193,9 +194,15 @@ export class SignedDisableController {
 		try {
 			const restored = await this.#statePort.load();
 			const validated = this.#validateRestoredState(restored);
-			if (this.#publicationToken === publicationToken) this.#state = validated;
+			if (
+				this.#publicationToken === publicationToken &&
+				(this.#publicationHighWater === undefined || validated.highestCounter >= this.#publicationHighWater)
+			) {
+				this.#publicationHighWater = validated.highestCounter;
+				this.#state = validated;
+			}
 		} catch {
-			if (this.#publicationToken === publicationToken) this.#state = undefined;
+			// Remain blocked unless a newer committed acknowledgment published meanwhile.
 		}
 		return this.consumerState();
 	}
@@ -256,10 +263,9 @@ export class SignedDisableController {
 			return { applied: false, reason: "state-commit-failed" };
 		}
 
-		const effective = this.#state;
-		// A truthful older acknowledgment stays applied without reclaiming publication ownership.
-		if (effective === undefined || next.highestCounter > effective.highestCounter) {
-			this.#publicationToken = {};
+		// A truthful acknowledgment may advance state without stealing a pending restore's ownership.
+		if (this.#publicationHighWater === undefined || next.highestCounter > this.#publicationHighWater) {
+			this.#publicationHighWater = next.highestCounter;
 			this.#state = cloneState(next);
 		}
 		return { applied: true, counter: command.counter };
