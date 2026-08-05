@@ -22917,20 +22917,66 @@ without rerunning either workload. Evidence is under
 and verified manifest SHA-256 is
 `a35c845e1fe3a4db19e8544e333530e7997d7df39e5ebdebbb9e366950c9a7a8`.
 
-## Next Agent Prompt — Phase 1i-b stale-applier final acceptance
+**Phase 1i-b final acceptance and closure.** Fresh native Grok 4.5/high, exact
+Kimi 3/high/dual-100 and final Claude-skill Opus 5/xhigh independently accepted
+production lineage `54c894e`, `683b86a` and `74fa960` against frozen REDs
+`fb0f662`, `823b337` and `d74b56e`. All returned `VERDICT: ACCEPTED`,
+`PHASE1I_B_MAY_CLOSE=yes` and `NEXT_PHASE_MAY_RESUME=yes`. They source-traced
+commit-first and adoption-first schedules, multi-vertex and partial batches,
+callback reentrancy/exceptions, duplicate/known hashes, revision and applier
+identity, result/event/inventory truth, private capability ownership, complete
+rehydration, sync, authorship/finality and stale-runtime isolation. No
+candidate-caused blocker remains. Neither sealed 100k workload was rerun.
 
-Review production lineage `54c894e`, `683b86a` and `74fa960` against frozen
-REDs `fb0f662`, `823b337` and `d74b56e`. Start fresh Grok 4.5/high; only after
-acceptance use exact Kimi 3/high/dual-100, then final Claude-skill Opus/xhigh.
-Independently attack both commit-first and adoption-first schedules, nested or
-multi-vertex batches, partial failures, callback exceptions, duplicate/known
-hashes, capability revision ordering, notification/result truth and the
-semantic suitability of transient quarantine. Confirm no stale applier can
-mutate installed inventory after adoption and no installed compact commit can
-escape the final rehydration guard. Reaudit private capability, complete
-rehydration, sync/authorship/finality and sealed evidence applicability. Do not
-rerun either 100k workload, mutate tracked files or schedule Fable. A blocker
-returns to a fresh RED; Opus runs only after Grok and Kimi both accept.
+Grok session `55a30cbc-7306-4444-851c-527c54e65b3d` used effective
+`grok-4.5-build` at high effort; native-final SHA-256 is
+`3697f5f28dbd846885fa4302186fdfc37d56ac004d0aff0fd738f8988139fd87`
+and verified manifest SHA-256 is
+`bf2388ea3231340a81cacd149609d10c0c183ea8ee46b73dd3220e5400820407`.
+Exact Kimi session `ff788336-1071-4476-9668-3a1bd2bf9b0f` used legacy v1.49.0,
+selector `kimi-code/k3`, thinking and both 100-step controls; result SHA-256 is
+`7cfdd1cf1f9402b3338fb831b182be40aa35ec655e575b9d4870a3ba71662ea7`
+and verified manifest SHA-256 is
+`ff8db18a48e95244512afd8160a3db7b86630829fab7d4c3525a199fcec25d43`.
+Final Opus session `18ff5133-fe95-41ff-ac8d-45ac0634f886` used substantive
+`claude-opus-5` at requested xhigh effort; native-final SHA-256 is
+`e8613ba18f68547c13c031fc59d539725d263c9a87d3c826cadac29fd9bddcdd`
+and verified manifest SHA-256 is
+`f2ec83683fa1b1dec839e659cbbad2dce23d31178500172f2f8a3e97cf86be15`.
+Native metering disclosed a non-substantive automatic Haiku helper with 23
+output tokens, permitted by the user; every substantive assistant event and
+the verdict came from Opus. Review worktree/index/stash invariance is exact.
+
+Keep the accepted nonblocking ledger visible: deprecated `merge()` cannot
+represent transient `quarantined` detail although it remains truthfully
+`applied:false`; a post-adoption stale-applier exception may carry abandoned
+partial-result bookkeeping but never reports success or mutates installed
+state; candidate replay omits `log_config` and may produce cosmetic noise; and
+the already-recorded redundant O(history) pruned-hash request plus O(n²)
+`offeredHashes.includes` remain later performance work. The frozen object 5 /
+node 2 correlated-fixture diagnostics remain test-only debt. Phase 1i-b closes
+at production `74fa960` with closure evidence under
+`.logs/phase-1i-b-stale-applier-green-{grok45-high,kimi3-high-100,opus-xhigh}-review/`.
+
+## Next Agent Prompt — Phase 1j FETCH_STATE amplification RED
+
+Use a fresh Codex-high tests-only RED on the Phase 1i-b closure checkpoint.
+Create the net-new `fetch-state-amplification.test.ts` owner required by the
+Phase 1 table. Drive a real validated `FETCH_STATE` request for an existing
+non-root hash through `handleMessage` and prove zero ACL/DRP snapshot payload
+bytes leave the responder: no stored-state serialization/decode seam may run,
+and any emitted response must carry no state payload. Use causal byte/call
+counters, not wall-clock or source scanning. Preserve the inbound event and a
+root-request positive control needed by the existing join handshake, plus an
+explicit missing-hash control, so GREEN cannot disable all FETCH_STATE handling
+or all responses. Pin wire/envelope behavior only where the existing contract
+requires it; allow the production GREEN to choose no non-root response or a
+header-only miss if both remain truthful and non-amplifying. Change no
+production or plan files. Run focused node tests, relevant object/node
+preservation, ordered builds, typecheck, lint, format and diff gates
+sequentially to `.log`; do not rerun either sealed 100k workload. Commit the
+minimum tests-only RED before assigning a distinct fresh Codex-high GREEN. Do
+not fold Phase 1d(iii), D.73, 1k/1n/1o, optional 0n or Fable into this slice.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
