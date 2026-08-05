@@ -23431,20 +23431,58 @@ ledger SHA-256 is
 and verified manifest SHA-256 is
 `8714af866a85bed8d298116098ffbbb042594592b8222ef6e5102553cfe1fb8d`.
 
-## Next Agent Prompt — Phase 1l production GREEN
+## Phase 1l product-path permissioned-default production GREEN checkpoint — awaiting review
 
-Implement a distinct production-only GREEN against `bdf82aa9`. On the ordinary
-product create path, omitted ACL deterministically means
-`createACL({ admins: localCreator })`; an explicitly supplied ACL remains
-authoritative. On connect, honor `options.acl` when supplied, otherwise derive
-the same permissioned ACL from `creatorFromObjectID(options.id)`. Reject an
-invalid/non-creator-bound ID rather than silently making the joiner admin. Do
-not alter explicit permissionless behavior, low-level constructor defaults,
-object-ID format, ACL conflict semantics, finality, wire format or historical
-objects. Run the frozen 5F/1P owner to 6/6, creator-bound join/restart and ACL
-preservation, ordered builds, relevant typecheck/lint/format/diff gates and no
-sealed 100k. Then use fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and final
-Claude-skill Opus/xhigh. Do not use Fable.
+Freeze distinct fresh Codex-high production-only GREEN
+`29bce202ace5f015f7cf633571a577880c95d451` against RED `bdf82aa9`.
+Its exact scope is `packages/node/src/index.ts`, 11 insertions / two deletions.
+On create, an omitted ACL now installs `createACL({ admins: localCreator })`;
+an explicitly supplied ACL remains authoritative. On connect, production now
+honors `options.acl`; when omitted it derives the creator from the object ID,
+rejects a non-creator-bound ID, and installs the same creator-only ACL. The
+change does not alter the low-level `DRPObject` default, object-ID format,
+stored-object restart path, wire/finality/conflict behavior or explicit
+permissionless mode.
+
+The frozen focused owner is 6/6 in 4.46 seconds. Proportional ACL,
+deterministic-rejection, permissionless, creator-bound join, restart, node
+finality and observer preservation is 51 passed / one existing sealed-100k
+skip. Ordered `types`, `object` and `node` builds pass; types typecheck passes;
+object/node retain only inherited Phase 1i-b compact-history diagnostics.
+Touched lint, formatting and diff gates pass. Neither sealed 100k workload
+ran. Evidence is under
+`.logs/phase-1l-permissioned-default-green-codex-high/`; production patch
+SHA-256 is
+`b079986a0970ba5b79d576b6f15420a0a057c7a0c2f47451c9c676b61a0161b2`,
+focused SHA-256 is
+`c3e37cafcc87ed6606476911c7811adf074d7aa085ae203676bdcad9ef0b0a13`,
+preservation SHA-256 is
+`7a66d34da7f6c8d02214b7efd9a11cdc1afd374dfdc60084b85ee2b7c2616a01`,
+ledger SHA-256 is
+`36d972ad5872feb8c4eef80e6eb71a1baf508f86a0ecd17333dd22608cafa114`
+and verified manifest SHA-256 is
+`0070ccf5861d9a6f871d0948e63ad73ed2b1defd11235affcb93cc7af4cf6269`.
+
+Compatibility is explicit rather than inferred: a legacy/custom
+non-creator-bound connect ID must supply the already-public `acl` option.
+Creator-bound historical objects retain their persisted root on restart;
+joining an intentionally permissionless object must supply the matching
+permissionless ACL because ACL mode is not encoded in its ID.
+
+## Next Agent Prompt — Phase 1l acceptance
+
+Review RED `bdf82aa9` and GREEN `29bce202` using fresh Grok 4.5/high and exact
+Kimi 3/high/dual-100 in parallel, followed by final Claude-skill Opus/xhigh
+only if both accept. Trace every ordinary product create/connect owner and the
+creator-bound ID derivation. Prove omission is deterministically permissioned
+on creator, joiner and restart; explicit permissionless ACL remains coordinated
+on create/connect; ungranted authenticated and 100-Sybil operations cause zero
+accepted graph/state growth; a Writer grant restores admission; and admin,
+finality, conflict, storage and wire semantics remain intact. Probe explicit
+custom IDs, missing/invalid creator IDs, caller-supplied ACL mutation/aliasing,
+observer/compact connect and already-stored restart without redefining
+low-level constructor policy. Treat any create/connect genesis disagreement as
+a blocker. No Fable and no sealed 100k rerun.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
