@@ -23109,31 +23109,66 @@ rerun. Evidence is under
 and verified manifest SHA-256 is
 `18103dc1483107c664fc39fd91d6f3c311bf8a37344f7c8c96c9595cf77320e7`.
 
-## Next Agent Prompt — Phase 1k production GREEN
+## Phase 1k rejected GREEN draft — transport identity correction required
 
-Start a distinct fresh Codex-high production GREEN on frozen tests-only RED
-`b5b1d95`. Add one bounded per-node, per-remote-peer invalid-vertex budget at
-the authenticated handler/object boundary. Aggregate authentication failures
-and deterministic-invalid merge results across message types and object IDs,
-disconnect the exhausted peer exactly once through the existing
-`networkNode.disconnect(peerId)` seam, and prevent further invalid-peer
-recovery work while leaving honest peers and ordinary signed-missing recovery
-independent. Do not shrink or expose the object's tombstone cache, change the
-existing per-object retry/cooldown semantics for non-exhausted peers, charge
-trusted duplicates or transient quarantine, add a test hook, or satisfy the
-RED by special-casing fixture values, `opType: "-1"`, object IDs or the 10,001st
-input. Keep state bounded and clean it at an appropriate node lifecycle
-boundary; handle asynchronous disconnect failure without unhandled rejection
-or repeated disconnect attempts.
+The first distinct Codex-high GREEN draft was intentionally removed without a
+commit. Its small handler-owned counter compiled and made frozen RED `b5b1d95`
+3/3, but it keyed both accounting and disconnect to self-declared
+`Message.sender`. Exact installed libp2p 3.3.5 / interface 3.2.5 source confirms
+that the direct protocol handler receives authenticated `connection.remotePeer`.
+Exact installed gossipsub 16.0.4 source exposes the signed original publisher
+as `msg.from` and the immediate mesh peer as `propagationSource`. Current
+network receive code discards that provenance and merely decodes/enqueues the
+application envelope. An attacker can therefore rotate claimed senders to
+evade the draft budget or name an innocent peer and make the node disconnect
+the victim. The draft's `Map<sender, ...>` also had unbounded sender-key
+cardinality. A green unit signature is not acceptance evidence for either
+property.
 
-GREEN may change production only. Run the focused RED, existing sync recovery,
-authenticated-ingress and sync-livelock preservation, ordered builds,
-typecheck, lint, formatting and diff checks to
-`.logs/phase-1k-invalid-vertex-budget-green-codex-high/`. Preserve the exact
-three inherited Phase 1n sentinel failures and exact object 5 / node 2
-typecheck diagnostics, and do not rerun either sealed 100k workload. After a
-clean production checkpoint, use the normal fresh Grok 4.5/high, exact Kimi
-3/high/dual-100 and final Claude-skill Opus/xhigh acceptance sequence; no Fable.
+The draft also allowed exactly 10,000 invalid occurrences and disconnected on
+10,001. Phase 1k's contract is exhaustion on the 10,000th occurrence: stopping
+at the real tombstone capacity prevents the eviction instead of permitting it
+and reacting afterward. The removed draft, including its caught asynchronous
+disconnect and node-stop cleanup, is superseded evidence only. Its focused 3/3
+log is under `.logs/phase-1k-invalid-vertex-budget-green-codex-high/07-focused-green.log`
+at SHA-256
+`dae75976fc73b400d57eca9596a202bc2928c847ddcbcb1e58dc00391b6564c9`.
+No production change from that draft remains.
+
+This finding does not amend the Phase 1k contract; it identifies the real
+production owner required by the existing phrase “per-peer”. The optional
+dependency-index helper named by the local skill was absent, so exact installed
+package source was inspected directly instead of using web or version-agnostic
+documentation.
+
+## Next Agent Prompt — Phase 1k transport-attribution corrective RED
+
+Start a fresh Codex-high tests-only corrective RED before resuming GREEN. Pin
+both real ingress paths: a direct protocol message whose claimed
+`Message.sender` names a victim must be delivered to the node layer with the
+authenticated `connection.remotePeer`; a signed gossipsub message with a
+spoofed application sender must be attributed to its authenticated original
+publisher, not blindly trusted or charged to the victim. Prefer real
+network-node integration over a source-shape assertion or test-only production
+hook. Prove the honest claimed-sender-equals-transport path remains unchanged.
+
+Extend the causal budget owner only as needed to freeze the two already-known
+closure gaps: exhaustion occurs on invalid occurrence 10,000, and sender-key
+cardinality cannot grow without bound. Express cardinality as externally
+observable fail-closed behavior at a finite tracked-peer capacity, not a heap
+measurement or private-map inspection; a new untracked invalid peer at
+capacity must be rejected/disconnected rather than evicting an active
+attacker's accumulated debt. Do not alter production, the plan, frozen RED
+`b5b1d95`, generated files, lockfiles or protected untracked assets. If exact
+installed APIs make authenticated publisher attribution impossible, stop and
+report an assumption conflict rather than weakening the contract.
+
+Run focused network/node preservation, ordered builds, typecheck, tracked
+lint, formatting and diff gates to
+`.logs/phase-1k-transport-attribution-red-codex-high/`. Do not rerun either
+sealed 100k workload. Commit tests only, then resume a distinct fresh
+production GREEN against both Phase 1k RED commits before the normal Grok,
+exact Kimi 3 and final Opus sequence.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
