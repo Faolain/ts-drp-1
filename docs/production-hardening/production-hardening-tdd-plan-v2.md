@@ -22804,20 +22804,45 @@ diagnostics and workspace retains the same node 2. Tracked lint is zero errors /
 and verified 41-entry manifest SHA-256 is
 `87779561e625b7fe78d706317c4d139d592137a70278d6bf1fe87154953a3b50`.
 
-## Next Agent Prompt — Phase 1i-b private capability-state GREEN
+**Phase 1i-b private capability-state corrective GREEN checkpoint.** Distinct
+fresh Codex-high production commit `683b86a` changes only
+`packages/object/src/index.ts` by 43 insertions / 23 deletions. One private
+discriminated `#historyCapability` now owns mode, authenticated hashes and
+revision. Public `historyStorage` is a non-configurable own getter with no
+setter or alias. Strict assignment and `Object.defineProperty` throw,
+non-strict assignment leaves compact unchanged, and `Reflect.set` returns
+false. Empty/partial/failed rehydration cannot mutate capability state. Complete
+authenticated rehydration changes the private owner to full only in the final
+atomic adoption block; a live-capability identity guard prevents an older
+asynchronous compact call from compacting an already adopted full runtime.
+Replica remains observer and finality absent.
 
-Use a distinct fresh Codex-high production-only GREEN on `823b337`. Make
-history storage a private, externally immutable capability state with a
-read-only public observation; do not keep a compatibility setter. Empty,
-partial, invalid or failed rehydration cannot change mode, inventory, payload
-availability, service/authorship/finality permissions or sync rejection. Only
-successful complete authenticated rehydration may atomically install full
-observer runtime and change the observation to `full`; replica mode remains
-observer and finality absent. Preserve all Phase 1i-b/1i-a behavior, protobuf
-wire and memory ownership. Run focused/proportional/typecheck/lint/build gates
-to `.log`; authenticate the sealed one-shot evidence but do not rerun 100k.
-Commit minimum production owners, then restart Grok, exact Kimi 3 and Opus. Do
-not schedule Fable.
+Final focused behavior is 14 passed / 1 opt-in skip, reclosed Phase 1i-a is 22
+passed / 1 skip, proportional preservation is 69/69 and direct object/node is
+49/49. Fresh four-package builds pass; types/validation are clean; frozen
+object/node test diagnostics remain exact 5+2 and workspace retains only the
+same node 2. Touched lint, format and diff checks pass. The `54c894e` one-shot
+100k manifest/provenance was reverified without rerunning the workload; the
+correction changes only constant per-object capability ownership and leaves
+HashGraph compaction, payload retention, inventory, scale worker, protobuf and
+writer/full data ownership untouched. Evidence is under
+`.logs/phase-1i-b-private-capability-green-codex-high/`; ledger SHA-256 is
+`7f8b618054d6508b666203c21b5ba3a862bbcb76e4d56149e1c714379d2e0e14`
+and verified manifest SHA-256 is
+`78659fa85267c56f3dbb2e135ab707dba7ff905af9ec1cf337939ee86f178934`.
+
+## Next Agent Prompt — Phase 1i-b final acceptance
+
+Review production lineage `54c894e` plus corrective `683b86a` against frozen
+REDs `fb0f662` and `823b337`, the Phase 1i amendment and all Phase 1i-a
+preservation. Start fresh Grok 4.5/high, then exact Kimi 3/high/dual-100 only
+after Grok accepts, then final Claude-skill Opus/xhigh. Reattack public and
+reflective mode mutation, own/prototype descriptor shadowing, async rehydration
+races, empty/partial/wrong/inventory-mismatched rehydration, sync service,
+authorship/finality and legitimate complete transition. Independently audit the
+original compact inventory/payload/compaction/rehydration contract and sealed
+100k provenance; do not rerun 100k. Preserve residual classifications and make
+no tracked changes. A blocker returns to a fresh RED. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
