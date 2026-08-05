@@ -22627,21 +22627,50 @@ are acceptance evidence. No 100k ran. Evidence is under
 and verified manifest SHA-256 is
 `cc76daf5c3fade6bf6ee9d36af3cdb18b9564b4ee6c4731acd5c036862e45fb6`.
 
-## Next Agent Prompt — complete canonical-live capture GREEN
+**Complete canonical-live capture GREEN checkpoint.** Distinct fresh
+Codex-high production-only commit `685098a` changes exactly `drp-applier.ts`,
+`proxy.ts` and `publication/publisher.ts` by 58 insertions / 128 deletions. The
+publisher recognizes canonical-live publication as a complete-capture contract
+and compares the prepared canonical instance with the prior live/checkpoint
+baseline over their full governed top-level key union. Target enumeration order
+is preserved and baseline-only keys become deletions. An unmaterialized
+deferred cell may bypass value comparison only when it names the exact previous
+baseline entry, preserving truthful identity reuse and the ballast bound.
+Replay attribution, `canonicalCandidateKeys`, attempted-write mode and its
+proxy plumbing are removed as redundant; adoption replay returns to the direct
+pre-attribution flow. Stored causal publication and direct-dependency retention
+are unchanged. The now-always-true raw-egress condition was removed inside the
+same simplified branch.
 
-Use a distinct fresh Codex-high production-only GREEN on `52a84bc`. Replace
-replay candidate keys as the canonical-live completeness oracle with a bounded
-complete comparison of the prepared canonical instance and previous
-live/checkpoint baseline over the union of their governed top-level keys.
-Replay attribution may remain as a truthful optimization or be simplified, but
-it may not suppress keys from completeness. Preserve causal stored pairs,
-direct-dependency retention, key order/addition/deletion, both ACL/DRP sides,
-copy/comparison attribution, rollback/raw/setter semantics and failure
-atomicity. This must remain O(top-level governed state), not O(history), a graph
-scan, blanket clone or threshold shortcut. Validate ballast/meter quick
-iteration explicitly. Do not change tests/plan, touch inherited residuals or
-run 100k. After a green commit restart Grok, exact Kimi 3 and Opus. Do not
-schedule Fable.
+Post-commit owner is 15/15, combined causal/prototype/publication is 49/49,
+Phase 1i-a is 22 passed / 1 opt-in 100k skip, D.92 is 53/53,
+fallback/conflict/replay is 50/50 and object/node/direct is 97/97. The ballast
+meter is exact. The six inherited residuals remain D.92.2 2 failed / 136
+passed, D.92.3 3 failed / 69 passed and descriptor-publication 1 failed / 116
+passed; the known worker `onTaskUpdate` timeout occurred only after D.92.2's
+assertions and was not rerun. The complete Phase 1i-b sentinel is exact 11
+failed / 2 passed / 1 skipped, typechecks remain 13/35/16, validation/build
+pass and tracked lint is zero errors / 230 inherited warnings. No 100k ran.
+Evidence is under `.logs/phase-1i-a-complete-canonical-capture-green-codex-high/`;
+ledger SHA-256 is
+`e00087e7109007531b1c3144ed19c9fb9d41e1c64586969a2870c636a0bf54c3`
+and verified 72-entry manifest SHA-256 is
+`68ce7eb70330ba20471fffcaa4b66d334b694144eb813bfff5a000c177f7d203`.
+
+## Next Agent Prompt — complete canonical-live GREEN acceptance
+
+Review `685098a` together with `8bc3755`, tests-only lineage through `52a84bc`
+and amendment `c0d8fb1`. Start fresh Grok 4.5/high, then exact Kimi
+3/high/dual-100 only after Grok accepts, then final Claude-skill Opus/xhigh only
+after Kimi accepts. Challenge completeness of the top-level target/baseline
+union, enumerable/function/local filtering, additions/deletions/order,
+deferred-cell exact-identity proof, causal stored pairs, ACL/DRP sides,
+checkpoint/join propagation, copy/comparison meters, raw/setter/rollback and
+failure atomicity. Look for a distinct semantic counterexample rather than a
+syntax/value-type matrix. Confirm runtime remains O(top-level state), not
+O(history) or a nested graph scan, and classify the exact six inherited
+residuals. Reviewers must not modify tracked state or run 100k. A blocker
+returns to a fresh RED. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
