@@ -24056,22 +24056,57 @@ HEAD/tree/index/status/stash/protected-untracked invariance held. Evidence is
 under
 `.logs/phase-1m-a-restore-race-corrected-green-final-opus-xhigh-review/`.
 
-## Next Agent Prompt — Phase 1m-a delayed-ack corrective RED
+## Phase 1m-a delayed-ack corrective RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only RED at the documented HEAD. Add the
-smallest bounded honest atomic-port fixture that separates commit
-linearization from acknowledgment resolution and freezes the exact
-E1-commit/delayed-ack → restore/publish-E1 → E2-commit/publish → E1-ack
-schedule. Positively prove storage remains at E2 while the current controller
-regresses to E1, then require local E2 retention, exact-E2 replay and E3
-progress without a repair restore. Include both deliberate deferred
-acknowledgments and a natural unequal-latency form so the RED is not tautology,
-plus safe controls for ordinary loser/retry and the frozen restore-race owner.
-Do not change production, existing tests, the plan, dependencies, generated
-files or lockfile; do not add a queue, scheduler, compatibility layer or
-general concurrency framework. Run focused RED, complete control-plane
-preservation, ordered build/typecheck, lint, formatting and exact-diff gates
-to `.logs`; no sealed 100k or unbounded stress.
+Freeze fresh Codex-high tests-only commit
+`f9952b0b6a8f6307ff0598aae88125d2eb0814e1` on documented parent
+`b1f1181`. Its exact scope is one new 251-line file,
+`packages/control-plane/tests/signed-disable-delayed-ack-1m-a-red.test.ts`.
+Production, all existing tests, the plan, dependencies/lockfile, generated
+files and protected untracked files remain unchanged.
+
+The explicitly non-production fixture performs honest synchronous atomic CAS:
+it compares and, on success, replaces a detached stored tuple before returning
+the Promise whose later resolution truthfully reports that linearized outcome.
+Two bounded failing cases establish commit order `[1, 2]`, restore/publish E1,
+acknowledgment order `[2, 1]`, and storage retained at E2. One acknowledgment is
+released explicitly; the other uses an independent 32-microtask E1 skew with
+ordinary E2 latency. Both require the controller to retain local E2, classify
+exact E2 as replay and commit E3 without a repair restore. The frozen candidate
+instead regresses local state to E1 and returns `state-commit-failed` for both
+E2 and E3 while storage remains E2. A passing control proves an ordinary
+honest losing CAS still refreshes, classifies replay and retries successfully.
+
+Focused and postcommit results are exact 2 failed / 1 passed. Complete
+control-plane is exact 2 failed / 75 passed; the original owner remains 23/23
+and the restore-race owner remains 3/3. Ordered `types` → `canonical` →
+`control-plane` builds and typechecks, complete control-plane ESLint, Prettier,
+cached diff and exact tests-only scope gates pass. An initial parallel
+preservation attempt made Vitest coverage processes contend for shared
+`coverage/.tmp`; those logs are retained as non-authoritative harness evidence
+and clean serialized reruns own every result above. Neither sealed 100k,
+workspace-wide, fuzz nor unbounded stress ran. Test SHA-256 is
+`89a2378bdb77b6e900a7fd7851a202ce592d1fd357eea47ccaa68dc947749639`
+and evidence-manifest integrity SHA-256 is
+`7abe5b8fbea99b89e1f537c3ee8403cdce1db05e652a41ae25d99d204bc823a6`.
+Evidence is under
+`.logs/phase-1m-a-delayed-ack-corrective-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a delayed-ack corrective GREEN
+
+Start a distinct fresh Codex-high production GREEN from this frozen RED. Make
+the smallest coherent change in the existing signed-disable controller that
+prevents an older truthful committed acknowledgment from publishing an older
+tuple over newer effective local state. Preserve exact commit-before-effective
+semantics, the restore publication-token correction, honest losing-CAS
+behavior, replay/stale/equivocation classifications and direct E3 liveness.
+Do not add a queue, scheduler, extra state history, compatibility layer,
+default adapter or general concurrency runtime; do not weaken or edit any
+frozen test. Run the focused 3-case owner, all three frozen Phase 1m-a owners,
+complete control-plane, ordered build/typecheck, lint, formatting, exact diff,
+browser bundle and built-export smoke to `.logs`; no sealed 100k, workspace-
+wide, fuzz or unbounded stress. Commit production only and rerun the causal
+owner postcommit before review.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
