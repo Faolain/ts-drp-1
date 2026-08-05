@@ -22958,25 +22958,59 @@ node 2 correlated-fixture diagnostics remain test-only debt. Phase 1i-b closes
 at production `74fa960` with closure evidence under
 `.logs/phase-1i-b-stale-applier-green-{grok45-high,kimi3-high-100,opus-xhigh}-review/`.
 
-## Next Agent Prompt — Phase 1j FETCH_STATE amplification RED
+## Phase 1j tests-only RED checkpoint — frozen
 
-Use a fresh Codex-high tests-only RED on the Phase 1i-b closure checkpoint.
-Create the net-new `fetch-state-amplification.test.ts` owner required by the
-Phase 1 table. Drive a real validated `FETCH_STATE` request for an existing
-non-root hash through `handleMessage` and prove zero ACL/DRP snapshot payload
-bytes leave the responder: no stored-state serialization/decode seam may run,
-and any emitted response must carry no state payload. Use causal byte/call
-counters, not wall-clock or source scanning. Preserve the inbound event and a
-root-request positive control needed by the existing join handshake, plus an
-explicit missing-hash control, so GREEN cannot disable all FETCH_STATE handling
-or all responses. Pin wire/envelope behavior only where the existing contract
-requires it; allow the production GREEN to choose no non-root response or a
-header-only miss if both remain truthful and non-amplifying. Change no
-production or plan files. Run focused node tests, relevant object/node
-preservation, ordered builds, typecheck, lint, format and diff gates
-sequentially to `.log`; do not rerun either sealed 100k workload. Commit the
-minimum tests-only RED before assigning a distinct fresh Codex-high GREEN. Do
-not fold Phase 1d(iii), D.73, 1k/1n/1o, optional 0n or Fable into this slice.
+Freeze tests-only RED `77ca8c40ad0b3430de489bbf4f468e55cad3d614`.
+The new real-object owner proves that an existing stored non-root request reaches
+`getSerializedStates` once, performs four state-codec encodes and two decodes,
+and emits 192 ACL/DRP snapshot payload bytes, where the Phase 1j contract
+requires zero reads, codec work and payload bytes. Two explicit missing-hash
+controls also expose the same unnecessary serialized-state read while preserving
+their header-only responses and inbound events. The authoritative focused result
+is 4 failed / 4 passed; the real `HashGraph.rootHash` payload response,
+missing-object behavior and event controls pass.
+
+Phase 1j intentionally supersedes two stale pre-1j expectations rather than
+leaving GREEN an impossible contract. The Phase 1d(i) exact-byte seam fixture is
+rebased from arbitrary non-root `present-cut` to the real root hash, preserving
+the honest join-path wire guarantee. Both old missing-hash fixtures now require
+zero serialized-state reads while retaining truthful header-only responses and
+events. These changes do not weaken the earlier serialized-byte boundary: they
+scope its positive payload contract to the only hash requested by honest
+`fetchState` callers. GREEN remains free to send no response or a header-only
+response for an existing non-root hash and must not be forced to inspect history
+merely to distinguish it from a miss.
+
+Ordered `types`, `validation`, `object` and `node` builds pass. The relevant
+real-join, handler, observer and compact-history preservation owners pass; the
+sealed scale workload remains skipped and neither one-shot 100k workload was
+rerun. Types/validation typechecks pass, while the exact inherited object 5 /
+node 2 compact-history fixture diagnostics remain unchanged. All tracked
+TypeScript lint, touched lint, formatting and diff gates pass. The untouched
+legacy `drpobject.test.ts` retains its inherited 18 failures / 15 passes.
+Evidence is under
+`.logs/phase-1j-fetch-state-amplification-red-codex-high/`; ledger SHA-256 is
+`87008f18884caf5c00dc986baa8df21f154ae8fbcb312520d003c662b171f48b`
+and verified manifest SHA-256 is
+`4b1af9cc415e4ccb5a4fda56cf65b855d8a818a61aeb81d418b330f1b000d891`.
+
+## Next Agent Prompt — Phase 1j FETCH_STATE amplification GREEN
+
+Use a distinct fresh Codex-high production-only GREEN from frozen RED
+`77ca8c40ad0b3430de489bbf4f468e55cad3d614`. Gate non-root `FETCH_STATE`
+requests before `getSerializedStates` or any state codec work. Preserve the
+root payload response used by the join handshake and preserve inbound
+`DRP_FETCH_STATE` dispatch. For a non-root request, choose the smallest truthful
+protocol behavior allowed by the RED: no response or a header-only response;
+do not add history lookup, compatibility branches or test-specific hooks merely
+to distinguish an existing hash from a miss. Change production only, run the
+focused 4F/4P owner to GREEN plus relevant handler/join and object/node
+preservation, ordered builds, typecheck, lint, formatting and diff gates
+sequentially to `.log`, and do not rerun either sealed 100k workload. Apply the
+refactor-clean check, commit the minimum GREEN, then hand the candidate to fresh
+Grok 4.5/high, exact Kimi 3/high/dual-100 and final Claude-skill Opus/xhigh
+acceptance. Do not fold Phase 1d(iii), D.73, 1k/1n/1o, optional 0n or Fable into
+this slice.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
