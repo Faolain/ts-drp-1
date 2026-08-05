@@ -22831,18 +22831,50 @@ writer/full data ownership untouched. Evidence is under
 and verified manifest SHA-256 is
 `78659fa85267c56f3dbb2e135ab707dba7ff905af9ec1cf337939ee86f178934`.
 
-## Next Agent Prompt — Phase 1i-b final acceptance
+**Phase 1i-b final-review rejection — stale-applier rehydration race.** Fresh
+Grok 4.5/high accepted production lineage `54c894e` plus `683b86a`, but the
+subsequent exact Kimi 3/high/dual-100 review proved a candidate-caused race and
+superseded its own initially inconsistent acceptance with
+`CHANGES_REQUESTED`, `PHASE1I_B_MAY_CLOSE: no` and
+`NEXT_PHASE_MAY_RESUME: no`. `authenticateAndApplyVertices` may bind the old
+applier before an await while `rehydrateHistory` later installs a replacement
+runtime. A value-equal vertex can then commit through that stale applier,
+return `applied:true` and notify subscribers after the replacement graph is
+installed even though that graph neither contains nor inventories the hash.
+The existing revision guard covers already-admitted vertices and the byte
+comparison covers state-changing races; neither covers this value-equal
+in-flight window. Eventual gossip or re-offer is not an atomicity repair and
+must not be used as an acceptance waiver. A fresh tests-only RED must pin the
+public result, notification and installed-history contradiction; GREEN must
+make the raced commit join the installed runtime or fail it truthfully without
+weakening complete authenticated rehydration.
 
-Review production lineage `54c894e` plus corrective `683b86a` against frozen
-REDs `fb0f662` and `823b337`, the Phase 1i amendment and all Phase 1i-a
-preservation. Start fresh Grok 4.5/high, then exact Kimi 3/high/dual-100 only
-after Grok accepts, then final Claude-skill Opus/xhigh. Reattack public and
-reflective mode mutation, own/prototype descriptor shadowing, async rehydration
-races, empty/partial/wrong/inventory-mismatched rehydration, sync service,
-authorship/finality and legitimate complete transition. Independently audit the
-original compact inventory/payload/compaction/rehydration contract and sealed
-100k provenance; do not rerun 100k. Preserve residual classifications and make
-no tracked changes. A blocker returns to a fresh RED. Do not schedule Fable.
+The same review recorded two nonblocking performance follow-ups: a compact
+observer may redundantly fetch O(history) payloads from a full peer only to
+discard already-known pruned history, and `rehydrateHistory` currently uses an
+O(n^2) `offeredHashes.includes` membership check. Keep these visible for a
+bounded later optimization; neither replaces the atomicity RED. The review's
+prototype-getter datum was contaminated by its own prototype replacement and
+its lowercase ACL-group authorship datum used an invalid fixture; both were
+explicitly retracted. The exact Kimi session was
+`ab8c261f-5909-4e79-b1ca-30dadb48fc45`; evidence is under
+`.logs/phase-1i-b-final-green-kimi3-high-100-review/` with verified manifest
+SHA-256 `9ebe5f567166e4096d75bb597fb9b885fe345e3e7f11e01addc329fcfd9718fc`.
+Final Opus was correctly skipped.
+
+## Next Agent Prompt — Phase 1i-b stale-applier race RED
+
+Use a fresh Codex-high tests-only RED on the rejection checkpoint. Reproduce the
+value-equal old-applier/rehydration interleaving through the public object path
+with deterministic barriers, not timing sleeps. Prove that the current
+candidate can report `applied:true` and notify for a hash absent from
+`historyInventory`/`readHistory` after successful complete rehydration. Include
+state-changing and non-racing controls so the test cannot pass by rejecting all
+concurrency or weakening rehydration. Change no production or plan files, do
+not rerun either sealed 100k workload, and run the focused Phase 1i-b,
+Phase 1i-a, proportional, direct, typecheck and touched-lint gates to `.log`.
+Commit the minimum tests-only RED before assigning a distinct fresh Codex-high
+GREEN. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
