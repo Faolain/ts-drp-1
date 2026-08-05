@@ -24092,21 +24092,56 @@ and evidence-manifest integrity SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-delayed-ack-corrective-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a delayed-ack corrective GREEN
+## Phase 1m-a delayed-ack corrective GREEN checkpoint — review pending
 
-Start a distinct fresh Codex-high production GREEN from this frozen RED. Make
-the smallest coherent change in the existing signed-disable controller that
-prevents an older truthful committed acknowledgment from publishing an older
-tuple over newer effective local state. Preserve exact commit-before-effective
-semantics, the restore publication-token correction, honest losing-CAS
-behavior, replay/stale/equivocation classifications and direct E3 liveness.
-Do not add a queue, scheduler, extra state history, compatibility layer,
-default adapter or general concurrency runtime; do not weaken or edit any
-frozen test. Run the focused 3-case owner, all three frozen Phase 1m-a owners,
-complete control-plane, ordered build/typecheck, lint, formatting, exact diff,
-browser bundle and built-export smoke to `.logs`; no sealed 100k, workspace-
-wide, fuzz or unbounded stress. Commit production only and rerun the causal
-owner postcommit before review.
+Freeze distinct fresh Codex-high production-only commit
+`b34f268e73a762f7290cba9daddbc9afd32e3894` on documented RED HEAD
+`a9bf145`. Its exact scope is six insertions / two deletions in
+`packages/control-plane/src/signed-disable.ts`. Every frozen test, the plan,
+exports/dependencies/lockfile, generated files and protected untracked files
+remain byte-identical.
+
+After an exact truthful committed acknowledgment, the controller compares the
+proposed tuple's counter with the current effective tuple. A blocked controller
+or a strictly advancing counter may take publication ownership, invalidate
+older restores and publish the detached committed tuple. An equal or older
+truthful acknowledgment still returns `applied` for its own committed
+transaction but cannot replace the publication token or regress newer local
+state. No queue, scheduler, history, adapter, transport, compactor,
+compatibility path or general concurrency owner was added.
+
+Authoritative and postcommit results are delayed-ack owner 3/3, original owner
+23/23, restore-race owner 3/3 and complete control-plane 77/77. Ordered
+`types` → `canonical` → `control-plane` builds and typechecks pass. Complete
+control-plane ESLint has zero errors and six unchanged warnings outside the
+changed owner; the changed file has zero output. Prettier, exact production-
+only diff, 94.7 KB browser bundle and built-export smoke pass. An initial
+package-filtered wrong-working-directory Vitest invocation is retained as
+non-authoritative harness evidence; every root-relative authoritative run
+passes. Neither sealed 100k, workspace-wide, fuzz nor unbounded stress ran.
+Production SHA-256 is
+`445e3de6bc1e6f4df8c6e859a8e73f6340b264a724e3b441fdd7d94e31caed0b`
+and evidence-manifest SHA-256 is
+`5b7e53601aaa4d3ac5273a21a515ee20325919bb32cbef4302987ced9876203d`.
+Evidence is under
+`.logs/phase-1m-a-delayed-ack-corrective-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a delayed-ack corrected preliminary reviews
+
+Run new fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100
+read-only reviews at the fixed documented HEAD. Authenticate the complete
+original, restore-race and delayed-ack RED/GREEN lineage and evidence. Try to
+falsify the strict-counter post-ack publication guard under multiple pending
+applies, restores between commit and acknowledgment, same/different/equal-
+counter commands, losing CAS completion, failed/malformed outcomes, reentrant
+ports and mutable inputs. Prove an older truthful committed acknowledgment
+cannot regress a newer local tuple or reclaim its publication token, while a
+blocked/current advancing commit still publishes and liveness/replay remain
+correct. Recheck canonical/crypto, detachment, bounded state, API/dependency/
+lock and browser boundaries without demanding deferred durability, transport,
+compactor, version-runtime or fleet-drill work. No edits, delegation/Fable,
+web, sealed 100k or unbounded stress. Final Opus/xhigh begins only if both
+fresh preliminary reviewers accept.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
