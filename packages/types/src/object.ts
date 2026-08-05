@@ -12,13 +12,38 @@ export interface LowestCommonAncestorResult {
 }
 
 export type ReplicaMode = "writer" | "observer";
+export type HistoryStorage = "full" | "compact";
+
+export interface HistoryInventory {
+	readonly availablePayloadHashes: readonly Hash[];
+	readonly knownHashes: readonly Hash[];
+}
+
+export type VertexPayloadResult =
+	| { readonly status: "available"; readonly vertex: Vertex }
+	| { readonly missingHashes: readonly Hash[]; readonly status: "history-unavailable" }
+	| { readonly hash: Hash; readonly status: "unknown" };
+
+export type HistoryReadResult =
+	| { readonly status: "available"; readonly vertices: readonly Vertex[] }
+	| { readonly missingHashes: readonly Hash[]; readonly status: "history-unavailable" }
+	| { readonly status: "unknown"; readonly unknownHashes: readonly Hash[] };
+
+export type HistoryRehydrationResult =
+	| { readonly historyStorage: "full"; readonly status: "complete" }
+	| {
+			readonly reason: "incomplete" | "interrupted" | "invalid" | "wrong-history";
+			readonly status: "rejected";
+	  };
 
 // snake_casing to match the JSON config
-export interface DRPObjectConfig {
+interface DRPObjectConfigBase {
 	log_config?: LoggerOptions;
 	finality_config?: FinalityConfig;
-	replica_mode?: ReplicaMode;
 }
+
+export type DRPObjectConfig = DRPObjectConfigBase &
+	({ history_storage?: "full"; replica_mode?: ReplicaMode } | { history_storage: "compact"; replica_mode: "observer" });
 
 export interface DRPObjectOptions<T extends IDRP> {
 	peerId: string;
@@ -56,6 +81,12 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	 */
 	readonly replicaMode?: ReplicaMode;
 
+	/** The payload-retention capability exposed by this replica. */
+	readonly historyStorage: HistoryStorage;
+
+	/** Authenticated hash knowledge, separated from complete local payload availability. */
+	readonly historyInventory: HistoryInventory;
+
 	/**
 	 * The ACL of the DRP object.
 	 */
@@ -77,6 +108,18 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	 * @returns The stored vertex reference, or undefined when the hash is absent.
 	 */
 	getVertex(hash: Hash): Vertex | undefined;
+
+	/** Reads one complete payload without manufacturing a partial vertex. */
+	getVertexPayload(hash: Hash): VertexPayloadResult;
+
+	/** Reads a complete history selection or returns one typed absence outcome. */
+	readHistory(hashes: readonly Hash[]): HistoryReadResult;
+
+	/** Atomically restores compact storage to the full-history observer capability. */
+	rehydrateHistory(
+		vertices: readonly Vertex[],
+		options?: { readonly signal?: AbortSignal }
+	): Promise<HistoryRehydrationResult>;
 
 	/**
 	 * The finality store of the DRP object.

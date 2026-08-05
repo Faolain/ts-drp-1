@@ -8,6 +8,10 @@ import {
 	type DRPState,
 	DRPStateOtherTheWire,
 	type Hash,
+	type HistoryInventory,
+	type HistoryReadResult,
+	type HistoryRehydrationResult,
+	type HistoryStorage,
 	type IACL,
 	type IDRP,
 	type IDRPObject,
@@ -15,6 +19,7 @@ import {
 	type MergeResult,
 	type ReplicaMode,
 	type Vertex,
+	type VertexPayloadResult,
 } from "@ts-drp/types";
 import { serializeDRPState } from "@ts-drp/utils/serialization";
 
@@ -23,7 +28,7 @@ import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js"
 import { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
 import { HashGraph } from "./hashgraph/index.js";
-import { type DRPObjectStateManager } from "./state-materialize.js";
+import { type DRPObjectStateManager, stateFromDRP } from "./state-materialize.js";
 import { detachStateSnapshot } from "./state-payload.js";
 import {
 	type AuthenticatedVertex,
@@ -64,7 +69,11 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 ): Promise<AuthenticatedMergeOutcome> {
 	const { authenticated, occurrences } = classifyNovelVertices(
 		vertices,
-		(hash) => hash === HashGraph.rootHash || object.getVertex(hash) !== undefined
+		(hash) =>
+			hash === HashGraph.rootHash ||
+			(object.historyStorage === "compact"
+				? object.getVertexPayload(hash).status !== "unknown"
+				: object.getVertex(hash) !== undefined)
 	);
 	const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
 	const dispatchedResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
@@ -101,6 +110,21 @@ function resolveReplicaMode(mode: ReplicaMode | undefined): ReplicaMode {
 	if (mode === undefined || mode === "writer") return "writer";
 	if (mode === "observer") return "observer";
 	throw new TypeError(`Unsupported replica mode: ${String(mode)}`);
+}
+
+function resolveHistoryStorage(storage: unknown, replicaMode: ReplicaMode): HistoryStorage {
+	if (storage === undefined || storage === "full") return "full";
+	if (storage === "compact" && replicaMode === "observer") return "compact";
+	if (storage === "compact") throw new TypeError("Compact history storage requires observer replica mode");
+	throw new TypeError(`Unsupported history storage: ${String(storage)}`);
+}
+
+function stateBytes(value: IDRP | undefined): Uint8Array {
+	return DRPStateOtherTheWire.encode(serializeDRPState(stateFromDRP(value))).finish();
+}
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function defaultIDFromPeerID(peerId: string): string {
@@ -154,8 +178,12 @@ export function createObject<T extends IDRP>(options: CreateObjectOptions<T>): I
 export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	readonly id: string;
 	readonly replicaMode: ReplicaMode;
+	historyStorage: HistoryStorage;
 	private readonly log: Logger;
-	private readonly hashGraph: HashGraph;
+	private hashGraph: HashGraph;
+	private readonly peerId: string;
+	private authenticatedHistoryHashes?: Set<Hash>;
+	private historyRevision = 0;
 
 	private _applier: DRPVertexApplier<T>;
 	private _states: DRPObjectStateManager<T>;
@@ -181,7 +209,12 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			//metrics,
 		} = options;
 		this.id = id;
+		this.peerId = peerId;
 		this.replicaMode = resolveReplicaMode(config?.replica_mode);
+		this.historyStorage = resolveHistoryStorage(config?.history_storage, this.replicaMode);
+		if (this.historyStorage === "compact") {
+			this.authenticatedHistoryHashes = new Set([HashGraph.rootHash]);
+		}
 		this.log = new Logger(`drp::object::${this.id}`, config?.log_config);
 
 		this.hashGraph = new HashGraph(
@@ -202,6 +235,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			hashGraph: this.hashGraph,
 			finalityStore: this._optionalFinalityStore,
 			replicaMode: this.replicaMode,
+			allowLocalAuthorship: this.historyStorage === "full",
 			notify: this._notify.bind(this),
 			finalityConfig: config?.finality_config,
 			logConfig: config?.log_config,
@@ -233,12 +267,146 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	}
 
 	/**
+	 * Authenticated hash knowledge and truthful complete-payload availability.
+	 * @returns Known hashes and the subset with complete retained payloads
+	 */
+	get historyInventory(): HistoryInventory {
+		const availablePayloadHashes = this.hashGraph.getAllVertices().map(({ hash }) => hash);
+		return {
+			knownHashes:
+				this.authenticatedHistoryHashes === undefined ? availablePayloadHashes : [...this.authenticatedHistoryHashes],
+			availablePayloadHashes,
+		};
+	}
+
+	/**
 	 * Gets a stored vertex by hash.
 	 * @param hash - The vertex hash.
 	 * @returns The stored vertex reference, or undefined when the hash is absent.
 	 */
 	getVertex(hash: Hash): Vertex | undefined {
 		return this.hashGraph.getVertex(hash);
+	}
+
+	/**
+	 * Reads one complete locally retained payload without synthesizing a Vertex.
+	 * @param hash - Authenticated hash to inspect
+	 * @returns A complete payload, an unavailable capability result, or unknown
+	 */
+	getVertexPayload(hash: Hash): VertexPayloadResult {
+		const vertex = this.hashGraph.getVertex(hash);
+		if (vertex !== undefined) return { status: "available", vertex };
+		if (this.authenticatedHistoryHashes?.has(hash)) {
+			return { missingHashes: [hash], status: "history-unavailable" };
+		}
+		return { hash, status: "unknown" };
+	}
+
+	/**
+	 * Reads only complete payloads, otherwise returning one truthful capability result.
+	 * @param hashes - Authenticated hashes to read
+	 * @returns Complete vertices or a typed unavailable/unknown result
+	 */
+	readHistory(hashes: readonly Hash[]): HistoryReadResult {
+		const vertices: Vertex[] = [];
+		const missingHashes: Hash[] = [];
+		const unknownHashes: Hash[] = [];
+		for (const hash of hashes) {
+			const result = this.getVertexPayload(hash);
+			if (result.status === "available") vertices.push(result.vertex);
+			else if (result.status === "history-unavailable") missingHashes.push(...result.missingHashes);
+			else unknownHashes.push(result.hash);
+		}
+		if (unknownHashes.length !== 0) return { status: "unknown", unknownHashes };
+		if (missingHashes.length !== 0) return { missingHashes, status: "history-unavailable" };
+		return { status: "available", vertices };
+	}
+
+	/**
+	 * Rehydrates an exact compact inventory in an isolated full observer. The
+	 * installed runtime changes only after authentication, ancestry replay and
+	 * converged live-state checks all succeed.
+	 * @param vertices - Complete signed non-root history, in any order
+	 * @param options - Optional cancellation signal
+	 * @param options.signal - Cancels isolated verification before adoption
+	 * @returns Atomic completion or a typed rejection reason
+	 */
+	async rehydrateHistory(
+		vertices: readonly Vertex[],
+		options: { readonly signal?: AbortSignal } = {}
+	): Promise<HistoryRehydrationResult> {
+		if (this.historyStorage === "full") return { historyStorage: "full", status: "complete" };
+		if (options.signal?.aborted) return { reason: "interrupted", status: "rejected" };
+
+		const expectedHashes = [...(this.authenticatedHistoryHashes ?? [])].filter((hash) => hash !== HashGraph.rootHash);
+		const expectedSet = new Set(expectedHashes);
+		const offeredHashes: Hash[] = [];
+		try {
+			for (const vertex of vertices) offeredHashes.push(vertex.hash);
+		} catch {
+			return { reason: "invalid", status: "rejected" };
+		}
+		if (offeredHashes.some((hash) => !expectedSet.has(hash))) {
+			return { reason: "wrong-history", status: "rejected" };
+		}
+		if (
+			new Set(offeredHashes).size !== expectedSet.size ||
+			expectedHashes.some((hash) => !offeredHashes.includes(hash))
+		) {
+			return { reason: "incomplete", status: "rejected" };
+		}
+		const offeredByHash = new Map(vertices.map((vertex) => [vertex.hash, vertex]));
+		const canonicalOffer: Vertex[] = [];
+		for (const hash of expectedHashes) {
+			const vertex = offeredByHash.get(hash);
+			if (vertex === undefined) return { reason: "incomplete", status: "rejected" };
+			canonicalOffer.push(vertex);
+		}
+
+		const revision = this.historyRevision;
+		const [rootDRP, rootACL] = this._states.fromHash(HashGraph.rootHash);
+		const candidate = new DRPObject<T>({
+			peerId: this.peerId,
+			id: this.id,
+			acl: rootACL,
+			drp: rootDRP,
+			config: { history_storage: "full", replica_mode: "observer" },
+		});
+		const result = await candidate.applyVertices(canonicalOffer);
+		if (options.signal?.aborted) return { reason: "interrupted", status: "rejected" };
+		if (result.invalid.length !== 0 || result.quarantined !== undefined) {
+			return { reason: "invalid", status: "rejected" };
+		}
+		if (!result.applied || result.missing.length !== 0) {
+			return { reason: "incomplete", status: "rejected" };
+		}
+		const candidateInventory = candidate.historyInventory;
+		const completeExpectedHashes = [HashGraph.rootHash, ...expectedHashes];
+		if (
+			candidateInventory.knownHashes.length !== completeExpectedHashes.length ||
+			!candidateInventory.knownHashes.every((hash, index) => hash === completeExpectedHashes[index])
+		) {
+			return { reason: "wrong-history", status: "rejected" };
+		}
+		if (
+			!bytesEqual(stateBytes(candidate.acl), stateBytes(this.acl)) ||
+			!bytesEqual(stateBytes(candidate.drp), stateBytes(this.drp))
+		) {
+			return { reason: "wrong-history", status: "rejected" };
+		}
+		if (this.historyStorage !== "compact" || this.historyRevision !== revision || options.signal?.aborted) {
+			return { reason: "interrupted", status: "rejected" };
+		}
+
+		candidate._applier.setNotify(this._notify.bind(this));
+		this.hashGraph = candidate.hashGraph;
+		this._states = candidate._states;
+		this._applier = candidate._applier;
+		this._optionalFinalityStore = undefined;
+		this.authenticatedHistoryHashes = undefined;
+		this.historyStorage = "full";
+		this.historyRevision++;
+		return { historyStorage: "full", status: "complete" };
 	}
 
 	/**
@@ -321,18 +489,91 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	private async authenticateAndApplyVertices(vertices: Vertex[]): Promise<ApplyResult> {
 		const { authenticated, occurrences } = classifyNovelVertices(
 			vertices,
-			(hash) => hash === HashGraph.rootHash || this.hashGraph.vertices.has(hash)
+			(hash) =>
+				hash === HashGraph.rootHash ||
+				this.hashGraph.vertices.has(hash) ||
+				this.authenticatedHistoryHashes?.has(hash) === true
 		);
+		const compactAdmission =
+			this.authenticatedHistoryHashes === undefined
+				? { executable: authenticated, unavailable: [] }
+				: this.classifyCompactAdmission(authenticated);
 		const applied =
-			authenticated.length === 0
+			compactAdmission.executable.length === 0
 				? { applied: true, invalid: [], missing: [] }
-				: await this._applier.applyVertices(authenticated);
-		if (!occurrences.some(({ status }) => status === "invalid")) return applied;
-		return {
-			...applied,
-			applied: false,
-			invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
+				: await this._applier.applyVertices(compactAdmission.executable);
+		if (compactAdmission.unavailable.length !== 0) {
+			applied.applied = false;
+			applied.missing.push(...compactAdmission.unavailable);
+		}
+		const result = !occurrences.some(({ status }) => status === "invalid")
+			? applied
+			: {
+					...applied,
+					applied: false,
+					invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
+				};
+		if (this.authenticatedHistoryHashes !== undefined) {
+			let admitted = false;
+			for (const { hash } of this.hashGraph.getAllVertices()) {
+				if (this.authenticatedHistoryHashes.has(hash)) continue;
+				this.authenticatedHistoryHashes.add(hash);
+				admitted = true;
+			}
+			this._applier.compactPayloadHistory();
+			if (admitted) this.historyRevision++;
+		}
+		return result;
+	}
+
+	private classifyCompactAdmission(authenticated: readonly AuthenticatedVertex[]): {
+		executable: AuthenticatedVertex[];
+		unavailable: Hash[];
+	} {
+		const frontier = new Set(this.hashGraph.getFrontier());
+		const offered = new Map<Hash, AuthenticatedVertex>();
+		for (const handle of authenticated) {
+			const vertex = resolveAuthenticatedVertex(handle);
+			if (vertex !== undefined) offered.set(vertex.hash, handle);
+		}
+		const memo = new Map<Hash, Set<Hash> | undefined>();
+		const visiting = new Set<Hash>();
+		const coverage = (hash: Hash): Set<Hash> | undefined => {
+			if (frontier.has(hash)) return new Set([hash]);
+			if (memo.has(hash)) return memo.get(hash);
+			if (visiting.has(hash)) return undefined;
+			const handle = offered.get(hash);
+			const vertex = handle === undefined ? undefined : resolveAuthenticatedVertex(handle);
+			if (vertex === undefined) return undefined;
+			visiting.add(hash);
+			const covered = new Set<Hash>();
+			for (const dependency of vertex.dependencies) {
+				const dependencyCoverage = coverage(dependency);
+				if (dependencyCoverage === undefined) {
+					visiting.delete(hash);
+					memo.set(hash, undefined);
+					return undefined;
+				}
+				for (const head of dependencyCoverage) covered.add(head);
+			}
+			visiting.delete(hash);
+			memo.set(hash, covered);
+			return covered;
 		};
+
+		const executable: AuthenticatedVertex[] = [];
+		const unavailable: Hash[] = [];
+		for (const handle of authenticated) {
+			const vertex = resolveAuthenticatedVertex(handle);
+			if (vertex === undefined) continue;
+			const covered = coverage(vertex.hash);
+			if (covered !== undefined && frontier.size === covered.size && [...frontier].every((hash) => covered.has(hash))) {
+				executable.push(handle);
+			} else {
+				unavailable.push(vertex.hash);
+			}
+		}
+		return { executable, unavailable };
 	}
 
 	/**

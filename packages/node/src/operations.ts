@@ -41,7 +41,7 @@ export async function syncObject<T extends IDRP>(node: DRPNode, objectId: string
 		return;
 	}
 	const data = Sync.create({
-		vertexHashes: object.vertices.map((v) => v.hash),
+		vertexHashes: [...object.historyInventory.knownHashes],
 	});
 	const message = Message.create({
 		sender: node.networkNode.peerId,

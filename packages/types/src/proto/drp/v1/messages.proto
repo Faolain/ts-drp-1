@@ -53,7 +53,10 @@ message SyncAccept {
   repeated string requesting = 3;
 }
 
-message SyncReject {}
+message SyncReject {
+  string reason = 1;
+  repeated string missing_hashes = 2;
+}
 
 message DRPDiscovery {}
 

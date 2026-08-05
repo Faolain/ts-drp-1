@@ -419,6 +419,7 @@ interface DRPVertexApplierBase<T extends IDRP> {
 	hashGraph: IHashGraph;
 	finalityStore?: FinalityStore;
 	replicaMode?: ReplicaMode;
+	allowLocalAuthorship?: boolean;
 	states: DRPObjectStateManager<T>;
 	logConfig?: LoggerOptions;
 	finalityConfig?: FinalityConfig;
@@ -470,6 +471,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	 * @param options.states - The state manager for the DRP object. If not provided, a new one will be created.
 	 * @param options.finalityStore - The finality store
 	 * @param options.replicaMode - Whether this replica retains writer-only state
+	 * @param options.allowLocalAuthorship - Whether local operations may enter the authoring lane
 	 * @param options.notify - The notify function
 	 * @param options.logConfig - The log config
 	 * @param options.publicationObserver - Optional deterministic publication-work observer
@@ -486,6 +488,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		logConfig,
 		publicationObserver,
 		comparisonObserver,
+		allowLocalAuthorship = true,
 	}: DRPVertexApplierBase<T>) {
 		this.hashGraph = hashGraph;
 		this.states = states;
@@ -525,9 +528,12 @@ export class DRPVertexApplier<T extends IDRP> {
 			.setNext(this.applyFn.bind(this));
 
 		const localMutationLane = new LocalMutationLane();
-		this._proxyACL = new DRPProxy(acl, callFnPipeline, DrpType.ACL, localMutationLane);
+		const localMutationDeniedReason = allowLocalAuthorship
+			? undefined
+			: "Compact history observers cannot author local operations";
+		this._proxyACL = new DRPProxy(acl, callFnPipeline, DrpType.ACL, localMutationLane, localMutationDeniedReason);
 		if (drp) {
-			this._proxyDRP = new DRPProxy(drp, callFnPipeline, DrpType.DRP, localMutationLane);
+			this._proxyDRP = new DRPProxy(drp, callFnPipeline, DrpType.DRP, localMutationLane, localMutationDeniedReason);
 		}
 		this.publicationCapability = createPublicationCapability(publicationObserver, comparisonObserver ?? null);
 		this.publicationPublisher = new PublicationPublisher(
@@ -565,6 +571,33 @@ export class DRPVertexApplier<T extends IDRP> {
 	 */
 	get acl(): IACL {
 		return this._proxyACL.proxy;
+	}
+
+	/**
+	 * Rebinds delivery after an independently verified runtime is atomically adopted.
+	 * @param notify - Owning object's notification callback
+	 */
+	setNotify(notify: (origin: string, vertices: Vertex[]) => void): void {
+		this._notify = notify;
+	}
+
+	/**
+	 * Releases graph payload/index history behind the authenticated frontier.
+	 * Live canonical state remains the execution base; only complete root/frontier
+	 * Vertex payloads remain locally available.
+	 * @returns Complete payload hashes retained by the graph
+	 */
+	compactPayloadHistory(): Hash[] {
+		const retainedPayloadHashes = (this.hashGraph as HashGraph).compactPayloadHistory();
+		this.states.prune(new Set([HashGraph.rootHash]));
+		const frontier = this.hashGraph.getFrontier();
+		this.checkpoints.splice(0, this.checkpoints.length, {
+			frontier,
+			origin: frontier[0] ?? HashGraph.rootHash,
+			state: this.liveCanonicalState,
+			vertexCount: retainedPayloadHashes.length,
+		});
+		return retainedPayloadHashes;
 	}
 
 	/**
@@ -1165,14 +1198,14 @@ export class DRPVertexApplier<T extends IDRP> {
 		const dependency = vertex.dependencies.length === 1 ? vertex.dependencies[0] : undefined;
 		if (
 			this.replicaMode === "observer" &&
-			dependency !== undefined &&
-			sameHashes(this.hashGraph.getFrontier(), [dependency])
+			vertex.dependencies.length !== 0 &&
+			sameHashes(this.hashGraph.getFrontier(), vertex.dependencies)
 		) {
 			return {
 				stop: false,
 				result: {
 					...operation,
-					lcaResult: { lca: dependency, linearizedVertices: [] },
+					lcaResult: { lca: dependency ?? vertex.dependencies[0] ?? HashGraph.rootHash, linearizedVertices: [] },
 					replayState: this.liveCanonicalState,
 				},
 			};

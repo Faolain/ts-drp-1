@@ -1597,6 +1597,7 @@ export class DRPProxy<T extends IDRP> {
 	private readonly _proxy: T;
 	private type: DrpType;
 	private readonly localMutationLane: LocalMutationLane;
+	private readonly localMutationDeniedReason?: string;
 
 	/**
 	 * Creates a new DRPProxy instance
@@ -1604,17 +1605,20 @@ export class DRPProxy<T extends IDRP> {
 	 * @param pipeline - The pipeline of steps to be executed
 	 * @param type - The type of the proxy
 	 * @param localMutationLane - The per-object local authoring lane
+	 * @param localMutationDeniedReason - Explicit capability denial for non-query operations
 	 */
 	constructor(
 		target: T,
 		pipeline: Pipeline<DRPProxyChainArgs, PostOperation<IDRP>>,
 		type: DrpType,
-		localMutationLane = new LocalMutationLane()
+		localMutationLane = new LocalMutationLane(),
+		localMutationDeniedReason?: string
 	) {
 		this.type = type;
 		this.target = target;
 		this.pipeline = pipeline;
 		this.localMutationLane = localMutationLane;
+		this.localMutationDeniedReason = localMutationDeniedReason;
 		this._proxy = this.createProxy();
 	}
 
@@ -1640,6 +1644,9 @@ export class DRPProxy<T extends IDRP> {
 
 				// Return wrapped function
 				return (...args: unknown[]) => {
+					if (this.localMutationDeniedReason !== undefined) {
+						throw new Error(this.localMutationDeniedReason);
+					}
 					return this.localMutationLane.run(() => {
 						let attempts = 1;
 						const retrying = (postOperation: PostOperation<IDRP>): boolean => postOperation.commitOutcome === "retry";

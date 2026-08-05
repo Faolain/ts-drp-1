@@ -1228,6 +1228,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			throw new DRPValidationError(validation.error);
 		}
 
+		const storageConfig =
+			options.history_storage === "compact"
+				? ({ history_storage: "compact", replica_mode: "observer" } as const)
+				: ({ history_storage: "full", replica_mode: options.replica_mode } as const);
 		const object = new DRPObject<T>({
 			peerId: this.networkNode.peerId,
 			acl: options.acl ?? createPermissionlessACL(this.networkNode.peerId),
@@ -1237,7 +1241,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			config: {
 				finality_config: options.finality_config,
 				log_config: options.log_config,
-				replica_mode: options.replica_mode,
+				...storageConfig,
 			},
 		});
 
@@ -1268,6 +1272,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!validation.success) {
 			throw new DRPValidationError(validation.error);
 		}
+		const storageConfig =
+			options.history_storage === "compact"
+				? ({ history_storage: "compact", replica_mode: "observer" } as const)
+				: ({ history_storage: "full", replica_mode: options.replica_mode } as const);
 		const object = new DRPObject<T>({
 			peerId: this.networkNode.peerId,
 			id: options.id,
@@ -1276,7 +1284,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			config: {
 				finality_config: options.finality_config,
 				log_config: options.log_config,
-				replica_mode: options.replica_mode,
+				...storageConfig,
 			},
 		});
 

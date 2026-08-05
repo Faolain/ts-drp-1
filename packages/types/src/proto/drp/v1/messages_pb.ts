@@ -132,6 +132,8 @@ export interface SyncAccept {
 }
 
 export interface SyncReject {
+  reason: string;
+  missingHashes: string[];
 }
 
 export interface DRPDiscovery {
@@ -713,11 +715,17 @@ export const SyncAccept: MessageFns<SyncAccept> = {
 };
 
 function createBaseSyncReject(): SyncReject {
-  return {};
+  return { reason: "", missingHashes: [] };
 }
 
 export const SyncReject: MessageFns<SyncReject> = {
-  encode(_: SyncReject, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: SyncReject, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.reason !== "") {
+      writer.uint32(10).string(message.reason);
+    }
+    for (const value of message.missingHashes) {
+      writer.uint32(18).string(value!);
+    }
     return writer;
   },
 
@@ -728,6 +736,16 @@ export const SyncReject: MessageFns<SyncReject> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) break;
+          message.reason = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) break;
+          message.missingHashes.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -737,20 +755,33 @@ export const SyncReject: MessageFns<SyncReject> = {
     return message;
   },
 
-  fromJSON(_: any): SyncReject {
-    return {};
+  fromJSON(object: any): SyncReject {
+    return {
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      missingHashes: globalThis.Array.isArray(object?.missingHashes)
+        ? object.missingHashes.map((e: any) => globalThis.String(e))
+        : [],
+    };
   },
 
-  toJSON(_: SyncReject): unknown {
+  toJSON(message: SyncReject): unknown {
     const obj: any = {};
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.missingHashes?.length) {
+      obj.missingHashes = message.missingHashes;
+    }
     return obj;
   },
 
   create<I extends Exact<DeepPartial<SyncReject>, I>>(base?: I): SyncReject {
     return SyncReject.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SyncReject>, I>>(_: I): SyncReject {
+  fromPartial<I extends Exact<DeepPartial<SyncReject>, I>>(object: I): SyncReject {
     const message = createBaseSyncReject();
+    message.reason = object.reason ?? "";
+    message.missingHashes = object.missingHashes?.map((e) => e) || [];
     return message;
   },
 };

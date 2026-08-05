@@ -358,6 +358,47 @@ export class HashGraph implements IHashGraph {
 	}
 
 	/**
+	 * Releases complete payloads and graph indexes behind the current frontier.
+	 * The retained map contains only real, complete vertices; no hash-only value
+	 * is ever inserted into the Vertex API.
+	 * @returns Hashes whose complete payloads remain locally available
+	 */
+	compactPayloadHistory(): Hash[] {
+		const retained = new Set<Hash>([HashGraph.rootHash, ...this.frontier]);
+		const vertices = new Map<Hash, Vertex>();
+		for (const [hash, vertex] of this.vertices) {
+			if (retained.has(hash)) vertices.set(hash, vertex);
+		}
+
+		const forwardEdges = new Map<Hash, Hash[]>();
+		for (const hash of vertices.keys()) forwardEdges.set(hash, []);
+		for (const [hash, vertex] of vertices) {
+			if (hash === HashGraph.rootHash) continue;
+			for (const dependency of vertex.dependencies) {
+				if (vertices.has(dependency)) forwardEdges.get(dependency)?.push(hash);
+			}
+		}
+
+		const vertexDistances = new Map<Hash, VertexDistance>();
+		const rootDistance = this.vertexDistances.get(HashGraph.rootHash);
+		vertexDistances.set(HashGraph.rootHash, rootDistance ?? { distance: 0 });
+		for (const hash of this.frontier) {
+			const distance = this.vertexDistances.get(hash);
+			if (distance !== undefined) vertexDistances.set(hash, distance);
+		}
+
+		this.vertices = vertices;
+		this.forwardEdges = forwardEdges;
+		this.vertexDistances = vertexDistances;
+		this.reachablePredecessors.clear();
+		this.topoSortedIndex.clear();
+		this.currentBitsetSize = 1;
+		this.arePredecessorsFresh = false;
+		this.arePredecessorsScoped = false;
+		return [...vertices.keys()];
+	}
+
+	/**
 	 * Topologically sorts the vertices in the whole hashgraph or the past of a given vertex.
 	 * @param origin - The origin hash.
 	 * @param subgraph - The subgraph.

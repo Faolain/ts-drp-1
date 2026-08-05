@@ -23,6 +23,7 @@ import {
 	NodeEventName,
 	Sync,
 	SyncAccept,
+	SyncReject,
 	Update,
 	type Vertex,
 } from "@ts-drp/types";
@@ -389,6 +390,27 @@ async function syncHandler({ node, message }: HandleParams): Promise<void> {
 		log.error("::syncHandler: Object not found");
 		return;
 	}
+	if (object.historyStorage === "compact") {
+		const remoteHashes = new Set(syncMessage.vertexHashes);
+		const availableHashes = new Set(object.historyInventory.availablePayloadHashes);
+		const unavailableHashes = object.historyInventory.knownHashes.filter(
+			(hash) => !remoteHashes.has(hash) && !availableHashes.has(hash)
+		);
+		if (unavailableHashes.length !== 0) {
+			const rejection = Message.create({
+				sender: node.networkNode.peerId,
+				type: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+				data: SyncReject.encode(
+					SyncReject.create({ missingHashes: unavailableHashes, reason: "history-unavailable" })
+				).finish(),
+				objectId: object.id,
+			});
+			node.networkNode.sendMessage(sender, rejection).catch((error) => {
+				log.error("::syncHandler: Error sending history-unavailable rejection", error);
+			});
+			return;
+		}
+	}
 
 	await signGeneratedVertices(node, object.vertices);
 
@@ -510,13 +532,31 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	}
 
 	// send missing vertices
-	const requested: Vertex[] = [];
-	for (const h of syncAcceptMessage.requesting) {
-		const vertex = object.getVertex(h);
-		if (vertex) {
-			requested.push(vertex);
-		}
+	const historyRead =
+		object.historyStorage === "compact"
+			? object.readHistory(syncAcceptMessage.requesting)
+			: {
+					status: "available" as const,
+					vertices: syncAcceptMessage.requesting.flatMap((hash) => {
+						const vertex = object.getVertex(hash);
+						return vertex === undefined ? [] : [vertex];
+					}),
+				};
+	if (historyRead.status === "history-unavailable") {
+		const rejection = Message.create({
+			sender: node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+			data: SyncReject.encode(
+				SyncReject.create({ missingHashes: [...historyRead.missingHashes], reason: "history-unavailable" })
+			).finish(),
+			objectId: object.id,
+		});
+		node.networkNode.sendMessage(sender, rejection).catch((error) => {
+			log.error("::syncAcceptHandler: Error sending history-unavailable rejection", error);
+		});
+		return;
 	}
+	const requested: Vertex[] = historyRead.status === "available" ? [...historyRead.vertices] : [];
 
 	if (requested.length === 0) return;
 
