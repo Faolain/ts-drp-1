@@ -619,6 +619,9 @@ importers:
       '@ts-drp/node':
         specifier: workspace:*
         version: link:../node
+      '@ts-drp/object':
+        specifier: workspace:*
+        version: link:../object
       '@ts-drp/relay-policy':
         specifier: workspace:*
         version: link:../relay-policy

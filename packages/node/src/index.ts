@@ -1233,6 +1233,13 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!validation.success) {
 			throw new DRPValidationError(validation.error);
 		}
+		if (
+			options.acl === undefined &&
+			options.id !== undefined &&
+			creatorFromObjectID(options.id) !== this.networkNode.peerId
+		) {
+			throw new Error("A custom object id must be creator-bound when acl is omitted");
+		}
 
 		const storageConfig =
 			options.history_storage === "compact"
