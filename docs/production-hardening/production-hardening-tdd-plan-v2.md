@@ -23069,30 +23069,71 @@ failures. O(1) header/event work is intentionally outside this amplification
 boundary. Live root-request budgets belong to later resource-governance work.
 Phase 1j closes at production `55fac22`.
 
-## Next Agent Prompt — Phase 1k invalid-vertex budget RED
+## Phase 1k tests-only RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only RED for the Phase 1k row. First audit the
-existing `recoverMissingSync` episode limiter and `sync-recovery.test.ts`: they
-already bound retries per `(objectId, sender)` and emit `DRP_SYNC_REJECTED`, so
-the RED must neither duplicate that partial protection nor mistake it for the
-required per-peer invalid-vertex budget and disconnect boundary. Drive the real
-validated message-handler path with one attacker rotating distinct invalid
-vertices/hashes, including across object identifiers where applicable. Prove
-with causal counters that recovery/re-request work stays bounded for that peer
-and that budget exhaustion disconnects it exactly once, while an honest peer
-remains usable and trusted duplicate, signed-missing or transient-quarantine
-inputs are not falsely charged. The 10k case is a behavioral characterization,
-not a heap-memory assertion; keep normal iteration bounded and do not rerun
-either sealed 100k workload.
+Freeze fresh Codex-high tests-only RED
+`b5b1d95` (`packages/node/tests/invalid-vertex-budget-1k-red.test.ts`, 199
+insertions). It drives the real validated `handleMessage` and authenticated
+object-merge boundary rather than adding a test hook. The existing
+`recoverMissingSync` protection remains correctly characterized as a
+per-`(objectId, sender)` retry episode; it is not mistaken for the required
+peer-wide invalid-input budget and disconnect boundary.
 
-RED may change tests only, must not change production or this plan, and should
-reuse public/real seams rather than add a test hook. Run focused preservation,
-ordered builds, typecheck, lint, formatting and diff gates to
-`.logs/phase-1k-invalid-vertex-budget-red-codex-high/`, separating inherited
-diagnostics from new failures. If the current partial limiter makes the exact
-Phase 1k contract pass, or source inspection reveals that the contract itself
-needs amendment, stop without changing the plan: amendment requires fresh
-agreement from Opus/xhigh, Codex-high and exact Kimi 3/high/dual-100.
+The authoritative focused result is 2 failed / 1 passed in 29.92 seconds. One
+attacker's 10,001 rotating authentication-invalid hashes distributed across
+four objects produce zero disconnects where exactly one is required, while a
+separate honest peer's correctly signed update still applies. Independently,
+10,001 correctly signed deterministic-invalid `opType: "-1"` vertices fill and
+evict the real 10,000-entry object tombstone cache. Correctly signed descendants
+of the evicted parent then produce 12 `syncObject` calls and four
+`DRP_SYNC_REJECTED` episodes across four object identifiers, where an already
+exhausted peer must cause neither recovery work nor repeated rejection
+episodes. The trusted-duplicate plus signed-missing positive control passes and
+proves that ordinary missing-dependency recovery is not itself invalid input.
+This is a causal work/counter assertion, not a heap-memory assertion.
+
+The handler-visible authenticated merge boundary consumes the legacy
+`MergeResult` tuple, which preserves `missing` and `invalid` but not transient
+`quarantined` detail. The RED therefore makes no false claim that quarantine
+charging is observable at this layer; it freezes the safe trusted-duplicate and
+signed-missing controls instead. This is a test-boundary gotcha, not permission
+to charge transient failures in GREEN. Broad lint was polluted only by allowed
+protected untracked agent assets; the authoritative git-tracked lint has zero
+errors and 249 inherited warnings. Preservation is 37 passed / the exact three
+inherited Phase 1n sync-livelock sentinel failures. Ordered builds pass;
+typecheck retains only the exact inherited object 5 / node 2 diagnostics, and
+touched lint, formatting and diff checks pass. Neither sealed 100k workload was
+rerun. Evidence is under
+`.logs/phase-1k-invalid-vertex-budget-red-codex-high/`; ledger SHA-256 is
+`3284ab8130ac43c81f3cebd3bcd44609df51dd1b4e77c50e13b271a6ea4c04d5`
+and verified manifest SHA-256 is
+`18103dc1483107c664fc39fd91d6f3c311bf8a37344f7c8c96c9595cf77320e7`.
+
+## Next Agent Prompt — Phase 1k production GREEN
+
+Start a distinct fresh Codex-high production GREEN on frozen tests-only RED
+`b5b1d95`. Add one bounded per-node, per-remote-peer invalid-vertex budget at
+the authenticated handler/object boundary. Aggregate authentication failures
+and deterministic-invalid merge results across message types and object IDs,
+disconnect the exhausted peer exactly once through the existing
+`networkNode.disconnect(peerId)` seam, and prevent further invalid-peer
+recovery work while leaving honest peers and ordinary signed-missing recovery
+independent. Do not shrink or expose the object's tombstone cache, change the
+existing per-object retry/cooldown semantics for non-exhausted peers, charge
+trusted duplicates or transient quarantine, add a test hook, or satisfy the
+RED by special-casing fixture values, `opType: "-1"`, object IDs or the 10,001st
+input. Keep state bounded and clean it at an appropriate node lifecycle
+boundary; handle asynchronous disconnect failure without unhandled rejection
+or repeated disconnect attempts.
+
+GREEN may change production only. Run the focused RED, existing sync recovery,
+authenticated-ingress and sync-livelock preservation, ordered builds,
+typecheck, lint, formatting and diff checks to
+`.logs/phase-1k-invalid-vertex-budget-green-codex-high/`. Preserve the exact
+three inherited Phase 1n sentinel failures and exact object 5 / node 2
+typecheck diagnostics, and do not rerun either sealed 100k workload. After a
+clean production checkpoint, use the normal fresh Grok 4.5/high, exact Kimi
+3/high/dual-100 and final Claude-skill Opus/xhigh acceptance sequence; no Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
