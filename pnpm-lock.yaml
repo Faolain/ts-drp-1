@@ -327,6 +327,12 @@ importers:
 
   packages/control-plane:
     dependencies:
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
       '@ts-drp/types':
         specifier: workspace:*
         version: link:../types

@@ -5,6 +5,20 @@ import type {
 	ControlPlaneRecoveryConfig,
 } from "@ts-drp/types";
 
+export { DISABLE_ENVELOPE_DOMAIN_V1, SignedDisableController } from "./signed-disable.js";
+export type {
+	DisableApplyFailureReason,
+	DisableApplyResult,
+	DisableAuthority,
+	DisableAuthorityPublicKey,
+	DisableCommandPreimage,
+	DisableConsumerState,
+	DisableLatchState,
+	DisableLatchStatePort,
+	SignedDisableControllerOptions,
+	SignedDisableEnvelope,
+} from "./signed-disable.js";
+
 export type { ControlPlaneHealthState, ControlPlaneRecoveryConfig } from "@ts-drp/types";
 
 export type RecoveryAction = ControlPlaneRecoveryAction;
