@@ -23819,25 +23819,58 @@ was preserved. Evidence is under
 `.logs/phase-1m-assumption-quorum-{opus-xhigh,kimi3-high-100}/` and
 `.logs/phase-1m-amendment-convergence-kimi3-high-100/`.
 
-## Next Agent Prompt — Phase 1m-a tests-only RED
+## Phase 1m-a tests-only RED checkpoint — frozen
 
-Start a new fresh Codex-high tests-only RED against the genuine
-`@ts-drp/control-plane` owner. Pin the versioned canonical/domain-separated
-disable-only envelope, configured/pinned operator authority, exact signed
-scope/capability, monotonic counter, bounded replay state and required atomic
-`DisableLatchStatePort`. A valid command must remain ineffective until the
-commit resolves successfully. Wrong authority/scope/capability/version,
-forgery, replay, stale counter, equivocation, commit rejection, throw and
-ambiguous outcome must leave both stored and observable counter/latch exact;
-unreadable or unknown restored state blocks a consumer instead of silently
-enabling it. Use only an explicitly labeled non-production in-memory test
-model. Do not add transport propagation, a message enum, a fake compactor,
-version-coexistence fixtures, a default store or any durability/restart/crash
-claim. Keep production, plan, generated files, manifests/lockfiles and
-unrelated tests unchanged. Run proportionate focused and preservation tests,
-ordered typecheck/build/lint/format/diff gates to `.logs`; do not run either
-sealed 100k workload. Return the causal RED signature, exact scope and evidence
-hashes before a distinct GREEN begins. No Fable.
+Freeze fresh Codex-high tests-only commit
+`d3b4b5acc4b21a4f59445753e3a61dde030ea4f3` on amended-plan parent
+`8f527a2`. Its exact two-file scope adds the independent non-production
+ephemeral fixture and behavioral owner under `packages/control-plane/tests/`,
+615 lines total, with no production, plan, generated, manifest/lockfile or
+unrelated-test edit. The fixture mirrors the not-yet-existing public types
+structurally so current package typecheck remains meaningful; GREEN must use
+the browser-safe production canonical/crypto owners rather than the fixture's
+narrow Node-only SHA-256 reference.
+
+The authoritative RED is 22 failed / one passed / zero skipped. Every
+behavioral case executes and reaches the causal missing
+`SignedDisableController` owner; the sole pass freezes the independent exact
+canonical v1 preimage bytes. The finite matrix owns exact domain and suite,
+pinned authority and authority-set version, scope/capability/version,
+forgery, replay, stale counter, same-counter equivocation, bounded latest-only
+state, commit reject/throw/malformed outcome, deferred effectiveness, public
+byte detachment, unreadable/unknown/throwing restore and mandatory state-port
+injection. It neither tests nor supplies transport, a compactor, version
+coexistence, a default store, real durability, restart/crash closure or drill
+logging.
+
+Existing control-plane preservation is 48/48. Ordered `types` and
+`control-plane` builds and typechecks pass; targeted ESLint has zero output;
+Prettier and exact two-file diff gates pass. Neither sealed 100k workload ran.
+Focused RED SHA-256 is
+`2e7c8859efec4b1ebf9cd515211ec7be5ff16af00f2fd1c45d4509fd9d1d7fd0`,
+preservation SHA-256 is
+`43832f4f7e2d2a289fa8933f6f718ade476a540ca9b2081052df1528e839ccae`,
+typecheck SHA-256 is
+`4c7407b715a05ab042b0a26ce67da81c4eeccca306a089979150018aedcca70c`
+and postcommit SHA-256 is
+`fcfac55fcf25b47421e1b04fd4c4dcbaadb670bff95355f5acf9f82fd757a394`.
+Evidence is under `.logs/phase-1m-a-signed-disable-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a production GREEN
+
+Use a distinct fresh Codex-high GREEN owner. Keep both RED files frozen and
+implement the smallest coherent browser-safe production owner in
+`@ts-drp/control-plane`, reusing the existing canonical and Ed25519 prior art
+through declared direct package dependencies rather than copying the test
+reference. Export the exact controller, domain, envelope/state/result and
+state-port contracts needed by the RED. Preserve commit-before-effective
+ordering, fail-closed restore, byte detachment and latest-only bounded state.
+No default store or durability claim; no transport, message enum, compactor,
+version coexistence, restart/crash proof, drill logging or unrelated
+control-plane refactor. Run the frozen 23-test owner, all control-plane
+preservation, ordered affected build/typecheck/lint/format/diff gates to
+`.logs`; do not run either sealed 100k workload. Commit only a production and
+necessary direct-dependency/lockfile GREEN with exact evidence. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
