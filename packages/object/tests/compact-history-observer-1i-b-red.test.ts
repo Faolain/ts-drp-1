@@ -2,19 +2,64 @@ import { Signature } from "@noble/secp256k1";
 import { ACLGroup, type DRPObjectConfig, DrpType, Operation, type Vertex, Vertex as VertexCodec } from "@ts-drp/types";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { createACL } from "../src/acl/index.js";
 import { createVertex, HashGraph } from "../src/hashgraph/index.js";
 import { authenticateVertices, DRPObject } from "../src/index.js";
 import {
 	cloneVertex,
 	compactHistoryDigest,
-	compactHistoryIdentity,
+	CompactHistoryDRP,
 	type CompactHistoryIdentity,
+	compactHistoryIdentity,
 	compactHistoryReplica,
 	signedCompactHistory,
 } from "./helpers/compact-history-observer-1i-b.js";
 
 let attacker: CompactHistoryIdentity;
 let author: CompactHistoryIdentity;
+
+interface Deferred {
+	promise: Promise<void>;
+	resolve(): void;
+}
+
+interface RaceControl {
+	entered: Deferred;
+	release: Deferred;
+}
+
+const raceControls = new Map<string, RaceControl>();
+
+function deferred(): Deferred {
+	let resolve!: () => void;
+	const promise = new Promise<void>((resolvePromise) => {
+		resolve = resolvePromise;
+	});
+	return { promise, resolve };
+}
+
+function raceControl(id: string): RaceControl {
+	const control = { entered: deferred(), release: deferred() };
+	raceControls.set(id, control);
+	return control;
+}
+
+class RehydrationRaceDRP extends CompactHistoryDRP {
+	async equalAfterRelease(controlId: string): Promise<void> {
+		const control = raceControls.get(controlId);
+		if (control === undefined) throw new Error(`Missing race control ${controlId}`);
+		control.entered.resolve();
+		await control.release.promise;
+	}
+
+	async appendBeforeRelease(controlId: string, value: number): Promise<void> {
+		const control = raceControls.get(controlId);
+		if (control === undefined) throw new Error(`Missing race control ${controlId}`);
+		this.values.push(value);
+		control.entered.resolve();
+		await control.release.promise;
+	}
+}
 
 beforeAll(async () => {
 	[author, attacker] = await Promise.all([
@@ -24,6 +69,7 @@ beforeAll(async () => {
 });
 
 afterEach(() => {
+	raceControls.clear();
 	vi.unstubAllEnvs();
 	vi.restoreAllMocks();
 });
@@ -37,6 +83,35 @@ function compactConfigWithoutObserver(historyStorage: string): DRPObjectConfig {
 		history_storage: historyStorage,
 		log_config: { level: "silent" },
 	};
+}
+
+function rehydrationRaceReplica(): DRPObject<RehydrationRaceDRP> {
+	return new DRPObject({
+		peerId: author.peerId,
+		acl: createACL({ admins: [author.peerId] }),
+		drp: new RehydrationRaceDRP(),
+		config: {
+			history_storage: "compact",
+			log_config: { level: "silent" },
+			replica_mode: "observer",
+		},
+	});
+}
+
+async function signedRaceVertex(
+	opType: "appendBeforeRelease" | "equalAfterRelease",
+	value: unknown[],
+	dependency: string,
+	timestamp: number
+): Promise<Vertex> {
+	const vertex = createVertex(
+		author.peerId,
+		Operation.create({ drpType: DrpType.DRP, opType, value }),
+		[dependency],
+		timestamp
+	);
+	vertex.signature = await author.keychain.signWithSecp256k1(vertex.hash);
+	return vertex;
 }
 
 describe("Phase 1i-b explicit compact-history capability", () => {
@@ -237,6 +312,140 @@ describe("Phase 1i-b explicit compact-history capability", () => {
 });
 
 describe("Phase 1i-b atomic rehydration", () => {
+	it("does not report or notify a value-equal stale-applier commit outside the installed rehydrated history", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "2");
+		const history = await signedCompactHistory(author);
+		const compact = rehydrationRaceReplica();
+		await expect(compact.applyVertices([...history])).resolves.toMatchObject({
+			applied: true,
+			invalid: [],
+			missing: [],
+		});
+		const dependency = history.at(-1)?.hash;
+		if (dependency === undefined) throw new Error("Expected a complete compact-history fixture");
+
+		const control = raceControl("value-equal-stale-applier");
+		const raced = await signedRaceVertex(
+			"equalAfterRelease",
+			["value-equal-stale-applier"],
+			dependency,
+			1_700_000_011_008
+		);
+		const notifications: string[] = [];
+		compact.subscribe((_object, _origin, vertices) => {
+			notifications.push(...vertices.map(({ hash }) => hash));
+		});
+
+		const inFlightApply = compact.applyVertices([raced]);
+		await control.entered.promise;
+		await expect(
+			compact.rehydrateHistory([...history].reverse()),
+			"positive control: the value-equal in-flight operation must not weaken complete authenticated rehydration"
+		).resolves.toEqual({ historyStorage: "full", status: "complete" });
+		control.release.resolve();
+		const applyResult = await inFlightApply;
+		const readResult = compact.readHistory([raced.hash]);
+		const installed =
+			compact.historyInventory.knownHashes.includes(raced.hash) &&
+			compact.historyInventory.availablePayloadHashes.includes(raced.hash) &&
+			readResult.status === "available" &&
+			readResult.vertices.some(({ hash }) => hash === raced.hash);
+
+		expect(
+			{
+				appliedWithoutInstalledHistory: applyResult.applied && !installed,
+				notifiedWithoutInstalledHistory: notifications.includes(raced.hash) && !installed,
+			},
+			"a stale applier must join the installed runtime or fail without publishing a ghost commit"
+		).toEqual({
+			appliedWithoutInstalledHistory: false,
+			notifiedWithoutInstalledHistory: false,
+		});
+	});
+
+	it("keeps a state-changing in-flight application and rehydration truthful", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "2");
+		const baseHistory = await signedCompactHistory(author);
+		const baseDependency = baseHistory.at(-1)?.hash;
+		if (baseDependency === undefined) throw new Error("Expected a complete compact-history fixture");
+		const initialReplayControl = raceControl("state-changing-candidate-replay");
+		initialReplayControl.release.resolve();
+		const replayBarrier = await signedRaceVertex(
+			"equalAfterRelease",
+			["state-changing-candidate-replay"],
+			baseDependency,
+			1_700_000_011_008
+		);
+		const history = [...baseHistory, replayBarrier];
+		const compact = rehydrationRaceReplica();
+		await compact.applyVertices([...history]);
+		const dependency = history.at(-1)?.hash;
+		if (dependency === undefined) throw new Error("Expected a complete compact-history fixture");
+
+		const control = raceControl("state-changing-rehydration");
+		const raced = await signedRaceVertex(
+			"appendBeforeRelease",
+			["state-changing-rehydration", 808],
+			dependency,
+			1_700_000_011_009
+		);
+		const notifications: string[] = [];
+		compact.subscribe((_object, _origin, vertices) => {
+			notifications.push(...vertices.map(({ hash }) => hash));
+		});
+
+		const inFlightApply = compact.applyVertices([raced]);
+		await control.entered.promise;
+		const candidateReplay = raceControl("state-changing-candidate-replay");
+		const inFlightRehydration = compact.rehydrateHistory([...history]);
+		await candidateReplay.entered.promise;
+		control.release.resolve();
+		await expect(inFlightApply).resolves.toEqual({ applied: true, invalid: [], missing: [] });
+		candidateReplay.release.resolve();
+		await expect(
+			inFlightRehydration,
+			"a candidate that excludes an already-visible state change must not replace the installed runtime"
+		).resolves.toMatchObject({ status: "rejected" });
+		expect(compact.historyStorage).toBe("compact");
+		expect(compact.historyInventory.knownHashes).toContain(raced.hash);
+		expect(compact.readHistory([raced.hash])).toMatchObject({ status: "available" });
+		expect(notifications).toContain(raced.hash);
+		expect(compact.drp?.query_values()).toContain(808);
+	});
+
+	it("applies, inventories, serves and rehydrates a non-racing value-equal operation", async () => {
+		vi.stubEnv("TS_DRP_CHECKPOINT_SUFFIX_SIZE", "2");
+		const history = await signedCompactHistory(author);
+		const compact = rehydrationRaceReplica();
+		await compact.applyVertices([...history]);
+		const dependency = history.at(-1)?.hash;
+		if (dependency === undefined) throw new Error("Expected a complete compact-history fixture");
+
+		const control = raceControl("ordinary-value-equal");
+		control.release.resolve();
+		const ordinary = await signedRaceVertex(
+			"equalAfterRelease",
+			["ordinary-value-equal"],
+			dependency,
+			1_700_000_011_010
+		);
+		const notifications: string[] = [];
+		compact.subscribe((_object, _origin, vertices) => {
+			notifications.push(...vertices.map(({ hash }) => hash));
+		});
+
+		await expect(compact.applyVertices([ordinary])).resolves.toEqual({ applied: true, invalid: [], missing: [] });
+		await control.entered.promise;
+		expect(compact.historyInventory.knownHashes).toContain(ordinary.hash);
+		expect(compact.readHistory([ordinary.hash])).toMatchObject({ status: "available" });
+		expect(notifications).toContain(ordinary.hash);
+		await expect(compact.rehydrateHistory([...history, ordinary].reverse())).resolves.toEqual({
+			historyStorage: "full",
+			status: "complete",
+		});
+		expect(compact.readHistory([ordinary.hash])).toMatchObject({ status: "available" });
+	});
+
 	it("rejects every incomplete or unauthenticated attempt without changing compact state", async () => {
 		const attempts = [
 			["partial", "incomplete"],
