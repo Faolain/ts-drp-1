@@ -22711,26 +22711,70 @@ is load-bearing and must not be widened. Phase 1i-a is reclosed at `685098a`;
 Phase 1i-b GREEN may resume from frozen tests-only RED `fb0f662` and its current
 exact sentinel.
 
-## Next Agent Prompt — Phase 1i-b compact-history GREEN
+**Phase 1i-b compact-history production GREEN checkpoint.** Distinct fresh
+Codex-high commit `54c894e` changes exactly twelve production files by 534
+insertions / 68 deletions. Public object/node configuration now exposes the
+correlated additive `history_storage: "full" | "compact"` capability; compact
+is observer-only. `DRPObject` is the single owner of authenticated known-hash
+inventory, complete-payload availability, typed history reads and atomic
+rehydration. HashGraph compaction removes payload/index history without
+fabricating `Vertex` placeholders and retains complete root/current-frontier
+payloads. Compact admission authenticates a full incoming vertex, requires the
+exact retained frontier needed for execution, and then compacts again; stale or
+history-dependent paths return truthful typed unavailability. Compact
+authorship, finality and pruned-history sync service are denied. Successful
+rehydration builds a separate full observer through normal signature/hash/
+ancestry/replay checks, requires exact inventory and converged state, then
+atomically adopts it without writer/finality promotion. Full/writer mode keeps
+the established `vertices/getVertex` path. `SYNC_REJECT` now carries a reason
+and missing hashes; protobuf source and generated runtime round-trip exactly.
 
-Use a fresh Codex-high production-only GREEN against frozen tests-only RED
-`fb0f662` plus all later preservation lineage. Implement the explicit additive
-`history_storage: "full" | "compact"` capability, allowed only with observer
-mode. A compact observer authenticates every incoming full vertex but exposes
-truthful authenticated inventory separately from locally available complete
-payloads; pruned history returns typed unavailable/unknown results, cannot be
-served, authored from, promoted or represented by partial `Vertex` objects.
-Rehydration is atomic and reverifies signatures, hashes, ancestry and
-convergence before restoring existing full-history observer APIs, without
-writer/finality promotion. Preserve truthful `SYNC_REJECT`, live/sync admission
-and full/writer defaults. First re-read the frozen RED and current 11F/2P/1S
-sentinel to derive exact public types and owners; do not infer from this summary
-or resurrect the rejected placeholder prototype. Run fast tests/typechecks,
-lint and proportional preservation to `.log`; the opt-in compact 100k `<25%`
-gate runs once only after fast GREEN gates and a fresh build. Do not touch the
-five ordinary-suite debt above, the six inherited Phase 1d residuals, D.73 or
-optional 0n. Then run fresh Grok, exact Kimi 3 and final Opus. Do not schedule
-Fable.
+Fast focused behavior is 13 passed / 1 opt-in skip, proportional preservation
+is 69/69, reclosed Phase 1i-a is 22 passed / 1 skip and direct preservation is
+49/49. Fresh ordered types-to-validation-to-object-to-node builds pass with
+artifact mtimes/hashes newer than source. Types/validation and production
+typechecks are clean. Exact frozen test-only diagnostics remain object 5 / node
+2: three are deliberate runtime-invalid `string`/`archive` probes, while four
+come from positive helpers constructing correlated modes from independent
+unions. The public correlation was not weakened and tests were not changed.
+Touched-source lint and format/diff checks pass. Root lint is non-authoritative
+because it scans accumulated untracked `.logs` TypeScript plus unrelated repo
+debt. One merge-rollback `quarantined` assertion reproduces identically on
+pre-GREEN `08c6335` and remains separately owned.
+
+The opt-in 100k gate ran exactly once after all fast gates and passed in 572.22
+seconds. Writer and compact each know 100,000 non-root hashes and converge on
+digest `15c08830990f704d6abba6f4a6d5e72ac894115c96e1117301675848361c9b02`.
+Writer retains all 100,000 non-root payloads and 161,254,472 bytes; compact
+retains one non-root payload and 4,875,712 bytes. Ratio is
+`0.030236135094597563`, below `<25%`, and both availability reports are
+truthful. Fresh object artifact SHA-256 is
+`037f117cc8caf553340662909463cdc60372427f22c00523c6c8f7fd0e1c8a5c`;
+source-tree SHA-256 is
+`d8b897e9483495680d2069b48d916ed84681044b4b36b2543b0b0fb78af010e7`.
+Evidence is under `.logs/phase-1i-b-compact-history-green-codex-high/`; ledger
+SHA-256 is
+`371e0ffa31421deff69b154b8a4c035e742e6dd911ef4c5c86545a67002a3a78`
+and verified manifest SHA-256 is
+`17bda5b26a6db6860599c1727d7e0d5dc927f835fa650211e067bcbbb361200d`.
+Do not rerun the one-shot sample during review.
+
+## Next Agent Prompt — Phase 1i-b compact-history acceptance
+
+Review `54c894e` against frozen RED `fb0f662`, the Phase 1i amendment and all
+later Phase 1i-a preservation. Start fresh Grok 4.5/high; only after acceptance
+run exact Kimi 3/high/dual-100; only after Kimi accepts run final
+Claude-skill Opus/xhigh. Inspect configuration correlation, authenticated
+inventory versus payload availability, compact frontier admission, typed
+unknown/unavailable reads, sync reject truth, authorship/finality denial,
+compaction memory ownership, full-mode compatibility and atomic rehydration
+failure/success. Attack incomplete/reordered/duplicate/wrong-author payloads,
+inventory mismatch, stale branches and promotion attempts without growing a
+syntax matrix. Authenticate the sealed one-shot provenance but do not rerun
+100k. Classify the exact seven test-only type diagnostics, pre-existing rollback
+failure, five ordinary-suite debt and six Phase 1d residuals without folding
+them into this slice. Reviewers must not modify tracked state. A blocker returns
+to a fresh RED. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
