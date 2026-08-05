@@ -22657,20 +22657,80 @@ ledger SHA-256 is
 and verified 72-entry manifest SHA-256 is
 `68ce7eb70330ba20471fffcaa4b66d334b694144eb813bfff5a000c177f7d203`.
 
-## Next Agent Prompt — complete canonical-live GREEN acceptance
+**Complete canonical-live GREEN final acceptance and Phase 1i-a reclosure.**
+Fresh native Grok 4.5/high session
+`019fcf52-f84a-7a12-93a4-51e392416ced` accepted `685098a` with no blocker and
+both Phase 1i flags `yes`. It authenticated the full-union and exact borrowed
+identity proofs; its own Vitest attempt was read-only-sandbox denied, so its
+verdict used source proof plus sealed GREEN evidence. Native final SHA-256 is
+`6db1acb472eef6c91018e86adfe9771ca6f2f41231753b7b1ee8e2653e954972`;
+manifest SHA-256 is
+`5514e4ba58690e5d26f946806218d25bd3c5e89b428180c5c8c2ba12589ba5fa`.
 
-Review `685098a` together with `8bc3755`, tests-only lineage through `52a84bc`
-and amendment `c0d8fb1`. Start fresh Grok 4.5/high, then exact Kimi
-3/high/dual-100 only after Grok accepts, then final Claude-skill Opus/xhigh only
-after Kimi accepts. Challenge completeness of the top-level target/baseline
-union, enumerable/function/local filtering, additions/deletions/order,
-deferred-cell exact-identity proof, causal stored pairs, ACL/DRP sides,
-checkpoint/join propagation, copy/comparison meters, raw/setter/rollback and
-failure atomicity. Look for a distinct semantic counterexample rather than a
-syntax/value-type matrix. Confirm runtime remains O(top-level state), not
-O(history) or a nested graph scan, and classify the exact six inherited
-residuals. Reviewers must not modify tracked state or run 100k. A blocker
-returns to a fresh RED. Do not schedule Fable.
+Exact Kimi 3/high/dual-100 session
+`79b207ad-f209-4783-aeb4-a06ec7e0acfe` independently accepted with both flags
+`yes`, after auditing the complete union, deferred identity, comparison-event
+metering and residual hashes. It deliberately did not rerun the long D.92.2
+analyzer. Native final SHA-256 is
+`759c4e3fb8c79c4240bbb59eb17d1105c96876a6fbeed9a0e507378b7eb32ed9`;
+manifest SHA-256 is
+`da5bd03c93489089eea1db00ad943e193e9ba0ea18a31b944a9ba776963e99bb`.
+
+Final Claude-skill Opus 5/xhigh session
+`98d7428e-7070-4430-9d3d-6ca1c6fa643f` accepted after extended adversarial
+source inspection and disposable probes. It confirmed value-equal,
+conditional-no-write, add/remove/order, causal stored-pair and checkpoint/join
+convergence. A broad disposable run entered the known long-worker shape and was
+terminated rather than treated as evidence. Opus found that canonical-live
+comparison events can encode substantial work while that publication record's
+`comparedKeys` and `comparisonPasses` remain zero. Neutral same-session
+adjudication against the exact D.92.4 contract classified those fields as
+raw-egress-widening counters: ordinary incremental/fallback equality paths also
+report zero, while actual equality and copy work is enforced by comparison and
+copy events. This is a genuine later meter-scope/documentation decision, not a
+`685098a` blocker. The authoritative neutral result is `ACCEPTED`,
+`PHASE_1I_A_IMPLEMENTATION_ACCEPTED=yes`, `PHASE_1I_A_MAY_RECLOSE=yes`; a
+zero-tool same-session clarification returned
+`PHASE1I_B_GREEN_MAY_RESUME=yes`. Authoritative result SHA-256 is
+`71f2f072b7ce8bef0adc7050ba07cc0887ca0c35ca5cafc8c47095d67ae43e3f`;
+clarification SHA-256 is
+`12231b2f0ab1268efe536fe55b4accf2c41a818dc31fda21a2e0f0c45e4fb1d4`.
+The initial envelope disclosed an automatic 25-output-token Haiku helper with
+no substantive transcript role. A controller prompt that prematurely demanded
+retraction was preserved as superseded process evidence; the neutral
+adjudication explicitly allowed either verdict and is authoritative.
+
+All three reviews preserved tracked/index/source/stash state and ran no 100k.
+The exact six inherited residuals remain separately owned. Opus also reproduced
+four `actiontypes.test.ts` failures and one
+`operation-argument-isolation.test.ts` replay failure at both `8bc3755` and the
+pre-`685098a` RED checkpoint, proving they are not caused by complete capture;
+keep this five-failure ordinary-suite debt visible for a later bounded owner
+rather than folding it into Phase 1i-b. The exact borrowed-entry identity guard
+is load-bearing and must not be widened. Phase 1i-a is reclosed at `685098a`;
+Phase 1i-b GREEN may resume from frozen tests-only RED `fb0f662` and its current
+exact sentinel.
+
+## Next Agent Prompt — Phase 1i-b compact-history GREEN
+
+Use a fresh Codex-high production-only GREEN against frozen tests-only RED
+`fb0f662` plus all later preservation lineage. Implement the explicit additive
+`history_storage: "full" | "compact"` capability, allowed only with observer
+mode. A compact observer authenticates every incoming full vertex but exposes
+truthful authenticated inventory separately from locally available complete
+payloads; pruned history returns typed unavailable/unknown results, cannot be
+served, authored from, promoted or represented by partial `Vertex` objects.
+Rehydration is atomic and reverifies signatures, hashes, ancestry and
+convergence before restoring existing full-history observer APIs, without
+writer/finality promotion. Preserve truthful `SYNC_REJECT`, live/sync admission
+and full/writer defaults. First re-read the frozen RED and current 11F/2P/1S
+sentinel to derive exact public types and owners; do not infer from this summary
+or resurrect the rejected placeholder prototype. Run fast tests/typechecks,
+lint and proportional preservation to `.log`; the opt-in compact 100k `<25%`
+gate runs once only after fast GREEN gates and a fresh build. Do not touch the
+five ordinary-suite debt above, the six inherited Phase 1d residuals, D.73 or
+optional 0n. Then run fresh Grok, exact Kimi 3 and final Opus. Do not schedule
+Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
