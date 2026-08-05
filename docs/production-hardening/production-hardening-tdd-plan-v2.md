@@ -23957,19 +23957,48 @@ and evidence-manifest SHA-256 is
 Evidence is under
 `.logs/phase-1m-a-restore-race-corrective-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a restore-race corrective GREEN
+## Phase 1m-a restore-race corrective GREEN checkpoint — review pending
 
-Use a distinct fresh Codex-high production-only owner. Keep all three RED
-files, plan, manifests/lockfile and unrelated production frozen. Change only
-the existing signed-disable production owner with the smallest coherent
-lifecycle-ordering primitive so an older overlapping restore result or failure
-cannot overwrite/block a newer committed local latch. Do not encode a test
-fixture check, prescribe a seed/interleaving, or broaden into general
-concurrency, persistence, restart, transport, compaction or version-runtime
-infrastructure. The corrective owner must become 3/3, original owner stay
-23/23 and complete control-plane become 74/74. Run ordered affected
-build/typecheck/lint/format/diff/browser gates to `.logs`; no sealed 100k.
-Commit production only with exact evidence. No Fable.
+Freeze distinct fresh Codex-high production-only GREEN
+`865b2dbf8e9b61efb2a657d643ddfaff57788f5e` on documented RED HEAD
+`b33942f`. Its exact scope is seven insertions / two deletions in the existing
+`packages/control-plane/src/signed-disable.ts` owner. All three RED files,
+plan, manifests/lockfile, exports/dependencies and unrelated production remain
+byte-identical.
+
+The controller now owns one identity publication token. Each `restore()` takes
+a fresh token and immediately retains the existing fail-closed blocked state;
+its later success or failure may publish only while that token is still
+current. An exact successful CAS replaces the token immediately before
+publishing the cloned committed latch, invalidating every older pending
+restore. Failed, rejected or malformed commits do not replace the token or
+change prior semantics. This is lifecycle ordering inside the 1m-a owner, not
+storage, restart or general concurrency infrastructure.
+
+Authoritative and postcommit results are corrective 3/3, original frozen owner
+23/23 and complete control-plane 74/74. Ordered `types` → `canonical` →
+`control-plane` builds and typechecks pass; targeted ESLint has zero output;
+Prettier, exact production-only diff, 94.6 KB browser bundle and built-export
+smoke pass. Neither sealed 100k workload ran. Production SHA-256 is
+`693a732b8eb176fe3afb16538634d4823ac18edd42377b67dbd814aa074cb11b`
+and evidence-manifest SHA-256 is
+`34cc78328c9cd5dfb155bd068210625f066bfe369e8d288b21019c08252bdfc3`.
+Evidence is under
+`.logs/phase-1m-a-restore-race-corrective-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1m-a corrected preliminary reviews
+
+Run new fresh independent Grok 4.5/high and exact legacy-CLI Kimi
+3/high/dual-100 read-only reviews at fixed HEAD. Reauthenticate the complete
+RED/GREEN/corrective lineage and evidence. Concentrate adversarial probes on
+overlapping restore success/rejection/throw, multiple restore ordering,
+concurrent successful/losing CAS calls, token invalidation timing,
+commit-before-effective and inability of any older async completion to regress
+a newer committed latch. Recheck the previously accepted canonical/crypto,
+detachment, bounded-state, API, dependency/lock and browser boundaries without
+reopening deferred durability/transport/compaction/version-runtime work. No
+edits, delegation/Fable or sealed 100k. Final Opus/xhigh begins only if both
+fresh preliminary reviewers accept the corrected candidate.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
