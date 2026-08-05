@@ -23888,20 +23888,61 @@ and evidence-manifest SHA-256 is
 `8d4a4fd93bec08febcdca9697e54ccc68d2d6d626a218cb00ab35c0d888253cd`.
 Evidence is under `.logs/phase-1m-a-signed-disable-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1m-a preliminary reviews
+## Phase 1m-a preliminary review finding — corrective restore-race RED required
 
-Run fresh independent Grok 4.5/high and exact legacy-CLI Kimi 3/high/dual-100
-read-only reviews at the fixed candidate HEAD. Authenticate candidate/evidence
-identity and frozen RED invariance. Adversarially inspect strict canonical
-shape/limits, signature/domain/suite binding, raw-key and envelope detachment,
-constructor validation, counter/replay/equivocation semantics, restored-state
-validation, concurrent CAS outcomes, commit-before-effective ordering,
-latest-only bounded state, direct dependency/lockfile ownership and browser
-compatibility. Seek causal bypasses beyond the frozen matrix with bounded
-coverage-disabled probes only when needed. Reject any implicit durability,
-propagation, compaction or version-runtime claim. Do not edit, delegate/Fable
-or run sealed 100k workloads. Opus/xhigh starts only if both preliminary
-reviewers accept.
+Fresh native Grok 4.5/high session
+`0ee09398-a04e-48f4-827a-d28cf1e34279` returned `ACCEPTED` /
+`PHASE1MA_MAY_CLOSE: yes` / `OPUS_MAY_START: yes`. It authenticated the full
+lineage, evidence, 23/23 and 71/71 results, browser bundle and dependency/lock
+ownership, and found no issue in canonical/crypto binding, detachment, CAS
+winner behavior or the frozen matrix. Result SHA-256 is
+`a43d23d0bbbb9362fa26b09faf637b37365ec2279c0393970b4c38d6e22dda8d`
+and artifact-manifest SHA-256 is
+`d7594c3919dad49c127eb411013058daca4b84e855493c1380bf4a327f99d7df`.
+Its read-only sandbox denied a direct Vitest rerun at Vite's temp write, so it
+used bounded inline probes plus authenticated GREEN evidence. No helper,
+subagent, web call or sealed workload ran.
+
+Grok's own probe nevertheless reproduced an overlapping `restore()`/`apply()`
+race and classified it as a nonblocking Phase 2 restoration concern. That
+classification is superseded by the causal exact Kimi result below. The race
+does not require persistence, restart or a compaction consumer: it regresses
+the current Phase 1m-a controller's observable local latch after a successful
+atomic commit, directly violating commit-before-effective and fail-closed
+monotonicity.
+
+Fresh exact legacy-CLI Kimi 3/high/dual-100 session
+`45eaf7dc-58c7-4f9f-b72e-53c2acd2fa67` returned `CHANGES_REQUESTED` /
+`PHASE1MA_MAY_CLOSE: no` / `OPUS_MAY_START: no`. Its corrected bounded probe
+started a load that captured enabled/counter-0, committed a valid disable to
+disabled/counter-1, then resolved the older load. `restore()` overwrote local
+state back to enabled/counter-0 while the port remained disabled/counter-1;
+reapplying the same command returned `state-commit-failed` until another
+restore. This is a genuine local fail-open window. Final SHA-256 is
+`872740001ddbd3fd815e08f7c9aaf6a980100fe5aec9618f7fe8514549fa09bd`
+and verified manifest SHA-256 is
+`c7933c842d4b008821e08f0954f93fe69fc089f609241ac5c79a0fa177442c44`.
+Everything else in the candidate was accepted. Both reviews preserved
+HEAD/index/status/stash/protected-untracked invariance; evidence is under
+`.logs/phase-1m-a-signed-disable-green-{grok45-high,kimi3-high-100}-review/`.
+Final Opus is correctly skipped.
+
+## Next Agent Prompt — Phase 1m-a restore-race corrective RED
+
+Use a fresh Codex-high tests-only owner. Preserve both original frozen RED
+files, production, plan, generated files and manifests/lockfile. Add one narrow
+causal owner using the real `SignedDisableController` and an explicitly
+non-production deferred-load/atomic-CAS fixture. Pin that a valid disable which
+commits after an older restore begins can never be overwritten by the late
+enabled/counter-0 load; after both operations settle, consumer and port remain
+disabled/counter-1 and the same envelope classifies as replay rather than
+`state-commit-failed`. Cover the adjacent late load-rejection/throw case only
+to prove it cannot block or re-enable a newer committed latch. Do not prescribe
+serialization versus an operation-generation guard, add general concurrency
+infrastructure, or reopen durability/transport/compaction/version-runtime
+scope. Run the causal RED, frozen owner, full control-plane preservation and
+affected build/typecheck/lint/format/diff gates to `.logs`; no sealed 100k.
+Commit tests only with exact evidence. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
