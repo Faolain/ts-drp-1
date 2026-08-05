@@ -22759,22 +22759,42 @@ and verified manifest SHA-256 is
 `17bda5b26a6db6860599c1727d7e0d5dc927f835fa650211e067bcbbb361200d`.
 Do not rerun the one-shot sample during review.
 
-## Next Agent Prompt — Phase 1i-b compact-history acceptance
+**Phase 1i-b GREEN acceptance rejection.** Fresh native Grok 4.5/high session
+`aa579eb0-ac1a-410a-9422-15efca75990b` initially accepted `54c894e`, then
+correctly withdrew that verdict after its own public capability-mutation probe.
+A real compact observer knew seven authenticated hashes but retained only two
+payloads. Ordinary assignment `object.historyStorage = "full"` succeeded;
+`rehydrateHistory()` then falsely returned complete/full while five payloads
+remained unavailable. Node sync took the forged full-history path and silently
+omitted pruned payloads instead of returning compact `SYNC_REJECT`; authorship
+and finality remained denied, exposing a contradictory pseudo-full capability.
+The authoritative superseding result is `CHANGES_REQUESTED`,
+`PHASE1I_B_MAY_CLOSE=no`, `NEXT_PHASE_MAY_RESUME=no`. Manifest SHA-256 is
+`005ac039c68ff0860cb4ac86686f0a2af1cb6c80776f9e1fe7da8c607efbe425`.
+Tracked/index/protected state remained invariant and 100k was not rerun. Kimi
+and Opus were correctly skipped.
 
-Review `54c894e` against frozen RED `fb0f662`, the Phase 1i amendment and all
-later Phase 1i-a preservation. Start fresh Grok 4.5/high; only after acceptance
-run exact Kimi 3/high/dual-100; only after Kimi accepts run final
-Claude-skill Opus/xhigh. Inspect configuration correlation, authenticated
-inventory versus payload availability, compact frontier admission, typed
-unknown/unavailable reads, sync reject truth, authorship/finality denial,
-compaction memory ownership, full-mode compatibility and atomic rehydration
-failure/success. Attack incomplete/reordered/duplicate/wrong-author payloads,
-inventory mismatch, stale branches and promotion attempts without growing a
-syntax matrix. Authenticate the sealed one-shot provenance but do not rerun
-100k. Classify the exact seven test-only type diagnostics, pre-existing rollback
-failure, five ordinary-suite debt and six Phase 1d residuals without folding
-them into this slice. Reviewers must not modify tracked state. A blocker returns
-to a fresh RED. Do not schedule Fable.
+The capability mode must be runtime-owned and externally immutable. No public
+assignment, reflective setter or alias may transition compact to full. Only a
+successful atomic rehydration may change payload availability and history mode,
+and it may report complete only after every authenticated inventory hash has a
+verified complete payload in the adopted full observer. Failed/empty/partial
+rehydration preserves compact denial and truthful sync rejection.
+
+## Next Agent Prompt — Phase 1i-b capability-state corrective RED
+
+Use a fresh Codex-high tests-only RED against `54c894e`. Add one bounded public
+real-object case that compacts authenticated history, proves a non-empty
+known-minus-available set, attempts ordinary and reflective history-mode
+mutation, calls empty/partial rehydration and verifies the mode/inventory/
+availability are unchanged. Node sync must continue returning truthful
+`SYNC_REJECT` with the missing hashes, and authorship/finality must remain
+denied. Preserve the existing successful complete rehydration as a positive
+control that alone restores full-observer read/service/authorship behavior
+without writer/finality promotion. Do not add mutation-spelling variants or
+rerun 100k. Do not edit production/plan. After RED, use a distinct Codex-high
+GREEN with one private capability-state owner and no compatibility setter, then
+restart Grok, exact Kimi 3 and Opus. Do not schedule Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
