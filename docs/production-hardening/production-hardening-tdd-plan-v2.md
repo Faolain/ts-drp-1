@@ -23635,26 +23635,60 @@ results SHA-256 is
 and verified 50-entry manifest SHA-256 is
 `eef1ad37d29aee8d7a14771ec1d45ab401329c0611149d75fcc64007019c9cea`.
 
-## Next Agent Prompt — Phase 1l comprehensive corrective GREEN
+## Phase 1l comprehensive corrective GREEN checkpoint — review pending
 
-Start a distinct fresh Codex-high GREEN from `bef5950a`. In
-`DRPNode.createObject`, reject an omitted-ACL caller-supplied ID unless
-`creatorFromObjectID(id)` equals the local peer, before object construction or
-publication side effects. Preserve generated/self-bound omission and explicit
-ACL authority. Keep connect behavior from `29bce202` unchanged.
+Freeze distinct fresh Codex-high GREEN
+`423cb25bce3a8352299cbbee27715c9973f60aa7` against comprehensive RED
+`bef5950a`. Its exact six-file scope is 36 insertions / four deletions. The
+seven-line production guard rejects a caller-supplied create ID when ACL is
+omitted unless `creatorFromObjectID(id)` equals the local peer. It executes
+after schema validation and before object construction or publication. The
+same commit declares the direct `@ts-drp/object` network-spike dependency,
+adds only its three-line lockfile importer edge, and gives each affected grid
+create/connect replica a fresh permissionless ACL.
 
-Also complete the single frozen network-spike package migration above: declare
-`@ts-drp/object` as a direct workspace dependency, update only the necessary
-lockfile edge, and use fresh permissionless ACLs for the shared grid create and
-connect paths plus the two affected tests. Do not re-export ACL factories from
-node, use a transitive/deep import, add a mode flag, alter the low-level object
-default, adopt remote roots, or change any frozen RED. The exact causal owner
-must become 4/4; rerun the comprehensive 76P/2S owners, restored network-spike
-4P/1S, prior 44/44, frozen 6/6 and inherited Phase 1n 3F/3P sentinel. Run
-ordered builds/typecheck/lint/format/diff coverage-disabled to `.logs`, without
-either sealed 100k workload. Commit the bounded GREEN candidate, then start
-fresh Grok 4.5/high, exact Kimi 3/high/dual-100 and gated final Opus/xhigh. No
-Fable.
+The causal owner is 4/4; the frozen original owner is 6/6; comprehensive owners
+are 76 passed / two skips; restored network-spike blockers are four passed /
+one opt-in live skip; prior preservation is 44/44; and the inherited Phase 1n
+sentinel remains exact 3 failed / 3 passed. Final ordered `types`, `object`,
+`node` and `network-spike` builds pass. Types and network-spike typecheck pass;
+object/node retain exactly the inherited five/two Phase 1i-b diagnostics.
+ESLint has zero errors and six inherited network-spike JSDoc warnings. Touched
+formatting, diff and frozen-lock checks pass. Neither sealed 100k workload ran.
+
+Tooling gotcha: a lockfile-only install intentionally did not materialize the
+new package-local workspace symlink, so the first network-spike build failed
+module resolution. A normal script-free workspace refresh installed the
+declared edge and the final ordered build passed. The pnpm-generated lockfile
+retains its pre-existing whole-file Prettier mismatch; GREEN did not perform an
+unrelated bulk lockfile rewrite.
+
+Evidence is under `.logs/phase-1l-comprehensive-green-codex-high/`; candidate
+and committed patch SHA-256 is
+`091c786fbcf61ff0ff05f0b23cb7a6f370c69f9271e73d00c420d446d71c1d45`,
+final node source SHA-256 is
+`876763e84e03b88b55fb2384fe1e04821460d7052d379f7307782cadaf330625`,
+comprehensive-owner log SHA-256 is
+`bb009004350030ff12764be808d8a43834be6805c15386653d2dc0532f3e8aab`
+and verified 51-entry manifest SHA-256 is
+`7fbfdceb85731da018f0090e0b701228652f588d57d4e1d6ac090cab67d76f01`.
+
+## Next Agent Prompt — Phase 1l independent acceptance reviews
+
+Review fixed HEAD without edits or commits. Fresh Grok 4.5/high and exact Kimi
+3/high/dual-100 must independently inspect the complete Phase 1l lineage,
+production guard, create/connect contract, direct package dependency, lockfile
+edge, every network-spike migration, frozen REDs, comprehensive census and
+evidence manifests. Look specifically for another explicit-ID caller missed by
+the census; publication before rejection; schema-order changes; generated or
+self-bound regression; explicit-ACL override regression; create/connect root
+mismatch; shared mutable ACL state; an undeclared/deep package edge; and a
+test-only migration that changes authorization semantics. Runtime probes may
+be bounded and coverage-disabled; do not rerun either sealed 100k workload.
+Preserve HEAD, index, tracked status, protected stash and protected untracked
+files. Return `ACCEPTED` or `CHANGES_REQUESTED` with exact causal evidence.
+Only if both preliminary reviews accept, run final Claude-skill Opus/xhigh
+adversarial review. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
