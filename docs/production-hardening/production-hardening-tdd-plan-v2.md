@@ -23673,22 +23673,62 @@ comprehensive-owner log SHA-256 is
 and verified 51-entry manifest SHA-256 is
 `7fbfdceb85731da018f0090e0b701228652f588d57d4e1d6ac090cab67d76f01`.
 
-## Next Agent Prompt — Phase 1l independent acceptance reviews
+## Phase 1l preliminary acceptance reviews — accepted
 
-Review fixed HEAD without edits or commits. Fresh Grok 4.5/high and exact Kimi
-3/high/dual-100 must independently inspect the complete Phase 1l lineage,
-production guard, create/connect contract, direct package dependency, lockfile
-edge, every network-spike migration, frozen REDs, comprehensive census and
-evidence manifests. Look specifically for another explicit-ID caller missed by
-the census; publication before rejection; schema-order changes; generated or
-self-bound regression; explicit-ACL override regression; create/connect root
-mismatch; shared mutable ACL state; an undeclared/deep package edge; and a
-test-only migration that changes authorization semantics. Runtime probes may
-be bounded and coverage-disabled; do not rerun either sealed 100k workload.
-Preserve HEAD, index, tracked status, protected stash and protected untracked
-files. Return `ACCEPTED` or `CHANGES_REQUESTED` with exact causal evidence.
-Only if both preliminary reviews accept, run final Claude-skill Opus/xhigh
-adversarial review. No Fable.
+Fresh native Grok 4.5/high returned `ACCEPTED` /
+`PHASE1L_MAY_CLOSE=yes` / `OPUS_MAY_START=yes` in session
+`9aec7b7a-86fc-4430-9734-67d0984426f0`. It reconciled all 80 census calls,
+guard and schema ordering, pre-publication rejection, generated/self-bound and
+explicit-ACL paths, fresh keyed/permissionless fixture semantics, and the
+direct network-spike dependency plus minimal lock edge. Its out-of-repository
+built-dist probe passed 39/39. A direct Vitest rerun was read-only-sandbox
+blocked at `.vite-temp`, so it authenticated the complete GREEN logs instead;
+this is environmental, not candidate evidence. Result SHA-256 is
+`7bfb13ff1b26a807a2c587475f240f352869243a9e1be91cedbdeedd7f320f78`
+and artifact-integrity manifest SHA-256 is
+`5d42be5ae7a882d4480f5f41de8aa318ba498474b116583b1537084ac9f44745`.
+
+Exact legacy-CLI Kimi 3/high/dual-100 independently returned `ACCEPTED` /
+`PHASE1L_MAY_CLOSE=yes` / `OPUS_MAY_START=yes` in native session
+`99dd11bb-4d12-4a7a-9c99-8ee1edbab82e`. It independently matched the same 80
+callers, pure Zod validation precedence, guard-before-publication behavior,
+root agreement, fresh/keyed ACL migrations, and package/lockfile boundary. It
+reran no tests because causal tracing plus authenticated evidence was
+sufficient. Final SHA-256 is
+`eed4d4840e6f8967e13ff22aed6f04525217d487be203984af8cf9c95c3e42ae`
+and verified authoritative manifest SHA-256 is
+`740d18a3e24596f4bc6d9764d3234e87228b87083bc31f86667bf88ea4b7205e`.
+Kimi disclosed one transient `/tmp/.kimi-review-diff-check` scratch artifact,
+immediately removed with no repository impact.
+
+Both reviews found no blocker and preserved HEAD `84c8fed`, tree/index,
+relevant hashes, protected stash and protected untracked state. Neither ran a
+sealed 100k workload or used helpers/subagents/Fable. Preserve these accepted
+greenfield boundaries: empty IDs remain validation-first; arbitrary/plain IDs
+require explicit ACL at create/connect; the narrower RPC subscribe wrapper has
+no ACL parameter and therefore intentionally supports creator-bound IDs only.
+There is no legacy plain-ID compatibility obligation or deferred shim. An
+explicit-ACL creator likewise requires a coordinated explicit-ACL joiner
+because ACL mode is not encoded in the object ID.
+
+Evidence is under
+`.logs/phase-1l-comprehensive-green-{grok45-high,kimi3-high-100}-review/`.
+
+## Next Agent Prompt — Phase 1l final Opus/xhigh acceptance review
+
+Use the Claude skill to run one fresh Opus/xhigh read-only adversarial review
+of the complete Phase 1l lineage at fixed HEAD. Authenticate the requested
+model/effort and disclose any automatic helper usage; no Task/Agent/Fable
+delegation. Inspect production, package/lockfile and all frozen RED/GREEN
+evidence plus both accepted preliminary reviews. Recount callers and seek a
+causal bypass or semantic mismatch rather than proposing legacy support.
+Specifically challenge rejection-before-publication, schema ordering,
+generated/self-bound root agreement, explicit-ACL authority, mutable ACL
+aliasing, keyed-finality preservation, network-spike create/connect parity,
+package ownership and lockfile minimality. Bounded coverage-disabled probes
+only if needed; do not run sealed 100k. Preserve HEAD/index/status/stash and
+return `ACCEPTED` or `CHANGES_REQUESTED`, `PHASE1L_MAY_CLOSE=yes/no`, and exact
+causal evidence. No Fable.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
