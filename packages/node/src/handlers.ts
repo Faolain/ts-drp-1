@@ -1,4 +1,5 @@
 import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
+import { directSyncProtocolFor, type SelectedSyncProtocol } from "@ts-drp/network";
 import {
 	AdoptionCommitExhaustedError,
 	ApplyInvariantError,
@@ -9,7 +10,6 @@ import {
 } from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
-	type AggregatedAttestation,
 	type ApplyResult,
 	Attestation,
 	AttestationUpdate,
@@ -34,15 +34,17 @@ import { MessageSchema } from "@ts-drp/validation/message";
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
 import { sendSyncObject } from "./operations.js";
+import { buildSyncResponseChunksForVertices } from "./sync-codec.js";
 import {
 	advertisedTheseHeads,
 	completePresentExactRequests,
-	markHeadsProtocol,
 	queueExactRequests,
 	recordBranchCuts,
 	recordSharedHeads,
-	usesHeadsProtocol,
 } from "./sync-state.js";
+import { signGeneratedVertices } from "./vertex-egress.js";
+
+export { signGeneratedVertices } from "./vertex-egress.js";
 
 export { SYNC_RECOVERY_COOLDOWN_MS } from "./sync-state.js";
 
@@ -51,6 +53,7 @@ const metrics = new OpentelemetryMetrics("@ts-drp/node/handlers");
 interface HandleParams {
 	node: DRPNode;
 	message: Message;
+	syncSelection?: SelectedSyncProtocol;
 }
 
 interface IHandlerStrategy {
@@ -219,8 +222,13 @@ export const messageHandlers: Record<MessageType, HandlerRegistryEntry | undefin
  * Handle message and run the handler
  * @param node - The DRP node instance handling the request
  * @param message - The incoming message
+ * @param syncSelection - Explicit selected-stream truth for trusted in-process callers
  */
-export async function handleMessage(node: DRPNode, message: Message): Promise<void> {
+export async function handleMessage(
+	node: DRPNode,
+	message: Message,
+	syncSelection: SelectedSyncProtocol | undefined = directSyncProtocolFor(message)
+): Promise<void> {
 	if (isInvalidPeerExhausted(node, message.sender)) return;
 	const validation = MessageSchema.safeParse(message);
 	if (!validation.success) {
@@ -233,7 +241,7 @@ export async function handleMessage(node: DRPNode, message: Message): Promise<vo
 		log.error("::messageHandler: Invalid operation");
 		return;
 	}
-	const result = entry.handler({ node, message: validatedMessage });
+	const result = entry.handler({ node, message: validatedMessage, syncSelection });
 	if (isPromise(result)) {
 		await result;
 	}
@@ -447,10 +455,13 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
  */
 async function syncHandler(params: HandleParams): Promise<void> {
 	const syncMessage = Sync.decode(params.message.data);
+	const selected = params.syncSelection;
 	if (
-		syncMessage.heads.length === 0 &&
-		syncMessage.sharedHeads.length === 0 &&
-		syncMessage.requestedHashes.length === 0
+		selected?.mode === "fallback" ||
+		(selected === undefined &&
+			syncMessage.heads.length === 0 &&
+			syncMessage.sharedHeads.length === 0 &&
+			syncMessage.requestedHashes.length === 0)
 	) {
 		await fullInventorySyncHandler(params, syncMessage);
 		return;
@@ -472,7 +483,7 @@ async function sendHistoryUnavailable(
 		).finish(),
 		objectId,
 	});
-	await node.networkNode.sendMessage(sender, rejection);
+	await node.sendNegotiatedSyncResponse(sender, rejection);
 }
 
 async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sync): Promise<void> {
@@ -484,7 +495,6 @@ async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sy
 	}
 
 	const localHeads = object.getHistoryHeads();
-	markHeadsProtocol(node, object.id, sender);
 	const knownRemoteHeads = syncMessage.heads.filter((hash) => object.getVertex(hash) !== undefined);
 	const unknownRemoteHeads = syncMessage.heads.filter((hash) => object.getVertex(hash) === undefined);
 	const verifiedSharedHeads = syncMessage.sharedHeads.filter((hash) => object.getVertex(hash) !== undefined);
@@ -520,20 +530,8 @@ async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sy
 	const selected = [...selectedByHash.values()];
 
 	if (selected.length !== 0) {
-		await signGeneratedVertices(node, selected);
-		const response = Message.create({
-			sender: node.networkNode.peerId,
-			type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
-			data: SyncAccept.encode(
-				SyncAccept.create({
-					requested: selected,
-					attestations: getAttestations(object, selected),
-					requesting: [],
-				})
-			).finish(),
-			objectId: object.id,
-		});
-		await node.networkNode.sendMessage(sender, response);
+		const responses = await buildSyncResponseChunksForVertices(node, object, selected);
+		for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
 	}
 
 	const queuedUnknown = queueExactRequests(node, object.id, sender, unknownRemoteHeads);
@@ -570,14 +568,12 @@ async function fullInventorySyncHandler({ node, message }: HandleParams, syncMes
 				).finish(),
 				objectId: object.id,
 			});
-			node.networkNode.sendMessage(sender, rejection).catch((error) => {
+			node.sendNegotiatedSyncResponse(sender, rejection).catch((error) => {
 				log.error("::syncHandler: Error sending history-unavailable rejection", error);
 			});
 			return;
 		}
 	}
-
-	await signGeneratedVertices(node, object.vertices);
 
 	const localVertices = object.vertices;
 
@@ -600,30 +596,14 @@ async function fullInventorySyncHandler({ node, message }: HandleParams, syncMes
 
 	if (requested.size === 0 && requesting.length === 0) return;
 
-	const attestations = getAttestations(object, [...requested]);
-
-	const messageSyncAccept = Message.create({
-		sender: node.networkNode.peerId,
-		type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
-		// add data here
-		data: SyncAccept.encode(
-			SyncAccept.create({
-				requested: [...requested],
-				attestations,
-				requesting,
-			})
-		).finish(),
-		objectId: object.id,
-	});
-
-	node.networkNode.sendMessage(sender, messageSyncAccept).catch((e) => {
-		log.error("::syncHandler: Error sending message", e);
-	});
+	const responses = await buildSyncResponseChunksForVertices(node, object, [...requested], requesting);
+	for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
+	const sentRequested = responses.flatMap((response) => SyncAccept.decode(response.data).requested);
 
 	node.safeDispatchEvent(NodeEventName.DRP_SYNC, {
 		detail: {
 			id: object.id,
-			requested,
+			requested: new Set(sentRequested),
 			requesting,
 		},
 	});
@@ -633,8 +613,8 @@ async function fullInventorySyncHandler({ node, message }: HandleParams, syncMes
   data: { id: string, operations: {nonce: string, fn: string, args: string[] }[] }
   operations array contain the full remote operations array
 */
-async function syncAcceptHandler({ node, message }: HandleParams): Promise<void> {
-	if (!isTracingEnabled()) return syncAcceptHandlerUntraced({ node, message });
+async function syncAcceptHandler(params: HandleParams): Promise<void> {
+	if (!isTracingEnabled()) return syncAcceptHandlerUntraced(params);
 
 	return metrics.traceFunc(
 		"node.syncAcceptHandler",
@@ -643,10 +623,10 @@ async function syncAcceptHandler({ node, message }: HandleParams): Promise<void>
 			span.setAttribute("drp.object.id", candidate.objectId);
 			span.setAttribute("drp.message.sender", candidate.sender);
 		}
-	)({ node, message });
+	)(params);
 }
 
-async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promise<void> {
+async function syncAcceptHandlerUntraced({ node, message, syncSelection }: HandleParams): Promise<void> {
 	const { data, sender } = message;
 	const syncAcceptMessage = SyncAccept.decode(data);
 	const object = node.get(message.objectId);
@@ -662,7 +642,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	let missing: string[] = [];
 	let suppressMissingRecovery = false;
 	const finalityStore = legacyFinalityStore(object);
-	const headsMode = usesHeadsProtocol(node, object.id, sender);
+	const headsMode = syncSelection?.mode === "heads-chunk";
 	const preMergeHeads = headsMode ? new Set(object.getHistoryHeads()) : new Set<string>();
 	const preExistingDependencies = headsMode
 		? new Set(
@@ -754,7 +734,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 			).finish(),
 			objectId: object.id,
 		});
-		node.networkNode.sendMessage(sender, rejection).catch((error) => {
+		node.sendNegotiatedSyncResponse(sender, rejection).catch((error) => {
 			log.error("::syncAcceptHandler: Error sending history-unavailable rejection", error);
 		});
 		return;
@@ -762,29 +742,13 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	const requested: Vertex[] = historyRead.status === "available" ? [...historyRead.vertices] : [];
 
 	if (requested.length === 0) return;
-	if (headsMode) await signGeneratedVertices(node, requested);
-
-	const attestations = getAttestations(object, requested);
-
-	const messageSyncAccept = Message.create({
-		sender: node.networkNode.peerId,
-		type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
-		data: SyncAccept.encode(
-			SyncAccept.create({
-				requested,
-				attestations,
-				requesting: [],
-			})
-		).finish(),
-		objectId: object.id,
-	});
-	node.networkNode.sendMessage(sender, messageSyncAccept).catch((e) => {
-		log.error("::syncAcceptHandler: Error sending message", e);
-	});
+	const responses = await buildSyncResponseChunksForVertices(node, object, requested);
+	for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
+	const sentRequested = responses.flatMap((response) => SyncAccept.decode(response.data).requested);
 	node.safeDispatchEvent(NodeEventName.DRP_SYNC_MISSING, {
 		detail: {
 			id: object.id,
-			requested,
+			requested: sentRequested,
 			requesting: [],
 		},
 	});
@@ -852,26 +816,6 @@ export function drpObjectChangesHandler<T extends IDRP>(
 }
 
 /**
- * Sign generated vertices.
- * @param node - The DRP node instance handling the request
- * @param vertices - The vertices to sign
- */
-export async function signGeneratedVertices(node: DRPNode, vertices: Vertex[]): Promise<void> {
-	const signPromises = vertices.map(async (vertex) => {
-		if (vertex.peerId !== node.networkNode.peerId || vertex.signature.length !== 0) {
-			return;
-		}
-		try {
-			vertex.signature = await node.keychain.signWithSecp256k1(vertex.hash);
-		} catch (error) {
-			log.error("::signGeneratedVertices: Error signing vertex:", vertex.hash, error);
-		}
-	});
-
-	await Promise.all(signPromises);
-}
-
-/**
  * Sign vertices for finality.
  * @param node - The DRP node instance handling the request
  * @param obj - The object that changed
@@ -909,16 +853,6 @@ function generateAttestations(node: DRPNode, finalityStore: IFinalityStore, vert
 			data: v.hash,
 			signature: node.keychain.signWithBls(v.hash),
 		})
-	);
-}
-
-function getAttestations<T extends IDRP>(object: IDRPObject<T>, vertices: Vertex[]): AggregatedAttestation[] {
-	const finalityStore = legacyFinalityStore(object);
-	if (finalityStore === undefined) return [];
-	return (
-		vertices
-			.map((v) => finalityStore.getAttestation(v.hash))
-			.filter((a): a is AggregatedAttestation => a !== undefined) ?? []
 	);
 }
 

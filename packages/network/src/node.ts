@@ -73,17 +73,51 @@ import {
 	type IMessageQueueHandler,
 	IntervalRunnerState,
 	Message,
+	MessageType,
 } from "@ts-drp/types";
 import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
 import { isBrowser, isWebWorker } from "wherearewe";
 
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
+import {
+	createDirectSyncIngress,
+	type DirectSyncIngress,
+	DRP_MESSAGE_PROTOCOL,
+	DRP_SYNC_PROTOCOLS,
+	isDirectSyncIngress,
+	isSyncProtocolMessage,
+	selectedSyncProtocol,
+	type SelectedSyncProtocol,
+	SyncTransportError,
+	validateNegotiatedSync,
+} from "./sync.js";
 
 export * from "./stream.js";
+export {
+	directSyncProtocolFor,
+	DRP_HEADS_CHUNK_PROTOCOL,
+	DRP_MESSAGE_PROTOCOL,
+	DRP_SYNC_PROTOCOLS,
+	isDirectSyncIngress,
+	isSyncProtocolMessage,
+	type DRPSyncMode,
+	type DRPSyncProtocol,
+	type NegotiatedSyncSender,
+	type SelectedSyncProtocol,
+	SYNC_FALLBACK_HASH_CAP,
+	SYNC_HEADS_FIELD_HASH_CAP,
+	SYNC_HEADS_TOTAL_HASH_CAP,
+	SYNC_OUTSTANDING_EXACT_CAP,
+	SYNC_REQUEST_BYTE_CAP,
+	SYNC_RESPONSE_BYTE_CAP,
+	SYNC_RESPONSE_CHUNK_CAP,
+	SYNC_RESPONSE_VERTEX_CAP,
+	SyncTransportError,
+	validateNegotiatedSync,
+} from "./sync.js";
 export type { GroupPeerChange, GroupPeerChangeHandler } from "@ts-drp/types";
 
-export const DRP_MESSAGE_PROTOCOL = "/drp/message/0.0.1";
 export const BOOTSTRAP_NODES = [
 	"/dns4/bootstrap1.topology.gg/tcp/443/wss/p2p/16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK",
 	"/dns4/bootstrap2.topology.gg/tcp/443/wss/p2p/16Uiu2HAmGjAVQyzgTCumpB9TuojKT4LZTBC5HRiZyuwGG9VHodLC",
@@ -327,6 +361,71 @@ function sanitizedRelayIdHash(relayId: string): string {
 	return bytesToHex(sha256(new TextEncoder().encode(relayId))).slice(0, 16);
 }
 
+interface PendingSyncSend {
+	reject(reason?: unknown): void;
+	resolve(): void;
+	run(): Promise<void>;
+}
+
+class SyncSendAdmission {
+	private active = false;
+	private activeTask?: PendingSyncSend;
+	private closed = false;
+	private readonly queued: PendingSyncSend[] = [];
+
+	constructor(connection: Connection) {
+		connection.addEventListener(
+			"close",
+			() => {
+				this.closed = true;
+				const error = new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection closed");
+				this.activeTask?.reject(error);
+				this.activeTask = undefined;
+				for (const task of this.queued.splice(0)) task.reject(error);
+			},
+			{ once: true }
+		);
+	}
+
+	submit(run: () => Promise<void>): Promise<void> {
+		if (this.closed) {
+			return Promise.reject(new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection is closed"));
+		}
+		if (this.active && this.queued.length >= 2) {
+			return Promise.reject(new SyncTransportError("SYNC_SEND_QUEUE_FULL", "Sync send queue is full"));
+		}
+
+		return new Promise<void>((resolve, reject) => {
+			const task = { reject, resolve, run };
+			if (this.active) {
+				this.queued.push(task);
+				return;
+			}
+			this.active = true;
+			void this.execute(task);
+		});
+	}
+
+	private async execute(task: PendingSyncSend): Promise<void> {
+		this.activeTask = task;
+		try {
+			if (this.closed) throw new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection is closed");
+			await task.run();
+			task.resolve();
+		} catch (error) {
+			task.reject(error);
+		} finally {
+			if (this.activeTask === task) this.activeTask = undefined;
+			const next = this.queued.shift();
+			if (next === undefined) {
+				this.active = false;
+			} else {
+				void this.execute(next);
+			}
+		}
+	}
+}
+
 /**
  * The DRPNetworkNode class is the main class for the DRP network.
  * It handles the creation and management of the libp2p node, pubsub, and message queue.
@@ -335,7 +434,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _config?: DRPNetworkNodeConfig;
 	private _node?: Libp2p;
 	private _pubsub?: ConfigurableGossipSub;
-	private _messageQueue: MessageQueue<Message>;
+	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
+	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapRetryController?: AbortController;
 	private _relayPolicyController?: AbortController;
@@ -381,7 +481,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		this._relayPolicyFactory = dependencies.relayPolicyFactory;
 		this._membershipVerifier = createMembershipVerifier(config?.control_plane?.membership);
 		log = new Logger("drp::network", config?.log_config);
-		this._messageQueue = new MessageQueue<Message>({ id: "network", logConfig: config?.log_config });
+		this._messageQueue = new MessageQueue<Message | DirectSyncIngress>({
+			id: "network",
+			logConfig: config?.log_config,
+		});
 		this._validateRelayPolicyConfiguration(false);
 	}
 
@@ -1716,6 +1819,150 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	}
 
 	/**
+	 * Open one negotiated sync stream, then build the payload for the protocol
+	 * selected by that exact stream. Additive completion means remote bounded
+	 * queue admission; fallback retains local write completion.
+	 */
+	async sendSyncMessage(
+		peerId: string,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>,
+		options: { readonly signal?: AbortSignal } = {}
+	): Promise<void> {
+		return this.submitNegotiatedSync(peerId, payloadFactory, MessageType.MESSAGE_TYPE_SYNC, options);
+	}
+
+	/** Send one bounded sync response over a freshly selected sync stream. */
+	async sendSyncResponseMessage(
+		peerId: string,
+		message: Message,
+		options: { readonly signal?: AbortSignal } = {}
+	): Promise<void> {
+		if (
+			message.type !== MessageType.MESSAGE_TYPE_SYNC_ACCEPT &&
+			message.type !== MessageType.MESSAGE_TYPE_SYNC_REJECT
+		) {
+			throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync response sender requires SyncAccept or SyncReject");
+		}
+		return this.submitNegotiatedSync(peerId, () => message, message.type, options);
+	}
+
+	private async submitNegotiatedSync(
+		peerId: string,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>,
+		expectedType:
+			| MessageType.MESSAGE_TYPE_SYNC
+			| MessageType.MESSAGE_TYPE_SYNC_ACCEPT
+			| MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		options: { readonly signal?: AbortSignal }
+	): Promise<void> {
+		const deadlineSignal = AbortSignal.timeout(10_000);
+		const signal = options.signal === undefined ? deadlineSignal : AbortSignal.any([options.signal, deadlineSignal]);
+		let connection: Connection | undefined;
+		try {
+			connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)], this._node, signal);
+		} catch (cause) {
+			throw this.syncFailure(signal, deadlineSignal, "SYNC_DIAL_FAILED", "Could not dial sync peer", cause);
+		}
+		if (connection === undefined) throw new SyncTransportError("SYNC_DIAL_FAILED", "Could not dial sync peer");
+		let admission = this._syncAdmissions.get(connection);
+		if (admission === undefined) {
+			admission = new SyncSendAdmission(connection);
+			this._syncAdmissions.set(connection, admission);
+		}
+		return admission.submit(() =>
+			this.sendSelectedSync(connection, payloadFactory, expectedType, signal, deadlineSignal)
+		);
+	}
+
+	private async sendSelectedSync(
+		connection: Connection,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>,
+		expectedType:
+			| MessageType.MESSAGE_TYPE_SYNC
+			| MessageType.MESSAGE_TYPE_SYNC_ACCEPT
+			| MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		signal: AbortSignal,
+		deadlineSignal: AbortSignal
+	): Promise<void> {
+		if (connection.status !== "open") {
+			throw new SyncTransportError("SYNC_CONNECTION_CLOSED", "Sync connection is closed");
+		}
+		let stream: Stream;
+		try {
+			stream = await connection.newStream([...DRP_SYNC_PROTOCOLS], {
+				maxOutboundStreams: 3,
+				signal,
+			});
+		} catch (cause) {
+			throw this.syncFailure(
+				signal,
+				deadlineSignal,
+				"SYNC_PROTOCOL_SELECTION_FAILED",
+				"Could not select a sync protocol",
+				cause
+			);
+		}
+
+		try {
+			const selection = selectedSyncProtocol(stream.protocol);
+			const message = await payloadFactory(selection);
+			if (message.type !== expectedType) {
+				throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync sender factory returned the wrong message type");
+			}
+			validateNegotiatedSync(message, stream.protocol);
+			await uint8ArrayToStream(stream, Message.encode(message).finish());
+			if (selection.mode === "heads-chunk") {
+				await this.waitForRemoteSyncAdmission(stream, signal, deadlineSignal);
+			}
+		} catch (error) {
+			if (stream.status === "open" || stream.status === "closing") {
+				stream.abort(error instanceof Error ? error : new Error(String(error)));
+			}
+			if (error instanceof SyncTransportError) throw error;
+			throw this.syncFailure(signal, deadlineSignal, "SYNC_WRITE_FAILED", "Sync stream failed", error);
+		}
+	}
+
+	private waitForRemoteSyncAdmission(stream: Stream, signal: AbortSignal, deadlineSignal: AbortSignal): Promise<void> {
+		if (signal.aborted) {
+			return Promise.reject(this.syncFailure(signal, deadlineSignal, "SYNC_SEND_ABORTED", "Sync send aborted"));
+		}
+		if (stream.status === "closed") return Promise.resolve();
+		if (stream.status === "reset" || stream.status === "aborted") {
+			return Promise.reject(new SyncTransportError("SYNC_STREAM_RESET", "Remote sync stream reset"));
+		}
+		return new Promise<void>((resolve, reject) => {
+			const onAbort = (): void => {
+				cleanup();
+				reject(this.syncFailure(signal, deadlineSignal, "SYNC_SEND_ABORTED", "Sync send aborted"));
+			};
+			const onClose = (): void => {
+				cleanup();
+				if (stream.status === "closed") resolve();
+				else reject(new SyncTransportError("SYNC_STREAM_RESET", "Remote sync stream reset"));
+			};
+			const cleanup = (): void => {
+				signal.removeEventListener("abort", onAbort);
+				stream.removeEventListener("close", onClose);
+			};
+			signal.addEventListener("abort", onAbort, { once: true });
+			stream.addEventListener("close", onClose, { once: true });
+		});
+	}
+
+	private syncFailure(
+		signal: AbortSignal,
+		deadlineSignal: AbortSignal,
+		code: string,
+		message: string,
+		cause?: unknown
+	): SyncTransportError {
+		if (deadlineSignal.aborted) return new SyncTransportError("SYNC_SEND_DEADLINE", "Sync send deadline exceeded");
+		if (signal.aborted) return new SyncTransportError("SYNC_SEND_ABORTED", "Sync send aborted");
+		return new SyncTransportError(code, message, cause === undefined ? undefined : { cause });
+	}
+
+	/**
 	 * Send a message to a random peer in a group.
 	 * @param group - The group to send the message to.
 	 * @param message - The message to send.
@@ -1763,8 +2010,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}
 			this.handleGossipsubMessage(e.detail.msg.data, e.detail.msg.from.toString());
 		});
-		await this._node?.handle(DRP_MESSAGE_PROTOCOL, (stream, connection) =>
-			this.handleStream(stream, connection.remotePeer.toString())
+		await this._node?.handle(
+			[...DRP_SYNC_PROTOCOLS],
+			(stream, connection) => this.handleStream(stream, connection.remotePeer.toString()),
+			{ maxInboundStreams: 3, maxOutboundStreams: 3 }
 		);
 	}
 
@@ -1777,6 +2026,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private handleGossipsubMessage(data: Uint8Array, authenticatedSender: string): void {
 		try {
 			const message = this.decodeAttributedMessage(data, authenticatedSender);
+			if (isSyncProtocolMessage(message)) return;
 			this._messageQueue.enqueue(message).catch((e) => {
 				log.error("::startEnqueueMessages::enqueue:", e);
 			});
@@ -1789,10 +2039,27 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		try {
 			const data = await streamToUint8Array(stream);
 			const message = this.decodeAttributedMessage(data, authenticatedSender);
-			this._messageQueue.enqueue(message).catch((e) => {
-				log.error("::startEnqueueMessages::enqueue:", e);
-			});
+			const selection = selectedSyncProtocol(stream.protocol);
+			if (selection.mode === "heads-chunk" && !isSyncProtocolMessage(message)) {
+				throw new SyncTransportError(
+					"SYNC_PROTOCOL_VIOLATION",
+					"The heads-chunk protocol only accepts sync-family messages"
+				);
+			}
+			if (isSyncProtocolMessage(message)) {
+				validateNegotiatedSync(message, stream.protocol);
+				const ingress = createDirectSyncIngress(message, authenticatedSender, selection.protocol);
+				await this._messageQueue.enqueue(ingress);
+				if (ingress.mode === "heads-chunk") await ingress.completion.wait();
+			} else {
+				validateNegotiatedSync(message, stream.protocol);
+				await this._messageQueue.enqueue(message);
+			}
+			await stream.close();
 		} catch (e) {
+			if (stream.status === "open" || stream.status === "closing") {
+				stream.abort(e instanceof Error ? e : new Error(String(e)));
+			}
 			log.error("::startEnqueueMessages::handleStream", e);
 		}
 	}
@@ -1802,6 +2069,19 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @param handler - The handler to subscribe to the message queue.
 	 */
 	subscribeToMessageQueue(handler: IMessageQueueHandler<Message>): void {
-		this._messageQueue.subscribe(handler);
+		this._messageQueue.subscribe((ingress) => {
+			try {
+				const result = handler(ingress as Message);
+				if (isDirectSyncIngress(ingress) && !ingress.completion.isClaimed()) {
+					ingress.completion.claim(result);
+				}
+				return result;
+			} catch (error) {
+				if (isDirectSyncIngress(ingress) && !ingress.completion.isClaimed()) {
+					ingress.completion.claim(Promise.reject(error));
+				}
+				throw error;
+			}
+		});
 	}
 }

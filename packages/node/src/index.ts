@@ -18,7 +18,13 @@ import { IntervalRunner } from "@ts-drp/interval-runner";
 import { Keychain } from "@ts-drp/keychain";
 import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
-import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
+import {
+	DRPNetworkNode as DefaultDRPNetworkNode,
+	isDirectSyncIngress,
+	type NegotiatedSyncSender,
+	type SelectedSyncProtocol,
+	SyncTransportError,
+} from "@ts-drp/network";
 import { createACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	AddressPolicy,
@@ -88,6 +94,12 @@ import { createDRPIntervalSync, DRPIntervalSync, hasRemoteSyncHistory } from "./
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
+import {
+	buildSyncResponseChunks as buildBoundedSyncResponseChunks,
+	buildSyncPayloadForProtocol as buildSelectedSyncPayload,
+	type SyncPayloadBuildInput,
+	type SyncResponseBuildInput,
+} from "./sync-codec.js";
 import { clearNodeSyncState, clearObjectSyncState } from "./sync-state.js";
 
 interface NodePeerCacheModule {
@@ -311,6 +323,8 @@ export interface DRPNodeDependencies {
 	readonly controlPlaneScheduler?: ControlPlaneScheduler;
 	/** Existing network implementation to use instead of the production default */
 	networkNode?: DRPNetworkNode;
+	/** Negotiated sync port paired with an injected network implementation. */
+	syncSender?: NegotiatedSyncSender;
 	/** Network shutdown owner when an attached control-plane adapter shares the host */
 	networkStop?(): Promise<void>;
 	/** Existing reconnect owner, or false when an external coordinator owns recovery */
@@ -377,6 +391,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _preservedControlPlaneState: ReadonlyMap<string, unknown> | undefined;
 	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
 	private readonly _stopNetwork: () => Promise<void>;
+	private readonly _syncSender: NegotiatedSyncSender | undefined;
 	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
 
 	/**
@@ -393,6 +408,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		log.warn = newLogger.warn;
 		log.error = newLogger.error;
 		this.networkNode = dependencies.networkNode ?? new DefaultDRPNetworkNode(config?.network_config);
+		this._syncSender =
+			dependencies.syncSender ?? (this.networkNode instanceof DefaultDRPNetworkNode ? this.networkNode : undefined);
 		if (dependencies.reconnect && dependencies.reconnect.networkNode !== this.networkNode) {
 			throw new Error("Injected reconnect policy must own the injected DRP network node");
 		}
@@ -431,8 +448,22 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const reconnectInterval = this.getReconnectInterval();
 		if (reconnectInterval) this._intervals.set("interval::reconnect", reconnectInterval);
 		if (this._subscribedNetworkNode !== this.networkNode) {
-			this.networkNode.subscribeToMessageQueue((message) => {
-				this.dispatchMessage(message).catch((error: unknown) => {
+			this.networkNode.subscribeToMessageQueue((ingress) => {
+				if (isDirectSyncIngress(ingress)) {
+					const admission = this.dispatchMessage(ingress.message);
+					ingress.completion.claim(admission);
+					admission.catch((error: unknown) => {
+						log.error("::dispatchMessage: Failed to enqueue direct sync message", error);
+					});
+					return;
+				}
+				if (
+					ingress.type === MessageType.MESSAGE_TYPE_SYNC ||
+					ingress.type === MessageType.MESSAGE_TYPE_SYNC_ACCEPT ||
+					ingress.type === MessageType.MESSAGE_TYPE_SYNC_REJECT
+				)
+					return;
+				this.dispatchMessage(ingress).catch((error: unknown) => {
 					log.error("::dispatchMessage: Failed to enqueue message", error);
 				});
 			});
@@ -1152,6 +1183,35 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 
 		await this.messageQueueManager.enqueue(msg.objectId, msg);
+	}
+
+	/** Build one request only after the live stream selects its sync protocol. */
+	buildSyncPayloadForProtocol(input: SyncPayloadBuildInput): Promise<Message> {
+		return Promise.resolve().then(() => buildSelectedSyncPayload(this, input));
+	}
+
+	/** Build bounded, independently applicable response chunks. */
+	async buildSyncResponseChunks(input: SyncResponseBuildInput): Promise<readonly Message[]> {
+		return buildBoundedSyncResponseChunks(this, input);
+	}
+
+	/** Send through the explicit negotiated-sync dependency. */
+	async sendNegotiatedSync(
+		peerId: string,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>
+	): Promise<void> {
+		if (this._syncSender === undefined) {
+			throw new SyncTransportError("SYNC_NEGOTIATION_UNAVAILABLE", "Injected network has no negotiated sync sender");
+		}
+		await this._syncSender.sendSyncMessage(peerId, payloadFactory);
+	}
+
+	/** Send one bounded response through the same negotiated-sync port. */
+	async sendNegotiatedSyncResponse(peerId: string, message: Message): Promise<void> {
+		if (this._syncSender === undefined) {
+			throw new SyncTransportError("SYNC_NEGOTIATION_UNAVAILABLE", "Injected network has no negotiated sync sender");
+		}
+		await this._syncSender.sendSyncResponseMessage(peerId, message);
 	}
 
 	/**

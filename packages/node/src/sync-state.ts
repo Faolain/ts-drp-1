@@ -1,3 +1,4 @@
+import { SYNC_HEADS_FIELD_HASH_CAP, SYNC_OUTSTANDING_EXACT_CAP } from "@ts-drp/network";
 import { NodeEventName } from "@ts-drp/types";
 
 import { type DRPNode } from "./index.js";
@@ -10,7 +11,6 @@ interface PeerSyncState {
 	branchCuts: Set<string>;
 	exactRequestAttempts: number;
 	exactRequestCooldownUntil?: number;
-	headsProtocol: boolean;
 	sharedHeads: Set<string>;
 	outstandingRequests: Set<string>;
 }
@@ -34,7 +34,6 @@ function getState(node: DRPNode, objectId: string, peerId: string): PeerSyncStat
 			advertisedHeads: new Set(),
 			branchCuts: new Set(),
 			exactRequestAttempts: 0,
-			headsProtocol: false,
 			sharedHeads: new Set(),
 			outstandingRequests: new Set(),
 		};
@@ -71,7 +70,6 @@ export function advertisedTheseHeads(
 export function recordAdvertisedHeads(node: DRPNode, objectId: string, peerId: string, heads: readonly string[]): void {
 	const state = getState(node, objectId, peerId);
 	state.advertisedHeads = new Set(heads);
-	state.headsProtocol = true;
 }
 
 /**
@@ -110,27 +108,6 @@ export function sharedHashes(node: DRPNode, objectId: string, peerId: string): s
 }
 
 /**
- * Mark a peer as capable of the additive heads protocol.
- * @param node - Node owning the sync state
- * @param objectId - Object being synchronized
- * @param peerId - Remote peer
- */
-export function markHeadsProtocol(node: DRPNode, objectId: string, peerId: string): void {
-	getState(node, objectId, peerId).headsProtocol = true;
-}
-
-/**
- * Determine whether a peer has used the heads protocol for this object.
- * @param node - Node owning the sync state
- * @param objectId - Object being synchronized
- * @param peerId - Remote peer
- * @returns Whether heads mode is active
- */
-export function usesHeadsProtocol(node: DRPNode, objectId: string, peerId: string): boolean {
-	return getState(node, objectId, peerId).headsProtocol;
-}
-
-/**
  * Add newly authenticated missing hashes to the exact request lifecycle.
  * @param node - Node owning the sync state
  * @param objectId - Object being synchronized
@@ -147,6 +124,7 @@ export function queueExactRequests(
 	const state = getState(node, objectId, peerId);
 	let queued = false;
 	for (const hash of hashes) {
+		if (state.outstandingRequests.size >= SYNC_OUTSTANDING_EXACT_CAP) break;
 		if (state.outstandingRequests.has(hash)) continue;
 		state.outstandingRequests.add(hash);
 		queued = true;
@@ -165,6 +143,42 @@ export type SyncSendPurpose = "inbound-reciprocity" | "scheduled-probe";
 export interface PreparedSyncSend {
 	requestedHashes: string[];
 	send: boolean;
+}
+
+/**
+ * Read the next deterministic exact-request chunk without charging the
+ * existing retry lifecycle. Selected-mode builders use this to validate the
+ * actual protobuf before committing one attempt.
+ */
+export function previewSyncSend(
+	node: DRPNode,
+	objectId: string,
+	peerId: string,
+	purpose: SyncSendPurpose
+): PreparedSyncSend {
+	const state = getState(node, objectId, peerId);
+	if (purpose === "inbound-reciprocity") {
+		const cooldownActive =
+			state.exactRequestCooldownUntil !== undefined && Date.now() < state.exactRequestCooldownUntil;
+		return { requestedHashes: [], send: !cooldownActive };
+	}
+	if (state.outstandingRequests.size === 0) return { requestedHashes: [], send: true };
+	const cooldownExpired =
+		state.exactRequestCooldownUntil !== undefined && Date.now() >= state.exactRequestCooldownUntil;
+	if (state.exactRequestCooldownUntil !== undefined && !cooldownExpired) {
+		return { requestedHashes: [], send: false };
+	}
+	const attempts = cooldownExpired ? 0 : state.exactRequestAttempts;
+	if (attempts >= MAX_EXACT_REQUEST_ATTEMPTS) {
+		return { requestedHashes: [], send: false };
+	}
+	const hashes = [...state.outstandingRequests];
+	const chunkCount = Math.ceil(hashes.length / SYNC_HEADS_FIELD_HASH_CAP);
+	const chunk = attempts % chunkCount;
+	return {
+		requestedHashes: hashes.slice(chunk * SYNC_HEADS_FIELD_HASH_CAP, (chunk + 1) * SYNC_HEADS_FIELD_HASH_CAP),
+		send: true,
+	};
 }
 
 /**
@@ -206,8 +220,9 @@ export function prepareSyncSend(
 		return { requestedHashes: [], send: false };
 	}
 
+	const prepared = previewSyncSend(node, objectId, peerId, purpose);
 	state.exactRequestAttempts += 1;
-	return { requestedHashes: [...state.outstandingRequests], send: true };
+	return prepared;
 }
 
 /**
