@@ -27451,30 +27451,54 @@ remote-authored history. Public reconnect remains inside C4 and fully measured,
 but it has no hidden initial-sync owner; the alternating public driver becomes
 the single deterministic recovery schedule.
 
-## Next Agent Prompt — Phase 1n-d aggregate C3 preconditioning corrective RED
+## Phase 1n-d aggregate C3 preconditioning corrective RED — checkpointed
 
-Spawn a fresh Codex-high tests-only owner against `d527333`. Change only the
-aggregate test. During non-sync pre-window prefix construction, author and sign
-one constant B vertex after B receives the A prefix, then merge it to A and C
-and include it in the shared-hash set before the seven missing vertices are
-authored. Prove publicly that both A and B contain remote-authored shared
-history before the window. Keep telemetry active before reconnect, retain the
-public bidirectional group-readiness and fixed quiescence barrier, and use the
-fixed quiescence barrier after every explicit attempt. Do not alter production
-eligibility logic or privately suppress the reconnect callback.
+Fresh Codex-high landed the tests-only correction at
+`c6a47f19f61a8899bbce236ce7bc7118d0f14b22`. Its sole committed path is the
+aggregate owner; corrected source SHA-256 is
+`2c24111db4ce12fd1a5860a684b4cb82de3d3ba0f43fb09e8a5c34b0e7b0a07d`.
 
-Recheck C1/C2 non-vacuity: actual shared-prefix ratio remains at least 4x and
-+64, and the seven-vertex missing DAG retains identical shape, operation bytes,
-signer set and encoded-length multiset. All C1-C13 traffic remains measured; no
-counter reset, filtering or normalization is permitted. Prove baseline causal
-RED stable in three isolated processes, and use only a temporary fully restored
-diagnostic candidate to prove complete snapshots repeat identically three
-times. Restore all production bytes before running preservation, five builds,
-exact typecheck census, lint, Prettier and diff checks to `.log`; package a
-verified manifest and commit only the test. Stop if either repeatability proof
-fails. No identity change, legacy plain-ID path or broad workload.
+The final C3 fixture removes both hidden network owners. B authors and signs one
+constant shared vertex after receiving A's retained prefix, and that vertex is
+merged non-network into A and C. Public vertex observations prove A and B each
+hold remote-authored history before reconnect, so neither is eligible for the
+group-change initial probe. The A3/B2/C2 missing vertices are then authored on
+unsubscribed public `DRPObject` replicas with the real ID, explicit ACL, real
+peer IDs and real node signatures, and merged into only their corresponding
+live replicas. A pre-window public graph assertion proves pubsub/message-queue
+did not transfer a missing vertex. No private callback or production state is
+suppressed.
 
-## After C3 preconditioning corrective — Phase 1n-d aggregate production GREEN
+Actual non-root shared-prefix counts are 17 and 81, satisfying greater than 4x
+and exactly +64. The missing set remains seven and preserves C2 parent shape,
+operation bytes, signer set and encoded-length multiset. Telemetry remains
+cumulative from immediately before reconnect, and every explicit attempt uses
+the fixed causal quiescence authority.
+
+Baseline RED is stable in three isolated full-file processes: exactly one hard-
+owner `SYNC_REQUEST_LIMIT` failure and one passing fallback owner each time.
+The exact bounded GREEN diagnostic was then applied temporarily and restored.
+Three isolated aggregate executions passed with byte-identical complete C9
+snapshots across runs and corpora: total 13,640 bytes / 18 requests / 10
+responses / 9 recovery probes and rounds; A→B 6,535 / 8 / 6 / 3; B→A 7,105 /
+10 / 4 / 6. A separately instrumented third full-file diagnostic caught one
+late fallback ingress after the aggregate already passed; authoritative
+baseline fallback passed 3/3 and the first two candidate full-file runs passed.
+Keep this timing characterization visible during GREEN repetition and reviews.
+
+Temporary `handlers.ts`, `sync-codec.ts` and snapshot instrumentation were
+restored byte-for-byte. Preservation passes 1n-a 11/11, 1n-b 11/11, 1n-c 28/28
+and 1n-d(i) 4/4. Five builds pass. Types/network/message-queue typecheck clean;
+object5/node2 remain exactly inherited with no corrected-owner diagnostic.
+ESLint, Prettier and diff checks pass. Evidence is under
+`.logs/phase-1n-d-aggregate-c3-preconditioning-corrective-red-codex-high/`;
+result SHA-256 is
+`a6e809579483b0c76ef7161a2040214f9a86eda0f55447ca9a16c622dd2fcb78`
+and verified artifact-manifest SHA-256 is
+`fb5b7028cdab657e97c50977f85718788fd449ccaac19d1551a3458be7a886b6`.
+No broad workload or identity/legacy path was added.
+
+## Next Agent Prompt — Phase 1n-d aggregate production GREEN
 
 Spawn a distinct fresh Codex-high production owner against frozen RED
 `fb8256d` plus its scheduling-oracle corrective and the exact C1-C13 contract.
