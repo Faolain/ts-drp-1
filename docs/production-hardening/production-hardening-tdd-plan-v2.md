@@ -24691,23 +24691,60 @@ A test-runner gotcha is also frozen: passing the libp2p spy itself to a failed
 set`. Numeric `mock.calls.length` assertions retain the same causal contract
 without invoking that unrelated proxy formatter.
 
-## Next Agent Prompt — Phase 1n-a clean-round corrective GREEN
+## Phase 1n-a clean-round corrective production GREEN — review pending
 
-Run a distinct fresh Codex-high production-only GREEN against frozen commit
-`9b8fa82`. Preserve both the raw object `missing` outcome and the authenticated
-true-missing recovery list. A merge that actually ran and returned raw missing
-empty owns an explicit successful-round recovery-episode reset and may emit
-`DRP_SYNC_ACCEPTED`; a pending-only round has raw missing nonempty, so it does
-neither even though its filtered recovery list is empty. Do not restore generic
-empty-list recovery calls, expose provenance, broaden invalid/quarantine
-semantics, or add compatibility/source-analysis/test-only branches. Preserve
-all true-missing retry/cooldown, pending-only budget neutrality, finality,
-persistence, error identity and event behavior. Change production only; do not
-modify tests, plan, dependencies, generated files or protected untracked state.
-Run the focused owner, combined pre/postcommit owners, 56/56 and 16/16
-preservation groups, ordered builds/typechecks, lint, formatting and diff gates
-to `.logs/phase-1n-a-clean-round-corrective-green-codex-high/`, then commit the
-production-only candidate for fresh independent review.
+Distinct fresh Codex-high production-only commit
+`d279fdab8c1bececdb054712d2a27da327c9d529` (tree
+`ab848492d3c3fc48b929c64f56ef0473b0cbd1d9`) changes only
+`packages/node/src/handlers.ts` by 21 insertions and 13 deletions. It retains
+the raw merge-missing result beside the authenticated true-missing recovery
+list. A merge that ran with raw missing empty explicitly clears only its
+`(node, object, sender)` episode; pending-only input retains raw missing and
+therefore neither clears that episode nor emits `DRP_SYNC_ACCEPTED`.
+
+The GREEN removes the `missing` argument and ambiguous empty-array reset branch
+from `recoverMissingSync` altogether. Its three consumers already prove the
+authenticated recovery set is nonempty before calling it, while the successful
+SYNC_ACCEPT path now owns a separate `clearSyncRecoveryEpisode`. This preserves
+the pre-`b951388` exhaustion distinction: budget-exhausted outcomes do not
+reset recovery state, while accepted-event truth remains independently keyed
+on a merge that ran plus raw missing empty. No invalid/quarantine, finality,
+persistence, unrelated event, compatibility, provenance or test-only branch
+changed.
+
+Focused and final-candidate owners pass 7/7; combined owners pass 13/13 both
+before and after commit; the migrated sentinel passes 6/6; preservation groups
+pass 56/56 and 16/16. Ordered types/validation/object/node builds pass. Types
+and validation typechecks pass; object retains the exact five inherited
+diagnostics and node the exact two. The object diagnostic body is byte-identical
+to the corrective RED authority after excluding pnpm's environment-dependent
+final child-exit footer (`1` now versus `2` there); the complete node log is
+byte-identical. Owned production lint is 0/0, exact tracked lint is 0 errors/249
+inherited warnings, the no-warn-ignored view is 0/226, and Prettier plus diff
+checks pass. Neither sealed nor 100k workload ran.
+
+Evidence is under
+`.logs/phase-1n-a-clean-round-corrective-green-codex-high/`. Ledger SHA-256 is
+`02bf89b8e4e6f2daea0372eb20a7998f246bb19c374e4360fc744e8b72c219fd`;
+the verified 37-entry integrity-manifest SHA-256 is
+`e3fe9d659a2ddadbb6e810b031ab62127674dab74657fb7816ab9aa870cfdd5b`.
+Tracked state is clean, protected untracked files and stash are unchanged, and
+the greenfield identity rule still has no legacy plain-id shim.
+
+## Next Agent Prompt — Phase 1n-a corrective preliminary reviews
+
+Run fresh independent Grok 4.5/high and exact Kimi 3/high/100 reviews of the
+complete fixed lineage through the plan checkpoint immediately preceding each
+review. Authenticate the frozen RED and production-only GREEN scope, rerun the
+focused 7/7 and combined 13/13 owners plus bounded relevant preservation, and
+adversarially inspect every recovery caller, raw-versus-filtered missing use,
+clean reset, pending-only event, exhaustion, error and persistence path. Reject
+any generic empty recovery, false accepted event, retry reset by pending-only
+input, hidden compatibility shim or same-slice regression. Treat Phase 1n-b's
+already recorded bounded provenance-eviction and mixed/transitive recovery
+handoffs as nonblocking unless new causal evidence disproves that classification.
+Do not modify production, tests, plan or protected state. Final Opus/xhigh may
+start only if both preliminary reviewers accept the same fixed candidate.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
