@@ -27,7 +27,7 @@ export function hasRemoteSyncHistory(vertices: readonly Vertex[], localPeerId: s
 export interface DRPIntervalSyncOptions {
 	id: string;
 	node: DRPNode;
-	replicaOrigin: "created" | "connected";
+	replicaOrigin: "created" | "connected" | "unmanaged";
 	interval?: number;
 	logConfig?: LoggerOptions;
 }

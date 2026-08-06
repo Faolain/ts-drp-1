@@ -369,7 +369,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _connectRendezvousControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
-	private _replicaOrigins = new Map<string, DRPIntervalSyncOptions["replicaOrigin"]>();
+	private _replicaOrigins = new Map<string, "created" | "connected">();
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
 	private readonly _roomRendezvousProducers = new Map<string, ReturnType<typeof createRecordProducer>>();
 	private readonly _roomRendezvousCapacityLogged = new Set<string>();
@@ -1641,10 +1641,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			this._addRoomRendezvousProducer(object.id);
 			const replicaOrigin = this._replicaOrigins.get(object.id);
 			if (replicaOrigin === undefined) {
-				// Provenance cannot be recovered from id shape. Restore discovery,
-				// but fail closed by omitting the managed Sync interval.
-				log.error("::restoreSubscriptions: Missing replica origin; skipping Sync interval", object.id);
-				this._createIntervalDiscovery(object.id);
+				// Provenance cannot be recovered from id shape. Restore ordinary
+				// anti-entropy without assigning a created or connected role.
+				this._createObjectIntervals(object.id, "unmanaged");
 				continue;
 			}
 			this._createObjectIntervals(object.id, replicaOrigin);
