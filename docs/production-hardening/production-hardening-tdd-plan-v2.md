@@ -25427,35 +25427,83 @@ greenfield identity contract is unchanged: arbitrary plain/custom IDs require
 an explicit coordinated ACL, and omitted ACL has no legacy plain-ID fallback or
 compatibility shim.
 
-## Next Agent Prompt — Phase 1n-b retry-attempt lifecycle tests-only RED
+## Phase 1n-b retry-attempt lifecycle tests-only RED — frozen
 
-Use a fresh Codex-high tests-only agent. Add one causal owner, preferably
-`packages/node/tests/sync-request-attempt-lifecycle-1n-b-red.test.ts`, and make
-only the minimal stale-amplification corrections required in
-`sync-clock-pending-provenance-1n-a-red.test.ts`,
-`sync-no-progress-corrective-1n-a-red.test.ts` and `sync-recovery.test.ts`,
-including the passing-but-stale UPDATE exhaustion setup. Preserve those files'
-provenance, classification, pending/empty non-interference, clean-progress,
-bounded-rejection, event/finality/state and cleanup assertions.
+Fresh replacement Codex-high tests-only commit
+`de9f414ebe5273678a59ea8a7480b422fd1a8217` (tree
+`2a0ce9ea789d13c854c7b501a061edb491a624e1`) changes exactly the four
+authorized test paths, +398/-29. Its new 346-line
+`sync-request-attempt-lifecycle-1n-b-red.test.ts` owns five bounded causal
+cases: scheduled exact-hash attempts/cooldown, UPDATE sharing the same owner,
+transitive dependency completion, object/peer/request isolation, and real
+rotating interval cleanup under fake timers. The three legacy files replace
+only duplicate-driven retry setup/counts—including the formerly coincidental
+UPDATE setup—with explicit scheduled probes while retaining provenance,
+classification, pending/empty/no-progress neutrality, clean progress,
+rejection detail, event/finality/state and cleanup assertions.
 
-Freeze the full contract above with explicit scheduled `node.syncObject` calls
-and one bounded fake-timer integration through the real interval owner. Assert
-the decoded `requestedHashes` on attempts one through three, not bare message
-counts; cover duplicate neutrality, fourth-attempt rejection, cooldown,
-post-expiry restart, dependency/progress clearing, newly exposed ancestors,
-peer/object/request isolation, peer rotation, unsubscribe and stop. Prefer the
-existing fake-timer/`Date.now` seams; do not add a wall-clock sleep or a test-only
-production hook.
+The final new-owner signature is 4 failed / 1 passed. The already-green
+transitive dependency case proves exact dependency arrival and the newly
+exposed ancestor without requiring the new scheduler. The four failures prove
+that the paused draft cannot re-carry outstanding hashes on attempts two/three,
+cannot put UPDATE on the same exact-request lifecycle, cannot reject scheduled
+attempt four/open cooldown, and cannot charge only the peer selected by the
+real rotating interval. Corrected legacy owners are 8 failed / 9 passed at the
+same missing production seam. Frozen core-heads owner `e639c4c` remains 4/4
+unchanged.
 
-The agent may edit and commit only those test files. It must not modify the
-paused production draft, frozen core-heads RED, plan, generated output, lockfile
-or protected untracked files. Its authentic RED should leave the frozen 1n-b
-owner 4/4 while failing only where the paused production draft lacks the causal
-scheduled-attempt lifecycle. Run the focused/corrected preservation tests plus
-ordered builds, typecheck, lint and formatting to `.log`. After the RED is
-frozen, a distinct fresh Codex-high GREEN may resume the preserved production
-draft, replace—not layer—the old recovery episode owner, and then enter fresh
-Grok 4.5/high, exact Kimi 3/high/100 and final Claude-skill Opus/xhigh review.
+Ordered types/object/node builds pass. Types typecheck passes; object retains
+exactly the inherited five and node exactly the inherited two Phase-1i-b
+diagnostics, with no owned-test diagnostic. Authenticated ingress, ACL auth,
+initial-sync and finality preservation pass; the combined selection is 37
+passed / 4 causal migrated-retry failures. Owned lint, Prettier and diff checks
+pass. Ledger SHA-256 is
+`c17f05af4e2edb90306133a59768a87c7193a667099166a689d542d637f7d644`;
+the verified evidence-manifest SHA-256 is
+`27084849693a86c0e3f6243ba76cf0183f345ac3d607c340ba0c8ec2af2070f6`.
+Evidence is under
+`.logs/phase-1n-b-retry-attempt-red2-codex-high/`. Postcommit verification
+confirms every paused production file, the untracked sync-state draft, stash
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e`, plan/frozen owner and protected
+paths remain intact and outside the RED commit.
+
+Preserve one process disclosure. The RED agent accidentally ran the ordinary
+`sync-perf-contract.test.ts` once before applying its name filter; all five
+cases passed, including the explicitly skipped 10k/50k/100k case (286 ms).
+It was not rerun. A subsequent 512-item named case passed with four skipped.
+No sealed one-shot workload, fuzzer or full suite ran. Do not rerun either
+inventory command during this slice.
+
+## Next Agent Prompt — Phase 1n-b retry-attempt lifecycle production GREEN
+
+Use a fresh distinct Codex-high production-only agent at RED commit `de9f414`.
+Resume the byte-authenticated paused core-heads draft; do not replace its
+additive wire/history work. In `sync-state.ts`, consolidate exact outstanding
+requests and retry/cooldown accounting into one per-node/object/peer/exact-set
+lifecycle. Remove the parallel `syncRecoveryEpisodes` receive-count owner from
+`handlers.ts`; do not layer a second budget or retain an inbound-message retry
+counter for compatibility.
+
+First authenticated discovery queues and sends exact attempt one. A scheduled
+`syncObject` call must retransmit the still-outstanding exact hashes for
+attempts two/three; scheduled attempt four sends nothing, emits exactly one
+`DRP_SYNC_REJECTED { id, peerId, retries: 3 }`, and opens the existing
+30-second cooldown. Inbound duplicates, UPDATE reoffers, pending/empty/trusted
+no-progress and cooldown traffic are neutral. UPDATE must queue true exact
+missing dependencies through the same owner. Authenticated dependency presence
+or truthful resolution clears it. Periodic rotation charges only its selected
+peer. Unsubscribe and stop clear the single owner and prevent later work.
+
+Change only genuinely required production/generated files. Do not modify any
+frozen/corrected test, the plan, lockfiles or protected untracked inputs. Keep
+field-1 fallback and the no-legacy-plain-ID greenfield boundary unchanged. Run
+new owner, corrected legacy owners, frozen core, broad 1n-a/auth/initial-sync/
+finality preservation, ordered builds/typecheck/lint/format and a small bounded
+delta-work check to `.log`. Do not rerun either inventory benchmark, sealed
+workload, fuzzer or full suite. Commit production/generated files only after all
+causal REDs are green and the preserved production draft is accounted for.
+Then return the candidate for fresh Grok 4.5/high, exact Kimi 3/high/100 and
+final Claude-skill Opus/xhigh review in that order.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
