@@ -8,7 +8,7 @@
  * periodic anti-entropy remains the repair path. With no group peers, no SYNC
  * is attempted.
  */
-import { createObject } from "@ts-drp/object";
+import { createACL, createObject } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -54,6 +54,17 @@ async function makeNode(seed: string): Promise<DRPNode> {
 	return node;
 }
 
+function coordinatedACL(creator: DRPNode, joiner: DRPNode): ReturnType<typeof createACL> {
+	const replicas = [creator, joiner];
+	const acl = createACL({ admins: replicas.map((replica) => replica.networkNode.peerId) });
+	for (const replica of replicas) {
+		acl.context = { caller: replica.networkNode.peerId };
+		acl.setKey(replica.keychain.blsPublicKey);
+	}
+	acl.context = { caller: "" };
+	return acl;
+}
+
 describe("initial fast sync retry", () => {
 	const nodes: DRPNode[] = [];
 
@@ -67,14 +78,21 @@ describe("initial fast sync retry", () => {
 		const creator = await makeNode("initial-sync-retry-creator");
 		const node = await makeNode("initial-sync-retry-joiner");
 		nodes.push(creator, node);
-		const creatorObject = await creator.createObject({ drp: new CounterDRP() });
+		const creatorObject = await creator.createObject({
+			acl: coordinatedACL(creator, node),
+			drp: new CounterDRP(),
+		});
 		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
 		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
 		vi.spyOn(node.networkNode, "sendGroupMessageRandomPeer").mockResolvedValue();
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 		vi.useFakeTimers();
 
-		const connecting = node.connectObject({ id: creatorObject.id, drp: new CounterDRP() });
+		const connecting = node.connectObject({
+			acl: coordinatedACL(creator, node),
+			id: creatorObject.id,
+			drp: new CounterDRP(),
+		});
 		await vi.advanceTimersByTimeAsync(5_000);
 		const object = await connecting;
 		sendMessage.mockClear();
@@ -110,9 +128,13 @@ describe("initial fast sync retry", () => {
 	}, 20_000);
 
 	test("an empty remote object exhausts the fast retry budget instead of probing forever", async () => {
-		const creatorObject = createObject({ peerId: "initial-sync-empty-creator", drp: new CounterDRP() });
+		const creator = await makeNode("initial-sync-empty-creator");
 		const node = await makeNode("initial-sync-empty-joiner");
-		nodes.push(node);
+		nodes.push(creator, node);
+		const creatorObject = await creator.createObject({
+			acl: coordinatedACL(creator, node),
+			drp: new CounterDRP(),
+		});
 		const peer = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
 		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
 		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
@@ -120,7 +142,11 @@ describe("initial fast sync retry", () => {
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 		vi.useFakeTimers();
 
-		const connecting = node.connectObject({ id: creatorObject.id, drp: new CounterDRP() });
+		const connecting = node.connectObject({
+			acl: coordinatedACL(creator, node),
+			id: creatorObject.id,
+			drp: new CounterDRP(),
+		});
 		await vi.advanceTimersByTimeAsync(5_000);
 		const object = await connecting;
 		sendMessage.mockClear();
