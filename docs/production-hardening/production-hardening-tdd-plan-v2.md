@@ -26849,24 +26849,125 @@ verified manifest SHA-256 is
 Freeze both test files byte-for-byte for GREEN and every later acceptance
 review.
 
-## Next Agent Prompt — Phase 1n-d(i) production GREEN
+## Phase 1n-d(i) first production GREEN — corrective review required
 
-Spawn a distinct fresh Codex-high GREEN agent. It may change only the bounded
-production owners authorized above: node-local role provenance and its
-create/connect/restore/purge propagation, `DRPIntervalSync`'s required role and
-fast-runner choice, and deletion of the raw post-fetch Sync timer/logs. It must
-not edit either frozen RED file, the plan, protocol/wire/schema, generated/lock
-or protected files. Keep `creatorFromObjectID` for ACL/routing authority and
-remove it only as a scheduler-role oracle. No optional/default role, fallback,
-shim or legacy plain-id branch is permitted.
+Distinct fresh Codex-high committed production-only review candidate
+`940a3d5d72086679cfbded23148a6af9ae35068c` (tree
+`e061b2810d0bd40fdf67ecfa8f2da918b28d5f43`, parent `2c93f4b`). Exact scope is
+`packages/node/src/index.ts` and `packages/node/src/interval-sync.ts`; no frozen
+test, plan, protocol/wire/schema, generated/lock or protected file changed.
 
-Run the frozen owner to exact 3/3, then the same sequential preservation,
-ordered builds, exact typecheck census, changed-file lint, Prettier and diff
-checks to a dedicated `.log` directory. Demonstrate a one-line/runtime causal
-mutation for each semantic owner without committing it; package result and
-verified manifest hashes; commit production only after all gates pass. Do not
-run inventory/performance, sealed, fuzz, proto-generation or full-suite
-workloads.
+The candidate deletes the raw post-fetch Sync interval and misleading success
+logs. The tracked `DRPIntervalSync` becomes the sole scheduled per-object Sync
+owner. A required `replicaOrigin: "created" | "connected"` replaces ID-shape
+role inference; only `connected` builds the bounded fast runner. Node-local
+provenance is recorded unconditionally at fresh create/connect acquisition,
+threaded through interval construction, retained across ordinary stop/start and
+public `node.put` replacement, and removed on purge. Legitimate
+`creatorFromObjectID` ACL/genesis/routing uses, directed fetch and the contained
+group-peer event trigger remain.
+
+Four bounded production mutants were killed and reverted: reintroducing an
+unmanaged post-fetch timer failed 3/3; inverting the origin gate failed 2/3;
+clearing origin on stop failed restart; and retaining it on purge failed a
+built-runtime assertion. Frozen RED passes 3/3; initial/anti-entropy passes
+11/11; Phase 1n-c passes 5/5 and 23/23; semantic preservation passes 30/30;
+manual passes 1/1 with 13 skipped; ordered builds pass 5/5. Typechecks retain
+clean/clean/clean and exact inherited object 5/node 2 with zero owned. Lint has
+zero errors, Prettier/diff checks pass, and protected/stash state is invariant.
+
+Disposition remains `CHANGES_REQUIRED`, not final GREEN. Evidence is under
+`.logs/phase-1n-d-i-retry-owner-green-codex-high/`. Result SHA-256 is
+`36387087b2c5395cbb1e7eb7b9cacd8edb329e29f3171917745440027a2530a9`;
+verified 41-entry manifest SHA-256 is
+`743de32111bd6da003adec93a98a7b370ea2d8140af98317b216b24d8d49dfd4`.
+
+## Phase 1n-d(i) first GREEN review — unmanaged restore corrective authorized
+
+The GREEN owner's first generic `codex review --uncommitted` widened into
+protected untracked files and unrelated checks, so it was interrupted and is
+non-authoritative; it made no edits. Replacement read-only two-file Codex-high
+(session `019fd7c4-9e86-7153-9e44-4be2a51490f6`, `gpt-5.6-sol`, high) found
+four candidate issues. The missing local type import and stale first-write-wins
+acquisition role were fixed before `940a3d5`; fresh create/connect now overwrite
+the map, while `node.put` leaves an existing role intact. Its public-put restore
+finding remains a genuine blocker. The configured-peer finding is a real
+off-group capability reduction but is the exact deletion already authorized by
+the prior quorum and golden-path membership contract; no timer, one-shot or
+preferred-peer scheduler state is added. Scoped review log SHA-256 is
+`f6534ee1c69676a46c22733a7bb202a31a15113f23965ede7ff1f84148e38649`.
+
+The blocker is precise: `put` is a supported public `IDRPNode` API. A genuinely
+new put-inserted object has no create/connect provenance. Before this GREEN,
+same-instance restart restored discovery and periodic anti-entropy for every
+stored object; candidate `940a3d5` restores discovery only, permanently
+removing the periodic repair floor. Missing provenance must suppress connected
+fast retry, not ordinary periodic anti-entropy.
+
+Required plan-refinement quorum authorizes the sustainable correction:
+
+- Codex-high agrees that transiently passing `"created"` would expose false
+  provenance through the exported readonly `DRPIntervalSync.replicaOrigin`.
+  It requires a scheduler-only `"unmanaged"` state, with the private
+  acquisition map remaining exactly `created | connected`.
+- Exact Kimi 3 initially proposed transient `"created"`, then the same native
+  session reconsidered the public observable property and superseded its first
+  verdict to `PLAN_REFINEMENT_AGREED=yes`. Session
+  `32d984a7-2d01-4cb1-b0a8-f722efcf3bbd` used CLI 1.49.0, effective
+  `managed:kimi-code:k3` / K3, thinking and environment/CLI/loaded caps 100:
+  two turns, nine steps, 13 successful read-only calls, no workload or write.
+  Authoritative result SHA-256 is
+  `6e38a2eae2c678579562225fd172b137fce7a2a9adc972c0fc8c3ef42efdae2e`;
+  verified 25-entry manifest SHA-256 is
+  `5af5d40e334448d9f399bede41c0bd6de020e7fc9ae4ca2b838785a8bb566918`.
+  Evidence is under
+  `.logs/phase-1n-d-i-green-boundary-kimi3-high-100/`.
+- Claude-skill Opus/xhigh independently returns `REVISE` and
+  `PLAN_REFINEMENT_AGREED=yes`. Session
+  `3623b402-715c-4ab3-aa7d-23749cfe61f7` used substantive `claude-opus-5`,
+  requested xhigh, 40 turns and read/Grep/Glob/Bash only. One unavailable Write
+  attempt created nothing. Automatic Haiku use was only 1,607 input / 25 output
+  tokens for `generate_session_title`, with no helper reasoning or conclusion.
+  Result SHA-256 is
+  `9b143a3b7493e2c3181c0a80a64161c8ad6b2e4696e4ed02c4b2e0d3531c87f6`;
+  verified five-entry manifest SHA-256 is
+  `4a1fa75bc38e32a303c84d581769ac130cdb28f10f0d7293a6d3e2cf97f412d4`.
+  Evidence is under `.logs/phase-1n-d-i-green-boundary-opus-xhigh/`.
+
+The authorized corrective boundary is additive and local:
+
+1. Keep node acquisition provenance strictly `created | connected`; never
+   record `unmanaged` in `_replicaOrigins` and never infer it from ID shape.
+2. Widen only the required scheduler input/state to
+   `created | connected | unmanaged`. `unmanaged` starts the existing immediate
+   and periodic anti-entropy runner but never constructs the one-second fast
+   runner. It is not a default, wire/schema field, durable record or legacy-ID
+   compatibility state.
+3. On missing-provenance restore, construct the ordinary discovery and Sync
+   intervals explicitly with `unmanaged`; do not mutate the provenance map.
+   A later public create/connect acquisition records its truthful role.
+4. Keep candidate `940a3d5`'s timer deletion, fresh acquisition overwrite,
+   `node.put` preservation, purge deletion, configured-peer disposition and all
+   other accepted semantics unchanged.
+
+## Next Agent Prompt — Phase 1n-d(i) unmanaged-restore corrective RED
+
+Spawn a fresh Codex-high tests-only corrective RED against `940a3d5`. Add one
+bounded non-frozen node test owner; do not edit the two frozen RED files,
+production, plan, protocol/schema or protected files. Through public `node.put`
+and same-instance stop/start, use a remote-shaped id and injected negotiated
+sender to prove: missing provenance restores one immediate and ordinary
+periodic anti-entropy probe, emits no one-second fast retries, and never derives
+role from the id. In the same coherent owner, pin that a `node.put` replacement
+does not erase an existing acquisition role and a later fresh connect/create
+overwrites it truthfully only if needed to keep the correction non-vacuous. Do
+not add a configured-peer test or reopen that authorized deletion.
+
+Run the new owner to causal RED while frozen 3/3 and all prior preservation
+remain green; run ordered builds, exact typecheck census, changed-test lint,
+Prettier and diff checks sequentially to `.log`. Package result/verified
+manifest hashes and commit tests only. No inventory/performance, sealed, fuzz,
+proto-generation or full-suite workload.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
