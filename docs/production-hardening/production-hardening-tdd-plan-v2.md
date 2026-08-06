@@ -26799,23 +26799,74 @@ constructions in `anti-entropy.test.ts`. Those old assertions, all 11 migrated
 initial/anti-entropy titles and all accepted 1n-c tests are preservation-only;
 no weakening, replacement or legacy fixture route is authorized.
 
-## Next Agent Prompt — Phase 1n-d(i) tests-only RED
+## Phase 1n-d(i) tests-only RED — checkpointed
 
-Spawn a fresh Codex-high tests-only RED agent against this authorized boundary.
-It may add one bounded node test owner and the five additive direct-constructor
-fixture arguments described above. It must not change production, the plan,
-generated/lock/protected files or accepted assertions. Use real public
-`createObject`/`connectObject`, injected negotiated sender, fake timers and
-bounded `unhandledRejection` capture; avoid a private-method-only oracle. Prove
-each failure is causal with a safe control and freeze exact pre/post counts.
+Fresh Codex-high committed immutable tests-only RED
+`514cc5506501b2ca819ed8aa22dab4adab29b2ab` (tree
+`280e03d5aad3ba3ecc940e2d5996a3751a572079`, parent `08bf722`). Exact scope is
+two node test files / +353/-5: new
+`sync-retry-owner-provenance-1n-d-i-red.test.ts` (346 lines, three titles) and
+five additive `replicaOrigin: "created"` spread arguments at the direct
+`createDRPIntervalSync` constructions in `anti-entropy.test.ts`. No production,
+plan, generated, lock or protected file changed; the eight anti-entropy and
+three initial-sync titles remain unchanged.
 
-Run the new owner, the relevant initial-sync and anti-entropy preservation,
-accepted Phase 1n-c focused/preservation owners, ordered affected builds,
-exact inherited typecheck census, changed-file lint, Prettier and diff checks
-sequentially to `.log`. Keep HEAD/tree/index/stash/protected state controlled
-and package result/verified manifest hashes. Do not run inventory/performance,
-sealed, fuzz, proto-generation or full-suite workloads. Commit only the
-tests-only RED after proving the intended current-production failures.
+Current production is exact 3 failures / 0 passes with 12 causal soft failures:
+
+1. The public successful-fetch `connectObject` path leaks one controlled typed
+   `SyncTransportError`, records eight attempts rather than one immediate plus
+   five fast retries, and produces `[a,b,c,c,c,a,b,c]` rather than the sole
+   tracked owner's `[a,b,c,a,b,c]` rotation.
+2. Remotely authored history, `stop()` and `unsubscribeObject()` each leave one
+   raw scheduled attempt, proving that send-resolution truth and the untracked
+   handle bypass all three authoritative stop conditions.
+3. A separator-shaped explicit-ACL local create incorrectly fast-retries five
+   times; a generated connected replica has six rather than five attempts; a
+   plain explicit-ACL connected replica has one rather than five; the two role
+   errors repeat across same-instance restart; and purge/reacquire exposes six
+   rather than five attempts. Plain custom create/connect without an explicit
+   ACL remain rejected controls.
+
+The first title also proves direct `syncObject` still rejects the typed
+transport error. The connected generated control rotates through all three
+sorted peers and the created generated control stays periodic-only. The role
+test uses the public create/connect boundaries and real same-instance
+stop/start; no private provenance map or ID parser is the oracle.
+
+Preservation passes initial/anti-entropy 11/11, accepted Phase 1n-c peerless
+5/5, focused 23/23, semantic 30/30 and manual 1/1 with 13 skipped. Ordered
+builds pass 5/5. Types/network/message-queue typechecks are clean; object/node
+retain exact inherited 5/2 with zero owned diagnostics. Changed-file lint,
+Prettier and diff checks pass. The tracked test-file census grows only 322 to
+323; protected files and stash `ef3a53...` remain invariant. No forbidden
+workload ran.
+
+Evidence is under `.logs/phase-1n-d-i-retry-owner-red-codex-high/`. Result
+SHA-256 is
+`07885e4ee41f0d8e767bd04f521fc1291cdac1dfbddeb7394c8d5ee8821d85a6`;
+verified manifest SHA-256 is
+`706f40cf80c202fec878f0ed64e96716b0b0b426bed756952e80f0f7e568008b`.
+Freeze both test files byte-for-byte for GREEN and every later acceptance
+review.
+
+## Next Agent Prompt — Phase 1n-d(i) production GREEN
+
+Spawn a distinct fresh Codex-high GREEN agent. It may change only the bounded
+production owners authorized above: node-local role provenance and its
+create/connect/restore/purge propagation, `DRPIntervalSync`'s required role and
+fast-runner choice, and deletion of the raw post-fetch Sync timer/logs. It must
+not edit either frozen RED file, the plan, protocol/wire/schema, generated/lock
+or protected files. Keep `creatorFromObjectID` for ACL/routing authority and
+remove it only as a scheduler-role oracle. No optional/default role, fallback,
+shim or legacy plain-id branch is permitted.
+
+Run the frozen owner to exact 3/3, then the same sequential preservation,
+ordered builds, exact typecheck census, changed-file lint, Prettier and diff
+checks to a dedicated `.log` directory. Demonstrate a one-line/runtime causal
+mutation for each semantic owner without committing it; package result and
+verified manifest hashes; commit production only after all gates pass. Do not
+run inventory/performance, sealed, fuzz, proto-generation or full-suite
+workloads.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
