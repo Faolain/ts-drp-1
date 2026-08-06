@@ -27274,23 +27274,69 @@ legacy plain or malformed IDs, and caller-chosen IDs without explicit ACL,
 remain negative controls. Field 1 is transport compatibility only, never legacy
 identity support.
 
-## Next Agent Prompt — Phase 1n-d aggregate acceptance RED, amended
+## Phase 1n-d aggregate acceptance tests-only RED — checkpointed
 
-Resume with a fresh Codex-high tests-only owner against this exact C1-C13
-contract and test-only capability seam. Use one coherent deterministic public-
-behavior harness with the paired short/long heads corpus, partition/rejoin,
-delayed old-branch injection, recursive exact-hash recovery, counted
-confirmation/quiescence and the separate asymmetric fallback exchange. Use a
-transparent wrapper around the real negotiated sender, real payload factories,
-real streams and exact outer protobuf bytes. The private host is permitted only
-for the single authorized `unhandle` setup. Preserve every accepted 1n owner
-byte-for-byte and add no production compatibility surface.
+Fresh Codex-high landed the single tests-only owner at
+`fb8256dbccc66796416d7993d5bb55493c7159aa`. Its only path is
+`packages/node/tests/sync-aggregate-acceptance-1n-d-red.test.ts`; source
+SHA-256 is
+`0624fdc3dec261e6711e106748da7f5127f17f2bca1a33659eb9f29e588a1a69`.
+No production, plan, identity or protected untracked path changed.
 
-Prove an exact causal RED against current production, run focused preservation,
-five ordered builds, exact typecheck census, changed-test lint, Prettier and
-diff checks sequentially to `.log`, package a verified manifest and commit only
-tests. No full inventory/performance, sealed, fuzz, proto-generation or full
-suite. No legacy plain-ID positive path.
+The authoritative run is causal RED at 1 failed / 1 passed. Both hard-corpus
+members exercise the same public partition/rejoin, seven-vertex missing DAG,
+exact-hash recovery, delayed signed old-branch injection and bidirectional
+confirmation/quiescence sequence. The short member retains 16 shared vertices;
+the long retains 80, satisfying 5x and +64. Missing parent shape, operation
+payload bytes, signer set and encoded-length multiset are equal. Current
+production nevertheless accumulates verified branch-cut/shared-head state with
+the retained prefix. The 80-prefix member reaches the real payload builder with
+an over-envelope heads request and throws `SyncTransportError` code
+`SYNC_REQUEST_LIMIT` / “Heads request exceeds the v1 sync ceiling”; the
+16-prefix member reaches the same scenario without that failure. This is the
+first hard C9/C10 violation and prevents the later equality oracle from being
+reached. Do not weaken or bypass the cap to turn it green.
+
+The separate real asymmetric fallback owner passes. Its sole private action is
+one authorized `unhandle(DRP_HEADS_CHUNK_PROTOCOL)`; the request selects field
+1 with one complete bounded inventory and the response leg reselects
+heads-chunk. Same-ID replicas use explicit coordinated ACL. No legacy plain-ID
+positive path, shim or identity fallback exists.
+
+Preservation passes Phase 1n-a 11/11, 1n-b 11/11, 1n-c 28/28 and 1n-d(i) 4/4;
+all twelve frozen owner blobs verify. Five ordered builds pass. Types, network
+and message-queue typecheck clean; object retains exactly five and node exactly
+two inherited Phase 1i-b diagnostics, with no owned-file diagnostic. Changed-
+test ESLint, Prettier and diff checks pass. Evidence is under
+`.logs/phase-1n-d-aggregate-amended-red-codex-high/`; result SHA-256 is
+`e63900aaf9d77f458aa6b65ebdc6053222eba18070b5a40729f67649eee7d383`
+and verified artifact-manifest SHA-256 is
+`aaa9670697646f9f0ac81b834e1ed1b6d29fa0507028fd91da188ab373f196a4`.
+No inventory/performance, sealed, fuzz, proto-generation or full-suite workload
+ran.
+
+## Next Agent Prompt — Phase 1n-d aggregate production GREEN
+
+Spawn a distinct fresh Codex-high production owner against frozen RED
+`fb8256d` and the exact C1-C13 contract. Trace the verified branch-cut/shared-
+head accumulation through the real heads payload factory, then make the
+smallest coherent production correction that keeps emitted heads-mode recovery
+state bounded by useful delta information. Preserve truthful old-branch and
+recursive exact-hash recovery, every accepted per-frame cap, aggregate
+short/long equality, fallback behavior and all accepted 1n owners. The GREEN
+must let the entire frozen aggregate owner reach and pass its equality oracle;
+catching `SYNC_REQUEST_LIMIT`, deleting the long corpus, relaxing a cap, hiding
+messages, truncating recovery, emitting field 1 to current peers or adding a
+production downgrade switch is forbidden.
+
+Do not edit the frozen aggregate test or the plan. Do not change ID generation,
+parsing, ACL, wire identity or durable schema: this remains greenfield and has
+no legacy plain-ID support. Run the focused owner and all accepted 1n
+preservation sequentially, five ordered builds, exact typecheck census,
+production lint, Prettier and diff checks to `.log`; add a narrow mutant or
+instrumented causal trace if needed to prove the production owner. Package a
+verified manifest and commit only the minimal production paths. No full
+inventory/performance, sealed, fuzz, proto-generation or full suite.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
