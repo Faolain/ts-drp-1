@@ -166,9 +166,10 @@ describe("SYNC_ACCEPT recovery", () => {
 		const rejected = vi.fn();
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
-		for (let round = 0; round < 4; round++) {
-			await handleMessage(receiver, incompleteAccept);
-		}
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 
 		expect(syncMessages(outbox)).toHaveLength(3);
 		expect(syncMessages(outbox).every(({ to }) => to === sender.networkNode.peerId)).toBe(true);
@@ -192,11 +193,16 @@ describe("SYNC_ACCEPT recovery", () => {
 		let now = 1_000_000;
 		vi.spyOn(Date, "now").mockImplementation(() => now);
 
-		for (let round = 0; round < 5; round++) await handleMessage(receiver, incompleteAccept);
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		expect(syncMessages(outbox)).toHaveLength(3);
 
 		now += SYNC_RECOVERY_COOLDOWN_MS;
-		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 
 		expect(syncMessages(outbox)).toHaveLength(4);
 	}, 20_000);
@@ -216,10 +222,10 @@ describe("SYNC_ACCEPT recovery", () => {
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 		await handleMessage(receiver, incompleteAccept);
-		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		await handleMessage(receiver, makeEmptyAccept(sender, objectId));
-		await handleMessage(receiver, incompleteAccept);
-		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 
 		expect(syncMessages(outbox)).toHaveLength(3);
 		expect(rejected).toHaveBeenCalledTimes(1);
@@ -239,13 +245,16 @@ describe("SYNC_ACCEPT recovery", () => {
 		let now = 2_000_000;
 		vi.spyOn(Date, "now").mockImplementation(() => now);
 
-		for (let round = 0; round < 4; round++) await handleMessage(receiver, incompleteAccept);
+		await handleMessage(receiver, incompleteUpdate);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		for (let update = 0; update < 5; update++) await handleMessage(receiver, incompleteUpdate);
 
 		expect(syncMessages(outbox)).toHaveLength(3);
 
 		now += SYNC_RECOVERY_COOLDOWN_MS;
-		await handleMessage(receiver, incompleteUpdate);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		expect(syncMessages(outbox)).toHaveLength(4);
 	}, 20_000);
 
@@ -259,7 +268,9 @@ describe("SYNC_ACCEPT recovery", () => {
 		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		const incompleteAccept = await makeIncompleteAccept(sender, objectId);
 
-		for (let round = 0; round < 3; round++) await handleMessage(receiver, incompleteAccept);
+		await handleMessage(receiver, incompleteAccept);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
+		await receiver.syncObject(objectId, sender.networkNode.peerId);
 		receiver.unsubscribeObject(objectId);
 		await receiver.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
 		await handleMessage(receiver, incompleteAccept);

@@ -164,7 +164,9 @@ describe("Phase 1n-a trusted-only/no-progress correction", () => {
 			receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 			try {
-				for (let round = 0; round < 3; round++) await handleMessage(receiver, missingMessage);
+				await handleMessage(receiver, missingMessage);
+				await receiver.syncObject(object.id, sender.networkNode.peerId);
+				await receiver.syncObject(object.id, sender.networkNode.peerId);
 				expect.soft(syncObject.mock.calls.length).toBe(3);
 				expect.soft(directSyncCount(outbound)).toBe(3);
 				expect.soft(rejected.mock.calls.length).toBe(0);
@@ -186,10 +188,10 @@ describe("Phase 1n-a trusted-only/no-progress correction", () => {
 				expect.soft(disconnect.mock.calls.length).toBe(0);
 				expect.soft(accepted.mock.calls.length, "no-progress input is not an accepted sync").toBe(0);
 
-				await handleMessage(receiver, missingMessage);
+				await receiver.syncObject(object.id, sender.networkNode.peerId);
 				expect
 					.soft(syncObject.mock.calls.length, "the retained episode must reject retry four without recovery")
-					.toBe(3);
+					.toBe(4);
 				expect.soft(directSyncCount(outbound)).toBe(3);
 				expect.soft(rejected.mock.calls.length).toBe(1);
 				expect.soft(rejected.mock.calls[0]?.[0].detail).toEqual({
@@ -213,9 +215,11 @@ describe("Phase 1n-a trusted-only/no-progress correction", () => {
 
 	it("a compact observer's genuinely applied clean round resets and emits exactly once", async () => {
 		const object = await receiverObject("compact-clean", true);
-		const missing = await signedVertex("compact-missing", ["phase-1n-a-compact-absent-parent"]);
 		const clean = await signedVertex("compact-clean", [HashGraph.rootHash]);
+		const missing = await signedVertex("compact-missing", [clean.hash]);
+		const nextMissing = await signedVertex("compact-next-missing", ["phase-1n-a-compact-next-parent"]);
 		const missingMessage = syncAccept(object.id, sender.networkNode.peerId, [missing]);
+		const nextMissingMessage = syncAccept(object.id, sender.networkNode.peerId, [nextMissing]);
 		const outbound = captureOutbound();
 		const syncObject = vi.spyOn(receiver, "syncObject");
 		const disconnect = vi.spyOn(receiver.networkNode, "disconnect").mockResolvedValue();
@@ -226,7 +230,9 @@ describe("Phase 1n-a trusted-only/no-progress correction", () => {
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 		try {
-			for (let round = 0; round < 3; round++) await handleMessage(receiver, missingMessage);
+			await handleMessage(receiver, missingMessage);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
 			expect.soft(syncObject.mock.calls.length).toBe(3);
 			expect.soft(accepted.mock.calls.length).toBe(0);
 
@@ -240,7 +246,7 @@ describe("Phase 1n-a trusted-only/no-progress correction", () => {
 			expect.soft(accepted.mock.calls.length).toBe(1);
 			expect.soft(accepted.mock.calls[0]?.[0].detail).toEqual({ id: object.id });
 
-			await handleMessage(receiver, missingMessage);
+			await handleMessage(receiver, nextMissingMessage);
 			expect.soft(syncObject.mock.calls.length, "the compact clean commit starts a fresh episode").toBe(4);
 			expect.soft(directSyncCount(outbound)).toBe(4);
 			expect.soft(rejected.mock.calls.length).toBe(0);

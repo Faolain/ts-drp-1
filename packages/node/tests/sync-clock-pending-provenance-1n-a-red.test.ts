@@ -244,10 +244,12 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 		const now = Date.now();
 		vi.spyOn(Date, "now").mockReturnValue(now);
 		const object = await receiverObject("clean-round-reset");
-		const missing = await signedVertex("clean-round-missing", ["phase-1n-a-clean-round-absent-parent"], now);
 		const clean = await signedVertex("clean-round-applied", [HashGraph.rootHash], now);
+		const missing = await signedVertex("clean-round-missing", [clean.hash], now);
+		const nextMissing = await signedVertex("clean-round-next-missing", ["phase-1n-a-clean-round-next-parent"], now);
 		const missingMessage = message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [missing]);
 		const cleanMessage = message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [clean]);
+		const nextMissingMessage = message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [nextMissing]);
 		const outbound = captureOutbound();
 		const syncObject = vi.spyOn(receiver, "syncObject");
 		const disconnect = vi.spyOn(receiver.networkNode, "disconnect").mockResolvedValue();
@@ -264,7 +266,9 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 		try {
-			for (let round = 0; round < 3; round++) await handleMessage(receiver, missingMessage);
+			await handleMessage(receiver, missingMessage);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
 			expect.soft(syncObject.mock.calls.length).toBe(3);
 			expect.soft(directTypes(outbound).filter((type) => type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(3);
 			expect.soft(rejected).not.toHaveBeenCalled();
@@ -280,15 +284,17 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 			expect.soft(object.vertices.map(({ hash }) => hash)).toEqual([HashGraph.rootHash, clean.hash]);
 			expect.soft(object.drp?.value).toBe(1);
 
-			// A reset makes this retry one of a new episode. Three new incomplete
-			// rounds must all recover before the fourth opens a fresh cooldown.
-			for (let round = 0; round < 3; round++) await handleMessage(receiver, missingMessage);
+			// Resolving the exact dependency closes the old lifecycle. A different
+			// missing request then owns three fresh scheduled attempts.
+			await handleMessage(receiver, nextMissingMessage);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
 			expect.soft(syncObject.mock.calls.length, "post-clean recovery must restart at retry one").toBe(6);
 			expect.soft(directTypes(outbound).filter((type) => type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(6);
 			expect.soft(rejected.mock.calls.length, "the clean round must discard the earlier retry count").toBe(0);
 
-			await handleMessage(receiver, missingMessage);
-			expect.soft(syncObject.mock.calls.length).toBe(6);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
+			expect.soft(syncObject.mock.calls.length).toBe(7);
 			expect.soft(rejected).toHaveBeenCalledTimes(1);
 			expect.soft(rejected.mock.calls[0]?.[0].detail).toEqual({
 				id: object.id,
@@ -321,7 +327,7 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 
 		try {
 			await handleMessage(receiver, missingMessage);
-			await handleMessage(receiver, missingMessage);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
 			expect.soft(syncObject.mock.calls.length).toBe(2);
 
 			await handleMessage(receiver, pendingMessage);
@@ -329,7 +335,7 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 			expect.soft(rejected.mock.calls.length).toBe(0);
 			expect.soft(accepted.mock.calls.length, "pending-only input is not an accepted sync").toBe(0);
 
-			await handleMessage(receiver, missingMessage);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
 			expect.soft(syncObject.mock.calls.length).toBe(3);
 			expect.soft(rejected.mock.calls.length).toBe(0);
 
@@ -338,13 +344,13 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 			expect.soft(rejected.mock.calls.length).toBe(0);
 			expect.soft(accepted.mock.calls.length, "pending-only input must not reset or report convergence").toBe(0);
 
-			await handleMessage(receiver, missingMessage);
-			expect.soft(syncObject.mock.calls.length).toBe(3);
+			await receiver.syncObject(object.id, sender.networkNode.peerId);
+			expect.soft(syncObject.mock.calls.length).toBe(4);
 			expect.soft(rejected.mock.calls.length).toBe(1);
 
 			await handleMessage(receiver, pendingMessage);
 			await handleMessage(receiver, missingMessage);
-			expect.soft(syncObject.mock.calls.length, "pending must not reset an active cooldown").toBe(3);
+			expect.soft(syncObject.mock.calls.length, "pending must not reset an active cooldown").toBe(4);
 			expect.soft(rejected.mock.calls.length).toBe(1);
 			expect.soft(accepted.mock.calls.length, "pending-only input in cooldown remains unaccepted").toBe(0);
 			expect.soft(directTypes(outbound).filter((type) => type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(3);
