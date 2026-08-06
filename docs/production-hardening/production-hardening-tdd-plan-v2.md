@@ -26290,15 +26290,52 @@ Evidence is under `.logs/phase-1n-c-literal-wire-cap-red-codex-high/`.
 The RED adds no legacy/plain-id fixture or behavior. Unknown-field padding is
 malformed resource input only.
 
-## Next Agent Prompt — Phase 1n-c literal-wire cap distinct GREEN
+## Phase 1n-c literal-wire cap corrective GREEN — review candidate
 
-Start a distinct fresh Codex-high GREEN from RED `3e4298e`. Freeze every test
-and assertion. Change the canonical validator contract to receive the exact
-encoded byte length. Encode once on the sender, validate that length and write
-the same byte array; on the receiver pass the raw stream frame length. Keep one
-request/response type-to-cap owner, canonical payload decode, field/count caps,
-typed errors and pre-admission ordering. Do not add a second byte parser, unknown
-field registry, compatibility wrapper, object-id policy or test-only seam.
+Distinct fresh Codex-high committed production-only GREEN
+`cde21098b1c782bb8046066526cda08236c44425` (tree
+`3d9316dc9c3a1784115257ca0eab19f855e68f9b`) from RED-docs parent
+`3341b5e`. Its exact scope is three production files, +13/-17:
+`packages/network/src/{node.ts,sync.ts}` and
+`packages/node/src/sync-codec.ts`.
+
+`validateNegotiatedSync` now requires the exact encoded byte length and never
+re-encodes. Both response types and both request modes consume that one byte-cap
+authority. The network sender encodes once after selected payload construction,
+validates that buffer length and writes the same `Uint8Array`. Receiver ingress
+passes raw `data.byteLength` before ingress construction or queue admission.
+The node payload builder passes its canonical encoded length during preflight
+before lifecycle/accounting mutation, preserving no-fabricated-progress; this
+required third call site is why the honest production scope is three files, not
+the initially expected two.
+
+Literal-wire tests pass 8/8 before and after commit; prior envelope corrective
+passes 3/3; immutable Phase 1n-c passes 12/12; corrected owners pass 22/22; and
+semantic preservation passes 30/30. Ordered builds pass 5/5. Types, network and
+message-queue typechecks are clean; object/node retain exact inherited 5/2 with
+zero owned. ESLint has zero errors and 41 JSDoc warnings; Prettier and diff
+checks pass. All 383 tests, four Phase 1n-c owners, 47,303 protected entries and
+stash `ef3a53...` remain invariant.
+
+The `refactor-clean` result is one required exact-byte contract with no optional
+fallback, parallel parser/validator, unknown-field preservation, schema/object-
+id surrogate, compatibility wrapper or test seam. No legacy/plain-id behavior
+was added. Evidence is under
+`.logs/phase-1n-c-literal-wire-cap-green-codex-high/`; ledger SHA-256 is
+`d5421788663792df5c15377087537afb63ec31ccb23d1f7e7a74b23450eb1b1e`
+and verified evidence-manifest SHA-256 is
+`987f40c455c286d1783865d9747850f9059fd9720720cc8e41ace848698a9d00`.
+
+## Next Agent Prompt — Phase 1n-c restart fresh acceptance review
+
+Start a fresh Grok 4.5/high review of candidate `cde2109` over the complete
+Phase 1n-c lineage. Re-run bounded hostile raw-frame and ordinary controls and
+verify sender actual-buffer, receiver literal-frame and node pre-accounting
+preflight owners agree. Reassess the full amended negotiation, provenance,
+bounded-flow, lifecycle/accounting, preservation and refactor-clean contracts.
+Authenticate the sole effective model and keep the review read-only. Only if
+Grok accepts may fresh exact Kimi 3/high/dual-100 start; only if Kimi accepts may
+final fresh Opus/xhigh start.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
@@ -26312,11 +26349,10 @@ fallback complete-or-typed-fail, never paginate or truncate it. Keep response
 chunks independently authenticated/idempotent and progress-preserving; add no
 session/continuation accumulator.
 
-Run the complete bounded Phase 1n-c focused and preservation gates, ordered
-builds, exact inherited typecheck census, lint, Prettier and diff checks to
-`.log`. Do not run inventory/perf, sealed, fuzz, proto-gen or full-suite
-workloads. Only after a production-only GREEN commit and packaged evidence may
-the fresh Grok -> exact Kimi 3/high/dual-100 -> Opus/xhigh chain restart.
+Keep HEAD/tree/index/stash/protected state invariant and package result/model
+authentication/verified manifest hashes under `.logs`. Do not run inventory/
+perf, sealed, fuzz, proto-gen or full-suite workloads. Do not request a legacy
+plain-id mode: this is a greenfield implementation.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
