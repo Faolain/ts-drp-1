@@ -25526,23 +25526,103 @@ focused generated Sync diff remains the paused draft's 56 additions/1 deletion
 and is verified by the types build and frozen wire tests. No inventory/perf
 benchmark, sealed workload, fuzzer or full suite ran during GREEN.
 
-## Next Agent Prompt — Phase 1n-b GREEN preliminary reviews
+## Phase 1n-b GREEN preliminary reviews — rejected
 
-At fixed candidate `299bc0b`, run fresh independent Grok 4.5/high and exact Kimi
-CLI v1.49.0 with `kimi-code/k3`, thinking and both 100-step limits. Each must
-authenticate the RED/GREEN manifests and fixed source, then adversarially trace
-the additive wire fallback, reciprocal possession proof, delta/history bounds,
-exact-set transitions, verifier-derived arrival, UPDATE/SYNC_ACCEPT parity,
-attempts one through four, cooldown restart, peer rotation, cleanup and removal
-of every old retry owner. Explicitly probe partial multi-hash completion,
-send-failure/reentry, identical/new-set reoffers, rejected-boundary behavior and
-normal no-outstanding heads sync for unseen gaps. Confirm the no-legacy-plain-ID
-greenfield boundary and absence of a compatibility/test-only branch.
+Both authoritative preliminary reviewers reject fixed candidate `299bc0b` for
+the same composed lifecycle defect, so the conditional final Opus/xhigh review
+was correctly skipped.
 
-Reviewers are read-only and must not run inventory/perf, sealed, fuzz or full
-suite workloads. They may run only bounded focused tests if their sandbox allows
-it. Final Claude-skill Opus/xhigh starts only after both preliminary reviewers
-accept. Record every finding and model/controller disclosure before closure.
+- Native Grok 4.5/high session
+  `019fd5fd-bcd9-7e82-96f7-635442662267` first provisionally accepted, then
+  same-session request `ac7ef3b4-8314-49e0-b761-0bbfe9b31836`
+  superseded that result after a controller-provided concrete path. The final
+  result is `CHANGES_REQUESTED` / `GREEN_MAY_PROCEED: no` /
+  `OPUS_MAY_START: no`; result SHA-256 is
+  `9d0a96de0b7d774837e3b6c64f216c2c194b25d25171697a32abdf99becde2b6`
+  and the verified 54-entry artifact-manifest SHA-256 is
+  `312ce16192f143733a82bc77287d839a6ea2656e08785db0b724a39e31731d00`.
+- Exact Kimi CLI v1.49.0, effective `managed:kimi-code:k3`, thinking and both
+  100-step limits, used the same native session
+  `d53a9d65-4717-4d28-86c5-8cc5b494711c` for its initial 31-step / 45-call
+  review and one-step / zero-call resumed adjudication. The superseding result
+  is `CHANGES_REQUESTED` / `GREEN_MAY_PROCEED: no` /
+  `OPUS_MAY_START: no`; result SHA-256 is
+  `54bbba915a0ca01a8d1443efc3aa072d07fcd6c5fe45187c4244686d1f6ceb78`
+  and the verified 52-entry artifact-manifest SHA-256 is
+  `061f9fbe978fbf68902172021a28f12365b58dee24a806da06fe163070218de1`.
+  It ran the same bounded 26-test selection twice; both passed. A third
+  600-second command was rejected before execution. Its native report also
+  invoked a bare PATH `kimi` that resolved to 0.31.0; the authenticated
+  controller above is authoritative. No inventory/perf, sealed, fuzz or full
+  workload ran.
+
+The defect is inside the already-authorized inbound-neutrality contract, not a
+new plan assumption. With an outstanding exact parent, an inbound heads-mode
+SYNC can advertise locally known but not last-advertised heads and prove the
+local current frontier in `sharedHeads`. The resulting delta is empty,
+`queuedUnknown` is false and `shouldReciprocate` is true. That branch calls the
+ordinary `syncObject`, whose unconditional exact-probe preparation re-carries
+the unchanged outstanding hash and charges attempts two/three/four. Repeated
+inbound messages can therefore consume the scheduled retry budget and open
+cooldown without a scheduled probe.
+
+The correction must keep one lifecycle owner while separating two send
+purposes. Discovery of a genuinely new unknown exact hash remains the charged
+attempt-one path. A pure heads/shared-heads reciprocity response is uncharged,
+carries an empty `requestedHashes`, does not change attempts/cooldown/rejection,
+and is inert during active cooldown. Public/manual and periodic scheduled probes
+remain the only owners of attempts two through four. Do not add a second counter,
+test hook, compatibility branch or legacy plain-ID path.
+
+Evidence is under `.logs/phase-1n-b-green-grok45-high-review/` and
+`.logs/phase-1n-b-green-kimi3-high-100-review/`. Both reviews verified fixed
+HEAD/tree/source/index/stash/protected-path invariance.
+
+## Phase 1n-b inbound-reciprocity attempt-neutrality corrective RED — frozen
+
+Fresh Codex-high tests-only commit
+`41671de44cb8b6c52ffccd5545feb292255e7319` (tree
+`c6eae3cc7ee03042cb012419525ae3f90076f545`) adds exactly the 279-line
+`sync-reciprocity-attempt-neutrality-1n-b-red.test.ts`; file SHA-256 is
+`316ee7e236bc816d49854eb933bc3a2c7390020d2bc2cb1d79fd237ac79b79bd`.
+It reaches the real handler/applier path and first opens an outstanding exact
+parent through an incomplete authenticated SYNC_ACCEPT. Four inbound no-delta
+heads/shared-heads messages then exercise ordinary reciprocity. The production
+candidate emits two reciprocal SYNCs that both re-carry that parent instead of
+empty exact-request fields, so the authoritative signature is 1 failed / 1
+passed. The positive control proves a genuinely new unknown head emits attempt
+one exactly once and an identical replay stays neutral.
+
+Existing lifecycle is 5/5, corrected legacy 17/17, frozen core 4/4 and bounded
+preservation 41/41. Ordered types/object/node builds pass. Types typecheck
+passes; object retains exactly five and node exactly two inherited Phase-1i-b
+diagnostics. Owned lint, Prettier and diff checks pass. Production hashes are
+identical before/after and protected stash
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` is unchanged. Ledger SHA-256 is
+`2c3a56e1d345e3169f0134b433afaee7ebce0749e0aa768b52a4e554ad31a56d`;
+the verified 18-entry root-relative manifest SHA-256 is
+`bc7d37f7ae6294abcf5dbcec02f91dc7ea7867c9ed74cc455844e3c9dde85742`.
+Evidence is under
+`.logs/phase-1n-b-reciprocity-attempt-neutrality-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-b reciprocity-neutrality corrective GREEN
+
+From frozen RED `41671de`, use a distinct fresh Codex-high production agent to
+implement the narrow single-owner correction above. Freeze every test and this
+plan. Preserve the public scheduled `node.syncObject` behavior and the real
+periodic owner; add only the natural production seam needed for uncharged
+heads/shared-heads reciprocity with an empty exact-request field and cooldown
+inertness. If new discovery and reciprocity coincide, the charged attempt-one
+request already carries the heads proof. Remove any duplicated transition or
+compatibility sediment rather than layering another lifecycle owner.
+
+Run the new corrective owner, existing lifecycle, corrected legacy, frozen core
+and bounded preservation selections, followed by ordered builds, exact inherited
+typecheck census, lint, Prettier and diff checks, all to `.log`. Do not run
+inventory/perf, sealed, fuzz or full-suite workloads. Run refactor-clean before
+checkpointing the production-only GREEN. Then obtain fresh native Grok 4.5/high
+and exact Kimi 3/high/dual-100 preliminary reviews; final Claude-skill Opus/xhigh
+starts only after both accept.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
