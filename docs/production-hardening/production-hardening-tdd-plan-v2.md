@@ -27709,6 +27709,73 @@ claims private retention is now bounded. No reviewer should reopen legacy
 plain-ID support: generated creator-bound IDs remain the default and
 caller-chosen/same-ID fixtures still require explicit ACL.
 
+## Phase 1o-a bounded shared-cut egress acceptance — closed
+
+The complete acceptance gate unanimously accepts production commit
+`fc8ab3a3be505ad73dc30e28c514d66579c76220` at tracked docs checkpoint
+`96ed6b7133f6ccc4a38ca3ae16191fa52d4fed9e`. Frozen tests-only RED
+`26b2e6d949174b8dc27eb1ca4fd7f29dc63b8a1c` remains unchanged.
+
+Fresh Grok 4.5/high session `019fd8c6-0bab-7cb1-84dc-3f08e15d61c8`
+returned `ACCEPTED`, no blockers and final Opus may start. Native evidence shows
+17/17 substantive calls used effective `grok-4.5-build` at high reasoning.
+Because its read-only workspace sandbox denied Vite temporary writes, it ran an
+exact-HEAD writable `/tmp` copy and passed the focused owner plus Phase 1n-b/c/d
+at 43/43 total. Evidence is under
+`.logs/phase-1o-a-green-grok45-high-review/`; result SHA-256 is
+`6310553e4ca815c95cd21e9820db98f18fb2b33661510345396c4b01b290b568`
+and verified 31-entry artifact-manifest SHA-256 is
+`210e342c280ecafa6ca013b4b668e74be5683aeba7ff4ae512da149bc8cafbee`.
+
+Exact Kimi 3/high/dual-100 session
+`65c4bea3-bd8b-4ad9-9bfa-2b91ff7a44bf` returned `ACCEPTED`, no blockers and
+`OPUS_MAY_START: YES`. Requested `kimi-code/k3` resolved to effective
+`managed:kimi-code/k3` / `K3`; thinking and environment, CLI and native caps
+of 100 were authenticated. It used 16 steps / 25 allowed read-only calls / zero
+forbidden or fallback calls. Controller reruns passed the same 43/43 census.
+Evidence is under `.logs/phase-1o-a-green-kimi3-high-100-review/`; result
+SHA-256 is
+`5e75a1b1e8285f921156057c53538d9d3920069d0b4cc48d5adf35a6e103d920`
+and verified 55-entry artifact-manifest SHA-256 is
+`0ce345453406ca527e215176253c73c187466d71ca5d82aeacbfa90b4d587e56`.
+
+Final Claude-skill Opus 5/xhigh session
+`18565d0c-cd8f-43c9-b41d-6777b273daa9` returned `ACCEPTED`, no blockers and
+`PHASE_1O_A_MAY_CLOSE: yes`. Safe `dontAsk` denied Vitest in the substantive
+turn; the controller ran the five exact suites sequentially with coverage off,
+all exit 0 and 43/43, then resumed the same Opus session to inspect the logs and
+supersede the contingent verdict. Initial and follow-up turns remained Opus 5
+xhigh. An automatic 21-output-token Haiku metadata helper made no tool call or
+substantive contribution. Evidence is under
+`.logs/phase-1o-a-green-opus5-xhigh-review/`; result SHA-256 is
+`604dd40e462d032472335f0e7d92028d96a80a9742cb45c31eb89ac445fe1fd8`
+and verified 36-entry artifact-manifest SHA-256 is
+`beb21c3f13106621a76fc991666160ed32bd9c62311dffe742a601ce5a79c6ad`.
+
+Accepted residuals and gotchas are:
+
+1. private `branchCuts`, per-peer/object map growth, empty-state allocation on
+   reads, reclamation and RAM/storage quotas remain later Phase 1o work;
+2. a 32-wide current frontier legitimately consumes the whole shared-cut field
+   and can exclude every historical cut for that payload;
+3. historical selection is stable insertion/oldest-first after the current
+   frontier. This slice promises no optimal eviction or fairness policy;
+4. the source stops traversing once 32 unique selections exist, but the frozen
+   RED pins the observable bounded result and priority, not an instrumented
+   iteration count; and
+5. with at least one head and 32 shared cuts, 33 or more outstanding exact
+   hashes make the scheduled selector emit a 32-hash exact chunk. The resulting
+   minimal 1 + 32 + 32 payload totals 65 and fails the unchanged 64-total cap.
+   This fail-closed interaction is pre-existing and strictly improved, not
+   introduced, by 1o-a. A later Phase 1o aggregate-egress item must arbitrate
+   the combined field entitlement without weakening caps or starving truthful
+   exact recovery.
+
+Identity remains greenfield: no legacy plain-ID path exists and caller-chosen
+or same-ID construction still requires explicit ACL. Phase 1o-a is closed at
+production lineage `fc8ab3a` plus this acceptance checkpoint; Phase 1o as a
+whole remains open.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
