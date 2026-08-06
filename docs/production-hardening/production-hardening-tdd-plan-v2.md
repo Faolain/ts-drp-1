@@ -27815,6 +27815,37 @@ and verified artifact-manifest SHA-256 is
 Identity remains greenfield. The one same-ID replica uses explicit coordinated
 ACL; no legacy plain-ID or caller-chosen-ID fallback is exercised or requested.
 
+## Phase 1o-b aggregate sync-egress GREEN — review candidate
+
+Fresh distinct Codex-high landed production-only commit
+`d3894c9a8801c3fbc1a44bdee6863a18faac6f68`. Its sole path is
+`packages/node/src/sync-codec.ts`, 7 insertions / 1 deletion; source SHA-256 is
+`0bf6622644eab80f56f137d4abb64ae1a88f31287627b44d3368692031307150`.
+Tests, plan, validation, state retention, identity and fallback remain frozen.
+
+The heads payload builder preserves every current head and deterministic exact
+chunk, then slices the already-prioritized 1o-a shared projection to
+`min(32, max(0, 64 - heads.length - requestedHashes.length))`. Existing
+per-field, total and byte validators remain unchanged. A fully occupied
+heads-plus-exact budget correctly emits no shared history; this is bounded wire
+projection, not retained-RAM governance.
+
+Baseline reproduces 1 failed / 1 passed at the 65-hash
+`SYNC_REQUEST_LIMIT`; focused GREEN passes 2/2 with two intact 32-hash exact
+rotations, all 64 missing vertices requested, convergence and isolation.
+Preservation passes 1n-b 11/11, 1n-c 28/28, 1n-d(i)+aggregate 6/6 and 1o-a
+2/2. Production-only typecheck passes; package typecheck retains only the two
+inherited compact-history diagnostics. ESLint, Prettier and diff checks pass.
+Evidence is under
+`.logs/phase-1o-b-aggregate-sync-egress-green-codex-high/`; result SHA-256 is
+`fa2aaa72f4e84b2d3f363c3fd393f932aed9fc6aa5486f8c7f06570177b8c25c`
+and verified artifact-manifest SHA-256 is
+`e4f9c36f736eaa1f07b0b69d1f8d6ee14741712ad5ba97de9f0cf492fa631458`.
+
+Reviewers must reject any cap weakening, lost/reordered exact chunk, hidden
+current head, peer/object contamination, parallel selector, storage-bound
+overclaim or legacy-ID reopening.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
