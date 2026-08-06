@@ -26183,15 +26183,43 @@ the verified 26-entry manifest SHA-256 is
 Evidence is under
 `.logs/phase-1n-c-request-envelope-cap-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-c request-envelope cap distinct GREEN
+## Phase 1n-c request-envelope cap corrective GREEN — review candidate
 
-Start a distinct fresh Codex-high GREEN from corrective RED `67b688a`. Freeze
-the new and both immutable Phase 1n-c RED files and every existing assertion.
-Repair the single canonical validator so
-request caps measure the complete encoded Message while preserving independent
-response-byte handling, typed mode-specific failures, pre-admission ordering
-and the existing normal path. Apply `refactor-clean`; do not add a second cap
-owner, schema workaround, compatibility wrapper or test-only production seam.
+Distinct fresh Codex-high committed production-only corrective GREEN
+`e8d676aac4d3bebd1c058be5b07967aa6d3113a3` (tree
+`612fbb03384ebd5ca8c6ff50861e1df2b2626923`) from RED-docs parent
+`1ecaae5`. Its exact scope is `packages/network/src/sync.ts`, +3/-2. After
+canonical Sync decode, the request validator computes
+`Message.encode(message).finish().byteLength` once and both fallback and
+heads-chunk caps consume that measurement. Independent response-byte handling,
+count limits, typed mode-specific failures and pre-admission call order are
+unchanged.
+
+Corrective tests pass 3/3, immutable Phase 1n-c passes 12/12, corrected owners
+pass 22/22 and semantic preservation passes 30/30. All five ordered builds
+pass. Types, network and message-queue typechecks are clean; object/node retain
+exactly the inherited 5/2 diagnostics with zero owned. ESLint has zero errors
+and 11 inherited warnings; Prettier and diff checks pass. The governed-test
+census is unchanged. The verified 40-entry evidence-manifest SHA-256 is
+`43840fd47af0df744885a760d0fe6d8033bc43568f36f5a15a419be2c0c7d0f7`;
+evidence is under
+`.logs/phase-1n-c-request-envelope-cap-green-codex-high/`.
+
+The `refactor-clean` boundary remains one canonical request-byte owner. No
+object-id schema limit, normalizer, adapter, shim, test seam, ACL bypass or
+legacy/plain-id compatibility was introduced. The hostile long id remains
+malformed envelope input. Protected state and stash `ef3a53...` are invariant.
+
+## Next Agent Prompt — Phase 1n-c fresh acceptance review
+
+Review production candidate `e8d676a` over the complete Phase 1n-c lineage:
+amended immutable RED `96efd42`, preservation corrective `4f9b940`, initial
+GREEN `0b44e90`, corrective RED `67b688a` and the current GREEN. Start with a
+fresh Grok 4.5/high review. Only if Grok accepts may a fresh exact Kimi
+3/high/dual-100 review start; only if Kimi accepts may final fresh Opus/xhigh
+start. Authenticate exact models, keep all reviews read-only, preserve
+HEAD/tree/index/stash/protected state and package bounded evidence with result
+and verified manifest hashes.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
@@ -26205,17 +26233,12 @@ fallback complete-or-typed-fail, never paginate or truncate it. Keep response
 chunks independently authenticated/idempotent and progress-preserving; add no
 session/continuation accumulator.
 
-Before external review, apply the `refactor-clean` ownership check: one concept
-must have one owner, obsolete branches must be removed rather than wrapped, and
-the implementation must not leave a general-purpose `sendMessage` compatibility
-adapter for sync. Run exact 12/12 focused GREEN and preservation with the same
-30 test titles/assertions/counts/outcomes through the corrected capture seam,
-ordered touched-package builds, exact inherited object 5/node 2 typecheck
-census, lint, Prettier and diff checks to `.log`. Keep workloads bounded and do
-not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads. Commit
-production only, package test-hash invariance, ledger and verified manifest, and
-stop for the required Grok -> exact Kimi 3/high/dual-100 -> Opus/xhigh review
-sequence.
+Recheck the full encoded request ceiling at both sender preflight and hostile
+direct ingress, including the ordinary positive path; verify existing raw-stream
+coverage plus the shared validator prevents a receiver-only bypass. Reassess
+negotiation/provenance, bounded flow, preservation and single-owner structure,
+but do not request a legacy plain-id mode: this implementation is greenfield.
+Do not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
