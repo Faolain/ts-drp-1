@@ -2,6 +2,7 @@
  * Phase 1n-a keeps finite receiver-clock-future vertices pending without
  * confusing them with absent dependencies at any node recovery call site.
  */
+import type { NegotiatedSyncSender } from "@ts-drp/network";
 import {
 	AdoptionCommitExhaustedError,
 	createPermissionlessACL,
@@ -49,6 +50,29 @@ interface Outbound {
 	readonly peerId: string;
 }
 
+const outboundByNode = new WeakMap<DRPNode, Outbound[]>();
+
+function syncSender(node: () => DRPNode): NegotiatedSyncSender {
+	function outbound(): Outbound[] {
+		const capture = outboundByNode.get(node());
+		if (capture === undefined) throw new Error("Expected outbound capture");
+		return capture;
+	}
+	return {
+		async sendSyncMessage(peerId, payloadFactory): Promise<void> {
+			const message = await payloadFactory({
+				mode: "heads-chunk",
+				protocol: "/drp/message/1.0.0/heads-chunk",
+			});
+			outbound().push({ message, peerId });
+		},
+		sendSyncResponseMessage(peerId, message): Promise<void> {
+			outbound().push({ message, peerId });
+			return Promise.resolve();
+		},
+	};
+}
+
 class CounterDRP implements IDRP {
 	semanticsType: SemanticsType = SemanticsType.pair;
 	value = 0;
@@ -63,15 +87,19 @@ class CounterDRP implements IDRP {
 }
 
 function node(seed: string): DRPNode {
-	return new DRPNode({
-		network_config: {
-			bootstrap_peers: [],
-			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+	const node: DRPNode = new DRPNode(
+		{
+			network_config: {
+				bootstrap_peers: [],
+				listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+				log_config: { level: "silent" },
+			},
+			keychain_config: { private_key_seed: seed },
 			log_config: { level: "silent" },
 		},
-		keychain_config: { private_key_seed: seed },
-		log_config: { level: "silent" },
-	});
+		{ syncSender: syncSender(() => node) }
+	);
+	return node;
 }
 
 function message(surface: Surface, objectId: string, sender: string, vertices: readonly Vertex[]): Message {
@@ -132,10 +160,7 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 
 	function captureOutbound(): Outbound[] {
 		const outbound: Outbound[] = [];
-		vi.spyOn(receiver.networkNode, "sendMessage").mockImplementation((peerId, outboundMessage) => {
-			outbound.push({ message: outboundMessage, peerId });
-			return Promise.resolve();
-		});
+		outboundByNode.set(receiver, outbound);
 		vi.spyOn(receiver.networkNode, "broadcastMessage").mockResolvedValue();
 		return outbound;
 	}

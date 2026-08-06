@@ -5,6 +5,7 @@
  * duplicate/out-of-order deliveries do not amplify recovery.
  */
 import { BinaryReader } from "@bufbuild/protobuf/wire";
+import { DRP_HEADS_CHUNK_PROTOCOL, type NegotiatedSyncSender, type SelectedSyncProtocol } from "@ts-drp/network";
 import { createACL, HashGraph } from "@ts-drp/object";
 import {
 	ActionType,
@@ -35,6 +36,31 @@ interface Outbound {
 	to: string;
 }
 
+const HEADS_SELECTION = Object.freeze({
+	mode: "heads-chunk",
+	protocol: DRP_HEADS_CHUNK_PROTOCOL,
+} satisfies SelectedSyncProtocol);
+
+const outboundByNode = new WeakMap<DRPNode, Outbound[]>();
+
+function syncSender(node: () => DRPNode): NegotiatedSyncSender {
+	function outbound(): Outbound[] {
+		const capture = outboundByNode.get(node());
+		if (capture === undefined) throw new Error("Expected outbound capture");
+		return capture;
+	}
+	return {
+		async sendSyncMessage(to, payloadFactory): Promise<void> {
+			const message = await payloadFactory(HEADS_SELECTION);
+			outbound().push({ message, to });
+		},
+		sendSyncResponseMessage(to, message): Promise<void> {
+			outbound().push({ message, to });
+			return Promise.resolve();
+		},
+	};
+}
+
 class CounterDRP implements IDRP {
 	semanticsType = SemanticsType.pair;
 	value = 0;
@@ -49,24 +75,24 @@ class CounterDRP implements IDRP {
 }
 
 async function makeNode(seed: string): Promise<DRPNode> {
-	const node = new DRPNode({
-		network_config: {
-			bootstrap_peers: [],
-			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+	const node: DRPNode = new DRPNode(
+		{
+			network_config: {
+				bootstrap_peers: [],
+				listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+				log_config: { level: "silent" },
+			},
+			keychain_config: { private_key_seed: seed },
 			log_config: { level: "silent" },
 		},
-		keychain_config: { private_key_seed: seed },
-		log_config: { level: "silent" },
-	});
+		{ syncSender: syncSender(() => node) }
+	);
 	await node.start();
 	return node;
 }
 
 function captureOutbound(node: DRPNode, outbound: Outbound[]): void {
-	vi.spyOn(node.networkNode, "sendMessage").mockImplementation((to: string, message: Message) => {
-		outbound.push({ message, to });
-		return Promise.resolve();
-	});
+	outboundByNode.set(node, outbound);
 	vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 }
 
@@ -161,7 +187,7 @@ async function deliverAll(outbound: Outbound[], nodes: readonly DRPNode[], limit
 		if (!entry) break;
 		const recipient = byPeer.get(entry.to);
 		if (!recipient) throw new Error(`Unknown recipient ${entry.to}`);
-		await handleMessage(recipient, Message.decode(Message.encode(entry.message).finish()));
+		await handleMessage(recipient, Message.decode(Message.encode(entry.message).finish()), HEADS_SELECTION);
 	}
 }
 
@@ -201,13 +227,13 @@ describe("Phase 1n-b core heads synchronization", () => {
 		await behind.syncObject(id, ahead.networkNode.peerId);
 		const unacknowledgedRetry = takeDirect(outbound, MessageType.MESSAGE_TYPE_SYNC);
 		expect(decodeSyncWire(unacknowledgedRetry.message.data).sharedHeads).not.toEqual(expect.arrayContaining(sharedCut));
-		await handleMessage(ahead, Message.decode(Message.encode(unacknowledgedRetry.message).finish()));
+		await handleMessage(ahead, Message.decode(Message.encode(unacknowledgedRetry.message).finish()), HEADS_SELECTION);
 		const reciprocalProof = takeDirect(outbound, MessageType.MESSAGE_TYPE_SYNC);
 		expect(decodeSyncWire(reciprocalProof.message.data)).toMatchObject({
 			fallbackHashes: [],
 			heads: sharedCut,
 		});
-		await handleMessage(behind, Message.decode(Message.encode(reciprocalProof.message).finish()));
+		await handleMessage(behind, Message.decode(Message.encode(reciprocalProof.message).finish()), HEADS_SELECTION);
 		expect(outbound).toHaveLength(0);
 
 		aheadObject.drp?.increment();
@@ -247,14 +273,14 @@ describe("Phase 1n-b core heads synchronization", () => {
 				return aheadVerticesGetter.call(aheadObject);
 			},
 		});
-		await handleMessage(ahead, Message.decode(Message.encode(probe.message).finish()));
+		await handleMessage(ahead, Message.decode(Message.encode(probe.message).finish()), HEADS_SELECTION);
 		expect.soft(aheadVertexMaterializations).toBe(0);
 		const response = takeDirect(outbound, MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
 		const responsePayload = SyncAccept.decode(response.message.data);
 		expect(responsePayload.requested.map(({ hash }) => hash)).toEqual(expectedDelta.map(({ hash }) => hash));
 		expect(responsePayload.requesting).toEqual([]);
 
-		await handleMessage(behind, Message.decode(Message.encode(response.message).finish()));
+		await handleMessage(behind, Message.decode(Message.encode(response.message).finish()), HEADS_SELECTION);
 		expect(behindObject.drp?.value).toBe(aheadObject.drp?.value);
 		expect(new Set(behindObject.vertices.map(({ hash }) => hash))).toEqual(
 			new Set(aheadObject.vertices.map(({ hash }) => hash))
@@ -348,11 +374,11 @@ describe("Phase 1n-b core heads synchronization", () => {
 		const probeWire = decodeSyncWire(probe.message.data);
 		expect.soft(probeWire.fallbackHashes).toEqual([]);
 		expect.soft(probeWire.sharedHeads).toEqual(expect.arrayContaining(oldSharedCut));
-		await handleMessage(right, Message.decode(Message.encode(probe.message).finish()));
+		await handleMessage(right, Message.decode(Message.encode(probe.message).finish()), HEADS_SELECTION);
 
 		const response = takeDirect(outbound, MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
 		expect(SyncAccept.decode(response.message.data).requested.map(({ hash }) => hash)).toEqual([injected.hash]);
-		await handleMessage(left, Message.decode(Message.encode(response.message).finish()));
+		await handleMessage(left, Message.decode(Message.encode(response.message).finish()), HEADS_SELECTION);
 		expect(leftObject.getVertex(injected.hash)).toBeDefined();
 		expect(new Set(leftObject.vertices.map(({ hash }) => hash))).toEqual(
 			new Set(rightObject.vertices.map(({ hash }) => hash))

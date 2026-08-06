@@ -3,6 +3,7 @@
  * shared cuts, but it never re-carries or charges an unchanged exact request.
  */
 import { BinaryReader } from "@bufbuild/protobuf/wire";
+import type { NegotiatedSyncSender } from "@ts-drp/network";
 import { createACL, HashGraph } from "@ts-drp/object";
 import {
 	ActionType,
@@ -27,6 +28,29 @@ interface Outbound {
 	to: string;
 }
 
+const outboundByNode = new WeakMap<DRPNode, Outbound[]>();
+
+function syncSender(node: () => DRPNode): NegotiatedSyncSender {
+	function outbound(): Outbound[] {
+		const capture = outboundByNode.get(node());
+		if (capture === undefined) throw new Error("Expected outbound capture");
+		return capture;
+	}
+	return {
+		async sendSyncMessage(to, payloadFactory): Promise<void> {
+			const message = await payloadFactory({
+				mode: "heads-chunk",
+				protocol: "/drp/message/1.0.0/heads-chunk",
+			});
+			outbound().push({ message, to });
+		},
+		sendSyncResponseMessage(to, message): Promise<void> {
+			outbound().push({ message, to });
+			return Promise.resolve();
+		},
+	};
+}
+
 interface SyncWire {
 	heads: string[];
 	requestedHashes: string[];
@@ -47,26 +71,26 @@ class CounterDRP implements IDRP {
 }
 
 async function makeNode(seed: string): Promise<DRPNode> {
-	const node = new DRPNode({
-		network_config: {
-			bootstrap_peers: [],
-			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+	const node: DRPNode = new DRPNode(
+		{
+			network_config: {
+				bootstrap_peers: [],
+				listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+				log_config: { level: "silent" },
+			},
+			keychain_config: { private_key_seed: seed },
+			interval_sync_options: { interval: 60_000 },
 			log_config: { level: "silent" },
 		},
-		keychain_config: { private_key_seed: seed },
-		interval_sync_options: { interval: 60_000 },
-		log_config: { level: "silent" },
-	});
+		{ syncSender: syncSender(() => node) }
+	);
 	await node.start();
 	return node;
 }
 
 function captureOutbound(node: DRPNode): Outbound[] {
 	const outbound: Outbound[] = [];
-	vi.spyOn(node.networkNode, "sendMessage").mockImplementation((to: string, message: Message) => {
-		outbound.push({ message, to });
-		return Promise.resolve();
-	});
+	outboundByNode.set(node, outbound);
 	vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 	return outbound;
 }
