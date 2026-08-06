@@ -25281,6 +25281,74 @@ inventory benchmark, sealed workload, fuzzer or full suite. Evidence is under
 `.logs/phase-1n-a-attestation-fixture-green-{grok45-high,kimi3-high-100}-review/`.
 Final fresh Claude-skill Opus/xhigh may now adjudicate closure.
 
+## Phase 1n-a stale attestation fixture final Opus/xhigh closure
+
+Fresh Claude-skill bridge session
+`1dbfcb64-d483-450e-a83c-9b77c1bfc4df` returns `ACCEPTED` /
+`FIXTURE_CORRECTIVE_MAY_CLOSE=yes` at fixed HEAD `ffcd230`. Opus/xhigh finds no
+blocker after independently tracing the exact pre-applied vertex through trusted
+classification, empty authenticated/committed sets, persistence-only `mergeRan`,
+false `appliedProgress`, retained retry episode and zero accepted dispatch. It
+confirms the one-line tests-only correction is causally forced rather than
+expectation fitting: three independent files retain negative no-progress and
+positive real-progress owners, the adjacent attestation positive case remains
+one, and every BLS/finality/residual/broadcast/store assertion is unchanged.
+
+Opus also authenticates the explicit coordinated ACL behind the arbitrary
+fixture IDs and the untouched greenfield identity rule: omitted ACL remains a
+generated creator-bound path, while arbitrary IDs receive no legacy fallback.
+Phase 1n-b's test blob remains frozen and RED, and no production change has
+begun for it.
+
+Preserve four nonblocking disclosures. The GREEN diagnostics-comparison file is
+empty because it is a successful diff, though Opus independently recounts the
+inherited object-five/node-two diagnostics. Phase 1n-a's original gate omitted
+this attestation file, which is why the stale assertion survived until 1n-b's
+broader preservation run; the present corrective closes that process gap. The
+already-recorded post-await `committed` attribution window remains bounded
+existing debt and is neither hidden nor worsened. The ordinary bounded
+sync-perf 10k/50k/100k case ran once accidentally and was never rerun. A loose
+source comment saying malformed genesis grants authority to nobody refers to
+admin/finality authority while writer access remains intentionally
+permissionless; this wording-only observation is disjoint future cleanup, not a
+candidate defect.
+
+The result/session byte-match SHA-256 is
+`5664a9e6e7d5943dd4dfab671b4ca9d58d8bb00e7718e4a744a8880c1cd05b7e`.
+All 119 transcript assistant records authenticate `claude-opus-5` at xhigh.
+Exact direct-tool audit is 47 Bash, 14 Grep and 12 Read calls; five Bash calls
+are safely denied, with zero write, web, MCP, delegation, test or forbidden
+workload calls. Automatic Haiku envelope use is 3,811 input / 22 output tokens
+and supplies zero transcript assistant record or substantive review content.
+The controller re-verifies all 59 RED, 41 GREEN, 36 Grok and 35 Kimi entries;
+the final verified 45-entry artifact-manifest SHA-256 is
+`310e60082ffaa28296d715653bfebef113c5ccad2aa13396fcfbea6e76a3bb19`.
+HEAD/tree/index/worktree/stash/protected/evidence invariance passes. Evidence is
+under
+`.logs/phase-1n-a-attestation-fixture-final-opus-xhigh-review/`.
+
+The corrective is closed at tests-only commit `6f2045151b4176e22e47ed9590127000be4521a8`.
+
+## Next Agent Prompt — Phase 1n-b core-heads-sync production GREEN
+
+Use a fresh distinct Codex-high agent at this closure checkpoint. Implement the
+smallest production/additive-wire change that satisfies frozen tests-only RED
+`e639c4c`: reciprocal heads proof before shared-cut advancement, delta-only work
+after a proven shared cut, exact recursive hash requests for true missing
+parents, duplicate/out-of-order idempotence, retention of older shared branches
+and explicit field-1 full-inventory fallback. Preserve the 1n-a truthful
+accepted-event predicate and closed fixture; do not change the frozen RED or
+plan. The delta path must not read/materialize full `historyInventory` or
+`vertices`, and send completion alone must never prove remote possession.
+Use real protocol/handler/history seams, no fake runtime, mock outcome, test hook
+or legacy plain-ID support. Run focused RED, independent 1n-a/auth/recovery/
+initial-sync/finality preservation, ordered builds/typecheck/lint/format and
+bounded performance gates to `.log`; skip the already-run inventory benchmark,
+sealed workloads and fuzzers unless a new bounded causal need is first shown.
+Commit production/generated protocol artifacts only as genuinely required.
+Then run fresh Grok 4.5/high, exact Kimi 3/high/100 and final Claude-skill
+Opus/xhigh review in order.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
