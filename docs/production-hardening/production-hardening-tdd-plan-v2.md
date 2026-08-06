@@ -26210,16 +26210,68 @@ object-id schema limit, normalizer, adapter, shim, test seam, ACL bypass or
 legacy/plain-id compatibility was introduced. The hostile long id remains
 malformed envelope input. Protected state and stash `ef3a53...` are invariant.
 
-## Next Agent Prompt — Phase 1n-c fresh acceptance review
+## Phase 1n-c second GREEN review — literal-wire cap corrective required
 
-Review production candidate `e8d676a` over the complete Phase 1n-c lineage:
-amended immutable RED `96efd42`, preservation corrective `4f9b940`, initial
-GREEN `0b44e90`, corrective RED `67b688a` and the current GREEN. Start with a
-fresh Grok 4.5/high review. Only if Grok accepts may a fresh exact Kimi
-3/high/dual-100 review start; only if Kimi accepts may final fresh Opus/xhigh
-start. Authenticate exact models, keep all reviews read-only, preserve
-HEAD/tree/index/stash/protected state and package bounded evidence with result
-and verified manifest hashes.
+Fresh Grok 4.5/high verifies that `e8d676a` correctly closes the known-field
+long-object-id bypass, but returns `CHANGES_REQUESTED` for one remaining finite
+defect class. Generated ts-proto decode discards unknown protobuf fields.
+Receiver validation therefore loses the literal frame length, re-encodes only
+known fields and can admit an oversized transmitted request or response whose
+canonical decoded projection is small.
+
+Bounded probes proved both sides of the matrix. Heads/fallback request frames of
+70,063 / 70,072 bytes decode and re-encode to 95 / 104 bytes and pass; a live
+70,111-byte raw heads stream reaches central admission once. A 300,046-byte raw
+`SYNC_ACCEPT` frame re-encodes to 47 bytes and also passes. This violates the
+already-authorized 65,536 request / 262,144 response actual encoded-byte caps
+and the requirement that over-cap ingress drop before graph, response or
+central-admission work. Kimi and Opus acceptance reviews correctly did not
+start.
+
+This is not another architecture-policy amendment. The existing contract
+already says actual encoded protobuf bytes, so the authority must be the exact
+byte array transmitted or received rather than a decoded/re-encoded projection.
+The sustainable one-owner correction is: sender encodes once, passes that exact
+length into the canonical validator and writes the same bytes; receiver passes
+the raw frame length into that same validator before admission. The validator
+applies request versus response ceilings by message type. Do not add a parallel
+wire scanner, preserve unknown fields, add a schema-length surrogate or weaken
+the independent transport-frame limit.
+
+Fresh Grok session `019fd700-da14-79d2-8c98-cbc9352e41bb` authenticated sole
+effective `grok-4.5-build` at high effort over 15 calls and exited zero at
+`end_turn`. It used no subagent, web, write or MCP call. Result SHA-256 is
+`414c9f9e73c11373c3b73e7df4177a814b88211a5b396b1b63a7284ad9d40324`;
+the verified 11-entry manifest SHA-256 is
+`9c4a7aa2f1fb64f9a72201faf407e36f0eb883635e09ed17821f96cbfd501386`.
+Evidence is under
+`.logs/phase-1n-c-request-envelope-cap-green-grok45-high-review/`.
+
+The identity contract remains unchanged: there is no legacy plain-id support.
+Unknown-field padding and oversized ids are malformed resource inputs; they do
+not authorize normalization or compatibility. Arbitrary custom ids still
+require an explicit coordinated ACL.
+
+## Next Agent Prompt — Phase 1n-c literal-wire cap corrective RED
+
+Start a fresh Codex-high tests-only corrective RED from rejected GREEN
+`e8d676a`. Freeze all existing Phase 1n-c tests and assertions. Add one bounded
+literal-frame cap owner that appends valid unknown-field padding outside a small
+canonical Message and uses real raw direct streams. Cover heads request,
+fallback request, `SYNC_ACCEPT` and `SYNC_REJECT`, proving literal over-cap but
+decoded/re-encoded under-cap messages are rejected/reset before central
+admission. Preserve ordinary within-cap request/response controls. Record the
+exact causal pre-fix admission/acceptance signature; do not edit production or
+the plan.
+
+Commit tests only with focused test, network build/typecheck, lint, Prettier,
+diff and immutable-source/test hash evidence. Then start a distinct fresh
+Codex-high GREEN. Change the canonical validator contract to receive the exact
+encoded byte length. Encode once on the sender, validate that length and write
+the same byte array; on the receiver pass the raw stream frame length. Keep one
+request/response type-to-cap owner, canonical payload decode, field/count caps,
+typed errors and pre-admission ordering. Do not add a second byte parser, unknown
+field registry, compatibility wrapper, object-id policy or test-only seam.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
@@ -26233,12 +26285,11 @@ fallback complete-or-typed-fail, never paginate or truncate it. Keep response
 chunks independently authenticated/idempotent and progress-preserving; add no
 session/continuation accumulator.
 
-Recheck the full encoded request ceiling at both sender preflight and hostile
-direct ingress, including the ordinary positive path; verify existing raw-stream
-coverage plus the shared validator prevents a receiver-only bypass. Reassess
-negotiation/provenance, bounded flow, preservation and single-owner structure,
-but do not request a legacy plain-id mode: this implementation is greenfield.
-Do not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads.
+Run the complete bounded Phase 1n-c focused and preservation gates, ordered
+builds, exact inherited typecheck census, lint, Prettier and diff checks to
+`.log`. Do not run inventory/perf, sealed, fuzz, proto-gen or full-suite
+workloads. Only after a production-only GREEN commit and packaged evidence may
+the fresh Grok -> exact Kimi 3/high/dual-100 -> Opus/xhigh chain restart.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
