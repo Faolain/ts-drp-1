@@ -24441,21 +24441,54 @@ and verified manifest SHA-256 is
 `4e2627a11a1385b9a2f6c7ada4e548e89928aa9a0925b2f3bfe339f4738d4ee3`.
 Evidence is under `.logs/phase-1n-a-clock-pending-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-a production GREEN
+## Phase 1n-a pre-GREEN finding — rejected-boundary RED fixture correction required
 
-Start a distinct fresh Codex-high GREEN from this frozen RED. Populate one
-narrow internal authenticated merge outcome carrying `clockPending` hashes
-alongside the unchanged legacy tuple, including partial/rejected-boundary
-errors, without exposing a public enum/error class or teaching callers to
-infer recovery from tuple position. At all three node recovery call sites,
-pass only true-missing hashes and do not invoke the empty recovery path for a
-pending-only batch because it resets the existing episode. Preserve Phase 0f
-pending/re-offerability, genuine-missing SYNC/heal, finality, invalid-peer
-budgets, retry/cooldown, event/response behavior and source-compatible public
-results. No 1n-b/c/d, compatibility shim or broad result rewrite. Run the
-focused 12 tests, 72-test preservation, ordered build/typecheck, lint,
-formatting and exact production-diff gates sequentially to `.logs`; no sealed
-100k. Commit production only and rerun focused/preservation postcommit.
+The distinct Codex-high GREEN attempt stopped without a commit and restored
+all production files to exact HEAD `71bec49`. A viable authenticated design
+reached focused 12/12 plus preservation 72/72, but the frozen rejected-boundary
+fixture required a spoofable production fallback and therefore cannot be used
+as GREEN evidence.
+
+The two parameterized RED cases replace `object.merge` with a mock that throws
+a caller-constructed public `ApplyInvariantError`, then attach a locked
+non-enumerable string property named `clockPending`. This bypasses the genuine
+object-owned provenance writer. Accepting that property in production would be
+test-specific logic and would let an ordinary caller suppress true missing-
+dependency recovery. With the fallback removed, authenticated-only focused
+results are exact 16 passed / two failed; only the UPDATE and SYNC_ACCEPT
+mocked rejected-boundary cases remain red. No production commit exists.
+
+The aborted design also caught and removed a second unsafe shortcut: rereading
+`Date.now()` in the applier catch path disagreed with Phase 0f's one
+authoritative clock observation and misclassified genuine-missing controls.
+The sustainable direction is module-owned `WeakMap` provenance seeded only by
+the existing private `ReceiverClockPendingValidationError`, dependency closure
+and bounded prior-proven-pending memory for later descendants; object
+boundaries propagate it beside unchanged legacy results, and node recovery
+filters only authenticated hashes without invoking empty recovery. This is
+design evidence, not an accepted GREEN.
+
+Aborted-design notes SHA-256 is
+`82a9ae1e590f7224e34728a0d156d679cd718fc7e36c1b6445af223852cb4af6`
+and the preserved uncommitted diff SHA-256 is
+`36e4ded8cda459112842234ad21de08a62af7201a4be94d999c607af5368c687`.
+Evidence is under `.logs/phase-1n-a-clock-pending-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-a rejected-boundary corrective RED
+
+Start a fresh Codex-high tests-only correction. Replace only the two mocked
+public-error/string-property cases with a genuine production-owned rejected
+boundary for UPDATE and SYNC_ACCEPT: process an authenticated clock-pending
+vertex before a later vertex triggers a real `ApplyInvariantError` or bounded
+adoption exhaustion, and prove the exact primary error identity plus partial
+result are preserved while pending provenance stays module-owned. If a
+deterministic fixture seam is unavoidable, it must invoke a module-owned writer
+from object test infrastructure; no caller-authored field, symbol, tuple
+position, message or public brand may authenticate provenance. Preserve every
+other frozen assertion and exact 9F/3P RED causality, adjusting only the two
+fixture cases' mechanics. No production/plan/dependency edits or sealed 100k.
+Commit tests-only, rerun focused/preservation/build/typecheck/lint/format gates
+sequentially to a new `.logs` directory, and report exact census/hashes.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
