@@ -90,7 +90,12 @@ import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
 import { clearInvalidPeerBudgets, drpObjectChangesHandler, handleMessage } from "./handlers.js";
-import { createDRPIntervalSync, DRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
+import {
+	createDRPIntervalSync,
+	DRPIntervalSync,
+	type DRPIntervalSyncOptions,
+	hasRemoteSyncHistory,
+} from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
@@ -364,6 +369,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _connectRendezvousControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
+	private _replicaOrigins = new Map<string, DRPIntervalSyncOptions["replicaOrigin"]>();
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
 	private readonly _roomRendezvousProducers = new Map<string, ReturnType<typeof createRecordProducer>>();
 	private readonly _roomRendezvousCapacityLogged = new Set<string>();
@@ -1317,6 +1323,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 
 		// put the object in the object store
 		this.#objectStore.put(object.id, object);
+		this._replicaOrigins.set(object.id, "created");
 
 		// subscribe to the object
 		this.subscribeObject(object);
@@ -1325,7 +1332,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (options.sync?.enabled) {
 			await operations.syncObject(this, object.id, options.sync.peerId);
 		}
-		this._createObjectIntervals(object.id);
+		this._createObjectIntervals(object.id, "created");
 		return object;
 	}
 
@@ -1369,13 +1376,14 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 
 		// put the object in the object store
 		this.#objectStore.put(object.id, object);
+		this._replicaOrigins.set(object.id, "connected");
 
 		this.subscribeObject(object);
 
 		// Genesis authority was already derived locally from the creator-bound id.
 		// Anti-entropy must remain active even when the initial fetch sees no peer,
 		// so a later SYNC can deliver the object's history.
-		this._createObjectIntervals(options.id);
+		this._createObjectIntervals(options.id, "connected");
 		void this._connectObjectCreator(options.id);
 		const previousFetch = this._connectFetchControllers.get(object.id);
 		previousFetch?.abort();
@@ -1403,11 +1411,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 		};
 		const fetchRetry = setInterval(() => void requestState(), 1000);
-		let fetchSucceeded = false;
 		try {
 			void requestState();
 			await fetchResponse;
-			fetchSucceeded = true;
 		} catch (error) {
 			if (error instanceof AbortError) {
 				if (fetchTimedOut) log.error("::connectObject: Fetch state timed out");
@@ -1422,19 +1428,6 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 		}
 		if (fetchController.signal.aborted && !fetchTimedOut) return object;
-		if (!fetchSucceeded) return object;
-		// TODO: since when the interval can run this twice do we really want it to be
-		// run while the other one might still be running?
-		const intervalFn = (interval: NodeJS.Timeout) => async (): Promise<void> => {
-			if (object.acl) {
-				await operations.syncObject(this, object.id, options.sync?.peerId);
-				log.info("::connectObject: Synced object", object.id);
-				log.info("::connectObject: Subscribed to object", object.id);
-				clearInterval(interval);
-			}
-		};
-		const retry = setInterval(() => void intervalFn(retry)(), 1000);
-
 		return object;
 	}
 
@@ -1593,7 +1586,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		clearObjectSyncState(this, id);
 		this._initialSyncPeers.delete(id);
 		this.networkNode.unsubscribe(id);
-		if (purge) this.#objectStore.remove(id);
+		if (purge) {
+			this.#objectStore.remove(id);
+			this._replicaOrigins.delete(id);
+		}
 		this.networkNode.removeTopicScoreParams(id);
 		this.messageQueueManager.close(id);
 	}
@@ -1643,7 +1639,15 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 			this.networkNode.subscribe(object.id);
 			this._addRoomRendezvousProducer(object.id);
-			this._createObjectIntervals(object.id);
+			const replicaOrigin = this._replicaOrigins.get(object.id);
+			if (replicaOrigin === undefined) {
+				// Provenance cannot be recovered from id shape. Restore discovery,
+				// but fail closed by omitting the managed Sync interval.
+				log.error("::restoreSubscriptions: Missing replica origin; skipping Sync interval", object.id);
+				this._createIntervalDiscovery(object.id);
+				continue;
+			}
+			this._createObjectIntervals(object.id, replicaOrigin);
 		}
 	}
 
@@ -1688,27 +1692,29 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		interval.start();
 	}
 
-	private _createIntervalSync(id: string): void {
+	private _createIntervalSync(id: string, replicaOrigin: DRPIntervalSyncOptions["replicaOrigin"]): void {
 		const key = objectIntervalKey("sync", id);
 		const existingInterval = this._intervals.get(key);
 		existingInterval?.stop();
 
 		const interval =
-			existingInterval ??
-			createDRPIntervalSync({
-				...this.config.interval_sync_options,
-				id,
-				node: this,
-				logConfig: this.config.log_config,
-			});
+			existingInterval instanceof DRPIntervalSync && existingInterval.replicaOrigin === replicaOrigin
+				? existingInterval
+				: createDRPIntervalSync({
+						...this.config.interval_sync_options,
+						id,
+						node: this,
+						replicaOrigin,
+						logConfig: this.config.log_config,
+					});
 
 		this._intervals.set(key, interval);
 		interval.start();
 	}
 
-	private _createObjectIntervals(id: string): void {
+	private _createObjectIntervals(id: string, replicaOrigin: DRPIntervalSyncOptions["replicaOrigin"]): void {
 		this._createIntervalDiscovery(id);
-		this._createIntervalSync(id);
+		this._createIntervalSync(id, replicaOrigin);
 	}
 
 	private _stopObjectIntervals(id: string): void {

@@ -1,5 +1,5 @@
 import { IntervalRunner } from "@ts-drp/interval-runner";
-import { creatorFromObjectID, HashGraph } from "@ts-drp/object";
+import { HashGraph } from "@ts-drp/object";
 import { IntervalRunnerState, type LoggerOptions, type Vertex } from "@ts-drp/types";
 
 import { type DRPNode } from "./index.js";
@@ -27,6 +27,7 @@ export function hasRemoteSyncHistory(vertices: readonly Vertex[], localPeerId: s
 export interface DRPIntervalSyncOptions {
 	id: string;
 	node: DRPNode;
+	replicaOrigin: "created" | "connected";
 	interval?: number;
 	logConfig?: LoggerOptions;
 }
@@ -36,6 +37,7 @@ export class DRPIntervalSync {
 	readonly type = "interval:sync";
 	readonly id: string;
 	readonly interval: number;
+	readonly replicaOrigin: DRPIntervalSyncOptions["replicaOrigin"];
 
 	private readonly node: DRPNode;
 	private readonly intervalRunner: IntervalRunner;
@@ -71,9 +73,10 @@ export class DRPIntervalSync {
 	 * @param options - Object, node, and interval configuration
 	 */
 	constructor(options: DRPIntervalSyncOptions) {
-		const { id, node, interval, logConfig } = options;
+		const { id, node, replicaOrigin, interval, logConfig } = options;
 		this.id = id;
 		this.node = node;
+		this.replicaOrigin = replicaOrigin;
 		this.intervalRunner = new IntervalRunner({
 			id,
 			interval,
@@ -82,13 +85,9 @@ export class DRPIntervalSync {
 			throwOnStop: false,
 		});
 		this.interval = this.intervalRunner.interval;
-		// Only a joined replica (creator-bound id committing to somebody else's
-		// peer id) fast-retries: its empty hashgraph means the creator's history
-		// is still missing. A creator's empty object is legitimately empty, and
-		// ids without a creator commitment predate the creator-bound model.
-		const creator = creatorFromObjectID(id);
-		const isJoinedReplica = creator !== undefined && creator !== node.networkNode.peerId;
-		if (isJoinedReplica && this.interval > INITIAL_SYNC_RETRY_INTERVAL_MS) {
+		// Acquisition provenance, not object-id shape, determines whether an
+		// empty hashgraph represents a connected replica still awaiting history.
+		if (replicaOrigin === "connected" && this.interval > INITIAL_SYNC_RETRY_INTERVAL_MS) {
 			this.initialSyncRunner = new IntervalRunner({
 				id: `initial-sync::${id}`,
 				interval: INITIAL_SYNC_RETRY_INTERVAL_MS,
