@@ -27561,6 +27561,72 @@ blocker and reproduce them before authorizing a corrective. Identity remains
 greenfield: generated creator-bound ID by default, explicit ACL for caller-
 chosen IDs, and no legacy plain-ID support.
 
+## Phase 1n-d aggregate GREEN3 acceptance — closed
+
+The complete acceptance gate unanimously accepts production commit
+`268aa2eb552354b5d870681cb99c6f41a7957d55` at tracked docs checkpoint
+`9f0cbd3fe314b7635a4329ee8f89507572e58ea4`. The frozen aggregate RED lineage
+remains `fb8256d` + `d527333` + `c6a47f1`; no reviewer changed source, tests,
+plan, index, stash or protected untracked paths.
+
+Fresh Grok 4.5/high session `0f82fdcc-5de5-46f8-81ab-2c4de9a13371`
+returned `ACCEPTED` with no blockers. Native metadata proves effective
+`grok-4.5-build` at high reasoning. Its fresh sequential gates passed aggregate
+2/2, 1n-a 11/11, 1n-b 11/11, 1n-c 28/28 and 1n-d(i) 4/4. Evidence is under
+`.logs/phase-1n-d-aggregate-green3-grok45-high-review/`; result SHA-256 is
+`d8e130dc8240cb48898e1497180c0a60807e6fb64ed6d625cb55536b5978b268`
+and verified 28-entry artifact-manifest SHA-256 is
+`a7699a80e110e222a5240a00d12a7c7dc26f2736a8a8f928d72dec90b069c792`.
+
+Exact Kimi 3/high/dual-100 session
+`edbee0f8-794b-407c-ab22-95cee8ad5149` returned `ACCEPTED`, no blockers and
+`OPUS_MAY_START: yes`. The launcher was v1.49.0, requested
+`kimi-code/k3`, resolved to effective `managed:kimi-code/k3` / `K3`, used
+thinking, and authenticated environment, CLI and native caps of 100. It used
+24 steps / 37 allowed read-only calls / zero forbidden calls. Its fresh
+sequential gates passed the same 2/2, 11/11, 11/11, 28/28 and 4/4 census.
+Evidence is under
+`.logs/phase-1n-d-aggregate-green3-kimi3-high-100-review/`; result SHA-256 is
+`ac0ef42122d310e02ed4f4a3ca5998ac0805a6cb1757cba11224f9805b13daa3`
+and verified 52-entry artifact-manifest SHA-256 is
+`ad40e2a297d0c14dea27f3a7c5e068efe18ace405212c4c67d21d91a7df42f12`.
+
+Final Claude-skill Opus 5/xhigh session
+`11cfb5fe-e3c9-4a4c-bfb9-912bfb613819` returned `ACCEPTED`, no blockers and
+`PHASE_1N_D_MAY_CLOSE: yes`. Safe `dontAsk` correctly denied the model's local
+hash/pipeline and Vitest commands. The controller therefore ran the five
+coverage-disabled suites sequentially, all exit 0 at the same 2/2, 11/11,
+11/11, 28/28 and 4/4 census, then resumed the same Opus session to inspect the
+logs and supersede its execution-gap-only provisional rejection. Automatic
+Haiku use was a 22-output-token metadata helper with no tool call or substantive
+reasoning. Evidence is under
+`.logs/phase-1n-d-aggregate-green3-opus5-xhigh-review/`; result SHA-256 is
+`80b2e7406afae7435876ba60a7cac03f61266e210100ddcc4f2562c3fb6c2296`
+and verified 35-entry artifact-manifest SHA-256 is
+`cd57e946b130065a644f4478693fb302e9fad3c0f37e9d139ce7a65e71c3f902`.
+
+Accepted nonblocking residuals and gotchas are:
+
+1. single-guard mutants remain non-proof because defenses overlap; the stable
+   complete pre-GREEN image remains the causal RED;
+2. `readUsefulSyncDelta` deliberately drops an entire speculative suffix when
+   any dependency lacks wire proof. Exact-hash recovery preserves convergence;
+3. unknown-head speculative silence can defer history-unavailable signaling,
+   without hiding exact or later truthful recovery;
+4. the historical one-off late fallback ingress did not recur in any GREEN3 or
+   reviewer gate and remains timing characterization rather than a blocker;
+5. append-only authenticated `branchCuts` / `sharedHeads`, including a wide DAG
+   or root-advertisement amplification, can eventually exceed a per-frame field
+   cap and fail closed. This is aggregate per-peer/object entitlement owned by
+   Phase 1o, not a reason to weaken Phase 1n's wire caps; and
+6. identity remains greenfield. Generated creator-bound IDs are the default,
+   caller-chosen or same-ID construction requires explicit ACL, legacy plain or
+   malformed IDs remain negative controls, and field 1 is transport
+   compatibility only.
+
+Phase 1n-d aggregate and therefore Phase 1n are closed at production lineage
+`268aa2e` plus this acceptance checkpoint.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
