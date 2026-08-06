@@ -25243,6 +25243,44 @@ tests-only fixture correction at fixed HEAD. Final Claude-skill Opus/xhigh may
 start only if both preliminary reviewers accept. Resume the distinct Phase
 1n-b production GREEN only after final closure.
 
+## Phase 1n-a stale attestation fixture preliminary reviews — accepted
+
+Fresh native Grok 4.5/high returns `ACCEPTED` /
+`FIXTURE_CORRECTIVE_MAY_CLOSE=yes` / `OPUS_MAY_START=yes` in session
+`019fd581-ae8a-7081-9caf-dac953ea84b0`, request
+`d6b891f6-a31b-4d70-8356-3d049689ca64`, at fixed HEAD `a03082c`.
+All ten assistant records use sole effective model `grok-4.5-build` at requested
+high, with 11 Bash and eight Read calls and no write, web, subagent or MCP-tool
+call. Grok independently authenticates the pre-applied duplicate, production
+progress predicate, one-line test ownership, unchanged positive control,
+finality/store assertions, coordinated ACL and greenfield identity boundary.
+Its read-only sandbox refuses Vite's required `.vite-temp` cache write, so no
+fresh Grok-side test executes; it instead verifies the complete 59-entry RED
+and 41-entry GREEN manifests and finds no blocker. Result SHA-256 is
+`8841d6a82bb8eb32d37b6a899a6e3dc7d57e2b44b9df59d1cb576ff24f235e1a`;
+the verified 36-entry review-manifest SHA-256 is
+`461527c690095a98c2eb48ee38fd686e90cc9f6c8552560bc18445e8c0bd14b2`.
+Configured MCP processes initialize automatically; none is called and no
+auxiliary model contributes review content.
+
+Exact Kimi CLI v1.49.0 with `kimi-code/k3`, thinking and both 100-step limits
+returns the same three acceptance decisions in fresh session
+`4d658e58-6c97-4586-8365-d1b7688c8968`. Effective model authentication is
+`managed:kimi-code:k3`; usage is 21/100 steps and 32 read-only Shell calls with
+zero forbidden calls. Kimi independently reruns only the focused attestation
+file and no-progress owner, 10/10, and verifies causality, exact scope, positive
+control, finality/store invariants, coordinated ACL and absence of any legacy
+plain-ID or production change. Result SHA-256 is
+`064ad89911a3d1157784b999038371ac5c0d77c5978daf2cd1f2b60d54d4b496`;
+the verified 35-entry review-manifest SHA-256 is
+`f83c960012daebef77a72f88d67ffa169f4a00650463d4d44b0f1d43d7b924fd`.
+
+Both reviewers preserve fixed HEAD/tree, tracked worktree/index, stash,
+candidate/evidence inputs and protected untracked hashes. Neither runs the
+inventory benchmark, sealed workload, fuzzer or full suite. Evidence is under
+`.logs/phase-1n-a-attestation-fixture-green-{grok45-high,kimi3-high-100}-review/`.
+Final fresh Claude-skill Opus/xhigh may now adjudicate closure.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
