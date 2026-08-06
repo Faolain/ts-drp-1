@@ -27315,19 +27315,75 @@ and verified artifact-manifest SHA-256 is
 No inventory/performance, sealed, fuzz, proto-generation or full-suite workload
 ran.
 
-## Next Agent Prompt — Phase 1n-d aggregate production GREEN
+## Phase 1n-d aggregate first GREEN attempt — frozen RED corrective required
+
+Distinct Codex-high correctly stopped without a production commit. Its causal
+trace independently confirms the production defect: append-only `branchCuts`
+absorbs already-retained dependencies from duplicate/history-bearing
+SyncAccept batches, then `sharedHashes()` unions that retained history into the
+next heads request. The frozen baseline repeated three times at the same 1
+failed / 1 passed `SYNC_REQUEST_LIMIT` signature.
+
+The exploratory semantic correction removed that first overflow and exposed a
+test-harness race in the later C9 equality oracle. The measured window opens
+before public reconnect, but `handleGroupPeerChange` starts initial sync
+fire-and-forget while the test begins its explicit alternating `syncObject`
+loop as soon as peer connection is visible. Three identical candidate runs
+therefore produced different short totals (14,044 bytes / 5 recovery probes /
+11 requests / 6 responses versus 9,638 / 2 / 8 / 3) and long totals of 33,640,
+31,522 and 31,654 bytes. Two runs even had identical counts but differed by 132
+bytes. A production candidate cannot be accepted against that timing-dependent
+oracle.
+
+All exploratory instrumentation and production edits were restored; HEAD and
+tracked production remain `0addc8c`. No broader gates ran because no valid
+candidate exists. Evidence is under
+`.logs/phase-1n-d-aggregate-green-codex-high/`; result SHA-256 is
+`9ad62a71f586a51cf185a180ffa2f9f10cc0a0300243dbd87300269124ced55d`
+and verified artifact-manifest SHA-256 is
+`562facd8946323aaf042484864dcae97ad2d062eb3f757dfb4a705ee15d3f33d`.
+
+This does not amend C1-C13. C3/C4 already require identical deterministic
+scheduling while retaining all traffic after the pre-connect window opens. A
+narrow tests-only corrective must keep telemetry active across reconnect, wait
+for public bidirectional group membership, settle all reconnect-triggered
+sync/fan-out behind one fixed common quiet/readiness barrier, and only then
+start the deterministic alternating explicit driver. It must not discard,
+reset or move reconnect traffic outside the window. Prove each corpus signature
+repeatable across at least three sequential runs before restarting GREEN.
+
+## Next Agent Prompt — Phase 1n-d aggregate scheduling-oracle corrective RED
+
+Spawn a fresh Codex-high tests-only owner against frozen RED `fb8256d`. Change
+only `sync-aggregate-acceptance-1n-d-red.test.ts` to remove the reconnect-versus-
+explicit-driver race using public observations and the fixed readiness/quiet
+barrier above. Preserve the complete C1-C13 assertions, all measured reconnect
+traffic, the causal baseline `SYNC_REQUEST_LIMIT`, the asymmetric fallback
+owner and every accepted test owner. Do not weaken C9, normalize observed
+counts, filter duplicate traffic after the fact, add sleeps whose only purpose
+is to make one sample pass, or touch production/plan/identity code.
+
+Run the hard corpus sequentially at least three times and require an identical
+causal RED signature before accepting the corrective. Then run the fallback
+owner, all accepted 1n preservation, five ordered builds, exact typecheck
+census, changed-test lint, Prettier and diff checks to `.log`; package a
+verified manifest and commit only the corrected aggregate test. No legacy
+plain-ID positive path and no full inventory/performance, sealed, fuzz,
+proto-generation or full-suite workload.
+
+## After the corrective — Phase 1n-d aggregate production GREEN
 
 Spawn a distinct fresh Codex-high production owner against frozen RED
-`fb8256d` and the exact C1-C13 contract. Trace the verified branch-cut/shared-
-head accumulation through the real heads payload factory, then make the
-smallest coherent production correction that keeps emitted heads-mode recovery
-state bounded by useful delta information. Preserve truthful old-branch and
-recursive exact-hash recovery, every accepted per-frame cap, aggregate
-short/long equality, fallback behavior and all accepted 1n owners. The GREEN
-must let the entire frozen aggregate owner reach and pass its equality oracle;
-catching `SYNC_REQUEST_LIMIT`, deleting the long corpus, relaxing a cap, hiding
-messages, truncating recovery, emitting field 1 to current peers or adding a
-production downgrade switch is forbidden.
+`fb8256d` plus its scheduling-oracle corrective and the exact C1-C13 contract.
+Trace the verified branch-cut/shared-head accumulation through the real heads
+payload factory, then make the smallest coherent production correction that
+keeps emitted heads-mode recovery state bounded by useful delta information.
+Preserve truthful old-branch and recursive exact-hash recovery, every accepted
+per-frame cap, aggregate short/long equality, fallback behavior and all
+accepted 1n owners. The GREEN must let the entire frozen aggregate owner reach
+and pass its equality oracle; catching `SYNC_REQUEST_LIMIT`, deleting the long
+corpus, relaxing a cap, hiding messages, truncating recovery, emitting field 1
+to current peers or adding a production downgrade switch is forbidden.
 
 Do not edit the frozen aggregate test or the plan. Do not change ID generation,
 parsing, ACL, wire identity or durable schema: this remains greenfield and has
