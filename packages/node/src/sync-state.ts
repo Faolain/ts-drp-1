@@ -21,6 +21,10 @@ function stateKey(objectId: string, peerId: string): string {
 	return JSON.stringify([objectId, peerId]);
 }
 
+function findState(node: DRPNode, objectId: string, peerId: string): PeerSyncState | undefined {
+	return states.get(node)?.get(stateKey(objectId, peerId));
+}
+
 function getState(node: DRPNode, objectId: string, peerId: string): PeerSyncState {
 	let nodeStates = states.get(node);
 	if (nodeStates === undefined) {
@@ -56,7 +60,8 @@ export function advertisedTheseHeads(
 	peerId: string,
 	heads: readonly string[]
 ): boolean {
-	const advertised = getState(node, objectId, peerId).advertisedHeads;
+	const advertised = findState(node, objectId, peerId)?.advertisedHeads;
+	if (advertised === undefined) return heads.length === 0;
 	return advertised.size === heads.length && heads.every((hash) => advertised.has(hash));
 }
 
@@ -107,7 +112,8 @@ export function recordBranchCuts(node: DRPNode, objectId: string, peerId: string
  * @returns Deduplicated shared hashes within the heads-field cap
  */
 export function sharedHashes(node: DRPNode, objectId: string, peerId: string): string[] {
-	const state = getState(node, objectId, peerId);
+	const state = findState(node, objectId, peerId);
+	if (state === undefined) return [];
 	const selected = new Set<string>();
 	for (const hashes of [state.sharedHeads, state.branchCuts]) {
 		for (const hash of hashes) {
@@ -167,7 +173,8 @@ export function previewSyncSend(
 	peerId: string,
 	purpose: SyncSendPurpose
 ): PreparedSyncSend {
-	const state = getState(node, objectId, peerId);
+	const state = findState(node, objectId, peerId);
+	if (state === undefined) return { requestedHashes: [], send: true };
 	if (purpose === "inbound-reciprocity") {
 		const cooldownActive =
 			state.exactRequestCooldownUntil !== undefined && Date.now() < state.exactRequestCooldownUntil;
@@ -249,7 +256,8 @@ export function completePresentExactRequests(
 	peerId: string,
 	hasHash: (hash: string) => boolean
 ): void {
-	const state = getState(node, objectId, peerId);
+	const state = findState(node, objectId, peerId);
+	if (state === undefined) return;
 	let completed = false;
 	for (const hash of state.outstandingRequests) {
 		if (!hasHash(hash)) continue;
