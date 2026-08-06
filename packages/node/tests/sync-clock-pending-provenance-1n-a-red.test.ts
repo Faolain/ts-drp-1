@@ -14,6 +14,7 @@ import {
 	type ApplyResult,
 	DrpType,
 	type IDRP,
+	type MergeResult,
 	Message,
 	MessageType,
 	NodeEventName,
@@ -239,6 +240,70 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 		}
 	);
 
+	it("a genuinely clean applied SYNC_ACCEPT resets recovery before the next incomplete round", async () => {
+		const now = Date.now();
+		vi.spyOn(Date, "now").mockReturnValue(now);
+		const object = await receiverObject("clean-round-reset");
+		const missing = await signedVertex("clean-round-missing", ["phase-1n-a-clean-round-absent-parent"], now);
+		const clean = await signedVertex("clean-round-applied", [HashGraph.rootHash], now);
+		const missingMessage = message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [missing]);
+		const cleanMessage = message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [clean]);
+		const outbound = captureOutbound();
+		const syncObject = vi.spyOn(receiver, "syncObject");
+		const disconnect = vi.spyOn(receiver.networkNode, "disconnect").mockResolvedValue();
+		const accepted = vi.fn();
+		const rejected = vi.fn();
+		const mergeResults: MergeResult[] = [];
+		const merge = object.merge.bind(object);
+		vi.spyOn(object, "merge").mockImplementation(async (vertices) => {
+			const result = await merge(vertices);
+			mergeResults.push(result);
+			return result;
+		});
+		receiver.addEventListener(NodeEventName.DRP_SYNC_ACCEPTED, accepted);
+		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
+
+		try {
+			for (let round = 0; round < 3; round++) await handleMessage(receiver, missingMessage);
+			expect.soft(syncObject.mock.calls.length).toBe(3);
+			expect.soft(directTypes(outbound).filter((type) => type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(3);
+			expect.soft(rejected).not.toHaveBeenCalled();
+			expect.soft(accepted).not.toHaveBeenCalled();
+			expect.soft(object.vertices.map(({ hash }) => hash)).toEqual([HashGraph.rootHash]);
+			expect.soft(object.drp?.value).toBe(0);
+
+			await handleMessage(receiver, cleanMessage);
+			expect.soft(mergeResults.at(-1)).toEqual([true, [], []]);
+			expect.soft(accepted).toHaveBeenCalledTimes(1);
+			expect.soft(accepted.mock.calls[0]?.[0].detail).toEqual({ id: object.id });
+			expect.soft(rejected).not.toHaveBeenCalled();
+			expect.soft(object.vertices.map(({ hash }) => hash)).toEqual([HashGraph.rootHash, clean.hash]);
+			expect.soft(object.drp?.value).toBe(1);
+
+			// A reset makes this retry one of a new episode. Three new incomplete
+			// rounds must all recover before the fourth opens a fresh cooldown.
+			for (let round = 0; round < 3; round++) await handleMessage(receiver, missingMessage);
+			expect.soft(syncObject.mock.calls.length, "post-clean recovery must restart at retry one").toBe(6);
+			expect.soft(directTypes(outbound).filter((type) => type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(6);
+			expect.soft(rejected.mock.calls.length, "the clean round must discard the earlier retry count").toBe(0);
+
+			await handleMessage(receiver, missingMessage);
+			expect.soft(syncObject.mock.calls.length).toBe(6);
+			expect.soft(rejected).toHaveBeenCalledTimes(1);
+			expect.soft(rejected.mock.calls[0]?.[0].detail).toEqual({
+				id: object.id,
+				peerId: sender.networkNode.peerId,
+				retries: 3,
+			});
+			expect.soft(accepted).toHaveBeenCalledTimes(1);
+			expect.soft(disconnect).not.toHaveBeenCalled();
+			expect.soft((object as unknown as PrivateObject)._applier.knownInvalidVertexHashes.has(missing.hash)).toBe(false);
+		} finally {
+			receiver.removeEventListener(NodeEventName.DRP_SYNC_ACCEPTED, accepted);
+			receiver.removeEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
+		}
+	});
+
 	it("pending-only rounds neither consume nor reset a true-missing retry/cooldown episode", async () => {
 		const now = Date.now();
 		vi.spyOn(Date, "now").mockReturnValue(now);
@@ -249,7 +314,9 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 		const pendingMessage = message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [pending]);
 		const outbound = captureOutbound();
 		const syncObject = vi.spyOn(receiver, "syncObject");
+		const accepted = vi.fn();
 		const rejected = vi.fn();
+		receiver.addEventListener(NodeEventName.DRP_SYNC_ACCEPTED, accepted);
 		receiver.addEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 
 		try {
@@ -260,6 +327,7 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 			await handleMessage(receiver, pendingMessage);
 			expect.soft(syncObject.mock.calls.length, "pending must not consume retry three").toBe(2);
 			expect.soft(rejected.mock.calls.length).toBe(0);
+			expect.soft(accepted.mock.calls.length, "pending-only input is not an accepted sync").toBe(0);
 
 			await handleMessage(receiver, missingMessage);
 			expect.soft(syncObject.mock.calls.length).toBe(3);
@@ -268,6 +336,7 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 			await handleMessage(receiver, pendingMessage);
 			expect.soft(syncObject.mock.calls.length, "pending at the limit must not open cooldown").toBe(3);
 			expect.soft(rejected.mock.calls.length).toBe(0);
+			expect.soft(accepted.mock.calls.length, "pending-only input must not reset or report convergence").toBe(0);
 
 			await handleMessage(receiver, missingMessage);
 			expect.soft(syncObject.mock.calls.length).toBe(3);
@@ -277,9 +346,20 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 			await handleMessage(receiver, missingMessage);
 			expect.soft(syncObject.mock.calls.length, "pending must not reset an active cooldown").toBe(3);
 			expect.soft(rejected.mock.calls.length).toBe(1);
+			expect.soft(accepted.mock.calls.length, "pending-only input in cooldown remains unaccepted").toBe(0);
 			expect.soft(directTypes(outbound).filter((type) => type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(3);
 			expect.soft((object as unknown as PrivateObject)._applier.knownInvalidVertexHashes.has(pending.hash)).toBe(false);
+
+			const clean = await signedVertex("retry-accounting-clean", [HashGraph.rootHash], now);
+			await handleMessage(receiver, message("SYNC_ACCEPT", object.id, sender.networkNode.peerId, [clean]));
+			expect
+				.soft(accepted.mock.calls.length, "one genuinely applied clean round reports acceptance exactly once")
+				.toBe(1);
+			expect.soft(accepted.mock.calls[0]?.[0].detail).toEqual({ id: object.id });
+			expect.soft(object.vertices.map(({ hash }) => hash)).toEqual([HashGraph.rootHash, clean.hash]);
+			expect.soft(object.drp?.value).toBe(1);
 		} finally {
+			receiver.removeEventListener(NodeEventName.DRP_SYNC_ACCEPTED, accepted);
 			receiver.removeEventListener(NodeEventName.DRP_SYNC_REJECTED, rejected);
 		}
 	});
