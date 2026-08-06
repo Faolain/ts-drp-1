@@ -562,6 +562,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	}
 
 	let mergeRan = false;
+	let appliedProgress = false;
 	let rawMissing: string[] = [];
 	let missing: string[] = [];
 	let suppressMissingRecovery = false;
@@ -571,6 +572,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		const mergeOutcome = governedOutcome.outcome;
 		suppressMissingRecovery = governedOutcome.exhausted;
 		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
+		appliedProgress = mergeOutcome.committed.length !== 0;
 		rawMissing = mergeOutcome.result[1];
 		missing = trueMissingHashes(rawMissing, mergeOutcome.clockPending);
 		if (mergeRan && finalityStore !== undefined) {
@@ -579,7 +581,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		if (mergeRan) {
 			node.put(object.id, object);
 			if (!suppressMissingRecovery) {
-				if (rawMissing.length === 0) {
+				if (appliedProgress && rawMissing.length === 0) {
 					clearSyncRecoveryEpisode(node, object.id, sender);
 				} else if (missing.length !== 0) {
 					await recoverMissingSync(node, object.id, sender);
@@ -607,7 +609,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		}
 	}
 
-	if (mergeRan && rawMissing.length === 0) {
+	if (!suppressMissingRecovery && appliedProgress && rawMissing.length === 0) {
 		node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
 			detail: { id: object.id },
 		});
