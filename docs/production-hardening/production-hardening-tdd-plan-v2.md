@@ -25642,24 +25642,75 @@ Evidence is under
 `.logs/phase-1n-b-reciprocity-neutrality-green-codex-high/`; protected stash
 `ef3a53bdf318a5cea30761a9e3d203b106f16e7e` is unchanged.
 
-## Next Agent Prompt — Phase 1n-b corrective GREEN preliminary reviews
+## Phase 1n-b corrective GREEN preliminary reviews — accepted
 
-At fixed candidate `25ce88a`, run fresh independent native Grok 4.5/high and
-exact Kimi CLI v1.49.0 with effective `kimi-code/k3`, thinking and both
-100-step limits. Authenticate the frozen RED and GREEN commits/manifests and
-review the complete Phase 1n-b production lineage, not only the three-line
-handler branch. Trace new discovery precedence, inbound no-delta reciprocity,
-cooldown inertness/expiry, scheduled attempts one through four, UPDATE and
-SYNC_ACCEPT parity, periodic peer rotation, cleanup, send failure/reentry and
-all call sites. Confirm the typed internal seam cannot introduce a second
-lifecycle owner, duplicated builder, test-only branch, compatibility layer or
-legacy plain-ID path.
+Both fresh authoritative preliminary reviewers accept fixed production
+candidate `25ce88a` and authorize the final Opus/xhigh gate.
 
-Reviewers are read-only and must not run inventory/perf, sealed, fuzz,
-proto-generation or full-suite workloads. They may run only bounded focused
-tests if necessary. Final Claude-skill Opus/xhigh starts only after both
-preliminary reviewers accept. Record every finding and controller/model
-disclosure before closure.
+- Native Grok 4.5/high session
+  `61fd2004-259a-4bba-90ac-24fe2207277e`, request
+  `2b2466c3-585c-4047-8413-33b5e36fe034`, resolved to
+  `grok-4.5-build`. It returned `ACCEPTED` / `GREEN_MAY_PROCEED: yes` /
+  `OPUS_MAY_START: yes` after 13 turns and 26 read-only calls: 13 file reads
+  and 13 terminal inspections. It ran no test, build or forbidden workload.
+  Result SHA-256 is
+  `75f2678fd9f3d0a2ef368a9fd92de39c1e7e55a2321d988ff3e163691d57b293`;
+  the verified 43-entry root-relative manifest SHA-256 is
+  `722c56d08865f6fc988d5944b9a7c1f4c66b824340e8970fd76dbd78d37a6208`.
+  The native stream ended normally. Its surrounding zsh wrapper then used the
+  shell's read-only `status` variable, exited 1 and omitted `exit-code.txt`;
+  the complete native end record authenticates success, and the packaging
+  defect did not affect the review.
+- Exact Kimi CLI v1.49.0 session
+  `05370b66-3e7b-4fa6-a4a2-00740a70ffb3`, effective
+  `managed:kimi-code:k3` / `K3`, thinking enabled, authenticated environment,
+  CLI and native loaded step caps all 100. It returned `ACCEPTED` /
+  `GREEN_MAY_PROCEED: yes` / `OPUS_MAY_START: yes` after 28 steps and 42/42
+  successful read-only calls: Shell 26, ReadFile 13 and Grep 3. It ran no test,
+  build or forbidden workload and did not invoke a bare PATH `kimi`. Result
+  SHA-256 is
+  `e82c040251b8b257a73485d7921d40b7bdd429b3e05b95a5dc14d8a355450c9a`;
+  the verified 53-entry root-relative manifest SHA-256 is
+  `030772856338b0e3bd48f8a8a8a47583c79ea22de6867f9a8fff034f697d538f`.
+
+Both reviews verify HEAD/tree, tracked source/tests/docs, index, stash and
+protected-path invariance. Kimi's only observed concurrent untracked change was
+the sibling Grok controller's evidence directory.
+
+Preserve Grok's four explicit nonblocking residuals without expanding this
+bounded correction absent a reproduced failure: there is no separate direct
+test that injects reciprocity after cooldown is already active; concurrent
+scheduled calls deliberately charge fail-closed; in-flight work can recreate
+an empty state entry after lifecycle cleanup; and pre-existing
+history-unavailable early returns remain. The first is a coverage observation,
+not a found behavior failure: the read-only reciprocity branch tests active
+cooldown before sending and cannot mutate attempt/rejection fields. The latter
+three are not introduced by `25ce88a` and remain available to their natural
+lifecycle/transport owners.
+
+Evidence is under
+`.logs/phase-1n-b-reciprocity-green-grok45-high-review/` and
+`.logs/phase-1n-b-reciprocity-green-kimi3-high-100-review/`.
+
+## Next Agent Prompt — Phase 1n-b final Opus/xhigh review
+
+Use the repository Claude skill in bridge/sidecar mode for one fresh final
+Opus/xhigh adversarial review of fixed production candidate `25ce88a` at docs
+checkpoint `79e3f77`. Authenticate the RED/GREEN and both accepted preliminary
+review packages. Review the complete Phase 1n-b lineage and actively attempt to
+falsify the claimed inbound neutrality, cooldown behavior, scheduled ownership,
+UPDATE/SYNC_ACCEPT parity, peer isolation/rotation, cleanup, send failure and
+wire fallback. Adjudicate Grok's four nonblocking residuals and distinguish a
+real reproducible blocker from coverage or later-owner debt. Confirm one state
+owner, one message builder, no compatibility/test-only branch and no legacy
+plain-ID support.
+
+The Opus sidecar is read-only: Bash/Read/Grep/Glob only, no edits, delegation,
+web/MCP/search, inventory/perf, sealed, fuzz, proto-generation or full suite.
+It may run at most one bounded exact 28-test causal selection if necessary.
+Require `VERDICT`, `PHASE_1N_B_MAY_CLOSE` and concrete blocker/nonblocking
+residual fields. Preserve source/index/stash/protected invariance and package
+the native session/model/tool/result/manifest evidence before closure.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
