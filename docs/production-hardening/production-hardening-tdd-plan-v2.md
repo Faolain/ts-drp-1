@@ -27022,18 +27022,105 @@ and verified 29-entry manifest SHA-256 is
 `f9c50cbed50b88badb6f37bdc049a5b51a6104c9f0ce26faa6075ad436adfc76`.
 This is a review candidate, not final Phase 1n-d(i) acceptance.
 
-## Next Agent Prompt — Phase 1n-d(i) corrective GREEN reviews
+## Phase 1n-d(i) final reviews and closure — accepted
 
-Run fresh Grok 4.5/high, then exact Kimi 3/high/100, then final Opus/xhigh over
-the complete `514cc55..3dd618f` Phase 1n-d(i) lineage and both evidence bundles.
-Reviewers must verify the scheduler has one retry owner; stop/unsubscribe and
-remote-history semantics remain truthful; create/connect provenance is
-explicit and lifecycle-correct; missing public-put provenance restores only
-ordinary anti-entropy; and no legacy/plain-ID support, ID-shape inference,
-default or false provenance was introduced. They must also adjudicate the
-non-authoritative wrapper-expanded run correctly and preserve the previously
-authorized configured-peer deletion. Reviews are read-only. Only after all
-three accept may Phase 1n-d(i) be closed.
+All three fresh read-only reviewers accept exact HEAD `0e23d68` and the full
+`514cc55..3dd618f` lineage with no code-backed blocker:
+
+- Native Grok 4.5/high session `2abdeac5-17f4-49d0-8089-ddf28c9952c2`
+  returned `ACCEPTED`. The requested selector was `grok-4.5`, effective native
+  telemetry was solely `grok-4.5-build`, and the substantive same-session
+  resume completed normally after two preserved permission/setup cancellations.
+  Result SHA-256 is
+  `ade2a01307d0987fed1aff646a1f65d5471bcf7129c0dec5d160bf9943890c05`;
+  verified manifest SHA-256 is
+  `63cc6287fa69a1e98669a5aaecdb3c0245f038fd615bee2d194f1ab225062ee6`.
+- Exact Kimi CLI v1.49.0 session
+  `fd19b94b-e9e1-4332-a84a-b995f60ba434` used effective
+  `managed:kimi-code:k3` / `K3`, thinking, and environment, CLI and native
+  loaded step caps all 100. It returned `ACCEPTED` / `BLOCKERS=none` after 26
+  steps and 36 successful read-only calls. Result SHA-256 is
+  `caeaa54fc9515a96044032c4a43c04460e74bd3b804501f9a98cb984313fc827`;
+  the final verified 16-entry manifest SHA-256, superseding the pre-combined-
+  stream packaging hash, is
+  `d6a0872238fa2af5452a583a216971643f4646e6df5769766177118d70a3fe4a`.
+- Final Claude-skill Opus/xhigh session
+  `ca48e6b0-a1ab-474b-80c4-4ad627258ad7` used substantive
+  `claude-opus-5`, requested xhigh and returned `ACCEPTED` with no blocking
+  finding after 56 turns and 55 read-only calls. Automatic Haiku use was only
+  2,069 input / 26 output tokens for `generate_session_title`; it authored no
+  reasoning, tool call or verdict. Result SHA-256 is
+  `e9ce803a6ed9eb4f9cdce1b65a2f10da39206ac1750a17eeac593facccc949cf`;
+  verified 13-entry manifest SHA-256 is
+  `13d68bdf6f49308af89b8dd4aa4f79539a0cee8634650a08b088e8ff9b572df6`.
+
+Evidence is under
+`.logs/phase-1n-d-i-unmanaged-restore-green-{grok45-high-review,kimi3-high-100-review}/`
+and `.logs/phase-1n-d-i-unmanaged-restore-final-opus-xhigh-review/`. Every
+reviewer independently verified the causal manifests, frozen blobs, source
+scope and public lifecycle paths. The scheduler now has one tracked Sync owner;
+create/connect acquisition provenance is explicit and lifecycle-correct;
+missing public-put provenance restores only immediate plus ordinary periodic
+anti-entropy; and the configured-peer timer deletion remains the authorized
+golden-path tradeoff.
+
+The greenfield identity boundary is final. Generated creator-bound IDs are the
+default. A positive fixture described as a “plain custom id” is **not** a
+legacy identity path: it is caller-chosen and lawful only because the caller
+supplies an explicit ACL. Plain/custom or malformed IDs without that ACL remain
+rejection controls. `unmanaged` is scheduler bookkeeping for a valid
+creator-bound, explicit-ACL public-put object with absent acquisition
+provenance; it is not an identity kind, compatibility mode or fallback.
+
+Preserve the accepted nonblocking ledger without reopening this slice absent a
+causal failure:
+
+1. Fresh live `put` does not arm intervals until same-instance restart; this
+   slice deliberately pins restart restoration, not a new live-put lifecycle.
+2. The now-identical abort/non-abort return at the end of `connectObject` is
+   inert cleanup debt. Missing-provenance restoration is also silent after the
+   prior error log was removed; neither changes behavior.
+3. `creatorFromObjectID` has one additional pre-existing health-reporting use
+   beyond ACL/genesis/rendezvous. All three reviewers agree it is not scheduler
+   role inference. An unmanaged interval reports the same synchronized state as
+   a created interval; the authorization quorum explicitly anticipated that
+   truthful no-fast-retry equivalence.
+4. The exported TypeScript scheduler factory has no runtime guard against a JS
+   caller supplying `undefined`; it then behaves like unmanaged. No default was
+   added, and runtime validation remains ordinary public-API hardening debt.
+5. Pre-existing `IntervalRunner` stop-during-execute/start overlap and a
+   connected replica with permanently zero peers retaining a dormant 1 Hz
+   runner are outside this correction. The latter consumes no attempt budget;
+   lifecycle/concurrency owners may tighten them only with fresh causal tests.
+6. The first GREEN test command's package wrapper expanded into the whole node
+   suite and is non-authoritative. The retry-owner RED manifest is repository-
+   root-relative while the other manifests are bundle-relative; verify each
+   from its recorded base.
+
+Phase 1n-d(i) is closed at production lineage `940a3d5` + `3dd618f`.
+
+## Next Agent Prompt — Phase 1n-d aggregate acceptance RED
+
+Spawn a fresh Codex-high tests-only owner for the Phase 1n-d row. Compose the
+accepted 1n-a/b/c production boundaries through public node/network surfaces in
+one bounded deterministic partition/rejoin harness with mixed negotiated peers.
+The causal owner must cover: a branch created before or during partition and
+injected after shared heads advance; recursive exact-hash recovery until both
+replicas converge; heads-chunk and explicitly negotiated bounded field-1
+fallback peers; no unnegotiated inventory downgrade; and byte/probe work tied
+to the missing delta rather than total retained history. Use actual encoded
+bytes and public outbound observations, not private maps or implementation-
+mirroring mocks. Preserve all accepted 1n causal owners byte-for-byte.
+
+If the row lacks an interoperable cost bound or a public seam needed to state a
+non-vacuous RED, stop with a read-only seam ledger rather than inventing a
+threshold or production architecture. Such a plan correction requires the
+normal Codex-high + exact Kimi 3/high/100 + Opus/xhigh quorum before any plan
+amendment. Otherwise land one coherent causal RED, run the focused preservation,
+five ordered builds, exact typecheck census, changed-test lint, Prettier and
+diff checks sequentially to `.log`, package a verified manifest and commit only
+tests. Do not run full inventory/performance, sealed, fuzz, proto-generation or
+the full suite. Identity remains greenfield: no legacy plain-ID positive path.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
