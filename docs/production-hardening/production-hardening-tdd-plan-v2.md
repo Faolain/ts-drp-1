@@ -26106,20 +26106,71 @@ This correction changes no identity rule. Omitted ACL still means a generated,
 creator-bound id; a caller-chosen id still requires an explicit coordinated
 ACL; legacy plain ids remain unsupported.
 
-## Next Agent Prompt — Phase 1n-c distinct production GREEN
+## Phase 1n-c first GREEN review — full request-envelope cap corrective required
 
-Start a distinct fresh Codex-high production GREEN from immutable RED
-`96efd42`. Read the complete amended contract, RED ledger and authorized
-preservation-fixture amendment. Freeze both RED tests and the amended plan; do
-not amend assertions to fit production. After the corrective tests-only
-checkpoint lands, implement the
-smallest coherent production architecture that satisfies both 1n-c(i) and
-1n-c(ii), with one canonical protocol bundle, one selected-stream payload
-factory, one private provenance/completion envelope, one bounded decoder/builder
-policy, one outstanding-exact owner and one per-live-connection admission owner.
-Do not add a capability cache, parallel mode/session registry, wire ACK,
-negotiation protobuf, network-side Sync rewrite, fake compatibility path,
-legacy plain-ID branch or test-only production seam.
+Production GREEN `0b44e90f91fd4fc25badf02848e21de65020f10f` restored
+the corrected preservation owners to 22/22, the complete semantic preservation
+set to 30/30 and the immutable Phase 1n-c owners to 12/12. Ordered builds,
+typechecks with only the inherited object 5/node 2 census, lint, Prettier and
+diff checks also passed. Fresh Grok 4.5/high nevertheless correctly returned
+`CHANGES_REQUESTED` before Kimi or Opus acceptance review.
+
+The one proven blocker is `1n-c-request-byte-cap-outer-message`.
+`validateNegotiatedSync` measures request bytes with the inner Sync payload's
+`message.data.byteLength`, while the amended contract requires the complete
+encoded protobuf request. Because the outer `Message.objectId` is nonempty but
+has no schema maximum, a request with a tiny inner Sync and a large object id
+passes the 65,536-byte request check and can reach central admission up to the
+independent transport-frame ceiling. Independent bounded probes measured a
+4-byte inner Sync and a 70,062-byte full Message accepted in both heads-chunk
+and fallback modes. The immutable RED inflates only the inner Sync and therefore
+does not cover this envelope bypass.
+
+This is a defect against the already-authorized contract, not a stale plan
+assumption or an identity-policy change, so no architecture-amendment quorum is
+required. Add one fresh tests-only corrective RED without modifying the
+immutable Phase 1n-c files. It must prove both modes reject before central
+admission when `Message.encode(message).finish().byteLength > 65,536` even
+though the inner Sync is within cap, preserve a normal positive control, and
+produce a causal pre-fix failure. A distinct fresh GREEN must repair the one
+canonical request-validation owner, then rerun the focused and preservation
+gates before restarting the complete Grok -> exact Kimi 3/high/dual-100 ->
+Opus/xhigh sequence.
+
+This corrective must not add, retain or infer legacy identity compatibility.
+The implementation is greenfield: omitted ACL accepts generated creator-bound
+ids only; arbitrary/plain ids require an explicit coordinated ACL. A very long
+attacker-supplied object id in the negative test is malformed resource input,
+not a legacy id that production should normalize or support.
+
+Fresh Grok session `a970f3a6-77f8-4c16-9397-fe09970ae920` authenticated sole
+effective model `grok-4.5-build` at high reasoning. Result SHA-256 is
+`c70101f612cfeec67221a99a900ac2bcf14bf3d46e634a38bb03599f48193af6`;
+the verified ten-entry root-relative manifest SHA-256 is
+`1ec63abd65ce95b4ee068d227f62a5ff372c3b21617e030954502748731f157d`.
+Evidence is under `.logs/phase-1n-c-green-grok45-high-review/`; the independent
+root reproduction is
+`.logs/phase-1n-c-green-root-request-wire-cap-probe.log`.
+
+## Next Agent Prompt — Phase 1n-c request-envelope cap corrective RED
+
+Start a fresh Codex-high tests-only corrective RED from rejected GREEN
+`0b44e90`. Freeze both immutable Phase 1n-c RED files and every existing
+assertion. Add one bounded network test owner for the complete encoded-request
+ceiling: for both heads-chunk and fallback, construct a request whose inner Sync
+is within 65,536 bytes but whose complete `Message.encode` output exceeds it,
+and prove rejection happens before central admission or response work. Include
+one ordinary within-cap positive control and a causal pre-fix failure. Do not
+make production or plan changes, do not turn a long malformed object id into a
+supported legacy identity, and do not add an identity compatibility test.
+
+Commit the RED tests only with focused test, network build/typecheck, lint,
+Prettier, diff and immutable-source hash evidence in `.log`. Then start a
+distinct fresh Codex-high GREEN. Repair the single canonical validator so
+request caps measure the complete encoded Message while preserving independent
+response-byte handling, typed mode-specific failures, pre-admission ordering
+and the existing normal path. Apply `refactor-clean`; do not add a second cap
+owner, schema workaround, compatibility wrapper or test-only production seam.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
