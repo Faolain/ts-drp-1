@@ -26625,18 +26625,61 @@ The response path's prebuilt mode-independent ACCEPT/REJECT message and generic
 non-Sync sender error handling are noted as pre-existing, out-of-slice and
 non-blocking. No architecture amendment is proposed.
 
-## Next Agent Prompt — Phase 1n-c exact Kimi 3 review
+## Phase 1n-c final GREEN review — exact Kimi 3 accepted
 
-Because Grok accepted, run fresh exact Kimi 3/high/dual-100 against the same
-fixed lineage and complete evidence. Independently source-trace the finite Sync
-egress census, peerless empty/non-empty behavior, build-after-selection,
-selected lifecycle/accounting truth, literal wire caps and fixture non-vacuity.
-Rerun the bounded gates sequentially; do not rely only on prior logs. Reject any
-generic bypass, duplicated validation, fallback truncation, compatibility or
-legacy plain-id route. Authenticate `/Users/aristotle/.local/bin/kimi-cli`,
-provider/model `kimi-code/k3`, thinking and environment/CLI/loaded-loop 100-step
-caps, session/steps/calls, result and verified manifest. Start final
-Claude-skill Opus/xhigh only if Kimi accepts.
+Fresh exact Kimi 3/high/dual-100 independently returns `ACCEPTED`,
+`OPUS_MAY_START=yes` and `BLOCKERS=None` against review HEAD `472706b`.
+Session `77499519-0493-40bc-ac75-4e82f1e416f4` used only
+`/Users/aristotle/.local/bin/kimi-cli` v1.49.0, requested `kimi-code/k3`,
+effective `managed:kimi-code:k3` / `K3`, thinking enabled, and authenticated
+environment, CLI and loaded `LoopControl` caps of 100. It completed 44 LLM
+steps and issued 61 calls: 34 Shell, 19 ReadFile and eight Grep. Sixty executed
+successfully; one 600-second timeout request was rejected by client validation
+before execution and immediately rerun within the allowed bound. No forbidden,
+fallback-model, subagent, web, MCP or memory call occurred.
+
+Kimi's independent finite census finds the sole Sync request constructor in
+`buildSyncPayloadForProtocol`, invoked only after negotiated selection. All
+explicit and omitted-peer callers converge on that owner after concrete peer
+choice. Response ACCEPT/REJECT egress is negotiated and validated. Generic
+random/send APIs have only non-Sync consumers. Exact raw wire length reaches
+the canonical validator before queue/graph/lifecycle work, selected lifecycle
+and advertised-head truth occur only after validation, and fallback never
+advertises heads. The peerless empty branch returns before any send, build or
+accounting action.
+
+The fixture audit accepts all 11 unchanged titles, real-factory request capture,
+verbatim response capture, negotiated no-peer observation, explicit selected
+truth on all three captured heads deliveries and the distinct broadcast-drop
+spy. It finds no dial emulation, swallowed factory error, generic compatibility,
+identity normalization or legacy plain-id behavior.
+
+Fresh sequential gates pass 5/5, 11/11, 23/23, 30/30 and manual 1/1 with 13
+skipped. Ordered builds pass 5/5. Types/network/message-queue typechecks are
+clean; object/node retain exact inherited 5/2 with zero owned. ESLint has zero
+errors and four inherited JSDoc warnings; Prettier/diff checks pass. HEAD/tree,
+index, stash, protected and relevant source state remain invariant. No
+architecture amendment is required.
+
+Evidence is under
+`.logs/phase-1n-c-peerless-green-kimi3-high-100-review/`. Result SHA-256 is
+`cbce130c671b3f149b9f81b9b19bb2a9a4b90dd927e5325b9250b10e454927c6`;
+verified 60-entry manifest SHA-256 is
+`fd909c5231e533327f2d536e2cf40fe2065933c97826ed0602db01cb41329cc9`.
+
+## Next Agent Prompt — Phase 1n-c final Opus review
+
+Because Grok and exact Kimi 3 accepted, run the final Claude-skill Opus/xhigh
+adversarial review against the complete amended contract and lineage. Use
+bridge mode, substantive Opus, requested xhigh and read/Bash-only plan mode.
+Require an independent finite Sync egress census; trace peerless selection,
+literal-byte caps, lifecycle/advertisement ordering, response boundaries and
+fixture non-vacuity; inspect for unseen ordinary bypasses rather than relying on
+the prior verdicts. Run only bounded causal probes and the sequential focused
+gates as needed; no forbidden workloads. Reject compatibility, arbitrary-id or
+legacy plain-id routes. Disclose any automatic helper-model use, authenticate
+session/model/calls, preserve repository state, and package result and verified
+manifest hashes. Close Phase 1n-c only if Opus returns final `ACCEPTED`.
 
 Do not amend architecture during acceptance review. If a new assumption change
 is proposed, stop and require fresh Codex-high, exact Kimi 3/high/dual-100 and
