@@ -26152,21 +26152,42 @@ Evidence is under `.logs/phase-1n-c-green-grok45-high-review/`; the independent
 root reproduction is
 `.logs/phase-1n-c-green-root-request-wire-cap-probe.log`.
 
-## Next Agent Prompt — Phase 1n-c request-envelope cap corrective RED
+## Phase 1n-c request-envelope cap corrective RED — checkpointed
 
-Start a fresh Codex-high tests-only corrective RED from rejected GREEN
-`0b44e90`. Freeze both immutable Phase 1n-c RED files and every existing
-assertion. Add one bounded network test owner for the complete encoded-request
-ceiling: for both heads-chunk and fallback, construct a request whose inner Sync
-is within 65,536 bytes but whose complete `Message.encode` output exceeds it,
-and prove rejection happens before central admission or response work. Include
-one ordinary within-cap positive control and a causal pre-fix failure. Do not
-make production or plan changes, do not turn a long malformed object id into a
-supported legacy identity, and do not add an identity compatibility test.
+Fresh Codex-high committed tests-only corrective RED
+`67b688a3062e07cdb0bc25577bcea418cfe037d5` (tree
+`5d9c6745b2031e9cf7a5748452efd3b3d2c24fd2`) from the rejection-docs
+parent `5d6bf3c`. Its sole new owner is
+`packages/network/tests/sync-request-envelope-cap-1n-c-red.test.ts` (152
+lines, SHA-256
+`f4820f25123a46686efb1b39deaf33ac1089e9d77f21781798f8887a9d51bda4`).
+No production, existing test, plan, generated, lock or protected-untracked file
+changed.
 
-Commit the RED tests only with focused test, network build/typecheck, lint,
-Prettier, diff and immutable-source hash evidence in `.log`. Then start a
-distinct fresh Codex-high GREEN. Repair the single canonical validator so
+The exact causal signature is **two failed / one passed**. Heads-chunk uses a
+15-byte inner Sync inside a 70,042-byte complete Message; fallback uses a
+24-byte inner Sync inside a 70,051-byte complete Message. Both current paths
+return no typed failure and reach central admission exactly once, where the
+contract requires zero admission and respectively `SYNC_REQUEST_LIMIT` and
+`SYNC_FALLBACK_LIMIT`. The ordinary complete encoded request within 65,536
+bytes passes. The hostile oversized object id is explicitly malformed envelope
+input and asserts no valid or legacy identity behavior.
+
+Network build/typecheck, ESLint, Prettier and diff checks pass. The complete
+production-source census is unchanged; immutable Phase 1n-c owners retain
+SHA-256 `1c605b...` and `ef33aa...`; protected paths and stash `ef3a53...`
+remain invariant. Ledger SHA-256 is
+`3987a3a139749757968f98ae006119d0fcdca98ee6439b86d082238de8663bb5`;
+the verified 26-entry manifest SHA-256 is
+`d58bc1da2c0cac9f38d1879f36b496ff412983fe29b5f523c5c5d701496bf8e5`.
+Evidence is under
+`.logs/phase-1n-c-request-envelope-cap-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-c request-envelope cap distinct GREEN
+
+Start a distinct fresh Codex-high GREEN from corrective RED `67b688a`. Freeze
+the new and both immutable Phase 1n-c RED files and every existing assertion.
+Repair the single canonical validator so
 request caps measure the complete encoded Message while preserving independent
 response-byte handling, typed mode-specific failures, pre-admission ordering
 and the existing normal path. Apply `refactor-clean`; do not add a second cap
