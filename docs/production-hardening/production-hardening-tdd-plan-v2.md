@@ -25049,17 +25049,32 @@ the verified 22-entry manifest SHA-256 is
 Evidence is under
 `.logs/phase-1l-initial-sync-fixture-migration-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1l tracked initial-sync fixture migration GREEN
+## Phase 1l tracked initial-sync fixture migration GREEN — review pending
 
-Run a distinct fresh Codex-high tests-only GREEN. Change only
-`packages/node/tests/initial-sync.test.ts`: give each of the two failing cases
-fresh coordinated explicit ACL instances for creator and joiner, granting the
-intended Writer authority and following the accepted anti-entropy precedent.
-Preserve every retry/timing assertion and the no-peers control. Do not change
-production, broaden permissionless defaults, add legacy/plain-id behavior or
-share one mutable ACL instance across object identities. Run focused 3/3,
-preservation 26/26 and proportionate build/type/lint/format gates to a new log
-directory, then commit only the tests-only fixture correction for fresh review.
+Distinct fresh Codex-high tests-only commit
+`f5b6d2b6c74110bba1d9fd501eefc0072f77db98` (tree
+`0cc57bd844f8a8ae0bbbde57860601e871a68755`) changes only
+`packages/node/tests/initial-sync.test.ts`, +32/-6, final SHA-256
+`036a0a5cf128d4bd3ed6c3f476a5d09256085b0f260742d9b63708db14d2fb01`.
+A small fixture helper constructs a fresh explicit ACL for each replica,
+authorizes both real creator and joiner and provisions both BLS keys. The two
+affected tests pass independently constructed matching ACLs to create/connect;
+the empty-history case now uses a real creator node. No retry, timing, network
+or no-peers assertion changed, no mutable ACL instance crosses object
+identities, and production/default/ID behavior is untouched.
+
+Focused initial-sync is 3/3 and identity/initial-sync preservation is 26/26.
+Ordered builds pass; typecheck retains only the exact inherited object-five /
+node-two Phase-1i-b diagnostics. Focused/tracked lint, Prettier, diff and
+postcommit ownership checks pass. No sealed/100k/fuzz/full suite ran. Ledger
+SHA-256 is
+`89e5845e23479682d46e4cf3cac454a204dced5339b24775035b83cf93ac8b34`;
+the verified 26-entry manifest SHA-256 is
+`6b08e867f51a665c5d789eed45309767927e0d0ef0ffd5b0ab28f72d9cec6ddb`.
+Evidence is under
+`.logs/phase-1l-initial-sync-fixture-migration-green-codex-high/`. Fresh Grok
+4.5/high and exact Kimi 3/high/100 must independently review this tests-only
+fixture correction before final Claude-skill Opus/xhigh acceptance.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
