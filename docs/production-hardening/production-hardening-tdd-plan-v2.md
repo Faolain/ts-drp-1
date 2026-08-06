@@ -24652,19 +24652,62 @@ Opus otherwise accepts the 10,000-entry eviction and mixed/transitive
 observations as genuine bounded 1n-b handoffs, and independently accepts the
 greenfield id rule. Those decisions are unchanged.
 
-## Next Agent Prompt — Phase 1n-a clean-round corrective RED
+## Phase 1n-a clean-round corrective RED checkpoint — frozen
 
-Run a fresh Codex-high tests-only RED. Pin an incomplete genuine-missing
-SYNC_ACCEPT that opens/increments a recovery episode, followed by a genuinely
-clean applied SYNC_ACCEPT that resets it, followed by a new incomplete round
-which starts from retry one rather than stale cooldown. Separately pin that a
-pending-only SYNC_ACCEPT neither resets an existing episode nor emits
-`DRP_SYNC_ACCEPTED`, while a genuinely clean applied round emits the event
-exactly once. Use real handlers/object outcomes and wire/event observations;
-no production mock result, private provenance write, source analyzer or test-
-only hook. Preserve all existing 1n-a owners and gates. Change tests only; do
-not modify production, plan, dependencies, generated files or protected
-untracked state.
+Fresh Codex-high tests-only commit
+`9b8fa821e214a69d4eb3846016baebe341348e6c` (tree
+`4d47fa7031aa43ed11fbf808483edf3810b53d6c`) changes only
+`packages/node/tests/sync-clock-pending-provenance-1n-a-red.test.ts` by 80
+insertions. Its SHA-256 is
+`84c53c7727e5190f5702e0141702abd66d45cad16b4bd8d79746402f348dc033`.
+
+The first new owner uses real signed traffic to open a true-missing recovery
+episode for three rounds, apply a real root-dependent clean vertex, and then
+open the same missing condition again. Current production sends the first
+three recovery SYNCs but zero after the clean round instead of another three:
+the successful merge did not clear the stale episode and the next occurrence
+enters cooldown. The second owner observes public events across the existing
+pending/retry interleave: three pending-only rounds incorrectly emit three
+`DRP_SYNC_ACCEPTED` events, and the eventual genuine clean round raises the
+total to four instead of exactly one. No mock result tuple, caller-authored
+provenance, private hook or source analyzer is involved.
+
+The authoritative signature is owner 2F/5P, migrated sentinel 6/6 and combined
+pre/postcommit 2F/11P. Phase-0f/recovery preservation is 56/56 and
+anti-entropy/1k/cap preservation is 16/16. Ordered types/validation/object/node
+builds pass; types/validation typechecks pass; object retains exactly five and
+node exactly two byte-identical inherited diagnostics. Owned lint is 0/0, all
+tracked TypeScript lint remains 0 errors/249 inherited warnings, and Prettier
+plus diff checks pass. Neither sealed nor 100k workload ran. Ledger SHA-256 is
+`21afd9a68747b26b31c0dba77220ee001d3b101c40a3d482dcb34777a5a18336`,
+the verified 37-entry integrity manifest SHA-256 is
+`024e889d82c6f61585bbea6203e91dcbfbb689d5a7b255b6c7cf0ab74a42a861`,
+and the manifest-hash artifact SHA-256 is
+`f09e5900658fa5113b21bfa81fad8e080bdd96bfe460b8c2fb0984c38f1dba15`.
+Evidence is under `.logs/phase-1n-a-clean-round-corrective-red-codex-high/`.
+
+A test-runner gotcha is also frozen: passing the libp2p spy itself to a failed
+`expect.soft` made Vitest's formatter inspect a proxy and report `$$typeof not
+set`. Numeric `mock.calls.length` assertions retain the same causal contract
+without invoking that unrelated proxy formatter.
+
+## Next Agent Prompt — Phase 1n-a clean-round corrective GREEN
+
+Run a distinct fresh Codex-high production-only GREEN against frozen commit
+`9b8fa82`. Preserve both the raw object `missing` outcome and the authenticated
+true-missing recovery list. A merge that actually ran and returned raw missing
+empty owns an explicit successful-round recovery-episode reset and may emit
+`DRP_SYNC_ACCEPTED`; a pending-only round has raw missing nonempty, so it does
+neither even though its filtered recovery list is empty. Do not restore generic
+empty-list recovery calls, expose provenance, broaden invalid/quarantine
+semantics, or add compatibility/source-analysis/test-only branches. Preserve
+all true-missing retry/cooldown, pending-only budget neutrality, finality,
+persistence, error identity and event behavior. Change production only; do not
+modify tests, plan, dependencies, generated files or protected untracked state.
+Run the focused owner, combined pre/postcommit owners, 56/56 and 16/16
+preservation groups, ordered builds/typechecks, lint, formatting and diff gates
+to `.logs/phase-1n-a-clean-round-corrective-green-codex-high/`, then commit the
+production-only candidate for fresh independent review.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
