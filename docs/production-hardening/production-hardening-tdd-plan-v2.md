@@ -24881,19 +24881,43 @@ the verified 68-entry manifest SHA-256 is
 `e0c76052400bbdad72f0aa8777399f3ddf3f4de3e2c76cb96e286517f99f2e28`.
 Evidence is under `.logs/phase-1n-a-no-progress-corrective-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-a no-progress corrective GREEN
+## Phase 1n-a trusted-only/no-progress corrective production GREEN — review pending
 
-Run a distinct fresh Codex-high production-only GREEN against frozen commit
-`b8dfcce`. Reset requires raw missing empty, a non-exhausted round and genuine
-object-owned applied progress; `DRP_SYNC_ACCEPTED` additionally requires a
-non-exhausted genuinely applied clean round. Use the existing `committed`
-outcome only if the frozen compact-observer control proves it is truthful for
-compact history; otherwise add the narrowest internal object-owned progress
-signal, without public/provenance/test hooks. Preserve all earlier 1n-a
-recovery, pending, clean-round, error, finality and persistence behavior. Change
-production only; run the 4-test owner, prior 13/13, 56/56, 16/16 and all
-build/type/lint/format gates to a new evidence directory, without sealed/100k,
-then commit only the production correction for fresh reviews.
+Distinct fresh Codex-high production-only commit
+`60d9f2f484ef6d2bb19383c1bf00b2dc52496e09` (tree
+`f20ebea5d754aeeb067efb0ecdd4570fd184a5b8`) changes only
+`packages/node/src/handlers.ts`, +4/-2, final SHA-256
+`ff3aea992eabf8548ac67177cf2720bd55291c17fb5586c15e469c5b4f00cdc2`.
+It retains `mergeRan` for the existing persistence/finality behavior but derives
+a separate internal `appliedProgress` predicate from the object-owned
+`mergeOutcome.committed`. Recovery-episode reset now requires applied progress
+plus raw-missing-empty, and `DRP_SYNC_ACCEPTED` additionally requires a
+non-exhausted applied clean round. There is no public API, provenance hook,
+wire change, identity compatibility mode or legacy plain-id shim.
+
+The frozen compact-observer control proves `committed` is truthful for compact
+history. The corrective owner passes 4/4 before and after commit; the prior
+combined owners pass 13/13 before and after commit, with sentinel 6/6,
+Phase-0f/recovery 56/56 and serial anti-entropy/1k 16/16. Ordered builds pass.
+Types/validation typechecks pass; object-five/node-two diagnostics byte-match
+the inherited authority. Lint is owned 0/0, tracked 0 errors/249 warnings and
+no-warn-ignored 0 errors/226 warnings; Prettier/diff pass. No sealed, 100k or
+fuzz workload ran.
+
+A supplementary uncommitted Codex review broadened into the protected untracked
+stale protocol-v2 0g2 fixtures and observed only their known 9F/2P state. That
+out-of-scope attempt was stopped and was not used as an acceptance result; the
+files remained untouched and untracked. The production scope, index, stash and
+all other protected paths remained invariant.
+
+Ledger SHA-256 is
+`d31a38fba2738b7da47a063edbb88c05e27d057e53564a666fd1b280f73de166`;
+the verified 53-entry manifest SHA-256 is
+`418c886f1e3160905f693587be25bcd695f4d8edac25c382749a42d6cc441096`.
+Evidence is under
+`.logs/phase-1n-a-no-progress-corrective-green-codex-high/`. Fresh Grok
+4.5/high and exact Kimi 3/high/100 must independently review this fixed
+candidate before final Claude-skill Opus/xhigh acceptance.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
