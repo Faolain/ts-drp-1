@@ -1909,8 +1909,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (message.type !== expectedType) {
 				throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync sender factory returned the wrong message type");
 			}
-			validateNegotiatedSync(message, stream.protocol);
-			await uint8ArrayToStream(stream, Message.encode(message).finish());
+			const messageBuffer = Message.encode(message).finish();
+			validateNegotiatedSync(message, stream.protocol, messageBuffer.byteLength);
+			await uint8ArrayToStream(stream, messageBuffer);
 			if (selection.mode === "heads-chunk") {
 				await this.waitForRemoteSyncAdmission(stream, signal, deadlineSignal);
 			}
@@ -2047,12 +2048,12 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				);
 			}
 			if (isSyncProtocolMessage(message)) {
-				validateNegotiatedSync(message, stream.protocol);
+				validateNegotiatedSync(message, stream.protocol, data.byteLength);
 				const ingress = createDirectSyncIngress(message, authenticatedSender, selection.protocol);
 				await this._messageQueue.enqueue(ingress);
 				if (ingress.mode === "heads-chunk") await ingress.completion.wait();
 			} else {
-				validateNegotiatedSync(message, stream.protocol);
+				validateNegotiatedSync(message, stream.protocol, data.byteLength);
 				await this._messageQueue.enqueue(message);
 			}
 			await stream.close();

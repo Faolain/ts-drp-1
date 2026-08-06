@@ -67,7 +67,7 @@ export function buildSyncPayloadForProtocol(node: DRPNode, input: SyncPayloadBui
 	});
 
 	// Validation precedes the only mutating lifecycle/accounting operations.
-	validateNegotiatedSync(message, input.protocol);
+	validateNegotiatedSync(message, input.protocol, Message.encode(message).finish().byteLength);
 	const committed = prepareSyncSend(node, input.objectId, input.peerId, input.purpose);
 	if (!committed.send) throw new SyncTransportError("SYNC_SEND_SUPPRESSED", "Sync lifecycle suppressed this send");
 	if (

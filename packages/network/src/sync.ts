@@ -1,4 +1,4 @@
-import { Message, MessageType, Sync, SyncAccept } from "@ts-drp/types";
+import { type Message, MessageType, Sync, SyncAccept } from "@ts-drp/types";
 
 export const DRP_MESSAGE_PROTOCOL = "/drp/message/0.0.1";
 export const DRP_HEADS_CHUNK_PROTOCOL = "/drp/message/1.0.0/heads-chunk";
@@ -142,11 +142,11 @@ export function selectedSyncProtocol(protocol: string): SelectedSyncProtocol {
 	return { mode: syncModeForProtocol(protocol), protocol: protocol as DRPSyncProtocol };
 }
 
-/** Validate negotiated Sync fields and actual encoded request bytes before admission. */
-export function validateNegotiatedSync(message: Message, protocol: string): void {
+/** Validate negotiated Sync fields and the exact encoded message length before admission. */
+export function validateNegotiatedSync(message: Message, protocol: string, encodedByteLength: number): void {
 	if (message.type === MessageType.MESSAGE_TYPE_SYNC_REJECT) {
 		syncModeForProtocol(protocol);
-		if (Message.encode(message).finish().byteLength > SYNC_RESPONSE_BYTE_CAP) {
+		if (encodedByteLength > SYNC_RESPONSE_BYTE_CAP) {
 			throw new SyncTransportError("SYNC_RESPONSE_LIMIT", "Sync rejection exceeds the v1 byte ceiling");
 		}
 		return;
@@ -161,10 +161,7 @@ export function validateNegotiatedSync(message: Message, protocol: string): void
 				cause,
 			});
 		}
-		if (
-			response.requested.length > SYNC_RESPONSE_VERTEX_CAP ||
-			Message.encode(message).finish().byteLength > SYNC_RESPONSE_BYTE_CAP
-		) {
+		if (response.requested.length > SYNC_RESPONSE_VERTEX_CAP || encodedByteLength > SYNC_RESPONSE_BYTE_CAP) {
 			throw new SyncTransportError("SYNC_RESPONSE_LIMIT", "Sync response exceeds the v1 sync ceiling");
 		}
 		return;
@@ -179,13 +176,11 @@ export function validateNegotiatedSync(message: Message, protocol: string): void
 			cause,
 		});
 	}
-	const requestByteLength = Message.encode(message).finish().byteLength;
-
 	if (mode === "fallback") {
 		if (sync.heads.length !== 0 || sync.sharedHeads.length !== 0 || sync.requestedHashes.length !== 0) {
 			throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Heads fields are forbidden on fallback sync");
 		}
-		if (sync.vertexHashes.length > SYNC_FALLBACK_HASH_CAP || requestByteLength > SYNC_REQUEST_BYTE_CAP) {
+		if (sync.vertexHashes.length > SYNC_FALLBACK_HASH_CAP || encodedByteLength > SYNC_REQUEST_BYTE_CAP) {
 			throw new SyncTransportError("SYNC_FALLBACK_LIMIT", "Fallback inventory exceeds the v1 sync ceiling");
 		}
 		return;
@@ -199,7 +194,7 @@ export function validateNegotiatedSync(message: Message, protocol: string): void
 	if (
 		fields.some((hashes) => hashes.length > SYNC_HEADS_FIELD_HASH_CAP) ||
 		total > SYNC_HEADS_TOTAL_HASH_CAP ||
-		requestByteLength > SYNC_REQUEST_BYTE_CAP
+		encodedByteLength > SYNC_REQUEST_BYTE_CAP
 	) {
 		throw new SyncTransportError("SYNC_REQUEST_LIMIT", "Heads request exceeds the v1 sync ceiling");
 	}
