@@ -24971,6 +24971,69 @@ the protected stash and protected untracked paths. Evidence is under
 The preliminary gate is unanimous; final fresh Claude-skill Opus/xhigh may
 start against the resulting docs-only checkpoint.
 
+## Phase 1n-a no-progress corrective final Opus/xhigh acceptance and closure
+
+Fresh direct Claude-skill bridge session
+`ccd3f74a-e4d1-4d13-99f2-6d78c04455e0` returns `ACCEPTED` /
+`PHASE1NA_MAY_CLOSE=yes` at fixed HEAD
+`1857ea87bdd219bb48f0425c793e4b160ec1419b` (tree
+`f90981728e0deba1c74ab223cf0cea00d6640472`). It independently authenticates
+the full lineage, all four evidence manifests, RED causality, the complete
+no-progress/mixed/throw/exhaustion matrix, compact-history `committed`
+truthfulness, prior Phase-1n-a invariants and every recorded build/type/lint
+gate. It finds no blocker. Phase 1n-a closes at production
+`60d9f2f484ef6d2bb19383c1bf00b2dc52496e09`.
+
+Opus retains one bounded nonblocking concurrency residual. Novelty is
+classified before the awaited merge and `committed` re-reads presence after
+it, so another handler can theoretically commit or compact the same offered
+vertex in that window. Positive attribution still requires genuine object
+progress and cannot create free unbounded recovery resets; negative
+under-attribution fails closed and anti-entropy repairs it. If later evidence
+requires stronger attribution, return a per-call object-owned applied count
+from the merge boundary rather than adding provenance or handler heuristics.
+Quarantine invisibility in the legacy merge tuple, a multi-vertex compact-chain
+positive control, clock-pending eviction/mixed/transitive schedules and the
+unbudgeted full-delta responder remain correctly owned by later work; none
+reopens this slice.
+
+Opus independently confirms that the two tracked `initial-sync.test.ts`
+`Not a writer` failures are a missed Phase 1l fixture migration and are
+causally disjoint from `60d9f2f`. The correct repair is tests-only coordinated
+explicit Writer authority, following the existing anti-entropy precedent. Do
+not restore implicit permissionlessness, relax creator-bound authorization or
+add legacy/plain-id compatibility. This does not gate 1n-a closure, but it must
+be repaired before a broad node-suite green baseline is claimed.
+
+The extracted native result and copied session result byte-match at SHA-256
+`b1236d03680d345e802913227e53e145d4a4f49a7f9652df66d106ea364d6d87`;
+native-stream SHA-256 is
+`76ef6f10ecb387f81895fb17f1b2d9cb753dc05cea1e7fb1911f0ede4556b7ea`.
+The verified 41-entry controller-manifest SHA-256 is
+`e88ba27be5342ce585415e260cce74147511c13ab6157ae1ddb97aec98b04fc2`.
+All 117 substantive assistant records are `claude-opus-5` at xhigh. The 69
+direct read-only calls are 48 Bash, 16 Read and five Grep, with zero forbidden,
+write, web, MCP, requested-helper or delegation calls. Automatic non-substantive Haiku
+envelope use was 4,200 input / 19 output tokens and supplied no review content
+or vote. Exit is 0/`end_turn`, stderr empty, and all HEAD/tree/index/worktree,
+stash, candidate, evidence, preliminary and protected comparisons are
+invariant. Evidence is under
+`.logs/phase-1n-a-no-progress-corrective-final-opus-xhigh-review/`.
+
+## Next Agent Prompt — Phase 1l tracked initial-sync fixture migration RED audit
+
+Before Phase 1n-b, run a fresh Codex-high read-only RED authentication of the
+existing `packages/node/tests/initial-sync.test.ts` at this closure checkpoint.
+Reproduce and freeze the exact two `Not a writer` failures / one passing case;
+prove both failures occur at the joining replica's local write before the
+Phase-1n-a handler predicate, and confirm Phase 1l's omitted-ACL creator-only
+contract plus the explicit coordinated-ACL precedent. Do not invent a new RED,
+modify files or weaken production. Run only the focused test and proportionate
+identity/initial-sync preservation, build/type/lint/format checks to a new log
+directory; no sealed/100k/fuzz work. A distinct tests-only GREEN may then update
+the two stale fixtures to explicit coordinated Writer authority while
+preserving their retry assertions, followed by the normal review gate.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
