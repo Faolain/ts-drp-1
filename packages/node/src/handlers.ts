@@ -34,7 +34,7 @@ import { MessageSchema } from "@ts-drp/validation/message";
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
 import { sendSyncObject } from "./operations.js";
-import { buildSyncResponseChunksForVertices } from "./sync-codec.js";
+import { buildSyncResponseChunksForVertices, readUsefulSyncDelta } from "./sync-codec.js";
 import {
 	advertisedTheseHeads,
 	completePresentExactRequests,
@@ -508,11 +508,14 @@ async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sy
 		verifiedSharedHeads.filter((hash) => !knownRemoteHeads.includes(hash))
 	);
 
-	const boundaries = new Set([...knownRemoteHeads, ...verifiedSharedHeads, HashGraph.rootHash]);
-	const mayWalkDelta = knownRemoteHeads.length !== 0 || verifiedSharedHeads.length !== 0;
-	const delta = mayWalkDelta
-		? object.readHistorySuffix(localHeads, boundaries)
-		: ({ status: "available", vertices: [] } as const);
+	const delta = readUsefulSyncDelta(
+		object,
+		localHeads,
+		knownRemoteHeads,
+		verifiedSharedHeads,
+		syncMessage.requestedHashes,
+		unknownRemoteHeads.length === 0
+	);
 	if (delta.status === "history-unavailable") {
 		await sendHistoryUnavailable(node, object.id, sender, delta.missingHashes);
 		return;
@@ -644,6 +647,12 @@ async function syncAcceptHandlerUntraced({ node, message, syncSelection }: Handl
 	const finalityStore = legacyFinalityStore(object);
 	const headsMode = syncSelection?.mode === "heads-chunk";
 	const preMergeHeads = headsMode ? new Set(object.getHistoryHeads()) : new Set<string>();
+	const preExistingOfferedVertices = headsMode
+		? syncAcceptMessage.requested.flatMap((vertex) => {
+				const stored = object.getVertex(vertex.hash);
+				return stored === undefined ? [] : [stored];
+			})
+		: [];
 	const preExistingDependencies = headsMode
 		? new Set(
 				syncAcceptMessage.requested.flatMap(({ dependencies }) =>
@@ -680,12 +689,17 @@ async function syncAcceptHandlerUntraced({ node, message, syncSelection }: Handl
 				await node.syncObject(object.id, sender);
 			}
 		}
-		recordBranchCuts(
-			node,
-			object.id,
-			sender,
-			[...preExistingDependencies].filter((hash) => !preMergeHeads.has(hash))
+		const canonicalOffered = new Map(
+			committedVertices.length === 0
+				? []
+				: [...preExistingOfferedVertices, ...committedVertices].map((vertex) => [vertex.hash, vertex] as const)
 		);
+		const committedBoundaryDependencies = [...canonicalOffered.values()].flatMap(({ dependencies }) =>
+			dependencies.filter(
+				(hash) => preExistingDependencies.has(hash) && !canonicalOffered.has(hash) && !preMergeHeads.has(hash)
+			)
+		);
+		recordBranchCuts(node, object.id, sender, committedBoundaryDependencies);
 	}
 
 	if (!headsMode) await signGeneratedVertices(node, object.vertices);

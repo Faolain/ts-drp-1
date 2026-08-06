@@ -9,7 +9,16 @@ import {
 	validateNegotiatedSync,
 } from "@ts-drp/network";
 import { HashGraph } from "@ts-drp/object";
-import { type IDRP, type IDRPObject, Message, MessageType, Sync, SyncAccept, type Vertex } from "@ts-drp/types";
+import {
+	type HistoryReadResult,
+	type IDRP,
+	type IDRPObject,
+	Message,
+	MessageType,
+	Sync,
+	SyncAccept,
+	type Vertex,
+} from "@ts-drp/types";
 
 import { type DRPNode } from "./index.js";
 import {
@@ -82,6 +91,33 @@ export function buildSyncPayloadForProtocol(node: DRPNode, input: SyncPayloadBui
 	return message;
 }
 
+/**
+ * Read a speculative frontier delta only when verified wire boundaries enclose
+ * the complete suffix. A sibling head is a valid stop if reached, but is not
+ * evidence that another local branch shares its ancestry. In that case the
+ * caller advertises the frontier and lets exact recovery discover the branch.
+ */
+export function readUsefulSyncDelta<T extends IDRP>(
+	object: IDRPObject<T>,
+	localHeads: readonly string[],
+	knownRemoteHeads: readonly string[],
+	verifiedSharedHeads: readonly string[],
+	requestedHashes: readonly string[],
+	allRemoteHeadsKnown: boolean
+): HistoryReadResult {
+	if (requestedHashes.length !== 0 || !allRemoteHeadsKnown) {
+		return { status: "available", vertices: [] };
+	}
+	const verifiedBoundaries = new Set([...knownRemoteHeads, ...verifiedSharedHeads]);
+	const walked = object.readHistorySuffix(localHeads, new Set([...verifiedBoundaries, HashGraph.rootHash]));
+	if (walked.status !== "available") return walked;
+	const selectedHashes = new Set(walked.vertices.map(({ hash }) => hash));
+	const fullyBounded = walked.vertices.every(({ dependencies }) =>
+		dependencies.every((hash) => selectedHashes.has(hash) || verifiedBoundaries.has(hash))
+	);
+	return fullyBounded ? walked : { status: "available", vertices: [] };
+}
+
 function selectedResponseVertices<T extends IDRP>(object: IDRPObject<T>, request: Sync): Vertex[] {
 	if (request.vertexHashes.length !== 0) {
 		const remote = new Set(request.vertexHashes);
@@ -89,11 +125,14 @@ function selectedResponseVertices<T extends IDRP>(object: IDRPObject<T>, request
 	}
 	const knownHeads = request.heads.filter((hash) => object.getVertex(hash) !== undefined);
 	const verifiedCuts = request.sharedHeads.filter((hash) => object.getVertex(hash) !== undefined);
-	const boundaries = new Set([...knownHeads, ...verifiedCuts, HashGraph.rootHash]);
-	const delta =
-		knownHeads.length !== 0 || verifiedCuts.length !== 0
-			? object.readHistorySuffix(object.getHistoryHeads(), boundaries)
-			: ({ status: "available", vertices: [] } as const);
+	const delta = readUsefulSyncDelta(
+		object,
+		object.getHistoryHeads(),
+		knownHeads,
+		verifiedCuts,
+		request.requestedHashes,
+		knownHeads.length === request.heads.length
+	);
 	if (delta.status === "history-unavailable") {
 		throw new SyncTransportError("SYNC_HISTORY_UNAVAILABLE", "Requested sync history is unavailable");
 	}
