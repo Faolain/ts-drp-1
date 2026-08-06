@@ -25880,32 +25880,108 @@ single canonical protocol-bundle order. There remains no legacy plain-ID path:
 RED fixtures use generated/creator-bound identity or a custom id only with an
 explicit coordinated ACL.
 
-## Next Agent Prompt — Phase 1n-c amended tests-only RED
+## Phase 1n-c amended tests-only RED — checkpointed
 
-Start a fresh Codex-high tests-only RED from this amended contract. Freeze
-production and the plan. Use two real libp2p DRP hosts; the fallback peer simply
-does not register the additive protocol. Do not use a fake stream/transport,
-test-only negotiator, parallel registry, legacy emulator or plain-ID fixture.
-If the public network test boundary cannot yet expose a production payload
-factory/provenance envelope without compiling against absent APIs, write
-compile-level/public-interface RED ownership plus the minimum real-host runtime
-owners rather than mocking the missing seam.
+Fresh Codex-high committed immutable tests-only RED
+`96efd42e82e13bc8a89b1f0679a3ae0fa139edef` (tree
+`bc9ca9ff7e777054dd992186d61fbe12f59029fc`) from amended-plan parent
+`d3f5b498918542536eb208526a73fc8f9aed7740`. Its exact scope is two new
+tests / 708 insertions, with no production, plan, generated, lock or protected
+untracked change:
 
-Pin mutual selection in both directions, bounded real fallback, all protocol/
-wire contradictions before state, actual byte/count caps, deterministic
-idempotent chunks, oversized-item and over-cap typed failures, fabricated-head
-retention/echo caps, pending-only neutrality and exact selected-mode attempt/
-advertisement accounting. Causally hold a real object route at capacity: central
-fanout must still admit another object's message, at most one active plus two
-queued negotiated sends remain pending, overflow rejects typed, releasing one
-slot advances exactly one graceful-close completion, and connection close
-rejects remaining waiters. No wall-time performance assertion.
+1. **1n-c(i), transport negotiation/provenance/admission:**
+   `packages/network/tests/sync-negotiation-admission-1n-c-red.test.ts`
+   (365 lines, SHA-256
+   `1c605bcbf1e96a1882938877f01b513134b480963d1a59794578a0a1792be1e0`).
+   Two real DRP/libp2p hosts pin additive-first mutual selection in both
+   directions and post-selection payload construction. An honest unsupported
+   peer uses only the real host's `unhandle` for the additive handler while the
+   production fallback handler remains registered. Direct ingress must carry
+   authenticated selected-protocol provenance; pubsub Sync must not masquerade
+   as negotiated direct ingress. Sender and independent raw-stream receiver
+   owners pin protocol contradictions plus count/actual-byte limits before
+   central admission. No fake stream, transport, negotiator, capability
+   registry, emulator or cache exists.
+2. **1n-c(ii), bounded codec/state/connection flow:**
+   `packages/node/tests/sync-bounded-codec-state-1n-c-red.test.ts`
+   (343 lines, SHA-256
+   `ef33aaa2babf8ccd76c53b3cd021bcd46c7b87ba41395efe38c398b4e1c9fa10`).
+   It pins 64 retained outstanding exact hashes with deterministic 32-hash
+   rotation in the existing lifecycle; one complete bounded fallback with no
+   head advertisement; actual-byte request failure without fabricated attempt
+   charge; deterministic topological response prefixes of at most four
+   32-vertex / 262,144-byte chunks; oversized single-vertex rejection before a
+   partial send; and one real connection at one active plus two queued sends,
+   typed fourth overflow, cross-object progress through a second connection,
+   one-slot advancement and close rejection.
 
-Keep workloads bounded. Do not run inventory/perf, sealed, fuzz, proto-gen or
-full-suite workloads. Run focused preservation plus ordered types/network/
-message-queue/object/node builds as genuinely touched, exact inherited object 5
-/ node 2 typecheck census, lint, Prettier and diff checks to `.log`. Commit tests
-only and package production-hash invariance, ledger and verified manifest.
+The authoritative causal signature is **12 failed / 0 passed**: network 6F/0P
+and node 6F/0P. The failures expose absent negotiated send/provenance/admission
+surfaces plus the real existing 71-entry outstanding set instead of the required
+64-entry retention/32-entry rotation; they are not syntax failures or fake
+transport probes. Accepted Phase 1h and Phase 1n-a/b owners remain 24/24, and
+network frame/attribution preservation remains 6/6. Ordered
+types/network/message-queue/object/node builds pass; types, network and
+message-queue typechecks are clean; object/node retain exactly the inherited
+5/2 compact-history diagnostics with zero owned diagnostic. ESLint, Prettier
+and diff checks pass. The complete tracked production-source hash census is
+identical before and after.
+
+All identities obey the greenfield rule. Real objects are production-generated
+and network-only negative messages use the established authenticated
+`<peerId>:<salt>` creator-bound form. There is no legacy plain-ID fixture,
+compatibility behavior or shim.
+
+The 1n-a/b preservation owners continue to govern pending-only neutrality and
+the single attempt/cooldown lifecycle. The new selected-mode owners add that
+fallback never advertises heads, successful scheduled construction charges only
+the existing lifecycle, and cap/negotiation failure does not fabricate progress.
+Unknown-protocol delivery is structurally excluded by registering only the two
+DRP protocols; the raw real-stream test independently prevents sender-only
+preflight from satisfying receiver rejection.
+
+Evidence is under `.logs/phase-1n-c-amended-red-codex-high/`. Ledger SHA-256 is
+`88e2af060012ae5481a4e132244103d8be75ee3e80c84647e73361ef16bb52a4`;
+the verified 21-entry root-relative artifact manifest SHA-256 is
+`c266c668793d47c1fe49740107afa448979bc1b91835989261fb941057958f07`.
+No inventory/performance benchmark, sealed workload, fuzzer, proto generation
+or full suite ran.
+
+## Next Agent Prompt — Phase 1n-c distinct production GREEN
+
+Start a distinct fresh Codex-high production GREEN from immutable RED
+`96efd42`. Read the complete amended contract and RED ledger. Freeze both RED
+tests and this plan; do not amend assertions to fit production. Implement the
+smallest coherent production architecture that satisfies both 1n-c(i) and
+1n-c(ii), with one canonical protocol bundle, one selected-stream payload
+factory, one private provenance/completion envelope, one bounded decoder/builder
+policy, one outstanding-exact owner and one per-live-connection admission owner.
+Do not add a capability cache, parallel mode/session registry, wire ACK,
+negotiation protobuf, network-side Sync rewrite, fake compatibility path,
+legacy plain-ID branch or test-only production seam.
+
+Preserve the Phase 1h detached central subscriber: settle the private completion
+from the real `dispatchMessage` admission promise without awaiting it in the
+subscriber, and let only the direct stream handler await it before graceful
+close/reset. The additive sender awaits clean remote EOF/reset under a bounded
+abort/deadline; fallback retains its honest old local write/close completion.
+Validate direct protocol/field/count/actual-byte contradictions before queue,
+graph or sync-state work. Build only after authoritative stream selection and
+record only the selected payload's attempt/advertisement truth. Keep field-1
+fallback complete-or-typed-fail, never paginate or truncate it. Keep response
+chunks independently authenticated/idempotent and progress-preserving; add no
+session/continuation accumulator.
+
+Before external review, apply the `refactor-clean` ownership check: one concept
+must have one owner, obsolete branches must be removed rather than wrapped, and
+the implementation must not leave a general-purpose `sendMessage` compatibility
+adapter for sync. Run exact 12/12 focused GREEN, the same 30/30 preservation,
+ordered touched-package builds, exact inherited object 5/node 2 typecheck
+census, lint, Prettier and diff checks to `.log`. Keep workloads bounded and do
+not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads. Commit
+production only, package test-hash invariance, ledger and verified manifest, and
+stop for the required Grok -> exact Kimi 3/high/dual-100 -> Opus/xhigh review
+sequence.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
