@@ -24508,23 +24508,71 @@ and artifact-manifest-file SHA-256 is
 Evidence is under
 `.logs/phase-1n-a-boundary-corrective-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-a authenticated production GREEN
+## Phase 1n-a authenticated production GREEN checkpoint — review pending
 
-Start a new distinct Codex-high GREEN from the corrected frozen RED. Use only
-module-owned provenance seeded by Phase 0f's existing private
-`ReceiverClockPendingValidationError`; propagate exact hashes on returned
-results and real partial/rejected-boundary errors through object-owned WeakMap
-or an equally unforgeable internal channel, beside unchanged public tuples.
-Use dependency closure plus bounded prior-proven-pending memory for later
-descendants; never reread `Date.now()` or infer from caller fields, symbols,
-tuple position, error text or public brands. At the three node recovery
-decisions, filter only authenticated pending hashes and skip pending-only empty
-recovery without consuming/resetting retry/cooldown. Preserve genuine-missing
-heal, Phase 0f re-offer, finality, invalid budgets and exact error identities.
-No 1n-b/c/d, test edits, public enum/error leak, compatibility shim or analyzer.
-Run focused 12/12, preservation 72/72, ordered build/typecheck/inherited ledger,
-lint/format/exact production scope sequentially to `.logs`; no sealed 100k.
-Commit production only and rerun focused/preservation postcommit.
+Freeze distinct fresh Codex-high production-only commit
+`b951388313337cf992659bca7ddc50a5f4d1476a` on corrected RED HEAD
+`c2e05c3`. Its exact four-file scope is 130 insertions / 19 deletions:
+`packages/object/src/clock-pending-provenance.ts`, `drp-applier.ts`,
+`object/src/index.ts` and `node/src/handlers.ts`. Every frozen test, the plan,
+dependencies/lockfile, generated and protected files remain byte-identical.
+
+One object-private WeakMap associates immutable exact hash arrays only with
+genuine object-owned `ApplyResult`, `MergeResult`,
+`AdoptionCommitExhaustedError` and `ApplyInvariantError` identities. Direct
+seeds come solely from the existing private
+`ReceiverClockPendingValidationError`; no public/caller field, symbol, brand,
+tuple position, error text or second `Date.now()` observation is trusted.
+Dependency closure covers same-batch descendants. Per-object insertion-ordered
+memory retains up to 10,000 hashes already proven pending for later separately
+offered descendants, does not refresh existing entries, evicts oldest on a new
+entry and clears exact hashes on commit or terminal-invalid classification.
+
+Object result cloning and legacy `MergeResult` wrapping propagate WeakMap
+provenance while leaving public tuples and existing `AuthenticatedMergeOutcome`
+structural requirements unchanged. The internal merge function's return type
+refines the outcome with readonly `clockPending`. UPDATE, SYNC_ACCEPT and real
+rejected-boundary recovery subtract only authenticated pending hashes. A
+pending-only filtered empty list never reaches `recoverMissingSync`, so it
+neither consumes nor resets retry/cooldown. Primary error and `partialResult`
+object identities remain exact.
+
+The bound has an explicit residual rather than a hidden claim: if a proven-
+pending ancestor is evicted before a separately offered descendant arrives,
+the relationship can no longer be authenticated and the descendant degrades
+to ordinary bounded missing recovery. A false SYNC is then possible, but never
+terminal-invalid memory, tombstoning or Phase 1k budget charge. Phase 1n-b's
+recursive heads/true-missing protocol owns eliminating or safely resolving this
+classification residual; Phase 1o remains aggregate resource governance.
+
+Authoritative and postcommit results are focused 12/12, new owner 6/6,
+migrated sentinel 6/6, Phase 0f/recovery preservation 56/56 and anti-entropy/
+Phase 1k/cap preservation 16/16. Two bounded disposable probes pass: a
+separately offered non-future descendant inherits authenticated pending
+provenance, and tolerance-boundary classification calls `Date.now()` exactly
+once. Ordered builds pass; typechecks retain only exact inherited object five /
+node two errors; owned lint is 0/0 and tracked-only lint is zero errors / 249
+warnings; Prettier and diff gates pass. No sealed workload ran. Evidence-ledger
+SHA-256 is
+`9c3976e3d4858600f3b8d65664fda5cc329a0730c444043b195ea04a27b846a5`
+and manifest SHA-256 is
+`fbb8fef6033bc9180c8cc109593fc881dd619cbc07e3e94bb788ae4da792b238`.
+Evidence is under `.logs/phase-1n-a-authenticated-green-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-a preliminary reviews
+
+Run fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100 read-only
+reviews at the fixed documented HEAD. Authenticate the quorum, corrected RED,
+aborted GREEN rejection and final GREEN lineage/evidence. Try to forge or lose
+WeakMap provenance through public results, copied tuples, primary/partial
+errors, authentication filtering, compact/result replacement, same-batch and
+later descendants, commit/terminal-invalid clearing, duplicates and 10k
+eviction. Recheck all three node recovery decisions, pending-only budget
+neutrality, genuine-missing heal, one clock observation, finality and invalid-
+peer accounting. Decide explicitly whether the documented eviction residual is
+an acceptable bounded 1n-b handoff or blocks 1n-a. No edits, delegation/Fable,
+web, sealed 100k or unbounded stress. Final Opus/xhigh begins only if both
+reviewers accept.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
