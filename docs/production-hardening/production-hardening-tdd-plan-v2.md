@@ -25692,25 +25692,83 @@ Evidence is under
 `.logs/phase-1n-b-reciprocity-green-grok45-high-review/` and
 `.logs/phase-1n-b-reciprocity-green-kimi3-high-100-review/`.
 
-## Next Agent Prompt — Phase 1n-b final Opus/xhigh review
+## Phase 1n-b final Opus/xhigh acceptance and closure
 
-Use the repository Claude skill in bridge/sidecar mode for one fresh final
-Opus/xhigh adversarial review of fixed production candidate `25ce88a` at docs
-checkpoint `79e3f77`. Authenticate the RED/GREEN and both accepted preliminary
-review packages. Review the complete Phase 1n-b lineage and actively attempt to
-falsify the claimed inbound neutrality, cooldown behavior, scheduled ownership,
-UPDATE/SYNC_ACCEPT parity, peer isolation/rotation, cleanup, send failure and
-wire fallback. Adjudicate Grok's four nonblocking residuals and distinguish a
-real reproducible blocker from coverage or later-owner debt. Confirm one state
-owner, one message builder, no compatibility/test-only branch and no legacy
-plain-ID support.
+Fresh repository-Claude-skill bridge session
+`66be2e30-a81d-4a3c-9807-08d04708b995` used the sole substantive and effective
+model `claude-opus-5` at requested xhigh effort and returned
+`VERDICT: ACCEPTED` / `PHASE_1N_B_MAY_CLOSE: yes` / `BLOCKERS: None`.
+It independently authenticated the complete base, RED, GREEN and docs lineage,
+reverified both causal manifests and both preliminary packages, and source-
+traced every discovery, completion, scheduled-probe, reciprocity, cooldown,
+rotation, cleanup, wire-fallback and identity call path. It ran zero tests or
+builds because no causal question survived source inspection.
 
-The Opus sidecar is read-only: Bash/Read/Grep/Glob only, no edits, delegation,
-web/MCP/search, inventory/perf, sealed, fuzz, proto-generation or full suite.
-It may run at most one bounded exact 28-test causal selection if necessary.
-Require `VERDICT`, `PHASE_1N_B_MAY_CLOSE` and concrete blocker/nonblocking
-residual fields. Preserve source/index/stash/protected invariance and package
-the native session/model/tool/result/manifest evidence before closure.
+The native process exited 0 after 60 turns. Stream-authenticated tool usage is
+59 read-only calls: Bash 44, Read 9 and Grep 6, with two harmless command errors,
+zero permission denials and zero write, delegation, web, MCP or forbidden
+workload call. The model's prose self-tally said 60 calls / 45 Bash / three
+errors; controller parsing of the raw stream is authoritative. No automatic
+helper model was used. Result SHA-256 is
+`b8b5ca15a3fb871931793f52d56f734187c9389b8493e2a26fbd13d954d10a58`;
+the verified 41-entry root-relative artifact-manifest SHA-256 is
+`69b141078bbefe90796819d7faf5c897165c52327ce7702982348cd2f0a84673`.
+Source/tests/docs, tracked worktree, index, protected stash and paths, and all
+required prior evidence remain invariant. Evidence is under
+`.logs/phase-1n-b-reciprocity-green-final-opus-xhigh-review/`.
+
+Preserve the accepted nonblocking ledger:
+
+1. Active-cooldown reciprocity suppression is structurally direct but lacks a
+   standalone post-cooldown RED assertion. This is coverage debt, not a found
+   failure; do not reopen 1n-b without a causal reproduction.
+2. Concurrent and failed scheduled sends charge attempts fail-closed by design.
+   Synchronous preparation plus the cooldown-first fence prevents double
+   rejection.
+3. In-flight handler work can recreate one empty default peer-state entry after
+   object cleanup. The entry is bounded, behaviorally inert and reclaimed by
+   later object/node cleanup; lifecycle cancellation remains a later owner.
+4. Compact-history `history-unavailable` early returns skip the remainder of
+   that one heads message. The path predates the correction and anti-entropy
+   self-heals; compact-observer integration remains later-owner work.
+5. An authenticated peer can offer fabricated unknown head strings, grow its
+   outstanding set and cause O(k) exact-request echo bytes. Phase 1n-c owns
+   request/chunk/byte caps and Phase 1o owns aggregate per-peer/object resource
+   governance; this is a required next-slice input, not accepted unlimited
+   entitlement.
+6. Verifier-authenticated claimed hashes can clear that same peer's lifecycle
+   before content-hash validation rejects the vertex. No forged state commits,
+   invalid-input budget still charges, peer isolation holds and anti-entropy
+   requeues; a later lifecycle-truthfulness refinement may exclude applier-
+   invalid hashes from completion, but the attacker gains no suppression beyond
+   remaining silent.
+
+Phase 1n-b closes at production lineage `299bc0b` + `25ce88a`. It introduces no
+legacy plain-ID route: generated/creator-bound identity remains the omitted-ACL
+path, while arbitrary custom IDs require an explicit coordinated ACL.
+
+## Next Agent Prompt — Phase 1n-c negotiation and bounded-flow tests-only RED
+
+Start a fresh Codex-high tests-only RED for the explicit Phase 1n-c contract in
+the Phase 1 table. First audit the real connection/message capability seams and
+existing frame/channel caps. Freeze production and this plan. Drive real
+validated node/network surfaces rather than a test hook and pin one coherent
+bounded contract: supported peers select one mutually supported heads/chunk
+mode; unsupported peers retain the mandatory bounded field-1 hash-list fallback;
+malformed/contradictory negotiation fails closed without split-brain; exact
+request and response chunks have count and byte caps; send completion is awaited
+under backpressure; fabricated heads cannot grow or echo an unbounded exact set;
+and pending-only input does not consume or reset recovery state.
+
+Do not implement a legacy protocol emulator, plain-ID compatibility path,
+parallel negotiation registry or fake transport. If the current code has no
+honest per-connection seam on which the stated negotiation can be observed,
+report the exact architectural conflict before inventing one; a genuine plan
+assumption change still requires the standing Codex-high + exact Kimi 3/high/
+dual-100 + Opus/xhigh agreement. Keep RED workloads bounded and causal; do not
+run inventory/perf, sealed, fuzz or full-suite workloads. Run ordered builds,
+focused preservation, exact inherited typecheck census, lint, Prettier and diff
+checks to `.log`, commit tests only, and package a verified evidence manifest.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
