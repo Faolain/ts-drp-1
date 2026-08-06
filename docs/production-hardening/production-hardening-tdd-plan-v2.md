@@ -24559,20 +24559,62 @@ and manifest SHA-256 is
 `fbb8fef6033bc9180c8cc109593fc881dd619cbc07e3e94bb788ae4da792b238`.
 Evidence is under `.logs/phase-1n-a-authenticated-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-a preliminary reviews
+## Phase 1n-a preliminary acceptance reviews — accepted
 
-Run fresh independent Grok 4.5/high and exact Kimi 3/high/dual-100 read-only
-reviews at the fixed documented HEAD. Authenticate the quorum, corrected RED,
-aborted GREEN rejection and final GREEN lineage/evidence. Try to forge or lose
-WeakMap provenance through public results, copied tuples, primary/partial
-errors, authentication filtering, compact/result replacement, same-batch and
-later descendants, commit/terminal-invalid clearing, duplicates and 10k
-eviction. Recheck all three node recovery decisions, pending-only budget
-neutrality, genuine-missing heal, one clock observation, finality and invalid-
-peer accounting. Decide explicitly whether the documented eviction residual is
-an acceptable bounded 1n-b handoff or blocks 1n-a. No edits, delegation/Fable,
-web, sealed 100k or unbounded stress. Final Opus/xhigh begins only if both
-reviewers accept.
+Fresh Grok 4.5/high session
+`049c62d3-aa38-45a8-bf76-a08163f9c583` returned `ACCEPTED` /
+`PHASE1NA_MAY_CLOSE=yes` / `OPUS_MAY_START=yes`. It authenticated the complete
+assumption-correction, RED, rejected-fixture and final GREEN lineage; traced
+the private WeakMap writer, every result/error propagation path, all three
+recovery decisions, exact clearing and the 10,000-entry insertion-order bound;
+and found no blocker. Its read-only sandbox could not start Vitest because Vite
+attempted to write `node_modules/.vite-temp`, so it authenticated the frozen
+GREEN logs and blobs and ran bounded probes under `/tmp`. The native review
+ended normally; a later wrapper assignment to zsh's read-only `status`
+variable prevented the ordinary exit-code file and is controller-only. Result
+SHA-256 is
+`f7e6b30749fd727f1a78320dcbe8b86daeac08a75986da3f817e3ef92bcaa347`
+and artifact-integrity-manifest SHA-256 is
+`c15e0c6e471a2279b70f23bf7c44d3b4ed11ecf092ae735b73d36226e4b90c5b`.
+
+Fresh exact Kimi 3/high/dual-100 session
+`0f12c429-87a7-42be-a9f8-f1f3b349d6d5` independently returned `ACCEPTED` /
+`PHASE1NA_MAY_CLOSE=yes` / `OPUS_MAY_START=yes`. The controller authenticated
+`/Users/aristotle/.local/bin/kimi-cli` 1.49.0, effective `kimi-code/k3`,
+thinking, and both 100-step caps. Kimi independently reran focused 12/12,
+Phase-0f/recovery 56/56 and anti-entropy/1k/cap 16/16, then accepted the same
+causal ownership and finite-memory boundary. Final SHA-256 is
+`eaa8ec02ed4bb1c26e0a29f84fb24a00a0aee5013e34c816fff59cb5c4f37e44`
+and artifact-integrity-manifest SHA-256 is
+`90c839904ee9447591fde2177e9f93e4f59f3b0870e640150e9b92a9004dc96a`.
+
+Both reviewers explicitly accept eviction of old pending provenance as a
+bounded Phase 1n-b handoff rather than a 1n-a blocker: it can conservatively
+cause an ordinary bounded false SYNC, but cannot create terminal-invalid
+memory, a tombstone, Phase-1k invalid-peer charge or the old permanent
+pending-as-invalid livelock. Two related observations remain visible for
+1n-b: a vertex depending on both a clock-pending and truly absent dependency
+defers true-missing recovery until re-offer after eligibility, and a
+transitively remembered descendant may wait for re-offer/anti-entropy when an
+intermediate vertex never arrives. These are protocol-recovery work, not a
+reason to grow 1n-a's finite provenance memory.
+
+The accepted greenfield identity rule is unchanged: omitted ACL requires a
+generated or creator-bound id; an arbitrary/plain id is allowed only with an
+explicit coordinated ACL. There is no legacy plain-id compatibility shim or
+debt. Evidence is under
+`.logs/phase-1n-a-authenticated-green-{grok45-high,kimi3-high-100}-review/`.
+
+## Next Agent Prompt — Phase 1n-a final Opus/xhigh review
+
+Run one fresh Claude-skill Opus/xhigh read-only adversarial review at this fixed
+documented HEAD. Authenticate the amendment quorum, both REDs, aborted GREEN,
+final GREEN and both accepted preliminary reviews. Independently attack the
+WeakMap authenticity/propagation boundary, all recovery and error paths,
+finite-memory eviction decision, budget/finality/one-clock invariants and the
+greenfield id rule. Decide `PHASE1NA_MAY_CLOSE` explicitly. No edits,
+Task/Agent/Fable/Grok/Kimi/Codex delegation, web, sealed 100k or unbounded
+stress.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
