@@ -139,16 +139,18 @@ export function clearInvalidPeerBudgets(node: DRPNode): void {
 	invalidPeerBudgets.delete(node);
 }
 
-async function recoverMissingSync(node: DRPNode, objectId: string, sender: string, missing: string[]): Promise<void> {
+function clearSyncRecoveryEpisode(node: DRPNode, objectId: string, sender: string): void {
+	const episodes = syncRecoveryEpisodes.get(node);
+	if (!episodes) return;
+
+	episodes.delete(recoveryKey(objectId, sender));
+	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
+}
+
+async function recoverMissingSync(node: DRPNode, objectId: string, sender: string): Promise<void> {
 	const key = recoveryKey(objectId, sender);
 	const episodes = syncRecoveryEpisodes.get(node) ?? new Map<string, SyncRecoveryEpisode>();
 	const episode = episodes.get(key);
-
-	if (missing.length === 0) {
-		episodes.delete(key);
-		if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
-		return;
-	}
 
 	if (episode?.cooldownUntil !== undefined) {
 		if (Date.now() < episode.cooldownUntil) return;
@@ -203,7 +205,7 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 
 		if (!exhausted && missing.length !== 0) {
 			try {
-				await recoverMissingSync(node, object.id, sender, missing);
+				await recoverMissingSync(node, object.id, sender);
 			} catch (recoveryError) {
 				log.error("::messageHandler: Rejected-boundary recovery failed", recoveryError);
 			}
@@ -422,7 +424,7 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	// The merge may have committed valid siblings before this batch exhausted the
 	// peer. Publish those commits normally; only attacker-driven recovery stops.
 	if (!governedOutcome.exhausted && missing.length !== 0) {
-		await recoverMissingSync(node, message.objectId, sender, missing);
+		await recoverMissingSync(node, message.objectId, sender);
 	}
 
 	node.put(object.id, object);
@@ -560,6 +562,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	}
 
 	let mergeRan = false;
+	let rawMissing: string[] = [];
 	let missing: string[] = [];
 	let suppressMissingRecovery = false;
 	const finalityStore = legacyFinalityStore(object);
@@ -568,14 +571,19 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		const mergeOutcome = governedOutcome.outcome;
 		suppressMissingRecovery = governedOutcome.exhausted;
 		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
-		missing = trueMissingHashes(mergeOutcome.result[1], mergeOutcome.clockPending);
+		rawMissing = mergeOutcome.result[1];
+		missing = trueMissingHashes(rawMissing, mergeOutcome.clockPending);
 		if (mergeRan && finalityStore !== undefined) {
 			finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		}
 		if (mergeRan) {
 			node.put(object.id, object);
-			if (!suppressMissingRecovery && missing.length !== 0) {
-				await recoverMissingSync(node, object.id, sender, missing);
+			if (!suppressMissingRecovery) {
+				if (rawMissing.length === 0) {
+					clearSyncRecoveryEpisode(node, object.id, sender);
+				} else if (missing.length !== 0) {
+					await recoverMissingSync(node, object.id, sender);
+				}
 			}
 		}
 	}
@@ -599,7 +607,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		}
 	}
 
-	if (mergeRan && missing.length === 0) {
+	if (mergeRan && rawMissing.length === 0) {
 		node.safeDispatchEvent(NodeEventName.DRP_SYNC_ACCEPTED, {
 			detail: { id: object.id },
 		});
