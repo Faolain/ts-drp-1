@@ -25747,28 +25747,165 @@ Phase 1n-b closes at production lineage `299bc0b` + `25ce88a`. It introduces no
 legacy plain-ID route: generated/creator-bound identity remains the omitted-ACL
 path, while arbitrary custom IDs require an explicit coordinated ACL.
 
-## Next Agent Prompt — Phase 1n-c negotiation and bounded-flow tests-only RED
+## Phase 1n-c pre-RED seam audit — architecture amendment required
 
-Start a fresh Codex-high tests-only RED for the explicit Phase 1n-c contract in
-the Phase 1 table. First audit the real connection/message capability seams and
-existing frame/channel caps. Freeze production and this plan. Drive real
-validated node/network surfaces rather than a test hook and pin one coherent
-bounded contract: supported peers select one mutually supported heads/chunk
-mode; unsupported peers retain the mandatory bounded field-1 hash-list fallback;
-malformed/contradictory negotiation fails closed without split-brain; exact
-request and response chunks have count and byte caps; send completion is awaited
-under backpressure; fabricated heads cannot grow or echo an unbounded exact set;
-and pending-only input does not consume or reset recovery state.
+Fresh Codex-high correctly stopped before writing a test. Real libp2p
+multistream selection is an honest per-stream negotiation mechanism, but the
+current abstraction orders the relevant operations backwards: node operations
+choose and encode heads versus field-1 Sync before the network opens its one
+fixed `/drp/message/0.0.1` stream. Outbound `sendMessage` then swallows
+dial/select/write failure, while inbound handling discards `stream.protocol`
+and connection provenance before enqueueing a bare `Message`. Sticky
+`[objectId, peerId]` heads observation is not mutual live-stream selection.
 
-Do not implement a legacy protocol emulator, plain-ID compatibility path,
-parallel negotiation registry or fake transport. If the current code has no
-honest per-connection seam on which the stated negotiation can be observed,
-report the exact architectural conflict before inventing one; a genuine plan
-assumption change still requires the standing Codex-high + exact Kimi 3/high/
-dual-100 + Opus/xhigh agreement. Keep RED workloads bounded and causal; do not
-run inventory/perf, sealed, fuzz or full-suite workloads. Run ordered builds,
-focused preservation, exact inherited typecheck census, lint, Prettier and diff
-checks to `.log`, commit tests only, and package a verified evidence manifest.
+The current wire also names no count/byte/chunk/admission policy. Field 1 has a
+particularly load-bearing constraint: one message means the complete inventory
+to an old receiver, so splitting or rotating it would manufacture false
+absence. Any compileable RED would therefore have selected a production
+architecture and policy values that the plan had not supplied. No test,
+tracked edit, commit or gate ran. The 369-line audit ledger SHA-256 is
+`bdfab22e10b00354b124a36cdd567886fad7a5aa69d33a10008cfdff58aaf2ca`;
+its verified one-entry manifest SHA-256 is
+`bd99a24fec587a06c9edfa2eed2c94679b993f0079a4376d2f49c2556c524569`.
+Evidence is under
+`.logs/phase-1n-c-negotiation-bounded-flow-red-codex-high/`.
+
+## Phase 1n-c plan-amendment quorum — authorized
+
+The required Codex-high, exact Kimi 3/high/dual-100 and Opus/xhigh quorum
+unanimously confirms the contradiction and authorizes the same narrowed
+architecture. The original Codex session explicitly re-reviewed and accepted
+the reconciled common design with `COMMON_ARCHITECTURE_AGREED: yes` /
+`PLAN_AMENDMENT_MAY_LAND: yes` / `BLOCKERS: None`.
+
+Exact Kimi session `80cb2caa-0b1b-452d-a415-5b796ef88304` used CLI v1.49.0,
+effective `managed:kimi-code:k3` / `K3`, thinking and environment, CLI and
+loaded loop caps all 100. Its initial turn used 14 steps / 28 read-only calls;
+a two-step / two-read same-session adjudication then confirmed that awaiting
+the central subscriber would violate accepted Phase 1h and superseded the
+wire-ack proposal. Final fields are `PLAN_AMENDMENT_AGREED: yes`,
+`PHASE1H_CONFLICT_CONFIRMED: yes`, `WIRE_ACK_REQUIRED: no`,
+`PRIVATE_DEFERRED_PLUS_GRACEFUL_CLOSE_ACCEPTED: yes` and
+`RED_MAY_RESUME_AFTER_AMENDMENT: yes`. Final result SHA-256 is
+`c36f0fe4914636048690b9dbed638c6c2f8d0eef1bac843a4d7011eaeb4fd987`;
+the verified 39-entry manifest SHA-256 is
+`15be07c6c720890d13d64a868a57ac7da025392027440ebdba30a2646e2d8ec7`.
+
+Fresh Claude-skill Opus/xhigh session
+`56859cf1-0c99-4788-9816-0b3589262540` used substantive
+`claude-opus-5`, returned `CONTRADICTION_CONFIRMED: yes` /
+`PLAN_AMENDMENT_AGREED: yes` / `REMOTE_ACK_REQUIRED: no` /
+`RED_MAY_RESUME_AFTER_AMENDMENT: yes` / `BLOCKERS: None`, and independently
+found the same Phase 1h-preserving deferred/close design. Its 66 read-only calls
+ran no test, build or forbidden workload. Automatic non-substantive Haiku use
+was 2,502 input / 25 output tokens and authored no assistant or tool event.
+Result SHA-256 is
+`3558acc7e594a5415da01d5d66a184f1dca13fff99e3cf4abf96a445f7425ddc`;
+the verified 42-entry manifest SHA-256 is
+`9e9f9ae132fdb16101e1b472728f65dfb031facef56ba7820480ce0e04d36a89`.
+All quorum legs preserve fixed HEAD/tree, tracked/index/stash/protected state.
+Evidence is under `.logs/phase-1n-c-architecture-quorum-{kimi3-high-100,opus-xhigh}/`.
+
+The amended Phase 1n-c contract is:
+
+1. Register one additive `/drp/message/1.0.0/heads-chunk` protocol beside
+   `/drp/message/0.0.1`, in one canonical global preference order. Targeted
+   sync dials once, opens one real stream with that list, reads authoritative
+   `stream.protocol`, then invokes a node-supplied payload factory and encodes/
+   writes on that same stream. Do not add a capability cache, persistent mode
+   registry, Identify/rendezvous side query, negotiation protobuf, two-phase
+   session API or network-side Sync rewrite. Per-stream selection is truth.
+2. Direct ingress carries a production-private provenance envelope containing
+   the decoded message, transport-authenticated peer, selected protocol/mode,
+   transport kind and a private completion deferred; connection identity is
+   only an optional diagnostic/admission-lifecycle key, never mode truth.
+   Pubsub has no negotiated Sync capability. Before decode-driven graph work or
+   sync-state mutation, reject heads/shared/exact fields on fallback, field 1
+   on heads, mixed fields, unknown protocol and direct Sync without provenance.
+3. The central node subscriber remains detached exactly as Phase 1h requires.
+   It attaches `then`/`catch` from the real `dispatchMessage` bounded object-
+   route admission to the private deferred and returns immediately. The direct
+   stream handler independently awaits that deferred, then gracefully closes or
+   resets; the sender awaits clean remote EOF versus reset/error under an abort
+   signal and bounded deadline. This means remote bounded queue admission, not
+   merge/convergence. No new wire ACK exists. A one-byte result is permitted
+   only if real GREEN muxer evidence proves EOF and reset indistinguishable.
+   This admission-completion contract applies to the additive protocol; a peer
+   that only implements the old fallback retains its legacy local write/close
+   completion semantics and cannot truthfully acknowledge the new queue bound.
+4. Heads-mode requests and SyncAccept responses are independently authenticated,
+   merge-idempotent bounded chunks with no sequence, session, continuation or
+   accumulator state. Preserve deterministic topological order; the first
+   bounded delta prefix must be progress-preserving, while later/out-of-order
+   chunks may remain pending and self-heal through the existing exact-request
+   lifecycle. A single oversized vertex fails closed before a partial oversized
+   send. Aggregate partition/rejoin convergence remains Phase 1n-d.
+5. Field-1 fallback remains exactly one complete old-compatible inventory only
+   when both count and actual encoded-byte ceilings hold. Over-cap egress fails
+   typed before send; over-cap ingress drops before graph/response work. Never
+   split, truncate, rotate, accumulate or emulate legacy pagination. This is a
+   bounded greenfield fallback, not general large-history coexistence.
+6. For the initial heads-chunk-v1 bundle, enforce fixed interoperable ceilings:
+   32 hashes per repeated heads-mode Sync field; 64 total hashes across heads,
+   shared heads and exact requests; 512 fallback inventory hashes; 32 response
+   vertices per chunk; 65,536 encoded request bytes; 262,144 encoded response
+   bytes; at most four response chunks per request; and 64 outstanding exact
+   hashes per `(objectId, peerId)`. Measure actual protobuf bytes, not estimates.
+   The values other than the 32/64 batch anchors are intentionally conservative
+   v1 ceilings whose product optimality remains characterization debt; changing
+   a wire-visible ceiling later requires a new mutually negotiated bundle, not
+   asymmetric local config. None enters `parametersDigest`.
+7. Fabricated authenticated unknown heads beyond the 64-entry outstanding cap
+   are ignored before allocation and never echoed or charged to Phase 1k.
+   Scheduled exact chunks rotate deterministically without resetting the single
+   accepted 1n-b lifecycle. Pending-only input remains neutral. There is no
+   second recovery counter or negotiation owner.
+8. One sync-send admission owner lives with each live connection: safe default
+   one active plus two queued; overflow, close, deadline, dial, selection, write
+   and reset are typed failures. Admission depths may be local configuration
+   because they do not alter wire acceptance. Set explicit bounded libp2p stream
+   limits for the additive protocol rather than relying on defaults. Generic
+   non-sync `sendMessage` behavior is outside this slice.
+9. Attempt/advertised-head accounting records only the payload actually built
+   for the selected mode. Fallback never claims heads were advertised. A real
+   scheduled fallback probe may charge the existing fail-closed lifecycle only
+   after a bounded compatible payload is selected/built; negotiation or cap
+   failure sends nothing and cannot fabricate progress. Preserve all accepted
+   1n-a/1n-b semantics and Phase 1h queue isolation.
+
+Phase 1n-d owns mixed-peer partition/rejoin convergence, old-branch recovery,
+delta/probe cost and negotiation-RTT characterization. Phase 1o owns aggregate
+cross-request/per-peer/per-object entitlement. Phase 1m-b later consumes the
+single canonical protocol-bundle order. There remains no legacy plain-ID path:
+RED fixtures use generated/creator-bound identity or a custom id only with an
+explicit coordinated ACL.
+
+## Next Agent Prompt — Phase 1n-c amended tests-only RED
+
+Start a fresh Codex-high tests-only RED from this amended contract. Freeze
+production and the plan. Use two real libp2p DRP hosts; the fallback peer simply
+does not register the additive protocol. Do not use a fake stream/transport,
+test-only negotiator, parallel registry, legacy emulator or plain-ID fixture.
+If the public network test boundary cannot yet expose a production payload
+factory/provenance envelope without compiling against absent APIs, write
+compile-level/public-interface RED ownership plus the minimum real-host runtime
+owners rather than mocking the missing seam.
+
+Pin mutual selection in both directions, bounded real fallback, all protocol/
+wire contradictions before state, actual byte/count caps, deterministic
+idempotent chunks, oversized-item and over-cap typed failures, fabricated-head
+retention/echo caps, pending-only neutrality and exact selected-mode attempt/
+advertisement accounting. Causally hold a real object route at capacity: central
+fanout must still admit another object's message, at most one active plus two
+queued negotiated sends remain pending, overflow rejects typed, releasing one
+slot advances exactly one graceful-close completion, and connection close
+rejects remaining waiters. No wall-time performance assertion.
+
+Keep workloads bounded. Do not run inventory/perf, sealed, fuzz, proto-gen or
+full-suite workloads. Run focused preservation plus ordered types/network/
+message-queue/object/node builds as genuinely touched, exact inherited object 5
+/ node 2 typecheck census, lint, Prettier and diff checks to `.log`. Commit tests
+only and package production-hash invariance, ledger and verified manifest.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
