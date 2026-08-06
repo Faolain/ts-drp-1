@@ -26580,17 +26580,63 @@ The GREEN adds no selector, duplicate cap, pagination, truncation, swallowed
 error, transport emulation, compatibility route, identity normalizer or legacy
 plain-id behavior.
 
-## Next Agent Prompt — Phase 1n-c final GREEN review chain
+## Phase 1n-c final GREEN review — Grok accepted
 
-Run a fresh Grok 4.5/high review first against the complete amended contract and
-lineage through `18aea72`. Require a finite Sync egress census, source-trace the
-peerless selection/inert path and selected lifecycle truth, and independently
-rerun the bounded focused/preservation gates sequentially. Reject any generic
-Sync bypass, build-before-selection, duplicate cap, fallback truncation,
-test-only branch, arbitrary-id compatibility or assertion weakening. Package
-model/session authentication, result and verified manifest hashes. Start exact
-Kimi 3/high/dual-100 only if Grok accepts; start final Claude-skill Opus/xhigh
-only if Kimi accepts.
+Fresh Grok 4.5/high returns `ACCEPTED` with no blocking findings against review
+HEAD `405b7a9` and production candidate `18aea72`. Substantive session
+`9b194b43-30c9-40ec-ba8e-295e87c90a81` used requested Grok 4.5/high and sole
+effective `grok-4.5-build`: 25 assistant envelopes, 38 read/Bash calls, no
+subagent, alternate model, memory or web search. An initial six-second
+controller attempt used an over-broad deny rule that blocked Bash and produced
+no review; the authenticated fresh session supersedes it.
+
+The finite egress census finds every Sync request routed through
+`sendNegotiatedSync`, post-selection payload construction and the canonical
+validator, and every Sync response routed through the negotiated response
+sender and validator. `sendGroupMessageRandomPeer` remains only for
+`FetchState`; generic `sendMessage` has no Sync-family production use. The
+peerless path sources the same group-subscriber universe, returns before send or
+lifecycle work when empty, preserves random choice over existing peers, and
+passes the chosen concrete peer to the one selected builder. Only typed
+`SYNC_SEND_SUPPRESSED` is intentionally swallowed.
+
+Grok also accepts the migrated fixtures as semantically intact and non-vacuous:
+all 11 titles remain; request capture awaits the real factory; response capture
+is verbatim; the no-peer assertion watches the negotiated outbox; and all three
+captured heads deliveries pass explicit selected truth. It finds no generic
+Sync bypass, build-before-selection, duplicate cap, byte estimate,
+truncation/pagination, accumulator, field-inferred protocol, test-only branch,
+assertion weakening, compatibility route, identity normalization or legacy
+plain-id support.
+
+Independent sequential gates pass peerless 5/5, fixtures 11/11, existing
+Phase 1n-c 23/23, semantic preservation 30/30 and manual 1/1 with 13 skipped.
+Builds pass 5/5. Typechecks match clean types/network/message-queue plus exact
+inherited object 5/node 2 with zero owned. Changed-file lint has zero errors and
+four inherited JSDoc warnings; Prettier and diff checks pass. HEAD/tree/index,
+stash, 47,303 protected entries and generated/lock state remain invariant.
+
+Evidence is under
+`.logs/phase-1n-c-peerless-green-grok45-high-review/`. Result SHA-256 is
+`60aa76a1baa828d3494c91cdb42af89fe6e5813fd1862b3b5672f9b462a1e796`;
+verified 45-entry manifest SHA-256 is
+`41d8d5739c838b4de11b5ae5a4def41adb165992622c6ff6f70e74993095663b`.
+The response path's prebuilt mode-independent ACCEPT/REJECT message and generic
+non-Sync sender error handling are noted as pre-existing, out-of-slice and
+non-blocking. No architecture amendment is proposed.
+
+## Next Agent Prompt — Phase 1n-c exact Kimi 3 review
+
+Because Grok accepted, run fresh exact Kimi 3/high/dual-100 against the same
+fixed lineage and complete evidence. Independently source-trace the finite Sync
+egress census, peerless empty/non-empty behavior, build-after-selection,
+selected lifecycle/accounting truth, literal wire caps and fixture non-vacuity.
+Rerun the bounded gates sequentially; do not rely only on prior logs. Reject any
+generic bypass, duplicated validation, fallback truncation, compatibility or
+legacy plain-id route. Authenticate `/Users/aristotle/.local/bin/kimi-cli`,
+provider/model `kimi-code/k3`, thinking and environment/CLI/loaded-loop 100-step
+caps, session/steps/calls, result and verified manifest. Start final
+Claude-skill Opus/xhigh only if Kimi accepts.
 
 Do not amend architecture during acceptance review. If a new assumption change
 is proposed, stop and require fresh Codex-high, exact Kimi 3/high/dual-100 and
