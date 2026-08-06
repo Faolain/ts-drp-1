@@ -27675,6 +27675,40 @@ That distinct storage obligation must receive its own later causal RED. Identity
 remains greenfield; this owner adds no legacy plain-ID or caller-chosen-ID
 fallback.
 
+## Phase 1o-a bounded shared-cut egress GREEN — review candidate
+
+Fresh distinct Codex-high landed production-only commit
+`fc8ab3a3be505ad73dc30e28c514d66579c76220`. Its sole path is
+`packages/node/src/sync-state.ts`, 14 insertions / 3 deletions. The frozen RED,
+plan, identity, ACL, validation, fallback and protected untracked paths did not
+change.
+
+`sharedHashes()` now constructs one bounded selection per object/peer. It
+selects the replaceable current `sharedHeads` first, then deduplicated retained
+historical `branchCuts`, and returns immediately when the existing
+`SYNC_HEADS_FIELD_HASH_CAP` of 32 is full. The early return avoids traversing or
+materializing the rest of the retained ledger for one egress. Private sets are
+unchanged, so this candidate makes no storage/RAM-retention claim.
+
+The frozen owner passes 2/2. A temporary priority mutant that selected
+historical cuts before the current frontier was killed at 1 failed / 1 passed
+and restored before commit. Complete preservation passes Phase 1n-b 11/11,
+Phase 1n-c 28/28 and Phase 1n-d aggregate 2/2. Node typecheck retains only the
+inherited compact-history TS1360/TS2322 pair and no owned diagnostic. ESLint has
+zero errors and five inherited warnings; Prettier and diff checks pass.
+Evidence is under
+`.logs/phase-1o-a-shared-cut-egress-green-codex-high/`; result SHA-256 is
+`c17e24992af392f7391e80aea4ed06e004e5ea93f0f2990acb65338198df3815`
+and verified 27-entry artifact-manifest SHA-256 is
+`064cde8a60ad3fd7595e07c492a5f3984375a602a8cc6549773ff1cfeb2e03f0`.
+
+Preliminary reviewers must reject any implementation that merely raises or
+removes the wire cap, lets historical cuts crowd out the current verified
+frontier, crosses a peer/object boundary, breaks exact/old-branch recovery, or
+claims private retention is now bounded. No reviewer should reopen legacy
+plain-ID support: generated creator-bound IDs remain the default and
+caller-chosen/same-ID fixtures still require explicit ACL.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
