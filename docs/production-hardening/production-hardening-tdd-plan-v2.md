@@ -25020,19 +25020,46 @@ stash, candidate, evidence, preliminary and protected comparisons are
 invariant. Evidence is under
 `.logs/phase-1n-a-no-progress-corrective-final-opus-xhigh-review/`.
 
-## Next Agent Prompt — Phase 1l tracked initial-sync fixture migration RED audit
+## Phase 1l tracked initial-sync fixture migration RED audit — frozen
 
-Before Phase 1n-b, run a fresh Codex-high read-only RED authentication of the
-existing `packages/node/tests/initial-sync.test.ts` at this closure checkpoint.
-Reproduce and freeze the exact two `Not a writer` failures / one passing case;
-prove both failures occur at the joining replica's local write before the
-Phase-1n-a handler predicate, and confirm Phase 1l's omitted-ACL creator-only
-contract plus the explicit coordinated-ACL precedent. Do not invent a new RED,
-modify files or weaken production. Run only the focused test and proportionate
-identity/initial-sync preservation, build/type/lint/format checks to a new log
-directory; no sealed/100k/fuzz work. A distinct tests-only GREEN may then update
-the two stale fixtures to explicit coordinated Writer authority while
-preserving their retry assertions, followed by the normal review gate.
+Fresh Codex-high read-only audit at fixed HEAD
+`29bcf02b1c2a46fea599d97048e8840e9b550ab3` (tree
+`26fb6bd18fb186ee515a6cfc0b17a67fb34cca37`) freezes the existing tracked
+`packages/node/tests/initial-sync.test.ts`, SHA-256
+`98b9c59c65c09c4db1dfa6e8ab06bceca3658b41064d8ae7b6cb7e27036c7039`.
+No synthetic test or commit was needed: the authentic signature is exactly two
+`Not a writer` failures and the no-peers control passing.
+
+Both failures are synchronous at the joining replica's local writes on lines
+84 and 128 through `callFnPipeline -> validateWriterPermission`, before peer
+insertion or timer advancement and outside the SYNC_ACCEPT-only `60d9f2f`
+predicate. Phase 1g commit `cc361a7` is byte-identical to HEAD and correctly
+repaired remote authentication; later Phase 1l commits `29bce20` / `423cb25`
+made its omitted-ACL local joiner writes stale. Commit `bef5950` supplies the
+authenticated anti-entropy precedent: fresh coordinated ACL instances grant
+the intended creator/joiner authority on both create and connect.
+
+Identity/initial-sync preservation is 26/26 and ordered builds pass. Typecheck
+retains only the exact inherited object-five/node-two Phase-1i-b diagnostics;
+lint, Prettier and diff checks pass. No sealed/100k/fuzz/full-suite work ran,
+and tracked/indexed/protected/stash state is invariant. Ledger SHA-256 is
+`8336c211bacd52029e77828152d409dae04fd2e1fe6bf67180fcaecf3fe6b31d`;
+the verified 22-entry manifest SHA-256 is
+`9f5c416586fe0d597cbb41cf30eda1852bae835222500ddc09f078dd916bb7da`.
+Evidence is under
+`.logs/phase-1l-initial-sync-fixture-migration-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1l tracked initial-sync fixture migration GREEN
+
+Run a distinct fresh Codex-high tests-only GREEN. Change only
+`packages/node/tests/initial-sync.test.ts`: give each of the two failing cases
+fresh coordinated explicit ACL instances for creator and joiner, granting the
+intended Writer authority and following the accepted anti-entropy precedent.
+Preserve every retry/timing assertion and the no-peers control. Do not change
+production, broaden permissionless defaults, add legacy/plain-id behavior or
+share one mutable ACL instance across object identities. Run focused 3/3,
+preservation 26/26 and proportionate build/type/lint/format gates to a new log
+directory, then commit only the tests-only fixture correction for fresh review.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
