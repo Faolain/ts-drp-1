@@ -24605,16 +24605,66 @@ explicit coordinated ACL. There is no legacy plain-id compatibility shim or
 debt. Evidence is under
 `.logs/phase-1n-a-authenticated-green-{grok45-high,kimi3-high-100}-review/`.
 
-## Next Agent Prompt — Phase 1n-a final Opus/xhigh review
+## Phase 1n-a final Opus/xhigh review — accepted candidate, corrective RED required
 
-Run one fresh Claude-skill Opus/xhigh read-only adversarial review at this fixed
-documented HEAD. Authenticate the amendment quorum, both REDs, aborted GREEN,
-final GREEN and both accepted preliminary reviews. Independently attack the
-WeakMap authenticity/propagation boundary, all recovery and error paths,
-finite-memory eviction decision, budget/finality/one-clock invariants and the
-greenfield id rule. Decide `PHASE1NA_MAY_CLOSE` explicitly. No edits,
-Task/Agent/Fable/Grok/Kimi/Codex delegation, web, sealed 100k or unbounded
-stress.
+Fresh Claude-skill Opus 5/xhigh session
+`d666785a-5f97-470a-bb00-9593fdcc2ae9` returned `ACCEPTED` /
+`PHASE1NA_MAY_CLOSE=yes` after independently authenticating the complete
+lineage, all seven evidence directories and every provenance/recovery path.
+It used only bounded read-only Bash and Grep, no delegation or network, and
+preserved HEAD `00ea468`, tree/index, stash and protected untracked state.
+Substantive metering was `claude-opus-5` at xhigh; an automatic
+non-substantive Haiku helper used 25 output tokens. Result SHA-256 is
+`bcab7394c3eb3a4df5bb055ec5f296c8bc92482e19708e21fdc04f9c4c44e50e`
+and artifact-integrity-manifest SHA-256 is
+`3d92eefceb98a55732865c317e9eb3fa406024d76eebb47f2944fe1b8f727499`.
+Evidence is under
+`.logs/phase-1n-a-authenticated-green-final-opus-xhigh-review/`.
+
+The controller deliberately retains the 1n-a gate despite that acceptance.
+Opus found two real behavior changes introduced by `b951388` which the focused
+suite and both preliminary reviews did not pin:
+
+1. **A genuinely clean SYNC_ACCEPT no longer resets its recovery episode.**
+   All three new call guards now forbid `recoverMissingSync(..., [])`, making
+   its existing `episodes.delete(key)` branch unreachable. A true-missing
+   round can increment the episode, a later fully successful round leaves it
+   stale, and repeated otherwise successful episodes can enter the 30-second
+   cooldown. Periodic anti-entropy still prevents permanent divergence, so
+   Opus correctly did not classify this as a safety blocker; nevertheless it
+   is a same-slice retry-semantics regression and must not be shipped as debt.
+2. **Pending-only SYNC_ACCEPT now emits `DRP_SYNC_ACCEPTED`.** The event guard
+   observes the filtered true-missing array, so it can report acceptance while
+   no vertex was committed and state/graph remain unchanged. Whether or not a
+   current production consumer exists, the public event must remain truthful.
+
+The correction must distinguish raw object outcome from recovery input:
+authenticated clock-pending hashes remain in the raw legacy `missing` tuple
+but are removed only from the list passed to recovery. A raw-missing-empty
+successful round resets the episode and may emit `DRP_SYNC_ACCEPTED`; a
+pending-only round does neither. Preserve true-missing retry/cooldown,
+pending-only budget neutrality, error identity, finality, persistence/events
+unrelated to acceptance, and every frozen 1n-a result. Do not re-enable empty
+`recoverMissingSync` calls as an accidental generic reset; make clean-round
+ownership explicit and test it causally.
+
+Opus otherwise accepts the 10,000-entry eviction and mixed/transitive
+observations as genuine bounded 1n-b handoffs, and independently accepts the
+greenfield id rule. Those decisions are unchanged.
+
+## Next Agent Prompt — Phase 1n-a clean-round corrective RED
+
+Run a fresh Codex-high tests-only RED. Pin an incomplete genuine-missing
+SYNC_ACCEPT that opens/increments a recovery episode, followed by a genuinely
+clean applied SYNC_ACCEPT that resets it, followed by a new incomplete round
+which starts from retry one rather than stale cooldown. Separately pin that a
+pending-only SYNC_ACCEPT neither resets an existing episode nor emits
+`DRP_SYNC_ACCEPTED`, while a genuinely clean applied round emits the event
+exactly once. Use real handlers/object outcomes and wire/event observations;
+no production mock result, private provenance write, source analyzer or test-
+only hook. Preserve all existing 1n-a owners and gates. Change tests only; do
+not modify production, plan, dependencies, generated files or protected
+untracked state.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
