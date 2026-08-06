@@ -8,10 +8,12 @@
  * periodic anti-entropy remains the repair path. With no group peers, no SYNC
  * is attempted.
  */
+import { DRP_HEADS_CHUNK_PROTOCOL, type NegotiatedSyncSender, type SelectedSyncProtocol } from "@ts-drp/network";
 import { createACL, createObject } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
+	type Message,
 	MessageType,
 	type ResolveConflictsType,
 	SemanticsType,
@@ -39,17 +41,56 @@ class CounterDRP implements IDRP {
 // SYNC below is attributable to the fast initial-sync retry alone.
 const ANTI_ENTROPY_INTERVAL_MS = 60_000;
 
+interface Outbound {
+	message: Message;
+	to: string;
+}
+
+const HEADS_SELECTION = Object.freeze({
+	mode: "heads-chunk",
+	protocol: DRP_HEADS_CHUNK_PROTOCOL,
+} satisfies SelectedSyncProtocol);
+
+const outboundByNode = new WeakMap<DRPNode, Outbound[]>();
+
+function syncSender(node: () => DRPNode): NegotiatedSyncSender {
+	function outbound(): Outbound[] {
+		const capture = outboundByNode.get(node());
+		if (capture === undefined) throw new Error("Expected outbound capture");
+		return capture;
+	}
+	return {
+		async sendSyncMessage(to, payloadFactory): Promise<void> {
+			const message = await payloadFactory(HEADS_SELECTION);
+			outbound().push({ message, to });
+		},
+		sendSyncResponseMessage(to, message): Promise<void> {
+			outbound().push({ message, to });
+			return Promise.resolve();
+		},
+	};
+}
+
+function captureOutbound(node: DRPNode): Outbound[] {
+	const outbound: Outbound[] = [];
+	outboundByNode.set(node, outbound);
+	return outbound;
+}
+
 async function makeNode(seed: string): Promise<DRPNode> {
-	const node = new DRPNode({
-		network_config: {
-			bootstrap_peers: [],
-			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+	const node: DRPNode = new DRPNode(
+		{
+			network_config: {
+				bootstrap_peers: [],
+				listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+				log_config: { level: "silent" },
+			},
+			keychain_config: { private_key_seed: seed },
+			interval_sync_options: { interval: ANTI_ENTROPY_INTERVAL_MS },
 			log_config: { level: "silent" },
 		},
-		keychain_config: { private_key_seed: seed },
-		interval_sync_options: { interval: ANTI_ENTROPY_INTERVAL_MS },
-		log_config: { level: "silent" },
-	});
+		{ syncSender: syncSender(() => node) }
+	);
 	await node.start();
 	return node;
 }
@@ -83,7 +124,7 @@ describe("initial fast sync retry", () => {
 			drp: new CounterDRP(),
 		});
 		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
-		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
+		const outbound = captureOutbound(node);
 		vi.spyOn(node.networkNode, "sendGroupMessageRandomPeer").mockResolvedValue();
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 		vi.useFakeTimers();
@@ -95,7 +136,7 @@ describe("initial fast sync retry", () => {
 		});
 		await vi.advanceTimersByTimeAsync(5_000);
 		const object = await connecting;
-		sendMessage.mockClear();
+		outbound.length = 0;
 
 		// A local operation after connect() returns must not masquerade as
 		// remotely synchronized history and stop the fast retry.
@@ -107,9 +148,9 @@ describe("initial fast sync retry", () => {
 		groupPeers.mockReturnValue([peer]);
 		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 3);
 
-		const probes = sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC);
+		const probes = outbound.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC);
 		expect(probes.length).toBeGreaterThanOrEqual(2);
-		for (const [to, message] of probes) {
+		for (const { to, message } of probes) {
 			expect(to).toBe(peer);
 			expect(message.objectId).toBe(creatorObject.id);
 		}
@@ -119,12 +160,10 @@ describe("initial fast sync retry", () => {
 		creatorObject.drp?.increment();
 		await signGeneratedVertices(creator, creatorObject.vertices);
 		await expect(object.merge(creatorObject.vertices)).resolves.toEqual([true, [], []]);
-		sendMessage.mockClear();
+		outbound.length = 0;
 		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 3);
 
-		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
-			0
-		);
+		expect(outbound.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(0);
 	}, 20_000);
 
 	test("an empty remote object exhausts the fast retry budget instead of probing forever", async () => {
@@ -137,7 +176,7 @@ describe("initial fast sync retry", () => {
 		});
 		const peer = "16Uiu2HAm4MeUv712cWmXpvGEZ1r1741YoWvsCcmptCza43b7opdK";
 		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
-		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
+		const outbound = captureOutbound(node);
 		vi.spyOn(node.networkNode, "sendGroupMessageRandomPeer").mockResolvedValue();
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 		vi.useFakeTimers();
@@ -149,25 +188,23 @@ describe("initial fast sync retry", () => {
 		});
 		await vi.advanceTimersByTimeAsync(5_000);
 		const object = await connecting;
-		sendMessage.mockClear();
+		outbound.length = 0;
 
 		object.drp?.increment();
 		groupPeers.mockReturnValue([peer]);
 		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 10);
 
-		const attemptsAfterBudget = sendMessage.mock.calls.filter(
-			([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC
-		).length;
+		const attemptsAfterBudget = outbound.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC).length;
 		expect(attemptsAfterBudget).toBe(5);
 
 		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 5);
-		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
+		expect(outbound.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
 			attemptsAfterBudget
 		);
 
 		// Capping the fast path must not stop the independent periodic repair path.
 		await vi.advanceTimersByTimeAsync(ANTI_ENTROPY_INTERVAL_MS);
-		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
+		expect(outbound.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
 			attemptsAfterBudget + 1
 		);
 	}, 20_000);
@@ -177,7 +214,7 @@ describe("initial fast sync retry", () => {
 		const node = await makeNode("initial-sync-no-peer-joiner");
 		nodes.push(node);
 		vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue([]);
-		const sendMessage = vi.spyOn(node.networkNode, "sendMessage").mockResolvedValue();
+		const outbound = captureOutbound(node);
 		vi.spyOn(node.networkNode, "sendGroupMessageRandomPeer").mockResolvedValue();
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 		vi.useFakeTimers();
@@ -185,12 +222,10 @@ describe("initial fast sync retry", () => {
 		const connecting = node.connectObject({ id: creatorObject.id, drp: new CounterDRP() });
 		await vi.advanceTimersByTimeAsync(5_000);
 		await connecting;
-		sendMessage.mockClear();
+		outbound.length = 0;
 
 		await vi.advanceTimersByTimeAsync(INITIAL_SYNC_RETRY_INTERVAL_MS * 4);
 
-		expect(sendMessage.mock.calls.filter(([, message]) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(
-			0
-		);
+		expect(outbound.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(0);
 	}, 20_000);
 });
