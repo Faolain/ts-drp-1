@@ -28092,6 +28092,35 @@ This slice validates retained hashes only: it adds no identity migration,
 legacy plain-ID acceptance or omitted-ACL fallback. Identity remains the
 greenfield creator-bound/explicit-ACL contract above.
 
+## Phase 1o-d exact retained-hash ingress GREEN — review candidate
+
+The distinct Codex-high production GREEN is frozen at `24cfc70`. One private
+`queueWireExactRequests` gate accepts exactly `/^[0-9a-f]{64}$/` and fronts all
+four wire-derived exact-request retention paths. The trusted direct
+`queueExactRequests` helper remains permissive. `recordBranchCuts([])` is now a
+nonallocating no-op so a malformed-only heads offer cannot materialize otherwise
+empty pair state; no branch-cut ordering or retention policy is changed ahead
+of Phase 1o-e.
+
+The focused suite passes 6/6, including retry/cooldown integrity and later
+same-hash recovery. The sequential Phase 1n-b/c/d and Phase 1o-a/b/c
+preservation set passes 51/51. Production TypeScript is clean. Package
+TypeScript retains only the inherited compact-history TS1360/TS2322 findings;
+ESLint has zero errors and five inherited JSDoc warnings. Prettier and diff
+checks pass. Production source SHA-256 values are
+`87555592cdf47b9216b590c66a3dec11d6afba01713161331496cfffbe750982` for
+`handlers.ts` and
+`43e335bc8101f47fad00ca5379075bf64f7220bcd5b68f6178c88286ddf1fe16` for
+`sync-state.ts`. The frozen RED source hash remains
+`33fa5968c6e7e091de4e4cc74eeb828ce6f1deffe420fc9eabcefbff676c05a7`.
+
+The 35-entry evidence manifest has SHA-256
+`229a48751bd68687744f03ea998c9015a216ae8e5f4e61e167716b08aa282b06`;
+the GREEN result SHA-256 is
+`18233cbf23e1935d66419c331ac5c027ee7b75e54281b66eb02cad5016747f87`.
+Tests and the plan were untouched by the GREEN. The candidate adds no legacy
+plain-ID route, compatibility fallback, identity migration or ACL change.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
