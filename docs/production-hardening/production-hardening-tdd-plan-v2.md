@@ -26984,25 +26984,56 @@ and verified 24-entry manifest SHA-256 is
 `6fec898c2b71abc7668987fe4ce82042ac11ff9e01806d0c95f7eb188f283fc2`.
 Freeze this new owner byte-for-byte with the original RED files.
 
-## Next Agent Prompt — Phase 1n-d(i) unmanaged-restore corrective GREEN
+## Phase 1n-d(i) unmanaged-restore corrective GREEN — review candidate
 
-Spawn a distinct fresh Codex-high production-only GREEN against `627e620`.
-Keep the acquisition map exactly `created | connected`; widen only the
-scheduler option/property to `created | connected | unmanaged`. When
-`restoreSubscriptions` finds no acquisition role, create the existing
-discovery interval and tracked Sync runner explicitly as `unmanaged` without
-writing the map. `unmanaged` must retain immediate plus ordinary periodic
-anti-entropy and must never build the connected one-second fast runner. It is
-not a default, identity kind, wire/schema/durable value, legacy compatibility
-route or ID parser result. Preserve all other `940a3d5` behavior unchanged.
+Distinct fresh Codex-high committed production-only candidate
+`3dd618f0d42b18e9d570b5a59ab082c8345dd80f` (tree
+`47a8799156b0c11004131b29bd957f57b34fff4b`, parent `f29d93d`). Exact scope is
+`packages/node/src/index.ts` plus `packages/node/src/interval-sync.ts`, with
+five insertions and six deletions; all three frozen test files remain unchanged.
 
-Run the corrective owner to GREEN, both original frozen RED files, all prior
-preservation gates, five ordered builds, exact typecheck census, changed-source
-lint, Prettier and diff checks sequentially to `.log`. Add bounded production
-mutation probes for collapsing unmanaged to created/connected or storing it as
-acquisition provenance when practical; revert every probe. Package result and
-verified manifest hashes, then commit production only. No inventory/
-performance, sealed, fuzz, proto-generation or full-suite workload.
+The acquisition map is now explicitly and only
+`Map<string, "created" | "connected">`. The scheduler option and its readonly
+observable property additionally admit `"unmanaged"`. Missing-provenance
+restart calls the existing discovery-plus-tracked-Sync constructor explicitly
+with that scheduler-only state and never writes the acquisition map. The
+existing `replicaOrigin === "connected"` predicate remains the sole fast-runner
+gate, so unmanaged objects receive immediate plus ordinary periodic
+anti-entropy but no one-second retries. No default, fallback, ID parser,
+plain-ID compatibility, wire/schema/durable value, configured-peer state or
+protocol/generated/lock change exists.
+
+The corrective owner passes 1/1 before and after mutation probes. Frozen RED
+passes 3/3; preservation passes 11/11, 5/5, 23/23, 30/30 and manual 1/1 with 13
+skipped. Five ordered builds pass. Typechecks retain clean/clean/clean and exact
+inherited object 5/node 2 with zero owned. ESLint reports zero errors and 12
+inherited warnings; quiet, Prettier, diff and frozen-file checks pass. Two
+bounded mutants were killed and reverted: treating unmanaged as connected
+produced forbidden one-second retries, while storing unmanaged in the
+acquisition map failed its explicit TypeScript boundary.
+
+The first test command accidentally used the package wrapper, expanded to the
+entire node suite and surfaced unrelated known failures plus the shared
+coverage-temp error. It is preserved as non-authoritative invocation evidence;
+all counted tests used direct, scoped, sequential Vitest commands. Evidence is
+under `.logs/phase-1n-d-i-unmanaged-restore-green-codex-high/`; result SHA-256
+is `181c3ece8775eb9eebf7b6dae5bf522bfd85375046fd26ee245949f9aabd1ac5`
+and verified 29-entry manifest SHA-256 is
+`f9c50cbed50b88badb6f37bdc049a5b51a6104c9f0ce26faa6075ad436adfc76`.
+This is a review candidate, not final Phase 1n-d(i) acceptance.
+
+## Next Agent Prompt — Phase 1n-d(i) corrective GREEN reviews
+
+Run fresh Grok 4.5/high, then exact Kimi 3/high/100, then final Opus/xhigh over
+the complete `514cc55..3dd618f` Phase 1n-d(i) lineage and both evidence bundles.
+Reviewers must verify the scheduler has one retry owner; stop/unsubscribe and
+remote-history semantics remain truthful; create/connect provenance is
+explicit and lifecycle-correct; missing public-put provenance restores only
+ordinary anti-entropy; and no legacy/plain-ID support, ID-shape inference,
+default or false provenance was introduced. They must also adjudicate the
+non-authoritative wrapper-expanded run correctly and preserve the previously
+authorized configured-peer deletion. Reviews are read-only. Only after all
+three accept may Phase 1n-d(i) be closed.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
