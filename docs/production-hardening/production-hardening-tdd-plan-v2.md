@@ -28156,6 +28156,16 @@ verified manifest SHA-256 is
 No substitute model or inferred verdict is permitted. The final Opus/xhigh gate
 has not started; Phase 1o-d remains open until a native Grok verdict completes.
 
+A later goal-turn made exactly one additional bounded same-session, no-tools,
+one-turn finalization attempt against the same authenticated Grok session. It
+again returned HTTP 402 with native exit 1 before emitting model output. No
+source inspection or test was repeated, and no further retry or model
+substitution followed. The resume remains `INCOMPLETE_PROVIDER_402` with
+`OPUS_MAY_START=no`. Resume result SHA-256 is
+`84fae1ca376c99ac166adebeeef643463fc4f4442b26425f69d923277d15a2a6`;
+verified manifest SHA-256 is
+`fbbc35adae7e75eb454f2bf34a686abb3cdd05d2fe58d1fb220155bcf9a8637f`.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
