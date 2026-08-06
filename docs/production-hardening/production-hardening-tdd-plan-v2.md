@@ -27846,6 +27846,43 @@ Reviewers must reject any cap weakening, lost/reordered exact chunk, hidden
 current head, peer/object contamination, parallel selector, storage-bound
 overclaim or legacy-ID reopening.
 
+## Phase 1o-b aggregate sync-egress acceptance — closed
+
+The gate unanimously accepts production `d3894c9` at docs checkpoint
+`84756e0`; frozen RED `8472d71` is unchanged. Grok 4.5/high session
+`019fd8f2-16de-79a2-8771-12fc1b594351` returned `ACCEPTED`, no blockers and
+`OPUS_MAY_START=yes`; controller and Grok each passed 49/49. Its result SHA is
+`01b370cbe60019333d550014809c76388ffd5e9644d8646e6330c0c5e3f6db86`
+and verified manifest SHA is
+`f895f8b78529816ca1514f067bf5bc7bccc3463fadbbb0ad39b6b50b34445a1a`.
+
+Exact Kimi 3/high/dual-100 session
+`34d3d91c-a20c-42f3-94d0-af965425a76d` returned `ACCEPTED`, no blockers and
+`OPUS_MAY_START: YES`. Effective K3 used thinking, all 100-step caps, 11 steps,
+20 allowed calls and zero forbidden/fallback calls; controller passed 49/49.
+Result SHA is
+`de93ea1ff10ac3df06a2bf8ba94bd4c2899f168ea6ff34310eab900edf0f8660`;
+verified manifest SHA is
+`635260a1b8b615d1507bcd3509c95e304aee665d63e756abc4f75d5ab6f57888`.
+
+Final Claude-skill Opus 5/xhigh session
+`b05a5cba-6dce-4b85-a93e-78b4108eedd3` returned `ACCEPTED`, no blockers and
+`PHASE_1O_B_MAY_CLOSE: yes`. After safe `dontAsk` denied tests, the controller
+ran all 13 files sequentially coverage-off at 49/49; the same Opus session
+authenticated the logs. Automatic Haiku metadata used 23 output tokens, zero
+tool calls and no substance. Result SHA is
+`7da713086ec444d4035eccb8bc7d45620ab7803f4353c40eca682c97567ef41f`;
+verified 49-entry manifest SHA is
+`0694d4ee0b7c1dea3d32f87e4f29d2d332e3153e9b07b27d29c981ef72388304`.
+
+Later Phase 1o still owns private retention/reclamation and aggregate quotas,
+cross-field duplicate slot waste, and oversized-frontier policy. Fully occupied
+heads plus exact legitimately leaves zero shared slots. Opus confirmed shared
+truncation below 32 occurs only with exact requests, when
+`readUsefulSyncDelta` already ignores shared cuts, so no speculative old-branch
+delta is lost. Identity remains greenfield with no legacy plain-ID path.
+Phase 1o-b is closed; Phase 1o remains open.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
