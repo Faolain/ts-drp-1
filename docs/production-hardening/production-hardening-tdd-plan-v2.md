@@ -25605,24 +25605,61 @@ the verified 18-entry root-relative manifest SHA-256 is
 Evidence is under
 `.logs/phase-1n-b-reciprocity-attempt-neutrality-red-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-b reciprocity-neutrality corrective GREEN
+## Phase 1n-b reciprocity-neutrality corrective GREEN — review pending
 
-From frozen RED `41671de`, use a distinct fresh Codex-high production agent to
-implement the narrow single-owner correction above. Freeze every test and this
-plan. Preserve the public scheduled `node.syncObject` behavior and the real
-periodic owner; add only the natural production seam needed for uncharged
-heads/shared-heads reciprocity with an empty exact-request field and cooldown
-inertness. If new discovery and reciprocity coincide, the charged attempt-one
-request already carries the heads proof. Remove any duplicated transition or
-compatibility sediment rather than layering another lifecycle owner.
+Distinct fresh Codex-high production commit
+`25ce88a7cf598b424cc18b44f4272816ad520245` (tree
+`549650e5453eb3c2e58c430a8dc28e21fdd182f5`) changes exactly
+`handlers.ts`, `operations.ts` and `sync-state.ts`, +57/-9. Tests, this plan,
+generated files, lockfiles, protected paths and stash remain frozen.
 
-Run the new corrective owner, existing lifecycle, corrected legacy, frozen core
-and bounded preservation selections, followed by ordered builds, exact inherited
-typecheck census, lint, Prettier and diff checks, all to `.log`. Do not run
-inventory/perf, sealed, fuzz or full-suite workloads. Run refactor-clean before
-checkpointing the production-only GREEN. Then obtain fresh native Grok 4.5/high
-and exact Kimi 3/high/dual-100 preliminary reviews; final Claude-skill Opus/xhigh
-starts only after both accept.
+The single sync-state lifecycle owner now prepares an explicit
+`scheduled-probe` or `inbound-reciprocity` send purpose. Public/manual
+`node.syncObject` and periodic anti-entropy remain scheduled probes and the sole
+owners of charged attempts/rejection/cooldown. The heads handler gives genuine
+new discovery precedence; otherwise pure reciprocity enters the same SYNC
+builder with empty `requestedHashes`. That path reads active cooldown only,
+sends nothing while it is active and mutates no attempt, cooldown or rejection
+state. Overloads require a concrete peer for inbound reciprocity, while peerless
+full-inventory sync remains scheduled-only.
+
+Refactor-clean found one lifecycle owner, one SYNC message builder and one
+inbound-reciprocity caller. The corrective owner is 2/2, existing lifecycle
+5/5, corrected legacy 17/17, frozen core 4/4, combined causal 28/28 and bounded
+preservation 41/41. Ordered types/object/node builds pass. Types typecheck
+passes; object retains exactly five and node exactly two inherited Phase-1i-b
+diagnostics, with zero owned diagnostic. Owned lint, supported-source Prettier
+and diff checks pass. Broader node-source lint retains exactly six inherited
+JSDoc warnings; the broad Prettier command sees only an ignored generated RPC
+file, so no generated output was changed. No inventory/perf, sealed, fuzz,
+proto-gen or full-suite workload ran.
+
+Ledger SHA-256 is
+`b9d0acf92f85db8c04bb4456071f9e3e89fa03ad7b659720b6c6afe37f3dabbb`;
+the verified 32-entry root-relative manifest SHA-256 is
+`46a68d3d99f8cfcfe66319e9f1bf4dcec96635e6392f37ba6595fdb2a2a6fc57`.
+Evidence is under
+`.logs/phase-1n-b-reciprocity-neutrality-green-codex-high/`; protected stash
+`ef3a53bdf318a5cea30761a9e3d203b106f16e7e` is unchanged.
+
+## Next Agent Prompt — Phase 1n-b corrective GREEN preliminary reviews
+
+At fixed candidate `25ce88a`, run fresh independent native Grok 4.5/high and
+exact Kimi CLI v1.49.0 with effective `kimi-code/k3`, thinking and both
+100-step limits. Authenticate the frozen RED and GREEN commits/manifests and
+review the complete Phase 1n-b production lineage, not only the three-line
+handler branch. Trace new discovery precedence, inbound no-delta reciprocity,
+cooldown inertness/expiry, scheduled attempts one through four, UPDATE and
+SYNC_ACCEPT parity, periodic peer rotation, cleanup, send failure/reentry and
+all call sites. Confirm the typed internal seam cannot introduce a second
+lifecycle owner, duplicated builder, test-only branch, compatibility layer or
+legacy plain-ID path.
+
+Reviewers are read-only and must not run inventory/perf, sealed, fuzz,
+proto-generation or full-suite workloads. They may run only bounded focused
+tests if necessary. Final Claude-skill Opus/xhigh starts only after both
+preliminary reviewers accept. Record every finding and controller/model
+disclosure before closure.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
