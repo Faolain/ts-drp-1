@@ -26537,15 +26537,64 @@ verified 48-entry manifest SHA-256 is
 The 47,303-entry protected census, production and generated/lock censuses,
 clean index and stash `ef3a53...` remain invariant. No forbidden workload ran.
 
-## Next Agent Prompt — Phase 1n-c peerless negotiated-egress GREEN
+## Phase 1n-c peerless negotiated-egress GREEN — review candidate
 
-Start a distinct fresh Codex-high GREEN: remove the
-peerless Sync builder/generic send from `operations.ts`; choose from
-`networkNode.getGroupPeers(objectId)` and feed the chosen peer into existing
-`sendNegotiatedSync` plus `buildSyncPayloadForProtocol`. Reuse scheduled-probe
-lifecycle purpose. Do not change generic random-peer behavior for non-Sync
-callers, introduce another selector API, duplicate validation or add a
-compatibility path.
+Fresh Codex-high committed production-only GREEN
+`18aea7266d47e9cf97b1f33b6a8e235eb124c077` (tree
+`5b1d61722e7c4f53146e3627b901b11e5e7512b6`, parent `ad7d593`). Exact scope is
+`operations.ts` (+17/-22) and the authorized `interval-sync.ts` contract
+comment (+1/-1). No test, plan, network validator/codec, generated/lock or
+protected file changed.
+
+When the caller omits a peer, `sendSyncObject` now reads
+`networkNode.getGroupPeers(objectId)`, returns inertly when it is empty, and
+otherwise preserves the old random-choice expression before sending to that
+concrete peer through the existing `sendNegotiatedSync` and
+`buildSyncPayloadForProtocol` owners. The peerless field-1 builder, direct Sync
+encoder import and generic Sync send are deleted. Explicit-peer calls use the
+same consolidated path. The selected builder remains the sole owner of mode,
+caps and attempt/advertisement accounting. `sendGroupMessageRandomPeer` and its
+non-Sync `FetchState` consumer are unchanged.
+
+The peerless RED passes 5/5; fixtures pass 11/11; existing Phase 1n-c passes
+23/23; Phase 1h/1n-a/1n-b preservation passes 30/30; and the selected manual
+control passes 1/1. Ordered builds pass 5/5. Types/network/message-queue
+typechecks are clean; object/node retain exact inherited 5/2 with zero owned.
+Lint has zero errors, Prettier/diff checks pass, and the 47,303 protected
+entries, generated/lock surface, clean index and stash `ef3a53...` remain
+invariant. All Vitest gates ran sequentially because of the documented shared
+coverage-finalization collision.
+
+The first non-authoritative focused command resolved workspace configuration
+from `packages/node` and stopped at startup. The authoritative root-workspace
+invocation passed 5/5; only root invocations support the reported gates. No
+inventory/performance, sealed, fuzz, proto-generation or full-suite workload
+ran.
+
+Evidence is under
+`.logs/phase-1n-c-peerless-egress-green-codex-high/`. Result SHA-256 is
+`83cf27cea16fdb5b938dc971a77b410f3dde390e890976e50db75492c02d1ceb`;
+verified 46-entry manifest SHA-256 is
+`d768a48b6c7ccaf82c5c4a4abf258d9497ae0998a3594788948c189ed88e4816`.
+The GREEN adds no selector, duplicate cap, pagination, truncation, swallowed
+error, transport emulation, compatibility route, identity normalizer or legacy
+plain-id behavior.
+
+## Next Agent Prompt — Phase 1n-c final GREEN review chain
+
+Run a fresh Grok 4.5/high review first against the complete amended contract and
+lineage through `18aea72`. Require a finite Sync egress census, source-trace the
+peerless selection/inert path and selected lifecycle truth, and independently
+rerun the bounded focused/preservation gates sequentially. Reject any generic
+Sync bypass, build-before-selection, duplicate cap, fallback truncation,
+test-only branch, arbitrary-id compatibility or assertion weakening. Package
+model/session authentication, result and verified manifest hashes. Start exact
+Kimi 3/high/dual-100 only if Grok accepts; start final Claude-skill Opus/xhigh
+only if Kimi accepts.
+
+Do not amend architecture during acceptance review. If a new assumption change
+is proposed, stop and require fresh Codex-high, exact Kimi 3/high/dual-100 and
+Opus/xhigh agreement before editing the plan or production.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
