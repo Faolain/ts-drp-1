@@ -26252,21 +26252,48 @@ Unknown-field padding and oversized ids are malformed resource inputs; they do
 not authorize normalization or compatibility. Arbitrary custom ids still
 require an explicit coordinated ACL.
 
-## Next Agent Prompt — Phase 1n-c literal-wire cap corrective RED
+## Phase 1n-c literal-wire cap corrective RED — checkpointed
 
-Start a fresh Codex-high tests-only corrective RED from rejected GREEN
-`e8d676a`. Freeze all existing Phase 1n-c tests and assertions. Add one bounded
-literal-frame cap owner that appends valid unknown-field padding outside a small
-canonical Message and uses real raw direct streams. Cover heads request,
-fallback request, `SYNC_ACCEPT` and `SYNC_REJECT`, proving literal over-cap but
-decoded/re-encoded under-cap messages are rejected/reset before central
-admission. Preserve ordinary within-cap request/response controls. Record the
-exact causal pre-fix admission/acceptance signature; do not edit production or
-the plan.
+Fresh Codex-high committed tests-only RED
+`3e4298e0b31c4d592163f448ccd12c3176d73475` (tree
+`8103de419f1e119eae63ad8379e8b33015357e7c`) from rejection-docs parent
+`929fce6`. Its sole new owner is
+`packages/network/tests/sync-literal-frame-cap-1n-c-red.test.ts` (251 lines,
+SHA-256
+`2d6b7af6a05afee0f22c2714f71ba79aac9b7786e97d321848a9087f14c9ff25`).
+All production, existing tests, the plan, generated/lock files and protected
+paths remain frozen.
 
-Commit tests only with focused test, network build/typecheck, lint, Prettier,
-diff and immutable-source/test hash evidence. Then start a distinct fresh
-Codex-high GREEN. Change the canonical validator contract to receive the exact
+The exact focused signature is **four failed / four passed**. Each hostile raw
+frame is over its literal cap, remains under cap after decode/re-encode, clean-
+closes and reaches central admission once:
+
+- heads request: 65,646 literal / 106 canonical bytes;
+- fallback request: 65,655 / 115 bytes;
+- `SYNC_ACCEPT`: 262,257 / 109 bytes;
+- `SYNC_REJECT`: 262,259 / 111 bytes.
+
+Each contract outcome is reset with zero central admission. All four ordinary
+within-cap controls pass. Both response types use heads-chunk because protocol
+mode does not alter their distinct type-selected validator branches; the
+request pair covers both mode-selected branches.
+
+Network build/typecheck, owned ESLint, Prettier and diff checks pass. Hash
+invariance covers 82 production sources, 382 prior tracked tests, all three
+prior Phase 1n-c owners, 47,303 protected entries and stash `ef3a53...`.
+Ledger SHA-256 is
+`ba89f9d6e9734166dfb48e5068f3c663da38c6f842950e4a38bd1d4c85138c7b`;
+the verified 29-entry manifest SHA-256 is
+`f808b62d19b5905f281091aa5de29c53998e7dcd0a6d2fc5d4f76cf781f8cb47`.
+Evidence is under `.logs/phase-1n-c-literal-wire-cap-red-codex-high/`.
+
+The RED adds no legacy/plain-id fixture or behavior. Unknown-field padding is
+malformed resource input only.
+
+## Next Agent Prompt — Phase 1n-c literal-wire cap distinct GREEN
+
+Start a distinct fresh Codex-high GREEN from RED `3e4298e`. Freeze every test
+and assertion. Change the canonical validator contract to receive the exact
 encoded byte length. Encode once on the sender, validate that length and write
 the same byte array; on the receiver pass the raw stream frame length. Keep one
 request/response type-to-cap owner, canonical payload decode, field/count caps,
