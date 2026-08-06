@@ -27980,6 +27980,80 @@ counter is a valid current cleanup-work seam, not a permanent representation
 contract; future key changes require equivalent causal cost proof. Identity
 remains greenfield. Phase 1o-c is closed; Phase 1o remains open.
 
+## Phase 1o mutation-retention amendment quorum — unanimous
+
+The remaining mutation-driven retention work was underspecified: Phase 1o did
+not authorize a retained-cut eviction policy, aggregate-pair defaults, pinned
+retry semantics, or the storage-work evidence needed to derive them. The
+read-only Codex-high, exact Kimi 3/high/100 and Claude-skill Opus 5/xhigh quorum
+made no test, production or plan edit while resolving the contract.
+
+Codex-high selected a 32-cut cap, oldest-distinct FIFO, duplicate no-refresh and
+mandatory full plus compact-history >cap recovery. It rejected arbitrary
+256/object and 1024/node defaults and preserved every
+outstanding/attempt/cooldown pair as pinned. Corrective result SHA-256 is
+`f283e701feab86062a40442d2d2b4001126a02673195cd56984ae9c9e781ae6e`;
+refreshed manifest SHA-256 is
+`3bbb060b56fc647f549807d30f389ddee1a99b22303a8e0dcaff1758572d4602`.
+
+Exact Kimi session `28024add-620d-4214-94a4-06e2eb6e2518` initially proposed
+64 cuts and reconfirmation LRU, then formally withdrew both after proving cuts
+#33+ are never selected and refresh gives an attacker a pinning lever. It also
+withdrew 256/1024 as unaudited defaults. Corrective cap/FIFO SHA-256 is
+`4aae0eb55969a61ca117088c6593509d809e4956538d6ff77ae0e51777c49553`;
+defaults-correction SHA-256 is
+`1fa735b915837e5783f8bf135678e626d964eddc0f073b5d1732f9e55619408d`;
+verified manifest SHA-256 is
+`b614f5d556abe40a9c00886681b01db8c905fc9969ecc3a76c48d474b2a61c28`.
+
+Opus session `1c3678c3-964e-42e8-845c-a5247b95ce1a` independently agreed an
+amendment was required, then used same-session adjudications to revise to
+32/FIFO/no-refresh and retract its provisional 256/1024 defaults and
+cooldown-expiry demotion. Final correction SHA-256 is
+`6357942f8f2c5883427a5e55074f625e47d684be57d361cee0e36d734c680f33`;
+verified 29-entry manifest SHA-256 is
+`d5ada230abba7aa7f339a9c42e58f206b4aa927b603c661192f44dda88e0c296`.
+
+The unanimously authorized order and contract are:
+
+1. **1o-d — exact retained-hash ingress and byte census.** Before a
+   wire-derived hash enters exact-request retention, require exactly 64
+   lowercase hexadecimal ASCII characters plus existing count/frame bounds.
+   Reject malformed or oversized strings before retention. Preserve permissive
+   direct internal `queueExactRequests` behavior required by frozen unit and
+   protobuf-cap owners; exercise real handler ingress. Record retained entries,
+   string characters/bytes and tuple-key contribution for later arithmetic.
+2. **1o-e — bounded branch cuts.** Each `(object, peer)` retains at most 32
+   distinct cuts. A new distinct cut evicts the oldest FIFO; duplicate or
+   reconfirmed cuts do not refresh order. If frozen 1o-a membership assertions
+   causally contradict FIFO, stop and use first-32-distinct-wins only after
+   documenting that contradiction. Acceptance requires >cap old-branch
+   recovery/convergence with both full and compact/unavailable history.
+3. **1o-f — atomic aggregate pair entitlement and idle reclamation.** One
+   node-scoped policy enforces per-object and per-node capacities atomically;
+   only the oldest dormant pair is evictable. Nonempty outstanding hashes,
+   nonzero attempts or any defined cooldown pin the pair; cooldown expiry
+   resumes work and is not terminal. With no dormant victim, hint admission
+   refuses without allocation or perturbation. RED may use tiny injected
+   internal capacities. Production defaults cannot freeze until accepted 1o-d
+   exact-byte census, reproducible runtime/version heap/container
+   characterization, golden-path peer/object demand, simultaneous pinned
+   fraction and an explicit node memory envelope/formula are recorded. GREEN
+   must test both injected and derived finite defaults.
+4. **Peer departure cleanup.** Dormant-only cleanup from an existing truthful
+   peer-leave lifecycle may follow 1o-f, but is an optimization, never the
+   capacity bound. Object unsubscribe and node stop cleanup stay mandatory.
+5. **1o-g — productive-peer fairness.** One well-formed unknown hash can pin a
+   bounded slot indefinitely, so 1o-f disclaims fairness. A named progress and
+   scheduling owner/configuration seam must prove pinned or slow peers cannot
+   starve an honest room before Phase 1o closes.
+
+Dependency fan-out, argument bytes, antichain width and epoch/NOP accounting
+remain Phase 3 consensus work. Network-wide Sybil/economic admission and object
+creation/ACL entitlement remain later named owners. No slice may add legacy
+plain-ID support; generated creator-bound IDs remain default and caller-chosen
+or same-ID construction requires explicit ACL.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
