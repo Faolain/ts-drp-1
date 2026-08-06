@@ -25112,6 +25112,64 @@ candidate/evidence hashes and protected paths. Evidence is under
 `.logs/phase-1l-initial-sync-fixture-migration-green-{grok45-high,kimi3-high-100}-review/`.
 Final fresh Claude-skill Opus/xhigh may now adjudicate closure.
 
+## Phase 1l tracked initial-sync fixture final Opus/xhigh acceptance and closure
+
+Fresh tracked Claude-skill bridge session
+`57688938-3a7a-4f9c-893c-0999193a6ce7` returns `ACCEPTED` /
+`FIXTURE_MIGRATION_MAY_CLOSE=yes` at fixed HEAD
+`f6bb4feda421dbecc1247839592d750ce82889aa` (tree
+`7ab8ef32a3ed088418a8c81918e7eeaf45b54b33`). Opus independently
+authenticates the natural RED causality, sole-file +32/-6 GREEN, fresh ACL
+ownership, identical deterministic authority/key state, creator-bound identity,
+genuinely empty remote history, complete assertion preservation and all
+recorded gates. It finds no blocker and closes this missed Phase 1l fixture
+migration at tests-only commit
+`f5b6d2b6c74110bba1d9fd501eefc0072f77db98`.
+
+Opus retracted every investigated objection: admins do receive Writer and
+Finality; each key is registered under its own caller; the two ACL objects and
+their maps/sets/context are independent; local context is cleared and excluded
+from consensus state; the real creator adds only root history and cannot be
+auto-discovered; the local operation still crosses the exact Writer gate; no
+assertion or timing window changed; and the no-peers low-level fixture remains
+a valid generated `<peerId>:<salt>` control, not a plain ID. The node typecheck
+wrapper's 1→2 exit reflects incremental `.tsbuildinfo` emission; the exact two
+diagnostics byte-match and no owned-file error exists.
+
+The first-turn result SHA-256 is
+`50e22c49343d8062036ade31e5134a80bae3e716e94675c080bceac6a9ee1f20`.
+Because safe mode denied Opus's hash and bounded-test commands, the controller
+independently re-verifies all 22 RED and 26 GREEN manifest entries, then uses a
+zero-tool continuation in the same session for explicit adjudication. The
+authoritative same-session finalization SHA-256 is
+`3c13eb31f5c01ccc6e289b2cb1d372421278aa3523bfbb1372e48a5428320c57`;
+the verified 61-entry artifact-manifest SHA-256 is
+`a35a33858f21f24f3b54cfc31a4e63bad8eb4531d4da122502795c1277a7e4cf`.
+The first turn uses 43 Bash, 40 Read and 19 Grep calls; the follow-up uses zero.
+All 157 transcript assistant model fields are `claude-opus-5` at xhigh, with
+zero forbidden/write/web/MCP/delegation calls. Automatic non-substantive Haiku
+envelope use is 2,916 input / 19 output tokens and supplies no review content.
+HEAD/tree/source/status/index/stash/protected invariance checks all pass.
+Evidence is under
+`.logs/phase-1l-initial-sync-fixture-migration-final-opus-xhigh-review/`.
+
+## Next Agent Prompt — Phase 1n-b core-heads-sync RED
+
+Run a fresh Codex-high tests-only RED against this closure checkpoint. First
+authenticate the current protobuf/wire, handler, history-storage and
+anti-entropy seams and confirm the planned 1n-b contract can precede generic
+1n-c negotiation without inventing a fake peer/runtime. If that dependency is
+false, stop read-only with evidence for the required Opus/Codex/Kimi plan
+quorum. Otherwise add the narrowest real-wire causal owner for core heads sync:
+heads exchange, recursive retrieval of true missing dependencies only,
+per-peer/object shared-head advancement without forgetting old branches,
+idempotent duplicate/out-of-order delivery, bounded delta-proportional work and
+the mandatory hash-list fallback. Reuse 1n-a provenance and real handler/object
+paths; do not mock merge outcomes or add test hooks. Change tests only, run
+focused plus proportionate sync/auth/preservation/build/type/lint/format gates
+to a new evidence directory, and avoid sealed 100k/fuzz until a bounded causal
+owner demonstrates a need.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
