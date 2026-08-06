@@ -123,6 +123,9 @@ export interface AttestationUpdate {
 
 export interface Sync {
   vertexHashes: string[];
+  heads: string[];
+  sharedHeads: string[];
+  requestedHashes: string[];
 }
 
 export interface SyncAccept {
@@ -555,13 +558,22 @@ export const AttestationUpdate: MessageFns<AttestationUpdate> = {
 };
 
 function createBaseSync(): Sync {
-  return { vertexHashes: [] };
+  return { vertexHashes: [], heads: [], sharedHeads: [], requestedHashes: [] };
 }
 
 export const Sync: MessageFns<Sync> = {
   encode(message: Sync, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.vertexHashes) {
       writer.uint32(10).string(v!);
+    }
+    for (const v of message.heads) {
+      writer.uint32(18).string(v!);
+    }
+    for (const v of message.sharedHeads) {
+      writer.uint32(26).string(v!);
+    }
+    for (const v of message.requestedHashes) {
+      writer.uint32(34).string(v!);
     }
     return writer;
   },
@@ -581,6 +593,30 @@ export const Sync: MessageFns<Sync> = {
           message.vertexHashes.push(reader.string());
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.heads.push(reader.string());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.sharedHeads.push(reader.string());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.requestedHashes.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -595,6 +631,13 @@ export const Sync: MessageFns<Sync> = {
       vertexHashes: globalThis.Array.isArray(object?.vertexHashes)
         ? object.vertexHashes.map((e: any) => globalThis.String(e))
         : [],
+      heads: globalThis.Array.isArray(object?.heads) ? object.heads.map((e: any) => globalThis.String(e)) : [],
+      sharedHeads: globalThis.Array.isArray(object?.sharedHeads)
+        ? object.sharedHeads.map((e: any) => globalThis.String(e))
+        : [],
+      requestedHashes: globalThis.Array.isArray(object?.requestedHashes)
+        ? object.requestedHashes.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -602,6 +645,15 @@ export const Sync: MessageFns<Sync> = {
     const obj: any = {};
     if (message.vertexHashes?.length) {
       obj.vertexHashes = message.vertexHashes;
+    }
+    if (message.heads?.length) {
+      obj.heads = message.heads;
+    }
+    if (message.sharedHeads?.length) {
+      obj.sharedHeads = message.sharedHeads;
+    }
+    if (message.requestedHashes?.length) {
+      obj.requestedHashes = message.requestedHashes;
     }
     return obj;
   },
@@ -612,6 +664,9 @@ export const Sync: MessageFns<Sync> = {
   fromPartial<I extends Exact<DeepPartial<Sync>, I>>(object: I): Sync {
     const message = createBaseSync();
     message.vertexHashes = object.vertexHashes?.map((e) => e) || [];
+    message.heads = object.heads?.map((e) => e) || [];
+    message.sharedHeads = object.sharedHeads?.map((e) => e) || [];
+    message.requestedHashes = object.requestedHashes?.map((e) => e) || [];
     return message;
   },
 };

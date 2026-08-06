@@ -3,6 +3,7 @@ import { FetchState, type IDRP, type IDRPObject, Message, MessageType, Sync } fr
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
+import { prepareExactRequestProbe, recordAdvertisedHeads, sharedHashes } from "./sync-state.js";
 
 /**
  * Fetches the state of an object.
@@ -40,9 +41,18 @@ export async function syncObject<T extends IDRP>(node: DRPNode, objectId: string
 		log.error("::syncObject: Object not found");
 		return;
 	}
-	const data = Sync.create({
-		vertexHashes: [...object.historyInventory.knownHashes],
-	});
+	const probe = peerId === undefined ? undefined : prepareExactRequestProbe(node, objectId, peerId);
+	if (probe?.send === false) return;
+	const heads = peerId === undefined ? [] : object.getHistoryHeads();
+	const data =
+		peerId === undefined
+			? Sync.create({ vertexHashes: [...object.historyInventory.knownHashes] })
+			: Sync.create({
+					heads,
+					requestedHashes: probe?.requestedHashes ?? [],
+					sharedHeads: sharedHashes(node, objectId, peerId),
+					vertexHashes: [],
+				});
 	const message = Message.create({
 		sender: node.networkNode.peerId,
 		type: MessageType.MESSAGE_TYPE_SYNC,
@@ -53,6 +63,7 @@ export async function syncObject<T extends IDRP>(node: DRPNode, objectId: string
 	if (!peerId) {
 		await node.networkNode.sendGroupMessageRandomPeer(objectId, message);
 	} else {
+		recordAdvertisedHeads(node, objectId, peerId, heads);
 		await node.networkNode.sendMessage(peerId, message);
 	}
 }

@@ -44,6 +44,7 @@ export { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError
 export { authenticateVertices } from "./vertex-authentication.js";
 
 export interface AuthenticatedMergeOutcome {
+	readonly authenticatedHashes: readonly Hash[];
 	readonly committed: readonly Vertex[];
 	readonly hasTrustedOrAuthenticatedOffers: boolean;
 	readonly result: MergeResult;
@@ -77,6 +78,7 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 				: object.getVertex(hash) !== undefined)
 	);
 	const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
+	const authenticatedHashes = authenticated.map((_, index) => canonicalAuthenticatedHash(authenticated, index));
 	const dispatchedResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
 	const clockPending = readClockPendingProvenance(dispatchedResult);
 	const result: MergeResult = occurrences.some(({ status }) => status === "invalid")
@@ -93,7 +95,7 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 		committedHashes.add(hash);
 		committed.push(stored);
 	}
-	return { clockPending, committed, hasTrustedOrAuthenticatedOffers, result };
+	return { authenticatedHashes, clockPending, committed, hasTrustedOrAuthenticatedOffers, result };
 }
 
 /**
@@ -319,6 +321,46 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	 */
 	getVertex(hash: Hash): Vertex | undefined {
 		return this.hashGraph.getVertex(hash);
+	}
+
+	/**
+	 * Returns the current causal frontier without materializing full history.
+	 * @returns Current history heads
+	 */
+	getHistoryHeads(): Hash[] {
+		return this.hashGraph.getFrontier();
+	}
+
+	/**
+	 * Reads a topologically ordered causal suffix without scanning unrelated history.
+	 * @param heads - Frontier to walk backward
+	 * @param boundaries - Verified shared cuts that stop the walk
+	 * @returns Available suffix or an explicit unavailable/unknown result
+	 */
+	readHistorySuffix(heads: readonly Hash[], boundaries: ReadonlySet<Hash>): HistoryReadResult {
+		const vertices: Vertex[] = [];
+		const missingHashes: Hash[] = [];
+		const unknownHashes: Hash[] = [];
+		const visited = new Set<Hash>();
+		const visit = (hash: Hash): void => {
+			if (boundaries.has(hash) || visited.has(hash)) return;
+			visited.add(hash);
+			const result = this.getVertexPayload(hash);
+			if (result.status === "history-unavailable") {
+				missingHashes.push(...result.missingHashes);
+				return;
+			}
+			if (result.status === "unknown") {
+				unknownHashes.push(result.hash);
+				return;
+			}
+			for (const dependency of result.vertex.dependencies) visit(dependency);
+			vertices.push(result.vertex);
+		};
+		for (const head of heads) visit(head);
+		if (unknownHashes.length !== 0) return { status: "unknown", unknownHashes };
+		if (missingHashes.length !== 0) return { missingHashes, status: "history-unavailable" };
+		return { status: "available", vertices };
 	}
 
 	/**

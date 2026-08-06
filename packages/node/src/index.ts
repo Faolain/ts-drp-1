@@ -83,16 +83,12 @@ import { NodeConnectObjectOptionsSchema, NodeCreateObjectOptionsSchema } from "@
 import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
-import {
-	clearInvalidPeerBudgets,
-	clearSyncRecoveryEpisodes,
-	drpObjectChangesHandler,
-	handleMessage,
-} from "./handlers.js";
+import { clearInvalidPeerBudgets, drpObjectChangesHandler, handleMessage } from "./handlers.js";
 import { createDRPIntervalSync, DRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
 import { DRPObjectStore } from "./store/index.js";
+import { clearNodeSyncState, clearObjectSyncState } from "./sync-state.js";
 
 interface NodePeerCacheModule {
 	createFsPeerCacheStore(path: string): Promise<PeerCacheStore>;
@@ -489,6 +485,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			await Promise.all([routing?.stop(), rendezvousBootstrap, rendezvousRegistration, this._stopNetwork()]);
 		} finally {
 			clearInvalidPeerBudgets(this);
+			clearNodeSyncState(this);
 			this.messageQueueManager.closeAll();
 		}
 	}
@@ -1533,7 +1530,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 		this._roomRendezvousCapacityLogged.delete(id);
 		this._stopObjectIntervals(id);
-		clearSyncRecoveryEpisodes(this, id);
+		clearObjectSyncState(this, id);
 		this._initialSyncPeers.delete(id);
 		this.networkNode.unsubscribe(id);
 		if (purge) this.#objectStore.remove(id);

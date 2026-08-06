@@ -33,6 +33,17 @@ import { MessageSchema } from "@ts-drp/validation/message";
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
+import {
+	advertisedTheseHeads,
+	completePresentExactRequests,
+	markHeadsProtocol,
+	queueExactRequests,
+	recordBranchCuts,
+	recordSharedHeads,
+	usesHeadsProtocol,
+} from "./sync-state.js";
+
+export { SYNC_RECOVERY_COOLDOWN_MS } from "./sync-state.js";
 
 const metrics = new OpentelemetryMetrics("@ts-drp/node/handlers");
 
@@ -52,26 +63,15 @@ interface HandlerRegistryEntry {
 
 type AuthenticatedClockPendingMergeOutcome = Awaited<ReturnType<typeof mergeAuthenticatedVertices>>;
 
-const MAX_SYNC_RECOVERY_RETRIES = 3;
 const MAX_UPDATE_VERTICES = 32;
 const MAX_INVALID_VERTICES_PER_PEER = 10_000;
 const MAX_INVALID_PEER_BUDGETS = 256;
-export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
 
 function legacyFinalityStore<T extends IDRP>(object: IDRPObject<T>): IFinalityStore | undefined {
 	if (object.replicaMode === "observer") return undefined;
 	const finalityStore = object.finalityStore;
 	return finalityStore.enabled === false ? undefined : finalityStore;
 }
-
-interface SyncRecoveryEpisode {
-	retries?: number;
-	cooldownUntil?: number;
-}
-
-// SYNC/SYNC_ACCEPT have no correlation id, so stale accepts from the same peer
-// necessarily share the current (objectId, sender) recovery episode budget.
-const syncRecoveryEpisodes = new WeakMap<DRPNode, Map<string, SyncRecoveryEpisode>>();
 
 interface InvalidPeerBudget {
 	exhausted: boolean;
@@ -111,65 +111,12 @@ function accountInvalidVertices(node: DRPNode, sender: string, invalidOccurrence
 	return exhausted;
 }
 
-function recoveryKey(objectId: string, sender: string): string {
-	return JSON.stringify([objectId, sender]);
-}
-
-/**
- * Clear all recovery episodes associated with one object subscription.
- * @param node - Node whose recovery state should be cleared
- * @param objectId - Object subscription being removed
- */
-export function clearSyncRecoveryEpisodes(node: DRPNode, objectId: string): void {
-	const episodes = syncRecoveryEpisodes.get(node);
-	if (!episodes) return;
-
-	for (const key of episodes.keys()) {
-		const [episodeObjectId] = JSON.parse(key) as [string, string];
-		if (episodeObjectId === objectId) episodes.delete(key);
-	}
-	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
-}
-
 /**
  * Clear node-lifetime invalid-peer accounting after the node has stopped.
  * @param node - Node whose invalid-peer accounting has ended
  */
 export function clearInvalidPeerBudgets(node: DRPNode): void {
 	invalidPeerBudgets.delete(node);
-}
-
-function clearSyncRecoveryEpisode(node: DRPNode, objectId: string, sender: string): void {
-	const episodes = syncRecoveryEpisodes.get(node);
-	if (!episodes) return;
-
-	episodes.delete(recoveryKey(objectId, sender));
-	if (episodes.size === 0) syncRecoveryEpisodes.delete(node);
-}
-
-async function recoverMissingSync(node: DRPNode, objectId: string, sender: string): Promise<void> {
-	const key = recoveryKey(objectId, sender);
-	const episodes = syncRecoveryEpisodes.get(node) ?? new Map<string, SyncRecoveryEpisode>();
-	const episode = episodes.get(key);
-
-	if (episode?.cooldownUntil !== undefined) {
-		if (Date.now() < episode.cooldownUntil) return;
-		episodes.delete(key);
-	}
-
-	const retryCount = episodes.get(key)?.retries ?? 0;
-	if (retryCount >= MAX_SYNC_RECOVERY_RETRIES) {
-		episodes.set(key, { cooldownUntil: Date.now() + SYNC_RECOVERY_COOLDOWN_MS });
-		syncRecoveryEpisodes.set(node, episodes);
-		node.safeDispatchEvent(NodeEventName.DRP_SYNC_REJECTED, {
-			detail: { id: objectId, peerId: sender, retries: retryCount },
-		});
-		return;
-	}
-
-	episodes.set(key, { retries: retryCount + 1 });
-	syncRecoveryEpisodes.set(node, episodes);
-	await node.syncObject(objectId, sender);
 }
 
 function rejectedBoundaryResult(error: unknown): ApplyResult | undefined {
@@ -183,6 +130,28 @@ function trueMissingHashes(missing: readonly string[], clockPending: readonly st
 	if (clockPending.length === 0) return [...missing];
 	const pending = new Set(clockPending);
 	return missing.filter((hash) => !pending.has(hash));
+}
+
+function exactMissingDependencies<T extends IDRP>(
+	object: IDRPObject<T>,
+	offered: readonly Vertex[],
+	missingOffers: readonly string[]
+): string[] {
+	const offeredByHash = new Map(offered.map((vertex) => [vertex.hash, vertex]));
+	const requested = new Set<string>();
+	const visited = new Set<string>();
+	const visit = (hash: string): void => {
+		if (object.getVertex(hash) !== undefined || visited.has(hash)) return;
+		visited.add(hash);
+		const vertex = offeredByHash.get(hash);
+		if (vertex === undefined) {
+			requested.add(hash);
+			return;
+		}
+		for (const dependency of vertex.dependencies) visit(dependency);
+	};
+	for (const hash of missingOffers) visit(hash);
+	return [...requested];
 }
 
 async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
@@ -201,11 +170,19 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 		const partialResult = rejectedBoundaryResult(error);
 		if (partialResult === undefined) throw error;
 		const exhausted = accountInvalidVertices(node, sender, partialResult.invalid.length);
-		const missing = trueMissingHashes(partialResult.missing, readAuthenticatedClockPending(error));
+		const rawMissing = trueMissingHashes(partialResult.missing, readAuthenticatedClockPending(error));
+		const authenticatedHashes = new Set(authenticateVertices(vertices).map(({ hash }) => hash));
+		completePresentExactRequests(
+			node,
+			object.id,
+			sender,
+			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash)
+		);
+		const missing = exactMissingDependencies(object, vertices, rawMissing);
 
-		if (!exhausted && missing.length !== 0) {
+		if (!exhausted && missing.length !== 0 && queueExactRequests(node, object.id, sender, missing)) {
 			try {
-				await recoverMissingSync(node, object.id, sender);
+				await node.syncObject(object.id, sender);
 			} catch (recoveryError) {
 				log.error("::messageHandler: Rejected-boundary recovery failed", recoveryError);
 			}
@@ -386,7 +363,18 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 
 	const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
 	const mergeOutcome = governedOutcome.outcome;
-	const missing = trueMissingHashes(mergeOutcome.result[1], mergeOutcome.clockPending);
+	const authenticatedHashes = new Set(mergeOutcome.authenticatedHashes);
+	completePresentExactRequests(
+		node,
+		object.id,
+		sender,
+		(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash)
+	);
+	const missing = exactMissingDependencies(
+		object,
+		updateMessage.vertices,
+		trueMissingHashes(mergeOutcome.result[1], mergeOutcome.clockPending)
+	);
 	const appliedVertices = [...mergeOutcome.committed];
 
 	const finalityStore = appliedVertices.length === 0 ? undefined : legacyFinalityStore(object);
@@ -423,8 +411,12 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 
 	// The merge may have committed valid siblings before this batch exhausted the
 	// peer. Publish those commits normally; only attacker-driven recovery stops.
-	if (!governedOutcome.exhausted && missing.length !== 0) {
-		await recoverMissingSync(node, message.objectId, sender);
+	if (
+		!governedOutcome.exhausted &&
+		missing.length !== 0 &&
+		queueExactRequests(node, message.objectId, sender, missing)
+	) {
+		await node.syncObject(message.objectId, sender);
 	}
 
 	node.put(object.id, object);
@@ -452,10 +444,107 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
  * @returns A promise that resolves when the sync response is sent
  * @throws {Error} If the stream is undefined or if the object is not found
  */
-async function syncHandler({ node, message }: HandleParams): Promise<void> {
-	const { sender, data } = message;
+async function syncHandler(params: HandleParams): Promise<void> {
+	const syncMessage = Sync.decode(params.message.data);
+	if (
+		syncMessage.heads.length === 0 &&
+		syncMessage.sharedHeads.length === 0 &&
+		syncMessage.requestedHashes.length === 0
+	) {
+		await fullInventorySyncHandler(params, syncMessage);
+		return;
+	}
+	await headsSyncHandler(params, syncMessage);
+}
+
+async function sendHistoryUnavailable(
+	node: DRPNode,
+	objectId: string,
+	sender: string,
+	missingHashes: readonly string[]
+): Promise<void> {
+	const rejection = Message.create({
+		sender: node.networkNode.peerId,
+		type: MessageType.MESSAGE_TYPE_SYNC_REJECT,
+		data: SyncReject.encode(
+			SyncReject.create({ missingHashes: [...missingHashes], reason: "history-unavailable" })
+		).finish(),
+		objectId,
+	});
+	await node.networkNode.sendMessage(sender, rejection);
+}
+
+async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sync): Promise<void> {
+	const { sender } = message;
+	const object = node.get(message.objectId);
+	if (!object) {
+		log.error("::syncHandler: Object not found");
+		return;
+	}
+
+	const localHeads = object.getHistoryHeads();
+	markHeadsProtocol(node, object.id, sender);
+	const knownRemoteHeads = syncMessage.heads.filter((hash) => object.getVertex(hash) !== undefined);
+	const unknownRemoteHeads = syncMessage.heads.filter((hash) => object.getVertex(hash) === undefined);
+	const verifiedSharedHeads = syncMessage.sharedHeads.filter((hash) => object.getVertex(hash) !== undefined);
+	if (knownRemoteHeads.length !== 0) {
+		recordSharedHeads(node, object.id, sender, knownRemoteHeads);
+	}
+	recordBranchCuts(
+		node,
+		object.id,
+		sender,
+		verifiedSharedHeads.filter((hash) => !knownRemoteHeads.includes(hash))
+	);
+
+	const boundaries = new Set([...knownRemoteHeads, ...verifiedSharedHeads, HashGraph.rootHash]);
+	const mayWalkDelta = knownRemoteHeads.length !== 0 || verifiedSharedHeads.length !== 0;
+	const delta = mayWalkDelta
+		? object.readHistorySuffix(localHeads, boundaries)
+		: ({ status: "available", vertices: [] } as const);
+	if (delta.status === "history-unavailable") {
+		await sendHistoryUnavailable(node, object.id, sender, delta.missingHashes);
+		return;
+	}
+
+	const exactRead = object.readHistory(syncMessage.requestedHashes);
+	if (exactRead.status === "history-unavailable") {
+		await sendHistoryUnavailable(node, object.id, sender, exactRead.missingHashes);
+		return;
+	}
+	const exact = exactRead.status === "available" ? exactRead.vertices : [];
+	const selectedByHash = new Map<string, Vertex>();
+	for (const vertex of delta.status === "available" ? delta.vertices : []) selectedByHash.set(vertex.hash, vertex);
+	for (const vertex of exact) selectedByHash.set(vertex.hash, vertex);
+	const selected = [...selectedByHash.values()];
+
+	if (selected.length !== 0) {
+		await signGeneratedVertices(node, selected);
+		const response = Message.create({
+			sender: node.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_SYNC_ACCEPT,
+			data: SyncAccept.encode(
+				SyncAccept.create({
+					requested: selected,
+					attestations: getAttestations(object, selected),
+					requesting: [],
+				})
+			).finish(),
+			objectId: object.id,
+		});
+		await node.networkNode.sendMessage(sender, response);
+	}
+
+	const queuedUnknown = queueExactRequests(node, object.id, sender, unknownRemoteHeads);
+	const isReciprocalProof = advertisedTheseHeads(node, object.id, sender, syncMessage.heads);
+	const shouldReciprocate =
+		syncMessage.heads.length !== 0 && unknownRemoteHeads.length === 0 && selected.length === 0 && !isReciprocalProof;
+	if (queuedUnknown || shouldReciprocate) await node.syncObject(object.id, sender);
+}
+
+async function fullInventorySyncHandler({ node, message }: HandleParams, syncMessage: Sync): Promise<void> {
+	const { sender } = message;
 	// (might send reject) <- TODO: when should we reject?
-	const syncMessage = Sync.decode(data);
 	const object = node.get(message.objectId);
 	if (!object) {
 		log.error("::syncHandler: Object not found");
@@ -563,36 +652,61 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 
 	let mergeRan = false;
 	let appliedProgress = false;
+	let committedVertices: readonly Vertex[] = [];
 	let rawMissing: string[] = [];
 	let missing: string[] = [];
 	let suppressMissingRecovery = false;
 	const finalityStore = legacyFinalityStore(object);
+	const headsMode = usesHeadsProtocol(node, object.id, sender);
+	const preMergeHeads = headsMode ? new Set(object.getHistoryHeads()) : new Set<string>();
+	const preExistingDependencies = headsMode
+		? new Set(
+				syncAcceptMessage.requested.flatMap(({ dependencies }) =>
+					dependencies.filter((hash) => object.getVertex(hash) !== undefined)
+				)
+			)
+		: new Set<string>();
 	if (syncAcceptMessage.requested.length !== 0) {
 		const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, syncAcceptMessage.requested);
 		const mergeOutcome = governedOutcome.outcome;
 		suppressMissingRecovery = governedOutcome.exhausted;
 		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
 		appliedProgress = mergeOutcome.committed.length !== 0;
+		committedVertices = mergeOutcome.committed;
 		rawMissing = mergeOutcome.result[1];
-		missing = trueMissingHashes(rawMissing, mergeOutcome.clockPending);
+		const authenticatedHashes = new Set(mergeOutcome.authenticatedHashes);
+		completePresentExactRequests(
+			node,
+			object.id,
+			sender,
+			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash)
+		);
+		missing = exactMissingDependencies(
+			object,
+			syncAcceptMessage.requested,
+			trueMissingHashes(rawMissing, mergeOutcome.clockPending)
+		);
 		if (mergeRan && finalityStore !== undefined) {
 			finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		}
 		if (mergeRan) {
 			node.put(object.id, object);
-			if (!suppressMissingRecovery) {
-				if (appliedProgress && rawMissing.length === 0) {
-					clearSyncRecoveryEpisode(node, object.id, sender);
-				} else if (missing.length !== 0) {
-					await recoverMissingSync(node, object.id, sender);
-				}
+			if (!suppressMissingRecovery && missing.length !== 0 && queueExactRequests(node, object.id, sender, missing)) {
+				await node.syncObject(object.id, sender);
 			}
 		}
+		recordBranchCuts(
+			node,
+			object.id,
+			sender,
+			[...preExistingDependencies].filter((hash) => !preMergeHeads.has(hash))
+		);
 	}
 
-	await signGeneratedVertices(node, object.vertices);
+	if (!headsMode) await signGeneratedVertices(node, object.vertices);
 	if (finalityStore !== undefined) {
-		const addedAttestations = signFinalityVerticesWithStore(node, finalityStore, object.vertices);
+		const finalityVertices = headsMode ? [...committedVertices] : object.vertices;
+		const addedAttestations = signFinalityVerticesWithStore(node, finalityStore, finalityVertices);
 		if (addedAttestations.length !== 0) {
 			// Vertices learned through sync must still propagate our finality
 			// signatures; otherwise a sync that front-runs the gossip UPDATE would
@@ -643,6 +757,7 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 	const requested: Vertex[] = historyRead.status === "available" ? [...historyRead.vertices] : [];
 
 	if (requested.length === 0) return;
+	if (headsMode) await signGeneratedVertices(node, requested);
 
 	const attestations = getAttestations(object, requested);
 

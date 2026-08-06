@@ -109,6 +109,12 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	 */
 	getVertex(hash: Hash): Vertex | undefined;
 
+	/** Returns the current causal frontier without materializing full history. */
+	getHistoryHeads(): Hash[];
+
+	/** Reads the causal suffix from heads back to any supplied shared boundary. */
+	readHistorySuffix(heads: readonly Hash[], boundaries: ReadonlySet<Hash>): HistoryReadResult;
+
 	/** Reads one complete payload without manufacturing a partial vertex. */
 	getVertexPayload(hash: Hash): VertexPayloadResult;
 

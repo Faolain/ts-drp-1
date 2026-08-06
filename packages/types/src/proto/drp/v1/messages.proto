@@ -45,6 +45,9 @@ message AttestationUpdate {
 
 message Sync {
   repeated string vertex_hashes = 1;
+  repeated string heads = 2;
+  repeated string shared_heads = 3;
+  repeated string requested_hashes = 4;
 }
 
 message SyncAccept {
