@@ -25206,18 +25206,42 @@ Correct only the stale duplicate assertion in a distinct tests-only GREEN; do
 not weaken the truthful progress predicate, change finality behavior, add a
 legacy/plain-ID path or fold the correction into the 1n-b production GREEN.
 
-## Next Agent Prompt — Phase 1n-a stale attestation fixture tests-only GREEN
+## Phase 1n-a stale attestation fixture tests-only GREEN — review pending
 
-At fixed HEAD, use a fresh distinct Codex-high agent. Change only the stale
-duplicate/no-progress `DRP_SYNC_ACCEPTED` expectation above to zero, adding at
-most a concise semantic comment if useful. Preserve the adjacent positive
-novel-history event case and every attestation/store assertion. Run the focused
-file, the Phase 1n-a no-progress/recovery/auth/initial-sync preservation set,
-the broader sync/finality set and proportionate builds/typecheck/lint/format
-gates to a fresh evidence directory. Commit tests only. Then require fresh Grok
-4.5/high and exact Kimi 3/high/100 acceptance before final Claude-skill
-Opus/xhigh closure. Resume the distinct Phase 1n-b production GREEN only after
-this corrective restores a truthful broad node baseline.
+Distinct fresh Codex-high commit
+`6f2045151b4176e22e47ed9590127000be4521a8` (tree
+`2ca2c01ed33a45e9e057ca2f19b34f3c6361d59a`) changes exactly one assertion in
+`packages/node/tests/attestation-budget.test.ts`, final SHA-256
+`1c9995fec1353ce2bfbd3e3453a79fdc3ed437d40adcea6493f1f9e6bdf06826`:
+the already-applied duplicate/no-progress `DRP_SYNC_ACCEPTED` count moves from
+one to zero. The adjacent novel-history positive count remains one, and every
+aggregate-verification, BLS-signing, residual-record, attestation-broadcast and
+store-put assertion is unchanged. No production, Phase 1n-b RED, plan-at-GREEN,
+generated, lock, identity or ACL path changed; no legacy plain-ID compatibility
+was added or implied.
+
+Focused is 6/6 before and after commit. Phase 1n-a
+no-progress/recovery/auth/initial-sync preservation is 50/50. The authentic
+broader sync/finality signature is restored from 1 failed / 18 passed / 1
+skipped to 19 passed / 1 skipped. Ordered types/object/node builds pass. Types
+typecheck passes; object retains exactly five and node exactly two inherited
+Phase-1i-b diagnostics. Lint, Prettier, diff, ownership, index, stash and
+protected-path gates pass.
+
+The broad four-file command accidentally included its bounded internal
+10k/50k/100k inventory lookup case once (357 ms). It was not rerun and is not
+either sealed one-shot Phase-1i workload; no sealed or fuzz workload ran.
+Ledger SHA-256 is
+`0b4781ce57ea4fb31dae76101c8d5a714589fb4ef0dcd8879c51117cbc03aff1`;
+the verified 41-entry artifact-manifest SHA-256 is
+`dc833050bdd76e0b25f5ce0bd8ef2b268d9d76fbdbd7553a4f0b6fe59192144a`.
+Evidence is under
+`.logs/phase-1n-a-attestation-fixture-green-codex-high/`.
+
+Fresh Grok 4.5/high and exact Kimi 3/high/100 must independently review this
+tests-only fixture correction at fixed HEAD. Final Claude-skill Opus/xhigh may
+start only if both preliminary reviewers accept. Resume the distinct Phase
+1n-b production GREEN only after final closure.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
