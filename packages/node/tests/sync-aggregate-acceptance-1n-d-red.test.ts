@@ -343,6 +343,17 @@ async function waitForConnection(left: DRPNode, right: DRPNode, connected: boole
 		.toBe(true);
 }
 
+async function waitForBidirectionalGroupReadiness(left: DRPNode, right: DRPNode, id: string): Promise<void> {
+	await expect
+		.poll(
+			() =>
+				left.networkNode.getGroupPeers(id).includes(right.networkNode.peerId) &&
+				right.networkNode.getGroupPeers(id).includes(left.networkNode.peerId),
+			{ interval: 10, timeout: 10_000 }
+		)
+		.toBe(true);
+}
+
 function addresses(node: DRPNode): string[] {
 	const values = node.networkNode.getMultiaddrs();
 	if (values === undefined || values.length === 0) throw new Error("Expected public listen addresses");
@@ -461,6 +472,12 @@ async function runCorpus(prefixCount: number): Promise<CorpusResult> {
 	telemetry.start();
 	await nodes[0].networkNode.connect(addresses(nodes[1]));
 	await waitForConnection(nodes[0], nodes[1], true);
+	await waitForBidirectionalGroupReadiness(nodes[0], nodes[1], id);
+	// Group readiness is the public lifecycle observation that starts the
+	// reconnect-owned initial probe. Keep telemetry active and require that
+	// probe plus its causal fan-out to cross the same fixed quiet barrier before
+	// the deterministic explicit driver begins.
+	await telemetry.quiescent();
 
 	for (
 		let attempt = 0;
