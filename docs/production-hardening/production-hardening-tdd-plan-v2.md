@@ -26950,24 +26950,59 @@ The authorized corrective boundary is additive and local:
    `node.put` preservation, purge deletion, configured-peer disposition and all
    other accepted semantics unchanged.
 
-## Next Agent Prompt — Phase 1n-d(i) unmanaged-restore corrective RED
+## Phase 1n-d(i) unmanaged-restore corrective RED — checkpointed
 
-Spawn a fresh Codex-high tests-only corrective RED against `940a3d5`. Add one
-bounded non-frozen node test owner; do not edit the two frozen RED files,
-production, plan, protocol/schema or protected files. Through public `node.put`
-and same-instance stop/start, use a remote-shaped id and injected negotiated
-sender to prove: missing provenance restores one immediate and ordinary
-periodic anti-entropy probe, emits no one-second fast retries, and never derives
-role from the id. In the same coherent owner, pin that a `node.put` replacement
-does not erase an existing acquisition role and a later fresh connect/create
-overwrites it truthfully only if needed to keep the correction non-vacuous. Do
-not add a configured-peer test or reopen that authorized deletion.
+Fresh Codex-high committed tests-only corrective RED
+`627e6205a877166b954a8680704af6a7f2b67c00` (tree
+`161f12f60a6209134aec5f8ada5543c28e8f15c8`, parent `5d317d9`). Its sole path
+is new `sync-unmanaged-restore-1n-d-i-red.test.ts` (181 lines); neither original
+frozen RED, production, plan, protocol/schema, generated/lock nor protected
+state changed.
 
-Run the new owner to causal RED while frozen 3/3 and all prior preservation
-remain green; run ordered builds, exact typecheck census, changed-test lint,
-Prettier and diff checks sequentially to `.log`. Package result/verified
-manifest hashes and commit tests only. No inventory/performance, sealed, fuzz,
-proto-generation or full-suite workload.
+The owner deliberately does **not** authorize legacy plain IDs. A real second
+node generates both creator-bound IDs, and every local construction or
+acquisition under them supplies an explicit permissionless ACL. The target
+enters only through supported public `node.put`, so its local acquisition
+provenance is genuinely absent without any malformed-ID, custom-ID fallback or
+ID-shape inference. After same-instance restart, the normalized expected Sync
+trace is exactly `[0, 60000]`: one immediate and one ordinary periodic probe,
+with no one-second connected fast retry. Candidate `940a3d5` is the exact causal
+1/1 RED because it produces `[]`. Same-title controls already pass: public
+`put` replacement preserves an existing truthful connected role with trace
+`[0, 1000, 2000, 3000, 4000, 5000]`, while a later fresh explicit-ACL create
+truthfully overwrites it and produces only `[0]` across that fast window.
+
+Frozen Phase 1n-d(i) remains 3/3; preservation remains 11/11, 5/5, 23/23,
+30/30 and manual 1/1 with 13 skipped. Five ordered builds pass. Typechecks are
+clean for types/network/message-queue and retain only the exact inherited
+object 5/node 2 diagnostics, with zero owned. Changed-test ESLint, Prettier and
+diff checks pass. No inventory/performance, sealed, fuzz, proto-generation or
+full-suite workload ran. Evidence is under
+`.logs/phase-1n-d-i-unmanaged-restore-red-codex-high/`; result SHA-256 is
+`c2eea506285c5dded725b707fc479b2d9d85f643c3145de1fe65a749d6b6b09a`
+and verified 24-entry manifest SHA-256 is
+`6fec898c2b71abc7668987fe4ce82042ac11ff9e01806d0c95f7eb188f283fc2`.
+Freeze this new owner byte-for-byte with the original RED files.
+
+## Next Agent Prompt — Phase 1n-d(i) unmanaged-restore corrective GREEN
+
+Spawn a distinct fresh Codex-high production-only GREEN against `627e620`.
+Keep the acquisition map exactly `created | connected`; widen only the
+scheduler option/property to `created | connected | unmanaged`. When
+`restoreSubscriptions` finds no acquisition role, create the existing
+discovery interval and tracked Sync runner explicitly as `unmanaged` without
+writing the map. `unmanaged` must retain immediate plus ordinary periodic
+anti-entropy and must never build the connected one-second fast runner. It is
+not a default, identity kind, wire/schema/durable value, legacy compatibility
+route or ID parser result. Preserve all other `940a3d5` behavior unchanged.
+
+Run the corrective owner to GREEN, both original frozen RED files, all prior
+preservation gates, five ordered builds, exact typecheck census, changed-source
+lint, Prettier and diff checks sequentially to `.log`. Add bounded production
+mutation probes for collapsing unmanaged to created/connected or storing it as
+acquisition provenance when practical; revert every probe. Package result and
+verified manifest hashes, then commit production only. No inventory/
+performance, sealed, fuzz, proto-generation or full-suite workload.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
