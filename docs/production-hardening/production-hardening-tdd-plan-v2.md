@@ -26326,16 +26326,74 @@ was added. Evidence is under
 and verified evidence-manifest SHA-256 is
 `987f40c455c286d1783865d9747850f9059fd9720720cc8e41ace848698a9d00`.
 
-## Next Agent Prompt — Phase 1n-c restart fresh acceptance review
+## Phase 1n-c third GREEN review — peerless field-1 egress corrective required
 
-Start a fresh Grok 4.5/high review of candidate `cde2109` over the complete
-Phase 1n-c lineage. Re-run bounded hostile raw-frame and ordinary controls and
-verify sender actual-buffer, receiver literal-frame and node pre-accounting
-preflight owners agree. Reassess the full amended negotiation, provenance,
-bounded-flow, lifecycle/accounting, preservation and refactor-clean contracts.
-Authenticate the sole effective model and keep the review read-only. Only if
-Grok accepts may fresh exact Kimi 3/high/dual-100 start; only if Kimi accepts may
-final fresh Opus/xhigh start.
+Fresh Grok 4.5/high verifies the exact-byte correction and the targeted
+request/response egress owners, but its same-session corrective follow-up
+returns authoritative `CHANGES_REQUESTED` for the sole remaining finite Sync
+egress bypass: `1n-c-peerless-field1-egress-cap-bypass`.
+
+Public/manual `syncObject(id)` without an explicit peer still builds a field-1
+inventory directly in `operations.ts` and calls generic
+`sendGroupMessageRandomPeer`. That old path neither negotiates a mode nor calls
+the Phase 1n-c validator; it also swallows send errors. Compiled bounded probes
+prove:
+
+- 513 hashes exceed the 512-count cap but send once with no error; the canonical
+  validator returns `SYNC_FALLBACK_LIMIT`;
+- 40 long hashes encode to 72,305 bytes, exceed 65,536, send once with no error
+  and receive the same validator rejection offline;
+- a four-hash within-cap control sends once.
+
+The finite `MESSAGE_TYPE_SYNC` / `SYNC_ACCEPT` / `SYNC_REJECT` egress census
+finds no other bypass: targeted requests and all responses use the negotiated,
+validated sender. Phase 1n-b's statement that peerless full-inventory sync is
+scheduled-only owns lifecycle purpose, not an exception from Phase 1n-c's
+field-1 count/byte caps or typed fail-before-send contract. Kimi and Opus
+acceptance reviews correctly remain gated.
+
+This is another defect against the existing contract, not a plan-architecture
+or identity amendment. The sustainable correction selects the existing random
+group peer first, then routes that concrete peer through the same negotiated
+payload factory as every targeted sync. Selection truth decides heads versus
+fallback; the fallback builder applies count/byte validation before lifecycle
+accounting and transport. Do not prebuild field 1, retain a generic Sync send,
+add a cap-only duplicate branch or silently truncate/paginate the inventory.
+No-peer behavior may remain an inert no-send result.
+
+Fresh Grok session `0fc0070d-e161-46aa-a6e6-1b9b7ba2d0c9` used requested
+Grok 4.5/high and sole effective `grok-4.5-build` for 13 initial plus six
+same-session follow-up calls; both turns ended normally with exit zero. The
+follow-up supersedes the preliminary verdict. Result SHA-256 is
+`faf48100a4798cbbea1f014fe709afb64081e4961afa34ef30645065952ad0c6`;
+the verified 13-entry manifest SHA-256 is
+`ace778871a77e890e94d836c2ad7828080f13b3653f840c259afe93687c49e73`.
+Evidence is under
+`.logs/phase-1n-c-literal-wire-cap-green-grok45-high-review/`.
+
+This correction has no legacy plain-id implication. It removes an obsolete
+generic Sync route; it must not add identity normalization or compatibility.
+
+## Next Agent Prompt — Phase 1n-c peerless egress corrective RED
+
+Start a fresh Codex-high tests-only RED from rejected candidate `cde2109`.
+Freeze every existing Phase 1n-c test and assertion. Add one bounded node-level
+owner for public peerless `syncObject`: prove one available group peer is chosen
+before payload construction; fallback selection with 513 hashes or an over-byte
+inventory returns typed `SYNC_FALLBACK_LIMIT` from the selected payload factory
+before any generic send or negotiated payload transmission and before lifecycle/
+advertisement mutation; an ordinary within-cap fallback uses the negotiated
+sender once; heads selection builds heads-mode fields and never field 1; and no
+available group peer sends nothing. Prove the current generic random-peer route
+causally fails these assertions. Do not edit production or the plan.
+
+After a tests-only RED commit, start a distinct fresh Codex-high GREEN. Remove
+the peerless Sync builder/generic send from `operations.ts`; choose from
+`networkNode.getGroupPeers(objectId)` and feed the chosen peer into the existing
+`sendNegotiatedSync` plus `buildSyncPayloadForProtocol` path. Reuse the same
+scheduled-probe lifecycle purpose. Do not change generic random-peer behavior
+for non-Sync callers, introduce another selector API, duplicate validation or
+add a compatibility path.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
@@ -26349,10 +26407,12 @@ fallback complete-or-typed-fail, never paginate or truncate it. Keep response
 chunks independently authenticated/idempotent and progress-preserving; add no
 session/continuation accumulator.
 
-Keep HEAD/tree/index/stash/protected state invariant and package result/model
-authentication/verified manifest hashes under `.logs`. Do not run inventory/
-perf, sealed, fuzz, proto-gen or full-suite workloads. Do not request a legacy
-plain-id mode: this is a greenfield implementation.
+Run the bounded new owner, all Phase 1n-c focused/preservation owners, affected
+initial/manual/anti-entropy preservation, ordered builds, exact inherited
+typecheck census, lint, Prettier and diff checks to `.log`. Keep HEAD/tree/index/
+stash/protected state controlled and package result/verified manifest hashes.
+Do not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads. Do
+not request a legacy plain-id mode: this is a greenfield implementation.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
