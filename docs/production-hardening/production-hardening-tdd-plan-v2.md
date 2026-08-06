@@ -24396,21 +24396,66 @@ per-connection negotiation plus bounded chunks/backpressure/caps and is the
 specific 1m-b prerequisite; 1n-d owns partition/rejoin/old-branch/delta-cost
 aggregate acceptance. All original Phase 1 and golden-path gates remain.
 
-## Next Agent Prompt — Phase 1n-a tests-only RED
+## Phase 1n-a tests-only RED checkpoint — frozen
 
-Resume the fresh Codex-high RED owner from its authenticated census. Make only
-the quorum-approved sentinel migration plus the smallest new tests that freeze
-the internal pending-vs-true-missing recovery provenance across all three node
-recovery call sites. Supersede exactly the four stale invalid/missing array
-expectations; do not weaken any no-sync/state/finality/genuine-missing control.
-Require pending-only offers to emit zero `syncObject`/`SYNC`/`SYNC_ACCEPT`,
-leave state/graph and invalid memory/budget unchanged, neither consume nor
-reset retry/cooldown state, preserve valid-sibling finality, and converge when
-the exact hashes are re-offered after receiver-clock eligibility. Require true
-absent dependencies to retain bounded recovery and healing. No production,
-public enum/error leak, compatibility shim, 1n-b/c/d implementation or sealed
-100k run. Commit tests-only and run focused/preservation build, typecheck, lint
-and tests sequentially to `.logs`.
+Freeze fresh Codex-high tests-only commit
+`741ac1260bc479339234a93c88d84c3aeb25d010` on amended-plan parent
+`b71bcfa`. Its exact scope adds the 259-line
+`packages/node/tests/sync-clock-pending-provenance-1n-a-red.test.ts` and changes
+the existing node sync-livelock sentinel by 23 insertions / four deletions. The
+four deletions are exactly the quorum-approved stale terminal-invalid
+expectations. The sentinel adds exact-hash parent/middle/leaf re-offer after
+receiver-clock eligibility and converged state/vertex assertions; every prior
+no-SYNC/state/finality/genuine-missing control remains.
+
+The new owner freezes the intended narrow internal
+`AuthenticatedMergeOutcome.clockPending`-style provenance without a public
+error/enum. It exercises pending-only UPDATE and SYNC_ACCEPT normal paths plus
+the shared rejected-boundary path through both surfaces, and interleaves true-
+missing retry/cooldown recovery with pending rounds. Pending-only input must
+leave invalid memory, disconnect decisions, state/graph and the current
+recovery episode exact; it must neither consume nor reset that episode. Only
+true-missing hashes may enter recovery.
+
+Authoritative and postcommit combined result is exact 9 failed / 3 passed: the
+new owner is 6 failed / zero passed and the migrated sentinel remains exact 3
+failed / 3 passed. Failures are missing `clockPending` provenance, false
+`syncObject`/SYNC recovery on the three paths, and pending consumption/opening
+of retry/cooldown. Corrected pending arrays, unchanged state/graph/invalid
+memory, finality and post-eligibility re-offer already pass until the retained
+no-SYNC assertions.
+
+Phase 0f/recovery/auth/rejected-boundary preservation is 56/56;
+anti-entropy/Phase 1k/update-cap/transport preservation is 16/16. Ordered
+`types` → `validation` → `object` → `node` builds pass. Types/validation
+typechecks pass; object retains the exact inherited Phase 1i-b five errors and
+node the exact inherited two, so workspace typecheck stops only at those two.
+Owned lint is clean; tracked lint has zero errors / 249 inherited warnings;
+Prettier and diff gates pass. No production, plan, dependency/lockfile,
+generated, sealed-workload or protected-file change occurred. New-owner
+SHA-256 is
+`461781a5625257e78453165d89da26a44d95473fc9e3c7e004086278075aabc6`,
+migrated-sentinel SHA-256 is
+`7cdea3709d5820b85243bf317caf41d73ca1b29a4cd7feb53b0aa0526e1d5ee9`
+and verified manifest SHA-256 is
+`4e2627a11a1385b9a2f6c7ada4e548e89928aa9a0925b2f3bfe339f4738d4ee3`.
+Evidence is under `.logs/phase-1n-a-clock-pending-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-a production GREEN
+
+Start a distinct fresh Codex-high GREEN from this frozen RED. Populate one
+narrow internal authenticated merge outcome carrying `clockPending` hashes
+alongside the unchanged legacy tuple, including partial/rejected-boundary
+errors, without exposing a public enum/error class or teaching callers to
+infer recovery from tuple position. At all three node recovery call sites,
+pass only true-missing hashes and do not invoke the empty recovery path for a
+pending-only batch because it resets the existing episode. Preserve Phase 0f
+pending/re-offerability, genuine-missing SYNC/heal, finality, invalid-peer
+budgets, retry/cooldown, event/response behavior and source-compatible public
+results. No 1n-b/c/d, compatibility shim or broad result rewrite. Run the
+focused 12 tests, 72-test preservation, ordered build/typecheck, lint,
+formatting and exact production-diff gates sequentially to `.logs`; no sealed
+100k. Commit production only and rerun focused/preservation postcommit.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
