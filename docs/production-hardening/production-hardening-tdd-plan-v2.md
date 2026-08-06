@@ -27352,26 +27352,39 @@ start the deterministic alternating explicit driver. It must not discard,
 reset or move reconnect traffic outside the window. Prove each corpus signature
 repeatable across at least three sequential runs before restarting GREEN.
 
-## Next Agent Prompt — Phase 1n-d aggregate scheduling-oracle corrective RED
+## Phase 1n-d aggregate scheduling-oracle corrective RED — checkpointed
 
-Spawn a fresh Codex-high tests-only owner against frozen RED `fb8256d`. Change
-only `sync-aggregate-acceptance-1n-d-red.test.ts` to remove the reconnect-versus-
-explicit-driver race using public observations and the fixed readiness/quiet
-barrier above. Preserve the complete C1-C13 assertions, all measured reconnect
-traffic, the causal baseline `SYNC_REQUEST_LIMIT`, the asymmetric fallback
-owner and every accepted test owner. Do not weaken C9, normalize observed
-counts, filter duplicate traffic after the fact, add sleeps whose only purpose
-is to make one sample pass, or touch production/plan/identity code.
+Fresh Codex-high landed the tests-only corrective at
+`d527333c7e4a4accab1d002594af0fef4788e52f`. Its sole path remains
+`packages/node/tests/sync-aggregate-acceptance-1n-d-red.test.ts`; corrected
+source SHA-256 is
+`cf21bd69040ff25957bbea5960fce510039ef6ea383b1c8b4b164198669efbde`.
+No production, plan, identity or protected untracked path changed.
 
-Run the hard corpus sequentially at least three times and require an identical
-causal RED signature before accepting the corrective. Then run the fallback
-owner, all accepted 1n preservation, five ordered builds, exact typecheck
-census, changed-test lint, Prettier and diff checks to `.log`; package a
-verified manifest and commit only the corrected aggregate test. No legacy
-plain-ID positive path and no full inventory/performance, sealed, fuzz,
-proto-generation or full-suite workload.
+Telemetry still opens immediately before public reconnect. After public
+bidirectional physical-peer visibility, the owner polls both public
+`getGroupPeers(id)` views until A reports B and B reports A, then reuses the
+existing fixed 250 ms `WireTelemetry.quiescent()` authority before starting
+the alternating explicit driver. The barrier first requires zero measured
+sends in flight and authenticated-ingress parity with successful emissions,
+then fails on any late emission, ingress or in-flight send. It neither resets
+nor excludes reconnect traffic.
 
-## After the corrective — Phase 1n-d aggregate production GREEN
+Three isolated full-file executions now produce the identical causal signature:
+the hard owner fails only with `SYNC_REQUEST_LIMIT` / “Heads request exceeds
+the v1 sync ceiling,” the asymmetric fallback owner passes, and each process is
+exactly 1 failed / 1 passed. Preservation passes 1n-a 11/11, 1n-b 11/11, 1n-c
+28/28 and 1n-d(i) 4/4. Five ordered builds pass. Types/network/message-queue
+typecheck clean; object5/node2 remain exactly inherited with no corrected-owner
+diagnostic. ESLint, Prettier and diff checks pass. Evidence is under
+`.logs/phase-1n-d-aggregate-scheduling-corrective-red-codex-high/`; result
+SHA-256 is
+`baf9a7381d012d021f4c4e0a5742400826d674e2582be49a81f6c665ce843ac7`
+and verified 31-entry artifact-manifest SHA-256 is
+`828b229397ca3e8b269e81937f7780f3a8ac8f0eae77d31c79fe40ca87e1a37d`.
+No full inventory/performance, sealed, fuzz, proto-generation or full suite ran.
+
+## Next Agent Prompt — Phase 1n-d aggregate production GREEN
 
 Spawn a distinct fresh Codex-high production owner against frozen RED
 `fb8256d` plus its scheduling-oracle corrective and the exact C1-C13 contract.
