@@ -26412,7 +26412,7 @@ Evidence is under `.logs/phase-1n-c-peerless-egress-red-codex-high/`.
 The owner uses production-derived creator identity and generated object ids. It
 adds no legacy/plain-id fixture or behavior.
 
-## Phase 1n-c initial/anti-entropy fixture conflict — quorum required
+## Phase 1n-c initial/anti-entropy fixture conflict — migration authorized
 
 The newly required affected preservation run is **six failed / five passed**
 across frozen `initial-sync.test.ts` and `anti-entropy.test.ts`, before any
@@ -26424,11 +26424,14 @@ spy generic `networkNode.sendMessage` and observe zero Sync messages.
 The exact affected titles are two initial-fast-sync tests and four periodic
 anti-entropy tests listed in
 `.logs/phase-1n-c-peerless-egress-red-codex-high/initial-anti-entropy-fixture-conflict.md`.
-Stale capture sites are `initial-sync.test.ts:86,140` and
-`anti-entropy.test.ts:49-55,154,202`; assertions at the audited sites retain
-retry budgets, timing, peer selection, convergence and no-response semantics.
+Stale capture sites are `initial-sync.test.ts:86,140,180` and
+`anti-entropy.test.ts:49-55,154,202`. The third initial-sync site is currently
+passing, but it must migrate too: otherwise its no-peer/no-Sync assertion would
+continue observing a route production no longer uses and become vacuous.
+Assertions at the audited sites retain retry budgets, timing, peer selection,
+convergence and no-response semantics.
 
-The proposed smallest tests-only migration is to inject the already-declared
+The authorized smallest tests-only migration is to inject the already-declared
 `NegotiatedSyncSender`, invoke the real request payload factory with an explicit
 heads-chunk selection, append the returned production-built Message to the
 existing direct outbox, and append response-sender Messages verbatim. Preserve
@@ -26437,25 +26440,73 @@ peer-selection, convergence and no-peer assertion. Do not emulate transport,
 infer mode, swallow payload errors, restore generic Sync sending or add
 production compatibility.
 
-This migration is **not yet authorized**. Because it changes a frozen
-preservation-fixture assumption, fresh Codex-high, exact Kimi 3/high/dual-100
-and Claude-skill Opus/xhigh must independently agree before either file changes.
+Define one frozen typed heads-chunk selection in `anti-entropy.test.ts`, reuse it
+for the injected request payload factory, and pass it as `handleMessage`
+argument three at the three captured negotiated deliveries currently around
+lines 129, 132 and 349. Payload-factory Messages do not carry the private
+direct-ingress WeakMap brand. Leaving the captured `SYNC_ACCEPT` bare would set
+`headsMode=false` and silently exercise fallback-only whole-object signing and
+finality behavior even though the convergence assertion still passes. Supplying
+the fixture-owned selection through the declared trusted in-process caller seam
+is explicit provenance, not field inference, transport emulation or private
+branding. No protobuf round trip is required.
 
-## Next Agent Prompt — Phase 1n-c fixture-conflict quorum
+Also add negotiated-capture emptiness beside the existing pre-peer no-send
+assertion and correct only `anti-entropy.test.ts`'s top contract comment to
+mode-neutral negotiated-probe wording. Its claim that every Sync carries the
+full O(|V|) inventory is false in heads-chunk mode. The matching production
+comment in `interval-sync.ts` is deferred to the distinct production GREEN.
 
-Run the required read-only Codex-high, exact Kimi 3/high/dual-100 and Claude-
-skill Opus/xhigh quorum against checkpointed RED `2529c1e`, the complete
-amended contract, both frozen preservation files and the conflict ledger.
-Require explicit findings for whether the six failures are solely stale
-capture, whether byte-freezing the fixtures would force forbidden production
-compatibility, and whether the proposed bounded two-file migration preserves
-all semantic assertions. Authenticate models and package result/manifest
-hashes. Do not edit either fixture, production or the plan during quorum.
+The required architecture-amendment quorum is unanimous:
 
-Only after unanimous authorization, commit a fresh tests-only corrective
-checkpoint limited to the audited capture/constructor sites. It must restore
-the two frozen files to 11/11 against current production while the peerless RED
-remains exact 5F/0P. Then start a distinct fresh Codex-high GREEN: remove the
+- Codex-high finds all six failures solely stale capture, rejects any
+  byte-freezing compatibility route, and authorizes the exact two-file scope
+  with the no-peer and explicit-selection additions. Result SHA-256 is
+  `e98210e7361d49ee67b57af82eff9235e0691414aeac0fee3f24e00c50e5c7f5`;
+  verified 10-entry manifest SHA-256 is
+  `dfb4e685d7d4ad7438292464959b996781cd2ee4ad41a0606087b049de676a50`.
+- Exact Kimi 3/high/dual-100 session
+  `c3c36d10-88e0-42e1-a5cb-cc3d8e84cf87` used effective
+  `managed:kimi-code:k3` / `K3`, thinking enabled, and 100-step environment,
+  CLI and loaded-loop caps. Its same-session adjudication explicitly requires
+  heads selection at all three captured deliveries and returns no blockers.
+  Result SHA-256 is
+  `135b389ab71397f92e9d047e9d1f7e44078388578655b12e5e7afb0287ba31cf`;
+  verified 21-entry manifest SHA-256 is
+  `9a51f45dee201c315bb97111917f949fcca95d8569d0442653d916296c1314dd`.
+- Claude-skill Opus/xhigh session
+  `fac9405b-0088-4286-9b18-b28b4eeb0fff` used effective substantive
+  `claude-opus-5`. After source-tracing the response stream it agrees that a
+  bare captured accept runs the wrong fallback branch and returns final
+  `ACCEPTED`, with no blockers. Automatic helper usage was limited to Haiku
+  2,164 input / 22 output tokens and authored no assistant/tool event. Result
+  SHA-256 is
+  `65059ed0c9270c8910ee91571c3aa29fc4a937544b8de59aeccf907f728d3cf1`;
+  verified 22-entry manifest SHA-256 is
+  `c759d550ec8492b63aeb5d88f4ae2bd32ef8876fea7351ed0b15fc1383b8d283`.
+
+Evidence is under
+`.logs/phase-1n-c-peerless-fixture-conflict-{codex-high,kimi3-high-100,opus-xhigh}/`.
+All reviewers kept HEAD `221483e`, tree `fc423db`, index, stash
+`ef3a53...` and the protected surface invariant, and ran no workloads or
+writes.
+
+The correction is now authorized as a fresh tests-only checkpoint limited to
+`initial-sync.test.ts` and `anti-entropy.test.ts`. It must preserve all 11
+titles/assertions/counts, move the measured signature from 6F/5P to 11P/0F,
+and leave the immutable peerless RED exact 5F/0P. A false sender that fabricates
+a Message instead of awaiting the real payload factory must not satisfy the
+capture assertions. There is no legacy plain-id implication: add no identity
+normalizer, shim or compatibility route.
+
+## Next Agent Prompt — Phase 1n-c fixture correction
+
+Commit a fresh Codex-high tests-only corrective checkpoint limited to the exact
+authorized two-file capture/constructor/comment/explicit-provenance scope. It
+must restore the files to 11/11 against current production while the peerless
+RED remains exact 5F/0P, prove the capture awaits the real payload factory, and
+run the bounded preservation/build/typecheck/lint/format gates below. Then start
+a distinct fresh Codex-high GREEN: remove the
 peerless Sync builder/generic send from `operations.ts`; choose from
 `networkNode.getGroupPeers(objectId)` and feed the chosen peer into existing
 `sendNegotiatedSync` plus `buildSyncPayloadForProtocol`. Reuse scheduled-probe
