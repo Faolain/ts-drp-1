@@ -24778,19 +24778,98 @@ stash, candidate and protected state remained invariant.
 Evidence is under
 `.logs/phase-1n-a-clean-round-corrective-{grok45-high,kimi3-high-100}-review/`.
 
-## Next Agent Prompt — Phase 1n-a corrective final Opus/xhigh review
+## Phase 1n-a corrective final Opus/xhigh review — changes requested
 
-Use the Claude skill for one fresh direct Opus/xhigh adversarial review at the
-fixed plan checkpoint immediately preceding the review. No delegation,
-subagent, Fable, web or network. Authenticate both preliminary acceptances but
-do not inherit their verdicts. Review the complete 1n-a lineage and independently
-try to falsify the corrected raw-versus-filtered missing contract, explicit
-clean reset, pending-only event truth, exhaustion distinction, every recovery
-caller, causal RED strength, preservation and evidence integrity. Reassess all
-known 1n-b handoffs and the greenfield no-legacy-ID boundary. Run only bounded
-read-only checks and proportionate focused tests; do not run sealed/100k. Return
-`VERDICT`, `PHASE1NA_MAY_CLOSE`, full findings/handoffs, model/tool/session
-authentication and invariance. Phase 1n-a closes only on final acceptance.
+The fresh direct Claude-skill bridge session
+`ee1f4c4f-28c9-4f34-9f0f-b4da46557b1f` independently returns
+`CHANGES_REQUESTED` / `PHASE1NA_MAY_CLOSE=no` at fixed HEAD
+`8388e3042a1b636ed2a6a64860b5653dcaa43315` (tree
+`af273892922ae2c13b360820699268a38130cc7b`). It authenticates rather than
+inherits every lineage edge, the RED and GREEN 37/37 manifests, the Grok 28/28
+and Kimi 26/26 review manifests, causal failures, preservation gates and
+pre/post state. All 117 substantive assistant records are `claude-opus-5` at
+xhigh. Its 69 calls are 54 Bash, 12 Read and three Grep, with zero Agent/Task,
+helper/delegation, web/network, write or forbidden-tool calls. An automatic
+non-substantive Haiku envelope used 3,795 input and 23 output tokens; no helper
+was requested and no Haiku review content or vote occurred.
+
+The candidate correctly repairs the prior stale-clean and pending-only-event
+defects, but Opus finds one new blocking no-progress reset. Object ingress
+classifies any offered occurrence whose claimed hash equals the public root
+hash, or is already stored, as `trusted` before snapshot/signature verification.
+If such occurrences are the whole batch, `authenticated.length` is zero,
+`object.merge` never runs, `committed` is empty and the object boundary
+synthesizes `[true, [], []]`, while `hasTrustedOrAuthenticatedOffers` remains
+true. The handler therefore sees `mergeRan=true` and raw missing empty, clears
+the keyed recovery episode, and can emit `DRP_SYNC_ACCEPTED` despite no merge,
+commit, graph change or state change.
+
+This is not a legacy compatibility concern or a forged clock-pending seam. It
+is an ordinary unauthenticated root-shaped/duplicate offer exploiting the
+difference between “trusted occurrence observed” and “application made
+progress.” Interleaving one such free round after three genuine missing rounds
+can keep resetting retry state and indefinitely evade cooldown/rejection. The
+existing owner that says an empty SYNC_ACCEPT neither resets nor emits accepted
+already establishes the equivalent no-progress behavior. `d279fda` newly made
+the reset reachable; the event's broader false-positive class predates it.
+
+Opus also requires an explicit event decision. A trusted-only no-progress round
+must not emit `DRP_SYNC_ACCEPTED`, consistent with the frozen pending-only and
+empty-round owners and this row's “genuinely clean applied round” wording. A
+raw-missing-empty round that exhausts the invalid-peer budget likewise is not a
+clean accepted round merely because a trusted occurrence was present; it must
+not report acceptance while disconnecting the peer. This clarifies the existing
+success contract rather than adding a compatibility mode or changing the wire.
+
+The narrow production direction is a real progress predicate, not another
+provenance surface: reset and acceptance require a nonempty object-owned
+committed/applied result in addition to raw missing empty; acceptance also must
+not report an exhausted round. `committed` already exists on the authenticated
+merge outcome, but compact history derives trust with `getVertexPayload` and
+derives `committed` with `getVertex`. A tests-first compact-observer control must
+therefore prove a genuine applied compact round is still recognized; if not,
+GREEN must expose a narrow object-owned applied-count/progress signal instead
+of assuming `committed` works for every storage mode.
+
+Opus leaves 10,000-entry provenance eviction, mixed pending/absent suppression
+latency and transitive re-offer schedules as valid Phase 1n-b handoffs. The
+greenfield identity rule is unchanged and requires no legacy plain-id shim. It
+also records a separate later resource-governance residual: the SYNC responder
+can return a full delta to unauthenticated requests without a budget; this is
+not caused by 1n-a and must not expand this corrective.
+
+Result SHA-256 is
+`760b3a93f75056508c91b1bc02fb7ac6cba309b17b7c9691561fc991d1c094c8`;
+the verified 34-entry review-manifest SHA-256 is
+`74c7ceefc2967c9fa9ebccb6d5f51b55389bd6f4aff1dee1c74a98cd694cd1e3`.
+Evidence is under
+`.logs/phase-1n-a-clean-round-corrective-final-opus-xhigh-review/`. Native exit
+is 0/`end_turn`, stderr empty, final and session result byte-match, and
+HEAD/tree/index/worktree/stash/candidate/evidence/preliminary/protected hashes
+are invariant.
+
+## Next Agent Prompt — Phase 1n-a trusted-only/no-progress corrective RED
+
+Run a fresh Codex-high tests-only RED against fixed production commit
+`d279fda`. Extend real signed/wire owner tests without mocking the object result
+or writing private recovery/provenance state. After three genuine true-missing
+rounds, deliver separately (a) one raw unsigned `Vertex` whose claimed hash is
+`HashGraph.rootHash` and (b) one already-present vertex. Prove each no-progress
+round sends no recovery, changes no graph/state or invalid budget, disconnects
+nobody, does not reset the episode and emits no `DRP_SYNC_ACCEPTED`; the very
+next genuine-missing round must enter the existing cooldown/rejection with no
+new SYNC. Preserve the genuine novel clean-round reset/event owner.
+
+Add a bounded compact-observer control showing a genuinely applied clean round
+still resets and emits once. Also pin that a raw-empty outcome which exhausts
+the peer invalid budget cannot emit acceptance; reuse existing Phase-1k
+fixtures/helpers where practical and keep this exact-capacity security owner
+separate from the fast focused loop if it is materially slower. Do not add a
+production hook or lower the cap for tests. Change tests only; do not modify
+production, plan, dependencies, generated files or protected state. Run the
+focused causal RED, prior 13/13 owner/sentinel group and proportionate
+preservation/build/type/lint/format gates to a new evidence directory, without
+sealed/100k work, then commit only the tests-only RED.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
