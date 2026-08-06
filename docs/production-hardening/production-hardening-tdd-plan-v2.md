@@ -27099,28 +27099,198 @@ causal failure:
 
 Phase 1n-d(i) is closed at production lineage `940a3d5` + `3dd618f`.
 
-## Next Agent Prompt — Phase 1n-d aggregate acceptance RED
+## Phase 1n-d aggregate pre-RED seam audit — plan quorum required
 
-Spawn a fresh Codex-high tests-only owner for the Phase 1n-d row. Compose the
-accepted 1n-a/b/c production boundaries through public node/network surfaces in
-one bounded deterministic partition/rejoin harness with mixed negotiated peers.
-The causal owner must cover: a branch created before or during partition and
-injected after shared heads advance; recursive exact-hash recovery until both
-replicas converge; heads-chunk and explicitly negotiated bounded field-1
-fallback peers; no unnegotiated inventory downgrade; and byte/probe work tied
-to the missing delta rather than total retained history. Use actual encoded
-bytes and public outbound observations, not private maps or implementation-
-mirroring mocks. Preserve all accepted 1n causal owners byte-for-byte.
+Fresh Codex-high correctly stopped before editing. The accepted 1n-a/b/c code
+provides public partition/rejoin, object lifecycle, targeted sync and a
+transparent real negotiated-sender seam, but the Phase 1n-d row supplied only
+the qualitative phrase “proportional to delta.” It did not define aggregate
+byte/probe/round authority, episode boundaries or a relational corpus. It also
+required a fallback-only peer through public surfaces even though production
+hardcodes both protocols and exposes no supported-protocol configuration; the
+accepted real 1n-c fixture reaches the concrete libp2p host only to `unhandle`
+the additive protocol.
 
-If the row lacks an interoperable cost bound or a public seam needed to state a
-non-vacuous RED, stop with a read-only seam ledger rather than inventing a
-threshold or production architecture. Such a plan correction requires the
-normal Codex-high + exact Kimi 3/high/100 + Opus/xhigh quorum before any plan
-amendment. Otherwise land one coherent causal RED, run the focused preservation,
+No test, production or plan edit and no workload occurred. Evidence is under
+`.logs/phase-1n-d-aggregate-acceptance-red-codex-high/`; result SHA-256 is
+`00c5729aa1283b7122eb065e90862d027926f6cf9dc70499ca6eeec349f1af75`
+and verified six-entry artifact-manifest SHA-256 is
+`a749c31bcf880ae4fd6d3951a84071f69d9152b3f0f8405ba4d084b7a9bad5a1`.
+The ledger independently verifies ten accepted 1n causal-owner hashes.
+
+The first exact Kimi 3/high/100 proposal agreed that the plan was
+underspecified and selected a relational corpus plus the existing real-host
+`unhandle` seam. Its literal corpus mistakenly required byte-identical missing
+vertices and hashes while changing the shared prefix. Opus correctly rejected
+that clause: `computeHash` covers dependency hashes, so changing the cut changes
+every descendant hash. Kimi also initially tried to suppress all receiver-
+originated sync, but a real `SyncAccept` response opens a new negotiated stream
+and legitimately reselects heads-chunk. Neither initial clause is retained.
+
+Fresh Opus/xhigh session `e3256185-4388-42a6-be84-ec4ac12c6deb`, substantive
+`claude-opus-5` at requested xhigh, supplied the corrected C1-C13 contract and
+directional seam below. Its result SHA-256 is
+`0f6f9d717ad824565e494dcd5d357ebd91a9010463f26e6697e9a62fe3e0e0a2`;
+verified manifest SHA-256 is
+`89bab328982ff48fd19b1154ddc952ac1ce5d35630e085ecb66257992ad8c51c`.
+Automatic Haiku use was title generation only and authored no reasoning, tool
+call or verdict.
+
+The same exact Kimi session `377ba937-b0e3-4ccf-90b8-5455b6d109b8`
+explicitly withdrew its initial clauses and accepted Opus C1-C13 and the
+directional seam in full. The corrective follow-up used one turn / three steps /
+three read-only calls. Corrective result SHA-256 is
+`9927e105449ae8107a41e6ea5ee657b7a1117fdf1dc3aaefe708d902190dd394`;
+verified 13-entry manifest SHA-256 is
+`369db802ccb7c6ab0cbceb9ad72ae75c437f98faf0edd35f2d70bd762c29e83b`.
+Evidence is under
+`.logs/phase-1n-d-aggregate-plan-quorum-kimi3-high-100-opus-correction/`.
+
+The original Codex-high seam owner then independently accepted the corrected
+contract as coherent and constructible. Result SHA-256 is
+`054e076f4807f4294ce712434df87dc23823442b72da2cb4186526a7ae917dea`;
+verified four-entry manifest SHA-256 is
+`ce29ee837a86e774747b08000c4c28c56af42c47dc0d9a340fe6da03c3850cb6`.
+The required amendment quorum is therefore unanimous. It changes no identity
+rule and authorizes no production downgrade surface.
+
+### Phase 1n-d aggregate delta-cost contract — heads-mode hard oracle
+
+**C1 — Relational corpus and non-vacuity floor.** The causal owner runs one
+identical partition/rejoin scenario over at least two corpus members that differ
+only in the size and content of the already-shared retained prefix both
+replicas hold before the common cut. The larger prefix must exceed the smaller
+by at least a factor of four and by at least 64 vertices, so any surviving
+O(retained-history) term is visible against the accepted 512-hash / 65,536-byte
+request envelope. Partition/rejoin topology, selected heads protocol, peer
+direction, scheduling inputs and every other workload dimension stay constant.
+
+**C2 — Constant missing DAG means shape and encoded width, not identity.**
+Before the window opens, assert across corpus members: identical missing-vertex
+count; isomorphic parent relation; identical per-vertex operation payload
+bytes; identical signer/peer-id set; and identical multiset of per-vertex
+encoded byte lengths. Missing hashes necessarily differ because `computeHash`
+covers `deps`; hash equality is forbidden. Exact byte equality is well-formed
+only because hash/dependency/signature widths and timestamp-varint widths are
+equal. Encoded-length inequality is a fixture defect and must fail rather than
+be normalized away.
+
+**C3 — Pre-episode conditioning.** Materialize the retained prefix on both
+replicas by non-sync means so the number and kind of pre-window sync-family
+exchanges are identical and prefix-size independent. Use identical interval
+configuration with no scheduled anti-entropy inside the window; any immediate
+startup probe settles before it. Assert identical pre-window sync-family trace
+counts. Do not reset production branch-cut, retry, cooldown or provenance state.
+
+**C4 — Measured episode.** Scope one window to ordered pair A/B and one object.
+It opens immediately before the public rejoin `connect(...)` call and closes
+only under C8. Every sync-family message emitted inside is measured.
+
+**C5 — Counted wire unit.** A measured message is produced by the unmodified
+production payload factory or response builder, handed to the real
+`NegotiatedSyncSender` paired with a real `DefaultDRPNetworkNode`, sent
+successfully, and associated with the real observed `SelectedSyncProtocol`.
+Count each emitted outer `MESSAGE_TYPE_SYNC` as one request and each emitted
+outer `MESSAGE_TYPE_SYNC_ACCEPT` chunk as one response. A
+`SYNC_SEND_SUPPRESSED` factory result emits no measured message and increments a
+separate suppressed-probe counter. Counting method invocations, dials or
+builder calls instead is forbidden. Any other send failure inside the window
+fails the owner.
+
+**C6 — Byte authority.** For each measured message, count exactly
+`Message.encode(message).finish().byteLength`, the outer protobuf bytes
+production writes. Inner payload, multistream, length-prefix and transport-
+framing bytes are not the authority.
+
+**C7 — Probe and round authority.** A probe is one measured Sync request. A
+dial, selection attempt, scheduled tick or request/response pair is not a
+probe. A recovery probe is a measured Sync whose decoded
+`requestedHashes.length > 0`. A recovery round is one exact-hash generation:
+take the emission-ordered sequence of `requestedHashes` multisets and collapse
+immediately repeated identical multisets. Retransmission of one set adds a
+probe but not a round, separating retry schedule from recovery depth.
+
+**C8 — Episode end and anti-truncation.** After public history-head set equality
+and deep public DRP-state equality, and after every measured send has settled,
+perform exactly one public `syncObject(id, peer)` from A and one from B. Count
+both confirmation messages and their entire causal fan-out. Close only after
+they settle, equality still holds, and no further sync-family message appears
+within one fixed bounded settle budget shared by all corpus members. Traffic in
+flight at budget exhaustion is a hard failure; closing at transient equality or
+excluding dependency recovery is forbidden.
+
+**C9 — Hard equality.** Across corpus members require equality per direction
+and in total for: measured Sync request count; measured SyncAccept response-
+message count; recovery-probe count; recovery-round count; and summed exact
+outer-message bytes. Suppressed-probe and `MESSAGE_TYPE_SYNC_REJECT` counts must
+also be equal and exactly zero; `DRP_SYNC_REJECTED` cooldown entry must be zero.
+
+**C10 — Per-frame ceilings.** Every measured frame independently obeys accepted
+1n-c ceilings: 32 hashes per heads field; 64 total heads/shared/exact; 65,536
+encoded request bytes; 32 response vertices per chunk; 262,144 encoded response
+bytes; four response chunks per request; and 64 outstanding exact hashes per
+object/peer. The 512-inventory ceiling belongs to C12 fallback.
+
+**C11 — Heads-only hard corpus.** Every measured stream in C1-C10 must
+authoritatively select `DRP_HEADS_CHUNK_PROTOCOL`, and every request must have
+empty `vertexHashes`. A field-1 peer is excluded. Current/current traffic must
+never select or emit field 1.
+
+**C12 — Bounded fallback exception.** An explicitly negotiated field-1 request
+is a separate capped O(retained-history) compatibility exception exempt from
+C9. It carries one complete inventory within 512 hashes / 65,536 outer request
+bytes and all accepted response/admission ceilings. It is reached only through
+authoritative multistream selection against a receiver that lacks the additive
+protocol. No production configuration, API or downgrade switch may be added.
+
+**C13 — Outside the hard oracle.** Multistream/framing bytes and negotiation
+RTT are informational characterization only, with no threshold or pass/fail
+role. Pubsub/non-sync traffic is excluded. Aggregate entitlement remains Phase
+1o; this contract does not reopen Phase 1n-d(i).
+
+### Phase 1n-d fallback-only fixture — authorized test-only capability seam
+
+For Phase 1n-d only, the owner may reach the concrete libp2p host of a real
+started `DefaultDRPNetworkNode`, exactly as accepted 1n-c does, solely to call
+`unhandle(DRP_HEADS_CHUNK_PROTOCOL)` once. Nothing else may be reached
+privately. All lifecycle, partition/rejoin, sync-driving, convergence and state
+observations use public surfaces; the real negotiated sender and production
+codec remain unchanged. Test-only capability setup may be private; behavior
+may not.
+
+This fixture proves an asymmetric receiver capability, not a symmetric prior
+implementation. Only the current peer's request leg toward the unhandled
+receiver can select field 1; assert the real selected mode, empty heads/shared/
+exact fields, complete bounded `vertexHashes` inventory and outer bytes. The
+receiver's SyncAccept response opens a new stream and legitimately reselects
+heads-chunk against the current peer; assert that outcome and do not hide or
+“repair” it. One request plus its response is sufficient; swapped-role mirrors
+are vacuous and not required. The fallback fixture is excluded from C1-C9, and
+the current/current C11 control carries the no-unnegotiated-downgrade claim.
+
+Identity remains greenfield in both owners: production-generated creator-bound
+ID by default; any caller-chosen/same-ID construction requires explicit ACL;
+legacy plain or malformed IDs, and caller-chosen IDs without explicit ACL,
+remain negative controls. Field 1 is transport compatibility only, never legacy
+identity support.
+
+## Next Agent Prompt — Phase 1n-d aggregate acceptance RED, amended
+
+Resume with a fresh Codex-high tests-only owner against this exact C1-C13
+contract and test-only capability seam. Use one coherent deterministic public-
+behavior harness with the paired short/long heads corpus, partition/rejoin,
+delayed old-branch injection, recursive exact-hash recovery, counted
+confirmation/quiescence and the separate asymmetric fallback exchange. Use a
+transparent wrapper around the real negotiated sender, real payload factories,
+real streams and exact outer protobuf bytes. The private host is permitted only
+for the single authorized `unhandle` setup. Preserve every accepted 1n owner
+byte-for-byte and add no production compatibility surface.
+
+Prove an exact causal RED against current production, run focused preservation,
 five ordered builds, exact typecheck census, changed-test lint, Prettier and
 diff checks sequentially to `.log`, package a verified manifest and commit only
-tests. Do not run full inventory/performance, sealed, fuzz, proto-generation or
-the full suite. Identity remains greenfield: no legacy plain-ID positive path.
+tests. No full inventory/performance, sealed, fuzz, proto-generation or full
+suite. No legacy plain-ID positive path.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
