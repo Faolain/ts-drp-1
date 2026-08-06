@@ -23,6 +23,7 @@ import {
 } from "@ts-drp/validation";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
+import { readClockPendingProvenance, recordClockPendingProvenance } from "./clock-pending-provenance.js";
 import { AdoptionCommitExhaustedError, ApplyInvariantError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
 import { type FrontierRestorePoint, HashGraph } from "./hashgraph/index.js";
@@ -76,6 +77,7 @@ export type { AuthenticatedVertex } from "./vertex-authentication.js";
 
 // Bound rejected-hash memory per object; oldest entries are evicted first.
 const MAX_KNOWN_INVALID_VERTEX_HASHES = 10_000;
+const MAX_CLOCK_PENDING_VERTEX_HASHES = 10_000;
 const DEFAULT_CHECKPOINT_SUFFIX_SIZE = 256;
 const MAX_APPLICATION_ATTEMPTS_PER_OFFER = 3;
 const metrics = new OpentelemetryMetrics("@ts-drp/object/drp-applier");
@@ -122,12 +124,11 @@ class UndoJournal implements OperationJournal {
 	}
 }
 
-/**
- * Bounded insertion-ordered memory for deterministic vertex rejections.
- * Transient application failures never enter this set.
- */
-class KnownInvalidHashes implements Iterable<Hash> {
+/** Bounded insertion-ordered hash memory; insertion of a new hash evicts the oldest. */
+class BoundedHashMemory implements Iterable<Hash> {
 	private readonly hashes = new Set<Hash>();
+
+	constructor(private readonly maximumSize: number) {}
 
 	get size(): number {
 		return this.hashes.size;
@@ -144,7 +145,7 @@ class KnownInvalidHashes implements Iterable<Hash> {
 	remember(hash: Hash): void {
 		if (this.hashes.has(hash)) return;
 		this.hashes.add(hash);
-		if (this.hashes.size <= MAX_KNOWN_INVALID_VERTEX_HASHES) return;
+		if (this.hashes.size <= this.maximumSize) return;
 		const oldest = this.hashes.values().next().value;
 		if (oldest !== undefined) this.hashes.delete(oldest);
 	}
@@ -453,7 +454,11 @@ export class DRPVertexApplier<T extends IDRP> {
 	private readonly replicaMode: ReplicaMode;
 	private _notify: (origin: string, vertices: Vertex[]) => void;
 	private log: Logger;
-	private readonly knownInvalidVertexHashes = new KnownInvalidHashes();
+	private readonly knownInvalidVertexHashes = new BoundedHashMemory(MAX_KNOWN_INVALID_VERTEX_HASHES);
+	// This remembers only hashes classified by the receiver-clock error or their
+	// dependency closure. Eviction may degrade a later descendant to ordinary
+	// bounded missing recovery, but never to terminal-invalid accounting.
+	private readonly clockPendingVertexHashes = new BoundedHashMemory(MAX_CLOCK_PENDING_VERTEX_HASHES);
 	private checkpoints: LinearizationCheckpoint[];
 	private readonly checkpointSuffixSize = checkpointSuffixSizeFromEnvironment();
 	private readonly notificationQueue: { origin: string; vertices: Vertex[] }[] = [];
@@ -629,11 +634,13 @@ export class DRPVertexApplier<T extends IDRP> {
 		}
 		const applied = await this.applyAuthenticatedVertices(authenticated);
 		if (!occurrences.some(({ status }) => status === "invalid")) return applied;
-		return {
+		const result: ApplyResult = {
 			...applied,
 			applied: false,
 			invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
 		};
+		recordClockPendingProvenance(result, readClockPendingProvenance(applied));
+		return result;
 	}
 
 	private async applyAuthenticatedVertices(vertices: AuthenticatedVertex[]): Promise<ApplyResult> {
@@ -676,6 +683,7 @@ export class DRPVertexApplier<T extends IDRP> {
 		const missing: Hash[] = [];
 		const invalid: Hash[] = [];
 		const quarantined: Hash[] = [];
+		const clockPending = new Set<Hash>();
 		const missingVertices = new Map<Hash, Vertex>();
 		const batchInvalidVertexHashes = new Set<Hash>();
 		for (const { submittedVertex, operationSnapshot } of vertices) {
@@ -718,15 +726,31 @@ export class DRPVertexApplier<T extends IDRP> {
 				const rejectedHash = stableVertex?.hash ?? submittedHash;
 				if (error instanceof AdoptionCommitExhaustedError) {
 					error.partialResult = this.createApplyResult(missing, invalid, [...quarantined, rejectedHash]);
+					this.publishClockPendingProvenance(error.partialResult, missingVertices, clockPending);
+					recordClockPendingProvenance(error, readClockPendingProvenance(error.partialResult));
 					throw error;
 				}
 				if (error instanceof ApplyInvariantError) {
 					error.partialResult = this.createApplyResult(missing, invalid, [...quarantined, rejectedHash]);
+					this.publishClockPendingProvenance(error.partialResult, missingVertices, clockPending);
+					recordClockPendingProvenance(error, readClockPendingProvenance(error.partialResult));
 					throw error;
 				}
 				if (error instanceof ReceiverClockPendingValidationError) {
 					missing.push(error.vertex.hash);
 					missingVertices.set(error.vertex.hash, error.vertex);
+					clockPending.add(error.vertex.hash);
+					this.clockPendingVertexHashes.remember(error.vertex.hash);
+					continue;
+				}
+				const dependsOnClockPending = stableVertex?.dependencies.some(
+					(dependency) => clockPending.has(dependency) || this.clockPendingVertexHashes.has(dependency)
+				);
+				if (error instanceof InvalidDependenciesError && dependsOnClockPending && stableVertex !== undefined) {
+					missing.push(stableVertex.hash);
+					missingVertices.set(stableVertex.hash, stableVertex);
+					clockPending.add(stableVertex.hash);
+					this.clockPendingVertexHashes.remember(stableVertex.hash);
 					continue;
 				}
 
@@ -802,7 +826,33 @@ export class DRPVertexApplier<T extends IDRP> {
 			}
 		}
 
-		return this.createApplyResult(missing, invalid, quarantined);
+		const result = this.createApplyResult(missing, invalid, quarantined);
+		this.publishClockPendingProvenance(result, missingVertices, clockPending);
+		return result;
+	}
+
+	private publishClockPendingProvenance(
+		target: object,
+		missingVertices: ReadonlyMap<Hash, Vertex>,
+		seeds: ReadonlySet<Hash>
+	): void {
+		const result = target as ApplyResult;
+		const missingHashes = new Set(result.missing);
+		const pending = new Set([...seeds].filter((hash) => missingHashes.has(hash)));
+		for (let iteration = 0; iteration < result.missing.length; iteration++) {
+			let changed = false;
+			for (const hash of result.missing) {
+				if (pending.has(hash)) continue;
+				const vertex = missingVertices.get(hash);
+				if (vertex === undefined || !vertex.dependencies.some((dependency) => pending.has(dependency))) continue;
+				pending.add(hash);
+				changed = true;
+			}
+			if (!changed) break;
+		}
+		const authenticatedPending = result.missing.filter((hash) => pending.has(hash));
+		for (const hash of authenticatedPending) this.clockPendingVertexHashes.remember(hash);
+		recordClockPendingProvenance(target, authenticatedPending);
 	}
 
 	private createApplyResult(missing: Hash[], invalid: Hash[], quarantined: Hash[]): ApplyResult {
@@ -835,6 +885,7 @@ export class DRPVertexApplier<T extends IDRP> {
 	}
 
 	private rememberInvalidVertexHash(hash: Hash): void {
+		this.clockPendingVertexHashes.delete(hash);
 		this.knownInvalidVertexHashes.remember(hash);
 	}
 
@@ -1139,6 +1190,7 @@ export class DRPVertexApplier<T extends IDRP> {
 			this.liveCanonicalState = nextCanonicalState;
 			this.publicationPublisher.reportPublications(publicationAttempts, "published");
 			this.knownInvalidVertexHashes.delete(operation.vertex.hash);
+			this.clockPendingVertexHashes.delete(operation.vertex.hash);
 			this.enqueueNotification(operation.isLocal ? "callFn" : "merge", [operation.vertex]);
 			return complete("committed");
 		} catch (error) {

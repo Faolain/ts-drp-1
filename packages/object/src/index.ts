@@ -24,6 +24,7 @@ import {
 import { serializeDRPState } from "@ts-drp/utils/serialization";
 
 import { createPermissionlessACL } from "./acl/index.js";
+import { readClockPendingProvenance, recordClockPendingProvenance } from "./clock-pending-provenance.js";
 import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js";
 import { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
@@ -66,7 +67,7 @@ function canonicalAuthenticatedHash(authenticated: readonly AuthenticatedVertex[
 export async function mergeAuthenticatedVertices<T extends IDRP>(
 	object: IDRPObject<T>,
 	vertices: Vertex[]
-): Promise<AuthenticatedMergeOutcome> {
+): Promise<AuthenticatedMergeOutcome & { readonly clockPending: readonly Hash[] }> {
 	const { authenticated, occurrences } = classifyNovelVertices(
 		vertices,
 		(hash) =>
@@ -77,9 +78,11 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 	);
 	const hasTrustedOrAuthenticatedOffers = occurrences.some(({ status }) => status !== "invalid");
 	const dispatchedResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
+	const clockPending = readClockPendingProvenance(dispatchedResult);
 	const result: MergeResult = occurrences.some(({ status }) => status === "invalid")
 		? [false, dispatchedResult[1], orderAuthenticatedVertexFailures(occurrences, authenticated, dispatchedResult[2])]
 		: dispatchedResult;
+	if (result !== dispatchedResult) recordClockPendingProvenance(result, clockPending);
 	const committed: Vertex[] = [];
 	const committedHashes = new Set<string>();
 	for (let index = 0; index < authenticated.length; index++) {
@@ -90,7 +93,16 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 		committedHashes.add(hash);
 		committed.push(stored);
 	}
-	return { committed, hasTrustedOrAuthenticatedOffers, result };
+	return { clockPending, committed, hasTrustedOrAuthenticatedOffers, result };
+}
+
+/**
+ * Read unforgeable receiver-clock provenance from a genuine object boundary.
+ * @param target - Candidate object-owned rejected boundary.
+ * @returns Exact authenticated pending hashes, or an empty array for unowned values.
+ */
+export function readAuthenticatedClockPending(target: unknown): readonly Hash[] {
+	return readClockPendingProvenance(target);
 }
 
 /**
@@ -524,6 +536,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			compactAdmission.executable.length === 0
 				? { applied: true, invalid: [], missing: [] }
 				: await applier.applyVertices(compactAdmission.executable);
+		const clockPending = readClockPendingProvenance(applied);
 		if (this._applier !== applier) {
 			const failedHashes = new Set([...applied.invalid, ...applied.missing, ...(applied.quarantined ?? [])]);
 			const staleCommittedHashes = compactAdmission.executable.flatMap((handle) => {
@@ -539,6 +552,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 					applied: false,
 					quarantined: [...new Set([...(applied.quarantined ?? []), ...staleCommittedHashes])],
 				};
+				recordClockPendingProvenance(applied, clockPending);
 			}
 		}
 		if (compactAdmission.unavailable.length !== 0) {
@@ -552,6 +566,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 					applied: false,
 					invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
 				};
+		if (result !== applied) recordClockPendingProvenance(result, clockPending);
 		if (this.#historyCapability === capability && capability.storage === "compact") {
 			let admitted = false;
 			for (const { hash } of this.hashGraph.getAllVertices()) {
@@ -634,7 +649,9 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			);
 		}
 		const result = await this.authenticateAndApplyVertices(vertices);
-		return [result.applied, result.missing, result.invalid];
+		const mergeResult: MergeResult = [result.applied, result.missing, result.invalid];
+		recordClockPendingProvenance(mergeResult, readClockPendingProvenance(result));
+		return mergeResult;
 	}
 
 	/**

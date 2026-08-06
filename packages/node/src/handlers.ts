@@ -2,10 +2,10 @@ import { DRPIntervalDiscovery } from "@ts-drp/interval-discovery";
 import {
 	AdoptionCommitExhaustedError,
 	ApplyInvariantError,
-	type AuthenticatedMergeOutcome,
 	authenticateVertices,
 	HashGraph,
 	mergeAuthenticatedVertices,
+	readAuthenticatedClockPending,
 } from "@ts-drp/object";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
@@ -49,6 +49,8 @@ interface HandlerRegistryEntry {
 	handler: IHandlerStrategy;
 	vertexIngress: false | typeof authenticateVertices;
 }
+
+type AuthenticatedClockPendingMergeOutcome = Awaited<ReturnType<typeof mergeAuthenticatedVertices>>;
 
 const MAX_SYNC_RECOVERY_RETRIES = 3;
 const MAX_UPDATE_VERTICES = 32;
@@ -175,12 +177,18 @@ function rejectedBoundaryResult(error: unknown): ApplyResult | undefined {
 	return undefined;
 }
 
+function trueMissingHashes(missing: readonly string[], clockPending: readonly string[]): string[] {
+	if (clockPending.length === 0) return [...missing];
+	const pending = new Set(clockPending);
+	return missing.filter((hash) => !pending.has(hash));
+}
+
 async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 	node: DRPNode,
 	object: IDRPObject<T>,
 	sender: string,
 	vertices: Vertex[]
-): Promise<{ exhausted: boolean; outcome: AuthenticatedMergeOutcome }> {
+): Promise<{ exhausted: boolean; outcome: AuthenticatedClockPendingMergeOutcome }> {
 	try {
 		const outcome = await mergeAuthenticatedVertices(object, vertices);
 		return {
@@ -191,10 +199,11 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 		const partialResult = rejectedBoundaryResult(error);
 		if (partialResult === undefined) throw error;
 		const exhausted = accountInvalidVertices(node, sender, partialResult.invalid.length);
+		const missing = trueMissingHashes(partialResult.missing, readAuthenticatedClockPending(error));
 
-		if (!exhausted && partialResult.missing.length !== 0) {
+		if (!exhausted && missing.length !== 0) {
 			try {
-				await recoverMissingSync(node, object.id, sender, partialResult.missing);
+				await recoverMissingSync(node, object.id, sender, missing);
 			} catch (recoveryError) {
 				log.error("::messageHandler: Rejected-boundary recovery failed", recoveryError);
 			}
@@ -375,7 +384,7 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 
 	const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
 	const mergeOutcome = governedOutcome.outcome;
-	const [, missing] = mergeOutcome.result;
+	const missing = trueMissingHashes(mergeOutcome.result[1], mergeOutcome.clockPending);
 	const appliedVertices = [...mergeOutcome.committed];
 
 	const finalityStore = appliedVertices.length === 0 ? undefined : legacyFinalityStore(object);
@@ -559,13 +568,15 @@ async function syncAcceptHandlerUntraced({ node, message }: HandleParams): Promi
 		const mergeOutcome = governedOutcome.outcome;
 		suppressMissingRecovery = governedOutcome.exhausted;
 		mergeRan = mergeOutcome.hasTrustedOrAuthenticatedOffers;
-		[, missing] = mergeOutcome.result;
+		missing = trueMissingHashes(mergeOutcome.result[1], mergeOutcome.clockPending);
 		if (mergeRan && finalityStore !== undefined) {
 			finalityStore.mergeSignatures(syncAcceptMessage.attestations);
 		}
 		if (mergeRan) {
 			node.put(object.id, object);
-			if (!suppressMissingRecovery) await recoverMissingSync(node, object.id, sender, missing);
+			if (!suppressMissingRecovery && missing.length !== 0) {
+				await recoverMissingSync(node, object.id, sender, missing);
+			}
 		}
 	}
 
