@@ -28054,6 +28054,44 @@ creation/ACL entitlement remain later named owners. No slice may add legacy
 plain-ID support; generated creator-bound IDs remain default and caller-chosen
 or same-ID construction requires explicit ACL.
 
+## Phase 1o-d exact retained-hash ingress RED — checkpointed
+
+The tests-only Codex-high RED is frozen at `8fd3ff9`. Its 391-line
+`sync-exact-retained-hash-ingress-1o-d-red.test.ts` source has SHA-256
+`33fa5968c6e7e091de4e4cc74eeb828ce6f1deffe420fc9eabcefbff676c05a7`.
+The authoritative untouched-production baseline is 5 failed and 1 passed; a
+temporary shared-boundary diagnostic made all 6 pass, after which production
+was restored clean.
+
+The RED exercises every wire-derived exact-retention owner: negotiated heads,
+authenticated UPDATE dependencies, authenticated heads-mode SYNC_ACCEPT
+dependencies and the rejected-boundary recovery path. The heads table covers
+63- and 65-character values, 64-character non-hex and uppercase values, and a
+64-character/128-byte multibyte value. Malformed ingress must allocate no
+retained tuple, start no recovery response work, preserve an existing canonical
+request's retry/cooldown episode and leave later recovery by that same canonical
+hash possible. A positive control proves canonical 64-character lowercase hex
+retention, while a direct `queueExactRequests` control preserves the trusted
+internal helper's intentionally permissive contract.
+
+The exact retained-entry census is one entry, 64 hash string characters and 64
+hash UTF-8 bytes. The current serialized `(object, peer)` tuple key is 146
+characters and 146 UTF-8 bytes for the measured fixture. These are payload/key
+contributions, not JavaScript heap-size claims; runtime/version heap and
+container characterization remains a Phase 1o-f prerequisite. Preservation is
+51/51 across Phase 1n-b/c/d and Phase 1o-a/b/c. Production TypeScript, ESLint,
+Prettier and diff gates pass; package TypeScript reports only the inherited
+compact-history TS1360/TS2322 diagnostics.
+
+The 26-entry evidence manifest has SHA-256
+`4954f879891c77a651bcd173bced930d5a99083cf10fcb3aa03470c6d2ed967b`;
+the finalized result SHA-256 is
+`ae7ad5f2e75f60e6e6a38112a576fb3cb6034e995cbb4ae3bdf51cdc6e37b95f`.
+Initial formatting and event-name diagnostic logs are explicitly superseded.
+This slice validates retained hashes only: it adds no identity migration,
+legacy plain-ID acceptance or omitted-ACL fallback. Identity remains the
+greenfield creator-bound/explicit-ACL contract above.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
