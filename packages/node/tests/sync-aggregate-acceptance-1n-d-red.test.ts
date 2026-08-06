@@ -25,7 +25,7 @@ import {
 	SYNC_RESPONSE_VERTEX_CAP,
 	SyncTransportError,
 } from "@ts-drp/network";
-import { createACL, HashGraph } from "@ts-drp/object";
+import { createACL, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	ActionType,
 	type IDRP,
@@ -455,12 +455,54 @@ async function runCorpus(prefixCount: number): Promise<CorpusResult> {
 	const prefix = nonRoot(objects[0].vertices);
 	await mergeExactly(objects[1], prefix);
 	await mergeExactly(objects[2], prefix);
-	const sharedHashes = new Set(objects[0].vertices.map(({ hash }) => hash));
 
-	for (const label of ["a-0", "a-1", "a-2"]) objects[0].drp?.increment(label);
-	for (const label of ["b-0", "b-1"]) objects[1].drp?.increment(label);
-	for (const label of ["old-0", "old-1"]) objects[2].drp?.increment(label);
-	await Promise.all(nodes.map((node, index) => signGeneratedVertices(node, objects[index].vertices)));
+	objects[1].drp?.increment("shared-b-constant");
+	await signGeneratedVertices(nodes[1], objects[1].vertices);
+	const bShared = nonRoot(objects[1].vertices).filter(
+		({ hash, peerId }) => peerId === nodes[1].networkNode.peerId && objects[0].getVertex(hash) === undefined
+	);
+	expect(bShared).toHaveLength(1);
+	await mergeExactly(objects[0], bShared);
+	await mergeExactly(objects[2], bShared);
+	const sharedVertices = nonRoot(objects[0].vertices);
+	expect(sharedVertices).toHaveLength(prefixCount + 1);
+	const sharedHashes = new Set(objects[0].vertices.map(({ hash }) => hash));
+	expect(sharedVertices.some(({ peerId }) => peerId === nodes[1].networkNode.peerId)).toBe(true);
+	expect(nonRoot(objects[1].vertices).some(({ peerId }) => peerId === nodes[0].networkNode.peerId)).toBe(true);
+
+	// Author the partition branches on unsubscribed public objects and merge the
+	// signed vertices into the live replicas. This is non-sync conditioning and
+	// prevents queued pubsub UPDATEs from racing the measured reconnect owner.
+	const authors = nodes.map(
+		(node) =>
+			new DRPObject<CounterDRP>({
+				acl: aclFor(nodes),
+				drp: new CounterDRP(),
+				id,
+				peerId: node.networkNode.peerId,
+			})
+	);
+	await Promise.all(authors.map((author) => mergeExactly(author, sharedVertices)));
+	for (const label of ["a-0", "a-1", "a-2"]) authors[0].drp?.increment(label);
+	for (const label of ["b-0", "b-1"]) authors[1].drp?.increment(label);
+	for (const label of ["old-0", "old-1"]) authors[2].drp?.increment(label);
+	await Promise.all(nodes.map((node, index) => signGeneratedVertices(node, authors[index].vertices)));
+	const authoredBranches = authors.map((author) =>
+		nonRoot(author.vertices).filter(({ hash }) => !sharedHashes.has(hash))
+	);
+	for (const [index, branch] of authoredBranches.entries()) {
+		await mergeExactly(objects[index], branch);
+	}
+	for (const [index, object] of objects.entries()) {
+		expect(authoredBranches[index].every(({ hash }) => object.getVertex(hash) !== undefined)).toBe(true);
+		expect(
+			authoredBranches
+				.filter((_, branchIndex) => branchIndex !== index)
+				.flat()
+				.every(({ hash }) => object.getVertex(hash) === undefined),
+			"pre-window pubsub/message-queue delivery must not transfer a missing branch"
+		).toBe(true);
+	}
 	const missing = objects.flatMap((object) => nonRoot(object.vertices).filter(({ hash }) => !sharedHashes.has(hash)));
 	const contract = missingContract(missing, sharedHashes);
 
@@ -468,15 +510,16 @@ async function runCorpus(prefixCount: number): Promise<CorpusResult> {
 	expect(new Set(missing.map(({ hash }) => hash)).size).toBe(7);
 	expect(telemetry.emissions, "prefix construction must not use sync-family transport").toEqual([]);
 	expect(telemetry.ingresses, "prefix construction must not receive sync-family transport").toEqual([]);
+	await telemetry.quiescent();
 
 	telemetry.start();
 	await nodes[0].networkNode.connect(addresses(nodes[1]));
 	await waitForConnection(nodes[0], nodes[1], true);
 	await waitForBidirectionalGroupReadiness(nodes[0], nodes[1], id);
-	// Group readiness is the public lifecycle observation that starts the
-	// reconnect-owned initial probe. Keep telemetry active and require that
-	// probe plus its causal fan-out to cross the same fixed quiet barrier before
-	// the deterministic explicit driver begins.
+	// Both sides already retain remote-authored history, so public group
+	// readiness cannot start the reconnect-owned initial probe. Keep telemetry
+	// active and prove no hidden sync-family owner crosses the fixed quiet
+	// barrier before the deterministic explicit driver begins.
 	await telemetry.quiescent();
 
 	for (
@@ -485,7 +528,7 @@ async function runCorpus(prefixCount: number): Promise<CorpusResult> {
 		attempt++
 	) {
 		await nodes[attempt % 2].syncObject(id, nodes[(attempt + 1) % 2].networkNode.peerId);
-		await telemetry.settled();
+		await telemetry.quiescent();
 	}
 	expect(sameHeads(objects[0], objects[1]), "partition branches did not converge").toBe(true);
 	expect(samePublicState(objects[0], objects[1]), "partition DRP states did not converge").toBe(true);
@@ -502,7 +545,7 @@ async function runCorpus(prefixCount: number): Promise<CorpusResult> {
 		attempt++
 	) {
 		await nodes[attempt % 2].syncObject(id, nodes[(attempt + 1) % 2].networkNode.peerId);
-		await telemetry.settled();
+		await telemetry.quiescent();
 	}
 	expect(sameHeads(objects[0], objects[1]), "delayed old branch was not recovered").toBe(true);
 	expect(samePublicState(objects[0], objects[1]), "state diverged after old-branch recovery").toBe(true);
@@ -532,7 +575,7 @@ async function runCorpus(prefixCount: number): Promise<CorpusResult> {
 	expect(snapshot.total.requests).toBeGreaterThan(2);
 	expect(snapshot.total.responses).toBeGreaterThan(0);
 
-	return { ...contract, prefixCount, snapshot };
+	return { ...contract, prefixCount: sharedVertices.length, snapshot };
 }
 
 function fallbackHost(node: DRPNode): Libp2p {
