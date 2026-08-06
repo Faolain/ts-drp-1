@@ -26667,42 +26667,155 @@ Evidence is under
 verified 60-entry manifest SHA-256 is
 `fd909c5231e533327f2d536e2cf40fe2065933c97826ed0602db01cb41329cc9`.
 
-## Next Agent Prompt — Phase 1n-c final Opus review
+## Phase 1n-c final GREEN review — Opus accepted; slice closed
 
-Because Grok and exact Kimi 3 accepted, run the final Claude-skill Opus/xhigh
-adversarial review against the complete amended contract and lineage. Use
-bridge mode, substantive Opus, requested xhigh and read/Bash-only plan mode.
-Require an independent finite Sync egress census; trace peerless selection,
-literal-byte caps, lifecycle/advertisement ordering, response boundaries and
-fixture non-vacuity; inspect for unseen ordinary bypasses rather than relying on
-the prior verdicts. Run only bounded causal probes and the sequential focused
-gates as needed; no forbidden workloads. Reject compatibility, arbitrary-id or
-legacy plain-id routes. Disclose any automatic helper-model use, authenticate
-session/model/calls, preserve repository state, and package result and verified
-manifest hashes. Close Phase 1n-c only if Opus returns final `ACCEPTED`.
+Final same-session Claude-skill Opus/xhigh independently returns `ACCEPTED`
+with no Phase 1n-c blocker against production candidate `18aea72`. Session
+`9ee1978c-8969-4ab7-99ec-14254805a5c5` used substantive `claude-opus-5` only
+for this adjudication: 13 turns, no helper-model use, no tests and no writes.
+The reviewer authenticated the complete negotiated request/response egress
+census, actual-byte caps, post-selection construction, lifecycle truth and the
+11 migrated fixture titles. Phase 1n-c remains unchanged and accepted.
 
-Do not amend architecture during acceptance review. If a new assumption change
-is proposed, stop and require fresh Codex-high, exact Kimi 3/high/dual-100 and
-Opus/xhigh agreement before editing the plan or production.
+The review did find a distinct pre-existing caller-lifecycle defect after the
+accepted egress boundary. `connectObject` installs a raw post-fetch one-second
+Sync interval in addition to the already-started `DRPIntervalSync`. Its promise
+is discarded, so typed send failures reach `unhandledRejection`; its handle is
+not registered in `_intervals`, so `stop()` and `unsubscribeObject()` cannot
+cancel it; and it clears on mere send resolution, including an inert no-peer
+return, rather than remotely authored history. It can therefore overlap the
+tracked runner, emit false synchronized/subscribed logs and corrupt Phase
+1n-d's convergence/probe-cost attribution. This does not reopen 1n-c: explicit
+peer exposure predates its GREEN, while omitted-peer selection only widened the
+same caller defect.
 
-Preserve the Phase 1h detached central subscriber: settle the private completion
-from the real `dispatchMessage` admission promise without awaiting it in the
-subscriber, and let only the direct stream handler await it before graceful
-close/reset. The additive sender awaits clean remote EOF/reset under a bounded
-abort/deadline; fallback retains its honest old local write/close completion.
-Validate direct protocol/field/count/actual-byte contradictions before queue,
-graph or sync-state work. Build only after authoritative stream selection and
-record only the selected payload's attempt/advertisement truth. Keep field-1
-fallback complete-or-typed-fail, never paginate or truncate it. Keep response
-chunks independently authenticated/idempotent and progress-preserving; add no
-session/continuation accumulator.
+Nonblocking observations remain owned later: the two contained fire-and-forget
+SyncReject sends, a response-chunk tail sliced at four, byte-only
+`SyncAccept.requesting` validation (Phase 1o), no receiver completion deadline,
+one attempt charged before `SYNC_STATE_CHANGED`, and prebuilt mode-independent
+responses. Do not silently pull them into 1n-d(i).
 
-Run the bounded new owner, all Phase 1n-c focused/preservation owners, affected
-initial/manual/anti-entropy preservation, ordered builds, exact inherited
-typecheck census, lint, Prettier and diff checks to `.log`. Keep HEAD/tree/index/
-stash/protected state controlled and package result/verified manifest hashes.
-Do not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads. Do
-not request a legacy plain-id mode: this is a greenfield implementation.
+Evidence is under
+`.logs/phase-1n-d-i-sync-retry-owner-adjudication-opus-xhigh/`. Result SHA-256
+is `1b030c7c6c3a7e84696705e266470436506ff378e6043f127951904ecd29dd8d`;
+verified manifest SHA-256 is
+`fcdd0541b4758661fdcba7de9d17b18dc9eed99b028cbad9b0634f663790c309`.
+HEAD/tree/index/stash/protected state remained invariant. This final acceptance
+closes Phase 1n-c.
+
+## Phase 1n-d(i) single retry-owner/provenance refinement — authorized
+
+The required plan-amendment quorum unanimously assigns the caller defect as a
+bounded prerequisite immediately before Phase 1n-d aggregate acceptance:
+
+- Fresh Codex-high reproduced the real public `connectObject` path. Two typed
+  scheduled failures became unhandled rejections, a third send resolved while
+  remote history remained absent, and the raw interval was neither registered
+  nor lifecycle-cancellable. It found no equivalent containment gap among the
+  other scheduled Sync callers and requires consolidation rather than catch-
+  only suppression. Evidence is under
+  `.logs/phase-1n-d-caller-containment-quorum-codex-high/`; result SHA-256 is
+  `d1c93fa447028af5c060c5f0bf22df8429b1978362d476d3934b71ef8dc504e6`
+  and verified manifest SHA-256 is
+  `6031b6ec769d6b6419d12c79d03267543ef5cf10ac4688df91ee5da831e547c1`.
+- Exact Kimi 3/high/dual-100 same-session adjudication superseded its initial
+  catch/log-only suggestion after tracing the duplicate owner. Session
+  `1de02914-7982-460d-9974-d3785bf7314d` used CLI 1.49.0, requested
+  `kimi-code/k3`, effective K3, thinking enabled and environment/CLI/loaded
+  caps 100. Its authoritative consolidation result SHA-256 is
+  `2dff15edfd7ec159b33c69f53d05701b22977a04b37fb3eba9a53e639a7039ca`;
+  its same-session role-adjudication result SHA-256 is
+  `d87d2e557d59ec7e0aa47d39d2d496d17a2ebb5281f908dab82d7072a89618af`;
+  and the updated verified 54-entry manifest SHA-256 is
+  `cb916ca3aea8e1343957bfdb9fbe976152a190e595811057567390e7b8e8be19`.
+  Evidence is under
+  `.logs/phase-1n-d-caller-containment-quorum-kimi3-high-100/`.
+- Final same-session Opus/xhigh agrees that catch-only hides symptoms while
+  retaining contradictory owners. It requires the existing tracked,
+  serialized `DRPIntervalSync` to be the sole per-object scheduled Sync owner,
+  with `handleGroupPeerChange` retained as the contained deduplicated event
+  trigger. Its result and manifest hashes are recorded in the closure above.
+
+All three also agree on the associated greenfield role correction. An object id
+commits authority; it does not say whether this local replica entered through
+`createObject` or `connectObject`. The current scheduler's
+`creatorFromObjectID(id)` role inference is both unsound and incomplete: an
+explicit-ACL locally created id such as `prefix:room` is falsely treated as a
+joiner, while an explicit-ACL connected id such as `room` is not fast-retried.
+The raw timer currently masks the latter. Retiring it without explicit
+provenance would therefore regress authorized custom-room joins.
+
+The authorized production boundary is finite:
+
+1. Delete the raw post-fetch `connectObject` Sync timer and its misleading
+   success logs. Do not replace it with another timer or a catch-only wrapper.
+   `DRPIntervalSync`, registered under `_intervals`, is the sole per-object
+   scheduled Sync owner.
+2. Add one required node-local acquisition role (`created | connected`, naming
+   may vary without changing semantics) to `DRPIntervalSyncOptions`; no
+   optional value, default, boolean parallel flag or ID-shape fallback. Create
+   the bounded one-second initial runner only for `connected` replicas.
+3. Record the role at `createObject` and `connectObject`; thread it through
+   `_createObjectIntervals`, `_createIntervalSync` and
+   `createDRPIntervalSync`; retain it in node-local memory across same-instance
+   stop/start; read it in `restoreSubscriptions`; and delete it on purge.
+   `node.put` replacements must not erase the existing role. The codebase has
+   no durable object hydration, so no wire/schema/storage format is introduced;
+   future durable hydration must persist this provenance rather than infer it.
+4. Remove `creatorFromObjectID` only from scheduler-role selection. Preserve its
+   legitimate creator-commitment uses for omitted-ACL admission, genesis ACL
+   derivation and targeted creator rendezvous. Missing scheduler provenance
+   fails closed or skips managed fast retry; it never parses the id as a
+   compatibility fallback.
+5. Preserve the tracked runner's existing immediate anti-entropy probe,
+   serialized execution, deterministic sorted peer rotation, one-second/five-
+   attempt connected-replica budget, per-attempt contained logging and
+   `hasRemoteSyncHistory` stop truth. Direct `syncObject` still propagates its
+   typed failure. A resolved send alone never means synchronized.
+6. Preserve `handleGroupPeerChange` as a contained, deduplicated event trigger;
+   do not turn it into a second scheduled owner. Preserve the directed fetch
+   from `connectObject`; retiring the redundant explicit-peer scheduled retry
+   is authorized because deterministic group-peer rotation reaches that peer.
+7. No legacy plain-id support exists. Generated creator-bound IDs are the
+   default. A custom id is supported only through its explicit ACL contract;
+   no shim, migration branch, normalization, silent fallback or ID-shaped role
+   acceptance is permitted. Malformed/plain ids without the required explicit
+   ACL remain negative-test inputs only.
+
+The tests-only RED must be one coherent lifecycle/provenance owner, not a syntax
+matrix. It must prove: zero unhandled scheduled rejections with later ticks and
+peers still progressing; one scheduled attempt per tick with no raw/duplicate
+owner; stop and unsubscribe cancel all later attempts; send resolution without
+remote history does not end initial sync; remotely authored history does;
+rotation and the one-second/five-attempt cap remain exact; direct typed failure
+still rejects; generated and explicit-ACL custom IDs follow the authoritative
+create/connect role; separator-shaped custom-created ids do not fast-retry;
+plain custom-connected ids do; and same-instance restart preserves both roles
+while purge removes their provenance. Keep every accepted 1n-c owner frozen.
+
+The RED agent may make only the mechanical additive fixture edits needed to
+pass the new required role to the five direct `createDRPIntervalSync` test
+constructions in `anti-entropy.test.ts`. Those old assertions, all 11 migrated
+initial/anti-entropy titles and all accepted 1n-c tests are preservation-only;
+no weakening, replacement or legacy fixture route is authorized.
+
+## Next Agent Prompt — Phase 1n-d(i) tests-only RED
+
+Spawn a fresh Codex-high tests-only RED agent against this authorized boundary.
+It may add one bounded node test owner and the five additive direct-constructor
+fixture arguments described above. It must not change production, the plan,
+generated/lock/protected files or accepted assertions. Use real public
+`createObject`/`connectObject`, injected negotiated sender, fake timers and
+bounded `unhandledRejection` capture; avoid a private-method-only oracle. Prove
+each failure is causal with a safe control and freeze exact pre/post counts.
+
+Run the new owner, the relevant initial-sync and anti-entropy preservation,
+accepted Phase 1n-c focused/preservation owners, ordered affected builds,
+exact inherited typecheck census, changed-file lint, Prettier and diff checks
+sequentially to `.log`. Keep HEAD/tree/index/stash/protected state controlled
+and package result/verified manifest hashes. Do not run inventory/performance,
+sealed, fuzz, proto-generation or full-suite workloads. Commit only the
+tests-only RED after proving the intended current-production failures.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
