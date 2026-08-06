@@ -179,12 +179,13 @@ export function validateNegotiatedSync(message: Message, protocol: string): void
 			cause,
 		});
 	}
+	const requestByteLength = Message.encode(message).finish().byteLength;
 
 	if (mode === "fallback") {
 		if (sync.heads.length !== 0 || sync.sharedHeads.length !== 0 || sync.requestedHashes.length !== 0) {
 			throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Heads fields are forbidden on fallback sync");
 		}
-		if (sync.vertexHashes.length > SYNC_FALLBACK_HASH_CAP || message.data.byteLength > SYNC_REQUEST_BYTE_CAP) {
+		if (sync.vertexHashes.length > SYNC_FALLBACK_HASH_CAP || requestByteLength > SYNC_REQUEST_BYTE_CAP) {
 			throw new SyncTransportError("SYNC_FALLBACK_LIMIT", "Fallback inventory exceeds the v1 sync ceiling");
 		}
 		return;
@@ -198,7 +199,7 @@ export function validateNegotiatedSync(message: Message, protocol: string): void
 	if (
 		fields.some((hashes) => hashes.length > SYNC_HEADS_FIELD_HASH_CAP) ||
 		total > SYNC_HEADS_TOTAL_HASH_CAP ||
-		message.data.byteLength > SYNC_REQUEST_BYTE_CAP
+		requestByteLength > SYNC_REQUEST_BYTE_CAP
 	) {
 		throw new SyncTransportError("SYNC_REQUEST_LIMIT", "Heads request exceeds the v1 sync ceiling");
 	}
