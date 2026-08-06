@@ -26499,14 +26499,47 @@ a Message instead of awaiting the real payload factory must not satisfy the
 capture assertions. There is no legacy plain-id implication: add no identity
 normalizer, shim or compatibility route.
 
-## Next Agent Prompt — Phase 1n-c fixture correction
+## Phase 1n-c negotiated Sync fixture correction — checkpointed
 
-Commit a fresh Codex-high tests-only corrective checkpoint limited to the exact
-authorized two-file capture/constructor/comment/explicit-provenance scope. It
-must restore the files to 11/11 against current production while the peerless
-RED remains exact 5F/0P, prove the capture awaits the real payload factory, and
-run the bounded preservation/build/typecheck/lint/format gates below. Then start
-a distinct fresh Codex-high GREEN: remove the
+Fresh Codex-high committed the exact authorized tests-only migration as
+`8bd7d3e63e6edfb6fccb14b33299a38dc472b327` (tree
+`38581f354a5669d9e318aac5d14af857321fecd5`, parent `1d8fbb3`). Scope is only
+`initial-sync.test.ts` (+63/-28) and `anti-entropy.test.ts` (+65/-36).
+Production, plan, generated/lock, every prior RED and every other test remain
+frozen.
+
+The frozen baseline reproduces exact 6F/5P; corrected fixtures pass 11/11 both
+before and after commit. The immutable peerless RED remains exact 5F/0P with
+the same 17 soft causal failures. Existing Phase 1n-c passes 23/23;
+Phase 1h/1n-a/1n-b semantic preservation passes 30/30; and the selected manual
+Sync control passes 1/1. Ordered builds pass 5/5. Types/network/message-queue
+typechecks are clean; object/node retain the exact inherited 5/2 diagnostics
+with zero owned. Owned lint is clean, bounded affected lint has zero errors and
+65 inherited JSDoc warnings, and Prettier/diff checks pass.
+
+A temporary false-sender mutation fabricated a Sync Message instead of
+awaiting the real payload factory. The substantive initial-sync title then
+failed because the fabricated object id did not match the generated
+creator-bound id. The mutation was reverted before final gates and commit.
+This is causal non-vacuity evidence, not a supported plain-id path. No legacy
+identity shim, normalizer or compatibility route exists.
+
+Gotcha: concurrent Vitest processes collide while finalizing shared
+`coverage/.tmp` and can report `ENOENT` even after test bodies complete. All
+authoritative gates were therefore rerun sequentially. Keep later bounded test
+invocations sequential unless coverage output is explicitly isolated.
+
+Evidence is under `.logs/phase-1n-c-fixture-correction-codex-high/`. Result
+SHA-256 is
+`3f1eab5d1d4575edf0f1a89db77898da91b0b957a3b9d57490dda559009499f9`;
+verified 48-entry manifest SHA-256 is
+`0c013d49b4ce735ee04d65669de39b90d0c5d518b7ff3cf1916f3c817261b715`.
+The 47,303-entry protected census, production and generated/lock censuses,
+clean index and stash `ef3a53...` remain invariant. No forbidden workload ran.
+
+## Next Agent Prompt — Phase 1n-c peerless negotiated-egress GREEN
+
+Start a distinct fresh Codex-high GREEN: remove the
 peerless Sync builder/generic send from `operations.ts`; choose from
 `networkNode.getGroupPeers(objectId)` and feed the chosen peer into existing
 `sendNegotiatedSync` plus `buildSyncPayloadForProtocol`. Reuse scheduled-probe
