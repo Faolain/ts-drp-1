@@ -96,15 +96,26 @@ export function recordBranchCuts(node: DRPNode, objectId: string, peerId: string
 }
 
 /**
- * Read every verified shared cut for one peer.
+ * Select the verified shared cuts advertised to one peer.
+ *
+ * The replaceable current frontier is more useful than retained historical
+ * cuts, so it consumes the bounded wire entitlement first. Retention remains
+ * independent from this egress projection.
  * @param node - Node owning the sync state
  * @param objectId - Object being synchronized
  * @param peerId - Remote peer
- * @returns Deduplicated shared hashes
+ * @returns Deduplicated shared hashes within the heads-field cap
  */
 export function sharedHashes(node: DRPNode, objectId: string, peerId: string): string[] {
 	const state = getState(node, objectId, peerId);
-	return [...new Set([...state.branchCuts, ...state.sharedHeads])];
+	const selected = new Set<string>();
+	for (const hashes of [state.sharedHeads, state.branchCuts]) {
+		for (const hash of hashes) {
+			selected.add(hash);
+			if (selected.size === SYNC_HEADS_FIELD_HASH_CAP) return [...selected];
+		}
+	}
+	return [...selected];
 }
 
 /**
