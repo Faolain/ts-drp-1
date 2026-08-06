@@ -3,7 +3,7 @@
  * confusing them with absent dependencies at any node recovery call site.
  */
 import {
-	ApplyInvariantError,
+	AdoptionCommitExhaustedError,
 	createPermissionlessACL,
 	createVertex,
 	HashGraph,
@@ -39,6 +39,7 @@ interface ClockPendingMergeOutcome {
 interface PrivateObject {
 	readonly _applier: {
 		readonly knownInvalidVertexHashes: { has(hash: string): boolean };
+		tryCommitPreparedVertex(...arguments_: unknown[]): "committed" | "duplicate" | "retry";
 	};
 }
 
@@ -189,22 +190,48 @@ describe("Phase 1n-a clock-pending recovery provenance", () => {
 				[HashGraph.rootHash],
 				now + DRP_VERTEX_FUTURE_TOLERANCE_MS + 1
 			);
-			const partialResult: ApplyResult = { applied: false, invalid: [], missing: [pending.hash] };
-			const primary = new ApplyInvariantError([new Error("controlled Phase 1n-a boundary")]);
-			primary.partialResult = partialResult;
-			Object.defineProperty(primary, "clockPending", {
-				configurable: false,
-				enumerable: false,
-				value: [pending.hash],
+			const rejected = await signedVertex(`boundary-rejected-${surface}`, [HashGraph.rootHash], now);
+			const applier = (object as unknown as PrivateObject)._applier;
+			const originalTryCommit = applier.tryCommitPreparedVertex;
+			applier.tryCommitPreparedVertex = (): "retry" => "retry";
+			const originalMerge = object.merge.bind(object);
+			let objectBoundaryError: unknown;
+			let objectBoundaryPartialResult: ApplyResult | undefined;
+			vi.spyOn(object, "merge").mockImplementation(async (vertices) => {
+				try {
+					return await originalMerge(vertices);
+				} catch (error) {
+					objectBoundaryError = error;
+					if (error instanceof AdoptionCommitExhaustedError) objectBoundaryPartialResult = error.partialResult;
+					throw error;
+				}
 			});
-			vi.spyOn(object, "merge").mockRejectedValue(primary);
 			const outbound = captureOutbound();
 			const syncObject = vi.spyOn(receiver, "syncObject");
+			let primary: unknown;
 
-			await expect(
-				handleMessage(receiver, message(surface, object.id, sender.networkNode.peerId, [pending]))
-			).rejects.toBe(primary);
-			expect.soft(syncObject.mock.calls.length, "pending boundary must not call syncObject").toBe(0);
+			try {
+				await handleMessage(receiver, message(surface, object.id, sender.networkNode.peerId, [pending, rejected]));
+			} catch (error) {
+				primary = error;
+			} finally {
+				applier.tryCommitPreparedVertex = originalTryCommit;
+			}
+
+			expect.soft(primary).toBe(objectBoundaryError);
+			expect.soft(primary).toBeInstanceOf(AdoptionCommitExhaustedError);
+			if (primary instanceof AdoptionCommitExhaustedError) {
+				expect.soft(primary.vertexHash).toBe(rejected.hash);
+				expect.soft(primary.attempts).toBe(3);
+				expect.soft(primary.partialResult).toBe(objectBoundaryPartialResult);
+				expect.soft(primary.partialResult).toEqual({
+					applied: false,
+					invalid: [],
+					missing: [pending.hash],
+					quarantined: [rejected.hash],
+				});
+			}
+			expect.soft(syncObject.mock.calls.length, "authenticated pending boundary must not call syncObject").toBe(0);
 			expect.soft(directTypes(outbound)).not.toContain(MessageType.MESSAGE_TYPE_SYNC);
 			expect.soft(directTypes(outbound)).not.toContain(MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
 			expect.soft(object.vertices.map(({ hash }) => hash)).toEqual([HashGraph.rootHash]);
