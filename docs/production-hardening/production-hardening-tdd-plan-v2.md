@@ -25947,11 +25947,86 @@ the verified 21-entry root-relative artifact manifest SHA-256 is
 No inventory/performance benchmark, sealed workload, fuzzer, proto generation
 or full suite ran.
 
+## Phase 1n-c preservation-fixture amendment — authorized
+
+The distinct production GREEN reached focused 12/12, but the originally frozen
+Phase 1n-a/b preservation command exposed an instrumentation contradiction.
+Five offline node fixtures intercept generic `networkNode.sendMessage` and
+never connect their peers. Targeted Sync now correctly dials, selects a real
+stream and only then builds its selected-mode payload, so those fixtures fail
+with typed `SYNC_DIAL_FAILED` before their obsolete spy can observe a message.
+The captured run was 15 failed / 15 passed; response-send ownership moved after
+that capture, so the exact final restored count must be measured against the
+settled patch rather than inferred from that stale split.
+
+Fresh Codex-high, exact Kimi 3/high/dual-100 and Claude-skill Opus/xhigh
+unanimously confirm that keeping the five fixture implementations byte-frozen
+would require a forbidden production compatibility branch: routing Sync back
+through generic `sendMessage`, building before authoritative selection,
+detecting a spy/disconnected test peer, or falling back after
+`SYNC_DIAL_FAILED`. All would contradict the amended contract and immutable
+12/12 RED. The preservation requirement therefore means unchanged behavioral
+titles, assertions, counts, ordering, outcomes and identity construction—not
+unchanged obsolete capture instrumentation.
+
+Authorize one fresh tests-only corrective checkpoint limited to outbound-
+capture helper and node-construction wiring in exactly:
+
+- `packages/node/tests/core-heads-sync-1n-b-red.test.ts`;
+- `packages/node/tests/sync-clock-pending-provenance-1n-a-red.test.ts`;
+- `packages/node/tests/sync-no-progress-corrective-1n-a-red.test.ts`;
+- `packages/node/tests/sync-reciprocity-attempt-neutrality-1n-b-red.test.ts`;
+- `packages/node/tests/sync-request-attempt-lifecycle-1n-b-red.test.ts`.
+
+Inject the production-declared `NegotiatedSyncSender` seam. Its request owner
+must invoke the real payload factory with the explicit selected value
+`{ mode: "heads-chunk", protocol: "/drp/message/1.0.0/heads-chunk" }` and
+capture the returned production-built message. Its response owner must capture
+`sendSyncResponseMessage` output verbatim wherever the old spy observed a
+response. It must not emulate dial, negotiation, admission, EOF/reset or caps;
+branch on inferred mode; swallow payload-factory errors; weaken an assertion;
+or add a production fallback. Preserve the existing non-Sync broadcast stub.
+
+`queue-isolation.test.ts`, both immutable 1n-c RED owners, both network
+preservation owners, and all other tests remain byte-frozen. All 22 titles and
+the five per-file counts 4 / 7 / 4 / 2 / 5 remain unchanged. The checkpoint
+must record the causal pre-GREEN absent-surface failure against `cf8fe9b` and a
+non-vacuity control proving the real payload factory cannot be bypassed, then
+restore the preservation behavior against the paused GREEN without changing
+production. This correction changes no identity rule: omitted ACL remains
+generated/creator-bound, a custom id requires an explicit coordinated ACL, and
+there is no legacy plain-ID path.
+
+Exact Kimi session `b0f83c3f-36e6-466e-bb1e-d7c33f4c6796` used CLI v1.49.0,
+effective `managed:kimi-code:k3`, thinking, and environment/CLI/loaded loop caps
+all 100; it completed 20 steps / 36 read-only calls. Result SHA-256 is
+`e789b775ab8bd02fbbb67e0d9719b8a26ee31acfca80b5cf5998cd9784a15818`;
+its verified 34-entry manifest SHA-256 is
+`3dd7cb919fe3c1579290236278155e497fb9483a6399283b11d31d05c3500944`.
+
+Fresh Claude-skill Opus/xhigh session
+`b4d95297-a3cc-4eec-bf81-4db0d0916167` used substantive `claude-opus-5` and
+returned `CONFLICT_PROVEN: yes`,
+`FROZEN_FIXTURES_FORCE_FORBIDDEN_COMPAT: yes`,
+`PLAN_AMENDMENT_AGREED: yes`,
+`CORRECTIVE_TESTS_ONLY_CHECKPOINT_REQUIRED: yes`,
+`GREEN_MAY_RESUME_AFTER_CHECKPOINT: yes` and `BLOCKERS: None`. Automatic Haiku
+usage was 2,106 input / 22 output tokens with zero assistant events or tool
+calls and did not author the verdict. Result SHA-256 is
+`300f1e5806e5533857bf002ea29185a63bd75331059f9f59cc6986aef6f82eee`;
+its verified 43-entry manifest SHA-256 is
+`fe0539fa086f16f21e98fa6aea6b5ac9b8d96243f86cb290222822173182084f`.
+Evidence is under
+`.logs/phase-1n-c-preservation-conflict-{kimi3-high-100,opus-xhigh}/` and the
+Codex-high production/preservation ledger.
+
 ## Next Agent Prompt — Phase 1n-c distinct production GREEN
 
 Start a distinct fresh Codex-high production GREEN from immutable RED
-`96efd42`. Read the complete amended contract and RED ledger. Freeze both RED
-tests and this plan; do not amend assertions to fit production. Implement the
+`96efd42`. Read the complete amended contract, RED ledger and authorized
+preservation-fixture amendment. Freeze both RED tests and the amended plan; do
+not amend assertions to fit production. After the corrective tests-only
+checkpoint lands, implement the
 smallest coherent production architecture that satisfies both 1n-c(i) and
 1n-c(ii), with one canonical protocol bundle, one selected-stream payload
 factory, one private provenance/completion envelope, one bounded decoder/builder
@@ -25975,7 +26050,8 @@ session/continuation accumulator.
 Before external review, apply the `refactor-clean` ownership check: one concept
 must have one owner, obsolete branches must be removed rather than wrapped, and
 the implementation must not leave a general-purpose `sendMessage` compatibility
-adapter for sync. Run exact 12/12 focused GREEN, the same 30/30 preservation,
+adapter for sync. Run exact 12/12 focused GREEN and preservation with the same
+30 test titles/assertions/counts/outcomes through the corrected capture seam,
 ordered touched-package builds, exact inherited object 5/node 2 typecheck
 census, lint, Prettier and diff checks to `.log`. Keep workloads bounded and do
 not run inventory/perf, sealed, fuzz, proto-gen or full-suite workloads. Commit
