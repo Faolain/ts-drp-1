@@ -70,6 +70,12 @@ type AuthenticatedClockPendingMergeOutcome = Awaited<ReturnType<typeof mergeAuth
 const MAX_UPDATE_VERTICES = 32;
 const MAX_INVALID_VERTICES_PER_PEER = 10_000;
 const MAX_INVALID_PEER_BUDGETS = 256;
+const CANONICAL_VERTEX_HASH = /^[0-9a-f]{64}$/;
+
+function queueWireExactRequests(node: DRPNode, objectId: string, peerId: string, hashes: readonly string[]): boolean {
+	const canonicalHashes = hashes.filter((hash) => CANONICAL_VERTEX_HASH.test(hash));
+	return canonicalHashes.length !== 0 && queueExactRequests(node, objectId, peerId, canonicalHashes);
+}
 
 function legacyFinalityStore<T extends IDRP>(object: IDRPObject<T>): IFinalityStore | undefined {
 	if (object.replicaMode === "observer") return undefined;
@@ -184,7 +190,7 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 		);
 		const missing = exactMissingDependencies(object, vertices, rawMissing);
 
-		if (!exhausted && missing.length !== 0 && queueExactRequests(node, object.id, sender, missing)) {
+		if (!exhausted && missing.length !== 0 && queueWireExactRequests(node, object.id, sender, missing)) {
 			try {
 				await node.syncObject(object.id, sender);
 			} catch (recoveryError) {
@@ -423,7 +429,7 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	if (
 		!governedOutcome.exhausted &&
 		missing.length !== 0 &&
-		queueExactRequests(node, message.objectId, sender, missing)
+		queueWireExactRequests(node, message.objectId, sender, missing)
 	) {
 		await node.syncObject(message.objectId, sender);
 	}
@@ -537,7 +543,7 @@ async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sy
 		for (const response of responses) await node.sendNegotiatedSyncResponse(sender, response);
 	}
 
-	const queuedUnknown = queueExactRequests(node, object.id, sender, unknownRemoteHeads);
+	const queuedUnknown = queueWireExactRequests(node, object.id, sender, unknownRemoteHeads);
 	const isReciprocalProof = advertisedTheseHeads(node, object.id, sender, syncMessage.heads);
 	const shouldReciprocate =
 		syncMessage.heads.length !== 0 && unknownRemoteHeads.length === 0 && selected.length === 0 && !isReciprocalProof;
@@ -685,7 +691,11 @@ async function syncAcceptHandlerUntraced({ node, message, syncSelection }: Handl
 		}
 		if (mergeRan) {
 			node.put(object.id, object);
-			if (!suppressMissingRecovery && missing.length !== 0 && queueExactRequests(node, object.id, sender, missing)) {
+			if (
+				!suppressMissingRecovery &&
+				missing.length !== 0 &&
+				queueWireExactRequests(node, object.id, sender, missing)
+			) {
 				await node.syncObject(object.id, sender);
 			}
 		}

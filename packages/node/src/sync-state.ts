@@ -96,6 +96,7 @@ export function recordSharedHeads(node: DRPNode, objectId: string, peerId: strin
  * @param hashes - Verified branch cuts
  */
 export function recordBranchCuts(node: DRPNode, objectId: string, peerId: string, hashes: readonly string[]): void {
+	if (hashes.length === 0) return;
 	const cuts = getState(node, objectId, peerId).branchCuts;
 	for (const hash of hashes) cuts.add(hash);
 }
