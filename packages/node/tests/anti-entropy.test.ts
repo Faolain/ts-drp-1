@@ -52,6 +52,8 @@ const HEADS_SELECTION = Object.freeze({
 	protocol: DRP_HEADS_CHUNK_PROTOCOL,
 } satisfies SelectedSyncProtocol);
 
+const CREATED = { replicaOrigin: "created" as const };
+
 const outboundByNode = new WeakMap<DRPNode, Outbox>();
 
 function syncSender(node: () => DRPNode): NegotiatedSyncSender {
@@ -147,7 +149,7 @@ describe("periodic anti-entropy", () => {
 
 		const groupPeers = vi.spyOn(receiver.networkNode, "getGroupPeers").mockReturnValue([]);
 		vi.useFakeTimers();
-		const interval = createDRPIntervalSync({ id: objectId, node: receiver, interval: intervalMs });
+		const interval = createDRPIntervalSync({ ...CREATED, id: objectId, node: receiver, interval: intervalMs });
 		intervals.push(interval);
 		interval.start();
 		await vi.advanceTimersByTimeAsync(0); // initial empty-peer run
@@ -308,7 +310,7 @@ describe("periodic anti-entropy", () => {
 			.mockRejectedValueOnce(new Error("transient probe failure"))
 			.mockResolvedValue();
 		vi.useFakeTimers();
-		const interval = createDRPIntervalSync({ id: "probe-retry-object", node, interval: intervalMs });
+		const interval = createDRPIntervalSync({ ...CREATED, id: "probe-retry-object", node, interval: intervalMs });
 		intervals.push(interval);
 
 		interval.start();
@@ -326,7 +328,7 @@ describe("periodic anti-entropy", () => {
 		vi.spyOn(Math, "random").mockReturnValue(0.9);
 		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
 		vi.useFakeTimers();
-		const interval = createDRPIntervalSync({ id: "peer-rotation-object", node, interval: intervalMs });
+		const interval = createDRPIntervalSync({ ...CREATED, id: "peer-rotation-object", node, interval: intervalMs });
 		intervals.push(interval);
 
 		interval.start();
@@ -343,7 +345,7 @@ describe("periodic anti-entropy", () => {
 		vi.spyOn(Math, "random").mockReturnValue(0);
 		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
 		vi.useFakeTimers();
-		const interval = createDRPIntervalSync({ id: "default-peer-cycle-object", node });
+		const interval = createDRPIntervalSync({ ...CREATED, id: "default-peer-cycle-object", node });
 		intervals.push(interval);
 
 		expect(interval.interval).toBe(10_000);
@@ -366,7 +368,7 @@ describe("periodic anti-entropy", () => {
 
 		const groupPeers = vi.spyOn(nodeA.networkNode, "getGroupPeers").mockReturnValue([]);
 		vi.useFakeTimers();
-		const interval = createDRPIntervalSync({ id: objectId, node: nodeA, interval: intervalMs });
+		const interval = createDRPIntervalSync({ ...CREATED, id: objectId, node: nodeA, interval: intervalMs });
 		intervals.push(interval);
 		interval.start();
 		await vi.advanceTimersByTimeAsync(0);
