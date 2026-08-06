@@ -25153,22 +25153,71 @@ HEAD/tree/source/status/index/stash/protected invariance checks all pass.
 Evidence is under
 `.logs/phase-1l-initial-sync-fixture-migration-final-opus-xhigh-review/`.
 
-## Next Agent Prompt — Phase 1n-b core-heads-sync RED
+## Phase 1n-b core-heads-sync RED — frozen
 
-Run a fresh Codex-high tests-only RED against this closure checkpoint. First
-authenticate the current protobuf/wire, handler, history-storage and
-anti-entropy seams and confirm the planned 1n-b contract can precede generic
-1n-c negotiation without inventing a fake peer/runtime. If that dependency is
-false, stop read-only with evidence for the required Opus/Codex/Kimi plan
-quorum. Otherwise add the narrowest real-wire causal owner for core heads sync:
-heads exchange, recursive retrieval of true missing dependencies only,
-per-peer/object shared-head advancement without forgetting old branches,
-idempotent duplicate/out-of-order delivery, bounded delta-proportional work and
-the mandatory hash-list fallback. Reuse 1n-a provenance and real handler/object
-paths; do not mock merge outcomes or add test hooks. Change tests only, run
-focused plus proportionate sync/auth/preservation/build/type/lint/format gates
-to a new evidence directory, and avoid sealed 100k/fuzz until a bounded causal
-owner demonstrates a need.
+Fresh Codex-high tests-only commit
+`e639c4c3b91da853169662f950cfd43cb66f3d26` (tree
+`ab6ca00950f5ddc3563d30cbdd3ad8ba64f5f52d`) adds only
+`packages/node/tests/core-heads-sync-1n-b-red.test.ts`, 386 lines, SHA-256
+`7058505df81777c23a373456446bc217fed8487bd83652d15852acee80a4d332`.
+The four real-node/wire cases freeze the additive core protocol before generic
+1n-c negotiation: reciprocal heads proof and no optimistic shared advancement,
+delta-only transfer after a shared cut, exact recursive retrieval of true
+missing parents, duplicate/out-of-order idempotence, retention of an older
+shared branch, and the mandatory field-1 full-inventory fallback. The dropped
+first send proves send completion is not possession proof. Real
+`historyInventory` and `vertices` getter counters require zero full-history
+materialization on the delta path, so delta-sized bytes after a full scan cannot
+reward-hack the budget.
+
+Focused RED is 3 failed / 1 passed: the three additive behaviors fail through
+the current real handlers, while explicit full-inventory fallback passes.
+Combined RED/preservation is 3 failed / 51 passed, and independent preservation
+is 50/50. Ordered types/object/node builds pass. Types typecheck passes; object
+and node retain only the exact inherited Phase-1i-b diagnostic sets. Owned lint,
+Prettier and diff checks pass; node lint has zero errors and 28 inherited
+warnings. Every replica uses generated creator-bound identity plus a fresh
+coordinated explicit ACL/key state. There is no plain-ID compatibility path,
+mocked merge result, production hook, sealed run, fuzzer or 100k workload.
+
+Ledger SHA-256 is
+`e4dcaf8800c5b8d420e3135b8486b690098daf80b9efe28e41f7b9dc24504485`;
+the verified 59-entry artifact list is
+`2ae22dfe3db0b52d383f2c3426397a17c10e68397d0d0e90b7bec7c369648de2`.
+Evidence is under `.logs/phase-1n-b-core-heads-sync-red-codex-high/`.
+
+## Phase 1n-a stale attestation-budget fixture RED audit — frozen
+
+The 1n-b RED's broader sync/finality preservation run authentically exposes
+one tracked stale assertion in
+`packages/node/tests/attestation-budget.test.ts:424`, case `disabled
+SYNC_ACCEPT neither verifies nor merges a defensive pre-existing aggregate
+record`: exact signature 1 failed / 18 passed / 1 skipped. The fixture applies
+the vertex before delivery, then redelivers the same vertex in `SYNC_ACCEPT`.
+All disabled-finality invariants correctly pass—zero aggregate verification,
+zero BLS signing, unchanged residual record, zero attestation broadcast and the
+expected store put—but its final assertion expects one `DRP_SYNC_ACCEPTED`.
+Phase 1n-a commit `60d9f2f` deliberately requires at least one newly committed
+vertex, so this duplicate/no-progress delivery correctly emits zero.
+
+This is stale Phase 1n-a test ownership, not Phase 1n-b production work. The
+adjacent novel-history case retains the positive accepted-event assertion.
+Correct only the stale duplicate assertion in a distinct tests-only GREEN; do
+not weaken the truthful progress predicate, change finality behavior, add a
+legacy/plain-ID path or fold the correction into the 1n-b production GREEN.
+
+## Next Agent Prompt — Phase 1n-a stale attestation fixture tests-only GREEN
+
+At fixed HEAD, use a fresh distinct Codex-high agent. Change only the stale
+duplicate/no-progress `DRP_SYNC_ACCEPTED` expectation above to zero, adding at
+most a concise semantic comment if useful. Preserve the adjacent positive
+novel-history event case and every attestation/store assertion. Run the focused
+file, the Phase 1n-a no-progress/recovery/auth/initial-sync preservation set,
+the broader sync/finality set and proportionate builds/typecheck/lint/format
+gates to a fresh evidence directory. Commit tests only. Then require fresh Grok
+4.5/high and exact Kimi 3/high/100 acceptance before final Claude-skill
+Opus/xhigh closure. Resume the distinct Phase 1n-b production GREEN only after
+this corrective restores a truthful broad node baseline.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
