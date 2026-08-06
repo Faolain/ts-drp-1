@@ -1,6 +1,6 @@
 import { SyncTransportError } from "@ts-drp/network";
 import { HashGraph } from "@ts-drp/object";
-import { FetchState, type IDRP, type IDRPObject, Message, MessageType, Sync } from "@ts-drp/types";
+import { FetchState, type IDRP, type IDRPObject, Message, MessageType } from "@ts-drp/types";
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
@@ -72,26 +72,21 @@ export async function sendSyncObject<T extends IDRP>(
 		return;
 	}
 	if (!peerId) {
-		const message = Message.create({
-			data: Sync.encode(Sync.create({ vertexHashes: [...object.historyInventory.knownHashes] })).finish(),
-			objectId,
-			sender: node.networkNode.peerId,
-			type: MessageType.MESSAGE_TYPE_SYNC,
-		});
-		await node.networkNode.sendGroupMessageRandomPeer(objectId, message);
-	} else {
-		try {
-			await node.sendNegotiatedSync(peerId, (selection) =>
-				node.buildSyncPayloadForProtocol({
-					objectId,
-					peerId,
-					protocol: selection.protocol,
-					purpose,
-				})
-			);
-		} catch (error) {
-			if (error instanceof SyncTransportError && error.code === "SYNC_SEND_SUPPRESSED") return;
-			throw error;
-		}
+		const peers = node.networkNode.getGroupPeers(objectId);
+		if (peers.length === 0) return;
+		peerId = peers[Math.floor(Math.random() * peers.length)];
+	}
+	try {
+		await node.sendNegotiatedSync(peerId, (selection) =>
+			node.buildSyncPayloadForProtocol({
+				objectId,
+				peerId,
+				protocol: selection.protocol,
+				purpose,
+			})
+		);
+	} catch (error) {
+		if (error instanceof SyncTransportError && error.code === "SYNC_SEND_SUPPRESSED") return;
+		throw error;
 	}
 }

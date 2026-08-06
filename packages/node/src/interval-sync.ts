@@ -31,7 +31,7 @@ export interface DRPIntervalSyncOptions {
 	logConfig?: LoggerOptions;
 }
 
-/** Periodically probes one object peer with the full local vertex-hash inventory (O(|V|)). */
+/** Periodically sends a negotiated Sync probe to one object peer. */
 export class DRPIntervalSync {
 	readonly type = "interval:sync";
 	readonly id: string;
