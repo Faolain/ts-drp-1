@@ -123,6 +123,15 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		}
 	}
 
+	async function onSkewedClockAsync<T>(fn: () => Promise<T>, skew: number): Promise<T> {
+		skewMs = skew;
+		try {
+			return await fn();
+		} finally {
+			skewMs = 0;
+		}
+	}
+
 	test("control: a dropped UPDATE heals through SYNC/SYNC_ACCEPT when timestamps are sane", async () => {
 		const OBJ = "control-object";
 		const outA = captureOutbound(nodeA);
@@ -256,11 +265,21 @@ describe("sync livelock (deterministic, handler-driven)", () => {
 		await handleMessage(nodeA, leaf.message);
 
 		for (const result of mergeResults.slice(0, 3)) {
-			expect(result[1]).toHaveLength(0);
-			expect(result[2]).toEqual(expect.arrayContaining([rootChild.vertex.hash, middle.vertex.hash]));
+			expect(result[1]).toEqual(expect.arrayContaining([rootChild.vertex.hash, middle.vertex.hash]));
+			expect(result[2]).toHaveLength(0);
 		}
-		expect(mergeResults[3][1]).toHaveLength(0);
-		expect(mergeResults[3][2]).toContain(leaf.vertex.hash);
+		expect(mergeResults[3][1]).toContain(leaf.vertex.hash);
+		expect(mergeResults[3][2]).toHaveLength(0);
+
+		await onSkewedClockAsync(async () => {
+			await handleMessage(nodeA, parentAndMiddleUpdate);
+			await handleMessage(nodeA, leaf.message);
+		}, BEYOND_TOLERANCE_SKEW);
+
+		expect(objA.drp?.query_pos("B")).toEqual({ x: 3, y: 3 });
+		expect(new Set(objA.vertices.map((vertex) => vertex.hash))).toEqual(
+			new Set(objB.vertices.map((vertex) => vertex.hash))
+		);
 		expect(directsOf(outA, MessageType.MESSAGE_TYPE_SYNC)).toHaveLength(0);
 	}, 20_000);
 
