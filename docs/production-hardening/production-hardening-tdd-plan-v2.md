@@ -25474,36 +25474,75 @@ It was not rerun. A subsequent 512-item named case passed with four skipped.
 No sealed one-shot workload, fuzzer or full suite ran. Do not rerun either
 inventory command during this slice.
 
-## Next Agent Prompt — Phase 1n-b retry-attempt lifecycle production GREEN
+## Phase 1n-b retry-attempt lifecycle production GREEN — review pending
 
-Use a fresh distinct Codex-high production-only agent at RED commit `de9f414`.
-Resume the byte-authenticated paused core-heads draft; do not replace its
-additive wire/history work. In `sync-state.ts`, consolidate exact outstanding
-requests and retry/cooldown accounting into one per-node/object/peer/exact-set
-lifecycle. Remove the parallel `syncRecoveryEpisodes` receive-count owner from
-`handlers.ts`; do not layer a second budget or retain an inbound-message retry
-counter for compatibility.
+Distinct fresh Codex-high production commit
+`299bc0b95798f65185a176392348906aa8cfe15f` (tree
+`e2c85e78f2916ab9e595385d355777780a09f802`) contains exactly eight
+production/generated paths, +569/-94. It completes the paused additive
+heads/shared-heads/exact-request wire and bounded history-reader draft while
+replacing the parallel handler receive-count budget with one natural owner in
+`sync-state.ts`. No frozen/corrected test, plan, lockfile, protected path or
+stash entered the commit.
 
-First authenticated discovery queues and sends exact attempt one. A scheduled
-`syncObject` call must retransmit the still-outstanding exact hashes for
-attempts two/three; scheduled attempt four sends nothing, emits exactly one
-`DRP_SYNC_REJECTED { id, peerId, retries: 3 }`, and opens the existing
-30-second cooldown. Inbound duplicates, UPDATE reoffers, pending/empty/trusted
-no-progress and cooldown traffic are neutral. UPDATE must queue true exact
-missing dependencies through the same owner. Authenticated dependency presence
-or truthful resolution clears it. Periodic rotation charges only its selected
-peer. Unsubscribe and stop clear the single owner and prevent later work.
+`sync-state.ts` now owns outstanding exact hashes, attempt count, cooldown,
+heads/shared knowledge and cleanup per node/object/peer/exact set. UPDATE,
+SYNC_ACCEPT and rejected-boundary recovery clear verifier-authenticated arrival
+or truthful local presence before deriving/queueing the next exact set.
+`operations.syncObject` re-carries outstanding hashes on attempts one through
+three; attempt four returns before constructing an empty probe, emits the exact
+bounded rejection and starts cooldown. The selected periodic peer is the only
+state charged. Object unsubscribe and node stop clear the same owner after
+interval shutdown. The old `syncRecoveryEpisodes`, receive-count recovery
+function/key/interface/constant and separate clear path are deleted; there is no
+compatibility counter or legacy plain-ID path.
 
-Change only genuinely required production/generated files. Do not modify any
-frozen/corrected test, the plan, lockfiles or protected untracked inputs. Keep
-field-1 fallback and the no-legacy-plain-ID greenfield boundary unchanged. Run
-new owner, corrected legacy owners, frozen core, broad 1n-a/auth/initial-sync/
-finality preservation, ordered builds/typecheck/lint/format and a small bounded
-delta-work check to `.log`. Do not rerun either inventory benchmark, sealed
-workload, fuzzer or full suite. Commit production/generated files only after all
-causal REDs are green and the preserved production draft is accounted for.
-Then return the candidate for fresh Grok 4.5/high, exact Kimi 3/high/100 and
-final Claude-skill Opus/xhigh review in that order.
+The first GREEN run was 4/5 because a signed parent that remained clock-pending
+was authenticated but not yet committed. The final design exposes the
+verifier-derived authenticated hashes from `mergeAuthenticatedVertices`, clears
+that arrived exact request even before commit, then queues the newly exposed
+ancestor as a fresh attempt-one set. Authenticated partial removal likewise
+resets attempts/cooldown because the exact-set identity changed. Authoritative
+new-owner result is 5/5; corrected legacy owners are 17/17; frozen core is 4/4;
+the final combined causal run is 26/26. Bounded auth/ACL/1n-a/initial-sync/
+finality preservation is 41/41.
+
+Ordered final types/object/node builds pass. Types typecheck passes; object
+retains exactly five and node exactly two inherited Phase-1i-b diagnostics, with
+no owned diagnostic. Owned lint is zero warnings/errors; supported-source
+Prettier and diff checks pass. Refactor-clean confirms one concept/owner and
+audits UPDATE, SYNC_ACCEPT, rejected boundary, operations, interval rotation,
+unsubscribe and stop consumers plus all new early returns and clearing paths.
+Ledger SHA-256 is
+`819d66310436765eab3a03656bc3d6544f7286eef66cffec901c4c642ee02c8f`;
+the verified evidence-manifest SHA-256 is
+`783d5142130be8030498a1390c6b3ace03175a8ea5aaa69071a1a3eef6bf8bfa`.
+Evidence is under
+`.logs/phase-1n-b-retry-attempt-green-codex-high/`.
+
+The repository has no `buf` executable, so one verification-only
+`pnpm proto-gen:types` attempt failed immediately without changing output. The
+focused generated Sync diff remains the paused draft's 56 additions/1 deletion
+and is verified by the types build and frozen wire tests. No inventory/perf
+benchmark, sealed workload, fuzzer or full suite ran during GREEN.
+
+## Next Agent Prompt — Phase 1n-b GREEN preliminary reviews
+
+At fixed candidate `299bc0b`, run fresh independent Grok 4.5/high and exact Kimi
+CLI v1.49.0 with `kimi-code/k3`, thinking and both 100-step limits. Each must
+authenticate the RED/GREEN manifests and fixed source, then adversarially trace
+the additive wire fallback, reciprocal possession proof, delta/history bounds,
+exact-set transitions, verifier-derived arrival, UPDATE/SYNC_ACCEPT parity,
+attempts one through four, cooldown restart, peer rotation, cleanup and removal
+of every old retry owner. Explicitly probe partial multi-hash completion,
+send-failure/reentry, identical/new-set reoffers, rejected-boundary behavior and
+normal no-outstanding heads sync for unseen gaps. Confirm the no-legacy-plain-ID
+greenfield boundary and absence of a compatibility/test-only branch.
+
+Reviewers are read-only and must not run inventory/perf, sealed, fuzz or full
+suite workloads. They may run only bounded focused tests if their sandbox allows
+it. Final Claude-skill Opus/xhigh starts only after both preliminary reviewers
+accept. Record every finding and model/controller disclosure before closure.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
