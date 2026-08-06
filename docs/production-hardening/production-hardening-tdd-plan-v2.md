@@ -26374,26 +26374,94 @@ Evidence is under
 This correction has no legacy plain-id implication. It removes an obsolete
 generic Sync route; it must not add identity normalization or compatibility.
 
-## Next Agent Prompt — Phase 1n-c peerless egress corrective RED
+## Phase 1n-c peerless egress corrective RED — checkpointed
 
-Start a fresh Codex-high tests-only RED from rejected candidate `cde2109`.
-Freeze every existing Phase 1n-c test and assertion. Add one bounded node-level
-owner for public peerless `syncObject`: prove one available group peer is chosen
-before payload construction; fallback selection with 513 hashes or an over-byte
-inventory returns typed `SYNC_FALLBACK_LIMIT` from the selected payload factory
-before any generic send or negotiated payload transmission and before lifecycle/
-advertisement mutation; an ordinary within-cap fallback uses the negotiated
-sender once; heads selection builds heads-mode fields and never field 1; and no
-available group peer sends nothing. Prove the current generic random-peer route
-causally fails these assertions. Do not edit production or the plan.
+Fresh Codex-high committed tests-only RED
+`2529c1eb40ab680f33c8a59c817c28730d90ba3c` (tree
+`1a46a9d1a309ff7d51d5a7bdefddbd1681b4287b`) from rejection-docs parent
+`6d2038e`. Its sole new owner is
+`packages/node/tests/sync-peerless-negotiated-egress-1n-c-red.test.ts` (394
+lines, SHA-256
+`df6730f00f7ad0b2e8d066ff7aa72bc0e46d308f98785e3ccc0fb3e70be15826`).
+Production, plan, generated/lock and every prior test remain frozen.
 
-After a tests-only RED commit, start a distinct fresh Codex-high GREEN. Remove
-the peerless Sync builder/generic send from `operations.ts`; choose from
-`networkNode.getGroupPeers(objectId)` and feed the chosen peer into the existing
-`sendNegotiatedSync` plus `buildSyncPayloadForProtocol` path. Reuse the same
-scheduled-probe lifecycle purpose. Do not change generic random-peer behavior
-for non-Sync callers, introduce another selector API, duplicate validation or
-add a compatibility path.
+The exact causal signature is **five failed / zero passed**, with 17 soft
+causal assertion failures. On `cde2109`, 513 hashes resolve and send generically
+as field 1 instead of returning typed failure; 40 long hashes produce a 72,269-
+byte Message and do the same; the negotiated sender is never invoked; heads
+selection is ignored because field 1 is prebuilt; and even the no-group-peer
+harness reaches the obsolete generic call. Both cap cases preserve lifecycle
+and advertisement state without fabrication, so the RED is about egress truth,
+not a counter side effect.
+
+Existing Phase 1n-c passes 23/23, Phase 1h/1n-a/1n-b preservation passes 30/30,
+and the selected manual-sync control passes 1/1. Ordered builds pass 5/5.
+Types/network/message-queue typechecks are clean; object/node retain exact
+inherited 5/2 with zero owned. Lint has zero errors and Prettier/diff checks
+pass. All production, plan, generated/lock, existing-test and 47,303 protected-
+entry censuses plus stash `ef3a53...` remain invariant.
+
+Ledger SHA-256 is
+`f42d4d7fb9bcde26cbe2be737ed34f7dccd323a4c1fcf09e809f52855df491d5`;
+result SHA-256 is
+`26f80c7077ae220a11d85091415ac112ccf9ae1dce5e68ae31ed6826e73f352a`;
+the verified 50-entry manifest SHA-256 is
+`df7af574823dfc8f3ad70a695c51727c0a7f9a485d4f12d4761f3bf67299e3a6`.
+Evidence is under `.logs/phase-1n-c-peerless-egress-red-codex-high/`.
+
+The owner uses production-derived creator identity and generated object ids. It
+adds no legacy/plain-id fixture or behavior.
+
+## Phase 1n-c initial/anti-entropy fixture conflict — quorum required
+
+The newly required affected preservation run is **six failed / five passed**
+across frozen `initial-sync.test.ts` and `anti-entropy.test.ts`, before any
+peerless GREEN. All six failures are obsolete capture instrumentation, not
+changed interval behavior: their production calls already pass a concrete peer
+and therefore use the accepted negotiated Sync sender, while the fixtures still
+spy generic `networkNode.sendMessage` and observe zero Sync messages.
+
+The exact affected titles are two initial-fast-sync tests and four periodic
+anti-entropy tests listed in
+`.logs/phase-1n-c-peerless-egress-red-codex-high/initial-anti-entropy-fixture-conflict.md`.
+Stale capture sites are `initial-sync.test.ts:86,140` and
+`anti-entropy.test.ts:49-55,154,202`; assertions at the audited sites retain
+retry budgets, timing, peer selection, convergence and no-response semantics.
+
+The proposed smallest tests-only migration is to inject the already-declared
+`NegotiatedSyncSender`, invoke the real request payload factory with an explicit
+heads-chunk selection, append the returned production-built Message to the
+existing direct outbox, and append response-sender Messages verbatim. Preserve
+the broadcast spy used for dropped-update setup plus every title, count, timer,
+peer-selection, convergence and no-peer assertion. Do not emulate transport,
+infer mode, swallow payload errors, restore generic Sync sending or add
+production compatibility.
+
+This migration is **not yet authorized**. Because it changes a frozen
+preservation-fixture assumption, fresh Codex-high, exact Kimi 3/high/dual-100
+and Claude-skill Opus/xhigh must independently agree before either file changes.
+
+## Next Agent Prompt — Phase 1n-c fixture-conflict quorum
+
+Run the required read-only Codex-high, exact Kimi 3/high/dual-100 and Claude-
+skill Opus/xhigh quorum against checkpointed RED `2529c1e`, the complete
+amended contract, both frozen preservation files and the conflict ledger.
+Require explicit findings for whether the six failures are solely stale
+capture, whether byte-freezing the fixtures would force forbidden production
+compatibility, and whether the proposed bounded two-file migration preserves
+all semantic assertions. Authenticate models and package result/manifest
+hashes. Do not edit either fixture, production or the plan during quorum.
+
+Only after unanimous authorization, commit a fresh tests-only corrective
+checkpoint limited to the audited capture/constructor sites. It must restore
+the two frozen files to 11/11 against current production while the peerless RED
+remains exact 5F/0P. Then start a distinct fresh Codex-high GREEN: remove the
+peerless Sync builder/generic send from `operations.ts`; choose from
+`networkNode.getGroupPeers(objectId)` and feed the chosen peer into existing
+`sendNegotiatedSync` plus `buildSyncPayloadForProtocol`. Reuse scheduled-probe
+lifecycle purpose. Do not change generic random-peer behavior for non-Sync
+callers, introduce another selector API, duplicate validation or add a
+compatibility path.
 
 Preserve the Phase 1h detached central subscriber: settle the private completion
 from the real `dispatchMessage` admission promise without awaiting it in the
