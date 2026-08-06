@@ -26020,6 +26020,92 @@ Evidence is under
 `.logs/phase-1n-c-preservation-conflict-{kimi3-high-100,opus-xhigh}/` and the
 Codex-high production/preservation ledger.
 
+## Phase 1n-c inbound selected-truth corrective — authorized
+
+The authorized outbound-capture migration restored 21 of the five owners' 22
+tests. The remaining core old-branch test is a causal RED, not another obsolete
+spy. Its captured negotiated messages are protobuf-round-tripped before direct
+in-process delivery. That clone cannot retain the production-private
+`WeakMap<Message, SelectedSyncProtocol>` identity, so the fixture must supply
+the already-declared third `handleMessage` argument at captured-message delivery
+sites. A bounded Codex-high audit classified all 52 syntactic inbound sites
+(15 / 11 / 11 / one helper with seven callers / 14); its 138-line ledger
+SHA-256 is
+`5359a4fca54bed09633fc135006f820d73a3d72c350b6974ea10353957f2fa5c`.
+
+Fresh Opus/xhigh then found the production half of the failure:
+`syncAcceptHandler` destructures `{ node, message }` and reconstructs that
+smaller object on both traced and untraced paths. Although `handleMessage`
+truthfully resolves and passes `syncSelection`, the wrapper drops it before
+`syncAcceptHandlerUntraced`; `headsMode` is therefore false and branch-cut
+recording is dead even for a real negotiated heads-mode `SYNC_ACCEPT`. Fresh
+Codex-high and a same-session exact Kimi 3/high/dual-100 follow-up independently
+confirmed the causal path and the same bounded TDD correction. This is an
+existing Phase 1n-c contract defect, not an architecture expansion.
+
+Amend the corrective tests-only checkpoint as follows:
+
+1. Preserve the already-authorized outbound-capture/constructor migration in
+   the five named preservation owners.
+2. Only in `core-heads-sync-1n-b-red.test.ts`, define one frozen typed
+   heads-chunk selection and reuse it in the request sender fixture. Pass that
+   exact value as `handleMessage` argument three at the seven deliveries of
+   captured negotiated messages: the existing `deliverAll` call and the six
+   direct captured request/response round trips previously at lines 228, 234,
+   274, 281, 375 and 379.
+3. Leave the seven handcrafted core `accept(...)` inputs and the deliberate
+   field-1 fallback input bare. Leave every inbound input in reciprocity,
+   clock-pending, no-progress and request-lifecycle bare: those are handcrafted
+   handler-unit messages, not captured stream traffic. Do not forge a private
+   ingress brand, infer protocol from fields or tag a noncausal message.
+4. Preserve every title, assertion, count, order, timeout, wire round trip and
+   identity construction. Against the paused GREEN, the authoritative
+   tests-only result must remain **21 passed / one failed**: the unchanged
+   `advancing shared heads does not forget a later old-branch injection`
+   assertions expose the callee propagation bug. Against `cf8fe9b`, retain the
+   already-recorded absent negotiated-sender surface RED and non-vacuity proof.
+
+Commit that state tests-only before production resumes. The distinct paused
+GREEN may then change only the existing production owner
+`packages/node/src/handlers.ts`: accept the complete `HandleParams` in
+`syncAcceptHandler` and forward it unchanged through both traced and untraced
+calls. Do not add a new branch, inference, compatibility adapter or registry.
+`syncHandler` already preserves the complete parameters. `updateHandler` has a
+similar reconstructing shape but UPDATE neither carries negotiated sync truth
+nor consumes `syncSelection`, so it remains unchanged. The production fix must
+restore the five owners to 22/22 and the complete semantic preservation set to
+30/30 before external review.
+
+Fresh Claude-skill Opus/xhigh session
+`a7544071-790d-4378-bdeb-6c10409167ba` used substantive `claude-opus-5` at
+xhigh and returned `CAUSAL_FAILURE_CONFIRMED: yes`,
+`OUTBOUND_ONLY_SCOPE_INSUFFICIENT: yes`, `PRODUCTION_INFERENCE_FORBIDDEN: yes`,
+`PLAN_AMENDMENT_AGREED: yes` and the production propagation blocker above.
+Automatic Haiku use produced only 15 output tokens and authored no verdict or
+tool call. Result SHA-256 is
+`d632c1653c4f80afe7da7d743c4021d452423a6f02e7cde650997b29d9acfa8e`;
+the verified manifest SHA-256 is
+`5210f9d5a70d7f20c7b6c713da6aa2bf51432e6d9928715cf3c8e9f38614dfa4`.
+
+Exact Kimi session `87e3dfaf-3279-40af-9295-d6364cc2a40e` initially used
+16 steps / 26 successful read-only calls. Its same-session follow-up used three
+steps / four successful read-only calls and authenticated effective
+`managed:kimi-code:k3`, thinking/high and environment/CLI/loaded caps all 100.
+The follow-up supersedes its initial noncausal reciprocity/fallback suggestion
+and confirms `PRODUCTION_DEFECT_CONFIRMED: yes`, the seven captured core sites,
+21/22 tests-only RED, one-wrapper GREEN repair, existing-contract sufficiency
+and `BLOCKERS: None`. Follow-up result SHA-256 is
+`5d2423f7495bf4208835c15e3b6ff9dc462dbfc3ca510502f92face1233006ac`;
+its verified 14-entry manifest SHA-256 is
+`96798b06f4c9db961ebfb178639f0848dcde8c85a944760b39b9e644244c49b7`.
+Evidence is under
+`.logs/phase-1n-c-inbound-fixture-scope-{opus-xhigh,kimi3-high-100}/` and the
+exact Kimi follow-up directory with the same prefix and `-followup` suffix.
+
+This correction changes no identity rule. Omitted ACL still means a generated,
+creator-bound id; a caller-chosen id still requires an explicit coordinated
+ACL; legacy plain ids remain unsupported.
+
 ## Next Agent Prompt — Phase 1n-c distinct production GREEN
 
 Start a distinct fresh Codex-high production GREEN from immutable RED
