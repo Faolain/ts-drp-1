@@ -24848,28 +24848,52 @@ is 0/`end_turn`, stderr empty, final and session result byte-match, and
 HEAD/tree/index/worktree/stash/candidate/evidence/preliminary/protected hashes
 are invariant.
 
-## Next Agent Prompt — Phase 1n-a trusted-only/no-progress corrective RED
+## Phase 1n-a trusted-only/no-progress corrective RED — frozen
 
-Run a fresh Codex-high tests-only RED against fixed production commit
-`d279fda`. Extend real signed/wire owner tests without mocking the object result
-or writing private recovery/provenance state. After three genuine true-missing
-rounds, deliver separately (a) one raw unsigned `Vertex` whose claimed hash is
-`HashGraph.rootHash` and (b) one already-present vertex. Prove each no-progress
-round sends no recovery, changes no graph/state or invalid budget, disconnects
-nobody, does not reset the episode and emits no `DRP_SYNC_ACCEPTED`; the very
-next genuine-missing round must enter the existing cooldown/rejection with no
-new SYNC. Preserve the genuine novel clean-round reset/event owner.
+Fresh Codex-high tests-only commit
+`b8dfcce6578582e0aaabf0cd8e90b5fed870525a` (tree
+`7832226315b295a2b3afc8e8aa8f37a7049983a5`) adds only the 313-line
+`packages/node/tests/sync-no-progress-corrective-1n-a-red.test.ts`, SHA-256
+`2947df739dfa1c672a87b751150c89cac0b37b643cd3dd7a2da81872c0e74994`.
+The prior 7-test owner and 6-test sentinel remain byte-identical.
 
-Add a bounded compact-observer control showing a genuinely applied clean round
-still resets and emits once. Also pin that a raw-empty outcome which exhausts
-the peer invalid budget cannot emit acceptance; reuse existing Phase-1k
-fixtures/helpers where practical and keep this exact-capacity security owner
-separate from the fast focused loop if it is materially slower. Do not add a
-production hook or lower the cap for tests. Change tests only; do not modify
-production, plan, dependencies, generated files or protected state. Run the
-focused causal RED, prior 13/13 owner/sentinel group and proportionate
-preservation/build/type/lint/format gates to a new evidence directory, without
-sealed/100k work, then commit only the tests-only RED.
+The authoritative signature is 3F/1P. Unsigned root-shaped and already-present
+offers each make no merge, commit, immediate recovery/wire, graph/state/invalid
+change or disconnect, but incorrectly emit acceptance, clear the three-retry
+episode and allow a fourth SYNC instead of rejection. The compact-observer
+genuine-commit control passes, including reset and exactly one accepted event.
+The real exact-10,000 invalid-budget owner disconnects once with no merge,
+recovery or state change but incorrectly emits acceptance; that is its sole
+failed assertion. Its test body is 187 ms and isolated process wall is 3.57 s,
+so it is bounded enough for acceptance rather than a long-suite exception.
+
+Frozen combined owners remain 13/13, sentinel 6/6, Phase-0f/recovery 56/56 and
+serial anti-entropy/1k 16/16. Ordered builds pass; typechecks retain only the
+byte-matched object-five/node-two Phase-1i-b diagnostics. Lint is owned 0/0 and
+tracked 0 errors/249 warnings; Prettier/diff pass. A concurrent preservation
+attempt hit a coverage `.tmp` ENOENT after all test bodies passed; the preserved
+failure is superseded by the serial 16/16 run without deleting coverage data.
+Fixture-only compact-config and Vitest proxy-formatting mistakes are likewise
+preserved and corrected before the authoritative RED. No sealed/100k/fuzz work
+ran. Ledger SHA-256 is
+`dc5053c07f852db3ae6e30cb99c7e00f6546b7bf025f39336433c5fbeda022f6`;
+the verified 68-entry manifest SHA-256 is
+`e0c76052400bbdad72f0aa8777399f3ddf3f4de3e2c76cb96e286517f99f2e28`.
+Evidence is under `.logs/phase-1n-a-no-progress-corrective-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-a no-progress corrective GREEN
+
+Run a distinct fresh Codex-high production-only GREEN against frozen commit
+`b8dfcce`. Reset requires raw missing empty, a non-exhausted round and genuine
+object-owned applied progress; `DRP_SYNC_ACCEPTED` additionally requires a
+non-exhausted genuinely applied clean round. Use the existing `committed`
+outcome only if the frozen compact-observer control proves it is truthful for
+compact history; otherwise add the narrowest internal object-owned progress
+signal, without public/provenance/test hooks. Preserve all earlier 1n-a
+recovery, pending, clean-round, error, finality and persistence behavior. Change
+production only; run the 4-test owner, prior 13/13, 56/56, 16/16 and all
+build/type/lint/format gates to a new evidence directory, without sealed/100k,
+then commit only the production correction for fresh reviews.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
