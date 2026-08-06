@@ -25076,6 +25076,42 @@ Evidence is under
 4.5/high and exact Kimi 3/high/100 must independently review this tests-only
 fixture correction before final Claude-skill Opus/xhigh acceptance.
 
+## Phase 1l tracked initial-sync fixture preliminary reviews — accepted
+
+Fresh native Grok 4.5/high returns `ACCEPTED` /
+`FIXTURE_MIGRATION_MAY_CLOSE=yes` / `OPUS_MAY_START=yes` in session
+`019fd549-7a3e-7103-a66b-0bafe0f5de3a` at fixed HEAD `3d93234`. It
+independently authenticates RED causality, sole-file GREEN ownership, fresh
+non-aliased ACL construction, both replicas' authority and keys, generated
+creator-bound identity, real empty history and every unchanged retry/timing /
+network/no-peers assertion. It finds no blocker. Sole effective model is
+`grok-4.5-build` at high across ten calls. Result SHA-256 is
+`04cfd64d8450b2c424a7516ea7ed442ed276fde4c39559fd33168ad570e95cd7`;
+the verified 45-entry artifact-manifest SHA-256 is
+`dda1b40a63152baf13ffe572bfc1233e80aecabbe73edadc311698c5f051938d`.
+
+Exact Kimi CLI v1.49.0 with `kimi-code/k3`, thinking and both 100-step limits
+returns `ACCEPTED` / `FIXTURE_MIGRATION_MAY_CLOSE=yes` /
+`OPUS_MAY_START=yes` in fresh session
+`256d09f7-7568-455e-9cec-6f67add6e3b9`. It independently reruns focused 3/3
+and preservation 26/26 with coverage disabled and verifies both evidence
+manifests, authority construction, empty-history semantics and causal commit
+history. It uses 22/100 steps and 30 read-only Shell calls. Final SHA-256 is
+`e3cd2b0cc9fbcacf34082477aecc274a799e49e875ceaf8e98c470fb8d855c3b`;
+the verified 19-entry manifest SHA-256 is
+`52941a930e243fd6dd53608f10edf18528182ec322727f4cc4a4b7052bf74da2`.
+
+Preserve two disclosure nuances. The GREEN node pnpm wrapper exits 2 while the
+RED wrapper exited 1, but the exact two inherited node diagnostic lines
+byte-match and the fixture adds no type error. Kimi informally called the old
+low-level empty case a plain-id fixture; in fact `createObject({ peerId })`
+generated `<peerId>:<salt>`. The material migration is from a synthetic
+creator label to a real creator node plus coordinated explicit ACL, not legacy
+ID compatibility. Both reviewers preserve HEAD/tree/index/worktree, stash,
+candidate/evidence hashes and protected paths. Evidence is under
+`.logs/phase-1l-initial-sync-fixture-migration-green-{grok45-high,kimi3-high-100}-review/`.
+Final fresh Claude-skill Opus/xhigh may now adjudicate closure.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
