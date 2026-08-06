@@ -24474,21 +24474,57 @@ and the preserved uncommitted diff SHA-256 is
 `36e4ded8cda459112842234ad21de08a62af7201a4be94d999c607af5368c687`.
 Evidence is under `.logs/phase-1n-a-clock-pending-green-codex-high/`.
 
-## Next Agent Prompt — Phase 1n-a rejected-boundary corrective RED
+## Phase 1n-a rejected-boundary corrective RED checkpoint — frozen
 
-Start a fresh Codex-high tests-only correction. Replace only the two mocked
-public-error/string-property cases with a genuine production-owned rejected
-boundary for UPDATE and SYNC_ACCEPT: process an authenticated clock-pending
-vertex before a later vertex triggers a real `ApplyInvariantError` or bounded
-adoption exhaustion, and prove the exact primary error identity plus partial
-result are preserved while pending provenance stays module-owned. If a
-deterministic fixture seam is unavoidable, it must invoke a module-owned writer
-from object test infrastructure; no caller-authored field, symbol, tuple
-position, message or public brand may authenticate provenance. Preserve every
-other frozen assertion and exact 9F/3P RED causality, adjusting only the two
-fixture cases' mechanics. No production/plan/dependency edits or sealed 100k.
-Commit tests-only, rerun focused/preservation/build/typecheck/lint/format gates
-sequentially to a new `.logs` directory, and report exact census/hashes.
+Freeze fresh Codex-high tests-only commit
+`92735d11b06115609bb597182effb0559d98d557` on documented parent
+`c4960d2`. Its exact scope is 41 insertions / 14 deletions in only
+`packages/node/tests/sync-clock-pending-provenance-1n-a-red.test.ts`; the
+migrated sentinel and every production/plan/dependency/generated file remain
+byte-identical.
+
+Both UPDATE and SYNC_ACCEPT boundary cases now submit a signed authenticated
+clock-pending vertex followed by a signed vertex whose existing private
+`tryCommitPreparedVertex` failpoint returns real retry three times. The actual
+object applier produces `AdoptionCommitExhaustedError`; a call-through merge
+spy proves the handler rethrows the exact primary error identity and preserves
+the exact same `partialResult` object:
+`{applied:false,invalid:[],missing:[pending],quarantined:[rejected]}`. No
+caller-authored provenance field/symbol/brand/message or test-only production
+hook remains. The intended RED is solely that node recovery still treats the
+authenticated pending hash as true missing, calls `syncObject` and sends SYNC.
+
+Authoritative and postcommit census remains exact combined 9 failed / 3
+passed: new owner 6 failed / zero passed and migrated sentinel 3 failed / 3
+passed. Preservation remains 56/56 plus 16/16; ordered builds pass; typechecks
+retain only the inherited object five / node two ledger; owned lint is clean,
+tracked lint has zero errors / 249 warnings, and formatting/diff gates pass.
+No sealed workload ran. Corrected test SHA-256 is
+`a1e72089458f05ff347c16c396572ea1f3eaf9c1b31b589f1a7ee2c7b210316c`,
+sentinel SHA-256 remains
+`7cdea3709d5820b85243bf317caf41d73ca1b29a4cd7feb53b0aa0526e1d5ee9`
+and artifact-manifest-file SHA-256 is
+`a74644eb3dc2b91f39d77e6b63365aacfe7ebfb5bf8919df41f31fc871c97b43`.
+Evidence is under
+`.logs/phase-1n-a-boundary-corrective-red-codex-high/`.
+
+## Next Agent Prompt — Phase 1n-a authenticated production GREEN
+
+Start a new distinct Codex-high GREEN from the corrected frozen RED. Use only
+module-owned provenance seeded by Phase 0f's existing private
+`ReceiverClockPendingValidationError`; propagate exact hashes on returned
+results and real partial/rejected-boundary errors through object-owned WeakMap
+or an equally unforgeable internal channel, beside unchanged public tuples.
+Use dependency closure plus bounded prior-proven-pending memory for later
+descendants; never reread `Date.now()` or infer from caller fields, symbols,
+tuple position, error text or public brands. At the three node recovery
+decisions, filter only authenticated pending hashes and skip pending-only empty
+recovery without consuming/resetting retry/cooldown. Preserve genuine-missing
+heal, Phase 0f re-offer, finality, invalid budgets and exact error identities.
+No 1n-b/c/d, test edits, public enum/error leak, compatibility shim or analyzer.
+Run focused 12/12, preservation 72/72, ordered build/typecheck/inherited ledger,
+lint/format/exact production scope sequentially to `.logs`; no sealed 100k.
+Commit production only and rerun focused/preservation postcommit.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
