@@ -27914,6 +27914,35 @@ Branch-cut eviction, mutation-driven per-node quotas, Sybil/object entitlement
 and honest-room arbitration remain separate quorum-defined Phase 1o work. This
 RED adds no legacy plain-ID support or identity fallback.
 
+## Phase 1o-c absent sync-state retention GREEN — review candidate
+
+Fresh distinct Codex-high landed production-only commit
+`cb60840b96ec55e493c31790cc5e91dbd97d7be5`. Its sole path is
+`packages/node/src/sync-state.ts`, 12 insertions / 4 deletions; source SHA-256 is
+`3d56839ad05d4e00f8c9de7fcb5828e426a3e1979bd497dcda2a92fb1889e6fa`.
+Tests, plan, caps, identity and fallback remain frozen.
+
+A private nonallocating `findState` now serves exactly the four absent/no-op
+operations. Each returns its prior empty semantic without retaining state.
+Writers, allocating `getState`, `prepareSyncSend`, retry/cooldown and cleanup
+remain unchanged; no shared mutable empty state exists.
+
+Baseline RED reproduces 1 failed / 1 passed at 514 visits; focused GREEN passes
+2/2. Preservation passes 13/13 files and 49/49 tests. Production typecheck is
+clean; package typecheck retains only inherited compact-history TS1360/TS2322.
+ESLint, Prettier and diff checks pass. The first preservation controller used
+wrong node paths for three network suites; authoritative numbered logs were
+overwritten by clean network runs and the correction is disclosed rather than
+counting the failed invocation. Evidence is under
+`.logs/phase-1o-c-sync-state-retention-green-codex-high/`; result SHA-256 is
+`f81410b7aa5854c4062cb936b722d5f7c34806332dd4ff2170476e669a822832`
+and verified 41-entry artifact-manifest SHA-256 is
+`847a2babc97a54900dfcce9a1b1d1d2063b2c9fb63be2b3afe7b7256f66bdf07`.
+
+Reviewers must reject allocation hidden behind another container, changed
+absent return semantics, lost mutation/retry state, cleanup/isolation regressions,
+storage-quota overclaims or legacy-ID reopening.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
