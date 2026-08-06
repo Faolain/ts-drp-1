@@ -27943,6 +27943,43 @@ Reviewers must reject allocation hidden behind another container, changed
 absent return semantics, lost mutation/retry state, cleanup/isolation regressions,
 storage-quota overclaims or legacy-ID reopening.
 
+## Phase 1o-c absent sync-state retention acceptance — closed
+
+The gate unanimously accepts production `cb60840` at docs checkpoint
+`9e5f0c8`; frozen RED `73af912` is unchanged. Grok 4.5/high session
+`019fd91c-4000-7e62-bc8c-12f545b9d64b` returned `ACCEPTED`, no blockers and
+`OPUS_MAY_START=yes`. Its focused rerun passed 2/2 and controller preservation
+passed 49/49. Result SHA is
+`323b830c5767d95faf9e04dac939c379d1e877064d9ae68ff3e3c0544e6a8fe0`;
+verified manifest SHA is
+`a98d356bff110fb4e1d637d3249b093ed8e1b256c226733360b051b5584b8881`.
+
+Exact Kimi 3/high/dual-100 session
+`fd5f94c1-5d10-4ec9-acdb-07decbdd210f` returned `ACCEPTED`, no blockers and
+`OPUS_MAY_START: YES`. Effective K3 used thinking, the 100-step cap, 13 steps,
+21 allowed calls and zero forbidden/fallback calls. Controller passed 2/2 plus
+49/49. Result SHA is
+`c40c368861eb3d3d6e84deba2e6473077d1f0d5581fa46789e65e2ff19fb3a2a`;
+verified manifest SHA is
+`4b087c320571f56e38a0ee36a3428f720616c025de3a7e3bafe1a480ad932b2a`.
+
+Final Claude-skill Opus 5/xhigh session
+`b9088084-5470-4d64-b9bd-a18bfeef09f9` returned `ACCEPTED`, no blockers and
+`PHASE_1O_C_MAY_CLOSE: yes`. After safe-mode denials, controller gates passed
+focused 2/2 and preservation 49/49; the same Opus session authenticated all 14
+logs and corrected network paths. Automatic Haiku metadata used 20 output
+tokens and no substantive/tool records. Result SHA is
+`e528570d3a3e71e3962bef69a99d195dafedbdf264625303636a6a6e9b042328`;
+verified 56-entry manifest SHA is
+`666de5ca4a482c221f5f1c85494c646ea1139bac1de6709b1e8f5cffce659bfb`.
+
+Later Phase 1o still owns mutation-driven `recordBranchCuts` and
+`queueExactRequests` retention, quotas/eviction and Sybil/object entitlement.
+Charged `prepareSyncSend` allocation remains intentional. The `JSON.parse`
+counter is a valid current cleanup-work seam, not a permanent representation
+contract; future key changes require equivalent causal cost proof. Identity
+remains greenfield. Phase 1o-c is closed; Phase 1o remains open.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
