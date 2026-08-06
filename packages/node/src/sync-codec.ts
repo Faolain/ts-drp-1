@@ -2,6 +2,8 @@ import {
 	DRP_HEADS_CHUNK_PROTOCOL,
 	DRP_MESSAGE_PROTOCOL,
 	type DRPSyncProtocol,
+	SYNC_HEADS_FIELD_HASH_CAP,
+	SYNC_HEADS_TOTAL_HASH_CAP,
 	SYNC_RESPONSE_BYTE_CAP,
 	SYNC_RESPONSE_CHUNK_CAP,
 	SYNC_RESPONSE_VERTEX_CAP,
@@ -59,13 +61,17 @@ export function buildSyncPayloadForProtocol(node: DRPNode, input: SyncPayloadBui
 	}
 
 	const heads = input.protocol === DRP_HEADS_CHUNK_PROTOCOL ? object.getHistoryHeads() : [];
+	const sharedHeadBudget = Math.min(
+		SYNC_HEADS_FIELD_HASH_CAP,
+		Math.max(0, SYNC_HEADS_TOTAL_HASH_CAP - heads.length - preview.requestedHashes.length)
+	);
 	const sync =
 		input.protocol === DRP_MESSAGE_PROTOCOL
 			? Sync.create({ vertexHashes: [...object.historyInventory.knownHashes] })
 			: Sync.create({
 					heads,
 					requestedHashes: preview.requestedHashes,
-					sharedHeads: sharedHashes(node, input.objectId, input.peerId),
+					sharedHeads: sharedHashes(node, input.objectId, input.peerId).slice(0, sharedHeadBudget),
 					vertexHashes: [],
 				});
 	const message = Message.create({
