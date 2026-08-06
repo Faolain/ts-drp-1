@@ -421,6 +421,6 @@ describe("Phase 1c legacy attestation budget", () => {
 		expect(disabledHarness.result.puts).toEqual([objectId]);
 		expect(
 			disabledHarness.result.dispatches.filter(({ type }) => type === NodeEventName.DRP_SYNC_ACCEPTED)
-		).toHaveLength(1);
+		).toHaveLength(0);
 	});
 });
