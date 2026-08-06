@@ -27627,6 +27627,54 @@ Accepted nonblocking residuals and gotchas are:
 Phase 1n-d aggregate and therefore Phase 1n are closed at production lineage
 `268aa2e` plus this acceptance checkpoint.
 
+## Phase 1o-a bounded shared-cut egress RED — checkpointed
+
+Fresh Codex-high landed tests-only commit
+`26b2e6d949174b8dc27eb1ca4fd7f29dc63b8a1c`. Its sole path is the new
+124-line
+`packages/node/tests/sync-ledger-resource-governance-1o-a-red.test.ts`; source
+SHA-256 is
+`c23055fa58c954b519e9619ff8fb8c0c9b428a81dd75f83a6c632a086bdd031e`.
+No production, plan, identity or protected untracked path changed.
+
+This first bounded Phase 1o item owns per-`(object, peer)` shared-cut **egress
+selection**, not private storage. Graph-known/authenticated evidence cannot
+make the next heads payload exceed the unchanged 32-hash shared-head field cap.
+The replaceable current verified shared frontier has selection priority over
+historical cuts. The contract does not prescribe an eviction order or promise
+that every historical cut remains selected. Abuse against one object/peer must
+not prevent a different peer on that object or the same peer on another object
+from building a bounded payload.
+
+The focused owner is stable causal RED at 1 failed / 1 passed. Current
+production selects 48 graph-known historical/current hashes for a field capped
+at 32 and then `buildSyncPayloadForProtocol` throws `SYNC_REQUEST_LIMIT`; the
+peer/object isolation control passes. Phase 1n-b core preservation passes 4/4,
+1n-c bounded codec/state passes 6/6 and 1n-d aggregate passes 2/2. Node
+typecheck retains only the exact inherited compact-history TS1360/TS2322 pair,
+with no owned-file diagnostic. ESLint, Prettier and diff checks pass. Evidence
+is under `.logs/phase-1o-a-resource-governance-red-codex-high/`; result
+SHA-256 is
+`7aeb39a7e4a77e078f68b6474553e2ac745273d06e57a2d309acedb5920b24dc`
+and verified 25-entry artifact-manifest SHA-256 is
+`cae0488935f146afef972a111a92fe7dba5f50327c3706c90722a60383c01da9`.
+
+The Phase 1o audit keeps the remaining ownership explicit. Phase 1f already
+owns channel pending sends; 1g pre-decode frame/update-batch caps; 1j
+`FETCH_STATE` response amplification; 1k invalid-peer retry/disconnect
+accounting; 1l product-path admission; 1n-c per-frame sync bounds; and 1n-d
+delta-proportional aggregate sync. Later Phase 1o items still own internal
+sync-state retention/reclamation, aggregate state across Sybil peers/objects,
+pending/decode/replay/storage quotas and honest-room non-starvation. Phase 3,
+through `parametersDigest`, still owns dependency fan-out, argument bytes,
+antichain/branch width and epoch capacity including NOP/dropped accounting.
+
+Do not claim that 1o-a bounds RAM: a GREEN that only selects a bounded egress
+set satisfies this slice while private retained cuts may remain unbounded.
+That distinct storage obligation must receive its own later causal RED. Identity
+remains greenfield; this owner adds no legacy plain-ID or caller-chosen-ID
+fallback.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
