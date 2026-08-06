@@ -27498,28 +27498,68 @@ and verified artifact-manifest SHA-256 is
 `fb5b7028cdab657e97c50977f85718788fd449ccaac19d1551a3458be7a886b6`.
 No broad workload or identity/legacy path was added.
 
-## Next Agent Prompt — Phase 1n-d aggregate production GREEN
+## Phase 1n-d aggregate production GREEN3 — review candidate
 
-Spawn a distinct fresh Codex-high production owner against frozen RED
-`fb8256d` plus its scheduling-oracle corrective and the exact C1-C13 contract.
-Trace the verified branch-cut/shared-head accumulation through the real heads
-payload factory, then make the smallest coherent production correction that
-keeps emitted heads-mode recovery state bounded by useful delta information.
-Preserve truthful old-branch and recursive exact-hash recovery, every accepted
-per-frame cap, aggregate short/long equality, fallback behavior and all
-accepted 1n owners. The GREEN must let the entire frozen aggregate owner reach
-and pass its equality oracle; catching `SYNC_REQUEST_LIMIT`, deleting the long
-corpus, relaxing a cap, hiding messages, truncating recovery, emitting field 1
-to current peers or adding a production downgrade switch is forbidden.
+Fresh distinct Codex-high landed production-only commit
+`268aa2eb552354b5d870681cb99c6f41a7957d55`. Scope is exactly
+`packages/node/src/handlers.ts` and `packages/node/src/sync-codec.ts`, 70
+insertions / 17 deletions. No test, plan, identity, ACL, parser, schema,
+fallback configuration or protected untracked path changed.
 
-Do not edit the frozen aggregate test or the plan. Do not change ID generation,
-parsing, ACL, wire identity or durable schema: this remains greenfield and has
-no legacy plain-ID support. Run the focused owner and all accepted 1n
-preservation sequentially, five ordered builds, exact typecheck census,
-production lint, Prettier and diff checks to `.log`; add a narrow mutant or
-instrumented causal trace if needed to prove the production owner. Package a
-verified manifest and commit only the minimal production paths. No full
-inventory/performance, sealed, fuzz, proto-generation or full suite.
+The coherent invariant is:
+
+1. authenticated merge progress teaches a durable cut only from the canonical
+   offered set's already-present external dependency boundary; pure duplicate
+   replay cannot grow the ledger;
+2. exact-bearing requests do not also receive an unrelated speculative delta,
+   but their simultaneously advertised unknown heads remain truthfully queued
+   for reciprocal recovery; and
+3. speculative suffix emission requires every advertised remote head to be
+   locally verified and every selected dependency to be enclosed by wire-proven
+   heads/cuts. Root remains an internal traversal sentinel and becomes proof
+   only if the peer actually advertised it.
+
+The first diagnostic form over-suppressed unknown-head queuing and broke 1n-b
+sibling/old-branch convergence. Restoring that truthful recovery made 1n-b
+11/11. A second form required non-empty `sharedHeads` and broke the accepted
+1n-c explicit-root bounded-response fixture; treating a wire-advertised root as
+a real boundary restored 1n-c 28/28 without reopening unadvertised root walks.
+
+The aggregate full file passes 2/2 in three initial runs, three refined runs and
+one final committed run. The asymmetric fallback passes every run; the earlier
+single late-ingress characterization did not recur. Final preservation is 1n-a
+11/11, 1n-b 11/11, 1n-c 28/28 and 1n-d(i) 4/4. Five ordered builds pass.
+Types/network/message-queue typecheck clean; object5/node2 are byte-identical
+to the inherited census with no owned-file diagnostic. Production ESLint,
+Prettier and diff checks pass.
+
+Three single-guard diagnostic mutants survived independently because the
+guards overlap defensively; no mutant result is claimed as proof. The complete
+pre-GREEN production image remains the stable causal kill. Every mutant and
+instrumentation edit was restored before final gates and commit. Evidence is
+under `.logs/phase-1n-d-aggregate-green3-codex-high/`; result SHA-256 is
+`b3f27aa91beca66280e200db2646334c54d47dd4b5815d170cc7378b0446d7b1`
+and verified artifact-manifest SHA-256 is
+`bc3a0f768172eb4fb12017f3db942a139b3806d4e0cdf945ee852da20b6e2b57`.
+No broad workload or legacy plain-ID path was added.
+
+## Next Agent Prompt — Phase 1n-d aggregate preliminary reviews
+
+Run fresh independent Grok 4.5/high and exact Kimi 3/high/100 reviews against
+exact GREEN HEAD `268aa2e`. Review the full C1-C13 contract, frozen RED lineage
+`fb8256d` + `d527333` + `c6a47f1`, production diff, accepted 1n owners and
+evidence. Re-run the aggregate full file and proportionate preservation
+sequentially. Adversarially inspect canonical boundary derivation, authenticated
+progress gating, exact-plus-advertised-head reciprocity, root proof, compact or
+unavailable history, retry/admission interaction, response chunking, fallback
+selection and the stable C3 fixture. Distinguish the superseded first candidate
+from committed GREEN3. No source/plan edit and no broad workload.
+
+Only after both preliminary reviewers accept, run final Claude-skill Opus/xhigh
+adversarial review. Require concrete public/runtime counterexamples for any
+blocker and reproduce them before authorizing a corrective. Identity remains
+greenfield: generated creator-bound ID by default, explicit ACL for caller-
+chosen IDs, and no legacy plain-ID support.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
