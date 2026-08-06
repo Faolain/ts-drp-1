@@ -27776,6 +27776,45 @@ or same-ID construction still requires explicit ACL. Phase 1o-a is closed at
 production lineage `fc8ab3a` plus this acceptance checkpoint; Phase 1o as a
 whole remains open.
 
+## Phase 1o-b aggregate sync-egress entitlement RED — checkpointed
+
+Fresh Codex-high landed tests-only commit
+`8472d716585c702b6cbed3588e3b7b23b2d3c3fd`. Its sole path is the new
+251-line
+`packages/node/tests/sync-aggregate-egress-entitlement-1o-b-red.test.ts`;
+source SHA-256 is
+`73677938ea3a853d2f6c8f17a081334fca2fcbea5009f079f1db03a3c6071f14`.
+The earlier `96c2ab4` commit was superseded by the final amend that added the
+missing shared-frontier-order assertion. No production, plan, cap, identity or
+protected untracked path changed.
+
+No plan-amendment gap exists. Accepted Phase 1n requires every current head and
+the deterministic truthful exact chunk to remain visible; those two individually
+32-capped fields fit the unchanged 64-total cap. Phase 1o-a already orders the
+current verified shared frontier before historical cuts. Shared knowledge
+therefore owns only
+`min(32, 64 - heads.length - requestedHashes.length)` remaining slots, in that
+accepted order. No wire or consensus cap may change.
+
+The focused owner is stable RED at 1 failed / 1 passed. Its real scheduled path
+constructs one current head, 32 selected shared hashes and one truthful 32-hash
+exact chunk, then fails `validateNegotiatedSync` with `SYNC_REQUEST_LIMIT` at
+65 total hashes. A tests-only 31-shared diagnostic passed 2/2 and was restored.
+The intended two-round control must request all 64 missing real vertices and
+converge, preventing a GREEN from starving exact recovery. The passing control
+proves peer/object isolation.
+
+Preservation passes 1n-b 11/11, 1n-c 28/28, 1n-d 2/2 and 1o-a 2/2. Node
+typecheck retains only the two inherited compact-history diagnostics; ESLint,
+Prettier and diff checks pass. Evidence is under
+`.logs/phase-1o-b-aggregate-sync-egress-red-codex-high/`; result SHA-256 is
+`ce3e147898ba9853415d0ef140ae1154175ab3c3baaf31bf230111f687c78300`
+and verified artifact-manifest SHA-256 is
+`ed6ef4d06520daa297de57120405f296547b5db58977ba953dc8e4778b37925e`.
+
+Identity remains greenfield. The one same-ID replica uses explicit coordinated
+ACL; no legacy plain-ID or caller-chosen-ID fallback is exercised or requested.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
