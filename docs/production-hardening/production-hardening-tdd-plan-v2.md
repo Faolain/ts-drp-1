@@ -24919,6 +24919,58 @@ Evidence is under
 4.5/high and exact Kimi 3/high/100 must independently review this fixed
 candidate before final Claude-skill Opus/xhigh acceptance.
 
+## Phase 1n-a no-progress corrective preliminary reviews — accepted
+
+Fresh native Grok 4.5/high returns `ACCEPTED` /
+`PHASE1NA_MAY_CLOSE=yes` / `OPUS_MAY_START=yes` at fixed HEAD
+`562e3b53e10aba747e218717bd20d769c19c3d36` (tree
+`4296cb7f2e76fe52cb49c755b63aad2da1a109a3`). It independently authenticates
+the complete RED/GREEN lineage, the 68/68 and 53/53 evidence manifests,
+trusted-only classification, compact `committed` truthfulness, exact-cap
+suppression and unchanged 1n-b handoffs. It finds no product issue. Its
+read-only bounded Vitest attempt was refused at Vite's `.vite-temp` write with
+`EPERM`, so it relies on the independently verified frozen run evidence and
+source audit rather than misreporting a rerun. Sole effective model is
+`grok-4.5-build` at high in session
+`d96caaef-c866-4d42-89f4-f8a5d0add78d`; no fallback/helper, web or write is
+used. Result SHA-256 is
+`1a3537dc2d15e7d7e3b18a86c9104092f7f653623f07aa836ab1727c32613f57`;
+the verified 28-entry manifest SHA-256 is
+`2dcc4420d4ce623ae6674213347656db16b76aff89001dd6dc7984f135569c4b`.
+
+Exact Kimi CLI v1.49.0 with `managed:kimi-code/k3`, thinking enabled and both
+100-step limits returns `ACCEPTED` / `PHASE1NA_MAY_CLOSE=yes` in session
+`d48f6a55-4980-4c83-a676-f5b5d705b4de`. It independently reruns the corrective
+owner 4/4, pending/recovery/finality/livelock owners successfully, and observes
+only the inherited two Phase-1i-b node type diagnostics. It confirms that
+trusted/root/duplicate/pending/failed values cannot enter `committed`, a
+genuine compact apply can, and exhaustion suppresses both reset and public
+success. Result SHA-256 is
+`8bb9724c56dacb253c41f57450147ce383efc815b29998e2e496571ff331398e`;
+raw-stream SHA-256 is
+`a331bd2703cf9a894fe0e1b4feaeca810751a2cf091ae1a9d713a9daae49ba2d`,
+and the verified 12-entry manifest SHA-256 is
+`d8c73ce71fe66093934eb3ac3a06a3262786b11628b628428e72e03161bb6692`.
+
+Kimi's wider nearby run also exposes two tracked `initial-sync.test.ts`
+failures at object-side Writer validation. They are causally disjoint from
+`60d9f2f`: Phase 1g had repaired their remote authentication, but later Phase
+1l made omitted ACL creator-only while two cases retained a local write by an
+ungranted joining replica. Record this as a missed Phase 1l tracked-fixture
+migration to repair with a fresh coordinated explicit ACL before claiming a
+broad node-suite green baseline. It is not Phase 1n-a production debt and must
+not be addressed by implicit permissionlessness, legacy/plain-id compatibility
+or weakened authority. Kimi also notes a theoretical cross-handler attribution
+window when `committed` re-reads a vertex after awaited merge; because the
+offered authenticated vertex is genuinely stored at that point, it remains an
+object-truthful progress signal and is nonblocking here.
+
+Both reviews preserve HEAD/tree/index/worktree, production/test/evidence hashes,
+the protected stash and protected untracked paths. Evidence is under
+`.logs/phase-1n-a-no-progress-corrective-green-{grok45-high,kimi3-high-100}-review/`.
+The preliminary gate is unanimous; final fresh Claude-skill Opus/xhigh may
+start against the resulting docs-only checkpoint.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
