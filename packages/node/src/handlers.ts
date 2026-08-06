@@ -33,6 +33,7 @@ import { MessageSchema } from "@ts-drp/validation/message";
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
+import { sendSyncObject } from "./operations.js";
 import {
 	advertisedTheseHeads,
 	completePresentExactRequests,
@@ -539,7 +540,11 @@ async function headsSyncHandler({ node, message }: HandleParams, syncMessage: Sy
 	const isReciprocalProof = advertisedTheseHeads(node, object.id, sender, syncMessage.heads);
 	const shouldReciprocate =
 		syncMessage.heads.length !== 0 && unknownRemoteHeads.length === 0 && selected.length === 0 && !isReciprocalProof;
-	if (queuedUnknown || shouldReciprocate) await node.syncObject(object.id, sender);
+	if (queuedUnknown) {
+		await node.syncObject(object.id, sender);
+	} else if (shouldReciprocate) {
+		await sendSyncObject(node, object.id, sender, "inbound-reciprocity");
+	}
 }
 
 async function fullInventorySyncHandler({ node, message }: HandleParams, syncMessage: Sync): Promise<void> {

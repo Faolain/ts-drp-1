@@ -160,22 +160,36 @@ export function queueExactRequests(
 	return queued;
 }
 
-export interface ExactRequestProbe {
+export type SyncSendPurpose = "inbound-reciprocity" | "scheduled-probe";
+
+export interface PreparedSyncSend {
 	requestedHashes: string[];
 	send: boolean;
 }
 
 /**
- * Prepare one outbound probe. Outstanding exact hashes are carried on attempts
- * one through three. The fourth scheduled probe rejects once and starts the
- * cooldown without putting an empty probe on the wire.
+ * Prepare one outbound sync send. Scheduled probes carry outstanding exact
+ * hashes on attempts one through three; the fourth rejects once and starts the
+ * cooldown without putting an empty probe on the wire. Inbound reciprocity is
+ * read-only with respect to that lifecycle and is suppressed during cooldown.
  * @param node - Node owning the sync state
  * @param objectId - Object being synchronized
  * @param peerId - Remote peer selected for this probe
+ * @param purpose - Lifecycle role of the outbound send
  * @returns Whether to send and which exact hashes to carry
  */
-export function prepareExactRequestProbe(node: DRPNode, objectId: string, peerId: string): ExactRequestProbe {
+export function prepareSyncSend(
+	node: DRPNode,
+	objectId: string,
+	peerId: string,
+	purpose: SyncSendPurpose
+): PreparedSyncSend {
 	const state = getState(node, objectId, peerId);
+	if (purpose === "inbound-reciprocity") {
+		const cooldownActive =
+			state.exactRequestCooldownUntil !== undefined && Date.now() < state.exactRequestCooldownUntil;
+		return { requestedHashes: [], send: !cooldownActive };
+	}
 	if (state.outstandingRequests.size === 0) return { requestedHashes: [], send: true };
 
 	if (state.exactRequestCooldownUntil !== undefined) {

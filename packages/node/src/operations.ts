@@ -3,7 +3,7 @@ import { FetchState, type IDRP, type IDRPObject, Message, MessageType, Sync } fr
 
 import { type DRPNode } from "./index.js";
 import { log } from "./logger.js";
-import { prepareExactRequestProbe, recordAdvertisedHeads, sharedHashes } from "./sync-state.js";
+import { prepareSyncSend, recordAdvertisedHeads, sharedHashes, type SyncSendPurpose } from "./sync-state.js";
 
 /**
  * Fetches the state of an object.
@@ -35,13 +35,42 @@ export async function fetchState(node: DRPNode, objectId: string, peerId?: strin
  * @param objectId - The object ID.
  * @param peerId - The peer ID.
  */
-export async function syncObject<T extends IDRP>(node: DRPNode, objectId: string, peerId?: string): Promise<void> {
+export async function syncObject(node: DRPNode, objectId: string, peerId?: string): Promise<void> {
+	await sendSyncObject(node, objectId, peerId, "scheduled-probe");
+}
+
+/**
+ * Sends an object sync for an explicit internal lifecycle purpose.
+ * @param node - The node.
+ * @param objectId - The object ID.
+ * @param peerId - The peer ID.
+ * @param purpose - Lifecycle role of the outbound send.
+ * @returns A promise that resolves after the send is handled.
+ */
+export function sendSyncObject(
+	node: DRPNode,
+	objectId: string,
+	peerId: string | undefined,
+	purpose: "scheduled-probe"
+): Promise<void>;
+export function sendSyncObject(
+	node: DRPNode,
+	objectId: string,
+	peerId: string,
+	purpose: "inbound-reciprocity"
+): Promise<void>;
+export async function sendSyncObject<T extends IDRP>(
+	node: DRPNode,
+	objectId: string,
+	peerId: string | undefined,
+	purpose: SyncSendPurpose
+): Promise<void> {
 	const object: IDRPObject<T> | undefined = node.get(objectId);
 	if (!object) {
 		log.error("::syncObject: Object not found");
 		return;
 	}
-	const probe = peerId === undefined ? undefined : prepareExactRequestProbe(node, objectId, peerId);
+	const probe = peerId === undefined ? undefined : prepareSyncSend(node, objectId, peerId, purpose);
 	if (probe?.send === false) return;
 	const heads = peerId === undefined ? [] : object.getHistoryHeads();
 	const data =
