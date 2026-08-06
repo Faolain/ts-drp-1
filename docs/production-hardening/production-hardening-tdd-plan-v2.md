@@ -28121,6 +28121,41 @@ the GREEN result SHA-256 is
 Tests and the plan were untouched by the GREEN. The candidate adds no legacy
 plain-ID route, compatibility fallback, identity migration or ACL change.
 
+## Phase 1o-d preliminary review status — one provider gate incomplete
+
+Exact Kimi 3/high/100 accepted `20d9df2` with no blocker and
+`OPUS_MAY_START=yes`. Fresh session `c56e571c-c8a1-4cb6-be4e-887a1b8e1bcf`
+used `kimi-code/k3`, thinking mode and both 100-step controls; it completed 20
+model steps and 27 read-only Shell calls/results without fallback, helper,
+subagent, web or write tools. Controller evidence independently passed the
+focused owner 6/6 and the 14-file preservation corpus 51/51, all exits zero.
+Result SHA-256 is
+`d6186175d6a4cdba87d794fa89e7a63ebbf5de5197b0092cec4506ee7b8034a8`;
+verified 48-entry manifest SHA-256 is
+`1cbcbf3d1c9ab939b1d534403ba568a40a7c94af9e92b00ab82d192ff9702b9d`.
+
+Kimi's nonblocking coverage notes are retained for the final review: one wire
+message does not yet combine canonical and malformed values, and the shape
+table omits whitespace/control and astral inputs. The production ASCII filter
+handles those equivalence classes directly. A malformed unknown head alongside
+otherwise-known canonical heads also suppresses reciprocity because the
+reciprocity predicate sees the unfiltered unknown array; this is a fail-safe
+reduction in attacker-triggered work, not retention or lifecycle mutation.
+
+The fresh Grok 4.5/high session
+`019fd96e-aad1-7131-ac19-66e8e8284201` authenticated effective
+`grok-4.5-build` at high reasoning and completed five read-only model calls. Its
+partial inspection found no concrete blocker, and its controller evidence also
+passed 6/6 focused plus 51/51 preservation. The provider then returned HTTP 402
+before the model emitted a verdict; one same-session, no-tools, one-turn
+finalization attempt returned the same 402. This is recorded as
+`INCOMPLETE_PROVIDER_402`, not acceptance. Result SHA-256 is
+`a2aab658cf83ef175c03573d4e16d65f47dbc8c72f253ef63aedce8f9e3212af`;
+verified manifest SHA-256 is
+`2630ed80d361b26716413928e4190d7396c2da58561a5ea5ea4115a600049d53`.
+No substitute model or inferred verdict is permitted. The final Opus/xhigh gate
+has not started; Phase 1o-d remains open until a native Grok verdict completes.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
