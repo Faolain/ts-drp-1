@@ -25329,25 +25329,133 @@ under
 
 The corrective is closed at tests-only commit `6f2045151b4176e22e47ed9590127000be4521a8`.
 
-## Next Agent Prompt — Phase 1n-b core-heads-sync production GREEN
+## Phase 1n-b core-heads-sync production GREEN2 draft — paused
 
-Use a fresh distinct Codex-high agent at this closure checkpoint. Implement the
-smallest production/additive-wire change that satisfies frozen tests-only RED
-`e639c4c`: reciprocal heads proof before shared-cut advancement, delta-only work
-after a proven shared cut, exact recursive hash requests for true missing
-parents, duplicate/out-of-order idempotence, retention of older shared branches
-and explicit field-1 full-inventory fallback. Preserve the 1n-a truthful
-accepted-event predicate and closed fixture; do not change the frozen RED or
-plan. The delta path must not read/materialize full `historyInventory` or
-`vertices`, and send completion alone must never prove remote possession.
-Use real protocol/handler/history seams, no fake runtime, mock outcome, test hook
-or legacy plain-ID support. Run focused RED, independent 1n-a/auth/recovery/
-initial-sync/finality preservation, ordered builds/typecheck/lint/format and
-bounded performance gates to `.log`; skip the already-run inventory benchmark,
-sealed workloads and fuzzers unless a new bounded causal need is first shown.
-Commit production/generated protocol artifacts only as genuinely required.
-Then run fresh Grok 4.5/high, exact Kimi 3/high/100 and final Claude-skill
-Opus/xhigh review in order.
+The distinct Codex-high GREEN2 draft remains deliberately uncommitted. It adds
+the additive heads/shared-heads/exact-request wire fields, bounded node sync
+state, history-head/suffix readers, reciprocal possession proof, exact recursive
+parent requests, retained branch cuts, lifecycle cleanup and field-1 fallback.
+After ordered builds its frozen 1n-b focused owner is 4/4; the final focused log
+SHA-256 is
+`1275e9b0751811752ab2dc8b40579fb67f611a91a914a567b62ae9551a70064f`.
+Preservation is only 41/50, however, with nine older retry assertions colliding
+with duplicate idempotence. It is therefore not a commit candidate and
+production must stay paused.
+
+The exact live draft is archived at
+`.logs/phase-1n-b-core-heads-sync-green2-codex-high/draft-production.patch`,
+SHA-256
+`89a35f446b199ac64722d18038dc0d4490ebb91674c17724fd25142b2907345a`.
+The collision ledger SHA-256 is
+`3b24c8e9566269ca7f9a0b77da383953a983937e39fcc375307215f4a9939c50`,
+the preservation log SHA-256 is
+`d83ac9e70c70241b14785af12d2d54bbaea1a4e365f64f1573080c0ce87feead`,
+and the verified GREEN2 manifest SHA-256 is
+`74a992e39e3aa248dee07b8b910fa2aa407dca2d717b0705b2b8939dc43d4f8f`.
+The pre-build 4F run used stale package output and is not causal evidence; the
+post-build 4/4 result above is authoritative.
+
+The collision is observational, not a fixture discriminator. In the frozen
+1n-b idempotence case and the nine legacy retry cases, production sees the same
+authenticated incomplete vertex from the same peer/object after a resolved
+first send, with no request delivery, acknowledgement, response, progress,
+timeout or anti-entropy tick. Only the test harness's private removal or
+retention of an outbound message differs. Production must not inspect or infer
+that private state.
+
+## Phase 1n-b retry/idempotence plan-amendment quorum — authorized
+
+The required independent quorum unanimously authorizes one causal correction
+and keeps the production draft paused:
+
+- Codex-high: `COLLISION_AUTHENTIC: yes`,
+  `PLAN_CORRECTION_AUTHORIZED: yes`, `PRODUCTION_MAY_RESUME: no`. Report
+  SHA-256 is
+  `346a8c761866a1fb0279e33baef3c74bea206ef31c79542c5c64d146605971b9`;
+  verified manifest SHA-256 is
+  `ed8b5c5f9dcbe40db70e8fdceac74bbd9671b2775d0bc4553058ce7cde342a28`.
+- Exact Kimi CLI v1.49.0, `kimi-code/k3`, thinking, both 100-step limits:
+  session `e90a524a-7ce4-4533-b82a-7da8246648cb`, 18/100 steps and 27
+  read-only calls; the result SHA-256 is
+  `84624538c5fd295530cba0a6c1de378fc7ca0e5bea9261c34cdbc65cea59d6be`
+  and verified manifest SHA-256 is
+  `fe25dc870fa01e72c01a95b105e28e30736fc98fa7d38e67bcc4b39336fb1b72`.
+  Its unchanged native report's inner bare `kimi --version` returned 0.31.0
+  from a different PATH executable; controller authentication above is the
+  authoritative model/tool disclosure.
+- Final Claude-skill Opus/xhigh: session
+  `879a5923-722f-4047-a5f8-0928b950cff9`, effective `claude-opus-5`, xhigh,
+  72 read-only calls, no Haiku review envelope. Result SHA-256 is
+  `e064faf806ef66cbbce4cfe28a37732e841ed65c5e5115e9ae89f4e1e6f15e5c`;
+  raw-stream SHA-256 is
+  `9b86daf0e50289e3eb8dbdcee72a1c98ab4a8291153bb71ed406487074a488d0`;
+  verified manifest SHA-256 is
+  `b242d1cbe6a7f069e8b7d091b2b33f251564c962efcc59e9c7c391ec9faf853b`.
+
+The amended contract replaces the legacy receive-count recovery budget; it
+must not layer a second retry counter beside it:
+
+1. Own one lifecycle per node, object, peer and exact outstanding request set.
+   First authenticated discovery of a truly missing dependency sends attempt
+   one to that peer with the exact requested hashes.
+2. Duplicate, out-of-order, pending-only, empty, trusted-no-progress and other
+   inbound messages neither retransmit, consume/reset attempts, open/close
+   cooldown, nor emit accepted progress.
+3. Only an actual scheduled outbound probe for that object/peer advances
+   attempts two and three. Direct `node.syncObject` and the real periodic
+   anti-entropy owner must re-carry still-outstanding unanswered hashes, not
+   merely drain a one-shot pending queue.
+4. Periodic anti-entropy rotates peers. A tick charges only the peer it actually
+   probes; it cannot migrate or charge another peer's exact request.
+5. The fourth scheduled attempt sends nothing, emits exactly one
+   `DRP_SYNC_REJECTED` with `{ id, peerId, retries: 3 }`, and opens the existing
+   30-second cooldown. Inbound and scheduled work is inert during cooldown; the
+   first scheduled probe after expiry starts a fresh episode.
+6. Authenticated arrival/presence of the exact dependency, or truthful committed
+   progress that resolves it, clears the relevant lifecycle. A newly exposed
+   missing ancestor starts its own exact request without reviving the old one.
+7. Object, peer and request lifecycles are isolated. `unsubscribeObject` clears
+   object-scoped requests, attempts, cooldowns and scheduled work; node `stop`
+   clears all node-scoped recovery state and prevents later work.
+8. The `UPDATE` path must use this same lifecycle. Its currently passing legacy
+   cooldown setup is an arithmetic coincidence from an ungated per-message
+   recovery path and must be migrated with the nine failing amplification
+   assertions.
+
+This is a scheduling/provenance correction only. The generated/creator-bound
+greenfield identity contract is unchanged: arbitrary plain/custom IDs require
+an explicit coordinated ACL, and omitted ACL has no legacy plain-ID fallback or
+compatibility shim.
+
+## Next Agent Prompt — Phase 1n-b retry-attempt lifecycle tests-only RED
+
+Use a fresh Codex-high tests-only agent. Add one causal owner, preferably
+`packages/node/tests/sync-request-attempt-lifecycle-1n-b-red.test.ts`, and make
+only the minimal stale-amplification corrections required in
+`sync-clock-pending-provenance-1n-a-red.test.ts`,
+`sync-no-progress-corrective-1n-a-red.test.ts` and `sync-recovery.test.ts`,
+including the passing-but-stale UPDATE exhaustion setup. Preserve those files'
+provenance, classification, pending/empty non-interference, clean-progress,
+bounded-rejection, event/finality/state and cleanup assertions.
+
+Freeze the full contract above with explicit scheduled `node.syncObject` calls
+and one bounded fake-timer integration through the real interval owner. Assert
+the decoded `requestedHashes` on attempts one through three, not bare message
+counts; cover duplicate neutrality, fourth-attempt rejection, cooldown,
+post-expiry restart, dependency/progress clearing, newly exposed ancestors,
+peer/object/request isolation, peer rotation, unsubscribe and stop. Prefer the
+existing fake-timer/`Date.now` seams; do not add a wall-clock sleep or a test-only
+production hook.
+
+The agent may edit and commit only those test files. It must not modify the
+paused production draft, frozen core-heads RED, plan, generated output, lockfile
+or protected untracked files. Its authentic RED should leave the frozen 1n-b
+owner 4/4 while failing only where the paused production draft lacks the causal
+scheduled-attempt lifecycle. Run the focused/corrected preservation tests plus
+ordered builds, typecheck, lint and formatting to `.log`. After the RED is
+frozen, a distinct fresh Codex-high GREEN may resume the preserved production
+draft, replace—not layer—the old recovery episode owner, and then enter fresh
+Grok 4.5/high, exact Kimi 3/high/100 and final Claude-skill Opus/xhigh review.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
