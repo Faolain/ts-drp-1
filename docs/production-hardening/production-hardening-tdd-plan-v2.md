@@ -24731,20 +24731,66 @@ the verified 37-entry integrity-manifest SHA-256 is
 Tracked state is clean, protected untracked files and stash are unchanged, and
 the greenfield identity rule still has no legacy plain-id shim.
 
-## Next Agent Prompt — Phase 1n-a corrective preliminary reviews
+## Phase 1n-a corrective preliminary reviews — accepted
 
-Run fresh independent Grok 4.5/high and exact Kimi 3/high/100 reviews of the
-complete fixed lineage through the plan checkpoint immediately preceding each
-review. Authenticate the frozen RED and production-only GREEN scope, rerun the
-focused 7/7 and combined 13/13 owners plus bounded relevant preservation, and
-adversarially inspect every recovery caller, raw-versus-filtered missing use,
-clean reset, pending-only event, exhaustion, error and persistence path. Reject
-any generic empty recovery, false accepted event, retry reset by pending-only
-input, hidden compatibility shim or same-slice regression. Treat Phase 1n-b's
-already recorded bounded provenance-eviction and mixed/transitive recovery
-handoffs as nonblocking unless new causal evidence disproves that classification.
-Do not modify production, tests, plan or protected state. Final Opus/xhigh may
-start only if both preliminary reviewers accept the same fixed candidate.
+Fresh Grok 4.5/high and exact Kimi 3/high/100 independently return `ACCEPTED`,
+`PHASE1NA_MAY_CLOSE=yes` and `OPUS_MAY_START=yes` at fixed docs HEAD
+`e664d5f19a0d135608d678cbae8c68d4e8a2d828` (tree
+`795950d784aa7dd7b368419af4be3f096b2dae92`). Both authenticate the complete
+lineage, strict RED/GREEN scope split, causal failures, production mechanism,
+all recovery callers, frozen evidence, greenfield identity rule and pre/post
+repository invariance. Neither finds a blocker or requests a legacy plain-id
+shim. Both retain bounded provenance eviction and mixed/transitive suppression
+latency as explicit Phase 1n-b handoffs rather than 1n-a safety debt.
+
+Grok session `9254a6db-0b48-4f12-8f83-86db93ec8166`, request
+`7be6eb45-6d16-4df4-9433-aa3afb991940`, requested `grok-4.5`, effective
+`grok-4.5-build` fingerprint `fp_a39489019fa99b6e`, high reasoning, exits 0
+with `end_turn`. Its 30 read-only calls comprise 15 terminal, 13 file reads and
+two greps, with zero helper/subagent, web/search or write-tool calls. Both RED
+and GREEN 37-entry manifests verify from the repository root. Result SHA-256 is
+`e50d9ad8277d05150886542533149ce97423e87b9bba6bd43e7a91ffde0dc2a6`;
+the 28-entry review-manifest SHA-256 is
+`f9307d9c96c0c04c7b292474b0325f64591edbc6118e93f1fb1dc0e35268e7cd`,
+and its manifest-hash artifact SHA-256 is
+`ea407cd3f46b7c059b2a25c43f90be1aafe26fbbc762bf8e88897a058e0690bf`.
+
+Grok correctly records three review-environment gotchas rather than converting
+them into evidence: read-only Vite cache creation blocked a bounded rerun with
+EPERM; `tee` masked that pnpm failure as a printed zero; and initial manifest
+verification used the wrong working directory before all entries verified from
+the repository root. A blocked `git write-tree` attempt created no lock or
+state. Nonfinal thought drafts in the raw stream are not verdicts; the
+byte-authenticated final assistant result is the acceptance above.
+
+Exact Kimi session `ed44abac-e65a-4ffd-80f4-682940e882fa` uses controller
+`/Users/aristotle/.local/bin/kimi-cli` v1.49.0, effective
+`managed:kimi-code/k3`, thinking enabled, environment cap 100 and CLI cap 100,
+and exits 0 without a resumed session, helper, delegation, Fable, fallback
+model, web or network. It independently reruns combined owners 13/13, the
+56/56 Phase-0f/recovery group and the 16/16 anti-entropy/1k group. Final SHA-256
+is `3ce6e563310c98a3f6fcb7d6286d6d9de6bf4b4bf24f5ad2cbd2963d513b3a70`;
+its verified 26-entry review-manifest SHA-256 is
+`3da782a5fbfb7ea906043662c4f0925da392afa3e6ec9ad925679bcea0901a87`.
+The test runner wrote only ignored coverage/cache artifacts; tracked/indexed,
+stash, candidate and protected state remained invariant.
+
+Evidence is under
+`.logs/phase-1n-a-clean-round-corrective-{grok45-high,kimi3-high-100}-review/`.
+
+## Next Agent Prompt — Phase 1n-a corrective final Opus/xhigh review
+
+Use the Claude skill for one fresh direct Opus/xhigh adversarial review at the
+fixed plan checkpoint immediately preceding the review. No delegation,
+subagent, Fable, web or network. Authenticate both preliminary acceptances but
+do not inherit their verdicts. Review the complete 1n-a lineage and independently
+try to falsify the corrected raw-versus-filtered missing contract, explicit
+clean reset, pending-only event truth, exhaustion distinction, every recovery
+caller, causal RED strength, preservation and evidence integrity. Reassess all
+known 1n-b handoffs and the greenfield no-legacy-ID boundary. Run only bounded
+read-only checks and proportionate focused tests; do not run sealed/100k. Return
+`VERDICT`, `PHASE1NA_MAY_CLOSE`, full findings/handoffs, model/tool/session
+authentication and invariance. Phase 1n-a closes only on final acceptance.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
