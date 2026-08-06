@@ -27384,7 +27384,59 @@ and verified 31-entry artifact-manifest SHA-256 is
 `828b229397ca3e8b269e81937f7780f3a8ac8f0eae77d31c79fe40ca87e1a37d`.
 No full inventory/performance, sealed, fuzz, proto-generation or full suite ran.
 
-## Next Agent Prompt — Phase 1n-d aggregate production GREEN
+## Phase 1n-d aggregate GREEN2 attempt — explicit-loop corrective required
+
+Fresh Codex-high GREEN2 stopped without a commit and restored exact HEAD
+`495fe599ccf5110f53df4ce14d2bb47134707a1a`; tracked production is clean and
+the corrected RED blob remains frozen. Baseline still repeats at the intended
+1 failed / 1 passed `SYNC_REQUEST_LIMIT` signature.
+
+The owner explicitly evaluated a bounded semantic candidate: only newly
+committed/authenticated offered vertices can teach branch boundaries; an exact
+request does not also walk an unrelated frontier; and speculative suffix
+walking requires useful verified shared boundaries rather than known sibling
+heads falling through to root. That removed both the cap overflow and retained-
+prefix-sized responses. The candidate still could not be judged: three
+identical executions produced short/long totals of 9,846/11,335,
+6,920/11,397 and 5,809/8,801 bytes with differing per-direction probe/request/
+response counts.
+
+The remaining race is narrower than reconnect readiness. Inside both explicit
+alternating loops, each `syncObject` attempt is followed by
+`telemetry.settled()`. That predicate can observe in-flight zero and ingress
+parity after enqueue but before the handler's fire-and-forget recursive fan-out
+emits, allowing the next explicit attempt to race that generation. The existing
+fixed `quiescent()` authority must separate every explicit attempt, retaining
+all telemetry and counters. This is another implementation correction of
+C3/C4/C7, not a C1-C13 amendment.
+
+No broad gates ran because no production candidate was eligible. Evidence is
+under `.logs/phase-1n-d-aggregate-green2-codex-high/`; result SHA-256 is
+`6956ed4e3de51fecb6d0f7866629d7d87159775ed611cf80b9daab28c30faac0`
+and verified ten-entry artifact-manifest SHA-256 is
+`247b3e4f71e9e1360205d5f626063c84244da0d048edb72d18d66db571d4c364`.
+
+## Next Agent Prompt — Phase 1n-d aggregate explicit-loop corrective RED
+
+Spawn a fresh Codex-high tests-only owner against `d527333`. Change only the
+aggregate test so every explicit sync attempt in both bounded alternating loops
+awaits the existing fixed `telemetry.quiescent()` causal barrier, not the
+instantaneous `settled()` predicate. Keep telemetry active and cumulative;
+exclude, reset, normalize or post-filter nothing. Preserve reconnect readiness,
+C1-C13, the baseline causal `SYNC_REQUEST_LIMIT`, fallback owner, explicit ACL
+fixture and every accepted owner.
+
+Prove baseline RED stability in at least three isolated processes. Because the
+baseline long corpus stops before the C9 snapshot, also use only temporary
+restored instrumentation or the already-traced bounded semantic candidate to
+prove complete short/long snapshots repeat identically across at least three
+isolated executions; restore every temporary production edit before the test-
+only commit. If this cannot be shown, stop read-only. Then run accepted 1n
+preservation, five builds, exact typecheck census, lint, Prettier and diff
+checks to `.log`, package a verified manifest and commit only the test. No
+identity change, legacy plain-ID path or broad workload.
+
+## After explicit-loop corrective — Phase 1n-d aggregate production GREEN
 
 Spawn a distinct fresh Codex-high production owner against frozen RED
 `fb8256d` plus its scheduling-oracle corrective and the exact C1-C13 contract.
