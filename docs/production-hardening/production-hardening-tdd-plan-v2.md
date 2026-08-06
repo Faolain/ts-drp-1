@@ -27883,6 +27883,37 @@ truncation below 32 occurs only with exact requests, when
 delta is lost. Identity remains greenfield with no legacy plain-ID path.
 Phase 1o-b is closed; Phase 1o remains open.
 
+## Phase 1o-c absent sync-state retention RED — checkpointed
+
+Fresh Codex-high landed tests-only commit
+`73af912eff20fce6243f5ea079cdb3be7ed7a227`. Its sole path is the new
+115-line `packages/node/tests/sync-state-retention-1o-c-red.test.ts`; source
+SHA-256 is
+`69a7cb706f0e3e3be612baa898408ce01ede75dac7102d3d46aa4897be625aba`.
+No production, plan, cap, identity or protected untracked path changed.
+
+This slice owns only allocation-free absent/no-op state reads. It uses public
+`unsubscribeObject` synchronous cleanup work as a causal counter, without
+inspecting private maps or prescribing representation. 128 absent pairs through
+each of `sharedHashes`, `advertisedTheseHeads`, `previewSyncSend` and no-op
+`completePresentExactRequests` retain 512 empty keys today. With two legitimate
+mutated control entries, focused RED is stable 1 failed / 1 passed at 514 cleanup
+visits versus an allowed maximum of two. Public unsubscribe cleanup and
+cross-object isolation pass; `stop()` reclamation passes.
+
+A temporary production-only nonallocating lookup mutation passed 2/2, was
+restored byte-exact, and the RED returned. Preservation passes 49/49 across
+1n-b/c/d and 1o-a/b. Node typecheck retains only inherited TS1360/TS2322;
+ESLint, Prettier and diff checks pass. Evidence is under
+`.logs/phase-1o-c-sync-state-retention-red-codex-high/`; result SHA-256 is
+`4c855cd5b1f9dcd37b3c744bc2c36a375e8d9d564ba63da39b156a6ed397ff91`
+and verified 61-entry artifact-manifest SHA-256 is
+`fc52eef5ad88232177f2163e142ae2e8f1cd47953c92940e22160975034437c1`.
+
+Branch-cut eviction, mutation-driven per-node quotas, Sybil/object entitlement
+and honest-room arbitration remain separate quorum-defined Phase 1o work. This
+RED adds no legacy plain-ID support or identity fallback.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
