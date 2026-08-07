@@ -2,7 +2,7 @@ import type { FailureArtifact, ParentFailureCode, RunStage, SettledChildEvidence
 import type { ProcessIdentity } from "./process-forest.js";
 import type { KillHit } from "../../src/killpoints.js";
 
-export interface CorrectivePartialFailureEvidence {
+export interface PartialFailureEvidence {
 	readonly cleanup: {
 		readonly unresolvedOwnedGroups: readonly number[];
 		readonly validatedGroups: readonly number[];
@@ -16,8 +16,8 @@ export interface CorrectivePartialFailureEvidence {
 	readonly settledChildren?: readonly SettledChildEvidence[];
 }
 
-export type CorrectiveFailureArtifact = FailureArtifact & {
-	readonly partialEvidence: CorrectivePartialFailureEvidence;
+export type RunFailureArtifact = FailureArtifact & {
+	readonly partialEvidence: PartialFailureEvidence;
 };
 
 export interface FinalizeFailedRunInput {
@@ -25,18 +25,18 @@ export interface FinalizeFailedRunInput {
 	readonly code: ParentFailureCode;
 	readonly detail: string;
 	readonly ownedGroups: readonly number[];
-	readonly partialEvidence: Omit<CorrectivePartialFailureEvidence, "cleanup">;
+	readonly partialEvidence: Omit<PartialFailureEvidence, "cleanup">;
 	readonly stage: RunStage;
 	readonly validatedGroups: readonly number[];
 }
 
 export interface FailureFinalizerDependencies {
 	killValidatedGroup(pgid: number): void;
-	writeArtifact(artifact: CorrectiveFailureArtifact): void;
+	writeArtifact(artifact: RunFailureArtifact): void;
 }
 
-export interface CorrectiveFinalizationObservation {
-	readonly artifact: CorrectiveFailureArtifact;
+export interface RunFinalizationObservation {
+	readonly artifact: RunFailureArtifact;
 	readonly cleanupKilledGroups: readonly number[];
 	readonly unresolvedOwnedGroups: readonly number[];
 }
@@ -50,14 +50,14 @@ export interface CorrectiveFinalizationObservation {
 export function finalizeFailedRun(
 	failure: FinalizeFailedRunInput,
 	dependencies: FailureFinalizerDependencies
-): CorrectiveFinalizationObservation {
+): RunFinalizationObservation {
 	const validatedOwnedGroups = Object.freeze(
 		failure.validatedGroups.filter((pgid) => failure.ownedGroups.includes(pgid))
 	);
 	const unresolvedOwnedGroups = Object.freeze(
 		failure.ownedGroups.filter((pgid) => !validatedOwnedGroups.includes(pgid))
 	);
-	const artifact: CorrectiveFailureArtifact = Object.freeze({
+	const artifact: RunFailureArtifact = Object.freeze({
 		...failure.base,
 		verdict: "fail",
 		stage: failure.stage,

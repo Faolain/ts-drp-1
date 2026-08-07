@@ -13,18 +13,18 @@ import {
 } from "./fixtures/artifacts.js";
 import { validCorrectiveCampaign } from "./fixtures/corrective-artifact-fixtures.js";
 import {
-	type CorrectivePartialFailureEvidence,
 	finalizeFailedRun,
 	type FinalizeFailedRunInput,
-} from "./fixtures/corrective-run-finalizer.js";
+	type PartialFailureEvidence,
+} from "./fixtures/run-finalizer.js";
 
 const CLEAN_SNAPSHOT_CHILD = process.env.PHASE_2B_CLEAN_SNAPSHOT_CHILD === "1";
 
 interface FailureCase {
 	readonly code: ParentFailureCode;
-	readonly expectedEvidenceKeys: readonly (keyof CorrectivePartialFailureEvidence)[];
+	readonly expectedEvidenceKeys: readonly (keyof PartialFailureEvidence)[];
 	readonly label: string;
-	readonly partialEvidence: Omit<CorrectivePartialFailureEvidence, "cleanup">;
+	readonly partialEvidence: Omit<PartialFailureEvidence, "cleanup">;
 	readonly passArtifact: PassArtifact;
 	readonly stage: RunStage;
 }
@@ -238,7 +238,7 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b corrective finalizer integration
 			(statement) =>
 				ts.isImportDeclaration(statement) &&
 				ts.isStringLiteral(statement.moduleSpecifier) &&
-				statement.moduleSpecifier.text === "./fixtures/corrective-run-finalizer.js"
+				statement.moduleSpecifier.text === "./fixtures/run-finalizer.js"
 		);
 		expect(importsFinalizer).toBe(true);
 	});

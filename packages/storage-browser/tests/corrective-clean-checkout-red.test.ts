@@ -11,7 +11,7 @@ const CORRECTIVE_FILES = Object.freeze([
 	"packages/storage-browser/tests/corrective-clean-checkout-red.test.ts",
 	"packages/storage-browser/tests/corrective-failure-finalization-red.test.ts",
 	"packages/storage-browser/tests/corrective-persisted-artifacts-red.test.ts",
-	"packages/storage-browser/tests/fixtures/corrective-run-finalizer.ts",
+	"packages/storage-browser/tests/fixtures/run-finalizer.ts",
 	"packages/storage-browser/tests/fixtures/corrective-artifact-fixtures.ts",
 ]);
 
@@ -36,6 +36,9 @@ it.skipIf(process.env[CLEAN_SNAPSHOT_CHILD] === "1")(
 				fs.mkdirSync(path.dirname(destination), { recursive: true });
 				fs.copyFileSync(path.join(REPOSITORY_ROOT, relativePath), destination);
 			}
+			fs.rmSync(path.join(snapshotRoot, "packages/storage-browser/tests/fixtures/corrective-run-finalizer.ts"), {
+				force: true,
+			});
 
 			fs.symlinkSync(path.join(REPOSITORY_ROOT, "node_modules"), path.join(snapshotRoot, "node_modules"), "dir");
 			for (const scope of ["examples", "packages"] as const) {
