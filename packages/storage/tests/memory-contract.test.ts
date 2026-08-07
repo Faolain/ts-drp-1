@@ -149,6 +149,71 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		expect(await store.getBlob(item.digest)).toEqual({ ok: true, value: null });
 	});
 
+	it("gives an own data SharedArrayBuffer bytes field precedence over malformed siblings", async () => {
+		const store = createMemoryAheDurableStore();
+		const { item } = await beginOne(store);
+		const before = await store.readObjectState(OBJECT_A);
+		const shared = new Uint8Array(new SharedArrayBuffer(item.byteLength));
+		const input = {
+			objectId: OBJECT_A,
+			generationId: GENERATION_A,
+			digest: item.digest,
+			bytes: shared,
+			extra: "malformed",
+		};
+		const result = await store.putCachedBlob(input);
+
+		expect(reasonOf(result)).toBe("SHARED_BUFFER_INPUT");
+		expect(await store.getBlob(item.digest)).toEqual({ ok: true, value: null });
+		expect(await store.readObjectState(OBJECT_A)).toEqual(before);
+	});
+
+	it("rejects an accessor bytes field without invoking it", async () => {
+		const store = createMemoryAheDurableStore();
+		const { payload, item } = await beginOne(store);
+		let getterCalls = 0;
+		const input = {
+			objectId: OBJECT_A,
+			generationId: GENERATION_A,
+			digest: item.digest,
+			get bytes(): Uint8Array {
+				getterCalls++;
+				return payload;
+			},
+		};
+
+		expect(reasonOf(await store.putCachedBlob(input))).toBe("INVALID_ARGUMENT");
+		expect(getterCalls).toBe(0);
+		expect(await store.getBlob(item.digest)).toEqual({ ok: true, value: null });
+	});
+
+	it("rejects an inherited bytes field", async () => {
+		const store = createMemoryAheDurableStore();
+		const { payload, item } = await beginOne(store);
+		const input = Object.assign(Object.create({ bytes: payload }) as Record<string, unknown>, {
+			objectId: OBJECT_A,
+			generationId: GENERATION_A,
+			digest: item.digest,
+		});
+
+		expect(reasonOf(await store.putCachedBlob(input as never))).toBe("INVALID_ARGUMENT");
+		expect(await store.getBlob(item.digest)).toEqual({ ok: true, value: null });
+	});
+
+	it("rejects an ordinary non-Uint8Array bytes field", async () => {
+		const store = createMemoryAheDurableStore();
+		const { item } = await beginOne(store);
+		const result = await store.putCachedBlob({
+			objectId: OBJECT_A,
+			generationId: GENERATION_A,
+			digest: item.digest,
+			bytes: [1, 2, 3] as never,
+		});
+
+		expect(reasonOf(result)).toBe("INVALID_ARGUMENT");
+		expect(await store.getBlob(item.digest)).toEqual({ ok: true, value: null });
+	});
+
 	it("global same-byte races have exactly one insertion and one idempotent success", async () => {
 		const store = createMemoryAheDurableStore();
 		const left = await beginOne(store, OBJECT_A, GENERATION_A);
