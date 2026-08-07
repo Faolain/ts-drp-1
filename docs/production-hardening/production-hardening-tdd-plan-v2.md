@@ -28222,6 +28222,45 @@ characterization and aggregate entitlement; Phase 1o-g retains productive-peer
 fairness. No legacy plain-ID, identity migration, omitted-ACL fallback or ACL
 policy was introduced. Phase 1o-d is closed.
 
+## Phase 1o-e bounded branch-cut retention RED — checkpointed
+
+The replacement Codex-high tests-only RED is frozen at `fb7c3ab`. Its 370-line
+`sync-branch-cut-retention-1o-e-red.test.ts` source has SHA-256
+`c002f103bc2a2fd949b2ffcb808ce45eb1302f14c05e36d217e3adb98c9d7d31`.
+Untouched production fails all three tests solely on four retention-order
+assertions: the current unbounded insertion history leaves the oldest cuts in
+the 32-slot wire projection instead of retaining the newest 32-cut FIFO
+window. A temporary exact 32-cut/FIFO/no-refresh diagnostic made all three
+tests pass, after which `sync-state.ts` was restored exactly to SHA-256
+`43e335bc8101f47fad00ca5379075bf64f7220bcd5b68f6178c88286ddf1fe16`.
+
+The public behavioral RED proves per-`(node, object, peer)` isolation, exact
+32-distinct retention, oldest-distinct FIFO eviction, duplicate no-refresh and
+evicted-cut readmission as a new admission. Full-history integration recovers
+an old branch whose fork cut aged out after more than 32 admissions.
+Compact-history integration first admits and compacts the complete
+authenticated graph, proves the old fork and an old-branch vertex are typed
+`history-unavailable`, observes the compact peer's rejection, and then
+recursively converges from a full-history peer.
+
+Two fixture gotchas were corrected before freezing. Re-admitting evicted cut 0
+is itself a distinct admission that evicts cut 1; the following new admission
+therefore exposes cut 3, not cut 2. An old-branch vertex that remains a graph
+head is correctly retained by compact storage, so the fixture advances that
+branch beyond the suffix before asserting unavailability. These corrections
+avoid weakening either FIFO semantics or compact-history truthfulness.
+
+Sequential preservation passes 57/57 across Phase 1n-b/c/d and Phase
+1o-a/b/c/d with coverage disabled. Production TypeScript exits zero. Package
+TypeScript reports only the inherited compact-history TS1360/TS2322 findings;
+ESLint has zero errors and five inherited JSDoc warnings. Prettier and diff
+checks pass. The 41-entry evidence manifest has SHA-256
+`f48d8af41e0884b9fdaab280cbf9b0dbea2ff60a524b332941adcadb1ecec30f`;
+the finalized result SHA-256 is
+`050c6fa5c0d25e2be2c47d7ed1771282492de10dfb6cbc1222df237a5de720f7`.
+Same-ID fixtures use explicit coordinated ACLs; no legacy plain-ID route,
+omitted-ACL fallback or identity migration is introduced.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
