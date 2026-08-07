@@ -34,6 +34,17 @@ label and runs the immutable inspected config ID with networking disabled.
 Protected untracked files, `.git`, host dependencies, logs, and host build
 artifacts never enter the context.
 
+The image installs the exact frozen lockfile with lifecycle scripts disabled,
+limited to the root production build toolchain and `@ts-drp/node`'s production
+workspace dependency closure. This deliberately excludes the unrelated
+development-only `pprof` native addon; the build fails closed if it appears or
+if the pinned TypeScript/esbuild tools are unusable. Importing the real DRPNode
+does require the production `node-datachannel` addon, so only its pinned
+prebuild fetch is run (without the package's mutable source-build fallback) and
+the Linux/arm64 binary must match the hard-coded SHA-256 before the image is
+accepted. The controller then builds fresh production JavaScript inside the
+pinned Linux image immediately before measurement.
+
 ```sh
 node scripts/production-hardening/run-sync-state-heap-oci.mjs \
   --output .logs/phase-1o-f-sync-state-heap
