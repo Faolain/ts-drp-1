@@ -1018,6 +1018,12 @@ importers:
         specifier: ^3.0.5
         version: 3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0)
 
+  packages/storage:
+    dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
+
   packages/test-utils:
     dependencies:
       '@ts-drp/types':
