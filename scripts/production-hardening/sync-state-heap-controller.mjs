@@ -6,7 +6,13 @@ import { cpus, freemem, hostname, type as osType, release, totalmem } from "node
 import { join } from "node:path";
 
 import { analyze } from "./sync-state-heap-analyzer.mjs";
-import { buildJobs, parseArguments, requiredArgument, sha256Hex } from "./sync-state-heap-common.mjs";
+import {
+	buildJobs,
+	MEASUREMENT_CAPACITY_POLICY,
+	parseArguments,
+	requiredArgument,
+	sha256Hex,
+} from "./sync-state-heap-common.mjs";
 
 const PINNED_RUNTIME = Object.freeze({
 	arch: "arm64",
@@ -119,6 +125,7 @@ async function main() {
 			totalMemoryBytes: totalmem(),
 		},
 		lockfileSha256: await fileSha256(lockfilePath),
+		measurementCapacityPolicy: MEASUREMENT_CAPACITY_POLICY,
 		measurementRuntime: {
 			arch: process.arch,
 			modules: process.versions.modules,

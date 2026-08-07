@@ -8,6 +8,7 @@ import {
 	assertCanonicalHash,
 	framedCorpusDigest,
 	integerArgument,
+	MEASUREMENT_CAPACITY_POLICY,
 	parseArguments,
 	requiredArgument,
 	SHAPES,
@@ -39,6 +40,7 @@ const [{ peerIdFromPrivateKey }, { privateKeyFromRaw }, { DRPNode }, syncState] 
 const {
 	advertisedTheseHeads,
 	completePresentExactRequests,
+	installSyncStateCapacity,
 	prepareSyncSend,
 	previewSyncSend,
 	queueExactRequests,
@@ -343,6 +345,9 @@ const node = new DRPNode({
 	log_config: { level: "silent" },
 	network_config: { bootstrap_peers: [], listen_addresses: [], log_config: { level: "silent" } },
 });
+const measurementCapacity =
+	population > 0 ? MEASUREMENT_CAPACITY_POLICY.nonzeroPopulation : MEASUREMENT_CAPACITY_POLICY.zeroPopulation;
+if (measurementCapacity !== null) installSyncStateCapacity(node, measurementCapacity);
 await node.keychain.start();
 const creatorPrivateKey = privateKeyFromRaw(node.keychain.secp256k1PrivateKey);
 if (creatorPrivateKey.type !== "secp256k1") throw new Error("Expected node creator secp256k1 key");
@@ -353,6 +358,7 @@ const heap = await stableHeapReading();
 process.stdout.write(
 	`${JSON.stringify({
 		heap,
+		measurementCapacity,
 		placement,
 		population,
 		runtime: {

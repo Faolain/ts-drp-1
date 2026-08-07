@@ -31,6 +31,11 @@ export const ACCEPTANCE_THRESHOLDS = Object.freeze({
 	maximumU99ToMedianRatio: 1.1,
 });
 
+export const MEASUREMENT_CAPACITY_POLICY = Object.freeze({
+	nonzeroPopulation: Object.freeze({ perNode: 4096, perObject: 4096 }),
+	zeroPopulation: null,
+});
+
 export function parseArguments(argv) {
 	const parsed = new Map();
 	for (let index = 0; index < argv.length; index++) {
