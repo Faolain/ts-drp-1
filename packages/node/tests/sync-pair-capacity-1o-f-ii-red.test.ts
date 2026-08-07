@@ -34,7 +34,7 @@ interface CapacityInternals {
 	isDormantSyncLifecycle(outstandingCount: number, attemptCount: number, cooldownUntil?: number): boolean;
 }
 
-const EXPECTED_DEFAULT_CAPACITY = Object.freeze({ perNode: 759, perObject: 37 });
+const EXPECTED_DEFAULT_CAPACITY = Object.freeze({ perNode: 752, perObject: 37 });
 const CREATOR_PEER_ID = `12D3KooW${"a".repeat(45)}`;
 
 function deriveDefaultCapacity(): SyncStateCapacity {
@@ -137,7 +137,7 @@ describe("Phase 1o-f(ii) finite sync-pair admission", () => {
 		expect
 			.soft(
 				sharedHashes(globalOwner, creatorBoundObject(10), peer(0)),
-				"pair 760 evicts the globally oldest dormant pair"
+				"pair 753 evicts the globally oldest dormant pair"
 			)
 			.toEqual([]);
 		expect.soft(sharedHashes(globalOwner, lastObject, lastPeer)).toEqual([hash(9_999)]);
