@@ -1387,9 +1387,11 @@ Complete/reference checks are ref-major in ascending digest order. For the
 first failing ref, test missing, corrupt, then unpromoted; a lower-digest
 unpromoted ref therefore wins over a higher-digest missing ref. Multi-invalid
 tests pin the first reason and exact nonmutation. `BLOB_MISSING` and
-`BLOB_CORRUPT` are unreachable through the exported memory store but execute
-through the shared transition module/harness in 2a and genuine adapters in
-2c/2d. `BLOB_NOT_REFERENCED` remains reachable through `putCachedBlob`.
+`BLOB_CORRUPT` are unreachable through memory `promoteReference`, which
+returns `DURABILITY_UNAVAILABLE` before lookup, but remain reachable through
+`completeGeneration`'s ref-major integrity checks on the exported memory model
+and through the strict test harness. `BLOB_NOT_REFERENCED` remains reachable
+through `putCachedBlob`.
 
 #### Exact persistence codecs
 
@@ -29628,6 +29630,116 @@ parser fallback, normalization, migration, translation, inferred authority or
 compatibility shim. Generated canonical creator-bound IDs remain the normal
 path. Deliberate shared IDs remain possible only through explicit coordinated
 ACL and authentic signatures.
+
+## Phase 2a storage seam — accepted and closed
+
+Phase 2a is accepted and closed at `ef70268`. Freeze the executable-contract
+checkpoint `5f84067`, tests-only RED `094fbb9`, current-head-first swap
+correction `8a60305`, production GREEN `b9b18f7` and semantic lock-noise
+cleanup `36fc44d`. The original RED was assertion-causal at 69 failures and 12
+positive controls. The accepted package depends only on
+`@ts-drp/canonical`, exposes the five-state journal and exact codecs/results,
+uses one non-exported `TransitionOwner`, and ships one honest memory store that
+reports only frozen `ephemeral`/`never`. It contains no durable-adapter,
+signing, consensus or 2b+ implementation.
+
+Preserve the two exact-precedence corrections. Tests-only SAB RED `6796b5c`
+was 1F/19P and proved a shared-backed own `bytes` data property must win over
+an invalid outer sibling without invoking accessors or accepting inherited
+bytes. Production GREEN `6423f3a` reads the own data descriptor, rejects SAB
+before closed-record validation and copies ordinary bytes before later
+validation or retention. The swap correction remains current-head-first:
+candidate existence/state, current request head, captured base, then revision
+overflow. Stale requests receive `HEAD_CONFLICT`; `BASE_HEAD_MISMATCH` is only
+for a request already proven current.
+
+The first shared-runner candidate was not closure-worthy. Tests-only RED
+`24f9f49` proved `runStoreContract` executed no scenario and accepted a lying
+blob read; shallow GREEN `8f3c5a5` ran only a positive path. Freeze consolidated
+tests-only matrix RED `52ff33f` at 7F/2P. It kills delayed begin/blob input
+consumption, aliased blob/state outputs, state-mutating repeated-begin and
+undeclared-put rejections, and reported-but-unpersisted discard. Its two
+positive controls require a fresh factory/close per invocation and preservation
+of a primary conformance failure over a throwing close. Tests-only corrections
+`bcc92b5` and `38afaaf` remove no property: the former replaces an obsolete
+five-call ceiling with the same ordered calls plus exactly one final close; the
+latter retains the mutant's first successful Staged result so a later
+`GENERATION_EXISTS` probe cannot accidentally make the mutant honest. The
+corrected RED remains exactly 7F/2P.
+
+Production-only GREEN `36c1e3b` makes the frozen data corpus load-bearing with
+typed exhaustive dispatch. It accepts only the two honest capability pairs,
+runs common cases for either, explicitly skips the strict scenario for an
+ephemeral store and fails closed if a strict store reaches the executor before
+2c/2d implements it. Its deterministic creator-bound fixture proves initial
+state, copy-before-first-await for nested begin input and blob bytes, fresh
+blob/state outputs by mutation and reread, exact rejection plus nonmutation,
+persistent discard, fresh factory use, final close and primary-error
+preservation. It invokes the public store API and validation helpers rather
+than duplicating the transition state machine.
+
+Final Opus review then found that the export guard still named the deleted RED
+stub `PermissiveTransitionOwner`, so exporting the real owner would not fail.
+Freeze tests-only correction/RED `4750303`: it guards the actual
+`TransitionOwner`, retains the harness/signing guards, proves causality with a
+synthetic leaking surface and pins ordinary assignment plus
+`Object.defineProperty` capability relabeling. The export control passes while
+both relabel routes are causally 2F/22P focused and 2F/96P across storage.
+Production-only GREEN `ef70268` adds only `Object.freeze(this)` after memory
+store field initialization. The capability property is therefore
+non-writable/non-configurable and the instance non-extensible, while its pinned
+owner remains internally mutable through prototype methods.
+
+Final root evidence is four storage files / 98 tests and two adjacent canonical
+files / 14 tests, all sequential with coverage disabled. Storage typecheck,
+ESLint with zero warnings, storage build, full workspace build, Prettier and
+diff checks pass. The package-local bare `vitest run` remains a repo-wide
+workspace convention failure shared by existing packages; the supported root
+runner is authoritative for this slice.
+
+Fresh final Grok 4.5/high, exact Kimi 3/high/100 and Opus 5/xhigh all accepted
+`ef70268`. Their retained artifact SHA-256 values are respectively
+`89e35860bb44d4e60a0c69559aa86c1d4284e1eb0fd117449c22f7e12c3c61d6`,
+`27735a2eaf8d95c80c6a3b57c77c519cdd67921592a2272232522110cb577d7f`
+and `103a8b070a18bb712b69da19bb9a2ac01a8c604d50d048ab93bf8986428c9799`.
+The final Opus session is `0ff78fef-d9ca-4da1-bfe2-50cdd38e1a77`.
+
+The plan-only reachability correction above is unanimous across Codex-high,
+Grok, exact Kimi and final Opus. Memory `promoteReference` cannot reach
+`BLOB_MISSING` or `BLOB_CORRUPT` because durability rejects first. Exported
+memory `completeGeneration` intentionally can reach both before
+`BLOB_UNPROMOTED`; changing production instead would violate the stronger
+missing → corrupt → unpromoted ref-major rule.
+
+Carry these nonblocking residuals to their named owners:
+
+- **2c/2d strict contract runner:** teach the success-result validator to
+  accept the exact `{ok:true,value:undefined}` returned by successful
+  `promoteReference`; replace the strict fail-closed placeholder only when the
+  genuine adapter exists; give persistent contract runs isolated fixture
+  namespaces rather than assuming a globally fresh fixed object ID; and
+  generalize the current single-ref common assertion where strict multi-ref
+  coverage requires it.
+- **2c/2d durable integrity decision:** 2a deliberately permits wrong bytes to
+  win the global digest slot and detects them at promote/complete. A persistent
+  adapter must explicitly decide and test whether validation moves to put time
+  or remains completion-time; it must not inherit durable cross-session poison
+  accidentally.
+- **Export governance:** the runtime denylist now covers the real owner and has
+  a causal control, but an aliased future re-export would require the owning
+  export-surface review to update the guard. Descriptive capabilities remain
+  non-authorizing even though hostile same-process prototype mutation is not a
+  security boundary.
+- **Repository test harness:** package-local Vitest configuration is a
+  repo-wide convention issue, not a Phase 2a behavioral failure. Fix it
+  consistently rather than adding a storage-only exception.
+
+Identity remains greenfield at Phase 2a closure. Only canonical generated
+`<creatorPeerId>:<32 lowercase hex salt>` IDs are accepted. There is no
+plain/legacy parser, overload, alias, normalization, translation, migration,
+fallback or inferred authority. A later explicit coordinated-ACL identity
+path must remain separately authority-bound; it may never become plain-string
+compatibility.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
