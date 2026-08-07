@@ -416,7 +416,7 @@ describe("applied-vertex lookup semantic and wire baselines", () => {
 		expect(object.mergedAttestationCalls).toEqual([[incomingAggregate]]);
 		expect(result.puts).toEqual([{ id: OBJECT_ID, object }]);
 		expect(result.syncs).toHaveLength(0);
-		expect(dispatchDetails(result, NodeEventName.DRP_SYNC_ACCEPTED)).toEqual([{ id: OBJECT_ID }]);
+		expect(dispatchDetails(result, NodeEventName.DRP_SYNC_ACCEPTED)).toEqual([]);
 
 		expect(result.broadcasts).toHaveLength(1);
 		const expectedGeneratedAttestations = [first, second, learned].map(({ hash }) => ({
