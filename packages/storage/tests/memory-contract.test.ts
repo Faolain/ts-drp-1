@@ -33,6 +33,27 @@ async function beginOne(
 	return { payload, item, begun: begun.value };
 }
 
+function observeStore(
+	store: AheDurableStore,
+	calls: string[],
+	options: { readonly corruptBlobRead?: boolean } = {}
+): AheDurableStore {
+	return new Proxy(store, {
+		get(target, property, receiver): unknown {
+			const value: unknown = Reflect.get(target, property, receiver);
+			if (typeof value !== "function") return value;
+			return async (...args: unknown[]): Promise<unknown> => {
+				if (typeof property === "string") calls.push(property);
+				const result: unknown = await Reflect.apply(value, target, args);
+				if (property === "getBlob" && options.corruptBlobRead === true) {
+					return { ok: true, value: null };
+				}
+				return result;
+			};
+		},
+	});
+}
+
 describe("Phase 2a shared contract and honest memory capabilities", () => {
 	it("exports a frozen data-only corpus and common runner", async () => {
 		expect(Object.isFrozen(STORE_CONTRACT_SCENARIOS)).toBe(true);
@@ -41,6 +62,31 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 			durability: "ephemeral",
 			signingEligibility: "never",
 		});
+	});
+
+	it("runs the common ephemeral scenario against the supplied store", async () => {
+		const calls: string[] = [];
+		const capabilities = await runStoreContract(() => observeStore(createMemoryAheDurableStore(), calls));
+
+		expect(capabilities).toEqual({ durability: "ephemeral", signingEligibility: "never" });
+		expect(calls.slice(0, 5)).toEqual([
+			"beginGeneration",
+			"putCachedBlob",
+			"getBlob",
+			"readObjectState",
+			"discardGeneration",
+		]);
+		expect([[], ["close"]]).toContainEqual(calls.slice(5));
+	});
+
+	it("rejects when a supplied store lies about an observable common step", async () => {
+		await expect(
+			runStoreContract(() =>
+				observeStore(createMemoryAheDurableStore(), [], {
+					corruptBlobRead: true,
+				})
+			)
+		).rejects.toThrow();
 	});
 
 	it("does not export the transition owner, harness, or a signing-capability predicate", () => {
