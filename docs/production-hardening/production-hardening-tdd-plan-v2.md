@@ -28388,6 +28388,158 @@ fairness remains Phase 1o-g. No legacy plain-ID route, compatibility fallback,
 identity migration, omitted-ACL fallback or ACL policy change was introduced.
 Phase 1o-e is closed.
 
+## Phase 1o-f executable split and characterization quorum — unanimous
+
+The attempted Codex-high 1o-f RED correctly stopped before creating tests. The
+existing amendment names five prerequisites for production defaults, but the
+repository contains only the accepted Phase 1o-d payload/key census. It has no
+runtime heap/container characterization, confirmed pair-demand record,
+simultaneous-pinned bound, sync-state memory envelope/formula, derived finite
+defaults or internal injection seam. The 1o-d census explicitly disclaims
+JavaScript heap sizing. Starting RED or selecting a number at this boundary
+would invent the contract.
+
+A read-only Codex-high, exact Kimi 3/high/dual-100 and Claude-skill Opus
+5/xhigh quorum unanimously classifies the following as an executable
+clarification/split of the already-authorized prerequisite order. Concrete
+numeric policy decisions remain a later normative quorum. All three then
+ratified the exact reconciled protocol with no blocking change.
+
+Exact Kimi session `1dfed97d-695e-497d-a6dd-41fa103d1889` used K3 with
+thinking and both 100-step controls. Its same-session tool-free ratification
+completed with zero new calls; native totals are 11 steps and nine read-only
+calls/results. Ratified result SHA-256 is
+`b1a7eae06d36093e710204cbfded5c00c3bf51855576fd18edb9be63594e3459`;
+verified 45-entry manifest SHA-256 is
+`a610cba32adc0830bf579551ef2004d5fb2915f8c7b58afdccaaf2d3a6526c9b`.
+
+Opus session `e71d34dd-995b-493b-864b-59db97ee4685` used
+`claude-opus-5` at `xhigh`. Its same-session tool-free ratification completed
+in one turn with zero calls and no fallback. Ratification result SHA-256 is
+`bed125e7423a2251654542ef15bc3ea9bdd9120d5ce840234f038846763321ee`;
+refreshed transcript SHA-256 is
+`44f4c0dcd46a430e9f5b5284cadf1a10fa3e8dbff7cdffe50de92e724e182cfc`;
+verified refreshed manifest SHA-256 is
+`2de993946c9b49f872dcb4e8626f69e4da8300dedbeaa0d8ce9aabde5ec33ecf`.
+Codex-high independently ratified the same text with no edit. Candidate, index,
+stash and tracked worktree remained invariant throughout.
+
+### Phase 1o-f(i) — characterization and default derivation
+
+Phase 1o-f(i), including accepted measurement evidence and justified numeric
+production defaults, must be frozen before any 1o-f(ii) RED is written or run.
+Tiny injected capacities are only a later internal test seam, never permission
+to start behavioral work early.
+
+The characterization artifact must pin the exact repository revision,
+lockfile/build, Node and V8 versions, module ABI, OS/platform/architecture,
+OCI image digest, CPU/core/RAM facts and process flags. It runs freshly built
+production JavaScript under `--expose-gc`, with coverage, source maps,
+inspector and unrelated instrumentation disabled. Runtime/container/layout or
+procedure changes invalidate the artifact.
+
+The worker must strongly retain the real owning `DRPNode` because the state
+owner is a `WeakMap`. It uses production-length creator-bound object and peer
+identities plus distinct runtime-generated canonical lowercase 64-hex strings
+so shared fixtures or string interning cannot undercharge retention. It drives
+production lifecycle functions and records exact allocation/deallocation
+sequences and structural counts.
+
+Mandatory shapes are:
+
+1. minimal dormant;
+2. maximum dormant with 32 advertised heads, 32 shared heads and 32 branch
+   cuts, zero outstanding, zero attempts and undefined cooldown;
+3. 64 distinct outstanding hashes at attempts zero, one, two and three;
+4. active defined cooldown;
+5. expired-but-defined cooldown immediately before normal preparation resumes
+   the episode; and
+6. post-completion dormant.
+
+Each pinned shape retains the stated 64 distinct outstanding hashes. Exercise
+both a one-hot-object placement and the exact 20-object × 14-peer demand point;
+the artifact must state how its population sweep distributes pairs beyond that
+fixed point so per-object and node-container overhead remain attributable.
+
+For every shape use populations `N = {0, 512, 1024, 2048, 4096}`, at least
+three discarded warmups and at least 30 fresh isolated processes per
+shape/population. Randomize launch order from a recorded seed. In each sample,
+alternate full GC and a macrotask until heap change is below
+`max(0.5%, 64 KiB)`, capped at ten cycles; reject a sample that does not
+stabilize. Record the minimum of the final three `heapUsed` readings and the
+corresponding V8 `used_heap_size` evidence, with raw observations preserved.
+
+Report exact structural census separately from empirical heap evidence. The
+artifact reports median, mean, p95, IQR, min/max, Theil-Sen marginal bytes per
+pair, an OLS R-squared diagnostic and a one-sided 99% bootstrap upper bound.
+It names heap/V8 agreement, baseline-drift and R-squared thresholds. Reject the
+characterization for non-positive or non-monotone population medians, median
+absolute residual above 10% of fitted delta, `U99 / median > 1.10`, a missed
+named R-squared threshold, excessive heap/V8 disagreement or excessive
+baseline drift. Increase populations/replicates or reject; never widen a
+capacity silently. The final 1o-f(ii) GREEN representation must rerun this
+exact characterization before default freeze.
+
+The existing 20-room heap target, 8–12 data peers plus 1–2 relays per hot
+object, at-most-48 client connections, 1,000-member room target and Track-T
+topology statements are hypotheses until confirmed by recorded evidence or an
+explicit product/operator decision. One thousand members never automatically
+means 1,000 direct pair entitlements. T1–T4 are not implemented and cannot be
+used as present enforcement. While 1o-g remains open, simultaneous pinned
+fraction is `p = 1.0`; one unknown hash can pin indefinitely.
+
+Before defaults freeze, a normative quorum must decide and record exact values
+for profile heap ceiling `B`, sync-state fraction `f_sync`, reserve `r`,
+cross-engine multiplier `k`, churn factor `c`, single-object divisor `K` and
+fixed owner/container upper bound `F99`. For the maximum p95 and one-sided-99%
+upper marginal cost across every pinned shape and recorded distribution:
+
+```text
+S_pinned = ceil(max(p95_marginal, U99_marginal) * k)
+E_usable = max(0, floor(B * f_sync * (1 - r)) - ceil(F99))
+C_node   = floor(E_usable / S_pinned)
+D_object = ceil(14 * c)
+D_node   = ceil(20 * D_object)
+C_object = min(C_node, max(D_object, floor(C_node / K)))
+```
+
+Capacity rounds down and demand rounds up. Acceptance requires
+`C_node >= D_node` and `C_object >= D_object`; otherwise that profile is
+unsupported and needs a product decision plus evidence rerun, never a silent
+clamp. Only measured profiles earn defaults. The shipped compatibility default
+uses the tighter of supported browser/game profiles; operator/relay defaults
+remain explicit later configuration until separately characterized. No
+unmeasured profile earns a scale claim.
+
+The accepted implementation seam is module-private and resolved once per
+node: `{ perObject, perNode }` limits plus a pure deterministic default
+derivation owner. Keep public package exports, `DRPNodeConfig`, shared types and
+config loading unchanged. No environment/global test hook, identifier override,
+unlimited sentinel, private-map accessor, test-mode branch, compatibility
+wrapper, legacy-ID path or identity/ACL fallback is authorized.
+
+### Phase 1o-f(ii) — behavioral RED/GREEN
+
+Only after 1o-f(i) acceptance may a fresh Codex-high tests-only RED freeze tiny
+injected limits and equality to the accepted finite defaults. One synchronous
+node-scoped admission owner must enforce object and node capacities atomically
+at every allocating hint writer. Existing-pair access does not refresh age;
+use a monotonic admission sequence, not wall time or accidental map order.
+
+Only the oldest dormant pair is evictable. Nonempty outstanding hashes,
+nonzero attempts or any defined cooldown pins a pair. An expired-but-defined
+cooldown remains pinned until normal preparation resumes it; expiry is not
+terminal. With no dormant victim, refuse before allocation and before any
+existing state, order, lifecycle or event mutation. Public/integration tests
+must prove per-object and node-global atomicity, deterministic oldest-dormant
+eviction, each pin predicate, refusal non-perturbation, expired-cooldown resumed
+egress, object unsubscribe and node-stop cleanup, and injected/default paths.
+
+Peer-leave cleanup remains optional and never makes the arithmetic work.
+Fairness remains Phase 1o-g. No public config/wire/type change, legacy plain-ID
+route, identity migration, omitted-ACL fallback or ACL policy change is
+authorized.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
