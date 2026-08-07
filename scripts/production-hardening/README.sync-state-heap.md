@@ -17,6 +17,34 @@ worker asserts the retained composite JSON tuple key is exactly 146 UTF-16 code
 units and verifies branch cuts and final advertised/shared projections through
 public read seams.
 
+## Final-representation measurement capacity
+
+The authoritative population sweep reaches 4,096 pairs, while the production
+defaults are intentionally smaller. The harness therefore uses one finite
+internal measurement policy:
+
+```text
+N > 0: { perNode: 4096, perObject: 4096 }
+N = 0: no capacity installation
+```
+
+For a nonzero sample the worker installs this policy exactly once immediately
+after constructing its fresh `DRPNode`, before keychain startup, population or
+any sync-state writer. The production ledger freezes its own copied capacity.
+For N=0 the worker never installs or lazily allocates a ledger. This makes the
+nonzero-minus-zero evidence include the real fixed ledger, copied capacity,
+maps, per-object counts and admission metadata. The module-level policy object
+itself exists in every worker and therefore cancels across isolated samples.
+
+This is measurement accommodation, not a production setting. It adds no public
+config or environment route, unlimited sentinel, test mode, identity override,
+ACL fallback or legacy/plain-ID support. Controller metadata records
+`measurementCapacityPolicy`; every raw worker sample records
+`measurementCapacity` as the exact finite object or `null`. Artifact review
+must verify both. The current analyzer's curve gates reject material silent
+truncation, but future hardening should also reject policy values below the
+schedule maximum and any per-sample policy mismatch directly.
+
 For a bounded host smoke run (never acceptable evidence):
 
 ```sh

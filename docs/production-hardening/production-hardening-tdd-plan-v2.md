@@ -28656,6 +28656,100 @@ Fairness remains Phase 1o-g. No public config/wire/type change, legacy plain-ID
 route, identity migration, omitted-ACL fallback or ACL policy change is
 authorized.
 
+#### Phase 1o-f(ii) bounded behavior and final-representation rerun gate
+
+The bounded behavior is implemented, but Phase 1o-f(ii) is **not closed** until
+the final retained representation is characterized and any representation-
+sensitive constants are rederived and accepted. Freeze the tests-only RED
+`35ceea3`, its causal pin-predicate correction `ee27fb8`, and production-only
+GREEN `7dcf0c0`. The node-owned ledger retains an explicit admission sequence,
+composite key, object ID and state per pair plus per-object counts and the
+resolved finite capacity. Existing-pair reads remain O(1); only at-capacity
+admission performs a bounded oldest-dormant scan. Refusal precedes admission
+sequence, count, state, lifecycle and event mutation. Exact dormancy is zero
+outstanding requests, zero attempts and undefined cooldown. An expired but
+defined cooldown remains pinned until normal preparation resumes it.
+
+The corrected RED is 20/20 and the bounded adjacent suites are 35/35. Production
+TypeScript, targeted ESLint and formatting pass. Package typecheck retains only
+the inherited compact-history `TS1360`/`TS2322`. The old
+`sync-recovery.test.ts` mock no longer intercepts the negotiated direct-dial
+path and its six failures are outside this production diff; that classification
+is based on stack/commit archaeology and an older pre-GREEN log, not a
+phase-local observed pre-GREEN invocation. Do not describe it as a fresh
+baseline. Final Opus found no executable behavior/test blocker, but correctly
+refused closure because revision `8662788` measured the pre-ledger bare-Map
+representation.
+
+The final-representation accommodation was an explicit assumption correction,
+not a unilateral harness change. Opus, a fresh Codex-high and exact Kimi
+3/high/dual-100 unanimously agreed:
+
+```text
+nonzero population: { perNode: 4096, perObject: 4096 }
+zero population:    no installation
+```
+
+The property order is deliberately `perNode`, then `perObject`, matching the
+production-derived capacity object's layout. `4096` is exact: the final
+admission sees 4,095 existing pairs, and no schedule cell creates a 4,097th
+pair. Every sample has a fresh process and node. Install once immediately after
+`DRPNode` construction, before `keychain.start()` and every sync-state writer,
+only when population is nonzero. Leaving N=0 uninstalled is mandatory: it keeps
+the real fixed ledger, frozen copied capacity, maps, count tracking and
+admission metadata outside the baseline and therefore inside the measured
+fixed-activation term. This is a finite internal measurement accommodation,
+not a production default, public config/environment seam, unlimited sentinel,
+test mode, identity override, ACL fallback or legacy/plain-ID route.
+
+Freeze recharacterization tests-only RED
+`f11449ae7193f869d625af04ddf969ab30a00231` and harness-only GREEN
+`0eeec46b461cafe3838ffd5180d27e04f03d6549`. The RED file SHA-256 is
+`cb6e34113b823b639f1e9ff5064a8a59f9bc49ab902415d51b03281c4b238643`.
+It executes the real worker at one-hot outstanding N=38 and N=4096, proves N=0
+emits `measurementCapacity: null`, and freezes all nine shapes, both sweep
+placements, populations, 30 replicates, three warmups, 3,267 jobs and exact
+statistical thresholds. GREEN adds one deeply frozen shared policy, uses it for
+the worker install and per-sample output, and records it in controller metadata.
+Focused tests are 5/5, adjacent capacity tests are 20/20, the analyzer
+self-check and production typecheck/lint/format gates pass, and package
+typecheck retains only the same inherited two errors. Evidence is under
+`.logs/phase-1o-f-ii-recharacterization-{red,green}-codex-high/`.
+
+Fresh Grok 4.5/high, exact Kimi 3/high with both 100-step controls, and final
+Claude-skill Opus 5/xhigh all accepted the harness and authorized the pinned-OCI
+rerun. Their retained review artifact SHA-256 values are respectively
+`de88cec697edeb0a9fb6b37edf9846bb57a9c44461d023e2b0c76a31bc292b51`,
+`36a413374e41267ddb15230ffe7fbc43e1bb661a3f2292663f01d7e8a413d465`
+and `88c154c4c99a1a471f0f508f719769323fbdc23b8532f023d615ad380fe675a7`.
+Opus independently traced constructor, keychain, package-export and OCI
+provenance paths and found no blocker.
+
+Preserve this acceptance gotcha: an undersized capacity does **not** always fail
+per sample. The three dormant shapes can evict an older dormant pair silently;
+only the outstanding/cooldown shapes necessarily fail loudly. Material
+truncation still fails the frozen curve gates (non-positive marginal cost or
+R-squared below 0.98), while a one-pair 4,095/4,096 window is numerically
+immaterial. The current shared-source policy plus immutable image provenance,
+raw per-sample field and curve gates are sufficient for this rerun. Post-run
+hardening should nevertheless make the analyzer fail closed unless N=0 policy
+is null, nonzero `perNode` and `perObject` cover the schedule maximum, and each
+sample field equals its population branch; a controller integration assertion
+and loud post-population retained-count guard are also prudent. These are
+nonblocking follow-ups, not permission to alter the accepted schedule before
+the authoritative run.
+
+The next action is the exact 3,267-process pinned-OCI characterization at the
+final tracked representation. Refresh source/build/image identities; preserve
+the schedule, shapes, placements, seeds, runtime and gates; authenticate the
+capacity policy in metadata and every raw sample; then rederive every curve,
+the maximum p95/U99, joint and per-placement fixed estimates, normative `F99`,
+`S_pinned`, `E_usable`, `C_node`, `C_object` and demand headroom. If any shipped
+constant changes, correct its exact tests and production constants through a
+fresh RED/GREEN and obtain the required numeric assumption quorum. The old
+`8662788` artifact remains valid historical evidence only and cannot close the
+final representation.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
