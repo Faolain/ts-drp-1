@@ -28261,6 +28261,33 @@ the finalized result SHA-256 is
 Same-ID fixtures use explicit coordinated ACLs; no legacy plain-ID route,
 omitted-ACL fallback or identity migration is introduced.
 
+## Phase 1o-e bounded branch-cut retention GREEN — review candidate
+
+The distinct Codex-high production GREEN is frozen at `8b4c319`. It adds one
+`MAX_RETAINED_BRANCH_CUTS = 32` owner and changes only `recordBranchCuts`: an
+already-retained hash is ignored without refreshing insertion order; a new
+hash evicts the oldest retained cut at capacity before becoming newest. An
+evicted hash is therefore a new admission if later observed again. The
+existing empty-array early return remains ahead of state allocation.
+
+The change is nine insertions and one deletion in `sync-state.ts`, whose
+SHA-256 is
+`6985f8c48ca8358cdbc7cf8856a671702d55267478aff34d6fbd7772e9478e70`.
+The frozen RED blob remains `aa7cffc6ccf359e20af3d8ca35564357490986f7`.
+Focused verification passes 3/3. The authoritative preservation corpus passes
+57/57 across 15 separate sequential Vitest invocations with coverage disabled;
+an earlier combined 57/57 invocation is explicitly non-authoritative.
+
+Production TypeScript, Prettier and diff checks pass. Package TypeScript
+contains only the inherited compact-history TS1360/TS2322 diagnostics. ESLint
+has zero errors and five inherited JSDoc warnings on the changed source. The
+evidence-manifest SHA-256 is
+`3078e54be4fbbc28de49a562f0af3e7a0bc4df58bd4704ab6a39ec7c8b88cff6`;
+the result SHA-256 is
+`4d4984f99277435f22cc94b6627f6dc8bf5c7f41d91973b00b41378a56752d05`.
+Tests and the plan were untouched by GREEN. No legacy plain-ID route,
+compatibility fallback, identity migration or ACL change was added.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
