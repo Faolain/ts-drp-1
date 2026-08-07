@@ -31,6 +31,7 @@ interface SyncStateCapacity {
 interface CapacityInternals {
 	deriveDefaultSyncStateCapacity(): SyncStateCapacity;
 	installSyncStateCapacity(node: DRPNode, capacity: SyncStateCapacity): void;
+	isDormantSyncLifecycle(outstandingCount: number, attemptCount: number, cooldownUntil?: number): boolean;
 }
 
 const EXPECTED_DEFAULT_CAPACITY = Object.freeze({ perNode: 759, perObject: 37 });
@@ -50,6 +51,14 @@ function installCapacity(node: DRPNode, capacity: SyncStateCapacity): void {
 		throw new Error("Phase 1o-f(ii) internal tiny-capacity seam is not implemented");
 	}
 	candidate.installSyncStateCapacity(node, capacity);
+}
+
+function isDormantSyncLifecycle(outstandingCount: number, attemptCount: number, cooldownUntil?: number): boolean {
+	const candidate = syncState as unknown as Partial<CapacityInternals>;
+	if (typeof candidate.isDormantSyncLifecycle !== "function") {
+		throw new Error("Phase 1o-f(ii) pure sync-lifecycle dormancy owner is not implemented");
+	}
+	return candidate.isDormantSyncLifecycle(outstandingCount, attemptCount, cooldownUntil);
 }
 
 function makeNode(seed: string): DRPNode {
@@ -132,6 +141,48 @@ describe("Phase 1o-f(ii) finite sync-pair admission", () => {
 			)
 			.toEqual([]);
 		expect.soft(sharedHashes(globalOwner, lastObject, lastPeer)).toEqual([hash(9_999)]);
+	});
+
+	test.each([
+		{
+			attemptCount: 0,
+			cooldownUntil: undefined,
+			dormant: true,
+			name: "the empty lifecycle",
+			outstandingCount: 0,
+		},
+		{
+			attemptCount: 0,
+			cooldownUntil: undefined,
+			dormant: false,
+			name: "outstanding work alone",
+			outstandingCount: 1,
+		},
+		{
+			attemptCount: 1,
+			cooldownUntil: undefined,
+			dormant: false,
+			name: "a nonzero attempt alone",
+			outstandingCount: 0,
+		},
+		{
+			attemptCount: 0,
+			cooldownUntil: Number.MAX_SAFE_INTEGER,
+			dormant: false,
+			name: "an active defined cooldown alone",
+			outstandingCount: 0,
+		},
+		{
+			attemptCount: 0,
+			cooldownUntil: 0,
+			dormant: false,
+			name: "an expired-but-defined cooldown alone",
+			outstandingCount: 0,
+		},
+	] as const)("classifies $name independently in the pure eviction predicate", (lifecycle) => {
+		expect(isDormantSyncLifecycle(lifecycle.outstandingCount, lifecycle.attemptCount, lifecycle.cooldownUntil)).toBe(
+			lifecycle.dormant
+		);
 	});
 
 	test.each([
@@ -227,11 +278,11 @@ describe("Phase 1o-f(ii) finite sync-pair admission", () => {
 	});
 
 	test.each([
-		{ attempts: 0, cooldown: "none", name: "nonempty outstanding requests" },
-		{ attempts: 1, cooldown: "none", name: "a nonzero attempt count" },
-		{ attempts: 3, cooldown: "active", name: "an active defined cooldown" },
-		{ attempts: 3, cooldown: "expired", name: "an expired-but-defined cooldown" },
-	] as const)("pins a pair with $name", ({ attempts, cooldown }) => {
+		{ attempts: 0, cooldown: "none", name: "outstanding work before its first attempt" },
+		{ attempts: 1, cooldown: "none", name: "outstanding work after one attempt" },
+		{ attempts: 3, cooldown: "active", name: "outstanding work during an active cooldown" },
+		{ attempts: 3, cooldown: "expired", name: "outstanding work during an expired-but-defined cooldown" },
+	] as const)("keeps the reachable lifecycle shape pinned with $name", ({ attempts, cooldown }) => {
 		vi.useFakeTimers();
 		vi.setSystemTime(1_000_000);
 		const node = makeNode(`phase-1o-f-ii-pin-${attempts}-${cooldown}`);
@@ -342,9 +393,14 @@ describe("Phase 1o-f(ii) finite sync-pair admission", () => {
 		recordSharedHeads(node, second.id, secondPeer, [hash(702)]);
 		expect(sharedHashes(node, first.id, firstPeer)).toEqual([]);
 		expect(sharedHashes(node, second.id, secondPeer)).toEqual([hash(702)]);
+		recordAdvertisedHeads(node, second.id, secondPeer, [hash(703)]);
+		recordBranchCuts(node, second.id, secondPeer, [hash(704)]);
+		queueExactRequests(node, second.id, secondPeer, [hash(705)]);
 
 		await node.stop();
 		expect(sharedHashes(node, second.id, secondPeer)).toEqual([]);
+		expect(advertisedTheseHeads(node, second.id, secondPeer, [hash(703)])).toBe(false);
+		expectRetainedExact(node, second.id, secondPeer, []);
 		clearNodeSyncState(node);
 	});
 });
