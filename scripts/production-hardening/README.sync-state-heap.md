@@ -111,3 +111,27 @@ per-placement estimate, not only
 `marginalEnvelope.fixedOwnerContainerOneSided99UpperBytes`. A non-positive bound
 from either placement, or from the joint result, rejects the characterization
 instead of enlarging a later capacity calculation.
+
+## Evidence interpretation
+
+The production constants and the Phase 1o-f freeze in the hardening plan are
+the normative owners of the accepted default; this README explains how to read
+the evidence, not the current numeric result. A final-representation change
+requires a new artifact and a causal RED/GREEN correction before any derived
+default moves. Historical artifacts remain useful comparisons but never become
+compatibility inputs.
+
+The marginal envelope deliberately retains fixed activation at small
+populations, while the fixed bound is budgeted separately. That double count
+biases capacity downward. The finite seeded bootstrap can also move a derived
+integer at a rounding boundary; review raw evidence and demand headroom rather
+than treating adjacent capacities as intrinsically contradictory.
+
+Two integrity checks remain explicit hardening debt. The analyzer should fail
+closed when any sample's recorded measurement capacity disagrees with its
+population branch. The worker should also assert retained population through a
+real observation seam: its current structural census describes the requested
+placement, so it is not independent proof that the private ledger retained
+every pair. The accepted corpus is bounded so its finite accommodation cannot
+evict, but future schedules must prove that property again rather than inherit
+it by assumption.

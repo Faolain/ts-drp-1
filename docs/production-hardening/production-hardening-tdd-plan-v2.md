@@ -28658,9 +28658,9 @@ authorized.
 
 #### Phase 1o-f(ii) bounded behavior and final-representation rerun gate
 
-The bounded behavior is implemented, but Phase 1o-f(ii) is **not closed** until
-the final retained representation is characterized and any representation-
-sensitive constants are rederived and accepted. Freeze the tests-only RED
+The bounded behavior checkpoint remained open until the final retained
+representation was characterized and every representation-sensitive constant
+was rederived and accepted. Freeze the tests-only RED
 `35ceea3`, its causal pin-predicate correction `ee27fb8`, and production-only
 GREEN `7dcf0c0`. The node-owned ledger retains an explicit admission sequence,
 composite key, object ID and state per pair plus per-object counts and the
@@ -28739,16 +28739,112 @@ and loud post-population retained-count guard are also prudent. These are
 nonblocking follow-ups, not permission to alter the accepted schedule before
 the authoritative run.
 
-The next action is the exact 3,267-process pinned-OCI characterization at the
-final tracked representation. Refresh source/build/image identities; preserve
-the schedule, shapes, placements, seeds, runtime and gates; authenticate the
-capacity policy in metadata and every raw sample; then rederive every curve,
-the maximum p95/U99, joint and per-placement fixed estimates, normative `F99`,
-`S_pinned`, `E_usable`, `C_node`, `C_object` and demand headroom. If any shipped
-constant changes, correct its exact tests and production constants through a
-fresh RED/GREEN and obtain the required numeric assumption quorum. The old
-`8662788` artifact remains valid historical evidence only and cannot close the
-final representation.
+#### Phase 1o-f(ii) final-representation numeric freeze — accepted and closed
+
+The authoritative pinned-OCI rerun completed at tracked representation
+`bf81bfbeee1c3b91f61d007661e1f8221eef1d0d`. It retained 3,267 processes:
+297 discarded warmups and 2,970 measured, usable samples, with zero unstable
+samples, 99 accepted cells, 18 accepted curves and no acceptance failure. Every
+N=0 sample records `measurementCapacity: null`; every nonzero and demand sample
+records exactly `{ perNode: 4096, perObject: 4096 }`. The runtime image manifest
+is `sha256:9ff958db94959f662de68ac75e5b5a6355269e0ce86f1a34c29ceadd0880dc97`
+and its config is
+`sha256:ab15dfee34cd98ed4f6e9061f5437717bf80743e67f25998fb102ebc8acf839e`.
+The base index, platform manifest and config remain respectively
+`sha256:557e52a0fcb928ee113df7e1fb5d4f60c1341dbda53f55e3d815ca10807efdce`,
+`sha256:71ecda08bfca53d2b72a727056be374eea4a0ba53cf0de1a947ec8068f4e0918`
+and `sha256:4a2f28cd195e7b99ea839a344269e93883c6c531a05b6f5ecf6b824c8dd8272d`.
+The source, built JavaScript and lockfile SHA-256 values are
+`9ecfe48c783756d303d4a28d091bb655c81dac9c42dac76df3979852caba5c10`,
+`ef081bc29704e17144c9ea6cd51b33a5ba2aa159c031261a68f6a5e0dd9db1c4`
+and `0be514355901ec8ca6dfdd7b51a5633b50f488034bfadd15c38a6c0ac5885701`.
+The run seed is
+`6b784077ae7327f14d6ef2d448761b8ee72c81f2d38926536b7a548d84b61775`.
+
+Retain the final artifact as:
+
+- `.logs/phase-1o-f-ii-recharacterization-authoritative/metadata.json`,
+  SHA-256
+  `ff4ffc8f97c8e479922a3f121ce405a6a1d1d020ec792e1399bc54fcaf9832fb`;
+- `.logs/phase-1o-f-ii-recharacterization-authoritative/raw.jsonl`, SHA-256
+  `bd3bd49e5b6f7a4185e94d07034f9c5fd910708e9e8c7c9eac00703acb0c73c6`;
+- `.logs/phase-1o-f-ii-recharacterization-authoritative/analysis.json`,
+  SHA-256
+  `93d2226d4e9a96f796de2fd39bf7cd9a3834e27044338f1570c851fbc77b643f`;
+- sibling
+  `.logs/phase-1o-f-ii-recharacterization-authoritative.wrapper.stdout.log`,
+  SHA-256
+  `6dad34ef0383aba86fc27410ea24ceb4bedfad59a9fd79263f5f08dda69bffcc`.
+
+A fresh Codex-high, exact Kimi 3/high with both 100-step controls and
+Claude-skill Opus 5/xhigh independently agreed that the rerun authorizes the
+numeric correction. The maximum marginal p95 is `10503.76953125` at
+maximum-dormant/round-robin-20; maximum marginal U99 is
+`10311.071704101563` at maximum-dormant/one-hot-object, so p95 binds. The
+maximum over all nine joint and 18 per-placement fixed U99 estimates is the
+active-cooldown joint value `142590.711328125`; therefore `F99 = 142591`.
+The unchanged ratified inputs remain decimal `B = 150000000`, `f_sync = .10`,
+`r = .20`, `k = 1.50`, `c = 2` and `K = 20`:
+
+```text
+S_pinned = ceil(10503.76953125 * 1.50) = 15756
+E_usable = floor(150000000 * .10 * .80) - 142591 = 11857409
+C_node   = floor(11857409 / 15756) = 752
+D_object = ceil(14 * 2) = 28
+D_node   = ceil(20 * 28) = 560
+C_object = min(752, max(28, floor(752 / 20))) = 37
+```
+
+The final defaults retain 192 node pairs (34.29%) and nine per-object pairs
+(32.14%) above doubled-churn demand. Freeze tests-only numeric RED
+`e621a0cc1130cd3da25835e1b41167737ba8e906` and production-only GREEN
+`1e85502bc108352d05067d983f474d8a87da4c98`. RED changes only expected
+`perNode` 759 to 752 and the corresponding pair-753 diagnostic. It is causally
+2F/18P against old production: default equality and node-global eviction only.
+GREEN changes only `PINNED_PAIR_P95_BYTES` to `10503.76953125` and
+`FIXED_LEDGER_BYTES` to `142591`; 752/37 remain derived, never hard-coded. The
+frozen RED blob `28119dbe4ddac6e49bd5e9839d3e416b15fe720d` is unchanged across GREEN.
+Focused capacity is 20/20 and the bounded adjacent set is 35/35. Production
+typecheck, targeted ESLint, formatting and diff checks pass. Package typecheck
+retains only the inherited compact-history `TS1360`/`TS2322`.
+
+Fresh Grok 4.5/high, exact Kimi 3/high with both 100-step controls and final
+Claude-skill Opus 5/xhigh accepted the RED/GREEN candidate. Their raw review
+SHA-256 values are respectively
+`4a332d8953ed4a74deecf5b0edd188655a7146c3d0b26cc20751dc59a37d648f`,
+`baa65667696a92d11a18753e0801479d548833635e714f241cdcd3788f2dfa81`
+and `4166bb285a209648d9a70da3a1a0b0ddaf31d7457ec8c620b9c0ca8a552f3bf4`.
+The earlier exact-Kimi and Opus numeric-quorum raw SHA-256 values are
+`42e933d8b79f5afaa463f838ea4fd37d600d827ef3fb6a8ba74123ac9620508e`
+and `f85a9eef7f1a28f263668fb32d5702fb7573bd738adae114f84ea6e7243ae89c`.
+
+Preserve these final gotchas and follow-ups:
+
+1. The p95 marginal includes amortized fixed activation while `F99` subtracts
+   fixed activation again. This is conservative: it can only lower capacity.
+2. `F99` uses a seeded finite bootstrap. At fixed `S_pinned`, `C_node = 752`
+   holds for `F99` in `[135733, 151488]`; at fixed `F99`, it holds for
+   `S_pinned` in `[15747, 15767]`. Future reruns can move capacity by one even
+   when the product boundary is unchanged, so compare raw evidence and demand
+   headroom instead of treating an adjacent integer as a regression by itself.
+3. One nonbinding bootstrap inversion remains: minimal-dormant one-hot
+   per-placement U99 exceeds its joint estimate by about 155.745 bytes. The
+   mandatory maximum over all joint and per-placement estimators absorbs it.
+4. The analyzer does not fail closed on a per-sample capacity mismatch, and the
+   worker census derives pair counts from the requested placement/population
+   rather than observing the private ledger. For this accepted corpus, all
+   3,267 policy fields match and 4,096 exactly admits the largest sample without
+   eviction. Harden the analyzer and add a loud post-population retention guard
+   before relying on future artifacts with a changed schedule or capacity.
+5. Production omits the formula's explicit `max(0, ...)` clamp and stores the
+   already-ceiled `F99` integer. The clamp is inert at `E_usable = 11857409`;
+   invalid nonpositive derived capacities fail loudly through existing capacity
+   validation. Revisit this only with a profile whose budget can cross zero.
+
+The old `8662788` artifact and 759/37 derivation remain historical evidence for
+the pre-ledger representation, not a compatibility default. Phase 1o-f(ii) is
+closed. No public config/wire/type seam, legacy/plain-ID route, identity or ACL
+fallback, or policy migration was added. Continue with Phase 1o-g fairness.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
