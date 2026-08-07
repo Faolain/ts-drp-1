@@ -1,16 +1,20 @@
 import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { Signature } from "@noble/secp256k1";
+import { SetDRP } from "@ts-drp/blueprints";
 import { Keychain } from "@ts-drp/keychain";
+import { createPermissionlessACL, createVertex, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	AggregatedAttestation,
 	type Attestation,
 	AttestationUpdate,
+	DrpType,
 	type IDRP,
 	type IDRPObject,
 	Message,
 	MessageType,
 	NodeEventName,
+	Operation,
 	SyncAccept,
 	Update,
 	Vertex,
@@ -41,8 +45,13 @@ interface HarnessResult {
 	broadcasts: CapturedMessage[];
 	direct: CapturedMessage[];
 	dispatches: CapturedDispatch[];
-	puts: Array<{ id: string; object: InstrumentedAppliedVertexObject }>;
+	puts: Array<{ id: string; object: IDRPObject<IDRP> }>;
 	syncs: Array<{ id: string; peerId: string }>;
+}
+
+interface SigningIdentity {
+	keychain: Keychain;
+	peerId: string;
 }
 
 interface InstrumentedObjectOptions {
@@ -59,6 +68,7 @@ const POST_SIGNING_SIGNATURE = Uint8Array.of(0xa5, 0x5a);
 
 let remoteKeychain: Keychain;
 let remotePeerId: string;
+let localIdentity: SigningIdentity;
 
 function observations(): LookupObservations {
 	return { candidateComparisons: 0, directLookups: 0, materializations: 0 };
@@ -74,14 +84,25 @@ function localVertex(hash: string, signed = true): Vertex {
 	});
 }
 
-async function remoteVertex(hash: string): Promise<Vertex> {
+async function remoteVertex(hash: string, dependencies: readonly string[] = []): Promise<Vertex> {
 	return Vertex.create({
 		hash,
 		peerId: remotePeerId,
-		dependencies: [],
+		dependencies: [...dependencies],
 		timestamp: 2,
 		signature: await remoteKeychain.signWithSecp256k1(hash),
 	});
+}
+
+async function genuineRemoteVertex(value: number): Promise<Vertex> {
+	const vertex = createVertex(
+		remotePeerId,
+		Operation.create({ drpType: DrpType.DRP, opType: "add", value: [value] }),
+		[HashGraph.rootHash],
+		1_700_200_000_000 + value
+	);
+	vertex.signature = await remoteKeychain.signWithSecp256k1(vertex.hash);
+	return vertex;
 }
 
 function aggregate(hash: string, marker: number): AggregatedAttestation {
@@ -92,11 +113,15 @@ function aggregate(hash: string, marker: number): AggregatedAttestation {
 	});
 }
 
-function updateMessage(vertices: readonly Vertex[], attestations: readonly Attestation[] = []): Message {
+function updateMessage(
+	vertices: readonly Vertex[],
+	attestations: readonly Attestation[] = [],
+	objectId = OBJECT_ID
+): Message {
 	return Message.create({
 		sender: remotePeerId,
 		type: MessageType.MESSAGE_TYPE_UPDATE,
-		objectId: OBJECT_ID,
+		objectId,
 		data: Update.encode(Update.create({ vertices: [...vertices], attestations: [...attestations] })).finish(),
 	});
 }
@@ -211,11 +236,15 @@ class InstrumentedAppliedVertexObject {
 	}
 }
 
-function makeHarness(object: InstrumentedAppliedVertexObject): { node: DRPNode; result: HarnessResult } {
+function makeHarness(
+	object: InstrumentedAppliedVertexObject | IDRPObject<IDRP>,
+	identity?: SigningIdentity
+): { node: DRPNode; result: HarnessResult } {
 	const result: HarnessResult = { broadcasts: [], direct: [], dispatches: [], puts: [], syncs: [] };
+	const localPeerId = identity?.peerId ?? LOCAL_PEER_ID;
 	const node = {
 		networkNode: {
-			peerId: LOCAL_PEER_ID,
+			peerId: localPeerId,
 			broadcastMessage: (to: string, message: Message): Promise<void> => {
 				result.broadcasts.push({ to, message });
 				return Promise.resolve();
@@ -230,11 +259,13 @@ function makeHarness(object: InstrumentedAppliedVertexObject): { node: DRPNode; 
 			return Promise.resolve();
 		},
 		keychain: {
-			signWithBls: (hash: string): Uint8Array => Uint8Array.of(0xb0, hash.length),
-			signWithSecp256k1: (): Promise<Uint8Array> => Promise.resolve(POST_SIGNING_SIGNATURE),
+			signWithBls: (hash: string): Uint8Array =>
+				identity?.keychain.signWithBls(hash) ?? Uint8Array.of(0xb0, hash.length),
+			signWithSecp256k1: (hash: string): Promise<Uint8Array> =>
+				identity?.keychain.signWithSecp256k1(hash) ?? Promise.resolve(POST_SIGNING_SIGNATURE),
 		},
 		get: (id: string) => (id === object.id ? (object as unknown as IDRPObject<IDRP>) : undefined),
-		put: (id: string, storedObject: InstrumentedAppliedVertexObject) => {
+		put: (id: string, storedObject: IDRPObject<IDRP>) => {
 			result.puts.push({ id, object: storedObject });
 		},
 		safeDispatchEvent: (type: NodeEventName, event: CustomEvent<unknown>) => {
@@ -254,21 +285,25 @@ function dispatchDetails<T>(result: HarnessResult, type: NodeEventName): T[] {
 
 beforeAll(async () => {
 	remoteKeychain = new Keychain({ private_key_seed: "applied-vertex-lookup-remote" });
-	await remoteKeychain.start();
+	const localKeychain = new Keychain({ private_key_seed: "applied-vertex-lookup-local" });
+	await Promise.all([remoteKeychain.start(), localKeychain.start()]);
 	const publicKey = publicKeyFromRaw(uint8ArrayFromString(remoteKeychain.secp256k1PublicKey, "base64"));
 	remotePeerId = peerIdFromPublicKey(publicKey).toString();
+	const localPublicKey = publicKeyFromRaw(uint8ArrayFromString(localKeychain.secp256k1PublicKey, "base64"));
+	localIdentity = { keychain: localKeychain, peerId: peerIdFromPublicKey(localPublicKey).toString() };
 });
 
 describe("applied-vertex lookup semantic and wire baselines", () => {
-	test("UPDATE preserves verified structural ingress, membership, finality, recovery, persistence, and dispatch", async () => {
+	test("UPDATE preserves verified structural ingress, membership, recovery, persistence, and dispatch", async () => {
+		const missingParent = "ab".repeat(32);
 		const known = await remoteVertex("update-known");
-		const added = await remoteVertex("update-added");
+		const added = await remoteVertex("update-added", [missingParent]);
 		const dropped = await remoteVertex("update-dropped");
 		const unauthenticated = Vertex.create({ ...localVertex("update-unsigned"), signature: new Uint8Array() });
 		const remoteAttestation = { data: known.hash, signature: Uint8Array.of(0x31) };
 		const object = new InstrumentedAppliedVertexObject([known], observations(), {
 			dropHashes: [dropped.hash],
-			missing: ["update-missing-parent"],
+			missing: [missingParent],
 		});
 		const { node, result } = makeHarness(object);
 		const message = updateMessage([known, added, dropped, unauthenticated], [remoteAttestation]);
@@ -304,33 +339,10 @@ describe("applied-vertex lookup semantic and wire baselines", () => {
 			expect.soft(result.syncs).toEqual([{ id: OBJECT_ID, peerId: remotePeerId }]);
 			expect.soft(result.puts).toEqual([{ id: OBJECT_ID, object }]);
 
-			expect.soft(object.addedSignatureCalls[0]).toEqual({
-				peerId: remotePeerId,
-				attestations: [remoteAttestation],
-				verify: undefined,
-			});
-			// Known hashes are trusted skips at the node boundary. They are not
-			// reauthenticated and therefore cannot trigger a new local attestation.
-			const generated = [added.hash].map((hash) => ({
-				data: hash,
-				signature: Uint8Array.of(0xb0, hash.length),
-			}));
-			expect.soft(object.addedSignatureCalls[1]).toEqual({
-				peerId: LOCAL_PEER_ID,
-				attestations: generated,
-				verify: false,
-			});
-			expect.soft(result.broadcasts).toHaveLength(1);
-			const broadcast = result.broadcasts[0];
-			expect.soft(broadcast?.to).toBe(OBJECT_ID);
-			expect.soft(broadcast?.message).toMatchObject({
-				sender: LOCAL_PEER_ID,
-				type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
-				objectId: OBJECT_ID,
-			});
-			expect
-				.soft(broadcast?.message.data)
-				.toEqual(AttestationUpdate.encode(AttestationUpdate.create({ attestations: generated })).finish());
+			// A caller-built MergeResult proves structural handler behavior only. It
+			// cannot claim that this object physically committed the offered vertex.
+			expect.soft(object.addedSignatureCalls).toEqual([]);
+			expect.soft(result.broadcasts).toEqual([]);
 
 			const updates = dispatchDetails<{ id: string; update: Update }>(result, NodeEventName.DRP_UPDATE);
 			expect.soft(updates).toHaveLength(1);
@@ -339,6 +351,50 @@ describe("applied-vertex lookup semantic and wire baselines", () => {
 			decode.mockRestore();
 			recover.mockRestore();
 		}
+	});
+
+	test("UPDATE preserves finality signing and broadcast for a genuine physical commit", async () => {
+		const acl = createPermissionlessACL([localIdentity.peerId, remotePeerId]);
+		for (const { keychain, peerId } of [localIdentity, { keychain: remoteKeychain, peerId: remotePeerId }]) {
+			acl.context = { caller: peerId };
+			acl.setKey(keychain.blsPublicKey);
+		}
+		acl.context = { caller: "" };
+		const object = new DRPObject({
+			peerId: localIdentity.peerId,
+			acl,
+			drp: new SetDRP<number>(),
+			config: { finality_config: { enabled: true } },
+		});
+		const vertex = await genuineRemoteVertex(701);
+		const remoteAttestation = { data: vertex.hash, signature: remoteKeychain.signWithBls(vertex.hash) };
+		const addSignatures = vi.spyOn(object.finalityStore, "addSignatures");
+		const { node, result } = makeHarness(object, localIdentity);
+
+		await handleMessage(node, updateMessage([vertex], [remoteAttestation], object.id));
+
+		expect.soft(object.id).toMatch(new RegExp(`^${localIdentity.peerId}:`));
+		expect.soft(object.getVertex(vertex.hash)).toBeDefined();
+		expect.soft(addSignatures).toHaveBeenNthCalledWith(1, remotePeerId, [remoteAttestation]);
+		expect.soft(addSignatures).toHaveBeenCalledTimes(2);
+		const localCall = addSignatures.mock.calls[1];
+		expect.soft(localCall?.[0]).toBe(localIdentity.peerId);
+		expect.soft(localCall?.[1].map(({ data }) => data)).toEqual([vertex.hash]);
+		expect.soft(localCall?.[2]).toBe(false);
+		expect.soft(result.broadcasts).toHaveLength(1);
+		const broadcast = result.broadcasts[0];
+		expect.soft(broadcast?.to).toBe(object.id);
+		expect.soft(broadcast?.message).toMatchObject({
+			sender: localIdentity.peerId,
+			type: MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE,
+			objectId: object.id,
+		});
+		if (broadcast === undefined) throw new Error("Expected genuine UPDATE finality broadcast");
+		expect
+			.soft(AttestationUpdate.decode(broadcast.message.data).attestations.map(({ data }) => data))
+			.toEqual([vertex.hash]);
+		expect.soft(result.puts).toEqual([{ id: object.id, object }]);
+		expect.soft(dispatchDetails(result, NodeEventName.DRP_UPDATE)).toHaveLength(1);
 	});
 
 	test("SYNC_ACCEPT pins exact response bytes, duplicates, stored identity, signing, finality, and events", async () => {

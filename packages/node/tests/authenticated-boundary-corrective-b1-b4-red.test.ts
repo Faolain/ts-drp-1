@@ -86,10 +86,22 @@ async function signedCandidate(
 	return vertex;
 }
 
-function receiver(finalityEnabled = false): DRPObject<SetDRP<number>> {
+function receiver(
+	finalityEnabled = false,
+	finalitySigners: readonly string[] = [author.peerId]
+): DRPObject<SetDRP<number>> {
+	const acl = createPermissionlessACL([...finalitySigners]);
+	if (finalityEnabled) {
+		for (const signer of [author, otherAuthor]) {
+			if (!finalitySigners.includes(signer.peerId)) continue;
+			acl.context = { caller: signer.peerId };
+			acl.setKey(signer.keychain.blsPublicKey);
+		}
+		acl.context = { caller: "" };
+	}
 	return new DRPObject({
 		peerId: author.peerId,
-		acl: createPermissionlessACL(author.peerId),
+		acl,
 		drp: new SetDRP<number>(),
 		config: { finality_config: { enabled: finalityEnabled } },
 	});
@@ -126,11 +138,11 @@ function nodeHarness<T extends IDRP>(object: IDRPObject<T>): { node: DRPNode; ob
 	const node = {
 		get: (): IDRPObject<T> => object,
 		keychain: {
-			signWithBls: (hash: string): Uint8Array => Uint8Array.of(0xb1, hash.length),
+			signWithBls: (hash: string): Uint8Array => author.keychain.signWithBls(hash),
 			signWithSecp256k1: (hash: string): Promise<Uint8Array> => author.keychain.signWithSecp256k1(hash),
 		},
 		networkNode: {
-			peerId: LOCAL_PEER_ID,
+			peerId: author.peerId,
 			broadcastMessage: (_id: string, message: Message): Promise<void> => {
 				observations.broadcasts.push(message);
 				return Promise.resolve();
@@ -337,7 +349,7 @@ describe("Phase 1e corrective authentication boundary", () => {
 		}
 	);
 
-	it("B4 UPDATE verifies structural-object ingress once and preserves valid local finality", async () => {
+	it("B4 UPDATE verifies structural-object ingress once and denies fake committed finality", async () => {
 		const { object, observations, stored } = structuralObject({ canSign: true });
 		const node = structuralNode(object, observations);
 		const valid = await signedCandidate(otherAuthor, 401);
@@ -366,22 +378,8 @@ describe("Phase 1e corrective authentication boundary", () => {
 			expect.soft(stored.has(valid.hash)).toBe(true);
 			expect.soft(stored.has(unsigned.hash)).toBe(false);
 			expect.soft(observations.ownerLookalikeCalls).toEqual({ applied: 0, trusted: 0 });
-			expect.soft(observations.addedSignatures).toEqual([
-				{
-					peerId: otherAuthor.peerId,
-					attestations: [remoteAttestation],
-					verify: undefined,
-				},
-				{
-					peerId: LOCAL_PEER_ID,
-					attestations: [{ data: valid.hash, signature: Uint8Array.of(0xc1, valid.hash.length) }],
-					verify: false,
-				},
-			]);
-			expect.soft(observations.broadcasts).toHaveLength(1);
-			const broadcast = observations.broadcasts[0];
-			expect.soft(broadcast.type).toBe(MessageType.MESSAGE_TYPE_ATTESTATION_UPDATE);
-			expect.soft(AttestationUpdate.decode(broadcast.data).attestations.map(({ data }) => data)).toEqual([valid.hash]);
+			expect.soft(observations.addedSignatures).toEqual([]);
+			expect.soft(observations.broadcasts).toEqual([]);
 			expect.soft(observations.puts).toBe(1);
 			expect.soft(observations.dispatches).toContain(NodeEventName.DRP_UPDATE);
 		} finally {
@@ -390,7 +388,32 @@ describe("Phase 1e corrective authentication boundary", () => {
 		}
 	});
 
-	it("B4 SYNC_ACCEPT verifies structural-object ingress once and preserves attestation merge", async () => {
+	it("B4 genuine UPDATE preserves remote and local finality for a physical commit", async () => {
+		const object = receiver(true, [author.peerId, otherAuthor.peerId]);
+		const valid = await signedCandidate(otherAuthor, 405);
+		const remoteAttestation = { data: valid.hash, signature: otherAuthor.keychain.signWithBls(valid.hash) };
+		const addSignatures = vi.spyOn(object.finalityStore, "addSignatures");
+		const harness = nodeHarness(object);
+
+		await handleMessage(harness.node, updateMessage(object.id, [valid], [remoteAttestation]));
+
+		expect.soft(object.id).toMatch(new RegExp(`^${author.peerId}:`));
+		expect.soft(object.getVertex(valid.hash)).toBeDefined();
+		expect.soft(addSignatures).toHaveBeenNthCalledWith(1, otherAuthor.peerId, [remoteAttestation]);
+		expect.soft(addSignatures).toHaveBeenCalledTimes(2);
+		const localCall = addSignatures.mock.calls[1];
+		expect.soft(localCall?.[0]).toBe(author.peerId);
+		expect.soft(localCall?.[1].map(({ data }) => data)).toEqual([valid.hash]);
+		expect.soft(localCall?.[2]).toBe(false);
+		expect.soft(harness.observations.broadcasts).toHaveLength(1);
+		expect
+			.soft(AttestationUpdate.decode(harness.observations.broadcasts[0].data).attestations.map(({ data }) => data))
+			.toEqual([valid.hash]);
+		expect.soft(harness.observations.puts).toBe(1);
+		expect.soft(harness.observations.dispatches).toContain(NodeEventName.DRP_UPDATE);
+	});
+
+	it("B4 SYNC_ACCEPT verifies structural-object ingress once but denies fake committed events", async () => {
 		const { object, observations, stored } = structuralObject({ canSign: false });
 		const node = structuralNode(object, observations);
 		const valid = await signedCandidate(otherAuthor, 411);
@@ -423,13 +446,54 @@ describe("Phase 1e corrective authentication boundary", () => {
 			expect.soft(stored.has(unsigned.hash)).toBe(false);
 			expect.soft(stored.has(valid.hash)).toBe(true);
 			expect.soft(observations.ownerLookalikeCalls).toEqual({ applied: 0, trusted: 0 });
+			// Incoming aggregate merge is authenticated-offer behavior. The empty
+			// local add below has no signature or broadcast effect; only the accepted
+			// event would falsely claim a physical commit from this structural tuple.
 			expect.soft(observations.mergedAttestations).toEqual([[aggregate]]);
 			expect.soft(observations.puts).toBe(1);
 			expect.soft(observations.syncs).toBe(0);
-			expect.soft(observations.dispatches.filter((type) => type === NodeEventName.DRP_SYNC_ACCEPTED)).toHaveLength(1);
+			expect.soft(observations.addedSignatures).toEqual([{ peerId: LOCAL_PEER_ID, attestations: [], verify: false }]);
+			expect.soft(observations.broadcasts).toEqual([]);
+			expect.soft(observations.dispatches.filter((type) => type === NodeEventName.DRP_SYNC_ACCEPTED)).toHaveLength(0);
 		} finally {
 			decode.mockRestore();
 			recover.mockRestore();
 		}
+	});
+
+	it("B4 genuine SYNC_ACCEPT preserves finality and accepted event for a physical commit", async () => {
+		const object = receiver(true, [author.peerId, otherAuthor.peerId]);
+		const valid = await signedCandidate(otherAuthor, 415);
+		const remoteSignerIndex = [author.peerId, otherAuthor.peerId].sort().indexOf(otherAuthor.peerId);
+		const aggregationBits = new Uint8Array(4);
+		aggregationBits[0] = 1 << remoteSignerIndex;
+		const aggregate = AggregatedAttestation.create({
+			data: valid.hash,
+			signature: otherAuthor.keychain.signWithBls(valid.hash),
+			aggregationBits,
+		});
+		const mergeSignatures = vi.spyOn(object.finalityStore, "mergeSignatures");
+		const addSignatures = vi.spyOn(object.finalityStore, "addSignatures");
+		const harness = nodeHarness(object);
+
+		await handleMessage(harness.node, syncAcceptMessage(object.id, [valid], [aggregate]));
+
+		expect.soft(object.id).toMatch(new RegExp(`^${author.peerId}:`));
+		expect.soft(object.getVertex(valid.hash)).toBeDefined();
+		expect.soft(mergeSignatures).toHaveBeenCalledOnce();
+		expect.soft(mergeSignatures).toHaveBeenCalledWith([aggregate]);
+		expect.soft(addSignatures).toHaveBeenCalledOnce();
+		const localCall = addSignatures.mock.calls[0];
+		expect.soft(localCall?.[0]).toBe(author.peerId);
+		expect.soft(localCall?.[1].map(({ data }) => data)).toEqual([valid.hash]);
+		expect.soft(localCall?.[2]).toBe(false);
+		expect.soft(harness.observations.broadcasts).toHaveLength(1);
+		expect
+			.soft(AttestationUpdate.decode(harness.observations.broadcasts[0].data).attestations.map(({ data }) => data))
+			.toEqual([valid.hash]);
+		expect.soft(harness.observations.puts).toBe(1);
+		expect
+			.soft(harness.observations.dispatches.filter((type) => type === NodeEventName.DRP_SYNC_ACCEPTED))
+			.toHaveLength(1);
 	});
 });
