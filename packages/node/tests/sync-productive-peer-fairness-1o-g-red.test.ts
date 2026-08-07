@@ -67,7 +67,7 @@ interface ApplyGate {
 }
 
 const CREATOR_PEER_ID = `12D3KooW${"a".repeat(45)}`;
-const EXPECTED_DEFAULT_CAPACITY = Object.freeze({ perNode: 752, perObject: 37 });
+const EXPECTED_DEFAULT_CAPACITY = Object.freeze({ perNode: 745, perObject: 37 });
 const applyGates = new Map<string, ApplyGate>();
 
 const {
