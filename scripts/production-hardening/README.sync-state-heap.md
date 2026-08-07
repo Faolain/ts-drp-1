@@ -1,0 +1,60 @@
+# Sync-state heap characterization
+
+This harness measures the production `@ts-drp/node` sync-state lifecycle from
+fresh, isolated Node processes. It does not expose private state or add a test or
+production seam. Authoritative constants are hard-coded; `--smoke` is a separate
+non-acceptance schedule.
+
+The two required sweeps are all pairs on one object and round-robin placement
+across 20 objects. A separate N=280 cell proves the exact 20-object × 14-pair
+demand point. Each sample seed completely determines its framed corpus: one
+genuine creator identity, creator-bound object IDs with 16-byte lowercase-hex
+salts, unique canonical 64-hex hashes, and unique 53-character base58-valid
+peer-key strings. Per-pair peer keys are deliberately production-shaped strings,
+not cryptographic identities, because sync-state retains only their JSON key
+text. No legacy/plain object-ID path is generated, measured, or supported. The
+worker asserts the retained composite JSON tuple key is exactly 146 UTF-16 code
+units and verifies branch cuts and final advertised/shared projections through
+public read seams.
+
+For a bounded host smoke run (never acceptable evidence):
+
+```sh
+node scripts/production-hardening/sync-state-heap-controller.mjs \
+  --smoke \
+  --output .logs/phase-1o-f-sync-state-heap-smoke
+```
+
+The authoritative wrapper verifies the pinned base index → Linux/arm64 manifest
+→ config chain, exports clean `HEAD` with `git archive`, and builds that isolated
+context with BuildKit. Consequently an uncommitted harness can run smoke checks
+but cannot produce authoritative evidence. BuildKit must report distinct output
+manifest and config digests; the wrapper validates the source-revision image
+label and runs the immutable inspected config ID with networking disabled.
+Protected untracked files, `.git`, host dependencies, logs, and host build
+artifacts never enter the context.
+
+```sh
+node scripts/production-hardening/run-sync-state-heap-oci.mjs \
+  --output .logs/phase-1o-f-sync-state-heap
+```
+
+The wrapper is the authoritative entry point because it binds source, base-chain,
+output-manifest, and output-config provenance end to end. To inspect its worker
+logic without collecting measurements, run the deterministic analyzer checks:
+
+```sh
+node scripts/production-hardening/sync-state-heap-analyzer.mjs --self-check
+```
+
+The controller records metadata, every warmup and measured process in raw
+JSONL, and the derived statistics/rejection report. Any worker error, unstable
+heap, dirty tracked worktree, missing/non-finite/non-positive fixed-activation evidence,
+runtime/provenance mismatch, or acceptance-threshold miss fails the authoritative
+run. Fixed activation uses one joint bootstrap across both placement curves. In
+each iteration it resamples the shared demand cell once, resamples each
+placement's N0 and curve, computes `demand20x14 - N0 - 280 × marginalSlope` for
+each placement, and takes that iteration's maximum. The accepted bound is q99
+of those maxima—not the smaller max of separate q99s. A non-positive bound from
+either placement, or from the joint result, rejects the characterization instead
+of enlarging a later capacity calculation.

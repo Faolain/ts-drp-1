@@ -1,0 +1,22 @@
+FROM node:22.15.0-bookworm-slim@sha256:557e52a0fcb928ee113df7e1fb5d4f60c1341dbda53f55e3d815ca10807efdce
+
+ARG SOURCE_REVISION
+RUN case "$SOURCE_REVISION" in ???????*) ;; *) exit 1 ;; esac
+LABEL org.opencontainers.image.revision="$SOURCE_REVISION"
+ENV TS_DRP_PROFILE_SOURCE_REVISION="$SOURCE_REVISION"
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable && corepack prepare pnpm@10.24.0 --activate
+
+WORKDIR /ts-drp
+COPY . .
+
+# Dependencies and all production JavaScript are built inside Linux. The
+# controller force-rebuilds @ts-drp/node again immediately before measuring so
+# the measured source/dist provenance is part of the artifact. The context is a
+# clean `git archive` prepared by the host wrapper; Git is intentionally absent.
+RUN pnpm install --frozen-lockfile
+
+ENTRYPOINT ["node", "scripts/production-hardening/sync-state-heap-controller.mjs"]
