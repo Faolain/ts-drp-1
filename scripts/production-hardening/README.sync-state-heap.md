@@ -74,6 +74,12 @@ run. Fixed activation uses one joint bootstrap across both placement curves. In
 each iteration it resamples the shared demand cell once, resamples each
 placement's N0 and curve, computes `demand20x14 - N0 - 280 × marginalSlope` for
 each placement, and takes that iteration's maximum. The accepted bound is q99
-of those maxima—not the smaller max of separate q99s. A non-positive bound from
-either placement, or from the joint result, rejects the characterization instead
-of enlarging a later capacity calculation.
+of those maxima. On identical draws, the population quantity
+`q99(max(X_A, X_B))` is at least `max(q99(X_A), q99(X_B))`; this analyzer uses
+independently seeded finite 10,000-iteration estimators and a structurally
+different shared demand draw, so their estimates can invert. The normative
+fixed bound is therefore the maximum of the joint estimate and every disclosed
+per-placement estimate, not only
+`marginalEnvelope.fixedOwnerContainerOneSided99UpperBytes`. A non-positive bound
+from either placement, or from the joint result, rejects the characterization
+instead of enlarging a later capacity calculation.

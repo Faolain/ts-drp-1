@@ -28518,6 +28518,122 @@ config loading unchanged. No environment/global test hook, identifier override,
 unlimited sentinel, private-map accessor, test-mode branch, compatibility
 wrapper, legacy-ID path or identity/ACL fallback is authorized.
 
+#### Phase 1o-f(i) accepted characterization and numeric freeze
+
+The authoritative characterization ran from tracked revision `8662788` in the
+pinned Linux/arm64 Node `v22.15.0` / V8 `12.4.254.21-node.24` OCI runtime. The
+runtime image manifest is
+`sha256:4253c2696ab5e1afa854851cc27986bfa083a0e6c1786fa86825df0b002b42ea`
+and its config is
+`sha256:a86451d1290f35fc0581f9ea67759b9bc69135dacb40b708f8189b1d94a18b0d`.
+The run produced 3,267 processes: 297 discarded warmups and 2,970 measured,
+usable samples, with zero unstabilized samples. It accepted all 99 cells and all
+18 marginal curves with no failed gate. The retained artifact is:
+
+- `.logs/phase-1o-f-i-characterization-authoritative/metadata.json`, SHA-256
+  `ef2c12b8d92471e1e76ee521066e20de9115a6fedcc596354f0c2110bd611076`;
+- `.logs/phase-1o-f-i-characterization-authoritative/raw.jsonl`, SHA-256
+  `cc527bde83cf7fcc7f2839e35f17850bda65fbb6ef550542ff56f680e8dc4733`;
+- `.logs/phase-1o-f-i-characterization-authoritative/analysis.json`, SHA-256
+  `7934859a60f0f44c3cfc17eee390307d7b8ec0de0260adcf804b06c9f5c6c62b`.
+
+The maximum marginal p95 is `10420.16875` bytes per pair and the maximum
+one-sided-99% marginal estimate is `10254.890729166667`, so p95 binds. The joint
+fixed estimate is `127603.96643229167`; the largest disclosed per-placement
+estimate is `127738.27979166682`. Independently seeded finite bootstrap
+estimators inverted the theoretical ordering in three of nine shapes:
+`outstanding-attempt-1` by about 744.03 bytes, `outstanding-attempt-3` by about
+190.30 bytes and `expired-defined-cooldown` by about 134.31 bytes. Normative
+`F99` therefore takes the maximum across the joint result and every disclosed
+per-placement result. The analyzer's joint-only headline field is diagnostic,
+not the normative bound.
+
+Fresh Grok 4.5/high, exact Kimi 3/high with both step limits set to 100, and
+final Opus 5/xhigh independently accepted the characterization. Their retained
+raw-review SHA-256 values are respectively
+`af46ad8d9814f3913c0fef5a16cc3136484b4056ba1c69e67ff51834619c3bb6`,
+`428a1269279fea6db7aa204d9670f017aae0469f176e6563badfb81be3c95c01`
+and `34383d7a07272b18da79d95f24e1a2277469e8a4b9c49ad46e661d506e90a64a`.
+
+Phase verification ran 16 focused Vitest invocations sequentially to avoid the
+repository's shared coverage-temporary collision: all 60 tests passed. The
+production Node TypeScript build, harness syntax/self-checks and targeted ESLint
+also passed. Logs are retained under
+`.logs/phase-1o-f-i-characterization-root-checks/`. The broader package
+typecheck still reports only the inherited `TS1360`/`TS2322` defects in
+`packages/node/tests/helpers/compact-history-scale-1i-b.ts`; full-repository
+lint still reports the inherited mutant/scratch corpus findings (176 errors and
+284 warnings). Neither broad failure is in this characterization lineage.
+
+The normative Codex-high, exact Kimi 3/high/dual-100 and Opus 5/xhigh quorum
+unanimously freezes these exact behavioral-target inputs and outputs:
+
+```text
+B        = 150000000 bytes
+f_sync   = 0.10
+r        = 0.20
+k        = 1.50
+c        = 2.00
+K        = 20
+F99      = 127739 bytes
+S_pinned = 15631 bytes per pair
+E_usable = 11872261 bytes
+C_node   = 759 pairs
+D_object = 28 pairs
+D_node   = 560 pairs
+C_object = 37 pairs
+```
+
+Opus first returned `CHANGES_REQUESTED` on the proposed 150 MiB interpretation.
+Codex-high and exact Kimi 3 then independently reconsidered the adjacent table
+units and agreed with Opus's decimal correction; this was a unanimous plan
+assumption change, not a unilateral edit. The initial and corrected Kimi raw
+transcripts have SHA-256
+`9e217287ceed558284f5ba0e8efe139973d2e90ac91cfd146bffd31e9cf59854` and
+`ba69836744fdf229a0b098d74834b740e1dfbf49553b3de8d0026263c9bcaeef`;
+the Opus numeric review has SHA-256
+`eaf0a8b45769a42cf451da4e83014174000012df0ff58a00679aa3ae52ddc5b7`.
+
+`B` uses decimal bytes because the ratified profile table deliberately writes
+heap as `MB` while its adjacent snapshot limits use `MiB`. Reading 150 MB as
+150 MiB would silently widen the ceiling by 7,286,400 bytes (4.8576%). The
+calculation is exact:
+
+```text
+S_pinned = ceil(10420.16875 * 1.50) = 15631
+floor(B * f_sync * (1 - r)) = 12000000
+E_usable = 12000000 - 127739 = 11872261
+C_node   = floor(11872261 / 15631) = 759
+D_object = ceil(14 * 2.00) = 28
+D_node   = ceil(20 * 28) = 560
+C_object = min(759, max(28, floor(759 / 20))) = 37
+```
+
+The accepted default retains 199 node pairs (35.5%) and nine per-object pairs
+(32.1%) above the 20-object × 14-peer doubled-churn demand. The 10% sync
+fraction is an allocation inside the profile heap, not a claim that the whole
+process fits that amount; the measured roughly 34.3 MB `N=0` process baseline
+is not subtracted from it. The reserve, cross-engine multiplier and churn
+factor cover distinct risks. `c = 2` is not a fairness or abuse bound, and
+`p = 1.0` remains until Phase 1o-g.
+
+This is a conservative compatibility product default anchored to the accepted
+Linux/arm64 Node/V8 evidence plus explicit product multipliers. It is not proof
+of Chromium, Firefox, WebKit, game-device or operator/relay memory behavior.
+Browser/device characterization must revisit `k`; churn evidence must revisit
+`c`; operator/relay ceilings remain explicit and uncharacterized; and a profile
+materially above 20 hot objects must re-characterize fixed container cost and
+`K` before earning a default or scale claim. The final 1o-f(ii) representation
+must rerun this exact characterization before its production default is
+accepted. Diagnostics for larger budgets are non-normative and must preserve
+the source profile's decimal `MB` units or be relabeled explicitly as `MiB`.
+
+This freeze does not authorize a public configuration/type/environment seam,
+an unlimited sentinel, a test-mode branch, a legacy/plain-ID route, an identity
+or ACL fallback, or early 1o-f(ii) implementation. Creator-bound generated IDs
+remain the normal greenfield boundary; any same-ID capability remains only the
+explicit coordinated-ACL policy already in scope, never compatibility logic.
+
 ### Phase 1o-f(ii) — behavioral RED/GREEN
 
 Only after 1o-f(i) acceptance may a fresh Codex-high tests-only RED freeze tiny
