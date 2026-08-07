@@ -244,7 +244,7 @@ describe("Phase 2a head CAS and atomicity", () => {
 		}
 	});
 
-	it("rejects captured-base mismatch before comparing the current head", () => {
+	it("rejects captured-base mismatch after the request matches the current head", () => {
 		const harness = createTransitionHarness();
 		const old = record({ state: "Adopted" });
 		const current = presentHead({ closureDigest: old.closureDigest });

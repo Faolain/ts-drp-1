@@ -11,7 +11,8 @@ export const STORE_CONTRACT_SCENARIOS = Object.freeze([
 /**
  * Runs the 2a common branch without pretending that an ephemeral factory can
  * satisfy the frozen strict branch. Test wrappers own assertions and faults.
- * @param factory
+ * @param factory - Store factory under contract.
+ * @returns The store's immutable capabilities.
  */
 export async function runStoreContract(
 	factory: StoreContractFactory

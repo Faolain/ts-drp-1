@@ -24,7 +24,8 @@ export const REVISION_ONE = must(parseHeadRevision(1));
 
 /**
  *
- * @param result
+ * @param result - Input value.
+ * @returns The successful fixture value.
  */
 export function must<T>(result: ParseResult<T>): T {
 	if (!result.ok) throw new Error(`fixture parse failed: ${result.reason}`);
@@ -33,7 +34,8 @@ export function must<T>(result: ParseResult<T>): T {
 
 /**
  *
- * @param values
+ * @param values - Input value.
+ * @returns A byte array containing the values.
  */
 export function bytes(...values: number[]): Uint8Array {
 	return Uint8Array.from(values);
@@ -41,7 +43,8 @@ export function bytes(...values: number[]): Uint8Array {
 
 /**
  *
- * @param value
+ * @param value - Input value.
+ * @returns A storage reference for the bytes.
  */
 export function ref(value: Uint8Array): GenerationRef {
 	return { digest: must(digestBlob(value)), byteLength: value.byteLength };
@@ -49,7 +52,8 @@ export function ref(value: Uint8Array): GenerationRef {
 
 /**
  *
- * @param objectId
+ * @param objectId - Input value.
+ * @returns An explicit no-head value.
  */
 export function noHead(objectId: StorageObjectId = OBJECT_A): ExpectedHead {
 	return { kind: "none", objectId };
@@ -57,11 +61,12 @@ export function noHead(objectId: StorageObjectId = OBJECT_A): ExpectedHead {
 
 /**
  *
- * @param input
- * @param input.objectId
- * @param input.generationId
- * @param input.revision
- * @param input.closureDigest
+ * @param input - Input value.
+ * @param input.objectId - Input value.
+ * @param input.generationId - Input value.
+ * @param input.revision - Input value.
+ * @param input.closureDigest - Input value.
+ * @returns A present-head fixture.
  */
 export function presentHead(input: {
 	objectId?: StorageObjectId;
@@ -80,12 +85,13 @@ export function presentHead(input: {
 
 /**
  *
- * @param input
- * @param input.objectId
- * @param input.generationId
- * @param input.baseExpectedHead
- * @param input.closure
- * @param input.state
+ * @param input - Input value.
+ * @param input.objectId - Input value.
+ * @param input.generationId - Input value.
+ * @param input.baseExpectedHead - Input value.
+ * @param input.closure - Input value.
+ * @param input.state - Input value.
+ * @returns A generation-record fixture.
  */
 export function record(
 	input: {
@@ -110,7 +116,8 @@ export function record(
 
 /**
  *
- * @param value
+ * @param value - Input value.
+ * @returns The blob digest for the bytes.
  */
 export function digestOf(value: Uint8Array): BlobDigest {
 	return must(digestBlob(value));
