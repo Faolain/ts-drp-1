@@ -8,6 +8,7 @@ import {
 	mergeAuthenticatedVertices,
 	readAuthenticatedClockPending,
 } from "@ts-drp/object";
+import { wasAuthenticatedHashCommitted } from "@ts-drp/object/internal/authenticated-commit";
 import { isTracingEnabled, OpentelemetryMetrics } from "@ts-drp/tracer";
 import {
 	type ApplyResult,
@@ -186,7 +187,8 @@ async function mergeWithRejectedBoundaryRecovery<T extends IDRP>(
 			node,
 			object.id,
 			sender,
-			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash)
+			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash),
+			(hash) => wasAuthenticatedHashCommitted(error, hash)
 		);
 		const missing = exactMissingDependencies(object, vertices, rawMissing);
 
@@ -379,11 +381,13 @@ async function updateHandlerUntraced({ node, message }: HandleParams): Promise<v
 	const governedOutcome = await mergeWithRejectedBoundaryRecovery(node, object, sender, updateMessage.vertices);
 	const mergeOutcome = governedOutcome.outcome;
 	const authenticatedHashes = new Set(mergeOutcome.authenticatedHashes);
+	const committedHashes = new Set(mergeOutcome.committed.map(({ hash }) => hash));
 	completePresentExactRequests(
 		node,
 		object.id,
 		sender,
-		(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash)
+		(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash),
+		(hash) => committedHashes.has(hash)
 	);
 	const missing = exactMissingDependencies(
 		object,
@@ -675,11 +679,13 @@ async function syncAcceptHandlerUntraced({ node, message, syncSelection }: Handl
 		committedVertices = mergeOutcome.committed;
 		rawMissing = mergeOutcome.result[1];
 		const authenticatedHashes = new Set(mergeOutcome.authenticatedHashes);
+		const committedHashes = new Set(mergeOutcome.committed.map(({ hash }) => hash));
 		completePresentExactRequests(
 			node,
 			object.id,
 			sender,
-			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash)
+			(hash) => object.getVertex(hash) !== undefined || authenticatedHashes.has(hash),
+			(hash) => committedHashes.has(hash)
 		);
 		missing = exactMissingDependencies(
 			object,

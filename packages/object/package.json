@@ -19,6 +19,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./internal/authenticated-commit": {
+			"types": "./dist/src/authenticated-commit.d.ts",
+			"import": "./dist/src/authenticated-commit.js"
 		}
 	},
 	"scripts": {

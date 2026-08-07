@@ -11,6 +11,8 @@ export default defineConfig({
 			"@ts-drp/errors": path.resolve(__dirname, "packages/errors/src/index.ts"),
 			"@ts-drp/membership": path.resolve(__dirname, "packages/membership/src/index.ts"),
 			"@ts-drp/network": path.resolve(__dirname, "packages/network/src/index.ts"),
+			// prettier-ignore
+			"@ts-drp/object/internal/authenticated-commit": path.resolve(__dirname, "packages/object/src/authenticated-commit.ts"),
 			"@ts-drp/object": path.resolve(__dirname, "packages/object/src/index.ts"),
 			"@ts-drp/relay-policy": path.resolve(__dirname, "packages/relay-policy/src/index.ts"),
 			"@ts-drp/rendezvous": path.resolve(__dirname, "packages/rendezvous/src/index.ts"),

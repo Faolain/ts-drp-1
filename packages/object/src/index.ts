@@ -24,6 +24,7 @@ import {
 import { serializeDRPState } from "@ts-drp/utils/serialization";
 
 import { createPermissionlessACL } from "./acl/index.js";
+import { readCommittedProvenance, recordCommittedProvenance } from "./authenticated-commit-registry.js";
 import { readClockPendingProvenance, recordClockPendingProvenance } from "./clock-pending-provenance.js";
 import { createDRPVertexApplier, type DRPVertexApplier } from "./drp-applier.js";
 import { AdoptionCommitExhaustedError, ApplyInvariantError, RootACLMutationError } from "./errors.js";
@@ -81,18 +82,18 @@ export async function mergeAuthenticatedVertices<T extends IDRP>(
 	const authenticatedHashes = authenticated.map((_, index) => canonicalAuthenticatedHash(authenticated, index));
 	const dispatchedResult: MergeResult = authenticated.length === 0 ? [true, [], []] : await object.merge(authenticated);
 	const clockPending = readClockPendingProvenance(dispatchedResult);
+	const committedProvenance = readCommittedProvenance(dispatchedResult);
 	const result: MergeResult = occurrences.some(({ status }) => status === "invalid")
 		? [false, dispatchedResult[1], orderAuthenticatedVertexFailures(occurrences, authenticated, dispatchedResult[2])]
 		: dispatchedResult;
-	if (result !== dispatchedResult) recordClockPendingProvenance(result, clockPending);
+	if (result !== dispatchedResult) {
+		recordClockPendingProvenance(result, clockPending);
+		recordCommittedProvenance(result, committedProvenance);
+	}
 	const committed: Vertex[] = [];
-	const committedHashes = new Set<string>();
-	for (let index = 0; index < authenticated.length; index++) {
-		const hash = canonicalAuthenticatedHash(authenticated, index);
-		if (committedHashes.has(hash)) continue;
+	for (const hash of readCommittedProvenance(result)) {
 		const stored = object.getVertex(hash);
 		if (stored === undefined) continue;
-		committedHashes.add(hash);
 		committed.push(stored);
 	}
 	return { authenticatedHashes, clockPending, committed, hasTrustedOrAuthenticatedOffers, result };
@@ -574,10 +575,22 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 			capability.storage === "full"
 				? { executable: authenticated, unavailable: [] }
 				: this.classifyCompactAdmission(authenticated);
-		let applied =
-			compactAdmission.executable.length === 0
-				? { applied: true, invalid: [], missing: [] }
-				: await applier.applyVertices(compactAdmission.executable);
+		let applied: ApplyResult;
+		try {
+			applied =
+				compactAdmission.executable.length === 0
+					? { applied: true, invalid: [], missing: [] }
+					: await applier.applyVertices(compactAdmission.executable);
+		} catch (error) {
+			if (
+				this._applier !== applier &&
+				(error instanceof AdoptionCommitExhaustedError || error instanceof ApplyInvariantError)
+			) {
+				recordCommittedProvenance(error, []);
+				if (error.partialResult !== undefined) recordCommittedProvenance(error.partialResult, []);
+			}
+			throw error;
+		}
 		const clockPending = readClockPendingProvenance(applied);
 		if (this._applier !== applier) {
 			const failedHashes = new Set([...applied.invalid, ...applied.missing, ...(applied.quarantined ?? [])]);
@@ -588,14 +601,16 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 				}
 				return [vertex.hash];
 			});
-			if (staleCommittedHashes.length !== 0) {
-				applied = {
-					...applied,
-					applied: false,
-					quarantined: [...new Set([...(applied.quarantined ?? []), ...staleCommittedHashes])],
-				};
-				recordClockPendingProvenance(applied, clockPending);
-			}
+			applied =
+				staleCommittedHashes.length === 0
+					? { ...applied }
+					: {
+							...applied,
+							applied: false,
+							quarantined: [...new Set([...(applied.quarantined ?? []), ...staleCommittedHashes])],
+						};
+			recordClockPendingProvenance(applied, clockPending);
+			recordCommittedProvenance(applied, []);
 		}
 		if (compactAdmission.unavailable.length !== 0) {
 			applied.applied = false;
@@ -608,7 +623,10 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 					applied: false,
 					invalid: orderAuthenticatedVertexFailures(occurrences, authenticated, applied.invalid),
 				};
-		if (result !== applied) recordClockPendingProvenance(result, clockPending);
+		if (result !== applied) {
+			recordClockPendingProvenance(result, clockPending);
+			recordCommittedProvenance(result, readCommittedProvenance(applied));
+		}
 		if (this.#historyCapability === capability && capability.storage === "compact") {
 			let admitted = false;
 			for (const { hash } of this.hashGraph.getAllVertices()) {
@@ -693,6 +711,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 		const result = await this.authenticateAndApplyVertices(vertices);
 		const mergeResult: MergeResult = [result.applied, result.missing, result.invalid];
 		recordClockPendingProvenance(mergeResult, readClockPendingProvenance(result));
+		recordCommittedProvenance(mergeResult, readCommittedProvenance(result));
 		return mergeResult;
 	}
 

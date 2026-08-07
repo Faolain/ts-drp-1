@@ -12,6 +12,7 @@ interface PeerSyncState {
 	branchCuts: Set<string>;
 	exactRequestAttempts: number;
 	exactRequestCooldownUntil?: number;
+	noProgressStrikes: number;
 	sharedHeads: Set<string>;
 	outstandingRequests: Set<string>;
 }
@@ -21,10 +22,15 @@ interface SyncStateCapacity {
 	readonly perObject: number;
 }
 
+interface SyncStatePolicy {
+	readonly maxNoProgressStrikes: number;
+}
+
 interface PeerSyncEntry {
 	admissionSequence: number;
 	readonly key: string;
 	readonly objectId: string;
+	readonly peerId: string;
 	readonly state: PeerSyncState;
 }
 
@@ -32,6 +38,7 @@ interface NodeSyncLedger {
 	readonly capacity: SyncStateCapacity;
 	nextAdmissionSequence: number;
 	readonly objectCounts: Map<string, number>;
+	readonly policy: SyncStatePolicy;
 	readonly states: Map<string, PeerSyncEntry>;
 }
 
@@ -43,6 +50,7 @@ const PINNED_PAIR_P95_BYTES = 10_503.76953125;
 const FIXED_LEDGER_BYTES = 142_591;
 const SINGLE_OBJECT_DIVISOR = 20;
 const CHURN_ADJUSTED_OBJECT_DEMAND = 28;
+const DEFAULT_MAX_NO_PROGRESS_STRIKES = 3;
 
 const ledgers = new WeakMap<DRPNode, NodeSyncLedger>();
 
@@ -73,12 +81,23 @@ function assertCapacity(capacity: SyncStateCapacity): void {
 	}
 }
 
-function createLedger(capacity: SyncStateCapacity): NodeSyncLedger {
+function assertPolicy(policy: SyncStatePolicy): void {
+	if (!Number.isSafeInteger(policy.maxNoProgressStrikes) || policy.maxNoProgressStrikes < 1) {
+		throw new RangeError("Sync-state maxNoProgressStrikes must be a positive safe integer");
+	}
+}
+
+function createLedger(
+	capacity: SyncStateCapacity,
+	policy: SyncStatePolicy = { maxNoProgressStrikes: DEFAULT_MAX_NO_PROGRESS_STRIKES }
+): NodeSyncLedger {
 	assertCapacity(capacity);
+	assertPolicy(policy);
 	return {
 		capacity: Object.freeze({ ...capacity }),
 		nextAdmissionSequence: 0,
 		objectCounts: new Map(),
+		policy: Object.freeze({ ...policy }),
 		states: new Map(),
 	};
 }
@@ -87,11 +106,16 @@ function createLedger(capacity: SyncStateCapacity): NodeSyncLedger {
  * Install a finite test capacity before this node first allocates sync state.
  * @param node - Node whose capacity is resolved
  * @param capacity - Positive finite pair limits
+ * @param policy - Optional bounded no-progress policy
  * @internal
  */
-export function installSyncStateCapacity(node: DRPNode, capacity: SyncStateCapacity): void {
+export function installSyncStateCapacity(
+	node: DRPNode,
+	capacity: SyncStateCapacity,
+	policy: SyncStatePolicy = { maxNoProgressStrikes: DEFAULT_MAX_NO_PROGRESS_STRIKES }
+): void {
 	if (ledgers.has(node)) throw new Error("Sync-state capacity is already resolved for this node");
-	ledgers.set(node, createLedger(capacity));
+	ledgers.set(node, createLedger(capacity, policy));
 }
 
 function stateKey(objectId: string, peerId: string): string {
@@ -126,14 +150,47 @@ function isDormant(entry: PeerSyncEntry): boolean {
 	);
 }
 
-function oldestDormantEntry(ledger: NodeSyncLedger, objectId?: string): PeerSyncEntry | undefined {
-	let oldest: PeerSyncEntry | undefined;
-	for (const entry of ledger.states.values()) {
-		if (objectId !== undefined && entry.objectId !== objectId) continue;
-		if (!isDormant(entry)) continue;
-		if (oldest === undefined || entry.admissionSequence < oldest.admissionSequence) oldest = entry;
+function oldestPressureVictim(ledger: NodeSyncLedger, node: DRPNode, objectId?: string): PeerSyncEntry | undefined {
+	let subscribedTopics: ReadonlySet<string>;
+	try {
+		subscribedTopics = new Set(node.networkNode.getSubscribedTopics());
+	} catch {
+		subscribedTopics = new Set();
 	}
-	return oldest;
+	const peersByObject = new Map<string, ReadonlySet<string> | undefined>();
+	let dormant: PeerSyncEntry | undefined;
+	let inactive: PeerSyncEntry | undefined;
+	let strikeExhausted: PeerSyncEntry | undefined;
+	let examined = 0;
+	for (const entry of ledger.states.values()) {
+		examined += 1;
+		if (examined > ledger.capacity.perNode) break;
+		if (objectId !== undefined && entry.objectId !== objectId) continue;
+		if (isDormant(entry) && (dormant === undefined || entry.admissionSequence < dormant.admissionSequence)) {
+			dormant = entry;
+		}
+		let isInactive = false;
+		if (subscribedTopics.has(entry.objectId) && !peersByObject.has(entry.objectId)) {
+			try {
+				peersByObject.set(entry.objectId, new Set(node.networkNode.getGroupPeers(entry.objectId)));
+			} catch {
+				peersByObject.set(entry.objectId, undefined);
+			}
+		}
+		if (subscribedTopics.has(entry.objectId)) {
+			isInactive = peersByObject.get(entry.objectId)?.has(entry.peerId) === false;
+		}
+		if (isInactive && (inactive === undefined || entry.admissionSequence < inactive.admissionSequence)) {
+			inactive = entry;
+		}
+		if (
+			entry.state.noProgressStrikes >= ledger.policy.maxNoProgressStrikes &&
+			(strikeExhausted === undefined || entry.admissionSequence < strikeExhausted.admissionSequence)
+		) {
+			strikeExhausted = entry;
+		}
+	}
+	return dormant ?? inactive ?? strikeExhausted;
 }
 
 function removeEntry(ledger: NodeSyncLedger, entry: PeerSyncEntry): void {
@@ -148,6 +205,7 @@ function newPeerSyncState(): PeerSyncState {
 		advertisedHeads: new Set(),
 		branchCuts: new Set(),
 		exactRequestAttempts: 0,
+		noProgressStrikes: 0,
 		sharedHeads: new Set(),
 		outstandingRequests: new Set(),
 	};
@@ -183,9 +241,9 @@ function getState(node: DRPNode, objectId: string, peerId: string): PeerSyncStat
 	const objectIsFull = (ledger.objectCounts.get(objectId) ?? 0) >= ledger.capacity.perObject;
 	const nodeIsFull = ledger.states.size >= ledger.capacity.perNode;
 	const victim = objectIsFull
-		? oldestDormantEntry(ledger, objectId)
+		? oldestPressureVictim(ledger, node, objectId)
 		: nodeIsFull
-			? oldestDormantEntry(ledger)
+			? oldestPressureVictim(ledger, node)
 			: undefined;
 	if ((objectIsFull || nodeIsFull) && victim === undefined) return undefined;
 
@@ -194,6 +252,7 @@ function getState(node: DRPNode, objectId: string, peerId: string): PeerSyncStat
 		admissionSequence: takeAdmissionSequence(ledger),
 		key,
 		objectId,
+		peerId,
 		state,
 	};
 	if (victim !== undefined) removeEntry(ledger, victim);
@@ -336,6 +395,11 @@ export interface PreparedSyncSend {
  * Read the next deterministic exact-request chunk without charging the
  * existing retry lifecycle. Selected-mode builders use this to validate the
  * actual protobuf before committing one attempt.
+ * @param node - Node owning the sync state
+ * @param objectId - Object being synchronized
+ * @param peerId - Remote peer selected for this probe
+ * @param purpose - Lifecycle role of the outbound send
+ * @returns Whether a send is allowed and which exact hashes it would carry
  */
 export function previewSyncSend(
 	node: DRPNode,
@@ -402,6 +466,7 @@ export function prepareSyncSend(
 	}
 
 	if (state.exactRequestAttempts >= MAX_EXACT_REQUEST_ATTEMPTS) {
+		state.noProgressStrikes = Math.min(Number.MAX_SAFE_INTEGER, state.noProgressStrikes + 1);
 		state.exactRequestCooldownUntil = Date.now() + SYNC_RECOVERY_COOLDOWN_MS;
 		node.safeDispatchEvent(NodeEventName.DRP_SYNC_REJECTED, {
 			detail: { id: objectId, peerId, retries: MAX_EXACT_REQUEST_ATTEMPTS },
@@ -420,24 +485,31 @@ export function prepareSyncSend(
  * @param objectId - Object being synchronized
  * @param peerId - Remote peer
  * @param hasHash - Truthful exact-presence predicate
+ * @param creditsHash - Optional exact call-local commit predicate
  */
 export function completePresentExactRequests(
 	node: DRPNode,
 	objectId: string,
 	peerId: string,
-	hasHash: (hash: string) => boolean
+	hasHash: (hash: string) => boolean,
+	creditsHash?: (hash: string) => boolean
 ): void {
 	const state = findState(node, objectId, peerId);
 	if (state === undefined) return;
 	let completed = false;
+	let credited = false;
 	for (const hash of state.outstandingRequests) {
 		if (!hasHash(hash)) continue;
 		state.outstandingRequests.delete(hash);
 		completed = true;
+		if (creditsHash?.(hash) === true) credited = true;
 	}
 	if (completed) {
 		state.exactRequestAttempts = 0;
 		state.exactRequestCooldownUntil = undefined;
+		if (creditsHash !== undefined) {
+			state.noProgressStrikes = credited ? 0 : Math.min(Number.MAX_SAFE_INTEGER, state.noProgressStrikes + 1);
+		}
 	}
 }
 

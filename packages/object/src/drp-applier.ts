@@ -23,6 +23,7 @@ import {
 } from "@ts-drp/validation";
 
 import { isObjectACLDeterministicError } from "./acl/errors.js";
+import { recordCommittedProvenance } from "./authenticated-commit-registry.js";
 import { readClockPendingProvenance, recordClockPendingProvenance } from "./clock-pending-provenance.js";
 import { AdoptionCommitExhaustedError, ApplyInvariantError } from "./errors.js";
 import { FinalityStore } from "./finality/index.js";
@@ -196,6 +197,14 @@ interface AdoptionHint<T extends IDRP> {
 
 interface ApplyCallContext {
 	hint?: AdoptionHint<IDRP>;
+}
+
+const committedHashesByCall = new WeakMap<ApplyCallContext, Set<Hash>>();
+
+function committedHashes(callContext: ApplyCallContext): Set<Hash> {
+	const hashes = committedHashesByCall.get(callContext);
+	if (hashes === undefined) throw new Error("Apply call is missing committed-hash provenance state");
+	return hashes;
 }
 
 type JournaledOperation<T extends IDRP, Op extends Operation<T> = Operation<T>> = Op & {
@@ -673,7 +682,9 @@ export class DRPVertexApplier<T extends IDRP> {
 			preflightByIdentity.set(submittedVertex, record);
 			return record;
 		});
-		return this.applyVerticesCall(preflight, {});
+		const callContext: ApplyCallContext = {};
+		committedHashesByCall.set(callContext, new Set());
+		return this.applyVerticesCall(preflight, callContext);
 	}
 
 	private async applyVerticesCall(
@@ -714,7 +725,8 @@ export class DRPVertexApplier<T extends IDRP> {
 							vertex: stableVertex,
 							isACL: stableVertex.operation.drpType === DrpType.ACL,
 						});
-						await this.commitPreparedVertex(operation, callContext);
+						const committed = await this.commitPreparedVertex(operation, callContext);
+						if (committed) committedHashes(callContext).add(operation.vertex.hash);
 						break;
 					} catch (error) {
 						if (isApplicationRetryBarrier(error) || attempt === MAX_APPLICATION_ATTEMPTS_PER_OFFER) {
@@ -728,12 +740,16 @@ export class DRPVertexApplier<T extends IDRP> {
 					error.partialResult = this.createApplyResult(missing, invalid, [...quarantined, rejectedHash]);
 					this.publishClockPendingProvenance(error.partialResult, missingVertices, clockPending);
 					recordClockPendingProvenance(error, readClockPendingProvenance(error.partialResult));
+					recordCommittedProvenance(error.partialResult, committedHashes(callContext));
+					recordCommittedProvenance(error, committedHashes(callContext));
 					throw error;
 				}
 				if (error instanceof ApplyInvariantError) {
 					error.partialResult = this.createApplyResult(missing, invalid, [...quarantined, rejectedHash]);
 					this.publishClockPendingProvenance(error.partialResult, missingVertices, clockPending);
 					recordClockPendingProvenance(error, readClockPendingProvenance(error.partialResult));
+					recordCommittedProvenance(error.partialResult, committedHashes(callContext));
+					recordCommittedProvenance(error, committedHashes(callContext));
 					throw error;
 				}
 				if (error instanceof ReceiverClockPendingValidationError) {
@@ -828,6 +844,7 @@ export class DRPVertexApplier<T extends IDRP> {
 
 		const result = this.createApplyResult(missing, invalid, quarantined);
 		this.publishClockPendingProvenance(result, missingVertices, clockPending);
+		recordCommittedProvenance(result, committedHashes(callContext));
 		return result;
 	}
 
