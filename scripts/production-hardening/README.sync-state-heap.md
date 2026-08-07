@@ -28,9 +28,14 @@ node scripts/production-hardening/sync-state-heap-controller.mjs \
 The authoritative wrapper verifies the pinned base index → Linux/arm64 manifest
 → config chain, exports clean `HEAD` with `git archive`, and builds that isolated
 context with BuildKit. Consequently an uncommitted harness can run smoke checks
-but cannot produce authoritative evidence. BuildKit must report distinct output
-manifest and config digests; the wrapper validates the source-revision image
-label and runs the immutable inspected config ID with networking disabled.
+but cannot produce authoritative evidence. BuildKit loads the single-platform
+image with provenance attestations disabled and writes its immutable config ID.
+The wrapper saves that exact ID as an OCI-layout-capable archive, hashes the
+archive's manifest blob, follows and hashes its declared config blob, requires
+it to equal BuildKit's config ID, validates the source-revision image label,
+reloads that verified archive, and runs the immutable inspected config ID with
+networking disabled. It does not treat BuildKit's exporter-dependent metadata
+fields as a manifest proof.
 Protected untracked files, `.git`, host dependencies, logs, and host build
 artifacts never enter the context.
 
@@ -49,6 +54,9 @@ pinned Linux image immediately before measurement.
 node scripts/production-hardening/run-sync-state-heap-oci.mjs \
   --output .logs/phase-1o-f-sync-state-heap
 ```
+
+To exercise the complete OCI provenance and isolated-runtime path with the
+bounded, non-acceptance schedule, add `--smoke` and use a separate output path.
 
 The wrapper is the authoritative entry point because it binds source, base-chain,
 output-manifest, and output-config provenance end to end. To inspect its worker

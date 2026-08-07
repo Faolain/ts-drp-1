@@ -70,15 +70,58 @@ function verifyPinnedBaseChain() {
 	};
 }
 
-function buildMetadataDigests(metadata) {
-	const manifestDigest = metadata["containerimage.digest"];
-	const configDigest = metadata["containerimage.config.digest"];
-	assertDigest(manifestDigest, "BuildKit output manifest digest");
-	assertDigest(configDigest, "BuildKit output config digest");
-	if (manifestDigest === configDigest) {
-		throw new Error("BuildKit reported the same digest for the output manifest and config");
+async function readOciBlob(layout, digest, name) {
+	assertDigest(digest, name);
+	const bytes = await readFile(join(layout, "blobs", "sha256", digest.slice("sha256:".length)));
+	if (sha256Digest(bytes) !== digest) throw new Error(`${name} bytes do not hash to ${digest}`);
+	return bytes;
+}
+
+async function verifyOciArchive(archive, extractionRoot, sourceRevision) {
+	const layout = join(extractionRoot, "oci-layout");
+	await mkdir(layout);
+	command("tar", ["-xf", archive, "-C", layout], { capture: true });
+	const layoutMarker = JSON.parse(await readFile(join(layout, "oci-layout"), "utf8"));
+	if (layoutMarker.imageLayoutVersion !== "1.0.0") {
+		throw new Error(`Unexpected OCI image layout version: ${layoutMarker.imageLayoutVersion}`);
 	}
-	return { configDigest, manifestDigest };
+	const index = JSON.parse(await readFile(join(layout, "index.json"), "utf8"));
+	if (index.schemaVersion !== 2 || index.manifests?.length !== 1) {
+		throw new Error(`OCI archive must contain exactly one image manifest: ${JSON.stringify(index.manifests)}`);
+	}
+	const descriptor = index.manifests[0];
+	if (
+		descriptor.mediaType !== "application/vnd.oci.image.manifest.v1+json" ||
+		(descriptor.platform !== undefined &&
+			(descriptor.platform.os !== "linux" || descriptor.platform.architecture !== "arm64"))
+	) {
+		throw new Error(`Unexpected OCI output manifest descriptor: ${JSON.stringify(descriptor)}`);
+	}
+	const manifestBytes = await readOciBlob(layout, descriptor.digest, "OCI output manifest digest");
+	if (descriptor.size !== manifestBytes.length) {
+		throw new Error(`OCI output manifest size ${manifestBytes.length}; expected ${descriptor.size}`);
+	}
+	const manifest = JSON.parse(manifestBytes.toString("utf8"));
+	if (
+		manifest.schemaVersion !== 2 ||
+		manifest.mediaType !== "application/vnd.oci.image.manifest.v1+json" ||
+		manifest.config?.mediaType !== "application/vnd.oci.image.config.v1+json"
+	) {
+		throw new Error(`Unexpected OCI output manifest: ${JSON.stringify(manifest)}`);
+	}
+	const configBytes = await readOciBlob(layout, manifest.config.digest, "OCI output config digest");
+	if (manifest.config.size !== configBytes.length) {
+		throw new Error(`OCI output config size ${configBytes.length}; expected ${manifest.config.size}`);
+	}
+	const config = JSON.parse(configBytes.toString("utf8"));
+	if (
+		config.architecture !== "arm64" ||
+		config.os !== "linux" ||
+		config.config?.Labels?.["org.opencontainers.image.revision"] !== sourceRevision
+	) {
+		throw new Error(`OCI output config platform/source mismatch: ${JSON.stringify(config)}`);
+	}
+	return { configDigest: manifest.config.digest, manifestDigest: descriptor.digest };
 }
 
 const argumentsMap = parseArguments(process.argv.slice(2));
@@ -87,6 +130,7 @@ const outputParent = dirname(output);
 const outputName = basename(output);
 const tag = typeof argumentsMap.get("tag") === "string" ? argumentsMap.get("tag") : "ts-drp-sync-state-heap:phase-1o-f";
 const runSeed = argumentsMap.get("run-seed");
+const smoke = argumentsMap.get("smoke") === true;
 const repositoryRoot = command("git", ["rev-parse", "--show-toplevel"], { capture: true });
 const sourceRevision = command("git", ["rev-parse", "HEAD"], { capture: true, cwd: repositoryRoot });
 if (!/^[0-9a-f]{40}$/u.test(sourceRevision)) throw new Error(`Unexpected source revision: ${sourceRevision}`);
@@ -99,7 +143,8 @@ if (
 const temporaryRoot = await mkdtemp(join(tmpdir(), "ts-drp-sync-state-heap-"));
 try {
 	const context = join(temporaryRoot, "context");
-	const metadataPath = join(temporaryRoot, "buildx-metadata.json");
+	const ociArchivePath = join(temporaryRoot, "profiler-image.oci.tar");
+	const imageIdPath = join(temporaryRoot, "profiler-image.id");
 	await mkdir(context);
 	const archive = command("git", ["archive", "--format=tar", sourceRevision], {
 		binary: true,
@@ -119,15 +164,22 @@ try {
 		join(context, "scripts/production-hardening/Dockerfile.sync-state-heap"),
 		"--build-arg",
 		`SOURCE_REVISION=${sourceRevision}`,
-		"--metadata-file",
-		metadataPath,
+		"--provenance=false",
+		"--iidfile",
+		imageIdPath,
 		"--tag",
 		tag,
 		"--load",
 		context,
 	]);
-	const buildMetadata = JSON.parse(await readFile(metadataPath, "utf8"));
-	const outputDigests = buildMetadataDigests(buildMetadata);
+	const builtConfigDigest = (await readFile(imageIdPath, "utf8")).trim();
+	assertDigest(builtConfigDigest, "BuildKit output config digest");
+	command("docker", ["image", "save", "--platform", "linux/arm64", "--output", ociArchivePath, builtConfigDigest]);
+	const outputDigests = await verifyOciArchive(ociArchivePath, temporaryRoot, sourceRevision);
+	if (outputDigests.configDigest !== builtConfigDigest) {
+		throw new Error(`OCI archive config ${outputDigests.configDigest}; expected built config ${builtConfigDigest}`);
+	}
+	command("docker", ["load", "--input", ociArchivePath]);
 	const inspection = JSON.parse(
 		command("docker", ["image", "inspect", outputDigests.configDigest], { capture: true })
 	)[0];
@@ -156,6 +208,7 @@ try {
 		baseChain.configDigest,
 	];
 	if (typeof runSeed === "string") controllerArguments.push("--run-seed", runSeed);
+	if (smoke) controllerArguments.push("--smoke");
 	command("docker", [
 		"run",
 		"--rm",
