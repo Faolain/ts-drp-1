@@ -28182,6 +28182,46 @@ verified manifest SHA-256 is
 The earlier 402 records remain useful provider-history evidence but no longer
 block the final Opus/xhigh gate.
 
+## Phase 1o-d exact retained-hash ingress — accepted and closed
+
+The fresh Claude-skill Opus 5/xhigh final review accepts the exact candidate
+`20d9df2`, tests-only RED `8fd3ff9` and production GREEN `24cfc70` with
+`BLOCKERS: none` and `PHASE_1O_D_MAY_CLOSE: yes`. Session
+`be893800-d8fc-4ac3-a137-55f477231601` exited zero after 94 turns. All 140
+substantive assistant records and all 93 direct tool calls are authenticated as
+`claude-opus-5` at xhigh; 44 Bash, 36 Read and 13 Grep calls were attempted,
+with eight safe-mode denials and no write, delegation, web, MCP, browser or
+fallback-model call. An automatic Haiku metadata envelope used 2,363 input and
+24 output tokens but authored no assistant record, tool call, finding or
+verdict.
+
+The final controller independently passes the focused owner 6/6 and the exact
+14-file preservation corpus 51/51 with coverage disabled. Production
+TypeScript, ESLint and Prettier exit zero. Package TypeScript contains only the
+inherited compact-history TS1360/TS2322 diagnostics. Source, frozen-test,
+tracked-worktree, index and accepted Grok/Kimi artifact-manifest invariance all
+verify. Final Opus result SHA-256 is
+`83c2841ab744052dcb632b3e9a0652eec99e1357b44aa62c089a5756e6d4a966`;
+verified 86-entry manifest SHA-256 is
+`04e2a5d655887e88452cfc37f0fc2fe97e27c20b14eb6dab6f79664a932fcdf4`.
+
+The accepted nonblockers remain explicit: a mixed canonical/malformed wire
+array and whitespace/control/astral equivalence classes are prudent extra
+coverage, not unexercised production branches; malformed unknown heads
+fail-safely suppress reciprocity to their own authenticated sender; full
+inventory does not retain exact requests; and no alternative production
+exact-retention mutator exists. The gate also covers full-inventory
+SYNC_ACCEPT dependencies, making the earlier "heads-mode" prose conservative.
+
+Opus's observation that verifier-authenticated claimed hashes may clear that
+same peer's lifecycle before later content-hash rejection is already the
+accepted Phase 1n-b residual recorded near this plan's Phase 1n-b closure. It
+does not bypass the 1o-d ingress gate, forge committed state or create a new
+owner. Phase 1o-e retains branch-cut cap/FIFO ownership; Phase 1o-f retains heap
+characterization and aggregate entitlement; Phase 1o-g retains productive-peer
+fairness. No legacy plain-ID, identity migration, omitted-ACL fallback or ACL
+policy was introduced. Phase 1o-d is closed.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
