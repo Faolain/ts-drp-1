@@ -172,12 +172,20 @@ export class TransitionOwner {
 		digest: BlobDigest;
 		bytes: Uint8Array;
 	}): StoreResult<{ inserted: boolean }> {
+		if (typeof input !== "object" || input === null) return rejected("INVALID_ARGUMENT");
+		const bytesDescriptor = Object.getOwnPropertyDescriptor(input, "bytes");
+		if (
+			bytesDescriptor === undefined ||
+			!("value" in bytesDescriptor) ||
+			!(bytesDescriptor.value instanceof Uint8Array)
+		) {
+			return rejected("INVALID_ARGUMENT");
+		}
+		if (hasSharedBacking(bytesDescriptor.value)) return rejected("SHARED_BUFFER_INPUT");
+		const bytes = new Uint8Array(bytesDescriptor.value);
 		if (!isClosedRecord(input, ["objectId", "generationId", "digest", "bytes"])) {
 			return rejected("INVALID_ARGUMENT");
 		}
-		if (!(input.bytes instanceof Uint8Array)) return rejected("INVALID_ARGUMENT");
-		if (hasSharedBacking(input.bytes)) return rejected("SHARED_BUFFER_INPUT");
-		const bytes = new Uint8Array(input.bytes);
 		if (!isStorageObjectId(input.objectId) || !isGenerationId(input.generationId) || !isBlobDigest(input.digest)) {
 			return rejected("INVALID_ARGUMENT");
 		}
