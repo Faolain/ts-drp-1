@@ -28288,6 +28288,52 @@ the result SHA-256 is
 Tests and the plan were untouched by GREEN. No legacy plain-ID route,
 compatibility fallback, identity migration or ACL change was added.
 
+## Phase 1o-e preliminary reviews — accepted
+
+Fresh native Grok 4.5/high session
+`019fda25-a40f-7642-940d-5892871874b1` accepted exact candidate `014f672`,
+tests-only RED `fb7c3ab` and production GREEN `8b4c319` with no blocker and
+`OPUS_MAY_START=yes`. Requested/current model was `grok-4.5`, effective backend
+usage was `grok-4.5-build`, and the read-only session completed seven model
+turns with clean `end_turn`. Its controller passed focused 3/3 and preservation
+57/57 across 15 separate coverage-disabled invocations. Production TypeScript,
+ESLint, Prettier and diff/invariance gates passed; package TypeScript retained
+only inherited TS1360/TS2322. HEAD, index, stash, tracked worktree, reviewed
+files and protected untracked files remained invariant. Result SHA-256 is
+`6a0b7d51a86204771590dff74f25f6b165db5a4131bccf535949ce213a835be1`;
+verified integrity-manifest SHA-256 is
+`9c4df2f4222b954457e868c458721fc48b1892492e4408c11fcc44d0ff5cf72f`.
+
+The authoritative exact Kimi 3/high/dual-100 replacement session is
+`7b99e053-17d1-4c3d-988d-68cf753c9b41`. The first fresh session accepted but
+was conservatively superseded after an unscoped grep incidentally surfaced
+`.logs` snippets. The replacement used exact named-object/path scopes, K3 with
+thinking and both 100-step controls, and completed 11 inspection steps with 20
+read-only calls/results. Its initial process exited after reasoning without a
+native assistant text verdict; no verdict was inferred from hidden thinking.
+One bounded resume of that exact session used K3/thinking/dual-100 with
+`allowed_tools: []` and emitted the canonical native text verdict in one step,
+zero tool calls and exit zero: `ACCEPTED`, no blockers and
+`OPUS_MAY_START=yes`.
+
+Kimi's controller independently passed focused 3/3 and the exact 15-file
+sequential preservation corpus 57/57. Production TypeScript, ESLint and
+Prettier passed; package TypeScript contained only the inherited compact
+TS1360/TS2322 findings. Candidate, index, stash and tracked worktree remained
+invariant. Canonical result SHA-256 is
+`d3bc5275c2fbfed7269684e716757d0ab7588d5d2c38f8deafd233bf9176ecc1`;
+verified 73-entry manifest SHA-256 is
+`9e0b6b35e6b9d1c26c2b9f270343dc6f244d08c11aaee277e9e498fd17307df6`.
+
+Both reviewers retain the same nonblockers: the defensive
+`oldest !== undefined` guard is unreachable at size 32 but harmless;
+over-capacity batches, in-batch duplicates and in-batch evict/readmit are
+structurally correct but not separately frozen; and the public oldest-cut
+probe assumes the wire field cap remains at least two, currently 32. Neither
+found a frozen Phase 1o-a/b/c contradiction, legacy-ID route, ACL change,
+identity migration or Phase 1o-f/g scope leak. The final Opus 5/xhigh gate may
+start.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
