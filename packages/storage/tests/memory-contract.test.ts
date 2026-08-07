@@ -12,8 +12,17 @@ import {
 } from "../src/index.js";
 import * as storageSurface from "../src/index.js";
 
+const FORBIDDEN_STORAGE_EXPORTS = ["TransitionOwner", "createTransitionHarness", "isSigningEligible"] as const;
+
 function reasonOf(result: StoreResult<unknown>): string {
 	return result.ok ? "OK" : result.reason;
+}
+
+function expectNoForbiddenStorageExports(surface: object): void {
+	const exports = Object.keys(surface);
+	for (const forbiddenExport of FORBIDDEN_STORAGE_EXPORTS) {
+		expect(exports).not.toContain(forbiddenExport);
+	}
 }
 
 async function beginOne(
@@ -92,10 +101,10 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 
 	it("does not export the transition owner, harness, or a signing-capability predicate", () => {
 		for (const surface of [storageSurface, contractSurface]) {
-			expect(Object.keys(surface)).not.toContain("PermissiveTransitionOwner");
-			expect(Object.keys(surface)).not.toContain("createTransitionHarness");
-			expect(Object.keys(surface)).not.toContain("isSigningEligible");
+			expectNoForbiddenStorageExports(surface);
 		}
+
+		expect(() => expectNoForbiddenStorageExports({ TransitionOwner: Symbol("controlled leak") })).toThrow();
 	});
 
 	it("cannot be relabeled strict or signing-eligible by an environment override", () => {
@@ -109,6 +118,40 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		} finally {
 			delete controls.TS_DRP_STRICT_STORAGE;
 		}
+	});
+
+	it.each([
+		{
+			name: "ordinary assignment",
+			replace(store: AheDurableStore): void {
+				(store as unknown as { capabilities: unknown }).capabilities = {
+					durability: "strict",
+					signingEligibility: "backend-capability-required",
+				};
+			},
+		},
+		{
+			name: "Object.defineProperty",
+			replace(store: AheDurableStore): void {
+				Object.defineProperty(store, "capabilities", {
+					value: { durability: "strict", signingEligibility: "backend-capability-required" },
+				});
+			},
+		},
+	] as const)("keeps the exported memory capability frozen and honest after $name", async ({ replace }) => {
+		const store = createMemoryAheDurableStore();
+		try {
+			replace(store);
+		} catch {
+			// A non-writable capability surface may reject replacement in strict mode.
+		}
+
+		expect.soft(store.capabilities).toEqual({ durability: "ephemeral", signingEligibility: "never" });
+		expect.soft(Object.isFrozen(store.capabilities)).toBe(true);
+		expect(await store.readObjectState(OBJECT_A)).toEqual({
+			ok: true,
+			value: { head: noHead(OBJECT_A), generations: [] },
+		});
 	});
 
 	it.each(["declared", "undeclared", "absent", "unknown-generation"] as const)(
