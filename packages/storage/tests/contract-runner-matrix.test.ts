@@ -97,8 +97,17 @@ function nonPersistentDiscardStore(store: AheDurableStore): AheDurableStore {
 	let staged: unknown;
 	return adaptStore(store, async (property, invoke) => {
 		if (property === "beginGeneration") {
-			staged = await invoke();
-			return staged;
+			const result = await invoke();
+			if (
+				staged === undefined &&
+				typeof result === "object" &&
+				result !== null &&
+				"ok" in result &&
+				result.ok === true
+			) {
+				staged = result;
+			}
+			return result;
 		}
 		if (property !== "discardGeneration") return invoke();
 		if (
