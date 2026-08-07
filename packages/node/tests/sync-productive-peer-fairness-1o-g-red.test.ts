@@ -448,9 +448,9 @@ describe("Phase 1o-g productive-peer fairness lifecycle", () => {
 		chargeRejectionBoundary(node, objectId, incumbentPeer);
 		recordSharedHeads(node, objectId, candidatePeer, [hash(61)]);
 		expect(sharedHashes(node, objectId, candidatePeer), "two production strikes remain below threshold").toEqual([]);
+		vi.advanceTimersByTime(SYNC_RECOVERY_COOLDOWN_MS);
 		expectRetained(node, objectId, incumbentPeer, [hash(60)]);
 
-		vi.advanceTimersByTime(SYNC_RECOVERY_COOLDOWN_MS);
 		chargeRejectionBoundary(node, objectId, incumbentPeer);
 		recordSharedHeads(node, objectId, candidatePeer, [hash(61)]);
 		expect(sharedHashes(node, objectId, candidatePeer), "the third production strike is reclaimable").toEqual([
@@ -553,6 +553,8 @@ describe("Phase 1o-g call-local committed provenance", () => {
 				drp: new ControlledLogDRP(),
 				finality_config: { enabled: false },
 			});
+			vi.spyOn(ownReceiver.networkNode, "getSubscribedTopics").mockReturnValue([ownObject.id]);
+			vi.spyOn(ownReceiver.networkNode, "getGroupPeers").mockReturnValue([peerA.networkNode.peerId]);
 			const own = await signedVertex(peerA, "append", "own-handler-commit", Date.now() + 100);
 			const ownSurvivor = hash(700);
 			queueExactRequests(ownReceiver, ownObject.id, peerA.networkNode.peerId, [own.hash, ownSurvivor]);
@@ -572,6 +574,11 @@ describe("Phase 1o-g call-local committed provenance", () => {
 				drp: new ControlledLogDRP(),
 				finality_config: { enabled: false },
 			});
+			vi.spyOn(racedReceiver.networkNode, "getSubscribedTopics").mockReturnValue([racedObject.id]);
+			vi.spyOn(racedReceiver.networkNode, "getGroupPeers").mockReturnValue([
+				peerA.networkNode.peerId,
+				peerB.networkNode.peerId,
+			]);
 			const gate = createApplyGate("handler-third-party-overlap");
 			const shared = await signedVertex(peerB, "appendControlled", "handler-third-party-overlap", Date.now() + 200);
 			const racedSurvivor = hash(710);

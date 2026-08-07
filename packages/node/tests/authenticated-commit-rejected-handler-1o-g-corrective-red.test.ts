@@ -160,6 +160,8 @@ describe("Phase 1o-g rejected-boundary handler commit credit", () => {
 			drp: new AppendLogDRP(),
 			finality_config: { enabled: false },
 		});
+		vi.spyOn(productiveReceiver.networkNode, "getSubscribedTopics").mockReturnValue([productiveObject.id]);
+		vi.spyOn(productiveReceiver.networkNode, "getGroupPeers").mockReturnValue([senderA.networkNode.peerId]);
 		expect(productiveObject.id).toMatch(new RegExp(`^${productiveReceiver.networkNode.peerId}:`));
 		const now = Date.now();
 		const committed = await signedVertex(senderA, "same-call-commit", now);
@@ -198,6 +200,8 @@ describe("Phase 1o-g rejected-boundary handler commit credit", () => {
 			drp: new AppendLogDRP(),
 			finality_config: { enabled: false },
 		});
+		vi.spyOn(unproductiveReceiver.networkNode, "getSubscribedTopics").mockReturnValue([unproductiveObject.id]);
+		vi.spyOn(unproductiveReceiver.networkNode, "getGroupPeers").mockReturnValue([senderA.networkNode.peerId]);
 		const preexisting = await signedVertex(senderB, "third-party-preexisting", now + 10);
 		await expect(unproductiveObject.applyVertices([preexisting])).resolves.toMatchObject({
 			applied: true,
