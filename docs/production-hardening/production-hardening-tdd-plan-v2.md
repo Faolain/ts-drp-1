@@ -28334,6 +28334,60 @@ found a frozen Phase 1o-a/b/c contradiction, legacy-ID route, ACL change,
 identity migration or Phase 1o-f/g scope leak. The final Opus 5/xhigh gate may
 start.
 
+## Phase 1o-e bounded branch-cut retention — accepted and closed
+
+The fresh Claude-skill Opus 5/xhigh final review accepts exact candidate
+`a9af2b0`, tests-only RED `fb7c3ab` and production GREEN `8b4c319` with
+`BLOCKERS: none` and `PHASE_1O_E_MAY_CLOSE=yes`. Session
+`160532e7-9cd2-4374-af45-d09c6169ff9d` exited zero with `end_turn` after 90
+turns. All 139 substantive assistant records and all 89 direct tool calls are
+authenticated as `claude-opus-5`: 28 Bash, 48 Read and 13 Grep calls. Seven
+read-only Bash attempts were denied by safe mode and none was bypassed. No
+write, delegation, subagent, web, browser, MCP, test, typecheck, lint,
+formatter, build or package-manager call occurred in the reviewer session.
+
+The automatic `claude-haiku-4-5` metadata envelope used 3,004 input and 24
+output tokens but authored no assistant record, tool call, finding or verdict.
+Requested/effective substantive model remained `claude-opus-5` at `xhigh`.
+Final result SHA-256 is
+`f22bc056ea5f1666d3f582f15f0a6af6d86800242c9dfbef282b024b2b3cb039`;
+verified 150-entry integrity-manifest SHA-256 is
+`63aa3fb83f4458706c5378852eae4705a45f03ea601256c83c50ffd449593fd3`.
+
+The final controller independently passes focused 3/3 and preservation 57/57
+across the exact 15 separate sequential coverage-disabled invocations.
+Production TypeScript exits zero. Package TypeScript contains only inherited
+compact-helper TS1360 at line 152 and TS2322 at line 157. Changed-source
+ESLint exits zero with no errors and five inherited JSDoc warnings. Prettier,
+diff, scope, production identity, frozen-RED identity and candidate/index/
+stash/tracked-worktree/protected-untracked invariance all pass. Production
+source SHA-256 is
+`6985f8c48ca8358cdbc7cf8856a671702d55267478aff34d6fbd7772e9478e70`;
+frozen RED source SHA-256 is
+`c002f103bc2a2fd949b2ffcb808ce45eb1302f14c05e36d217e3adb98c9d7d31`.
+The exact preliminary Grok and canonical Kimi result/manifest anchors fully
+verify.
+
+Opus independently re-adjudicated the 0/1/31/32/33+ boundaries, over-cap and
+mixed batches, duplicate no-refresh, evicted-cut readmission, JavaScript
+`Set` insertion order, the sole-mutator invariant, shared-head-first
+projection, empty-input nonallocation, node/object/peer isolation, object/node
+cleanup, frozen Phase 1o-a/b/c/d compatibility, full and compact/
+history-unavailable recovery, and public test causality. No concrete
+source-level counterexample or reward-hacking path was found. The recovery
+assertions also pass on untouched production and are therefore preservation
+guards rather than cap discriminators; the four retention-order assertions
+remain the causal RED.
+
+Accepted nonblockers are limited to prudent direct-coverage gaps for some
+in-batch duplicate/readmission and boundary sequences, the unreachable but
+harmless `oldest !== undefined` guard, and the test helper's dependency on the
+current field cap and shared-head-first projection. Aggregate pair entitlement,
+heap characterization and idle reclamation remain Phase 1o-f; productive-peer
+fairness remains Phase 1o-g. No legacy plain-ID route, compatibility fallback,
+identity migration, omitted-ACL fallback or ACL policy change was introduced.
+Phase 1o-e is closed.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
