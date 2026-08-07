@@ -28977,6 +28977,72 @@ The final contract is:
     any fairness-only structure beyond the stated fields, reject maximum-dormant
     dominance and add a representative shape. Correct every derived default
     through a fresh numeric RED/GREEN/review loop before 1o-g closes.
+14. **Cross-package authenticated-commit capability.** The tests-only RED exposed
+    a packaging contradiction at the rejected-boundary production owner. Normal
+    `UPDATE` and `SYNC_ACCEPT` owners already receive
+    `mergeOutcome.committed`, but `mergeWithRejectedBoundaryRecovery` holds only
+    the exact thrown error and its partial result. A source-relative import from
+    `packages/node/src` into `packages/object/src` is not shippable under the
+    package `composite`/`rootDir`/`dist` layout, JavaScript provides no
+    cross-package friend visibility, and post-state inference is the race this
+    phase removes. The reconciled least-authority seam is therefore exactly one
+    internal/unstable export-map subpath,
+    `@ts-drp/object/internal/authenticated-commit`, whose sole runtime and type
+    export is
+    `wasAuthenticatedHashCommitted(target: unknown, hash: Hash): boolean`.
+    The root `@ts-drp/object` namespace, `AuthenticatedMergeOutcome`, public
+    types, wire and configuration remain unchanged. Successful owners pass
+    `(hash) => committedSet.has(hash)`; only rejected-boundary recovery imports
+    the boolean capability and passes
+    `(hash) => wasAuthenticatedHashCommitted(error, hash)`.
+
+    Keep the object-owned `WeakMap`, raw reader and writer in an unexported
+    registry. `committed-provenance.ts` is an unexported source/test facade that
+    re-exports only the raw reader required by the frozen RED; object internals
+    import the registry writer directly. No export-map entry reaches the
+    registry, writer or raw hash-list reader. The writer always records a frozen
+    snapshot, including empty, so an empty restamp clears prior credit. Do not
+    use `@internal` JSDoc on the boolean capability: root `stripInternal: true`
+    would erase its declaration. Add the exact longer-key-first Vite alias above
+    `@ts-drp/object`, targeting the capability source, so source-root and
+    capability imports share one registry instance instead of silently reading
+    a stale `dist` `WeakMap`.
+
+    Every displaced-applier exit fails closed. If the applier captured by
+    `authenticateAndApplyVertices` is no longer `this._applier`, the entire
+    normal-return branch creates a fresh result identity with empty commit
+    provenance, including when `staleCommittedHashes.length === 0` because the
+    replacement graph already contains the same hash. Preserve existing stale
+    quarantine and clock-pending provenance. On an escaping
+    `AdoptionCommitExhaustedError` or `ApplyInvariantError`, catch in the object
+    frame that still holds the captured applier; when displaced, restamp both
+    the same error identity and its partial result with the empty commit set,
+    then rethrow it. Otherwise a discarded applier commit can borrow the
+    replacement applier's same-hash presence, or escape through the boundary
+    error before the normal displacement check runs.
+
+    Freeze a separate corrective tests-only RED before resuming GREEN. It must
+    cover both normal-return and thrown-boundary displaced-applier/rehydration
+    overlaps, including replacement same-hash presence; a real `handleMessage`
+    rejected boundary in which an earlier same-call vertex genuinely commits
+    and resets strikes while a survivor remains; and a runtime singleton check
+    through that real handler. This must defeat both an explicit `() => false`
+    fifth predicate and accidental source/`dist` split-`WeakMap` behavior. Build
+    gates assert the built subpath namespace is exactly
+    `['wasAuthenticatedHashCommitted']`; raw `src`, `dist`, registry, writer and
+    reader package subpaths stay `ERR_PACKAGE_PATH_NOT_EXPORTED`; emitted node
+    handlers retain the bare subpath and no raw relative cross-package import;
+    object/node typecheck and build, the browser esbuild bundle and focused
+    preservation tests pass. Node and object release together because node pins
+    object `0.11.0` exactly.
+
+    This is a supported-API boundary, not same-process secrecy. The package
+    ships `src` and `dist`; deliberately hostile in-process code can use absolute
+    file paths and already controls the node. The boolean capability and
+    module-owned `WeakMap` prevent remote input and copied or caller-constructed
+    outcomes from creating, enumerating, transferring or forging provenance on
+    the supported package surface. They do not claim isolation from hostile code
+    in the same JavaScript process.
 
 Preserve these fairness gotchas:
 
@@ -29009,6 +29075,19 @@ SHA-256 is `fc638c9c59b9d64d885e7a6e51a0eb12a0765419be5f10ebef620c8cfc23a796`.
 Opus session `990a6bda-61b4-4a7c-aba6-e8df9ec4b5ef` accepted v5; raw SHA-256 is
 `e7cf3a61317501c36a5b8020ec4c2b06da1fab2e773bfbbd545ab9e07273c8a5`.
 Codex-high independently accepted v5 after finding the v4 concurrency race.
+
+The post-RED packaging reconciliation also required unanimity before this plan
+changed. The final v3 prompt SHA-256 is
+`b6643d3d338782eb363858a8373d7ff0f7d29c22e692f9c27f5f81deb3baa85b`.
+Exact Kimi 3/high/100 accepted v3; raw SHA-256 is
+`2755a828a8a66f455ce7ec139d2af7a31ab90110c794e4553a9a8ef15bf22b63`.
+Opus 5/xhigh accepted v3; session
+`04431c17-e6ee-439f-8688-ffcd3f622da4`, raw SHA-256
+`f8b7d3a3278c3a06900c8ac19dfab37131e72366625c19c93b78c39e2489de70`.
+Codex-high independently accepted v3. The v1 raw-module subpath was rejected
+because it exported the writer and enabled provenance forgery; v2 was withheld
+until both normal and thrown displaced-applier exits and the same-process
+security boundary were stated explicitly.
 
 Identity remains greenfield throughout: generated creator-bound IDs are the
 default. There is no legacy/plain-ID compatibility, translation, normalization,
