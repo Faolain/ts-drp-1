@@ -28846,6 +28846,176 @@ the pre-ledger representation, not a compatibility default. Phase 1o-f(ii) is
 closed. No public config/wire/type seam, legacy/plain-ID route, identity or ACL
 fallback, or policy migration was added. Continue with Phase 1o-g fairness.
 
+## Phase 1o-g productive-peer fairness contract — unanimously amended
+
+Phase 1o-g was not executable as written: it named productive-peer fairness but
+did not define progress, bounded no-progress tenure, truthful peer activity,
+victim order or the internal configuration seam. A read-only Codex-high, exact
+Kimi 3/high/100 and Claude-skill Opus 5/xhigh quorum therefore completed before
+the tests-only RED. No test, production or plan edit occurred before unanimity.
+
+The final contract is:
+
+1. **Unit, threat and progress.** The unit is one
+   `(node, objectId, authenticated peerId)` exact-recovery entry. A removed hash
+   earns fairness progress only when that exact peer supplied it in the current
+   authenticated batch and that governed apply call actually committed it for
+   this receiver. Sends, rejection, cooldown, advertised/shared heads, invalid
+   or authenticated-but-not-retained input, clock-pending input, dependencies
+   delivered by another peer, duplicate offers, post-state presence and new
+   missing hashes are not progress. Starvation is an honest admission refused
+   while a truthfully inactive or strike-exhausted victim exists, or a
+   continuously present peer receiving no opportunity within one stable-set
+   rotation.
+2. **Race-safe progress evidence.** `DRPVertexApplier` records a hash in a
+   transient call-local committed set only when `commitPreparedVertex` returns
+   its existing `committed` boolean result, never for `duplicate`. Associate the
+   immutable hashes out of band with genuine `ApplyResult`, partial-result and
+   boundary-error objects through a module-owned `WeakMap`, following the
+   receiver-clock-pending provenance pattern. Propagate provenance through the
+   object result and merge wrappers. `mergeAuthenticatedVertices.committed`
+   derives exclusively from that provenance, never from a pre/post or
+   post-state `object.getVertex` scan. Copied or caller-constructed outcomes read
+   empty. This preserves supported overlapping merges and adds no public type,
+   wire field, mutex or retained fairness collection.
+3. **Owner and internal seam.** `sync-state.ts` remains the sole fairness
+   policy, admission and reclamation owner; object/applier code only produces
+   truthful outcome evidence. Extend deep-internal
+   `installSyncStateCapacity` with optional `{ maxNoProgressStrikes }`, resolved
+   with the ledger before first allocation. Production defaults to exactly `3`;
+   RED may inject `1`. Add retained `peerId` to `PeerSyncEntry` and one
+   saturating nonnegative `noProgressStrikes` counter to `PeerSyncState`,
+   initialized to zero. No public configuration, environment/global/test mode
+   or export is authorized.
+4. **Strike and reset boundaries.** Increment `noProgressStrikes` once,
+   saturating, either immediately before the existing rejection/cooldown
+   transition after three charged sends, or when one
+   `completePresentExactRequests` call compatibility-removes at least one hash
+   but credits none from that peer's call-local committed provenance. The
+   second rule applies whether other requests remain or the set becomes empty.
+   An empty set preserves current attempts/cooldown cleanup but retains the new
+   strike. A call with at least one attributable committed removal is productive
+   and resets strikes, attempts and cooldown; mixed removal is productive only
+   on that basis. Offers and duplicates never reduce strikes or refresh
+   admission age.
+5. **Frozen four-argument helper.** The additional deep-internal credit
+   predicate on `completePresentExactRequests` is optional only so frozen direct
+   helpers remain source- and behavior-compatible. With it absent,
+   compatibility removal resets attempts/cooldown as at HEAD and changes no
+   strike count. Every production owner must pass the explicit provenance
+   predicate. RED must discover/pin those owners reflectively rather than rely
+   on a hand-maintained list, because this absent-predicate default is
+   intentionally fail-open for frozen helpers and is not a production fallback.
+6. **Finite tenure.** Preserve the current changed-set attempts/cooldown reset
+   for a new distinct hash while a set is nonempty. At most 64 distinct hashes
+   can buy resets within one set; an uncredited removal/refill batch necessarily
+   adds a strike. After at most three such batches, three attempt-cap
+   boundaries, or any combination totaling three strikes, the entry is
+   pressure-reclaimable. A continuously pinned peer that never drains reaches
+   the threshold on its third three-send rejection boundary. Cooldown expiry
+   still resumes indefinitely when no admission needs its slot.
+7. **Pressure-only victim order.** Existing-entry access never evicts. Only a
+   new admission at object/node pressure selects atomically before allocation:
+   (a) oldest dormant in the constrained scope, exactly as frozen; else (b)
+   oldest truthfully inactive; else (c) oldest entry at the strike threshold;
+   else refuse before mutation. Reclamation deletes the full entry, adds no
+   tombstone or blacklist, and the candidate that caused pressure wins the
+   synchronous transition. Authentic handler discovery can rederive evicted
+   hashes after re-admission.
+8. **Truthful membership and bounded scan.** Inactivity is knowable only when
+   `entry.objectId` appears in one current subscribed-topic snapshot. For such
+   an object, absence from one lazily captured `getGroupPeers(objectId)` snapshot
+   means inactive. Unsubscribed, unstarted, unavailable or otherwise unknown
+   membership is treated as present; never infer departure. This is fail-closed
+   lifecycle handling for frozen unstarted fixtures, not identity compatibility.
+   Examine at most 752 entries, capture subscribed topics once and at most one
+   peer snapshot per distinct examined object, and discard transient sets before
+   return. Disclose pressure work as `O(752 + sum surfaced peers)` pending the
+   later T1–T4 peer-surface bound.
+9. **Scheduling and cleanup.** Do not change `DRPIntervalSync`: a stable finite
+   peer snapshot stays sorted, the cursor advances before await, and every
+   continuously present peer is selected within `P` completed executions.
+   Random initial offset, 32-hash chunks, 64-outstanding cap, event, inclusive
+   cooldown expiry and fake-time owner remain unchanged. Object unsubscribe and
+   node stop remain total. Peer-leave events are optional and non-load-bearing;
+   current membership is evaluated only under pressure.
+10. **Causal RED.** One focused tests-only slice through real owners must prove:
+    active pinners fill tiny capacity, reach the configured strike threshold and
+    allow an honest candidate; subscribed absent/direct nonmembers reclaim first
+    while unknown/unstarted fixtures remain pinned; refusal below every victim
+    tier is nonperturbing; up-to-cap changed-set resets do not reset strikes and
+    drain/refill delay is finite; attributable commit resets while authentication,
+    clock-pending and third-party presence do not; and re-offer after reclaim
+    converges. Add deterministic successful and rejected-boundary overlapping
+    same-hash A/B schedules: only the call whose commit returns `committed` owns
+    provenance, A cannot receive B's credit, duplicate A cannot refresh, and
+    forged/copied outcomes fail closed. Preserve stable-set rotation and assert
+    object/node pressure, unsubscribe/stop and the accepted 752/37 policy.
+11. **Expanded preservation gates.** Run all Phase 1n and 1o-a–f node gates
+    sequentially, plus the object applier/hashgraph/merge concurrency suites and
+    D.92/D.73 result/boundary lineages. Narrowing `mergeOutcome.committed` also
+    feeds finality-attestation selection, `DRP_SYNC_ACCEPTED` applied progress
+    and `committedBoundaryDependencies`/`recordBranchCuts`; assert these remain
+    sequentially equivalent and fail safe under overlap rather than assuming it.
+12. **Golden boundary and deferrals.** In a finite stable active set, each honest
+    peer gets one turn per rotation; a truthfully inactive incumbent is eligible
+    on first pressure; an active nonproductive incumbent is eligible at three
+    strikes. One attacked supported room remains bounded by the derived
+    per-object capacity, while the accepted 20-room demand remains below the
+    derived node capacity after recharacterization. Choosing an honest identity
+    from more than the supported number of continuously active, productive,
+    indistinguishable same-room identities remains impossible here and stays
+    with T1–T4 and/or ACL/object admission. Defer Sybil/economics, object
+    entitlement, Phase 3 consensus caps, relay topology, inbound-queue weighted
+    fairness and public wire/config.
+13. **Representation gate.** The retained `peerId` reference, one strike counter
+    and ledger policy require the exact accepted pinned-OCI characterization
+    after GREEN with the unchanged schedule, nine shapes, formula and
+    `B/f/r/k/c/K`. Keep `p=1.0`; never widen. The peer reference keeps the
+    original peer string alive independently of the serialized composite key,
+    so the derived capacity may move by more than one. If implementation retains
+    any fairness-only structure beyond the stated fields, reject maximum-dormant
+    dominance and add a representative shape. Correct every derived default
+    through a fresh numeric RED/GREEN/review loop before 1o-g closes.
+
+Preserve these fairness gotchas:
+
+- Treating every absent peer as departed would have invalidated frozen
+  unstarted fixtures. Only a subscribed object's truthful membership snapshot
+  may prove inactivity; unknown means present.
+- Simultaneous 64-hash capacity did not bound cumulative drain/refill cycles.
+  Uncredited removal batches must strike even when they empty the set.
+- Local possession is peer-agnostic. Without attribution, a pinner can earn
+  credit for honest work delivered by another peer.
+- Pre-absence plus post-presence is still not attribution under supported
+  overlapping merges. Only call-local `committed` provenance is causal.
+- An honest peer that repeatedly loses the delivery race, or supplied a
+  clock-pending vertex that later commits inside another peer's call, can become
+  pressure-reclaimable. A peer winning every race can push such losers toward
+  the threshold. This is an accepted pressure-only, non-destructive tradeoff:
+  the loser did not serve this receiver in those calls and hashes are rederived
+  on re-admission.
+- The optional four-argument completion default is deliberately fail-open for
+  frozen deep-internal tests. Reflective production-owner coverage is mandatory
+  so it never becomes an accidental production policy.
+
+Rejected drafts were useful evidence, not executable contracts: v1 inferred
+absence too broadly; v2 left uncredited drain/refill unbounded; v3 allowed
+third-party local possession to reset tenure; v4 used racy pre/post evidence.
+The final v5 prompt SHA-256 is
+`4bc1fe729b5fcae7a859f35cc17a10efcbe9078f7ef7bda72b38b4b66cdaedc5`.
+Exact Kimi session `acdbd5bf-761c-4dc2-88c4-2ccbb0d8d186` accepted v5; raw
+SHA-256 is `fc638c9c59b9d64d885e7a6e51a0eb12a0765419be5f10ebef620c8cfc23a796`.
+Opus session `990a6bda-61b4-4a7c-aba6-e8df9ec4b5ef` accepted v5; raw SHA-256 is
+`e7cf3a61317501c36a5b8020ec4c2b06da1fab2e773bfbbd545ab9e07273c8a5`.
+Codex-high independently accepted v5 after finding the v4 concurrency race.
+
+Identity remains greenfield throughout: generated creator-bound IDs are the
+default. There is no legacy/plain-ID compatibility, translation, normalization,
+migration, upgrade, omitted-ACL fallback or inferred authority. Deliberate
+caller-chosen or same-ID construction remains lawful only through the explicit
+coordinated-ACL policy.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
