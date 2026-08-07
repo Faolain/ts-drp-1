@@ -28121,7 +28121,7 @@ the GREEN result SHA-256 is
 Tests and the plan were untouched by the GREEN. The candidate adds no legacy
 plain-ID route, compatibility fallback, identity migration or ACL change.
 
-## Phase 1o-d preliminary review status — one provider gate incomplete
+## Phase 1o-d preliminary review history and acceptance
 
 Exact Kimi 3/high/100 accepted `20d9df2` with no blocker and
 `OPUS_MAY_START=yes`. Fresh session `c56e571c-c8a1-4cb6-be4e-887a1b8e1bcf`
@@ -28165,6 +28165,22 @@ substitution followed. The resume remains `INCOMPLETE_PROVIDER_402` with
 `84fae1ca376c99ac166adebeeef643463fc4f4442b26425f69d923277d15a2a6`;
 verified manifest SHA-256 is
 `fbbc35adae7e75eb454f2bf34a686abb3cdd05d2fe58d1fb220155bcf9a8637f`.
+
+After the blocked goal was explicitly resumed, one final bounded check against
+that same session succeeded. Grok emitted `ACCEPTED`, no blocker and
+`OPUS_MAY_START=yes` without tools or repeated inspection. Native exit was zero,
+stop reason was `end_turn`, and the effective model remained
+`grok-4.5-build` at high reasoning. It accepted the controller's focused 6/6
+plus preservation 51/51 evidence. Its nonblockers match the scoped contract:
+malformed heads remain unknown for reciprocity gating but cause no retention,
+allocation or recovery; full-inventory sync does not use exact-request
+retention; Phase 1o-e ordering/eviction and Phase 1o-f heap/resource governance
+remain deferred. Final Grok result SHA-256 is
+`9f5ae390b4cf757e7a0d2d0b6c02f75bef2a99aa1c0822121d59c782d7ac1869`;
+verified manifest SHA-256 is
+`79afb7c5d0c2db41958ff856c98d5c32140c0fbe31647f4cf0335bd0a132487b`.
+The earlier 402 records remain useful provider-history evidence but no longer
+block the final Opus/xhigh gate.
 
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
