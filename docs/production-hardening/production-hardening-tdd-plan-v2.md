@@ -29095,6 +29095,142 @@ migration, upgrade, omitted-ACL fallback or inferred authority. Deliberate
 caller-chosen or same-ID construction remains lawful only through the explicit
 coordinated-ACL policy.
 
+### Phase 1o-g implementation, representation correction and closure — accepted
+
+Phase 1o-g is accepted and closed at corrected HEAD `6737430`. Freeze the
+behavioral lineage `f631891` original RED, `9842fc0` clause-14 reconciliation,
+`ccbbf00` corrective provenance RED, `d42bddb` cooldown/membership fixture
+correction, `49bf99b` negotiated-transport fixture correction, `dbc1776`
+structural provenance RED, `e0eb35c` one-line structural correction and
+production GREEN `9faabb8`. The GREEN changes nine production/package files by
+194 insertions and 35 deletions. It adds physical-commit-only transient
+provenance, displaced-applier fail-closed restamping, the one-capability package
+subpath, peer-bound no-progress strikes and pressure reclamation in the ratified
+dormant → inactive → strike-exhausted order. It adds no public result, type,
+wire or configuration field and no second lifecycle owner.
+
+The repaired behavioral selection is 8 files / 47 tests. The expanded node
+preservation selection is 75/80, with only the already-owned Phase 1n
+clock-pending 2F and no-progress 3F. Object merge/core is 62/63, with only the
+inherited rollback/quarantine mismatch. Object and node production builds, the
+browser bundle, package runtime/export gates, emitted bare subpath import,
+targeted ESLint, Prettier and diff checks pass. Package typecheck retains only
+the inherited compact-history `TS1360`/`TS2322` diagnostics. Fresh Grok
+4.5/high, exact Kimi 3/high/dual-100 and final Opus 5/xhigh accepted `9faabb8`;
+their retained review SHA-256 values are respectively
+`a560e00a4e4715f83effa9e804078dee6d0fc30e5f8f05034f5c5ae802b73899`,
+`e6b2325d949867445b2679d0bc8623e539a2916f44602b6cdf897449dab49500`
+and `a5b3dbac753bd250f6901855892187d2ea27c5694a123adffc766ae3287bb386`.
+
+Clause 13 then required the accepted full pinned-OCI rerun because retained
+`peerId`, `noProgressStrikes` and ledger policy changed representation. The run
+is anchored to `9faabb8`, pinned Linux/arm64 Node `v22.15.0` / V8
+`12.4.254.21-node.24`, runtime manifest
+`sha256:cbd5ce30abb572440c151bd2a43701643931355d76d12b255a9515843dfc57b1`
+and config
+`sha256:1588f7271b3f1d03baa84d8beea1860f63d01a77d2014644c5b7839b2aaf7451`.
+It completed all 3,267 isolated processes: 297 warmups and 2,970 measured,
+usable samples, zero unstable samples, 99 accepted cells, 18 accepted curves
+and no failure. Every N=0 record has `measurementCapacity: null`; every
+nonzero/demand record has exactly `{ perNode: 4096, perObject: 4096 }`.
+Artifact SHA-256 values are:
+
+- metadata:
+  `46d84c5bb2660b0b1a6a15cfb4e96c330b2d2a240391b97fdb52855fae8a92b9`;
+- raw JSONL:
+  `d48f0f5f8aa461d385214eee88a34c8393327757968c46517b0b05389b20b1c1`;
+- analysis:
+  `e87aef9e523dc665991bce964e857c399d188c7b9057b2636ece76a9ae2f0d49`.
+
+The post-GREEN empirical maxima are:
+
+```text
+maximum marginal p95      = 10592.29921875
+maximum marginal U99      = 10400.182021484374
+maximum joint fixed U99   = 148169.088828125
+maximum placement fixed U99 = 148169.20179687516
+```
+
+`maximum-dormant/round-robin-20` binds p95.
+`expired-defined-cooldown/one-hot-object` binds the fixed term: its independent
+finite-bootstrap result exceeds the joint result by about 0.113 byte, so the
+ratified maximum across the joint and every placement must use it. With the
+unchanged decimal profile inputs:
+
+```text
+F99      = ceil(148169.20179687516) = 148170
+S_pinned = ceil(10592.29921875 * 1.50) = 15889
+E_usable = floor(150000000 * .10 * .80) - 148170 = 11851830
+C_node   = floor(11851830 / 15889) = 745
+D_object = 28
+D_node   = 560
+C_object = min(745, max(28, floor(745 / 20))) = 37
+```
+
+This is the clause-13 representation-sensitive derived correction anticipated
+by the contract, not a new product assumption or compatibility change. Freeze
+tests-only numeric RED `d982266`: it changes the default expectation 752→745
+and node boundary pair 753→746, and is causally 2F/18P against `9faabb8`.
+Freeze production-only numeric GREEN `962620e`: it changes only
+`PINNED_PAIR_P95_BYTES` to `10592.29921875` and `FIXED_LEDGER_BYTES` to
+`148170`; 745/37 remain derived. Focused capacity is 20/20 and the prior bounded
+adjacent selection is 10 files / 35 tests. Production build/typecheck,
+ESLint, Prettier and diff checks pass; package typecheck retains only the same
+two inherited compact-history diagnostics.
+
+Preserve the closure gotcha: `d982266` discovered only one of two live derived
+capacity consumers. Consequently `962620e` is an intentionally recorded
+non-green intermediate commit: the earlier productive-peer fairness fixture
+still expected 752/37. Opus found the omitted consumer after preliminary Grok
+and exact Kimi accepted the numeric candidate. Freeze tests-only fixture
+correction `6737430`, whose sole line changes that expected value to 745/37.
+The immutable `962620e` fairness baseline is exactly 1F/15P and fails only that
+capacity assertion. Corrected fairness is 16/16, focused capacity 20/20 and the
+augmented sequential selection is 11 files / 51 tests. No tracked executable
+test retains 752; both live fixtures pin 745/37. The standing numeric-RED rule
+is therefore to enumerate every executable consumer of a derived constant
+before freezing the RED, then carry that complete consumer set into the
+preservation selection.
+
+The accepted numeric preliminary review SHA-256 values are Grok
+`fbda1c4209704e957167db50e903d68385c3b1ad061edcd0bcb9059a00296e62`
+and exact Kimi
+`4a2903888192f1e0bc3db0938871709486f97c656852351040c71d16f4109e6e`.
+The first Opus numeric review correctly rejected the stale fixture; raw
+SHA-256 is
+`d2ad6e2a0d6980defb6b3c12d372464d2981b98e64cc4124e4caba6ef77d3e1f`.
+After `6737430`, fresh Grok and exact Kimi accepted with retained SHA-256
+values
+`22f2b6ecaffd457ed7542568d41b25d49607393cb42663af9c786878cef6f001`
+and
+`377405da47c89566192dd4097d40b528d276a6b545fb1d6b07451eabbbbbc5f6`.
+Final fresh Opus 5/xhigh session
+`2d2c2e77-2d48-47e3-a7de-022a02ba793a` accepted closure; raw SHA-256 is
+`0c9e84985a431e7d5026ca4b82ae9125d38583eee7df9d145bd87093456ce1ad`.
+It independently enumerated every sync-state consumer, found no remaining
+capacity fixture, derived 745/37 and authorized closure without a second OCI
+run. A second run would remeasure the same representation: `962620e` changes
+only non-retained formula constants bypassed by the explicit measurement
+capacity, and `6737430` changes only a test literal.
+
+Retain two nonblocking fairness residuals disclosed at acceptance. A compact
+observer can conservatively miss credit for a genuinely committed
+non-frontier hash after history compaction and therefore take a false strike;
+the failure direction is pressure-only and non-destructive, while full-storage
+nodes are unaffected. Separately, a local application-triggered history
+rehydration landing in the microtask interval after the displacement check but
+before committed-set materialization could observe same-hash replacement
+state. No handler invokes that local API, so remote input cannot trigger the
+window. Neither residual permits one remote peer to borrow another peer's
+credit; preserve them for the owning compact-observer/local-rehydration work
+rather than reopening Phase 1o-g.
+
+Identity remains greenfield at closure. There is no legacy/plain-ID route,
+parser fallback, normalization, migration, translation, inferred authority or
+compatibility shim. Generated canonical creator-bound IDs remain the normal
+path. Deliberate shared IDs remain possible only through explicit coordinated
+ACL and authentic signatures.
+
 ## Superseded Phase 1d(ii) handoff — historical only, do not execute
 
 P1, P2, P3a, P3a-prime and D.92.4-D.92.6 are accepted and closed. P3a-prime's
