@@ -69,14 +69,15 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		const capabilities = await runStoreContract(() => observeStore(createMemoryAheDurableStore(), calls));
 
 		expect(capabilities).toEqual({ durability: "ephemeral", signingEligibility: "never" });
-		expect(calls.slice(0, 5)).toEqual([
-			"beginGeneration",
-			"putCachedBlob",
-			"getBlob",
-			"readObjectState",
-			"discardGeneration",
-		]);
-		expect([[], ["close"]]).toContainEqual(calls.slice(5));
+		const requiredCalls = ["beginGeneration", "putCachedBlob", "getBlob", "readObjectState", "discardGeneration"];
+		let previousIndex = -1;
+		for (const requiredCall of requiredCalls) {
+			const index = calls.indexOf(requiredCall, previousIndex + 1);
+			expect(index).toBeGreaterThan(previousIndex);
+			previousIndex = index;
+		}
+		expect(calls.filter((call) => call === "close")).toHaveLength(1);
+		expect(calls.at(-1)).toBe("close");
 	});
 
 	it("rejects when a supplied store lies about an observable common step", async () => {
