@@ -225,6 +225,10 @@ function makeHarness(object: InstrumentedAppliedVertexObject): { node: DRPNode; 
 				return Promise.resolve();
 			},
 		},
+		sendNegotiatedSyncResponse: (to: string, message: Message): Promise<void> => {
+			result.direct.push({ to, message });
+			return Promise.resolve();
+		},
 		keychain: {
 			signWithBls: (hash: string): Uint8Array => Uint8Array.of(0xb0, hash.length),
 			signWithSecp256k1: (): Promise<Uint8Array> => Promise.resolve(POST_SIGNING_SIGNATURE),
@@ -401,17 +405,20 @@ describe("applied-vertex lookup semantic and wire baselines", () => {
 		expect(missingDispatches).toHaveLength(1);
 		expect(missingDispatches[0].id).toBe(OBJECT_ID);
 		expect(missingDispatches[0].requesting).toEqual([]);
-		expect(missingDispatches[0].requested).toEqual(expectedRequested);
-		expect(missingDispatches[0].requested[0]).toBe(second);
-		expect(missingDispatches[0].requested[1]).toBe(first);
-		expect(missingDispatches[0].requested[2]).toBe(second);
+		expect(missingDispatches[0].requested.map((vertex) => Vertex.encode(vertex).finish())).toEqual(
+			expectedRequested.map((vertex) => Vertex.encode(vertex).finish())
+		);
 	});
 
 	test("SYNC_ACCEPT preserves missing recovery and suppresses accepted until recovery is complete", async () => {
 		const stored = localVertex("recovery-stored");
-		const learned = await remoteVertex("recovery-learned");
+		const missingParent = "ab".repeat(32);
+		const learned = Vertex.create({
+			...(await remoteVertex("recovery-learned")),
+			dependencies: [missingParent],
+		});
 		const object = new InstrumentedAppliedVertexObject([stored], observations(), {
-			missing: ["recovery-parent"],
+			missing: [missingParent],
 			canSign: false,
 		});
 		const { node, result } = makeHarness(object);

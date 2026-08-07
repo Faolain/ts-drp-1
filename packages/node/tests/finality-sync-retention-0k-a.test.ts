@@ -1,9 +1,15 @@
+import { SYNC_RESPONSE_BYTE_CAP, SYNC_RESPONSE_VERTEX_CAP } from "@ts-drp/network";
 import { createACL } from "@ts-drp/object";
 import { type IDRP, Message, MessageType, SemanticsType, Sync, SyncAccept } from "@ts-drp/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { handleMessage, signFinalityVertices } from "../src/handlers.js";
 import { DRPNode } from "../src/index.js";
+
+interface CapturedMessage {
+	message: Message;
+	to: string;
+}
 
 class SyncRetentionProbeDRP implements IDRP {
 	semanticsType = SemanticsType.pair;
@@ -14,14 +20,14 @@ class SyncRetentionProbeDRP implements IDRP {
 	}
 }
 
-async function makeNode(): Promise<DRPNode> {
+async function makeNode(seed = "phase-0k-a-sync-retention"): Promise<DRPNode> {
 	const node = new DRPNode({
 		network_config: {
 			bootstrap_peers: [],
 			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 			log_config: { level: "silent" },
 		},
-		keychain_config: { private_key_seed: "phase-0k-a-sync-retention" },
+		keychain_config: { private_key_seed: seed },
 		log_config: { level: "silent" },
 	});
 	await node.start();
@@ -38,10 +44,11 @@ describe("Phase 0k-a ancient finality sync completeness", () => {
 
 	it("includes exactly every signed requested non-root vertex attestation in a real SYNC response", async () => {
 		const node = await makeNode();
-		nodes.push(node);
-		const direct: Message[] = [];
-		vi.spyOn(node.networkNode, "sendMessage").mockImplementation((_peerId, message) => {
-			direct.push(message);
+		const requester = await makeNode("phase-0k-a-sync-retention-requester");
+		nodes.push(node, requester);
+		const direct: CapturedMessage[] = [];
+		vi.spyOn(node, "sendNegotiatedSyncResponse").mockImplementation((to, message) => {
+			direct.push({ to, message });
 			return Promise.resolve();
 		});
 		vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
@@ -59,21 +66,32 @@ describe("Phase 0k-a ancient finality sync completeness", () => {
 		await handleMessage(
 			node,
 			Message.create({
-				sender: "phase-0k-a-sync-requester",
+				sender: requester.networkNode.peerId,
 				type: MessageType.MESSAGE_TYPE_SYNC,
 				data: Sync.encode(Sync.create({ vertexHashes: [] })).finish(),
 				objectId: object.id,
 			})
 		);
 
-		const responses = direct.filter(({ type }) => type === MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
-		expect(responses).toHaveLength(1);
-		const response = SyncAccept.decode(responses[0].data);
-		const attestationHashes = response.attestations.map(({ data }) => data);
+		const responses = direct.filter(({ message }) => message.type === MessageType.MESSAGE_TYPE_SYNC_ACCEPT);
+		expect(responses.length).toBeGreaterThan(1);
+		expect(responses.every(({ to }) => to === requester.networkNode.peerId)).toBe(true);
+		const responseChunks = responses.map(({ message }) => SyncAccept.decode(message.data));
+		for (const [index, chunk] of responseChunks.entries()) {
+			expect(chunk.requested.length, `response chunk ${index} vertex count`).toBeLessThanOrEqual(
+				SYNC_RESPONSE_VERTEX_CAP
+			);
+			expect(responses[index].message.data.byteLength, `response chunk ${index} byte length`).toBeLessThanOrEqual(
+				SYNC_RESPONSE_BYTE_CAP
+			);
+		}
+		const responseVertices = responseChunks.flatMap(({ requested }) => requested);
+		const responseAttestations = responseChunks.flatMap(({ attestations }) => attestations);
+		const attestationHashes = responseAttestations.map(({ data }) => data);
 		const signedRequestedHashes = requestedVertices.map(({ hash }) => hash);
-		expect(response.requested.map(({ hash }) => hash)).toEqual(object.vertices.map(({ hash }) => hash));
+		expect(responseVertices.map(({ hash }) => hash)).toEqual(object.vertices.map(({ hash }) => hash));
 		expect(new Set(attestationHashes)).toEqual(new Set(signedRequestedHashes));
 		expect(attestationHashes).toHaveLength(signedRequestedHashes.length);
-		for (const attestation of response.attestations) expect(attestation.signature.length).toBeGreaterThan(0);
+		for (const attestation of responseAttestations) expect(attestation.signature.length).toBeGreaterThan(0);
 	}, 20_000);
 });

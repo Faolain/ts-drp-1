@@ -3,6 +3,7 @@
  * that same sender at most three times. A fourth incomplete round must send no
  * further SYNC and must emit the existing DRP_SYNC_REJECTED diagnostic event.
  */
+import { DRP_HEADS_CHUNK_PROTOCOL, type SelectedSyncProtocol } from "@ts-drp/network";
 import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
@@ -40,11 +41,16 @@ interface OutboxEntry {
 	message: Message;
 }
 
+const HEADS_SELECTION = {
+	mode: "heads-chunk",
+	protocol: DRP_HEADS_CHUNK_PROTOCOL,
+} as const satisfies SelectedSyncProtocol;
+
 function captureDirectMessages(node: DRPNode): OutboxEntry[] {
 	const outbox: OutboxEntry[] = [];
-	vi.spyOn(node.networkNode, "sendMessage").mockImplementation((to: string, message: Message) => {
+	vi.spyOn(node, "sendNegotiatedSync").mockImplementation(async (to, payloadFactory) => {
+		const message = await payloadFactory(HEADS_SELECTION);
 		outbox.push({ to, message });
-		return Promise.resolve();
 	});
 	vi.spyOn(node.networkNode, "broadcastMessage").mockResolvedValue();
 	return outbox;
