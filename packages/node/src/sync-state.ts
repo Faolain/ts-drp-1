@@ -4,6 +4,7 @@ import { NodeEventName } from "@ts-drp/types";
 import { type DRPNode } from "./index.js";
 
 const MAX_EXACT_REQUEST_ATTEMPTS = 3;
+const MAX_RETAINED_BRANCH_CUTS = 32;
 export const SYNC_RECOVERY_COOLDOWN_MS = 30_000;
 
 interface PeerSyncState {
@@ -98,7 +99,14 @@ export function recordSharedHeads(node: DRPNode, objectId: string, peerId: strin
 export function recordBranchCuts(node: DRPNode, objectId: string, peerId: string, hashes: readonly string[]): void {
 	if (hashes.length === 0) return;
 	const cuts = getState(node, objectId, peerId).branchCuts;
-	for (const hash of hashes) cuts.add(hash);
+	for (const hash of hashes) {
+		if (cuts.has(hash)) continue;
+		if (cuts.size === MAX_RETAINED_BRANCH_CUTS) {
+			const oldest = cuts.values().next().value;
+			if (oldest !== undefined) cuts.delete(oldest);
+		}
+		cuts.add(hash);
+	}
 }
 
 /**
