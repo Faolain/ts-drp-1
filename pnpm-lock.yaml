@@ -1024,6 +1024,15 @@ importers:
         specifier: 0.11.0
         version: link:../canonical
 
+  packages/storage-browser:
+    dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
+      '@ts-drp/storage':
+        specifier: 0.11.0
+        version: link:../storage
+
   packages/test-utils:
     dependencies:
       '@ts-drp/types':

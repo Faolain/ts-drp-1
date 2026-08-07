@@ -44,6 +44,7 @@ export default defineConfig({
 			reporter: ["text", "lcov", "json-summary", "json"],
 			include: ["packages/**/*.{ts,tsx}"],
 			exclude: ["**/node_modules/**", "**/__tests__/**", "**/tests/**", "**/proto/**", "**/dist/**", "**/version.ts"],
+			thresholds: { lines: 70 },
 		},
 		testTimeout: 10000,
 	},

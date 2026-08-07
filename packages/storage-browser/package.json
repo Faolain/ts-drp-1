@@ -1,0 +1,17 @@
+{
+	"name": "@ts-drp/storage-browser",
+	"version": "0.11.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"test": "pnpm --dir ../.. exec vitest run packages/storage-browser/tests --no-coverage --maxWorkers=1 --minWorkers=1",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/storage": "0.11.0"
+	}
+}

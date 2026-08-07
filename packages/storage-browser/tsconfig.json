@@ -1,0 +1,9 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "dist"
+	},
+	"files": ["killpoints.json"],
+	"include": ["src/**/*.ts", "tests/**/*.ts", "playwright.storage-browser.config.ts"],
+	"exclude": ["dist", "./*.d.ts"]
+}
