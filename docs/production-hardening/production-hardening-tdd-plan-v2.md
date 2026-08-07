@@ -1239,8 +1239,9 @@ absent -> Staged -> Complete -> Adopted -> Superseded
   immutable captured closure, and atomically succeeds from `Staged` only when
   every ref is present, exact and promoted. Empty/duplicate closure rejects at
   begin; no caller can substitute or add a closure at completion.
-- `swapHead` accepts only `Complete`. The captured base must equal the request's
-  expected head, and that request must equal the current head. Success atomically
+- `swapHead` accepts only `Complete`. The request's expected head must first
+  equal the current head, then the captured base must equal that proven-current
+  request. Success atomically
   installs the candidate as `Adopted`, increments revision and changes a prior
   `Adopted` generation to `Superseded`. Failure changes nothing and leaves the
   candidate `Complete`.
@@ -1380,7 +1381,7 @@ backend capability. Thus an ephemeral store returns `DURABILITY_UNAVAILABLE`
 from `promoteReference` before generation lookup, declaration, presence or
 integrity checks. Next come lookup, lifecycle and operation-specific checks.
 Begin checks empty before duplicates. Swap checks missing generation,
-non-`Complete` candidate, captured base, current head, then overflow.
+non-`Complete` candidate, current head, captured base, then overflow.
 
 Complete/reference checks are ref-major in ascending digest order. For the
 first failing ref, test missing, corrupt, then unpromoted; a lower-digest
@@ -1475,6 +1476,17 @@ remain owned by 2b–2l, 4, 5c and 7.
    shared non-exported owner.
 7. Storage accepts canonical creator-bound identity only. Nothing in 2a adds a
    legacy/plain-ID compatibility path or infers ACL authority.
+8. The first GREEN exposed one ratified-precedence drafting error. At RED HEAD
+   `094fbb9`, a stale request differed from both the current head and the
+   candidate's captured base. Base-first classified it as
+   `BASE_HEAD_MISMATCH`, contradicting 2e's existing rule that a stale expected
+   revision is `HEAD_CONFLICT`. A fresh Codex-high, exact Kimi 3/high/100 and
+   Opus 5/xhigh correction quorum unanimously selected current-head-first.
+   The accepted swap set, transaction and nonmutation are unchanged; only the
+   doubly-invalid label is corrected. `HEAD_CONFLICT` means re-read/retry, while
+   `BASE_HEAD_MISMATCH` is reachable only after the request proves current and
+   therefore means rebuild the wrongly based candidate. No assertion changes;
+   the RED title may be renamed to remove its stale “before current head” wording.
 
 ### Exit gate (Phase 2)
 
