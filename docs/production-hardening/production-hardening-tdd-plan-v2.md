@@ -23,16 +23,16 @@ the correction is folded in with its evidence.
 Round 1 declined direct adoption largely because the reference was "untyped JS outside the workspace with
 browser gates self-reported blocked." Both halves were tested here:
 
-| Check                     | Command                                                         | Result                                                                                                                                      |
-| ------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reference test suite      | `node --test test/core.test.mjs` in `reference-implementation/` | **22/22 pass, 287 ms**                                                                                                                      |
-| Reference size            | `wc -l src/*.js`                                                | **2,379 LOC across 13 modules** (round 1's "~3,400" counted tests + browser harness)                                                        |
-| Browser gate, Chromium    | AHE `browser/harness.html` under this repo's Playwright 1.51.1  | **PASS** — 3/3 checks, `elapsedMs 170.3`                                                                                                    |
-| Browser gate, Firefox 135 | same                                                            | **NO VERDICT — silent hang**                                                                                                                |
-| Browser gate, WebKit 605  | same                                                            | **NO VERDICT — silent hang**                                                                                                                |
-| Repo persistence infra    | `grep -rl "indexedDB" packages`                                 | **zero matches**                                                                                                                            |
-| Repo Worker infra         | `grep -rl "new Worker(" packages`                               | **zero matches**                                                                                                                            |
-| CI shape                  | `.github/workflows/`                                            | 17 workflows, **all `runs-on: ubuntu-latest`**, most `timeout-minutes: 10`; `network-spike-public.yml` is 360 min (precedent for long jobs) |
+| Check                     | Command                                                                                                                      | Result                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reference test suite      | `node --test test/core.test.mjs` in `reference-implementation/`                                                              | **22/22 pass, 287 ms**                                                                                                                      |
+| Reference size            | `wc -l src/*.js`                                                                                                             | **2,379 LOC across 13 modules** (round 1's "~3,400" counted tests + browser harness)                                                        |
+| Browser gate, Chromium    | AHE `browser/harness.html` under the then-installed Playwright 1.51.1 (**historical measurement; not the current root pin**) | **PASS** — 3/3 checks, `elapsedMs 170.3`                                                                                                    |
+| Browser gate, Firefox 135 | same                                                                                                                         | **NO VERDICT — silent hang**                                                                                                                |
+| Browser gate, WebKit 605  | same                                                                                                                         | **NO VERDICT — silent hang**                                                                                                                |
+| Repo persistence infra    | `grep -rl "indexedDB" packages`                                                                                              | **zero matches**                                                                                                                            |
+| Repo Worker infra         | `grep -rl "new Worker(" packages`                                                                                            | **zero matches**                                                                                                                            |
+| CI shape                  | `.github/workflows/`                                                                                                         | 17 workflows, **all `runs-on: ubuntu-latest`**, most `timeout-minutes: 10`; `network-spike-public.yml` is 360 min (precedent for long jobs) |
 
 The bundle's own `evidence/chromium-browser-validation.json` records `net::ERR_BLOCKED_BY_ADMINISTRATOR`,
 `verdict: "blocked"`, with the note _"the managed Chromium policy in this execution environment blocks all
@@ -1075,21 +1075,21 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 > Build the **hard-kill driver first, on a trivial two-record generation**, before any snapshot code exists.
 > The driver is the hard part and gates Phases 4/5/6. Do not let the storage slice absorb the snapshot slice.
 
-| Slice       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Class       | Atomic?                 | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **2a**      | `packages/storage/`: implement the exact **Phase 2a storage seam v1** below — runtime-neutral brands, five-state lifecycle, returned rejection taxonomy, exact persistence codecs, narrow `AheDurableStore`, shared scenarios, non-exported transition owner/harness, and one honest public in-memory model reporting `durability: "ephemeral"` and therefore never eligible for signing. No RAM store may claim strict durability.                                                                                                                                                                                                                                               | local-safe  | state machine atomic    | `state-machine.test.ts` + shared contract: non-vacuous positive/negative `Complete`, exact expected-head CAS, full graph, precedence, codec/copy isolation, global blob races, overflow and greenfield no-plain-ID controls defined below. RED is assertion-causal via an authorized permissive scaffold, never module-resolution-only                                                                                                                                                                                                                                                                                                                                                                                               |
-| **2b**      | **Hard-kill driver** on a trivial payload. Every raw IDB call — **including `cursor.continue()`** — passes through an adapter requiring a literal `KillPointId`; an AST test rejects direct IDB requests elsewhere; a reviewed `killpoints.json` is compared by **set equality** with observed points. The operation runs in a dedicated Worker that posts the point ID and blocks on `Atomics.wait` (COOP/COEP for `SharedArrayBuffer`); the Playwright parent then `SIGKILL`s a detached child process group containing a `launchPersistentContext` browser and all descendants. **`page.close()`, `context.close()` and `browser.close()` are forbidden — they are graceful.** | local-safe  | infra sliceable         | `crash-driver.spec.ts`: `expect(declaredKillPoints).toEqual(observedKillPoints)`; both edges per point; hard-killed PID/process-group exit recorded; `closureDigest ∈ {old,new}` with `mixed === false`. Missing, timed-out, skipped or `blocked` points **fail the job**                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **2c**      | `packages/storage-node/`: SQLite backend — composite primary keys, WAL, full synchronous durability, explicit transactions, child-process `SIGKILL` at each statement/commit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | local-safe  | sliceable               | Same frozen strict store-contract scenarios and shared transition rules; every SIGKILL returns exactly one complete closure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **2-spike** | **OPFS-vs-IDB substrate decision, before the 2d schema freezes.** Measure OPFS `createSyncAccessHandle` + `flush()` against IDB `durability:"strict"` (the mode the reference silently falls back from) on the vote-slot and pointer-swap workloads; **test, don't assume, eviction equivalence** — the "same origin bucket, same ITP eviction" claim is currently `[unverified]`. `AheDurableStore` (2a) is substrate-neutral by construction, so the loser costs nothing. Decision recorded in `docs/protocol/` as a decision record consumed by 2d.                                                                                                                            | local-safe  | sliceable               | `opfs-idb-spike/`: durability microbench + `eviction-equivalence.spec.ts` (trigger real origin eviction; assert OPFS and IDB data vanish together or the difference is documented); the 2d PR links the decision record or fails review                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **2d**      | `packages/storage-browser/`: **rewrite** per §2.2. IDB schema + migration lifecycle (`onblocked`, `db.onversionchange`), **native compound array keys** (not NUL-delimited strings), immutable exact-byte CAS via `add` (never `put`), the Phase-2a five-state journal (`Staged`/`Complete`/`Adopted`/`Superseded`/`Discarded`) keyed `(objectId, generationId)`, an `(objectId, epoch)`-indexed vote store (not `getAll()`), bounded staging. **Strict-durability rejection is a fatal capability error, never a silent fallback.**                                                                                                                                              | coordinated | sliceable until enabled | `indexeddb-staging.spec.ts`: same digest + different bytes **rejects**; `chunkBatchSize: 0` rejects; a missing/corrupt chunk cannot reach `Complete`; a blocked upgrade closes the old tab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **2e**      | **Full request matrix + recovery closure.** Recovery hashes the **entire active generation closure**, not two scalar metadata fields — a correct pointer can still reference a missing or mixed manifest, chunk set, QC or tail. Relaxed chunk writes are **cache only**; a generation becomes `Complete` only after every referenced chunk is hash-verified and promoted through strict transactions. Cleanup is **never** part of commit.                                                                                                                                                                                                                                       | coordinated | pointer-swap atomic     | `adoption-crash-matrix.spec.ts`: every request kill yields `closure(G_old)` **XOR** `closure(G_new)`; competing same/future/rollback candidates yield one monotone head; `HEAD_CONFLICT` on a stale expected revision, never last-writer-wins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| **2f**      | `packages/worker-host/`: **replace** `runtime.js`. Bounded streaming batches (validated batch size, per-item abort checks), cancellation, capped telemetry histograms, termination recovery, and a **ready-handshake worker protocol** — the worker posts `{ready}` after evaluation and the host queues work until then (this is the §0.1 bug). Ban top-level `await` in worker import graphs.                                                                                                                                                                                                                                                                                   | local-safe  | sliceable               | `worker-handshake.pw.ts` on **firefox + webkit**: a message posted immediately after construction is answered ≤ 5 s (fails against a no-handshake worker). `runtime.test.ts`: invalid batch sizes reject; result buffer stays under cap; abort prevents the next item; metric cardinality bounded. Frame budget: Playwright long-task observer `expect(maxLongTask).toBeLessThan(50)` during a **real 4,096-vertex fold**, plus a worker-side execution counter proving it ran off-main-thread                                                                                                                                                                                                                                       |
-| **2g**      | Quota, persistence, private mode, rollback pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | coordinated | unpin rule atomic       | `quota-rollback.spec.ts`: `QuotaExceededError` injected at **every** mutating request never moves the head; estimate below margin refuses a new stage **before** destructive cleanup; a forged mirror receipt can **never** unpin the last usable signer rollback (`RollbackPinned`, not success)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **2h**      | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**.                                                                                                                                                                                                                  | local-safe  | sliceable               | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []`                                                                                                                                                                                                                                                                                                                                                       |
-| **2i**      | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work.                                                                                                                                                                                                                                                                                                                                        | local-safe  | sliceable               | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite.                                                                                                                                                                                                                                                                                                                                    | local-safe  | sliceable               | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json` |
-| **2k**      | **Browser-matrix currency.** `@playwright/test` is pinned `^1.49.1`, resolving to 1.51.1 with **Chromium 134.0.6998.35** — roughly 16 months behind the field, and it already produced a false negative that nearly mis-set the seal suite. Every browser gate in this plan (kill-point matrix, storage validation, golden path 1 step 17) currently runs against a browser essentially nobody uses. Add a scheduled bump and make staleness visible.                                                                                                                                                                                                                             | local-safe  | sliceable               | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover                                                                                                                                                                                                                                                                                                                                                                                                |
-| **2l**      | **Durable author-sequence issuance transaction.** Implement the production adapter for the post-freeze 0g(ii-I) `transactIssue` contract. For one structural `(objectId, author)` scope, next counter, exact canonical-preimage bytes, signature, digest, issued record and outbox entry share one strict transaction; the internal build/sign closure cannot expose bytes outside that transaction. Browser and node backends implement the same contract.                                                                                                                                                                                                                       | coordinated | issuance-record atomic  | Shared contract plus real IDB/SQLite hard-kill matrix: every request/statement/commit edge recovers either the old state or the exact new counter+envelope+outbox closure, never a counter-only or envelope-only state. Same-scope callers across tabs/processes are linearizable; different scopes progress independently; throw/rejection/commit failure advances nothing; retry reselects the unconsumed ordinal; restart never signs different content for an already committed ordinal. The in-memory implementation remains an explicitly ephemeral test double and cannot satisfy this gate.                                                                                                                                  |
+| Slice       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Class       | Atomic?                 | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **2a**      | `packages/storage/`: implement the exact **Phase 2a storage seam v1** below — runtime-neutral brands, five-state lifecycle, returned rejection taxonomy, exact persistence codecs, narrow `AheDurableStore`, shared scenarios, non-exported transition owner/harness, and one honest public in-memory model reporting `durability: "ephemeral"` and therefore never eligible for signing. No RAM store may claim strict durability.                                                                                                                                                                                                                         | local-safe  | state machine atomic    | `state-machine.test.ts` + shared contract: non-vacuous positive/negative `Complete`, exact expected-head CAS, full graph, precedence, codec/copy isolation, global blob races, overflow and greenfield no-plain-ID controls defined below. RED is assertion-causal via an authorized permissive scaffold, never module-resolution-only                                                                                                                                                                                                                                                                                                                                                                                               |
+| **2b**      | **Private browser hard-kill instrument on a trivial two-record payload.** `@ts-drp/storage-browser` owns one literal-ID instrumented IDB boundary plus an independent raw-IDB oracle allowlist. A page-owned `SharedArrayBuffer` lets a dedicated Worker block at seven reviewed points × both edges. Playwright 1.61.1 creates a separate browser PGID, so the parent freezes and `SIGKILL`s the detached Node child group and browser group independently, browser first; no graceful close is permitted on the crash graph. This proves transaction atomicity under **process death**, not fsync/power-loss durability, and exports no production store. | local-safe  | infra sliceable         | `crash-driver.pw.ts`: exactly 16 closed artifacts (14 tuples + discovery + arming), exact point/prefix coverage, Worker-authenticated 3 `not-reached` + 11 `strict` durability observations, genuine two-PGID death evidence, and `fixtureRecordsDigest` recovery of exactly 13 old + 1 new with `mixed === false`. Missing, extra, malformed, timed-out, skipped, `blocked` or unsupported evidence **fails the job**.                                                                                                                                                                                                                                                                                                              |
+| **2c**      | `packages/storage-node/`: SQLite backend — composite primary keys, WAL, full synchronous durability, explicit transactions, child-process `SIGKILL` at each statement/commit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | local-safe  | sliceable               | Same frozen strict store-contract scenarios and shared transition rules; every SIGKILL returns exactly one complete closure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **2-spike** | **OPFS-vs-IDB substrate decision, before the 2d schema freezes.** Measure OPFS `createSyncAccessHandle` + `flush()` against IDB `durability:"strict"` (the mode the reference silently falls back from) on the vote-slot and pointer-swap workloads; **test, don't assume, eviction equivalence** — the "same origin bucket, same ITP eviction" claim is currently `[unverified]`. `AheDurableStore` (2a) is substrate-neutral by construction, so the loser costs nothing. Decision recorded in `docs/protocol/` as a decision record consumed by 2d.                                                                                                      | local-safe  | sliceable               | `opfs-idb-spike/`: durability microbench + `eviction-equivalence.spec.ts` (trigger real origin eviction; assert OPFS and IDB data vanish together or the difference is documented); the 2d PR links the decision record or fails review                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **2d**      | `packages/storage-browser/`: **rewrite** per §2.2. IDB schema + migration lifecycle (`onblocked`, `db.onversionchange`), **native compound array keys** (not NUL-delimited strings), immutable exact-byte CAS via `add` (never `put`), the Phase-2a five-state journal (`Staged`/`Complete`/`Adopted`/`Superseded`/`Discarded`) keyed `(objectId, generationId)`, an `(objectId, epoch)`-indexed vote store (not `getAll()`), bounded staging. **Strict-durability rejection is a fatal capability error, never a silent fallback.**                                                                                                                        | coordinated | sliceable until enabled | `indexeddb-staging.spec.ts`: same digest + different bytes **rejects**; `chunkBatchSize: 0` rejects; a missing/corrupt chunk cannot reach `Complete`; a blocked upgrade closes the old tab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **2e**      | **Full request matrix + recovery closure.** Recovery hashes the **entire active generation closure**, not two scalar metadata fields — a correct pointer can still reference a missing or mixed manifest, chunk set, QC or tail. Relaxed chunk writes are **cache only**; a generation becomes `Complete` only after every referenced chunk is hash-verified and promoted through strict transactions. Cleanup is **never** part of commit.                                                                                                                                                                                                                 | coordinated | pointer-swap atomic     | `adoption-crash-matrix.spec.ts`: every request kill yields `closure(G_old)` **XOR** `closure(G_new)`; competing same/future/rollback candidates yield one monotone head; `HEAD_CONFLICT` on a stale expected revision, never last-writer-wins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **2f**      | `packages/worker-host/`: **replace** `runtime.js`. Bounded streaming batches (validated batch size, per-item abort checks), cancellation, capped telemetry histograms, termination recovery, and a **ready-handshake worker protocol** — the worker posts `{ready}` after evaluation and the host queues work until then (this is the §0.1 bug). Ban top-level `await` in worker import graphs.                                                                                                                                                                                                                                                             | local-safe  | sliceable               | `worker-handshake.pw.ts` on **firefox + webkit**: a message posted immediately after construction is answered ≤ 5 s (fails against a no-handshake worker). `runtime.test.ts`: invalid batch sizes reject; result buffer stays under cap; abort prevents the next item; metric cardinality bounded. Frame budget: Playwright long-task observer `expect(maxLongTask).toBeLessThan(50)` during a **real 4,096-vertex fold**, plus a worker-side execution counter proving it ran off-main-thread                                                                                                                                                                                                                                       |
+| **2g**      | Quota, persistence, private mode, rollback pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | coordinated | unpin rule atomic       | `quota-rollback.spec.ts`: `QuotaExceededError` injected at **every** mutating request never moves the head; estimate below margin refuses a new stage **before** destructive cleanup; a forged mirror receipt can **never** unpin the last usable signer rollback (`RollbackPinned`, not success)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **2h**      | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**.                                                                                                                                                                                            | local-safe  | sliceable               | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []`                                                                                                                                                                                                                                                                                                                                                       |
+| **2i**      | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work.                                                                                                                                                                                                                                                                                                                  | local-safe  | sliceable               | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite.                                                                                                                                                                                                                                                                                                              | local-safe  | sliceable               | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json` |
+| **2k**      | **Browser-matrix currency.** At `fbdb396`, root pins `@playwright/test` exactly `1.61.1`, bundling Chromium/Chrome for Testing `149.0.7827.55`. `examples/network-spike` still declares `^1.49.1`, resolving a second installed `playwright-core@1.51.1`, although its own e2e script delegates to the root binary. Measure release-time currency instead of preserving either historical premise; add a scheduled bump and make staleness visible.                                                                                                                                                                                                         | local-safe  | sliceable               | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover                                                                                                                                                                                                                                                                                                                                                                                                |
+| **2l**      | **Durable author-sequence issuance transaction.** Implement the production adapter for the post-freeze 0g(ii-I) `transactIssue` contract. For one structural `(objectId, author)` scope, next counter, exact canonical-preimage bytes, signature, digest, issued record and outbox entry share one strict transaction; the internal build/sign closure cannot expose bytes outside that transaction. Browser and node backends implement the same contract.                                                                                                                                                                                                 | coordinated | issuance-record atomic  | Shared contract plus real IDB/SQLite hard-kill matrix: every request/statement/commit edge recovers either the old state or the exact new counter+envelope+outbox closure, never a counter-only or envelope-only state. Same-scope callers across tabs/processes are linearizable; different scopes progress independently; throw/rejection/commit failure advances nothing; retry reselects the unconsumed ordinal; restart never signs different content for an already committed ordinal. The in-memory implementation remains an explicitly ephemeral test double and cannot satisfy this gate.                                                                                                                                  |
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
@@ -1490,6 +1490,406 @@ remain owned by 2b–2l, 4, 5c and 7.
    therefore means rebuild the wrongly based candidate. No assertion changes;
    the RED title may be renamed to remove its stale “before current head” wording.
 
+### Phase 2b assumption-correction quorum — executable process-death seam v1
+
+The original row could not support an honest RED. Playwright 1.61.1 launches
+Chromium detached on POSIX, so the browser leads a second process group rather
+than remaining inside the detached Node child's group. A generic old-or-new
+oracle was also vacuous: a no-op writer could recover old in every tuple and
+pass. Finally, `crash-driver.spec.ts` would be collected by root Vitest. Local
+characterization pinned those facts before the seam was changed.
+The local process-characterization artifact is
+`f973f30add8e48c8d84bbf6da3057d6052fe0449c72f6eb991b8b69a1e30a824`.
+
+The correction quorum converged on the composed v2+v3+v4+v5 contract. Fresh
+Codex-high, exact Kimi 3/high/100 and Opus 5/xhigh reviewers unanimously
+returned `RATIFIED`, `PLAN_AMENDMENT_APPROVED yes`,
+`BEHAVIORAL_RED_EXECUTABLE yes`, `PROCESS_DEATH_PROOF_SOUND yes`,
+`NONVACUOUS_OUTCOMES yes`, `GOLDEN_PATH_ALIGNMENT yes` and
+`GREENFIELD_NO_PLAIN_ID_CONFIRMED yes`. The ratified sources and final review
+artifacts are:
+
+- v2 complete proposal:
+  `cbb402978402d2f80e39097ac1314dcc282cc24605b463ce27ecc6c946c7538d`;
+- v3 correction delta:
+  `cff188354e18499013e590f691cce6f3f57d5245f4eaa0e7c2f1bdee36beabe6`;
+- v4 evidence-schema delta:
+  `545e1338aa897cb9f0e0469c48fe8332a782b4f88ce9fca3a2b6b5e9167283e5`;
+- v5 final two-fix delta:
+  `a5457e59916a108888cd405febcabfda5d5f65caec0efc5650cea987c22c3c4b`;
+- final Codex-high result:
+  `fc8bc4efdf865efde5ebc76bfb83c09f5fc28f67440abfe93b23615c1be7b967`;
+- final exact Kimi 3/high/100 raw stream:
+  `375c86ecbb30d69286a6dbb3c48eacb2cd36901e274ab17b089b7a1f33b08941`;
+- final Opus 5/xhigh raw result:
+  `7b8adb6fc7abe7f18fa3fa84a29cd9cf834502b6461ebdb21978287757529579`.
+
+The one-off Fable-high course audit was advisory, not quorum. It returned
+`ON_TRACK` (`eae9c316d1f9ca26f331757ec7da66951ece74b07f87bd3ce2955acabd5063fe`):
+this seam is the right precursor for chat golden-path step 7 and is reused by
+the game path without a durable-plane carve-out, but it does not make either
+golden path complete.
+
+#### Claim, package and identity boundary
+
+Phase 2b proves one deliberately small claim: a two-record IndexedDB
+transaction recovers atomically after **browser process death**. It does not
+prove fsync or power-loss durability because `SIGKILL` leaves the OS page cache
+alive. It creates private package `@ts-drp/storage-browser` with exact workspace
+dependencies `@ts-drp/storage: "0.11.0"` and
+`@ts-drp/canonical: "0.11.0"`. Its only production source is the private
+kill-point types and instrumented IDB boundary. It is `private:true`, has no
+export map, exports no `AheDurableStore`, claims no strict-durability capability
+and freezes no Phase 2d schema.
+
+The sole object ID is the frozen creator-bound literal
+`phase-2b-driver:0123456789abcdef0123456789abcdef`. Seed, transition and
+recovery all call `parseStorageObjectId`. No legacy/plain parser, alias,
+normalizer, fallback, compatibility route or inferred authority exists. The toy
+digest domain `ts-drp-storage/phase-2b-fixture-records/v1` must remain absent
+from both frozen protocol registries; it is diagnostic evidence, never a
+registered protocol domain.
+
+`tsconfig.json` includes `src/**/*.ts`, `tests/**/*.ts` and
+`playwright.storage-browser.config.ts`; `tsconfig.build.json` excludes tests and
+the Playwright config. Root `@ts-drp/*` build/clean/watch filters include the
+package. Adding it regenerates and commits `pnpm-lock.yaml` in RED so the
+dedicated frozen-lockfile CI install is meaningful.
+
+#### Fixed fixture and independent oracle
+
+Schema version 1 has one store, `records`, with key path `key`. Seed commits
+exactly:
+
+```text
+{key:"left",  objectId:FIXTURE_OBJECT_ID, generation:0,
+ bytes:Uint8Array([0x6f,0x6c,0x64,0x2d,0x6c])}
+{key:"right", objectId:FIXTURE_OBJECT_ID, generation:0,
+ bytes:Uint8Array([0x6f,0x6c,0x64,0x2d,0x72])}
+```
+
+The instrumented transition replaces both records in one strict readwrite
+transaction with:
+
+```text
+{key:"left",  objectId:FIXTURE_OBJECT_ID, generation:1,
+ bytes:Uint8Array([0x6e,0x65,0x77,0x2d,0x6c])}
+{key:"right", objectId:FIXTURE_OBJECT_ID, generation:1,
+ bytes:Uint8Array([0x6e,0x65,0x77,0x2d,0x72])}
+```
+
+Every input owns fresh non-shared bytes. The independent recovery oracle never
+imports the instrumented boundary. It enumerates the entire store through the
+terminal `null` cursor and accepts exactly the closed `left`/`right` pair. It
+rejects missing, extra, duplicate, accessor, malformed, wrong-ID,
+wrong-generation, non-`Uint8Array` or shared-backed bytes. Because the storage
+package's helper is internal, the oracle performs the equivalent local check
+after the `Uint8Array` guard:
+
+```ts
+typeof SharedArrayBuffer !== "undefined" && value.buffer instanceof SharedArrayBuffer;
+```
+
+The parent receives only closed `{key,objectId,generation,bytes:number[]}`
+values, validates each byte as an integer in `0..255`, rebuilds fresh arrays and
+classifies the exact old pair, exact new pair or `mixed`. It then computes the
+toy diagnostic, never a storage `ClosureDigest`:
+
+```text
+fixtureRecordsDigest = hex(hashDomain(
+  "ts-drp-storage/phase-2b-fixture-records/v1",
+  encodeCanonical([leftClosedRecord, rightClosedRecord])
+))
+```
+
+Checked-in old/new literals are independently recomputed before any run. The
+expected table is deliberately non-vacuous:
+
+```text
+transaction-complete / after  -> new
+every other point/edge        -> old
+```
+
+The aggregate therefore requires exactly 13 old and one new. Every other store
+image is `mixed` and fails.
+
+#### One manifest, exact edges and bounded ownership checking
+
+`packages/storage-browser/killpoints.json` is the single reviewed
+ID-to-ordinal bijection:
+
+```json
+{
+	"database-open": 0,
+	"transition-begin": 1,
+	"preflight-cursor-open": 2,
+	"preflight-cursor-continue": 3,
+	"left-write": 4,
+	"right-write": 5,
+	"transaction-complete": 6
+}
+```
+
+The exact ordinals `0..6` define order. `KillPointId` is
+`keyof typeof manifest`; `KillEdge` is `"before" | "after"`. Discovery derives
+the fourteen ordered pairs mechanically, before then after for each ordinal,
+and compares the projected ID set with the manifest keys.
+
+Request `before` is emitted immediately before the raw call. Request `after`
+is emitted only in its successful event after validating the exact result;
+error reaches a closed failure without `after`.
+
+- `database-open`: around `indexedDB.open(databaseName)`; after installs error
+  and `onversionchange` handlers and rejects an unexpected upgrade.
+- `transition-begin`: around the one readwrite transaction with
+  `{durability:"strict"}`; after validates the handles, exact durability and
+  callable explicit `commit` before the first request.
+- `preflight-cursor-open`: after validates the exact seeded `left` record.
+- `preflight-cursor-continue`: governs the void-returning `cursor.continue()`;
+  after validates the exact seeded `right` record.
+- `left-write`/`right-write`: around the two fixture `put` requests. This does
+  not authorize production blob `put`; 2d requires immutable `add`.
+- `transaction-complete`: before explicit `commit()` and after only in
+  `transaction.oncomplete`.
+
+From transaction creation through `oncomplete`, every success callback issues
+the next request or commit synchronously. The region contains no `async`,
+`await`, Promise adoption, timer, microtask or other authored yield.
+
+All armed-path raw IDB calls live in exactly
+`src/internal/instrumented-idb.ts`; the sole second raw-IDB module is test-only
+`tests/fixtures/oracle-idb.ts`. Raw handles never escape either boundary, and
+the crash graph cannot import the oracle. Direct boundary calls use literal
+manifest IDs; defaults, casts, computed IDs, spreads, aliases and optional IDs
+are forbidden.
+
+One bounded TypeScript `Program`/checker gate identifies DOM IDB receivers or
+resolved signatures, permits raw calls only in those two modules and rejects
+raw IDB types escaping their owner. It builds one Program for all governed
+files and has an explicit 60,000 ms Vitest timeout. This is an ownership checker,
+not a provenance analyzer or TypeScript interpreter: it does not chase arbitrary
+callback/value flow, and unsupported governed syntax fails closed.
+
+#### Browser roles, server and closed Worker protocol
+
+Global setup only bundles browser page/Worker entries and Node child entries
+with root esbuild into a per-suite temporary directory and exports its path as
+`PHASE_2B_ASSET_DIR`; global teardown removes it. The browser bundle is ESM,
+`platform:"browser"`, `target:"es2022"`; child bundles target Node 22 with
+packages external. Bare package specifiers never reach the browser.
+
+With `workers:1` and `fullyParallel:false`, `crash-driver.pw.ts` owns one
+`127.0.0.1:0` server in `beforeAll`/`afterAll`. It serves only resolved files
+beneath `PHASE_2B_ASSET_DIR`, rejects traversal/unknown/outside paths and sends
+correct type, `Cache-Control:no-store`, COOP `same-origin`, COEP `require-corp`
+and CORP `same-origin`. Each transition route has a one-use token revoked after
+crash groups die and before recovery. Recovery hides the crash-restore bubble,
+rejects restored non-oracle pages and uses only the oracle entry.
+
+The campaign has exactly sixteen runs: fourteen tuples, discovery and arming.
+Each run owns one fresh profile and `phase-2b-<runId>` database from seed until
+its artifact is written. Roles share that profile/database/origin/object ID:
+
+- tuple: seed → crash → recovery;
+- discovery: seed → discovery → recovery;
+- arming: seed → arming → recovery.
+
+The Playwright test process launches no browser. Each isolated child alone owns
+its `launchPersistentContext`. Seed/discovery/arming/recovery settle, close
+gracefully, exit zero and prove no profile process survives. The detached crash
+child never closes, never succeeds and waits forever after ready.
+
+The page realm alone creates the four-byte `SharedArrayBuffer` and one-cell
+`Int32Array`; it never crosses Playwright serialization. States are
+`0=idle`, `1=armed-waiting`, `2=resumed`, never reset. The closed protocol is:
+
+```text
+Worker -> page: {kind:"ready", version:1}
+page -> Worker: {kind:"run", version:1, databaseName, objectId,
+                 armed:{id:KillPointId,edge:KillEdge}|null,
+                 signal:SharedArrayBuffer}
+Worker -> page: {kind:"hit", version:1, id:KillPointId, edge:KillEdge,
+                 transactionDurability:"not-reached"|"strict"}
+Worker -> page: {kind:"complete", version:1,
+                 observed:readonly {id:KillPointId,edge:KillEdge}[],
+                 transactionDurability:"strict"}
+Worker -> page: {kind:"failure", version:1,
+                 code:WorkerFailureCode, detail:bounded-string}
+```
+
+The Worker owns durability state `not-reached`. After validating the created
+transaction and exact strict attribute, it flips to `strict` immediately before
+emitting `transition-begin/after`. Every hit carries the current state; page and
+child validate and relay it literally, and the parent never infers or repairs it
+from the manifest, armed point or later completion. Exactly three hits are
+`not-reached` (`database-open` both edges and `transition-begin/before`); the
+other eleven are `strict`.
+
+At the armed pair the Worker requires `compareExchange(cell,0,0,1) === 0`,
+posts the hit, requires `Atomics.wait(cell,0,1) === "ok"` and, after waking,
+requires `compareExchange(cell,0,1,2) === 1`. Discovery never waits and finishes
+with cell 0. Tuples observe cell 1 at the exact hit and never notify. Arming
+blocks at `left-write/before`; the page retries `Atomics.notify(cell,0,1)`
+without changing the cell until it returns exactly 1, proving a real waiter.
+Only the Worker performs 1→2, then completes and recovers new.
+
+Closed codes are:
+
+```text
+WorkerFailureCode =
+  "UNSUPPORTED_CAPABILITY" | "INVALID_RUN_MESSAGE" |
+  "INVALID_OBJECT_ID" | "UNEXPECTED_UPGRADE" |
+  "DURABILITY_NOT_STRICT" | "PREFLIGHT_MISMATCH" |
+  "REQUEST_ERROR" | "TRANSACTION_ABORT" |
+  "ARM_STATE_ERROR" | "MANIFEST_MISMATCH" |
+  "DRIVER_NOT_IMPLEMENTED"
+
+ParentFailureCode =
+  "UNSUPPORTED_PLATFORM" | "SETUP_FAILED" | "CHILD_PROTOCOL" |
+  "FOREST_CONTRADICTION" | "SURVIVOR" | "WRONG_EXIT" |
+  "PREFIX_MISMATCH" | "RECOVERY_INVALID" | "RECOVERY_MIXED" |
+  "EXPECTED_STATE_MISMATCH" | "DURABILITY_PROVENANCE" |
+  "TIMEOUT" | "UNKNOWN_FAILURE_CODE" | "ARTIFACT_SCHEMA"
+```
+
+Unknown codes map only to `UNKNOWN_FAILURE_CODE` and fail.
+
+#### Measured two-group hard kill
+
+On POSIX, Playwright 1.61.1 itself spawns Chromium detached. The browser root
+therefore leads a PGID distinct from the detached Node crash child and the test
+parent. Phase 2b never monkeypatches Playwright and never claims one group
+contains both.
+
+Before arming, the child reports its PID/PGID, resolved Chromium executable,
+profile, browser root PID/PGID and initial forest. At the exact armed hit the
+parent:
+
+1. sends `SIGSTOP` to the child PGID;
+2. polls a fresh process forest until every owned non-zombie is stopped or the
+   bound expires;
+3. validates the unique browser root, at least one renderer, exactly the child
+   and browser groups, and an unambiguous birth token for every PID;
+4. sends `SIGSTOP` to the browser PGID and recaptures the same owned union;
+5. sends `SIGKILL` to the browser PGID first, then the child PGID, without a
+   graceful call, resume or delay.
+
+Every capture uses:
+
+```text
+LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=
+```
+
+Each line parses as three decimal IDs, five C-locale `lstart` tokens, one state
+token and remaining command bytes. Ambiguity fails. The child must exit
+`code:null`, `signal:"SIGKILL"`; both negative-PGID probes must reach `ESRCH`.
+Every recorded PID is rechecked: same PID/birth token is a survivor and fails;
+a changed token proves reuse after death; unreadable identity fails. Cleanup may
+hard-kill only explicitly validated owned groups and never converts a failure
+to pass.
+
+The crash graph is structurally forbidden from calling `close`, `storageState`
+or `dispose` on Playwright page/context/browser values; installing source exit,
+beforeExit, SIGINT, SIGTERM or SIGHUP handlers; IPC shutdown; or graceful
+signals. Seed/discovery/recovery close behavior lives only in
+`settled-child.ts`; arming resume/close lives only in `arming-child.ts`; neither
+entry is reachable from `crash-child.ts`.
+
+#### Truthful artifacts and aggregate
+
+Every run writes one closed schema-v1 artifact outside its profile before
+disposal. The base requires run kind, unique run ID, git SHA,
+platform/browser/profile/database/object identity, both expected fixture digests
+and pass/fail verdict. A fail artifact records one run stage
+(`setup|seed|ready|hit|freeze|kill|recovery`), one closed code, bounded detail and
+only evidence actually reached; no pass-shaped sentinel is permitted. Campaign
+aggregation is not a seventeenth run or artifact and never rewrites run evidence.
+
+Pass records are exact per run kind:
+
+- `TuplePass`: armed point, expected/recovered old-or-new state, `mixed:false`,
+  expected/observed durability, recovered digest, typed hit prefix,
+  page-observed `armedCellValue:1`, isolation, complete child/browser/forest/
+  stop/kill/death evidence, plus settled seed/recovery evidence.
+- `DiscoveryPass`: `armedPoint:null`, recovery-new/digest, the exact fourteen
+  typed hits with the 3/11 durability sequence, matching complete sequence,
+  complete strict durability, `finalCellValue:0`, isolation, and settled
+  seed/discovery/recovery evidence. It contains no crash-shaped field.
+- `ArmingPass`: fixed `left-write/before`, recovery-new/digest, exact pre-resume
+  prefix and full post-resume typed hits, strict armed hit,
+  `notifyWoken:1`, `finalCellValue:2`, matching complete sequence, complete
+  strict durability, isolation, and settled seed/arming/recovery evidence. It
+  contains no crash-shaped field.
+
+Typed hits are `{id,edge,transactionDurability}`. Tuple scalar durability equals
+its terminal hit; no parent synthesis is allowed. Settled evidence pins role,
+child/browser identity, zero exit, recorded forest and absence of every owned
+process.
+
+The aggregate accepts exactly sixteen complete pass artifacts: fourteen unique
+manifest tuples, one discovery and one arming, with no fail, malformed, missing,
+duplicate or extra run. “Zero extras” means no tuple beyond the fourteen and no
+run beyond the sixteen; controls are mandatory, never extras.
+`missingKillPoints` is the exact manifest-derived tuple-set difference and must
+equal `[]`, but does not substitute for control validation. The aggregate also
+requires exact prefixes/sequences, 3 `not-reached` + 11 `strict`, 13 old + one
+new, no mixed, both controls strict/recovery-new, actual waiter evidence, and
+complete two-group death evidence.
+
+#### Causal RED, CI and coverage truth
+
+RED may add private package metadata/tsconfigs, lockfile, manifest and derived
+types, test-only oracle/assets/process fixtures, runner/CI wiring and an inert
+typed boundary whose Worker reports closed `DRIVER_NOT_IMPLEMENTED`. It may not
+implement real mutation or the full campaign. Old/new digest and classifier
+controls, malformed rejection, allowed checker sites and synthetic forest
+controls pass. Real hit, armed state, non-vacuous outcome, process-group and
+manifest assertions fail against the inert scaffold. No RED failure may be
+missing-import, resolution, typecheck, lint, server-start, collection or default
+timeout noise. RED runs static/unit tests and at most one bounded Chromium smoke;
+GREEN runs all sixteen runs.
+
+`playwright.storage-browser.config.ts` matches only `crash-driver.pw.ts` with
+`retries:0`, `workers:1`, `fullyParallel:false`, 180 seconds per test and a
+3,600-second global bound. Dedicated CI runs Ubuntu and macOS with a 75-minute
+outer timeout, Node 22 and pnpm 10.24.0:
+
+```text
+pnpm install --frozen-lockfile
+pnpm exec playwright install --with-deps chromium
+pnpm e2e-test:storage-browser
+```
+
+Root coverage includes both `packages/storage-browser/src/**` and the package-
+root Playwright config, while test fixtures are excluded, and enforces a hard
+aggregate line threshold. RED records the before/after denominator delta. RED
+and GREEN may not exclude this source/config, lower a threshold, add ignore
+directives or claim Playwright execution was merged into Vitest coverage.
+Testable logic receives focused unit coverage; 2h remains the owner of actual
+cross-runner/all-engine coverage integration. Any gate failure is reported,
+never bypassed.
+
+#### Deferrals, gotchas and golden-path ownership
+
+- 2c owns SQLite, statement/commit kills and the strict Node backend.
+- 2-spike owns the OPFS-vs-IDB substrate decision.
+- 2d owns the production browser schema, migration, immutable `add`, journal,
+  capability claim and exported durable store.
+- 2e owns real-generation adoption and full active-generation closure recovery;
+  the toy digest must never be relabelled a `ClosureDigest`.
+- 2h owns Firefox/WebKit/device matrices and normative
+  `ahe-storage-validation.json` aggregation. WebKit may not preserve Chromium's
+  indefinite callback-blocking mechanism, so porting must be measured.
+- Chromium may delete a corrupt database after a crash. The oracle classifies
+  that as mixed/fail, never retry or pass.
+- At this checkpoint root pins Playwright 1.61.1/Chromium 149.0.7827.55; the
+  network-spike 1.51.1 install is a version split, not the current root runtime.
+  2k owns release-time currency.
+- No 2b artifact creates signing authority or accepts a legacy/plain ID.
+- This is the trivial-payload precursor for chat golden-path step 7. Step 7's
+  full closure XOR remains owned by 2e. Game golden-path step 1 reuses the same
+  durable plane with no carve-out. Phase 2b completes neither path by itself.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
@@ -1794,7 +2194,7 @@ recommendation**. These are storage modes, not trust profiles: both `delegated-t
    is forbidden without browser-specific evidence that key/log co-eviction is atomic. No such evidence
    exists for that population.
 
-   _Cautionary note, because it nearly drove this decision the wrong way:_ the same measurement showed
+   _Historical cautionary note, because it nearly drove this decision the wrong way:_ the same measurement showed
    Ed25519 failing on Chromium — but that was **Playwright 1.51.1's bundled Chromium 134**, which predates
    Chrome 137 (May 2025) where Ed25519 shipped. The platform was never the constraint; **our test tooling
    was ~16 months stale**, and it produced a false negative on a protocol decision. The current desktop
