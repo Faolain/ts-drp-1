@@ -22,6 +22,10 @@ class MemoryAheDurableStore implements AheDurableStore {
 	public readonly capabilities = EPHEMERAL_CAPABILITIES;
 	private readonly owner = new TransitionOwner("ephemeral");
 
+	public constructor() {
+		Object.freeze(this);
+	}
+
 	/**
 	 * Reads one detached object state.
 	 * @param objectId - Input value.
