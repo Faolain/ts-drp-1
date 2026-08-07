@@ -7,7 +7,18 @@ export const PACKAGE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../..");
 const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
 	[
 		path.join(PACKAGE_DIRECTORY, "src/internal/instrumented-idb.ts"),
-		new Set(["open", "transaction", "objectStore", "openCursor", "continue", "put", "commit", "close"]),
+		new Set([
+			"open",
+			"createObjectStore",
+			"transaction",
+			"objectStore",
+			"add",
+			"openCursor",
+			"continue",
+			"put",
+			"commit",
+			"close",
+		]),
 	],
 	[
 		path.join(PACKAGE_DIRECTORY, "tests/fixtures/oracle-idb.ts"),
@@ -78,13 +89,14 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 			}
 			if (exported(node)) {
 				let rawTypeEscapes = isIdbDomType(checker.typeToString(checker.getTypeAtLocation(node)));
-				const inspectTypeNodes = (child: ts.Node): void => {
+				const inspectExportSignature = (child: ts.Node): void => {
+					if (ts.isBlock(child)) return;
 					if (ts.isTypeNode(child) && isIdbDomType(checker.typeToString(checker.getTypeAtLocation(child)))) {
 						rawTypeEscapes = true;
 					}
-					ts.forEachChild(child, inspectTypeNodes);
+					ts.forEachChild(child, inspectExportSignature);
 				};
-				inspectTypeNodes(node);
+				inspectExportSignature(node);
 				if (rawTypeEscapes) {
 					violations.push(`${normalized}: raw IDB type escapes its owner`);
 				}

@@ -1,6 +1,8 @@
 import { EXPECTED_NEW_DIGEST, EXPECTED_OLD_DIGEST, FIXTURE_OBJECT_ID } from "./fixture-records.js";
+import type { ProcessIdentity } from "./process-forest.js";
 import { boundedDetail, isWorkerFailureCode } from "./worker-protocol.js";
 import type { WorkerFailureCode } from "../../src/internal/instrumented-idb.js";
+import { KILL_POINT_MANIFEST, type KillHit, type KillPoint, orderedKillPoints } from "../../src/killpoints.js";
 
 export type ParentFailureCode =
 	| "UNSUPPORTED_PLATFORM"
@@ -42,6 +44,117 @@ export interface FailureArtifact {
 	readonly stage: RunStage;
 	readonly code: WorkerFailureCode | ParentFailureCode;
 	readonly detail: string;
+}
+
+export interface BrowserIdentity {
+	readonly executablePath: string;
+	readonly name: "chromium";
+	readonly version: string;
+}
+
+export interface SettledChildEvidence {
+	readonly role: "seed" | "discovery" | "arming" | "recovery";
+	readonly child: ProcessIdentity & { readonly exitCode: 0; readonly exitSignal: null };
+	readonly browserRoot: ProcessIdentity;
+	readonly ownedGroups: readonly {
+		readonly role: "child" | "browser";
+		readonly pgid: number;
+		readonly rootPid: number;
+		readonly absent: true;
+	}[];
+	readonly recordedForest: readonly ProcessIdentity[];
+	readonly allRecordedProcessesAbsent: true;
+}
+
+interface PassBase {
+	readonly schemaVersion: 1;
+	readonly verdict: "pass";
+	readonly browser: BrowserIdentity;
+	readonly databaseName: string;
+	readonly expectedDigests: { readonly old: typeof EXPECTED_OLD_DIGEST; readonly new: typeof EXPECTED_NEW_DIGEST };
+	readonly gitSha: string;
+	readonly objectId: typeof FIXTURE_OBJECT_ID;
+	readonly platform: "darwin" | "linux";
+	readonly profilePath: string;
+	readonly runId: string;
+}
+
+export interface TuplePassArtifact extends PassBase {
+	readonly runKind: "tuple";
+	readonly armedPoint: KillPoint;
+	readonly expectedRecoveredState: "old" | "new";
+	readonly recoveredState: "old" | "new";
+	readonly mixed: false;
+	readonly expectedTransactionDurability: "not-reached" | "strict";
+	readonly observedTransactionDurability: "not-reached" | "strict";
+	readonly recoveredFixtureRecordsDigest: string;
+	readonly observedHits: readonly KillHit[];
+	readonly armedCellValue: 1;
+	readonly crossOriginIsolated: true;
+	readonly child: ProcessIdentity & { readonly exitCode: null; readonly exitSignal: "SIGKILL" };
+	readonly browserRoot: ProcessIdentity;
+	readonly killedGroups: readonly {
+		readonly role: "child" | "browser";
+		readonly pgid: number;
+		readonly rootPid: number;
+		readonly stopAccepted: true;
+		readonly killAccepted: true;
+		readonly absent: true;
+	}[];
+	readonly recordedForest: readonly ProcessIdentity[];
+	readonly recordedProcessDeaths: readonly {
+		readonly pid: number;
+		readonly birthToken: string;
+		readonly outcome: "absent" | "reused";
+		readonly currentBirthToken: string | null;
+	}[];
+	readonly settledChildren: readonly [SettledChildEvidence, SettledChildEvidence];
+}
+
+export interface DiscoveryPassArtifact extends PassBase {
+	readonly runKind: "discovery";
+	readonly armedPoint: null;
+	readonly recoveredState: "new";
+	readonly mixed: false;
+	readonly recoveredFixtureRecordsDigest: typeof EXPECTED_NEW_DIGEST;
+	readonly observedHits: readonly KillHit[];
+	readonly completeObservedPairs: readonly KillPoint[];
+	readonly completeTransactionDurability: "strict";
+	readonly finalCellValue: 0;
+	readonly crossOriginIsolated: true;
+	readonly settledChildren: readonly [SettledChildEvidence, SettledChildEvidence, SettledChildEvidence];
+}
+
+export interface ArmingPassArtifact extends PassBase {
+	readonly runKind: "arming";
+	readonly armedPoint: { readonly id: "left-write"; readonly edge: "before" };
+	readonly recoveredState: "new";
+	readonly mixed: false;
+	readonly recoveredFixtureRecordsDigest: typeof EXPECTED_NEW_DIGEST;
+	readonly preResumeObservedHits: readonly KillHit[];
+	readonly observedHits: readonly KillHit[];
+	readonly armedHitTransactionDurability: "strict";
+	readonly notifyWoken: 1;
+	readonly finalCellValue: 2;
+	readonly completeObservedPairs: readonly KillPoint[];
+	readonly completeTransactionDurability: "strict";
+	readonly crossOriginIsolated: true;
+	readonly settledChildren: readonly [SettledChildEvidence, SettledChildEvidence, SettledChildEvidence];
+}
+
+export type PassArtifact = TuplePassArtifact | DiscoveryPassArtifact | ArmingPassArtifact;
+
+export interface CampaignAggregate {
+	readonly artifactCount: 16;
+	readonly tupleCount: 14;
+	readonly discoveryCount: 1;
+	readonly armingCount: 1;
+	readonly old: 13;
+	readonly new: 1;
+	readonly mixed: 0;
+	readonly notReachedDurability: 3;
+	readonly strictDurability: 11;
+	readonly missingKillPoints: readonly [];
 }
 
 const PARENT_CODES: ReadonlySet<ParentFailureCode> = new Set([
@@ -145,4 +258,348 @@ export function parseFailureArtifact(value: unknown): FailureArtifact {
 		browser: Object.freeze({ ...(browser as Record<string, unknown>) }),
 		expectedDigests: Object.freeze({ ...(expectedDigests as Record<string, unknown>) }),
 	}) as unknown as FailureArtifact;
+}
+
+function requireClosed(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
+	if (typeof value !== "object" || value === null || !closedRecord(value, keys)) {
+		throw new TypeError(`${label} is outside its closed schema`);
+	}
+	return value as Record<string, unknown>;
+}
+
+function requireArray(value: unknown, label: string): readonly unknown[] {
+	if (!Array.isArray(value) || Object.getOwnPropertySymbols(value).length !== 0) {
+		throw new TypeError(`${label} must be a closed array`);
+	}
+	const names = Object.getOwnPropertyNames(value).sort();
+	const expected = [...value.keys()].map(String).concat("length").sort();
+	if (names.length !== expected.length || names.some((name, index) => name !== expected[index])) {
+		throw new TypeError(`${label} must be dense and expando-free`);
+	}
+	return value;
+}
+
+function requireIdentity(value: unknown, extra: readonly string[] = []): Record<string, unknown> {
+	const identity = requireClosed(
+		value,
+		["pid", "ppid", "pgid", "birthToken", "state", "command", ...extra],
+		"process identity"
+	);
+	if (
+		![identity.pid, identity.pgid].every((item) => Number.isSafeInteger(item) && Number(item) > 0) ||
+		!Number.isSafeInteger(identity.ppid) ||
+		Number(identity.ppid) < 0 ||
+		![identity.birthToken, identity.state, identity.command].every(
+			(item) => typeof item === "string" && item.length > 0
+		)
+	) {
+		throw new TypeError("process identity values are malformed");
+	}
+	return identity;
+}
+
+function requirePoint(value: unknown): KillPoint {
+	const point = requireClosed(value, ["id", "edge"], "kill point");
+	if (
+		typeof point.id !== "string" ||
+		!Object.hasOwn(KILL_POINT_MANIFEST, point.id) ||
+		(point.edge !== "before" && point.edge !== "after")
+	) {
+		throw new TypeError("kill point values are malformed");
+	}
+	return Object.freeze({ id: point.id as KillPoint["id"], edge: point.edge });
+}
+
+function requireHits(value: unknown): readonly KillHit[] {
+	return Object.freeze(
+		requireArray(value, "hit evidence").map((untrusted) => {
+			const hit = requireClosed(untrusted, ["id", "edge", "transactionDurability"], "hit");
+			const point = requirePoint({ id: hit.id, edge: hit.edge });
+			if (hit.transactionDurability !== "not-reached" && hit.transactionDurability !== "strict") {
+				throw new TypeError("hit durability is malformed");
+			}
+			return Object.freeze({ ...point, transactionDurability: hit.transactionDurability });
+		})
+	);
+}
+
+function requireSettled(value: unknown): SettledChildEvidence {
+	const settled = requireClosed(
+		value,
+		["role", "child", "browserRoot", "ownedGroups", "recordedForest", "allRecordedProcessesAbsent"],
+		"settled evidence"
+	);
+	if (
+		settled.role !== "seed" &&
+		settled.role !== "discovery" &&
+		settled.role !== "arming" &&
+		settled.role !== "recovery"
+	) {
+		throw new TypeError("settled role is malformed");
+	}
+	const child = requireIdentity(settled.child, ["exitCode", "exitSignal"]);
+	if (child.exitCode !== 0 || child.exitSignal !== null) throw new TypeError("settled child did not exit zero");
+	requireIdentity(settled.browserRoot);
+	const forest = requireArray(settled.recordedForest, "settled forest");
+	forest.forEach((identity) => requireIdentity(identity));
+	const groups = requireArray(settled.ownedGroups, "settled groups");
+	if (groups.length !== 2) throw new TypeError("settled evidence requires two groups");
+	groups.forEach((untrusted) => {
+		const group = requireClosed(untrusted, ["role", "pgid", "rootPid", "absent"], "settled group");
+		if (
+			(group.role !== "child" && group.role !== "browser") ||
+			!Number.isSafeInteger(group.pgid) ||
+			!Number.isSafeInteger(group.rootPid) ||
+			group.absent !== true
+		) {
+			throw new TypeError("settled group is malformed");
+		}
+	});
+	if (settled.allRecordedProcessesAbsent !== true) throw new TypeError("settled processes were not all absent");
+	return value as SettledChildEvidence;
+}
+
+function requireBase(candidate: Record<string, unknown>): void {
+	const browser = requireClosed(candidate.browser, ["name", "version", "executablePath"], "browser identity");
+	const digests = requireClosed(candidate.expectedDigests, ["old", "new"], "expected digests");
+	if (
+		candidate.schemaVersion !== 1 ||
+		candidate.verdict !== "pass" ||
+		(candidate.platform !== "darwin" && candidate.platform !== "linux") ||
+		typeof candidate.runId !== "string" ||
+		candidate.runId.length === 0 ||
+		typeof candidate.gitSha !== "string" ||
+		!/^[0-9a-f]{40}$/u.test(candidate.gitSha) ||
+		typeof candidate.profilePath !== "string" ||
+		candidate.profilePath.length === 0 ||
+		typeof candidate.databaseName !== "string" ||
+		candidate.databaseName.length === 0 ||
+		candidate.objectId !== FIXTURE_OBJECT_ID ||
+		browser.name !== "chromium" ||
+		typeof browser.version !== "string" ||
+		browser.version.length === 0 ||
+		typeof browser.executablePath !== "string" ||
+		browser.executablePath.length === 0 ||
+		digests.old !== EXPECTED_OLD_DIGEST ||
+		digests.new !== EXPECTED_NEW_DIGEST
+	) {
+		throw new TypeError("pass artifact base values are malformed");
+	}
+}
+
+/**
+ * Parses one exact closed schema-v1 pass artifact.
+ * @param value - Untrusted run artifact.
+ * @returns The validated closed pass variant.
+ */
+export function parsePassArtifact(value: unknown): PassArtifact {
+	if (typeof value !== "object" || value === null) throw new TypeError("pass artifact must be an object");
+	const kind = (value as Record<string, unknown>).runKind;
+	const common = [
+		"schemaVersion",
+		"verdict",
+		"browser",
+		"databaseName",
+		"expectedDigests",
+		"gitSha",
+		"objectId",
+		"platform",
+		"profilePath",
+		"runId",
+		"runKind",
+	];
+	let keys: readonly string[];
+	if (kind === "tuple") {
+		keys = [
+			...common,
+			"armedPoint",
+			"expectedRecoveredState",
+			"recoveredState",
+			"mixed",
+			"expectedTransactionDurability",
+			"observedTransactionDurability",
+			"recoveredFixtureRecordsDigest",
+			"observedHits",
+			"armedCellValue",
+			"crossOriginIsolated",
+			"child",
+			"browserRoot",
+			"killedGroups",
+			"recordedForest",
+			"recordedProcessDeaths",
+			"settledChildren",
+		];
+	} else if (kind === "discovery") {
+		keys = [
+			...common,
+			"armedPoint",
+			"recoveredState",
+			"mixed",
+			"recoveredFixtureRecordsDigest",
+			"observedHits",
+			"completeObservedPairs",
+			"completeTransactionDurability",
+			"finalCellValue",
+			"crossOriginIsolated",
+			"settledChildren",
+		];
+	} else if (kind === "arming") {
+		keys = [
+			...common,
+			"armedPoint",
+			"recoveredState",
+			"mixed",
+			"recoveredFixtureRecordsDigest",
+			"preResumeObservedHits",
+			"observedHits",
+			"armedHitTransactionDurability",
+			"notifyWoken",
+			"finalCellValue",
+			"completeObservedPairs",
+			"completeTransactionDurability",
+			"crossOriginIsolated",
+			"settledChildren",
+		];
+	} else {
+		throw new TypeError("pass artifact has an unknown run kind");
+	}
+	const candidate = requireClosed(value, keys, `${String(kind)} pass artifact`);
+	requireBase(candidate);
+	const hits = requireHits(candidate.observedHits);
+	if (candidate.mixed !== false || candidate.crossOriginIsolated !== true) {
+		throw new TypeError("pass artifact contains a false pass sentinel");
+	}
+	const settled = requireArray(candidate.settledChildren, "settled children").map(requireSettled);
+	if (kind === "tuple") {
+		const point = requirePoint(candidate.armedPoint);
+		const expectedState = point.id === "transaction-complete" && point.edge === "after" ? "new" : "old";
+		const expectedDurability =
+			point.id === "database-open" || (point.id === "transition-begin" && point.edge === "before")
+				? "not-reached"
+				: "strict";
+		if (
+			candidate.expectedRecoveredState !== expectedState ||
+			candidate.recoveredState !== expectedState ||
+			candidate.expectedTransactionDurability !== expectedDurability ||
+			candidate.observedTransactionDurability !== expectedDurability ||
+			candidate.armedCellValue !== 1 ||
+			settled.length !== 2 ||
+			settled[0]?.role !== "seed" ||
+			settled[1]?.role !== "recovery"
+		) {
+			throw new TypeError("tuple pass scalar or settled evidence is malformed");
+		}
+		requireIdentity(candidate.child, ["exitCode", "exitSignal"]);
+		const child = candidate.child as Record<string, unknown>;
+		if (child.exitCode !== null || child.exitSignal !== "SIGKILL")
+			throw new TypeError("tuple child death is malformed");
+		requireIdentity(candidate.browserRoot);
+		requireArray(candidate.recordedForest, "tuple forest").forEach((identity) => requireIdentity(identity));
+		const groups = requireArray(candidate.killedGroups, "killed groups");
+		if (groups.length !== 2) throw new TypeError("tuple requires exactly two killed groups");
+		groups.forEach((untrusted) => {
+			const group = requireClosed(
+				untrusted,
+				["role", "pgid", "rootPid", "stopAccepted", "killAccepted", "absent"],
+				"killed group"
+			);
+			if (group.stopAccepted !== true || group.killAccepted !== true || group.absent !== true) {
+				throw new TypeError("killed group lacks complete death evidence");
+			}
+		});
+		requireArray(candidate.recordedProcessDeaths, "process deaths").forEach((untrusted) => {
+			const death = requireClosed(untrusted, ["pid", "birthToken", "outcome", "currentBirthToken"], "process death");
+			if (death.outcome !== "absent" && death.outcome !== "reused") throw new TypeError("process death is malformed");
+		});
+		const prefixLength =
+			orderedKillPoints().findIndex(
+				(candidatePoint) => candidatePoint.id === point.id && candidatePoint.edge === point.edge
+			) + 1;
+		if (
+			JSON.stringify(hits.map(({ id, edge }) => ({ id, edge }))) !==
+			JSON.stringify(orderedKillPoints().slice(0, prefixLength))
+		) {
+			throw new TypeError("tuple hit prefix is malformed");
+		}
+		return value as TuplePassArtifact;
+	}
+	const points = requireArray(candidate.completeObservedPairs, "complete pairs").map(requirePoint);
+	if (
+		candidate.recoveredState !== "new" ||
+		candidate.recoveredFixtureRecordsDigest !== EXPECTED_NEW_DIGEST ||
+		candidate.completeTransactionDurability !== "strict" ||
+		JSON.stringify(points) !== JSON.stringify(orderedKillPoints()) ||
+		JSON.stringify(hits.map(({ id, edge }) => ({ id, edge }))) !== JSON.stringify(orderedKillPoints())
+	) {
+		throw new TypeError("control complete evidence is malformed");
+	}
+	if (kind === "discovery") {
+		if (
+			candidate.armedPoint !== null ||
+			candidate.finalCellValue !== 0 ||
+			settled.length !== 3 ||
+			settled.map((item) => item.role).join(",") !== "seed,discovery,recovery"
+		) {
+			throw new TypeError("discovery pass evidence is malformed");
+		}
+		return value as DiscoveryPassArtifact;
+	}
+	const armed = requirePoint(candidate.armedPoint);
+	const preResume = requireHits(candidate.preResumeObservedHits);
+	if (
+		armed.id !== "left-write" ||
+		armed.edge !== "before" ||
+		candidate.armedHitTransactionDurability !== "strict" ||
+		candidate.notifyWoken !== 1 ||
+		candidate.finalCellValue !== 2 ||
+		settled.length !== 3 ||
+		settled.map((item) => item.role).join(",") !== "seed,arming,recovery" ||
+		JSON.stringify(preResume.map(({ id, edge }) => ({ id, edge }))) !== JSON.stringify(orderedKillPoints().slice(0, 9))
+	) {
+		throw new TypeError("arming pass evidence is malformed");
+	}
+	return value as ArmingPassArtifact;
+}
+
+/**
+ * Aggregates exactly sixteen pass artifacts after closed parsing.
+ * @param values - Untrusted complete campaign artifacts.
+ * @returns Exact campaign counts and empty manifest difference.
+ */
+export function aggregatePassArtifacts(values: readonly unknown[]): CampaignAggregate {
+	const artifacts = values.map(parsePassArtifact);
+	if (artifacts.length !== 16 || new Set(artifacts.map((artifact) => artifact.runId)).size !== 16) {
+		throw new TypeError("aggregate requires sixteen unique pass artifacts");
+	}
+	const tuples = artifacts.filter((artifact): artifact is TuplePassArtifact => artifact.runKind === "tuple");
+	const discovery = artifacts.filter((artifact) => artifact.runKind === "discovery");
+	const arming = artifacts.filter((artifact) => artifact.runKind === "arming");
+	const expected = new Set(orderedKillPoints().map((point) => `${point.id}/${point.edge}`));
+	const actual = new Set(tuples.map((artifact) => `${artifact.armedPoint.id}/${artifact.armedPoint.edge}`));
+	const missing = [...expected].filter((point) => !actual.has(point));
+	if (
+		tuples.length !== 14 ||
+		discovery.length !== 1 ||
+		arming.length !== 1 ||
+		actual.size !== 14 ||
+		missing.length !== 0 ||
+		tuples.filter((artifact) => artifact.recoveredState === "old").length !== 13 ||
+		tuples.filter((artifact) => artifact.recoveredState === "new").length !== 1 ||
+		tuples.filter((artifact) => artifact.observedTransactionDurability === "not-reached").length !== 3 ||
+		tuples.filter((artifact) => artifact.observedTransactionDurability === "strict").length !== 11
+	) {
+		throw new TypeError("aggregate evidence does not match the exact sixteen-run contract");
+	}
+	return Object.freeze({
+		artifactCount: 16,
+		tupleCount: 14,
+		discoveryCount: 1,
+		armingCount: 1,
+		old: 13,
+		new: 1,
+		mixed: 0,
+		notReachedDurability: 3,
+		strictDurability: 11,
+		missingKillPoints: Object.freeze([] as const),
+	});
 }

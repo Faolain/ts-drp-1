@@ -9,6 +9,62 @@ export interface ProcessIdentity {
 
 const PROCESS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(\S+)\s+(.+)$/u;
 
+export const PROCESS_FOREST_ARGUMENTS = Object.freeze(["-A", "-ww", "-o", "pid=,ppid=,pgid=,lstart=,state=,command="]);
+
+/**
+ * Captures the complete process table using the ratified C-locale command.
+ * @returns Parsed full process identities.
+ */
+export function captureProcessForest(): readonly ProcessIdentity[] {
+	return parseProcessForest(
+		execFileSync("ps", PROCESS_FOREST_ARGUMENTS, {
+			encoding: "utf8",
+			env: { ...process.env, LC_ALL: "C" },
+			maxBuffer: 16 * 1024 * 1024,
+		})
+	);
+}
+
+/**
+ * Returns the transitive descendant closure including the root.
+ * @param forest - Complete process-table capture.
+ * @param rootPid - Owned isolated child root.
+ * @returns Stable forest subset reachable through parent IDs.
+ */
+export function processClosure(forest: readonly ProcessIdentity[], rootPid: number): readonly ProcessIdentity[] {
+	const owned = new Set([rootPid]);
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const identity of forest) {
+			if (owned.has(identity.ppid) && !owned.has(identity.pid)) {
+				owned.add(identity.pid);
+				changed = true;
+			}
+		}
+	}
+	return Object.freeze(forest.filter((identity) => owned.has(identity.pid)));
+}
+
+/**
+ * Locates the unique Chromium root directly owned by the isolated child.
+ * @param forest - Complete process-table capture.
+ * @param childPid - Isolated Node child PID.
+ * @param profilePath - Exact fresh persistent-profile path.
+ * @returns The unique browser root identity.
+ */
+export function locateBrowserRoot(
+	forest: readonly ProcessIdentity[],
+	childPid: number,
+	profilePath: string
+): ProcessIdentity {
+	const candidates = forest.filter(
+		(identity) => identity.ppid === childPid && identity.command.includes(`--user-data-dir=${profilePath}`)
+	);
+	if (candidates.length !== 1) throw new TypeError(`expected one browser root, observed ${candidates.length}`);
+	return candidates[0] as ProcessIdentity;
+}
+
 /**
  * Parses one exact C-locale process-table capture.
  * @param output - Raw `ps` output.
@@ -25,8 +81,15 @@ export function parseProcessForest(output: string): readonly ProcessIdentity[] {
 			const pid = Number(match[1]);
 			const ppid = Number(match[2]);
 			const pgid = Number(match[3]);
-			if (![pid, ppid, pgid].every((value) => Number.isSafeInteger(value) && value > 0)) {
-				throw new TypeError("process IDs must be positive safe integers");
+			if (
+				!Number.isSafeInteger(pid) ||
+				pid <= 0 ||
+				!Number.isSafeInteger(ppid) ||
+				ppid < 0 ||
+				!Number.isSafeInteger(pgid) ||
+				pgid <= 0
+			) {
+				throw new TypeError("pid/pgid must be positive and ppid must be non-negative safe integers");
 			}
 			return Object.freeze({
 				pid,
@@ -67,3 +130,4 @@ export function validateTwoGroupForest(
 	if (identities.size !== owned.length) throw new TypeError("forest contains ambiguous process identity");
 	return Object.freeze({ childPgid, browserPgid, ownedPids: Object.freeze(owned.map((process) => process.pid)) });
 }
+import { execFileSync } from "node:child_process";

@@ -30,6 +30,15 @@ workerScope.onmessage = (event: MessageEvent<unknown>): void => {
 				observed: result.observed,
 				transactionDurability: result.transactionDurability,
 			});
+		},
+		(error: unknown) => {
+			post({
+				kind: "failure",
+				version: 1,
+				code: "REQUEST_ERROR",
+				detail:
+					boundedDetail(error instanceof Error ? error.message : "unknown boundary rejection") ?? "boundary rejected",
+			});
 		}
 	);
 };

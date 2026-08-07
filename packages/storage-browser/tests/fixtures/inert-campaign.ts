@@ -1,5 +1,9 @@
-import { FIXTURE_OBJECT_ID } from "./fixture-records.js";
-import { type InstrumentedTransitionResult, runInstrumentedTransition } from "../../src/internal/instrumented-idb.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { aggregatePassArtifacts, type PassArtifact } from "./artifacts.js";
+import { type InstrumentedTransitionResult } from "../../src/internal/instrumented-idb.js";
 import { type KillHit, type KillPoint, orderedKillPoints } from "../../src/killpoints.js";
 
 export interface RedCampaignObservation {
@@ -21,16 +25,16 @@ export interface RedCampaignObservation {
 /**
  * Returns the deliberately non-vacuous expected recovery for one tuple.
  * @param point - Manifest-derived tuple.
- * @returns New only after transaction completion; old otherwise.
+ * @returns New only at transaction-complete/after; old otherwise.
  */
 export function expectedFixtureState(point: KillPoint): "old" | "new" {
 	return point.id === "transaction-complete" && point.edge === "after" ? "new" : "old";
 }
 
 /**
- * Returns the expected Worker-owned durability at a hit.
+ * Returns the exact Worker-owned durability expected at one literal hit.
  * @param point - Manifest-derived tuple.
- * @returns The exact three-not-reached/eleven-strict provenance.
+ * @returns The frozen three-not-reached/eleven-strict value.
  */
 export function expectedHitDurability(point: KillPoint): "not-reached" | "strict" {
 	return point.id === "database-open" || (point.id === "transition-begin" && point.edge === "before")
@@ -38,43 +42,96 @@ export function expectedHitDurability(point: KillPoint): "not-reached" | "strict
 		: "strict";
 }
 
+function artifactDirectory(): string {
+	return path.resolve(
+		path.dirname(fileURLToPath(import.meta.url)),
+		"../../../..",
+		".logs/phase-2b-process-death-green-codex-high/artifacts"
+	);
+}
+
+function readArtifacts(): readonly PassArtifact[] {
+	const directory = artifactDirectory();
+	if (!fs.existsSync(directory)) throw new Error("ACTUAL_CAMPAIGN_EVIDENCE artifact directory is absent");
+	const files = fs
+		.readdirSync(directory)
+		.filter((file) => file.endsWith(".json"))
+		.sort();
+	const untrusted = files.map((file) => {
+		const parsed = JSON.parse(fs.readFileSync(path.join(directory, file), "utf8")) as unknown;
+		if (typeof parsed !== "object" || parsed === null) throw new Error("ACTUAL_CAMPAIGN_EVIDENCE malformed artifact");
+		return parsed;
+	});
+	aggregatePassArtifacts(untrusted);
+	return Object.freeze(untrusted.map((artifact) => artifact as PassArtifact));
+}
+
+function artifactHits(artifact: PassArtifact): readonly KillHit[] {
+	if (!Array.isArray(artifact.observedHits)) throw new Error("ACTUAL_CAMPAIGN_EVIDENCE missing observed hits");
+	return Object.freeze(
+		artifact.observedHits.map((value) => {
+			if (typeof value !== "object" || value === null) throw new Error("ACTUAL_CAMPAIGN_EVIDENCE malformed hit");
+			const hit = value as Record<string, unknown>;
+			if (
+				typeof hit.id !== "string" ||
+				(hit.edge !== "before" && hit.edge !== "after") ||
+				(hit.transactionDurability !== "not-reached" && hit.transactionDurability !== "strict")
+			) {
+				throw new Error("ACTUAL_CAMPAIGN_EVIDENCE malformed typed hit");
+			}
+			return Object.freeze({
+				id: hit.id as KillHit["id"],
+				edge: hit.edge,
+				transactionDurability: hit.transactionDurability,
+			});
+		})
+	);
+}
+
 /**
- * Runs the inert boundary and preserves only evidence it actually emitted.
- * @param armed - Requested manifest tuple, or null for discovery.
- * @returns The causal RED observation.
+ * Loads the immutable sixteen-run browser campaign evidence emitted by the sole Playwright test.
+ * @param armed - Requested tuple, or null for aggregate/discovery evidence.
+ * @returns Reached evidence from the parsed immutable campaign artifacts.
  */
 export function runInertCampaign(armed: KillPoint | null): Promise<RedCampaignObservation> {
-	const hits: KillHit[] = [];
-	const signal = new SharedArrayBuffer(4);
-	const manifestPoints = orderedKillPoints();
-	return runInstrumentedTransition({
-		armed,
-		databaseName: "phase-2b-red-contract",
-		objectId: FIXTURE_OBJECT_ID,
-		signal,
-		onHit: (hit): void => {
-			hits.push(hit);
-		},
-	}).then((result) => ({
-		result,
-		hits: Object.freeze(hits),
-		armedCellValue: Atomics.load(new Int32Array(signal), 0),
-		actualCampaign: Object.freeze({
-			artifactCount: 0,
-			old: 0,
-			new: 0,
-			mixed: 0,
-			discoveryRecoveredState: null,
-			armingRecoveredState: null,
-		}),
-		forestGroups: Object.freeze([]),
-		manifestPoints,
-	}));
+	const artifacts = readArtifacts();
+	const aggregate = aggregatePassArtifacts(artifacts);
+	const tuples = artifacts.filter((artifact) => artifact.runKind === "tuple");
+	const discovery = artifacts.find((artifact) => artifact.runKind === "discovery");
+	const arming = artifacts.find((artifact) => artifact.runKind === "arming");
+	const selected =
+		armed === null
+			? discovery
+			: tuples.find((artifact) => artifact.armedPoint.id === armed.id && artifact.armedPoint.edge === armed.edge);
+	if (selected === undefined || discovery === undefined || arming === undefined) {
+		throw new Error("ACTUAL_CAMPAIGN_EVIDENCE required run artifact is missing");
+	}
+	const hits = artifactHits(selected);
+	const killedGroups = selected.runKind === "tuple" ? selected.killedGroups : [];
+	const forestGroups = killedGroups.map((group) => group.pgid);
+	return Promise.resolve(
+		Object.freeze({
+			result: Object.freeze({ kind: "complete", observed: hits, transactionDurability: "strict" }),
+			hits,
+			armedCellValue:
+				armed === null ? discovery.finalCellValue : selected.runKind === "tuple" ? selected.armedCellValue : 0,
+			actualCampaign: Object.freeze({
+				artifactCount: aggregate.artifactCount,
+				old: aggregate.old,
+				new: aggregate.new,
+				mixed: aggregate.mixed,
+				discoveryRecoveredState: discovery.recoveredState === "new" ? "new" : null,
+				armingRecoveredState: arming.recoveredState === "new" ? "new" : null,
+			}),
+			forestGroups: Object.freeze(forestGroups),
+			manifestPoints: orderedKillPoints(),
+		})
+	);
 }
 
 /**
  * Requires complete reached recovery evidence, never manifest-derived expectations.
- * @param observation - Actual campaign evidence accumulated from completed artifacts.
+ * @param observation - Parsed artifact-backed campaign evidence.
  */
 export function requireActualCampaignOutcomes(observation: RedCampaignObservation): void {
 	const actual = observation.actualCampaign;
@@ -95,9 +152,9 @@ export function requireActualCampaignOutcomes(observation: RedCampaignObservatio
 }
 
 /**
- * Stops a behavioral assertion at the closed inert-driver failure.
- * @param observation - Actual RED observation.
- * @param assertion - Required evidence label.
+ * Stops an assertion only if the reached campaign emitted a closed failure.
+ * @param observation - Parsed artifact-backed campaign evidence.
+ * @param assertion - Frozen causal assertion label.
  */
 export function requireImplementedDriver(observation: RedCampaignObservation, assertion: string): void {
 	if (observation.result.kind === "failure") {

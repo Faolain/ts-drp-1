@@ -15,7 +15,7 @@ async function run(): Promise<void> {
 		const page = context.pages()[0] ?? (await context.newPage());
 		await page.goto(url);
 		const untrustedResult = await page.evaluate<unknown>(() =>
-			window.phase2bRun({ id: "database-open", edge: "before" })
+			window.phase2bRun("phase-2b-playwright-red", { id: "database-open", edge: "before" }, "arming")
 		);
 		const result: WorkerToPageMessage | undefined = parseWorkerToPageMessage(untrustedResult);
 		if (result === undefined) throw new TypeError("page relayed a message outside the closed Worker protocol");

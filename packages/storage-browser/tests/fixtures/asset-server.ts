@@ -28,7 +28,15 @@ function closeServer(server: http.Server): Promise<void> {
  */
 export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 	const root = fs.realpathSync(assetDirectory);
-	const allowed = new Set(["index.html", "page-entry.js", "worker-entry.js"]);
+	const allowed = new Set([
+		"index.html",
+		"page-entry.js",
+		"worker-entry.js",
+		"seed.html",
+		"seed-entry.js",
+		"oracle.html",
+		"oracle-entry.js",
+	]);
 	const tokens = new Set<string>();
 	const server = http.createServer((request, response) => {
 		const rawUrl = request.url ?? "";
