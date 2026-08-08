@@ -127,9 +127,6 @@ test("one target-origin whole-bucket clear removes both endpoints without touchi
 	expect(after.target.idb).toEqual({ present: false, exactValue: false });
 
 	const evidence = wholeBucketEvidence(after);
-	// Fail closed: the IDB-only RED clear leaves target OPFS exact, so it cannot emit a partial artifact.
-	expect(evidence).toEqual({ evidenceJson: null, evidenceBytes: null });
-
 	// Sole causal RED assertion: only genuine whole-bucket deletion may produce S0 clear evidence.
 	expect(evidence).toEqual({
 		evidenceJson: EXPECTED_CLEAR_EVIDENCE_JSON,
