@@ -2489,6 +2489,82 @@ Carry these S2-specific residuals into RED rather than obscuring them:
 3. The browser adapter backing remains private, unpublished and
    non-schema-freezing. It is benchmark infrastructure, not an early 2d store.
 
+##### Phase 2-spike S2 accepted closure — outcome-neutral command parity
+
+S2 is accepted at GREEN `00d609b` over tests-only RED `b5a3e45`, after the
+unanimous workload correction at `94b7086`. Both arms execute independent
+parses of one recorded 12-command script through the published
+`@ts-drp/storage/adapter` preparation/evaluation seam: two complete generation
+lifecycles cover cached blobs, promotion, `Complete`, exact expected-head
+`swapHead`, supersession, final `readObjectState` and exact `getBlob` bytes. The
+measurement artifact records 24 operations and identical per-arm script
+digests. It contains no winner, preference, threshold or vote claim.
+
+The dedicated cross-origin-isolated Worker uses real OPFS
+`createSyncAccessHandle` read/write/truncate/`flush()` and one fresh live-strict
+IDB readwrite transaction per command. Each command reloads the serialized
+snapshot from its substrate, evaluates once and persists only the adapter's
+returned writes before continuing. The private snapshot layout is benchmark
+infrastructure only; it is unpublished and freezes no 2d schema.
+
+RED proved the publication boundary causally. The real two-arm baseline passed,
+while an OPFS-only observed-blob corruption made the OPFS full-state/blob oracle
+false and left the IDB oracle true; the permissive scaffold still returned a
+timing-bearing `oracle-pass` artifact, producing exactly 1F/1P. GREEN changes
+only that Worker: the shared arm-independent oracle scores both arms first,
+`allOraclesPass` gates the single evidence construction site, and any failure
+returns `evidence:null` with no elapsed value in diagnostics. The committed
+browser suite is 2/2; S0 plus raw-IDB ownership controls are 16/16; the full
+non-browser `storage-browser` suite is 161/161; package typecheck, build, ESLint
+with zero warnings, Prettier and diff checks are green.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session
+  `019fe1d9-18da-7300-a9c3-934444a8492b` accepted and returned
+  `S2_MAY_CLOSE: yes`; result SHA-256
+  `11d39a507459b1588625176f70f8fea2d9e7731a06f6eb953ce54fea4f3bfbd1`;
+- exact Kimi 3/high/100 session
+  `276e2de1-b38f-47eb-9dd9-e4cf04028427` accepted; result SHA-256
+  `2423feacdc4c25de5c6640724161878bf6182287ebde48daa50270b228a6bfaa`;
+- final Opus 5/xhigh session
+  `bde5c707-5d77-44f1-96ac-55a60531a595` approved with
+  `S2_MAY_CLOSE: yes` and all 72 assistant records authenticated as Opus 5;
+  result SHA-256
+  `ac23b87c3b28e711ba9e8d6adf34552f57526a476ab761f54fa3daa77a6d0b77`.
+
+Carry these bounded residuals into S3/S4 instead of inflating S2:
+
+1. Only OPFS oracle corruption is injected. IDB suppression uses the same pure
+   oracle and the same single conjunction/publication site, so all reviewers
+   found the untested IDB failure structurally fail-closed. S3/S4 may replace
+   the boolean seam with exact `corruptArm:"opfs"|"idb-strict"` coverage if it
+   can do so without duplicating the benchmark matrix.
+2. `JSON.stringify` equality is deliberately exact and order-sensitive over
+   trusted generated adapter output. Reordering fails closed by suppressing
+   evidence; S4 must not weaken it to a permissive partial-state comparison.
+3. One IDB connection spans the run, but every command uses a fresh strict
+   transaction, fresh `get`, loop-local decoded snapshot, `put` and awaited
+   completion. This proves per-command persisted reload in one process, not
+   process restart.
+4. The current elapsed values are not a fair substrate comparison: OPFS starts
+   its clock before the initial truncate + flush, whereas IDB open/delete/setup
+   occurs before its clock. OPFS always runs first and IDB second in one
+   unwarmed sample, creating ordering/JIT/cache bias. S4 must not score or choose
+   from these raw values. It must either run a bounded paired/interleaved design
+   with symmetric timing boundaries and recorded warmup policy, or treat S2 as
+   correctness/feasibility evidence only.
+5. The successful GREEN log proves pinned Chromium behavior but does not retain
+   the full successful measurement artifact as a standalone engine-bound file.
+   S4 must generate a fresh successful unforced run, persist exact JSON bytes,
+   bind the full engine build and cite that digest. RED timing output and S1
+   forced-seam runs are never citable.
+6. S2 remains single-engine, single-writer, same-process and non-citable for
+   crash atomicity, fsync, power loss, torn writes, pressure eviction, custody,
+   multi-tab behavior, vote parity, anti-equivocation or either complete golden
+   path. S3 owns deletion-not-eviction controls; S4 owns the paired decision and
+   2d consumption gate; 2d/5c retain the real vote-store and atomic transaction.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
