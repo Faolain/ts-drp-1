@@ -1,28 +1,14 @@
-import type { FailureArtifact, ParentFailureCode, RunStage, SettledChildEvidence } from "./artifacts.js";
-import type { ProcessIdentity } from "./process-forest.js";
-import type { KillHit } from "../../src/killpoints.js";
+import type { FailureArtifact, PartialFailureEvidence, RunStage } from "./artifacts.js";
 
-export interface PartialFailureEvidence {
-	readonly cleanup: {
-		readonly unresolvedOwnedGroups: readonly number[];
-		readonly validatedGroups: readonly number[];
-	};
-	readonly observedHits?: readonly KillHit[];
-	readonly recordedForest?: readonly ProcessIdentity[];
-	readonly recoveryClassification?: {
-		readonly digest: string;
-		readonly state: "old" | "new" | "mixed";
-	};
-	readonly settledChildren?: readonly SettledChildEvidence[];
-}
+export type { PartialFailureEvidence } from "./artifacts.js";
 
 export type RunFailureArtifact = FailureArtifact & {
 	readonly partialEvidence: PartialFailureEvidence;
 };
 
 export interface FinalizeFailedRunInput {
-	readonly base: Omit<FailureArtifact, "code" | "detail" | "stage" | "verdict">;
-	readonly code: ParentFailureCode;
+	readonly base: Omit<FailureArtifact, "code" | "detail" | "partialEvidence" | "stage" | "verdict">;
+	readonly code: FailureArtifact["code"];
 	readonly detail: string;
 	readonly ownedGroups: readonly number[];
 	readonly partialEvidence: Omit<PartialFailureEvidence, "cleanup">;
@@ -52,10 +38,19 @@ export function finalizeFailedRun(
 	dependencies: FailureFinalizerDependencies
 ): RunFinalizationObservation {
 	const validatedOwnedGroups = Object.freeze(
-		failure.validatedGroups.filter((pgid) => failure.ownedGroups.includes(pgid))
+		[...new Set(failure.validatedGroups)].filter((pgid) => failure.ownedGroups.includes(pgid))
 	);
+	const cleanupKilledGroups: number[] = [];
+	for (const pgid of validatedOwnedGroups) {
+		try {
+			dependencies.killValidatedGroup(pgid);
+			cleanupKilledGroups.push(pgid);
+		} catch {
+			// The emitted artifact reports every owned group whose cleanup did not complete.
+		}
+	}
 	const unresolvedOwnedGroups = Object.freeze(
-		failure.ownedGroups.filter((pgid) => !validatedOwnedGroups.includes(pgid))
+		[...new Set(failure.ownedGroups)].filter((pgid) => !cleanupKilledGroups.includes(pgid))
 	);
 	const artifact: RunFailureArtifact = Object.freeze({
 		...failure.base,
@@ -66,16 +61,15 @@ export function finalizeFailedRun(
 		partialEvidence: Object.freeze({
 			...failure.partialEvidence,
 			cleanup: Object.freeze({
-				validatedGroups: validatedOwnedGroups,
+				validatedGroups: Object.freeze([...cleanupKilledGroups]),
 				unresolvedOwnedGroups,
 			}),
 		}),
 	});
 	dependencies.writeArtifact(artifact);
-	for (const pgid of validatedOwnedGroups) dependencies.killValidatedGroup(pgid);
 	return Object.freeze({
 		artifact,
-		cleanupKilledGroups: validatedOwnedGroups,
+		cleanupKilledGroups: Object.freeze(cleanupKilledGroups),
 		unresolvedOwnedGroups,
 	});
 }

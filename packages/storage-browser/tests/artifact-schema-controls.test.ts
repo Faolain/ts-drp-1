@@ -18,6 +18,7 @@ const VALID_FAILURE = Object.freeze({
 	stage: "hit",
 	code: "DRIVER_NOT_IMPLEMENTED",
 	detail: "inert RED driver",
+	partialEvidence: { cleanup: { validatedGroups: [], unresolvedOwnedGroups: [] } },
 });
 
 describe("Phase 2b closed artifact controls", () => {

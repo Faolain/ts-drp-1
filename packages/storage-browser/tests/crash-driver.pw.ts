@@ -12,11 +12,14 @@ import type {
 	BrowserIdentity,
 	DiscoveryPassArtifact,
 	FailureArtifact,
+	ParentFailureCode,
+	PartialFailureEvidence,
 	PassArtifact,
+	RunStage,
 	SettledChildEvidence,
 	TuplePassArtifact,
 } from "./fixtures/artifacts.js";
-import { aggregatePassArtifacts } from "./fixtures/artifacts.js";
+import { aggregatePassArtifacts, classifyRunFailure } from "./fixtures/artifacts.js";
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 import {
 	classifyParentRecords,
@@ -34,6 +37,7 @@ import {
 	type ProcessIdentity,
 	validateTwoGroupForest,
 } from "./fixtures/process-forest.js";
+import { finalizeFailedRun } from "./fixtures/run-finalizer.js";
 import { parseWorkerToPageMessage } from "./fixtures/worker-protocol.js";
 
 const ASSET_DIRECTORY_VALUE = process.env.PHASE_2B_ASSET_DIR;
@@ -300,6 +304,21 @@ function writeArtifact(artifact: PassArtifact | FailureArtifact): void {
 	);
 }
 
+function failureFallback(stage: RunStage): ParentFailureCode {
+	if (stage === "setup" || stage === "seed") return "SETUP_FAILED";
+	if (stage === "ready" || stage === "hit") return "CHILD_PROTOCOL";
+	if (stage === "recovery") return "RECOVERY_INVALID";
+	return "FOREST_CONTRADICTION";
+}
+
+function killValidatedGroup(pgid: number): void {
+	try {
+		process.kill(-pgid, "SIGKILL");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+	}
+}
+
 function parseHitRelay(value: unknown): { readonly hit: KillHit; readonly cellValue: number } {
 	if (typeof value !== "object" || value === null) throw new TypeError("CHILD_PROTOCOL: crash relay missing");
 	const candidate = value as Record<string, unknown>;
@@ -360,15 +379,29 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 	const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), `${runId}-profile-`));
 	const databaseName = `phase-2b-${runId}-${path.basename(profilePath)}`;
 	let token = "";
+	let stage: RunStage = "setup";
+	let artifactWritten = false;
+	let ownedGroups: readonly number[] = [];
 	let validatedGroups: readonly number[] = [];
 	let crashProcess: ChildProcess | undefined;
+	const hits: KillHit[] = [];
+	const settledChildren: SettledChildEvidence[] = [];
+	let recordedForestEvidence: readonly ProcessIdentity[] | undefined;
+	let recoveryClassification: PartialFailureEvidence["recoveryClassification"];
 	let browserForFailure: BrowserIdentity = Object.freeze({
 		name: "chromium",
 		version: "unreached",
 		executablePath: path.join(ASSET_DIRECTORY, "chromium-unreached"),
 	});
+	const writeOnce = (artifact: PassArtifact | FailureArtifact): void => {
+		if (artifactWritten) throw new TypeError("ARTIFACT_SCHEMA: run attempted to write more than one artifact");
+		writeArtifact(artifact);
+		artifactWritten = true;
+	};
 	try {
+		stage = "seed";
 		const seed = await runSettled("seed", profilePath, databaseName);
+		settledChildren.push(seed.evidence);
 		browserForFailure = seed.browser;
 		if ((seed.result as Record<string, unknown>).transactionDurability !== "strict") {
 			throw new TypeError("DURABILITY_PROVENANCE: seed was not strict");
@@ -387,10 +420,10 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		crashProcess = crash;
+		if (crash.pid !== undefined) ownedGroups = Object.freeze([crash.pid]);
 		if (crash.stdout === null) throw new TypeError("SETUP_FAILED: crash stdout unavailable");
 		const lines = readline.createInterface({ input: crash.stdout, crlfDelay: Infinity });
 		let ready: Record<string, unknown> | undefined;
-		const hits: KillHit[] = [];
 		let terminalCell: number | undefined;
 		const reached = new Promise<void>((resolve, reject) => {
 			lines.on("line", (line) => {
@@ -427,11 +460,14 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 				}
 			});
 		});
+		stage = "ready";
 		await withTimeout(reached, 20_000, `armed hit ${point.id}/${point.edge}`);
+		stage = "hit";
 		if (ready === undefined || crash.pid === undefined)
 			throw new TypeError("CHILD_PROTOCOL: hit preceded ready identity");
 		const childIdentity = exactIdentity(ready.child);
 		const browserRoot = exactIdentity(ready.browserRoot);
+		ownedGroups = Object.freeze([...new Set([crash.pid, browserRoot.pgid])]);
 		browserForFailure = exactBrowser(ready.browser);
 		if (ready.crossOriginIsolated !== true) {
 			throw new TypeError("CHILD_PROTOCOL: crash child did not relay literal cross-origin isolation");
@@ -451,6 +487,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		);
 		if (terminalCell !== 1) throw new TypeError("CHILD_PROTOCOL: armed cell was not observed at one");
 
+		stage = "freeze";
 		const initialAll = captureProcessForest();
 		const initial = processClosure(initialAll, childIdentity.pid);
 		const groups = validateTwoGroupForest(initial, childIdentity.pid, browserRoot.pid);
@@ -477,6 +514,8 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		}, "owned union did not stop with stable identities");
 		const recordedForest = sameUnion(stoppedAll, initial);
 		if (recordedForest === undefined) throw new TypeError("FOREST_CONTRADICTION: stopped union changed identity");
+		recordedForestEvidence = Object.freeze(recordedForest);
+		stage = "kill";
 		process.kill(-groups.browserPgid, "SIGKILL");
 		process.kill(-groups.childPgid, "SIGKILL");
 		const exit = await withTimeout(exitOf(crash), 10_000, "crash child SIGKILL exit");
@@ -499,8 +538,11 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		});
 		server.revoke(token);
 		token = "";
+		stage = "recovery";
 		const recovery = await runSettled("recovery", profilePath, databaseName);
+		settledChildren.push(recovery.evidence);
 		const classification = classifyParentRecords(recovery.result as readonly unknown[]);
+		recoveryClassification = Object.freeze({ state: classification.state, digest: classification.digest });
 		if (classification.mixed)
 			throw new TypeError("RECOVERY_MIXED: recovered image was neither exact old nor exact new");
 		const expectedState = expectedFixtureState(point);
@@ -550,13 +592,19 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 			recordedProcessDeaths: Object.freeze(recordedProcessDeaths),
 			settledChildren: Object.freeze([seed.evidence, recovery.evidence] as const),
 		});
-		writeArtifact(artifact);
+		writeOnce(artifact);
 		return artifact;
 	} catch (error) {
 		if (validatedGroups.length === 0 && crashProcess?.pid !== undefined) {
 			try {
 				const forest = captureProcessForest();
 				const closure = processClosure(forest, crashProcess.pid);
+				ownedGroups = Object.freeze([...new Set([...ownedGroups, ...closure.map((identity) => identity.pgid)])]);
+				const childRoot = closure.find((identity) => identity.pid === crashProcess?.pid);
+				const parent = forest.find((identity) => identity.pid === process.pid);
+				if (childRoot?.pgid === crashProcess.pid && parent !== undefined && parent.pgid !== childRoot.pgid) {
+					validatedGroups = Object.freeze([childRoot.pgid]);
+				}
 				const browserCandidates = closure.filter(
 					(identity) => identity.ppid === crashProcess?.pid && identity.command.includes(profilePath)
 				);
@@ -565,30 +613,42 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 					const groups = validateTwoGroupForest(closure, crashProcess.pid, browserRoot.pid);
 					if (groups.childPgid === crashProcess.pid && groups.browserPgid === browserRoot.pid) {
 						validatedGroups = Object.freeze([groups.browserPgid, groups.childPgid]);
+						ownedGroups = Object.freeze([...new Set([...ownedGroups, groups.browserPgid, groups.childPgid])]);
 					}
 				}
 			} catch {
-				// Ambiguous ownership is reported by the original failure; only the explicit child can be cleaned below.
+				// Ambiguous ownership remains explicit in partialEvidence.cleanup.
 			}
 		}
-		for (const pgid of validatedGroups) {
+		if (token !== "") {
 			try {
-				process.kill(-pgid, "SIGKILL");
+				server.revoke(token);
 			} catch {
-				// Cleanup is restricted to already validated owned groups.
+				// The causal run failure remains primary; the token is already unusable outside this server instance.
 			}
 		}
-		if (validatedGroups.length === 0 && crashProcess?.exitCode === null) crashProcess.kill("SIGKILL");
-		if (token !== "") server.revoke(token);
-		const detail = (error instanceof Error ? error.message : "unknown tuple failure").slice(0, 256);
-		const artifact: FailureArtifact = Object.freeze({
-			...baseArtifact("tuple", runId, profilePath, databaseName, browserForFailure),
-			verdict: "fail",
-			stage: "kill",
-			code: detail.startsWith("TIMEOUT") ? "TIMEOUT" : "FOREST_CONTRADICTION",
-			detail,
+		const classified = classifyRunFailure(error, failureFallback(stage));
+		const partialEvidence: Omit<PartialFailureEvidence, "cleanup"> = Object.freeze({
+			...(settledChildren.length === 0 ? {} : { settledChildren: Object.freeze([...settledChildren]) }),
+			...(hits.length === 0 ? {} : { observedHits: Object.freeze([...hits]) }),
+			...(recordedForestEvidence === undefined ? {} : { recordedForest: recordedForestEvidence }),
+			...(recoveryClassification === undefined ? {} : { recoveryClassification }),
 		});
-		writeArtifact(artifact);
+		finalizeFailedRun(
+			{
+				base: baseArtifact("tuple", runId, profilePath, databaseName, browserForFailure),
+				stage,
+				code: classified.code,
+				detail: classified.detail,
+				partialEvidence,
+				ownedGroups,
+				validatedGroups,
+			},
+			{
+				writeArtifact: (artifact): void => writeOnce(artifact),
+				killValidatedGroup,
+			}
+		);
 		throw error;
 	} finally {
 		fs.rmSync(profilePath, { recursive: true, force: true });
@@ -610,17 +670,42 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 	const runId = runKind;
 	const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), `phase-2b-${runId}-profile-`));
 	const databaseName = `phase-2b-${runId}-${path.basename(profilePath)}`;
+	let stage: RunStage = "setup";
+	let artifactWritten = false;
+	const settledChildren: SettledChildEvidence[] = [];
+	let observedHits: readonly KillHit[] = [];
+	let recoveryClassification: PartialFailureEvidence["recoveryClassification"];
+	let browserForFailure: BrowserIdentity = Object.freeze({
+		name: "chromium",
+		version: "unreached",
+		executablePath: path.join(ASSET_DIRECTORY, "chromium-unreached"),
+	});
+	const writeOnce = (artifact: PassArtifact | FailureArtifact): void => {
+		if (artifactWritten) throw new TypeError("ARTIFACT_SCHEMA: run attempted to write more than one artifact");
+		writeArtifact(artifact);
+		artifactWritten = true;
+	};
 	try {
+		stage = "seed";
 		const seed = await runSettled("seed", profilePath, databaseName);
+		settledChildren.push(seed.evidence);
+		browserForFailure = seed.browser;
+		stage = "hit";
 		const control = await runSettled(runKind, profilePath, databaseName);
+		settledChildren.push(control.evidence);
+		browserForFailure = control.browser;
+		stage = "recovery";
 		const recovery = await runSettled("recovery", profilePath, databaseName);
+		settledChildren.push(recovery.evidence);
 		const classification = classifyParentRecords(recovery.result as readonly unknown[]);
+		recoveryClassification = Object.freeze({ state: classification.state, digest: classification.digest });
 		if (classification.state !== "new" || classification.mixed || classification.digest !== EXPECTED_NEW_DIGEST) {
 			throw new TypeError("RECOVERY_INVALID: completed control did not recover exact new image");
 		}
 		const result = control.result as Record<string, unknown>;
 		const complete = result.complete as Record<string, unknown>;
 		const hits = exactHits(result.hits);
+		observedHits = hits;
 		if (result.crossOriginIsolated !== true) {
 			throw new TypeError("CHILD_PROTOCOL: control did not relay literal cross-origin isolation");
 		}
@@ -651,7 +736,7 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 				finalCellValue: 0,
 				settledChildren: Object.freeze([seed.evidence, control.evidence, recovery.evidence] as const),
 			});
-			writeArtifact(artifact);
+			writeOnce(artifact);
 			return artifact;
 		}
 		const preResume = exactHits(result.preResumeHits);
@@ -676,8 +761,31 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 			finalCellValue: 2,
 			settledChildren: Object.freeze([seed.evidence, control.evidence, recovery.evidence] as const),
 		});
-		writeArtifact(artifact);
+		writeOnce(artifact);
 		return artifact;
+	} catch (error) {
+		const classified = classifyRunFailure(error, failureFallback(stage));
+		const partialEvidence: Omit<PartialFailureEvidence, "cleanup"> = Object.freeze({
+			...(settledChildren.length === 0 ? {} : { settledChildren: Object.freeze([...settledChildren]) }),
+			...(observedHits.length === 0 ? {} : { observedHits }),
+			...(recoveryClassification === undefined ? {} : { recoveryClassification }),
+		});
+		finalizeFailedRun(
+			{
+				base: baseArtifact(runKind, runId, profilePath, databaseName, browserForFailure),
+				stage,
+				code: classified.code,
+				detail: classified.detail,
+				partialEvidence,
+				ownedGroups: [],
+				validatedGroups: [],
+			},
+			{
+				writeArtifact: (artifact): void => writeOnce(artifact),
+				killValidatedGroup,
+			}
+		);
+		throw error;
 	} finally {
 		fs.rmSync(profilePath, { recursive: true, force: true });
 	}

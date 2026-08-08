@@ -8,11 +8,7 @@ import path from "node:path";
 export default async function globalSetup(): Promise<void> {
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
 	const assetDirectory = fs.mkdtempSync(path.join(packageDirectory, ".phase-2b-assets-"));
-	const artifactDirectory = path.resolve(
-		packageDirectory,
-		"../..",
-		".logs/phase-2b-process-death-green-codex-high/artifacts"
-	);
+	const artifactDirectory = path.resolve(packageDirectory, "../..", ".logs/phase-2b-process-death/artifacts");
 	fs.rmSync(artifactDirectory, { recursive: true, force: true });
 	fs.mkdirSync(artifactDirectory, { recursive: true });
 	await build({

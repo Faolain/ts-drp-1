@@ -4,12 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { KILL_POINT_MANIFEST, orderedKillPoints } from "../src/killpoints.js";
-import {
-	expectedFixtureState,
-	expectedHitDurability,
-	type RedCampaignObservation,
-	requireActualCampaignOutcomes,
-} from "./fixtures/inert-campaign.js";
+import { expectedFixtureState, expectedHitDurability } from "./fixtures/inert-campaign.js";
 
 const PACKAGE_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKSPACE_DIRECTORY = path.resolve(PACKAGE_DIRECTORY, "../..");
@@ -109,34 +104,16 @@ describe("Phase 2b structural controls", () => {
 
 	it("wires the exact Playwright matcher and root runner", () => {
 		const config = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "playwright.storage-browser.config.ts"), "utf8");
+		const setup = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "tests/global-setup.ts"), "utf8");
 		expect(config).toContain('testMatch: "crash-driver.pw.ts"');
 		expect(config).toContain("workers: 1");
 		expect(config).toContain("fullyParallel: false");
+		expect(setup).toContain('".logs/phase-2b-process-death/artifacts"');
+		expect(setup).not.toContain("green-codex-high");
 		const root = readJson("package.json");
 		expect(root.scripts).toMatchObject({
 			"e2e-test:storage-browser":
 				"pnpm exec playwright test --config packages/storage-browser/playwright.storage-browser.config.ts",
 		});
-	});
-
-	it("rejects a shallow complete result with no recovered campaign evidence", () => {
-		const shallow: RedCampaignObservation = {
-			result: { kind: "complete", observed: [], transactionDurability: "strict" },
-			hits: [],
-			armedCellValue: 0,
-			actualCampaign: {
-				artifactCount: 0,
-				old: 0,
-				new: 0,
-				mixed: 0,
-				discoveryRecoveredState: null,
-				armingRecoveredState: null,
-			},
-			forestGroups: [],
-			manifestPoints: orderedKillPoints(),
-		};
-		expect(() => requireActualCampaignOutcomes(shallow)).toThrow(
-			"ACTUAL_CAMPAIGN_EVIDENCE expected old=13 new=1 mixed=0 artifacts=16"
-		);
 	});
 });

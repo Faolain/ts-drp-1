@@ -22,6 +22,20 @@ export type ParentFailureCode =
 
 export type RunStage = "setup" | "seed" | "ready" | "hit" | "freeze" | "kill" | "recovery";
 
+export interface PartialFailureEvidence {
+	readonly cleanup: {
+		readonly unresolvedOwnedGroups: readonly number[];
+		readonly validatedGroups: readonly number[];
+	};
+	readonly observedHits?: readonly KillHit[];
+	readonly recordedForest?: readonly ProcessIdentity[];
+	readonly recoveryClassification?: {
+		readonly digest: string;
+		readonly state: "old" | "new" | "mixed";
+	};
+	readonly settledChildren?: readonly SettledChildEvidence[];
+}
+
 export interface FailureArtifact {
 	readonly schemaVersion: 1;
 	readonly verdict: "fail";
@@ -44,6 +58,7 @@ export interface FailureArtifact {
 	readonly stage: RunStage;
 	readonly code: WorkerFailureCode | ParentFailureCode;
 	readonly detail: string;
+	readonly partialEvidence: PartialFailureEvidence;
 }
 
 export interface BrowserIdentity {
@@ -176,6 +191,23 @@ const PARENT_CODES: ReadonlySet<ParentFailureCode> = new Set([
 const RUN_STAGES: ReadonlySet<RunStage> = new Set(["setup", "seed", "ready", "hit", "freeze", "kill", "recovery"]);
 const RUN_KINDS = new Set(["tuple", "discovery", "arming"]);
 
+/**
+ * Classifies an exception message only when it carries a closed Phase 2b code prefix.
+ * @param error - Reached exception value.
+ * @param fallback - Stage-specific closed code used for unclassified exceptions.
+ * @returns A bounded detail and closed failure code.
+ */
+export function classifyRunFailure(
+	error: unknown,
+	fallback: ParentFailureCode
+): Readonly<{ readonly code: FailureArtifact["code"]; readonly detail: string }> {
+	const raw = error instanceof Error ? error.message : "unknown Phase 2b run failure";
+	const detail = raw.slice(0, 256) || fallback;
+	const prefix = detail.split(":", 1)[0];
+	const code = isWorkerFailureCode(prefix) || PARENT_CODES.has(prefix as ParentFailureCode) ? prefix : fallback;
+	return Object.freeze({ code: code as FailureArtifact["code"], detail });
+}
+
 function closedRecord(value: object, keys: readonly string[]): boolean {
 	if (Object.getOwnPropertySymbols(value).length !== 0) return false;
 	const actual = Object.getOwnPropertyNames(value).sort();
@@ -213,6 +245,7 @@ export function parseFailureArtifact(value: unknown): FailureArtifact {
 			"stage",
 			"code",
 			"detail",
+			"partialEvidence",
 		])
 	) {
 		throw new TypeError("artifact has missing or extra fields");
@@ -253,10 +286,12 @@ export function parseFailureArtifact(value: unknown): FailureArtifact {
 	) {
 		throw new TypeError("artifact is outside the closed failure schema");
 	}
+	const partialEvidence = requirePartialFailureEvidence(candidate.partialEvidence);
 	return Object.freeze({
 		...candidate,
 		browser: Object.freeze({ ...(browser as Record<string, unknown>) }),
 		expectedDigests: Object.freeze({ ...(expectedDigests as Record<string, unknown>) }),
+		partialEvidence,
 	}) as unknown as FailureArtifact;
 }
 
@@ -277,6 +312,86 @@ function requireArray(value: unknown, label: string): readonly unknown[] {
 		throw new TypeError(`${label} must be dense and expando-free`);
 	}
 	return value;
+}
+
+function requirePositiveGroups(value: unknown, label: string): readonly number[] {
+	const groups = requireArray(value, label);
+	if (
+		groups.some((group) => !Number.isSafeInteger(group) || Number(group) <= 0) ||
+		new Set(groups).size !== groups.length
+	) {
+		throw new TypeError(`${label} must contain unique positive process groups`);
+	}
+	return Object.freeze(groups as number[]);
+}
+
+function requirePartialFailureEvidence(value: unknown): PartialFailureEvidence {
+	if (typeof value !== "object" || value === null) throw new TypeError("partial failure evidence must be an object");
+	const names = Object.getOwnPropertyNames(value);
+	const permitted = new Set(["cleanup", "observedHits", "recordedForest", "recoveryClassification", "settledChildren"]);
+	if (
+		Object.getOwnPropertySymbols(value).length !== 0 ||
+		!names.includes("cleanup") ||
+		names.some((name) => !permitted.has(name)) ||
+		names.some((name) => {
+			const descriptor = Object.getOwnPropertyDescriptor(value, name);
+			return descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable;
+		})
+	) {
+		throw new TypeError("partial failure evidence is outside its closed schema");
+	}
+	const candidate = value as Record<string, unknown>;
+	const cleanup = requireClosed(
+		candidate.cleanup,
+		["validatedGroups", "unresolvedOwnedGroups"],
+		"failure cleanup evidence"
+	);
+	const validatedGroups = requirePositiveGroups(cleanup.validatedGroups, "validated cleanup groups");
+	const unresolvedOwnedGroups = requirePositiveGroups(cleanup.unresolvedOwnedGroups, "unresolved owned groups");
+	if (validatedGroups.some((pgid) => unresolvedOwnedGroups.includes(pgid))) {
+		throw new TypeError("failure cleanup group classes must be disjoint");
+	}
+	const partial: {
+		cleanup: PartialFailureEvidence["cleanup"];
+		observedHits?: readonly KillHit[];
+		recordedForest?: readonly ProcessIdentity[];
+		recoveryClassification?: { readonly digest: string; readonly state: "old" | "new" | "mixed" };
+		settledChildren?: readonly SettledChildEvidence[];
+	} = {
+		cleanup: Object.freeze({ validatedGroups, unresolvedOwnedGroups }),
+	};
+	if (Object.hasOwn(candidate, "observedHits")) partial.observedHits = requireHits(candidate.observedHits);
+	if (Object.hasOwn(candidate, "recordedForest")) {
+		partial.recordedForest = Object.freeze(
+			requireArray(candidate.recordedForest, "failure forest").map(
+				(identity) => requireIdentity(identity) as unknown as ProcessIdentity
+			)
+		);
+	}
+	if (Object.hasOwn(candidate, "recoveryClassification")) {
+		const classification = requireClosed(
+			candidate.recoveryClassification,
+			["digest", "state"],
+			"failure recovery classification"
+		);
+		if (
+			typeof classification.digest !== "string" ||
+			classification.digest.length === 0 ||
+			(classification.state !== "old" && classification.state !== "new" && classification.state !== "mixed")
+		) {
+			throw new TypeError("failure recovery classification is malformed");
+		}
+		partial.recoveryClassification = Object.freeze({
+			digest: classification.digest,
+			state: classification.state,
+		});
+	}
+	if (Object.hasOwn(candidate, "settledChildren")) {
+		partial.settledChildren = Object.freeze(
+			requireArray(candidate.settledChildren, "failure settled children").map(requireSettled)
+		);
+	}
+	return Object.freeze(partial);
 }
 
 function requireIdentity(value: unknown, extra: readonly string[] = []): Record<string, unknown> {
@@ -323,6 +438,87 @@ function requireHits(value: unknown): readonly KillHit[] {
 	);
 }
 
+function pointKey(point: { readonly id: unknown; readonly edge: unknown }): string {
+	return `${String(point.id)}/${String(point.edge)}`;
+}
+
+function expectedDurability(point: KillPoint): KillHit["transactionDurability"] {
+	return point.id === "database-open" || (point.id === "transition-begin" && point.edge === "before")
+		? "not-reached"
+		: "strict";
+}
+
+function requireExactHitSequence(hits: readonly KillHit[], points: readonly KillPoint[], label: string): void {
+	if (
+		hits.length !== points.length ||
+		hits.some(
+			(hit, index) =>
+				pointKey(hit) !== pointKey(points[index] as KillPoint) || hit.transactionDurability !== expectedDurability(hit)
+		)
+	) {
+		throw new TypeError(`${label} is not the exact manifest/durability sequence`);
+	}
+}
+
+function sameIdentity(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+	return (
+		left.pid === right.pid &&
+		left.ppid === right.ppid &&
+		left.pgid === right.pgid &&
+		left.birthToken === right.birthToken &&
+		left.command === right.command
+	);
+}
+
+function requireOwnedForest(
+	child: Record<string, unknown>,
+	browserRoot: Record<string, unknown>,
+	forestValues: unknown,
+	groupValues: unknown,
+	groupKeys: readonly string[]
+): readonly Record<string, unknown>[] {
+	const forest = requireArray(forestValues, "owned forest").map((identity) => requireIdentity(identity));
+	if (
+		new Set(forest.map((identity) => `${String(identity.pid)}:${String(identity.birthToken)}`)).size !== forest.length
+	) {
+		throw new TypeError("owned forest identities are not unique");
+	}
+	const childInForest = forest.find((identity) => identity.pid === child.pid);
+	const browserInForest = forest.find((identity) => identity.pid === browserRoot.pid);
+	if (
+		childInForest === undefined ||
+		browserInForest === undefined ||
+		!sameIdentity(childInForest, child) ||
+		!sameIdentity(browserInForest, browserRoot) ||
+		browserRoot.ppid !== child.pid ||
+		child.pgid !== child.pid ||
+		browserRoot.pgid !== browserRoot.pid ||
+		forest.some((identity) => identity.pgid !== child.pgid && identity.pgid !== browserRoot.pgid) ||
+		!forest.some(
+			(identity) =>
+				identity.pgid === browserRoot.pgid &&
+				identity.ppid === browserRoot.pid &&
+				typeof identity.command === "string" &&
+				/renderer/u.test(identity.command)
+		)
+	) {
+		throw new TypeError("owned forest does not prove the child/browser two-group topology");
+	}
+	const groups = requireArray(groupValues, "owned groups").map((untrusted) =>
+		requireClosed(untrusted, groupKeys, "owned group")
+	);
+	if (groups.length !== 2 || new Set(groups.map((group) => group.role)).size !== 2) {
+		throw new TypeError("owned evidence requires one child and one browser group");
+	}
+	for (const group of groups) {
+		const root = group.role === "child" ? child : group.role === "browser" ? browserRoot : undefined;
+		if (root === undefined || group.rootPid !== root.pid || group.pgid !== root.pgid) {
+			throw new TypeError("owned group does not match its process root");
+		}
+	}
+	return Object.freeze(forest);
+}
+
 function requireSettled(value: unknown): SettledChildEvidence {
 	const settled = requireClosed(
 		value,
@@ -339,22 +535,18 @@ function requireSettled(value: unknown): SettledChildEvidence {
 	}
 	const child = requireIdentity(settled.child, ["exitCode", "exitSignal"]);
 	if (child.exitCode !== 0 || child.exitSignal !== null) throw new TypeError("settled child did not exit zero");
-	requireIdentity(settled.browserRoot);
-	const forest = requireArray(settled.recordedForest, "settled forest");
-	forest.forEach((identity) => requireIdentity(identity));
+	const browserRoot = requireIdentity(settled.browserRoot);
 	const groups = requireArray(settled.ownedGroups, "settled groups");
-	if (groups.length !== 2) throw new TypeError("settled evidence requires two groups");
 	groups.forEach((untrusted) => {
 		const group = requireClosed(untrusted, ["role", "pgid", "rootPid", "absent"], "settled group");
-		if (
-			(group.role !== "child" && group.role !== "browser") ||
-			!Number.isSafeInteger(group.pgid) ||
-			!Number.isSafeInteger(group.rootPid) ||
-			group.absent !== true
-		) {
-			throw new TypeError("settled group is malformed");
-		}
+		if (group.absent !== true) throw new TypeError("settled group is not absent");
 	});
+	requireOwnedForest(child, browserRoot, settled.recordedForest, settled.ownedGroups, [
+		"role",
+		"pgid",
+		"rootPid",
+		"absent",
+	]);
 	if (settled.allRecordedProcessesAbsent !== true) throw new TypeError("settled processes were not all absent");
 	return value as SettledChildEvidence;
 }
@@ -480,6 +672,8 @@ export function parsePassArtifact(value: unknown): PassArtifact {
 		if (
 			candidate.expectedRecoveredState !== expectedState ||
 			candidate.recoveredState !== expectedState ||
+			candidate.recoveredFixtureRecordsDigest !==
+				(expectedState === "old" ? EXPECTED_OLD_DIGEST : EXPECTED_NEW_DIGEST) ||
 			candidate.expectedTransactionDurability !== expectedDurability ||
 			candidate.observedTransactionDurability !== expectedDurability ||
 			candidate.armedCellValue !== 1 ||
@@ -489,14 +683,11 @@ export function parsePassArtifact(value: unknown): PassArtifact {
 		) {
 			throw new TypeError("tuple pass scalar or settled evidence is malformed");
 		}
-		requireIdentity(candidate.child, ["exitCode", "exitSignal"]);
-		const child = candidate.child as Record<string, unknown>;
+		const child = requireIdentity(candidate.child, ["exitCode", "exitSignal"]);
 		if (child.exitCode !== null || child.exitSignal !== "SIGKILL")
 			throw new TypeError("tuple child death is malformed");
-		requireIdentity(candidate.browserRoot);
-		requireArray(candidate.recordedForest, "tuple forest").forEach((identity) => requireIdentity(identity));
+		const browserRoot = requireIdentity(candidate.browserRoot);
 		const groups = requireArray(candidate.killedGroups, "killed groups");
-		if (groups.length !== 2) throw new TypeError("tuple requires exactly two killed groups");
 		groups.forEach((untrusted) => {
 			const group = requireClosed(
 				untrusted,
@@ -507,29 +698,58 @@ export function parsePassArtifact(value: unknown): PassArtifact {
 				throw new TypeError("killed group lacks complete death evidence");
 			}
 		});
-		requireArray(candidate.recordedProcessDeaths, "process deaths").forEach((untrusted) => {
+		const forest = requireOwnedForest(child, browserRoot, candidate.recordedForest, candidate.killedGroups, [
+			"role",
+			"pgid",
+			"rootPid",
+			"stopAccepted",
+			"killAccepted",
+			"absent",
+		]);
+		const deaths = requireArray(candidate.recordedProcessDeaths, "process deaths").map((untrusted) => {
 			const death = requireClosed(untrusted, ["pid", "birthToken", "outcome", "currentBirthToken"], "process death");
-			if (death.outcome !== "absent" && death.outcome !== "reused") throw new TypeError("process death is malformed");
+			if (
+				!Number.isSafeInteger(death.pid) ||
+				typeof death.birthToken !== "string" ||
+				death.birthToken.length === 0 ||
+				(death.outcome !== "absent" && death.outcome !== "reused") ||
+				(death.outcome === "absent" && death.currentBirthToken !== null) ||
+				(death.outcome === "reused" &&
+					(typeof death.currentBirthToken !== "string" ||
+						death.currentBirthToken.length === 0 ||
+						death.currentBirthToken === death.birthToken))
+			) {
+				throw new TypeError("process death is malformed");
+			}
+			return death;
 		});
+		if (
+			deaths.length !== forest.length ||
+			new Set(deaths.map((death) => death.pid)).size !== deaths.length ||
+			forest.some(
+				(identity) => !deaths.some((death) => death.pid === identity.pid && death.birthToken === identity.birthToken)
+			)
+		) {
+			throw new TypeError("process deaths do not cover the recorded forest identities");
+		}
 		const prefixLength =
 			orderedKillPoints().findIndex(
 				(candidatePoint) => candidatePoint.id === point.id && candidatePoint.edge === point.edge
 			) + 1;
-		if (
-			JSON.stringify(hits.map(({ id, edge }) => ({ id, edge }))) !==
-			JSON.stringify(orderedKillPoints().slice(0, prefixLength))
-		) {
-			throw new TypeError("tuple hit prefix is malformed");
+		const expectedPrefix = orderedKillPoints().slice(0, prefixLength);
+		requireExactHitSequence(hits, expectedPrefix, "tuple hit prefix");
+		if (hits.at(-1)?.transactionDurability !== candidate.observedTransactionDurability) {
+			throw new TypeError("tuple terminal hit durability disagrees with the scalar evidence");
 		}
 		return value as TuplePassArtifact;
 	}
 	const points = requireArray(candidate.completeObservedPairs, "complete pairs").map(requirePoint);
+	requireExactHitSequence(hits, orderedKillPoints(), "control hit stream");
 	if (
 		candidate.recoveredState !== "new" ||
 		candidate.recoveredFixtureRecordsDigest !== EXPECTED_NEW_DIGEST ||
 		candidate.completeTransactionDurability !== "strict" ||
-		JSON.stringify(points) !== JSON.stringify(orderedKillPoints()) ||
-		JSON.stringify(hits.map(({ id, edge }) => ({ id, edge }))) !== JSON.stringify(orderedKillPoints())
+		JSON.stringify(points) !== JSON.stringify(orderedKillPoints())
 	) {
 		throw new TypeError("control complete evidence is malformed");
 	}
@@ -546,6 +766,7 @@ export function parsePassArtifact(value: unknown): PassArtifact {
 	}
 	const armed = requirePoint(candidate.armedPoint);
 	const preResume = requireHits(candidate.preResumeObservedHits);
+	requireExactHitSequence(preResume, orderedKillPoints().slice(0, 9), "arming pre-resume hit stream");
 	if (
 		armed.id !== "left-write" ||
 		armed.edge !== "before" ||
@@ -553,8 +774,7 @@ export function parsePassArtifact(value: unknown): PassArtifact {
 		candidate.notifyWoken !== 1 ||
 		candidate.finalCellValue !== 2 ||
 		settled.length !== 3 ||
-		settled.map((item) => item.role).join(",") !== "seed,arming,recovery" ||
-		JSON.stringify(preResume.map(({ id, edge }) => ({ id, edge }))) !== JSON.stringify(orderedKillPoints().slice(0, 9))
+		settled.map((item) => item.role).join(",") !== "seed,arming,recovery"
 	) {
 		throw new TypeError("arming pass evidence is malformed");
 	}
