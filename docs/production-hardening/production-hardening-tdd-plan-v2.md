@@ -2956,8 +2956,9 @@ The corrective RED must freeze structure rather than prematurely implement
 3. a three-element native compound-key collision control for promotions,
    alongside the existing generation control;
 4. one bounded write-kind/load-requirement-to-store ownership table so every
-   frozen adapter kind has exactly one physical owner and another missing store
-   cannot remain invisible;
+   frozen adapter kind has an explicit store-set mapping, every write has one
+   physical owner, and another missing store cannot remain invisible to the
+   combined inventory and mapping gates;
 5. removal or retargeting of the test-only strict mutation marker so it does
    not establish non-canonical generation rows as precedent.
 
@@ -2988,6 +2989,103 @@ as did fresh Opus 5/xhigh session `04d62c1e-ed39-43bd-8e8b-77d80d7cc354`
 `f7f8bfded77785c65b60225e614d73695f0271a693df52310a8282b22a36890c`).
 All reconciliation work was read-only at `15c2c1f`; no reviewer ran tests or
 changed tracked files.
+
+#### Phase 2d1 inventory correction accepted closure
+
+The private-v1 inventory correction is accepted at tests-only RED `3b5755a`
+and production-only GREEN `f3d3ef4`. RED changes exactly the three existing
+Phase-2d1 test/harness files; GREEN changes only
+`packages/storage-browser/src/internal/schema-idb.ts`, and every RED byte is
+frozen across GREEN. The schema version and S4 decision-link digest remain
+unchanged. This closes only the corrected inventory/lifecycle shell and
+unblocks 2d2; it does not close full Phase 2d.
+
+RED is assertion-causal. Focused unit/static is 1 failed / 8 passed because
+the three new production store authorities are absent. Chromium with one
+worker and retries disabled is 3 failed / 7 passed: a fresh open still exposes
+only the historical two stores, that historical shape is accepted rather than
+rejected, and the strict probe leaves one junk generation row. All other
+malformed-schema cases, both native compound-key controls, the decision link,
+strict downgrade rejection, cooperative `versionchange`, bounded blocked
+upgrade and future-version controls remain green. The full non-browser package
+is 1 failed / 169 passed. Typecheck, build, ownership, ESLint, Prettier and diff
+checks are green.
+
+GREEN creates and validates exactly the five authorized stores at version 1,
+rejects the historical two-store shape without migrating it, enforces zero
+indexes on `objects`, `generations`, `blobs` and `promotions`, preserves the
+sole exact vote index, and retargets the test-only strict marker to a complete
+promotion tuple. Focused unit/static is 9/9 and Chromium is 10/10. The
+precommit package run honestly retains one clean-checkout failure because its
+isolated tracked snapshot still points at RED; the authoritative postcommit
+run is 21 files / 170 tests. Ownership is 6/6; typecheck, build, changed-file
+and package ESLint with zero warnings, Prettier and diff checks are green.
+Exact Kimi 3 independently reproduced focused 9/9, typecheck and postcommit
+Chromium 10/10 at `f3d3ef4`.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session
+  `019fe2c8-c6e7-7cc2-8ad7-f14fd33d920e` returned `VERDICT: APPROVED`,
+  `BLOCKERS: none` and `2D1_CORRECTION_MAY_CLOSE: yes`; exact result SHA-256
+  `37a2f39cbb96c98b18affa0775fd580b3342d94dfc65913c3f3021318e89d7af`.
+  Its independent focused-test attempt was blocked by its read-only Vite-cache
+  sandbox, so it made no execution claim;
+- exact Kimi 3/high/100 session
+  `6f421144-28b8-4e40-b7fa-f9fa7f1330ee` returned the same three fields and
+  independently reproduced the bounded runs above; exact result SHA-256
+  `0effbf1afdedd281ecedec601ed840b7cfb38bd9f7b75a2846f2799ad13d75bb`;
+- final Opus 5/xhigh session
+  `fe7126b4-356e-453f-94d6-7bf29d05047c` independently re-derived the schema,
+  RED/GREEN split, authorization quorum and dedicated-promotion rationale, then
+  returned the same approval fields; exact result SHA-256
+  `12b2150c554f287b6b928467eb73a5f7780cabfa9ece1949e9a8fee26e7c70eb`.
+  Opus ran no commands or tests. Its substantive 46,686 output tokens are
+  first-party Opus 5 at xhigh; an automatic 27-token Haiku metadata call
+  contributed no substantive review turn.
+
+Carry these accepted nonblocking findings to their named owners:
+
+1. The non-browser authority test reads production store names/version but its
+   three key-path fields are literal-versus-literal. Chromium causally pins
+   content and order today. In 2d2, expose or derive one internal inventory
+   authority and make the non-browser key-path assertions production-bound.
+2. The malformed matrix lacks generation, promotion and vote-index compound
+   key order-swap mutants. Production comparison is order-exact now; add those
+   validation-side mutants in 2d2 before real data depends on the schema.
+3. Failing closed on a malformed database has no remediation path. That is the
+   correct current security posture because there is no shipped consumer or
+   database. Phase 2e must choose surfaced error versus delete-and-recreate
+   recovery before a real consumer lands.
+4. The typed crosswalk can bind a stale `@ts-drp/storage` `dist` declaration,
+   and its runtime `toEqual` compares duplicated test-only literals. Require a
+   fresh upstream build before the 2d2 typecheck and replace the table with
+   executable adapter-to-store evidence when real operations land.
+5. The strict probe still leaves a test-only promotion marker and proves only
+   that no generation residue remains. Its `transaction.complete` result is
+   commit-causal, but 2d2 must retire the probe in favor of real `add`-only
+   insertion evidence.
+6. The old Phase-2d1 residual for missing
+   `generations.indexNames.length === 0` is discharged by GREEN. The other
+   historical residuals retain their owners: blocked-upgrade race and
+   production `onblocked` at the first real schema bump; authored-abort
+   classification and malformed-database recovery in 2e; strict-durability
+   governance before the 2d2 mutation owner is allowlisted; decision-link
+   duplication on any S4 rotation; probe settlement/cleanup on replacement;
+   and the cross-browser matrix in 2h.
+7. The Phase-specific Playwright config remains outside package `tsconfig`
+   inclusion. It contains no IDB calls and predates this correction; bring the
+   real 2d2 browser config under typecheck/ownership rather than treating this
+   as production proof.
+8. The vote `multiEntry` negative necessarily also uses a scalar wrong key,
+   because IndexedDB forbids `multiEntry` on an array key path. Its two causes
+   cannot be isolated; no follow-up is required.
+
+The controller's Chromium GREEN predates the commit, but this provenance gap
+is materially cured by Kimi's independent postcommit 10/10 at the exact
+reviewed HEAD. Cross-engine evidence remains Phase 2h's responsibility. No
+reviewer found reward hacking, compatibility sediment, or premature 2d2/2l
+behavior.
 
 ### Exit gate (Phase 2)
 
