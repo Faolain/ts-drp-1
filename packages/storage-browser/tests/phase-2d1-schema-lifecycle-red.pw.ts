@@ -8,30 +8,27 @@ interface Phase2dSchemaHarness {
 	runLifecyclePositiveControl(): Promise<unknown>;
 	runNativeCompoundPositiveControl(): Promise<unknown>;
 	runPromotionCompoundPositiveControl(): Promise<unknown>;
-	runStrictMutation(observedDurability: IDBTransactionDurability): Promise<unknown>;
 	runUnexpectedPrivateV1Schemas(): Promise<unknown>;
 	runUnexpectedSchemaAndVersion(): Promise<unknown>;
 }
 
-async function runHarness(
-	page: Page,
-	method: keyof Phase2dSchemaHarness,
-	argument?: IDBTransactionDurability
-): Promise<unknown> {
+async function runHarness(page: Page, method: keyof Phase2dSchemaHarness): Promise<unknown> {
 	await page.goto("/");
 	await page.waitForFunction(() => "phase2dSchemaHarness" in globalThis);
-	return page.evaluate(
-		async ({ argument: scenarioArgument, method: scenarioMethod }) => {
-			const harness = (globalThis as unknown as { readonly phase2dSchemaHarness: Phase2dSchemaHarness })
-				.phase2dSchemaHarness;
-			if (scenarioMethod === "runStrictMutation") {
-				if (scenarioArgument === undefined) throw new TypeError("strict mutation requires an observation");
-				return harness.runStrictMutation(scenarioArgument);
-			}
-			return harness[scenarioMethod]();
-		},
-		{ argument, method }
-	);
+	return page.evaluate(async (scenarioMethod) => {
+		const harness = (globalThis as unknown as { readonly phase2dSchemaHarness: Phase2dSchemaHarness })
+			.phase2dSchemaHarness;
+		return harness[scenarioMethod]();
+	}, method);
+}
+
+async function runStrictAdapterEvidence(page: Page): Promise<unknown> {
+	await page.goto("/");
+	await page.waitForFunction(() => "phase2d2aAdapterHarness" in globalThis);
+	return page.evaluate(async () => {
+		const harness = Reflect.get(globalThis, "phase2d2aAdapterHarness") as Record<string, () => Promise<unknown>>;
+		return harness.runStrictDurabilityEvidence?.();
+	});
 }
 
 test("positive control: Chromium preserves native compound keys and distinct embedded-NUL tuples", async ({ page }) => {
@@ -139,35 +136,33 @@ test("historical, missing, extra and malformed private-v1 schemas all fail close
 	});
 });
 
-test("all non-strict observations fail fatally and no strict probe leaves junk generation rows", async ({ page }) => {
-	const observations = [];
-	for (const observedDurability of ["default", "relaxed"] as const) {
-		observations.push(await runHarness(page, "runStrictMutation", observedDurability));
-	}
-	observations.push(await runHarness(page, "runStrictMutation", "strict"));
-	expect(observations).toEqual([
+test("real adapter mutations reject downgraded observations without writes and commit once under strict", async ({
+	page,
+}) => {
+	await expect(runStrictAdapterEvidence(page)).resolves.toEqual([
 		{
-			junkGenerationRecords: 0,
-			error: {
-				code: "NON_STRICT_DURABILITY",
-				message: "strict IndexedDB durability is required",
-				name: "StrictDurabilityCapabilityError",
-			},
-			result: null,
+			cause: { code: "NON_STRICT_DURABILITY", name: "StrictDurabilityCapabilityError" },
+			generationRows: 0,
+			observed: "default",
+			reason: "SUBSTRATE_FAILURE",
+			requested: "strict",
+			writes: [],
 		},
 		{
-			junkGenerationRecords: 0,
-			error: {
-				code: "NON_STRICT_DURABILITY",
-				message: "strict IndexedDB durability is required",
-				name: "StrictDurabilityCapabilityError",
-			},
-			result: null,
+			cause: { code: "NON_STRICT_DURABILITY", name: "StrictDurabilityCapabilityError" },
+			generationRows: 0,
+			observed: "relaxed",
+			reason: "SUBSTRATE_FAILURE",
+			requested: "strict",
+			writes: [],
 		},
 		{
-			junkGenerationRecords: 0,
-			error: null,
-			result: { committed: true, observedDurability: "strict" },
+			cause: null,
+			generationRows: 1,
+			observed: "strict",
+			reason: "OK",
+			requested: "strict",
+			writes: ["put:generations"],
 		},
 	]);
 });

@@ -57,6 +57,7 @@ describe("Phase 2b structural controls", () => {
 			"playwright.storage-browser.config.ts",
 			"playwright.phase-2d1-schema.config.ts",
 			"playwright.phase-2d2a-idb-adapter.config.ts",
+			"playwright.phase-2d2b1-adapter-closure.config.ts",
 		]);
 		const build = readJson("packages/storage-browser/tsconfig.build.json");
 		expect(build.exclude).toEqual([
@@ -65,6 +66,7 @@ describe("Phase 2b structural controls", () => {
 			"playwright.storage-browser.config.ts",
 			"playwright.phase-2d1-schema.config.ts",
 			"playwright.phase-2d2a-idb-adapter.config.ts",
+			"playwright.phase-2d2b1-adapter-closure.config.ts",
 		]);
 	});
 

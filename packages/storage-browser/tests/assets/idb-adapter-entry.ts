@@ -3,6 +3,7 @@ import {
 	digestBlob,
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
+	type ExpectedHead,
 	type GenerationId,
 	type GenerationRecord,
 	type NoHead,
@@ -15,10 +16,14 @@ import { runStoreContract } from "@ts-drp/storage/contract";
 
 import {
 	deletePhase2dDatabase,
+	gateNextPhase2dTransactionTerminal,
+	type Phase2dTerminalGate,
 	rawPhase2dCount,
 	rawPhase2dGet,
 	rawPhase2dReplaceBlob,
+	requestPhase2dVersionchange,
 	withFailingHeadWrite,
+	withForcedPhase2dDurability,
 	withPhase2dTransactionTrace,
 } from "../fixtures/idb-adapter-browser-oracle.js";
 import { createPhase2d2aRedStore } from "../fixtures/idb-adapter-red-scaffold.js";
@@ -49,6 +54,15 @@ function reason(result: StoreResult<unknown>): string {
 	return result.ok ? "OK" : result.reason;
 }
 
+function failureCause(result: StoreResult<unknown>): unknown {
+	if (result.ok || result.reason !== "SUBSTRATE_FAILURE") return null;
+	const candidate = result.cause as { readonly code?: unknown; readonly name?: unknown };
+	return {
+		code: candidate?.code ?? null,
+		name: typeof candidate?.name === "string" ? candidate.name : null,
+	};
+}
+
 function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
 	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
 }
@@ -59,9 +73,19 @@ function begin(
 	generationId: GenerationId,
 	payload = PAYLOAD_A
 ): Promise<StoreResult<GenerationRecord>> {
+	return beginFrom(store, objectId, generationId, noHead(objectId), payload);
+}
+
+function beginFrom(
+	store: AheDurableStore,
+	objectId: StorageObjectId,
+	generationId: GenerationId,
+	baseExpectedHead: ExpectedHead,
+	payload = PAYLOAD_A
+): Promise<StoreResult<GenerationRecord>> {
 	const digest = must(digestBlob(payload));
 	return store.beginGeneration({
-		baseExpectedHead: noHead(objectId),
+		baseExpectedHead,
 		closure: [{ byteLength: payload.byteLength, digest }],
 		generationId,
 		objectId,
@@ -72,14 +96,29 @@ async function stageComplete(
 	store: AheDurableStore,
 	objectId: StorageObjectId,
 	generationId: GenerationId,
-	payload = PAYLOAD_A
+	payload = PAYLOAD_A,
+	baseExpectedHead: ExpectedHead = noHead(objectId)
 ): Promise<void> {
 	const digest = must(digestBlob(payload));
-	if (!(await begin(store, objectId, generationId, payload)).ok) throw new Error("begin failed");
+	if (!(await beginFrom(store, objectId, generationId, baseExpectedHead, payload)).ok) throw new Error("begin failed");
 	if (!(await store.putCachedBlob({ bytes: payload, digest, generationId, objectId })).ok)
 		throw new Error("put failed");
 	if (!(await store.promoteReference({ digest, generationId, objectId })).ok) throw new Error("promotion failed");
 	if (!(await store.completeGeneration({ generationId, objectId })).ok) throw new Error("completion failed");
+}
+
+async function operationReasons(store: AheDurableStore): Promise<readonly string[]> {
+	const commands = await Promise.all([
+		store.readObjectState(OBJECT_A),
+		store.getBlob(DIGEST_A),
+		begin(store, OBJECT_A, GENERATION_A),
+		store.putCachedBlob({ bytes: PAYLOAD_A, digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A }),
+		store.promoteReference({ digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A }),
+		store.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A }),
+		store.swapHead({ expectedHead: noHead(OBJECT_A), generationId: GENERATION_A, objectId: OBJECT_A }),
+		store.discardGeneration({ generationId: GENERATION_A, objectId: OBJECT_A }),
+	]);
+	return commands.map(reason);
 }
 
 async function runSharedContract(): Promise<unknown> {
@@ -245,13 +284,29 @@ async function runAtomicRollback(): Promise<unknown> {
 				objectId: OBJECT_A,
 			})
 		);
-		const state = await store.readObjectState(OBJECT_A);
+		const beforeRetry = await store.readObjectState(OBJECT_A);
+		const rowsBeforeRetry = await rawPhase2dCount(name, "objects");
+		const retry = await store.swapHead({
+			expectedHead: noHead(OBJECT_A),
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		const afterRetry = await store.readObjectState(OBJECT_A);
 		await store.close();
 		return {
-			generationState: state.ok ? state.value.generations[0]?.state : null,
-			head: state.ok ? state.value.head.kind : null,
-			objectRows: await rawPhase2dCount(name, "objects"),
-			reason: reason(result),
+			afterRetry: {
+				generationState: afterRetry.ok ? afterRetry.value.generations[0]?.state : null,
+				head: afterRetry.ok ? afterRetry.value.head.kind : null,
+				objectRows: await rawPhase2dCount(name, "objects"),
+				reason: reason(retry),
+				revision: afterRetry.ok && afterRetry.value.head.kind === "present" ? afterRetry.value.head.revision : null,
+			},
+			beforeRetry: {
+				generationState: beforeRetry.ok ? beforeRetry.value.generations[0]?.state : null,
+				head: beforeRetry.ok ? beforeRetry.value.head.kind : null,
+				objectRows: rowsBeforeRetry,
+				reason: reason(result),
+			},
 		};
 	} catch (error) {
 		return { error: error instanceof Error ? error.message : String(error) };
@@ -291,6 +346,7 @@ async function runOwnershipTrace(): Promise<unknown> {
 	const name = databaseName("ownership");
 	try {
 		const store = await createPhase2d2aRedStore({ databaseName: name });
+		await begin(store, OBJECT_A, GENERATION_B);
 		const { calls, transactions } = await withPhase2dTransactionTrace(async (mark) => {
 			mark("readObjectState");
 			await store.readObjectState(OBJECT_A);
@@ -306,10 +362,17 @@ async function runOwnershipTrace(): Promise<unknown> {
 			await store.completeGeneration({ generationId: GENERATION_C, objectId: OBJECT_A });
 			mark("swapHead");
 			await store.swapHead({ expectedHead: noHead(OBJECT_A), generationId: GENERATION_C, objectId: OBJECT_A });
+			mark("discardGeneration");
+			await store.discardGeneration({ generationId: GENERATION_B, objectId: OBJECT_A });
 		});
 		await store.close();
 		return {
-			reads: calls.filter((call) => call.method === "get" || call.method === "getAll"),
+			ranges: calls
+				.filter((call) => call.method === "getAll")
+				.map(({ operation, query, store }) => ({ operation, query, store })),
+			reads: calls
+				.filter((call) => call.method === "get" || call.method === "getAll")
+				.map(({ method, operation, store }) => ({ method, operation, store })),
 			transactions,
 			writes: calls.filter((call) => call.method === "add" || call.method === "put"),
 		};
@@ -320,8 +383,131 @@ async function runOwnershipTrace(): Promise<unknown> {
 	}
 }
 
+async function runCloseQuiescence(): Promise<unknown> {
+	const name = databaseName("close-quiescence");
+	let gate: Phase2dTerminalGate<StoreResult<GenerationRecord>> | undefined;
+	try {
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		gate = gateNextPhase2dTransactionTerminal(() => begin(store, OBJECT_A, GENERATION_A));
+		await gate.started;
+		const settlementOrder: string[] = [];
+		const operation = gate.operation.then((result) => {
+			settlementOrder.push("operation");
+			return result;
+		});
+		const close = store.close().then(() => {
+			settlementOrder.push("close");
+		});
+		const firstSettlement = await Promise.race([
+			close.then(() => "close" as const),
+			gate.terminalObserved.then(() => "transaction-terminal" as const),
+		]);
+		gate.release();
+		const operationResult = await operation;
+		await close;
+		return {
+			firstSettlement,
+			operation: reason(operationResult),
+			postClose: await operationReasons(store),
+			settlementOrder,
+		};
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		gate?.release();
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runVersionchangeClosure(): Promise<unknown> {
+	const name = databaseName("versionchange");
+	try {
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		await requestPhase2dVersionchange(name, 2);
+		const postVersionchange = await operationReasons(store);
+		await store.close();
+		return { postVersionchange };
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runStrictDurabilityEvidence(): Promise<unknown> {
+	const scenarios: unknown[] = [];
+	for (const [index, observed] of (["default", "relaxed", "strict"] as const).entries()) {
+		const name = databaseName(`durability-${observed}`);
+		try {
+			const store = await createPhase2d2aRedStore({ databaseName: name });
+			const generationId = [GENERATION_A, GENERATION_B, GENERATION_C][index];
+			if (generationId === undefined) throw new TypeError("missing generation fixture");
+			const evidence = await withForcedPhase2dDurability(observed, () => begin(store, OBJECT_A, generationId));
+			await store.close();
+			scenarios.push({
+				cause: failureCause(evidence.result),
+				generationRows: await rawPhase2dCount(name, "generations"),
+				observed: evidence.observed,
+				reason: reason(evidence.result),
+				requested: evidence.requested,
+				writes: evidence.writes,
+			});
+		} finally {
+			await deletePhase2dDatabase(name);
+		}
+	}
+	return scenarios;
+}
+
+async function runSupersedingSwap(): Promise<unknown> {
+	const name = databaseName("superseding-swap");
+	try {
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		await stageComplete(store, OBJECT_A, GENERATION_A);
+		const firstSwap = await store.swapHead({
+			expectedHead: noHead(OBJECT_A),
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		if (!firstSwap.ok) throw new Error(`first swap failed: ${firstSwap.reason}`);
+		await stageComplete(store, OBJECT_A, GENERATION_B, PAYLOAD_B, firstSwap.value.head);
+		const traced = await withPhase2dTransactionTrace(async (mark) => {
+			mark("swapHeadRevision2");
+			return store.swapHead({
+				expectedHead: firstSwap.value.head,
+				generationId: GENERATION_B,
+				objectId: OBJECT_A,
+			});
+		});
+		const state = await store.readObjectState(OBJECT_A);
+		await store.close();
+		return {
+			generations: state.ok
+				? state.value.generations.map(({ generationId, state: generationState }) => ({
+						generationId,
+						state: generationState,
+					}))
+				: [],
+			head:
+				state.ok && state.value.head.kind === "present"
+					? { generationId: state.value.head.generationId, revision: state.value.head.revision }
+					: null,
+			result: traced.result.ok
+				? { reason: "OK", supersededGenerationId: traced.result.value.supersededGenerationId }
+				: { reason: traced.result.reason, supersededGenerationId: null },
+			transactions: traced.transactions,
+			writes: traced.calls.filter((call) => call.method === "add" || call.method === "put"),
+		};
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
 const harness = Object.freeze({
 	runAtomicRollback,
+	runCloseQuiescence,
 	runClosureIntegrity,
 	runCompetingCas,
 	runImmutableAndIdempotent,
@@ -329,6 +515,9 @@ const harness = Object.freeze({
 	runPersistenceAndCopies,
 	runSameDigestDifferentBytes,
 	runSharedContract,
+	runStrictDurabilityEvidence,
+	runSupersedingSwap,
+	runVersionchangeClosure,
 });
 
 Reflect.set(globalThis, "phase2d2aAdapterHarness", harness);

@@ -1,8 +1,4 @@
-import {
-	openPhase2dBrowserDatabase,
-	testOnlyAttemptStrictMutation,
-	testOnlyRequestPhase2dUpgrade,
-} from "../../src/internal/schema-idb.js";
+import { openPhase2dBrowserDatabase, testOnlyRequestPhase2dUpgrade } from "../../src/internal/schema-idb.js";
 
 const EXPECTED_SCHEMA_REASON = "unexpected browser storage schema/version";
 
@@ -273,25 +269,6 @@ async function runFreshSchema(): Promise<unknown> {
 	}
 }
 
-async function runStrictMutation(observedDurability: IDBTransactionDurability): Promise<unknown> {
-	const databaseName = `phase-2d1-strict-${crypto.randomUUID()}`;
-	try {
-		let result: unknown = null;
-		let error: SerializedError | null = null;
-		try {
-			result = await testOnlyAttemptStrictMutation({
-				databaseName,
-				testOnlyForcedObservedDurability: observedDurability,
-			});
-		} catch (caught) {
-			error = serializeError(caught);
-		}
-		return Object.freeze({ junkGenerationRecords: await countGenerationRecords(databaseName), error, result });
-	} finally {
-		await deleteDatabase(databaseName);
-	}
-}
-
 async function runCooperativeVersionchange(): Promise<unknown> {
 	const databaseName = `phase-2d1-cooperative-${crypto.randomUUID()}`;
 	try {
@@ -434,7 +411,6 @@ Object.defineProperty(globalThis, "phase2dSchemaHarness", {
 		runLifecyclePositiveControl,
 		runNativeCompoundPositiveControl,
 		runPromotionCompoundPositiveControl,
-		runStrictMutation,
 		runUnexpectedPrivateV1Schemas,
 		runUnexpectedSchemaAndVersion,
 	}),

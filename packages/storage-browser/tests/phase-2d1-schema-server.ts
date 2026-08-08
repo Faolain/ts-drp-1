@@ -1,28 +1,39 @@
-import fs from "node:fs";
+import * as esbuild from "esbuild";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
 
 const HOST = "127.0.0.1";
 const PORT = 43_875;
-const DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function transpile(relativePath: string): Buffer {
-	return Buffer.from(
-		ts.transpileModule(fs.readFileSync(path.join(DIRECTORY, relativePath), "utf8"), {
-			compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-		}).outputText
-	);
+function bundle(entryPoint: string): Uint8Array {
+	const result = esbuild.buildSync({
+		bundle: true,
+		entryPoints: [entryPoint],
+		format: "esm",
+		platform: "browser",
+		sourcemap: false,
+		target: "es2022",
+		write: false,
+	});
+	const output = result.outputFiles[0];
+	if (output === undefined) throw new Error(`esbuild emitted no browser module for ${entryPoint}`);
+	return output.contents;
 }
 
 const MODULES = new Map([
-	["/src/internal/schema-idb.js", transpile("../src/internal/schema-idb.ts")],
-	["/tests/assets/schema-lifecycle-entry.js", transpile("assets/schema-lifecycle-entry.ts")],
+	["/src/internal/idb-adapter.js", bundle(path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts"))],
+	[
+		"/tests/assets/schema-lifecycle-entry.js",
+		bundle(path.join(PACKAGE_DIRECTORY, "tests/assets/schema-lifecycle-entry.ts")),
+	],
+	["/tests/assets/idb-adapter-entry.js", bundle(path.join(PACKAGE_DIRECTORY, "tests/assets/idb-adapter-entry.ts"))],
 ]);
 const PAGE = Buffer.from(
 	'<!doctype html><html><head><meta charset="utf-8"><title>Phase 2d1 schema RED</title></head>' +
-		'<body><script type="module" src="/tests/assets/schema-lifecycle-entry.js"></script></body></html>'
+		'<body><script type="module" src="/tests/assets/schema-lifecycle-entry.js"></script>' +
+		'<script type="module" src="/tests/assets/idb-adapter-entry.js"></script></body></html>'
 );
 
 const server = createServer((request, response) => {

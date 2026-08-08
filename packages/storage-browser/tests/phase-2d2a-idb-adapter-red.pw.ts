@@ -1,5 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 
+const OBJECT_A = `phase-2d2a-a:${"a".repeat(32)}`;
+
+function generationRange(operation: string): unknown {
+	return {
+		operation,
+		query: { lower: [OBJECT_A], lowerOpen: false, upper: [OBJECT_A, []], upperOpen: false },
+		store: "generations",
+	};
+}
+
 type HarnessMethod =
 	| "runAtomicRollback"
 	| "runClosureIntegrity"
@@ -77,10 +87,19 @@ test("concurrent expected-head swaps linearize to one adoption and one stable co
 
 test("a second-write failure aborts the entire strict transaction and permits an exact retry", async ({ page }) => {
 	await expect(run(page, "runAtomicRollback")).resolves.toEqual({
-		generationState: "Complete",
-		head: "none",
-		objectRows: 0,
-		reason: "SUBSTRATE_FAILURE",
+		afterRetry: {
+			generationState: "Adopted",
+			head: "present",
+			objectRows: 1,
+			reason: "OK",
+			revision: 1,
+		},
+		beforeRetry: {
+			generationState: "Complete",
+			head: "none",
+			objectRows: 0,
+			reason: "SUBSTRATE_FAILURE",
+		},
 	});
 });
 
@@ -88,6 +107,15 @@ test("adapter requirements execute against their real store owners in strict bou
 	page,
 }) => {
 	await expect(run(page, "runOwnershipTrace")).resolves.toEqual({
+		ranges: [
+			generationRange("readObjectState"),
+			generationRange("beginGeneration"),
+			generationRange("putCachedBlob"),
+			generationRange("promoteReference"),
+			generationRange("completeGeneration"),
+			generationRange("swapHead"),
+			generationRange("discardGeneration"),
+		],
 		reads: [
 			{ method: "get", operation: "readObjectState", store: "objects" },
 			{ method: "getAll", operation: "readObjectState", store: "generations" },
@@ -107,6 +135,8 @@ test("adapter requirements execute against their real store owners in strict bou
 			{ method: "get", operation: "completeGeneration", store: "promotions" },
 			{ method: "get", operation: "swapHead", store: "objects" },
 			{ method: "getAll", operation: "swapHead", store: "generations" },
+			{ method: "get", operation: "discardGeneration", store: "objects" },
+			{ method: "getAll", operation: "discardGeneration", store: "generations" },
 		],
 		transactions: [
 			{
@@ -146,6 +176,12 @@ test("adapter requirements execute against their real store owners in strict bou
 				operation: "swapHead",
 				stores: ["generations", "objects"],
 			},
+			{
+				durability: "strict",
+				mode: "readwrite",
+				operation: "discardGeneration",
+				stores: ["generations", "objects"],
+			},
 		],
 		writes: [
 			{ method: "put", operation: "beginGeneration", store: "generations" },
@@ -154,6 +190,7 @@ test("adapter requirements execute against their real store owners in strict bou
 			{ method: "put", operation: "completeGeneration", store: "generations" },
 			{ method: "put", operation: "swapHead", store: "generations" },
 			{ method: "put", operation: "swapHead", store: "objects" },
+			{ method: "put", operation: "discardGeneration", store: "generations" },
 		],
 	});
 });

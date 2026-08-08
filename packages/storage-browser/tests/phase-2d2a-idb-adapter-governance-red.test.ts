@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { auditIdbOwnership, PACKAGE_DIRECTORY } from "./fixtures/idb-ownership-checker.js";
+import * as phase2dSchema from "../src/internal/schema-idb.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -12,9 +13,10 @@ afterEach(() => {
 });
 
 describe("Phase 2d2a production IDB ownership", () => {
-	it("governs the real adapter owner and browser config in the package TypeScript program", () => {
+	it("governs the real adapter and retires the obsolete schema mutation probe", () => {
 		const config = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "tsconfig.json"), "utf8");
 		expect(config).toContain('"playwright.phase-2d2a-idb-adapter.config.ts"');
+		expect(Reflect.has(phase2dSchema, "testOnlyAttemptStrictMutation")).toBe(false);
 		expect(auditIdbOwnership()).toEqual([]);
 	}, 60_000);
 

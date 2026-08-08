@@ -9,7 +9,8 @@
 		"tests/**/*.ts",
 		"playwright.storage-browser.config.ts",
 		"playwright.phase-2d1-schema.config.ts",
-		"playwright.phase-2d2a-idb-adapter.config.ts"
+		"playwright.phase-2d2a-idb-adapter.config.ts",
+		"playwright.phase-2d2b1-adapter-closure.config.ts"
 	],
 	"exclude": ["dist", "./*.d.ts"]
 }

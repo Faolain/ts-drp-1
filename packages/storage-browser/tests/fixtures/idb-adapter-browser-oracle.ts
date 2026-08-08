@@ -10,7 +10,20 @@ export interface Phase2dTransactionTrace {
 export interface Phase2dStoreCallTrace {
 	readonly method: "add" | "get" | "getAll" | "put";
 	readonly operation: string;
+	readonly query?: Readonly<{
+		readonly lower: unknown;
+		readonly lowerOpen: boolean;
+		readonly upper: unknown;
+		readonly upperOpen: boolean;
+	}>;
 	readonly store: string;
+}
+
+export interface Phase2dTerminalGate<T> {
+	readonly operation: Promise<T>;
+	release(): void;
+	readonly started: Promise<void>;
+	readonly terminalObserved: Promise<void>;
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -82,6 +95,16 @@ export async function rawPhase2dCount(name: string, storeName: string): Promise<
 }
 
 /**
+ * Requests a real version upgrade and waits for the upgraded connection to open.
+ * @param name - Isolated database name.
+ * @param version - Higher schema version used only to trigger versionchange.
+ */
+export async function requestPhase2dVersionchange(name: string, version: number): Promise<void> {
+	const database = await requestResult(indexedDB.open(name, version));
+	database.close();
+}
+
+/**
  * Injects corrupt bytes under an otherwise canonical digest for a negative control.
  * @param name - Isolated database name.
  * @param digest - Canonical blob key whose payload is corrupted.
@@ -116,6 +139,147 @@ export async function withFailingHeadWrite<T>(run: () => Promise<T>): Promise<T>
 	try {
 		return await run();
 	} finally {
+		IDBObjectStore.prototype.put = originalPut;
+	}
+}
+
+/**
+ * Gates delivery of the next real readwrite transaction's terminal event to the
+ * adapter while independently exposing when Chromium emitted that event.
+ * @param run - Starts exactly one adapter mutation.
+ * @returns The operation and explicit deterministic gate controls.
+ */
+export function gateNextPhase2dTransactionTerminal<T>(run: () => Promise<T>): Phase2dTerminalGate<T> {
+	const originalTransaction = IDBDatabase.prototype.transaction;
+	const originalAddEventListener = IDBTransaction.prototype.addEventListener;
+	let selected: IDBTransaction | undefined;
+	let releaseGate: (() => void) | undefined;
+	let startedGate: (() => void) | undefined;
+	let terminalGate: (() => void) | undefined;
+	const released = new Promise<void>((resolve) => {
+		releaseGate = resolve;
+	});
+	const started = new Promise<void>((resolve) => {
+		startedGate = resolve;
+	});
+	const terminalObserved = new Promise<void>((resolve) => {
+		terminalGate = resolve;
+	});
+
+	IDBDatabase.prototype.transaction = function gatedTransaction(
+		this: IDBDatabase,
+		storeNames: string | string[],
+		mode?: IDBTransactionMode,
+		options?: IDBTransactionOptions
+	): IDBTransaction {
+		const transaction = originalTransaction.call(this, storeNames, mode, options);
+		if (selected === undefined && transaction.mode === "readwrite") {
+			selected = transaction;
+			startedGate?.();
+		}
+		return transaction;
+	};
+	IDBTransaction.prototype.addEventListener = function gatedTerminalListener(
+		this: IDBTransaction,
+		type: string,
+		listener: EventListenerOrEventListenerObject | null,
+		options?: boolean | AddEventListenerOptions
+	): void {
+		if (listener === null) return;
+		if (this !== selected || (type !== "complete" && type !== "abort")) {
+			originalAddEventListener.call(this, type, listener, options);
+			return;
+		}
+		const terminalListener = listener;
+		originalAddEventListener.call(
+			this,
+			type,
+			(event: Event) => {
+				terminalGate?.();
+				void released.then(() => {
+					if (typeof terminalListener === "function") terminalListener.call(event.currentTarget, event);
+					else terminalListener.handleEvent(event);
+				});
+			},
+			options
+		);
+	};
+
+	let operation: Promise<T>;
+	try {
+		operation = run();
+	} finally {
+		IDBDatabase.prototype.transaction = originalTransaction;
+		IDBTransaction.prototype.addEventListener = originalAddEventListener;
+	}
+	return Object.freeze({
+		operation,
+		release: (): void => releaseGate?.(),
+		started,
+		terminalObserved,
+	});
+}
+
+/**
+ * Forces only the live observed durability of one real adapter transaction.
+ * The adapter's requested options and physical writes remain independently
+ * recorded.
+ * @param observed - Observation exposed to production.
+ * @param run - Starts exactly one real adapter mutation.
+ * @returns The requested/observed durability, result and exact physical writes.
+ */
+export async function withForcedPhase2dDurability<T>(
+	observed: "default" | "relaxed" | "strict",
+	run: () => Promise<T>
+): Promise<{
+	readonly observed: "default" | "relaxed" | "strict";
+	readonly requested: "default" | "relaxed" | "strict" | undefined;
+	readonly result: T;
+	readonly writes: readonly string[];
+}> {
+	const originalTransaction = IDBDatabase.prototype.transaction;
+	const originalAdd = IDBObjectStore.prototype.add;
+	const originalPut = IDBObjectStore.prototype.put;
+	let requested: "default" | "relaxed" | "strict" | undefined;
+	const writes: string[] = [];
+	IDBDatabase.prototype.transaction = function forcedDurabilityTransaction(
+		this: IDBDatabase,
+		storeNames: string | string[],
+		mode?: IDBTransactionMode,
+		options?: IDBTransactionOptions
+	): IDBTransaction {
+		const transaction = originalTransaction.call(this, storeNames, mode, options);
+		if (transaction.mode === "readwrite") {
+			requested = options?.durability;
+			Object.defineProperty(transaction, "durability", {
+				configurable: true,
+				get: () => observed,
+			});
+		}
+		return transaction;
+	};
+	IDBObjectStore.prototype.add = function forcedDurabilityAdd(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		writes.push(`add:${this.name}`);
+		return key === undefined ? originalAdd.call(this, value) : originalAdd.call(this, value, key);
+	};
+	IDBObjectStore.prototype.put = function forcedDurabilityPut(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		writes.push(`put:${this.name}`);
+		return key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);
+	};
+	try {
+		const result = await run();
+		return Object.freeze({ observed, requested, result, writes: Object.freeze([...writes]) });
+	} finally {
+		IDBDatabase.prototype.transaction = originalTransaction;
+		IDBObjectStore.prototype.add = originalAdd;
 		IDBObjectStore.prototype.put = originalPut;
 	}
 }
@@ -176,7 +340,21 @@ export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: str
 		query?: IDBValidKey | IDBKeyRange | null,
 		count?: number
 	): IDBRequest<unknown[]> {
-		calls.push({ method: "getAll", operation, store: this.name });
+		calls.push({
+			method: "getAll",
+			operation,
+			...(query instanceof IDBKeyRange
+				? {
+						query: {
+							lower: query.lower,
+							lowerOpen: query.lowerOpen,
+							upper: query.upper,
+							upperOpen: query.upperOpen,
+						},
+					}
+				: {}),
+			store: this.name,
+		});
 		return count === undefined ? originalGetAll.call(this, query) : originalGetAll.call(this, query, count);
 	};
 	IDBObjectStore.prototype.put = function tracedPut(

@@ -30,7 +30,6 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"transaction",
 			"objectStore",
 			"index",
-			"add",
 			"count",
 			"abort",
 			"close",
