@@ -11,6 +11,14 @@ const PHASE_2D_PROMOTION_KEY_PATH = Object.freeze(["objectId", "generationId", "
 const PHASE_2D_VOTE_INDEX_KEY_PATH = Object.freeze(["objectId", "epoch"]);
 const PHASE_2D_DECISION_LINK_SHA256 = "40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c";
 
+export const PHASE_2D_DATA_STORE_INVENTORY = Object.freeze([
+	Object.freeze({ keyPath: "objectId", name: PHASE_2D_OBJECTS_STORE }),
+	Object.freeze({ keyPath: PHASE_2D_GENERATION_KEY_PATH, name: PHASE_2D_GENERATIONS_STORE }),
+	Object.freeze({ keyPath: "digest", name: PHASE_2D_BLOBS_STORE }),
+	Object.freeze({ keyPath: PHASE_2D_PROMOTION_KEY_PATH, name: PHASE_2D_PROMOTIONS_STORE }),
+	Object.freeze({ keyPath: null, name: PHASE_2D_VOTES_STORE }),
+]);
+
 export interface Phase2dStorageDecisionBinding {
 	readonly chosen: "idb-strict" | "unselected";
 	readonly linkSha256: string;
@@ -158,7 +166,7 @@ function classifyOpenError(error: DOMException | null): Error {
 	return error ?? new Error("browser storage database open failed");
 }
 
-function openDatabase(databaseName: string): Promise<IDBDatabase> {
+function openDatabase(databaseName: string, onVersionChange: () => void = (): void => {}): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(databaseName, PHASE_2D_SCHEMA_VERSION);
 		request.addEventListener(
@@ -191,12 +199,33 @@ function openDatabase(databaseName: string): Promise<IDBDatabase> {
 					reject(new BrowserStorageSchemaError());
 					return;
 				}
-				database.addEventListener("versionchange", () => database.close());
+				database.addEventListener("versionchange", () => {
+					try {
+						onVersionChange();
+					} finally {
+						database.close();
+					}
+				});
 				resolve(database);
 			},
 			{ once: true }
 		);
 	});
+}
+
+/**
+ * Opens the private data-owner connection without exposing a native IDB type.
+ * @param options - Isolated database and accepted decision binding.
+ * @param onVersionChange - Synchronous lifecycle notification before closure.
+ * @returns The schema-validated connection as an owner-local opaque value.
+ * @internal
+ */
+export async function openPhase2dInternalDatabase(
+	options: OpenPhase2dBrowserDatabaseOptions,
+	onVersionChange: () => void
+): Promise<unknown> {
+	requireAcceptedDecision(options.testOnlyDecisionBinding ?? PHASE_2D_STORAGE_DECISION);
+	return openDatabase(options.databaseName, onVersionChange);
 }
 
 /**
