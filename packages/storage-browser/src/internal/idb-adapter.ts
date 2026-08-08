@@ -36,8 +36,6 @@ export interface Phase2dAheDurableStoreOptions {
 
 type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readObjectState">;
 
-type Lifecycle = { closed: boolean };
-
 type TransactionOutcome = Readonly<{ ok: true }> | Readonly<{ cause: unknown; ok: false }>;
 
 const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
@@ -75,13 +73,58 @@ class StrictDurabilityCapabilityError extends Error {
 	}
 }
 
+class IdbAdapterLifecycle {
+	private activeOperations = 0;
+	private closePromise: Promise<void> | undefined;
+	private connection: IDBDatabase | undefined;
+	private resolveClose: (() => void) | undefined;
+
+	public attach(database: IDBDatabase): void {
+		if (this.closePromise !== undefined) {
+			database.close();
+			return;
+		}
+		if (this.connection !== undefined) throw new Error("IndexedDB lifecycle already attached");
+		this.connection = database;
+	}
+
+	public startOperation(): IDBDatabase | undefined {
+		const database = this.connection;
+		if (database === undefined) return undefined;
+		this.activeOperations += 1;
+		return database;
+	}
+
+	public finishOperation(): void {
+		this.activeOperations -= 1;
+		this.resolveIfQuiescent();
+	}
+
+	public close(): Promise<void> {
+		this.closePromise ??= new Promise((resolve) => {
+			this.resolveClose = resolve;
+		});
+		const database = this.connection;
+		if (database !== undefined) {
+			this.connection = undefined;
+			database.close();
+		}
+		this.resolveIfQuiescent();
+		return this.closePromise;
+	}
+
+	private resolveIfQuiescent(): void {
+		if (this.connection !== undefined || this.activeOperations !== 0) return;
+		const resolve = this.resolveClose;
+		this.resolveClose = undefined;
+		if (resolve !== undefined) queueMicrotask(resolve);
+	}
+}
+
 class IdbAheDurableStore implements AheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 
-	public constructor(
-		private readonly database: IDBDatabase,
-		private readonly lifecycle: Lifecycle
-	) {}
+	public constructor(private readonly lifecycle: IdbAdapterLifecycle) {}
 
 	public readObjectState(objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>> {
 		return this.run(commandWithKind("readObjectState", { objectId })) as Promise<StoreResult<ObjectStoreState>>;
@@ -142,31 +185,32 @@ class IdbAheDurableStore implements AheDurableStore {
 	}
 
 	public close(): Promise<void> {
-		if (!this.lifecycle.closed) {
-			this.lifecycle.closed = true;
-			this.database.close();
-		}
-		return Promise.resolve();
+		return this.lifecycle.close();
 	}
 
 	private async run(command: unknown): Promise<StoreResult<unknown>> {
 		const prepared = prepareStorageAdapterCommand(command);
 		if (!prepared.ok) return prepared;
-		if (this.lifecycle.closed) {
+		const database = this.lifecycle.startOperation();
+		if (database === undefined) {
 			return evaluateStorageAdapterCommand(prepared.value, [{ kind: "store-closed" }]).result;
 		}
-		return this.execute(prepared.value);
+		try {
+			return await this.execute(database, prepared.value);
+		} finally {
+			this.lifecycle.finishOperation();
+		}
 	}
 
-	private async execute(prepared: PreparedStorageAdapterCommand): Promise<StoreResult<unknown>> {
+	private async execute(database: IDBDatabase, prepared: PreparedStorageAdapterCommand): Promise<StoreResult<unknown>> {
 		const operation = prepared.command.kind;
 		const mutation = isMutation(operation);
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
 			transaction = mutation
-				? this.database.transaction([...OPERATION_STORES[operation]], "readwrite", { durability: "strict" })
-				: this.database.transaction([...OPERATION_STORES[operation]], "readonly");
+				? database.transaction([...OPERATION_STORES[operation]], "readwrite", { durability: "strict" })
+				: database.transaction([...OPERATION_STORES[operation]], "readonly");
 			completion = transactionOutcome(transaction);
 			if (mutation && transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
 
@@ -404,9 +448,10 @@ function substrateFailure(cause: unknown): StoreResult<never> {
  * @internal
  */
 export async function createPhase2dAheDurableStore(options: Phase2dAheDurableStoreOptions): Promise<AheDurableStore> {
-	const lifecycle: Lifecycle = { closed: false };
+	const lifecycle = new IdbAdapterLifecycle();
 	const opaqueDatabase = await openPhase2dInternalDatabase(options, () => {
-		lifecycle.closed = true;
+		void lifecycle.close();
 	});
-	return new IdbAheDurableStore(opaqueDatabase as IDBDatabase, lifecycle);
+	lifecycle.attach(opaqueDatabase as IDBDatabase);
+	return new IdbAheDurableStore(lifecycle);
 }

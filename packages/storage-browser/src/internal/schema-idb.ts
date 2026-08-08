@@ -34,16 +34,6 @@ export interface OpenPhase2dBrowserDatabaseOptions {
 	readonly testOnlyDecisionBinding?: Phase2dStorageDecisionBinding;
 }
 
-export interface StrictMutationProbeOptions {
-	readonly databaseName: string;
-	readonly testOnlyForcedObservedDurability?: "default" | "relaxed" | "strict";
-}
-
-export interface StrictMutationProbeResult {
-	readonly observedDurability: "default" | "relaxed" | "strict";
-	readonly committed: true;
-}
-
 export interface UpgradeProbeOptions {
 	readonly blockedTimeoutMilliseconds: number;
 	readonly databaseName: string;
@@ -61,15 +51,6 @@ class BrowserStorageCapabilityError extends Error {
 	constructor() {
 		super("Phase 2d requires the accepted idb-strict decision link");
 		this.name = "BrowserStorageCapabilityError";
-	}
-}
-
-class StrictDurabilityCapabilityError extends Error {
-	readonly code = "NON_STRICT_DURABILITY";
-
-	constructor() {
-		super("strict IndexedDB durability is required");
-		this.name = "StrictDurabilityCapabilityError";
 	}
 }
 
@@ -166,7 +147,7 @@ function classifyOpenError(error: DOMException | null): Error {
 	return error ?? new Error("browser storage database open failed");
 }
 
-function openDatabase(databaseName: string, onVersionChange: () => void = (): void => {}): Promise<IDBDatabase> {
+function openDatabase(databaseName: string, onVersionChange?: () => void): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(databaseName, PHASE_2D_SCHEMA_VERSION);
 		request.addEventListener(
@@ -200,11 +181,8 @@ function openDatabase(databaseName: string, onVersionChange: () => void = (): vo
 					return;
 				}
 				database.addEventListener("versionchange", () => {
-					try {
-						onVersionChange();
-					} finally {
-						database.close();
-					}
+					if (onVersionChange === undefined) database.close();
+					else onVersionChange();
 				});
 				resolve(database);
 			},
@@ -216,7 +194,7 @@ function openDatabase(databaseName: string, onVersionChange: () => void = (): vo
 /**
  * Opens the private data-owner connection without exposing a native IDB type.
  * @param options - Isolated database and accepted decision binding.
- * @param onVersionChange - Synchronous lifecycle notification before closure.
+ * @param onVersionChange - Synchronous owner callback that closes its lifecycle.
  * @returns The schema-validated connection as an owner-local opaque value.
  * @internal
  */
@@ -249,53 +227,6 @@ export async function openPhase2dBrowserDatabase(
 	return Object.freeze({
 		version: database.version,
 		close: (): void => database.close(),
-	});
-}
-
-/**
- * Private schema-lifecycle mutation probe; this module is not a published package subpath.
- * @param options - Isolated database name and optional forced live observation.
- * @returns The live durability and commit outcome.
- */
-export async function testOnlyAttemptStrictMutation(
-	options: StrictMutationProbeOptions
-): Promise<StrictMutationProbeResult> {
-	const database = await openDatabase(options.databaseName);
-	return new Promise((resolve, reject) => {
-		const transaction = database.transaction(PHASE_2D_PROMOTIONS_STORE, "readwrite", { durability: "strict" });
-		const observedDurability = options.testOnlyForcedObservedDurability ?? transaction.durability;
-		if (observedDurability !== "strict") {
-			transaction.addEventListener(
-				"abort",
-				() => {
-					database.close();
-					reject(new StrictDurabilityCapabilityError());
-				},
-				{ once: true }
-			);
-			transaction.abort();
-			return;
-		}
-
-		transaction.addEventListener(
-			"complete",
-			() => {
-				database.close();
-				resolve(Object.freeze({ committed: true, observedDurability: "strict" }));
-			},
-			{ once: true }
-		);
-		const fail = (): void => {
-			database.close();
-			reject(transaction.error ?? new Error("browser storage mutation failed"));
-		};
-		transaction.addEventListener("abort", fail, { once: true });
-		transaction.addEventListener("error", fail, { once: true });
-		transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).add({
-			digest: "strict-mutation-probe",
-			generationId: "strict-mutation-probe",
-			objectId: "phase-2d1",
-		});
 	});
 }
 
