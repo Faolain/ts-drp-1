@@ -2141,6 +2141,90 @@ single-process SQLite transaction/configuration behavior. Per-statement and
 commit-edge child `SIGKILL`, WAL-sidecar recovery and the bounded crash campaign
 belong to 2c-b; fsync, torn-write and power-loss durability remain unclaimed.
 
+#### Phase 2c-b accepted and closed; Phase 2 remains open
+
+Phase 2c-b is accepted at production checkpoint `dfa7116`; Phase 2c is now
+closed, while the remaining Phase 2 slices and the Phase 2 exit gate remain
+open. Freeze the bounded lineage: initial tests-only process-death RED
+`9c6f8b8`, callback-scope corrective RED `ba9daeb`, and production GREEN
+`dfa7116`. The corrective RED was necessary because the existing two-argument
+2c-a hook intentionally observes only `beginGeneration:before-commit`; the
+2c-b child now requests the expanded chronological observer through an
+explicit private third argument instead of overloading callback presence or
+identity.
+
+The accepted matrix owns one declarative inventory of 25 physical boundaries:
+13 after-statement points, six before-COMMIT points and six
+after-COMMIT-before-return points across `beginGeneration`, `putCachedBlob`,
+`promoteReference`, `completeGeneration`, `swapHead` and
+`discardGeneration`. The child publishes the real production checkpoint and
+then blocks in `Atomics.wait` until the parent sends `SIGKILL`. Every target
+must be observed; no result may be published first; the WAL sidecar is checked
+before recovery opens the database; recovery must equal the exact four-table
+old state except after COMMIT, where it must equal the exact new state; and a
+retry must remain valid and converge to that exact new state. The two
+`swapHead` generation writes are distinguished by per-operation occurrence
+counts.
+
+The implementation keeps the existing two-argument fault behavior unchanged.
+Expanded after-statement and before-COMMIT observer failures occur while the
+transaction is active. The after-COMMIT checkpoint executes only after
+`COMMIT` and `transactionActive = false`, outside the rollback-catching region
+and before successful-result publication, so a private observer failure cannot
+misreport a committed mutation as rolled back or as `SUBSTRATE_FAILURE`.
+Neither instrumentation path is reachable through the package export map.
+
+The fast 25-point campaign and the opt-in five-repetition campaign both pass.
+Phase 2c-a remains 9/9, the adapter facade remains 6/6 and prior storage
+controls remain 104/104. Storage and storage-node builds/typechecks, targeted
+ESLint, Prettier, export-map and diff checks pass. Fresh final reviews all
+accepted the candidate:
+
+- Grok 4.5/high session `019fe104-65ab-7bf2-80d9-f849b59a5196`, result
+  SHA-256 `653e5deb61c76957e721aff379093dc003a6a4a202e4113c6f3676900061d4fd`;
+- exact Kimi 3/high/100 session `46b724c3-737c-4359-9c3c-bfcd29a80b48`,
+  result SHA-256
+  `b5e9a3fb3b8e1f033dcdf438b8fbe171cd1a20cbf11f52517cd3898ee945707f`;
+- Opus 5/xhigh session `dc46000b-347b-42ae-b021-74d3c55988c6`, all 74
+  substantive assistant events `claude-opus-5`, result SHA-256
+  `0a3fc126abf2b35ce4725e20b1071723c27a39aa2719ff4e36bf751852905aa1`.
+
+Carry these bounded residuals without reopening 2c-b:
+
+1. Before the Phase 2 exit gate signs off its declared-equals-observed
+   requirement, commit an exact full-sequence/no-extra-events assertion for
+   the node matrix. Every declared target is causal today, source derivation
+   and Kimi's independent capture both observed exactly 13/6/6, and the child
+   already returns its full `observed` sequence; the committed parent currently
+   checks reachability of all expected targets but not the converse.
+2. The private after-COMMIT observer throws synchronously after durability,
+   while earlier observer throws roll back and return `SUBSTRATE_FAILURE`.
+   This is truthful and unreachable publicly, but document the asymmetry on
+   `SqliteCrashCheckpointObserver` at the next storage-node touch.
+3. Removing `@internal` from the private test factory causes its declaration to
+   be emitted under `stripInternal`. The package remains `private: true`, the
+   module remains absent from the single-entry export map and the public index
+   is unchanged. Re-check encapsulation before the package ever becomes public.
+4. The second callback parameter is conservatively over-broad for the legacy
+   two-argument path, and the JSDoc still describes only the 2c-a hook. Tighten
+   the private type with overloads and refresh the comment at a later coherent
+   touch rather than reopening accepted crash behavior.
+5. The frozen six-operation matrix covers the current shared adapter write
+   set. Any future mutation kind or SQL write path must extend both the
+   declared inventory and the exact-sequence assertion before Phase 2 exit.
+6. Grok's read-only sandbox could not initialize Vitest because Vite attempted
+   to write `.vite-temp`; it instead reproduced all 25 paths against the real
+   built fixture. The authoritative GREEN and Kimi runs executed Vitest
+   normally. Kimi's first optional ad hoc probe used property-order-sensitive
+   whole-object JSON equality and was retracted as non-authoritative; its
+   corrected field-wise probe in the same single Kimi session confirmed old
+   before COMMIT, new after COMMIT and a causal absent-target control.
+
+The accepted durability claim remains process-death transaction atomicity
+under SQLite/WAL. It does not claim fsync, torn-write, filesystem, kernel or
+power-loss durability, and it introduces no legacy/plain identity path,
+signing authority or public strict-store commitment.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
