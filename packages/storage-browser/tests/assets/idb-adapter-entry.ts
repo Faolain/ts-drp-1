@@ -36,6 +36,7 @@ const GENERATION_C = must(parseGenerationId("c".repeat(64)));
 const PAYLOAD_A = Uint8Array.of(1, 2, 3, 4);
 const PAYLOAD_B = Uint8Array.of(9, 8, 7);
 const DIGEST_A = must(digestBlob(PAYLOAD_A));
+const DIGEST_B = must(digestBlob(PAYLOAD_B));
 
 function must<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
 	if (!result.ok) throw new TypeError("invalid Phase 2d2a fixture");
@@ -188,16 +189,64 @@ async function runClosureIntegrity(): Promise<unknown> {
 	try {
 		const store = await createPhase2d2aRedStore({ databaseName: name });
 		await begin(store, OBJECT_A, GENERATION_A);
-		const missing = await store.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		const missing = await store.promoteReference({ digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A });
 		await begin(store, OBJECT_A, GENERATION_B);
 		await rawPhase2dReplaceBlob(name, DIGEST_A, Uint8Array.of(99));
-		const corrupt = await store.completeGeneration({ generationId: GENERATION_B, objectId: OBJECT_A });
+		const corrupt = await store.promoteReference({ digest: DIGEST_A, generationId: GENERATION_B, objectId: OBJECT_A });
 		const state = await store.readObjectState(OBJECT_A);
 		await store.close();
 		return {
 			corrupt: reason(corrupt),
 			missing: reason(missing),
 			states: state.ok ? state.value.generations.map(({ state: value }) => value) : [],
+		};
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runBoundedCompletionTrace(): Promise<unknown> {
+	const name = databaseName("bounded-completion");
+	try {
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		const begun = await store.beginGeneration({
+			baseExpectedHead: noHead(OBJECT_A),
+			closure: [
+				{ byteLength: PAYLOAD_A.byteLength, digest: DIGEST_A },
+				{ byteLength: PAYLOAD_B.byteLength, digest: DIGEST_B },
+			],
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		if (!begun.ok) throw new Error(`begin failed: ${begun.reason}`);
+		for (const [digest, payload] of [
+			[DIGEST_A, PAYLOAD_A],
+			[DIGEST_B, PAYLOAD_B],
+		] as const) {
+			const cached = await store.putCachedBlob({
+				bytes: payload,
+				digest,
+				generationId: GENERATION_A,
+				objectId: OBJECT_A,
+			});
+			if (!cached.ok) throw new Error(`cache failed: ${cached.reason}`);
+			const promoted = await store.promoteReference({ digest, generationId: GENERATION_A, objectId: OBJECT_A });
+			if (!promoted.ok) throw new Error(`promotion failed: ${promoted.reason}`);
+		}
+		const traced = await withPhase2dTransactionTrace(async (mark) => {
+			mark("completeGeneration");
+			return store.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		});
+		await store.close();
+		return {
+			reads: traced.calls.filter((call) => call.method === "get" || call.method === "getAll"),
+			result: traced.result.ok
+				? { reason: "OK", state: traced.result.value.state }
+				: { reason: traced.result.reason, state: null },
+			transactions: traced.transactions,
+			writes: traced.calls.filter((call) => call.method === "add" || call.method === "put"),
 		};
 	} catch (error) {
 		return { error: error instanceof Error ? error.message : String(error) };
@@ -507,6 +556,7 @@ async function runSupersedingSwap(): Promise<unknown> {
 
 const harness = Object.freeze({
 	runAtomicRollback,
+	runBoundedCompletionTrace,
 	runCloseQuiescence,
 	runClosureIntegrity,
 	runCompetingCas,

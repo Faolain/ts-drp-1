@@ -2,7 +2,16 @@ import { expect, type Page, test } from "@playwright/test";
 
 const OBJECT_A = `phase-2d2a-a:${"a".repeat(32)}`;
 
-function generationRange(operation: string): unknown {
+function generationRange(operation: string): Readonly<{
+	operation: string;
+	query: Readonly<{
+		lower: readonly string[];
+		lowerOpen: false;
+		upper: readonly [string, readonly []];
+		upperOpen: false;
+	}>;
+	store: "generations";
+}> {
 	return {
 		operation,
 		query: { lower: [OBJECT_A], lowerOpen: false, upper: [OBJECT_A, []], upperOpen: false },
@@ -12,6 +21,7 @@ function generationRange(operation: string): unknown {
 
 type HarnessMethod =
 	| "runAtomicRollback"
+	| "runBoundedCompletionTrace"
 	| "runClosureIntegrity"
 	| "runCompetingCas"
 	| "runImmutableAndIdempotent"
@@ -47,11 +57,34 @@ test("whole canonical rows and exact blobs survive reopen with detached outputs"
 	});
 });
 
-test("missing and corrupt closure bytes cannot complete or mutate journal state", async ({ page }) => {
+test("promoteReference owns missing and corrupt closure bytes without mutating journal state", async ({ page }) => {
 	await expect(run(page, "runClosureIntegrity")).resolves.toEqual({
 		corrupt: "BLOB_CORRUPT",
 		missing: "BLOB_MISSING",
 		states: ["Staged", "Staged"],
+	});
+});
+
+test("completion loads every promotion but zero blob values in one strict generation-write transaction", async ({
+	page,
+}) => {
+	await expect(run(page, "runBoundedCompletionTrace")).resolves.toEqual({
+		reads: [
+			{ method: "get", operation: "completeGeneration", store: "objects" },
+			{ method: "getAll", ...generationRange("completeGeneration") },
+			{ method: "get", operation: "completeGeneration", store: "promotions" },
+			{ method: "get", operation: "completeGeneration", store: "promotions" },
+		],
+		result: { reason: "OK", state: "Complete" },
+		transactions: [
+			{
+				durability: "strict",
+				mode: "readwrite",
+				operation: "completeGeneration",
+				stores: ["generations", "objects", "promotions"],
+			},
+		],
+		writes: [{ method: "put", operation: "completeGeneration", store: "generations" }],
 	});
 });
 
@@ -131,7 +164,6 @@ test("adapter requirements execute against their real store owners in strict bou
 			{ method: "get", operation: "promoteReference", store: "promotions" },
 			{ method: "get", operation: "completeGeneration", store: "objects" },
 			{ method: "getAll", operation: "completeGeneration", store: "generations" },
-			{ method: "get", operation: "completeGeneration", store: "blobs" },
 			{ method: "get", operation: "completeGeneration", store: "promotions" },
 			{ method: "get", operation: "swapHead", store: "objects" },
 			{ method: "getAll", operation: "swapHead", store: "generations" },
@@ -168,7 +200,7 @@ test("adapter requirements execute against their real store owners in strict bou
 				durability: "strict",
 				mode: "readwrite",
 				operation: "completeGeneration",
-				stores: ["blobs", "generations", "objects", "promotions"],
+				stores: ["generations", "objects", "promotions"],
 			},
 			{
 				durability: "strict",
