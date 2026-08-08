@@ -54,6 +54,21 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"close",
 		]),
 	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/bucket-clear-harness.ts"),
+		new Set([
+			"open",
+			"createObjectStore",
+			"deleteDatabase",
+			"databases",
+			"transaction",
+			"objectStore",
+			"put",
+			"get",
+			"addEventListener",
+			"close",
+		]),
+	],
 ]);
 
 export interface IdbOwnershipAuditOptions {
