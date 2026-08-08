@@ -7,8 +7,8 @@ import {
 import { TransitionOwner } from "./internal/transition.js";
 import {
 	bytesEqual,
-	copyClosure,
 	copyExpectedHead,
+	copyGenerationRef,
 	hasSharedBacking,
 	isBlobDigest,
 	isClosedArray,
@@ -185,6 +185,17 @@ function generationScope(
 	return { objectId: value.objectId, generationId: value.generationId };
 }
 
+function copyStructuralClosure(value: unknown): readonly GenerationRef[] | undefined {
+	if (!isClosedArray(value)) return undefined;
+	const closure: GenerationRef[] = [];
+	for (const item of value) {
+		const copied = copyGenerationRef(item);
+		if (copied === undefined) return undefined;
+		closure.push(copied);
+	}
+	return closure;
+}
+
 /**
  * Validates and detaches one closed adapter command before substrate I/O.
  * @param value - Untrusted adapter command input.
@@ -218,7 +229,7 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		const scope = generationScope(value);
 		if (scope === undefined) return invalidPreparation();
 		const baseExpectedHead = copyExpectedHead(value.baseExpectedHead, scope.objectId);
-		const closure = copyClosure(value.closure);
+		const closure = copyStructuralClosure(value.closure);
 		if (baseExpectedHead === undefined || closure === undefined) return invalidPreparation();
 		const command: BeginGenerationCommand = {
 			kind: "beginGeneration",
