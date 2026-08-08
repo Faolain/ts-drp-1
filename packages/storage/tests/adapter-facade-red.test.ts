@@ -36,6 +36,11 @@ function mustPrepare(command: StorageAdapterCommand): PreparedStorageAdapterComm
 	return result.value;
 }
 
+function evaluateFacade(command: StorageAdapterCommand, facts: readonly StorageAdapterFact[]): StoreResult<unknown> {
+	const prepared = prepareStorageAdapterCommand(command);
+	return prepared.ok ? evaluateStorageAdapterCommand(prepared.value, facts).result : prepared;
+}
+
 function objectFact(
 	state: Readonly<{ head: ReturnType<typeof noHead> | ReturnType<typeof presentHead>; generations: GenerationRecord[] }>
 ): StorageAdapterFact {
@@ -280,6 +285,42 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 				reason: "INVALID_ARGUMENT",
 			});
 		}
+	});
+
+	it("preserves closure reasons and lets STORE_CLOSED outrank semantic closure rejection", () => {
+		const item = ref(bytes(1, 2, 3));
+		const empty = objectFact({ head: noHead(), generations: [] });
+		const cases = [
+			{ closure: [], reason: "EMPTY_CLOSURE" },
+			{ closure: [item, item], reason: "DUPLICATE_CLOSURE_REFERENCE" },
+		] as const;
+
+		for (const { closure, reason } of cases) {
+			const command: StorageAdapterCommand = {
+				kind: "beginGeneration",
+				objectId: OBJECT_A,
+				generationId: GENERATION_A,
+				baseExpectedHead: noHead(),
+				closure,
+			};
+			expect.soft(evaluateFacade(command, [empty])).toEqual({ ok: false, reason });
+			expect.soft(evaluateFacade(command, [{ kind: "store-closed" }])).toEqual({
+				ok: false,
+				reason: "STORE_CLOSED",
+			});
+		}
+		expect(
+			evaluateFacade(
+				{
+					kind: "beginGeneration",
+					objectId: OBJECT_A,
+					generationId: GENERATION_A,
+					baseExpectedHead: noHead(),
+					closure: [item],
+				},
+				[empty]
+			)
+		).toMatchObject({ ok: true });
 	});
 
 	it("names exact fact loads and fails closed on every inexact fact set", () => {

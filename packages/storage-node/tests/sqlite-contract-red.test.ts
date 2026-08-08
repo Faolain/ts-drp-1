@@ -300,6 +300,56 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 		}
 	});
 
+	it("preserves closure reasons and lets STORE_CLOSED outrank semantic closure rejection", async () => {
+		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
+		const payload = Uint8Array.of(19, 20, 21);
+		const digest = must(digestBlob(payload));
+		const reference = { digest, byteLength: payload.byteLength };
+		const cases = [
+			{ closure: [], reason: "EMPTY_CLOSURE" },
+			{ closure: [reference, reference], reason: "DUPLICATE_CLOSURE_REFERENCE" },
+		] as const;
+
+		for (const { closure, reason } of cases) {
+			expect
+				.soft(
+					await store.beginGeneration({
+						objectId: OBJECT_A,
+						generationId: GENERATION_A,
+						baseExpectedHead: noHead(OBJECT_A),
+						closure,
+					})
+				)
+				.toEqual({ ok: false, reason });
+		}
+		expect.soft(await store.readObjectState(OBJECT_A)).toEqual({
+			ok: true,
+			value: { head: noHead(OBJECT_A), generations: [] },
+		});
+		expect(
+			await store.beginGeneration({
+				objectId: OBJECT_B,
+				generationId: GENERATION_A,
+				baseExpectedHead: noHead(OBJECT_B),
+				closure: [reference],
+			})
+		).toMatchObject({ ok: true });
+
+		await store.close();
+		for (const { closure } of cases) {
+			expect
+				.soft(
+					await store.beginGeneration({
+						objectId: OBJECT_A,
+						generationId: GENERATION_A,
+						baseExpectedHead: noHead(OBJECT_A),
+						closure,
+					})
+				)
+				.toEqual({ ok: false, reason: "STORE_CLOSED" });
+		}
+	});
+
 	it("keeps legacy plain object IDs outside the greenfield adapter", async () => {
 		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
 		const result = await store.readObjectState("plain-room-id" as StorageObjectId);
