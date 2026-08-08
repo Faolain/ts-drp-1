@@ -2,16 +2,36 @@ import type { ProcessIdentity } from "./process-forest.js";
 import { validateTwoGroupForest } from "./process-forest.js";
 
 export interface SettledFailureOwnership {
+	readonly evidenceState: OwnershipEvidenceState;
 	readonly ownedGroups: readonly number[];
 	readonly recordedForest: readonly ProcessIdentity[];
 	readonly validatedGroups: readonly number[];
 }
 
-const EMPTY_OWNERSHIP: SettledFailureOwnership = Object.freeze({
-	ownedGroups: Object.freeze([]),
-	recordedForest: Object.freeze([]),
-	validatedGroups: Object.freeze([]),
-});
+export type OwnershipEvidenceState = "captured" | "unknown";
+
+/**
+ * Freezes one ownership envelope with explicit evidence completeness kept
+ * separate from signal authority.
+ * @param ownership - Bounded owned, recorded and validated process evidence.
+ * @param evidenceState - Whether the complete process table was captured.
+ * @returns One immutable ownership envelope.
+ */
+export function settledFailureOwnership(
+	ownership: Omit<SettledFailureOwnership, "evidenceState">,
+	evidenceState: OwnershipEvidenceState
+): SettledFailureOwnership {
+	return Object.freeze({ evidenceState, ...ownership });
+}
+
+const EMPTY_OWNERSHIP = settledFailureOwnership(
+	{
+		ownedGroups: Object.freeze([]),
+		recordedForest: Object.freeze([]),
+		validatedGroups: Object.freeze([]),
+	},
+	"captured"
+);
 
 function distinctGroups(groups: readonly number[]): readonly number[] {
 	return Object.freeze([...new Set(groups)]);
@@ -74,13 +94,16 @@ export function inspectSettledFailureOwnership(
 			throw new TypeError("settled failure forest does not prove isolated group leaders");
 		}
 		const validatedGroups = Object.freeze([groups.childPgid, groups.browserPgid]);
-		return Object.freeze({ ownedGroups: validatedGroups, recordedForest, validatedGroups });
+		return settledFailureOwnership({ ownedGroups: validatedGroups, recordedForest, validatedGroups }, "captured");
 	} catch {
-		return Object.freeze({
-			ownedGroups: discoverableGroups,
-			recordedForest,
-			validatedGroups: Object.freeze([]),
-		});
+		return settledFailureOwnership(
+			{
+				ownedGroups: discoverableGroups,
+				recordedForest,
+				validatedGroups: Object.freeze([]),
+			},
+			"captured"
+		);
 	}
 }
 

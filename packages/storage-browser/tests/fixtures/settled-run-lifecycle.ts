@@ -1,12 +1,22 @@
 import type { ProcessIdentity } from "./process-forest.js";
 import type { RunFinalizationObservation } from "./run-finalizer.js";
-import type { SettledFailureOwnership } from "./settled-failure-ownership.js";
+import {
+	type OwnershipEvidenceState,
+	type SettledFailureOwnership,
+	settledFailureOwnership,
+} from "./settled-failure-ownership.js";
 
 export interface SettledRunOwnershipContext {
 	readonly childPid: number;
 	readonly chromiumExecutablePath: string;
 	readonly controllerPid: number;
 	readonly profilePath: string;
+	readonly priorOwnershipEvidenceState?: OwnershipEvidenceState;
+	readonly trustedChildIdentity?: ProcessIdentity;
+}
+
+interface CapturedSettledRunOwnershipContext extends SettledRunOwnershipContext {
+	readonly captureState: OwnershipEvidenceState;
 }
 
 export type ProfileDisposition = "remove" | "retain";
@@ -16,6 +26,7 @@ export type RunCompletion =
 	| Readonly<{
 			finalization: Pick<RunFinalizationObservation, "unresolvedOwnedGroups">;
 			kind: "failed-finalized";
+			ownershipEvidenceState: OwnershipEvidenceState;
 	  }>
 	| Readonly<{ kind: "finalization-failed" }>;
 
@@ -50,6 +61,44 @@ function uniqueIdentities(forest: readonly ProcessIdentity[]): boolean {
 	return new Set(forest.map(({ pid }) => pid)).size === forest.length;
 }
 
+function sameIdentity(left: ProcessIdentity, right: ProcessIdentity): boolean {
+	return (
+		left.birthToken === right.birthToken &&
+		left.command === right.command &&
+		left.pgid === right.pgid &&
+		left.pid === right.pid &&
+		left.ppid === right.ppid &&
+		left.state === right.state
+	);
+}
+
+function ownershipEvidenceState(context: CapturedSettledRunOwnershipContext): OwnershipEvidenceState {
+	return context.captureState === "unknown" || context.priorOwnershipEvidenceState === "unknown"
+		? "unknown"
+		: "captured";
+}
+
+/**
+ * Captures the process table and delegates all pure ownership inspection to the
+ * settled-run inspector. Capture failure is explicit incomplete evidence and
+ * never grants signal authority.
+ * @param captureProcessForest - Complete process-table capture effect.
+ * @param context - Parent-authoritative browser and child context.
+ * @returns Owned evidence, validated groups and evidence completeness.
+ */
+export function captureSettledRunOwnership(
+	captureProcessForest: () => readonly ProcessIdentity[],
+	context: SettledRunOwnershipContext
+): SettledFailureOwnership {
+	let forest: readonly ProcessIdentity[];
+	try {
+		forest = captureProcessForest();
+	} catch {
+		return inspectSettledRunOwnership(Object.freeze([]), { ...context, captureState: "unknown" });
+	}
+	return inspectSettledRunOwnership(forest, { ...context, captureState: "captured" });
+}
+
 /**
  * Resolves bounded settled-run ownership while the Node child is present or
  * after Chromium has been reparented. Only one exact executable, profile,
@@ -60,8 +109,13 @@ function uniqueIdentities(forest: readonly ProcessIdentity[]): boolean {
  */
 export function inspectSettledRunOwnership(
 	forest: readonly ProcessIdentity[],
-	context: SettledRunOwnershipContext
+	context: SettledRunOwnershipContext & { readonly captureState?: OwnershipEvidenceState }
 ): SettledFailureOwnership {
+	const capturedContext: CapturedSettledRunOwnershipContext = {
+		...context,
+		captureState: context.captureState ?? "captured",
+	};
+	const evidenceState = ownershipEvidenceState(capturedContext);
 	const profileArgument = `--user-data-dir=${context.profilePath}`;
 	const candidates = forest.filter(
 		(identity) =>
@@ -69,14 +123,23 @@ export function inspectSettledRunOwnership(
 			hasExactArgument(identity.command, profileArgument)
 	);
 	const children = forest.filter(({ pid }) => pid === context.childPid);
+	const possibleUncapturedChildGroup =
+		capturedContext.captureState === "unknown" && Number.isSafeInteger(context.childPid) && context.childPid > 0
+			? [context.childPid]
+			: [];
 	const discoverableGroups = Object.freeze([
-		...new Set(
-			[...children, ...candidates].filter(({ pgid }) => Number.isSafeInteger(pgid) && pgid > 0).map(({ pgid }) => pgid)
-		),
+		...new Set([
+			...possibleUncapturedChildGroup,
+			...children.filter(({ pgid }) => Number.isSafeInteger(pgid) && pgid > 0).map(({ pgid }) => pgid),
+			...candidates.filter(({ pgid }) => Number.isSafeInteger(pgid) && pgid > 0).map(({ pgid }) => pgid),
+		]),
 	]);
 	const recordedForest = Object.freeze(forest.filter(({ pgid }) => discoverableGroups.includes(pgid)));
 	const unresolved = (): SettledFailureOwnership =>
-		Object.freeze({ ownedGroups: discoverableGroups, recordedForest, validatedGroups: Object.freeze([]) });
+		settledFailureOwnership(
+			{ ownedGroups: discoverableGroups, recordedForest, validatedGroups: Object.freeze([]) },
+			evidenceState
+		);
 
 	const controllers = forest.filter(({ pid }) => pid === context.controllerPid);
 	if (
@@ -107,28 +170,32 @@ export function inspectSettledRunOwnership(
 	if (browserRoot.pid !== browserRoot.pgid || browserRoot.pgid === controller.pgid || renderers.length === 0) {
 		return unresolved();
 	}
-	if (children.length === 1) {
+	const validatedGroups: number[] = [];
+	if (children.length === 1 && context.trustedChildIdentity !== undefined) {
 		const child = children[0] as ProcessIdentity;
 		if (
+			!sameIdentity(child, context.trustedChildIdentity) ||
 			child.pid !== child.pgid ||
 			child.pgid === controller.pgid ||
 			child.pgid === browserRoot.pgid ||
 			browserRoot.ppid !== child.pid
 		) {
-			return unresolved();
+			return settledFailureOwnership(
+				{
+					ownedGroups: discoverableGroups,
+					recordedForest,
+					validatedGroups: Object.freeze([browserRoot.pgid]),
+				},
+				evidenceState
+			);
 		}
-		return Object.freeze({
-			ownedGroups: Object.freeze([child.pgid, browserRoot.pgid]),
-			recordedForest,
-			validatedGroups: Object.freeze([child.pgid, browserRoot.pgid]),
-		});
+		validatedGroups.push(child.pgid);
 	}
-
-	return Object.freeze({
-		ownedGroups: Object.freeze([browserRoot.pgid]),
-		recordedForest,
-		validatedGroups: Object.freeze([browserRoot.pgid]),
-	});
+	validatedGroups.push(browserRoot.pgid);
+	return settledFailureOwnership(
+		{ ownedGroups: discoverableGroups, recordedForest, validatedGroups: Object.freeze(validatedGroups) },
+		evidenceState
+	);
 }
 
 /**
@@ -139,6 +206,7 @@ export function inspectSettledRunOwnership(
 export function profileDispositionFor(completion: RunCompletion): ProfileDisposition {
 	if (completion.kind === "pass") return "remove";
 	if (completion.kind === "finalization-failed") return "retain";
+	if (completion.ownershipEvidenceState !== "captured") return "retain";
 	return completion.finalization.unresolvedOwnedGroups.length === 0 ? "remove" : "retain";
 }
 

@@ -40,8 +40,8 @@ import {
 import { finalizeFailedRun } from "./fixtures/run-finalizer.js";
 import { ownershipFromSettledFailure, SettledRunFailure } from "./fixtures/settled-failure-ownership.js";
 import {
+	captureSettledRunOwnership,
 	disposeProfileWhenAllowed,
-	inspectSettledRunOwnership,
 	profileDispositionFor,
 } from "./fixtures/settled-run-lifecycle.js";
 import { parseWorkerToPageMessage } from "./fixtures/worker-protocol.js";
@@ -218,6 +218,7 @@ async function runSettled(
 			else reject(new TypeError("CHILD_PROTOCOL: unknown settled child message"));
 		});
 	});
+	let trustedChildIdentity: ProcessIdentity | undefined;
 	try {
 		const [untrusted, exit] = await Promise.all([
 			withTimeout(resultPromise, 20_000, `${role} result`),
@@ -236,6 +237,7 @@ async function runSettled(
 		if (child.pid !== childIdentity.pid || childIdentity.pgid !== childIdentity.pid) {
 			throw new TypeError("FOREST_CONTRADICTION: settled child did not lead its group");
 		}
+		trustedChildIdentity = childIdentity;
 		validateTwoGroupForest(forest, childIdentity.pid, browserRoot.pid);
 		await requireRecordedProcessesAbsent(forest);
 		return Object.freeze({
@@ -265,19 +267,14 @@ async function runSettled(
 			}),
 		});
 	} catch (error) {
-		let failureForest: readonly ProcessIdentity[] = Object.freeze([]);
-		try {
-			failureForest = captureProcessForest();
-		} catch {
-			// The original run failure remains primary and absent process evidence grants no signal authority.
-		}
 		const childPid = child.pid ?? -1;
 		const controllerPid = process.pid;
-		const failureOwnership = inspectSettledRunOwnership(failureForest, {
+		const failureOwnership = captureSettledRunOwnership(captureProcessForest, {
 			childPid,
 			chromiumExecutablePath: chromium.executablePath(),
 			controllerPid,
 			profilePath,
+			...(trustedChildIdentity === undefined ? {} : { trustedChildIdentity }),
 		});
 		throw new SettledRunFailure(error, failureOwnership);
 	}
@@ -404,6 +401,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 	let ownedGroups: readonly number[] = [];
 	let validatedGroups: readonly number[] = [];
 	let crashProcess: ChildProcess | undefined;
+	let trustedCrashChildIdentity: ProcessIdentity | undefined;
 	const hits: KillHit[] = [];
 	const settledChildren: SettledChildEvidence[] = [];
 	let recordedForestEvidence: readonly ProcessIdentity[] | undefined;
@@ -440,7 +438,6 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		crashProcess = crash;
-		if (crash.pid !== undefined) ownedGroups = Object.freeze([crash.pid]);
 		if (crash.stdout === null) throw new TypeError("SETUP_FAILED: crash stdout unavailable");
 		const lines = readline.createInterface({ input: crash.stdout, crlfDelay: Infinity });
 		let ready: Record<string, unknown> | undefined;
@@ -460,8 +457,17 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 				}
 				const candidate = message as Record<string, unknown>;
 				if (candidate.kind === "ready") {
-					if (ready !== undefined) reject(new TypeError("CHILD_PROTOCOL: duplicate crash ready"));
-					else ready = candidate;
+					try {
+						if (ready !== undefined) throw new TypeError("CHILD_PROTOCOL: duplicate crash ready");
+						const childIdentity = exactIdentity(candidate.child);
+						if (crash.pid === undefined || childIdentity.pid !== crash.pid || childIdentity.pgid !== crash.pid) {
+							throw new TypeError("FOREST_CONTRADICTION: crash child did not lead its detached group");
+						}
+						trustedCrashChildIdentity = childIdentity;
+						ready = candidate;
+					} catch (error) {
+						reject(error);
+					}
 					return;
 				}
 				if (candidate.kind === "child-error") {
@@ -485,7 +491,8 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		stage = "hit";
 		if (ready === undefined || crash.pid === undefined)
 			throw new TypeError("CHILD_PROTOCOL: hit preceded ready identity");
-		const childIdentity = exactIdentity(ready.child);
+		const childIdentity = trustedCrashChildIdentity;
+		if (childIdentity === undefined) throw new TypeError("CHILD_PROTOCOL: ready child identity was not retained");
 		const browserRoot = exactIdentity(ready.browserRoot);
 		ownedGroups = Object.freeze([...new Set([crash.pid, browserRoot.pgid])]);
 		browserForFailure = exactBrowser(ready.browser);
@@ -617,38 +624,29 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		return artifact;
 	} catch (error) {
 		const failureOwnership = ownershipFromSettledFailure(error);
-		ownedGroups = Object.freeze([...new Set([...ownedGroups, ...failureOwnership.ownedGroups])]);
-		validatedGroups = Object.freeze([...new Set([...validatedGroups, ...failureOwnership.validatedGroups])]);
+		const localOwnership = captureSettledRunOwnership(captureProcessForest, {
+			childPid: crashProcess?.pid ?? -1,
+			chromiumExecutablePath: chromium.executablePath(),
+			controllerPid: process.pid,
+			profilePath,
+			priorOwnershipEvidenceState: failureOwnership.evidenceState,
+			...(trustedCrashChildIdentity === undefined ? {} : { trustedChildIdentity: trustedCrashChildIdentity }),
+		});
+		ownedGroups = Object.freeze([
+			...new Set([...ownedGroups, ...failureOwnership.ownedGroups, ...localOwnership.ownedGroups]),
+		]);
+		validatedGroups = Object.freeze([
+			...new Set([...validatedGroups, ...failureOwnership.validatedGroups, ...localOwnership.validatedGroups]),
+		]);
 		const reachedForest = new Map<string, ProcessIdentity>();
-		for (const identity of [...(recordedForestEvidence ?? []), ...failureOwnership.recordedForest]) {
+		for (const identity of [
+			...(recordedForestEvidence ?? []),
+			...failureOwnership.recordedForest,
+			...localOwnership.recordedForest,
+		]) {
 			reachedForest.set(`${identity.pid}:${identity.birthToken}`, identity);
 		}
 		if (reachedForest.size !== 0) recordedForestEvidence = Object.freeze([...reachedForest.values()]);
-		if (validatedGroups.length === 0 && crashProcess?.pid !== undefined) {
-			try {
-				const forest = captureProcessForest();
-				const closure = processClosure(forest, crashProcess.pid);
-				ownedGroups = Object.freeze([...new Set([...ownedGroups, ...closure.map((identity) => identity.pgid)])]);
-				const childRoot = closure.find((identity) => identity.pid === crashProcess?.pid);
-				const parent = forest.find((identity) => identity.pid === process.pid);
-				if (childRoot?.pgid === crashProcess.pid && parent !== undefined && parent.pgid !== childRoot.pgid) {
-					validatedGroups = Object.freeze([childRoot.pgid]);
-				}
-				const browserCandidates = closure.filter(
-					(identity) => identity.ppid === crashProcess?.pid && identity.command.includes(profilePath)
-				);
-				if (browserCandidates.length === 1) {
-					const browserRoot = browserCandidates[0] as ProcessIdentity;
-					const groups = validateTwoGroupForest(closure, crashProcess.pid, browserRoot.pid);
-					if (groups.childPgid === crashProcess.pid && groups.browserPgid === browserRoot.pid) {
-						validatedGroups = Object.freeze([groups.browserPgid, groups.childPgid]);
-						ownedGroups = Object.freeze([...new Set([...ownedGroups, groups.browserPgid, groups.childPgid])]);
-					}
-				}
-			} catch {
-				// Ambiguous ownership remains explicit in partialEvidence.cleanup.
-			}
-		}
 		if (token !== "") {
 			try {
 				server.revoke(token);
@@ -678,7 +676,11 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 				killValidatedGroup,
 			}
 		);
-		profileDisposition = profileDispositionFor({ kind: "failed-finalized", finalization });
+		profileDisposition = profileDispositionFor({
+			kind: "failed-finalized",
+			finalization,
+			ownershipEvidenceState: localOwnership.evidenceState,
+		});
 		throw error;
 	} finally {
 		disposeProfileWhenAllowed(profilePath, profileDisposition, (disposableProfilePath) =>
@@ -822,7 +824,11 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 				killValidatedGroup,
 			}
 		);
-		profileDisposition = profileDispositionFor({ kind: "failed-finalized", finalization });
+		profileDisposition = profileDispositionFor({
+			kind: "failed-finalized",
+			finalization,
+			ownershipEvidenceState: failureOwnership.evidenceState,
+		});
 		throw error;
 	} finally {
 		disposeProfileWhenAllowed(profilePath, profileDisposition, (disposableProfilePath) =>
