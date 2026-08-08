@@ -35,6 +35,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"add",
 			"count",
 			"get",
+			"abort",
 			"addEventListener",
 			"close",
 		]),
