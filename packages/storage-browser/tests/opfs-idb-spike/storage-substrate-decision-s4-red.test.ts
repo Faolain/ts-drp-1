@@ -17,12 +17,16 @@ const S4_LINK_PATH = "tests/opfs-idb-spike/artifacts/phase-2d-storage-substrate-
 const temporaryDirectories: string[] = [];
 
 interface MutableLink {
-	decision: { jsonPath: string; jsonSha256: string; markdownSha256: string };
+	decision: { jsonPath: string; jsonSha256: string; markdownPath: string; markdownSha256: string };
 	artifacts: {
 		strictIdb: { testOnlyForcedObservedDurability: string };
 		measurement: { oracleStatus: string; sha256: string };
 		clearControl: { scoringWeight: string };
 	};
+}
+
+interface MutableDecision {
+	measurementArtifactDigests: string[];
 }
 
 afterEach(() => {
@@ -187,6 +191,46 @@ describe("Phase 2-spike S4 decision bundle and future 2d consumption gate", () =
 				requirePhase2dDecisionConsumptionReady({ rootDirectory: bundle.root, linkPath: bundle.linkPath })
 			).toThrow(TypeError);
 		}
+	});
+
+	it("rejects caller link-path escapes and additional uncited measurement digests", () => {
+		const escapedBundle = createSyntheticBundle("idb-strict");
+		const governedRoot = path.join(escapedBundle.root, "governed-root");
+		fs.mkdirSync(governedRoot);
+		fs.renameSync(path.join(escapedBundle.root, "artifacts"), path.join(governedRoot, "artifacts"));
+		fs.renameSync(
+			path.join(escapedBundle.root, escapedBundle.linkPath),
+			path.join(escapedBundle.root, "outside-link.json")
+		);
+		expect
+			.soft(() =>
+				requirePhase2dDecisionConsumptionReady({ rootDirectory: governedRoot, linkPath: "../outside-link.json" })
+			)
+			.toThrow(TypeError);
+
+		const digestBundle = createSyntheticBundle("idb-strict");
+		const fullLinkPath = path.join(digestBundle.root, digestBundle.linkPath);
+		const link = JSON.parse(fs.readFileSync(fullLinkPath, "utf8")) as MutableLink;
+		const fullDecisionPath = path.join(digestBundle.root, link.decision.jsonPath);
+		const decision = JSON.parse(fs.readFileSync(fullDecisionPath, "utf8")) as MutableDecision;
+		decision.measurementArtifactDigests.push(sha256("uncited measurement artifact"));
+		const decisionJson = JSON.stringify(decision);
+		const decisionDigest = sha256(decisionJson);
+		fs.writeFileSync(fullDecisionPath, decisionJson);
+
+		const fullMarkdownPath = path.join(digestBundle.root, link.decision.markdownPath);
+		const markdown = fs
+			.readFileSync(fullMarkdownPath, "utf8")
+			.replace(`Decision JSON SHA-256: ${link.decision.jsonSha256}`, `Decision JSON SHA-256: ${decisionDigest}`);
+		fs.writeFileSync(fullMarkdownPath, markdown);
+		link.decision.jsonSha256 = decisionDigest;
+		link.decision.markdownSha256 = sha256(markdown);
+		fs.writeFileSync(fullLinkPath, JSON.stringify(link));
+		expect
+			.soft(() =>
+				requirePhase2dDecisionConsumptionReady({ rootDirectory: digestBundle.root, linkPath: digestBundle.linkPath })
+			)
+			.toThrow(TypeError);
 	});
 
 	it("requires the finalized fresh S1/S2/S3 evidence, paired decision, and preimplementation 2d link in-repo", () => {
