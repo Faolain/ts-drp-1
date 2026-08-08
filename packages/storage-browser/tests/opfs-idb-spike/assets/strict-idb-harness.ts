@@ -42,7 +42,7 @@ async function deleteDatabase(name: string): Promise<void> {
 }
 
 interface ForcedObservationOptions {
-	readonly testOnlyForcedObservedDurability?: "strict" | "relaxed";
+	readonly testOnlyForcedObservedDurability?: "default" | "relaxed" | "strict";
 }
 
 interface ReopenedState {
@@ -53,8 +53,8 @@ interface ReopenedState {
 interface PermissiveScenarioResult {
 	readonly kind: "committed";
 	readonly requestedDurability: "strict";
-	readonly liveReportedDurability: "strict" | "relaxed";
-	readonly observedDurability: "strict" | "relaxed";
+	readonly liveReportedDurability: "default" | "relaxed" | "strict";
+	readonly observedDurability: "default" | "relaxed" | "strict";
 	readonly reportedDurability: "strict";
 	readonly error: null;
 	readonly reopened: ReopenedState;
@@ -90,20 +90,24 @@ async function runStrictIdbCapabilityScenario(
 	options: ForcedObservationOptions = {}
 ): Promise<PermissiveScenarioResult> {
 	const forced = options.testOnlyForcedObservedDurability;
-	if (forced !== undefined && forced !== "strict" && forced !== "relaxed") {
+	if (forced !== undefined && forced !== "strict" && forced !== "relaxed" && forced !== "default") {
 		throw new TypeError("testOnlyForcedObservedDurability is outside the bounded IDB vocabulary");
 	}
 
 	const databaseName = `${DATABASE_PREFIX}-${crypto.randomUUID()}`;
 	const database = await openDatabase(databaseName);
 	let liveReportedDurability: IDBTransactionDurability;
-	let observedDurability: "strict" | "relaxed";
+	let observedDurability: IDBTransactionDurability;
 	try {
 		const transaction = database.transaction(STORE_NAME, "readwrite", {
 			durability: REQUESTED_DURABILITY,
 		});
 		liveReportedDurability = transaction.durability;
-		if (liveReportedDurability !== "strict" && liveReportedDurability !== "relaxed") {
+		if (
+			liveReportedDurability !== "strict" &&
+			liveReportedDurability !== "relaxed" &&
+			liveReportedDurability !== "default"
+		) {
 			throw new TypeError(`unexpected live IDB durability: ${liveReportedDurability}`);
 		}
 		observedDurability = forced ?? liveReportedDurability;

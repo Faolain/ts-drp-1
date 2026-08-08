@@ -2,10 +2,15 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { parseSpikeEvidence } from "./fixtures/evidence-schema.js";
 
+type NonStrictDurability = Exclude<IDBTransactionDurability, "strict">;
+
 const SENTINEL = Object.freeze({
 	key: "phase-2-spike-s1-sentinel-key-v1",
 	value: "phase-2-spike-s1-exact-sentinel-v1",
 });
+const NON_STRICT_DURABILITIES = Object.freeze(
+	Object.keys({ relaxed: true, default: true } satisfies Record<NonStrictDurability, true>) as NonStrictDurability[]
+);
 const EXPECTED_EVIDENCE_JSON =
 	'{"schemaVersion":1,"artifactKind":"strict-idb-capability","requestedDurability":"strict","observedDurability":"strict","observedFrom":"live-transaction","nonStrictOutcome":"typed-fatal-capability-error","nonStrictWritesCommitted":0,"durabilityEvidenceScope":"capability-and-no-fallback","notProven":["fsync","power-loss","torn-write"]}';
 
@@ -13,13 +18,13 @@ interface ScenarioResult {
 	readonly kind: "committed" | "fatal-capability-error";
 	readonly requestedDurability: "strict";
 	readonly liveReportedDurability: "default" | "relaxed" | "strict";
-	readonly observedDurability: "strict" | "relaxed";
+	readonly observedDurability: "default" | "relaxed" | "strict";
 	readonly reportedDurability: "strict" | null;
 	readonly error: null | {
 		readonly name: "StrictIdbCapabilityError";
 		readonly code: "NON_STRICT_DURABILITY";
 		readonly requestedDurability: "strict";
-		readonly observedDurability: "relaxed";
+		readonly observedDurability: "default" | "relaxed";
 	};
 	readonly reopened: { readonly count: number; readonly value: string | null };
 	readonly evidenceJson: string | null;
@@ -28,12 +33,12 @@ interface ScenarioResult {
 
 interface StrictIdbPageGlobal {
 	runStrictIdbCapabilityScenario(options?: {
-		readonly testOnlyForcedObservedDurability?: "strict" | "relaxed";
+		readonly testOnlyForcedObservedDurability?: "default" | "relaxed" | "strict";
 	}): Promise<ScenarioResult>;
 	readonly strictIdbSentinel: typeof SENTINEL;
 }
 
-async function runScenario(page: Page, forced?: "strict" | "relaxed"): Promise<ScenarioResult> {
+async function runScenario(page: Page, forced?: "default" | "relaxed" | "strict"): Promise<ScenarioResult> {
 	await page.goto("/");
 	await page.waitForFunction(() => "runStrictIdbCapabilityScenario" in globalThis);
 	return page.evaluate(async (forcedObservation) => {
@@ -82,37 +87,44 @@ test("forced strict observation is a causal control against a vacuous always-fat
 	});
 });
 
-test("forced relaxed observation returns one typed fatal capability error and reopens with zero committed writes", async ({
+test("every non-strict durability returns a typed fatal capability error and reopens with zero writes", async ({
 	page,
 }) => {
-	const result = await runScenario(page, "relaxed");
-	expect({
-		kind: result.kind,
-		requestedDurability: result.requestedDurability,
-		liveReportedDurability: result.liveReportedDurability,
-		observedDurability: result.observedDurability,
-		reportedDurability: result.reportedDurability,
-		error: result.error,
-		committedWritesAfterReopen: result.reopened.count,
-		reopenedValue: result.reopened.value,
-		emittedEvidence:
-			result.evidenceJson === null && result.evidenceBytes === null
-				? "none"
-				: `present:${result.evidenceBytes?.length ?? 0}-bytes`,
-	}).toEqual({
-		kind: "fatal-capability-error",
-		requestedDurability: "strict",
-		liveReportedDurability: "strict",
-		observedDurability: "relaxed",
-		reportedDurability: null,
-		error: {
-			name: "StrictIdbCapabilityError",
-			code: "NON_STRICT_DURABILITY",
+	const observations = [];
+	for (const nonStrictDurability of NON_STRICT_DURABILITIES) {
+		const result = await runScenario(page, nonStrictDurability);
+		observations.push({
+			kind: result.kind,
+			requestedDurability: result.requestedDurability,
+			liveReportedDurability: result.liveReportedDurability,
+			observedDurability: result.observedDurability,
+			reportedDurability: result.reportedDurability,
+			error: result.error,
+			committedWritesAfterReopen: result.reopened.count,
+			reopenedValue: result.reopened.value,
+			emittedEvidence:
+				result.evidenceJson === null && result.evidenceBytes === null
+					? "none"
+					: `present:${result.evidenceBytes?.length ?? 0}-bytes`,
+		});
+	}
+
+	expect(observations).toEqual(
+		NON_STRICT_DURABILITIES.map((observedDurability) => ({
+			kind: "fatal-capability-error",
 			requestedDurability: "strict",
-			observedDurability: "relaxed",
-		},
-		committedWritesAfterReopen: 0,
-		reopenedValue: null,
-		emittedEvidence: "none",
-	});
+			liveReportedDurability: "strict",
+			observedDurability,
+			reportedDurability: null,
+			error: {
+				name: "StrictIdbCapabilityError",
+				code: "NON_STRICT_DURABILITY",
+				requestedDurability: "strict",
+				observedDurability,
+			},
+			committedWritesAfterReopen: 0,
+			reopenedValue: null,
+			emittedEvidence: "none",
+		}))
+	);
 });
