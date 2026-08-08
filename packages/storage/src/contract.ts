@@ -34,10 +34,26 @@ function parsed<T>(result: ParseResult<T>, label: string): T {
 }
 
 function successfulValue(result: unknown, step: string): unknown {
-	if (!isClosedRecord(result, ["ok", "value"]) || result.ok !== true) {
+	if (typeof result !== "object" || result === null || Array.isArray(result)) {
 		return contractViolation(step, "expected an exact successful StoreResult");
 	}
-	return result.value;
+	const prototype = Object.getPrototypeOf(result);
+	const ok = Object.getOwnPropertyDescriptor(result, "ok");
+	const value = Object.getOwnPropertyDescriptor(result, "value");
+	if (
+		(prototype !== Object.prototype && prototype !== null) ||
+		Reflect.ownKeys(result).length !== 2 ||
+		ok === undefined ||
+		!("value" in ok) ||
+		!ok.enumerable ||
+		ok.value !== true ||
+		value === undefined ||
+		!("value" in value) ||
+		!value.enumerable
+	) {
+		return contractViolation(step, "expected an exact successful StoreResult");
+	}
+	return value.value;
 }
 
 function assertRejection(result: unknown, reason: string, step: string): void {
@@ -235,6 +251,118 @@ async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
 	assertObjectState(persistedDiscard, { ...expectedGeneration, state: "Discarded" }, "readObjectState after discard");
 }
 
+function assertStrictGeneration(
+	value: unknown,
+	expected: Omit<GenerationRecord, "state"> & { readonly state: GenerationRecord["state"] },
+	step: string
+): asserts value is GenerationRecord {
+	const copied = copyGenerationRecord(value);
+	if (
+		copied === undefined ||
+		copied.objectId !== expected.objectId ||
+		copied.generationId !== expected.generationId ||
+		copied.baseExpectedHead.kind !== "none" ||
+		copied.baseExpectedHead.objectId !== expected.objectId ||
+		copied.closureDigest !== expected.closureDigest ||
+		copied.state !== expected.state ||
+		copied.closure.length !== expected.closure.length
+	) {
+		return contractViolation(step, `expected the exact ${expected.state} strict generation`);
+	}
+	for (let index = 0; index < expected.closure.length; index++) {
+		if (
+			copied.closure[index]?.digest !== expected.closure[index]?.digest ||
+			copied.closure[index]?.byteLength !== expected.closure[index]?.byteLength
+		) {
+			return contractViolation(step, "expected the exact sorted strict closure");
+		}
+	}
+}
+
+async function runStrictLifecycle(store: AheDurableStore): Promise<void> {
+	const objectId = parsed(parseStorageObjectId(`strict-contract:${"d".repeat(32)}`), "strict object ID");
+	const generationId = parsed(parseGenerationId("d".repeat(64)), "strict generation ID");
+	const payloads = [Uint8Array.of(0x73, 0x74, 0x72, 0x69, 0x63, 0x74), Uint8Array.of(0, 1, 2, 3)] as const;
+	const closure = payloads
+		.map(
+			(bytes): GenerationRef => ({
+				digest: parsed(digestBlob(bytes), "strict blob digest"),
+				byteLength: bytes.byteLength,
+			})
+		)
+		.sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0));
+	const closureDigest = parsed(digestClosure(closure), "strict closure digest");
+	const baseExpectedHead = { kind: "none", objectId } as const;
+	const expectedGeneration = { objectId, generationId, baseExpectedHead, closureDigest, closure };
+
+	const begun = successfulValue(
+		await store.beginGeneration({ objectId, generationId, baseExpectedHead, closure }),
+		"strict beginGeneration"
+	);
+	assertStrictGeneration(begun, { ...expectedGeneration, state: "Staged" }, "strict beginGeneration");
+	for (const payload of payloads) {
+		const digest = parsed(digestBlob(payload), "strict cache digest");
+		const cached = successfulValue(
+			await store.putCachedBlob({ objectId, generationId, digest, bytes: new Uint8Array(payload) }),
+			"strict putCachedBlob"
+		);
+		if (!isClosedRecord(cached, ["inserted"]) || cached.inserted !== true) {
+			contractViolation("strict putCachedBlob", "expected a new immutable blob insert");
+		}
+		const promoted = successfulValue(
+			await store.promoteReference({ objectId, generationId, digest }),
+			"strict promoteReference"
+		);
+		if (promoted !== undefined) {
+			contractViolation("strict promoteReference", "expected exact successful undefined promotion value");
+		}
+	}
+
+	const completed = successfulValue(
+		await store.completeGeneration({ objectId, generationId }),
+		"strict completeGeneration"
+	);
+	assertStrictGeneration(completed, { ...expectedGeneration, state: "Complete" }, "strict completeGeneration");
+	Reflect.set(completed, "state", "Discarded");
+	const beforeSwap = successfulValue(await store.readObjectState(objectId), "strict read before swap");
+	if (!isClosedRecord(beforeSwap, ["head", "generations"]) || !isClosedArray(beforeSwap.generations)) {
+		return contractViolation("strict read before swap", "expected an exact detached object state");
+	}
+	assertStrictGeneration(
+		beforeSwap.generations[0],
+		{ ...expectedGeneration, state: "Complete" },
+		"strict read before swap"
+	);
+
+	const swapped = successfulValue(
+		await store.swapHead({ objectId, generationId, expectedHead: baseExpectedHead }),
+		"strict swapHead"
+	);
+	if (
+		!isClosedRecord(swapped, ["head", "supersededGenerationId"]) ||
+		swapped.supersededGenerationId !== null ||
+		!isClosedRecord(swapped.head, ["kind", "objectId", "generationId", "revision", "closureDigest"]) ||
+		swapped.head.kind !== "present" ||
+		swapped.head.objectId !== objectId ||
+		swapped.head.generationId !== generationId ||
+		swapped.head.revision !== 1 ||
+		swapped.head.closureDigest !== closureDigest
+	) {
+		return contractViolation("strict swapHead", "expected the exact first adopted head");
+	}
+	Reflect.set(swapped.head, "objectId", "mutated-output");
+	const adopted = successfulValue(await store.readObjectState(objectId), "strict adopted reread");
+	if (
+		!isClosedRecord(adopted, ["head", "generations"]) ||
+		!isClosedRecord(adopted.head, ["kind", "objectId", "generationId", "revision", "closureDigest"]) ||
+		adopted.head.objectId !== objectId ||
+		!isClosedArray(adopted.generations)
+	) {
+		return contractViolation("strict adopted reread", "returned mutations changed persisted state");
+	}
+	assertStrictGeneration(adopted.generations[0], { ...expectedGeneration, state: "Adopted" }, "strict adopted reread");
+}
+
 async function executeScenario(scenario: StoreContractScenario, context: ContractContext): Promise<void> {
 	switch (scenario.id) {
 		case "ephemeral-capability": {
@@ -251,7 +379,8 @@ async function executeScenario(scenario: StoreContractScenario, context: Contrac
 				return contractViolation(scenario.id, "the capability scenario did not run first");
 			}
 			if (context.capabilities.durability === "ephemeral") return;
-			return contractViolation(scenario.id, "the strict scenario executor is not implemented until Phase 2c/2d");
+			await runStrictLifecycle(context.store);
+			return;
 		default: {
 			const exhaustiveScenario: never = scenario;
 			return exhaustiveScenario;
