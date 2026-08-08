@@ -65,18 +65,36 @@ function directForest(): readonly ProcessIdentity[] {
 	]);
 }
 
-function inspect(forest: readonly ProcessIdentity[]): ReturnType<typeof inspectSettledRunOwnership> {
-	return inspectSettledRunOwnership(forest, {
+function inspect(
+	forest: readonly ProcessIdentity[],
+	trustedChildIdentity?: ProcessIdentity
+): ReturnType<typeof inspectSettledRunOwnership> {
+	const context: Parameters<typeof inspectSettledRunOwnership>[1] & {
+		readonly trustedChildIdentity?: ProcessIdentity;
+	} = {
 		childPid: 410,
 		chromiumExecutablePath: EXECUTABLE,
 		controllerPid: CONTROLLER_PID,
 		profilePath: PROFILE,
-	});
+		...(trustedChildIdentity === undefined ? {} : { trustedChildIdentity }),
+	};
+	return inspectSettledRunOwnership(forest, context);
+}
+
+function expectCapturedOwnership(ownership: ReturnType<typeof inspectSettledRunOwnership>): void {
+	expect(Object.keys(ownership).sort()).toEqual(["evidenceState", "ownedGroups", "recordedForest", "validatedGroups"]);
+	expect(
+		(ownership as ReturnType<typeof inspectSettledRunOwnership> & { readonly evidenceState?: unknown }).evidenceState
+	).toBe("captured");
 }
 
 describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b reparented settled ownership controls", () => {
 	it("preserves both validated groups while the exact settled child relationship remains observable", () => {
-		const ownership = inspect(directForest());
+		const forest = directForest();
+		const trustedChildIdentity = forest.find(({ pid }) => pid === 410);
+		if (trustedChildIdentity === undefined) throw new TypeError("missing direct child identity");
+		const ownership = inspect(forest, trustedChildIdentity);
+		expectCapturedOwnership(ownership);
 		expect(ownership.ownedGroups).toEqual([410, 420]);
 		expect(ownership.validatedGroups).toEqual([410, 420]);
 		expect(new Set(ownership.recordedForest.map(({ pid }) => pid))).toEqual(new Set([410, 420, 421]));
@@ -84,6 +102,7 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b reparented settled ownership con
 
 	it("validates only the unique exact-profile Chromium group after the settled child disappeared", () => {
 		const ownership = inspect(reparentedForest());
+		expectCapturedOwnership(ownership);
 		expect(ownership.ownedGroups).toEqual([420]);
 		expect(ownership.validatedGroups).toEqual([420]);
 		expect(new Set(ownership.recordedForest.map(({ pid }) => pid))).toEqual(new Set([420, 421]));
@@ -146,8 +165,18 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b reparented settled ownership con
 					)
 				: candidate
 		);
-		expect(inspect(substring)).toEqual({ ownedGroups: [], recordedForest: [], validatedGroups: [] });
-		expect(inspect(executableLookalike)).toEqual({ ownedGroups: [], recordedForest: [], validatedGroups: [] });
+		expect(inspect(substring)).toEqual({
+			evidenceState: "captured",
+			ownedGroups: [],
+			recordedForest: [],
+			validatedGroups: [],
+		});
+		expect(inspect(executableLookalike)).toEqual({
+			evidenceState: "captured",
+			ownedGroups: [],
+			recordedForest: [],
+			validatedGroups: [],
+		});
 	});
 
 	it("never turns unresolved discoverability into signal authority", () => {
@@ -179,16 +208,43 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b closed profile disposal controls
 	it.each([
 		{ completion: { kind: "pass" } as const, expected: "remove" },
 		{
-			completion: { kind: "failed-finalized", finalization: { unresolvedOwnedGroups: [] } } as const,
+			completion: {
+				kind: "failed-finalized",
+				finalization: { unresolvedOwnedGroups: [] },
+				ownershipEvidenceState: "captured",
+			} as const,
 			expected: "remove",
 		},
 		{
-			completion: { kind: "failed-finalized", finalization: { unresolvedOwnedGroups: [420] } } as const,
+			completion: {
+				kind: "failed-finalized",
+				finalization: { unresolvedOwnedGroups: [420] },
+				ownershipEvidenceState: "captured",
+			} as const,
 			expected: "retain",
 		},
 		{ completion: { kind: "finalization-failed" } as const, expected: "retain" },
 	])("returns $expected for $completion.kind", ({ completion, expected }) => {
 		expect(profileDispositionFor(completion)).toBe(expected);
+	});
+
+	it("fails closed for omitted or unrecognized failed-finalized evidence state", () => {
+		const untrustedCompletions: readonly unknown[] = [
+			{ kind: "failed-finalized", finalization: { unresolvedOwnedGroups: [] } },
+			{
+				kind: "failed-finalized",
+				finalization: { unresolvedOwnedGroups: [] },
+				ownershipEvidenceState: "unrecognized",
+			},
+		];
+		for (const completion of untrustedCompletions) {
+			expect
+				.soft(
+					profileDispositionFor(completion as Parameters<typeof profileDispositionFor>[0]),
+					"untyped failed-finalized input cannot create delete eligibility"
+				)
+				.toBe("retain");
+		}
 	});
 
 	it("makes removal versus retention observable at the one disposal boundary", () => {
@@ -292,12 +348,14 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled lifecycle integration RE
 	it("runSettled rediscovers a reparented browser from parent-authoritative context", () => {
 		const declaration = namedFunction("runSettled");
 		const clause = catchClauseOf(declaration);
-		const combined = callsNamed(clause, "inspectSettledRunOwnership");
+		const durable = callsNamed(clause, "captureSettledRunOwnership");
+		const superseded = callsNamed(clause, "inspectSettledRunOwnership");
 		const legacy = callsNamed(clause, "inspectSettledFailureOwnership");
-		expect.soft(importedFromLifecycle("inspectSettledRunOwnership")).toBe(true);
-		expect.soft(combined).toHaveLength(1);
-		expect.soft(legacy, "one combined inspector owns direct and reparented failure states").toHaveLength(0);
-		const context = combined[0]?.arguments[1];
+		expect.soft(importedFromLifecycle("captureSettledRunOwnership")).toBe(true);
+		expect.soft(durable).toHaveLength(1);
+		expect.soft(superseded, "capture and inspection have one durable owner").toHaveLength(0);
+		expect.soft(legacy, "no legacy settled-failure inspector remains").toHaveLength(0);
+		const context = durable[0]?.arguments[1];
 		expect.soft(context !== undefined && containsIdentifier(context, "childPid")).toBe(true);
 		expect.soft(context !== undefined && containsIdentifier(context, "profilePath")).toBe(true);
 		expect.soft(context !== undefined && containsIdentifier(context, "controllerPid")).toBe(true);

@@ -66,9 +66,18 @@ function finalizeOwnership(
 	);
 }
 
+function expectCapturedOwnership(ownership: ReturnType<typeof inspectSettledFailureOwnership>): void {
+	expect(Object.keys(ownership).sort()).toEqual(["evidenceState", "ownedGroups", "recordedForest", "validatedGroups"]);
+	expect(
+		(ownership as ReturnType<typeof inspectSettledFailureOwnership> & { readonly evidenceState?: unknown })
+			.evidenceState
+	).toBe("captured");
+}
+
 describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled failure ownership model", () => {
 	it("proves only the exact profile-bound child/browser groups and excludes the controller", () => {
 		const ownership = inspectSettledFailureOwnership(parseProcessForest(VALID_FOREST), 410, PROFILE, CONTROLLER_PID);
+		expectCapturedOwnership(ownership);
 		expect(ownership.ownedGroups).toEqual([410, 420]);
 		expect(ownership.validatedGroups).toEqual([410, 420]);
 		expect(new Set(ownership.recordedForest.map(({ pgid }) => pgid))).toEqual(new Set([410, 420]));
@@ -80,6 +89,7 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled failure ownership model"
 			`${VALID_FOREST}\n 440 410 440 Fri Aug  7 16:00:05 2026 S chromium --user-data-dir=${PROFILE}`
 		);
 		const ownership = inspectSettledFailureOwnership(ambiguous, 410, PROFILE, CONTROLLER_PID);
+		expectCapturedOwnership(ownership);
 		const signaled: number[] = [];
 		const observation = finalizeOwnership(ownership, (pgid): void => {
 			signaled.push(pgid);
@@ -95,6 +105,7 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled failure ownership model"
 
 	it("records successful cleanup separately from a validated group whose signal fails", () => {
 		const ownership = inspectSettledFailureOwnership(parseProcessForest(VALID_FOREST), 410, PROFILE, CONTROLLER_PID);
+		expectCapturedOwnership(ownership);
 		const signaled: number[] = [];
 		const observation = finalizeOwnership(ownership, (pgid): void => {
 			signaled.push(pgid);
@@ -111,9 +122,11 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled failure ownership model"
 
 	it("preserves structured ownership without treating ordinary errors as kill authority", () => {
 		const ownership = inspectSettledFailureOwnership(parseProcessForest(VALID_FOREST), 410, PROFILE, CONTROLLER_PID);
+		expectCapturedOwnership(ownership);
 		const wrapped = new SettledRunFailure(new TypeError("SETUP_FAILED: injected"), ownership);
 		expect(ownershipFromSettledFailure(wrapped)).toBe(ownership);
 		expect(ownershipFromSettledFailure(new TypeError("untrusted"))).toEqual({
+			evidenceState: "captured",
 			ownedGroups: [],
 			recordedForest: [],
 			validatedGroups: [],
