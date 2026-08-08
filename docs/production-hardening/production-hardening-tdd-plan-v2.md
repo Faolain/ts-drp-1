@@ -1765,14 +1765,20 @@ Before arming, the child reports its PID/PGID, resolved Chromium executable,
 profile, browser root PID/PGID and initial forest. At the exact armed hit the
 parent:
 
-1. sends `SIGSTOP` to the child PGID;
-2. polls a fresh process forest until every owned non-zombie is stopped or the
-   bound expires;
-3. validates the unique browser root, at least one renderer, exactly the child
-   and browser groups, and an unambiguous birth token for every PID;
-4. sends `SIGSTOP` to the browser PGID and recaptures the same owned union;
-5. sends `SIGKILL` to the browser PGID first, then the child PGID, without a
-   graceful call, resume or delay.
+1. validates exact, distinct, root-led child and browser PGIDs, the unique
+   browser root, in-group renderer ancestry, parent non-overlap and an
+   unambiguous birth token for every initially owned PID before signaling;
+2. sends `SIGSTOP` to the child PGID, pins both roots by exact non-state
+   identity and polls fresh forests until every initial and current child-group
+   member is stopped or zombie; browser leaves may legitimately depart or be
+   replaced while their group is still running;
+3. sends `SIGSTOP` to the browser PGID, then revalidates and freezes the current
+   stopped members of those same two authorized PGIDs; departed initial browser
+   leaves are omitted and replacements are admitted only through the already
+   authorized browser PGID and the complete current topology proof;
+4. sends `SIGKILL` to the browser PGID first, then the child PGID, without a
+   graceful call, resume or delay; and
+5. proves both groups and every frozen PID/birth-token identity absent.
 
 Every capture uses:
 
@@ -1889,6 +1895,86 @@ never bypassed.
 - This is the trivial-payload precursor for chat golden-path step 7. Step 7's
   full closure XOR remains owned by 2e. Game golden-path step 1 reuses the same
   durable plane with no carve-out. Phase 2b completes neither path by itself.
+
+#### Phase 2b corrective closure — `6ad9516`
+
+The original executable process-death seam needed a bounded corrective lineage
+before acceptance. The accepted sequence is:
+
+- `6cdbe05` retained unresolved settled profiles;
+- `a0d9978`/`00e2641` added cleanup authority and its GREEN;
+- `32bf8ee`/`33e406a` bound authority to the launched executable;
+- `a1ce7ca`/`de177dd` admitted legitimate browser-leaf churn while keeping the
+  two authorized roots and PGIDs pinned;
+- `0c9e295`/`ee72df3` covered real Chrome helper topology and cleanup;
+- `62f1a7c`/`5619eb7` replaced the direct-renderer-child assumption with
+  transitive in-group ancestry;
+- `f7be347`/`64ffc60` made persisted-artifact validation reuse the shared
+  topology validator; and
+- `83fb928`/`6ad9516` closed Linux failure cleanup when the browser root and all
+  helpers share the exact executable and profile.
+
+The last RED failed only the two legitimate Linux cases and kept three safety
+controls green: competing group-leading roots, a helper-only group and
+cross-PGID renderer ancestry. The frozen RED hash is
+`1bea0a1884cb2927798d58a49379cb199cc1af974c7e73ca8264e36d7f0cfbe4`.
+The GREEN adds only the group-leader discriminator `pid === pgid` to the exact
+executable/profile root candidates. This is fail-closed: no leader, multiple
+leaders, profile escape, controller overlap, malformed identity or missing
+renderer ancestry still yields `UNKNOWN`, grants no signal authority and
+retains the profile. Focused tests pass 5/5; the bounded corrective set passes
+126/126; typecheck, build, Prettier, ESLint, diff and clean-checkout gates pass.
+
+The success campaign and failure-cleanup proof are deliberately separate. A
+successful 16-run process-death campaign does not execute the catch-path
+inspector. The accepted failure proof therefore combines the frozen RED with a
+replay of the real prior Ubuntu forest: eight exact executable/profile
+candidates narrow to the sole group-leading browser root, changing
+`validatedGroups:[]`/`UNKNOWN` at `64ffc60` to both authorized groups and
+`CAPTURED` at `6ad9516`. Exact Ubuntu Noble arm64 and macOS arm64 campaigns at
+the accepted SHA each pass all sixteen artifacts with 14 tuple + discovery +
+arming, 13 old + one new, 3 `not-reached` + 11 `strict`, zero mixed state, zero
+kill/settled-proof failures and zero profile/process/temporary-asset survivors.
+All artifact and candidate-evidence manifests verify.
+
+The plan wording above was amended only after the required assumption-correction
+quorum agreed that the old “same initially owned union” description was false.
+A fresh Codex-high vote, exact Kimi 3/high/100 and Opus 5/xhigh unanimously
+ratified the current-member staged-freeze contract; genuine Grok 4.5/high also
+approved it during acceptance. Final review provenance:
+
+- Grok session `019fe011-8250-7572-b75e-612e7aa3428a`, result SHA-256
+  `95b9639fab4344b28697029a17f4b01eb2ec2c4095443dafe8c5ac875dc1f313`;
+- Kimi 3 session `ff578c1c-4b1b-48dd-ac4f-487c18f38aec`, exact K3/thinking/
+  100-step controls, result SHA-256
+  `de6ef12a2886e80d811fd75c40c94c85947ee8692192c9af90ef83ee1b2026e2`;
+- Opus session `14e6643e-30ef-473f-bb64-884e9fec342c`, all 135 substantive
+  assistant records `claude-opus-5`/`xhigh`, result SHA-256
+  `934d601e653845424bebf72c62d2d28f54533c854f74d162c936594b9b587a02`.
+
+All three returned `APPROVED`, highest severity `NONE`, prior blocker fixed,
+plan amendment approved, campaigns sufficient, golden-path alignment preserved
+and greenfield/no-plain-ID confirmed. The small automatic Haiku title metadata
+in the Opus ledger was not a review/helper turn.
+
+Accepted LOW/later hardening, not Phase 2b blockers:
+
+1. make the shared renderer predicate use the same exact `--type=renderer`
+   token as failure cleanup;
+2. remove or explicitly archive the now-unwired parallel settled-failure
+   inspector so it cannot be miswired later;
+3. consider making catch-path cleanup browser-then-child like the measured path
+   and pinning that order;
+4. document or harden the failure-path capture-to-signal TOCTOU and the bounded
+   assumption that owned browser descendants do not escape their PGID;
+5. add a future real failure-cleanup exercise with non-empty validated groups;
+   the accepted evidence today is the real-forest replay plus behavioural
+   dependency-injected tests; and
+6. document or unify `runControl` failure cleanup with the tuple path.
+
+These do not widen the claim: 2b proves browser **process death**, not power
+loss, and 2e still owns real-generation adoption and the complete closure XOR
+required by the chat/MMORPG golden paths.
 
 ### Exit gate (Phase 2)
 
