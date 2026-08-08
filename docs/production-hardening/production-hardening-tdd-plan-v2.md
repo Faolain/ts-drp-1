@@ -2370,6 +2370,69 @@ Carry these bounded residuals without inflating S0 into browser behavior:
    churn, a schema-library migration and deep-clone machinery are not justified
    unless a later executable consumer demonstrates the need.
 
+##### Phase 2-spike S1 accepted closure — live strict-IDB capability
+
+S1 is accepted at GREEN `6e7da48` over initial tests-only RED `1540f8c` and
+corrective RED `f6b9951`. Pinned Playwright Chromium `149.0.7827.55` exposes the
+live `IDBTransaction.durability` property and reported `strict` on a real
+readwrite transaction requested with `{durability:"strict"}`. The initial RED
+proved the permissive request-echo defect: forced `relaxed` still committed one
+sentinel and emitted a strict artifact. The corrective RED type-linked the
+complete `Exclude<IDBTransactionDurability,"strict">` set and reproduced the
+same failure for both `relaxed` and `default` in one aggregate test. GREEN reads
+the live report, applies the private observation seam, aborts before any object
+store request on either non-strict value, awaits the abort, closes/reopens the
+database, and returns one typed fatal capability result with zero records and no
+evidence bytes. Only exact `strict` may add the sentinel, await commit, reopen it,
+emit exact JSON bytes, `JSON.parse` them and pass the S0 validator.
+
+The committed browser suite is 3/3; S0 plus ownership controls are 16/16; the
+non-browser `storage-browser` suite is 161/161; package typecheck, build, focused
+and package lint, formatting and diff checks are green. The harness is a third
+exact raw-IDB owner; GREEN added only its required `abort` permission and did
+not broaden either pre-existing owner.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session `807d64a8-e034-4366-8c68-90bcee6c2509`
+  accepted; result SHA-256
+  `f6c5c65aaaa07241712bbeea8fa271386caa3aeb6b964aacb25740606de92b6f`;
+- exact Kimi 3/high/100 authoritative attempt-2 session
+  `81a05086-f9fd-45f0-9a5c-4953ac4e5f92` accepted; result SHA-256
+  `eb483fb60a0c4b7ae5b45a253daddbd4ba7b86df84a8caacb7f8dc96ab2d394a`.
+  Attempt 1 session `71e4f4f6-887d-4b14-a63f-a173e59d88a2` stalled after
+  a completed read-only call, emitted no verdict, was preserved and is
+  explicitly non-authoritative;
+- final Opus 5/xhigh session `9fc6c43c-a163-449e-bcd6-912b5fb98923`
+  approved with all 80 assistant records authenticated as Opus 5; result
+  SHA-256
+  `6798b55930866dc556f738202d3b0fc8d8e7ec59447aad0fc7f09070dcffb8bc`.
+
+Carry these bounded residuals into the remaining spike slices:
+
+1. The forced observation seam is causal test instrumentation, never evidence.
+   S2-S4 must refuse to persist, digest, cite or select from any run where
+   `testOnlyForcedObservedDurability` is present; only a fresh unforced run may
+   contribute the `observedFrom:"live-transaction"` capability artifact. S4
+   must make this non-citability mechanically visible before binding digests.
+2. The only proven browser is Chromium `149.0.7827.55`. The artifact schema has
+   no engine field for strict capability, so S4 must bind the unforced artifact
+   digest to surrounding runtime-version evidence rather than imply a general
+   browser result. Firefox, WebKit, mobile and real-device behavior remain
+   unmeasured here.
+3. An out-of-union future durability string throws and cleans up rather than
+   returning the typed vocabulary error. This is fail-closed; revisit only when
+   the platform vocabulary changes. Fixed port collision, abort/reopen/delete
+   hangs and server cwd mistakes also fail the bounded Playwright run instead
+   of attaching, retrying or emitting evidence.
+4. Reopen means a fresh connection in the same page/browser process, not a
+   process restart. This slice proves capability and no fallback only; it does
+   not prove process death, fsync, power loss, torn writes, eviction, benchmark
+   superiority, production adapter wiring or either golden path.
+5. The S1 Playwright config is a decision-spike runner, not a standing package
+   script. S4 owns the authenticated decision bundle and 2d consumption gate;
+   do not cite an ad hoc or forced local run in their place.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
