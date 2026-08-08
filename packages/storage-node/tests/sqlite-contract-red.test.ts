@@ -1,22 +1,25 @@
 import {
 	type AheDurableStore,
+	type BlobDigest,
 	digestBlob,
 	type GenerationId,
+	type GenerationRecord,
 	parseGenerationId,
 	type ParseResult,
 	parseStorageObjectId,
 	type StorageObjectId,
 } from "@ts-drp/storage";
 import { runStoreContract } from "@ts-drp/storage/contract";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createSqliteAheDurableStore } from "../src/index.js";
+import * as storageNode from "../src/index.js";
 import { createInstrumentedSqliteAheDurableStore } from "../src/test-instrumentation.js";
 
+const { createSqliteAheDurableStore } = storageNode;
 const temporaryDirectories: string[] = [];
 
 function must<T>(result: ParseResult<T>): T {
@@ -44,7 +47,7 @@ async function begin(
 	objectId: StorageObjectId,
 	generationId: GenerationId,
 	bytes: Uint8Array
-): Promise<void> {
+): Promise<GenerationRecord> {
 	const digest = must(digestBlob(bytes));
 	const result = await store.beginGeneration({
 		objectId,
@@ -53,6 +56,12 @@ async function begin(
 		closure: [{ digest, byteLength: bytes.byteLength }],
 	});
 	if (!result.ok) throw new Error(`begin fixture failed: ${result.reason}`);
+	return result.value;
+}
+
+function rawPragma(database: DatabaseSync, pragma: "integrity_check" | "journal_mode"): unknown {
+	const row = database.prepare(`PRAGMA ${pragma}`).get();
+	return row === undefined ? undefined : Object.values(row)[0];
 }
 
 afterEach(async () => {
@@ -63,6 +72,21 @@ afterEach(async () => {
 
 describe("Phase 2c-a Node SQLite strict store RED", () => {
 	it("reports the exact frozen strict capability pair", async () => {
+		const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
+			engines?: { node?: unknown };
+			exports?: Record<string, unknown>;
+			private?: unknown;
+		};
+		expect({
+			engines: manifest.engines,
+			exportSubpaths: Object.keys(manifest.exports ?? {}),
+			private: manifest.private,
+		}).toEqual({
+			engines: { node: ">=22.13.0" },
+			exportSubpaths: ["."],
+			private: true,
+		});
+		expect(Object.keys(storageNode)).toEqual(["createSqliteAheDurableStore"]);
 		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
 		expect(store.capabilities).toEqual({
 			durability: "strict",
@@ -83,41 +107,64 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 	it("persists distinct structural object-generation tuples and blob bytes across close and reopen", async () => {
 		const filename = await databaseFilename();
 		const first = createSqliteAheDurableStore({ filename });
-		const bytesA = Uint8Array.of(1, 2, 3);
-		const bytesB = Uint8Array.of(4, 5, 6);
-		const digestA = must(digestBlob(bytesA));
-		const digestB = must(digestBlob(bytesB));
-		await begin(first, OBJECT_A, GENERATION_B, bytesA);
-		await begin(first, OBJECT_B, GENERATION_A, bytesB);
-		expect(
-			await first.putCachedBlob({ objectId: OBJECT_A, generationId: GENERATION_B, digest: digestA, bytes: bytesA })
-		).toEqual({
-			ok: true,
-			value: { inserted: true },
-		});
-		expect(
-			await first.putCachedBlob({ objectId: OBJECT_B, generationId: GENERATION_A, digest: digestB, bytes: bytesB })
-		).toEqual({
-			ok: true,
-			value: { inserted: true },
-		});
+		const tuples = [
+			{ bytes: Uint8Array.of(1, 2, 3), generationId: GENERATION_A, objectId: OBJECT_A },
+			{ bytes: Uint8Array.of(4, 5, 6), generationId: GENERATION_B, objectId: OBJECT_A },
+			{ bytes: Uint8Array.of(7, 8, 9), generationId: GENERATION_A, objectId: OBJECT_B },
+		] as const;
+		const expectedGenerations: GenerationRecord[] = [];
+		const expectedBlobs: Array<Readonly<{ bytes: Uint8Array; digest: BlobDigest }>> = [];
+		for (const tuple of tuples) {
+			const digest = must(digestBlob(tuple.bytes));
+			expectedGenerations.push(await begin(first, tuple.objectId, tuple.generationId, tuple.bytes));
+			expect(
+				await first.putCachedBlob({
+					objectId: tuple.objectId,
+					generationId: tuple.generationId,
+					digest,
+					bytes: tuple.bytes,
+				})
+			).toEqual({ ok: true, value: { inserted: true } });
+			expectedBlobs.push({ bytes: tuple.bytes, digest });
+		}
 		await first.close();
 
 		const reopened = createSqliteAheDurableStore({ filename });
-		const stateA = await reopened.readObjectState(OBJECT_A);
-		const stateB = await reopened.readObjectState(OBJECT_B);
-		expect.soft(stateA.ok && stateA.value.generations.map(({ generationId }) => generationId)).toEqual([GENERATION_B]);
-		expect.soft(stateB.ok && stateB.value.generations.map(({ generationId }) => generationId)).toEqual([GENERATION_A]);
-		expect.soft(await reopened.getBlob(digestA)).toEqual({ ok: true, value: bytesA });
-		expect.soft(await reopened.getBlob(digestB)).toEqual({ ok: true, value: bytesB });
+		expect.soft(await reopened.readObjectState(OBJECT_A)).toEqual({
+			ok: true,
+			value: {
+				head: noHead(OBJECT_A),
+				generations: [expectedGenerations[0], expectedGenerations[1]],
+			},
+		});
+		expect.soft(await reopened.readObjectState(OBJECT_B)).toEqual({
+			ok: true,
+			value: { head: noHead(OBJECT_B), generations: [expectedGenerations[2]] },
+		});
+		for (const { bytes, digest } of expectedBlobs) {
+			expect.soft(await reopened.getBlob(digest)).toEqual({ ok: true, value: bytes });
+		}
 		await reopened.close();
 	});
 
 	it("creates a structural composite-key schema with WAL, FULL synchronous, foreign keys, and integrity", async () => {
 		const filename = await databaseFilename();
 		const instrumented = createInstrumentedSqliteAheDurableStore({ filename });
-		const configuration = instrumented.inspectConfiguration();
 		const store = instrumented.store;
+		const payload = Uint8Array.of(13, 14, 15);
+		const digest = must(digestBlob(payload));
+		await begin(store, OBJECT_A, GENERATION_A, payload);
+		expect(
+			await store.putCachedBlob({ objectId: OBJECT_A, generationId: GENERATION_A, digest, bytes: payload })
+		).toEqual({ ok: true, value: { inserted: true } });
+
+		expect.soft(instrumented.inspectConfiguration()).toEqual({
+			foreignKeys: 1,
+			integrityCheck: "ok",
+			journalMode: "wal",
+			synchronous: 2,
+		});
+		expect(() => instrumented.attemptInvalidForeignKeyInsert()).toThrow(/FOREIGN KEY constraint failed/u);
 		await store.close();
 
 		const database = new DatabaseSync(filename);
@@ -130,17 +177,18 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 				.filter(({ pk }) => pk > 0)
 				.sort((left, right) => left.pk - right.pk)
 				.map(({ name, pk }) => ({ name, pk }));
+			const persistedRows =
+				generationColumns.length === 0
+					? undefined
+					: (database.prepare("SELECT count(*) AS count FROM generations").get() as { count: number }).count;
 
-			expect.soft(configuration).toEqual({
-				foreignKeys: true,
-				integrityCheck: "ok",
-				journalMode: "wal",
-				synchronous: "full",
-			});
+			expect.soft(rawPragma(database, "journal_mode")).toBe("wal");
 			expect.soft(primaryKey).toEqual([
 				{ name: "object_id", pk: 1 },
 				{ name: "generation_id", pk: 2 },
 			]);
+			expect.soft(persistedRows).toBe(1);
+			expect.soft(rawPragma(database, "integrity_check")).toBe("ok");
 		} finally {
 			database.close();
 		}
@@ -152,7 +200,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 		const checkpoints: string[] = [];
 		const instrumented = createInstrumentedSqliteAheDurableStore({ filename }, (checkpoint) => {
 			checkpoints.push(`${checkpoint.operation}:${checkpoint.edge}`);
-			throw injected;
+			if (checkpoints.length === 1) throw injected;
 		});
 		const store = instrumented.store;
 		const payload = Uint8Array.of(7, 8, 9);
@@ -171,6 +219,22 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 			value: { head: noHead(OBJECT_A), generations: [] },
 		});
 		expect.soft(await store.getBlob(digest)).toEqual({ ok: true, value: null });
+
+		const retry = await store.beginGeneration({
+			objectId: OBJECT_A,
+			generationId: GENERATION_A,
+			baseExpectedHead: noHead(OBJECT_A),
+			closure: [{ digest, byteLength: payload.byteLength }],
+		});
+		expect.soft(checkpoints).toEqual(["beginGeneration:before-commit", "beginGeneration:before-commit"]);
+		expect.soft(retry.ok).toBe(true);
+		expect.soft(await store.readObjectState(OBJECT_A)).toEqual({
+			ok: true,
+			value: {
+				head: noHead(OBJECT_A),
+				generations: retry.ok ? [retry.value] : [],
+			},
+		});
 		await store.close();
 	});
 

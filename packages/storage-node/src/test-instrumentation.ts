@@ -1,16 +1,17 @@
 import type { AheDurableStore } from "@ts-drp/storage";
 
 import type { SqliteAheDurableStoreOptions } from "./index.js";
-import { createSqliteScaffold, type SqliteMutationFault } from "./internal/create-scaffold.js";
+import { createInstrumentedSqliteScaffold, type SqliteMutationFault } from "./internal/create-scaffold.js";
 
 export type SqliteConnectionConfiguration = Readonly<{
-	foreignKeys: boolean;
-	integrityCheck: string;
-	journalMode: string;
-	synchronous: string;
+	foreignKeys: unknown;
+	integrityCheck: unknown;
+	journalMode: unknown;
+	synchronous: unknown;
 }>;
 
 export type InstrumentedSqliteAheDurableStore = Readonly<{
+	attemptInvalidForeignKeyInsert(): void;
 	inspectConfiguration(): SqliteConnectionConfiguration;
 	store: AheDurableStore;
 }>;
@@ -27,13 +28,15 @@ export function createInstrumentedSqliteAheDurableStore(
 	options: SqliteAheDurableStoreOptions,
 	fault?: SqliteMutationFault
 ): InstrumentedSqliteAheDurableStore {
+	const scaffold = createInstrumentedSqliteScaffold(options, fault);
 	return {
+		attemptInvalidForeignKeyInsert: scaffold.attemptInvalidForeignKeyInsert,
 		inspectConfiguration: () => ({
-			foreignKeys: false,
-			integrityCheck: "ok",
-			journalMode: "delete",
-			synchronous: "full",
+			foreignKeys: scaffold.readPragma("foreign_keys"),
+			integrityCheck: scaffold.readPragma("integrity_check"),
+			journalMode: scaffold.readPragma("journal_mode"),
+			synchronous: scaffold.readPragma("synchronous"),
 		}),
-		store: createSqliteScaffold(options, fault),
+		store: scaffold.store,
 	};
 }
