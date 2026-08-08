@@ -1,23 +1,55 @@
-export const PHASE_2D_SCHEMA_VERSION = 1;
-export const PHASE_2D_OBJECTS_STORE = "objects";
-export const PHASE_2D_GENERATIONS_STORE = "generations";
-export const PHASE_2D_BLOBS_STORE = "blobs";
-export const PHASE_2D_PROMOTIONS_STORE = "promotions";
-export const PHASE_2D_VOTES_STORE = "votes";
-export const PHASE_2D_VOTES_OBJECT_EPOCH_INDEX = "by-object-epoch";
-
-const PHASE_2D_GENERATION_KEY_PATH = Object.freeze(["objectId", "generationId"]);
-const PHASE_2D_PROMOTION_KEY_PATH = Object.freeze(["objectId", "generationId", "digest"]);
-const PHASE_2D_VOTE_INDEX_KEY_PATH = Object.freeze(["objectId", "epoch"]);
 const PHASE_2D_DECISION_LINK_SHA256 = "40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c";
 
-export const PHASE_2D_DATA_STORE_INVENTORY = Object.freeze([
-	Object.freeze({ keyPath: "objectId", name: PHASE_2D_OBJECTS_STORE }),
-	Object.freeze({ keyPath: PHASE_2D_GENERATION_KEY_PATH, name: PHASE_2D_GENERATIONS_STORE }),
-	Object.freeze({ keyPath: "digest", name: PHASE_2D_BLOBS_STORE }),
-	Object.freeze({ keyPath: PHASE_2D_PROMOTION_KEY_PATH, name: PHASE_2D_PROMOTIONS_STORE }),
-	Object.freeze({ keyPath: null, name: PHASE_2D_VOTES_STORE }),
-]);
+export const PHASE_2D_SCHEMA_AUTHORITY = Object.freeze({
+	stores: Object.freeze([
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: "objectId",
+			name: "objects",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "generationId"]),
+			name: "generations",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: "digest",
+			name: "blobs",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "generationId", "digest"]),
+			name: "promotions",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([
+				Object.freeze({
+					keyPath: Object.freeze(["objectId", "epoch"]),
+					multiEntry: false,
+					name: "by-object-epoch",
+					unique: false,
+				}),
+			]),
+			keyPath: null,
+			name: "votes",
+		}),
+	]),
+	version: 1,
+} as const);
+
+export const PHASE_2D_SCHEMA_VERSION = PHASE_2D_SCHEMA_AUTHORITY.version;
+export const PHASE_2D_OBJECTS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[0].name;
+export const PHASE_2D_GENERATIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[1].name;
+export const PHASE_2D_BLOBS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[2].name;
+export const PHASE_2D_PROMOTIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[3].name;
+export const PHASE_2D_VOTES_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[4].name;
+export const PHASE_2D_VOTES_OBJECT_EPOCH_INDEX = PHASE_2D_SCHEMA_AUTHORITY.stores[4].indexes[0].name;
 
 export interface Phase2dStorageDecisionBinding {
 	readonly chosen: "idb-strict" | "unselected";
@@ -72,7 +104,8 @@ class BrowserStorageSchemaError extends Error {
 	}
 }
 
-function exactKeyPath(actual: string | string[] | null, expected: readonly string[]): boolean {
+function exactKeyPath(actual: string | string[] | null, expected: string | readonly string[] | null): boolean {
+	if (!Array.isArray(expected)) return actual === expected;
 	return (
 		Array.isArray(actual) &&
 		actual.length === expected.length &&
@@ -81,56 +114,43 @@ function exactKeyPath(actual: string | string[] | null, expected: readonly strin
 }
 
 function hasExactSchema(database: IDBDatabase): boolean {
+	const authority = PHASE_2D_SCHEMA_AUTHORITY;
 	if (
-		database.version !== PHASE_2D_SCHEMA_VERSION ||
-		database.objectStoreNames.length !== 5 ||
-		!database.objectStoreNames.contains(PHASE_2D_OBJECTS_STORE) ||
-		!database.objectStoreNames.contains(PHASE_2D_GENERATIONS_STORE) ||
-		!database.objectStoreNames.contains(PHASE_2D_BLOBS_STORE) ||
-		!database.objectStoreNames.contains(PHASE_2D_PROMOTIONS_STORE) ||
-		!database.objectStoreNames.contains(PHASE_2D_VOTES_STORE)
+		database.version !== authority.version ||
+		database.objectStoreNames.length !== authority.stores.length ||
+		authority.stores.some((store) => !database.objectStoreNames.contains(store.name))
 	) {
 		return false;
 	}
 
 	try {
-		const transaction = database.transaction([
-			PHASE_2D_OBJECTS_STORE,
-			PHASE_2D_GENERATIONS_STORE,
-			PHASE_2D_BLOBS_STORE,
-			PHASE_2D_PROMOTIONS_STORE,
-			PHASE_2D_VOTES_STORE,
-		]);
-		const objects = transaction.objectStore(PHASE_2D_OBJECTS_STORE);
-		const generations = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
-		const blobs = transaction.objectStore(PHASE_2D_BLOBS_STORE);
-		const promotions = transaction.objectStore(PHASE_2D_PROMOTIONS_STORE);
-		const votes = transaction.objectStore(PHASE_2D_VOTES_STORE);
-		if (
-			objects.autoIncrement ||
-			objects.keyPath !== "objectId" ||
-			objects.indexNames.length !== 0 ||
-			generations.autoIncrement ||
-			!exactKeyPath(generations.keyPath, PHASE_2D_GENERATION_KEY_PATH) ||
-			generations.indexNames.length !== 0 ||
-			blobs.autoIncrement ||
-			blobs.keyPath !== "digest" ||
-			blobs.indexNames.length !== 0 ||
-			promotions.autoIncrement ||
-			!exactKeyPath(promotions.keyPath, PHASE_2D_PROMOTION_KEY_PATH) ||
-			promotions.indexNames.length !== 0 ||
-			votes.autoIncrement ||
-			votes.keyPath !== null ||
-			votes.indexNames.length !== 1 ||
-			!votes.indexNames.contains(PHASE_2D_VOTES_OBJECT_EPOCH_INDEX)
-		) {
-			return false;
-		}
-		const voteIndex = votes.index(PHASE_2D_VOTES_OBJECT_EPOCH_INDEX);
-		return !voteIndex.multiEntry && !voteIndex.unique && exactKeyPath(voteIndex.keyPath, PHASE_2D_VOTE_INDEX_KEY_PATH);
+		const transaction = database.transaction(authority.stores.map((store) => store.name));
+		return authority.stores.every((expectedStore) => {
+			const actualStore = transaction.objectStore(expectedStore.name);
+			if (
+				actualStore.autoIncrement !== expectedStore.autoIncrement ||
+				!exactKeyPath(actualStore.keyPath, expectedStore.keyPath) ||
+				actualStore.indexNames.length !== expectedStore.indexes.length ||
+				expectedStore.indexes.some((index) => !actualStore.indexNames.contains(index.name))
+			) {
+				return false;
+			}
+			return expectedStore.indexes.every((expectedIndex) => {
+				const actualIndex = actualStore.index(expectedIndex.name);
+				return (
+					actualIndex.multiEntry === expectedIndex.multiEntry &&
+					actualIndex.unique === expectedIndex.unique &&
+					exactKeyPath(actualIndex.keyPath, expectedIndex.keyPath)
+				);
+			});
+		});
 	} catch {
 		return false;
 	}
+}
+
+function copyKeyPath(keyPath: string | readonly string[]): string | string[] {
+	return typeof keyPath === "string" ? keyPath : [...keyPath];
 }
 
 function requireAcceptedDecision(binding: Phase2dStorageDecisionBinding): void {
@@ -157,16 +177,23 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 					request.transaction?.abort();
 					return;
 				}
-				request.result.createObjectStore(PHASE_2D_OBJECTS_STORE, { keyPath: "objectId" });
-				request.result.createObjectStore(PHASE_2D_GENERATIONS_STORE, {
-					keyPath: [...PHASE_2D_GENERATION_KEY_PATH],
-				});
-				request.result.createObjectStore(PHASE_2D_BLOBS_STORE, { keyPath: "digest" });
-				request.result.createObjectStore(PHASE_2D_PROMOTIONS_STORE, {
-					keyPath: [...PHASE_2D_PROMOTION_KEY_PATH],
-				});
-				const votes = request.result.createObjectStore(PHASE_2D_VOTES_STORE);
-				votes.createIndex(PHASE_2D_VOTES_OBJECT_EPOCH_INDEX, [...PHASE_2D_VOTE_INDEX_KEY_PATH]);
+				for (const storeAuthority of PHASE_2D_SCHEMA_AUTHORITY.stores) {
+					const store =
+						storeAuthority.keyPath === null
+							? request.result.createObjectStore(storeAuthority.name, {
+									autoIncrement: storeAuthority.autoIncrement,
+								})
+							: request.result.createObjectStore(storeAuthority.name, {
+									autoIncrement: storeAuthority.autoIncrement,
+									keyPath: copyKeyPath(storeAuthority.keyPath),
+								});
+					for (const indexAuthority of storeAuthority.indexes) {
+						store.createIndex(indexAuthority.name, copyKeyPath(indexAuthority.keyPath), {
+							multiEntry: indexAuthority.multiEntry,
+							unique: indexAuthority.unique,
+						});
+					}
+				}
 			},
 			{ once: true }
 		);
