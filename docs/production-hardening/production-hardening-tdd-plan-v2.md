@@ -3214,6 +3214,131 @@ Carry these accepted residuals to their named owners rather than overstating
     2d/2e/2g/2l/5c owners. Phase 2d2a advances the durable local foundation for
     both Discord/chat and MMORPG; it proves neither golden path.
 
+#### Phase 2d2b(i) accepted closure — adapter lifecycle and retained evidence
+
+Only Phase 2d2b(i) is accepted at tests/config-only RED `9e6f35d` and
+production-only GREEN `33f45ec`. This closes the private IndexedDB adapter's
+lifecycle boundary and discharges the first five evidence and retirement
+obligations carried from 2d2a. It does not close the remaining 2d2b work, full
+Phase 2d, the Phase 2 exit gate, or either Discord/chat or MMORPG golden path.
+
+The RED has frozen 13-file custody and changes no production source. Its
+focused non-browser run is 2 failed / 15 passed: the schema owner still makes
+the now-forbidden physical `add` call, and the obsolete
+`testOnlyAttemptStrictMutation` export still exists. The full package
+diagnostic is 2 failed / 170 passed for those same two causes. Its dedicated
+Chromium run is 1 failed / 2 passed: the real in-flight operation reports
+`firstSettlement: "close"` and `settlementOrder: ["close", "operation"]`
+instead of waiting for transaction-terminal delivery. The already-correct
+post-versionchange closure and revision-2 superseding swap are retained as
+additive evidence rather than misrepresented as failing defects. Phase-2d1
+Chromium remains 10/10 and Phase-2d2a Chromium remains 8/8; typecheck, builds,
+ESLint, Prettier, diff and custody checks are green. The RED evidence manifest
+SHA-256 is
+`37e86a7c423f33a30aeb5faa513f7f78b1483804df840674d9e2a7cdf7015ead`.
+
+GREEN replaces the boolean lifecycle with one connection owner that admits
+valid operations synchronously, counts admitted work, latches closure at call
+time, closes each attached native handle through the same explicit-close and
+versionchange path, and shares a close promise that resolves only after all
+admitted operations reach their transaction-terminal gate. Command
+preparation remains before lifecycle admission, preserving the shared/node
+`INVALID_ARGUMENT`-before-`STORE_CLOSED` precedence, and closed results still
+come from the shared evaluator rather than a browser-local literal. The
+versionchange callback owns the adapter connection teardown, including the
+defensive attach-after-close case; the public schema opener keeps its own
+default native-close path. The obsolete schema mutation probe, its duplicate
+types and its duplicate strict-durability error are removed. Real adapter
+transactions now provide the strict-durability evidence.
+
+The strengthened frozen evidence also traces the exact inclusive compound-key
+range `bound([objectId], [objectId, []])`, includes `discardGeneration`, retries
+the exact rollback command successfully, and observes the revision-2
+superseding swap as exactly two generation writes plus one head write in one
+strict transaction. The initial focused GREEN command was honestly retained
+as a workspace-startup failure caused by running Vitest from the wrong working
+directory; the corrected bounded command is 17/17. The implementation audit
+also preserved prepare-first validation and one lifecycle owner rather than
+introducing a second closed-result or versionchange path.
+
+At committed HEAD, the package suite is 22 files / 172 tests, Phase-2d1
+Chromium is 10/10, Phase-2d2a Chromium is 8/8, Phase-2d2b(i) Chromium is 3/3,
+and ownership is 8/8. Upstream storage build, storage-browser typecheck/build,
+package and production ESLint with zero warnings, Prettier, diff and custody
+checks are green; all 13 RED files remain byte-identical. The GREEN evidence
+manifest SHA-256 is
+`8b5b2776eacca4e75013a1855e786bfb5392f722e231b0fefbad549c6b8a753e`.
+
+The independent acceptance loop found no blocker and no reward hacking:
+
+- genuine Grok 4.5/high session
+  `019fe354-eb37-7dc1-8fa8-95e05e07b83f` authoritatively returned
+  `APPROVED`, `BLOCKERS: none` and `2D2B1_MAY_CLOSE: yes` after a same-session
+  clarification; exact clarification result SHA-256
+  `c22bffe98bcf7a99bb87635ca6c8ec1a74d7b93cde4551c2cb09817a849a5337`,
+  artifact-integrity manifest SHA-256
+  `4ddb58768a7a51c42ef32e3cee8d931b172087c6694f5b214cc3f94c6b5b5f8a`;
+- exact Kimi 3/high/100 session
+  `5828def5-f47d-442d-be7a-bb6ef7fb3c6d` returned `APPROVED`,
+  `BLOCKERS: none`, `REWARD_HACKING: no` and `2D2B_I_MAY_CLOSE: yes`; exact
+  result SHA-256
+  `47d56c0e349b2e21ad5d0efbeb839cffebef06ff4152b8538f9e4e08f107173d`;
+- final Opus 5/xhigh session
+  `83a19d4f-f284-4079-aeb8-764c83297796` returned `APPROVED`,
+  `BLOCKERS: none`, `REWARD_HACKING: no` and `2D2B_I_MAY_CLOSE: yes`; exact
+  result SHA-256
+  `78057b16bfdd5f5a28a35d6a2f371bd899fed5ae0ecda9fe69b1e7d9a151b246`,
+  artifact-integrity manifest SHA-256
+  `40759413e110e4626ab712bd38b9c1a01d23831ae71950bed624659ea19c937b`.
+  All 130 substantive assistant events authenticate as `claude-opus-5` at
+  xhigh effort and use only Read/Grep/Glob. A small automatic Haiku metadata
+  call performed no review work.
+
+Grok's retained initial thought stream contains mutually contradictory
+`CHANGES_REQUESTED` drafts, invented in-prose session identifiers and a concern
+about directly counting native `close()` calls. These artifacts are not
+concealed or normalized. The published initial result was approved, and the
+authenticated same-session clarification explicitly retracts every
+contradictory draft and classifies the missing call counter as no finding:
+successful version-2 upgrade proves the browser released the old connection,
+while terminal-gated quiescence and post-close/post-versionchange
+`STORE_CLOSED` prove the owned behavior more directly.
+
+Carry these accepted residuals to their existing owners:
+
+1. A later 2d2b slice may strengthen the adapter versionchange evidence with
+   an explicit `blocked === false` assertion; the current synchronous close is
+   already structural and indirectly observed.
+2. A shared close-quiescence contract for browser, node and memory backends
+   requires the standing assumption-correction quorum, otherwise Phase 2e
+   retains it.
+3. Recovery from a transaction that never reaches a terminal event, and any
+   bounded policy for the resulting close promise, belongs to Phase 2e.
+4. A future throwing owner callback must not strand its native connection;
+   the later 2d2b lifecycle owner retains that strengthening. The current
+   callback has no throw path.
+5. The exact operation-before-close promise order is deliberately stronger
+   and hop-sensitive. A future lifecycle refactor must revise it explicitly,
+   not accidentally add or remove a promise hop.
+6. The range assertion intentionally pins the inherited unbounded prefix
+   read. Full 2d/2e owns the bounded replacement under the shared-contract
+   quorum.
+7. The storage-browser fixture owner retains safe composition for its three
+   independently restoring prototype-patching oracles; no current test nests
+   them.
+8. Inventory-driven store creation and validation remains the next later-2d2b
+   authority task, so neither Phase 2d2b nor full Phase 2d closes here.
+9. Existing owners remain unchanged for malformed-row taxonomy and recovery
+   (2e), engines (2h), cross-tab/multi-connection behavior (2i/5c), kill and
+   coverage gates (Phase 2 exit), and votes, migrations, quota, GC, durable
+   issuance/outbox and the public production surface (2d/2e/2g/2l/5c).
+10. Root scripts for these direct Playwright invocations and a declared
+    `esbuild` test dependency remain Phase 2h/CI-topology work.
+
+This slice is therefore an honest local-durability advance for both golden
+paths, not a claim that either path can yet survive its full crash, engine,
+multi-peer or application scenario.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
