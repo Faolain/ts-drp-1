@@ -133,7 +133,9 @@ export function validateTwoGroupForest(
 		throw new TypeError("forest requires root-led child and browser process groups");
 	}
 	const owned = forest.filter((process) => process.pgid === childPgid || process.pgid === browserPgid);
-	if (!owned.some((process) => process.ppid === browserPid && /renderer/u.test(process.command))) {
+	const browserGroup = owned.filter((process) => process.pgid === browserPgid);
+	const browserDescendants = processClosure(browserGroup, browserPid);
+	if (!browserDescendants.some((process) => process.pid !== browserPid && /renderer/u.test(process.command))) {
 		throw new TypeError("forest requires at least one browser renderer");
 	}
 	const identities = new Set(owned.map((process) => `${process.pid}:${process.birthToken}`));
