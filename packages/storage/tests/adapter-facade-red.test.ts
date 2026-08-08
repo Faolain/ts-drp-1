@@ -255,6 +255,33 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		expect(blobRead.result.value).toEqual(bytes(7, 8, 9));
 	});
 
+	it("gives own SharedArrayBuffer bytes precedence over extra string and symbol siblings", () => {
+		const payload = bytes(1, 2, 3);
+		const item = ref(payload);
+		const shared = new Uint8Array(new SharedArrayBuffer(payload.byteLength));
+		shared.set(payload);
+		const extras: readonly Record<PropertyKey, unknown>[] = [{ extra: true }, { [Symbol("extra")]: true }];
+
+		for (const extra of extras) {
+			const input = {
+				kind: "putCachedBlob",
+				objectId: OBJECT_A,
+				generationId: GENERATION_A,
+				digest: item.digest,
+				bytes: shared,
+				...extra,
+			};
+			expect.soft(prepareStorageAdapterCommand(input)).toEqual({
+				ok: false,
+				reason: "SHARED_BUFFER_INPUT",
+			});
+			expect.soft(prepareStorageAdapterCommand({ ...input, bytes: payload })).toEqual({
+				ok: false,
+				reason: "INVALID_ARGUMENT",
+			});
+		}
+	});
+
 	it("names exact fact loads and fails closed on every inexact fact set", () => {
 		const item = ref(bytes(1));
 		const requirements: ReadonlyArray<readonly [StorageAdapterCommand, readonly StorageAdapterLoadRequirement[]]> = [

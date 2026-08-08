@@ -261,6 +261,45 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 		await store.close();
 	});
 
+	it("gives own SharedArrayBuffer bytes precedence over an extra sibling without database mutation", async () => {
+		const filename = await databaseFilename();
+		const store = createSqliteAheDurableStore({ filename });
+		const payload = Uint8Array.of(16, 17, 18);
+		const digest = must(digestBlob(payload));
+		await begin(store, OBJECT_A, GENERATION_A, payload);
+		const before = await store.readObjectState(OBJECT_A);
+		const ordinaryWithExtra = {
+			objectId: OBJECT_A,
+			generationId: GENERATION_A,
+			digest,
+			bytes: payload,
+			extra: true,
+		};
+		const shared = new Uint8Array(new SharedArrayBuffer(payload.byteLength));
+		shared.set(payload);
+
+		expect
+			.soft(await store.putCachedBlob(ordinaryWithExtra as Parameters<AheDurableStore["putCachedBlob"]>[0]))
+			.toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
+		expect
+			.soft(
+				await store.putCachedBlob({ ...ordinaryWithExtra, bytes: shared } as Parameters<
+					AheDurableStore["putCachedBlob"]
+				>[0])
+			)
+			.toEqual({ ok: false, reason: "SHARED_BUFFER_INPUT" });
+		expect.soft(await store.getBlob(digest)).toEqual({ ok: true, value: null });
+		expect.soft(await store.readObjectState(OBJECT_A)).toEqual(before);
+		await store.close();
+
+		const database = new DatabaseSync(filename);
+		try {
+			expect.soft(database.prepare("SELECT count(*) AS count FROM blobs").get()).toEqual({ count: 0 });
+		} finally {
+			database.close();
+		}
+	});
+
 	it("keeps legacy plain object IDs outside the greenfield adapter", async () => {
 		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
 		const result = await store.readObjectState("plain-room-id" as StorageObjectId);
