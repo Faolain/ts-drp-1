@@ -1,9 +1,13 @@
 export const PHASE_2D_SCHEMA_VERSION = 1;
+export const PHASE_2D_OBJECTS_STORE = "objects";
 export const PHASE_2D_GENERATIONS_STORE = "generations";
+export const PHASE_2D_BLOBS_STORE = "blobs";
+export const PHASE_2D_PROMOTIONS_STORE = "promotions";
 export const PHASE_2D_VOTES_STORE = "votes";
 export const PHASE_2D_VOTES_OBJECT_EPOCH_INDEX = "by-object-epoch";
 
 const PHASE_2D_GENERATION_KEY_PATH = Object.freeze(["objectId", "generationId"]);
+const PHASE_2D_PROMOTION_KEY_PATH = Object.freeze(["objectId", "generationId", "digest"]);
 const PHASE_2D_VOTE_INDEX_KEY_PATH = Object.freeze(["objectId", "epoch"]);
 const PHASE_2D_DECISION_LINK_SHA256 = "40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c";
 
@@ -90,20 +94,42 @@ function exactKeyPath(actual: string | string[] | null, expected: readonly strin
 function hasExactSchema(database: IDBDatabase): boolean {
 	if (
 		database.version !== PHASE_2D_SCHEMA_VERSION ||
-		database.objectStoreNames.length !== 2 ||
+		database.objectStoreNames.length !== 5 ||
+		!database.objectStoreNames.contains(PHASE_2D_OBJECTS_STORE) ||
 		!database.objectStoreNames.contains(PHASE_2D_GENERATIONS_STORE) ||
+		!database.objectStoreNames.contains(PHASE_2D_BLOBS_STORE) ||
+		!database.objectStoreNames.contains(PHASE_2D_PROMOTIONS_STORE) ||
 		!database.objectStoreNames.contains(PHASE_2D_VOTES_STORE)
 	) {
 		return false;
 	}
 
 	try {
-		const transaction = database.transaction([PHASE_2D_GENERATIONS_STORE, PHASE_2D_VOTES_STORE]);
+		const transaction = database.transaction([
+			PHASE_2D_OBJECTS_STORE,
+			PHASE_2D_GENERATIONS_STORE,
+			PHASE_2D_BLOBS_STORE,
+			PHASE_2D_PROMOTIONS_STORE,
+			PHASE_2D_VOTES_STORE,
+		]);
+		const objects = transaction.objectStore(PHASE_2D_OBJECTS_STORE);
 		const generations = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
+		const blobs = transaction.objectStore(PHASE_2D_BLOBS_STORE);
+		const promotions = transaction.objectStore(PHASE_2D_PROMOTIONS_STORE);
 		const votes = transaction.objectStore(PHASE_2D_VOTES_STORE);
 		if (
+			objects.autoIncrement ||
+			objects.keyPath !== "objectId" ||
+			objects.indexNames.length !== 0 ||
 			generations.autoIncrement ||
 			!exactKeyPath(generations.keyPath, PHASE_2D_GENERATION_KEY_PATH) ||
+			generations.indexNames.length !== 0 ||
+			blobs.autoIncrement ||
+			blobs.keyPath !== "digest" ||
+			blobs.indexNames.length !== 0 ||
+			promotions.autoIncrement ||
+			!exactKeyPath(promotions.keyPath, PHASE_2D_PROMOTION_KEY_PATH) ||
+			promotions.indexNames.length !== 0 ||
 			votes.autoIncrement ||
 			votes.keyPath !== null ||
 			votes.indexNames.length !== 1 ||
@@ -142,8 +168,13 @@ function openDatabase(databaseName: string): Promise<IDBDatabase> {
 					request.transaction?.abort();
 					return;
 				}
+				request.result.createObjectStore(PHASE_2D_OBJECTS_STORE, { keyPath: "objectId" });
 				request.result.createObjectStore(PHASE_2D_GENERATIONS_STORE, {
 					keyPath: [...PHASE_2D_GENERATION_KEY_PATH],
+				});
+				request.result.createObjectStore(PHASE_2D_BLOBS_STORE, { keyPath: "digest" });
+				request.result.createObjectStore(PHASE_2D_PROMOTIONS_STORE, {
+					keyPath: [...PHASE_2D_PROMOTION_KEY_PATH],
 				});
 				const votes = request.result.createObjectStore(PHASE_2D_VOTES_STORE);
 				votes.createIndex(PHASE_2D_VOTES_OBJECT_EPOCH_INDEX, [...PHASE_2D_VOTE_INDEX_KEY_PATH]);
@@ -202,7 +233,7 @@ export async function testOnlyAttemptStrictMutation(
 ): Promise<StrictMutationProbeResult> {
 	const database = await openDatabase(options.databaseName);
 	return new Promise((resolve, reject) => {
-		const transaction = database.transaction(PHASE_2D_GENERATIONS_STORE, "readwrite", { durability: "strict" });
+		const transaction = database.transaction(PHASE_2D_PROMOTIONS_STORE, "readwrite", { durability: "strict" });
 		const observedDurability = options.testOnlyForcedObservedDurability ?? transaction.durability;
 		if (observedDurability !== "strict") {
 			transaction.addEventListener(
@@ -231,7 +262,8 @@ export async function testOnlyAttemptStrictMutation(
 		};
 		transaction.addEventListener("abort", fail, { once: true });
 		transaction.addEventListener("error", fail, { once: true });
-		transaction.objectStore(PHASE_2D_GENERATIONS_STORE).add({
+		transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).add({
+			digest: "strict-mutation-probe",
 			generationId: "strict-mutation-probe",
 			objectId: "phase-2d1",
 		});
