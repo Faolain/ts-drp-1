@@ -2066,6 +2066,81 @@ shortcut. A 2c-b artifact retains/checkpoints the WAL together with its database
 rather than copying only the main file. None of these obligations adds legacy
 plain IDs, inferred authority, signing eligibility or a power-loss claim.
 
+#### Phase 2c-a accepted and closed; Phase 2c remains open
+
+Phase 2c-a is accepted at production checkpoint `a6b1901`; 2c-b remains the
+next slice and Phase 2 is not closed. Freeze the bounded lineage: SQLite RED
+`7b0723c`, adapter-facade RED `7e5a988`, initial GREEN `d570774`, SAB-precedence
+RED/GREEN `609e2e8`/`7871ac1`, and closure-reason RED/GREEN
+`9d0dd26`/`a6b1901`. The final production change remains only the published
+runtime-neutral adapter facade, strict contract runner and private SQLite
+substrate; the concrete transition owner, seeds, forgery/test hooks,
+capabilities and signing authority remain hidden.
+
+Both corrective cycles were necessary and causal. Grok found that initial
+command preparation returned `INVALID_ARGUMENT` before the frozen
+`SHARED_BUFFER_INPUT` precedence when SAB-backed bytes carried an extra
+sibling. Opus then found the adjacent semantic-boundary defect: preparation's
+non-empty duplicate-free closure copier collapsed empty/duplicate closures to
+`INVALID_ARGUMENT` before the shared owner could return `EMPTY_CLOSURE` or
+`DUPLICATE_CLOSURE_REFERENCE`, and before `STORE_CLOSED`. The accepted helper
+now validates and detaches only closed-array/reference structure; the single
+transition owner retains semantic classification and the frozen
+`STORE_CLOSED` → `GENERATION_EXISTS` → empty → duplicate order. This is a
+coherent ownership split, not four input-shape exceptions.
+
+At closure the adapter suite is 6/6, SQLite is 9/9 and prior storage is 98/98;
+the authoritative combined root run is 113/113. Both package typechecks and
+builds, targeted ESLint, Prettier, export/deep-import checks and diff checks
+pass. Fresh final reviews all returned `APPROVED`:
+
+- Grok 4.5/high session `019fe0c1-3a0a-7df3-9555-1e1626d2372a`, result
+  SHA-256 `3855c2e64d1063ce9d9c73a05afaf7a66b4cbfb6d8e1ccb0871e6938015c1072`;
+- exact Kimi 3/high/100 session `1d25282f-57b9-46c5-a4e8-6a62aca2d035`, result
+  SHA-256 `01e6528735f80d10e2569f6d5effd566be3804cb6c723dbed8bab017d5de497b`;
+- Opus 5/xhigh session `c4eacc98-f73f-4afb-bb64-c8a8dffd762f`, all 93
+  substantive assistant events `claude-opus-5`, result SHA-256
+  `589eeda91ca85a58a2db00bc9bfb66e3309991bbfde1a0f13132a49b27602bbf`.
+
+Carry these nonblocking boundaries without reopening 2c-a:
+
+1. `runStoreContract` uses fixed creator-bound fixture IDs and therefore
+   requires an isolated fresh factory/filename. Deliberate reuse of a populated
+   filename fails closed; it is not a migration or reuse contract.
+2. Wrong bytes may win the global digest slot at put time and are detected as
+   corrupt at promote/complete. Preserve the explicit later durable-integrity
+   decision rather than silently moving the semantic rule.
+3. The SQLite store instance is not frozen, and `close()` can throw
+   synchronously only if the underlying guarded close itself throws. Hostile
+   same-process object mutation remains outside this storage boundary.
+4. Package-local bare Vitest and build-before-cross-package ordering remain
+   repository workflow issues. The root runner is authoritative; build
+   `@ts-drp/storage` before storage-node tests. Node 22.15 may still print the
+   expected experimental warning despite the measured `>=22.13.0` floor.
+5. `busy_timeout = 1000` is configured and was independently exercised under
+   contention, but the frozen configuration inspector does not expose it.
+   Idempotent put/promote write suppression is source-correct and independently
+   probed but lacks its own committed 2c-a assertion. These are bounded test
+   coverage residuals, not missing transition behavior.
+6. SQLite pragma activation is live-verified by the populated RED rather than
+   asserted inside `configureConnection`. Keep that evidence mandatory; do not
+   turn 2c-a into an fsync or power-loss claim.
+7. `loadObjectState` duplicates only a substrate-integrity head/adopted guard;
+   failures become `SUBSTRATE_FAILURE`. It must not grow into a second semantic
+   transition owner during 2c-b.
+8. The private SQLite envelope reserves the own key `kind`. A doubly invalid
+   call carrying both that sibling and SAB-backed bytes returns
+   `INVALID_ARGUMENT`, while memory returns `SHARED_BUFFER_INPUT`; both reject
+   before database access or writes. Treat any future unification as an
+   explicit envelope-contract decision, not another syntax-by-syntax matrix.
+
+Identity remains greenfield at closure. Only canonical creator-bound IDs are
+accepted; there is no plain/legacy parser, alias, normalization, migration,
+translation, fallback or inferred authority. The accepted claim remains
+single-process SQLite transaction/configuration behavior. Per-statement and
+commit-edge child `SIGKILL`, WAL-sidecar recovery and the bounded crash campaign
+belong to 2c-b; fsync, torn-write and power-loss durability remain unclaimed.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
