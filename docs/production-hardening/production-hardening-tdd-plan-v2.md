@@ -2785,6 +2785,121 @@ Carry these bounded residuals forward instead of overstating S4:
    Phase 2d must not cite the raw S2 timing as a substrate comparison; 2d/5c,
    Phase 5 and the pre-release real-device matrix retain their named owners.
 
+#### Phase 2d1 accepted closure — decision-bound schema lifecycle shell
+
+Phase 2d1 is accepted at production GREEN `d3d8d56` over tests-plus-inert-
+scaffold RED `8849768`. This is the first bounded sub-slice of the explicitly
+sliceable Phase 2d row, not closure of full 2d. It binds browser database
+opening to the accepted S4 `idb-strict` decision and exact link digest
+`40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c`
+before any `indexedDB.open`. A mismatched private causal seam fails with no
+database creation; the normal binding is a build-time constant pinned to the
+full S4 gate and artifact bytes by a frozen unit test, rather than a mutable
+runtime JSON load.
+
+The fresh version-1 schema contains only `generations`, with native compound
+key path `[objectId, generationId]`, and `votes`, with no primary key or
+auto-increment and one non-unique/non-multi-entry native `[objectId, epoch]`
+index. The positive browser control proves the two tuples `{a, b\0c}` and
+`{a\0b, c}` remain distinct, so no NUL-delimited encoding is hiding behind the
+schema. Exact store count, key paths, vote-index count and index properties are
+validated on every open. The slice freezes no vote primary-key tuple and adds
+no journal rows, blob layout or later recovery schema.
+
+The sole governed production readwrite probe requests
+`durability:"strict"`, reads the live transaction value and aborts before its
+marker `add` on either non-strict observation. Chromium proves zero committed
+records for both `default` and `relaxed`, one exact commit for `strict`, and no
+fallback. A scoped ownership control requires literal strict durability for
+the controlled production IDB owner without retroactively governing accepted
+spike fixtures. Raw IDB types remain internal; the package is private and has
+no export map for the new module.
+
+Production connections close on `versionchange`. A separate private upgrade
+probe proves a genuinely noncooperative connection surfaces the frozen blocked
+error within its 250 ms bound and aborts a late `upgradeneeded` reached after
+settlement. Malformed required schema and future versions share the frozen
+schema error; unrelated IndexedDB open errors pass through instead of being
+mislabelled. This is lifecycle evidence for the v1 shell. The first production
+schema-version bump still owns its own `onblocked` bound and migration policy.
+
+The RED was assertion-causal: focused unit/static was 1F/7P and the Chromium
+matrix was 6F/2P, with both positive controls green; the full non-browser
+package diagnostic was 1F/168P. Typecheck, ownership 6/6, ESLint with zero
+warnings, Prettier and diff checks were green. GREEN left every frozen test and
+fixture byte-identical and changed only the production schema owner. Focused
+unit/static is 8/8, Chromium is 8/8 with one worker and retries disabled, and
+the authoritative postcommit package run is 21 files / 169 tests. Package
+typecheck, build, focused and package ESLint, Prettier and diff checks are
+green. The precommit package run's single failure is retained honestly: its
+clean-checkout control archives tracked `HEAD`, which still contained the RED
+scaffold. The postcommit run includes `d3d8d56` and is fully green. The
+controller's Chromium run preceded a formatting-only Prettier pass; exact Kimi
+3 independently reproduced 8/8 against the committed HEAD.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session
+  `019fe285-8799-7e30-bb91-51382c1512ee` approved with
+  `2D1 MAY CLOSE: YES`; exact result SHA-256
+  `f519f319fedb2bf08a105cbaddde8f319b61d37f6e485055a91236631ae5cf0f`.
+  Its read-only sandbox prevented Vitest cache writes and Chromium launch, so
+  it made no independent browser-execution claim;
+- exact Kimi 3/high/100 session
+  `d4eebc8b-d7c8-4bd9-b65e-c967a7b3bbdd` approved with no blocker and
+  independently reproduced focused 8/8, Chromium 8/8 and package 169/169;
+  exact result SHA-256
+  `0c822440defd080b01fc7829524465e6b851263795f055b765a3f4c9241d38cb`;
+- final Opus 5/xhigh session
+  `1189e415-a295-4704-b941-25e79164321e` approved with no blocker and
+  `2d1 may close: yes`; exact result SHA-256
+  `bc8e72148f9c79c652cd1be44b57f9f8da72353219f10c93f5c519363c598dc8`.
+  The substantive result is first-party Opus 5 at xhigh; an automatic 18-token
+  Haiku metadata call contributed no review turn. Opus executed no tests and
+  based its ruling on source plus the retained and independently reproduced
+  evidence.
+
+Carry these bounded residuals into 2d2+ instead of overstating 2d1:
+
+1. `hasExactSchema` rejects extra stores and extra vote indexes but does not
+   yet require `generations.indexNames.length === 0`. This module cannot create
+   such an index and no consumer exists yet; add the exact check before real 2d
+   data or migration depends on malformed-schema rejection.
+2. The private blocked-upgrade probe has a narrow race: if `upgradeneeded`
+   starts just before its timeout but success is delivered after it, it can
+   report `UPGRADE_BLOCKED` while the version bump commits. The frozen test
+   holds the blocker until after rejection, so the path is unreachable there,
+   and no production caller exists. Clear the timer when upgrade starts or
+   carry an explicit upgrade-started state before this probe becomes reusable.
+3. `AbortError` maps to the schema error because every abort authored by this
+   v1 module is its own schema guard. A user-agent abort could still be
+   misclassified; record an authored-abort flag when 2d adds recovery/retry
+   policy. Other substrate errors already pass through unchanged.
+4. Production v1 opening cannot receive `blocked` because it requests the
+   minimum/current version. The first production version bump must move the
+   bounded `onblocked` policy out of the private probe and into the real open/
+   migration path.
+5. The strict-durability AST governance is intentionally narrow and fails open
+   if a future production owner hides the `"readwrite"` mode behind a variable
+   or template. The live behavior remains load-bearing. Before later mutation
+   paths land, make the controlled-owner rule fail closed or extend it
+   coherently; do not grow another syntax-by-syntax interpreter.
+6. The build-time link digest is duplicated in production and its frozen unit
+   gate. That is the intended immutable binding, but any reviewed S4 link
+   rotation must update both. The link status
+   `preimplementation-required-before-2d` remains the frozen gate identifier,
+   not a mutable progress flag.
+7. The strict probe's error and abort listeners can attempt harmless duplicate
+   settlement, and a synchronous transaction-construction throw could leave
+   its test-only connection open. Clean up when the probe is replaced by real
+   operations rather than expanding this shell.
+8. Evidence remains Chromium-only and single-engine. Phase 2h owns the browser
+   matrix. The full Phase 2d row remains open: 2d2+ still owns five-state
+   journal operations, immutable exact-byte blob CAS via `add`, bounded
+   staging, the real indexed vote transaction and production store surface;
+   2e owns full-closure recovery and 2l owns durable issuance. Phase 2d1 proves
+   neither complete Discord/MMORPG golden path.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
