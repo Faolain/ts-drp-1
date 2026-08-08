@@ -13,6 +13,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"objectStore",
 			"get",
 			"getAll",
+			"bound",
 			"add",
 			"put",
 			"abort",
