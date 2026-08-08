@@ -115,13 +115,15 @@ export function inspectSettledRunOwnership(
 		...context,
 		captureState: context.captureState ?? "captured",
 	};
-	const evidenceState = ownershipEvidenceState(capturedContext);
 	const profileArgument = `--user-data-dir=${context.profilePath}`;
-	const candidates = forest.filter(
-		(identity) =>
-			hasExactExecutable(identity.command, context.chromiumExecutablePath) &&
-			hasExactArgument(identity.command, profileArgument)
+	const profileCandidates = forest.filter((identity) => hasExactArgument(identity.command, profileArgument));
+	const executableCandidates = profileCandidates.filter((identity) =>
+		hasExactExecutable(identity.command, context.chromiumExecutablePath)
 	);
+	const contradictoryProfileAuthority =
+		profileCandidates.length > 0 && (profileCandidates.length !== 1 || executableCandidates.length !== 1);
+	const evidenceState =
+		contradictoryProfileAuthority || ownershipEvidenceState(capturedContext) === "unknown" ? "unknown" : "captured";
 	const children = forest.filter(({ pid }) => pid === context.childPid);
 	const possibleUncapturedChildGroup =
 		capturedContext.captureState === "unknown" && Number.isSafeInteger(context.childPid) && context.childPid > 0
@@ -131,7 +133,7 @@ export function inspectSettledRunOwnership(
 		...new Set([
 			...possibleUncapturedChildGroup,
 			...children.filter(({ pgid }) => Number.isSafeInteger(pgid) && pgid > 0).map(({ pgid }) => pgid),
-			...candidates.filter(({ pgid }) => Number.isSafeInteger(pgid) && pgid > 0).map(({ pgid }) => pgid),
+			...profileCandidates.filter(({ pgid }) => Number.isSafeInteger(pgid) && pgid > 0).map(({ pgid }) => pgid),
 		]),
 	]);
 	const recordedForest = Object.freeze(forest.filter(({ pgid }) => discoverableGroups.includes(pgid)));
@@ -153,13 +155,14 @@ export function inspectSettledRunOwnership(
 		!uniqueIdentities(forest) ||
 		controllers.length !== 1 ||
 		children.length > 1 ||
-		candidates.length !== 1
+		contradictoryProfileAuthority ||
+		executableCandidates.length !== 1
 	) {
 		return unresolved();
 	}
 
 	const controller = controllers[0] as ProcessIdentity;
-	const browserRoot = candidates[0] as ProcessIdentity;
+	const browserRoot = executableCandidates[0] as ProcessIdentity;
 	const renderers = forest.filter(
 		(identity) =>
 			identity.ppid === browserRoot.pid &&

@@ -52,6 +52,7 @@ const ASSET_DIRECTORY: string =
 const ARTIFACT_DIRECTORY =
 	process.env.PHASE_2B_ARTIFACT_DIR ?? path.join(os.tmpdir(), "phase-2b-list-only-artifacts-unavailable");
 const GIT_SHA = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const chromiumExecutablePath = chromium.executablePath();
 const PLATFORM = process.platform;
 if (PLATFORM !== "darwin" && PLATFORM !== "linux")
 	throw new TypeError("UNSUPPORTED_PLATFORM: POSIX process groups required");
@@ -194,6 +195,7 @@ async function runSettled(
 		detached: true,
 		env: {
 			...process.env,
+			PHASE_2B_EXECUTABLE_PATH: chromiumExecutablePath,
 			PHASE_2B_ROLE: role,
 			PHASE_2B_PROFILE: profilePath,
 			PHASE_2B_DATABASE: databaseName,
@@ -271,7 +273,7 @@ async function runSettled(
 		const controllerPid = process.pid;
 		const failureOwnership = captureSettledRunOwnership(captureProcessForest, {
 			childPid,
-			chromiumExecutablePath: chromium.executablePath(),
+			chromiumExecutablePath: chromiumExecutablePath,
 			controllerPid,
 			profilePath,
 			...(trustedChildIdentity === undefined ? {} : { trustedChildIdentity }),
@@ -430,6 +432,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 			detached: true,
 			env: {
 				...process.env,
+				PHASE_2B_EXECUTABLE_PATH: chromiumExecutablePath,
 				PHASE_2B_PROFILE: profilePath,
 				PHASE_2B_DATABASE: databaseName,
 				PHASE_2B_URL: transitionURL,
@@ -626,7 +629,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		const failureOwnership = ownershipFromSettledFailure(error);
 		const localOwnership = captureSettledRunOwnership(captureProcessForest, {
 			childPid: crashProcess?.pid ?? -1,
-			chromiumExecutablePath: chromium.executablePath(),
+			chromiumExecutablePath: chromiumExecutablePath,
 			controllerPid: process.pid,
 			profilePath,
 			priorOwnershipEvidenceState: failureOwnership.evidenceState,

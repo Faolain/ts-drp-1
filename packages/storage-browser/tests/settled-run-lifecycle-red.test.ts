@@ -172,9 +172,9 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b reparented settled ownership con
 			validatedGroups: [],
 		});
 		expect(inspect(executableLookalike)).toEqual({
-			evidenceState: "captured",
-			ownedGroups: [],
-			recordedForest: [],
+			evidenceState: "unknown",
+			ownedGroups: [420],
+			recordedForest: executableLookalike.filter(({ pgid }) => pgid === 420),
 			validatedGroups: [],
 		});
 	});
@@ -359,8 +359,7 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled lifecycle integration RE
 		expect.soft(context !== undefined && containsIdentifier(context, "childPid")).toBe(true);
 		expect.soft(context !== undefined && containsIdentifier(context, "profilePath")).toBe(true);
 		expect.soft(context !== undefined && containsIdentifier(context, "controllerPid")).toBe(true);
-		expect.soft(context !== undefined && containsIdentifier(context, "chromium")).toBe(true);
-		expect.soft(context !== undefined && containsIdentifier(context, "executablePath")).toBe(true);
+		expect.soft(context !== undefined && containsIdentifier(context, "chromiumExecutablePath")).toBe(true);
 	});
 
 	it.each(["runTuple", "runControl"])("%s binds finalization and delegates one closed profile disposition", (name) => {

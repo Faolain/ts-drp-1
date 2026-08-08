@@ -317,28 +317,40 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b corrective cleanup-authority con
 		{
 			label: "profile prefix",
 			command: `${EXECUTABLE} --user-data-dir=prefix${PROFILE}`,
+			expectedEvidenceState: "captured",
+			expectedOwned: [CHILD_PID],
 		},
 		{
 			label: "profile suffix",
 			command: `${EXECUTABLE} --user-data-dir=${PROFILE}-suffix`,
+			expectedEvidenceState: "captured",
+			expectedOwned: [CHILD_PID],
 		},
 		{
 			label: "executable prefix wrapper",
 			command: `/tmp/chromium-wrapper ${EXECUTABLE} --user-data-dir=${PROFILE}`,
+			expectedEvidenceState: "unknown",
+			expectedOwned: [CHILD_PID, BROWSER_PID],
 		},
 		{
 			label: "executable suffix lookalike",
 			command: `${EXECUTABLE}-wrapper --user-data-dir=${PROFILE}`,
+			expectedEvidenceState: "unknown",
+			expectedOwned: [CHILD_PID, BROWSER_PID],
 		},
-	])("rejects $label substring evidence as browser and child signal authority", ({ command }) => {
-		const ownership = inspectSettledRunOwnership(directForest(TRUSTED_CHILD, command), context("captured"));
-		const { observation, signaled } = finalize(ownership);
+	])(
+		"rejects $label evidence as browser and child signal authority",
+		({ command, expectedEvidenceState, expectedOwned }) => {
+			const ownership = inspectSettledRunOwnership(directForest(TRUSTED_CHILD, command), context("captured"));
+			const { observation, signaled } = finalize(ownership);
 
-		expect.soft(ownership.ownedGroups).toEqual([CHILD_PID]);
-		expect.soft(ownership.validatedGroups).toEqual([]);
-		expect.soft(signaled).toEqual([]);
-		expect(observation.unresolvedOwnedGroups).toEqual([CHILD_PID]);
-	});
+			expect.soft(evidenceState(ownership)).toBe(expectedEvidenceState);
+			expect.soft(ownership.ownedGroups).toEqual(expectedOwned);
+			expect.soft(ownership.validatedGroups).toEqual([]);
+			expect.soft(signaled).toEqual([]);
+			expect(observation.unresolvedOwnedGroups).toEqual(expectedOwned);
+		}
+	);
 });
 
 const DRIVER_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "crash-driver.pw.ts");

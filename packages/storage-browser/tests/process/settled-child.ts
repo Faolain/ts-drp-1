@@ -13,10 +13,12 @@ function required(name: string): string {
 async function run(): Promise<void> {
 	const role = required("PHASE_2B_ROLE") as SettledRole;
 	if (role !== "seed" && role !== "discovery" && role !== "recovery") throw new TypeError("invalid settled role");
+	const executablePath = required("PHASE_2B_EXECUTABLE_PATH");
 	const profilePath = required("PHASE_2B_PROFILE");
 	const databaseName = required("PHASE_2B_DATABASE");
 	const url = required("PHASE_2B_URL");
 	const context = await chromium.launchPersistentContext(profilePath, {
+		executablePath: executablePath,
 		headless: true,
 		args: ["--hide-crash-restore-bubble"],
 	});
@@ -47,7 +49,7 @@ async function run(): Promise<void> {
 			browser: {
 				name: "chromium",
 				version: context.browser()?.version() ?? "unknown",
-				executablePath: browserRoot.command.split(" --", 1)[0] ?? chromium.executablePath(),
+				executablePath: browserRoot.command.split(" --", 1)[0] ?? executablePath,
 			},
 		});
 	} finally {

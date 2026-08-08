@@ -14,6 +14,7 @@ function write(message: unknown): void {
 }
 
 async function run(): Promise<never> {
+	const executablePath = required("PHASE_2B_EXECUTABLE_PATH");
 	const profilePath = required("PHASE_2B_PROFILE");
 	const databaseName = required("PHASE_2B_DATABASE");
 	const url = required("PHASE_2B_URL");
@@ -30,7 +31,10 @@ async function run(): Promise<never> {
 		throw new TypeError("invalid crash armed point");
 	}
 	const armed = { id: armedValue.id, edge: armedValue.edge } as KillPoint;
-	const context = await chromium.launchPersistentContext(profilePath, { headless: true });
+	const context = await chromium.launchPersistentContext(profilePath, {
+		executablePath: executablePath,
+		headless: true,
+	});
 	const page = context.pages()[0] ?? (await context.newPage());
 	await page.exposeBinding("phase2bRelay", (_source, message: unknown, cellValue: number) => {
 		write({ kind: "hit", version: 1, message, cellValue });
@@ -52,7 +56,7 @@ async function run(): Promise<never> {
 		browser: {
 			name: "chromium",
 			version: context.browser()?.version() ?? "unknown",
-			executablePath: browserRoot.command.split(" --", 1)[0] ?? chromium.executablePath(),
+			executablePath: browserRoot.command.split(" --", 1)[0] ?? executablePath,
 		},
 	});
 	void page.evaluate(({ name, point }) => window.phase2bRun(name, point, "tuple"), {

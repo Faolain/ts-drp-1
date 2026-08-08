@@ -9,10 +9,14 @@ function required(name: string): string {
 }
 
 async function run(): Promise<void> {
+	const executablePath = required("PHASE_2B_EXECUTABLE_PATH");
 	const profilePath = required("PHASE_2B_PROFILE");
 	const databaseName = required("PHASE_2B_DATABASE");
 	const url = required("PHASE_2B_URL");
-	const context = await chromium.launchPersistentContext(profilePath, { headless: true });
+	const context = await chromium.launchPersistentContext(profilePath, {
+		executablePath: executablePath,
+		headless: true,
+	});
 	try {
 		const page = context.pages()[0] ?? (await context.newPage());
 		const relayed: unknown[] = [];
@@ -40,7 +44,7 @@ async function run(): Promise<void> {
 			browser: {
 				name: "chromium",
 				version: context.browser()?.version() ?? "unknown",
-				executablePath: browserRoot.command.split(" --", 1)[0] ?? chromium.executablePath(),
+				executablePath: browserRoot.command.split(" --", 1)[0] ?? executablePath,
 			},
 		});
 	} finally {
