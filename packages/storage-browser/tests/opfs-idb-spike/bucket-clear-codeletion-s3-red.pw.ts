@@ -51,9 +51,12 @@ async function read(page: Page, name: OriginName): Promise<PayloadObservation> {
 	);
 }
 
-async function partialRedClear(page: Page): Promise<void> {
-	// RED defect: this deletes only one endpoint, not the origin's whole default bucket.
-	await page.evaluate(async () => (globalThis as unknown as { phase2SpikeS3: Harness }).phase2SpikeS3.deleteDatabase());
+async function clearTargetOriginBucket(page: Page): Promise<void> {
+	const session = await page.context().newCDPSession(page);
+	await session.send("Storage.clearDataForOrigin", {
+		origin: ORIGINS.target,
+		storageTypes: "all",
+	});
 }
 
 function exactPresent(): PayloadObservation {
@@ -114,7 +117,7 @@ test("one target-origin whole-bucket clear removes both endpoints without touchi
 		expect(await seedAndReopen(pages[name], name)).toEqual(exactPresent());
 	}
 
-	await partialRedClear(pages.target);
+	await clearTargetOriginBucket(pages.target);
 	await pages.target.reload();
 	await pages.target.waitForFunction(() => "phase2SpikeS3" in globalThis);
 	const after = {
