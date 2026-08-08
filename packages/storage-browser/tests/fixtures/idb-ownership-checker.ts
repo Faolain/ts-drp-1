@@ -40,6 +40,20 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"close",
 		]),
 	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/substrate-bench-worker.ts"),
+		new Set([
+			"open",
+			"createObjectStore",
+			"deleteDatabase",
+			"transaction",
+			"objectStore",
+			"get",
+			"put",
+			"addEventListener",
+			"close",
+		]),
+	],
 ]);
 
 export interface IdbOwnershipAuditOptions {
