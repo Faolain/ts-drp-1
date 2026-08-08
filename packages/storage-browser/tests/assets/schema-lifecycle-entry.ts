@@ -73,15 +73,21 @@ interface CorrectedSchemaOptions {
 	readonly autoIncrement?: string;
 	readonly extraIndex?: string;
 	readonly extraStore?: boolean;
-	readonly indexMode?: "extra" | "missing" | "multi-entry" | "unique" | "wrong-key";
+	readonly indexMode?: "extra" | "missing" | "multi-entry" | "swapped-key" | "unique" | "wrong-key";
 	readonly omitStore?: string;
+	readonly swappedKey?: string;
 	readonly wrongKey?: string;
 }
 
 function createCorrectedSchema(database: IDBDatabase, options: CorrectedSchemaOptions = {}): void {
 	const create = (name: string, keyPath: string | string[] | undefined): IDBObjectStore | undefined => {
 		if (options.omitStore === name) return undefined;
-		const selectedKeyPath = options.wrongKey === name ? `${name}WrongKey` : keyPath;
+		const selectedKeyPath =
+			options.wrongKey === name
+				? `${name}WrongKey`
+				: options.swappedKey === name && Array.isArray(keyPath)
+					? [...keyPath].reverse()
+					: keyPath;
 		return database.createObjectStore(name, {
 			autoIncrement: options.autoIncrement === name,
 			...(selectedKeyPath === undefined ? {} : { keyPath: selectedKeyPath }),
@@ -97,7 +103,11 @@ function createCorrectedSchema(database: IDBDatabase, options: CorrectedSchemaOp
 	indexedStore?.createIndex("unexpected", "unexpected");
 	if (votes !== undefined && options.indexMode !== "missing") {
 		const voteIndexKeyPath =
-			options.indexMode === "multi-entry" || options.indexMode === "wrong-key" ? "epoch" : ["objectId", "epoch"];
+			options.indexMode === "multi-entry" || options.indexMode === "wrong-key"
+				? "epoch"
+				: options.indexMode === "swapped-key"
+					? ["epoch", "objectId"]
+					: ["objectId", "epoch"];
 		votes.createIndex("by-object-epoch", voteIndexKeyPath, {
 			multiEntry: options.indexMode === "multi-entry",
 			unique: options.indexMode === "unique",
@@ -342,6 +352,8 @@ async function runUnexpectedPrivateV1Schemas(): Promise<unknown> {
 			name: `wrong-${wrongKey}-key`,
 			options: { wrongKey },
 		})),
+		{ name: "swapped-generations-key-order", options: { swappedKey: "generations" } },
+		{ name: "swapped-promotions-key-order", options: { swappedKey: "promotions" } },
 		...(["objects", "blobs", "votes"] as const).map((autoIncrement) => ({
 			name: `${autoIncrement}-auto-increment`,
 			options: { autoIncrement },
@@ -353,6 +365,7 @@ async function runUnexpectedPrivateV1Schemas(): Promise<unknown> {
 		{ name: "votes-missing-index", options: { indexMode: "missing" } },
 		{ name: "votes-extra-index", options: { indexMode: "extra" } },
 		{ name: "votes-wrong-index-key", options: { indexMode: "wrong-key" } },
+		{ name: "swapped-votes-index-key-order", options: { indexMode: "swapped-key" } },
 		{ name: "votes-unique-index", options: { indexMode: "unique" } },
 		{ name: "votes-multi-entry-index", options: { indexMode: "multi-entry" } },
 	];

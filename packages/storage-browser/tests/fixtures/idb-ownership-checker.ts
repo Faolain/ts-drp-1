@@ -6,6 +6,21 @@ const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 export const PACKAGE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../..");
 const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
 	[
+		path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts"),
+		new Set([
+			"open",
+			"transaction",
+			"objectStore",
+			"get",
+			"getAll",
+			"add",
+			"put",
+			"abort",
+			"close",
+			"addEventListener",
+		]),
+	],
+	[
 		path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts"),
 		new Set([
 			"open",
@@ -102,6 +117,21 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"close",
 		]),
 	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/fixtures/idb-adapter-browser-oracle.ts"),
+		new Set([
+			"open",
+			"deleteDatabase",
+			"transaction",
+			"objectStore",
+			"get",
+			"count",
+			"put",
+			"call",
+			"addEventListener",
+			"close",
+		]),
+	],
 ]);
 
 export interface IdbOwnershipAuditOptions {
@@ -138,14 +168,28 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 	const program = ts.createProgram({ rootNames: [...governedRootNames], options: { ...parsed.options, noEmit: true } });
 	const checker = program.getTypeChecker();
 	const violations: string[] = [];
-	const isStrictDurability = (expression: ts.Expression): boolean => {
-		if (ts.isStringLiteral(expression)) return expression.text === "strict";
-		if (!ts.isIdentifier(expression)) return false;
-		const declaration = checker.getSymbolAtLocation(expression)?.valueDeclaration;
-		return declaration !== undefined && ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined
-			? isStrictDurability(declaration.initializer)
-			: false;
+	const stringValue = (expression: ts.Expression, seen = new Set<ts.Symbol>()): string | undefined => {
+		if (ts.isStringLiteral(expression)) return expression.text;
+		if (
+			ts.isParenthesizedExpression(expression) ||
+			ts.isAsExpression(expression) ||
+			ts.isSatisfiesExpression(expression)
+		) {
+			return stringValue(expression.expression, seen);
+		}
+		if (!ts.isIdentifier(expression)) return undefined;
+		const symbol = checker.getSymbolAtLocation(expression);
+		if (symbol === undefined || seen.has(symbol)) return undefined;
+		seen.add(symbol);
+		const declaration = symbol.valueDeclaration;
+		return declaration !== undefined &&
+			ts.isVariableDeclaration(declaration) &&
+			declaration.initializer !== undefined &&
+			declaration.parent.flags & ts.NodeFlags.Const
+			? stringValue(declaration.initializer, seen)
+			: undefined;
 	};
+	const isStrictDurability = (expression: ts.Expression): boolean => stringValue(expression) === "strict";
 	for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
 		if (diagnostic.file && governedRootNames.includes(diagnostic.file.fileName)) {
 			violations.push(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
@@ -155,7 +199,9 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 		if (!governedRootNames.includes(source.fileName)) continue;
 		const normalized = path.resolve(source.fileName);
 		const enforceProductionStrictMutation =
-			options.ownerMethods !== undefined || normalized === path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts");
+			options.ownerMethods !== undefined ||
+			normalized === path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts") ||
+			normalized === path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts");
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node)) {
 				if (ts.isElementAccessExpression(node.expression)) {
@@ -166,24 +212,25 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 				} else if (ts.isPropertyAccessExpression(node.expression)) {
 					const receiver = checker.typeToString(checker.getTypeAtLocation(node.expression.expression));
 					if (isIdbDomType(receiver)) {
-						if (
-							enforceProductionStrictMutation &&
-							node.expression.name.text === "transaction" &&
-							node.arguments[1]?.kind === ts.SyntaxKind.StringLiteral &&
-							(node.arguments[1] as ts.StringLiteral).text === "readwrite"
-						) {
-							const options = node.arguments[2];
-							const strictDurability =
-								options !== undefined &&
-								ts.isObjectLiteralExpression(options) &&
-								options.properties.some(
-									(property) =>
-										ts.isPropertyAssignment(property) &&
-										property.name.getText(source) === "durability" &&
-										isStrictDurability(property.initializer)
-								);
-							if (!strictDurability) {
-								violations.push(`${normalized}: readwrite IDB transaction does not request strict durability`);
+						if (enforceProductionStrictMutation && node.expression.name.text === "transaction") {
+							const modeExpression = node.arguments[1];
+							const mode = modeExpression === undefined ? "readonly" : stringValue(modeExpression);
+							if (mode !== "readonly" && mode !== "readwrite") {
+								violations.push(`${normalized}: unsupported IDB transaction mode`);
+							} else if (mode === "readwrite") {
+								const options = node.arguments[2];
+								const strictDurability =
+									options !== undefined &&
+									ts.isObjectLiteralExpression(options) &&
+									options.properties.some(
+										(property) =>
+											ts.isPropertyAssignment(property) &&
+											property.name.getText(source) === "durability" &&
+											isStrictDurability(property.initializer)
+									);
+								if (!strictDurability) {
+									violations.push(`${normalized}: readwrite IDB transaction does not request strict durability`);
+								}
 							}
 						}
 						const methods = ownerMethods.get(normalized);

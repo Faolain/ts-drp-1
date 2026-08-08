@@ -31,27 +31,19 @@ describe("Phase 2d1 selected schema authority", () => {
 	it("freezes the corrected private-v1 five-store authority without compatibility stores", () => {
 		const authority = phase2dSchema as unknown as Readonly<Record<string, unknown>>;
 		expect({
-			blobsStore: authority.PHASE_2D_BLOBS_STORE,
-			generationKeyPath: ["objectId", "generationId"],
-			generationsStore: authority.PHASE_2D_GENERATIONS_STORE,
-			objectsStore: authority.PHASE_2D_OBJECTS_STORE,
-			promotionKeyPath: ["objectId", "generationId", "digest"],
-			promotionsStore: authority.PHASE_2D_PROMOTIONS_STORE,
+			inventory: authority.PHASE_2D_DATA_STORE_INVENTORY,
 			schemaVersion: authority.PHASE_2D_SCHEMA_VERSION,
-			voteIndexKeyPath: ["objectId", "epoch"],
 			voteIndexName: authority.PHASE_2D_VOTES_OBJECT_EPOCH_INDEX,
-			votesStore: authority.PHASE_2D_VOTES_STORE,
 		}).toEqual({
-			blobsStore: "blobs",
-			generationKeyPath: ["objectId", "generationId"],
-			generationsStore: "generations",
-			objectsStore: "objects",
-			promotionKeyPath: ["objectId", "generationId", "digest"],
-			promotionsStore: "promotions",
+			inventory: [
+				{ keyPath: "objectId", name: "objects" },
+				{ keyPath: ["objectId", "generationId"], name: "generations" },
+				{ keyPath: "digest", name: "blobs" },
+				{ keyPath: ["objectId", "generationId", "digest"], name: "promotions" },
+				{ keyPath: null, name: "votes" },
+			],
 			schemaVersion: 1,
-			voteIndexKeyPath: ["objectId", "epoch"],
 			voteIndexName: "by-object-epoch",
-			votesStore: "votes",
 		});
 	});
 

@@ -1,0 +1,114 @@
+import type {
+	AheDurableStore,
+	BlobDigest,
+	ExpectedHead,
+	GenerationId,
+	GenerationRecord,
+	GenerationRef,
+	ObjectStoreState,
+	PresentHead,
+	StorageObjectId,
+	StoreResult,
+} from "@ts-drp/storage";
+
+export interface Phase2dAheDurableStoreOptions {
+	readonly databaseName: string;
+}
+
+type Phase2dAheDurableStoreFactory = (options: Phase2dAheDurableStoreOptions) => Promise<AheDurableStore>;
+
+const CAUSE = Object.freeze({ code: "PHASE_2D2A_NOT_IMPLEMENTED" });
+
+function unavailable<T>(): Promise<StoreResult<T>> {
+	return Promise.resolve({ ok: false, reason: "SUBSTRATE_FAILURE", cause: CAUSE });
+}
+
+class InertStrictRedStore implements AheDurableStore {
+	public readonly capabilities = Object.freeze({
+		durability: "strict" as const,
+		signingEligibility: "backend-capability-required" as const,
+	});
+
+	public readObjectState(_objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>> {
+		return unavailable();
+	}
+
+	public getBlob(_digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
+		return unavailable();
+	}
+
+	public beginGeneration(_input: {
+		readonly objectId: StorageObjectId;
+		readonly generationId: GenerationId;
+		readonly baseExpectedHead: ExpectedHead;
+		readonly closure: readonly GenerationRef[];
+	}): Promise<StoreResult<GenerationRecord>> {
+		return unavailable();
+	}
+
+	public putCachedBlob(_input: {
+		readonly objectId: StorageObjectId;
+		readonly generationId: GenerationId;
+		readonly digest: BlobDigest;
+		readonly bytes: Uint8Array;
+	}): Promise<StoreResult<{ inserted: boolean }>> {
+		return unavailable();
+	}
+
+	public promoteReference(_input: {
+		readonly objectId: StorageObjectId;
+		readonly generationId: GenerationId;
+		readonly digest: BlobDigest;
+	}): Promise<StoreResult<undefined>> {
+		return unavailable();
+	}
+
+	public completeGeneration(_input: {
+		readonly objectId: StorageObjectId;
+		readonly generationId: GenerationId;
+	}): Promise<StoreResult<GenerationRecord>> {
+		return unavailable();
+	}
+
+	public swapHead(_input: {
+		readonly objectId: StorageObjectId;
+		readonly generationId: GenerationId;
+		readonly expectedHead: ExpectedHead;
+	}): Promise<StoreResult<{ head: PresentHead; supersededGenerationId: GenerationId | null }>> {
+		return unavailable();
+	}
+
+	public discardGeneration(_input: {
+		readonly objectId: StorageObjectId;
+		readonly generationId: GenerationId;
+	}): Promise<StoreResult<GenerationRecord>> {
+		return unavailable();
+	}
+
+	public close(): Promise<void> {
+		return Promise.resolve();
+	}
+}
+
+/**
+ * Loads the future private production owner without making RED fail at import time.
+ * The inert fallback is deliberately strict-labelled but behaviorally incapable.
+ * @param options - Isolated production database options.
+ * @returns The real private adapter when present, otherwise the behavioral RED scaffold.
+ */
+export async function createPhase2d2aRedStore(options: Phase2dAheDurableStoreOptions): Promise<AheDurableStore> {
+	const productionModulePath = ["..", "..", "src", "internal", "idb-adapter.js"].join("/");
+	let candidate: unknown;
+	try {
+		candidate = await import(productionModulePath);
+	} catch {
+		return new InertStrictRedStore();
+	}
+	if (typeof candidate === "object" && candidate !== null) {
+		const factory = Reflect.get(candidate, "createPhase2dAheDurableStore");
+		if (typeof factory === "function") {
+			return (factory as Phase2dAheDurableStoreFactory)(options);
+		}
+	}
+	return new InertStrictRedStore();
+}

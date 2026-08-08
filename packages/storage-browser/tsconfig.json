@@ -4,6 +4,12 @@
 		"outDir": "dist"
 	},
 	"files": ["killpoints.json"],
-	"include": ["src/**/*.ts", "tests/**/*.ts", "playwright.storage-browser.config.ts"],
+	"include": [
+		"src/**/*.ts",
+		"tests/**/*.ts",
+		"playwright.storage-browser.config.ts",
+		"playwright.phase-2d1-schema.config.ts",
+		"playwright.phase-2d2a-idb-adapter.config.ts"
+	],
 	"exclude": ["dist", "./*.d.ts"]
 }

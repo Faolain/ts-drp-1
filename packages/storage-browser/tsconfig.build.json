@@ -1,4 +1,10 @@
 {
 	"extends": "./tsconfig.json",
-	"exclude": ["dist", "tests/**/*.ts", "playwright.storage-browser.config.ts"]
+	"exclude": [
+		"dist",
+		"tests/**/*.ts",
+		"playwright.storage-browser.config.ts",
+		"playwright.phase-2d1-schema.config.ts",
+		"playwright.phase-2d2a-idb-adapter.config.ts"
+	]
 }

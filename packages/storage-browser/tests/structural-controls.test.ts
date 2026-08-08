@@ -51,9 +51,21 @@ describe("Phase 2b structural controls", () => {
 		expect(metadata).not.toHaveProperty("types");
 		const tsconfig = readJson("packages/storage-browser/tsconfig.json");
 		expect(tsconfig.files).toEqual(["killpoints.json"]);
-		expect(tsconfig.include).toEqual(["src/**/*.ts", "tests/**/*.ts", "playwright.storage-browser.config.ts"]);
+		expect(tsconfig.include).toEqual([
+			"src/**/*.ts",
+			"tests/**/*.ts",
+			"playwright.storage-browser.config.ts",
+			"playwright.phase-2d1-schema.config.ts",
+			"playwright.phase-2d2a-idb-adapter.config.ts",
+		]);
 		const build = readJson("packages/storage-browser/tsconfig.build.json");
-		expect(build.exclude).toEqual(["dist", "tests/**/*.ts", "playwright.storage-browser.config.ts"]);
+		expect(build.exclude).toEqual([
+			"dist",
+			"tests/**/*.ts",
+			"playwright.storage-browser.config.ts",
+			"playwright.phase-2d1-schema.config.ts",
+			"playwright.phase-2d2a-idb-adapter.config.ts",
+		]);
 	});
 
 	it("keeps the toy diagnostic outside both frozen protocol registries", () => {
