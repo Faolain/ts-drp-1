@@ -251,7 +251,6 @@ class SqliteAheDurableStore implements AheDurableStore {
 					if (state === undefined) throw new Error("generation closure loaded without its object state");
 					const generation = state.generations.find((record) => record.generationId === requirement.generationId);
 					for (const reference of generation?.closure ?? []) {
-						this.loadBlob(reference.digest, facts, loadedBlobs);
 						this.loadPromotion(
 							{
 								objectId: requirement.objectId,

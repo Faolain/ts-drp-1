@@ -527,7 +527,6 @@ function exactFactsForCommand(command: StorageAdapterCommand, facts: LoadedFacts
 				.get(command.objectId)
 				?.generations.find(({ generationId }) => generationId === command.generationId);
 			for (const reference of generation?.closure ?? []) {
-				blobIds.add(reference.digest);
 				allowedPromotions.add(promotionKey({ ...command, digest: reference.digest }));
 			}
 		}

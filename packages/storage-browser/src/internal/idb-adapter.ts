@@ -45,12 +45,7 @@ const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
 
 const OPERATION_STORES = Object.freeze({
 	beginGeneration: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
-	completeGeneration: Object.freeze([
-		PHASE_2D_OBJECTS_STORE,
-		PHASE_2D_GENERATIONS_STORE,
-		PHASE_2D_BLOBS_STORE,
-		PHASE_2D_PROMOTIONS_STORE,
-	]),
+	completeGeneration: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_PROMOTIONS_STORE]),
 	discardGeneration: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
 	getBlob: Object.freeze([PHASE_2D_BLOBS_STORE]),
 	promoteReference: Object.freeze([
@@ -277,7 +272,6 @@ class IdbAheDurableStore implements AheDurableStore {
 						break;
 					}
 					for (const reference of decoded.value.closure) {
-						await this.loadBlob(transaction, reference.digest, facts, loadedBlobs);
 						await this.loadPromotion(
 							transaction,
 							{

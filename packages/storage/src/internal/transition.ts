@@ -231,7 +231,7 @@ export class TransitionOwner {
 	}
 
 	/**
-	 * Completes a staged generation only after ref-major integrity checks.
+	 * Completes a staged generation only after every reference is promoted.
 	 * @param input - Input value.
 	 * @param input.objectId - Input value.
 	 * @param input.generationId - Input value.
@@ -249,9 +249,6 @@ export class TransitionOwner {
 		for (const reference of [...generation.closure].sort((left, right) =>
 			compareCanonicalText(left.digest, right.digest)
 		)) {
-			const blob = this.blobs.get(reference.digest);
-			if (blob === undefined) return rejected("BLOB_MISSING");
-			if (!this.blobMatches(reference, blob)) return rejected("BLOB_CORRUPT");
 			if (!this.promoted.has(this.promotionKey(input.objectId, input.generationId, reference.digest))) {
 				return rejected("BLOB_UNPROMOTED");
 			}
