@@ -330,17 +330,23 @@ describe("Phase 2a ref-major precedence", () => {
 		expect(harness.readObjectState(OBJECT_A)).toEqual(before);
 	});
 
-	it("checks missing, then corrupt, then unpromoted for one digest", () => {
-		const item = ref(bytes(1));
-		const expected = ["BLOB_MISSING", "BLOB_CORRUPT", "BLOB_UNPROMOTED"];
-		for (const [index, reason] of expected.entries()) {
+	it.each([
+		{ cache: "missing", bytes: undefined },
+		{ cache: "corrupt", bytes: bytes(9) },
+		{ cache: "valid", bytes: bytes(1) },
+	] as const)(
+		"returns BLOB_UNPROMOTED when promotion evidence is absent and cached bytes are $cache",
+		({ bytes: cacheBytes }) => {
+			const item = ref(bytes(1));
 			const harness = createTransitionHarness();
 			harness.seedObjectState({ head: noHead(), generations: [record({ closure: [item] })] });
-			if (index > 0) harness.seedBlob(item.digest, index === 1 ? bytes(9) : bytes(1));
+			if (cacheBytes !== undefined) harness.seedBlob(item.digest, cacheBytes);
+			const before = harness.readObjectState(OBJECT_A);
 			const result = harness.completeGeneration({ objectId: OBJECT_A, generationId: GENERATION_A });
-			expect(reasonOf(result)).toBe(reason);
+			expect(reasonOf(result)).toBe("BLOB_UNPROMOTED");
+			expect(harness.readObjectState(OBJECT_A)).toEqual(before);
 		}
-	});
+	);
 
 	it("keeps closure digest captured at begin instead of accepting a substitute", () => {
 		const harness = createTransitionHarness();
