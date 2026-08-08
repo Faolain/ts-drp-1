@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { chromium, expect, test } from "@playwright/test";
 import { type ChildProcess, fork, spawn } from "node:child_process";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -38,11 +38,12 @@ import {
 	validateTwoGroupForest,
 } from "./fixtures/process-forest.js";
 import { finalizeFailedRun } from "./fixtures/run-finalizer.js";
+import { ownershipFromSettledFailure, SettledRunFailure } from "./fixtures/settled-failure-ownership.js";
 import {
-	inspectSettledFailureOwnership,
-	ownershipFromSettledFailure,
-	SettledRunFailure,
-} from "./fixtures/settled-failure-ownership.js";
+	disposeProfileWhenAllowed,
+	inspectSettledRunOwnership,
+	profileDispositionFor,
+} from "./fixtures/settled-run-lifecycle.js";
 import { parseWorkerToPageMessage } from "./fixtures/worker-protocol.js";
 
 const ASSET_DIRECTORY_VALUE = process.env.PHASE_2B_ASSET_DIR;
@@ -270,7 +271,14 @@ async function runSettled(
 		} catch {
 			// The original run failure remains primary and absent process evidence grants no signal authority.
 		}
-		const failureOwnership = inspectSettledFailureOwnership(failureForest, child.pid ?? -1, profilePath, process.pid);
+		const childPid = child.pid ?? -1;
+		const controllerPid = process.pid;
+		const failureOwnership = inspectSettledRunOwnership(failureForest, {
+			childPid,
+			chromiumExecutablePath: chromium.executablePath(),
+			controllerPid,
+			profilePath,
+		});
 		throw new SettledRunFailure(error, failureOwnership);
 	}
 }
@@ -392,6 +400,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 	let token = "";
 	let stage: RunStage = "setup";
 	let artifactWritten = false;
+	let profileDisposition: ReturnType<typeof profileDispositionFor> = "retain";
 	let ownedGroups: readonly number[] = [];
 	let validatedGroups: readonly number[] = [];
 	let crashProcess: ChildProcess | undefined;
@@ -604,6 +613,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 			settledChildren: Object.freeze([seed.evidence, recovery.evidence] as const),
 		});
 		writeOnce(artifact);
+		profileDisposition = profileDispositionFor({ kind: "pass" });
 		return artifact;
 	} catch (error) {
 		const failureOwnership = ownershipFromSettledFailure(error);
@@ -653,7 +663,7 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 			...(recordedForestEvidence === undefined ? {} : { recordedForest: recordedForestEvidence }),
 			...(recoveryClassification === undefined ? {} : { recoveryClassification }),
 		});
-		finalizeFailedRun(
+		const finalization = finalizeFailedRun(
 			{
 				base: baseArtifact("tuple", runId, profilePath, databaseName, browserForFailure),
 				stage,
@@ -668,9 +678,12 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 				killValidatedGroup,
 			}
 		);
+		profileDisposition = profileDispositionFor({ kind: "failed-finalized", finalization });
 		throw error;
 	} finally {
-		fs.rmSync(profilePath, { recursive: true, force: true });
+		disposeProfileWhenAllowed(profilePath, profileDisposition, (disposableProfilePath) =>
+			fs.rmSync(disposableProfilePath, { recursive: true, force: true })
+		);
 	}
 }
 
@@ -691,6 +704,7 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 	const databaseName = `phase-2b-${runId}-${path.basename(profilePath)}`;
 	let stage: RunStage = "setup";
 	let artifactWritten = false;
+	let profileDisposition: ReturnType<typeof profileDispositionFor> = "retain";
 	const settledChildren: SettledChildEvidence[] = [];
 	let observedHits: readonly KillHit[] = [];
 	let recoveryClassification: PartialFailureEvidence["recoveryClassification"];
@@ -756,6 +770,7 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 				settledChildren: Object.freeze([seed.evidence, control.evidence, recovery.evidence] as const),
 			});
 			writeOnce(artifact);
+			profileDisposition = profileDispositionFor({ kind: "pass" });
 			return artifact;
 		}
 		const preResume = exactHits(result.preResumeHits);
@@ -781,6 +796,7 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 			settledChildren: Object.freeze([seed.evidence, control.evidence, recovery.evidence] as const),
 		});
 		writeOnce(artifact);
+		profileDisposition = profileDispositionFor({ kind: "pass" });
 		return artifact;
 	} catch (error) {
 		const failureOwnership = ownershipFromSettledFailure(error);
@@ -791,7 +807,7 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 			...(failureOwnership.recordedForest.length === 0 ? {} : { recordedForest: failureOwnership.recordedForest }),
 			...(recoveryClassification === undefined ? {} : { recoveryClassification }),
 		});
-		finalizeFailedRun(
+		const finalization = finalizeFailedRun(
 			{
 				base: baseArtifact(runKind, runId, profilePath, databaseName, browserForFailure),
 				stage,
@@ -806,9 +822,12 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 				killValidatedGroup,
 			}
 		);
+		profileDisposition = profileDispositionFor({ kind: "failed-finalized", finalization });
 		throw error;
 	} finally {
-		fs.rmSync(profilePath, { recursive: true, force: true });
+		disposeProfileWhenAllowed(profilePath, profileDisposition, (disposableProfilePath) =>
+			fs.rmSync(disposableProfilePath, { recursive: true, force: true })
+		);
 	}
 }
 
