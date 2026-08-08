@@ -2787,6 +2787,13 @@ Carry these bounded residuals forward instead of overstating S4:
 
 #### Phase 2d1 accepted closure — decision-bound schema lifecycle shell
 
+> **Inventory correction authorized before 2d2:** the lifecycle, decision-link,
+> strict-durability and connection-management evidence below remains accepted,
+> but its two-store v1 inventory is historical and no longer an implementation
+> target. The private/unshipped v1 must be corrected in place by the dedicated
+> five-store RED/GREEN defined after this closure. Phase 2d2 remains blocked
+> until that correction is accepted.
+
 Phase 2d1 is accepted at production GREEN `d3d8d56` over tests-plus-inert-
 scaffold RED `8849768`. This is the first bounded sub-slice of the explicitly
 sliceable Phase 2d row, not closure of full 2d. It binds browser database
@@ -2899,6 +2906,88 @@ Carry these bounded residuals into 2d2+ instead of overstating 2d1:
    staging, the real indexed vote transaction and production store surface;
    2e owns full-closure recovery and 2l owns durable issuance. Phase 2d1 proves
    neither complete Discord/MMORPG golden path.
+
+#### Phase 2d1 inventory correction authorization — private v1, before 2d2
+
+The first 2d2 source-to-write audit found that the accepted two-store shell
+cannot faithfully realize the already-frozen adapter vocabulary. A global blob
+CAS cannot live under an object-scoped generation key; `HeadRevision` is not
+derivable from a `GenerationRecord`; and standalone promotion facts and
+`insert-promotion` writes have no owner. Reusing `generations` or `votes` would
+overload their semantics. Adding an immediate v2 migration would instead
+preserve an unshipped, private schema known to be incomplete. The correction is
+therefore an in-place v1 correction, not compatibility work.
+
+The corrected schema contains exactly five stores and no others:
+
+- `objects`, key path `objectId`, no auto-increment and no indexes;
+- `generations`, native compound key path `[objectId, generationId]`, no
+  auto-increment and no indexes;
+- `blobs`, global key path `digest`, no auto-increment and no indexes;
+- `promotions`, native compound key path
+  `[objectId, generationId, digest]`, no auto-increment and no indexes;
+- `votes`, unchanged: an out-of-line primary key, no auto-increment, and exactly
+  one non-unique/non-multi-entry `by-object-epoch` index with native compound
+  key path `[objectId, epoch]`.
+
+Version remains `1`. Existing two-store databases are malformed private
+artifacts and fail closed; there is no legacy migration. This correction still
+does not choose the vote primary-key tuple and adds no outbox, author-sequence,
+signer-state, recovery, cleanup or Phase-2l schema.
+
+The dedicated `promotions` store is intentional. A sibling side field on a
+generation row is codec-legal and could be made atomic, but only by teaching
+both `insert-promotion` and every future `replace-generation` to read, merge and
+preserve each other's state. That backend-only dual-merge protocol is absent
+from the frozen exact-write vocabulary, couples append-only evidence to the
+generation lifecycle, and is unnecessary. A triple-keyed store maps the
+standalone fact and immutable insertion one-for-one, matching the semantic
+decomposition already exercised by the SQLite backend without making its SQL
+layout independently normative.
+
+The corrective RED must freeze structure rather than prematurely implement
+2d2 data operations:
+
+1. exact five-store constants, names, key paths, auto-increment flags and index
+   inventory on every open, including zero generation indexes and rejection of
+   any missing, extra or malformed store/index;
+2. fresh-database creation at version 1, plus preserved decision-link,
+   strict-durability, `versionchange`, blocked-upgrade and schema-error controls;
+3. a three-element native compound-key collision control for promotions,
+   alongside the existing generation control;
+4. one bounded write-kind/load-requirement-to-store ownership table so every
+   frozen adapter kind has exactly one physical owner and another missing store
+   cannot remain invisible;
+5. removal or retargeting of the test-only strict mutation marker so it does
+   not establish non-canonical generation rows as precedent.
+
+Phase 2d2 retains requirement loading, exact write application, real strict
+multi-store transactions, `add`-only immutable blob/promotion insertion,
+referential checks, concurrency, crash/recovery and production adapter
+contract evidence. Phase 2l retains durable issuance and outbox ownership.
+
+The standing assumption-correction quorum approved this change before any plan
+or production edit. Codex-high returned `ASSUMPTION_INCORRECT: yes`,
+`PLAN_CORRECTION_APPROVED: yes`, recommendation C, with sealed evidence in
+`.logs/phase-2d2-schema-assumption-codex-high-review/`. Exact Kimi 3/high/100
+session `3b4adeff-cc0e-411f-9786-8fde4e8b3885` returned the same fields and
+recommendation (result SHA-256
+`525b0d61dcb1a0f9704636ca7437ed59c6b097349f94f4f862f6efb75950af1c`);
+Opus 5/xhigh session `b50745fc-eec9-4a42-97d1-1f94dd7cbfba` independently
+returned the same verdict (result SHA-256
+`a3affece434f27a5bbe041649a8cfd92918c799884c0d4a4eb2f9027accbbaa3`).
+
+The initial quorum agreed on correction C but exposed a four-versus-five-store
+promotion-layout detail. The same reviewers reconciled it before this text was
+changed. Codex-high returned `PROMOTIONS_LAYOUT: DEDICATED` and
+`PLAN_DETAIL_APPROVED: yes`. Exact Kimi 3/high/100 session
+`6a8dd042-3f9d-451c-9de3-ceb1d87960eb` returned the same verdict (result
+SHA-256 `3b0fba15e25c15a54783b9c0f4250ae13744f02e725854ec3ea4f494570ffc80`),
+as did fresh Opus 5/xhigh session `04d62c1e-ed39-43bd-8e8b-77d80d7cc354`
+(result SHA-256
+`f7f8bfded77785c65b60225e614d73695f0271a693df52310a8282b22a36890c`).
+All reconciliation work was read-only at `15c2c1f`; no reviewer ran tests or
+changed tracked files.
 
 ### Exit gate (Phase 2)
 
