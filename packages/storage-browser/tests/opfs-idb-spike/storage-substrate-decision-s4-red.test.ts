@@ -20,13 +20,23 @@ interface MutableLink {
 	decision: { jsonPath: string; jsonSha256: string; markdownPath: string; markdownSha256: string };
 	artifacts: {
 		strictIdb: { testOnlyForcedObservedDurability: string };
-		measurement: { oracleStatus: string; sha256: string };
+		measurement: {
+			path: string;
+			oracleStatus: string;
+			sha256: string;
+			engine: { browserName: string; browserVersion: string; userAgent: string };
+		};
 		clearControl: { scoringWeight: string };
 	};
 }
 
 interface MutableDecision {
 	measurementArtifactDigests: string[];
+	consequences: string[];
+}
+
+interface MutableMeasurement {
+	engineBuild: string;
 }
 
 afterEach(() => {
@@ -37,13 +47,16 @@ function sha256(bytes: string): string {
 	return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-function createSyntheticBundle(chosen: "idb-strict" | "opfs"): { readonly root: string; readonly linkPath: string } {
+function createSyntheticBundle(
+	chosen: "idb-strict" | "opfs",
+	userAgent = VALID_MEASUREMENT_EVIDENCE.engineBuild
+): { readonly root: string; readonly linkPath: string } {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2-spike-s4-gate-"));
 	temporaryDirectories.push(root);
 	const artifactDirectory = path.join(root, "artifacts");
 	fs.mkdirSync(artifactDirectory);
 	const strictJson = JSON.stringify(VALID_STRICT_IDB_CAPABILITY_EVIDENCE);
-	const measurementJson = JSON.stringify(VALID_MEASUREMENT_EVIDENCE);
+	const measurementJson = JSON.stringify({ ...VALID_MEASUREMENT_EVIDENCE, engineBuild: userAgent });
 	const clearJson = JSON.stringify(VALID_CLEAR_CONTROL_EVIDENCE);
 	const artifactDigests = {
 		strictIdb: sha256(strictJson),
@@ -94,7 +107,7 @@ function createSyntheticBundle(chosen: "idb-strict" | "opfs"): { readonly root: 
 		browserName: "chromium",
 		browserVersion: "149.0.7827.55",
 		executableRevision: "chromium-1234567",
-		userAgent: "Mozilla/5.0 synthetic S4 control Chromium/149.0.7827.55",
+		userAgent,
 		operatingSystem: "synthetic-control-os",
 		playwrightVersion: "1.61.1",
 	};
@@ -145,6 +158,46 @@ function createSyntheticBundle(chosen: "idb-strict" | "opfs"): { readonly root: 
 	const linkPath = "phase-2d-link.json";
 	fs.writeFileSync(path.join(root, linkPath), JSON.stringify(link));
 	return { root, linkPath };
+}
+
+function replaceMeasurementEngineBuild(
+	bundle: { readonly root: string; readonly linkPath: string },
+	engineBuild: string
+): void {
+	const fullLinkPath = path.join(bundle.root, bundle.linkPath);
+	const link = JSON.parse(fs.readFileSync(fullLinkPath, "utf8")) as MutableLink;
+	const fullMeasurementPath = path.join(bundle.root, link.artifacts.measurement.path);
+	const measurement = JSON.parse(fs.readFileSync(fullMeasurementPath, "utf8")) as MutableMeasurement;
+	measurement.engineBuild = engineBuild;
+	const measurementJson = JSON.stringify(measurement);
+	const previousMeasurementDigest = link.artifacts.measurement.sha256;
+	const measurementDigest = sha256(measurementJson);
+	fs.writeFileSync(fullMeasurementPath, measurementJson);
+
+	const fullDecisionPath = path.join(bundle.root, link.decision.jsonPath);
+	const decision = JSON.parse(fs.readFileSync(fullDecisionPath, "utf8")) as MutableDecision;
+	decision.measurementArtifactDigests = [measurementDigest];
+	decision.consequences = decision.consequences.map((consequence) =>
+		consequence === `artifact-sha256:substrate-measurement=${previousMeasurementDigest}`
+			? `artifact-sha256:substrate-measurement=${measurementDigest}`
+			: consequence
+	);
+	const decisionJson = JSON.stringify(decision);
+	const previousDecisionDigest = link.decision.jsonSha256;
+	const decisionDigest = sha256(decisionJson);
+	fs.writeFileSync(fullDecisionPath, decisionJson);
+
+	const fullMarkdownPath = path.join(bundle.root, link.decision.markdownPath);
+	const markdown = fs
+		.readFileSync(fullMarkdownPath, "utf8")
+		.replace(`Decision JSON SHA-256: ${previousDecisionDigest}`, `Decision JSON SHA-256: ${decisionDigest}`)
+		.replace(`Measurement SHA-256: ${previousMeasurementDigest}`, `Measurement SHA-256: ${measurementDigest}`);
+	fs.writeFileSync(fullMarkdownPath, markdown);
+
+	link.artifacts.measurement.sha256 = measurementDigest;
+	link.decision.jsonSha256 = decisionDigest;
+	link.decision.markdownSha256 = sha256(markdown);
+	fs.writeFileSync(fullLinkPath, JSON.stringify(link));
 }
 
 describe("Phase 2-spike S4 decision bundle and future 2d consumption gate", () => {
@@ -230,6 +283,24 @@ describe("Phase 2-spike S4 decision bundle and future 2d consumption gate", () =
 			.soft(() =>
 				requirePhase2dDecisionConsumptionReady({ rootDirectory: digestBundle.root, linkPath: digestBundle.linkPath })
 			)
+			.toThrow(TypeError);
+	});
+
+	it("binds the S2 measurement engine build to the citation's live user agent", () => {
+		const liveUserAgent =
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.7827.55 Safari/537.36";
+		const bundle = createSyntheticBundle("idb-strict", liveUserAgent);
+		expect
+			.soft(() => requirePhase2dDecisionConsumptionReady({ rootDirectory: bundle.root, linkPath: bundle.linkPath }))
+			.not.toThrow();
+
+		const link = JSON.parse(fs.readFileSync(path.join(bundle.root, bundle.linkPath), "utf8")) as MutableLink;
+		const synthesizedNameVersion = `${link.artifacts.measurement.engine.browserName}-${link.artifacts.measurement.engine.browserVersion}`;
+		expect(synthesizedNameVersion).not.toBe(liveUserAgent);
+		replaceMeasurementEngineBuild(bundle, synthesizedNameVersion);
+
+		expect
+			.soft(() => requirePhase2dDecisionConsumptionReady({ rootDirectory: bundle.root, linkPath: bundle.linkPath }))
 			.toThrow(TypeError);
 	});
 
