@@ -43,6 +43,23 @@ function hasExactExecutable(command: string, executablePath: string): boolean {
 	return command === executablePath || command.startsWith(`${executablePath} `);
 }
 
+function hasAncestorInGroup(
+	identity: ProcessIdentity,
+	ancestorPid: number,
+	group: ReadonlyMap<number, ProcessIdentity>
+): boolean {
+	const visited = new Set<number>();
+	let current = identity;
+	while (current.pid !== ancestorPid) {
+		if (visited.has(current.pid)) return false;
+		visited.add(current.pid);
+		const parent = group.get(current.ppid);
+		if (parent === undefined) return false;
+		current = parent;
+	}
+	return true;
+}
+
 function validIdentity(identity: ProcessIdentity): boolean {
 	return (
 		Number.isSafeInteger(identity.pid) &&
@@ -117,13 +134,9 @@ export function inspectSettledRunOwnership(
 	};
 	const profileArgument = `--user-data-dir=${context.profilePath}`;
 	const profileCandidates = forest.filter((identity) => hasExactArgument(identity.command, profileArgument));
-	const executableCandidates = profileCandidates.filter((identity) =>
+	const browserRootCandidates = profileCandidates.filter((identity) =>
 		hasExactExecutable(identity.command, context.chromiumExecutablePath)
 	);
-	const contradictoryProfileAuthority =
-		profileCandidates.length > 0 && (profileCandidates.length !== 1 || executableCandidates.length !== 1);
-	const evidenceState =
-		contradictoryProfileAuthority || ownershipEvidenceState(capturedContext) === "unknown" ? "unknown" : "captured";
 	const children = forest.filter(({ pid }) => pid === context.childPid);
 	const possibleUncapturedChildGroup =
 		capturedContext.captureState === "unknown" && Number.isSafeInteger(context.childPid) && context.childPid > 0
@@ -137,14 +150,14 @@ export function inspectSettledRunOwnership(
 		]),
 	]);
 	const recordedForest = Object.freeze(forest.filter(({ pgid }) => discoverableGroups.includes(pgid)));
-	const unresolved = (): SettledFailureOwnership =>
+	const unresolved = (evidenceState: OwnershipEvidenceState): SettledFailureOwnership =>
 		settledFailureOwnership(
 			{ ownedGroups: discoverableGroups, recordedForest, validatedGroups: Object.freeze([]) },
 			evidenceState
 		);
 
 	const controllers = forest.filter(({ pid }) => pid === context.controllerPid);
-	if (
+	const invalidInput =
 		context.profilePath.length === 0 ||
 		context.chromiumExecutablePath.length === 0 ||
 		!Number.isSafeInteger(context.childPid) ||
@@ -154,25 +167,42 @@ export function inspectSettledRunOwnership(
 		forest.some((identity) => !validIdentity(identity)) ||
 		!uniqueIdentities(forest) ||
 		controllers.length !== 1 ||
-		children.length > 1 ||
-		contradictoryProfileAuthority ||
-		executableCandidates.length !== 1
-	) {
-		return unresolved();
-	}
+		children.length > 1;
+	const browserRoot = browserRootCandidates.length === 1 ? browserRootCandidates[0] : undefined;
+	const browserGroup =
+		browserRoot === undefined
+			? new Map<number, ProcessIdentity>()
+			: new Map(
+					forest
+						.filter(({ pgid }) => pgid === browserRoot.pgid)
+						.map((identity): readonly [number, ProcessIdentity] => [identity.pid, identity])
+				);
+	const profileContained =
+		browserRoot !== undefined && profileCandidates.every(({ pgid }) => pgid === browserRoot.pgid);
+	const hasRenderer =
+		browserRoot !== undefined &&
+		forest.some(
+			(identity) =>
+				identity.pid !== browserRoot.pid &&
+				identity.pgid === browserRoot.pgid &&
+				hasExactArgument(identity.command, "--type=renderer") &&
+				hasAncestorInGroup(identity, browserRoot.pid, browserGroup)
+		);
+	const controller = controllers[0];
+	const browserAuthorityValid =
+		!invalidInput &&
+		browserRoot !== undefined &&
+		profileContained &&
+		controller !== undefined &&
+		browserRoot.pid === browserRoot.pgid &&
+		browserRoot.pgid !== controller.pgid &&
+		browserRoot.pgid !== context.childPid &&
+		hasRenderer;
+	const localEvidenceState = profileCandidates.length > 0 && !browserAuthorityValid ? "unknown" : "captured";
+	const evidenceState =
+		localEvidenceState === "unknown" || ownershipEvidenceState(capturedContext) === "unknown" ? "unknown" : "captured";
+	if (!browserAuthorityValid || browserRoot === undefined || controller === undefined) return unresolved(evidenceState);
 
-	const controller = controllers[0] as ProcessIdentity;
-	const browserRoot = executableCandidates[0] as ProcessIdentity;
-	const renderers = forest.filter(
-		(identity) =>
-			identity.ppid === browserRoot.pid &&
-			identity.pgid === browserRoot.pgid &&
-			hasExactExecutable(identity.command, context.chromiumExecutablePath) &&
-			hasExactArgument(identity.command, "--type=renderer")
-	);
-	if (browserRoot.pid !== browserRoot.pgid || browserRoot.pgid === controller.pgid || renderers.length === 0) {
-		return unresolved();
-	}
 	const validatedGroups: number[] = [];
 	if (children.length === 1 && context.trustedChildIdentity !== undefined) {
 		const child = children[0] as ProcessIdentity;
