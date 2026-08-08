@@ -484,7 +484,7 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 			{
 				name: "complete",
 				command: { kind: "completeGeneration", objectId: OBJECT_A, generationId: GENERATION_A },
-				facts: [stagedFact, blob, promoted],
+				facts: [stagedFact, promoted],
 				writes: generationWrite,
 			},
 			{
@@ -528,12 +528,6 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 				facts: [objectFact({ head: currentHead, generations: [currentGeneration, candidate] })],
 				writes: () => [],
 			},
-			{
-				name: "reference-integrity rejection",
-				command: { kind: "completeGeneration", objectId: OBJECT_A, generationId: GENERATION_A },
-				facts: [stagedFact, { kind: "blob", digest: item.digest, bytes: bytes(9) }, promoted],
-				writes: () => [],
-			},
 		];
 
 		for (const scenario of scenarios) {
@@ -544,5 +538,12 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 				writes: scenario.writes(expectedResult),
 			});
 		}
+
+		expect(
+			evaluateStorageAdapterCommand(
+				mustPrepare({ kind: "completeGeneration", objectId: OBJECT_A, generationId: GENERATION_A }),
+				[stagedFact, { kind: "blob", digest: item.digest, bytes: bytes(9) }, promoted]
+			)
+		).toEqual({ result: { ok: false, reason: "INVALID_ARGUMENT" }, writes: [] });
 	});
 });
