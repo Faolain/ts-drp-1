@@ -64,4 +64,26 @@ describe("Phase 2b bounded TypeScript Program ownership checker", () => {
 			expect.stringContaining("unsupported computed IDB call"),
 		]);
 	}, 60_000);
+
+	it("requires strict durability on every governed readwrite transaction", () => {
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2d1-idb-durability-"));
+		temporaryDirectories.push(directory);
+		const source = path.join(directory, "mutation-owner.ts");
+		const allowed = new Map([[source, ["transaction"]]]);
+		fs.writeFileSync(
+			source,
+			"function mutate(database: IDBDatabase): void { database.transaction('records', 'readwrite'); }\n",
+			"utf8"
+		);
+		expect(auditIdbOwnership({ rootNames: [source], ownerMethods: allowed })).toEqual([
+			expect.stringContaining("readwrite IDB transaction does not request strict durability"),
+		]);
+
+		fs.writeFileSync(
+			source,
+			"function mutate(database: IDBDatabase): void { database.transaction('records', 'readwrite', { durability: 'strict' }); }\n",
+			"utf8"
+		);
+		expect(auditIdbOwnership({ rootNames: [source], ownerMethods: allowed })).toEqual([]);
+	}, 60_000);
 });
