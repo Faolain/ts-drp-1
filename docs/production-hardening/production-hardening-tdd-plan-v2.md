@@ -2321,6 +2321,55 @@ and 2d consumption gate. Every RED must fail on observed behavior or artifact
 validation, never missing imports, collection, typecheck, default timeouts or a
 preselected benchmark winner. Long campaigns are not justified here.
 
+##### Phase 2-spike S0 accepted closure — private evidence schema
+
+S0 is accepted at GREEN `026b175` over tests-only RED `69a8d38`. The RED's nine
+tests collected with eight controls green and one causal failure: the private
+measurement parser accepted all three forbidden selection aliases (`winner`,
+`chosen`, `preferred`). GREEN removed the permissive self-derived key handling
+and validates measurement evidence directly against the frozen closed key set;
+the RED test remained byte-identical. The narrow suite is 9/9 and the committed
+`storage-browser` suite is 161/161, with package typecheck, build, focused lint
+and formatting green. The pre-commit package run is retained as a truthful
+diagnostic: its clean-checkout control cloned the still-committed RED and
+reproduced the same causal failure; the authoritative post-commit run is green.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session `9538c123-17a4-4380-bf39-900c3e77f82e`
+  accepted; result SHA-256
+  `9828dc5224a350f1e9222b276d17927cb5a292d09cbd6612e7bb99aa14875a9d`;
+- exact Kimi 3/high/100 session `43a6536d-c35d-4962-8e4d-de13084154d7`
+  accepted; result SHA-256
+  `a8dd7041788493464c6d3f26174c0383cfc6cd11d14c8cbdb182f4792dc54ab4`;
+- final Opus 5/xhigh session `71b61d25-6be0-4087-b43a-65da57c5e93a`
+  approved with all 68 assistant events authenticated as Opus 5; result SHA-256
+  `c1db0a330aab11a3525b17a1a891fc7c5a03769b513b1c259bbaa35c08d5d7ae`.
+
+Carry these bounded residuals without inflating S0 into browser behavior:
+
+1. The parser boundary is plain parsed JSON evidence. S1-S4 emit exact JSON
+   bytes, parse them back, and validate the parsed value before consumption;
+   arbitrary live objects, Proxies, polluted prototypes, array-index accessors
+   and post-validation mutation aliases are not accepted evidence. If a later
+   consumer needs a retained live value, detach/freeze it at that consumer
+   rather than growing S0 into a general hostile-JavaScript interpreter.
+2. Runtime key lists duplicate the TypeScript interfaces. The next schema-field
+   edit must add a type-linked key-set check or equivalent bounded drift test;
+   do not loosen `requireClosed` to make a later artifact fit.
+3. The synthetic decision fixture chooses `idb-strict` only to inhabit the
+   decision schema and carries placeholder repeated-character digests. S4 must
+   prove the symmetric `chosen:"opfs"` positive, bind the real MD/JSON pair to
+   actual emitted artifact digests, and reject a missing or mismatched 2d link.
+4. Schema conformance cannot prove observation. S1 must fail on live durability
+   read-back and zero-write fatal downgrade behavior; S2 must fail on real
+   Worker/COOP-COEP command parity and post-state; S3 must fail on the four real
+   deletion controls. No S1-S4 browser behavior, substrate winner, eviction
+   behavior or durability beyond the explicit non-claims is proven by S0.
+5. Keep the `-red` test filename and explicit validator straightforward; naming
+   churn, a schema-library migration and deep-clone machinery are not justified
+   unless a later executable consumer demonstrates the need.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
