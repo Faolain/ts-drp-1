@@ -174,7 +174,10 @@ function requireDecisionContract(
 	for (const risk of ["multi-tab", "custody", "crash", "real-pressure"]) {
 		if (!decision.implementationRisk.includes(risk)) throw new TypeError(`decision omits implementation risk: ${risk}`);
 	}
-	if (!decision.measurementArtifactDigests.includes(measurement.sha256)) {
+	if (
+		decision.measurementArtifactDigests.length !== 1 ||
+		decision.measurementArtifactDigests[0] !== measurement.sha256
+	) {
 		throw new TypeError("decision does not cite the exact measurement artifact SHA-256");
 	}
 	const requiredConsequences = [
@@ -218,7 +221,11 @@ function requireDecisionContract(
  * @returns The closed, S0-parsed substrate decision when the link is ready.
  */
 export function requirePhase2dDecisionConsumptionReady(options: DecisionConsumptionGateOptions): DecisionEvidence {
-	const fullLinkPath = path.resolve(options.rootDirectory, options.linkPath);
+	const rootDirectory = path.resolve(options.rootDirectory);
+	const fullLinkPath = path.resolve(rootDirectory, options.linkPath);
+	if (fullLinkPath !== rootDirectory && !fullLinkPath.startsWith(`${rootDirectory}${path.sep}`)) {
+		throw new TypeError("2d consumption link path escapes the governed root");
+	}
 	if (!fs.existsSync(fullLinkPath)) {
 		throw new TypeError(`required preimplementation 2d consumption link is missing: ${options.linkPath}`);
 	}
