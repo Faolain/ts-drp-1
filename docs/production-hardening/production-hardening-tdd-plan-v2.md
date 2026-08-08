@@ -3087,6 +3087,133 @@ reviewed HEAD. Cross-engine evidence remains Phase 2h's responsibility. No
 reviewer found reward hacking, compatibility sediment, or premature 2d2/2l
 behavior.
 
+#### Phase 2d2a accepted closure — private strict IndexedDB adapter
+
+Phase 2d2a is accepted at tests-only RED `80b9341`, bounded RED-governance
+correction `0366d80`, and production-only GREEN `0ffd760`. This closes the
+private real `AheDurableStore` adapter over `objects`, `generations`, `blobs`
+and `promotions`; it does not close full Phase 2d, export a public browser
+store, implement the indexed vote transaction, or make either golden path
+complete.
+
+The RED dynamically imports the private production adapter and falls back to
+an inert strict-labelled store only while the module is absent, so module
+resolution alone cannot make it green. Its authoritative Chromium run is 8
+failed / 0 passed: shared strict-store behavior, canonical persistence and
+detached rereads, missing/corrupt closure rejection, immutable same-byte and
+different-byte races, expected-head concurrency, multi-write rollback and the
+runtime transaction/read/write trace all fail behaviorally. The focused
+non-browser run is 1 failed / 10 passed because the production inventory
+authority is absent; the full package diagnostic is 1 failed / 171 passed.
+Phase-2d1 Chromium preservation remains 10/10, ownership controls are 8/8,
+and the RED typecheck, builds, ESLint, Prettier and diff checks are green.
+
+The original ownership allowlist omitted `IDBKeyRange.bound` even though the
+RED requires a native compound-prefix generation read. Hiding the call behind
+`Reflect`, materializing every object's generations, or changing the
+production design to satisfy that omission would have been reward hacking.
+The original Codex-high RED owner therefore added exactly `bound` to the
+designated adapter owner at `0366d80`; focused ownership/governance remained
+8/8 and all unsupported-call, raw-type-escape, hidden-mode and non-strict
+controls remained causal. This one-line correction is part of the frozen RED
+baseline; GREEN changes no test or configuration byte after it.
+
+GREEN adds one 412-line IDB plumbing owner plus the schema owner's frozen
+five-store inventory and opaque internal connection seam. The seam passes the
+same decision-bound, schema-validated connection as `unknown`, then recovers
+the native type only inside the governed raw-IDB owner; there is no
+validate-close-reopen window and no raw handle in the public signature. Each
+command is prepared before I/O, opens its exact store scope, loads the shared
+adapter facts, evaluates once, applies only the exact returned writes and
+publishes success only after terminal transaction completion. Every mutation
+uses `readwrite` with live-observed `durability:"strict"`; a downgrade is
+fatal. Mutable head/generation rows use `put`, while immutable global blobs
+and promotion facts use `add`. Semantic rejection aborts before publication;
+request, synchronous, abort and commit failures return `SUBSTRATE_FAILURE`.
+The transaction error listener records cause but only `complete` or `abort`
+settles the operation, preventing publication before rollback finishes.
+
+The native generation prefix is
+`IDBKeyRange.bound([objectId], [objectId, []])`. IndexedDB array-key ordering
+places every permitted string `generationId` above the shorter lower key and
+below the array-valued upper sentinel while excluding foreign object IDs. The
+NUL-joined promotion key is only an in-memory deduplication key; canonical
+object IDs forbid control characters and generation/blob digests are fixed
+hex, while persistence uses the native three-part compound key.
+
+The first Chromium GREEN attempt honestly retained 5 failures / 3 passes: a
+spread from a `generation-closure` requirement overwrote the discriminator of
+the derived promotion fact. Production was corrected to construct that fact
+from explicit `objectId`, `generationId` and `digest` fields; no RED byte was
+changed. The committed candidate then passes the authoritative postcommit
+package suite at 22 files / 172 tests, focused ownership/schema/governance at
+11/11, Phase-2d1 Chromium at 10/10 and Phase-2d2a Chromium at 8/8 with one
+worker and zero retries. The latter proves same-byte idempotence, one immutable
+winner for different bytes, one linearized head-CAS winner, and rollback of a
+generation write when the following head write fails. Upstream storage build,
+storage-browser typecheck/build, package ESLint with zero warnings, Prettier,
+diff and custody checks are green.
+
+The independent acceptance loop found no blocker and no reward hacking:
+
+- genuine Grok 4.5/high session
+  `019fe312-d296-76f3-9b46-72af00df1238` returned `VERDICT: APPROVED`,
+  `BLOCKERS: none` and `2D2A_MAY_CLOSE: yes`; exact result SHA-256
+  `481458507737abfe677990d30b61e30d8a701ad27942659176e0141e3778aaee`;
+- exact Kimi 3/high/100 session
+  `5b6b2611-4cb9-4fb4-8575-30deb474c75c` returned the same closure fields and
+  independently reproduced Chromium 8/8, Phase-2d1 Chromium 10/10, focused
+  governance 5/5 and typecheck; exact result SHA-256
+  `0f61fa7d0b39f24e8fd2ca7fb414fcc11fee0709dd9d88c706bbb658ce1e126f`;
+- final Opus 5/xhigh session
+  `169a077e-1009-42fd-a7ad-40584dfa9962` returned `VERDICT: APPROVED`,
+  `BLOCKERS: none`, `REWARD_HACKING: no` and `2D2A_MAY_CLOSE: yes`; exact
+  result SHA-256
+  `2114ac0cba49a31288a0c5527ddb7fabcdc6ccf25d48ecbf0f41f6523e6eef13`.
+  All 97 substantive assistant events authenticate as `claude-opus-5` at
+  requested xhigh effort and used only Read/Grep/Glob. A 27-token automatic
+  Haiku metadata call performed no review work.
+
+Carry these accepted residuals to their named owners rather than overstating
+2d2a:
+
+1. Phase 2d2b must trace the actual `getAll` range argument and the eighth
+   command, `discardGeneration`; the shared contract already proves discard
+   semantics, but its browser transaction scope is inspection-only today.
+2. Phase 2d2b must directly prove adapter-level post-`close()` and
+   post-`versionchange` `STORE_CLOSED` behavior and specify whether
+   `await close()` waits for in-flight transactions. Phase 2e retains the
+   recovery interaction.
+3. Phase 2d2b must rename the rollback test or perform the claimed exact retry;
+   rollback itself is causal now, but the title overclaims its assertion.
+4. Phase 2d2b must retire `testOnlyAttemptStrictMutation` now that real
+   add-only mutation evidence exists. Do not carry the obsolete marker farther.
+5. Phase 2d2b must add a successful revision-2 superseding `swapHead` browser
+   case, exercising the three-write generation/generation/head transaction.
+   Phase 2e still owns the adoption crash matrix.
+6. The exported internal inventory is declarative rather than the sole input
+   to store creation, so scalar key-path literals remain duplicated. Phase
+   2d2b owns an inventory-driven creation/validation authority rather than
+   another comparison of parallel literals.
+7. Malformed physical rows fail closed as `INVALID_ARGUMENT`, while the
+   accepted storage-node adapter classifies equivalent corruption as
+   `SUBSTRATE_FAILURE`. Phase 2e must choose the recovery policy and unify the
+   cross-backend taxonomy before any real consumer lands.
+8. Per-object generation `getAll` and whole-closure blob materialization remain
+   unbounded. They are inherited from the frozen Phase-2a contract and match
+   the accepted SQLite backend, so they do not block this private slice, but
+   they block full Phase 2d/2e closure. Any shared-contract change must use the
+   standing assumption-correction quorum.
+9. Concurrency evidence is one connection and execution evidence is Chromium
+   only. Phase 2h owns engines, 2i/5c own cross-tab behavior, and the Phase-2
+   exit gate owns the kill-point matrix. A cross-connection immutable race is
+   fail-closed today but has not earned the semantic `IMMUTABLE_CONFLICT`
+   claim.
+10. Votes/anti-equivocation, migrations, quota, recovery, cleanup/GC, durable
+    issuance/outbox and a public production surface retain their existing
+    2d/2e/2g/2l/5c owners. Phase 2d2a advances the durable local foundation for
+    both Discord/chat and MMORPG; it proves neither golden path.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
