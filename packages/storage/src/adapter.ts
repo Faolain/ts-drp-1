@@ -234,19 +234,22 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		if (
 			bytesDescriptor === undefined ||
 			!("value" in bytesDescriptor) ||
-			!(bytesDescriptor.value instanceof Uint8Array) ||
-			!isClosedRecord(value, ["kind", "objectId", "generationId", "digest", "bytes"])
+			!(bytesDescriptor.value instanceof Uint8Array)
 		) {
 			return invalidPreparation();
 		}
 		if (hasSharedBacking(bytesDescriptor.value)) return sharedPreparation();
+		const bytes = new Uint8Array(bytesDescriptor.value);
+		if (!isClosedRecord(value, ["kind", "objectId", "generationId", "digest", "bytes"])) {
+			return invalidPreparation();
+		}
 		const scope = generationScope(value);
 		if (scope === undefined || !isBlobDigest(value.digest)) return invalidPreparation();
 		const command: PutCachedBlobCommand = {
 			kind: "putCachedBlob",
 			...scope,
 			digest: value.digest,
-			bytes: new Uint8Array(bytesDescriptor.value),
+			bytes,
 		};
 		return freezePrepared(command, [
 			{ kind: "object-state", objectId: command.objectId },
