@@ -7,6 +7,12 @@ export interface ProcessIdentity {
 	readonly state: string;
 }
 
+export interface StagedFreezeAuthority {
+	readonly browserRoot: ProcessIdentity;
+	readonly childRoot: ProcessIdentity;
+	readonly initialForest: readonly ProcessIdentity[];
+}
+
 const PROCESS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(\S+)\s+(.+)$/u;
 
 export const PROCESS_FOREST_ARGUMENTS = Object.freeze(["-A", "-ww", "-o", "pid=,ppid=,pgid=,lstart=,state=,command="]);
@@ -114,6 +120,7 @@ export function validateTwoGroupForest(
 	childPid: number,
 	browserPid: number
 ): { readonly browserPgid: number; readonly childPgid: number; readonly ownedPids: readonly number[] } {
+	if (!validUniqueForest(forest)) throw new TypeError("forest contains malformed or ambiguous process identity");
 	const child = forest.filter((process) => process.pid === childPid);
 	const browser = forest.filter((process) => process.pid === browserPid);
 	if (child.length !== 1 || browser.length !== 1) throw new TypeError("forest requires unique child and browser roots");
@@ -122,6 +129,9 @@ export function validateTwoGroupForest(
 	if (childPgid === undefined || browserPgid === undefined || childPgid === browserPgid) {
 		throw new TypeError("forest requires exactly two distinct process groups");
 	}
+	if (childPid !== childPgid || browserPid !== browserPgid || browser[0]?.ppid !== childPid) {
+		throw new TypeError("forest requires root-led child and browser process groups");
+	}
 	const owned = forest.filter((process) => process.pgid === childPgid || process.pgid === browserPgid);
 	if (!owned.some((process) => process.ppid === browserPid && /renderer/u.test(process.command))) {
 		throw new TypeError("forest requires at least one browser renderer");
@@ -129,5 +139,149 @@ export function validateTwoGroupForest(
 	const identities = new Set(owned.map((process) => `${process.pid}:${process.birthToken}`));
 	if (identities.size !== owned.length) throw new TypeError("forest contains ambiguous process identity");
 	return Object.freeze({ childPgid, browserPgid, ownedPids: Object.freeze(owned.map((process) => process.pid)) });
+}
+
+/**
+ * Proves that every initially observed child-group member stopped while both
+ * group roots retain their exact non-state identities. Browser leaves are not
+ * part of this first-stage proof because Chromium may replace them before its
+ * group is stopped.
+ * @param forest - Current complete process-table capture.
+ * @param authority - Roots and initial owned forest validated before signaling.
+ * @returns Whether the child group is safely stopped for the second stage.
+ */
+export function childGroupStoppedForFreeze(
+	forest: readonly ProcessIdentity[],
+	authority: StagedFreezeAuthority
+): boolean {
+	const authorized = validatedFreezeAuthority(authority);
+	if (authorized === undefined || !validUniqueForest(forest)) return false;
+	const childRoot = exactStableIdentity(forest, authority.childRoot);
+	const browserRoot = exactStableIdentity(forest, authority.browserRoot);
+	if (childRoot === undefined || browserRoot === undefined) return false;
+
+	const currentChildGroup = forest.filter(({ pgid }) => pgid === authorized.childPgid);
+	if (currentChildGroup.length === 0 || !currentChildGroup.every(stoppedOrZombie)) return false;
+	return authorized.initialChildGroup.every((initial) => {
+		const current = exactStableIdentity(forest, initial);
+		return current !== undefined && stoppedOrZombie(current);
+	});
+}
+
+/**
+ * Freezes the current members of the two previously authorized process groups
+ * after both groups have stopped. Departed initial browser leaves are omitted;
+ * replacement leaves are admitted only through the already authorized browser
+ * PGID and the complete current topology proof.
+ * @param forest - Current complete process-table capture.
+ * @param authority - Roots and initial owned forest validated before signaling.
+ * @returns Frozen current owned union, or undefined for incomplete evidence.
+ */
+export function freezeCurrentOwnedUnion(
+	forest: readonly ProcessIdentity[],
+	authority: StagedFreezeAuthority
+): readonly ProcessIdentity[] | undefined {
+	const authorized = validatedFreezeAuthority(authority);
+	if (authorized === undefined || !validUniqueForest(forest)) return undefined;
+	if (
+		exactStableIdentity(forest, authority.childRoot) === undefined ||
+		exactStableIdentity(forest, authority.browserRoot) === undefined
+	) {
+		return undefined;
+	}
+	try {
+		const groups = validateTwoGroupForest(forest, authority.childRoot.pid, authority.browserRoot.pid);
+		if (groups.childPgid !== authorized.childPgid || groups.browserPgid !== authorized.browserPgid) return undefined;
+	} catch {
+		return undefined;
+	}
+	const owned = forest.filter(({ pgid }) => pgid === authorized.childPgid || pgid === authorized.browserPgid);
+	if (!owned.every(stoppedOrZombie)) return undefined;
+	return Object.freeze([...owned]);
+}
+
+function validUniqueForest(forest: readonly ProcessIdentity[]): boolean {
+	if (!Array.isArray(forest) || !forest.every(validIdentity)) return false;
+	return new Set(forest.map(({ pid }) => pid)).size === forest.length;
+}
+
+function validIdentity(identity: ProcessIdentity): boolean {
+	return (
+		typeof identity === "object" &&
+		identity !== null &&
+		Number.isSafeInteger(identity.pid) &&
+		identity.pid > 0 &&
+		Number.isSafeInteger(identity.ppid) &&
+		identity.ppid >= 0 &&
+		Number.isSafeInteger(identity.pgid) &&
+		identity.pgid > 0 &&
+		typeof identity.birthToken === "string" &&
+		identity.birthToken.length > 0 &&
+		typeof identity.command === "string" &&
+		identity.command.length > 0 &&
+		typeof identity.state === "string" &&
+		identity.state.length > 0
+	);
+}
+
+function sameNonStateIdentity(left: ProcessIdentity, right: ProcessIdentity): boolean {
+	return (
+		left.pid === right.pid &&
+		left.ppid === right.ppid &&
+		left.pgid === right.pgid &&
+		left.birthToken === right.birthToken &&
+		left.command === right.command
+	);
+}
+
+function exactStableIdentity(
+	forest: readonly ProcessIdentity[],
+	expected: ProcessIdentity
+): ProcessIdentity | undefined {
+	const matches = forest.filter(({ pid }) => pid === expected.pid);
+	return matches.length === 1 && matches[0] !== undefined && sameNonStateIdentity(matches[0], expected)
+		? matches[0]
+		: undefined;
+}
+
+function stoppedOrZombie(identity: ProcessIdentity): boolean {
+	return /T|Z/u.test(identity.state);
+}
+
+function validatedFreezeAuthority(authority: StagedFreezeAuthority):
+	| {
+			readonly browserPgid: number;
+			readonly childPgid: number;
+			readonly initialChildGroup: readonly ProcessIdentity[];
+	  }
+	| undefined {
+	if (
+		typeof authority !== "object" ||
+		authority === null ||
+		!validIdentity(authority.childRoot) ||
+		!validIdentity(authority.browserRoot) ||
+		!validUniqueForest(authority.initialForest)
+	) {
+		return undefined;
+	}
+	if (
+		exactStableIdentity(authority.initialForest, authority.childRoot) === undefined ||
+		exactStableIdentity(authority.initialForest, authority.browserRoot) === undefined
+	) {
+		return undefined;
+	}
+	try {
+		const groups = validateTwoGroupForest(authority.initialForest, authority.childRoot.pid, authority.browserRoot.pid);
+		if (groups.childPgid !== authority.childRoot.pgid || groups.browserPgid !== authority.browserRoot.pgid) {
+			return undefined;
+		}
+		return Object.freeze({
+			childPgid: groups.childPgid,
+			browserPgid: groups.browserPgid,
+			initialChildGroup: Object.freeze(authority.initialForest.filter(({ pgid }) => pgid === groups.childPgid)),
+		});
+	} catch {
+		return undefined;
+	}
 }
 import { execFileSync } from "node:child_process";

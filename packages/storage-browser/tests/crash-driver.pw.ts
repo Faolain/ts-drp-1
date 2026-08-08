@@ -33,8 +33,11 @@ import {
 import { expectedFixtureState, expectedHitDurability } from "./fixtures/inert-campaign.js";
 import {
 	captureProcessForest,
+	childGroupStoppedForFreeze,
+	freezeCurrentOwnedUnion,
 	processClosure,
 	type ProcessIdentity,
+	type StagedFreezeAuthority,
 	validateTwoGroupForest,
 } from "./fixtures/process-forest.js";
 import { finalizeFailedRun } from "./fixtures/run-finalizer.js";
@@ -382,16 +385,6 @@ async function requireGroupsAbsent(pgids: readonly number[]): Promise<void> {
 	}
 }
 
-function sameUnion(
-	forest: readonly ProcessIdentity[],
-	recorded: readonly ProcessIdentity[]
-): readonly ProcessIdentity[] | undefined {
-	const byPid = new Map(forest.map((identity) => [identity.pid, identity]));
-	const current = recorded.map((identity) => byPid.get(identity.pid));
-	if (current.some((identity, index) => identity?.birthToken !== recorded[index]?.birthToken)) return undefined;
-	return current as readonly ProcessIdentity[];
-}
-
 async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArtifact> {
 	const runId = `tuple-${String(ordinal).padStart(2, "0")}-${point.id}-${point.edge}`;
 	const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), `${runId}-profile-`));
@@ -528,21 +521,23 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		if (parent === undefined || parent.pgid === groups.childPgid || parent.pgid === groups.browserPgid) {
 			throw new TypeError("FOREST_CONTRADICTION: owned groups overlap the parent");
 		}
+		const freezeAuthority: StagedFreezeAuthority = Object.freeze({
+			childRoot: childIdentity,
+			browserRoot,
+			initialForest: initial,
+		});
 		validatedGroups = Object.freeze([groups.browserPgid, groups.childPgid]);
 		process.kill(-groups.childPgid, "SIGSTOP");
-		await pollForest((forest) => {
-			const union = sameUnion(forest, initial);
-			return (
-				union !== undefined &&
-				union.filter((identity) => identity.pgid === groups.childPgid).every((identity) => /T|Z/u.test(identity.state))
-			);
-		}, "child group did not stop with stable identities");
+		await pollForest(
+			(forest) => childGroupStoppedForFreeze(forest, freezeAuthority),
+			"child group did not stop with stable identities"
+		);
 		process.kill(-groups.browserPgid, "SIGSTOP");
-		const stoppedAll = await pollForest((forest) => {
-			const union = sameUnion(forest, initial);
-			return union !== undefined && union.every((identity) => /T|Z/u.test(identity.state));
+		let recordedForest: readonly ProcessIdentity[] | undefined;
+		await pollForest((forest) => {
+			recordedForest = freezeCurrentOwnedUnion(forest, freezeAuthority);
+			return recordedForest !== undefined;
 		}, "owned union did not stop with stable identities");
-		const recordedForest = sameUnion(stoppedAll, initial);
 		if (recordedForest === undefined) throw new TypeError("FOREST_CONTRADICTION: stopped union changed identity");
 		recordedForestEvidence = Object.freeze(recordedForest);
 		stage = "kill";
