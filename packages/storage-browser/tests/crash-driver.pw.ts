@@ -38,6 +38,11 @@ import {
 	validateTwoGroupForest,
 } from "./fixtures/process-forest.js";
 import { finalizeFailedRun } from "./fixtures/run-finalizer.js";
+import {
+	inspectSettledFailureOwnership,
+	ownershipFromSettledFailure,
+	SettledRunFailure,
+} from "./fixtures/settled-failure-ownership.js";
 import { parseWorkerToPageMessage } from "./fixtures/worker-protocol.js";
 
 const ASSET_DIRECTORY_VALUE = process.env.PHASE_2B_ASSET_DIR;
@@ -259,8 +264,14 @@ async function runSettled(
 			}),
 		});
 	} catch (error) {
-		if (child.pid !== undefined && child.exitCode === null) child.kill("SIGKILL");
-		throw error;
+		let failureForest: readonly ProcessIdentity[] = Object.freeze([]);
+		try {
+			failureForest = captureProcessForest();
+		} catch {
+			// The original run failure remains primary and absent process evidence grants no signal authority.
+		}
+		const failureOwnership = inspectSettledFailureOwnership(failureForest, child.pid ?? -1, profilePath, process.pid);
+		throw new SettledRunFailure(error, failureOwnership);
 	}
 }
 
@@ -595,6 +606,14 @@ async function runTuple(point: KillPoint, ordinal: number): Promise<TuplePassArt
 		writeOnce(artifact);
 		return artifact;
 	} catch (error) {
+		const failureOwnership = ownershipFromSettledFailure(error);
+		ownedGroups = Object.freeze([...new Set([...ownedGroups, ...failureOwnership.ownedGroups])]);
+		validatedGroups = Object.freeze([...new Set([...validatedGroups, ...failureOwnership.validatedGroups])]);
+		const reachedForest = new Map<string, ProcessIdentity>();
+		for (const identity of [...(recordedForestEvidence ?? []), ...failureOwnership.recordedForest]) {
+			reachedForest.set(`${identity.pid}:${identity.birthToken}`, identity);
+		}
+		if (reachedForest.size !== 0) recordedForestEvidence = Object.freeze([...reachedForest.values()]);
 		if (validatedGroups.length === 0 && crashProcess?.pid !== undefined) {
 			try {
 				const forest = captureProcessForest();
@@ -764,10 +783,12 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 		writeOnce(artifact);
 		return artifact;
 	} catch (error) {
+		const failureOwnership = ownershipFromSettledFailure(error);
 		const classified = classifyRunFailure(error, failureFallback(stage));
 		const partialEvidence: Omit<PartialFailureEvidence, "cleanup"> = Object.freeze({
 			...(settledChildren.length === 0 ? {} : { settledChildren: Object.freeze([...settledChildren]) }),
 			...(observedHits.length === 0 ? {} : { observedHits }),
+			...(failureOwnership.recordedForest.length === 0 ? {} : { recordedForest: failureOwnership.recordedForest }),
 			...(recoveryClassification === undefined ? {} : { recoveryClassification }),
 		});
 		finalizeFailedRun(
@@ -777,8 +798,8 @@ async function runControl(runKind: "discovery" | "arming"): Promise<DiscoveryPas
 				code: classified.code,
 				detail: classified.detail,
 				partialEvidence,
-				ownedGroups: [],
-				validatedGroups: [],
+				ownedGroups: failureOwnership.ownedGroups,
+				validatedGroups: failureOwnership.validatedGroups,
 			},
 			{
 				writeArtifact: (artifact): void => writeOnce(artifact),
