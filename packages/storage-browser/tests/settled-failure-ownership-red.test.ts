@@ -199,10 +199,8 @@ function accessesProperty(node: ts.Node | undefined, name: string): boolean {
 }
 
 describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled failure integration RED", () => {
-	it("runSettled captures profile-bound ownership before direct child cleanup and throws the structured failure", () => {
+	it("runSettled preserves the structured ownership envelope without directly killing the child", () => {
 		const clause = catchClauseOf(namedFunction("runSettled"));
-		const captures = callsNamed(clause, "captureProcessForest");
-		const inspections = callsNamed(clause, "inspectSettledFailureOwnership");
 		let structuredThrow: ts.NewExpression | undefined;
 		let directKill: ts.CallExpression | undefined;
 		const visit = (node: ts.Node): void => {
@@ -226,15 +224,8 @@ describe.skipIf(CLEAN_SNAPSHOT_CHILD)("Phase 2b settled failure integration RED"
 		};
 		visit(clause);
 		expect.soft(importsOwnershipSeam(), "actual driver imports the durable ownership seam").toBe(true);
-		expect.soft(captures, "catch captures the relationship before the child can disappear").toHaveLength(1);
-		expect.soft(inspections, "catch validates exact profile-bound ownership").toHaveLength(1);
 		expect.soft(structuredThrow, "catch propagates groups instead of discarding them").toBeDefined();
-		if (captures[0] !== undefined && inspections[0] !== undefined) {
-			expect.soft(captures[0].getStart()).toBeLessThan(inspections[0].getStart());
-		}
-		if (inspections[0] !== undefined && directKill !== undefined) {
-			expect.soft(inspections[0].getStart()).toBeLessThan(directKill.getStart());
-		}
+		expect.soft(directKill, "the ownership envelope never grants a direct child.kill escape hatch").toBeUndefined();
 	});
 
 	it("runControl forwards structured owned/validated groups and reached forest to the shared finalizer", () => {
