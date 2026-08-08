@@ -220,9 +220,7 @@ function requireNonEmpty(value: unknown, label: string): string {
 }
 
 function parseMeasurement(value: unknown): MeasurementEvidence {
-	const initial = requireClosed(value, Object.getOwnPropertyNames(value as object), "measurement evidence");
-	const forbiddenSelectionAliases = ["winner", "chosen", "preferred"].filter((key) => Object.hasOwn(initial, key));
-	const candidate = requireClosed(value, [...MEASUREMENT_KEYS, ...forbiddenSelectionAliases], "measurement evidence");
+	const candidate = requireClosed(value, MEASUREMENT_KEYS, "measurement evidence");
 	const arms = requireArray(candidate.arms, "measurement arms");
 	if (arms.length !== 2) throw new TypeError("measurement evidence requires exactly two arms");
 	const expectedSubstrates = ["opfs", "idb-strict"] as const;
