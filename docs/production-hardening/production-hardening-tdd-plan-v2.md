@@ -1079,7 +1079,8 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **2a**      | `packages/storage/`: implement the exact **Phase 2a storage seam v1** below — runtime-neutral brands, five-state lifecycle, returned rejection taxonomy, exact persistence codecs, narrow `AheDurableStore`, shared scenarios, non-exported transition owner/harness, and one honest public in-memory model reporting `durability: "ephemeral"` and therefore never eligible for signing. No RAM store may claim strict durability.                                                                                                                                                                                                                         | local-safe  | state machine atomic    | `state-machine.test.ts` + shared contract: non-vacuous positive/negative `Complete`, exact expected-head CAS, full graph, precedence, codec/copy isolation, global blob races, overflow and greenfield no-plain-ID controls defined below. RED is assertion-causal via an authorized permissive scaffold, never module-resolution-only                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2b**      | **Private browser hard-kill instrument on a trivial two-record payload.** `@ts-drp/storage-browser` owns one literal-ID instrumented IDB boundary plus an independent raw-IDB oracle allowlist. A page-owned `SharedArrayBuffer` lets a dedicated Worker block at seven reviewed points × both edges. Playwright 1.61.1 creates a separate browser PGID, so the parent freezes and `SIGKILL`s the detached Node child group and browser group independently, browser first; no graceful close is permitted on the crash graph. This proves transaction atomicity under **process death**, not fsync/power-loss durability, and exports no production store. | local-safe  | infra sliceable         | `crash-driver.pw.ts`: exactly 16 closed artifacts (14 tuples + discovery + arming), exact point/prefix coverage, Worker-authenticated 3 `not-reached` + 11 `strict` durability observations, genuine two-PGID death evidence, and `fixtureRecordsDigest` recovery of exactly 13 old + 1 new with `mixed === false`. Missing, extra, malformed, timed-out, skipped, `blocked` or unsupported evidence **fails the job**.                                                                                                                                                                                                                                                                                                              |
-| **2c**      | `packages/storage-node/`: SQLite backend — composite primary keys, WAL, full synchronous durability, explicit transactions, child-process `SIGKILL` at each statement/commit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | local-safe  | sliceable               | Same frozen strict store-contract scenarios and shared transition rules; every SIGKILL returns exactly one complete closure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **2c-a**    | `packages/storage-node/`: private/unpublished SQLite adapter over `@ts-drp/storage/adapter` until 2c-b closes. Use composite `(object_id,generation_id)` primary keys, WAL, live-verified `synchronous=FULL`, enforced foreign keys, `BEGIN IMMEDIATE` for every mutation and one consistent transaction for multi-statement reads. Load authoritative rows, run one fresh synchronous shared-semantic evaluation, persist only its exact writes, `COMMIT`, then return; no `await` or persistent RAM mirror may span the transaction. Any load/decode/write/commit failure rolls back, discards tentative state and returns `SUBSTRATE_FAILURE`.           | local-safe  | transaction atomic      | Frozen strict store contract plus SQLite reopen, same-column composite-key collisions, populated integrity, raw live PRAGMAs/foreign-key enforcement, detachment and before-commit rollback. A bounded non-exported fault seam and inert strict-labeled RED wrapper are allowed only while the package is private; neither is reachable from the production export map. 2c-a proves single-process transaction behavior and configuration only and never closes 2c.                                                                                                                                                                                                                                                                  |
+| **2c-b**    | Child-process `SIGKILL` matrix at every mutating statement and commit edge, including the bounded long crash campaign. Recovery is exactly the old state or one complete new closure; never a mixed journal/head/blob/promotion state. Like 2b, this proves atomicity under **process death**, not fsync, torn-write or power-loss durability: `SIGKILL` cannot distinguish SQLite `FULL` from `NORMAL`, so the live pragma evidence remains separately mandatory.                                                                                                                                                                                          | local-safe  | process-death atomic    | Every statement/commit kill recovers exactly old XOR complete-new, retry remains valid, WAL sidecars are retained or checkpointed correctly, and no successful result is published before `COMMIT`. Phase 2 exit requires both 2c-a and 2c-b.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **2-spike** | **OPFS-vs-IDB substrate decision, before the 2d schema freezes.** Measure OPFS `createSyncAccessHandle` + `flush()` against IDB `durability:"strict"` (the mode the reference silently falls back from) on the vote-slot and pointer-swap workloads; **test, don't assume, eviction equivalence** — the "same origin bucket, same ITP eviction" claim is currently `[unverified]`. `AheDurableStore` (2a) is substrate-neutral by construction, so the loser costs nothing. Decision recorded in `docs/protocol/` as a decision record consumed by 2d.                                                                                                      | local-safe  | sliceable               | `opfs-idb-spike/`: durability microbench + `eviction-equivalence.spec.ts` (trigger real origin eviction; assert OPFS and IDB data vanish together or the difference is documented); the 2d PR links the decision record or fails review                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **2d**      | `packages/storage-browser/`: **rewrite** per §2.2. IDB schema + migration lifecycle (`onblocked`, `db.onversionchange`), **native compound array keys** (not NUL-delimited strings), immutable exact-byte CAS via `add` (never `put`), the Phase-2a five-state journal (`Staged`/`Complete`/`Adopted`/`Superseded`/`Discarded`) keyed `(objectId, generationId)`, an `(objectId, epoch)`-indexed vote store (not `getAll()`), bounded staging. **Strict-durability rejection is a fatal capability error, never a silent fallback.**                                                                                                                        | coordinated | sliceable until enabled | `indexeddb-staging.spec.ts`: same digest + different bytes **rejects**; `chunkBatchSize: 0` rejects; a missing/corrupt chunk cannot reach `Complete`; a blocked upgrade closes the old tab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **2e**      | **Full request matrix + recovery closure.** Recovery hashes the **entire active generation closure**, not two scalar metadata fields — a correct pointer can still reference a missing or mixed manifest, chunk set, QC or tail. Relaxed chunk writes are **cache only**; a generation becomes `Complete` only after every referenced chunk is hash-verified and promoted through strict transactions. Cleanup is **never** part of commit.                                                                                                                                                                                                                 | coordinated | pointer-swap atomic     | `adoption-crash-matrix.spec.ts`: every request kill yields `closure(G_old)` **XOR** `closure(G_new)`; competing same/future/rollback candidates yield one monotone head; `HEAD_CONFLICT` on a stale expected revision, never last-writer-wins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -1324,19 +1325,47 @@ copy and rejection behavior. `promoteReference` returns
 `DURABILITY_UNAVAILABLE`, so memory cannot complete or adopt.
 
 Success-path transition, CAS, atomicity and interleaving tests use a
-package-test-internal harness driving the same non-exported transition module
-every production adapter uses. The harness accepts modeled backend-owned
-promotion facts but is not an `AheDurableStore`, has no capabilities, is absent
-from package exports and grants no signing authority. It supports seeded state
-solely for transition/interleaving tests, including a maximum-revision head.
-The success assertions therefore exercise shipped transition code rather than
-a duplicate oracle. No independent-oracle or mutation-probe obligation is
-created in 2a.
+package-test-internal harness over one source-internal semantic kernel. An
+in-package adapter may use that kernel directly; an out-of-package production
+adapter reaches it only through the runtime-neutral
+`@ts-drp/storage/adapter` subpath defined below. The concrete
+`TransitionOwner`, its seeding methods and the harness remain absent from every
+published subpath. The harness accepts modeled backend-owned promotion facts
+but is not an `AheDurableStore`, has no capabilities and grants no signing
+authority. It supports seeded state solely for transition/interleaving tests,
+including a maximum-revision head. The success assertions therefore exercise
+shipped transition code rather than a duplicate oracle. No independent-oracle
+or mutation-probe obligation is created in 2a.
+
+#### Adapter evaluation seam
+
+`@ts-drp/storage/adapter` is the sole adapter-author surface for production
+adapters outside `@ts-drp/storage`. It is runtime-neutral and data-oriented: a
+closed command is synchronously validated and detached before the caller's
+first suspension point; the facade names the exact authoritative rows/facts to
+load; and one fresh, single-use evaluation returns the public `StoreResult`
+plus a deterministic, canonically ordered write set. Every read and rejection
+has an empty write set. Supplied rows are decoded and revalidated through the
+same persistence codecs and semantic kernel, and no evaluation state survives
+the substrate transaction.
+
+The strict-only facade exports no store or store factory, mutable owner/session,
+seed hook, promotion-marking hook, capability constructor, durability selector,
+signing predicate or signing authority. A caller may not assert promotion
+through a boolean or receipt: a promote command derives new evidence only from
+authoritative declared references and rehashed blob bytes, while later commands
+consume the backend-owned persisted promotion rows. The bounded 2a/2c write
+vocabulary is whole canonical head/generation row replacement plus immutable
+blob and promotion insertion; it contains no cleanup delete. Root,
+`./contract` and `./adapter` export guards prove the concrete owner/harness and
+signing surfaces absent, while packed-package controls prove the declared
+subpath works and deep internal imports remain unavailable.
 
 `@ts-drp/storage/contract` exports only the frozen data-only scenarios and
 `runStoreContract(factory)`. At 2a it runs common/ephemeral cases. Its already
 frozen strict branch first runs against genuine SQLite and IDB adapters in
-2c/2d; their observable results must conform to the shared transition module.
+2c/2d; they execute the shared semantic kernel through the adapter facade, so
+observable conformance alone never substitutes for single-owner reuse.
 No RAM store claims strict durability.
 
 #### Returned reasons and total precedence
@@ -1417,10 +1446,14 @@ reader, fallback, alias, normalization or migration. IDB migration belongs to
 #### Causal RED and explicit deferrals
 
 The scenario corpus is frozen data; test wrappers own fault behavior and no
-production store gains a fault hook or test mode. The non-exported shared
-transition module, driven by the internal harness, covers the full graph,
-closure gates, CAS/supersession, precedence, seeded overflow and interleavings.
-Neither module nor harness is exported from the package root or `./contract`.
+public production store API gains a fault hook or test mode. A durable-adapter
+RED may bind one bounded synchronous fault seam only through a non-exported
+test module while its package is private; the hook is absent from the root
+factory and every export map and must never become a capability. The
+source-internal transition module, driven by the internal harness, covers the
+full graph, closure gates, CAS/supersession, precedence, seeded overflow and
+interleavings. Neither concrete module nor harness is exported from the package
+root, `./contract` or `./adapter`.
 
 Because the package is new, RED may add types/interfaces/result/codec-name
 scaffolding plus a deliberately **permissive** transition stub accepting every
@@ -1474,8 +1507,8 @@ remain owned by 2b–2l, 4, 5c and 7.
 5. Returned reasons must be reachable from the stated methods, and capability
    precedence must not conflict with lookup/integrity precedence.
 6. A test oracle that reimplements the shipped transition rules is duplicated
-   semantics, not useful differential evidence. The harness drives the one
-   shared non-exported owner.
+   semantics, not useful differential evidence. The harness and adapter facade
+   drive one source-internal semantic kernel; the concrete owner stays hidden.
 7. Storage accepts canonical creator-bound identity only. Nothing in 2a adds a
    legacy/plain-ID compatibility path or infers ACL authority.
 8. The first GREEN exposed one ratified-precedence drafting error. At RED HEAD
@@ -1975,6 +2008,63 @@ Accepted LOW/later hardening, not Phase 2b blockers:
 These do not widen the claim: 2b proves browser **process death**, not power
 loss, and 2e still owns real-generation adoption and the complete closure XOR
 required by the chat/MMORPG golden paths.
+
+#### Phase 2c package-seam correction and bounded RED handoff
+
+Phase 2c exposed one false forward assumption in the accepted 2a wording. A
+separately built and published `@ts-drp/storage-node` cannot import the concrete
+non-exported `TransitionOwner`: `@ts-drp/storage` exposes only declared package
+subpaths, `stripInternal` removes the class from emitted declarations, and a
+deep/source import is neither export-map-safe nor publishable. Conformance tests
+alone would instead create the duplicated semantic owner forbidden by gotcha 6.
+
+Fresh Codex-high, exact Kimi 3/high/100 and genuine Opus 5/xhigh unanimously
+returned `PLAN_CORRECTION_APPROVED` and `ASSUMPTION_INCORRECT`. All three chose
+the narrow runtime-neutral `@ts-drp/storage/adapter` facade recorded above over
+a new core package, duplicated SQL transitions, a deep import or an aliased
+owner export. The facade performs one fresh closed-command evaluation over
+authoritative detached rows and emits an exact deterministic write set; the
+concrete owner/harness, seed and promotion-forgery hooks, capabilities and
+signing authority remain hidden. Review evidence:
+
+- Codex-high result SHA-256
+  `45ab0aa2d7314864f8ecf0b762dc12ca0ac070edbb086ca6494b699cbe6ac996`;
+- exact Kimi 3 session `f27055ec-150e-4448-851d-4565f7864c2f`, result SHA-256
+  `1ff2b251d1c67c787782493469c7514f4eafe7d921c4001c9333c1585df322f9`;
+- Opus 5/xhigh session `4c91f674-16c9-4371-a663-1cd0e58bd21d`, all 55
+  substantive assistant events `claude-opus-5`, result SHA-256
+  `08026dfc9c9a5e4aaae1b1cb8f91ef0fdc9d4e2cfc070533973577a7ef52fa79`.
+
+Tests-only checkpoint `8214941` is useful but not yet the accepted 2c-a RED. It
+is assertion-causal at exactly 4F/3P, keeps 98/98 prior storage controls green,
+and correctly defers child-process kills to 2c-b. It freezes strict-runner
+execution, reopen persistence, schema/configuration, before-commit rollback,
+detachment and greenfield plain-ID rejection without naming the adapter symbols.
+Opus nevertheless found reward-hackable or unsafe scaffold edges, so a fresh
+corrective RED must close them before any GREEN:
+
+1. keep `storage-node` private/unpublished while any RAM-backed strict scaffold
+   exists and declare the measured non-experimental Node floor for `node:sqlite`;
+2. replace self-reported configuration literals with live raw connection
+   evidence (`synchronous` is integer `2`), behaviorally enforce foreign keys,
+   and run integrity checking after rows exist;
+3. prove composite identity behavior with both same-generation/different-object
+   and same-object/different-generation collisions, not only tuples differing in
+   both columns; and
+4. retain the bounded fault seam only in the non-exported test module authorized
+   above; the public factory and export map expose no hook or test mode.
+
+Preserve these implementation gotchas. Every caller input, including nested
+closure values and bytes, is validated and copied synchronously before its first
+suspension. `BEGIN IMMEDIATE` contention is `SUBSTRATE_FAILURE`, never a forged
+`HEAD_CONFLICT`; configure an explicit bounded busy timeout. A failed statement
+or commit leaves the connection reusable and both same-instance and reopened
+reads exact-old. SQLite BLOB outputs are copied into fresh plain
+`Uint8Array`s. Completion may load and rehash the whole closure in 2c for exact
+semantic fidelity; 2e owns later bounded-generation work, not an unreviewed
+shortcut. A 2c-b artifact retains/checkpoints the WAL together with its database
+rather than copying only the main file. None of these obligations adds legacy
+plain IDs, inferred authority, signing eligibility or a power-loss claim.
 
 ### Exit gate (Phase 2)
 
@@ -30212,10 +30302,12 @@ Carry these nonblocking residuals to their named owners:
   or remains completion-time; it must not inherit durable cross-session poison
   accidentally.
 - **Export governance:** the runtime denylist now covers the real owner and has
-  a causal control, but an aliased future re-export would require the owning
-  export-surface review to update the guard. Descriptive capabilities remain
-  non-authorizing even though hostile same-process prototype mutation is not a
-  security boundary.
+  a causal control. Phase 2c extends that same guard across the deliberately
+  published `./adapter` subpath and proves built-package deep imports remain
+  blocked; an aliased future re-export still requires the owning export-surface
+  review to update the guard. Descriptive capabilities remain non-authorizing
+  even though hostile same-process prototype mutation is not a security
+  boundary.
 - **Repository test harness:** package-local Vitest configuration is a
   repo-wide convention issue, not a Phase 2a behavioral failure. Fix it
   consistently rather than adding a storage-only exception.
