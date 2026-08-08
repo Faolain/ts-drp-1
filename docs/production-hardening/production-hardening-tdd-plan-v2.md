@@ -3339,6 +3339,123 @@ This slice is therefore an honest local-durability advance for both golden
 paths, not a claim that either path can yet survive its full crash, engine,
 multi-peer or application scenario.
 
+#### Phase 2d2b(ii) accepted closure — inventory-driven schema authority
+
+Only Phase 2d2b(ii) is accepted at tests/assets-only RED `0aef809` and
+production-only GREEN `702ec91`. This discharges the inventory-driven creation
+and validation authority carried from 2d2a residual 6 and 2d2b(i) residual 8.
+It does not close the rest of Phase 2d2b, full Phase 2d, the Phase 2 exit gate,
+or either Discord/chat or MMORPG golden path.
+
+The RED changes exactly the three existing schema test/harness files and its
+bytes remain frozen through GREEN. Its focused non-browser signal is one
+failed / two passed: the old production module still exposes the partial data-
+store inventory and has no full schema authority. The full non-browser package
+diagnostic is one failed / 171 passed for the same cause. Chromium is honestly
+11/11 at RED because the existing hand-written paths already produce and
+reject the right physical schemas; the additive browser evidence instead pins
+fresh creation, acceptance of an independently seeded exact private-v1 schema,
+and fail-closed malformed-schema preservation. Phase-2d2a Chromium remains
+8/8. The first Phase-2d2b(i) preservation launch retained a real shared-port
+`EADDRINUSE`; the bounded rerun is 3/3. Ownership/governance is 16/16, and
+upstream storage build, storage-browser typecheck/build, ESLint with zero
+warnings, Prettier and diff/custody checks are green. The RED
+`SHA256SUMS.txt` digest is
+`ac723e379681308fb61a7a00057f0b9d5ddbbb7710ae379af34c0edce5eb67e1`.
+
+GREEN replaces the partial inventory and parallel creation/validation
+literals with one recursively frozen private-v1 authority containing the
+version, all five stores, their string/compound/null key paths,
+`autoIncrement` values, and the sole exact vote index. Both fresh creation and
+validation iterate that authority; the stale partial export is deleted rather
+than retained as a compatibility alias. Compound key paths are copied before
+crossing the IndexedDB DOM boundary, the out-of-line votes key path is created
+by omitting the `keyPath` option, and validation remains exact for store/index
+counts, names, options and ordered key-path elements and fails closed on an
+exception. The open path validates even a freshly created database, so future
+creation/validation divergence becomes immediately observable. Keeping both
+consumers on the authority is a bounded code-review invariant for this small
+private module; this closure explicitly requires no AST or token analyzer.
+
+At committed GREEN, focused non-browser authority is 3/3, the package suite is
+22 files / 172 tests, Phase-2d1 Chromium is 11/11, Phase-2d2a Chromium is 8/8,
+Phase-2d2b(i) Chromium is 3/3, and ownership/governance is 16/16. Upstream
+storage build, storage-browser typecheck/build, package ESLint with zero
+warnings, Prettier, production-only diff and custody checks are green. The
+precommit package run honestly retains the expected clean-checkout failure:
+its isolated tracked snapshot still points at RED; the authoritative
+postcommit run at `702ec91` is fully green. The GREEN evidence-manifest digest
+is `670657113647535df9ae249088019cdf1ea9c06ce913563a3b97f5e066c627d5`.
+
+The independent acceptance loop found no blocker and no reward hacking:
+
+- genuine Grok 4.5/high session
+  `019fe383-7cd5-7ae2-a298-91d83c4f24ae` returned `APPROVED`,
+  `BLOCKERS: none`, `REWARD_HACKING: no` and
+  `2D2B_II_MAY_CLOSE: yes`; exact result SHA-256
+  `9328b20bc9b49f4b185a34b8e4bbab98bb50b36d4359f5c25a7c406378b155d2`,
+  raw-envelope SHA-256
+  `a07a096918f3665527213551ed74c23656ea334bb1134cf45d58c35b3d15c224`,
+  thought-stream SHA-256
+  `215a7423b38c92507f4d7ca106a6da40d847c2f449db2e9f49310a4cd8c140e4`
+  and artifact-integrity-manifest SHA-256
+  `c708da6709acc7c74400ad437bd74d86b9d3d6db8ad286c4501bdfc07e4a9d87`.
+  Its read-only sandbox blocked an independent Vitest run, so its execution
+  claims are limited to retained controller evidence;
+- exact Kimi 3/high/100 session
+  `ad1a86ff-9162-4853-9723-aea81a56d57a` returned `APPROVED`,
+  `BLOCKERS: none`, `REWARD_HACKING: no` and
+  `2D2B_II_MAY_CLOSE: yes`, and independently reproduced focused 3/3; exact
+  result SHA-256
+  `8323bb7f7cd46de9419f02d20e4ccf003e7f628de4200a62d3fe32bd74b8c6ee`
+  and artifact-integrity-manifest SHA-256
+  `b2ac1891c773d40065280f58115f724b27adf0c22aaf97bc88795ba6bb592be4`;
+- final Opus 5/xhigh session
+  `44d4a6a1-a4ed-496d-91ab-615a87dadeda` returned `APPROVED`,
+  `BLOCKERS: none`, `REWARD_HACKING: no` and
+  `2D2B_II_MAY_CLOSE: yes`; exact result SHA-256
+  `609dab4beab42a4b281b1a3e96dda76c54cd21707164eb936d13ff6e56abba54`
+  and artifact-integrity-manifest SHA-256
+  `66d27216c38a5ca89b969051b237f671b0a6a4096562754e71ca0624a3bd3d63`.
+  All 89 assistant events authenticate as Opus 5 at requested xhigh effort and
+  used only Read/Grep/Glob. Automatic Haiku metadata contributed no review
+  turn. Opus ran no commands or tests and made no independent execution claim.
+
+The final review corrects two harmless preliminary inaccuracies. The generated
+declarations show that the positional store-alias types are widened five-name
+unions, not preserved literals; TypeScript is therefore not the claimed
+backstop. The runtime aliases are currently correct, the ordered authority
+test pins their positions, and the independent adapter trace pins every
+currently consumed store alias. Also, the malformed-schema list contains 27
+scenarios, as Opus counted; Kimi's count of 28 was an immaterial miscount and
+did not affect its verdict.
+
+Carry these accepted nonblocking findings to their named owners:
+
+1. `PHASE_2D_VOTES_STORE` and
+   `PHASE_2D_VOTES_OBJECT_EPOCH_INDEX` are currently unused. A future authority
+   reorder or index insertion could silently rebind their positional exports,
+   and the widened store-alias declaration types would not catch it. The later
+   votes/anti-equivocation slice must use name-keyed lookup, add an identity
+   assertion, or delete the unused exports before wiring them into a vote
+   transaction.
+2. Dedicated `autoIncrement:true` mutants for `generations` and `promotions`
+   are impossible with their array key paths without also changing the key
+   path. Remaining string/array shape mutants are optional later full-2d
+   schema-evolution matrix hygiene, not a closure blocker.
+3. Future creation and validation consumption remains the explicit bounded
+   code-review invariant above. Do not add an AST/token analyzer for it.
+4. Existing owners remain unchanged: malformed-row taxonomy, malformed-
+   database remediation and recovery belong to 2e; bounded staging and
+   materialization belong to 2d/2e under the standing shared-contract quorum;
+   engines belong to 2h; cross-tab/multi-connection behavior to 2i/5c;
+   kill-point and coverage gates to the Phase 2 exit gate; quota/GC to 2g;
+   durable issuance/outbox to 2l; and the public production surface to later
+   2d packaging.
+5. The prior 2d2b(i) lifecycle strengthenings and root-script/CI-topology work
+   retain their existing later owners. No finding here closes full Phase 2d2b
+   or Phase 2d.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
