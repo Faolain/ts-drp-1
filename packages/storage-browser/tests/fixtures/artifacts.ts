@@ -1,5 +1,5 @@
 import { EXPECTED_NEW_DIGEST, EXPECTED_OLD_DIGEST, FIXTURE_OBJECT_ID } from "./fixture-records.js";
-import type { ProcessIdentity } from "./process-forest.js";
+import { type ProcessIdentity, validateTwoGroupForest } from "./process-forest.js";
 import { boundedDetail, isWorkerFailureCode } from "./worker-protocol.js";
 import type { WorkerFailureCode } from "../../src/internal/instrumented-idb.js";
 import { KILL_POINT_MANIFEST, type KillHit, type KillPoint, orderedKillPoints } from "../../src/killpoints.js";
@@ -490,18 +490,13 @@ function requireOwnedForest(
 		browserInForest === undefined ||
 		!sameIdentity(childInForest, child) ||
 		!sameIdentity(browserInForest, browserRoot) ||
-		browserRoot.ppid !== child.pid ||
-		child.pgid !== child.pid ||
-		browserRoot.pgid !== browserRoot.pid ||
-		forest.some((identity) => identity.pgid !== child.pgid && identity.pgid !== browserRoot.pgid) ||
-		!forest.some(
-			(identity) =>
-				identity.pgid === browserRoot.pgid &&
-				identity.ppid === browserRoot.pid &&
-				typeof identity.command === "string" &&
-				/renderer/u.test(identity.command)
-		)
+		forest.some((identity) => identity.pgid !== child.pgid && identity.pgid !== browserRoot.pgid)
 	) {
+		throw new TypeError("owned forest does not prove the child/browser two-group topology");
+	}
+	try {
+		validateTwoGroupForest(forest as unknown as readonly ProcessIdentity[], Number(child.pid), Number(browserRoot.pid));
+	} catch {
 		throw new TypeError("owned forest does not prove the child/browser two-group topology");
 	}
 	const groups = requireArray(groupValues, "owned groups").map((untrusted) =>
