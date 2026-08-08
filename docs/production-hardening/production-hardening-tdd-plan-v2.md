@@ -2709,10 +2709,21 @@ the tracked bundle and is green. A default generator run is 1 skipped and all
 six before/after hashes are identical, with no staging or backup residue.
 
 Evidence provenance is recorded narrowly. A retained 12:44 write-mode run of
-an earlier generator variant is followed by a 5/5 gate on its resulting bundle;
-the current bundle separately has a retained 5/5 gate and the default-skip
-hash-identity check. There is no retained final write-mode
-`generator-restored.log`, and the preserved evidence cannot establish whether
+an earlier generator variant is accompanied by a same-window 5/5 gate; a final
+write-mode run is also retained, package-locally, at
+`packages/storage-browser/.logs/phase-2-spike-s4-generator-codex-high/generator-restored.log`
+(SHA-256 `b730bd08dfdb93ae60721456efd97efe8b51a7782f874f4ab63f6735da939b11`),
+1/1 passing on the pinned Chromium after reconciliation and before `76c1807`.
+The 5/5 gate at 12:48:44 in
+`.logs/phase-2-spike-s4-generator-codex-high/s4-gate.log` runs twenty seconds
+later and therefore covers the bundle that final run published; the current
+bundle additionally carries the postcommit 5/5 inside 166/166 and the
+default-skip hash-identity check. That final log's `:138` test position differs
+from the current `:140` by exactly the two lines the retained
+`eslint-restored.log` Prettier fix at `73:19` inserts above the test, and no
+preserved evidence shows a behavioral edit between the two source states. The
+log emits no artifact digests or bytes, so it does not byte-bind the files it
+published, and the preserved evidence still cannot establish whether
 measurement values changed during reconciliation. The closure therefore makes
 neither claim. Two briefly concurrent untracked generator agents were stopped
 and their shared-file edits reconciled before `76c1807`; this coordination
@@ -2733,12 +2744,18 @@ The independent acceptance loop found no blocker:
   `c2a247c8-a399-4cfe-9790-7999e30b462c` approved with no blocker; extracted
   result SHA-256
   `a79dd146bb2d4fd1932bc2556bdd1dbab145679676cf341d92f1e9c1c839644b`.
+  After the ignored package-local final write log was discovered, fresh Opus
+  5/xhigh addendum session `bb173df6-dd85-4ad1-96c5-78e91b15c0f7`
+  re-approved closure, authenticated all 64 assistant events as Opus 5 and
+  supplied the provenance correction above; extracted result SHA-256
+  `b87ebad22fb6a61de8db4ddfd7977c8968e5a0a062f1645796e23053d35f92c1`.
 
 Carry these bounded residuals forward instead of overstating S4:
 
-1. The retained provenance is structural plus the earlier write-mode pass; the
-   generator does not print the six output digests. On the next coherent spike
-   touch, print them so a future write-mode log byte-binds its output.
+1. The retained provenance is structural plus two write-mode passes, the later
+   of which ran on the final generator source; the generator does not print the
+   six output digests. On the next coherent spike touch, print them so a future
+   write-mode log byte-binds its output.
 2. The strict-IDB and bucket-clear artifacts are byte-equal to generator
    constants; their liveness comes from assertions executed in the same run.
    Only the measurement artifact contains run-specific data.
