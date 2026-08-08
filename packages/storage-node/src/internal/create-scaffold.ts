@@ -26,11 +26,30 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { SqliteAheDurableStoreOptions } from "../index.js";
 
-export type SqliteMutationOperation = "beginGeneration";
+export type SqliteMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readObjectState">;
 
 export type SqliteMutationFault = (
-	checkpoint: Readonly<{ readonly edge: "before-commit"; readonly operation: SqliteMutationOperation }>
+	checkpoint: Readonly<{ readonly edge: "before-commit"; readonly operation: "beginGeneration" }>
 ) => void;
+
+export type SqliteMutationStatement =
+	| "blob-insert"
+	| "generation-insert"
+	| "generation-update"
+	| "head-upsert"
+	| "object-ensure"
+	| "promotion-insert";
+
+export type SqliteCrashCheckpoint =
+	| Readonly<{
+			edge: "after-statement";
+			occurrence: number;
+			operation: SqliteMutationOperation;
+			statement: SqliteMutationStatement;
+	  }>
+	| Readonly<{ edge: "after-commit" | "before-commit"; operation: SqliteMutationOperation }>;
+
+export type SqliteCrashCheckpointObserver = (checkpoint: SqliteCrashCheckpoint) => void;
 
 export type SqlitePragma = "foreign_keys" | "integrity_check" | "journal_mode" | "synchronous";
 
@@ -79,7 +98,8 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 	public constructor(
 		private readonly connection: DatabaseSync,
-		private readonly fault?: SqliteMutationFault
+		private readonly fault?: SqliteMutationFault,
+		private readonly crashObserver?: SqliteCrashCheckpointObserver
 	) {}
 
 	public readObjectState(objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>> {
@@ -162,6 +182,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 		const mutation = isMutation(operation);
 		const readTransaction = operation === "readObjectState";
 		let transactionActive = false;
+		let result: StoreResult<unknown>;
 		try {
 			if (mutation) {
 				this.connection.exec("BEGIN IMMEDIATE");
@@ -180,14 +201,18 @@ class SqliteAheDurableStore implements AheDurableStore {
 				return evaluation.result;
 			}
 			if (mutation) {
-				this.applyWrites(evaluation);
-				if (operation === "beginGeneration") this.fault?.({ operation, edge: "before-commit" });
+				this.applyWrites(evaluation, operation);
+				if (this.crashObserver === undefined) {
+					if (operation === "beginGeneration") this.fault?.({ operation, edge: "before-commit" });
+				} else {
+					this.crashObserver({ operation, edge: "before-commit" });
+				}
 			}
 			if (transactionActive) {
 				this.connection.exec("COMMIT");
 				transactionActive = false;
 			}
-			return evaluation.result;
+			result = evaluation.result;
 		} catch (cause) {
 			if (transactionActive) {
 				try {
@@ -198,6 +223,8 @@ class SqliteAheDurableStore implements AheDurableStore {
 			}
 			return { ok: false, reason: "SUBSTRATE_FAILURE", cause };
 		}
+		if (mutation) this.crashObserver?.({ operation, edge: "after-commit" });
+		return result;
 	}
 
 	private loadFacts(prepared: PreparedStorageAdapterCommand): readonly StorageAdapterFact[] {
@@ -314,11 +341,18 @@ class SqliteAheDurableStore implements AheDurableStore {
 		loaded.add(key);
 	}
 
-	private applyWrites(evaluation: StorageAdapterEvaluation): void {
-		for (const write of evaluation.writes) this.applyWrite(write);
+	private applyWrites(evaluation: StorageAdapterEvaluation, operation: SqliteMutationOperation): void {
+		const occurrences = new Map<SqliteMutationStatement, number>();
+		const observe = (statement: SqliteMutationStatement): void => {
+			if (this.crashObserver === undefined) return;
+			const occurrence = (occurrences.get(statement) ?? 0) + 1;
+			occurrences.set(statement, occurrence);
+			this.crashObserver({ edge: "after-statement", occurrence, operation, statement });
+		};
+		for (const write of evaluation.writes) this.applyWrite(write, observe);
 	}
 
-	private applyWrite(write: StorageAdapterWrite): void {
+	private applyWrite(write: StorageAdapterWrite, observe: (statement: SqliteMutationStatement) => void): void {
 		switch (write.kind) {
 			case "replace-generation": {
 				const decoded = decodeGenerationRecordV1(write.record);
@@ -332,6 +366,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 				this.connection
 					.prepare("INSERT OR IGNORE INTO objects(object_id, head_record) VALUES (?, NULL)")
 					.run(write.objectId);
+				observe("object-ensure");
 				const exists = this.connection
 					.prepare("SELECT 1 FROM generations WHERE object_id = ? AND generation_id = ?")
 					.get(write.objectId, write.generationId);
@@ -343,6 +378,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 					exists === undefined
 						? statement.run(write.objectId, write.generationId, new Uint8Array(write.record))
 						: statement.run(new Uint8Array(write.record), write.objectId, write.generationId);
+				observe(exists === undefined ? "generation-insert" : "generation-update");
 				requireOneChange(result.changes, "generation write");
 				return;
 			}
@@ -357,6 +393,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 							"ON CONFLICT(object_id) DO UPDATE SET head_record = excluded.head_record"
 					)
 					.run(write.objectId, new Uint8Array(write.record));
+				observe("head-upsert");
 				requireOneChange(result.changes, "head write");
 				return;
 			}
@@ -364,6 +401,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 				const result = this.connection
 					.prepare("INSERT INTO blobs(digest, bytes) VALUES (?, ?)")
 					.run(write.digest, new Uint8Array(write.bytes));
+				observe("blob-insert");
 				requireOneChange(result.changes, "blob insert");
 				return;
 			}
@@ -371,13 +409,14 @@ class SqliteAheDurableStore implements AheDurableStore {
 				const result = this.connection
 					.prepare("INSERT INTO promotions(object_id, generation_id, digest) VALUES (?, ?, ?)")
 					.run(write.objectId, write.generationId, write.digest);
+				observe("promotion-insert");
 				requireOneChange(result.changes, "promotion insert");
 			}
 		}
 	}
 }
 
-function isMutation(kind: StorageAdapterCommand["kind"]): boolean {
+function isMutation(kind: StorageAdapterCommand["kind"]): kind is SqliteMutationOperation {
 	return kind !== "readObjectState" && kind !== "getBlob";
 }
 
@@ -425,12 +464,14 @@ export function createSqliteScaffold(
  * Creates the store and exact live-connection probes used by the package-local RED.
  * @param options - File-backed SQLite options.
  * @param fault - Optional bounded test-only fault callback.
+ * @param crashObserver - Optional expanded process-death checkpoint observer.
  * @returns Store and non-exported connection instrumentation.
  * @internal
  */
 export function createInstrumentedSqliteScaffold(
 	options: SqliteAheDurableStoreOptions,
-	fault?: SqliteMutationFault
+	fault?: SqliteMutationFault,
+	crashObserver?: SqliteCrashCheckpointObserver
 ): SqliteScaffoldInstrumentation {
 	const connection = new DatabaseSync(options.filename);
 	try {
@@ -455,6 +496,6 @@ export function createInstrumentedSqliteScaffold(
 			const row = connection.prepare(`PRAGMA ${pragma}`).get();
 			return row === undefined ? undefined : Object.values(row)[0];
 		},
-		store: new SqliteAheDurableStore(connection, fault),
+		store: new SqliteAheDurableStore(connection, fault, crashObserver),
 	};
 }

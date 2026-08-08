@@ -1,7 +1,11 @@
 import type { AheDurableStore } from "@ts-drp/storage";
 
 import type { SqliteAheDurableStoreOptions } from "./index.js";
-import { createInstrumentedSqliteScaffold, type SqliteMutationFault } from "./internal/create-scaffold.js";
+import {
+	createInstrumentedSqliteScaffold,
+	type SqliteCrashCheckpointObserver,
+	type SqliteMutationFault,
+} from "./internal/create-scaffold.js";
 
 export type SqliteConnectionConfiguration = Readonly<{
 	foreignKeys: unknown;
@@ -16,19 +20,27 @@ export type InstrumentedSqliteAheDurableStore = Readonly<{
 	store: AheDurableStore;
 }>;
 
+export type ExpandedCrashInstrumentation = Readonly<{ crashCheckpoints: "expanded" }>;
+
 /**
  * Creates a store with the bounded Phase 2c-a transaction fault hook.
  * This module is intentionally absent from the package export map.
  * @param options - File-backed SQLite options.
- * @param fault - Synchronous fault injected immediately before commit.
+ * @param callback - Legacy fault hook, or the expanded crash observer when explicitly enabled.
+ * @param instrumentation - Private opt-in for expanded process-death checkpoints.
  * @returns An instrumented strict store.
- * @internal
  */
 export function createInstrumentedSqliteAheDurableStore(
 	options: SqliteAheDurableStoreOptions,
-	fault?: SqliteMutationFault
+	callback?: SqliteCrashCheckpointObserver,
+	instrumentation?: ExpandedCrashInstrumentation
 ): InstrumentedSqliteAheDurableStore {
-	const scaffold = createInstrumentedSqliteScaffold(options, fault);
+	const expanded = instrumentation?.crashCheckpoints === "expanded";
+	const scaffold = createInstrumentedSqliteScaffold(
+		options,
+		expanded ? undefined : (callback as SqliteMutationFault | undefined),
+		expanded ? callback : undefined
+	);
 	return {
 		attemptInvalidForeignKeyInsert: scaffold.attemptInvalidForeignKeyInsert,
 		inspectConfiguration: () => ({
