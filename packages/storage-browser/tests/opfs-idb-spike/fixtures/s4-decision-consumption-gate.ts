@@ -297,10 +297,7 @@ export function requirePhase2dDecisionConsumptionReady(options: DecisionConsumpt
 	}
 	const engines = Object.values(citations).map(({ engine }) => JSON.stringify(engine));
 	if (new Set(engines).size !== 1) throw new TypeError("cited artifacts do not share one full pinned engine identity");
-	if (
-		`${citations.measurement.engine.browserName}-${citations.measurement.engine.browserVersion}` !==
-		measurementEvidence.engineBuild
-	) {
+	if (citations.measurement.engine.userAgent !== measurementEvidence.engineBuild) {
 		throw new TypeError("measurement engine build does not match the full pinned engine identity");
 	}
 	requireDecisionContract(decision, link, decisionMarkdown, link.decision.jsonSha256);
