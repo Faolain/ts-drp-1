@@ -4,6 +4,7 @@ interface Phase2dSchemaHarness {
 	runBlockedUpgrade(): Promise<unknown>;
 	runCooperativeVersionchange(): Promise<unknown>;
 	runDecisionMismatch(): Promise<unknown>;
+	runExistingCorrectSchema(): Promise<unknown>;
 	runFreshSchema(): Promise<unknown>;
 	runLifecyclePositiveControl(): Promise<unknown>;
 	runNativeCompoundPositiveControl(): Promise<unknown>;
@@ -11,6 +12,40 @@ interface Phase2dSchemaHarness {
 	runUnexpectedPrivateV1Schemas(): Promise<unknown>;
 	runUnexpectedSchemaAndVersion(): Promise<unknown>;
 }
+
+const EXPECTED_EXACT_SCHEMA = Object.freeze({
+	kind: "opened",
+	stores: [
+		{ autoIncrement: false, indexes: [], keyPath: "digest", name: "blobs" },
+		{
+			autoIncrement: false,
+			indexes: [],
+			keyPath: ["objectId", "generationId"],
+			name: "generations",
+		},
+		{ autoIncrement: false, indexes: [], keyPath: "objectId", name: "objects" },
+		{
+			autoIncrement: false,
+			indexes: [],
+			keyPath: ["objectId", "generationId", "digest"],
+			name: "promotions",
+		},
+		{
+			autoIncrement: false,
+			indexes: [
+				{
+					keyPath: ["objectId", "epoch"],
+					multiEntry: false,
+					name: "by-object-epoch",
+					unique: false,
+				},
+			],
+			keyPath: null,
+			name: "votes",
+		},
+	],
+	version: 1,
+});
 
 async function runHarness(page: Page, method: keyof Phase2dSchemaHarness): Promise<unknown> {
 	await page.goto("/");
@@ -66,39 +101,11 @@ test("production opening consumes the selected decision digest before creating a
 });
 
 test("fresh production opening creates the plan-owned native compound schema shell", async ({ page }) => {
-	await expect(runHarness(page, "runFreshSchema")).resolves.toEqual({
-		kind: "opened",
-		stores: [
-			{ autoIncrement: false, indexes: [], keyPath: "digest", name: "blobs" },
-			{
-				autoIncrement: false,
-				indexes: [],
-				keyPath: ["objectId", "generationId"],
-				name: "generations",
-			},
-			{ autoIncrement: false, indexes: [], keyPath: "objectId", name: "objects" },
-			{
-				autoIncrement: false,
-				indexes: [],
-				keyPath: ["objectId", "generationId", "digest"],
-				name: "promotions",
-			},
-			{
-				autoIncrement: false,
-				indexes: [
-					{
-						keyPath: ["objectId", "epoch"],
-						multiEntry: false,
-						name: "by-object-epoch",
-						unique: false,
-					},
-				],
-				keyPath: null,
-				name: "votes",
-			},
-		],
-		version: 1,
-	});
+	await expect(runHarness(page, "runFreshSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
+});
+
+test("production validation accepts an independently created exact private-v1 schema", async ({ page }) => {
+	await expect(runHarness(page, "runExistingCorrectSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
 });
 
 test("historical, missing, extra and malformed private-v1 schemas all fail closed", async ({ page }) => {

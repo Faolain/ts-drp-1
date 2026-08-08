@@ -12,6 +12,12 @@ const PACKAGE_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.ur
 const LINK_PATH = "tests/opfs-idb-spike/artifacts/phase-2d-storage-substrate-decision-link-v1.json";
 type Phase2dStore = "blobs" | "generations" | "objects" | "promotions" | "votes";
 
+function isDeeplyFrozen(value: unknown): boolean {
+	if (typeof value !== "object" || value === null) return true;
+	if (!Object.isFrozen(value)) return false;
+	return Object.values(value).every((child) => isDeeplyFrozen(child));
+}
+
 const ADAPTER_STORE_OWNERSHIP = Object.freeze({
 	loads: {
 		"blob": ["blobs"],
@@ -28,23 +34,47 @@ const ADAPTER_STORE_OWNERSHIP = Object.freeze({
 });
 
 describe("Phase 2d1 selected schema authority", () => {
-	it("freezes the corrected private-v1 five-store authority without compatibility stores", () => {
+	it("exposes one frozen private-v1 authority for every store, key path and index", () => {
 		const authority = phase2dSchema as unknown as Readonly<Record<string, unknown>>;
 		expect({
-			inventory: authority.PHASE_2D_DATA_STORE_INVENTORY,
-			schemaVersion: authority.PHASE_2D_SCHEMA_VERSION,
-			voteIndexName: authority.PHASE_2D_VOTES_OBJECT_EPOCH_INDEX,
+			partialDataStoreInventoryPresent: Reflect.has(authority, "PHASE_2D_DATA_STORE_INVENTORY"),
+			schema: authority.PHASE_2D_SCHEMA_AUTHORITY,
 		}).toEqual({
-			inventory: [
-				{ keyPath: "objectId", name: "objects" },
-				{ keyPath: ["objectId", "generationId"], name: "generations" },
-				{ keyPath: "digest", name: "blobs" },
-				{ keyPath: ["objectId", "generationId", "digest"], name: "promotions" },
-				{ keyPath: null, name: "votes" },
-			],
-			schemaVersion: 1,
-			voteIndexName: "by-object-epoch",
+			partialDataStoreInventoryPresent: false,
+			schema: {
+				stores: [
+					{ autoIncrement: false, indexes: [], keyPath: "objectId", name: "objects" },
+					{
+						autoIncrement: false,
+						indexes: [],
+						keyPath: ["objectId", "generationId"],
+						name: "generations",
+					},
+					{ autoIncrement: false, indexes: [], keyPath: "digest", name: "blobs" },
+					{
+						autoIncrement: false,
+						indexes: [],
+						keyPath: ["objectId", "generationId", "digest"],
+						name: "promotions",
+					},
+					{
+						autoIncrement: false,
+						indexes: [
+							{
+								keyPath: ["objectId", "epoch"],
+								multiEntry: false,
+								name: "by-object-epoch",
+								unique: false,
+							},
+						],
+						keyPath: null,
+						name: "votes",
+					},
+				],
+				version: 1,
+			},
 		});
+		expect(isDeeplyFrozen(authority.PHASE_2D_SCHEMA_AUTHORITY)).toBe(true);
 	});
 
 	it("maps every frozen adapter load and write kind to its physical store owners", () => {

@@ -247,25 +247,40 @@ async function runDecisionMismatch(): Promise<unknown> {
 async function runFreshSchema(): Promise<unknown> {
 	const databaseName = `phase-2d1-schema-${crypto.randomUUID()}`;
 	try {
-		let handle;
-		try {
-			handle = await openPhase2dBrowserDatabase({ databaseName });
-		} catch (error) {
-			return Object.freeze({ kind: "open-error", error: serializeError(error) });
-		}
-		handle.close();
-		const database = await requestResult(indexedDB.open(databaseName));
-		try {
-			return Object.freeze({
-				kind: "opened",
-				stores: schemaDescription(database),
-				version: database.version,
-			});
-		} finally {
-			database.close();
-		}
+		return await openAndDescribeProductionSchema(databaseName);
 	} finally {
 		await deleteDatabase(databaseName);
+	}
+}
+
+async function runExistingCorrectSchema(): Promise<unknown> {
+	const databaseName = `phase-2d1-existing-schema-${crypto.randomUUID()}`;
+	try {
+		const seeded = await createDatabase(databaseName, 1, (database) => createCorrectedSchema(database));
+		seeded.close();
+		return await openAndDescribeProductionSchema(databaseName);
+	} finally {
+		await deleteDatabase(databaseName);
+	}
+}
+
+async function openAndDescribeProductionSchema(databaseName: string): Promise<unknown> {
+	let handle;
+	try {
+		handle = await openPhase2dBrowserDatabase({ databaseName });
+	} catch (error) {
+		return Object.freeze({ kind: "open-error", error: serializeError(error) });
+	}
+	handle.close();
+	const database = await requestResult(indexedDB.open(databaseName));
+	try {
+		return Object.freeze({
+			kind: "opened",
+			stores: schemaDescription(database),
+			version: database.version,
+		});
+	} finally {
+		database.close();
 	}
 }
 
@@ -407,6 +422,7 @@ Object.defineProperty(globalThis, "phase2dSchemaHarness", {
 		runBlockedUpgrade,
 		runCooperativeVersionchange,
 		runDecisionMismatch,
+		runExistingCorrectSchema,
 		runFreshSchema,
 		runLifecyclePositiveControl,
 		runNativeCompoundPositiveControl,
