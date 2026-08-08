@@ -7,7 +7,9 @@ interface Phase2dSchemaHarness {
 	runFreshSchema(): Promise<unknown>;
 	runLifecyclePositiveControl(): Promise<unknown>;
 	runNativeCompoundPositiveControl(): Promise<unknown>;
+	runPromotionCompoundPositiveControl(): Promise<unknown>;
 	runStrictMutation(observedDurability: IDBTransactionDurability): Promise<unknown>;
+	runUnexpectedPrivateV1Schemas(): Promise<unknown>;
 	runUnexpectedSchemaAndVersion(): Promise<unknown>;
 }
 
@@ -40,6 +42,13 @@ test("positive control: Chromium preserves native compound keys and distinct emb
 	});
 });
 
+test("positive control: Chromium keeps colliding three-part promotion tuples distinct", async ({ page }) => {
+	await expect(runHarness(page, "runPromotionCompoundPositiveControl")).resolves.toEqual({
+		count: 2,
+		promotionKeyPath: ["objectId", "generationId", "digest"],
+	});
+});
+
 test("positive control: Chromium exposes cooperative versionchange and a genuine blocked upgrade", async ({ page }) => {
 	await expect(runHarness(page, "runLifecyclePositiveControl")).resolves.toEqual({
 		blockedObserved: true,
@@ -61,14 +70,73 @@ test("production opening consumes the selected decision digest before creating a
 
 test("fresh production opening creates the plan-owned native compound schema shell", async ({ page }) => {
 	await expect(runHarness(page, "runFreshSchema")).resolves.toEqual({
-		generationKeyPath: ["objectId", "generationId"],
 		kind: "opened",
+		stores: [
+			{ autoIncrement: false, indexes: [], keyPath: "digest", name: "blobs" },
+			{
+				autoIncrement: false,
+				indexes: [],
+				keyPath: ["objectId", "generationId"],
+				name: "generations",
+			},
+			{ autoIncrement: false, indexes: [], keyPath: "objectId", name: "objects" },
+			{
+				autoIncrement: false,
+				indexes: [],
+				keyPath: ["objectId", "generationId", "digest"],
+				name: "promotions",
+			},
+			{
+				autoIncrement: false,
+				indexes: [
+					{
+						keyPath: ["objectId", "epoch"],
+						multiEntry: false,
+						name: "by-object-epoch",
+						unique: false,
+					},
+				],
+				keyPath: null,
+				name: "votes",
+			},
+		],
 		version: 1,
-		voteIndexKeyPath: ["objectId", "epoch"],
 	});
 });
 
-test("all non-strict live mutation observations fail fatally and commit zero writes", async ({ page }) => {
+test("historical, missing, extra and malformed private-v1 schemas all fail closed", async ({ page }) => {
+	await expect(runHarness(page, "runUnexpectedPrivateV1Schemas")).resolves.toEqual({
+		accepted: [],
+		rejected: [
+			"historical-two-store",
+			"missing-objects",
+			"missing-generations",
+			"missing-blobs",
+			"missing-promotions",
+			"missing-votes",
+			"extra-store",
+			"wrong-objects-key",
+			"wrong-generations-key",
+			"wrong-blobs-key",
+			"wrong-promotions-key",
+			"wrong-votes-key",
+			"objects-auto-increment",
+			"blobs-auto-increment",
+			"votes-auto-increment",
+			"objects-extra-index",
+			"generations-extra-index",
+			"blobs-extra-index",
+			"promotions-extra-index",
+			"votes-missing-index",
+			"votes-extra-index",
+			"votes-wrong-index-key",
+			"votes-unique-index",
+			"votes-multi-entry-index",
+		],
+	});
+});
+
+test("all non-strict observations fail fatally and no strict probe leaves junk generation rows", async ({ page }) => {
 	const observations = [];
 	for (const observedDurability of ["default", "relaxed"] as const) {
 		observations.push(await runHarness(page, "runStrictMutation", observedDurability));
@@ -76,7 +144,7 @@ test("all non-strict live mutation observations fail fatally and commit zero wri
 	observations.push(await runHarness(page, "runStrictMutation", "strict"));
 	expect(observations).toEqual([
 		{
-			committedRecords: 0,
+			junkGenerationRecords: 0,
 			error: {
 				code: "NON_STRICT_DURABILITY",
 				message: "strict IndexedDB durability is required",
@@ -85,7 +153,7 @@ test("all non-strict live mutation observations fail fatally and commit zero wri
 			result: null,
 		},
 		{
-			committedRecords: 0,
+			junkGenerationRecords: 0,
 			error: {
 				code: "NON_STRICT_DURABILITY",
 				message: "strict IndexedDB durability is required",
@@ -94,7 +162,7 @@ test("all non-strict live mutation observations fail fatally and commit zero wri
 			result: null,
 		},
 		{
-			committedRecords: 1,
+			junkGenerationRecords: 0,
 			error: null,
 			result: { committed: true, observedDurability: "strict" },
 		},

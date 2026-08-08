@@ -69,6 +69,66 @@ async function countGenerationRecords(databaseName: string): Promise<number> {
 	}
 }
 
+interface CorrectedSchemaOptions {
+	readonly autoIncrement?: string;
+	readonly extraIndex?: string;
+	readonly extraStore?: boolean;
+	readonly indexMode?: "extra" | "missing" | "multi-entry" | "unique" | "wrong-key";
+	readonly omitStore?: string;
+	readonly wrongKey?: string;
+}
+
+function createCorrectedSchema(database: IDBDatabase, options: CorrectedSchemaOptions = {}): void {
+	const create = (name: string, keyPath: string | string[] | undefined): IDBObjectStore | undefined => {
+		if (options.omitStore === name) return undefined;
+		const selectedKeyPath = options.wrongKey === name ? `${name}WrongKey` : keyPath;
+		return database.createObjectStore(name, {
+			autoIncrement: options.autoIncrement === name,
+			...(selectedKeyPath === undefined ? {} : { keyPath: selectedKeyPath }),
+		});
+	};
+	const objects = create("objects", "objectId");
+	const generations = create("generations", ["objectId", "generationId"]);
+	const blobs = create("blobs", "digest");
+	const promotions = create("promotions", ["objectId", "generationId", "digest"]);
+	const votes = create("votes", undefined);
+	const stores = { blobs, generations, objects, promotions };
+	const indexedStore = options.extraIndex === undefined ? undefined : stores[options.extraIndex as keyof typeof stores];
+	indexedStore?.createIndex("unexpected", "unexpected");
+	if (votes !== undefined && options.indexMode !== "missing") {
+		const voteIndexKeyPath =
+			options.indexMode === "multi-entry" || options.indexMode === "wrong-key" ? "epoch" : ["objectId", "epoch"];
+		votes.createIndex("by-object-epoch", voteIndexKeyPath, {
+			multiEntry: options.indexMode === "multi-entry",
+			unique: options.indexMode === "unique",
+		});
+		if (options.indexMode === "extra") votes.createIndex("unexpected", "unexpected");
+	}
+	if (options.extraStore === true) database.createObjectStore("unexpected");
+}
+
+function schemaDescription(database: IDBDatabase): readonly unknown[] {
+	const names = [...database.objectStoreNames];
+	const transaction = database.transaction(names, "readonly");
+	return names.map((name) => {
+		const store = transaction.objectStore(name);
+		return Object.freeze({
+			autoIncrement: store.autoIncrement,
+			indexes: [...store.indexNames].map((indexName) => {
+				const index = store.index(indexName);
+				return Object.freeze({
+					keyPath: index.keyPath,
+					multiEntry: index.multiEntry,
+					name: index.name,
+					unique: index.unique,
+				});
+			}),
+			keyPath: store.keyPath,
+			name: store.name,
+		});
+	});
+}
+
 async function runNativeCompoundPositiveControl(): Promise<unknown> {
 	const databaseName = `phase-2d1-native-control-${crypto.randomUUID()}`;
 	try {
@@ -90,6 +150,29 @@ async function runNativeCompoundPositiveControl(): Promise<unknown> {
 			generationKeyPath,
 			voteIndexKeyPath,
 		});
+	} finally {
+		await deleteDatabase(databaseName);
+	}
+}
+
+async function runPromotionCompoundPositiveControl(): Promise<unknown> {
+	const databaseName = `phase-2d1-promotion-control-${crypto.randomUUID()}`;
+	try {
+		const database = await createDatabase(databaseName, 1, (upgradeDatabase) => {
+			upgradeDatabase.createObjectStore("promotions", {
+				keyPath: ["objectId", "generationId", "digest"],
+			});
+		});
+		const transaction = database.transaction("promotions", "readwrite", { durability: "strict" });
+		const store = transaction.objectStore("promotions");
+		store.add({ digest: "c\u0000d", generationId: "b", objectId: "a" });
+		store.add({ digest: "d", generationId: "b\u0000c", objectId: "a" });
+		await transactionCompletion(transaction);
+		const inspection = database.transaction("promotions", "readonly").objectStore("promotions");
+		const promotionKeyPath = inspection.keyPath;
+		const count = await requestResult(inspection.count());
+		database.close();
+		return Object.freeze({ count, promotionKeyPath });
 	} finally {
 		await deleteDatabase(databaseName);
 	}
@@ -167,13 +250,10 @@ async function runFreshSchema(): Promise<unknown> {
 		handle.close();
 		const database = await requestResult(indexedDB.open(databaseName));
 		try {
-			const generationStore = database.transaction("generations").objectStore("generations");
-			const votesStore = database.transaction("votes").objectStore("votes");
 			return Object.freeze({
-				generationKeyPath: generationStore.keyPath,
 				kind: "opened",
+				stores: schemaDescription(database),
 				version: database.version,
-				voteIndexKeyPath: votesStore.index("by-object-epoch").keyPath,
 			});
 		} finally {
 			database.close();
@@ -196,7 +276,7 @@ async function runStrictMutation(observedDurability: IDBTransactionDurability): 
 		} catch (caught) {
 			error = serializeError(caught);
 		}
-		return Object.freeze({ committedRecords: await countGenerationRecords(databaseName), error, result });
+		return Object.freeze({ junkGenerationRecords: await countGenerationRecords(databaseName), error, result });
 	} finally {
 		await deleteDatabase(databaseName);
 	}
@@ -229,11 +309,7 @@ async function runBlockedUpgrade(): Promise<unknown> {
 	const databaseName = `phase-2d1-blocked-${crypto.randomUUID()}`;
 	let blocker: IDBDatabase | null = null;
 	try {
-		const seeded = await createDatabase(databaseName, 1, (database) => {
-			database.createObjectStore("generations", { keyPath: ["objectId", "generationId"] });
-			const votes = database.createObjectStore("votes");
-			votes.createIndex("by-object-epoch", ["objectId", "epoch"]);
-		});
+		const seeded = await createDatabase(databaseName, 1, (database) => createCorrectedSchema(database));
 		seeded.close();
 		blocker = await requestResult(indexedDB.open(databaseName));
 		const started = performance.now();
@@ -254,20 +330,69 @@ async function runBlockedUpgrade(): Promise<unknown> {
 	}
 }
 
+async function runUnexpectedPrivateV1Schemas(): Promise<unknown> {
+	const scenarios: readonly Readonly<{ name: string; options?: CorrectedSchemaOptions; historical?: true }>[] = [
+		{ historical: true, name: "historical-two-store" },
+		...(["objects", "generations", "blobs", "promotions", "votes"] as const).map((omitStore) => ({
+			name: `missing-${omitStore}`,
+			options: { omitStore },
+		})),
+		{ name: "extra-store", options: { extraStore: true } },
+		...(["objects", "generations", "blobs", "promotions", "votes"] as const).map((wrongKey) => ({
+			name: `wrong-${wrongKey}-key`,
+			options: { wrongKey },
+		})),
+		...(["objects", "blobs", "votes"] as const).map((autoIncrement) => ({
+			name: `${autoIncrement}-auto-increment`,
+			options: { autoIncrement },
+		})),
+		...(["objects", "generations", "blobs", "promotions"] as const).map((extraIndex) => ({
+			name: `${extraIndex}-extra-index`,
+			options: { extraIndex },
+		})),
+		{ name: "votes-missing-index", options: { indexMode: "missing" } },
+		{ name: "votes-extra-index", options: { indexMode: "extra" } },
+		{ name: "votes-wrong-index-key", options: { indexMode: "wrong-key" } },
+		{ name: "votes-unique-index", options: { indexMode: "unique" } },
+		{ name: "votes-multi-entry-index", options: { indexMode: "multi-entry" } },
+	];
+	const accepted: string[] = [];
+	const rejected: string[] = [];
+	for (const scenario of scenarios) {
+		const databaseName = `phase-2d1-malformed-${scenario.name}-${crypto.randomUUID()}`;
+		try {
+			const seeded = await createDatabase(databaseName, 1, (database) => {
+				if (scenario.historical === true) {
+					database.createObjectStore("generations", { keyPath: ["objectId", "generationId"] });
+					const votes = database.createObjectStore("votes");
+					votes.createIndex("by-object-epoch", ["objectId", "epoch"]);
+				} else createCorrectedSchema(database, scenario.options);
+			});
+			seeded.close();
+			try {
+				const opened = await openPhase2dBrowserDatabase({ databaseName });
+				opened.close();
+				accepted.push(scenario.name);
+			} catch (error) {
+				if (serializeError(error).code !== "UNEXPECTED_SCHEMA_VERSION") throw error;
+				rejected.push(scenario.name);
+			}
+		} finally {
+			await deleteDatabase(databaseName);
+		}
+	}
+	return Object.freeze({ accepted, rejected });
+}
+
 async function runUnexpectedSchemaAndVersion(): Promise<unknown> {
 	const malformedName = `phase-2d1-malformed-${crypto.randomUUID()}`;
 	const futureName = `phase-2d1-future-${crypto.randomUUID()}`;
 	try {
-		const malformed = await createDatabase(malformedName, 1, (database) => {
-			database.createObjectStore("generations", { keyPath: "encodedKey" });
-			database.createObjectStore("votes");
-		});
+		const malformed = await createDatabase(malformedName, 1, (database) =>
+			createCorrectedSchema(database, { wrongKey: "generations" })
+		);
 		malformed.close();
-		const future = await createDatabase(futureName, 2, (database) => {
-			database.createObjectStore("generations", { keyPath: ["objectId", "generationId"] });
-			const votes = database.createObjectStore("votes");
-			votes.createIndex("by-object-epoch", ["objectId", "epoch"]);
-		});
+		const future = await createDatabase(futureName, 2, (database) => createCorrectedSchema(database));
 		future.close();
 		const errors: SerializedError[] = [];
 		for (const databaseName of [malformedName, futureName]) {
@@ -295,7 +420,9 @@ Object.defineProperty(globalThis, "phase2dSchemaHarness", {
 		runFreshSchema,
 		runLifecyclePositiveControl,
 		runNativeCompoundPositiveControl,
+		runPromotionCompoundPositiveControl,
 		runStrictMutation,
+		runUnexpectedPrivateV1Schemas,
 		runUnexpectedSchemaAndVersion,
 	}),
 	writable: false,
