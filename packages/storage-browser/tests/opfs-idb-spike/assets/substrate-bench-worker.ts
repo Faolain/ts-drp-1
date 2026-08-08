@@ -375,31 +375,33 @@ async function benchmark(request: BenchmarkRequest): Promise<unknown> {
 		throw new Error("S2 command script parity failed");
 	}
 
-	// Deliberate RED defect: corrupt post-state does not suppress publication.
-	const evidence = {
-		schemaVersion: 1,
-		artifactKind: "substrate-measurement",
-		arms: [
-			{ substrate: "opfs", postState: "oracle-pass", elapsedMilliseconds: opfs.elapsed },
-			{ substrate: "idb-strict", postState: "oracle-pass", elapsedMilliseconds: idb.elapsed },
-		],
-		commandScriptDigest,
-		opsExecuted: parsedForOpfs.length + parsedForIdb.length,
-		oracleId: "phase-2a-read-object-state-v1",
-		runId: request.runId,
-		engineBuild: navigator.userAgent,
-		executionOwner: "dedicated-worker",
-		crossOriginIsolated: true,
-		concurrencyShape: "single-writer",
-		contendedMultiTab: "unmeasured-for-2i",
-		commandParity: "byte-identical",
-		correctnessBeforeTiming: true,
-		timingPassingThreshold: "none",
-	};
+	const allOraclesPass = armOraclePass.opfs && armOraclePass.idbStrict;
+	const evidence = allOraclesPass
+		? {
+				schemaVersion: 1,
+				artifactKind: "substrate-measurement",
+				arms: [
+					{ substrate: "opfs", postState: "oracle-pass", elapsedMilliseconds: opfs.elapsed },
+					{ substrate: "idb-strict", postState: "oracle-pass", elapsedMilliseconds: idb.elapsed },
+				],
+				commandScriptDigest,
+				opsExecuted: parsedForOpfs.length + parsedForIdb.length,
+				oracleId: "phase-2a-read-object-state-v1",
+				runId: request.runId,
+				engineBuild: navigator.userAgent,
+				executionOwner: "dedicated-worker",
+				crossOriginIsolated: true,
+				concurrencyShape: "single-writer",
+				contendedMultiTab: "unmeasured-for-2i",
+				commandParity: "byte-identical",
+				correctnessBeforeTiming: true,
+				timingPassingThreshold: "none",
+			}
+		: null;
 
 	return {
 		evidence,
-		oraclePass: armOraclePass.opfs && armOraclePass.idbStrict,
+		oraclePass: allOraclesPass,
 		diagnostics: {
 			commandCountPerArm: parsedForOpfs.length,
 			commandScriptDigestByArm: scriptDigestByArm,
