@@ -2654,6 +2654,120 @@ Carry these bounded residuals into S4 instead of overstating S3:
    pressure eviction or either complete Discord/MMORPG golden path. S4 owns the
    paired decision bundle and 2d consumption gate.
 
+##### Phase 2-spike S4 accepted closure — authenticated substrate decision bundle
+
+S4 is accepted at GREEN `76c1807` over initial tests-only RED `ffff33c`,
+custody corrective RED `f113bc0`, partial GREEN `5d9487d`, engine-identity
+corrective RED `5bc7a67` and partial GREEN `39d592c`. The initial gate froze
+both positive substrate choices plus the negative requirement that Phase 2d
+cannot proceed without an in-repo, digest-bound decision link. The corrective
+lineage then made caller-supplied paths remain inside the governed package
+root, required the exact singleton measurement digest rather than a permissive
+membership check, and bound measurement evidence to the live Worker user agent
+rather than a synthesized browser name/version.
+
+The accepted GREEN adds an opt-in `S4_WRITE_ARTIFACTS=true` Playwright
+generator. In one pinned Chromium session it runs the existing S1, S2 and S3
+harnesses, rejects forced S1 evidence, requires both exact S2 oracles and the
+target-only S3 clear, stages all six files under a package-shaped temporary
+root, validates the staged tree through the real S4 consumption gate, and then
+directory-swaps with rollback. The default invocation skips without changing
+artifact bytes. The committed decision selects `idb-strict` from live strict
+capability and the future 2d/5c strict-transaction boundary; it explicitly
+treats the raw asymmetric, unwarmed, OPFS-first S2 elapsed values as
+correctness-only and does not score them.
+
+The six committed artifacts are byte-bound as follows:
+
+- `strict-idb-capability.json`:
+  `7f76bb252a3d3f7347c02ea49f418c10a5e26c56dad3f6f510d526b71f21e80f`;
+- `substrate-measurement.json`:
+  `68a9a5d91d277ec909ebe1171a3a87c3b4975ee12566c86689f6cae1ed7aff85`;
+- `bucket-clear-control.json`:
+  `2b7be12a9ab4cbf8eca0f4c6b293a83b0ce29a24a9fb9df54dfc2ee21f435786`;
+- `storage-substrate-decision-v1.json`:
+  `fc14fcde6aa4032fcb883a967a63b4af0ac522fb9030f120b49d14374c7ea901`;
+- `storage-substrate-decision-v1.md`:
+  `f6d33fa230978ef9a6b6dd793262285ee1b0f15099ca8d7411e887f1f7606c4d`;
+- `phase-2d-storage-substrate-decision-link-v1.json`:
+  `40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c`.
+
+The link records Chromium `149.0.7827.55`, Chrome for Testing
+`149.0.7827.55`, its complete live user agent, Darwin `25.3.0 arm64` and
+Playwright `1.61.1`. Its status is exactly
+`preimplementation-required-before-2d`: this is a private evidence-custody and
+consumption gate, not a Phase 2d implementation or storage schema.
+
+Focused S4 is 5/5; S1 is 3/3, S2 is 2/2, S3 is 2/2, and S0 plus raw-IDB
+ownership controls are 16/16 on the pinned engine. After the artifact commit,
+the full non-browser `storage-browser` suite is 166/166; package typecheck,
+build, focused and package ESLint with zero warnings, Prettier and diff checks
+are green. The earlier 165/166 full-suite run was an honest precommit
+diagnostic: its clean-checkout control uses `git archive HEAD`, so the then
+untracked required link was absent. The authoritative postcommit run includes
+the tracked bundle and is green. A default generator run is 1 skipped and all
+six before/after hashes are identical, with no staging or backup residue.
+
+Evidence provenance is recorded narrowly. A retained 12:44 write-mode run of
+an earlier generator variant is followed by a 5/5 gate on its resulting bundle;
+the current bundle separately has a retained 5/5 gate and the default-skip
+hash-identity check. There is no retained final write-mode
+`generator-restored.log`, and the preserved evidence cannot establish whether
+measurement values changed during reconciliation. The closure therefore makes
+neither claim. Two briefly concurrent untracked generator agents were stopped
+and their shared-file edits reconciled before `76c1807`; this coordination
+incident did not alter the accepted byte and behavioral gates.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session
+  `8b7f995e-c04d-4dc9-9c4b-76c1807a4500` accepted; result SHA-256
+  `5a7f167baf29db4d49a048282955f8b3ef3f431f72f90734d48ed525ed542763`;
+- exact Kimi 3/high/100 session
+  `6a8394ff-0917-4e57-b705-0e82dcccf683` accepted all twelve requested
+  properties; extracted result SHA-256
+  `56ab7e6e221204fb7315bf899c40644da95f3586742435841aa077ae7ce30463`.
+  Two non-authoritative controller retries are retained separately and carry no
+  verdict;
+- final Opus 5/xhigh session
+  `c2a247c8-a399-4cfe-9790-7999e30b462c` approved with no blocker; extracted
+  result SHA-256
+  `a79dd146bb2d4fd1932bc2556bdd1dbab145679676cf341d92f1e9c1c839644b`.
+
+Carry these bounded residuals forward instead of overstating S4:
+
+1. The retained provenance is structural plus the earlier write-mode pass; the
+   generator does not print the six output digests. On the next coherent spike
+   touch, print them so a future write-mode log byte-binds its output.
+2. The strict-IDB and bucket-clear artifacts are byte-equal to generator
+   constants; their liveness comes from assertions executed in the same run.
+   Only the measurement artifact contains run-specific data.
+3. Only the measurement user agent is bound back to live evidence. Browser
+   version, executable revision, OS and Playwright version are attestations;
+   S1/S3 have no engine field under the frozen S0 schema.
+4. The synthetic `chosen:"opfs"` positive is executable, but there is no
+   negative test proving a missing or malformed `opfs-cas:` consequence is
+   rejected. This is not load-bearing for the committed `idb-strict` choice;
+   Phase 2d owns it before any OPFS regeneration can be consumed.
+5. Root containment is lexical and does not resolve symlinks. That is adequate
+   for this private trusted-tree gate; harden it before use over an untrusted
+   root.
+6. A process crash or a second failure while restoring the directory swap can
+   leave a stage or backup directory requiring manual cleanup. No residue
+   remained in the accepted run.
+7. The decision markdown is digest-pinned but not Prettier-ignored. A future
+   Markdown-format change therefore fails closed until the digest is
+   regenerated. The gate also duplicates frozen key lists, retaining the S0
+   schema-drift maintenance risk.
+8. The S3 controls are read using fresh handles without a second post-clear
+   reload, unchanged from accepted S3 residual 3.
+9. S4 remains Chromium-only, single-engine, single-writer and same-process. It
+   proves neither pressure eviction nor named-bucket behavior, crash/fsync/
+   power-loss/torn-write safety, multi-tab behavior, custody, executable vote
+   parity, anti-equivocation, or either complete Discord/MMORPG golden path.
+   Phase 2d must not cite the raw S2 timing as a substrate comparison; 2d/5c,
+   Phase 5 and the pre-release real-device matrix retain their named owners.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
