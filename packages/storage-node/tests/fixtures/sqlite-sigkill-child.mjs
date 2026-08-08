@@ -179,6 +179,7 @@ async function runTarget(store, scenario) {
 const target = encodedTarget === undefined ? undefined : JSON.parse(encodedTarget);
 const waitBuffer = new Int32Array(new SharedArrayBuffer(4));
 const observed = [];
+const expandedCrashInstrumentation = Object.freeze({ crashCheckpoints: "expanded" });
 
 try {
 	if (mode !== "retry") {
@@ -189,13 +190,17 @@ try {
 	if (mode === "old") {
 		send({ kind: "ready-old" });
 	} else {
-		const instrumented = createInstrumentedSqliteAheDurableStore({ filename }, (checkpoint) => {
-			observed.push(checkpoint);
-			send({ checkpoint, kind: "checkpoint" });
-			if (mode === "crash" && checkpointMatches(checkpoint, target)) {
-				Atomics.wait(waitBuffer, 0, 0);
-			}
-		});
+		const instrumented = createInstrumentedSqliteAheDurableStore(
+			{ filename },
+			(checkpoint) => {
+				observed.push(checkpoint);
+				send({ checkpoint, kind: "checkpoint" });
+				if (mode === "crash" && checkpointMatches(checkpoint, target)) {
+					Atomics.wait(waitBuffer, 0, 0);
+				}
+			},
+			expandedCrashInstrumentation
+		);
 		const result = await runTarget(instrumented.store, scenarioName);
 		send({ kind: "result", observed, result });
 		await instrumented.store.close();

@@ -327,7 +327,9 @@ describe("Phase 2c-b SQLite process-death atomicity RED", () => {
 	});
 
 	it("recovers old XOR complete-new and permits retry at every fast checkpoint", async () => {
-		expect(await runMatrix(FAST_REPETITIONS)).toEqual([]);
+		const failures = await runMatrix(FAST_REPETITIONS);
+		expect.soft(failures.filter((failure) => failure.includes(" absent;"))).toHaveLength(0);
+		expect(failures).toEqual([]);
 	}, 120_000);
 });
 
