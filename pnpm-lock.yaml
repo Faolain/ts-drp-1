@@ -1033,6 +1033,12 @@ importers:
         specifier: 0.11.0
         version: link:../storage
 
+  packages/storage-node:
+    dependencies:
+      '@ts-drp/storage':
+        specifier: 0.11.0
+        version: link:../storage
+
   packages/test-utils:
     dependencies:
       '@ts-drp/types':
