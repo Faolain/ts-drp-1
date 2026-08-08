@@ -2565,6 +2565,95 @@ Carry these bounded residuals into S3/S4 instead of inflating S2:
    path. S3 owns deletion-not-eviction controls; S4 owns the paired decision and
    2d consumption gate; 2d/5c retain the real vote-store and atomic transaction.
 
+##### Phase 2-spike S3 accepted closure — target-origin default-bucket deletion control
+
+S3 is accepted at GREEN `69f57c8` over initial tests-only RED `fbcb3ea` and
+corrective tests-only RED `7f92c96`. Three port-distinct origins on
+`127.0.0.1:43873`, `:43874` and `:43875` seed different exact OPFS bytes and
+strict-IDB values under the same endpoint names. Each origin closes its
+write-side handles, reloads, opens fresh read-side handles and proves exact
+survival before the clear. The GREEN performs one Chromium CDP
+`Storage.clearDataForOrigin` call for only the target origin with
+`storageTypes:"all"`; after target reload, both target endpoints are absent
+while both control origins retain their exact bytes and values. The read path
+enumerates databases before opening, so observing an absent target IDB cannot
+recreate an empty database.
+
+The initial RED used only `indexedDB.deleteDatabase()` and therefore removed
+one endpoint while target OPFS survived. Its second test accidentally asserted
+both the RED-state `null` evidence and, immediately afterward, the enduring
+canonical success artifact. The first attempted GREEN correctly produced the
+canonical artifact and exposed that contradiction. Corrective RED `7f92c96`
+removed only the obsolete three-line `null` assertion/comment; the partial
+IDB-only driver and every enduring postcondition remained unchanged and still
+produced exactly 1F/1P. GREEN then changed only the clear action. This lineage
+records the correction rather than treating a logically unsatisfiable frozen
+assertion as an implementation requirement.
+
+The committed browser suite is 2/2 on pinned Chromium `149.0.7827.55`; S0 plus
+raw-IDB ownership controls are 16/16; the full non-browser `storage-browser`
+suite is 161/161; package typecheck, build, ESLint with zero warnings,
+Prettier and diff checks are green. Evidence emission is fail-closed on target
+OPFS and IDB absence plus exact survival of both controls, round-trips through
+the frozen S0 parser and names its claim only
+`deletion-not-eviction`. No retry, skip, global context wipe, production export
+or standing package runner was added.
+
+The independent acceptance loop found no blocker:
+
+- genuine Grok 4.5/high session
+  `019fe201-395d-77b0-b2ab-f3a24d9cfe5f` accepted; result SHA-256
+  `2b491b88f64c32f67b3510289ccec2e4d2be3aeb3d4dabed4875bef5538927a3`.
+  Its sandbox could not launch Chromium, so it made no independent execution
+  claim;
+- exact Kimi 3/high/100 session
+  `c05d0c06-ef4f-42f8-b58b-0d90a95d17c0` accepted and independently
+  reproduced 2/2 on the pinned engine; result SHA-256
+  `521dec30ca066a7c67194e95f7a2f9db5eb54dfa75a0bc81d7240ca3e8f32a1c`;
+- final Opus 5/xhigh session
+  `ef0e5e04-bf3f-48a1-b16a-9189e0580b38` approved with all 61 substantive
+  assistant events authenticated as Opus 5; result SHA-256
+  `e400419f67f0b99aa8ba735c2e28c7571dcbd262921f24ae770fb1c649370a00`.
+  Its small Haiku usage was automatic metadata only and did not contribute a
+  review turn.
+
+Carry these bounded residuals into S4 instead of overstating S3:
+
+1. This proves explicit target-origin deletion of both exercised endpoints in
+   Chromium's default local bucket. It does not trigger or measure pressure,
+   quota, LRU, ITP or atomic co-eviction, and it does not exercise named Storage
+   Buckets. `whole-bucket-clear` retains only this bounded default-bucket
+   deletion meaning and has zero substrate-scoring weight.
+2. The successful clear evidence currently exists in the live test result, not
+   as a standalone engine-bound artifact. S4 must run fresh, persist exact JSON
+   bytes, bind the full engine build and digest, and cite only that bundle.
+3. Target OPFS absence is enforced by the executed fail-closed publication gate
+   rather than a separate direct assertion, and the controls use fresh backend
+   handles without a second page reload after clearing. Both are sufficient for
+   this slice; S4 may make the symmetry explicit if it can do so without growing
+   another browser matrix.
+4. The parser equality assertion mainly proves that validation does not throw,
+   and the no-claim regex is not the load-bearing freeze. S4 must rely on the S0
+   closed key set and exact `notMeasured` vocabulary and must not weaken it.
+5. CDP clearing and `indexedDB.databases()` make this Chromium-specific. S4 must
+   bind that engine scope; Phase 5 and the pre-release real-device matrix retain
+   cross-engine custody and eviction ownership.
+6. The one-call mechanism is source-attested by the committed test while the
+   outcome gates prove deletion and isolation. Do not cite the outcome alone as
+   proof that an arbitrary implementation used one whole-bucket operation.
+7. `.logs/phase-2-spike-s3-green-codex-high-20260808/` is a transitional,
+   deliberately failing run despite its directory name: it applied the correct
+   clear while the obsolete RED-state `null` assertion still existed. The
+   authoritative accepted GREEN is the sealed `green2` run at `69f57c8`.
+8. The test-side `Harness.deleteDatabase` member is vestigial after GREEN,
+   although the harness still uses its internal function while seeding. Remove
+   the exposed member only on the next coherent spike touch; it is cosmetic and
+   not a production API.
+9. S3 remains private test infrastructure and is non-citable for crash
+   atomicity, durability beyond S1, substrate selection, vote safety, custody,
+   pressure eviction or either complete Discord/MMORPG golden path. S4 owns the
+   paired decision bundle and 2d consumption gate.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
