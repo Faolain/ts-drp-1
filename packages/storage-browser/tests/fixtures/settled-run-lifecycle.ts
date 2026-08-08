@@ -134,8 +134,8 @@ export function inspectSettledRunOwnership(
 	};
 	const profileArgument = `--user-data-dir=${context.profilePath}`;
 	const profileCandidates = forest.filter((identity) => hasExactArgument(identity.command, profileArgument));
-	const browserRootCandidates = profileCandidates.filter((identity) =>
-		hasExactExecutable(identity.command, context.chromiumExecutablePath)
+	const browserRootCandidates = profileCandidates.filter(
+		(identity) => identity.pid === identity.pgid && hasExactExecutable(identity.command, context.chromiumExecutablePath)
 	);
 	const children = forest.filter(({ pid }) => pid === context.childPid);
 	const possibleUncapturedChildGroup =
