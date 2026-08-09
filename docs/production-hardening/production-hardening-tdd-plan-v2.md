@@ -1083,7 +1083,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2c-b**    | Child-process `SIGKILL` matrix at every mutating statement and commit edge, including the bounded long crash campaign. Recovery is exactly the old state or one complete new closure; never a mixed journal/head/blob/promotion state. Like 2b, this proves atomicity under **process death**, not fsync, torn-write or power-loss durability: `SIGKILL` cannot distinguish SQLite `FULL` from `NORMAL`, so the live pragma evidence remains separately mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | local-safe  | process-death atomic    | Every statement/commit kill recovers exactly old XOR complete-new, retry remains valid, WAL sidecars are retained or checkpointed correctly, and no successful result is published before `COMMIT`. Phase 2 exit requires both 2c-a and 2c-b.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **2-spike** | **OPFS-vs-IDB substrate decision, before the 2d schema freezes.** Run OPFS `createSyncAccessHandle` + `flush()` and IDB `durability:"strict"` through one byte-identical Worker-owned Phase-2a staged-generation / cached-blob / promotion / pointer-swap (`swapHead`) command script, driven only through the published `@ts-drp/storage/adapter` `prepareStorageAdapterCommand` / `evaluateStorageAdapterCommand` seam. Live-read IDB's reported durability and fail fatally on any downgrade. The File System and Storage standards place OPFS and IDB in distinct endpoints of the same default local bucket, so record `sameDefaultBucket:"normative"`; real pressure-eviction behavior has no deterministic ordinary-web/Playwright trigger, so record `sameEvictionBehavior:"unmeasured"` and `realPressureEviction:"unautomatable"`. A whole-bucket clear is only `deletion-not-eviction` evidence and cannot score the substrate choice or satisfy Phase-5 custody co-eviction. `AheDurableStore` remains substrate-neutral; 2d consumes the paired decision record and cited artifact digests. S2 measures no vote slot and makes no anti-equivocation, vote-transaction, signer-state or signer-safety claim; a benchmark command outside the eight accepted `StorageAdapterCommand` kinds disqualifies the run. | local-safe  | sliceable               | Private `opfs-idb-spike/`: `substrate-bench.pw.ts` runs both arms with one byte-identical script and correctness-before-timing; `strict-idb-capability.pw.ts` proves live strict read-back and zero-write fatal fallback; `bucket-clear-codeletion.pw.ts` proves both exact payloads survive reload before one whole-bucket clear, both are absent after it, a no-clear control survives and a second origin survives. Artifacts freeze the no-claim set, runtime engine builds, scope/basis/revisit trigger, fairness/concurrency shape and durability limits. Bench JSON has no winner field; the separate `storage-substrate-decision-v1.{md,json}` cites measured digests and limits its choice to the measured generation/blob/pointer-swap workload. It records vote-slot parity as unmeasured and non-citable, names 2d and 5c as the executable owners, and carries a revisit trigger. An OPFS choice additionally requires a separately reviewed account of how 2d/5c preserve exact-byte insert-if-absent CAS inside one strict transaction; latency alone cannot select a substrate lacking that boundary. Deferred real-pressure evidence is nonblocking unless a deterministic supported trigger appears. The 2d PR links the decision record or fails review; 2d is not blocked on a pressure-eviction oracle. |
 | **2d**      | `packages/storage-browser/`: **rewrite** per §2.2 with **native compound array keys** (not NUL-delimited strings), immutable exact-byte CAS via `add` (never `put`), the Phase-2a five-state journal (`Staged`/`Complete`/`Adopted`/`Superseded`/`Discarded`) keyed `(objectId, generationId)`, and bounded closure completion. `completeGeneration` reads zero blob values and relies only on immutable promotion evidence; `promoteReference` remains the exclusive byte-verification owner. Private v1 owns `db.onversionchange` closure, but the first real version bump, migration and `onblocked` policy land atomically with the exact `storageMeta`/`voteSlots`/`signerState`/`voteOutbox` vote schema and mutations in 5c. The package stays private with no export map through 2d; public packaging is 2e-gated. **Strict-durability rejection is a fatal capability error, never a silent fallback.**                                                                                                                                                                                                                                                                                                                                                                                                            | coordinated | sliceable until enabled | `indexeddb-staging.spec.ts`: same digest + different bytes **rejects**; `completeGeneration` reads zero blob values, rejects over-supplied closure blob facts and returns `BLOB_UNPROMOTED` when promotion evidence is absent; `promoteReference` returns `BLOB_MISSING`/`BLOB_CORRUPT` for absent/mismatched bytes; private-v1 `db.onversionchange` closes the old tab, while blocked-upgrade/migration evidence waits for 5c's first real version bump                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **2e**      | **Full request matrix + recovery closure.** Recovery hashes the **entire active generation closure**, not two scalar metadata fields — a correct pointer can still reference a missing or mixed manifest, chunk set, QC or tail. Relaxed chunk writes are **cache only**; a generation becomes `Complete` only after every referenced chunk is hash-verified and promoted through strict transactions. Cleanup is **never** part of commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | coordinated | pointer-swap atomic     | `adoption-crash-matrix.spec.ts`: every request kill yields `closure(G_old)` **XOR** `closure(G_new)`; competing same/future/rollback candidates yield one monotone head; `HEAD_CONFLICT` on a stale expected revision, never last-writer-wins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **2e**      | **Bounded reads, atomic recovery authority and the full request/crash matrix.** Replace public whole-journal reads with exact `readHead` plus bounded generation pages. Keep the private whole-journal invariant owner active until one atomic shared/browser/Node GREEN installs recovery, shared incremental adoption verification, the mandatory per-object/incarnation gate and bounded composite mutation reads, then deletes the monolithic mutation path. `promoteReference` exclusively verifies staging bytes; the shared incremental verifier exclusively verifies adoption and recovery. Cached writes remain strict; no relaxed write ships. Cleanup is **never** part of commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | coordinated | pointer-swap atomic     | The finite 2e1–2e7 ledger below: exact paging and write traces; stable corruption/poison taxonomy; missing-head/surviving-`Adopted` rollback RED; one-reference-at-a-time closure recovery; browser/Node lifecycle controls; real Playwright request inventory and watchdog-poisoning process-death matrix; every kill yields sentinel + `closure(G_old)` **XOR** sentinel + `closure(G_new)`, never deletion or a mix; stale expected revision returns `HEAD_CONFLICT`, never last-writer-wins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **2f**      | `packages/worker-host/`: **replace** `runtime.js`. Bounded streaming batches (validated batch size, per-item abort checks), cancellation, capped telemetry histograms, termination recovery, and a **ready-handshake worker protocol** — the worker posts `{ready}` after evaluation and the host queues work until then (this is the §0.1 bug). Ban top-level `await` in worker import graphs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | local-safe  | sliceable               | `worker-handshake.pw.ts` on **firefox + webkit**: a message posted immediately after construction is answered ≤ 5 s (fails against a no-handshake worker). `runtime.test.ts`: invalid batch sizes reject; result buffer stays under cap; abort prevents the next item; metric cardinality bounded. Frame budget: Playwright long-task observer `expect(maxLongTask).toBeLessThan(50)` during a **real 4,096-vertex fold**, plus a worker-side execution counter proving it ran off-main-thread                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2g**      | Quota, persistence, private mode, rollback pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | coordinated | unpin rule atomic       | `quota-rollback.spec.ts`: `QuotaExceededError` injected at **every** mutating request never moves the head; estimate below margin refuses a new stage **before** destructive cleanup; a forged mirror receipt can **never** unpin the last usable signer rollback (`RollbackPinned`, not success)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **2h**      | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | local-safe  | sliceable               | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -3773,6 +3773,246 @@ closed under the finite remaining-scope authorization. This enables no live
 Discord/chat or MMORPG path: Phase 2e still owns recovery and public packaging,
 Phase 5c owns the real vote transaction and first upgrade, and the Phase 2 exit
 gate remains open.
+
+### Phase 2e assumption-correction authorization — bounded reads without an unsafe authority gap
+
+The original one-row 2e description was directionally correct but not executable
+as a safe TDD boundary. It did not say how to replace public whole-journal reads,
+which transaction owns recovery, when the global exactly-one-`Adopted` invariant
+may stop using a whole-journal scan, whether post-promotion damage is a repairable
+candidate failure or fatal adopted-state corruption, or how the historical
+browser crash harness becomes the real adapter harness. A raw line diff could not
+answer those questions because the failure is an interaction between a persisted
+head, older adopted rows, recovery certification and the new read shape.
+
+Three independent Codex-high slice drafts converged on bounded reads, explicit
+writes, recovery of the full generic closure, stable persisted-error taxonomy,
+the existing Node kill evidence, and browser-only publication. The first broad
+proposal was not authorized: Opus found that an operation needs the generation
+dynamically named by the persisted head, and that relaxing cache durability while
+later trusting promotion evidence could adopt missing bytes. The next proposal
+kept cache writes strict and added the head-named row, but was still not
+authorized. Reviewers required one-reference-at-a-time recovery, synchronous
+hashing inside the live transaction, exact error precedence, non-vacuous crash
+sentinels, replacement of the public whole-state type and explicit ownership of
+the old structural controls.
+
+The final sequencing review found the decisive counterexample. Persisted head
+`G1` at revision 5 can be missing while the `G1` row survives as `Adopted`. A
+bounded mutation path that sees only `head = none` and candidate `G2` can accept
+`swapHead(G2, expected none)`, reset the revision to 1 and leave both `G1` and
+`G2` adopted. Therefore no enabled or releasable checkpoint may replace the
+whole-journal authority before mandatory recovery exists. Dormant composite code
+was also rejected as decorative. The authority switch is one atomic
+shared/memory/browser/Node GREEN in 2e3.
+
+The standing assumption-correction quorum ratified the corrected boundary before
+this plan edit:
+
+- Codex-high returned `CODEX_FINAL_DELTA: AGREE` with no remaining blocker after
+  requiring the shared incremental verifier and the atomic authority flip;
+- fresh exact Kimi 3/high/max-100 session
+  `fc3b9ff9-6755-478e-94f5-4c75bc43b3b9` returned
+  `KIMI_FINAL_DELTA: AGREE`, no safety blocker and no required correction; result,
+  raw-stream and integrity SHA-256 values are
+  `47f2a5b41afd2d44ebfa6ca97ec3c3e3180e90e0c3b01fcf7d913f14e288d49d`,
+  `57f04129e07f5c9c53ab35675e6ad9c0ee57ec56289801cfc9473ebc360f7990`
+  and `18bc76f708b0afd71735e21c63196712f8fd393c5f99de1ba4ef7b99a7041891`;
+- Opus 5/xhigh session `96a050bf-f6d3-4fac-b1c7-9a092e68ca53e2e4`
+  returned `OPUS_RATIFICATION: AGREE`, no safety blocker and no correction after
+  two same-session focused challenges. The authoritative final result and
+  integrity SHA-256 values are
+  `e7f19b829b164e104e8d79b3f4f2f2ead0fc8c8ca0251298ebcbf00021551eb0`
+  and `ecab4658605a2224c7192ea05421b74ea3804a778abc93561c9d475ff70ddfc5`.
+
+All rejected preliminary and reconciliation artifacts remain in their exact
+`.logs/phase-2e-assumption-*` directories. They are retained evidence, not
+additional votes and not permission to implement their superseded proposals.
+
+The ratified contract is:
+
+1. Public inspection has two independent bounded reads. `readHead(objectId)`
+   returns one detached head. `readGenerationPage({ objectId, cursor, limit })`
+   returns detached generation rows plus an opaque branded `nextCursor`; the
+   cursor is exclusive over the compound `(objectId, generationId)` order, the
+   limit has a production hard maximum, and order is deterministic. Each call is
+   snapshot-consistent only for itself. Combining public pages does not create a
+   cross-call snapshot. Only internal recovery may combine the head and the
+   complete generation cursor walk in one backend transaction.
+2. `promoteReference` is the exclusive staging-time raw-byte verifier. A single
+   shared, source-internal incremental verifier is the exclusive adoption- and
+   recovery-time verifier. A backend supplies only promotion presence and one
+   detached blob or `null` at a time. Shared code alone checks the exact next
+   canonical reference, applies unpromoted → missing → length → digest ordering,
+   hashes synchronously, discards the bytes and issues the unforgeable internal
+   authorization only after the final reference succeeds. A backend never mints
+   `verified` facts or a closure authorization.
+3. In IndexedDB, recovery/adoption verification runs in one strict `readwrite`
+   transaction. `blobs` and `promotions` participate as reads but receive no
+   writes. The browser drives each incremental verifier step from IDB request
+   callbacks and schedules the next request before returning; there is no
+   non-IDB `await` between the last authoritative read and the decision. Node
+   drives the same shared verifier from its synchronous SQL transaction.
+4. `recoverActiveGeneration` proves the full generic storage closure, not future
+   semantic manifest/QC/tail roles. It cursor-walks every generation row to prove
+   zero adopted rows with no head or exactly one adopted row matching the head and
+   `closureDigest`, then verifies every active reference one at a time. A valid
+   empty object returns `{ kind: "empty", head, adoptedGeneration: null,
+recomputedClosureDigest: null, references: [] }`. An active result contains
+   detached verification-at-snapshot metadata only; it returns no closure bytes
+   and makes no later-use-safety claim.
+5. Recovery and any mutation that it unlocks share one consistent transaction
+   when recovery is required. The mandatory gate is serialized per
+   `(objectId, database incarnation)` ahead of `completeGeneration` and
+   `swapHead`. Its certificate is bound to the recovered head fingerprint. Every
+   authoritative mutation transaction compares the current head; a mismatch
+   invalidates and reruns recovery in that transaction before evaluation. A
+   verified swap advances the certificate only after commit. Reopen,
+   `versionchange`, poisoning or an ambiguous substrate failure invalidates it.
+   Silent arbitrary external row mutation with an unchanged head during a live
+   handle is outside the adapter threat model; explicit recovery or reopen detects
+   it.
+6. Work is `O(generation rows + active closure bytes)`, transient memory is
+   `O(max(generation page bytes, referenced blob bytes))`, and successful output
+   is `O(active reference count)`. No absolute active-closure or blob-size cap
+   exists yet, so 2e makes no false constant-work claim and invents no semantic
+   cap. The later semantic/epoch owner or a separate correction quorum must add
+   such a structural cap before claiming one.
+7. Cached blob writes stay strict. No relaxed write ships. Candidate adoption
+   failures are repairable/non-poisoning and, in canonical closure order, return
+   `BLOB_UNPROMOTED`, `BLOB_MISSING` or `BLOB_CORRUPT` (length before digest).
+   Recovery of already adopted state uses the distinct public reasons
+   `ADOPTED_BLOB_UNPROMOTED`, `ADOPTED_BLOB_MISSING` and
+   `ADOPTED_BLOB_CORRUPT`; the first failure is returned and the handle becomes
+   poisoned.
+8. `StorageRejectionReason` and the type/contract matrices add
+   `STORE_POISONED` plus the three `ADOPTED_BLOB_*` reasons. Unsupported persisted
+   envelope/schema is `UNSUPPORTED_STORAGE_SCHEMA`; malformed records and
+   relational contradictions — including an absent head-named generation, a
+   non-`Adopted` head row, head/closure mismatch or multiple adopted rows — are
+   `NON_CANONICAL_RECORD`; a caller-addressed absent candidate is
+   `GENERATION_NOT_FOUND`; malformed caller input remains `INVALID_ARGUMENT`;
+   substrate I/O remains `SUBSTRATE_FAILURE`.
+9. Open-time unsupported/noncanonical storage returns its exact root failure and
+   no handle. First-touch corruption on a returned handle atomically sets poison
+   before resolving the root failure once. Queued-but-not-started and later calls
+   return `STORE_POISONED`. `close()` remains successful and idempotent; after it
+   resolves, `STORE_CLOSED` outranks poison. For `swapHead`, after records that
+   must be decoded, semantic precedence is `GENERATION_NOT_FOUND`,
+   `CANDIDATE_NOT_COMPLETE`, `HEAD_CONFLICT`, `BASE_HEAD_MISMATCH`,
+   `REVISION_EXHAUSTED`, then the candidate closure order above. Every rejection
+   performs zero writes.
+10. Cleanup is never part of commit. Browser process-death evidence uses a
+    distinguishing preexisting committed sentinel so database deletion/recreation
+    cannot vacuously pass as the old state. The watchdog poisons a timed-out run.
+    Old XOR new includes the sentinel and the complete head/closure; never a mix.
+
+The finite TDD ledger is:
+
+#### Slice 2e1 — bounded public reads and command-owned writes, broad invariant retained
+
+**Causal RED.** Freeze exact detached `readHead` and generation-page behavior,
+exclusive opaque cursor continuation, deterministic ordering, the production
+page limit and invalid cursor/limit rejection. Prove that independently fetched
+pages are not advertised as one snapshot. Freeze command-owned exact write sets
+for every mutation and kill the old whole-state diff owner, while explicitly
+requiring both strict backends to retain their private whole-journal mutation
+load and exactly-one-`Adopted` validation. The RED must include a behavioral
+failure against the old whole-state command, not rely only on a missing export or
+type error.
+
+**GREEN boundary.** Replace public `ObjectStoreState`/`readObjectState` with
+`readHead` and `readGenerationPage` across shared, memory, browser and Node. Move
+write ownership to exact command-specific planners. Do not add a dormant
+composite authority and do not remove either strict backend's broad mutation
+loader. Re-freeze browser transaction traces, Node query/statement ordering and
+the 25-checkpoint count if and only if the executable statement shape changes.
+
+The historical OPFS/IDB measurement artifacts remain immutable evidence from
+their recorded pre-2e script. Port the source consumer from `readObjectState` to
+the split reads so it still builds, but record its new command digest as an API
+port and do not silently rerun, re-score or overwrite the old decision basis.
+
+#### Slice 2e2 — persisted taxonomy and poison lifecycle on the broad loader
+
+**Causal RED.** Exercise unsupported schema, malformed generation/head bytes,
+absent head-named generation, non-adopted head target, closure mismatch and
+multiple adopted rows on real browser and Node stores. Freeze the exact reason
+mapping above and the lifecycle matrix: open failure returns no handle;
+first-touch returns the root once after poison is set; queued and later calls see
+`STORE_POISONED`; successful idempotent close changes later calls to
+`STORE_CLOSED`. Preserve caller-error and substrate-failure controls and zero
+writes for every rejection.
+
+**GREEN boundary.** Add the four public rejection reasons and one shared
+classification/precedence owner. Backend decode/I/O adapters report facts or raw
+failure only; they do not invent divergent semantic reasons. Full-journal
+canonicality remains the active authority through this slice.
+
+#### Slice 2e3 — atomic recovery and bounded mutation authority flip
+
+**Causal RED.** One cross-package tests-only RED freezes shared, memory, browser
+and Node recovery plus the authority transition. Its mandatory adversarial case
+seeds head `G1` revision 5, deletes only the head while retaining `G1` as
+`Adopted`, then attempts `swapHead(G2, expected none)`; the accepted production
+must reject/poison without revision rollback, a second adopted row or any write.
+Add missing/noncanonical promotion, missing blob, length corruption, digest
+corruption, first-failure ordering, multi-page generation scans, head change,
+empty recovery, detachment and peak-live-blob instrumentation. Mutants that let a
+backend assert `verified`, finalize early, skip/out-of-order/duplicate a reference,
+hold two blobs, hash outside the transaction, omit the gate or retain both
+authorities must fail.
+
+**Atomic GREEN boundary.** In one production commit, add the shared incremental
+verifier and `recoverActiveGeneration`; implement memory, browser and Node
+recovery; enable the serialized gate; switch both strict backends to bounded
+composite mutation facts; and delete the monolithic mutation fact/loaders and
+whole-state diff. The composite reads the addressed candidate, current head and
+generation dynamically named by that head. No enabled bounded-only checkpoint,
+dual evaluator or compatibility wrapper may exist before or after this GREEN.
+
+Run focused shared/backend tests, all accepted storage preservation suites,
+builds, package and workspace typechecks, explicit-command zero-warning lint,
+Prettier, ownership/custody and the relevant browser/Node process tests to logs.
+This larger-than-normal GREEN is indivisible because splitting its authority is
+the reproduced safety bug, not because broad unrelated work is bundled.
+
+#### Slice 2e4 — recovery lifecycle and backend acceptance
+
+Freeze reopen/first-touch/explicit-recovery behavior, post-promotion physical
+damage, certificate invalidation, concurrent-handle head change, close during
+recovery and the real-backend completion-without-promotion negative. Browser and
+Node must report the same results. Retain Node's six mutations and 25 crash
+checkpoints unless 2e1/2e3 changed executable SQL shape; if they did, rederive and
+freeze the inventory/count honestly rather than preserving the numeral. Do not
+rerun a redundant long campaign when the inventory is unchanged.
+
+#### Slice 2e5 — real browser request inventory and CI authority
+
+Freeze the declared real adapter request/transaction inventory before any kill
+run. Repoint the root command and CI to a dedicated Playwright `*.pw.ts` matrix
+under its package config before deleting the toy `records`-store harness.
+Explicitly supersede the current matcher, root-script and tsconfig structural
+lists; deletion or an unobserved/extra request must fail the inventory gate.
+
+#### Slice 2e6 — real browser process-death adoption matrix
+
+At every declared request edge, freeze the Worker, kill the actual detached
+browser process group without graceful close, reopen and run recovery. Every case
+contains the distinguishing committed sentinel and yields exactly sentinel + old
+complete closure XOR sentinel + new complete closure. Missing, mixed, deleted,
+timed-out, skipped or unsupported evidence fails. Competing same/future/rollback
+candidates remain monotone; stale expected revision is `HEAD_CONFLICT`.
+
+#### Slice 2e7 — browser publication and component acceptance
+
+Publish only `@ts-drp/storage-browser` after the real recovery and kill evidence
+is green. Explicitly supersede package privacy, exports, files and toy-manifest
+structural controls in this slice; Node stays private. Run the proportionate
+three-engine/Phase-2 exit evidence owned by 2h rather than silently claiming it
+from Chromium-only 2e work. Semantic manifest/QC/tail roles remain 4c/6, quota/
+retention remains 2g, vote transactions remain 5c, durable issuance remains 2l,
+and neither Discord/chat nor MMORPG is enabled by 2e alone.
 
 ### Exit gate (Phase 2)
 
