@@ -15,10 +15,16 @@ afterEach(async () => {
 	directory = undefined;
 });
 
-describe("Phase 2b closed asset server controls", () => {
+describe("closed browser asset server controls", () => {
 	it("serves only token-owned assets with isolation and no-store headers", async () => {
 		directory = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2b-server-"));
-		for (const name of ["index.html", "page-entry.js", "worker-entry.js"])
+		for (const name of [
+			"index.html",
+			"page-entry.js",
+			"worker-entry.js",
+			"phase-2e7.html",
+			"phase-2e7-publication-component.js",
+		])
 			fs.writeFileSync(path.join(directory, name), name);
 		server = await startAssetServer(directory);
 		const transitionURL = server.issueTransitionURL();
@@ -28,6 +34,12 @@ describe("Phase 2b closed asset server controls", () => {
 		expect(response.headers.get("cross-origin-opener-policy")).toBe("same-origin");
 		expect(response.headers.get("cross-origin-embedder-policy")).toBe("require-corp");
 		expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+		const componentURL = server.issueTransitionURL("phase-2e7.html");
+		expect((await fetch(componentURL)).status).toBe(200);
+		const componentToken = new URL(componentURL).pathname.split("/")[2] ?? "";
+		expect(
+			(await fetch(`${server.baseURL}/transition/${componentToken}/phase-2e7-publication-component.js`)).status
+		).toBe(200);
 		const token = new URL(transitionURL).pathname.split("/")[2] ?? "";
 		expect((await fetch(`${server.baseURL}/transition/${token}/unknown.js`)).status).toBe(404);
 		expect((await fetch(`${server.baseURL}/transition/${token}/..%2Findex.html`)).status).toBe(404);
