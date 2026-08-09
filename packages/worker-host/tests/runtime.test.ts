@@ -693,6 +693,32 @@ describe("Phase 2f-a cancellation, failure, and abandonment RED", () => {
 		expect(namedValue(snapshot, "items-processed")).toBe(0);
 	});
 
+	it("reports the nonzero processor failure index without publishing failed or later items", async () => {
+		const executeBounded = await executor();
+		const root = await loadRuntime();
+		const itemFailure = new Error("processor failed at index one");
+		const processedIndexes: number[] = [];
+		const published: BoundedItem<string>[] = [];
+		let error: unknown;
+		try {
+			for await (const item of executeBounded(["first", "second", "later"], (value, index) => {
+				processedIndexes.push(index);
+				if (index === 1) throw itemFailure;
+				return value.toUpperCase();
+			})) {
+				published.push(item);
+			}
+		} catch (caught) {
+			error = caught;
+		}
+
+		expectWorkerHostError(error, "worker-host-item-failed", root);
+		expect((error as Error).cause).toBe(itemFailure);
+		expect((error as { detail: Readonly<Record<string, unknown>> }).detail.index).toBe(1);
+		expect(processedIndexes).toEqual([0, 1]);
+		expect(published).toEqual([{ index: 0, value: "FIRST" }]);
+	});
+
 	it("abandons without a second consumer error, aborts linked work, and awaits processor/source cleanup", async () => {
 		const executeBounded = await executor();
 		const secondWork = deferred<number>();
