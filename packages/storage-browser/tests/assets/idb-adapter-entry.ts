@@ -23,7 +23,6 @@ import {
 	type Phase2dTerminalGate,
 	probePhase2e3BlobRequestPeak,
 	rawPhase2dAliasGenerationRecord,
-	rawPhase2dClearHead,
 	rawPhase2dCount,
 	rawPhase2dGet,
 	rawPhase2dReplaceBlob,
@@ -573,35 +572,6 @@ async function runPhase2e1BoundedReads(): Promise<unknown> {
 	}
 }
 
-async function runPhase2e1BroadInvariant(): Promise<unknown> {
-	const name = databaseName("phase-2e1-broad-invariant");
-	try {
-		let store = await createPhase2d2aRedStore({ databaseName: name });
-		await stageComplete(store, OBJECT_A, GENERATION_A);
-		const swapped = await store.swapHead({
-			expectedHead: noHead(OBJECT_A),
-			generationId: GENERATION_A,
-			objectId: OBJECT_A,
-		});
-		if (!swapped.ok) throw new Error(`fixture swap failed: ${swapped.reason}`);
-		await store.close();
-		await rawPhase2dClearHead(name, OBJECT_A);
-
-		store = await createPhase2d2aRedStore({ databaseName: name });
-		const attempt = await begin(store, OBJECT_A, GENERATION_B);
-		await store.close();
-		return {
-			generationRows: await rawPhase2dCount(name, "generations"),
-			headRows: await rawPhase2dCount(name, "objects"),
-			reason: reason(attempt),
-		};
-	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error) };
-	} finally {
-		await deletePhase2dDatabase(name);
-	}
-}
-
 async function runPhase2e1PhysicalKeyMismatch(): Promise<unknown> {
 	const name = databaseName("phase-2e1-physical-key-mismatch");
 	try {
@@ -780,7 +750,7 @@ async function corruptPhase2e2Journal(
 	}
 }
 
-function broadPhase2e2Touch(
+function phase2e2MutationTouch(
 	store: AheDurableStore,
 	generationId = GENERATION_C
 ): Promise<StoreResult<GenerationRecord>> {
@@ -806,7 +776,7 @@ async function runPhase2e2TaxonomyMatrix(): Promise<unknown> {
 			await corruptPhase2e2Journal(name, corruption, fixture);
 			const before = await rawPhase2e2Snapshot(name);
 			const store = await createPhase2d2aRedStore({ databaseName: name });
-			const result = await broadPhase2e2Touch(store);
+			const result = await recoverActive(store, OBJECT_A);
 			await store.close();
 			results.push({
 				corruption,
@@ -845,8 +815,8 @@ async function runPhase2e2PoisonLifecycle(): Promise<unknown> {
 		await corruptPhase2e2Journal(name, "malformed-generation", fixture);
 		const before = await rawPhase2e2Snapshot(name);
 		const store = await createPhase2d2aRedStore({ databaseName: name });
-		const first = broadPhase2e2Touch(store, GENERATION_C);
-		const queued = broadPhase2e2Touch(store, GENERATION_D);
+		const first = recoverActive(store, OBJECT_A);
+		const queued = recoverActive(store, OBJECT_A);
 		const firstResult = await first;
 		const queuedResult = await queued;
 		const later = await splitRead(store, "readHead", OBJECT_A);
@@ -873,9 +843,9 @@ async function runPhase2e2Controls(): Promise<unknown> {
 		const before = await rawPhase2e2Snapshot(name);
 		const invalid = (await Reflect.apply(store.beginGeneration, store, [{}])) as StoreResult<unknown>;
 		const invalidZeroWrites = deepBytesEqual(before, await rawPhase2e2Snapshot(name));
-		const valid = await broadPhase2e2Touch(store, GENERATION_A);
+		const valid = await phase2e2MutationTouch(store, GENERATION_A);
 		const beforeSubstrate = await rawPhase2e2Snapshot(name);
-		const substrate = await withFailingGenerationRead(() => broadPhase2e2Touch(store, GENERATION_B));
+		const substrate = await withFailingGenerationRead(() => recoverActive(store, OBJECT_A));
 		const substrateZeroWrites = deepBytesEqual(beforeSubstrate, await rawPhase2e2Snapshot(name));
 		await store.close();
 		return {
@@ -1315,7 +1285,6 @@ const harness = Object.freeze({
 	runImmutableAndIdempotent,
 	runOwnershipTrace,
 	runPhase2e1BoundedReads,
-	runPhase2e1BroadInvariant,
 	runPhase2e1PhysicalKeyMismatch,
 	runPhase2e2Controls,
 	runPhase2e2OpenFailure,

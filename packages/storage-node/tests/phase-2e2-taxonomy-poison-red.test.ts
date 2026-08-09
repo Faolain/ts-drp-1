@@ -193,13 +193,21 @@ function snapshot(filename: string): unknown {
 	}
 }
 
-async function touchBroadLoader(store: AheDurableStore): Promise<unknown> {
+async function beginTouch(store: AheDurableStore): Promise<unknown> {
 	return store.beginGeneration({
 		baseExpectedHead: noHead(),
 		closure: [{ byteLength: 1, digest: must(digestBlob(Uint8Array.of(9))) }],
 		generationId: GENERATION_C,
 		objectId: OBJECT_A,
 	});
+}
+
+async function recoverActive(store: AheDurableStore): Promise<unknown> {
+	const method = Reflect.get(store, "recoverActiveGeneration");
+	if (typeof method !== "function") {
+		return { cause: "RECOVERY_NOT_IMPLEMENTED", ok: false, reason: "SUBSTRATE_FAILURE" };
+	}
+	return Reflect.apply(method, store, [OBJECT_A]) as Promise<unknown>;
 }
 
 afterEach(async () => {
@@ -224,7 +232,7 @@ describe("Phase 2e2 Node persisted taxonomy RED", () => {
 			corruptJournal(filename, corruption, fixture);
 			const before = snapshot(filename);
 			const store = createSqliteAheDurableStore({ filename });
-			expect.soft(await touchBroadLoader(store)).toEqual({ ok: false, reason: expectedReason });
+			expect.soft(await recoverActive(store)).toEqual({ ok: false, reason: expectedReason });
 			expect.soft(snapshot(filename)).toEqual(before);
 			await store.close();
 		});
@@ -236,9 +244,9 @@ describe("Phase 2e2 Node persisted taxonomy RED", () => {
 		corruptJournal(filename, "malformed-generation", fixture);
 		const before = snapshot(filename);
 		const store = createSqliteAheDurableStore({ filename });
-		expect.soft(await touchBroadLoader(store)).toEqual({ ok: false, reason: "NON_CANONICAL_RECORD" });
+		expect.soft(await recoverActive(store)).toEqual({ ok: false, reason: "NON_CANONICAL_RECORD" });
 		expect.soft(await store.readHead(OBJECT_A)).toEqual({ ok: false, reason: "STORE_POISONED" });
-		expect.soft(await touchBroadLoader(store)).toEqual({ ok: false, reason: "STORE_POISONED" });
+		expect.soft(await recoverActive(store)).toEqual({ ok: false, reason: "STORE_POISONED" });
 		expect.soft(snapshot(filename)).toEqual(before);
 		await expect(store.close()).resolves.toBeUndefined();
 		await expect(store.close()).resolves.toBeUndefined();
@@ -255,7 +263,7 @@ describe("Phase 2e2 Node persisted taxonomy RED", () => {
 		});
 		expect.soft(snapshot(filename)).toEqual(before);
 		expect.soft(await store.readHead(OBJECT_A)).toEqual({ ok: true, value: noHead() });
-		expect.soft(await touchBroadLoader(store)).toMatchObject({ ok: true });
+		expect.soft(await beginTouch(store)).toMatchObject({ ok: true });
 		await store.close();
 	});
 

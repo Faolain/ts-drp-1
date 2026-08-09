@@ -12,7 +12,7 @@ async function run(
 	}, method);
 }
 
-test("real Chromium classifies every persisted broad-loader contradiction and writes nothing", async ({ page }) => {
+test("real Chromium classifies every persisted recovery contradiction and writes nothing", async ({ page }) => {
 	await expect(run(page, "runPhase2e2TaxonomyMatrix")).resolves.toEqual(
 		[
 			["unsupported-generation", "UNSUPPORTED_STORAGE_SCHEMA"],

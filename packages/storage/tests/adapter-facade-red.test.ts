@@ -58,7 +58,7 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 		if (existsSync(builtAdapter)) sources.push(readFileSync(builtAdapter, "utf8"));
 		const combined = sources.join("\n");
 		const declaredExports = Array.from(
-			sources[0]?.matchAll(/^export (?:function|type) ([A-Za-z0-9_]+)/gmu) ?? [],
+			sources[0]?.matchAll(/^export (?:const|function|type) ([A-Za-z0-9_]+)/gmu) ?? [],
 			(match) => match[1]
 		).sort();
 
@@ -70,6 +70,7 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"classifyPersistedState",
 			"evaluateStorageAdapterCommand",
 			"prepareStorageAdapterCommand",
+			"storageAdapterClosureVerifier",
 		]);
 		expect(declaredExports).toEqual([
 			"PreparedStorageAdapterCommand",
@@ -82,6 +83,7 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"classifyPersistedState",
 			"evaluateStorageAdapterCommand",
 			"prepareStorageAdapterCommand",
+			"storageAdapterClosureVerifier",
 		]);
 		expect(Object.keys(root).sort()).toEqual([
 			"createMemoryAheDurableStore",

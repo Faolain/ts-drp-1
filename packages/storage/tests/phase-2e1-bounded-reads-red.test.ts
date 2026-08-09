@@ -1,43 +1,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-	bytes,
-	GENERATION_A,
-	GENERATION_B,
-	GENERATION_C,
-	noHead,
-	OBJECT_A,
-	OBJECT_B,
-	presentHead,
-	record,
-	ref,
-} from "./fixtures.js";
+import { bytes, GENERATION_A, GENERATION_B, GENERATION_C, noHead, OBJECT_A, OBJECT_B, ref } from "./fixtures.js";
 import {
 	evaluateStorageAdapterCommand,
 	prepareStorageAdapterCommand,
-	type StorageAdapterFact,
 	type StorageAdapterWrite,
 } from "../src/adapter.js";
-import { encodeGenerationRecordV1, encodeHeadRecordV1 } from "../src/codecs.js";
 import { TransitionOwner } from "../src/internal/transition.js";
 import { createMemoryAheDurableStore } from "../src/memory.js";
 import type { GenerationRecord } from "../src/types.js";
 import { parseGenerationId } from "../src/values.js";
 
 const MAX_GENERATION_PAGE_ROWS = 128;
-
-function objectFact(
-	head: ReturnType<typeof noHead> | ReturnType<typeof presentHead>,
-	generations: readonly GenerationRecord[]
-): StorageAdapterFact {
-	return {
-		kind: "object-state",
-		objectId: head.objectId,
-		headRecord: head.kind === "none" ? null : encodeHeadRecordV1(head),
-		generationRecords: generations.map(encodeGenerationRecordV1),
-	};
-}
 
 function prepared(command: unknown): unknown {
 	const result = prepareStorageAdapterCommand(command);
@@ -52,10 +27,6 @@ async function callSplitRead(
 	const callable = Reflect.get(store, method);
 	if (typeof callable !== "function") return { ok: false, reason: "SPLIT_READ_NOT_IMPLEMENTED" };
 	return Reflect.apply(callable, store, [input]) as Promise<unknown>;
-}
-
-function writeKinds(writes: readonly StorageAdapterWrite[]): readonly string[] {
-	return writes.map(({ kind }) => kind);
 }
 
 function generationIdAt(index: number): GenerationRecord["generationId"] {
@@ -234,117 +205,68 @@ describe("Phase 2e1 bounded public reads RED", () => {
 });
 
 describe("Phase 2e1 command-owned write RED", () => {
-	it("emits one exact ordered write set for every successful command and zero writes on rejection", () => {
-		const payload = bytes(1, 2, 3);
-		const item = ref(payload);
-		const staged = record({ closure: [item] });
-		const adopted = record({ closure: [item], generationId: GENERATION_A, state: "Adopted" });
-		const head = presentHead({ closureDigest: adopted.closureDigest });
-		const candidate = record({
-			baseExpectedHead: head,
-			closure: [item],
-			generationId: GENERATION_B,
-			state: "Complete",
+	it("retains exact write vocabulary and closed-store precedence without reclaiming 2e3 authority", () => {
+		const ownership: Record<StorageAdapterWrite["kind"], string> = {
+			"insert-blob": "blobs",
+			"insert-promotion": "promotions",
+			"replace-generation": "generations",
+			"replace-head": "objects",
+		};
+		expect(ownership).toEqual({
+			"insert-blob": "blobs",
+			"insert-promotion": "promotions",
+			"replace-generation": "generations",
+			"replace-head": "objects",
 		});
-		const facts = {
-			empty: objectFact(noHead(), []),
-			staged: objectFact(noHead(), [staged]),
-			swap: objectFact(head, [adopted, candidate]),
-		};
-		const promotion: StorageAdapterFact = {
-			digest: item.digest,
-			generationId: GENERATION_A,
-			kind: "promotion",
-			objectId: OBJECT_A,
-		};
-		const scenarios = [
+
+		const item = ref(bytes(1));
+		const commands = [
 			{
-				command: {
-					baseExpectedHead: noHead(),
-					closure: [item],
-					generationId: GENERATION_A,
-					kind: "beginGeneration",
-					objectId: OBJECT_A,
-				},
-				facts: [facts.empty],
-				writes: ["replace-generation"],
+				baseExpectedHead: noHead(),
+				closure: [item],
+				generationId: GENERATION_A,
+				kind: "beginGeneration",
+				objectId: OBJECT_A,
 			},
 			{
-				command: {
-					bytes: payload,
-					digest: item.digest,
-					generationId: GENERATION_A,
-					kind: "putCachedBlob",
-					objectId: OBJECT_A,
-				},
-				facts: [facts.staged, { bytes: null, digest: item.digest, kind: "blob" }],
-				writes: ["insert-blob"],
+				bytes: bytes(1),
+				digest: item.digest,
+				generationId: GENERATION_A,
+				kind: "putCachedBlob",
+				objectId: OBJECT_A,
 			},
 			{
-				command: {
-					digest: item.digest,
-					generationId: GENERATION_A,
-					kind: "promoteReference",
-					objectId: OBJECT_A,
-				},
-				facts: [facts.staged, { bytes: payload, digest: item.digest, kind: "blob" }],
-				writes: ["insert-promotion"],
+				digest: item.digest,
+				generationId: GENERATION_A,
+				kind: "promoteReference",
+				objectId: OBJECT_A,
 			},
-			{
-				command: { generationId: GENERATION_A, kind: "completeGeneration", objectId: OBJECT_A },
-				facts: [facts.staged, promotion],
-				writes: ["replace-generation"],
-			},
-			{
-				command: {
-					expectedHead: head,
-					generationId: GENERATION_B,
-					kind: "swapHead",
-					objectId: OBJECT_A,
-				},
-				facts: [facts.swap],
-				writes: ["replace-generation", "replace-generation", "replace-head"],
-			},
-			{
-				command: { generationId: GENERATION_A, kind: "discardGeneration", objectId: OBJECT_A },
-				facts: [facts.staged],
-				writes: ["replace-generation"],
-			},
+			{ generationId: GENERATION_A, kind: "completeGeneration", objectId: OBJECT_A },
+			{ expectedHead: noHead(), generationId: GENERATION_A, kind: "swapHead", objectId: OBJECT_A },
+			{ generationId: GENERATION_A, kind: "discardGeneration", objectId: OBJECT_A },
 		] as const;
 
-		for (const scenario of scenarios) {
-			const command = prepareStorageAdapterCommand(scenario.command);
+		// Phase 2e3's real-backend recovery suites own mutation fact authority.
+		// This older bounded-read slice retains only stable public preparation,
+		// rejection and write-vocabulary obligations.
+		for (const candidate of commands) {
+			const command = prepareStorageAdapterCommand(candidate);
 			if (!command.ok) throw new Error(`fixture failed preparation: ${command.reason}`);
-			const accepted = evaluateStorageAdapterCommand(command.value, scenario.facts);
-			expect.soft(accepted.result.ok, scenario.command.kind).toBe(true);
-			expect.soft(writeKinds(accepted.writes), scenario.command.kind).toEqual(scenario.writes);
 			const rejected = evaluateStorageAdapterCommand(command.value, [{ kind: "store-closed" }]);
-			expect.soft(rejected, `${scenario.command.kind} rejection`).toEqual({
+			expect.soft(rejected, `${candidate.kind} rejection`).toEqual({
 				result: { ok: false, reason: "STORE_CLOSED" },
 				writes: [],
 			});
 		}
+		expect(prepareStorageAdapterCommand({ ...commands[0], durability: "strict" })).toEqual({
+			ok: false,
+			reason: "INVALID_ARGUMENT",
+		});
 	});
 
 	it("deletes the generic whole-state diff owner without replacing it with a test analyzer", () => {
 		const source = readFileSync(new URL("../src/adapter.ts", import.meta.url), "utf8");
 		expect.soft(source).not.toContain("appendStateWrites(");
 		expect.soft(source).not.toMatch(/beforeState|afterState/u);
-	});
-
-	it("keeps the broad exactly-one-Adopted authority live for mutation facts", () => {
-		const survivingAdopted = record({ generationId: GENERATION_A, state: "Adopted" });
-		const command = prepareStorageAdapterCommand({
-			baseExpectedHead: noHead(),
-			closure: [ref(bytes(9))],
-			generationId: GENERATION_B,
-			kind: "beginGeneration",
-			objectId: OBJECT_A,
-		});
-		if (!command.ok) throw new Error(`fixture failed preparation: ${command.reason}`);
-		expect(evaluateStorageAdapterCommand(command.value, [objectFact(noHead(), [survivingAdopted])])).toEqual({
-			result: { ok: false, reason: "INVALID_ARGUMENT" },
-			writes: [],
-		});
 	});
 });

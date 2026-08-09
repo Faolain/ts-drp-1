@@ -125,47 +125,6 @@ describe("Phase 2e1 Node SQLite bounded-read RED", () => {
 		await store.close();
 	});
 
-	it("retains the broad missing-head/surviving-Adopted rejection with zero mutation", async () => {
-		const filename = await databaseFilename();
-		let store = createSqliteAheDurableStore({ filename });
-		const payload = Uint8Array.of(4, 5, 6);
-		await stage(store, GENERATION_A, payload, noHead());
-		await complete(store, GENERATION_A, payload);
-		const adopted = await store.swapHead({
-			expectedHead: noHead(),
-			generationId: GENERATION_A,
-			objectId: OBJECT_A,
-		});
-		if (!adopted.ok) throw new Error(`adoption failed: ${adopted.reason}`);
-		await store.close();
-
-		const corruptor = new DatabaseSync(filename);
-		corruptor.prepare("UPDATE objects SET head_record = NULL WHERE object_id = ?").run(OBJECT_A);
-		corruptor.close();
-
-		store = createSqliteAheDurableStore({ filename });
-		const rejected = await store.beginGeneration({
-			baseExpectedHead: noHead(),
-			closure: [{ byteLength: 1, digest: must(digestBlob(Uint8Array.of(9))) }],
-			generationId: GENERATION_B,
-			objectId: OBJECT_A,
-		});
-		expect(rejected).toMatchObject({ ok: false, reason: "NON_CANONICAL_RECORD" });
-		await store.close();
-
-		const oracle = new DatabaseSync(filename, { readOnly: true });
-		try {
-			expect(
-				oracle.prepare("SELECT generation_id FROM generations WHERE object_id = ? ORDER BY generation_id").all(OBJECT_A)
-			).toEqual([{ generation_id: GENERATION_A }]);
-			expect(oracle.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(OBJECT_A)).toEqual({
-				head_record: null,
-			});
-		} finally {
-			oracle.close();
-		}
-	});
-
 	it("fails closed when a physical SQLite generation key disagrees with its canonical record", async () => {
 		const filename = await databaseFilename();
 		let store = createSqliteAheDurableStore({ filename });
@@ -252,7 +211,7 @@ describe("Phase 2e1 Node SQLite bounded-read RED", () => {
 		}
 	});
 
-	it("freezes bounded public SQL while leaving the accepted six-mutation inventory unchanged", async () => {
+	it("freezes bounded public SQL while Phase 2e3 owns mutation authority", async () => {
 		const source = await readFile(new URL("../src/internal/create-scaffold.ts", import.meta.url), "utf8");
 		expect.soft(source).toContain("readHead(objectId");
 		expect.soft(source).toContain("readGenerationPage(input");
@@ -264,9 +223,6 @@ describe("Phase 2e1 Node SQLite bounded-read RED", () => {
 		expect
 			.soft(source)
 			.toMatch(/SELECT generation_id, record FROM generations WHERE object_id = \? ORDER BY generation_id LIMIT \?/u);
-		expect
-			.soft(source)
-			.toContain('prepare("SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id")');
 		expect.soft(source).not.toContain('operation === "readObjectState"');
 	});
 });

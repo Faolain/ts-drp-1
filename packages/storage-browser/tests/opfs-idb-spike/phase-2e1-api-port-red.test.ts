@@ -22,9 +22,13 @@ describe("Phase 2e1 historical spike API port", () => {
 		expect(worker).toContain('{ kind: "readHead", objectId: OBJECT_ID }');
 		expect(worker).toContain('{ kind: "readGenerationPage", objectId: OBJECT_ID, limit: 128 }');
 		expect(worker).not.toContain('{ kind: "readObjectState", objectId: OBJECT_ID }');
+		expect(worker).toContain('requirement.kind === "generation"');
+		expect(worker).toContain("storageAdapterClosureVerifier.start(");
+		expect(worker).not.toContain('requirement.kind === "object-state"');
+		expect(worker).not.toContain('requirement.kind === "generation-closure"');
 		expect(worker).toContain('oracleId: "phase-2e1-split-read-api-port-v1"');
 		expect(worker).toContain(
-			'PHASE_2E1_API_PORT_COMMAND_DIGEST = "498c129b7cc5bc34056e9c4cce1ff7cd5096e221ea13f300c88079007537e368"'
+			'PHASE_2E1_API_PORT_COMMAND_DIGEST = "15c2c0ea5a11e6b25da29c7ad5e259b9f356ff2207c5c86d17b3a5d99aee9f70"'
 		);
 
 		for (const [name, expected] of Object.entries(ARTIFACT_HASHES)) {

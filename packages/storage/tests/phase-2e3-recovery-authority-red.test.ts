@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { bytes, GENERATION_A, GENERATION_B, must, noHead, OBJECT_A, presentHead, record, ref } from "./fixtures.js";
 import { createTransitionHarness } from "./internal-harness.js";
+import * as adapter from "../src/adapter.js";
+import { encodeGenerationRecordV1 } from "../src/codecs.js";
 import { createMemoryAheDurableStore, parseHeadRevision, type StoreResult } from "../src/index.js";
 
 type RecoveryValue = Readonly<{
@@ -11,6 +13,14 @@ type RecoveryValue = Readonly<{
 	adoptedGeneration: unknown;
 	recomputedClosureDigest: unknown;
 	references: readonly unknown[];
+}>;
+
+type ClosureVerifierController = Readonly<{
+	acceptBlob(session: unknown, bytes: Uint8Array | null): void;
+	acceptPromotion(session: unknown, present: boolean): void;
+	finish(session: unknown): StoreResult<unknown>;
+	next(session: unknown): Readonly<{ kind: "blob" | "promotion"; reference: unknown }> | null;
+	start(generation: unknown, mode: "adopted" | "candidate"): unknown;
 }>;
 
 function recover(target: object): StoreResult<RecoveryValue> {
@@ -162,6 +172,54 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 		expect(reason(lengthFirst.completeGeneration({ objectId: OBJECT_A, generationId: GENERATION_A }))).toBe(
 			"BLOB_CORRUPT"
 		);
+	});
+
+	it("publishes one runtime-neutral verifier controller and opaque candidate authorization", () => {
+		const controller = Reflect.get(adapter, "storageAdapterClosureVerifier") as ClosureVerifierController | undefined;
+		expect(controller).toBeDefined();
+		if (controller === undefined) return;
+		expect(Object.keys(controller).sort()).toEqual(["acceptBlob", "acceptPromotion", "finish", "next", "start"]);
+
+		const payloads = [bytes(1, 2, 3), bytes(4, 5, 6)];
+		const generation = record({ closure: payloads.map(ref) });
+		const session = controller.start(generation, "candidate");
+		for (let index = 0; index < payloads.length; index++) {
+			expect.soft(controller.next(session)).toEqual({ kind: "promotion", reference: generation.closure[index] });
+			controller.acceptPromotion(session, true);
+			expect.soft(controller.next(session)).toEqual({ kind: "blob", reference: generation.closure[index] });
+			controller.acceptBlob(session, payloads[index] ?? null);
+		}
+		expect.soft(controller.next(session)).toBeNull();
+		const authorization = controller.finish(session);
+		expect.soft(authorization.ok).toBe(true);
+
+		const prepared = adapter.prepareStorageAdapterCommand({
+			generationId: GENERATION_A,
+			kind: "completeGeneration",
+			objectId: OBJECT_A,
+		});
+		if (!prepared.ok || !authorization.ok) return;
+		const facts = [
+			{
+				generationId: GENERATION_A,
+				generationRecord: encodeGenerationRecordV1(generation),
+				kind: "generation",
+				objectId: OBJECT_A,
+			},
+		];
+		const evaluate = adapter.evaluateStorageAdapterCommand as unknown as (
+			command: unknown,
+			loaded: readonly unknown[],
+			authorization?: unknown
+		) => unknown;
+		expect.soft(evaluate(prepared.value, facts, authorization.value)).toMatchObject({
+			result: { ok: true, value: { state: "Complete" } },
+			writes: [{ kind: "replace-generation" }],
+		});
+		expect.soft(evaluate(prepared.value, facts, Object.freeze({}))).toEqual({
+			result: { ok: false, reason: "INVALID_ARGUMENT" },
+			writes: [],
+		});
 	});
 
 	it("rejects dual, batch and forgeable authority forms with a deterministic mutant control", () => {

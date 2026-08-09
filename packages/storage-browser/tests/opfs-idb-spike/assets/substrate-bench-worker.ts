@@ -1,6 +1,7 @@
 import {
 	type BlobDigest,
 	decodeGenerationRecordV1,
+	decodeHeadRecordV1,
 	digestBlob,
 	digestClosure,
 	type GenerationId,
@@ -10,6 +11,8 @@ import {
 	evaluateStorageAdapterCommand,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
+	storageAdapterClosureVerifier,
+	type StorageAdapterCommand,
 	type StorageAdapterFact,
 	type StorageAdapterWrite,
 } from "@ts-drp/storage/adapter";
@@ -21,7 +24,7 @@ const PAYLOAD_A = new TextEncoder().encode("phase-2-spike-generation-a");
 const PAYLOAD_B = new TextEncoder().encode("phase-2-spike-generation-b");
 const STORE_NAME = "benchmark-state";
 const STORE_KEY = "snapshot";
-const PHASE_2E1_API_PORT_COMMAND_DIGEST = "498c129b7cc5bc34056e9c4cce1ff7cd5096e221ea13f300c88079007537e368";
+const PHASE_2E1_API_PORT_COMMAND_DIGEST = "15c2c0ea5a11e6b25da29c7ad5e259b9f356ff2207c5c86d17b3a5d99aee9f70";
 
 type JsonCommand = Readonly<Record<string, unknown>>;
 type SerializedSnapshot = Readonly<{
@@ -82,17 +85,20 @@ function decodeCommand(value: JsonCommand): Record<string, unknown> {
 	return copy;
 }
 
-function objectFact(snapshot: MutableSnapshot): StorageAdapterFact {
-	return {
-		kind: "object-state",
-		objectId: OBJECT_ID,
-		headRecord: snapshot.headRecord === null ? null : new Uint8Array(snapshot.headRecord),
-		generationRecords: [...snapshot.generationRecords.values()].map((bytes) => new Uint8Array(bytes)),
-	};
-}
-
 function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnapshot): StorageAdapterFact[] {
 	const facts: StorageAdapterFact[] = [];
+	const loadedGenerations = new Set<string>();
+	const pushGeneration = (objectId: StorageObjectId, generationId: GenerationId): void => {
+		if (loadedGenerations.has(generationId)) return;
+		loadedGenerations.add(generationId);
+		const encoded = snapshot.generationRecords.get(generationId);
+		facts.push({
+			generationId,
+			generationRecord: encoded === undefined ? null : new Uint8Array(encoded),
+			kind: "generation",
+			objectId,
+		});
+	};
 	for (const requirement of prepared.requirements) {
 		if (requirement.kind === "head") {
 			facts.push({
@@ -109,8 +115,8 @@ function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnap
 				kind: "generation-page",
 				objectId: requirement.objectId,
 			});
-		} else if (requirement.kind === "object-state") {
-			facts.push(objectFact(snapshot));
+		} else if (requirement.kind === "generation") {
+			pushGeneration(requirement.objectId, requirement.generationId);
 		} else if (requirement.kind === "blob") {
 			const bytes = snapshot.blobs.get(requirement.digest);
 			facts.push({ kind: "blob", digest: requirement.digest, bytes: bytes ? new Uint8Array(bytes) : null });
@@ -118,29 +124,43 @@ function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnap
 			if (snapshot.promotions.has(promotionKey(requirement.objectId, requirement.generationId, requirement.digest))) {
 				facts.push(requirement);
 			}
-		} else if (requirement.kind === "generation-closure") {
-			const encoded = snapshot.generationRecords.get(requirement.generationId);
-			if (encoded === undefined) continue;
-			const decoded = decodeGenerationRecordV1(encoded);
-			if (!decoded.ok) throw new Error(`fixture generation decode failed: ${decoded.reason}`);
-			for (const reference of decoded.value.closure) {
-				const bytes = snapshot.blobs.get(reference.digest);
-				facts.push({ kind: "blob", digest: reference.digest, bytes: bytes ? new Uint8Array(bytes) : null });
-				if (snapshot.promotions.has(promotionKey(requirement.objectId, requirement.generationId, reference.digest))) {
-					facts.push({
-						kind: "promotion",
-						objectId: requirement.objectId,
-						generationId: requirement.generationId,
-						digest: reference.digest,
-					});
-				}
-			}
 		} else {
 			const unsupported: never = requirement;
 			throw new Error(`unsupported storage load requirement: ${String(unsupported)}`);
 		}
 	}
+	if (prepared.command.kind === "swapHead" && snapshot.headRecord !== null) {
+		const decoded = decodeHeadRecordV1(snapshot.headRecord);
+		if (!decoded.ok) throw new Error(`fixture head decode failed: ${decoded.reason}`);
+		if (decoded.value.kind === "present" && decoded.value.generationId !== prepared.command.generationId) {
+			pushGeneration(decoded.value.objectId, decoded.value.generationId);
+		}
+	}
 	return facts;
+}
+
+function candidateAuthorization(command: StorageAdapterCommand, snapshot: MutableSnapshot): unknown | undefined {
+	if (command.kind !== "completeGeneration" && command.kind !== "swapHead") return undefined;
+	const encoded = snapshot.generationRecords.get(command.generationId);
+	if (encoded === undefined) throw new Error(`${command.kind} candidate generation is absent`);
+	const decoded = decodeGenerationRecordV1(encoded);
+	if (!decoded.ok) throw new Error(`fixture generation decode failed: ${decoded.reason}`);
+	const session = storageAdapterClosureVerifier.start(decoded.value, "candidate");
+	for (let request = storageAdapterClosureVerifier.next(session); request !== null; ) {
+		if (request.kind === "promotion") {
+			storageAdapterClosureVerifier.acceptPromotion(
+				session,
+				snapshot.promotions.has(promotionKey(command.objectId, command.generationId, request.reference.digest))
+			);
+		} else {
+			const bytes = snapshot.blobs.get(request.reference.digest);
+			storageAdapterClosureVerifier.acceptBlob(session, bytes === undefined ? null : new Uint8Array(bytes));
+		}
+		request = storageAdapterClosureVerifier.next(session);
+	}
+	const authorization = storageAdapterClosureVerifier.finish(session);
+	if (!authorization.ok) throw new Error(`${command.kind} verification failed: ${authorization.reason}`);
+	return authorization.value;
 }
 
 function applyWrites(snapshot: MutableSnapshot, writes: readonly StorageAdapterWrite[]): void {
@@ -188,8 +208,8 @@ function makeScript(): Readonly<{
 		},
 		{ kind: "putCachedBlob", objectId: OBJECT_ID, generationId: GENERATION_A, digest: blobA, bytes: [...PAYLOAD_A] },
 		{ kind: "promoteReference", objectId: OBJECT_ID, generationId: GENERATION_A, digest: blobA },
-		{ kind: "completeGeneration", objectId: OBJECT_ID, generationId: GENERATION_A },
-		{ kind: "swapHead", objectId: OBJECT_ID, generationId: GENERATION_A, expectedHead: noHead },
+		{ generationId: GENERATION_A, kind: "completeGeneration", objectId: OBJECT_ID },
+		{ expectedHead: noHead, generationId: GENERATION_A, kind: "swapHead", objectId: OBJECT_ID },
 		{
 			kind: "beginGeneration",
 			objectId: OBJECT_ID,
@@ -199,8 +219,8 @@ function makeScript(): Readonly<{
 		},
 		{ kind: "putCachedBlob", objectId: OBJECT_ID, generationId: GENERATION_B, digest: blobB, bytes: [...PAYLOAD_B] },
 		{ kind: "promoteReference", objectId: OBJECT_ID, generationId: GENERATION_B, digest: blobB },
-		{ kind: "completeGeneration", objectId: OBJECT_ID, generationId: GENERATION_B },
-		{ kind: "swapHead", objectId: OBJECT_ID, generationId: GENERATION_B, expectedHead: headA },
+		{ generationId: GENERATION_B, kind: "completeGeneration", objectId: OBJECT_ID },
+		{ expectedHead: headA, generationId: GENERATION_B, kind: "swapHead", objectId: OBJECT_ID },
 		{ kind: "readHead", objectId: OBJECT_ID },
 		{ kind: "readGenerationPage", objectId: OBJECT_ID, limit: 128 },
 		{ kind: "getBlob", digest: blobB },
@@ -280,7 +300,11 @@ function evaluateOne(
 ): Readonly<{ snapshot: MutableSnapshot; value: unknown }> {
 	const prepared = prepareStorageAdapterCommand(decodeCommand(command));
 	if (!prepared.ok) throw new Error(`command preparation failed: ${prepared.reason}`);
-	const evaluation = evaluateStorageAdapterCommand(prepared.value, factsFor(prepared.value, snapshot));
+	const evaluation = evaluateStorageAdapterCommand(
+		prepared.value,
+		factsFor(prepared.value, snapshot),
+		candidateAuthorization(prepared.value.command, snapshot)
+	);
 	if (!evaluation.result.ok) {
 		throw new Error(`${String(command.kind)} command evaluation failed: ${evaluation.result.reason}`);
 	}

@@ -7,10 +7,7 @@ const GENERATION_B = "b".repeat(64);
 const GENERATION_C = "c".repeat(64);
 const GENERATION_D = "d".repeat(64);
 
-async function run(
-	page: Page,
-	method: "runPhase2e1BoundedReads" | "runPhase2e1BroadInvariant" | "runPhase2e1PhysicalKeyMismatch"
-): Promise<unknown> {
+async function run(page: Page, method: "runPhase2e1BoundedReads" | "runPhase2e1PhysicalKeyMismatch"): Promise<unknown> {
 	await page.goto("/");
 	await page.waitForFunction(() => "phase2d2aAdapterHarness" in globalThis);
 	return page.evaluate(async (selected) => {
@@ -39,14 +36,6 @@ test("real Chromium exposes detached head and bounded exclusive pages with pre-I
 		invalidReasons: Array(6).fill("INVALID_ARGUMENT"),
 	});
 	expect(typeof Reflect.get(Reflect.get(result.firstPage as object, "value") as object, "nextCursor")).toBe("string");
-});
-
-test("real Chromium retains broad missing-head/surviving-Adopted rejection before 2e3", async ({ page }) => {
-	await expect(run(page, "runPhase2e1BroadInvariant")).resolves.toEqual({
-		generationRows: 1,
-		headRows: 1,
-		reason: "NON_CANONICAL_RECORD",
-	});
 });
 
 test("real Chromium fails closed when an IndexedDB compound key disagrees with its canonical record", async ({
