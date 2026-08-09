@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
 	testDir: "./tests",
-	testMatch: "phase-2d2a-idb-adapter-red.pw.ts",
+	testMatch: ["phase-2d2a-idb-adapter-red.pw.ts", "phase-2e1-bounded-reads-red.pw.ts"],
 	fullyParallel: false,
 	workers: 1,
 	retries: 0,

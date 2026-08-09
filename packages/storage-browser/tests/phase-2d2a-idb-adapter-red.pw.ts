@@ -2,7 +2,11 @@ import { expect, type Page, test } from "@playwright/test";
 
 const OBJECT_A = `phase-2d2a-a:${"a".repeat(32)}`;
 
-function generationRange(operation: string): Readonly<{
+function generationRange(
+	operation: string,
+	count?: number
+): Readonly<{
+	count?: number;
 	operation: string;
 	query: Readonly<{
 		lower: readonly string[];
@@ -13,6 +17,7 @@ function generationRange(operation: string): Readonly<{
 	store: "generations";
 }> {
 	return {
+		...(count === undefined ? {} : { count }),
 		operation,
 		query: { lower: [OBJECT_A], lowerOpen: false, upper: [OBJECT_A, []], upperOpen: false },
 		store: "generations",
@@ -141,7 +146,7 @@ test("adapter requirements execute against their real store owners in strict bou
 }) => {
 	await expect(run(page, "runOwnershipTrace")).resolves.toEqual({
 		ranges: [
-			generationRange("readObjectState"),
+			generationRange("readGenerationPage", 129),
 			generationRange("beginGeneration"),
 			generationRange("putCachedBlob"),
 			generationRange("promoteReference"),
@@ -150,8 +155,8 @@ test("adapter requirements execute against their real store owners in strict bou
 			generationRange("discardGeneration"),
 		],
 		reads: [
-			{ method: "get", operation: "readObjectState", store: "objects" },
-			{ method: "getAll", operation: "readObjectState", store: "generations" },
+			{ method: "get", operation: "readHead", store: "objects" },
+			{ method: "getAll", operation: "readGenerationPage", store: "generations" },
 			{ method: "get", operation: "getBlob", store: "blobs" },
 			{ method: "get", operation: "beginGeneration", store: "objects" },
 			{ method: "getAll", operation: "beginGeneration", store: "generations" },
@@ -174,8 +179,14 @@ test("adapter requirements execute against their real store owners in strict bou
 			{
 				durability: "default",
 				mode: "readonly",
-				operation: "readObjectState",
-				stores: ["generations", "objects"],
+				operation: "readHead",
+				stores: ["objects"],
+			},
+			{
+				durability: "default",
+				mode: "readonly",
+				operation: "readGenerationPage",
+				stores: ["generations"],
 			},
 			{ durability: "default", mode: "readonly", operation: "getBlob", stores: ["blobs"] },
 			{

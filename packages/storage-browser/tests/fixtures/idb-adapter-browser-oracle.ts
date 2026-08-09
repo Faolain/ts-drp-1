@@ -9,6 +9,7 @@ export interface Phase2dTransactionTrace {
 
 export interface Phase2dStoreCallTrace {
 	readonly method: "add" | "get" | "getAll" | "put";
+	readonly count?: number;
 	readonly operation: string;
 	readonly query?: Readonly<{
 		readonly lower: unknown;
@@ -89,6 +90,22 @@ export async function rawPhase2dCount(name: string, storeName: string): Promise<
 		const count = await requestResult(transaction.objectStore(storeName).count());
 		await transactionCompletion(transaction);
 		return count;
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Clears one physical head through the independent raw-IDB corruption oracle.
+ * @param name - Isolated database name.
+ * @param objectId - Creator-bound object whose adopted generation survives.
+ */
+export async function rawPhase2dClearHead(name: string, objectId: string): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction("objects", "readwrite", { durability: "strict" });
+		transaction.objectStore("objects").put({ objectId, record: null });
+		await transactionCompletion(transaction);
 	} finally {
 		database.close();
 	}
@@ -341,6 +358,7 @@ export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: str
 		count?: number
 	): IDBRequest<unknown[]> {
 		calls.push({
+			...(count === undefined ? {} : { count }),
 			method: "getAll",
 			operation,
 			...(query instanceof IDBKeyRange

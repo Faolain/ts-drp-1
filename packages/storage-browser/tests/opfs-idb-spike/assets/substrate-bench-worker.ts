@@ -21,6 +21,7 @@ const PAYLOAD_A = new TextEncoder().encode("phase-2-spike-generation-a");
 const PAYLOAD_B = new TextEncoder().encode("phase-2-spike-generation-b");
 const STORE_NAME = "benchmark-state";
 const STORE_KEY = "snapshot";
+const PHASE_2E1_API_PORT_COMMAND_DIGEST = "498c129b7cc5bc34056e9c4cce1ff7cd5096e221ea13f300c88079007537e368";
 
 type JsonCommand = Readonly<Record<string, unknown>>;
 type SerializedSnapshot = Readonly<{
@@ -93,7 +94,23 @@ function objectFact(snapshot: MutableSnapshot): StorageAdapterFact {
 function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnapshot): StorageAdapterFact[] {
 	const facts: StorageAdapterFact[] = [];
 	for (const requirement of prepared.requirements) {
-		if (requirement.kind === "object-state") {
+		const requirementKind: string = requirement.kind;
+		if (requirementKind === "head") {
+			facts.push({
+				kind: "head",
+				objectId: OBJECT_ID,
+				headRecord: snapshot.headRecord === null ? null : new Uint8Array(snapshot.headRecord),
+			} as unknown as StorageAdapterFact);
+		} else if (requirementKind === "generation-page") {
+			facts.push({
+				afterGenerationId: null,
+				generationRecords: [...snapshot.generationRecords.entries()]
+					.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+					.map(([, bytes]) => new Uint8Array(bytes)),
+				kind: "generation-page",
+				objectId: OBJECT_ID,
+			} as unknown as StorageAdapterFact);
+		} else if (requirement.kind === "object-state") {
 			facts.push(objectFact(snapshot));
 		} else if (requirement.kind === "blob") {
 			const bytes = snapshot.blobs.get(requirement.digest);
@@ -142,7 +159,8 @@ function makeScript(): Readonly<{
 	bytes: Uint8Array;
 	commands: readonly JsonCommand[];
 	blobBDigest: BlobDigest;
-	expectedState: unknown;
+	expectedGenerations: unknown;
+	expectedHead: unknown;
 }> {
 	const blobA = must(digestBlob(PAYLOAD_A));
 	const blobB = must(digestBlob(PAYLOAD_B));
@@ -181,40 +199,39 @@ function makeScript(): Readonly<{
 		{ kind: "promoteReference", objectId: OBJECT_ID, generationId: GENERATION_B, digest: blobB },
 		{ kind: "completeGeneration", objectId: OBJECT_ID, generationId: GENERATION_B },
 		{ kind: "swapHead", objectId: OBJECT_ID, generationId: GENERATION_B, expectedHead: headA },
-		{ kind: "readObjectState", objectId: OBJECT_ID },
+		{ kind: "readHead", objectId: OBJECT_ID },
+		{ kind: "readGenerationPage", objectId: OBJECT_ID, limit: 128 },
 		{ kind: "getBlob", digest: blobB },
 	];
 	return {
 		bytes: new TextEncoder().encode(JSON.stringify(commands)),
 		commands,
 		blobBDigest: blobB,
-		expectedState: {
-			head: {
-				kind: "present",
+		expectedHead: {
+			kind: "present",
+			objectId: OBJECT_ID,
+			generationId: GENERATION_B,
+			revision: 2,
+			closureDigest: closureBDigest,
+		},
+		expectedGenerations: [
+			{
+				objectId: OBJECT_ID,
+				generationId: GENERATION_A,
+				baseExpectedHead: noHead,
+				closureDigest: closureADigest,
+				closure: closureA,
+				state: "Superseded",
+			},
+			{
 				objectId: OBJECT_ID,
 				generationId: GENERATION_B,
-				revision: 2,
+				baseExpectedHead: headA,
 				closureDigest: closureBDigest,
+				closure: closureB,
+				state: "Adopted",
 			},
-			generations: [
-				{
-					objectId: OBJECT_ID,
-					generationId: GENERATION_A,
-					baseExpectedHead: noHead,
-					closureDigest: closureADigest,
-					closure: closureA,
-					state: "Superseded",
-				},
-				{
-					objectId: OBJECT_ID,
-					generationId: GENERATION_B,
-					baseExpectedHead: headA,
-					closureDigest: closureBDigest,
-					closure: closureB,
-					state: "Adopted",
-				},
-			],
-		},
+		],
 	};
 }
 
@@ -339,8 +356,21 @@ function exactJsonEqual(left: unknown, right: unknown): boolean {
 	return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function oraclePass(values: readonly unknown[], expectedState: unknown, expectedBlob: Uint8Array): boolean {
-	return exactJsonEqual(values.at(-2), expectedState) && bytesEqual(values.at(-1), expectedBlob);
+function oraclePass(
+	values: readonly unknown[],
+	expectedHead: unknown,
+	expectedGenerations: unknown,
+	expectedBlob: Uint8Array
+): boolean {
+	const page = values.at(-2);
+	return (
+		exactJsonEqual(values.at(-3), expectedHead) &&
+		typeof page === "object" &&
+		page !== null &&
+		exactJsonEqual(Reflect.get(page, "generations"), expectedGenerations) &&
+		Reflect.get(page, "nextCursor") === null &&
+		bytesEqual(values.at(-1), expectedBlob)
+	);
 }
 
 async function benchmark(request: BenchmarkRequest): Promise<unknown> {
@@ -357,8 +387,8 @@ async function benchmark(request: BenchmarkRequest): Promise<unknown> {
 		opfsValues[opfsValues.length - 1] = corrupted;
 	}
 	const armOraclePass = {
-		opfs: oraclePass(opfsValues, script.expectedState, PAYLOAD_B),
-		idbStrict: oraclePass(idb.values, script.expectedState, PAYLOAD_B),
+		opfs: oraclePass(opfsValues, script.expectedHead, script.expectedGenerations, PAYLOAD_B),
+		idbStrict: oraclePass(idb.values, script.expectedHead, script.expectedGenerations, PAYLOAD_B),
 	};
 	const encodedForOpfs = new TextEncoder().encode(JSON.stringify(parsedForOpfs));
 	const encodedForIdb = new TextEncoder().encode(JSON.stringify(parsedForIdb));
@@ -368,6 +398,7 @@ async function benchmark(request: BenchmarkRequest): Promise<unknown> {
 	};
 	const commandScriptDigest = await sha256Hex(script.bytes);
 	if (
+		commandScriptDigest !== PHASE_2E1_API_PORT_COMMAND_DIGEST ||
 		scriptDigestByArm.opfs !== commandScriptDigest ||
 		scriptDigestByArm.idbStrict !== commandScriptDigest ||
 		!exactJsonEqual(parsedForOpfs, parsedForIdb)
@@ -386,7 +417,7 @@ async function benchmark(request: BenchmarkRequest): Promise<unknown> {
 				],
 				commandScriptDigest,
 				opsExecuted: parsedForOpfs.length + parsedForIdb.length,
-				oracleId: "phase-2a-read-object-state-v1",
+				oracleId: "phase-2e1-split-read-api-port-v1",
 				runId: request.runId,
 				engineBuild: navigator.userAgent,
 				executionOwner: "dedicated-worker",

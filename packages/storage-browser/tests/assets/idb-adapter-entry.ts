@@ -18,6 +18,7 @@ import {
 	deletePhase2dDatabase,
 	gateNextPhase2dTransactionTerminal,
 	type Phase2dTerminalGate,
+	rawPhase2dClearHead,
 	rawPhase2dCount,
 	rawPhase2dGet,
 	rawPhase2dReplaceBlob,
@@ -53,6 +54,18 @@ function noHead(objectId: StorageObjectId): NoHead {
 
 function reason(result: StoreResult<unknown>): string {
 	return result.ok ? "OK" : result.reason;
+}
+
+async function splitRead(
+	store: object,
+	method: "readGenerationPage" | "readHead",
+	input: unknown
+): Promise<StoreResult<unknown>> {
+	const callable = Reflect.get(store, method);
+	if (typeof callable !== "function") {
+		return { ok: false, reason: "SUBSTRATE_FAILURE", cause: new Error("SPLIT_READ_NOT_IMPLEMENTED") };
+	}
+	return Reflect.apply(callable, store, [input]) as Promise<StoreResult<unknown>>;
 }
 
 function failureCause(result: StoreResult<unknown>): unknown {
@@ -397,8 +410,10 @@ async function runOwnershipTrace(): Promise<unknown> {
 		const store = await createPhase2d2aRedStore({ databaseName: name });
 		await begin(store, OBJECT_A, GENERATION_B);
 		const { calls, transactions } = await withPhase2dTransactionTrace(async (mark) => {
-			mark("readObjectState");
-			await store.readObjectState(OBJECT_A);
+			mark("readHead");
+			await splitRead(store, "readHead", OBJECT_A);
+			mark("readGenerationPage");
+			await splitRead(store, "readGenerationPage", { limit: 128, objectId: OBJECT_A });
 			mark("getBlob");
 			await store.getBlob(DIGEST_A);
 			mark("beginGeneration");
@@ -418,12 +433,114 @@ async function runOwnershipTrace(): Promise<unknown> {
 		return {
 			ranges: calls
 				.filter((call) => call.method === "getAll")
-				.map(({ operation, query, store }) => ({ operation, query, store })),
+				.map(({ count, operation, query, store }) => ({
+					...(count === undefined ? {} : { count }),
+					operation,
+					query,
+					store,
+				})),
 			reads: calls
 				.filter((call) => call.method === "get" || call.method === "getAll")
 				.map(({ method, operation, store }) => ({ method, operation, store })),
 			transactions,
 			writes: calls.filter((call) => call.method === "add" || call.method === "put"),
+		};
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runPhase2e1BoundedReads(): Promise<unknown> {
+	const name = databaseName("phase-2e1-bounded-reads");
+	try {
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		const emptyHead = await splitRead(store, "readHead", OBJECT_A);
+		const emptyPage = await splitRead(store, "readGenerationPage", { limit: 2, objectId: OBJECT_A });
+		await stageComplete(store, OBJECT_A, GENERATION_A);
+		const swapped = await store.swapHead({
+			expectedHead: noHead(OBJECT_A),
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		if (!swapped.ok) throw new Error(`fixture swap failed: ${swapped.reason}`);
+		await beginFrom(store, OBJECT_A, GENERATION_C, swapped.value.head, PAYLOAD_B);
+		await beginFrom(store, OBJECT_A, GENERATION_B, swapped.value.head, PAYLOAD_A);
+
+		const firstHead = await splitRead(store, "readHead", OBJECT_A);
+		const headValue = firstHead.ok ? firstHead.value : undefined;
+		if (typeof headValue === "object" && headValue !== null) Reflect.set(headValue, "revision", 99);
+		const secondHead = await splitRead(store, "readHead", OBJECT_A);
+		const firstPage = await splitRead(store, "readGenerationPage", { limit: 2, objectId: OBJECT_A });
+		const pageValue =
+			firstPage.ok && typeof firstPage.value === "object" && firstPage.value !== null ? firstPage.value : undefined;
+		const cursor = pageValue === undefined ? undefined : Reflect.get(pageValue, "nextCursor");
+		const pageRows = pageValue === undefined ? undefined : Reflect.get(pageValue, "generations");
+		if (Array.isArray(pageRows) && typeof pageRows[0] === "object" && pageRows[0] !== null) {
+			Reflect.set(pageRows[0], "state", "Discarded");
+		}
+		const finalPage = await splitRead(store, "readGenerationPage", { cursor, limit: 2, objectId: OBJECT_A });
+		const detachedPage = await splitRead(store, "readGenerationPage", { limit: 1, objectId: OBJECT_A });
+		const invalidTrace = await withPhase2dTransactionTrace(async () =>
+			Promise.all([
+				...([0, -1, 1.5, 129] as const).map((limit) =>
+					splitRead(store, "readGenerationPage", { limit, objectId: OBJECT_A })
+				),
+				splitRead(store, "readGenerationPage", { cursor: "not-a-cursor", limit: 1, objectId: OBJECT_A }),
+				splitRead(store, "readGenerationPage", { cursor, limit: 1, objectId: OBJECT_B }),
+			])
+		);
+		await store.close();
+		return {
+			detachedHeadRevision:
+				secondHead.ok &&
+				typeof secondHead.value === "object" &&
+				secondHead.value !== null &&
+				Reflect.get(secondHead.value, "revision"),
+			detachedPageState:
+				detachedPage.ok &&
+				typeof detachedPage.value === "object" &&
+				detachedPage.value !== null &&
+				Array.isArray(Reflect.get(detachedPage.value, "generations"))
+					? Reflect.get(Reflect.get(detachedPage.value, "generations")[0] as object, "state")
+					: null,
+			emptyHead,
+			emptyPage,
+			finalPage,
+			firstHead,
+			firstPage,
+			invalidBackendCalls: invalidTrace.calls.length,
+			invalidReasons: invalidTrace.result.map(reason),
+		};
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runPhase2e1BroadInvariant(): Promise<unknown> {
+	const name = databaseName("phase-2e1-broad-invariant");
+	try {
+		let store = await createPhase2d2aRedStore({ databaseName: name });
+		await stageComplete(store, OBJECT_A, GENERATION_A);
+		const swapped = await store.swapHead({
+			expectedHead: noHead(OBJECT_A),
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		if (!swapped.ok) throw new Error(`fixture swap failed: ${swapped.reason}`);
+		await store.close();
+		await rawPhase2dClearHead(name, OBJECT_A);
+
+		store = await createPhase2d2aRedStore({ databaseName: name });
+		const attempt = await begin(store, OBJECT_A, GENERATION_B);
+		await store.close();
+		return {
+			generationRows: await rawPhase2dCount(name, "generations"),
+			headRows: await rawPhase2dCount(name, "objects"),
+			reason: reason(attempt),
 		};
 	} catch (error) {
 		return { error: error instanceof Error ? error.message : String(error) };
@@ -562,6 +679,8 @@ const harness = Object.freeze({
 	runCompetingCas,
 	runImmutableAndIdempotent,
 	runOwnershipTrace,
+	runPhase2e1BoundedReads,
+	runPhase2e1BroadInvariant,
 	runPersistenceAndCopies,
 	runSameDigestDifferentBytes,
 	runSharedContract,
