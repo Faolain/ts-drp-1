@@ -53,7 +53,7 @@ type TransitionDurability = "ephemeral" | "strict";
 
 const MAX_INTERNAL_GENERATION_PAGE_ROWS = 129;
 
-/** Source-internal full journal state retained as the mutation authority through Phase 2e2. */
+/** Detached full-journal state retained for explicit reads and package-internal fixture seeding. */
 export type TransitionObjectState = Readonly<{
 	head: ExpectedHead;
 	generations: readonly GenerationRecord[];
@@ -411,14 +411,22 @@ export class TransitionOwner {
 
 		const object = this.objects.get(objectId);
 		const head = object === undefined ? ({ kind: "none", objectId } as const) : cloneHead(object.head);
-		const generations = object?.generationIds.map((id) => indexedGenerationRecord(object, id)) ?? [];
-		const adopted = generations.filter((generation) => generation.state === "Adopted");
+		let adoptedCount = 0;
+		let adoptedGeneration: MutableGeneration | undefined;
+		if (object !== undefined) {
+			for (const generationId of object.generationIds) {
+				const generation = indexedGeneration(object, generationId);
+				if (generation.state !== "Adopted") continue;
+				adoptedCount += 1;
+				adoptedGeneration = adoptedCount === 1 ? generation : undefined;
+			}
+		}
 		const relationalFailure =
-			(head.kind === "none" && adopted.length !== 0) ||
+			(head.kind === "none" && adoptedCount !== 0) ||
 			(head.kind === "present" &&
-				(adopted.length !== 1 ||
-					adopted[0]?.generationId !== head.generationId ||
-					adopted[0].closureDigest !== head.closureDigest));
+				(adoptedCount !== 1 ||
+					adoptedGeneration?.generationId !== head.generationId ||
+					adoptedGeneration.closureDigest !== head.closureDigest));
 		if (relationalFailure) return this.latchIntegrityFailure("NON_CANONICAL_RECORD");
 
 		if (head.kind === "none") {
@@ -434,7 +442,7 @@ export class TransitionOwner {
 			};
 		}
 
-		const generation = adopted[0];
+		const generation = adoptedGeneration;
 		if (generation === undefined) return this.latchIntegrityFailure("NON_CANONICAL_RECORD");
 		const verification = this.verifyGenerationClosure(generation, "adopted");
 		if (!verification.ok) {
@@ -696,8 +704,12 @@ function insertGenerationId(generationIds: GenerationId[], generationId: Generat
 	generationIds.splice(index, 0, generationId);
 }
 
-function indexedGenerationRecord(object: MutableObject, generationId: GenerationId): GenerationRecord {
+function indexedGeneration(object: MutableObject, generationId: GenerationId): MutableGeneration {
 	const generation = object.generations.get(generationId);
 	if (generation === undefined) throw new Error("ordered generation index disagrees with the journal");
-	return asRecord(generation);
+	return generation;
+}
+
+function indexedGenerationRecord(object: MutableObject, generationId: GenerationId): GenerationRecord {
+	return asRecord(indexedGeneration(object, generationId));
 }
