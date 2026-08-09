@@ -4482,6 +4482,107 @@ Missing, mixed, deleted, timed-out, skipped, duplicated or unsupported evidence
 fails. Competing same/future/rollback candidates remain monotone; stale expected
 revision is `HEAD_CONFLICT`.
 
+##### Phase 2e6 accepted and closed
+
+Phase 2e6 is accepted at tests-only GREEN `cfe915a`, directly above frozen
+tests/config/assets/CI-only RED `bcbd9df`. The RED already executed all eighteen
+real settlement-edge kills and failed only on the deliberately absent recovery
+driver: fifty-four database-identity, sentinel/recovery and independent-image
+obligations, six `swapHead` head/closure XOR obligations, and the two campaign
+controls. It had no arm, trace-prefix, transaction-count, write-count, Worker,
+process-death, provenance or premature-publication error. The GREEN changes
+only five test/harness/governance files; production, the edge derivation, the
+expected-image contract, the closed validator and its mutation controls remain
+byte-identical.
+
+The exact-HEAD campaign passes all eighteen real detached-Chromium hard kills
+in about thirty-eight seconds: ten recover the exact old persistent image and
+eight recover the exact complete new image. All eighteen preserve the same
+schema-v1 database identity and distinguishing sentinel, reopen the same
+profile and database without a create or delete, reach one requested arm, kill
+both owned process groups, and record every frozen birth token absent. All six
+`swapHead` cases prove monotone old/new head and closure XOR. The separate
+controls observe same/future/rollback monotonicity and a genuine stale
+`HEAD_CONFLICT`. Phase 2e5 remains 4/4; the browser package is 179/179; IDB
+ownership governance is 8/8; all three storage package typechecks/builds,
+traced ESLint and Prettier pass. The postcommit artifact set binds one campaign
+and `cfe915a`, with eighteen unique ordered run IDs, profiles and databases and
+zero new asset, profile or process residue.
+
+The nonpublication claim is intentionally narrower and more honest than one
+artifact field suggests. `publicResultDeliveries` is dead telemetry: the crash
+child relays the arm but discards the resolved page observation, so that counter
+cannot become nonzero and must not be cited as evidence. Nonpublication is
+instead causal: request-success and transaction-complete interception listeners
+are registered before the adapter listeners on the same target; the selected
+listener posts the arm and enters an unreleasable Worker `Atomics.wait`; adapter
+publication is downstream of transaction completion; publication before the
+arm fails closed as an arm timeout; and reopened bytes independently prove the
+old/pre-complete or complete-new/post-complete side. A later tests-only harness
+cleanup may add a distinct result relay or delete the decorative counter.
+
+The rollback control also has a recorded discrimination limit. Its old A
+generation is already `Superseded`, so the real rollback attempt rejects with
+`CANDIDATE_NOT_COMPLETE` before the head guard; a disk reread still proves the
+revision-2 B head does not move. A separate still-`Complete` B attempt genuinely
+reaches the stale-head guard and returns `HEAD_CONFLICT`, satisfying the exact
+stale-revision clause. Phase 2e7 may strengthen the rollback arm with a third
+still-`Complete` old-base candidate and replace the same-case double read with a
+real competing candidate. This is executable strengthening of the existing
+contract, not a plan-assumption change.
+
+Other harness fields are redundant rather than authoritative:
+`mainThreadAtomicsWaitCalls`, `workerRealm`, `reachedRequestedArm`, `unsupported`
+and the literal kill-group booleans carry no independent evidential weight.
+Acceptance rests on the measured arm count, closed Worker protocol, child exit,
+re-derived two-group forest, frozen birth-token deaths and exact image oracle.
+The campaign also retains a hardcoded agent-named artifact directory and a
+`*-red.pw.ts` filename; both belong to Phase 2e7 harness hygiene. The two
+disclosed stale pre-fix control profiles are unused operator-cleanup residue:
+the safety hook blocked both exact deletion and an exact recoverable Trash move,
+while every run after the awaited-cleanup fix produced no new residue.
+
+Independent acceptance is unanimous. Grok 4.5/high session
+`019fe6d4-98cb-7bd3-945e-9065152f807a` returned `APPROVED`, no blockers, no
+reward hacking and `2E6_MAY_CLOSE: yes`. Its private thought trace contained
+fabricated draft hashes despite a correct published lineage; a read-only
+same-session follow-up explicitly retracted every placeholder and
+re-authenticated `bcbd9df` -> `cfe915a`. The primary prompt/raw/result and
+integrity SHA-256 values are
+`cb6c373c7c275b463609d62fe5698a6dc11e17f0c722a9f74b3fedda8d1b9696`,
+`2adc7a29aecf41bc5887a2b58c68d9aaa2263a09ee48e1bffa1f0e79542ee49a`,
+`feb615b40675185179c53349f06e336da405a56163da2ed53f5d9ab5e107dbb0`
+and `06a6d31afd3e2d7cc0a7446b96f6d0d235655a38db0e09a70f5263d5b5143e73`.
+
+Genuine Kimi 3/high/max-100 session
+`625f871e-9b70-47b5-a0e8-96d53fc9017c` returned the same verdict with 26
+reasoning blocks and 41 read-only tool calls. Its prompt/raw/result,
+model-session and integrity SHA-256 values are
+`d17f8f552fd103cb12ef6b734f8819f3bacbd9f087a108e39d1ccdab14be8b9a`,
+`310488925a7b0472f0e727df5b39d7f83e2f9310058eb5be1d3338296e462e22`,
+`aed41453428164b1e8816dc54a976e751af80cb0820b95decee143af2622ec15`,
+`22aebbc349ac309622d84a802dcce2406bd31aad2523682e035dcdaaab64fdeb`
+and `97add3e7e47cc8ee80ff83b86e6f5718f587ab80456ae9fcb8811095d6d05900`.
+
+Final Opus 5/xhigh session `ffeac4fe-a249-4b75-83de-8ee8f6645d03`
+independently returned `APPROVED`, zero blockers, no reward hacking,
+`2E6_MAY_CLOSE: yes` and no plan-change quorum requirement. All 99 substantive
+assistant events authenticated as `claude-opus-5`; permitted automatic Haiku
+metadata/helper usage was 4,659 input and 27 output tokens and performed no
+review work. Prompt/raw/result/integrity SHA-256 values are
+`2fca63e4ea4cffe499875b21f4808ff2a49d20a94a747279e50bebb29bc78ff8`,
+`9f4bfafc541a50c8f662e418d444951e1dbf3a9409b8530480c83d8d54f710c6`,
+`2047d2d603d9326ab178510fab7677200576caea85d1efab8492a345f8982fe5`
+and `dd4fc4e34f39b05b518d65cc54038a4465d6762f38ec4f053f1cc19b6ad19f43`.
+All review custody diffs are empty.
+
+Phase 2e7 now owns publication/component acceptance, retirement of the toy
+arming harness and the optional harness-strengthening items above. Initial
+database creation/version upgrade remains an explicit schema-migration
+residual; Firefox/WebKit replication remains Phase 2h/Phase-2 exit work. Phase
+2e6 advances the durability prerequisite only: neither Discord/chat nor MMORPG
+is enabled by this closure.
+
 #### Slice 2e7 — browser publication and component acceptance
 
 Publish only `@ts-drp/storage-browser` after the real recovery and kill evidence
