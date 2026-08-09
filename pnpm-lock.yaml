@@ -1146,6 +1146,8 @@ importers:
         specifier: ^3.24.2
         version: 3.24.2
 
+  packages/worker-host: {}
+
 packages:
 
   '@ampproject/remapping@2.3.0':
