@@ -124,9 +124,14 @@ function abortError(reason: unknown, suppressed: readonly unknown[] = []): Worke
 	});
 }
 
-function failureError(code: "worker-host-item-failed" | "worker-host-source-failed", cause: unknown): WorkerHostError {
+function failureError(
+	code: "worker-host-item-failed" | "worker-host-source-failed",
+	cause: unknown,
+	detail: Readonly<Record<string, unknown>> = {}
+): WorkerHostError {
 	return new WorkerHostError(code, code === "worker-host-item-failed" ? "Item processing failed" : "Source failed", {
 		cause,
+		detail,
 	});
 }
 
@@ -263,7 +268,7 @@ export function executeBounded<T, R>(
 						resolved.metrics?.observe("item-duration", elapsedMilliseconds(itemStartedAt));
 						rawFailure = error;
 						if (callerAborted) throw abortError(callerAbortReason, [error]);
-						throw failureError("worker-host-item-failed", error);
+						throw failureError("worker-host-item-failed", error, { index });
 					}
 					resolved.metrics?.observe("item-duration", elapsedMilliseconds(itemStartedAt));
 					if (callerAborted) {
