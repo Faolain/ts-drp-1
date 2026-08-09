@@ -1,5 +1,6 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -19,6 +20,16 @@ import {
 const PACKAGE_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKSPACE_DIRECTORY = path.resolve(PACKAGE_DIRECTORY, "../..");
 
+type PackedPackage = Readonly<{
+	filename: string;
+	files: readonly Readonly<{ path: string }>[];
+}>;
+
+type ConsumerCompilation = Readonly<{
+	diagnostics: string;
+	status: number | null;
+}>;
+
 function workspacePath(relative: string): string {
 	return path.join(WORKSPACE_DIRECTORY, relative);
 }
@@ -33,6 +44,66 @@ function textIfPresent(relative: string): string {
 
 function json(relative: string): Record<string, unknown> {
 	return JSON.parse(text(relative)) as Record<string, unknown>;
+}
+
+function writeJson(file: string, value: unknown): void {
+	fs.writeFileSync(file, `${JSON.stringify(value, undefined, "\t")}\n`);
+}
+
+function compileConsumer(project: string): ConsumerCompilation {
+	const compilation = spawnSync("pnpm", ["exec", "tsc", "--project", project, "--pretty", "false"], {
+		cwd: WORKSPACE_DIRECTORY,
+		encoding: "utf8",
+	});
+	if (compilation.error) throw compilation.error;
+	return {
+		diagnostics: `${compilation.stdout}${compilation.stderr}`.trim(),
+		status: compilation.status,
+	};
+}
+
+function writeKnownGoodStoragePackage(consumerDirectory: string): void {
+	const packageDirectory = path.join(consumerDirectory, "node_modules/@ts-drp/storage");
+	fs.mkdirSync(packageDirectory, { recursive: true });
+	writeJson(path.join(packageDirectory, "package.json"), {
+		exports: { ".": { types: "./index.d.ts" } },
+		name: "@ts-drp/storage",
+		type: "module",
+		version: "0.0.0-phase-2e7-control",
+	});
+	fs.writeFileSync(
+		path.join(packageDirectory, "index.d.ts"),
+		`export interface AheDurableStore {
+	readonly capabilities: Readonly<{
+		durability: "ephemeral" | "strict";
+		signingEligibility: "never" | "backend-capability-required";
+	}>;
+	close(): Promise<void>;
+}
+
+export declare function createMemoryAheDurableStore(): AheDurableStore;
+`
+	);
+}
+
+function writeConsumerProject(consumerDirectory: string, name: string, source: string): string {
+	const sourcePath = path.join(consumerDirectory, `${name}.ts`);
+	const projectPath = path.join(consumerDirectory, `tsconfig.${name}.json`);
+	fs.writeFileSync(sourcePath, source);
+	writeJson(projectPath, {
+		compilerOptions: {
+			lib: ["ES2023", "DOM"],
+			module: "NodeNext",
+			moduleResolution: "NodeNext",
+			noEmit: true,
+			skipLibCheck: false,
+			strict: true,
+			target: "ES2023",
+			types: [],
+		},
+		files: [`./${name}.ts`],
+	});
+	return projectPath;
 }
 
 function currentClosure(): Phase2e7ClosureObservation {
@@ -100,28 +171,95 @@ describe("Phase 2e7 public browser package and component closure", () => {
 		expect.soft(fs.existsSync(workspacePath("packages/storage-browser/src/index.ts"))).toBe(true);
 	});
 
-	it("ships functional root JavaScript and declarations without tests, Playwright, toy, or build-info artifacts", () => {
-		execFileSync("pnpm", ["--dir", PACKAGE_DIRECTORY, "build"], { cwd: WORKSPACE_DIRECTORY, stdio: "pipe" });
-		const packed = JSON.parse(
-			execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
-				cwd: PACKAGE_DIRECTORY,
-				encoding: "utf8",
-			})
-		) as readonly [{ readonly files: readonly { readonly path: string }[] }];
-		const files = packed[0]?.files.map(({ path: packedPath }) => packedPath) ?? [];
-		expect.soft(files).toContain("dist/src/index.js");
-		expect.soft(files).toContain("dist/src/index.d.ts");
-		expect
-			.soft(
-				files.filter(
-					(candidate) =>
-						/(^|\/)(?:tests?|playwright[^/]*|killpoints\.json)(?:\/|$)/u.test(candidate) ||
-						candidate.endsWith(".tsbuildinfo") ||
-						candidate.includes("instrumented-idb") ||
-						candidate.includes("src/killpoints")
+	it("ships a consumer-usable typed root without tests, Playwright, toy, or build-info artifacts", () => {
+		const consumerDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2e7-consumer-"));
+		try {
+			execFileSync("pnpm", ["--dir", PACKAGE_DIRECTORY, "build"], {
+				cwd: WORKSPACE_DIRECTORY,
+				stdio: "pipe",
+			});
+			const packed = JSON.parse(
+				execFileSync("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", consumerDirectory], {
+					cwd: PACKAGE_DIRECTORY,
+					encoding: "utf8",
+				})
+			) as readonly PackedPackage[];
+			const artifact = packed[0];
+			expect(artifact).toBeDefined();
+			const files = artifact?.files.map(({ path: packedPath }) => packedPath) ?? [];
+			expect.soft(files).toContain("dist/src/index.js");
+			expect.soft(files).toContain("dist/src/index.d.ts");
+			expect
+				.soft(
+					files.filter(
+						(candidate) =>
+							/(^|\/)(?:tests?|playwright[^/]*|killpoints\.json)(?:\/|$)/u.test(candidate) ||
+							candidate.endsWith(".tsbuildinfo") ||
+							candidate.includes("instrumented-idb") ||
+							candidate.includes("src/killpoints")
+					)
 				)
-			)
-			.toEqual([]);
+				.toEqual([]);
+
+			writeKnownGoodStoragePackage(consumerDirectory);
+			const installedPackageDirectory = path.join(consumerDirectory, "node_modules/@ts-drp/storage-browser");
+			fs.mkdirSync(installedPackageDirectory, { recursive: true });
+			execFileSync(
+				"tar",
+				[
+					"-xzf",
+					path.join(consumerDirectory, artifact?.filename ?? "missing-package.tgz"),
+					"--strip-components=1",
+					"-C",
+					installedPackageDirectory,
+				],
+				{ cwd: WORKSPACE_DIRECTORY, stdio: "pipe" }
+			);
+
+			const controlProject = writeConsumerProject(
+				consumerDirectory,
+				"control",
+				`import { type AheDurableStore, createMemoryAheDurableStore } from "@ts-drp/storage";
+
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type AssertFalse<T extends false> = T;
+export type KnownGoodFactoryMustNotBeAny = AssertFalse<IsAny<typeof createMemoryAheDurableStore>>;
+
+const store: AheDurableStore = createMemoryAheDurableStore();
+const closeResult: Promise<void> = store.close();
+void closeResult;
+`
+			);
+			const targetProject = writeConsumerProject(
+				consumerDirectory,
+				"storage-browser",
+				`import type { AheDurableStore } from "@ts-drp/storage";
+import {
+	type BrowserAheDurableStoreOptions,
+	createBrowserAheDurableStore,
+} from "@ts-drp/storage-browser";
+
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type AssertFalse<T extends false> = T;
+export type PublicFactoryMustNotBeAny = AssertFalse<IsAny<typeof createBrowserAheDurableStore>>;
+
+const options = { databaseName: "phase-2e7-consumer" } satisfies BrowserAheDurableStoreOptions;
+const factory: (input: BrowserAheDurableStoreOptions) => Promise<AheDurableStore> =
+	createBrowserAheDurableStore;
+const closeResult: Promise<void> = factory(options).then((store) => store.close());
+void closeResult;
+`
+			);
+
+			const control = compileConsumer(controlProject);
+			expect(control.status, control.diagnostics).toBe(0);
+			expect(control.diagnostics).toBe("");
+			const target = compileConsumer(targetProject);
+			expect(target.status, target.diagnostics).toBe(0);
+			expect(target.diagnostics).toBe("");
+		} finally {
+			fs.rmSync(consumerDirectory, { force: true, recursive: true });
+		}
 	});
 
 	it("retires the complete toy campaign while retaining shared process, server, and ownership governance", () => {
