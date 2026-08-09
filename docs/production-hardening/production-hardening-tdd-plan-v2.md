@@ -1416,6 +1416,71 @@ timestamps, chunk/byte totals and verdict for every exact required tuple.
 Missing, extra, malformed, skipped, blocked or timed-out evidence fails.
 Chromium may characterize the handshake but does not own this gate.
 
+##### Phase 2f-b accepted and closed
+
+Phase 2f-b closed at final production GREEN `11f4a11` over corrective
+tests-only RED `6e5c091`. Its initial tests-only RED was `35985b3` and its
+initial production GREEN was `90c7c0f`. The corrective RED changed only
+`wire-host.test.ts`; the corrective GREEN changed only `host.ts`. The frozen
+test and ratified plan blobs remained byte-identical through the GREEN.
+
+The correction closes a real host-wide retained-byte leak found independently
+by the preliminary Grok and Kimi reviews. A successful terminal removed the
+request from the open registry while leaving unread chunks charged. If a
+consumer that had already started the stream then returned before draining
+those chunks, the old `cancel` cleanup returned early because the terminal was
+already present. The causal RED left 20,000 bytes charged and proved that a
+later valid 50,000-byte result was falsely rejected against a 65,536-byte host
+cap. The GREEN preserves pre-terminal cancellation, but discards only the
+remaining chunk array when terminal settlement has already occurred. Pulled
+chunks are shifted and debited before delivery; discarding iterates only the
+remaining entries and empties the array, so normal drain and repeated cleanup
+cannot double-debit.
+
+Final evidence records 87/87 worker-host tests, including the focused
+regression twice; package typecheck and build; traced nonempty production
+ESLint with zero errors and warnings; pack/export probes; Firefox and WebKit
+4/4 with retries zero; workspace typecheck 36/36 after excluding only the
+unchanged known object/node baselines; and the full 32-package build. Evidence
+is retained under
+`.logs/phase-2f-b-retained-bytes-{red,green}-codex-high/` and the original
+`.logs/phase-2f-b-wire-{red,green}-codex-high/` directories. This remains a
+scoped claim: root lint was not run or represented as green.
+
+The clean final review chain was Grok 4.5/high session
+`41dc8e5c-79b3-433c-a86d-91174a018720`, genuine Kimi 3/high/max-100 session
+`6fc244d2-254c-49f8-acc6-ab2981d3e3c8`, and Claude Opus 5/xhigh session
+`d7dddb36-4689-4281-9b57-a3eb8e675b78`; all returned `APPROVED`. The Opus
+bridge recorded only Opus 5, no Agent/Task or Fable use and no observable
+automatic helper. Their authenticated artifacts are respectively
+`.logs/phase-2f-b-retained-bytes-green-grok45-high-review/`,
+`.logs/phase-2f-b-retained-bytes-green-kimi3-high-100-review/` and
+`.logs/phase-2f-b-retained-bytes-final-opus-xhigh-review/`.
+
+Accepted non-gating gotchas remain explicit. Synchronous admission gives the
+host no guaranteed cleanup notification for a result generator that is never
+started and whose successful result is never consumed; ECMAScript garbage
+collection must not be assumed to execute its `finally`. Such unread storage
+remains bounded by the configured host cap, and callers must consume admitted
+streams. Returning while an already-started generator is parked on its wake
+promise defers cleanup until the request wakes; that parked state retains no
+chunk bytes, and the slice intentionally has no general execution timeout.
+Worker `emit` transfers and therefore detaches its accepted tight buffer.
+During cancellation, a structurally valid terminal acknowledges cancellation
+without rechecking emitted totals because race-window chunks are intentionally
+dropped by the host and may make those totals differ.
+
+Final Opus also found that the worker-side browser timestamp inequality is not
+by itself a discriminator for the named pre-ready-post host mutant. The frozen
+host unit mutant does kill that behavior, while the real Firefox/WebKit gate
+proves the production handshake and custody. This is retained as a proof-layer
+gotcha, not used to weaken the combined gate or amend the ratified browser
+wording; changing that normative inference would require a new assumption-
+correction quorum. The unused private `isTightBytes` predicate and narrow
+transfer-list, `worker-internal` and stale-metric assertion gaps are accepted
+low-severity cleanup/test residuals. None changes the public surface, bounded
+wire semantics or Discord/MMORPG path ownership. Phase 2f-c may now start.
+
 #### Slice 2f-c — emitted graph and real workload
 
 `worker-entries.json` lists every `*.worker.ts` under worker-host. Missing listed
