@@ -607,6 +607,32 @@ describe("Phase 2f-a cancellation, failure, and abandonment RED", () => {
 		expect((error as { suppressed: readonly unknown[] }).suppressed).toContain(itemFailure);
 	});
 
+	it("gives same-turn external abort precedence and suppresses the source failure", async () => {
+		const executeBounded = await executor();
+		const root = await loadRuntime();
+		const controller = new AbortController();
+		const nextCalled = deferred<undefined>();
+		const sourceNext = deferred<IteratorResult<number>>();
+		const sourceFailure = new Error("source failed in abort turn");
+		const processor = vi.fn((item: number) => item);
+		const source: AsyncIterable<number> = {
+			[Symbol.asyncIterator]: () => ({
+				next: (): Promise<IteratorResult<number>> => {
+					nextCalled.resolve(undefined);
+					return sourceNext.promise;
+				},
+			}),
+		};
+		const pending = executeBounded(source, processor, { signal: controller.signal }).next();
+		await nextCalled.promise;
+		controller.abort("cancel-source-first");
+		sourceNext.reject(sourceFailure);
+		const error = await rejection(pending);
+		expectWorkerHostError(error, "worker-host-aborted", root);
+		expect((error as { suppressed: readonly unknown[] }).suppressed).toContain(sourceFailure);
+		expect(processor).not.toHaveBeenCalled();
+	});
+
 	it("maps sync/async source and processor failures to the closed taxonomy with causes", async () => {
 		const executeBounded = await executor();
 		const root = await loadRuntime();
@@ -727,6 +753,7 @@ describe("Phase 2f-a caller-owned fixed telemetry RED", () => {
 			(): void => first.increment("items-processed", Number.MAX_SAFE_INTEGER + 1),
 			(): void => first.observe("unknown" as TimingName, 1),
 			(): void => first.observe("item-duration", -1),
+			(): void => first.observe("item-duration", Number.NaN),
 			(): void => first.observe("item-duration", Number.POSITIVE_INFINITY),
 		]) {
 			let error: unknown;
@@ -740,6 +767,8 @@ describe("Phase 2f-a caller-owned fixed telemetry RED", () => {
 		first.increment("items-processed", 2);
 		expect(namedValue(first.snapshot(), "items-processed")).toBe(2);
 		expect(namedValue(second.snapshot(), "items-processed")).toBe(0);
+		second.increment("items-processed");
+		expect(namedValue(second.snapshot(), "items-processed")).toBe(1);
 	});
 
 	it("saturates counts/totals and uses upper-inclusive fixed histogram buckets plus overflow", async () => {
