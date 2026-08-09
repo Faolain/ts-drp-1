@@ -733,6 +733,72 @@ describe("Phase 2f-a cancellation, failure, and abandonment RED", () => {
 		await expect(abandoned).resolves.toEqual({ done: true, value: undefined });
 		expect(sourceReturn).toHaveBeenCalledOnce();
 	});
+
+	it.each(["throwing-getter", "non-callable"] as const)(
+		"abandons without surfacing or hanging on a %s iterator return",
+		async (shape) => {
+			const executeBounded = await executor();
+			const releaseSecond = deferred<number>();
+			const secondStarted = deferred<undefined>();
+			let nextIndex = 0;
+			let linkedSignal: AbortSignal | undefined;
+			const iterator: AsyncIterator<number> & Record<string, unknown> = {
+				next: () => Promise.resolve({ done: false as const, value: nextIndex++ }),
+			};
+			if (shape === "throwing-getter") {
+				Object.defineProperty(iterator, "return", {
+					get(): never {
+						throw new Error("return getter exploded");
+					},
+				});
+			} else {
+				Object.defineProperty(iterator, "return", { value: 42 });
+			}
+			const source: AsyncIterable<number> = { [Symbol.asyncIterator]: () => iterator };
+			const stream = executeBounded(
+				source,
+				(item, index, signal) => {
+					linkedSignal = signal;
+					if (index === 0) return item;
+					secondStarted.resolve(undefined);
+					return releaseSecond.promise;
+				},
+				{ maxBufferedResults: 1 }
+			);
+			expect(await stream.next()).toEqual({ done: false, value: { index: 0, value: 0 } });
+			await secondStarted.promise;
+
+			type CloseOutcome =
+				| Readonly<{ kind: "rejected"; reason: unknown }>
+				| Readonly<{ kind: "resolved"; value: IteratorResult<BoundedItem<number>> }>;
+			let immediate: CloseOutcome | undefined;
+			const closing = stream.return();
+			const observed = closing.then(
+				(value): CloseOutcome => ({ kind: "resolved", value }),
+				(reason: unknown): CloseOutcome => ({ kind: "rejected", reason })
+			);
+			void observed.then((outcome) => {
+				immediate = outcome;
+			});
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(linkedSignal?.aborted).toBe(true);
+			if (immediate !== undefined) {
+				expect(immediate).toEqual({ kind: "resolved", value: { done: true, value: undefined } });
+				return;
+			}
+
+			releaseSecond.resolve(1);
+			let watchdog: ReturnType<typeof setTimeout> | undefined;
+			const outcome = await Promise.race([
+				observed,
+				new Promise<CloseOutcome>((resolve) => {
+					watchdog = setTimeout(() => resolve({ kind: "rejected", reason: new Error("abandonment timeout") }), 100);
+				}),
+			]);
+			if (watchdog !== undefined) clearTimeout(watchdog);
+			expect(outcome).toEqual({ kind: "resolved", value: { done: true, value: undefined } });
+		}
+	);
 });
 
 describe("Phase 2f-a caller-owned fixed telemetry RED", () => {
@@ -854,6 +920,57 @@ describe("Phase 2f-a caller-owned fixed telemetry RED", () => {
 			expect(snapshot.timings[name]).toMatchObject({ count: 1, maxMs: 0, totalMs: 0 });
 			expect(snapshot.timings[name].buckets[0]).toBe(1);
 		}
+	});
+
+	it("records positive ascending-clock item and batch elapsed durations", async () => {
+		const executeBounded = await executor();
+		const Metrics = await metricsConstructor();
+		const now = vi
+			.fn()
+			.mockReturnValueOnce(100)
+			.mockReturnValueOnce(103)
+			.mockReturnValueOnce(110)
+			.mockReturnValueOnce(111)
+			.mockReturnValue(112);
+		replaceGlobal("performance", { now });
+		replaceGlobal("scheduler", { yield: () => Promise.resolve() });
+		const metrics = new Metrics();
+
+		await expect(collect(executeBounded([4], (item) => item * 2, { batchSize: 1, metrics }))).resolves.toEqual([
+			{ index: 0, value: 8 },
+		]);
+		const snapshot = metrics.snapshot() as {
+			readonly timings: Readonly<
+				Record<TimingName, Readonly<{ buckets: readonly number[]; count: number; maxMs: number; totalMs: number }>>
+			>;
+		};
+		expect(snapshot.timings["item-duration"]).toMatchObject({ count: 1, maxMs: 7, totalMs: 7 });
+		expect(snapshot.timings["item-duration"].buckets[2]).toBe(1);
+		expect(snapshot.timings["batch-duration"]).toMatchObject({ count: 1, maxMs: 11, totalMs: 11 });
+		expect(snapshot.timings["batch-duration"].buckets[2]).toBe(1);
+	});
+
+	it("clamps failure-path item timing while preserving the primary item error and cause", async () => {
+		const executeBounded = await executor();
+		const root = await loadRuntime();
+		const Metrics = await metricsConstructor();
+		const now = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(80).mockReturnValueOnce(10).mockReturnValue(0);
+		replaceGlobal("performance", { now });
+		const metrics = new Metrics();
+		const itemFailure = new Error("processor failed under regressing clock");
+
+		const error = await rejection(collect(executeBounded([1], () => Promise.reject(itemFailure), { metrics })));
+		expectWorkerHostError(error, "worker-host-item-failed", root);
+		expect((error as Error).cause).toBe(itemFailure);
+		const timing = (
+			metrics.snapshot() as {
+				readonly timings: Readonly<
+					Record<TimingName, Readonly<{ buckets: readonly number[]; count: number; maxMs: number; totalMs: number }>>
+				>;
+			}
+		).timings["item-duration"];
+		expect(timing).toMatchObject({ count: 1, maxMs: 0, totalMs: 0 });
+		expect(timing.buckets[0]).toBe(1);
 	});
 });
 
