@@ -1,4 +1,3 @@
-/* eslint-disable import/no-unresolved -- the public root is the intentional type-level RED until production lands */
 import {
 	type BoundedExecutionOptions,
 	type BoundedItem,

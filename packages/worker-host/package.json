@@ -4,6 +4,13 @@
 	"license": "MIT",
 	"private": true,
 	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/src/index.d.ts",
@@ -11,7 +18,11 @@
 		}
 	},
 	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b tsconfig.build.json",
 		"test": "vitest run",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b tsconfig.build.json -w"
 	}
 }

@@ -2,7 +2,10 @@
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"exactOptionalPropertyTypes": true,
-		"noEmit": true
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/worker-host": ["./src/index.ts"]
+		}
 	},
-	"include": ["tests/**/*.ts"]
+	"include": ["src/**/*.ts", "tests/**/*.ts"]
 }
