@@ -9,6 +9,7 @@ import {
 	type GenerationRecord,
 	type NoHead,
 	parseGenerationId,
+	parseHeadRevision,
 	parseStorageObjectId,
 	type StorageObjectId,
 	type StoreResult,
@@ -24,7 +25,12 @@ import {
 	rawPhase2dCount,
 	rawPhase2dGet,
 	rawPhase2dReplaceBlob,
+	rawPhase2e2CreateWrongSchema,
+	rawPhase2e2Delete,
+	rawPhase2e2Put,
+	rawPhase2e2Snapshot,
 	requestPhase2dVersionchange,
+	withFailingGenerationRead,
 	withFailingHeadWrite,
 	withForcedPhase2dDurability,
 	withPhase2dTransactionTrace,
@@ -642,6 +648,250 @@ async function runPhase2e1PhysicalKeyMismatch(): Promise<unknown> {
 	}
 }
 
+type Phase2e2Corruption =
+	| "absent-head-target"
+	| "closure-mismatch"
+	| "malformed-generation"
+	| "malformed-head"
+	| "multiple-adopted"
+	| "non-adopted-head-target"
+	| "physical-key-mismatch"
+	| "unsupported-generation"
+	| "unsupported-head";
+
+function futureVersionEnvelope(v1: Uint8Array): Uint8Array {
+	const bytes = new Uint8Array(v1);
+	if (bytes.at(-1) !== 2) throw new Error("canonical v1 envelope encoding changed");
+	bytes[bytes.length - 1] = 4;
+	return bytes;
+}
+
+async function seedPhase2e2Journal(
+	name: string
+): Promise<Readonly<{ adopted: GenerationRecord; staged: GenerationRecord }>> {
+	const store = await createPhase2d2aRedStore({ databaseName: name });
+	await stageComplete(store, OBJECT_A, GENERATION_A);
+	const swapped = await store.swapHead({
+		expectedHead: noHead(OBJECT_A),
+		generationId: GENERATION_A,
+		objectId: OBJECT_A,
+	});
+	if (!swapped.ok) throw new Error(`fixture swap failed: ${swapped.reason}`);
+	const staged = await beginFrom(store, OBJECT_A, GENERATION_B, swapped.value.head, PAYLOAD_B);
+	if (!staged.ok) throw new Error(`fixture staging failed: ${staged.reason}`);
+	await store.close();
+	const adoptedRow = (await rawPhase2dGet(name, "generations", [OBJECT_A, GENERATION_A])) as
+		| { readonly record?: unknown }
+		| undefined;
+	if (!(adoptedRow?.record instanceof Uint8Array)) throw new Error("missing adopted fixture row");
+	const adopted = decodeGenerationRecordV1(adoptedRow.record);
+	if (!adopted.ok) throw new Error(`invalid adopted fixture row: ${adopted.reason}`);
+	return { adopted: adopted.value, staged: staged.value };
+}
+
+async function corruptPhase2e2Journal(
+	name: string,
+	corruption: Phase2e2Corruption,
+	fixture: Readonly<{ adopted: GenerationRecord; staged: GenerationRecord }>
+): Promise<void> {
+	switch (corruption) {
+		case "unsupported-generation":
+			await rawPhase2e2Put(name, "generations", {
+				generationId: GENERATION_B,
+				objectId: OBJECT_A,
+				record: futureVersionEnvelope(encodeGenerationRecordV1(fixture.staged)),
+			});
+			return;
+		case "unsupported-head":
+			await rawPhase2e2Put(name, "objects", {
+				objectId: OBJECT_A,
+				record: futureVersionEnvelope(
+					encodeHeadRecordV1({
+						closureDigest: fixture.adopted.closureDigest,
+						generationId: GENERATION_A,
+						kind: "present",
+						objectId: OBJECT_A,
+						revision: must(parseHeadRevision(1)),
+					})
+				),
+			});
+			return;
+		case "malformed-generation":
+			await rawPhase2e2Put(name, "generations", {
+				generationId: GENERATION_B,
+				objectId: OBJECT_A,
+				record: Uint8Array.of(255),
+			});
+			return;
+		case "malformed-head":
+			await rawPhase2e2Put(name, "objects", { objectId: OBJECT_A, record: Uint8Array.of(255) });
+			return;
+		case "absent-head-target":
+			await rawPhase2e2Delete(name, "generations", [OBJECT_A, GENERATION_A]);
+			return;
+		case "non-adopted-head-target":
+			await rawPhase2e2Put(name, "generations", {
+				generationId: GENERATION_A,
+				objectId: OBJECT_A,
+				record: encodeGenerationRecordV1({ ...fixture.adopted, state: "Complete" }),
+			});
+			return;
+		case "closure-mismatch":
+			await rawPhase2e2Put(name, "objects", {
+				objectId: OBJECT_A,
+				record: encodeHeadRecordV1({
+					closureDigest: fixture.staged.closureDigest,
+					generationId: GENERATION_A,
+					kind: "present",
+					objectId: OBJECT_A,
+					revision: must(parseHeadRevision(1)),
+				}),
+			});
+			return;
+		case "multiple-adopted":
+			await rawPhase2e2Put(name, "generations", {
+				generationId: GENERATION_B,
+				objectId: OBJECT_A,
+				record: encodeGenerationRecordV1({ ...fixture.staged, state: "Adopted" }),
+			});
+			return;
+		case "physical-key-mismatch":
+			await rawPhase2e2Put(name, "generations", {
+				generationId: GENERATION_C,
+				objectId: OBJECT_A,
+				record: encodeGenerationRecordV1(fixture.staged),
+			});
+	}
+}
+
+function broadPhase2e2Touch(
+	store: AheDurableStore,
+	generationId = GENERATION_C
+): Promise<StoreResult<GenerationRecord>> {
+	return begin(store, OBJECT_A, generationId, Uint8Array.of(7));
+}
+
+async function runPhase2e2TaxonomyMatrix(): Promise<unknown> {
+	const results: unknown[] = [];
+	for (const [corruption, expected] of [
+		["unsupported-generation", "UNSUPPORTED_STORAGE_SCHEMA"],
+		["unsupported-head", "UNSUPPORTED_STORAGE_SCHEMA"],
+		["malformed-generation", "NON_CANONICAL_RECORD"],
+		["malformed-head", "NON_CANONICAL_RECORD"],
+		["absent-head-target", "NON_CANONICAL_RECORD"],
+		["non-adopted-head-target", "NON_CANONICAL_RECORD"],
+		["closure-mismatch", "NON_CANONICAL_RECORD"],
+		["multiple-adopted", "NON_CANONICAL_RECORD"],
+		["physical-key-mismatch", "NON_CANONICAL_RECORD"],
+	] as const) {
+		const name = databaseName(`phase-2e2-${corruption}`);
+		try {
+			const fixture = await seedPhase2e2Journal(name);
+			await corruptPhase2e2Journal(name, corruption, fixture);
+			const before = await rawPhase2e2Snapshot(name);
+			const store = await createPhase2d2aRedStore({ databaseName: name });
+			const result = await broadPhase2e2Touch(store);
+			await store.close();
+			results.push({
+				corruption,
+				expected,
+				reason: reason(result),
+				zeroWrites: deepBytesEqual(before, await rawPhase2e2Snapshot(name)),
+			});
+		} finally {
+			await deletePhase2dDatabase(name);
+		}
+	}
+	return results;
+}
+
+function deepBytesEqual(left: unknown, right: unknown): boolean {
+	if (left instanceof Uint8Array && right instanceof Uint8Array) return bytesEqual(left, right);
+	if (Array.isArray(left) && Array.isArray(right)) {
+		return left.length === right.length && left.every((value, index) => deepBytesEqual(value, right[index]));
+	}
+	if (typeof left === "object" && left !== null && typeof right === "object" && right !== null) {
+		const leftRecord = left as Record<string, unknown>;
+		const rightRecord = right as Record<string, unknown>;
+		const keys = Object.keys(leftRecord);
+		return (
+			keys.length === Object.keys(rightRecord).length &&
+			keys.every((key) => deepBytesEqual(leftRecord[key], rightRecord[key]))
+		);
+	}
+	return Object.is(left, right);
+}
+
+async function runPhase2e2PoisonLifecycle(): Promise<unknown> {
+	const name = databaseName("phase-2e2-poison-lifecycle");
+	try {
+		const fixture = await seedPhase2e2Journal(name);
+		await corruptPhase2e2Journal(name, "malformed-generation", fixture);
+		const before = await rawPhase2e2Snapshot(name);
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		const first = broadPhase2e2Touch(store, GENERATION_C);
+		const queued = broadPhase2e2Touch(store, GENERATION_D);
+		const firstResult = await first;
+		const queuedResult = await queued;
+		const later = await splitRead(store, "readHead", OBJECT_A);
+		const zeroWrites = deepBytesEqual(before, await rawPhase2e2Snapshot(name));
+		await store.close();
+		await store.close();
+		const afterClose = await splitRead(store, "readHead", OBJECT_A);
+		return {
+			afterClose: reason(afterClose),
+			first: reason(firstResult),
+			later: reason(later),
+			queued: reason(queuedResult),
+			zeroWrites,
+		};
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runPhase2e2Controls(): Promise<unknown> {
+	const name = databaseName("phase-2e2-controls");
+	try {
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		const before = await rawPhase2e2Snapshot(name);
+		const invalid = (await Reflect.apply(store.beginGeneration, store, [{}])) as StoreResult<unknown>;
+		const invalidZeroWrites = deepBytesEqual(before, await rawPhase2e2Snapshot(name));
+		const valid = await broadPhase2e2Touch(store, GENERATION_A);
+		const beforeSubstrate = await rawPhase2e2Snapshot(name);
+		const substrate = await withFailingGenerationRead(() => broadPhase2e2Touch(store, GENERATION_B));
+		const substrateZeroWrites = deepBytesEqual(beforeSubstrate, await rawPhase2e2Snapshot(name));
+		await store.close();
+		return {
+			invalid: reason(invalid),
+			invalidZeroWrites,
+			substrate: reason(substrate),
+			substrateZeroWrites,
+			valid: reason(valid),
+		};
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runPhase2e2OpenFailure(): Promise<unknown> {
+	const name = databaseName("phase-2e2-open-failure");
+	try {
+		await rawPhase2e2CreateWrongSchema(name);
+		let handle: AheDurableStore | undefined;
+		let failureReason: unknown;
+		try {
+			handle = await createPhase2d2aRedStore({ databaseName: name });
+		} catch (error) {
+			failureReason = Reflect.get(Object(error), "reason");
+		}
+		await handle?.close();
+		return { handleReturned: handle !== undefined, reason: failureReason };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
 async function runCloseQuiescence(): Promise<unknown> {
 	const name = databaseName("close-quiescence");
 	let gate: Phase2dTerminalGate<StoreResult<GenerationRecord>> | undefined;
@@ -775,6 +1025,10 @@ const harness = Object.freeze({
 	runPhase2e1BoundedReads,
 	runPhase2e1BroadInvariant,
 	runPhase2e1PhysicalKeyMismatch,
+	runPhase2e2Controls,
+	runPhase2e2OpenFailure,
+	runPhase2e2PoisonLifecycle,
+	runPhase2e2TaxonomyMatrix,
 	runPersistenceAndCopies,
 	runSameDigestDifferentBytes,
 	runSharedContract,

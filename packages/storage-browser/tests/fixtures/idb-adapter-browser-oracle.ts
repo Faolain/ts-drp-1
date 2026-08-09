@@ -96,6 +96,106 @@ export async function rawPhase2dCount(name: string, storeName: string): Promise<
 }
 
 /**
+ * Reads exact raw rows for Phase 2e2 zero-write comparisons.
+ * @param name - Isolated database name.
+ * @returns Exact rows from every storage-owned store.
+ */
+export async function rawPhase2e2Snapshot(name: string): Promise<unknown> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(["objects", "generations", "blobs", "promotions"], "readonly");
+		const snapshot = await Promise.all(
+			["objects", "generations", "blobs", "promotions"].map(async (storeName) => {
+				const rows = await requestResult(transaction.objectStore(storeName).getAll());
+				return [storeName, rows] as const;
+			})
+		);
+		await transactionCompletion(transaction);
+		return snapshot;
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Replaces one raw row to seed a persisted-corruption case.
+ * @param name - Isolated database name.
+ * @param storeName - Physical store to alter.
+ * @param row - Test-owned raw row.
+ */
+export async function rawPhase2e2Put(name: string, storeName: string, row: unknown): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(storeName, "readwrite", { durability: "strict" });
+		transaction.objectStore(storeName).put(row);
+		await transactionCompletion(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Deletes one raw row to seed a relational contradiction.
+ * @param name - Isolated database name.
+ * @param storeName - Physical store to alter.
+ * @param key - Direct or compound physical key.
+ */
+export async function rawPhase2e2Delete(
+	name: string,
+	storeName: string,
+	key: string | readonly string[]
+): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(storeName, "readwrite", { durability: "strict" });
+		transaction.objectStore(storeName).delete(key as IDBValidKey);
+		await transactionCompletion(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Creates one incompatible v1 database without invoking production opening.
+ * @param name - Isolated database name.
+ */
+export async function rawPhase2e2CreateWrongSchema(name: string): Promise<void> {
+	await deletePhase2dDatabase(name);
+	const request = indexedDB.open(name, 1);
+	request.addEventListener(
+		"upgradeneeded",
+		() => {
+			request.result.createObjectStore("objects", { keyPath: "wrongKey" });
+		},
+		{ once: true }
+	);
+	const database = await requestResult(request);
+	database.close();
+}
+
+/**
+ * Injects one read failure without intercepting any write request.
+ * @param run - Adapter operation expected to read the generation journal.
+ * @returns The adapter operation result.
+ */
+export async function withFailingGenerationRead<T>(run: () => Promise<T>): Promise<T> {
+	const originalGetAll = IDBObjectStore.prototype.getAll;
+	IDBObjectStore.prototype.getAll = function failingGenerationRead(
+		this: IDBObjectStore,
+		query?: IDBValidKey | IDBKeyRange | null,
+		count?: number
+	): IDBRequest<unknown[]> {
+		if (this.name === "generations") throw new DOMException("injected generation read failure", "UnknownError");
+		return originalGetAll.call(this, query, count);
+	};
+	try {
+		return await run();
+	} finally {
+		IDBObjectStore.prototype.getAll = originalGetAll;
+	}
+}
+
+/**
  * Clears one physical head through the independent raw-IDB corruption oracle.
  * @param name - Isolated database name.
  * @param objectId - Creator-bound object whose adopted generation survives.
