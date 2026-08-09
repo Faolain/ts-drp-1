@@ -3546,6 +3546,106 @@ full-closure recovery and post-promotion damage classification, adoption crash
 matrix, malformed-row/database remediation and non-terminal transaction/close
 policy. No recovery or retention/GC behavior enters 2d2c.
 
+#### Phase 2d2c accepted closure — bounded completion from promotion evidence
+
+Only Phase 2d2c is accepted at tests-only RED commits `e5a94f9`, `7b85b5e`
+and `7acfde2`, and production-only GREEN `9069239`. The two RED corrections
+were necessary because inherited state-machine expectations still assigned
+missing/corrupt taxonomy to completion, and the adapter fixture still supplied
+closure blob facts on the normal completion path. Both corrections froze the
+ratified contract rather than weakening it: byte existence and integrity are
+checked by `promoteReference`; completion accepts only exact generation and
+promotion facts, rejects an over-supplied blob fact, and returns
+`BLOB_UNPROMOTED` when evidence is absent.
+
+The six final RED files remained byte-identical through GREEN. Their SHA-256
+values are `c56f6f671b31ff1022c855ed6b8f9b257aa096358236be8228eefbf83af5e613`,
+`cfbfc55c93864cdc10564230557b0adfee6715a1a67171acd0cc1ca9de794473`,
+`179a51fc37a4ed81d18810b9322e44249fb880a71f9a4c6dad20931e68ae3ec7`,
+`89960e53c68c33f68753e96073e59917b382932e1b2d400ad3ade909324f4f37`,
+`79cf46fa57efd4e0ed5b21da96134b6750f41b259671c23ed2ef8fbb7bee1163`
+and `c6bee893cd856f3d7bf0ad30d2365d117554c4a0f4f6cb6e02aa491d3bf4afb8`.
+At the final RED checkpoint, the shared causal suite was seven failed / one
+passed, the Node probe failed solely on two blob `SELECT`s, and the Chromium
+probe failed solely on two blob reads plus inclusion of the `blobs` store in
+the completion transaction. Positive transaction, result, write and promotion
+controls remained green.
+
+GREEN changes exactly the four authorized production files. The shared exact-
+facts evaluator no longer permits closure blob facts for completion, the
+transition owner requires promotion evidence without rechecking blob bytes,
+the Node loader issues no closure-blob query, and the browser loader neither
+reads a closure blob nor includes the `blobs` store in its completion
+transaction. No caller-supplied evidence path was added: promotion rows remain
+immutable backend-owned records written only after the backend has loaded and
+exactly verified the referenced bytes. The diff is two insertions / thirteen
+deletions and introduces no new fact kind, store, API, migration, recovery
+policy or public surface.
+
+At committed GREEN, the focused shared, Node and Chromium cases are 8/8, 1/1
+and 1/1. Full storage is 114/114, storage-node is 13 passed plus one deliberate
+opt-in skip, and storage-browser is 172/172. Chromium preservation is Phase
+2d1 11/11, 2d2a 9/9 and 2d2b(i) 3/3. All three package builds and typechecks,
+zero-warning ESLint, Prettier, production-only diff and custody checks are
+green. The GREEN evidence-manifest digest is
+`e0ca4493a002b91d794f4591dc04ab3b805de80da758ae12f55c86c44ca339e7`.
+
+The independent acceptance loop unanimously found no blocker and no reward
+hacking:
+
+- genuine Grok 4.5/high session
+  `019fe3d3-a37d-7eb1-8f59-c6a8bfcbba3d` returned `APPROVED`, no blockers and
+  `2D2C_MAY_CLOSE: yes`; exact result SHA-256
+  `0bc7e0fc005ea6b6bf0a8c67afa6399a38a162d2ca57d5ab1b30139e7046a3ff`,
+  raw-envelope SHA-256
+  `c28b0645dae8fc0f2e5a98aee230b5e84886517dade92139c43a2d90ead54b8c`
+  and artifact-integrity-manifest SHA-256
+  `82d14d3bc2c06c81aaaea783be61b3c49aa7e5d1eb8e4f1b8aca239ac8b1156d`;
+- exact Kimi 3/high/100 session
+  `b75e75a7-2448-4cda-a4c8-884d6b99afc4` returned `APPROVED`, no blockers,
+  `REWARD_HACKING: no` and `2D2C_MAY_CLOSE: yes`, and independently reproduced
+  51/51 targeted tests; exact result SHA-256
+  `ebf4becab0577d5a6729624009495df1cc88116185a85a467e4fba830f3ac3b8`,
+  raw-stream SHA-256
+  `d5027ae12164311f8812b862538d42a57a35f4c38a68f0e069deb71c057b5b52`
+  and artifact-integrity-manifest SHA-256
+  `44f990590cd41c2ff51d74eae2d6651bf54bf2e8742f3222299e7c79035d7b72`;
+- final Opus 5/xhigh session
+  `bdd4f0de-01bb-4fad-b0a5-477e1afda9c7` returned `APPROVED`,
+  `CONTRACT_SATISFIED: yes`, no blockers and `2D2C_MAY_CLOSE: yes`; exact
+  result SHA-256
+  `1da5d786a5d0e0f928c5b2c6e307c4b6fde7cbf5eb35e036f527eb5226c98fe4`,
+  raw-stream SHA-256
+  `f6dff1b9a0fce0b9a787384cda647e096e694f3aa2975adc3ec195bce0bf6410`
+  and artifact-integrity-manifest SHA-256
+  `30cbc9e9222b5931dc40edaa1359331c36d46f6460245b5cc2b40921aacfe0e6`.
+  All 72 assistant events authenticate as Opus 5 at requested xhigh effort and
+  use only Read/Grep/Glob. Small automatic Haiku metadata performed no review
+  or helper work.
+
+Carry these accepted findings and execution gotchas to their bounded owners:
+
+1. Phase 2e or the Phase 2 exit gate should add a real-backend negative control
+   for completion without promotion evidence. The shared contract already
+   proves the result; this is backend integration depth, not a 2d2c blocker.
+2. A Phase-2d1 generation-closure browser fixture still lists the `blobs`
+   store tautologically. Clean it during 2d2d test hygiene without changing
+   the accepted 2d2c production contract.
+3. The Node no-read probe currently detects SQL text. A stronger engine-level
+   read counter may replace it at the 2e/Phase 2 exit instrumentation gate.
+4. Physical loss/corruption after promotion, full-closure recovery and the
+   journal/per-object read bound remain Phase 2e; promotion retention/GC
+   remains 2g; browser referential-integrity and multi-connection behavior
+   remain 2e/2i/5c; votes remain 2d2d/5c; public packaging remains 2e.
+5. Node child-process preservation must rebuild both shared storage and
+   storage-node first; one pre-rebuild run honestly loaded stale `dist`. An
+   initial Chromium `tee` path error, a formatting-only rerun and an aborted
+   nested Codex review are retained in the evidence log and are not counted as
+   passing gates.
+
+This closes only Phase 2d2c. It does not close Phase 2d, the Phase 2 exit gate,
+or either golden path.
+
 ##### Slice 2d2d — vote-schema disposition and private-surface gate
 
 **Causal RED.** Freeze an exact four-store, zero-index private-v1 authority and
