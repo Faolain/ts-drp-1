@@ -4593,6 +4593,103 @@ from Chromium-only 2e work. Semantic manifest/QC/tail roles remain 4c/6, quota/
 retention remains 2g, vote transactions remain 5c, durable issuance remains 2l,
 and neither Discord/chat nor MMORPG is enabled by 2e alone.
 
+##### Phase 2e7 accepted and closed
+
+Phase 2e7 is accepted at final GREEN `fbd992d`, directly above corrective
+tests-only RED `a22f82d`. The publication lineage also freezes comprehensive
+tests/config/assets RED `a16dc25` and initial GREEN `b6f594f`. The package now
+publishes one stable root factory and options type, while the Node package
+remains private and browser internals remain unavailable as package subpaths.
+The real Chromium component imports that root, reopens the same database and
+verifies persisted bytes, then proves a still-`Complete` stale candidate reaches
+`HEAD_CONFLICT` after a competing head advance.
+
+The corrective RED closes a real declaration-surface gap in the initial GREEN.
+It builds and packs the package, extracts the tarball into an isolated consumer,
+first compiles a self-contained known-good storage declaration, then compiles
+the browser root with strict NodeNext, `skipLibCheck: false`, a non-`any` guard
+and the exact `Promise<AheDurableStore>` factory contract. At RED it fails in
+the resolved packed root declaration with `TS2305`: the root re-export names a
+factory absent from the nested declaration. The first corrective checkpoint
+`e0765b6` was superseded because its control symlinked live workspace packages
+and therefore depended on untracked sibling build output. `a22f82d` replaces
+that control with a self-contained declaration fixture and reproduces the same
+causal failure from the tracked-only clean-checkout runner. The frozen test blob
+is identical across `a22f82d` and `fbd992d`.
+
+The final GREEN changes only the public factory JSDoc: it removes stale
+`private` wording and `@internal`. Root `stripInternal: true` can therefore no
+longer erase the public factory from emitted declarations. The actual packed
+`idb-adapter.d.ts` declares
+`createBrowserAheDurableStore(options: BrowserAheDurableStoreOptions): Promise<AheDurableStore>`,
+and the packed root declaration re-exports it. Runtime code, package metadata,
+tests, fixtures and browser configuration are unchanged by this correction.
+
+The initial GREEN retires exactly the frozen 22 toy-only paths and changes 59
+files by +456/-5,838. That headline includes a material consolidation inside
+nine surviving governance files: 184 package tests became 88, with 87 tests and
+2,249 lines removed from those retained files:
+
+| Retained governance owner  | Tests before -> after |
+| -------------------------- | --------------------: |
+| staged freeze churn        |               26 -> 2 |
+| settled-run lifecycle      |               19 -> 3 |
+| cleanup authority          |               15 -> 2 |
+| persisted-artifact custody |               15 -> 2 |
+| failure finalization       |               10 -> 2 |
+| executable authority       |                9 -> 3 |
+| settled-failure ownership  |                6 -> 3 |
+| structural controls        |                6 -> 3 |
+| nested IDB ownership       |                2 -> 1 |
+
+Acceptance does not treat the retained-path allowlist as anti-hollowing proof:
+`PHASE_2E7_RETAINED_GOVERNANCE_PATHS` checks existence only. Preservation rests
+instead on the remaining behavioral negative controls and exact-HEAD suites:
+process-forest/freeze/cleanup/finalization remain live, asset serving stays
+closed, IDB ownership and its nested-signature mutant remain causal, Phase 2e5
+is 4/4 in Chromium, and the Phase 2e6 edge derivation still owns eighteen
+declared edges. The unchanged eighteen-kill campaign was not rerun in 2e7 and
+is not claimed as fresh evidence.
+
+Final exact-HEAD gates are 24 storage-browser files / 88 tests, including the
+tracked-only clean-checkout runner; focused publication/declaration 5/5; Phase
+2e7 Chromium 1/1; and Phase 2e5 Chromium 4/4. Storage, storage-node and
+storage-browser typechecks/builds pass, as do scoped traced ESLint, Prettier,
+diff checks and actual tarball inspection. Root `pnpm lint` remains a red
+workspace baseline, observed at 183 errors and 286 warnings with zero
+storage-browser contribution; it is not a green Phase 2e7 gate, and its totals
+can drift as protected untracked `.logs` inputs appear.
+
+One publication-path residual remains explicit. The accepted tarball was built
+with the src-only build config and packed with lifecycle scripts disabled. The
+real `prepack: tsc -b` path, whose broader config can emit test and Playwright
+outputs before the package-file negations exclude them, was not empirically
+exercised against that polluted `dist`. Before an actual package release or the
+Phase-2 exit claims publish readiness, run the real clean lifecycle pack without
+`--ignore-scripts` and prove those exclusions from the produced tarball. The
+unsourced diagnostic-audit occurrence count and its unprinted outer-import arm
+are deliberately not acceptance evidence; only the directly observed packed
+root `TS2305`, passing control and final consumer compile are cited.
+
+Fresh Grok 4.5/high session `019fe74d-5c19-7050-be7d-c5bb3912ee39`, genuine
+Kimi 3/high/max-100 session `252d6ddc-7b6b-4427-b086-3d7972dd51ff` and final
+Opus 5/xhigh session `ee5d70c9-6fe9-4986-ba01-e56791c17b9a` all returned
+`APPROVED`, no blockers and no reward hacking. Their result SHA-256 values are
+respectively
+`cacd9bec94ebb35ca0fa762c4ce6c4d4d29af3e6e7be1fa850b189a2701cb606`,
+`45af55bddfd1a9a8780da5f2ce75c1a93e52e52f97104926cc224fa6fa0c4ff6`
+and `f9287fbb8d6fdb276bb642a8acfc8c838b4c2e475430f44ad3c10efd324f5326`.
+All review custody checks are clean. Opus used no Agent/Task helper; the runtime
+reported permitted automatic Haiku metadata usage of 1,939 input and 20 output
+tokens.
+
+Phase 2e7 closes publication and toy-harness retirement only. Initial database
+creation/version upgrade remains a schema-lifecycle residual, the real
+prepublish lifecycle check remains at the release/Phase-2 exit gate, and
+Firefox/WebKit plus multi-tab replication remain Phase 2h/exit work. The next
+implementation slice is 2f. Neither Discord/chat nor MMORPG is enabled by this
+closure.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
