@@ -256,36 +256,50 @@ export interface Phase2e5ObservedRow {
 }
 
 export interface Phase2e6InventoryEdge {
-	readonly edge: "after" | "before";
+	readonly edge: "after";
 	readonly id: string;
 	readonly scenarioId: string;
-	readonly target: "request" | "transaction-open" | "transaction-terminal";
+	readonly target: "request" | "transaction-terminal";
 }
 
 /**
- * Derives the exact later kill edges from the ratified request inventory.
+ * Derives the settlement-time interruption cases Phase 2e6 must execute from
+ * successful write transactions in the ratified request inventory. Request
+ * creation traces establish order and identity here; they do not by themselves
+ * prove that the corresponding writes or transaction have settled.
  * @param inventory - Finite Phase 2e5 declaration.
- * @returns Stable before/after request and transaction edges for Phase 2e6.
+ * @returns Stable post-write and post-commit edges for Phase 2e6.
  */
 export function phase2e6Edges(inventory: readonly Phase2e5InventoryRow[]): readonly Phase2e6InventoryEdge[] {
 	return inventory.flatMap((row) => {
-		if (row.transaction === null) return [];
-		const targets = [
-			{ id: "transaction-open", target: "transaction-open" as const },
-			...row.requests.map((value, index) => ({
-				id: `request-${String(index).padStart(2, "0")}-${value.kind}-${value.store}`,
-				target: "request" as const,
-			})),
-			{ id: `transaction-terminal-${row.transaction.terminal}`, target: "transaction-terminal" as const },
-		];
-		return targets.flatMap(({ id, target }) =>
-			(["before", "after"] as const).map((edge) => ({
-				edge,
-				id: `${row.id}/${id}/${edge}`,
-				scenarioId: row.id,
-				target,
-			}))
+		if (
+			row.transaction === null ||
+			row.transaction.mode !== "readwrite" ||
+			row.transaction.terminal !== "complete" ||
+			row.writes.length === 0
+		)
+			return [];
+		const writeEdges: Phase2e6InventoryEdge[] = row.requests.flatMap((value, index) =>
+			value.kind === "add" || value.kind === "put"
+				? [
+						{
+							edge: "after",
+							id: `${row.id}/request-${String(index).padStart(2, "0")}-${value.kind}-${value.store}/after`,
+							scenarioId: row.id,
+							target: "request",
+						},
+					]
+				: []
 		);
+		return [
+			...writeEdges,
+			{
+				edge: "after",
+				id: `${row.id}/transaction-terminal-complete/after`,
+				scenarioId: row.id,
+				target: "transaction-terminal",
+			},
+		];
 	});
 }
 
