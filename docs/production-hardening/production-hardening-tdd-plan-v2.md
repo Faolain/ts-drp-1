@@ -4137,6 +4137,118 @@ Prettier, ownership/custody and the relevant browser/Node process tests to logs.
 This larger-than-normal GREEN is indivisible because splitting its authority is
 the reproduced safety bug, not because broad unrelated work is bundled.
 
+##### Phase 2e3 closure checkpoint — atomic recovery and bounded authority
+
+Phase 2e3 is accepted at final production HEAD
+`df7a89fdf9f70a7a53bb165e37685e952531928e`. The causal lineage is
+`9138317` → `205dea6` → `20bde4c` → `3bdad38` → `e3961e6` →
+`04a7b00` → `feb9e5f` → production `b9739dc` → corrective RED
+`b9c6f48` → corrective production `df7a89f`. The original production GREEN is
+the indivisible authority flip; the final GREEN changes only the shared memory
+transition owner to close the review-found transient-materialization defect.
+
+The shipped design has one shared synchronous incremental closure verifier and
+opaque, frozen, propertyless session/authorization handles bound to the full
+canonical generation bytes and mode. Memory, SQLite and IndexedDB all use that
+verifier. Strict backends load bounded head, addressed-candidate and dynamic
+head-named-generation facts; neither backend can assert a `verified` fact or mint
+authorization. `completeGeneration` and `swapHead` run behind the serialized
+per-object/database-incarnation recovery certificate gate. A certificate is
+head-fingerprint-bound, is advanced only after a successful commit, and is
+cleared on close, version change, poison or ambiguous substrate failure. The
+monolithic `object-state`/`generation-closure` mutation facts, broad backend
+loaders and whole-state diff owner are deleted. The sole adoption assignment and
+head-write plan remain behind the verified transition owner.
+
+Recovery scans every generation row in deterministic bounded pages, proves the
+exact head/Adopted relationship, verifies the active closure one reference at a
+time and returns a deep-frozen, detached, byte-free snapshot. Candidate failures
+remain repairable `BLOB_*` results. Adopted-state failures return the exact
+`ADOPTED_BLOB_*` or persisted-record root once, then all later work sees
+`STORE_POISONED`; successful close makes `STORE_CLOSED` win. Browser verification
+issues its next promotion/blob request from the preceding IDB success callback,
+with peak one live blob request. Node performs the same verifier steps inside its
+synchronous SQL transaction. Every rejection performs zero writes.
+
+The final memory correction is deliberately behavioral rather than a source
+pattern. `b9c6f48` seeds 320 retained rows and transparently observes actual
+closure access. Against `b9739dc`, a sole adopted row at position 320 and a
+first-plus-last multiple-Adopted journal both touched all 320 closures instead
+of the required one and zero. `df7a89f` now full-walks the ordered IDs, counts
+all Adopted rows, retains at most one mutable row, rejects multiplicity before
+any closure access, and clones/verifies only the sole valid adopted row. This
+honors the ratified transient-memory bound for the ephemeral implementation too;
+there is no undocumented memory-backend carve-out.
+
+Two RED/test corrections are part of the accepted evidence, not hidden test
+weakening. `04a7b00` replaced an invalid executable RED that required production
+`TransitionOwner.swapHead` to remain unsafe with a local bounded-only mutant;
+the ordinary production method is now the sole verified path. It also froze the
+shared root-once/poison-later lifecycle and retired the stale Phase 2d2a exact
+ownership trace because Phase 2e5 owns the final browser inventory. `feb9e5f`
+gave three pre-verification CAS positive fixtures real blob and promotion
+evidence and widened the expected successful swap transaction's read stores to
+include `blobs` and `promotions`; its CAS and exact three-write assertions remain
+unchanged.
+
+Final verification is: shared Phase 2e3 focus 25/25, memory-bound RED 2/2,
+state machine 37/37, full storage 133/133, Node Phase 2e3 16/16 and real Chromium
+preservation 19/19. All three storage package typechecks and builds, explicit
+zero-warning ESLint, Prettier, diff and custody gates passed. The write/checkpoint
+shape remains six mutations and 25 checkpoints: 2e3 added reads but no executable
+write checkpoint, and `df7a89f` is memory-only. The fast 25-checkpoint campaign
+passed on the unchanged backend content; the redundant five-repetition opt-in
+campaign was therefore not rerun. Workspace typecheck remains red only in the
+unrelated Phase 1i-b object fixtures already recorded at 2e1/2e2.
+
+Evidence gotchas are explicit. A pre-commit clean-checkout wrapper necessarily
+failed while the GREEN was untracked and passed after `b9739dc`; an earlier Node
+process run imported stale child `dist`; and one focused Vitest invocation passed
+its assertions but inherited the workspace coverage threshold. Those are
+iteration artifacts, not final gates. One initial Kimi review created an
+untracked temporary adversarial probe despite the read-only prompt; the
+controller authenticated its origin and removed only that probe before the fresh
+read-only rereview. Protected untracked files and all five stashes remained
+unchanged.
+
+Independent final acceptance is unanimous:
+
+- fresh Grok 4.5/high session `019fe5b0-5982-7202-ab63-6003d8ea7d11`
+  returned `APPROVED` and `2E3_MAY_CLOSE: yes`; result, raw and integrity
+  SHA-256 values are
+  `4c33e2059407efa67349b6cbd300fc66e393d638d9b33722dd1e2e6470de90d3`,
+  `ad79d777ba2cf17225d9797ee42c412d72f033bf3e506e74d42a11e30d36437d`
+  and `77a3d2cc9eaf11678ff5c89c5c0fb6e829f7fac09a40390e54aed2387ae05c89`;
+- fresh exact Kimi 3/high/max-100 session
+  `49345dee-2faa-4091-8cd1-a825da97a234` returned `APPROVED` and
+  `2E3_MAY_CLOSE: YES`; prompt, raw, result and integrity-manifest SHA-256
+  values are
+  `e9d4430d4aecb8399bfca7704b205678b8a494284524af3a488226e30edffddd`,
+  `8aae92c8d867634f0179a365a3956652d0ef61b0b877d24e1597a49c5ff56706`,
+  `19250675a0a160a55f9b25e7e8bb4150e9495e5c1270d640867ac3fb992934ea`
+  and `858949c02e594e1b3851d3efc9a19f9995f234bb93fd407d38b0de5e9bed5b9f`;
+- genuine Opus 5/xhigh session `951111ab-eaf5-4f3e-af7a-fb834451eb50`
+  returned `APPROVED`, no blockers and `2E3_MAY_CLOSE: yes`. It used direct
+  read-only `Bash`/`Read`, no Agent/Task/delegation; the permitted automatic
+  Haiku helper used 3,309 input and 24 output tokens. Prompt, raw, result and
+  integrity-manifest SHA-256 values are
+  `951089b68428da127eecec03bc8e7ba7e43646a8b8103609e701502c09c8cb02`,
+  `6d779bc7ba27e1627c6e095a8fa29695565b2b3457983012db78954e6e84060a`,
+  `51935037fdfc21f3f135dee85c9b2ce830c8a17aaa10ef501b5fad71f5b7c22c`
+  and `f7db02ae82213b074da3893a87e4e7e50231e7532896d4d1169ec5f852dfd406`.
+
+Residuals are routed rather than hidden. Phase 2e4 owns reopen/first-touch,
+close-during-recovery, post-promotion damage, the explicit later result after a
+genuine substrate failure, finer null-row/non-byte precision, new-gate poison
+latch ordering and the Node recovery-cursor guard asymmetry. Phase 2e5 owns the
+duplicated browser object read, widened authority scope and final
+declared-equals-observed request inventory; 2e6 owns process-death adoption and
+2e7 publication. Fixture-only `TransitionOwner.readObjectState` and an optional
+one-shot `finish()` latch are cleanup, not safety blockers. IDB page continuations
+are request-event/microtask-backed and have no concrete auto-commit reproducer;
+other browser engines remain an exit-gate obligation. Neither Discord/chat nor
+MMORPG is enabled by 2e3 alone.
+
 #### Slice 2e4 — recovery lifecycle and backend acceptance
 
 Freeze reopen/first-touch/explicit-recovery behavior, post-promotion physical
