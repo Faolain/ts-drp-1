@@ -297,6 +297,11 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 		if (!prepared.ok) return;
 		const facts = (generationRecord: Uint8Array): readonly unknown[] => [
 			{
+				headRecord: null,
+				kind: "head",
+				objectId: OBJECT_A,
+			},
+			{
 				generationId: GENERATION_A,
 				generationRecord,
 				kind: "generation",
