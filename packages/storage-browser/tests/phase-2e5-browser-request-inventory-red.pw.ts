@@ -69,14 +69,87 @@ test("the inventory covers every adapter operation, recovery path, write set, an
 	}
 });
 
-test("Phase 2e6 request and terminal edge IDs derive bijectively from this same inventory", () => {
-	const edges = phase2e6Edges(PHASE_2E5_BROWSER_REQUEST_INVENTORY);
-	expect(edges.length).toBeGreaterThan(0);
-	expect(new Set(edges.map(({ id }) => id)).size).toBe(edges.length);
-	for (const row of PHASE_2E5_BROWSER_REQUEST_INVENTORY) {
-		const scenarioEdges = edges.filter(({ scenarioId }) => scenarioId === row.id);
-		expect(scenarioEdges).toHaveLength(row.transaction === null ? 0 : (row.requests.length + 2) * 2);
-	}
+test("Phase 2e6 derives only write-success and committed-publication kill edges", () => {
+	type InventoryRow = (typeof PHASE_2E5_BROWSER_REQUEST_INVENTORY)[number];
+	type InventoryEdges = ReturnType<typeof phase2e6Edges>;
+	const selected = (row: InventoryRow): boolean =>
+		row.transaction?.mode === "readwrite" && row.transaction.terminal === "complete" && row.writes.length > 0;
+	const expectedEdges = (inventory: readonly InventoryRow[]): InventoryEdges =>
+		inventory.filter(selected).flatMap((row) => [
+			...row.requests.flatMap((request, index) =>
+				request.kind === "add" || request.kind === "put"
+					? [
+							{
+								edge: "after" as const,
+								id: `${row.id}/request-${String(index).padStart(2, "0")}-${request.kind}-${request.store}/after`,
+								scenarioId: row.id,
+								target: "request" as const,
+							},
+						]
+					: []
+			),
+			{
+				edge: "after" as const,
+				id: `${row.id}/transaction-terminal-complete/after`,
+				scenarioId: row.id,
+				target: "transaction-terminal" as const,
+			},
+		]);
+	const mutate = (id: string, update: (row: InventoryRow) => InventoryRow): readonly InventoryRow[] =>
+		PHASE_2E5_BROWSER_REQUEST_INVENTORY.map((row) => (row.id === id ? update(row) : row));
+	const selectedIds = PHASE_2E5_BROWSER_REQUEST_INVENTORY.filter(selected).map(({ id }) => id);
+	expect(selectedIds).toEqual([
+		"begin-generation-empty",
+		"begin-generation-certificate-match",
+		"put-cached-blob-staged",
+		"promote-reference-staged",
+		"complete-generation-empty-recovery",
+		"swap-head-certificate-match",
+		"swap-head-fresh-recovery",
+		"discard-generation-staged",
+	]);
+	expect(PHASE_2E5_BROWSER_REQUEST_INVENTORY.filter(selected).every(({ result }) => result === "OK")).toBe(true);
+	const expected = expectedEdges(PHASE_2E5_BROWSER_REQUEST_INVENTORY);
+	expect(expected).toHaveLength(18);
+	expect(expected.filter(({ target }) => target === "request")).toHaveLength(10);
+	expect(expected.filter(({ target }) => target === "transaction-terminal")).toHaveLength(8);
+	expect(new Set(expected.map(({ id }) => id)).size).toBe(18);
+
+	const twoWriteId = "swap-head-certificate-match";
+	const withoutOneWrite = mutate(twoWriteId, (row) => ({
+		...row,
+		requests: row.requests.slice(0, -1),
+		writes: row.writes.slice(0, -1),
+	}));
+	const selectedId = "begin-generation-empty";
+	const aborted = mutate(selectedId, (row) => ({
+		...row,
+		transaction: row.transaction === null ? null : { ...row.transaction, terminal: "abort" },
+	}));
+	const readonly = mutate(selectedId, (row) => ({
+		...row,
+		transaction: row.transaction === null ? null : { ...row.transaction, mode: "readonly" },
+	}));
+	const zeroWrite = mutate(selectedId, (row) => ({ ...row, writes: [] }));
+	const cases = [
+		{
+			expected: expectedEdges(PHASE_2E5_BROWSER_REQUEST_INVENTORY),
+			input: PHASE_2E5_BROWSER_REQUEST_INVENTORY,
+			label: "control",
+		},
+		{ expected: expectedEdges(withoutOneWrite), input: withoutOneWrite, label: "one write removed" },
+		{ expected: expectedEdges(aborted), input: aborted, label: "selected row aborts" },
+		{ expected: expectedEdges(readonly), input: readonly, label: "selected row becomes readonly" },
+		{ expected: expectedEdges(zeroWrite), input: zeroWrite, label: "selected row declares zero writes" },
+	] as const;
+	expect(cases.map(({ expected: values }) => values.length)).toEqual([18, 17, 16, 16, 16]);
+	const mismatches = cases.flatMap(({ expected: wanted, input, label }) => {
+		const actual = phase2e6Edges(input);
+		return JSON.stringify(actual) === JSON.stringify(wanted)
+			? []
+			: [`${label}: expected ${wanted.length} exact edges, received ${actual.length}`];
+	});
+	expect(mismatches).toEqual([]);
 });
 
 test("causal request and transaction mutants cannot satisfy declared-equals-observed", () => {
