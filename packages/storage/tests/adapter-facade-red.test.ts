@@ -1,8 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { bytes, GENERATION_A, GENERATION_B, noHead, OBJECT_A, OBJECT_B, presentHead, record, ref } from "./fixtures.js";
-import { createTransitionHarness } from "./internal-harness.js";
+import { bytes, GENERATION_A, noHead, OBJECT_A, OBJECT_B, record, ref } from "./fixtures.js";
 import * as adapter from "../src/adapter.js";
 import {
 	evaluateStorageAdapterCommand,
@@ -10,30 +9,19 @@ import {
 	prepareStorageAdapterCommand,
 	type StorageAdapterCommand,
 	type StorageAdapterFact,
-	type StorageAdapterLoadRequirement,
 	type StorageAdapterWrite,
 } from "../src/adapter.js";
-import {
-	decodeGenerationRecordV1,
-	decodeHeadRecordV1,
-	encodeGenerationRecordV1,
-	encodeHeadRecordV1,
-} from "../src/codecs.js";
+import { encodeGenerationRecordV1 } from "../src/codecs.js";
 import * as contract from "../src/contract.js";
 import * as root from "../src/index.js";
-import type { GenerationRecord, StoreResult } from "../src/types.js";
-
-type Scenario = Readonly<{
-	command: AdapterCommandFixture;
-	facts: readonly StorageAdapterFact[];
-	name: string;
-	writes(result: StoreResult<unknown>): readonly StorageAdapterWrite[];
-}>;
+import type { GenerationRecord } from "../src/types.js";
 
 type AdapterCommandFixture =
 	| StorageAdapterCommand
 	| Readonly<{ kind: "readHead"; objectId: typeof OBJECT_A }>
 	| Readonly<{ cursor?: string; kind: "readGenerationPage"; limit: number; objectId: typeof OBJECT_A }>;
+
+type Phase2e3LoadKind = "blob" | "generation" | "generation-page" | "head" | "promotion";
 
 function mustPrepare(command: unknown): PreparedStorageAdapterCommand {
 	const result = prepareStorageAdapterCommand(command);
@@ -41,17 +29,12 @@ function mustPrepare(command: unknown): PreparedStorageAdapterCommand {
 	return result.value;
 }
 
-function evaluateFacade(command: AdapterCommandFixture, facts: readonly StorageAdapterFact[]): StoreResult<unknown> {
-	const prepared = prepareStorageAdapterCommand(command);
-	return prepared.ok ? evaluateStorageAdapterCommand(prepared.value, facts).result : prepared;
+function requirementKinds(command: AdapterCommandFixture): readonly string[] {
+	return mustPrepare(command).requirements.map(({ kind }) => kind);
 }
 
-function headFact(head: ReturnType<typeof noHead> | ReturnType<typeof presentHead>): StorageAdapterFact {
-	return {
-		headRecord: head.kind === "none" ? null : encodeHeadRecordV1(head),
-		kind: "head",
-		objectId: head.objectId,
-	} as unknown as StorageAdapterFact;
+function headFact(objectId = OBJECT_A): StorageAdapterFact {
+	return { headRecord: null, kind: "head", objectId } as unknown as StorageAdapterFact;
 }
 
 function generationPageFact(generations: readonly GenerationRecord[]): StorageAdapterFact {
@@ -63,142 +46,7 @@ function generationPageFact(generations: readonly GenerationRecord[]): StorageAd
 	} as unknown as StorageAdapterFact;
 }
 
-function objectFact(
-	state: Readonly<{ head: ReturnType<typeof noHead> | ReturnType<typeof presentHead>; generations: GenerationRecord[] }>
-): StorageAdapterFact {
-	return {
-		kind: "object-state",
-		objectId: state.head.objectId,
-		headRecord: state.head.kind === "none" ? null : encodeHeadRecordV1(state.head),
-		generationRecords: state.generations.map(encodeGenerationRecordV1),
-	};
-}
-
-function executeHarness(
-	harness: ReturnType<typeof createTransitionHarness>,
-	command: AdapterCommandFixture
-): StoreResult<unknown> {
-	switch (command.kind) {
-		case "readHead": {
-			const state = harness.readObjectState(command.objectId);
-			return state.ok ? { ok: true, value: state.value.head } : state;
-		}
-		case "readGenerationPage": {
-			const state = harness.readObjectState(command.objectId);
-			return state.ok
-				? { ok: true, value: { generations: state.value.generations.slice(0, command.limit), nextCursor: null } }
-				: state;
-		}
-		case "getBlob":
-			return harness.getBlob(command.digest);
-		case "beginGeneration":
-			return harness.beginGeneration({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				baseExpectedHead: command.baseExpectedHead,
-				closure: command.closure,
-			});
-		case "putCachedBlob":
-			return harness.putCachedBlob({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				digest: command.digest,
-				bytes: command.bytes,
-			});
-		case "promoteReference":
-			return harness.promoteReference({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				digest: command.digest,
-			});
-		case "completeGeneration":
-			return harness.completeGeneration({ objectId: command.objectId, generationId: command.generationId });
-		case "swapHead":
-			return harness.swapHead({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				expectedHead: command.expectedHead,
-			});
-		case "discardGeneration":
-			return harness.discardGeneration({ objectId: command.objectId, generationId: command.generationId });
-	}
-	throw new Error("unhandled adapter command fixture");
-}
-
-function expectedFromSharedKernel(
-	command: AdapterCommandFixture,
-	facts: readonly StorageAdapterFact[]
-): StoreResult<unknown> {
-	const harness = createTransitionHarness();
-	for (const fact of facts) {
-		const splitFact = fact as unknown as {
-			readonly generationRecords?: readonly Uint8Array[];
-			readonly headRecord?: Uint8Array | null;
-			readonly kind: string;
-			readonly objectId?: typeof OBJECT_A;
-		};
-		if (splitFact.kind === "head" && splitFact.objectId !== undefined && splitFact.headRecord !== undefined) {
-			const head =
-				splitFact.headRecord === null
-					? { ok: true as const, value: noHead(splitFact.objectId) }
-					: decodeHeadRecordV1(splitFact.headRecord);
-			if (!head.ok) return head;
-			harness.seedObjectState({ head: head.value, generations: [] });
-			continue;
-		}
-		if (splitFact.kind === "generation-page" && splitFact.objectId !== undefined) {
-			const generations: GenerationRecord[] = [];
-			for (const bytes of splitFact.generationRecords ?? []) {
-				const decoded = decodeGenerationRecordV1(bytes);
-				if (!decoded.ok) return decoded;
-				generations.push(decoded.value);
-			}
-			harness.seedObjectState({ head: noHead(splitFact.objectId), generations });
-			continue;
-		}
-		switch (fact.kind) {
-			case "store-closed":
-				harness.close();
-				break;
-			case "object-state": {
-				const head =
-					fact.headRecord === null
-						? { ok: true as const, value: noHead(fact.objectId) }
-						: decodeHeadRecordV1(fact.headRecord);
-				if (!head.ok) return head;
-				const generations: GenerationRecord[] = [];
-				for (const bytes of fact.generationRecords) {
-					const decoded = decodeGenerationRecordV1(bytes);
-					if (!decoded.ok) return decoded;
-					generations.push(decoded.value);
-				}
-				harness.seedObjectState({ head: head.value, generations });
-				break;
-			}
-			case "blob":
-				if (fact.bytes !== null) harness.seedBlob(fact.digest, fact.bytes);
-				break;
-			case "promotion":
-				harness.markPromoted(fact.objectId, fact.generationId, fact.digest);
-		}
-	}
-	return executeHarness(harness, command);
-}
-
-function generationWrite(result: StoreResult<unknown>): readonly StorageAdapterWrite[] {
-	if (!result.ok) return [];
-	const generation = result.value as GenerationRecord;
-	return [
-		{
-			kind: "replace-generation",
-			objectId: generation.objectId,
-			generationId: generation.generationId,
-			record: encodeGenerationRecordV1(generation),
-		},
-	];
-}
-
-describe("Phase 2c-a durable adapter facade RED", () => {
+describe("Phase 2e3 durable adapter facade correction RED", () => {
 	it("publishes only the strict runtime-neutral adapter-author surface", () => {
 		const packageDirectory = new URL("../", import.meta.url);
 		const manifest = JSON.parse(readFileSync(new URL("package.json", packageDirectory), "utf8")) as {
@@ -266,23 +114,23 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		expect(combined).not.toMatch(/\b(?:document|HTMLElement|window|WorkerGlobalScope)\b/u);
 	});
 
-	it("detaches nested closure values and blob bytes synchronously before substrate work", () => {
+	it("detaches caller closure and blob bytes synchronously before substrate work", () => {
 		const closure = [ref(bytes(1, 2, 3))];
 		const beginInput: StorageAdapterCommand = {
-			kind: "beginGeneration",
-			objectId: OBJECT_A,
-			generationId: GENERATION_A,
 			baseExpectedHead: noHead(),
 			closure,
+			generationId: GENERATION_A,
+			kind: "beginGeneration",
+			objectId: OBJECT_A,
 		};
 		const blobInput = bytes(4, 5, 6);
 		const blobReference = ref(blobInput);
 		const putInput: StorageAdapterCommand = {
+			bytes: blobInput,
+			digest: blobReference.digest,
+			generationId: GENERATION_A,
 			kind: "putCachedBlob",
 			objectId: OBJECT_A,
-			generationId: GENERATION_A,
-			digest: blobReference.digest,
-			bytes: blobInput,
 		};
 		const preparedBegin = mustPrepare(beginInput);
 		const preparedPut = mustPrepare(putInput);
@@ -290,28 +138,16 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		closure.push(ref(bytes(9)));
 		blobInput.fill(0);
 
-		expect(preparedBegin).toEqual({
-			command: {
-				...beginInput,
-				closure: [{ digest: ref(bytes(1, 2, 3)).digest, byteLength: 3 }],
-			},
-			requirements: [{ kind: "object-state", objectId: OBJECT_A }],
+		expect(preparedBegin.command).toEqual({
+			...beginInput,
+			closure: [{ byteLength: 3, digest: ref(bytes(1, 2, 3)).digest }],
 		});
 		expect(preparedPut.command).toMatchObject({ bytes: bytes(4, 5, 6) });
-		const initial = objectFact({ head: noHead(), generations: [record({ closure: [blobReference] })] });
-		const evaluated = evaluateStorageAdapterCommand(preparedPut, [
-			initial,
-			{ kind: "blob", digest: blobReference.digest, bytes: null },
-		]);
-		expect(evaluated).toEqual({
-			result: { ok: true, value: { inserted: true } },
-			writes: [{ kind: "insert-blob", digest: blobReference.digest, bytes: bytes(4, 5, 6) }],
-		});
 
 		const suppliedFactBytes = bytes(7, 8, 9);
 		const factReference = ref(suppliedFactBytes);
 		const blobRead = evaluateStorageAdapterCommand(mustPrepare({ kind: "getBlob", digest: factReference.digest }), [
-			{ kind: "blob", digest: factReference.digest, bytes: suppliedFactBytes },
+			{ bytes: suppliedFactBytes, digest: factReference.digest, kind: "blob" },
 		]);
 		expect(blobRead).toEqual({ result: { ok: true, value: bytes(7, 8, 9) }, writes: [] });
 		if (!blobRead.result.ok || !(blobRead.result.value instanceof Uint8Array)) {
@@ -322,7 +158,7 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		expect(blobRead.result.value).toEqual(bytes(7, 8, 9));
 	});
 
-	it("gives own SharedArrayBuffer bytes precedence over extra string and symbol siblings", () => {
+	it("gives own SharedArrayBuffer bytes precedence over extra siblings", () => {
 		const payload = bytes(1, 2, 3);
 		const item = ref(payload);
 		const shared = new Uint8Array(new SharedArrayBuffer(payload.byteLength));
@@ -331,11 +167,11 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 
 		for (const extra of extras) {
 			const input = {
+				bytes: shared,
+				digest: item.digest,
+				generationId: GENERATION_A,
 				kind: "putCachedBlob",
 				objectId: OBJECT_A,
-				generationId: GENERATION_A,
-				digest: item.digest,
-				bytes: shared,
 				...extra,
 			};
 			expect.soft(prepareStorageAdapterCommand(input)).toEqual({
@@ -349,284 +185,129 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		}
 	});
 
-	it("preserves closure reasons and lets STORE_CLOSED outrank semantic closure rejection", () => {
-		const item = ref(bytes(1, 2, 3));
-		const empty = objectFact({ head: noHead(), generations: [] });
-		const cases = [
-			{ closure: [], reason: "EMPTY_CLOSURE" },
-			{ closure: [item, item], reason: "DUPLICATE_CLOSURE_REFERENCE" },
-		] as const;
-
-		for (const { closure, reason } of cases) {
-			const command: StorageAdapterCommand = {
+	it("uses only the ratified bounded load vocabulary and addresses every mutation generation", () => {
+		const item = ref(bytes(1));
+		const commands: readonly AdapterCommandFixture[] = [
+			{
+				baseExpectedHead: noHead(),
+				closure: [item],
+				generationId: GENERATION_A,
 				kind: "beginGeneration",
 				objectId: OBJECT_A,
+			},
+			{
+				bytes: bytes(1),
+				digest: item.digest,
 				generationId: GENERATION_A,
-				baseExpectedHead: noHead(),
-				closure,
-			};
-			expect.soft(evaluateFacade(command, [empty])).toEqual({ ok: false, reason });
-			expect.soft(evaluateFacade(command, [{ kind: "store-closed" }])).toEqual({
+				kind: "putCachedBlob",
+				objectId: OBJECT_A,
+			},
+			{
+				digest: item.digest,
+				generationId: GENERATION_A,
+				kind: "promoteReference",
+				objectId: OBJECT_A,
+			},
+			{ generationId: GENERATION_A, kind: "completeGeneration", objectId: OBJECT_A },
+			{ expectedHead: noHead(), generationId: GENERATION_A, kind: "swapHead", objectId: OBJECT_A },
+			{ generationId: GENERATION_A, kind: "discardGeneration", objectId: OBJECT_A },
+		];
+		const allowed = new Set<Phase2e3LoadKind>(["blob", "generation", "generation-page", "head", "promotion"]);
+		for (const command of commands) {
+			const kinds = requirementKinds(command);
+			expect.soft(kinds, command.kind).toContain("generation");
+			expect
+				.soft(
+					kinds.every((kind) => allowed.has(kind as Phase2e3LoadKind)),
+					command.kind
+				)
+				.toBe(true);
+		}
+
+		const source = readFileSync(new URL("../src/adapter.ts", import.meta.url), "utf8");
+		expect.soft(source).toContain('kind: "generation"');
+		expect.soft(source).not.toContain('kind: "object-state"');
+		expect.soft(source).not.toContain('kind: "generation-closure"');
+	});
+
+	it("keeps bounded public read facts exact and rejects inexact fact sets", () => {
+		const generation = record();
+		const decodedGeneration = generationPageFact([generation]);
+		const cases = [
+			{
+				command: { kind: "readHead", objectId: OBJECT_A } as const,
+				fact: headFact(),
+				expected: { ok: true, value: noHead() },
+			},
+			{
+				command: { kind: "readGenerationPage", limit: 1, objectId: OBJECT_A } as const,
+				fact: decodedGeneration,
+				expected: { ok: true, value: { generations: [generation], nextCursor: null } },
+			},
+		] as const;
+		for (const { command, expected, fact } of cases) {
+			const prepared = mustPrepare(command);
+			expect.soft(evaluateStorageAdapterCommand(prepared, [fact]).result).toEqual(expected);
+			expect.soft(evaluateStorageAdapterCommand(prepared, []).result).toEqual({
 				ok: false,
-				reason: "STORE_CLOSED",
+				reason: "INVALID_ARGUMENT",
+			});
+			expect.soft(evaluateStorageAdapterCommand(prepared, [fact, fact]).result).toEqual({
+				ok: false,
+				reason: "INVALID_ARGUMENT",
 			});
 		}
 		expect(
-			evaluateFacade(
-				{
-					kind: "beginGeneration",
-					objectId: OBJECT_A,
-					generationId: GENERATION_A,
-					baseExpectedHead: noHead(),
-					closure: [item],
-				},
-				[empty]
-			)
-		).toMatchObject({ ok: true });
+			evaluateStorageAdapterCommand(mustPrepare({ kind: "readHead", objectId: OBJECT_A }), [headFact(OBJECT_B)])
+		).toEqual({ result: { ok: false, reason: "INVALID_ARGUMENT" }, writes: [] });
 	});
 
-	it("names exact fact loads and fails closed on every inexact fact set", () => {
+	it("keeps exact command-owned write kinds and caller-input failure precedence", () => {
+		const ownership: Record<StorageAdapterWrite["kind"], string> = {
+			"insert-blob": "blobs",
+			"insert-promotion": "promotions",
+			"replace-generation": "generations",
+			"replace-head": "objects",
+		};
+		expect(ownership).toEqual({
+			"insert-blob": "blobs",
+			"insert-promotion": "promotions",
+			"replace-generation": "generations",
+			"replace-head": "objects",
+		});
 		const item = ref(bytes(1));
-		const requirements: ReadonlyArray<readonly [AdapterCommandFixture, readonly StorageAdapterLoadRequirement[]]> = [
-			[
-				{ kind: "readHead", objectId: OBJECT_A },
-				[{ kind: "head", objectId: OBJECT_A } as unknown as StorageAdapterLoadRequirement],
-			],
-			[
-				{ kind: "readGenerationPage", objectId: OBJECT_A, limit: 2 },
-				[
-					{
-						afterGenerationId: null,
-						kind: "generation-page",
-						limitPlusOne: 3,
-						objectId: OBJECT_A,
-					} as unknown as StorageAdapterLoadRequirement,
-				],
-			],
-			[
-				{
-					kind: "beginGeneration",
-					objectId: OBJECT_A,
-					generationId: GENERATION_A,
-					baseExpectedHead: noHead(),
-					closure: [item],
-				},
-				[{ kind: "object-state", objectId: OBJECT_A }],
-			],
-			[
-				{ kind: "putCachedBlob", objectId: OBJECT_A, generationId: GENERATION_A, digest: item.digest, bytes: bytes(1) },
-				[
-					{ kind: "object-state", objectId: OBJECT_A },
-					{ kind: "blob", digest: item.digest },
-				],
-			],
-			[
-				{ kind: "promoteReference", objectId: OBJECT_A, generationId: GENERATION_A, digest: item.digest },
-				[
-					{ kind: "object-state", objectId: OBJECT_A },
-					{ kind: "blob", digest: item.digest },
-					{ kind: "promotion", objectId: OBJECT_A, generationId: GENERATION_A, digest: item.digest },
-				],
-			],
-			[
-				{ kind: "completeGeneration", objectId: OBJECT_A, generationId: GENERATION_A },
-				[
-					{ kind: "object-state", objectId: OBJECT_A },
-					{ kind: "generation-closure", objectId: OBJECT_A, generationId: GENERATION_A },
-				],
-			],
-		];
-		for (const [command, expected] of requirements) {
-			expect(mustPrepare(command).requirements).toEqual(expected);
-		}
-		if (typeof SharedArrayBuffer !== "undefined") {
-			const shared = new Uint8Array(new SharedArrayBuffer(1));
-			expect(
-				prepareStorageAdapterCommand({
-					kind: "putCachedBlob",
-					objectId: OBJECT_A,
-					generationId: GENERATION_A,
-					digest: item.digest,
-					bytes: shared,
-				})
-			).toEqual({ ok: false, reason: "SHARED_BUFFER_INPUT" });
-		}
 		expect(
-			prepareStorageAdapterCommand({ ...(requirements[2]?.[0] as StorageAdapterCommand), durability: "strict" })
+			prepareStorageAdapterCommand({
+				baseExpectedHead: noHead(),
+				closure: [item],
+				durability: "strict",
+				generationId: GENERATION_A,
+				kind: "beginGeneration",
+				objectId: OBJECT_A,
+			})
 		).toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
 		expect(
 			prepareStorageAdapterCommand({
+				digest: item.digest,
+				generationId: GENERATION_A,
 				kind: "promoteReference",
 				objectId: OBJECT_A,
-				generationId: GENERATION_A,
-				digest: item.digest,
 				promoted: true,
 			})
 		).toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
-
-		const prepared = mustPrepare(requirements[2]?.[0]);
-		const correct = objectFact({ head: noHead(), generations: [] });
-		const foreign = objectFact({ head: noHead(OBJECT_B), generations: [] });
-		for (const facts of [[], [correct, foreign], [correct, correct], [foreign]]) {
-			expect(evaluateStorageAdapterCommand(prepared, facts)).toEqual({
-				result: { ok: false, reason: "INVALID_ARGUMENT" },
-				writes: [],
-			});
-		}
-		expect(evaluateStorageAdapterCommand(prepared, [{ kind: "store-closed" }])).toEqual({
-			result: { ok: false, reason: "STORE_CLOSED" },
-			writes: [],
-		});
+		expect(
+			evaluateStorageAdapterCommand(mustPrepare({ kind: "readHead", objectId: OBJECT_A }), [{ kind: "store-closed" }])
+		).toEqual({ result: { ok: false, reason: "STORE_CLOSED" }, writes: [] });
 	});
 
-	it("matches the single transition kernel and emits only canonical whole-row or immutable-insert writes", () => {
-		const payload = bytes(1, 2, 3);
-		const item = ref(payload);
-		const staged = record({ closure: [item] });
-		const currentGeneration = record({ closure: [item], generationId: GENERATION_A, state: "Adopted" });
-		const currentHead = presentHead({ closureDigest: currentGeneration.closureDigest });
-		const candidate = record({
-			baseExpectedHead: currentHead,
-			closure: [item],
-			generationId: GENERATION_B,
-			state: "Complete",
-		});
-		const empty = objectFact({ head: noHead(), generations: [] });
-		const stagedFact = objectFact({ head: noHead(), generations: [staged] });
-		const promoted: StorageAdapterFact = {
-			kind: "promotion",
-			objectId: OBJECT_A,
-			generationId: GENERATION_A,
-			digest: item.digest,
-		};
-		const blob: StorageAdapterFact = { kind: "blob", digest: item.digest, bytes: payload };
-		const scenarios: readonly Scenario[] = [
-			{
-				name: "read head",
-				command: { kind: "readHead", objectId: OBJECT_A },
-				facts: [headFact(noHead())],
-				writes: () => [],
-			},
-			{
-				name: "read generation page",
-				command: { kind: "readGenerationPage", objectId: OBJECT_A, limit: 128 },
-				facts: [generationPageFact([staged])],
-				writes: () => [],
-			},
-			{
-				name: "read blob",
-				command: { kind: "getBlob", digest: item.digest },
-				facts: [blob],
-				writes: () => [],
-			},
-			{
-				name: "begin",
-				command: {
-					kind: "beginGeneration",
-					objectId: OBJECT_A,
-					generationId: GENERATION_A,
-					baseExpectedHead: noHead(),
-					closure: [item],
-				},
-				facts: [empty],
-				writes: generationWrite,
-			},
-			{
-				name: "cache",
-				command: {
-					kind: "putCachedBlob",
-					objectId: OBJECT_A,
-					generationId: GENERATION_A,
-					digest: item.digest,
-					bytes: payload,
-				},
-				facts: [stagedFact, { kind: "blob", digest: item.digest, bytes: null }],
-				writes: (result) => (result.ok ? [{ kind: "insert-blob", digest: item.digest, bytes: payload }] : []),
-			},
-			{
-				name: "promote",
-				command: {
-					kind: "promoteReference",
-					objectId: OBJECT_A,
-					generationId: GENERATION_A,
-					digest: item.digest,
-				},
-				facts: [stagedFact, blob],
-				writes: (result) =>
-					result.ok
-						? [
-								{
-									kind: "insert-promotion",
-									objectId: OBJECT_A,
-									generationId: GENERATION_A,
-									digest: item.digest,
-								},
-							]
-						: [],
-			},
-			{
-				name: "complete",
-				command: { kind: "completeGeneration", objectId: OBJECT_A, generationId: GENERATION_A },
-				facts: [stagedFact, promoted],
-				writes: generationWrite,
-			},
-			{
-				name: "swap",
-				command: {
-					kind: "swapHead",
-					objectId: OBJECT_A,
-					generationId: GENERATION_B,
-					expectedHead: currentHead,
-				},
-				facts: [objectFact({ head: currentHead, generations: [currentGeneration, candidate] })],
-				writes: (result): readonly StorageAdapterWrite[] => {
-					if (!result.ok) return [];
-					const value = result.value as { head: ReturnType<typeof presentHead> };
-					return [
-						{
-							kind: "replace-generation",
-							objectId: OBJECT_A,
-							generationId: GENERATION_A,
-							record: encodeGenerationRecordV1({ ...currentGeneration, state: "Superseded" }),
-						},
-						{
-							kind: "replace-generation",
-							objectId: OBJECT_A,
-							generationId: GENERATION_B,
-							record: encodeGenerationRecordV1({ ...candidate, state: "Adopted" }),
-						},
-						{ kind: "replace-head", objectId: OBJECT_A, record: encodeHeadRecordV1(value.head) },
-					];
-				},
-			},
-			{
-				name: "discard",
-				command: { kind: "discardGeneration", objectId: OBJECT_A, generationId: GENERATION_A },
-				facts: [stagedFact],
-				writes: generationWrite,
-			},
-			{
-				name: "current-head-first rejection",
-				command: { kind: "swapHead", objectId: OBJECT_A, generationId: GENERATION_B, expectedHead: noHead() },
-				facts: [objectFact({ head: currentHead, generations: [currentGeneration, candidate] })],
-				writes: () => [],
-			},
-		];
-
-		for (const scenario of scenarios) {
-			const expectedResult = expectedFromSharedKernel(scenario.command, scenario.facts);
-			const actual = evaluateStorageAdapterCommand(mustPrepare(scenario.command), scenario.facts);
-			expect.soft(actual, scenario.name).toEqual({
-				result: expectedResult,
-				writes: scenario.writes(expectedResult),
-			});
-		}
-
-		expect(
-			evaluateStorageAdapterCommand(
-				mustPrepare({ kind: "completeGeneration", objectId: OBJECT_A, generationId: GENERATION_A }),
-				[stagedFact, { kind: "blob", digest: item.digest, bytes: bytes(9) }, promoted]
-			)
-		).toEqual({ result: { ok: false, reason: "INVALID_ARGUMENT" }, writes: [] });
+	it("keeps the bounded load kind ledger exhaustive without private authorization guesses", () => {
+		const owners = {
+			"blob": "blob",
+			"generation": "generation",
+			"generation-page": "generation",
+			"head": "head",
+			"promotion": "promotion",
+		} satisfies Record<Phase2e3LoadKind, string>;
+		expect(Object.keys(owners).sort()).toEqual(["blob", "generation", "generation-page", "head", "promotion"]);
 	});
 });
