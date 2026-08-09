@@ -1,4 +1,4 @@
-import { chromium, expect, test } from "@playwright/test";
+import { chromium, expect, type Page, test } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -30,7 +30,7 @@ import {
 const ASSET_DIRECTORY = process.env.PHASE_2E6_ASSET_DIR;
 const ARTIFACT_DIRECTORY = path.resolve(
 	import.meta.dirname,
-	"../../../.logs/phase-2e6-real-process-death-red-codex-high/artifacts"
+	"../../../.logs/phase-2e6-real-process-death-green-codex-high/artifacts"
 );
 const GIT_SHA = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const CAMPAIGN_ID = `phase-2e6-${GIT_SHA}-${process.pid}`;
@@ -75,6 +75,53 @@ function exitOf(
 	});
 }
 
+async function inFreshPersistentContext<T>(profile: string, run: (page: Page) => Promise<T>): Promise<T> {
+	const transitionURL = server.issueTransitionURL("phase-2e6.html");
+	const token = required(new URL(transitionURL).pathname.split("/")[2], "fresh transition token");
+	const context = await chromium.launchPersistentContext(profile, {
+		executablePath: EXECUTABLE,
+		headless: true,
+	});
+	try {
+		const page = context.pages()[0] ?? (await context.newPage());
+		await page.goto(transitionURL, { waitUntil: "load" });
+		await page.waitForFunction(() => typeof window.phase2e6Recover === "function");
+		return await run(page);
+	} finally {
+		await context.close();
+		server.revoke(token);
+	}
+}
+
+async function recoverEdge(
+	profile: string,
+	databaseName: string,
+	edge: (typeof PHASE_2E6_DECLARED_EDGES)[number],
+	seededHead: unknown
+): Promise<Record<string, unknown>> {
+	return inFreshPersistentContext(
+		profile,
+		async (page) =>
+			(await page.evaluate(
+				({ databaseName, scenarioId, seededHead }) =>
+					window.phase2e6Recover(databaseName, scenarioId, seededHead as never),
+				{ databaseName, scenarioId: edge.scenarioId, seededHead }
+			)) as Record<string, unknown>
+	);
+}
+
+async function runControls(): Promise<Record<string, unknown>> {
+	const profile = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2e6-controls-"));
+	try {
+		return await inFreshPersistentContext(profile, async (page) => {
+			await page.waitForFunction(() => typeof window.phase2e6RunControls === "function");
+			return (await page.evaluate(() => window.phase2e6RunControls())) as Record<string, unknown>;
+		});
+	} finally {
+		fs.rmSync(profile, { force: true, recursive: true });
+	}
+}
+
 async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal: number): Promise<unknown> {
 	const runId = phase2e6RunId(edge, ordinal);
 	const profile = fs.mkdtempSync(path.join(os.tmpdir(), `phase-2e6-${runId}-`));
@@ -101,6 +148,8 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 	const exit = exitOf(child);
 	let ready: Record<string, unknown> | undefined;
 	let armed: Record<string, unknown> | undefined;
+	let armReachCount = 0;
+	let publicResultDeliveries = 0;
 	const reached = new Promise<void>((resolve, reject) => {
 		const lines = readline.createInterface({
 			input: required(child.stdout ?? undefined, "crash stdout"),
@@ -112,9 +161,10 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 				if (message.kind === "child-error") reject(new TypeError(String(message.detail)));
 				else if (message.kind === "ready") ready = message;
 				else if (message.kind === "armed") {
+					armReachCount += 1;
 					armed = message;
 					resolve();
-				}
+				} else if (message.kind === "premature-public-result") publicResultDeliveries += 1;
 			} catch (error) {
 				reject(error);
 			}
@@ -173,29 +223,31 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 				pid,
 			};
 		});
+		const recovery = await recoverEdge(profile, databaseName, edge, observation.seededHead);
 		const row = required(
 			PHASE_2E5_BROWSER_REQUEST_INVENTORY.find(({ id }) => id === edge.scenarioId),
 			"inventory row"
 		);
 		const expectedState = edge.target === "request" ? "old" : "new";
+		const databaseCreateCountAfterSeed =
+			Number(observation.databaseCreateCountAfterSeed) + Number(recovery.databaseCreateCountAfterSeed);
+		const databaseDeleteCount = Number(observation.databaseDeleteCount) + Number(recovery.databaseDeleteCount);
 		const evidence = {
-			armReachCount: 1,
+			armReachCount,
 			browserExecutable: EXECUTABLE,
 			browserRoot,
 			child: childIdentity,
 			childExit,
 			controllerPgid: controller.pgid,
 			databaseName,
-			databaseCreateCountAfterSeed: 0,
-			databaseDeleteCount: 0,
-			databaseIdentityPreserved: false,
+			databaseCreateCountAfterSeed,
+			databaseDeleteCount,
+			databaseIdentityPreserved:
+				recovery.databaseIdentityPreserved === true && databaseCreateCountAfterSeed === 0 && databaseDeleteCount === 0,
 			edgeId: edge.id,
 			expectedState,
 			frozenForest,
-			head:
-				row.operation === "swapHead"
-					? { kind: "swap", monotone: false, new: "UNREACHED", old: null, recovered: null }
-					: { kind: "unchanged", old: null, recovered: null },
+			head: recovery.head,
 			initialForest: initial,
 			killedGroups: [
 				{ absent: true, killAccepted: true, pgid: groups.browserPgid, role: "browser", rootPid: browserRoot.pid },
@@ -204,14 +256,14 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 			mainThreadAtomicsWaitCalls: 0,
 			operationTransactionCount: Number(observation.transactionCount),
 			profilePath: profile,
-			publicResultDeliveries: 0,
+			publicResultDeliveries,
 			reachedRequestedArm: true,
 			recordedProcessDeaths: deaths,
-			recoveredDatabaseName: "UNREACHED",
-			recoveredImage: { blobs: [], generations: [], objects: [], promotions: [] },
-			recoveryResult: "DRIVER_NOT_IMPLEMENTED",
+			recoveredDatabaseName: recovery.recoveredDatabaseName,
+			recoveredImage: recovery.recoveredImage,
+			recoveryResult: recovery.recoveryResult,
 			scenarioOperation: row.operation,
-			sentinelRetained: false,
+			sentinelRetained: recovery.sentinelRetained,
 			tracePrefix: observation.trace,
 			unsupported: false,
 			workerCrossOriginIsolated: ready.crossOriginIsolated === true,
@@ -249,15 +301,20 @@ test("eighteen actual-adapter settlement arms hard-kill detached Chromium before
 			expect(file).toBe(`${phase2e6RunId(required(PHASE_2E6_DECLARED_EDGES[index], "artifact edge"), index)}.json`);
 			return JSON.parse(fs.readFileSync(path.join(ARTIFACT_DIRECTORY, file), "utf8")) as unknown;
 		});
+	const controls = await runControls();
+	fs.writeFileSync(
+		path.join(path.dirname(ARTIFACT_DIRECTORY), "controls.json"),
+		`${JSON.stringify({ campaignId: CAMPAIGN_ID, gitSha: GIT_SHA, ...controls }, null, 2)}\n`
+	);
 	const campaign = phase2e6CampaignFromArtifacts(
 		diskArtifacts,
 		{
-			competingRecovery: {
-				future: "NOT_IMPLEMENTED",
-				rollback: "NOT_IMPLEMENTED",
-				same: "NOT_IMPLEMENTED",
-			} as unknown as { future: "MONOTONE"; rollback: "MONOTONE"; same: "MONOTONE" },
-			staleExpectedRevision: "NOT_IMPLEMENTED" as "HEAD_CONFLICT",
+			competingRecovery: controls.competingRecovery as {
+				future: "MONOTONE";
+				rollback: "MONOTONE";
+				same: "MONOTONE";
+			},
+			staleExpectedRevision: controls.staleExpectedRevision as "HEAD_CONFLICT",
 		},
 		{ campaignId: CAMPAIGN_ID, gitSha: GIT_SHA }
 	);

@@ -1,12 +1,110 @@
 import type { BlobDigest } from "@ts-drp/storage";
 
-import type { Phase2e6DeclaredEdge, Phase2e6TraceEvent } from "./phase-2e6-real-process-death-contract.js";
+import type {
+	Phase2e6DeclaredEdge,
+	Phase2e6PersistentImage,
+	Phase2e6TraceEvent,
+} from "./phase-2e6-real-process-death-contract.js";
 
 export interface Phase2dTransactionTrace {
 	readonly durability: "default" | "relaxed" | "strict";
 	readonly mode: "readonly" | "readwrite" | "versionchange";
 	readonly operation: string;
 	readonly stores: readonly string[];
+}
+
+export interface Phase2e6DatabaseLifecycleTrace {
+	readonly createCount: number;
+	readonly deleteCount: number;
+	restore(): void;
+}
+
+const PHASE_2E6_STORE_NAMES = ["objects", "generations", "blobs", "promotions"] as const;
+
+/**
+ * Counts post-seed database creation/deletion calls in one browser realm.
+ * @returns Exact live counters and a restoration boundary.
+ */
+export function tracePhase2e6DatabaseLifecycle(): Phase2e6DatabaseLifecycleTrace {
+	const originalCreateObjectStore = IDBDatabase.prototype.createObjectStore;
+	const originalDeleteDatabase = IDBFactory.prototype.deleteDatabase;
+	let createCount = 0;
+	let deleteCount = 0;
+	IDBDatabase.prototype.createObjectStore = function phase2e6CreateObjectStore(
+		this: IDBDatabase,
+		name: string,
+		options?: IDBObjectStoreParameters
+	): IDBObjectStore {
+		createCount += 1;
+		return originalCreateObjectStore.call(this, name, options);
+	};
+	IDBFactory.prototype.deleteDatabase = function phase2e6DeleteDatabase(
+		this: IDBFactory,
+		name: string
+	): IDBOpenDBRequest {
+		deleteCount += 1;
+		return originalDeleteDatabase.call(this, name);
+	};
+	return {
+		get createCount(): number {
+			return createCount;
+		},
+		get deleteCount(): number {
+			return deleteCount;
+		},
+		restore: (): void => {
+			IDBDatabase.prototype.createObjectStore = originalCreateObjectStore;
+			IDBFactory.prototype.deleteDatabase = originalDeleteDatabase;
+		},
+	};
+}
+
+/**
+ * Finds one exact schema-v1 database before any recovery open can create it.
+ * @param databaseName - Exact database identity selected before process death.
+ * @returns The unique matching persisted name, or null.
+ */
+export async function rawPhase2e6DatabaseIdentity(databaseName: string): Promise<string | null> {
+	let matchCount = 0;
+	let matchedName: string | null = null;
+	for (const database of await indexedDB.databases()) {
+		if (database.name !== databaseName || database.version !== 1) continue;
+		matchCount += 1;
+		matchedName = database.name;
+	}
+	return matchCount === 1 ? matchedName : null;
+}
+
+function phase2e6Plain(value: unknown): unknown {
+	if (value instanceof Uint8Array) return [...value];
+	if (Array.isArray(value)) return value.map(phase2e6Plain);
+	if (typeof value !== "object" || value === null) return value;
+	return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, phase2e6Plain(nested)]));
+}
+
+/**
+ * Reads the exact four-store persistent image through readonly raw IndexedDB.
+ * @param databaseName - Existing database reopened after process death.
+ * @returns Plain detached rows in native key order.
+ */
+export async function rawPhase2e6PersistentImage(databaseName: string): Promise<Phase2e6PersistentImage> {
+	const database = await requestResult(indexedDB.open(databaseName));
+	try {
+		const transaction = database.transaction([...PHASE_2E6_STORE_NAMES], "readonly");
+		const completion = transactionCompletion(transaction);
+		const rows = await Promise.all(
+			PHASE_2E6_STORE_NAMES.map((storeName) => requestResult(transaction.objectStore(storeName).getAll()))
+		);
+		await completion;
+		return Object.freeze({
+			blobs: Object.freeze(phase2e6Plain(rows[2]) as readonly unknown[]),
+			generations: Object.freeze(phase2e6Plain(rows[1]) as readonly unknown[]),
+			objects: Object.freeze(phase2e6Plain(rows[0]) as readonly unknown[]),
+			promotions: Object.freeze(phase2e6Plain(rows[3]) as readonly unknown[]),
+		});
+	} finally {
+		database.close();
+	}
 }
 
 /**

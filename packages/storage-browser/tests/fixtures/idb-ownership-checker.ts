@@ -121,6 +121,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		path.join(PACKAGE_DIRECTORY, "tests/fixtures/idb-adapter-browser-oracle.ts"),
 		new Set([
 			"open",
+			"databases",
 			"createObjectStore",
 			"deleteDatabase",
 			"transaction",

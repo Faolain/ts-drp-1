@@ -10,7 +10,11 @@ import {
 } from "@ts-drp/storage";
 
 import { createPhase2dAheDurableStore } from "../../src/internal/idb-adapter.js";
-import { withPhase2e6SettlementTrace } from "../fixtures/idb-adapter-browser-oracle.js";
+import {
+	type Phase2e6DatabaseLifecycleTrace,
+	tracePhase2e6DatabaseLifecycle,
+	withPhase2e6SettlementTrace,
+} from "../fixtures/idb-adapter-browser-oracle.js";
 import type { Phase2e6DeclaredEdge } from "../fixtures/phase-2e6-real-process-death-contract.js";
 
 const OBJECT = must(parseStorageObjectId(`phase-2e6-object:${"a".repeat(32)}`));
@@ -155,9 +159,11 @@ function exactRun(value: unknown): RunMessage {
 self.addEventListener("message", (event: MessageEvent<unknown>) => {
 	void (async (): Promise<void> => {
 		let store: AheDurableStore | undefined;
+		let lifecycleTrace: Phase2e6DatabaseLifecycleTrace | undefined;
 		try {
 			const input = exactRun(event.data);
 			const seededHead = await seed(input.databaseName, input.edge.scenarioId);
+			lifecycleTrace = tracePhase2e6DatabaseLifecycle();
 			store = await createPhase2dAheDurableStore({ databaseName: input.databaseName });
 			const activeStore = store;
 			if (
@@ -173,8 +179,11 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 				(trace, transactionCount) =>
 					self.postMessage({
 						crossOriginIsolated,
+						databaseCreateCountAfterSeed: lifecycleTrace?.createCount,
+						databaseDeleteCount: lifecycleTrace?.deleteCount,
 						edgeId: input.edge.id,
 						kind: "armed",
+						seededHead,
 						trace,
 						transactionCount,
 						version: 1,
@@ -195,6 +204,7 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 		} catch (error) {
 			self.postMessage({ detail: error instanceof Error ? error.message : String(error), kind: "failure", version: 1 });
 		} finally {
+			lifecycleTrace?.restore();
 			await store?.close();
 		}
 	})();
