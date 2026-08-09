@@ -896,10 +896,9 @@ function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGener
 }
 
 /**
- * Creates the private production IndexedDB durable store.
+ * Creates the production IndexedDB durable store.
  * @param options - Isolated schema-owned database options.
  * @returns A strict durable-store adapter over one validated connection.
- * @internal
  */
 export async function createBrowserAheDurableStore(options: BrowserAheDurableStoreOptions): Promise<AheDurableStore> {
 	const lifecycle = new IdbAdapterLifecycle();
