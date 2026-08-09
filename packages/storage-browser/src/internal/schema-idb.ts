@@ -26,19 +26,6 @@ export const PHASE_2D_SCHEMA_AUTHORITY = Object.freeze({
 			keyPath: Object.freeze(["objectId", "generationId", "digest"]),
 			name: "promotions",
 		}),
-		Object.freeze({
-			autoIncrement: false,
-			indexes: Object.freeze([
-				Object.freeze({
-					keyPath: Object.freeze(["objectId", "epoch"]),
-					multiEntry: false,
-					name: "by-object-epoch",
-					unique: false,
-				}),
-			]),
-			keyPath: null,
-			name: "votes",
-		}),
 	]),
 	version: 1,
 } as const);
@@ -48,8 +35,6 @@ export const PHASE_2D_OBJECTS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[0].name;
 export const PHASE_2D_GENERATIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[1].name;
 export const PHASE_2D_BLOBS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[2].name;
 export const PHASE_2D_PROMOTIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[3].name;
-export const PHASE_2D_VOTES_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[4].name;
-export const PHASE_2D_VOTES_OBJECT_EPOCH_INDEX = PHASE_2D_SCHEMA_AUTHORITY.stores[4].indexes[0].name;
 
 export interface Phase2dStorageDecisionBinding {
 	readonly chosen: "idb-strict" | "unselected";
@@ -130,19 +115,11 @@ function hasExactSchema(database: IDBDatabase): boolean {
 			if (
 				actualStore.autoIncrement !== expectedStore.autoIncrement ||
 				!exactKeyPath(actualStore.keyPath, expectedStore.keyPath) ||
-				actualStore.indexNames.length !== expectedStore.indexes.length ||
-				expectedStore.indexes.some((index) => !actualStore.indexNames.contains(index.name))
+				actualStore.indexNames.length !== 0
 			) {
 				return false;
 			}
-			return expectedStore.indexes.every((expectedIndex) => {
-				const actualIndex = actualStore.index(expectedIndex.name);
-				return (
-					actualIndex.multiEntry === expectedIndex.multiEntry &&
-					actualIndex.unique === expectedIndex.unique &&
-					exactKeyPath(actualIndex.keyPath, expectedIndex.keyPath)
-				);
-			});
+			return true;
 		});
 	} catch {
 		return false;
@@ -178,21 +155,10 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 					return;
 				}
 				for (const storeAuthority of PHASE_2D_SCHEMA_AUTHORITY.stores) {
-					const store =
-						storeAuthority.keyPath === null
-							? request.result.createObjectStore(storeAuthority.name, {
-									autoIncrement: storeAuthority.autoIncrement,
-								})
-							: request.result.createObjectStore(storeAuthority.name, {
-									autoIncrement: storeAuthority.autoIncrement,
-									keyPath: copyKeyPath(storeAuthority.keyPath),
-								});
-					for (const indexAuthority of storeAuthority.indexes) {
-						store.createIndex(indexAuthority.name, copyKeyPath(indexAuthority.keyPath), {
-							multiEntry: indexAuthority.multiEntry,
-							unique: indexAuthority.unique,
-						});
-					}
+					request.result.createObjectStore(storeAuthority.name, {
+						autoIncrement: storeAuthority.autoIncrement,
+						keyPath: copyKeyPath(storeAuthority.keyPath),
+					});
 				}
 			},
 			{ once: true }
