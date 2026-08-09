@@ -10,6 +10,7 @@ import {
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
+	parseGenerationId,
 	type PresentHead,
 	type StorageObjectId,
 	type StoreCapabilities,
@@ -520,7 +521,11 @@ class SqliteAheDurableStore implements AheDurableStore {
 				}
 			}
 			if (rows.length < 129) break;
-			after = String(rows.at(-1)?.generation_id);
+			const cursor = rows.at(-1)?.generation_id;
+			if (typeof cursor !== "string") return { ok: false, reason: "NON_CANONICAL_RECORD" };
+			const parsedCursor = parseGenerationId(cursor);
+			if (!parsedCursor.ok) return { ok: false, reason: "NON_CANONICAL_RECORD" };
+			after = parsedCursor.value;
 		}
 		if (failure !== undefined) return { ok: false, reason: failure };
 		const head = headResult.value;

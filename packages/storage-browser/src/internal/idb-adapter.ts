@@ -90,6 +90,8 @@ class IdbAdapterLifecycle {
 	private closePromise: Promise<void> | undefined;
 	private connection: IDBDatabase | undefined;
 	private poisoned = false;
+	private recoveryActive = false;
+	private readonly recoveryWaiters: Array<(release: () => void) => void> = [];
 	private resolveClose: (() => void) | undefined;
 	private readonly invalidators = new Set<() => void>();
 
@@ -115,6 +117,18 @@ class IdbAdapterLifecycle {
 
 	public isPoisoned(): boolean {
 		return this.poisoned;
+	}
+
+	public isClosed(): boolean {
+		return this.connection === undefined;
+	}
+
+	public acquireRecoveryTurn(): (() => void) | Promise<() => void> {
+		if (!this.recoveryActive) {
+			this.recoveryActive = true;
+			return () => this.releaseRecoveryTurn();
+		}
+		return new Promise((resolve) => this.recoveryWaiters.push(resolve));
 	}
 
 	public latchPoison(reason: PersistedStorageError["reason"]): StoreResult<never> {
@@ -147,6 +161,15 @@ class IdbAdapterLifecycle {
 		const resolve = this.resolveClose;
 		this.resolveClose = undefined;
 		if (resolve !== undefined) queueMicrotask(resolve);
+	}
+
+	private releaseRecoveryTurn(): void {
+		const next = this.recoveryWaiters.shift();
+		if (next === undefined) {
+			this.recoveryActive = false;
+			return;
+		}
+		next(() => this.releaseRecoveryTurn());
 	}
 }
 
@@ -420,9 +443,12 @@ class IdbAheDurableStore implements AheDurableStore {
 	private async runRecovery(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>> {
 		const database = this.lifecycle.startOperation();
 		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
+		const recoveryTurn = this.lifecycle.acquireRecoveryTurn();
+		const releaseRecoveryTurn = typeof recoveryTurn === "function" ? recoveryTurn : await recoveryTurn;
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
+			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
 			transaction = database.transaction(allAuthorityStores(), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
@@ -448,6 +474,7 @@ class IdbAheDurableStore implements AheDurableStore {
 			this.recoveryCertificates.clear();
 			return substrateFailure(cause);
 		} finally {
+			releaseRecoveryTurn();
 			this.lifecycle.finishOperation();
 		}
 	}
