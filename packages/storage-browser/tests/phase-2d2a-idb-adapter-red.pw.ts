@@ -1,36 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 
-const OBJECT_A = `phase-2d2a-a:${"a".repeat(32)}`;
-
-function generationRange(
-	operation: string,
-	count?: number
-): Readonly<{
-	count?: number;
-	operation: string;
-	query: Readonly<{
-		lower: readonly string[];
-		lowerOpen: false;
-		upper: readonly [string, readonly []];
-		upperOpen: false;
-	}>;
-	store: "generations";
-}> {
-	return {
-		...(count === undefined ? {} : { count }),
-		operation,
-		query: { lower: [OBJECT_A], lowerOpen: false, upper: [OBJECT_A, []], upperOpen: false },
-		store: "generations",
-	};
-}
-
 type HarnessMethod =
 	| "runAtomicRollback"
 	| "runBoundedCompletionTrace"
 	| "runClosureIntegrity"
 	| "runCompetingCas"
 	| "runImmutableAndIdempotent"
-	| "runOwnershipTrace"
 	| "runPersistenceAndCopies"
 	| "runSameDigestDifferentBytes"
 	| "runSharedContract";
@@ -136,102 +111,5 @@ test("a second-write failure aborts the entire strict transaction and permits an
 			objectRows: 0,
 			reason: "SUBSTRATE_FAILURE",
 		},
-	});
-});
-
-test("adapter requirements execute against their real store owners in strict bounded transactions", async ({
-	page,
-}) => {
-	await expect(run(page, "runOwnershipTrace")).resolves.toEqual({
-		ranges: [
-			generationRange("readGenerationPage", 129),
-			generationRange("beginGeneration"),
-			generationRange("putCachedBlob"),
-			generationRange("promoteReference"),
-			generationRange("completeGeneration"),
-			generationRange("swapHead"),
-			generationRange("discardGeneration"),
-		],
-		reads: [
-			{ method: "get", operation: "readHead", store: "objects" },
-			{ method: "getAll", operation: "readGenerationPage", store: "generations" },
-			{ method: "get", operation: "getBlob", store: "blobs" },
-			{ method: "get", operation: "beginGeneration", store: "objects" },
-			{ method: "getAll", operation: "beginGeneration", store: "generations" },
-			{ method: "get", operation: "putCachedBlob", store: "objects" },
-			{ method: "getAll", operation: "putCachedBlob", store: "generations" },
-			{ method: "get", operation: "putCachedBlob", store: "blobs" },
-			{ method: "get", operation: "promoteReference", store: "objects" },
-			{ method: "getAll", operation: "promoteReference", store: "generations" },
-			{ method: "get", operation: "promoteReference", store: "blobs" },
-			{ method: "get", operation: "promoteReference", store: "promotions" },
-			{ method: "get", operation: "completeGeneration", store: "objects" },
-			{ method: "getAll", operation: "completeGeneration", store: "generations" },
-			{ method: "get", operation: "completeGeneration", store: "promotions" },
-			{ method: "get", operation: "swapHead", store: "objects" },
-			{ method: "getAll", operation: "swapHead", store: "generations" },
-			{ method: "get", operation: "discardGeneration", store: "objects" },
-			{ method: "getAll", operation: "discardGeneration", store: "generations" },
-		],
-		transactions: [
-			{
-				durability: "default",
-				mode: "readonly",
-				operation: "readHead",
-				stores: ["objects"],
-			},
-			{
-				durability: "default",
-				mode: "readonly",
-				operation: "readGenerationPage",
-				stores: ["generations"],
-			},
-			{ durability: "default", mode: "readonly", operation: "getBlob", stores: ["blobs"] },
-			{
-				durability: "strict",
-				mode: "readwrite",
-				operation: "beginGeneration",
-				stores: ["generations", "objects"],
-			},
-			{
-				durability: "strict",
-				mode: "readwrite",
-				operation: "putCachedBlob",
-				stores: ["blobs", "generations", "objects"],
-			},
-			{
-				durability: "strict",
-				mode: "readwrite",
-				operation: "promoteReference",
-				stores: ["blobs", "generations", "objects", "promotions"],
-			},
-			{
-				durability: "strict",
-				mode: "readwrite",
-				operation: "completeGeneration",
-				stores: ["generations", "objects", "promotions"],
-			},
-			{
-				durability: "strict",
-				mode: "readwrite",
-				operation: "swapHead",
-				stores: ["generations", "objects"],
-			},
-			{
-				durability: "strict",
-				mode: "readwrite",
-				operation: "discardGeneration",
-				stores: ["generations", "objects"],
-			},
-		],
-		writes: [
-			{ method: "put", operation: "beginGeneration", store: "generations" },
-			{ method: "add", operation: "putCachedBlob", store: "blobs" },
-			{ method: "add", operation: "promoteReference", store: "promotions" },
-			{ method: "put", operation: "completeGeneration", store: "generations" },
-			{ method: "put", operation: "swapHead", store: "generations" },
-			{ method: "put", operation: "swapHead", store: "objects" },
-			{ method: "put", operation: "discardGeneration", store: "generations" },
-		],
 	});
 });

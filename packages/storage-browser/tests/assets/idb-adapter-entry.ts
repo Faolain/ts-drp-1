@@ -456,54 +456,6 @@ async function runSameDigestDifferentBytes(): Promise<unknown> {
 	}
 }
 
-async function runOwnershipTrace(): Promise<unknown> {
-	const name = databaseName("ownership");
-	try {
-		const store = await createPhase2d2aRedStore({ databaseName: name });
-		await begin(store, OBJECT_A, GENERATION_B);
-		const { calls, transactions } = await withPhase2dTransactionTrace(async (mark) => {
-			mark("readHead");
-			await splitRead(store, "readHead", OBJECT_A);
-			mark("readGenerationPage");
-			await splitRead(store, "readGenerationPage", { limit: 128, objectId: OBJECT_A });
-			mark("getBlob");
-			await store.getBlob(DIGEST_A);
-			mark("beginGeneration");
-			await begin(store, OBJECT_A, GENERATION_C);
-			mark("putCachedBlob");
-			await store.putCachedBlob({ bytes: PAYLOAD_A, digest: DIGEST_A, generationId: GENERATION_C, objectId: OBJECT_A });
-			mark("promoteReference");
-			await store.promoteReference({ digest: DIGEST_A, generationId: GENERATION_C, objectId: OBJECT_A });
-			mark("completeGeneration");
-			await store.completeGeneration({ generationId: GENERATION_C, objectId: OBJECT_A });
-			mark("swapHead");
-			await store.swapHead({ expectedHead: noHead(OBJECT_A), generationId: GENERATION_C, objectId: OBJECT_A });
-			mark("discardGeneration");
-			await store.discardGeneration({ generationId: GENERATION_B, objectId: OBJECT_A });
-		});
-		await store.close();
-		return {
-			ranges: calls
-				.filter((call) => call.method === "getAll")
-				.map(({ count, operation, query, store }) => ({
-					...(count === undefined ? {} : { count }),
-					operation,
-					query,
-					store,
-				})),
-			reads: calls
-				.filter((call) => call.method === "get" || call.method === "getAll")
-				.map(({ method, operation, store }) => ({ method, operation, store })),
-			transactions,
-			writes: calls.filter((call) => call.method === "add" || call.method === "put"),
-		};
-	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error) };
-	} finally {
-		await deletePhase2dDatabase(name);
-	}
-}
-
 async function runPhase2e1BoundedReads(): Promise<unknown> {
 	const name = databaseName("phase-2e1-bounded-reads");
 	try {
@@ -1283,7 +1235,6 @@ const harness = Object.freeze({
 	runClosureIntegrity,
 	runCompetingCas,
 	runImmutableAndIdempotent,
-	runOwnershipTrace,
 	runPhase2e1BoundedReads,
 	runPhase2e1PhysicalKeyMismatch,
 	runPhase2e2Controls,

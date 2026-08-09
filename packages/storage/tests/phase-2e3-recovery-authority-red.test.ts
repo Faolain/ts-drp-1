@@ -135,16 +135,55 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 		});
 	});
 
+	it("latches an adopted-integrity recovery root as poison and preserves close precedence", () => {
+		const adopted = record({ state: "Adopted" });
+		const head = presentHead({ closureDigest: adopted.closureDigest });
+		const missing = createTransitionHarness();
+		missing.seedObjectState({ head, generations: [adopted] });
+		for (const reference of adopted.closure) {
+			missing.markPromoted(OBJECT_A, GENERATION_A, reference.digest);
+		}
+
+		expect(reason(recover(missing))).toBe("ADOPTED_BLOB_MISSING");
+		expect(reason(missing.readObjectState(OBJECT_A))).toBe("STORE_POISONED");
+		expect(reason(recover(missing))).toBe("STORE_POISONED");
+		missing.close();
+		expect(reason(recover(missing))).toBe("STORE_CLOSED");
+	});
+
 	it("reproduces the bounded-only revision-reset mutant and requires recovery to kill it", () => {
 		const adopted = record({ state: "Adopted" });
 		const head = presentHead({ closureDigest: adopted.closureDigest, revision: must(parseHeadRevision(5)) });
 		const candidate = record({ generationId: GENERATION_B, state: "Complete" });
 
-		// Executable mutant: a bounded-only evaluator sees no head and only G2. It
-		// accepts and resets revision to one, exactly the unsafe 2e counterexample.
-		const boundedOnly = createTransitionHarness();
-		boundedOnly.seedObjectState({ head: noHead(), generations: [candidate] });
-		const unsafe = boundedOnly.swapHead({ objectId: OBJECT_A, generationId: GENERATION_B, expectedHead: noHead() });
+		// Executable local mutant: the addressed candidate looks valid in
+		// isolation, but this deliberately has no authority to discover the
+		// hidden adopted generation or its revision-five head.
+		const unsafeBoundedOnlySwap = (
+			addressedCandidate: typeof candidate,
+			expectedHead: ReturnType<typeof noHead>
+		): StoreResult<{ readonly head: unknown }> => {
+			if (
+				addressedCandidate.state !== "Complete" ||
+				addressedCandidate.generationId !== GENERATION_B ||
+				expectedHead.kind !== "none" ||
+				expectedHead.objectId !== addressedCandidate.objectId ||
+				addressedCandidate.baseExpectedHead.kind !== "none"
+			) {
+				return { ok: false, reason: "INVALID_ARGUMENT" };
+			}
+			return {
+				ok: true,
+				value: {
+					head: presentHead({
+						closureDigest: addressedCandidate.closureDigest,
+						generationId: addressedCandidate.generationId,
+						revision: must(parseHeadRevision(1)),
+					}),
+				},
+			};
+		};
+		const unsafe = unsafeBoundedOnlySwap(candidate, noHead());
 		expect(unsafe).toMatchObject({ ok: true, value: { head: { generationId: GENERATION_B, revision: 1 } } });
 
 		const corruptedFullState = createTransitionHarness();
@@ -152,7 +191,8 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 		expect(reason(recover(corruptedFullState))).toBe("NON_CANONICAL_RECORD");
 		expect(
 			corruptedFullState.swapHead({ objectId: OBJECT_A, generationId: GENERATION_B, expectedHead: noHead() })
-		).toEqual({ ok: false, reason: "NON_CANONICAL_RECORD" });
+		).toEqual({ ok: false, reason: "STORE_POISONED" });
+		expect(reason(recover(corruptedFullState))).toBe("STORE_POISONED");
 
 		// The intact rev-5 state is a positive control for the reproduced lineage.
 		const intact = createTransitionHarness();
