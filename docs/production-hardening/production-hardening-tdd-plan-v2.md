@@ -3933,6 +3933,77 @@ their recorded pre-2e script. Port the source consumer from `readObjectState` to
 the split reads so it still builds, but record its new command digest as an API
 port and do not silently rerun, re-score or overwrite the old decision basis.
 
+##### Phase 2e1 closure checkpoint — bounded reads and explicit write ownership
+
+Phase 2e1 is accepted at production commit
+`810cc844cac932c71ce20eba3203bccc9b6d4456`, after frozen RED lineage
+`1b0df79` → `5049fd4` → `0bbf101` → `8e8c548`. The chain is the causal
+evidence: the initial RED kills the old public whole-state behavior, while the
+later frozen corrections close stale consumers and then kill two subtler
+split-shaped mutants. In memory, a page-shaped implementation still cloned and
+sorted the whole journal through the broad transition owner. In Node and
+IndexedDB, ordering only by the physical key let a canonical record whose
+embedded generation disagreed with that key emit a misleading cursor and skip a
+valid later generation. The GREEN adds a maintained sorted memory index, issues
+only `limit + 1` backend rows, and binds every physical row key to the canonical
+record before cursor publication. Do not cite the later post-GREEN files named
+`*-causal.log` alone as proof that RED4 failed; cite the frozen commit chain and
+its pre-GREEN causal outcomes.
+
+The public `ObjectStoreState`/`readObjectState` surface is gone. Public callers
+now receive independently detached `readHead` results and exclusive,
+object-bound, hard-capped generation pages. The private whole-journal transition
+load remains deliberately authoritative until the atomic 2e3 recovery switch.
+Generic before/after diffing is deleted; command-specific planners own exact
+write sets, including superseding swap order: current generation
+`Superseded`, candidate generation `Adopted`, then head. No legacy compatibility
+surface, dormant recovery path or relaxed cached-blob write was introduced.
+
+Focused shared, Node and Chromium tests passed 8/8, 4/4 and 12/12. The full
+accepted suites passed storage 123/123, Node 17/17 with the separate opt-in long
+campaign skipped, and Chromium 174/174. Storage package builds/typechecks,
+explicit zero-warning production lint, Prettier, ownership, custody and
+post-commit clean-checkout gates passed. Workspace typecheck remains red only in
+unrelated Phase 1i-b object test fixtures that still use the rejected
+`history_storage: "archive"` spelling and an unconstrained discriminated-union
+helper; the three storage packages typecheck. Earlier malformed Vitest passthrough
+commands, a stale Node child build, and a pre-commit clean-checkout failure are
+retained as iteration evidence, not final gates. Prefer direct root Vitest paths,
+build child-process packages before their suites, label RED/GREEN evidence by
+actual tree state, and require a non-empty final lint summary in the next slice.
+
+Independent acceptance was unanimous:
+
+- genuine Grok 4.5/high session
+  `019fe4b6-9917-7e23-8509-73802bbebcf1` returned `APPROVED` and
+  `2E1_MAY_CLOSE: yes`; result/raw/integrity SHA-256 values are
+  `774b5de9c4bc6c12b1bb1a24edf28f7bd01ac9b8af71e73ad961e4f255458b73`,
+  `4f07063d29ee399426856d63d4322cb413c3b24cd71f726b05b6c9cce5a37477`
+  and `c1b595e52bd883a0173c21b59d894ff136aa0e4f67a98567ce1ef1b17a2c3029`;
+- exact Kimi 3/high/max-100 session
+  `f5799ce6-0221-472d-abeb-d2b29cfcf25b` returned `APPROVED` and
+  `2E1_MAY_CLOSE: yes`; result/raw/integrity SHA-256 values are
+  `d613b43baa4c41cfbe620bdb3099219be5b4f1b0aef5c98cff3b9bf89bb93947`,
+  `80137a7ee1f00e4ae8065071a0c129d754ed7fd1c27d6ffa7a6f5f7f2e6f29a5`
+  and `3e0d0e1318084a60f5526f3e071023e446d6b18e647e5b8836de7965acd9f3dd`;
+- genuine Opus 5/xhigh session
+  `fe33dfb3-41a4-4240-891b-db7d15f4feb4` used only direct
+  `Read`/`Grep`/`Glob`, returned `APPROVED` and `2E1_MAY_CLOSE: yes`, and
+  produced result/raw/integrity SHA-256 values
+  `b5cb48312deb3108aea02759a2d4efec1824643215ede190544869136445124f`,
+  `c086207f8f9295457441eb4ad5cc996624725e1172dc8f01538b8065aeeec379`
+  and `f17ca18c5f3d70a9b382c529b94021ac90417dae8750c198a4e7628924a7b4ec`.
+
+The remaining findings are routed, not hidden. Phase 2e2 owns a single stable
+persisted-record reason taxonomy, poison lifecycle, and physical-key binding in
+the IndexedDB broad loader; it may also normalize explicit `cursor: undefined`
+and cheaply snapshot direct third-party adapter inputs even though shipped stores
+already snapshot descriptors and fail closed. Phase 2e3 deletes the private broad
+reader during the atomic recovery/authority flip. Phase 2e5 strengthens browser
+transaction-inventory assertions. None blocks 2e1, and none is evidence that the
+Discord/chat or MMORPG golden path is complete: those paths still depend on the
+remaining 2e slices and their later semantic owners.
+
 #### Slice 2e2 — persisted taxonomy and poison lifecycle on the broad loader
 
 **Causal RED.** Exercise unsupported schema, malformed generation/head bytes,
