@@ -10,7 +10,7 @@ import { requirePhase2dDecisionConsumptionReady } from "./opfs-idb-spike/fixture
 
 const PACKAGE_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LINK_PATH = "tests/opfs-idb-spike/artifacts/phase-2d-storage-substrate-decision-link-v1.json";
-type Phase2dStore = "blobs" | "generations" | "objects" | "promotions" | "votes";
+type Phase2dStore = "blobs" | "generations" | "objects" | "promotions";
 
 function isDeeplyFrozen(value: unknown): boolean {
 	if (typeof value !== "object" || value === null) return true;
@@ -21,7 +21,7 @@ function isDeeplyFrozen(value: unknown): boolean {
 const ADAPTER_STORE_OWNERSHIP = Object.freeze({
 	loads: {
 		"blob": ["blobs"],
-		"generation-closure": ["generations", "blobs", "promotions"],
+		"generation-closure": ["generations", "promotions"],
 		"object-state": ["objects", "generations"],
 		"promotion": ["promotions"],
 	} satisfies Record<StorageAdapterLoadRequirement["kind"], readonly Phase2dStore[]>,
@@ -33,12 +33,14 @@ const ADAPTER_STORE_OWNERSHIP = Object.freeze({
 	} satisfies Record<StorageAdapterWrite["kind"], Phase2dStore>,
 });
 
-describe("Phase 2d1 selected schema authority", () => {
-	it("exposes one frozen private-v1 authority for every store, key path and index", () => {
+describe("Phase 2d2d private-v1 schema authority", () => {
+	it("exposes one frozen four-store zero-index authority without speculative vote aliases", () => {
 		const authority = phase2dSchema as unknown as Readonly<Record<string, unknown>>;
 		expect({
 			partialDataStoreInventoryPresent: Reflect.has(authority, "PHASE_2D_DATA_STORE_INVENTORY"),
 			schema: authority.PHASE_2D_SCHEMA_AUTHORITY,
+			votesObjectEpochIndexAliasPresent: Reflect.has(authority, "PHASE_2D_VOTES_OBJECT_EPOCH_INDEX"),
+			votesStoreAliasPresent: Reflect.has(authority, "PHASE_2D_VOTES_STORE"),
 		}).toEqual({
 			partialDataStoreInventoryPresent: false,
 			schema: {
@@ -57,22 +59,11 @@ describe("Phase 2d1 selected schema authority", () => {
 						keyPath: ["objectId", "generationId", "digest"],
 						name: "promotions",
 					},
-					{
-						autoIncrement: false,
-						indexes: [
-							{
-								keyPath: ["objectId", "epoch"],
-								multiEntry: false,
-								name: "by-object-epoch",
-								unique: false,
-							},
-						],
-						keyPath: null,
-						name: "votes",
-					},
 				],
 				version: 1,
 			},
+			votesObjectEpochIndexAliasPresent: false,
+			votesStoreAliasPresent: false,
 		});
 		expect(isDeeplyFrozen(authority.PHASE_2D_SCHEMA_AUTHORITY)).toBe(true);
 	});
@@ -81,7 +72,7 @@ describe("Phase 2d1 selected schema authority", () => {
 		expect(ADAPTER_STORE_OWNERSHIP).toEqual({
 			loads: {
 				"blob": ["blobs"],
-				"generation-closure": ["generations", "blobs", "promotions"],
+				"generation-closure": ["generations", "promotions"],
 				"object-state": ["objects", "generations"],
 				"promotion": ["promotions"],
 			},
@@ -92,6 +83,17 @@ describe("Phase 2d1 selected schema authority", () => {
 				"replace-head": "objects",
 			},
 		});
+	});
+
+	it("keeps the package private and exposes no package export map", () => {
+		const packageManifest = JSON.parse(
+			fs.readFileSync(path.join(PACKAGE_DIRECTORY, "package.json"), "utf8")
+		) as Readonly<Record<string, unknown>>;
+
+		expect({
+			exportMapPresent: Reflect.has(packageManifest, "exports"),
+			private: packageManifest.private,
+		}).toEqual({ exportMapPresent: false, private: true });
 	});
 
 	it("binds production opening to the accepted S4 idb-strict decision link digest", () => {

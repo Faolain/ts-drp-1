@@ -6,6 +6,7 @@ interface Phase2dSchemaHarness {
 	runDecisionMismatch(): Promise<unknown>;
 	runExistingCorrectSchema(): Promise<unknown>;
 	runFreshSchema(): Promise<unknown>;
+	runHistoricalFiveStoreSchema(): Promise<unknown>;
 	runLifecyclePositiveControl(): Promise<unknown>;
 	runNativeCompoundPositiveControl(): Promise<unknown>;
 	runPromotionCompoundPositiveControl(): Promise<unknown>;
@@ -30,6 +31,13 @@ const EXPECTED_EXACT_SCHEMA = Object.freeze({
 			keyPath: ["objectId", "generationId", "digest"],
 			name: "promotions",
 		},
+	],
+	version: 1,
+});
+
+const HISTORICAL_FIVE_STORE_SCHEMA = Object.freeze({
+	stores: [
+		...EXPECTED_EXACT_SCHEMA.stores,
 		{
 			autoIncrement: false,
 			indexes: [
@@ -70,7 +78,6 @@ test("positive control: Chromium preserves native compound keys and distinct emb
 	await expect(runHarness(page, "runNativeCompoundPositiveControl")).resolves.toEqual({
 		count: 2,
 		generationKeyPath: ["objectId", "generationId"],
-		voteIndexKeyPath: ["objectId", "epoch"],
 	});
 });
 
@@ -100,7 +107,7 @@ test("production opening consumes the selected decision digest before creating a
 	});
 });
 
-test("fresh production opening creates the plan-owned native compound schema shell", async ({ page }) => {
+test("fresh production opening creates the exact four-store zero-index private-v1 schema", async ({ page }) => {
 	await expect(runHarness(page, "runFreshSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
 });
 
@@ -108,37 +115,42 @@ test("production validation accepts an independently created exact private-v1 sc
 	await expect(runHarness(page, "runExistingCorrectSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
 });
 
+test("historical five-store private v1 rejects fail-closed without migration", async ({ page }) => {
+	await expect(runHarness(page, "runHistoricalFiveStoreSchema")).resolves.toEqual({
+		afterAttempt: HISTORICAL_FIVE_STORE_SCHEMA,
+		opening: {
+			error: {
+				code: "UNEXPECTED_SCHEMA_VERSION",
+				message: "unexpected browser storage schema/version",
+				name: "BrowserStorageSchemaError",
+			},
+			kind: "rejected",
+		},
+	});
+});
+
 test("historical, missing, extra and malformed private-v1 schemas all fail closed", async ({ page }) => {
 	await expect(runHarness(page, "runUnexpectedPrivateV1Schemas")).resolves.toEqual({
 		accepted: [],
 		rejected: [
-			"historical-two-store",
+			"legacy-two-store",
 			"missing-objects",
 			"missing-generations",
 			"missing-blobs",
 			"missing-promotions",
-			"missing-votes",
 			"extra-store",
 			"wrong-objects-key",
 			"wrong-generations-key",
 			"wrong-blobs-key",
 			"wrong-promotions-key",
-			"wrong-votes-key",
 			"swapped-generations-key-order",
 			"swapped-promotions-key-order",
 			"objects-auto-increment",
 			"blobs-auto-increment",
-			"votes-auto-increment",
 			"objects-extra-index",
 			"generations-extra-index",
 			"blobs-extra-index",
 			"promotions-extra-index",
-			"votes-missing-index",
-			"votes-extra-index",
-			"votes-wrong-index-key",
-			"swapped-votes-index-key-order",
-			"votes-unique-index",
-			"votes-multi-entry-index",
 		],
 	});
 });
