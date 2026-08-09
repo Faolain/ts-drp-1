@@ -4,9 +4,10 @@ import {
 	decodeGenerationRecordV1,
 	type ExpectedHead,
 	type GenerationId,
+	type GenerationPage,
+	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
-	type ObjectStoreState,
 	type PresentHead,
 	type StorageObjectId,
 	type StoreCapabilities,
@@ -34,7 +35,7 @@ export interface Phase2dAheDurableStoreOptions {
 	readonly databaseName: string;
 }
 
-type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readObjectState">;
+type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readGenerationPage" | "readHead">;
 
 type TransactionOutcome = Readonly<{ ok: true }> | Readonly<{ cause: unknown; ok: false }>;
 
@@ -55,7 +56,8 @@ const OPERATION_STORES = Object.freeze({
 		PHASE_2D_PROMOTIONS_STORE,
 	]),
 	putCachedBlob: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_BLOBS_STORE]),
-	readObjectState: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
+	readGenerationPage: Object.freeze([PHASE_2D_GENERATIONS_STORE]),
+	readHead: Object.freeze([PHASE_2D_OBJECTS_STORE]),
 	swapHead: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
 } satisfies Readonly<Record<StorageAdapterCommand["kind"], readonly string[]>>);
 
@@ -121,8 +123,16 @@ class IdbAheDurableStore implements AheDurableStore {
 
 	public constructor(private readonly lifecycle: IdbAdapterLifecycle) {}
 
-	public readObjectState(objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>> {
-		return this.run(commandWithKind("readObjectState", { objectId })) as Promise<StoreResult<ObjectStoreState>>;
+	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
+		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
+	}
+
+	public readGenerationPage(input: {
+		readonly objectId: StorageObjectId;
+		readonly cursor?: GenerationPageCursor;
+		readonly limit: number;
+	}): Promise<StoreResult<GenerationPage>> {
+		return this.run(commandWithKind("readGenerationPage", input)) as Promise<StoreResult<GenerationPage>>;
 	}
 
 	public getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
@@ -237,6 +247,32 @@ class IdbAheDurableStore implements AheDurableStore {
 		const loadedPromotions = new Set<string>();
 		for (const requirement of prepared.requirements) {
 			switch (requirement.kind) {
+				case "head": {
+					const headRow = await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
+					facts.push({
+						headRecord: headRow === undefined ? null : (rowProperty(headRow, "record") as Uint8Array),
+						kind: "head",
+						objectId: requirement.objectId,
+					});
+					break;
+				}
+				case "generation-page": {
+					const rows = await requestValue(
+						transaction
+							.objectStore(PHASE_2D_GENERATIONS_STORE)
+							.getAll(
+								generationPageRange(requirement.objectId, requirement.afterGenerationId),
+								requirement.limitPlusOne
+							)
+					);
+					facts.push({
+						afterGenerationId: requirement.afterGenerationId,
+						generationRecords: rows.map((row) => boundGenerationRecord(row, requirement.objectId)),
+						kind: "generation-page",
+						objectId: requirement.objectId,
+					});
+					break;
+				}
 				case "object-state": {
 					const headRow = await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
 					const rows = await requestValue(
@@ -365,7 +401,7 @@ class IdbAheDurableStore implements AheDurableStore {
 }
 
 function isMutation(kind: StorageAdapterCommand["kind"]): kind is Phase2dMutationOperation {
-	return kind !== "readObjectState" && kind !== "getBlob";
+	return kind !== "readHead" && kind !== "readGenerationPage" && kind !== "getBlob";
 }
 
 function commandWithKind(kind: StorageAdapterCommand["kind"], input: unknown): unknown {
@@ -381,10 +417,34 @@ function generationPrefix(objectId: StorageObjectId): IDBKeyRange {
 	return IDBKeyRange.bound([objectId], [objectId, []]);
 }
 
+function generationPageRange(objectId: StorageObjectId, afterGenerationId: GenerationId | null): IDBKeyRange {
+	return afterGenerationId === null
+		? generationPrefix(objectId)
+		: IDBKeyRange.bound([objectId, afterGenerationId], [objectId, []], true, false);
+}
+
 function rowProperty(value: unknown, key: string): unknown {
 	if (typeof value !== "object" || value === null) return undefined;
 	const descriptor = Object.getOwnPropertyDescriptor(value, key);
 	return descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
+}
+
+function boundGenerationRecord(row: unknown, objectId: StorageObjectId): Uint8Array {
+	const record = rowProperty(row, "record");
+	const physicalObjectId = rowProperty(row, "objectId");
+	const physicalGenerationId = rowProperty(row, "generationId");
+	if (!(record instanceof Uint8Array)) throw new Error("IndexedDB returned a non-binary generation record");
+	const copied = new Uint8Array(record);
+	const decoded = decodeGenerationRecordV1(copied);
+	if (
+		!decoded.ok ||
+		physicalObjectId !== objectId ||
+		decoded.value.objectId !== objectId ||
+		decoded.value.generationId !== physicalGenerationId
+	) {
+		throw new Error("IndexedDB generation key does not match its canonical record");
+	}
+	return copied;
 }
 
 function promotionKey(value: { objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }): string {

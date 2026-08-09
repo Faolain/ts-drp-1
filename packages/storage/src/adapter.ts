@@ -4,9 +4,8 @@ import {
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
 } from "./codecs.js";
-import { TransitionOwner } from "./internal/transition.js";
+import { type TransitionObjectState, TransitionOwner } from "./internal/transition.js";
 import {
-	bytesEqual,
 	copyExpectedHead,
 	copyGenerationRef,
 	hasSharedBacking,
@@ -20,15 +19,17 @@ import type {
 	BlobDigest,
 	ExpectedHead,
 	GenerationId,
+	GenerationPage,
+	GenerationPageCursor,
 	GenerationRecord,
 	GenerationRef,
-	ObjectStoreState,
 	StorageObjectId,
 	StoreResult,
 } from "./types.js";
 
 export type StorageAdapterCommand =
-	| ReadObjectStateCommand
+	| ReadHeadCommand
+	| ReadGenerationPageCommand
 	| GetBlobCommand
 	| BeginGenerationCommand
 	| PutCachedBlobCommand
@@ -37,9 +38,16 @@ export type StorageAdapterCommand =
 	| SwapHeadCommand
 	| DiscardGenerationCommand;
 
-type ReadObjectStateCommand = Readonly<{
-	kind: "readObjectState";
+type ReadHeadCommand = Readonly<{
+	kind: "readHead";
 	objectId: StorageObjectId;
+}>;
+
+type ReadGenerationPageCommand = Readonly<{
+	kind: "readGenerationPage";
+	objectId: StorageObjectId;
+	cursor?: GenerationPageCursor;
+	limit: number;
 }>;
 
 type GetBlobCommand = Readonly<{
@@ -91,6 +99,13 @@ type DiscardGenerationCommand = Readonly<{
 
 export type StorageAdapterLoadRequirement =
 	| Readonly<{ kind: "object-state"; objectId: StorageObjectId }>
+	| Readonly<{ kind: "head"; objectId: StorageObjectId }>
+	| Readonly<{
+			kind: "generation-page";
+			objectId: StorageObjectId;
+			afterGenerationId: GenerationId | null;
+			limitPlusOne: number;
+	  }>
 	| Readonly<{ kind: "blob"; digest: BlobDigest }>
 	| Readonly<{
 			kind: "promotion";
@@ -111,6 +126,17 @@ export type PreparedStorageAdapterCommand = Readonly<{
 
 export type StorageAdapterFact =
 	| Readonly<{ kind: "store-closed" }>
+	| Readonly<{
+			kind: "head";
+			objectId: StorageObjectId;
+			headRecord: Uint8Array | null;
+	  }>
+	| Readonly<{
+			kind: "generation-page";
+			objectId: StorageObjectId;
+			afterGenerationId: GenerationId | null;
+			generationRecords: readonly Uint8Array[];
+	  }>
 	| Readonly<{
 			kind: "object-state";
 			objectId: StorageObjectId;
@@ -142,7 +168,8 @@ export type StorageAdapterWrite =
 	  }>;
 
 export type StorageAdapterResultValue =
-	| ObjectStoreState
+	| ExpectedHead
+	| GenerationPage
 	| Uint8Array
 	| GenerationRecord
 	| Readonly<{ inserted: boolean }>
@@ -159,6 +186,8 @@ export type StorageAdapterEvaluation = Readonly<{
 }>;
 
 const EMPTY_WRITES: readonly StorageAdapterWrite[] = Object.freeze([]);
+const MAX_GENERATION_PAGE_ROWS = 128;
+const GENERATION_PAGE_CURSOR_PREFIX = "ts-drp-storage/generation-page/v1\0";
 
 function invalidPreparation(): StoreResult<PreparedStorageAdapterCommand> {
 	return { ok: false, reason: "INVALID_ARGUMENT" };
@@ -196,6 +225,27 @@ function copyStructuralClosure(value: unknown): readonly GenerationRef[] | undef
 	return closure;
 }
 
+function validPageLimit(value: unknown): value is number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= MAX_GENERATION_PAGE_ROWS;
+}
+
+function encodeGenerationPageCursor(objectId: StorageObjectId, generationId: GenerationId): GenerationPageCursor {
+	return `${GENERATION_PAGE_CURSOR_PREFIX}${objectId}\0${generationId}` as GenerationPageCursor;
+}
+
+function decodeGenerationPageCursor(
+	value: unknown
+): Readonly<{ objectId: StorageObjectId; generationId: GenerationId }> | undefined {
+	if (typeof value !== "string" || !value.startsWith(GENERATION_PAGE_CURSOR_PREFIX)) return undefined;
+	const payload = value.slice(GENERATION_PAGE_CURSOR_PREFIX.length);
+	const separator = payload.indexOf("\0");
+	if (separator <= 0 || separator !== payload.lastIndexOf("\0")) return undefined;
+	const objectId = payload.slice(0, separator);
+	const generationId = payload.slice(separator + 1);
+	if (!isStorageObjectId(objectId) || !isGenerationId(generationId)) return undefined;
+	return encodeGenerationPageCursor(objectId, generationId) === value ? { objectId, generationId } : undefined;
+}
+
 /**
  * Validates and detaches one closed adapter command before substrate I/O.
  * @param value - Untrusted adapter command input.
@@ -208,12 +258,43 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		return invalidPreparation();
 	}
 
-	if (kindDescriptor.value === "readObjectState") {
+	if (kindDescriptor.value === "readHead") {
 		if (!isClosedRecord(value, ["kind", "objectId"]) || !isStorageObjectId(value.objectId)) {
 			return invalidPreparation();
 		}
-		const command: ReadObjectStateCommand = { kind: "readObjectState", objectId: value.objectId };
-		return freezePrepared(command, [{ kind: "object-state", objectId: command.objectId }]);
+		const command: ReadHeadCommand = { kind: "readHead", objectId: value.objectId };
+		return freezePrepared(command, [{ kind: "head", objectId: command.objectId }]);
+	}
+
+	if (kindDescriptor.value === "readGenerationPage") {
+		const keys = Object.prototype.hasOwnProperty.call(value, "cursor")
+			? ["kind", "objectId", "cursor", "limit"]
+			: ["kind", "objectId", "limit"];
+		if (!isClosedRecord(value, keys) || !isStorageObjectId(value.objectId) || !validPageLimit(value.limit)) {
+			return invalidPreparation();
+		}
+		let afterGenerationId: GenerationId | null = null;
+		let cursor: GenerationPageCursor | undefined;
+		if (keys.length === 4) {
+			const decoded = decodeGenerationPageCursor(value.cursor);
+			if (decoded === undefined || decoded.objectId !== value.objectId) return invalidPreparation();
+			afterGenerationId = decoded.generationId;
+			cursor = value.cursor as GenerationPageCursor;
+		}
+		const command: ReadGenerationPageCommand = {
+			kind: "readGenerationPage",
+			objectId: value.objectId,
+			...(cursor === undefined ? {} : { cursor }),
+			limit: value.limit,
+		};
+		return freezePrepared(command, [
+			{
+				afterGenerationId,
+				kind: "generation-page",
+				limitPlusOne: command.limit + 1,
+				objectId: command.objectId,
+			},
+		]);
 	}
 
 	if (kindDescriptor.value === "getBlob") {
@@ -340,9 +421,7 @@ export function evaluateStorageAdapterCommand(
 	for (const fact of loaded.promotions.values()) {
 		owner.markPromoted(fact.objectId, fact.generationId, fact.digest);
 	}
-	const before = objectScope(canonical.command);
-	const beforeState = before === undefined ? undefined : owner.readObjectState(before);
-	const result = execute(owner, canonical.command);
+	const result = execute(owner, canonical.command, loaded);
 	if (!result.ok) return Object.freeze({ result, writes: EMPTY_WRITES });
 
 	const writes: StorageAdapterWrite[] = [];
@@ -362,21 +441,51 @@ export function evaluateStorageAdapterCommand(
 	} else if (
 		canonical.command.kind === "beginGeneration" ||
 		canonical.command.kind === "completeGeneration" ||
-		canonical.command.kind === "swapHead" ||
 		canonical.command.kind === "discardGeneration"
 	) {
-		const afterState = owner.readObjectState(canonical.command.objectId);
-		if (!afterState.ok || beforeState === undefined || !beforeState.ok) return invalidEvaluation();
-		appendStateWrites(writes, beforeState.value, afterState.value);
+		const generation = result.value as GenerationRecord;
+		writes.push(generationWrite(generation));
+	} else if (canonical.command.kind === "swapHead") {
+		const swap = result.value as Readonly<{
+			head: Exclude<ExpectedHead, { kind: "none" }>;
+			supersededGenerationId: GenerationId | null;
+		}>;
+		if (swap.supersededGenerationId !== null) {
+			const superseded = owner.readGenerationRecord(canonical.command.objectId, swap.supersededGenerationId);
+			if (!superseded.ok || superseded.value === null) return invalidEvaluation();
+			writes.push(generationWrite(superseded.value));
+		}
+		const candidate = owner.readGenerationRecord(canonical.command.objectId, canonical.command.generationId);
+		if (!candidate.ok || candidate.value === null) return invalidEvaluation();
+		writes.push(generationWrite(candidate.value));
+		writes.push({
+			kind: "replace-head",
+			objectId: canonical.command.objectId,
+			record: encodeHeadRecordV1(swap.head),
+		});
 	}
 	return Object.freeze({ result, writes: Object.freeze(writes) });
 }
 
 type LoadedFacts = Readonly<{
-	objects: Map<StorageObjectId, ObjectStoreState>;
+	objects: Map<StorageObjectId, TransitionObjectState>;
+	heads: Map<StorageObjectId, ExpectedHead>;
+	pages: Map<
+		StorageObjectId,
+		Readonly<{ afterGenerationId: GenerationId | null; records: readonly GenerationRecord[] }>
+	>;
 	blobs: Map<BlobDigest, Readonly<{ digest: BlobDigest; bytes: Uint8Array | null }>>;
 	promotions: Map<string, Readonly<{ objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }>>;
 }>;
+
+function generationWrite(generation: GenerationRecord): StorageAdapterWrite {
+	return {
+		kind: "replace-generation",
+		objectId: generation.objectId,
+		generationId: generation.generationId,
+		record: encodeGenerationRecordV1(generation),
+	};
+}
 
 function invalidEvaluation(): StorageAdapterEvaluation {
 	return Object.freeze({ result: { ok: false, reason: "INVALID_ARGUMENT" }, writes: EMPTY_WRITES });
@@ -390,6 +499,10 @@ function requirementKey(requirement: StorageAdapterLoadRequirement): string {
 	switch (requirement.kind) {
 		case "object-state":
 			return `object-state\0${requirement.objectId}`;
+		case "head":
+			return `head\0${requirement.objectId}`;
+		case "generation-page":
+			return `generation-page\0${requirement.objectId}\0${requirement.afterGenerationId ?? ""}\0${requirement.limitPlusOne}`;
 		case "blob":
 			return `blob\0${requirement.digest}`;
 		case "promotion":
@@ -417,6 +530,22 @@ function isRequirement(value: unknown): value is StorageAdapterLoadRequirement {
 	if (isClosedRecord(value, ["kind", "objectId"]) && value.kind === "object-state") {
 		return isStorageObjectId(value.objectId);
 	}
+	if (isClosedRecord(value, ["kind", "objectId"]) && value.kind === "head") {
+		return isStorageObjectId(value.objectId);
+	}
+	if (
+		isClosedRecord(value, ["kind", "objectId", "afterGenerationId", "limitPlusOne"]) &&
+		value.kind === "generation-page"
+	) {
+		return (
+			isStorageObjectId(value.objectId) &&
+			(value.afterGenerationId === null || isGenerationId(value.afterGenerationId)) &&
+			typeof value.limitPlusOne === "number" &&
+			Number.isSafeInteger(value.limitPlusOne) &&
+			value.limitPlusOne >= 2 &&
+			value.limitPlusOne <= MAX_GENERATION_PAGE_ROWS + 1
+		);
+	}
 	if (isClosedRecord(value, ["kind", "digest"]) && value.kind === "blob") return isBlobDigest(value.digest);
 	if (isClosedRecord(value, ["kind", "objectId", "generationId", "digest"]) && value.kind === "promotion") {
 		return isStorageObjectId(value.objectId) && isGenerationId(value.generationId) && isBlobDigest(value.digest);
@@ -431,13 +560,56 @@ function isRequirement(value: unknown): value is StorageAdapterLoadRequirement {
 
 function copyAndValidateFacts(command: StorageAdapterCommand, facts: unknown): LoadedFacts | undefined {
 	if (!isClosedArray(facts)) return undefined;
-	const objects = new Map<StorageObjectId, ObjectStoreState>();
+	const objects = new Map<StorageObjectId, TransitionObjectState>();
+	const heads = new Map<StorageObjectId, ExpectedHead>();
+	const pages = new Map<
+		StorageObjectId,
+		Readonly<{ afterGenerationId: GenerationId | null; records: readonly GenerationRecord[] }>
+	>();
 	const blobs = new Map<BlobDigest, Readonly<{ digest: BlobDigest; bytes: Uint8Array | null }>>();
 	const promotions = new Map<
 		string,
 		Readonly<{ objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }>
 	>();
 	for (const fact of facts) {
+		if (isClosedRecord(fact, ["kind", "objectId", "headRecord"]) && fact.kind === "head") {
+			if (!isStorageObjectId(fact.objectId) || heads.has(fact.objectId)) return undefined;
+			const head = decodeHeadFact(fact.objectId, fact.headRecord);
+			if (head === undefined) return undefined;
+			heads.set(fact.objectId, head);
+			continue;
+		}
+		if (
+			isClosedRecord(fact, ["kind", "objectId", "afterGenerationId", "generationRecords"]) &&
+			fact.kind === "generation-page"
+		) {
+			if (
+				!isStorageObjectId(fact.objectId) ||
+				pages.has(fact.objectId) ||
+				(fact.afterGenerationId !== null && !isGenerationId(fact.afterGenerationId)) ||
+				!isClosedArray(fact.generationRecords)
+			) {
+				return undefined;
+			}
+			const records: GenerationRecord[] = [];
+			let previous = fact.afterGenerationId as GenerationId | null;
+			for (const recordBytes of fact.generationRecords) {
+				const bytes = copyBytes(recordBytes);
+				if (bytes === undefined) return undefined;
+				const decoded = decodeGenerationRecordV1(bytes);
+				if (
+					!decoded.ok ||
+					decoded.value.objectId !== fact.objectId ||
+					(previous !== null && decoded.value.generationId <= previous)
+				) {
+					return undefined;
+				}
+				records.push(decoded.value);
+				previous = decoded.value.generationId;
+			}
+			pages.set(fact.objectId, { afterGenerationId: fact.afterGenerationId as GenerationId | null, records });
+			continue;
+		}
 		if (isClosedRecord(fact, ["kind", "objectId", "headRecord", "generationRecords"]) && fact.kind === "object-state") {
 			if (!isStorageObjectId(fact.objectId) || objects.has(fact.objectId) || !isClosedArray(fact.generationRecords)) {
 				return undefined;
@@ -503,8 +675,18 @@ function copyAndValidateFacts(command: StorageAdapterCommand, facts: unknown): L
 		}
 		return undefined;
 	}
-	const loaded = { objects, blobs, promotions };
+	const loaded = { objects, heads, pages, blobs, promotions };
 	return exactFactsForCommand(command, loaded) ? loaded : undefined;
+}
+
+function decodeHeadFact(objectId: StorageObjectId, value: unknown): ExpectedHead | undefined {
+	if (value === null) return { kind: "none", objectId };
+	const bytes = copyBytes(value);
+	if (bytes === undefined) return undefined;
+	const decoded = decodeHeadRecordV1(bytes);
+	return decoded.ok && decoded.value.kind === "present" && decoded.value.objectId === objectId
+		? decoded.value
+		: undefined;
 }
 
 function copyBytes(value: unknown): Uint8Array | undefined {
@@ -517,8 +699,29 @@ function exactFactsForCommand(command: StorageAdapterCommand, facts: LoadedFacts
 	const blobIds = new Set<BlobDigest>();
 	const allowedPromotions = new Set<string>();
 	if (command.kind === "getBlob") blobIds.add(command.digest);
-	else if (command.kind === "readObjectState") objectIds.add(command.objectId);
-	else {
+	else if (command.kind === "readHead") {
+		return (
+			facts.heads.size === 1 &&
+			facts.heads.has(command.objectId) &&
+			facts.pages.size === 0 &&
+			facts.objects.size === 0 &&
+			facts.blobs.size === 0 &&
+			facts.promotions.size === 0
+		);
+	} else if (command.kind === "readGenerationPage") {
+		const page = facts.pages.get(command.objectId);
+		const cursor = command.cursor === undefined ? undefined : decodeGenerationPageCursor(command.cursor);
+		return (
+			page !== undefined &&
+			facts.pages.size === 1 &&
+			facts.heads.size === 0 &&
+			facts.objects.size === 0 &&
+			facts.blobs.size === 0 &&
+			facts.promotions.size === 0 &&
+			page.afterGenerationId === (cursor?.generationId ?? null) &&
+			page.records.length <= command.limit + 1
+		);
+	} else {
 		objectIds.add(command.objectId);
 		if (command.kind === "putCachedBlob" || command.kind === "promoteReference") blobIds.add(command.digest);
 		if (command.kind === "promoteReference") allowedPromotions.add(promotionKey(command));
@@ -531,7 +734,14 @@ function exactFactsForCommand(command: StorageAdapterCommand, facts: LoadedFacts
 			}
 		}
 	}
-	if (facts.objects.size !== objectIds.size || facts.blobs.size !== blobIds.size) return false;
+	if (
+		facts.heads.size !== 0 ||
+		facts.pages.size !== 0 ||
+		facts.objects.size !== objectIds.size ||
+		facts.blobs.size !== blobIds.size
+	) {
+		return false;
+	}
 	for (const id of objectIds) if (!facts.objects.has(id)) return false;
 	for (const id of blobIds) if (!facts.blobs.has(id)) return false;
 	for (const key of facts.promotions.keys()) if (!allowedPromotions.has(key)) return false;
@@ -542,14 +752,32 @@ function promotionKey(value: { objectId: StorageObjectId; generationId: Generati
 	return `${value.objectId}\0${value.generationId}\0${value.digest}`;
 }
 
-function objectScope(command: StorageAdapterCommand): StorageObjectId | undefined {
-	return command.kind === "getBlob" ? undefined : command.objectId;
-}
-
-function execute(owner: TransitionOwner, command: StorageAdapterCommand): StoreResult<StorageAdapterResultValue> {
+function execute(
+	owner: TransitionOwner,
+	command: StorageAdapterCommand,
+	loaded: LoadedFacts
+): StoreResult<StorageAdapterResultValue> {
 	switch (command.kind) {
-		case "readObjectState":
-			return owner.readObjectState(command.objectId);
+		case "readHead": {
+			const head = loaded.heads.get(command.objectId);
+			return head === undefined ? { ok: false, reason: "INVALID_ARGUMENT" } : { ok: true, value: head };
+		}
+		case "readGenerationPage": {
+			const page = loaded.pages.get(command.objectId);
+			if (page === undefined) return { ok: false, reason: "INVALID_ARGUMENT" };
+			const generations = page.records.slice(0, command.limit);
+			const lastGeneration = generations.at(-1);
+			return {
+				ok: true,
+				value: {
+					generations,
+					nextCursor:
+						page.records.length > command.limit && lastGeneration !== undefined
+							? encodeGenerationPageCursor(command.objectId, lastGeneration.generationId)
+							: null,
+				},
+			};
+		}
 		case "getBlob":
 			return owner.getBlob(command.digest);
 		case "beginGeneration":
@@ -582,25 +810,5 @@ function execute(owner: TransitionOwner, command: StorageAdapterCommand): StoreR
 			});
 		case "discardGeneration":
 			return owner.discardGeneration({ objectId: command.objectId, generationId: command.generationId });
-	}
-}
-
-function appendStateWrites(writes: StorageAdapterWrite[], before: ObjectStoreState, after: ObjectStoreState): void {
-	const previous = new Map(before.generations.map((generation) => [generation.generationId, generation]));
-	for (const generation of after.generations) {
-		const record = encodeGenerationRecordV1(generation);
-		const old = previous.get(generation.generationId);
-		if (old !== undefined && bytesEqual(record, encodeGenerationRecordV1(old))) continue;
-		writes.push({
-			kind: "replace-generation",
-			objectId: generation.objectId,
-			generationId: generation.generationId,
-			record: new Uint8Array(record),
-		});
-	}
-	if (after.head.kind === "present") {
-		const record = encodeHeadRecordV1(after.head);
-		if (before.head.kind === "present" && bytesEqual(record, encodeHeadRecordV1(before.head))) return;
-		writes.push({ kind: "replace-head", objectId: after.head.objectId, record: new Uint8Array(record) });
 	}
 }

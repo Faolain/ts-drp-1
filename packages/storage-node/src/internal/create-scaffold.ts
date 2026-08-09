@@ -5,9 +5,10 @@ import {
 	decodeHeadRecordV1,
 	type ExpectedHead,
 	type GenerationId,
+	type GenerationPage,
+	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
-	type ObjectStoreState,
 	type PresentHead,
 	type StorageObjectId,
 	type StoreCapabilities,
@@ -26,7 +27,10 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { SqliteAheDurableStoreOptions } from "../index.js";
 
-export type SqliteMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readObjectState">;
+export type SqliteMutationOperation = Exclude<
+	StorageAdapterCommand["kind"],
+	"getBlob" | "readGenerationPage" | "readHead"
+>;
 
 export type SqliteMutationFault = (
 	checkpoint: Readonly<{ readonly edge: "before-commit"; readonly operation: "beginGeneration" }>
@@ -91,6 +95,7 @@ CREATE TABLE IF NOT EXISTS promotions (
 `;
 
 type DatabaseRow = Record<string, unknown>;
+type ObjectJournalState = Readonly<{ head: ExpectedHead; generations: readonly GenerationRecord[] }>;
 
 class SqliteAheDurableStore implements AheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
@@ -102,8 +107,16 @@ class SqliteAheDurableStore implements AheDurableStore {
 		private readonly crashObserver?: SqliteCrashCheckpointObserver
 	) {}
 
-	public readObjectState(objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>> {
-		return this.run(commandWithKind("readObjectState", { objectId })) as Promise<StoreResult<ObjectStoreState>>;
+	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
+		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
+	}
+
+	public readGenerationPage(input: {
+		readonly objectId: StorageObjectId;
+		readonly cursor?: GenerationPageCursor;
+		readonly limit: number;
+	}): Promise<StoreResult<GenerationPage>> {
+		return this.run(commandWithKind("readGenerationPage", input)) as Promise<StoreResult<GenerationPage>>;
 	}
 
 	public getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
@@ -180,15 +193,11 @@ class SqliteAheDurableStore implements AheDurableStore {
 	private execute(prepared: PreparedStorageAdapterCommand): StoreResult<unknown> {
 		const operation = prepared.command.kind;
 		const mutation = isMutation(operation);
-		const readTransaction = operation === "readObjectState";
 		let transactionActive = false;
 		let result: StoreResult<unknown>;
 		try {
 			if (mutation) {
 				this.connection.exec("BEGIN IMMEDIATE");
-				transactionActive = true;
-			} else if (readTransaction) {
-				this.connection.exec("BEGIN");
 				transactionActive = true;
 			}
 			const facts = this.loadFacts(prepared);
@@ -229,11 +238,44 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 	private loadFacts(prepared: PreparedStorageAdapterCommand): readonly StorageAdapterFact[] {
 		const facts: StorageAdapterFact[] = [];
-		const objectStates = new Map<StorageObjectId, ObjectStoreState>();
+		const objectStates = new Map<StorageObjectId, ObjectJournalState>();
 		const loadedBlobs = new Set<BlobDigest>();
 		const loadedPromotions = new Set<string>();
 		for (const requirement of prepared.requirements) {
 			switch (requirement.kind) {
+				case "head": {
+					const row = this.connection
+						.prepare("SELECT head_record FROM objects WHERE object_id = ?")
+						.get(requirement.objectId) as DatabaseRow | undefined;
+					facts.push({
+						headRecord: row === undefined || row.head_record === null ? null : databaseBytes(row.head_record),
+						kind: "head",
+						objectId: requirement.objectId,
+					});
+					break;
+				}
+				case "generation-page": {
+					const rows = (
+						requirement.afterGenerationId === null
+							? this.connection
+									.prepare(
+										"SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id LIMIT ?"
+									)
+									.all(requirement.objectId, requirement.limitPlusOne)
+							: this.connection
+									.prepare(
+										"SELECT generation_id, record FROM generations WHERE object_id = ? AND generation_id > ? ORDER BY generation_id LIMIT ?"
+									)
+									.all(requirement.objectId, requirement.afterGenerationId, requirement.limitPlusOne)
+					) as DatabaseRow[];
+					facts.push({
+						afterGenerationId: requirement.afterGenerationId,
+						generationRecords: rows.map((row) => boundGenerationRecord(row, requirement.objectId)),
+						kind: "generation-page",
+						objectId: requirement.objectId,
+					});
+					break;
+				}
 				case "object-state": {
 					const loaded = this.loadObjectState(requirement.objectId);
 					facts.push(loaded.fact);
@@ -270,7 +312,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 	private loadObjectState(objectId: StorageObjectId): Readonly<{
 		fact: Extract<StorageAdapterFact, { kind: "object-state" }>;
-		state: ObjectStoreState;
+		state: ObjectJournalState;
 	}> {
 		const object = this.connection.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
 			| DatabaseRow
@@ -416,7 +458,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 }
 
 function isMutation(kind: StorageAdapterCommand["kind"]): kind is SqliteMutationOperation {
-	return kind !== "readObjectState" && kind !== "getBlob";
+	return kind !== "readHead" && kind !== "readGenerationPage" && kind !== "getBlob";
 }
 
 function commandWithKind(kind: StorageAdapterCommand["kind"], input: unknown): unknown {
@@ -431,6 +473,15 @@ function commandWithKind(kind: StorageAdapterCommand["kind"], input: unknown): u
 function databaseBytes(value: unknown): Uint8Array {
 	if (!(value instanceof Uint8Array)) throw new Error("SQLite returned a non-BLOB value");
 	return new Uint8Array(value);
+}
+
+function boundGenerationRecord(row: DatabaseRow, objectId: StorageObjectId): Uint8Array {
+	const record = databaseBytes(row.record);
+	const decoded = decodeGenerationRecordV1(record);
+	if (!decoded.ok || decoded.value.objectId !== objectId || decoded.value.generationId !== row.generation_id) {
+		throw new Error("SQLite generation key does not match its canonical record");
+	}
+	return record;
 }
 
 function requireOneChange(changes: number | bigint, label: string): void {

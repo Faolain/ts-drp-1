@@ -1,11 +1,14 @@
 import { bytesEqual, copyGenerationRecord, isClosedArray, isClosedRecord } from "./internal/validation.js";
 import type {
 	AheDurableStore,
+	ExpectedHead,
+	GenerationPageCursor,
 	GenerationRecord,
 	GenerationRef,
-	ObjectStoreState,
 	ParseResult,
+	StorageObjectId,
 	StoreCapabilities,
+	StoreResult,
 } from "./types.js";
 import { digestBlob, digestClosure, parseGenerationId, parseStorageObjectId } from "./values.js";
 
@@ -23,6 +26,11 @@ type ContractContext = {
 	readonly store: AheDurableStore;
 	capabilities?: Readonly<StoreCapabilities>;
 };
+
+type QuiescentContractView = Readonly<{
+	head: ExpectedHead;
+	generations: readonly GenerationRecord[];
+}>;
 
 function contractViolation(step: string, detail: string): never {
 	throw new Error(`AheDurableStore contract violation at ${step}: ${detail}`);
@@ -99,7 +107,7 @@ function assertObjectState(
 	value: unknown,
 	expected: Omit<GenerationRecord, "state"> & { readonly state: GenerationRecord["state"] },
 	step: string
-): asserts value is ObjectStoreState {
+): asserts value is QuiescentContractView {
 	if (
 		!isClosedRecord(value, ["head", "generations"]) ||
 		!isClosedRecord(value.head, ["kind", "objectId"]) ||
@@ -137,13 +145,35 @@ function assertBlob(
 	}
 }
 
-function mutateStateOutput(value: ObjectStoreState): void {
+function mutateStateOutput(value: QuiescentContractView): void {
 	Reflect.set(value.head, "objectId", "mutated-output");
 	const generation = value.generations[0];
 	if (generation === undefined) return;
 	Reflect.set(generation, "state", "Discarded");
 	const reference = generation.closure[0];
 	if (reference !== undefined) Reflect.set(reference, "byteLength", 0);
+}
+
+// Contract assertions call this only while their own writes are quiescent. The
+// two public APIs remain independently consistent; this internal helper does not
+// present their aggregate as an adapter snapshot.
+async function readQuiescentContractView(
+	store: AheDurableStore,
+	objectId: StorageObjectId
+): Promise<StoreResult<QuiescentContractView>> {
+	const head = await store.readHead(objectId);
+	if (!head.ok) return head;
+	const generations: GenerationRecord[] = [];
+	let cursor: GenerationPageCursor | undefined;
+	let complete = false;
+	while (!complete) {
+		const page = await store.readGenerationPage({ objectId, ...(cursor === undefined ? {} : { cursor }), limit: 128 });
+		if (!page.ok) return page;
+		generations.push(...page.value.generations);
+		cursor = page.value.nextCursor ?? undefined;
+		complete = page.value.nextCursor === null;
+	}
+	return { ok: true, value: { head: head.value, generations } };
 }
 
 async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
@@ -165,8 +195,8 @@ async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
 		closure: expectedClosure,
 	};
 
-	const initialState = successfulValue(await store.readObjectState(objectId), "initial readObjectState");
-	assertFreshState(initialState, objectId, "initial readObjectState");
+	const initialState = successfulValue(await readQuiescentContractView(store, objectId), "initial split read");
+	assertFreshState(initialState, objectId, "initial split read");
 
 	const inputReference = { ...expectedReference };
 	const inputClosure: GenerationRef[] = [inputReference];
@@ -191,11 +221,11 @@ async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
 	const secondBlob = successfulValue(await store.getBlob(digest), "getBlob reread");
 	assertBlob(secondBlob, expectedBytes, firstBlob, "getBlob reread");
 
-	const firstState = successfulValue(await store.readObjectState(objectId), "readObjectState");
-	assertObjectState(firstState, { ...expectedGeneration, state: "Staged" }, "readObjectState");
+	const firstState = successfulValue(await readQuiescentContractView(store, objectId), "split read");
+	assertObjectState(firstState, { ...expectedGeneration, state: "Staged" }, "split read");
 	mutateStateOutput(firstState);
-	const secondState = successfulValue(await store.readObjectState(objectId), "readObjectState reread");
-	assertObjectState(secondState, { ...expectedGeneration, state: "Staged" }, "readObjectState reread");
+	const secondState = successfulValue(await readQuiescentContractView(store, objectId), "split reread");
+	assertObjectState(secondState, { ...expectedGeneration, state: "Staged" }, "split reread");
 
 	const repeatedBegin = await store.beginGeneration({
 		objectId,
@@ -205,14 +235,10 @@ async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
 	});
 	assertRejection(repeatedBegin, "GENERATION_EXISTS", "repeated beginGeneration");
 	const afterRepeatedBegin = successfulValue(
-		await store.readObjectState(objectId),
-		"readObjectState after repeated begin"
+		await readQuiescentContractView(store, objectId),
+		"split read after repeated begin"
 	);
-	assertObjectState(
-		afterRepeatedBegin,
-		{ ...expectedGeneration, state: "Staged" },
-		"readObjectState after repeated begin"
-	);
+	assertObjectState(afterRepeatedBegin, { ...expectedGeneration, state: "Staged" }, "split read after repeated begin");
 	assertBlob(
 		successfulValue(await store.getBlob(digest), "getBlob after repeated begin"),
 		expectedBytes,
@@ -228,14 +254,10 @@ async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
 	});
 	assertRejection(undeclaredPut, "BLOB_NOT_REFERENCED", "undeclared putCachedBlob");
 	const afterUndeclaredPut = successfulValue(
-		await store.readObjectState(objectId),
-		"readObjectState after undeclared put"
+		await readQuiescentContractView(store, objectId),
+		"split read after undeclared put"
 	);
-	assertObjectState(
-		afterUndeclaredPut,
-		{ ...expectedGeneration, state: "Staged" },
-		"readObjectState after undeclared put"
-	);
+	assertObjectState(afterUndeclaredPut, { ...expectedGeneration, state: "Staged" }, "split read after undeclared put");
 	const absentBlob = successfulValue(await store.getBlob(undeclaredDigest), "undeclared getBlob");
 	if (absentBlob !== null) contractViolation("undeclared getBlob", "expected no globally published blob");
 	assertBlob(
@@ -247,8 +269,11 @@ async function runCommonLifecycle(store: AheDurableStore): Promise<void> {
 
 	const discarded = successfulValue(await store.discardGeneration({ objectId, generationId }), "discardGeneration");
 	assertGeneration(discarded, { ...expectedGeneration, state: "Discarded" }, "discardGeneration");
-	const persistedDiscard = successfulValue(await store.readObjectState(objectId), "readObjectState after discard");
-	assertObjectState(persistedDiscard, { ...expectedGeneration, state: "Discarded" }, "readObjectState after discard");
+	const persistedDiscard = successfulValue(
+		await readQuiescentContractView(store, objectId),
+		"split read after discard"
+	);
+	assertObjectState(persistedDiscard, { ...expectedGeneration, state: "Discarded" }, "split read after discard");
 }
 
 function assertStrictGeneration(
@@ -324,7 +349,7 @@ async function runStrictLifecycle(store: AheDurableStore): Promise<void> {
 	);
 	assertStrictGeneration(completed, { ...expectedGeneration, state: "Complete" }, "strict completeGeneration");
 	Reflect.set(completed, "state", "Discarded");
-	const beforeSwap = successfulValue(await store.readObjectState(objectId), "strict read before swap");
+	const beforeSwap = successfulValue(await readQuiescentContractView(store, objectId), "strict split read before swap");
 	if (!isClosedRecord(beforeSwap, ["head", "generations"]) || !isClosedArray(beforeSwap.generations)) {
 		return contractViolation("strict read before swap", "expected an exact detached object state");
 	}
@@ -351,7 +376,7 @@ async function runStrictLifecycle(store: AheDurableStore): Promise<void> {
 		return contractViolation("strict swapHead", "expected the exact first adopted head");
 	}
 	Reflect.set(swapped.head, "objectId", "mutated-output");
-	const adopted = successfulValue(await store.readObjectState(objectId), "strict adopted reread");
+	const adopted = successfulValue(await readQuiescentContractView(store, objectId), "strict adopted split reread");
 	if (
 		!isClosedRecord(adopted, ["head", "generations"]) ||
 		!isClosedRecord(adopted.head, ["kind", "objectId", "generationId", "revision", "closureDigest"]) ||

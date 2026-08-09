@@ -4,7 +4,6 @@ import type {
 	GenerationId,
 	GenerationRecord,
 	GenerationRef,
-	ObjectStoreState,
 	PresentHead,
 	StorageObjectId,
 	StorageRejectionReason,
@@ -39,9 +38,18 @@ type MutableGeneration = {
 type MutableObject = {
 	head: ExpectedHead;
 	generations: Map<GenerationId, MutableGeneration>;
+	generationIds: GenerationId[];
 };
 
 type TransitionDurability = "ephemeral" | "strict";
+
+const MAX_INTERNAL_GENERATION_PAGE_ROWS = 129;
+
+/** Source-internal full journal state retained as the mutation authority through Phase 2e2. */
+export type TransitionObjectState = Readonly<{
+	head: ExpectedHead;
+	generations: readonly GenerationRecord[];
+}>;
 
 function rejected<T>(reason: Exclude<StorageRejectionReason, "SUBSTRATE_FAILURE">): StoreResult<T> {
 	return { ok: false, reason };
@@ -73,7 +81,7 @@ export class TransitionOwner {
 	 * @param objectId - Input value.
 	 * @returns A detached state or stable rejection.
 	 */
-	public readObjectState(objectId: StorageObjectId): StoreResult<ObjectStoreState> {
+	public readObjectState(objectId: StorageObjectId): StoreResult<TransitionObjectState> {
 		if (!isStorageObjectId(objectId)) return rejected("INVALID_ARGUMENT");
 		if (this.closed) return rejected("STORE_CLOSED");
 		const object = this.objects.get(objectId);
@@ -84,11 +92,75 @@ export class TransitionOwner {
 			ok: true,
 			value: {
 				head: cloneHead(object.head),
-				generations: [...object.generations.values()]
-					.sort((left, right) => compareCanonicalText(left.generationId, right.generationId))
-					.map(asRecord),
+				generations: object.generationIds.map((generationId) => indexedGenerationRecord(object, generationId)),
 			},
 		};
+	}
+
+	/**
+	 * Reads one detached head without materializing the object's journal.
+	 * @param objectId - Canonical object identity.
+	 * @returns The detached head or stable rejection.
+	 */
+	public readHead(objectId: StorageObjectId): StoreResult<ExpectedHead> {
+		if (!isStorageObjectId(objectId)) return rejected("INVALID_ARGUMENT");
+		if (this.closed) return rejected("STORE_CLOSED");
+		const object = this.objects.get(objectId);
+		return {
+			ok: true,
+			value: object === undefined ? { kind: "none", objectId } : cloneHead(object.head),
+		};
+	}
+
+	/**
+	 * Reads at most one internally bounded, detached generation page in canonical ID order.
+	 * @param objectId - Canonical object identity.
+	 * @param afterGenerationId - Exclusive canonical lower bound, or the beginning.
+	 * @param limit - Maximum number of records to detach.
+	 * @returns The detached page or stable rejection.
+	 */
+	public readGenerationPage(
+		objectId: StorageObjectId,
+		afterGenerationId: GenerationId | null,
+		limit: number
+	): StoreResult<readonly GenerationRecord[]> {
+		if (
+			!isStorageObjectId(objectId) ||
+			(afterGenerationId !== null && !isGenerationId(afterGenerationId)) ||
+			!Number.isSafeInteger(limit) ||
+			limit < 1 ||
+			limit > MAX_INTERNAL_GENERATION_PAGE_ROWS
+		) {
+			return rejected("INVALID_ARGUMENT");
+		}
+		if (this.closed) return rejected("STORE_CLOSED");
+		const object = this.objects.get(objectId);
+		if (object === undefined) return { ok: true, value: [] };
+		const start = firstGenerationAfter(object.generationIds, afterGenerationId);
+		const end = Math.min(start + limit, object.generationIds.length);
+		const generations: GenerationRecord[] = [];
+		for (let index = start; index < end; index++) {
+			const generationId = object.generationIds[index];
+			if (generationId === undefined) throw new Error("ordered generation index is sparse");
+			generations.push(indexedGenerationRecord(object, generationId));
+		}
+		return { ok: true, value: generations };
+	}
+
+	/**
+	 * Reads one detached generation by its exact identity for command-owned write planning.
+	 * @param objectId - Canonical object identity.
+	 * @param generationId - Canonical generation identity.
+	 * @returns The detached record, absence, or stable rejection.
+	 */
+	public readGenerationRecord(
+		objectId: StorageObjectId,
+		generationId: GenerationId
+	): StoreResult<GenerationRecord | null> {
+		if (!isStorageObjectId(objectId) || !isGenerationId(generationId)) return rejected("INVALID_ARGUMENT");
+		if (this.closed) return rejected("STORE_CLOSED");
+		const generation = this.findGeneration(objectId, generationId);
+		return { ok: true, value: generation === undefined ? null : asRecord(generation) };
 	}
 
 	/**
@@ -154,6 +226,7 @@ export class TransitionOwner {
 			state: "Staged",
 		};
 		object.generations.set(input.generationId, generation);
+		insertGenerationId(object.generationIds, input.generationId);
 		return { ok: true, value: asRecord(generation) };
 	}
 
@@ -340,15 +413,17 @@ export class TransitionOwner {
 	 * Seeds modeled adapter state for package-internal conformance tests.
 	 * @param state - Input value.
 	 */
-	public seedObjectState(state: ObjectStoreState): void {
+	public seedObjectState(state: TransitionObjectState): void {
+		const generations = new Map(
+			state.generations.map((record) => {
+				const copied = cloneGeneration(record);
+				return [copied.generationId, { ...copied, closure: copied.closure.map((item) => ({ ...item })) }];
+			})
+		);
 		this.objects.set(state.head.objectId, {
 			head: cloneHead(state.head),
-			generations: new Map(
-				state.generations.map((record) => {
-					const copied = cloneGeneration(record);
-					return [copied.generationId, { ...copied, closure: copied.closure.map((item) => ({ ...item })) }];
-				})
-			),
+			generations,
+			generationIds: [...generations.keys()].sort(compareCanonicalText),
 		});
 	}
 
@@ -374,7 +449,7 @@ export class TransitionOwner {
 	private object(objectId: StorageObjectId): MutableObject {
 		let value = this.objects.get(objectId);
 		if (value === undefined) {
-			value = { head: { kind: "none", objectId }, generations: new Map() };
+			value = { head: { kind: "none", objectId }, generations: new Map(), generationIds: [] };
 			this.objects.set(objectId, value);
 		}
 		return value;
@@ -414,4 +489,29 @@ export class TransitionOwner {
 	private promotionKey(objectId: StorageObjectId, generationId: GenerationId, digest: BlobDigest): string {
 		return `${objectId}\0${generationId}\0${digest}`;
 	}
+}
+
+function firstGenerationAfter(generationIds: readonly GenerationId[], afterGenerationId: GenerationId | null): number {
+	if (afterGenerationId === null) return 0;
+	let lower = 0;
+	let upper = generationIds.length;
+	while (lower < upper) {
+		const middle = lower + Math.floor((upper - lower) / 2);
+		const generationId = generationIds[middle];
+		if (generationId === undefined) throw new Error("ordered generation index is sparse");
+		if (compareCanonicalText(generationId, afterGenerationId) <= 0) lower = middle + 1;
+		else upper = middle;
+	}
+	return lower;
+}
+
+function insertGenerationId(generationIds: GenerationId[], generationId: GenerationId): void {
+	const index = firstGenerationAfter(generationIds, generationId);
+	generationIds.splice(index, 0, generationId);
+}
+
+function indexedGenerationRecord(object: MutableObject, generationId: GenerationId): GenerationRecord {
+	const generation = object.generations.get(generationId);
+	if (generation === undefined) throw new Error("ordered generation index disagrees with the journal");
+	return asRecord(generation);
 }

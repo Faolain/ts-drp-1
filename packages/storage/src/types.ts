@@ -3,12 +3,14 @@ declare const generationIdBrand: unique symbol;
 declare const blobDigestBrand: unique symbol;
 declare const closureDigestBrand: unique symbol;
 declare const headRevisionBrand: unique symbol;
+declare const generationPageCursorBrand: unique symbol;
 
 export type StorageObjectId = string & { readonly [storageObjectIdBrand]: true };
 export type GenerationId = string & { readonly [generationIdBrand]: true };
 export type BlobDigest = string & { readonly [blobDigestBrand]: true };
 export type ClosureDigest = string & { readonly [closureDigestBrand]: true };
 export type HeadRevision = number & { readonly [headRevisionBrand]: true };
+export type GenerationPageCursor = string & { readonly [generationPageCursorBrand]: true };
 
 export type ParseResult<T> =
 	| { readonly ok: true; readonly value: T }
@@ -76,9 +78,9 @@ export type GenerationRecord = {
 	readonly state: GenerationState;
 };
 
-export type ObjectStoreState = {
-	readonly head: ExpectedHead;
+export type GenerationPage = {
 	readonly generations: readonly GenerationRecord[];
+	readonly nextCursor: GenerationPageCursor | null;
 };
 
 export type StoreCapabilities = {
@@ -88,7 +90,12 @@ export type StoreCapabilities = {
 
 export interface AheDurableStore {
 	readonly capabilities: Readonly<StoreCapabilities>;
-	readObjectState(objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>>;
+	readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>>;
+	readGenerationPage(input: {
+		readonly objectId: StorageObjectId;
+		readonly cursor?: GenerationPageCursor;
+		readonly limit: number;
+	}): Promise<StoreResult<GenerationPage>>;
 	getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>>;
 	beginGeneration(input: {
 		readonly objectId: StorageObjectId;
