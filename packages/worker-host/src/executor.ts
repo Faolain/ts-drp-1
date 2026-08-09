@@ -93,6 +93,10 @@ function nowMilliseconds(): number {
 	return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
+function elapsedMilliseconds(startedAt: number): number {
+	return Math.max(0, nowMilliseconds() - startedAt);
+}
+
 async function cooperativeYield(): Promise<void> {
 	const scheduler = (globalThis as typeof globalThis & { scheduler?: SchedulerLike }).scheduler;
 	if (typeof scheduler?.yield === "function") {
@@ -210,7 +214,7 @@ export function executeBounded<T, R>(
 					if (callerAborted) throw abortError(callerAbortReason);
 					if (index > 0 && index % resolved.batchSize === 0) {
 						resolved.metrics?.increment("batches-completed");
-						resolved.metrics?.observe("batch-duration", nowMilliseconds() - batchStartedAt);
+						resolved.metrics?.observe("batch-duration", elapsedMilliseconds(batchStartedAt));
 						try {
 							await cooperativeYield();
 						} catch (error) {
@@ -252,12 +256,12 @@ export function executeBounded<T, R>(
 						value = await process(next.value, index, linkedController.signal);
 					} catch (error) {
 						resolved.metrics?.increment("items-failed");
-						resolved.metrics?.observe("item-duration", nowMilliseconds() - itemStartedAt);
+						resolved.metrics?.observe("item-duration", elapsedMilliseconds(itemStartedAt));
 						rawFailure = error;
 						if (callerAborted) throw abortError(callerAbortReason, [error]);
 						throw failureError("worker-host-item-failed", error);
 					}
-					resolved.metrics?.observe("item-duration", nowMilliseconds() - itemStartedAt);
+					resolved.metrics?.observe("item-duration", elapsedMilliseconds(itemStartedAt));
 					if (callerAborted) {
 						resolved.metrics?.increment("items-discarded");
 						throw abortError(callerAbortReason);
