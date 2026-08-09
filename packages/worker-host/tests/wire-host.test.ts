@@ -336,6 +336,41 @@ describe("Phase 2f-b host stream, cancellation, and lifecycle RED", () => {
 		host.close();
 	});
 
+	it("releases unread buffered bytes when a consumer abandons an already completed stream", async () => {
+		const endpoint = new EndpointDouble();
+		const host = await create(endpoint, {
+			maxBufferedChunks: 4,
+			maxBufferedBytes: 65_536,
+			maxChunksPerRequest: 4,
+			maxResultBytesPerRequest: 65_536,
+		});
+		endpoint.emit("message", ready());
+
+		const abandoned = host.submit("echo", new Uint8Array());
+		const abandonedId = firstRequest(endpoint).id;
+		const consumed = new Uint8Array(40_000);
+		const unread = new Uint8Array(20_000);
+		endpoint.emit("message", chunk(abandonedId, 0, consumed));
+		endpoint.emit("message", chunk(abandonedId, 1, unread));
+		endpoint.emit("message", terminal(abandonedId, "done", 2, consumed.byteLength + unread.byteLength));
+		await expect(abandoned.next()).resolves.toEqual({ done: false, value: consumed });
+		await abandoned.return(undefined);
+
+		const subsequent = host.submit("echo", new Uint8Array());
+		const subsequentId = (
+			endpoint.posted.find(
+				(value) =>
+					(value as { kind?: unknown; id?: unknown }).kind === "request" &&
+					(value as { id?: unknown }).id !== abandonedId
+			) as { id: string }
+		).id;
+		const validResult = new Uint8Array(50_000);
+		endpoint.emit("message", chunk(subsequentId, 0, validResult));
+		endpoint.emit("message", terminal(subsequentId, "done", 1, validResult.byteLength));
+		await expect(drain(subsequent)).resolves.toEqual([validResult]);
+		host.close();
+	});
+
 	it("normalizes inbound chunk views and treats oversized chunk payloads as protocol violations", async () => {
 		const endpoint = new EndpointDouble();
 		const host = await create(endpoint);
