@@ -1222,8 +1222,9 @@ before the next pull, use feature-detected `scheduler.yield()`, then
 The scheduler is not injectable. Abort checks occur before pull, after pull and
 before process, after process settlement, after a buffer wait, after yield and
 before enqueue. An in-flight processor settles, then its result/failure is
-discarded or suppressed and no next item begins. Source, processor and max-item
-failures map to their named codes. Breaking/returning/throwing from consumption
+discarded or suppressed and no next item begins. Source and max-item failures
+map to their named codes. Processor failure maps to `worker-host-item-failed`
+with `detail.index`. Breaking/returning/throwing from consumption
 aborts the linked signal, calls and awaits `source.return` when present, awaits
 the one in-flight processor and emits no second abandonment error. No completed
 result array or raw timing-sample array exists.
@@ -1240,6 +1241,64 @@ plus overflow. The only methods are `increment`, `observe`, `snapshot` and
 `Number.MAX_SAFE_INTEGER`, maximum is maintained incrementally, snapshots are
 fresh/deeply frozen and `drain` atomically zeroes state. Telemetry is never
 consensus-visible, hashed or transmitted.
+
+##### Phase 2f-a accepted and closed
+
+Phase 2f-a closed at final GREEN `1f32cd0` over final tests-only RED `27b58e3`.
+Its TDD lineage is contract `80d0e70`; initial REDs `6bcf24c` and `b40797e`;
+initial GREEN `31ba498`; regressing-clock RED/GREEN `9235b88`/`7826689`;
+iterator-cleanup and timing-control RED/GREEN `c1f721e`/`a8a03ee`; and
+item-index RED/GREEN `27b58e3`/`1f32cd0`. The `detail.index` sentence above is a
+factual reconciliation with line 60 of the already-ratified contract whose
+SHA-256 is `659e7e0078ab68cf954021b03792a0003eb238136b376dd5d7e2f1720961262d`,
+not a new assumption or normative change.
+
+The accepted package remains private, root-only and dependency-free at runtime.
+It supplies the bounded, ordered executor with one processor call in flight,
+zero pull-ahead, a fixed-capacity ring buffer, linked cancellation and
+abandonment, and the closed telemetry/error taxonomy above. `./host` and
+`./worker` remain owned by 2f-b; Phase 2f-a does not expose either subpath.
+
+Three independent adversarial passes found real contract gaps after earlier
+candidates had satisfied their frozen REDs. Regressing internal clocks could
+feed negative elapsed values into metrics, so every elapsed duration is now
+clamped non-negative. A throwing `iterator.return` getter or non-callable
+`return` could cause a secondary rejection or unhandled error, so cleanup is
+captured once, safely classified/read/invoked, awaited, and a lower-priority
+cleanup failure is suppressed when a primary failure or cancellation already
+owns settlement. Processor failures omitted the canonical failing index, so
+`worker-host-item-failed` now carries `detail.index`. Earlier reviews that did
+not surface a later finding are superseded only by the subsequent exact-HEAD
+gates; they are not evidence against the reviewers or the TDD process.
+
+Final evidence records 36/36 worker-host tests; package typecheck and build;
+traced scoped ESLint with 0 errors and 0 warnings; Prettier and diff checks; and
+packed/built-artifact probes. The workspace gate typechecked 36/36 selected
+projects while excluding only the unchanged, known Phase 1i-b object/node RED
+baselines, and the full 32-package build passed. This is not a claim that root
+lint is green: protected untracked and unrelated baseline state remains outside
+this slice's scoped lint acceptance.
+
+The exact final-candidate review chain was clean Grok 4.5/high session
+`4b98d169-5175-420d-8538-f6f090e8d9e6`, Kimi 3/high/max-100 session
+`244b70b3-4d5b-479b-abea-d45f24806955`, and Opus 5/xhigh session
+`73d6487a-c3a0-4f9a-86fe-90b1edc2c515`; all returned `APPROVED`. Preliminary
+Grok session `c860d7f9-7643-4e6f-913e-1cb9e46575c2` is retained but quarantined
+because it read concurrent Kimi evidence and is not authoritative. The final
+Opus artifact is
+`.logs/phase-2f-a-item-failure-index-final-opus-xhigh-review/`.
+
+Accepted residuals are explicit. A processor or source `return` that never
+settles can still suspend cleanup because this slice has no general timeout and
+requires cooperation. Calling `return` while an exotic iterator has a pending
+`next` remains an integration residual. When 2f-b adds `./host` and `./worker`,
+the root test that currently pins `exports: ["."]` must be deliberately amended.
+`appendSuppressed` retention of `detail.index` and empty detail construction for
+source failures are construction-correct and exercised by the built probe, but
+do not each have a dedicated unit assertion. Phase 2f-a owns no Phase 4
+fold/hash/crypto behavior; optional 2f-d remains trigger-gated. By itself this
+slice enables neither the Discord/chat nor MMORPG golden path. The next TDD
+slice is 2f-b.
 
 #### Slice 2f-b — byte-bounded wire and host lifecycle
 
