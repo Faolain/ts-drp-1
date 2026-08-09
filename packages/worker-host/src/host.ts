@@ -568,7 +568,10 @@ export function createWorkerHost(options: WorkerHostOptions): WorkerHost {
 					}
 				}
 			} finally {
-				if (!terminalObserved) cancel(request);
+				if (!terminalObserved) {
+					if (request.terminal === undefined) cancel(request);
+					else discardChunks(request);
+				}
 			}
 		})();
 	};
