@@ -827,6 +827,34 @@ describe("Phase 2f-a caller-owned fixed telemetry RED", () => {
 		expect(namedValue(snapshot, "batches-completed")).toBe(1);
 		expect(namedValue(snapshot, "item-duration")).toBeDefined();
 	});
+
+	it("clamps regressing internal item and batch clock deltas to zero", async () => {
+		const executeBounded = await executor();
+		const Metrics = await metricsConstructor();
+		const now = vi
+			.fn()
+			.mockReturnValueOnce(100)
+			.mockReturnValueOnce(80)
+			.mockReturnValueOnce(10)
+			.mockReturnValueOnce(5)
+			.mockReturnValue(0);
+		replaceGlobal("performance", { now });
+		replaceGlobal("scheduler", { yield: () => Promise.resolve() });
+		const metrics = new Metrics();
+
+		await expect(
+			collect(executeBounded(["item"], (item, index) => `${index}:${item}`, { batchSize: 1, metrics }))
+		).resolves.toEqual([{ index: 0, value: "0:item" }]);
+		const snapshot = metrics.snapshot() as {
+			readonly timings: Readonly<
+				Record<TimingName, Readonly<{ buckets: readonly number[]; count: number; maxMs: number; totalMs: number }>>
+			>;
+		};
+		for (const name of ["item-duration", "batch-duration"] as const) {
+			expect(snapshot.timings[name]).toMatchObject({ count: 1, maxMs: 0, totalMs: 0 });
+			expect(snapshot.timings[name].buckets[0]).toBe(1);
+		}
+	});
 });
 
 describe("Phase 2f-a causal mutant and harness controls", () => {
