@@ -24,21 +24,43 @@ import * as root from "../src/index.js";
 import type { GenerationRecord, StoreResult } from "../src/types.js";
 
 type Scenario = Readonly<{
-	command: StorageAdapterCommand;
+	command: AdapterCommandFixture;
 	facts: readonly StorageAdapterFact[];
 	name: string;
 	writes(result: StoreResult<unknown>): readonly StorageAdapterWrite[];
 }>;
 
-function mustPrepare(command: StorageAdapterCommand): PreparedStorageAdapterCommand {
+type AdapterCommandFixture =
+	| StorageAdapterCommand
+	| Readonly<{ kind: "readHead"; objectId: typeof OBJECT_A }>
+	| Readonly<{ cursor?: string; kind: "readGenerationPage"; limit: number; objectId: typeof OBJECT_A }>;
+
+function mustPrepare(command: unknown): PreparedStorageAdapterCommand {
 	const result = prepareStorageAdapterCommand(command);
 	if (!result.ok) throw new Error(`valid command failed preparation: ${result.reason}`);
 	return result.value;
 }
 
-function evaluateFacade(command: StorageAdapterCommand, facts: readonly StorageAdapterFact[]): StoreResult<unknown> {
+function evaluateFacade(command: AdapterCommandFixture, facts: readonly StorageAdapterFact[]): StoreResult<unknown> {
 	const prepared = prepareStorageAdapterCommand(command);
 	return prepared.ok ? evaluateStorageAdapterCommand(prepared.value, facts).result : prepared;
+}
+
+function headFact(head: ReturnType<typeof noHead> | ReturnType<typeof presentHead>): StorageAdapterFact {
+	return {
+		headRecord: head.kind === "none" ? null : encodeHeadRecordV1(head),
+		kind: "head",
+		objectId: head.objectId,
+	} as unknown as StorageAdapterFact;
+}
+
+function generationPageFact(generations: readonly GenerationRecord[]): StorageAdapterFact {
+	return {
+		afterGenerationId: null,
+		generationRecords: generations.map(encodeGenerationRecordV1),
+		kind: "generation-page",
+		objectId: OBJECT_A,
+	} as unknown as StorageAdapterFact;
 }
 
 function objectFact(
@@ -54,11 +76,19 @@ function objectFact(
 
 function executeHarness(
 	harness: ReturnType<typeof createTransitionHarness>,
-	command: StorageAdapterCommand
+	command: AdapterCommandFixture
 ): StoreResult<unknown> {
 	switch (command.kind) {
-		case "readObjectState":
-			return harness.readObjectState(command.objectId);
+		case "readHead": {
+			const state = harness.readObjectState(command.objectId);
+			return state.ok ? { ok: true, value: state.value.head } : state;
+		}
+		case "readGenerationPage": {
+			const state = harness.readObjectState(command.objectId);
+			return state.ok
+				? { ok: true, value: { generations: state.value.generations.slice(0, command.limit), nextCursor: null } }
+				: state;
+		}
 		case "getBlob":
 			return harness.getBlob(command.digest);
 		case "beginGeneration":
@@ -92,14 +122,40 @@ function executeHarness(
 		case "discardGeneration":
 			return harness.discardGeneration({ objectId: command.objectId, generationId: command.generationId });
 	}
+	throw new Error("unhandled adapter command fixture");
 }
 
 function expectedFromSharedKernel(
-	command: StorageAdapterCommand,
+	command: AdapterCommandFixture,
 	facts: readonly StorageAdapterFact[]
 ): StoreResult<unknown> {
 	const harness = createTransitionHarness();
 	for (const fact of facts) {
+		const splitFact = fact as unknown as {
+			readonly generationRecords?: readonly Uint8Array[];
+			readonly headRecord?: Uint8Array | null;
+			readonly kind: string;
+			readonly objectId?: typeof OBJECT_A;
+		};
+		if (splitFact.kind === "head" && splitFact.objectId !== undefined && splitFact.headRecord !== undefined) {
+			const head =
+				splitFact.headRecord === null
+					? { ok: true as const, value: noHead(splitFact.objectId) }
+					: decodeHeadRecordV1(splitFact.headRecord);
+			if (!head.ok) return head;
+			harness.seedObjectState({ head: head.value, generations: [] });
+			continue;
+		}
+		if (splitFact.kind === "generation-page" && splitFact.objectId !== undefined) {
+			const generations: GenerationRecord[] = [];
+			for (const bytes of splitFact.generationRecords ?? []) {
+				const decoded = decodeGenerationRecordV1(bytes);
+				if (!decoded.ok) return decoded;
+				generations.push(decoded.value);
+			}
+			harness.seedObjectState({ head: noHead(splitFact.objectId), generations });
+			continue;
+		}
 		switch (fact.kind) {
 			case "store-closed":
 				harness.close();
@@ -325,7 +381,22 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 
 	it("names exact fact loads and fails closed on every inexact fact set", () => {
 		const item = ref(bytes(1));
-		const requirements: ReadonlyArray<readonly [StorageAdapterCommand, readonly StorageAdapterLoadRequirement[]]> = [
+		const requirements: ReadonlyArray<readonly [AdapterCommandFixture, readonly StorageAdapterLoadRequirement[]]> = [
+			[
+				{ kind: "readHead", objectId: OBJECT_A },
+				[{ kind: "head", objectId: OBJECT_A } as unknown as StorageAdapterLoadRequirement],
+			],
+			[
+				{ kind: "readGenerationPage", objectId: OBJECT_A, limit: 2 },
+				[
+					{
+						afterGenerationId: null,
+						kind: "generation-page",
+						limitPlusOne: 3,
+						objectId: OBJECT_A,
+					} as unknown as StorageAdapterLoadRequirement,
+				],
+			],
 			[
 				{
 					kind: "beginGeneration",
@@ -375,7 +446,7 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 			).toEqual({ ok: false, reason: "SHARED_BUFFER_INPUT" });
 		}
 		expect(
-			prepareStorageAdapterCommand({ ...(requirements[0]?.[0] as StorageAdapterCommand), durability: "strict" })
+			prepareStorageAdapterCommand({ ...(requirements[2]?.[0] as StorageAdapterCommand), durability: "strict" })
 		).toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
 		expect(
 			prepareStorageAdapterCommand({
@@ -387,7 +458,7 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 			})
 		).toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
 
-		const prepared = mustPrepare(requirements[0]?.[0] as StorageAdapterCommand);
+		const prepared = mustPrepare(requirements[2]?.[0]);
 		const correct = objectFact({ head: noHead(), generations: [] });
 		const foreign = objectFact({ head: noHead(OBJECT_B), generations: [] });
 		for (const facts of [[], [correct, foreign], [correct, correct], [foreign]]) {
@@ -425,9 +496,15 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		const blob: StorageAdapterFact = { kind: "blob", digest: item.digest, bytes: payload };
 		const scenarios: readonly Scenario[] = [
 			{
-				name: "read object",
-				command: { kind: "readObjectState", objectId: OBJECT_A },
-				facts: [stagedFact],
+				name: "read head",
+				command: { kind: "readHead", objectId: OBJECT_A },
+				facts: [headFact(noHead())],
+				writes: () => [],
+			},
+			{
+				name: "read generation page",
+				command: { kind: "readGenerationPage", objectId: OBJECT_A, limit: 128 },
+				facts: [generationPageFact([staged])],
 				writes: () => [],
 			},
 			{

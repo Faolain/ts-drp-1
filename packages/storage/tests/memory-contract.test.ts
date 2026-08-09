@@ -6,8 +6,10 @@ import * as contractSurface from "../src/contract.js";
 import {
 	type AheDurableStore,
 	createMemoryAheDurableStore,
+	type ExpectedHead,
 	type GenerationRecord,
 	type GenerationRef,
+	type StorageObjectId,
 	type StoreResult,
 } from "../src/index.js";
 import * as storageSurface from "../src/index.js";
@@ -16,6 +18,39 @@ const FORBIDDEN_STORAGE_EXPORTS = ["TransitionOwner", "createTransitionHarness",
 
 function reasonOf(result: StoreResult<unknown>): string {
 	return result.ok ? "OK" : result.reason;
+}
+
+type QuiescentStoreView = Readonly<{
+	head: ExpectedHead;
+	generations: readonly GenerationRecord[];
+}>;
+
+async function callSplitRead(
+	store: object,
+	method: "readGenerationPage" | "readHead",
+	input: unknown
+): Promise<StoreResult<unknown>> {
+	const callable = Reflect.get(store, method);
+	if (typeof callable !== "function")
+		return { ok: false, reason: "SUBSTRATE_FAILURE", cause: "SPLIT_READ_NOT_IMPLEMENTED" };
+	return Reflect.apply(callable, store, [input]) as Promise<StoreResult<unknown>>;
+}
+
+// Test-only convenience for assertions made while no writes are concurrent. This
+// deliberately does not claim that the two public reads form one atomic snapshot.
+async function readStoreView(store: object, objectId: StorageObjectId): Promise<StoreResult<QuiescentStoreView>> {
+	const head = await callSplitRead(store, "readHead", objectId);
+	if (!head.ok) return head;
+	const generations: GenerationRecord[] = [];
+	let cursor: unknown;
+	do {
+		const page = await callSplitRead(store, "readGenerationPage", { cursor, limit: 128, objectId });
+		if (!page.ok) return page;
+		const value = page.value as { readonly generations: readonly GenerationRecord[]; readonly nextCursor: unknown };
+		generations.push(...value.generations);
+		cursor = value.nextCursor;
+	} while (cursor !== null);
+	return { ok: true, value: { head: head.value as ExpectedHead, generations } };
 }
 
 function expectNoForbiddenStorageExports(surface: object): void {
@@ -78,7 +113,14 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		const capabilities = await runStoreContract(() => observeStore(createMemoryAheDurableStore(), calls));
 
 		expect(capabilities).toEqual({ durability: "ephemeral", signingEligibility: "never" });
-		const requiredCalls = ["beginGeneration", "putCachedBlob", "getBlob", "readObjectState", "discardGeneration"];
+		const requiredCalls = [
+			"beginGeneration",
+			"putCachedBlob",
+			"getBlob",
+			"readHead",
+			"readGenerationPage",
+			"discardGeneration",
+		];
 		let previousIndex = -1;
 		for (const requiredCall of requiredCalls) {
 			const index = calls.indexOf(requiredCall, previousIndex + 1);
@@ -148,7 +190,7 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 
 		expect.soft(store.capabilities).toEqual({ durability: "ephemeral", signingEligibility: "never" });
 		expect.soft(Object.isFrozen(store.capabilities)).toBe(true);
-		expect(await store.readObjectState(OBJECT_A)).toEqual({
+		expect(await readStoreView(store, OBJECT_A)).toEqual({
 			ok: true,
 			value: { head: noHead(OBJECT_A), generations: [] },
 		});
@@ -200,7 +242,8 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 	it("returns GENERATION_EXISTS for equal, substitute, and extra repeated begin", async () => {
 		const store = createMemoryAheDurableStore();
 		const first = await beginOne(store);
-		const before = await store.readObjectState(OBJECT_A);
+		const before = await readStoreView(store, OBJECT_A);
+		if (!before.ok) throw new Error(`split read fixture failed: ${before.reason}`);
 		for (const closure of [[first.item], [ref(bytes(4))], [first.item, ref(bytes(5))]]) {
 			const result = await store.beginGeneration({
 				objectId: OBJECT_A,
@@ -209,7 +252,7 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 				closure,
 			});
 			expect(reasonOf(result)).toBe("GENERATION_EXISTS");
-			expect(await store.readObjectState(OBJECT_A)).toEqual(before);
+			expect(await readStoreView(store, OBJECT_A)).toEqual(before);
 		}
 	});
 
@@ -242,7 +285,8 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 	it("gives an own data SharedArrayBuffer bytes field precedence over malformed siblings", async () => {
 		const store = createMemoryAheDurableStore();
 		const { item } = await beginOne(store);
-		const before = await store.readObjectState(OBJECT_A);
+		const before = await readStoreView(store, OBJECT_A);
+		if (!before.ok) throw new Error(`split read fixture failed: ${before.reason}`);
 		const shared = new Uint8Array(new SharedArrayBuffer(item.byteLength));
 		const input = {
 			objectId: OBJECT_A,
@@ -255,7 +299,7 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 
 		expect(reasonOf(result)).toBe("SHARED_BUFFER_INPUT");
 		expect(await store.getBlob(item.digest)).toEqual({ ok: true, value: null });
-		expect(await store.readObjectState(OBJECT_A)).toEqual(before);
+		expect(await readStoreView(store, OBJECT_A)).toEqual(before);
 	});
 
 	it("rejects an accessor bytes field without invoking it", async () => {
@@ -362,7 +406,7 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		const store = createMemoryAheDurableStore();
 		await store.close();
 		await store.close();
-		expect(reasonOf(await store.readObjectState(OBJECT_A))).toBe("STORE_CLOSED");
+		expect(reasonOf(await readStoreView(store, OBJECT_A))).toBe("STORE_CLOSED");
 		expect(store.capabilities).toEqual({ durability: "ephemeral", signingEligibility: "never" });
 	});
 
@@ -370,7 +414,7 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		const store = createMemoryAheDurableStore();
 		await beginOne(store, OBJECT_A, GENERATION_B);
 		await beginOne(store, OBJECT_A, GENERATION_A);
-		const first = await store.readObjectState(OBJECT_A);
+		const first = await readStoreView(store, OBJECT_A);
 		expect(first.ok && first.value.generations.map(({ generationId }) => generationId)).toEqual([
 			GENERATION_A,
 			GENERATION_B,
@@ -379,7 +423,7 @@ describe("Phase 2a shared contract and honest memory capabilities", () => {
 		const firstRecord = first.value.generations[0] as GenerationRecord;
 		(firstRecord as { state: string }).state = "Discarded";
 		(first.value.generations as GenerationRecord[]).push(firstRecord);
-		const second = await store.readObjectState(OBJECT_A);
+		const second = await readStoreView(store, OBJECT_A);
 		expect(second.ok && second.value.generations).toHaveLength(2);
 		expect(second.ok && second.value.generations[0]?.state).toBe("Staged");
 	});

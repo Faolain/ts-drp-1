@@ -5,7 +5,7 @@ type HarnessMethod = "runCloseQuiescence" | "runSupersedingSwap" | "runVersionch
 const OBJECT_A = `phase-2d2a-a:${"a".repeat(32)}`;
 const GENERATION_A = "a".repeat(64);
 const GENERATION_B = "b".repeat(64);
-const CLOSED = Array.from({ length: 8 }, () => "STORE_CLOSED");
+const CLOSED = Array.from({ length: 9 }, () => "STORE_CLOSED");
 
 async function run(page: Page, method: HarnessMethod): Promise<unknown> {
 	await page.goto("/");
@@ -25,7 +25,7 @@ test("close rejects later work but waits for an already-started real transaction
 	});
 });
 
-test("versionchange closes the adapter and all eight later operations report STORE_CLOSED", async ({ page }) => {
+test("versionchange closes the adapter and all nine later operations report STORE_CLOSED", async ({ page }) => {
 	await expect(run(page, "runVersionchangeClosure")).resolves.toEqual({ postVersionchange: CLOSED });
 });
 

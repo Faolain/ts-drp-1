@@ -5,7 +5,6 @@ import type {
 	GenerationId,
 	GenerationRecord,
 	GenerationRef,
-	ObjectStoreState,
 	PresentHead,
 	StorageObjectId,
 	StoreResult,
@@ -17,19 +16,47 @@ export interface Phase2dAheDurableStoreOptions {
 
 type Phase2dAheDurableStoreFactory = (options: Phase2dAheDurableStoreOptions) => Promise<AheDurableStore>;
 
+type Phase2e1PublicStore = Pick<
+	AheDurableStore,
+	| "beginGeneration"
+	| "capabilities"
+	| "close"
+	| "completeGeneration"
+	| "discardGeneration"
+	| "getBlob"
+	| "promoteReference"
+	| "putCachedBlob"
+	| "swapHead"
+> & {
+	readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>>;
+	readGenerationPage(input: {
+		readonly objectId: StorageObjectId;
+		readonly cursor?: string;
+		readonly limit: number;
+	}): Promise<StoreResult<{ readonly generations: readonly GenerationRecord[]; readonly nextCursor: null }>>;
+};
+
 const CAUSE = Object.freeze({ code: "PHASE_2D2A_NOT_IMPLEMENTED" });
 
 function unavailable<T>(): Promise<StoreResult<T>> {
 	return Promise.resolve({ ok: false, reason: "SUBSTRATE_FAILURE", cause: CAUSE });
 }
 
-class InertStrictRedStore implements AheDurableStore {
+class InertStrictRedStore implements Phase2e1PublicStore {
 	public readonly capabilities = Object.freeze({
 		durability: "strict" as const,
 		signingEligibility: "backend-capability-required" as const,
 	});
 
-	public readObjectState(_objectId: StorageObjectId): Promise<StoreResult<ObjectStoreState>> {
+	public readHead(_objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
+		return unavailable();
+	}
+
+	public readGenerationPage(_input: {
+		readonly objectId: StorageObjectId;
+		readonly cursor?: string;
+		readonly limit: number;
+	}): Promise<StoreResult<{ readonly generations: readonly GenerationRecord[]; readonly nextCursor: null }>> {
 		return unavailable();
 	}
 
@@ -102,7 +129,7 @@ export async function createPhase2d2aRedStore(options: Phase2dAheDurableStoreOpt
 	try {
 		candidate = await import(productionModulePath);
 	} catch {
-		return new InertStrictRedStore();
+		return new InertStrictRedStore() as unknown as AheDurableStore;
 	}
 	if (typeof candidate === "object" && candidate !== null) {
 		const factory = Reflect.get(candidate, "createPhase2dAheDurableStore");
@@ -110,5 +137,5 @@ export async function createPhase2d2aRedStore(options: Phase2dAheDurableStoreOpt
 			return (factory as Phase2dAheDurableStoreFactory)(options);
 		}
 	}
-	return new InertStrictRedStore();
+	return new InertStrictRedStore() as unknown as AheDurableStore;
 }

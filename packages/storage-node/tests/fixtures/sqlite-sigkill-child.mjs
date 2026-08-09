@@ -130,9 +130,26 @@ async function setup(store, scenario) {
 	}
 }
 
+// Test-only aggregation while the SIGKILL fixture is quiescent. It does not
+// represent the independently consistent reads as one public snapshot.
+async function readStoreView(store) {
+	const head = await successful(await store.readHead(OBJECT), "readHead");
+	const generations = [];
+	let cursor;
+	do {
+		const page = await successful(
+			await store.readGenerationPage({ cursor, limit: 128, objectId: OBJECT }),
+			"readGenerationPage"
+		);
+		generations.push(...page.generations);
+		cursor = page.nextCursor;
+	} while (cursor !== null);
+	return { generations, head };
+}
+
 async function expectedFirstHead(store) {
-	const state = await successful(await store.readObjectState(OBJECT), "readObjectState");
-	const generation = state.generations.find(({ generationId }) => generationId === GENERATION_A);
+	const view = await readStoreView(store);
+	const generation = view.generations.find(({ generationId }) => generationId === GENERATION_A);
 	if (generation === undefined) throw new Error("missing first generation");
 	return {
 		closureDigest: generation.closureDigest,

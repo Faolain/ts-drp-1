@@ -32,7 +32,10 @@ function delayedMethodStore(
 	});
 }
 
-function aliasedOutputStore(store: AheDurableStore, aliasedMethod: "getBlob" | "readObjectState"): AheDurableStore {
+function aliasedOutputStore(
+	store: AheDurableStore,
+	aliasedMethod: "getBlob" | "readGenerationPage" | "readHead"
+): AheDurableStore {
 	let aliasedResult: unknown;
 	return adaptStore(store, async (property, invoke) => {
 		if (property !== aliasedMethod) return invoke();
@@ -135,7 +138,7 @@ describe("Phase 2a shared contract runner closure matrix", () => {
 		}
 	);
 
-	it.each(["getBlob", "readObjectState"] as const)(
+	it.each(["getBlob", "readHead", "readGenerationPage"] as const)(
 		"rejects an adapter that reuses aliased %s output",
 		async (method) => {
 			await expect(runStoreContract(() => aliasedOutputStore(createMemoryAheDurableStore(), method))).rejects.toThrow(

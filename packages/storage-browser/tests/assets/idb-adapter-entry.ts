@@ -68,6 +68,28 @@ async function splitRead(
 	return Reflect.apply(callable, store, [input]) as Promise<StoreResult<unknown>>;
 }
 
+type QuiescentStoreView = Readonly<{
+	head: ExpectedHead;
+	generations: readonly GenerationRecord[];
+}>;
+
+// Test-only aggregation at quiescent assertion points. The public pages remain
+// independently consistent, and this helper has no whole-state fallback.
+async function readStoreView(store: object, objectId: StorageObjectId): Promise<StoreResult<QuiescentStoreView>> {
+	const head = await splitRead(store, "readHead", objectId);
+	if (!head.ok) return head;
+	const generations: GenerationRecord[] = [];
+	let cursor: unknown;
+	do {
+		const page = await splitRead(store, "readGenerationPage", { cursor, limit: 128, objectId });
+		if (!page.ok) return page;
+		const value = page.value as { readonly generations: readonly GenerationRecord[]; readonly nextCursor: unknown };
+		generations.push(...value.generations);
+		cursor = value.nextCursor;
+	} while (cursor !== null);
+	return { ok: true, value: { head: head.value as ExpectedHead, generations } };
+}
+
 function failureCause(result: StoreResult<unknown>): unknown {
 	if (result.ok || result.reason !== "SUBSTRATE_FAILURE") return null;
 	const candidate = result.cause as { readonly code?: unknown; readonly name?: unknown };
@@ -123,7 +145,8 @@ async function stageComplete(
 
 async function operationReasons(store: AheDurableStore): Promise<readonly string[]> {
 	const commands = await Promise.all([
-		store.readObjectState(OBJECT_A),
+		splitRead(store, "readHead", OBJECT_A),
+		splitRead(store, "readGenerationPage", { limit: 128, objectId: OBJECT_A }),
 		store.getBlob(DIGEST_A),
 		begin(store, OBJECT_A, GENERATION_A),
 		store.putCachedBlob({ bytes: PAYLOAD_A, digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A }),
@@ -161,7 +184,7 @@ async function runPersistenceAndCopies(): Promise<unknown> {
 		});
 		await store.close();
 		store = await createPhase2d2aRedStore({ databaseName: name });
-		const firstState = await store.readObjectState(OBJECT_A);
+		const firstState = await readStoreView(store, OBJECT_A);
 		const firstBlob = await store.getBlob(DIGEST_A);
 		const generation = firstState.ok ? firstState.value.generations[0] : undefined;
 		const head = firstState.ok ? firstState.value.head : undefined;
@@ -173,7 +196,7 @@ async function runPersistenceAndCopies(): Promise<unknown> {
 		const canonicalHead = head?.kind === "present" ? encodeHeadRecordV1(head) : undefined;
 		if (firstBlob.ok && firstBlob.value !== null) firstBlob.value.fill(0);
 		if (firstState.ok) Reflect.set(firstState.value.head, "objectId", OBJECT_B);
-		const secondState = await store.readObjectState(OBJECT_A);
+		const secondState = await readStoreView(store, OBJECT_A);
 		const secondBlob = await store.getBlob(DIGEST_A);
 		await store.close();
 		return {
@@ -206,7 +229,7 @@ async function runClosureIntegrity(): Promise<unknown> {
 		await begin(store, OBJECT_A, GENERATION_B);
 		await rawPhase2dReplaceBlob(name, DIGEST_A, Uint8Array.of(99));
 		const corrupt = await store.promoteReference({ digest: DIGEST_A, generationId: GENERATION_B, objectId: OBJECT_A });
-		const state = await store.readObjectState(OBJECT_A);
+		const state = await readStoreView(store, OBJECT_A);
 		await store.close();
 		return {
 			corrupt: reason(corrupt),
@@ -319,7 +342,7 @@ async function runCompetingCas(): Promise<unknown> {
 				store.swapHead({ expectedHead: noHead(OBJECT_A), generationId, objectId: OBJECT_A })
 			)
 		);
-		const state = await store.readObjectState(OBJECT_A);
+		const state = await readStoreView(store, OBJECT_A);
 		await store.close();
 		return {
 			adopted: state.ok ? state.value.generations.filter(({ state: value }) => value === "Adopted").length : 0,
@@ -346,14 +369,14 @@ async function runAtomicRollback(): Promise<unknown> {
 				objectId: OBJECT_A,
 			})
 		);
-		const beforeRetry = await store.readObjectState(OBJECT_A);
+		const beforeRetry = await readStoreView(store, OBJECT_A);
 		const rowsBeforeRetry = await rawPhase2dCount(name, "objects");
 		const retry = await store.swapHead({
 			expectedHead: noHead(OBJECT_A),
 			generationId: GENERATION_A,
 			objectId: OBJECT_A,
 		});
-		const afterRetry = await store.readObjectState(OBJECT_A);
+		const afterRetry = await readStoreView(store, OBJECT_A);
 		await store.close();
 		return {
 			afterRetry: {
@@ -645,7 +668,7 @@ async function runSupersedingSwap(): Promise<unknown> {
 				objectId: OBJECT_A,
 			});
 		});
-		const state = await store.readObjectState(OBJECT_A);
+		const state = await readStoreView(store, OBJECT_A);
 		await store.close();
 		return {
 			generations: state.ok

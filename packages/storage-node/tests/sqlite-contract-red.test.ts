@@ -2,12 +2,14 @@ import {
 	type AheDurableStore,
 	type BlobDigest,
 	digestBlob,
+	type ExpectedHead,
 	type GenerationId,
 	type GenerationRecord,
 	parseGenerationId,
 	type ParseResult,
 	parseStorageObjectId,
 	type StorageObjectId,
+	type StoreResult,
 } from "@ts-drp/storage";
 import { runStoreContract } from "@ts-drp/storage/contract";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -40,6 +42,39 @@ async function databaseFilename(): Promise<string> {
 
 function noHead(objectId: StorageObjectId): Readonly<{ kind: "none"; objectId: StorageObjectId }> {
 	return { kind: "none", objectId };
+}
+
+type QuiescentStoreView = Readonly<{
+	head: ExpectedHead;
+	generations: readonly GenerationRecord[];
+}>;
+
+async function callSplitRead(
+	store: object,
+	method: "readGenerationPage" | "readHead",
+	input: unknown
+): Promise<StoreResult<unknown>> {
+	const callable = Reflect.get(store, method);
+	if (typeof callable !== "function")
+		return { ok: false, reason: "SUBSTRATE_FAILURE", cause: "SPLIT_READ_NOT_IMPLEMENTED" };
+	return Reflect.apply(callable, store, [input]) as Promise<StoreResult<unknown>>;
+}
+
+// Test-only aggregation at quiescent assertion points; pages are not presented as
+// one public snapshot and this helper has no compatibility fallback.
+async function readStoreView(store: object, objectId: StorageObjectId): Promise<StoreResult<QuiescentStoreView>> {
+	const head = await callSplitRead(store, "readHead", objectId);
+	if (!head.ok) return head;
+	const generations: GenerationRecord[] = [];
+	let cursor: unknown;
+	do {
+		const page = await callSplitRead(store, "readGenerationPage", { cursor, limit: 128, objectId });
+		if (!page.ok) return page;
+		const value = page.value as { readonly generations: readonly GenerationRecord[]; readonly nextCursor: unknown };
+		generations.push(...value.generations);
+		cursor = value.nextCursor;
+	} while (cursor !== null);
+	return { ok: true, value: { head: head.value as ExpectedHead, generations } };
 }
 
 async function begin(
@@ -130,14 +165,14 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 		await first.close();
 
 		const reopened = createSqliteAheDurableStore({ filename });
-		expect.soft(await reopened.readObjectState(OBJECT_A)).toEqual({
+		expect.soft(await readStoreView(reopened, OBJECT_A)).toEqual({
 			ok: true,
 			value: {
 				head: noHead(OBJECT_A),
 				generations: [expectedGenerations[0], expectedGenerations[1]],
 			},
 		});
-		expect.soft(await reopened.readObjectState(OBJECT_B)).toEqual({
+		expect.soft(await readStoreView(reopened, OBJECT_B)).toEqual({
 			ok: true,
 			value: { head: noHead(OBJECT_B), generations: [expectedGenerations[2]] },
 		});
@@ -214,7 +249,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 
 		expect.soft(checkpoints).toEqual(["beginGeneration:before-commit"]);
 		expect.soft(result).toEqual({ ok: false, reason: "SUBSTRATE_FAILURE", cause: injected });
-		expect.soft(await store.readObjectState(OBJECT_A)).toEqual({
+		expect.soft(await readStoreView(store, OBJECT_A)).toEqual({
 			ok: true,
 			value: { head: noHead(OBJECT_A), generations: [] },
 		});
@@ -228,7 +263,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 		});
 		expect.soft(checkpoints).toEqual(["beginGeneration:before-commit", "beginGeneration:before-commit"]);
 		expect.soft(retry.ok).toBe(true);
-		expect.soft(await store.readObjectState(OBJECT_A)).toEqual({
+		expect.soft(await readStoreView(store, OBJECT_A)).toEqual({
 			ok: true,
 			value: {
 				head: noHead(OBJECT_A),
@@ -267,7 +302,8 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 		const payload = Uint8Array.of(16, 17, 18);
 		const digest = must(digestBlob(payload));
 		await begin(store, OBJECT_A, GENERATION_A, payload);
-		const before = await store.readObjectState(OBJECT_A);
+		const before = await readStoreView(store, OBJECT_A);
+		if (!before.ok) throw new Error(`split read fixture failed: ${before.reason}`);
 		const ordinaryWithExtra = {
 			objectId: OBJECT_A,
 			generationId: GENERATION_A,
@@ -289,7 +325,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 			)
 			.toEqual({ ok: false, reason: "SHARED_BUFFER_INPUT" });
 		expect.soft(await store.getBlob(digest)).toEqual({ ok: true, value: null });
-		expect.soft(await store.readObjectState(OBJECT_A)).toEqual(before);
+		expect.soft(await readStoreView(store, OBJECT_A)).toEqual(before);
 		await store.close();
 
 		const database = new DatabaseSync(filename);
@@ -322,7 +358,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 				)
 				.toEqual({ ok: false, reason });
 		}
-		expect.soft(await store.readObjectState(OBJECT_A)).toEqual({
+		expect.soft(await readStoreView(store, OBJECT_A)).toEqual({
 			ok: true,
 			value: { head: noHead(OBJECT_A), generations: [] },
 		});
@@ -352,7 +388,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 
 	it("keeps legacy plain object IDs outside the greenfield adapter", async () => {
 		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
-		const result = await store.readObjectState("plain-room-id" as StorageObjectId);
+		const result = await callSplitRead(store, "readHead", "plain-room-id" as StorageObjectId);
 		expect(result).toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
 		await store.close();
 	});
