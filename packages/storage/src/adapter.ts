@@ -4,7 +4,8 @@ import {
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
 } from "./codecs.js";
-import { type TransitionObjectState, TransitionOwner } from "./internal/transition.js";
+import { acceptBlob, acceptPromotion, type Authorization, finish, next, start } from "./internal/closure-verifier.js";
+import { TransitionOwner } from "./internal/transition.js";
 import {
 	copyExpectedHead,
 	copyGenerationRef,
@@ -98,8 +99,8 @@ type DiscardGenerationCommand = Readonly<{
 }>;
 
 export type StorageAdapterLoadRequirement =
-	| Readonly<{ kind: "object-state"; objectId: StorageObjectId }>
 	| Readonly<{ kind: "head"; objectId: StorageObjectId }>
+	| Readonly<{ kind: "generation"; objectId: StorageObjectId; generationId: GenerationId }>
 	| Readonly<{
 			kind: "generation-page";
 			objectId: StorageObjectId;
@@ -112,11 +113,6 @@ export type StorageAdapterLoadRequirement =
 			objectId: StorageObjectId;
 			generationId: GenerationId;
 			digest: BlobDigest;
-	  }>
-	| Readonly<{
-			kind: "generation-closure";
-			objectId: StorageObjectId;
-			generationId: GenerationId;
 	  }>;
 
 export type PreparedStorageAdapterCommand = Readonly<{
@@ -138,10 +134,10 @@ export type StorageAdapterFact =
 			generationRecords: readonly Uint8Array[];
 	  }>
 	| Readonly<{
-			kind: "object-state";
+			kind: "generation";
 			objectId: StorageObjectId;
-			headRecord: Uint8Array | null;
-			generationRecords: readonly Uint8Array[];
+			generationId: GenerationId;
+			generationRecord: Uint8Array | null;
 	  }>
 	| Readonly<{ kind: "blob"; digest: BlobDigest; bytes: Uint8Array | null }>
 	| Readonly<{
@@ -189,6 +185,8 @@ const EMPTY_WRITES: readonly StorageAdapterWrite[] = Object.freeze([]);
 const MAX_GENERATION_PAGE_ROWS = 128;
 const GENERATION_PAGE_CURSOR_PREFIX = "ts-drp-storage/generation-page/v1\0";
 
+export const storageAdapterClosureVerifier = Object.freeze({ start, next, acceptPromotion, acceptBlob, finish });
+
 type PersistedStorageReason = "NON_CANONICAL_RECORD" | "UNSUPPORTED_STORAGE_SCHEMA";
 
 type PersistedGenerationRow = Readonly<{
@@ -199,34 +197,13 @@ type PersistedGenerationRow = Readonly<{
 
 type PersistedHeadRow = Readonly<{ objectId: unknown; record: unknown }> | null;
 
-type PersistedObjectStateSource =
-	| Readonly<{
-			kind: "adapter-fact";
-			objectId: StorageObjectId;
-			headRecord: unknown;
-			generationRecords: readonly unknown[];
-	  }>
-	| Readonly<{
-			kind: "physical";
-			objectId: StorageObjectId;
-			headRow: PersistedHeadRow;
-			generationRows: readonly PersistedGenerationRow[];
-	  }>;
-
-type ClassifiedPersistedObjectState = Readonly<{
-	fact: Extract<StorageAdapterFact, { kind: "object-state" }>;
-	state: TransitionObjectState;
-}>;
-
 type PersistedStateSource =
 	| Readonly<{ kind: "head"; objectId: StorageObjectId; row: PersistedHeadRow }>
-	| Readonly<{ kind: "generation"; objectId: StorageObjectId; row: PersistedGenerationRow }>
-	| PersistedObjectStateSource;
+	| Readonly<{ kind: "generation"; objectId: StorageObjectId; row: PersistedGenerationRow }>;
 
 type ClassifiedPersistedState =
 	| Readonly<{ kind: "head"; head: ExpectedHead; record: Uint8Array | null }>
-	| Readonly<{ kind: "generation"; generation: GenerationRecord; record: Uint8Array }>
-	| (ClassifiedPersistedObjectState & Readonly<{ kind: "object-state" }>);
+	| Readonly<{ kind: "generation"; generation: GenerationRecord; record: Uint8Array }>;
 
 /** A semantic persisted-state failure, kept distinct from substrate exceptions. */
 export class PersistedStorageError extends Error {
@@ -246,15 +223,6 @@ type PersistedClassification<T> =
 
 function persistedFailure<T>(reason: PersistedStorageReason): PersistedClassification<T> {
 	return { ok: false, reason };
-}
-
-function mergePersistedReasons(
-	left: PersistedStorageReason | undefined,
-	right: PersistedStorageReason
-): PersistedStorageReason {
-	return left === "UNSUPPORTED_STORAGE_SCHEMA" || right === "UNSUPPORTED_STORAGE_SCHEMA"
-		? "UNSUPPORTED_STORAGE_SCHEMA"
-		: "NON_CANONICAL_RECORD";
 }
 
 function copyPersistedBytes(value: unknown): Uint8Array | undefined {
@@ -315,102 +283,6 @@ function classifyPersistedGeneration(
 	return { ok: true, value: { generation: decoded.value, record } };
 }
 
-function classifyPersistedGenerations(
-	objectId: StorageObjectId,
-	rows: readonly PersistedGenerationRow[]
-): PersistedClassification<Readonly<{ generations: readonly GenerationRecord[]; records: readonly Uint8Array[] }>> {
-	const generations: GenerationRecord[] = [];
-	const records: Uint8Array[] = [];
-	const ids = new Set<GenerationId>();
-	let failure: PersistedStorageReason | undefined;
-	for (const row of rows) {
-		const classified = classifyPersistedGeneration(objectId, row);
-		if (!classified.ok) {
-			failure = mergePersistedReasons(failure, classified.reason);
-			continue;
-		}
-		if (ids.has(classified.value.generation.generationId)) {
-			failure = mergePersistedReasons(failure, "NON_CANONICAL_RECORD");
-			continue;
-		}
-		ids.add(classified.value.generation.generationId);
-		generations.push(classified.value.generation);
-		records.push(classified.value.record);
-	}
-	return failure === undefined
-		? { ok: true, value: { generations: Object.freeze(generations), records: Object.freeze(records) } }
-		: persistedFailure(failure);
-}
-
-/**
- * Owns persisted full-journal decoding, physical-key binding and relational precedence.
- * Strict backends supply physical rows; the adapter-fact branch preserves direct fact validation.
- * @param source - Physical backend rows or a direct adapter fact.
- * @returns Detached canonical journal state or its stable persisted rejection.
- */
-function classifyPersistedObjectState(
-	source: PersistedObjectStateSource
-): PersistedClassification<ClassifiedPersistedObjectState> {
-	const physical = source.kind === "physical";
-	let headClassification: ReturnType<typeof classifyPersistedHead>;
-	let rows: readonly PersistedGenerationRow[];
-	if (physical) {
-		headClassification = classifyPersistedHead(source.objectId, source.headRow);
-		rows = source.generationRows;
-	} else {
-		headClassification =
-			source.headRecord === null
-				? classifyPersistedHead(source.objectId, null)
-				: classifyPersistedHead(source.objectId, { objectId: source.objectId, record: source.headRecord });
-		rows = source.generationRecords.map((record) => {
-			const bytes = copyPersistedBytes(record);
-			if (bytes === undefined) return { objectId: source.objectId, generationId: undefined, record };
-			const decoded = decodeGenerationRecordV1(bytes);
-			return {
-				objectId: source.objectId,
-				generationId: decoded.ok ? decoded.value.generationId : undefined,
-				record: bytes,
-			};
-		});
-	}
-	const generationsClassification = classifyPersistedGenerations(source.objectId, rows);
-	if (!headClassification.ok || !generationsClassification.ok) {
-		const headReason = headClassification.ok ? undefined : headClassification.reason;
-		const generationReason = generationsClassification.ok ? undefined : generationsClassification.reason;
-		return persistedFailure(
-			headReason === undefined
-				? (generationReason as PersistedStorageReason)
-				: generationReason === undefined
-					? headReason
-					: mergePersistedReasons(headReason, generationReason)
-		);
-	}
-	const { head, record: headRecord } = headClassification.value;
-	const { generations, records: generationRecords } = generationsClassification.value;
-	const adopted = generations.filter(({ state }) => state === "Adopted");
-	if (head.kind === "none" ? adopted.length !== 0 : adopted.length !== 1) {
-		return persistedFailure("NON_CANONICAL_RECORD");
-	}
-	if (
-		head.kind === "present" &&
-		(adopted[0]?.generationId !== head.generationId || adopted[0].closureDigest !== head.closureDigest)
-	) {
-		return persistedFailure("NON_CANONICAL_RECORD");
-	}
-	return {
-		ok: true,
-		value: {
-			fact: Object.freeze({
-				generationRecords,
-				headRecord,
-				kind: "object-state",
-				objectId: source.objectId,
-			}),
-			state: { generations, head },
-		},
-	};
-}
-
 /**
  * Classifies one tagged persisted head, generation or full-journal source.
  * This is the strict backends' only semantic persisted-state entrypoint.
@@ -424,12 +296,8 @@ export function classifyPersistedState(
 		const classified = classifyPersistedHead(source.objectId, source.row);
 		return classified.ok ? { ok: true, value: { kind: "head", ...classified.value } } : classified;
 	}
-	if (source.kind === "generation") {
-		const classified = classifyPersistedGeneration(source.objectId, source.row);
-		return classified.ok ? { ok: true, value: { kind: "generation", ...classified.value } } : classified;
-	}
-	const classified = classifyPersistedObjectState(source);
-	return classified.ok ? { ok: true, value: { kind: "object-state", ...classified.value } } : classified;
+	const classified = classifyPersistedGeneration(source.objectId, source.row);
+	return classified.ok ? { ok: true, value: { kind: "generation", ...classified.value } } : classified;
 }
 
 function invalidPreparation(): StoreResult<PreparedStorageAdapterCommand> {
@@ -561,7 +429,10 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 			baseExpectedHead,
 			closure,
 		};
-		return freezePrepared(command, [{ kind: "object-state", objectId: command.objectId }]);
+		return freezePrepared(command, [
+			{ kind: "head", objectId: command.objectId },
+			{ kind: "generation", objectId: command.objectId, generationId: command.generationId },
+		]);
 	}
 
 	if (kindDescriptor.value === "putCachedBlob") {
@@ -587,7 +458,8 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 			bytes,
 		};
 		return freezePrepared(command, [
-			{ kind: "object-state", objectId: command.objectId },
+			{ kind: "head", objectId: command.objectId },
+			{ kind: "generation", objectId: command.objectId, generationId: command.generationId },
 			{ kind: "blob", digest: command.digest },
 		]);
 	}
@@ -598,7 +470,8 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		if (scope === undefined || !isBlobDigest(value.digest)) return invalidPreparation();
 		const command: PromoteReferenceCommand = { kind: "promoteReference", ...scope, digest: value.digest };
 		return freezePrepared(command, [
-			{ kind: "object-state", objectId: command.objectId },
+			{ kind: "head", objectId: command.objectId },
+			{ kind: "generation", objectId: command.objectId, generationId: command.generationId },
 			{ kind: "blob", digest: command.digest },
 			{ kind: "promotion", ...scope, digest: command.digest },
 		]);
@@ -610,8 +483,8 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		if (scope === undefined) return invalidPreparation();
 		const command: CompleteGenerationCommand = { kind: "completeGeneration", ...scope };
 		return freezePrepared(command, [
-			{ kind: "object-state", objectId: command.objectId },
-			{ kind: "generation-closure", ...scope },
+			{ kind: "head", objectId: command.objectId },
+			{ kind: "generation", ...scope },
 		]);
 	}
 
@@ -624,7 +497,10 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		const expectedHead = copyExpectedHead(value.expectedHead, scope.objectId);
 		if (expectedHead === undefined) return invalidPreparation();
 		const command: SwapHeadCommand = { kind: "swapHead", ...scope, expectedHead };
-		return freezePrepared(command, [{ kind: "object-state", objectId: command.objectId }]);
+		return freezePrepared(command, [
+			{ kind: "head", objectId: command.objectId },
+			{ kind: "generation", ...scope },
+		]);
 	}
 
 	if (kindDescriptor.value === "discardGeneration") {
@@ -632,87 +508,17 @@ export function prepareStorageAdapterCommand(value: unknown): StoreResult<Prepar
 		const scope = generationScope(value);
 		if (scope === undefined) return invalidPreparation();
 		const command: DiscardGenerationCommand = { kind: "discardGeneration", ...scope };
-		return freezePrepared(command, [{ kind: "object-state", objectId: command.objectId }]);
+		return freezePrepared(command, [
+			{ kind: "head", objectId: command.objectId },
+			{ kind: "generation", ...scope },
+		]);
 	}
 
 	return invalidPreparation();
 }
-
-/**
- * Evaluates a detached command over exact backend-owned facts.
- * @param prepared - Prepared command.
- * @param facts - Exact authoritative facts loaded by the adapter transaction.
- * @returns The shared-kernel result and exact deterministic write set.
- */
-export function evaluateStorageAdapterCommand(
-	prepared: PreparedStorageAdapterCommand,
-	facts: readonly StorageAdapterFact[]
-): StorageAdapterEvaluation {
-	const canonical = canonicalPrepared(prepared);
-	if (canonical === undefined) return invalidEvaluation();
-	if (isClosedArray(facts) && facts.length === 1 && isClosedStoreFact(facts[0])) {
-		return Object.freeze({ result: { ok: false, reason: "STORE_CLOSED" }, writes: EMPTY_WRITES });
-	}
-	const loaded = copyAndValidateFacts(canonical.command, facts);
-	if (loaded === undefined) return invalidEvaluation();
-
-	const owner = new TransitionOwner("strict");
-	for (const state of loaded.objects.values()) owner.seedObjectState(state);
-	for (const fact of loaded.blobs.values()) {
-		if (fact.bytes !== null) owner.seedBlob(fact.digest, fact.bytes);
-	}
-	for (const fact of loaded.promotions.values()) {
-		owner.markPromoted(fact.objectId, fact.generationId, fact.digest);
-	}
-	const result = execute(owner, canonical.command, loaded);
-	if (!result.ok) return Object.freeze({ result, writes: EMPTY_WRITES });
-
-	const writes: StorageAdapterWrite[] = [];
-	if (canonical.command.kind === "putCachedBlob" && (result.value as Readonly<{ inserted: boolean }>).inserted) {
-		writes.push({
-			kind: "insert-blob",
-			digest: canonical.command.digest,
-			bytes: new Uint8Array(canonical.command.bytes),
-		});
-	} else if (canonical.command.kind === "promoteReference" && !loaded.promotions.has(promotionKey(canonical.command))) {
-		writes.push({
-			kind: "insert-promotion",
-			objectId: canonical.command.objectId,
-			generationId: canonical.command.generationId,
-			digest: canonical.command.digest,
-		});
-	} else if (
-		canonical.command.kind === "beginGeneration" ||
-		canonical.command.kind === "completeGeneration" ||
-		canonical.command.kind === "discardGeneration"
-	) {
-		const generation = result.value as GenerationRecord;
-		writes.push(generationWrite(generation));
-	} else if (canonical.command.kind === "swapHead") {
-		const swap = result.value as Readonly<{
-			head: Exclude<ExpectedHead, { kind: "none" }>;
-			supersededGenerationId: GenerationId | null;
-		}>;
-		if (swap.supersededGenerationId !== null) {
-			const superseded = owner.readGenerationRecord(canonical.command.objectId, swap.supersededGenerationId);
-			if (!superseded.ok || superseded.value === null) return invalidEvaluation();
-			writes.push(generationWrite(superseded.value));
-		}
-		const candidate = owner.readGenerationRecord(canonical.command.objectId, canonical.command.generationId);
-		if (!candidate.ok || candidate.value === null) return invalidEvaluation();
-		writes.push(generationWrite(candidate.value));
-		writes.push({
-			kind: "replace-head",
-			objectId: canonical.command.objectId,
-			record: encodeHeadRecordV1(swap.head),
-		});
-	}
-	return Object.freeze({ result, writes: Object.freeze(writes) });
-}
-
 type LoadedFacts = Readonly<{
-	objects: Map<StorageObjectId, TransitionObjectState>;
 	heads: Map<StorageObjectId, ExpectedHead>;
+	generations: Map<string, GenerationRecord | null>;
 	pages: Map<
 		StorageObjectId,
 		Readonly<{ afterGenerationId: GenerationId | null; records: readonly GenerationRecord[] }>
@@ -721,105 +527,54 @@ type LoadedFacts = Readonly<{
 	promotions: Map<string, Readonly<{ objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }>>;
 }>;
 
-function generationWrite(generation: GenerationRecord): StorageAdapterWrite {
-	return {
-		kind: "replace-generation",
-		objectId: generation.objectId,
-		generationId: generation.generationId,
-		record: encodeGenerationRecordV1(generation),
-	};
+function generationKey(objectId: StorageObjectId, generationId: GenerationId): string {
+	return `${objectId}\0${generationId}`;
 }
-
-function invalidEvaluation(): StorageAdapterEvaluation {
-	return Object.freeze({ result: { ok: false, reason: "INVALID_ARGUMENT" }, writes: EMPTY_WRITES });
+function promotionKey(value: { objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }): string {
+	return `${value.objectId}\0${value.generationId}\0${value.digest}`;
 }
-
-function isClosedStoreFact(value: unknown): value is Readonly<{ kind: "store-closed" }> {
-	return isClosedRecord(value, ["kind"]) && value.kind === "store-closed";
+function decodeHeadFact(objectId: StorageObjectId, value: unknown): ExpectedHead | undefined {
+	if (value === null) return { kind: "none", objectId };
+	const bytes = copyFactBytes(value);
+	if (bytes === undefined) return undefined;
+	const decoded = decodeHeadRecordV1(bytes);
+	return decoded.ok && decoded.value.kind === "present" && decoded.value.objectId === objectId
+		? decoded.value
+		: undefined;
 }
-
-function requirementKey(requirement: StorageAdapterLoadRequirement): string {
-	switch (requirement.kind) {
-		case "object-state":
-			return `object-state\0${requirement.objectId}`;
-		case "head":
-			return `head\0${requirement.objectId}`;
-		case "generation-page":
-			return `generation-page\0${requirement.objectId}\0${requirement.afterGenerationId ?? ""}\0${requirement.limitPlusOne}`;
-		case "blob":
-			return `blob\0${requirement.digest}`;
-		case "promotion":
-			return `promotion\0${requirement.objectId}\0${requirement.generationId}\0${requirement.digest}`;
-		case "generation-closure":
-			return `generation-closure\0${requirement.objectId}\0${requirement.generationId}`;
-	}
+function copyFactBytes(value: unknown): Uint8Array | undefined {
+	return value instanceof Uint8Array && !hasSharedBacking(value) ? new Uint8Array(value) : undefined;
 }
-
-function canonicalPrepared(value: unknown): PreparedStorageAdapterCommand | undefined {
-	if (!isClosedRecord(value, ["command", "requirements"]) || !isClosedArray(value.requirements)) return undefined;
-	const prepared = prepareStorageAdapterCommand(value.command);
-	if (!prepared.ok || prepared.value.requirements.length !== value.requirements.length) return undefined;
-	for (let index = 0; index < prepared.value.requirements.length; index++) {
-		const supplied = value.requirements[index];
-		const expected = prepared.value.requirements[index];
-		if (expected === undefined || !isRequirement(supplied) || requirementKey(supplied) !== requirementKey(expected)) {
-			return undefined;
-		}
-	}
-	return prepared.value;
-}
-
-function isRequirement(value: unknown): value is StorageAdapterLoadRequirement {
-	if (isClosedRecord(value, ["kind", "objectId"]) && value.kind === "object-state") {
-		return isStorageObjectId(value.objectId);
-	}
-	if (isClosedRecord(value, ["kind", "objectId"]) && value.kind === "head") {
-		return isStorageObjectId(value.objectId);
-	}
-	if (
-		isClosedRecord(value, ["kind", "objectId", "afterGenerationId", "limitPlusOne"]) &&
-		value.kind === "generation-page"
-	) {
-		return (
-			isStorageObjectId(value.objectId) &&
-			(value.afterGenerationId === null || isGenerationId(value.afterGenerationId)) &&
-			typeof value.limitPlusOne === "number" &&
-			Number.isSafeInteger(value.limitPlusOne) &&
-			value.limitPlusOne >= 2 &&
-			value.limitPlusOne <= MAX_GENERATION_PAGE_ROWS + 1
-		);
-	}
-	if (isClosedRecord(value, ["kind", "digest"]) && value.kind === "blob") return isBlobDigest(value.digest);
-	if (isClosedRecord(value, ["kind", "objectId", "generationId", "digest"]) && value.kind === "promotion") {
-		return isStorageObjectId(value.objectId) && isGenerationId(value.generationId) && isBlobDigest(value.digest);
-	}
-	return (
-		isClosedRecord(value, ["kind", "objectId", "generationId"]) &&
-		value.kind === "generation-closure" &&
-		isStorageObjectId(value.objectId) &&
-		isGenerationId(value.generationId)
-	);
-}
-
-function copyAndValidateFacts(command: StorageAdapterCommand, facts: unknown): LoadedFacts | undefined {
+function loadFacts(command: StorageAdapterCommand, facts: unknown): LoadedFacts | undefined {
 	if (!isClosedArray(facts)) return undefined;
-	const objects = new Map<StorageObjectId, TransitionObjectState>();
-	const heads = new Map<StorageObjectId, ExpectedHead>();
-	const pages = new Map<
-		StorageObjectId,
-		Readonly<{ afterGenerationId: GenerationId | null; records: readonly GenerationRecord[] }>
-	>();
-	const blobs = new Map<BlobDigest, Readonly<{ digest: BlobDigest; bytes: Uint8Array | null }>>();
-	const promotions = new Map<
-		string,
-		Readonly<{ objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }>
-	>();
+	const loaded: LoadedFacts = {
+		heads: new Map(),
+		generations: new Map(),
+		pages: new Map(),
+		blobs: new Map(),
+		promotions: new Map(),
+	};
 	for (const fact of facts) {
 		if (isClosedRecord(fact, ["kind", "objectId", "headRecord"]) && fact.kind === "head") {
-			if (!isStorageObjectId(fact.objectId) || heads.has(fact.objectId)) return undefined;
+			if (!isStorageObjectId(fact.objectId) || loaded.heads.has(fact.objectId)) return undefined;
 			const head = decodeHeadFact(fact.objectId, fact.headRecord);
 			if (head === undefined) return undefined;
-			heads.set(fact.objectId, head);
+			loaded.heads.set(fact.objectId, head);
+			continue;
+		}
+		if (isClosedRecord(fact, ["kind", "objectId", "generationId", "generationRecord"]) && fact.kind === "generation") {
+			if (!isStorageObjectId(fact.objectId) || !isGenerationId(fact.generationId)) return undefined;
+			const key = generationKey(fact.objectId, fact.generationId);
+			if (loaded.generations.has(key)) return undefined;
+			if (fact.generationRecord === null) loaded.generations.set(key, null);
+			else {
+				const bytes = copyFactBytes(fact.generationRecord);
+				if (bytes === undefined) return undefined;
+				const decoded = decodeGenerationRecordV1(bytes);
+				if (!decoded.ok || decoded.value.objectId !== fact.objectId || decoded.value.generationId !== fact.generationId)
+					return undefined;
+				loaded.generations.set(key, decoded.value);
+			}
 			continue;
 		}
 		if (
@@ -828,52 +583,36 @@ function copyAndValidateFacts(command: StorageAdapterCommand, facts: unknown): L
 		) {
 			if (
 				!isStorageObjectId(fact.objectId) ||
-				pages.has(fact.objectId) ||
+				loaded.pages.has(fact.objectId) ||
 				(fact.afterGenerationId !== null && !isGenerationId(fact.afterGenerationId)) ||
 				!isClosedArray(fact.generationRecords)
-			) {
+			)
 				return undefined;
-			}
 			const records: GenerationRecord[] = [];
 			let previous = fact.afterGenerationId as GenerationId | null;
-			for (const recordBytes of fact.generationRecords) {
-				const bytes = copyBytes(recordBytes);
+			for (const raw of fact.generationRecords) {
+				const bytes = copyFactBytes(raw);
 				if (bytes === undefined) return undefined;
 				const decoded = decodeGenerationRecordV1(bytes);
 				if (
 					!decoded.ok ||
 					decoded.value.objectId !== fact.objectId ||
 					(previous !== null && decoded.value.generationId <= previous)
-				) {
+				)
 					return undefined;
-				}
 				records.push(decoded.value);
 				previous = decoded.value.generationId;
 			}
-			pages.set(fact.objectId, { afterGenerationId: fact.afterGenerationId as GenerationId | null, records });
-			continue;
-		}
-		if (isClosedRecord(fact, ["kind", "objectId", "headRecord", "generationRecords"]) && fact.kind === "object-state") {
-			if (!isStorageObjectId(fact.objectId) || objects.has(fact.objectId) || !isClosedArray(fact.generationRecords)) {
-				return undefined;
-			}
-			const classified = classifyPersistedObjectState({
-				generationRecords: fact.generationRecords,
-				headRecord: fact.headRecord,
-				kind: "adapter-fact",
-				objectId: fact.objectId,
-			});
-			if (!classified.ok) return undefined;
-			objects.set(fact.objectId, classified.value.state);
+			loaded.pages.set(fact.objectId, { afterGenerationId: fact.afterGenerationId as GenerationId | null, records });
 			continue;
 		}
 		if (isClosedRecord(fact, ["kind", "digest", "bytes"]) && fact.kind === "blob") {
-			if (!isBlobDigest(fact.digest) || blobs.has(fact.digest)) return undefined;
-			if (fact.bytes === null) blobs.set(fact.digest, { digest: fact.digest, bytes: null });
+			if (!isBlobDigest(fact.digest) || loaded.blobs.has(fact.digest)) return undefined;
+			if (fact.bytes === null) loaded.blobs.set(fact.digest, { digest: fact.digest, bytes: null });
 			else {
-				const bytes = copyBytes(fact.bytes);
+				const bytes = copyFactBytes(fact.bytes);
 				if (bytes === undefined) return undefined;
-				blobs.set(fact.digest, { digest: fact.digest, bytes });
+				loaded.blobs.set(fact.digest, { digest: fact.digest, bytes });
 			}
 			continue;
 		}
@@ -884,150 +623,259 @@ function copyAndValidateFacts(command: StorageAdapterCommand, facts: unknown): L
 			isGenerationId(fact.generationId) &&
 			isBlobDigest(fact.digest)
 		) {
-			const objectId = fact.objectId as StorageObjectId;
-			const generationId = fact.generationId as GenerationId;
-			const digest = fact.digest as BlobDigest;
-			const key = promotionKey({ objectId, generationId, digest });
-			if (promotions.has(key)) return undefined;
-			promotions.set(key, { objectId, generationId, digest });
+			const value = fact as { objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest };
+			const key = promotionKey(value);
+			if (loaded.promotions.has(key)) return undefined;
+			loaded.promotions.set(key, value);
 			continue;
 		}
 		return undefined;
 	}
-	const loaded = { objects, heads, pages, blobs, promotions };
-	return exactFactsForCommand(command, loaded) ? loaded : undefined;
+	return exactFacts(command, loaded) ? loaded : undefined;
 }
-
-function decodeHeadFact(objectId: StorageObjectId, value: unknown): ExpectedHead | undefined {
-	if (value === null) return { kind: "none", objectId };
-	const bytes = copyBytes(value);
-	if (bytes === undefined) return undefined;
-	const decoded = decodeHeadRecordV1(bytes);
-	return decoded.ok && decoded.value.kind === "present" && decoded.value.objectId === objectId
-		? decoded.value
-		: undefined;
-}
-
-function copyBytes(value: unknown): Uint8Array | undefined {
-	if (!(value instanceof Uint8Array) || hasSharedBacking(value)) return undefined;
-	return new Uint8Array(value);
-}
-
-function exactFactsForCommand(command: StorageAdapterCommand, facts: LoadedFacts): boolean {
-	const objectIds = new Set<StorageObjectId>();
-	const blobIds = new Set<BlobDigest>();
-	const allowedPromotions = new Set<string>();
-	if (command.kind === "getBlob") blobIds.add(command.digest);
-	else if (command.kind === "readHead") {
+function exactFacts(command: StorageAdapterCommand, facts: LoadedFacts): boolean {
+	if (command.kind === "readHead")
 		return (
 			facts.heads.size === 1 &&
 			facts.heads.has(command.objectId) &&
+			facts.generations.size === 0 &&
 			facts.pages.size === 0 &&
-			facts.objects.size === 0 &&
 			facts.blobs.size === 0 &&
 			facts.promotions.size === 0
 		);
-	} else if (command.kind === "readGenerationPage") {
+	if (command.kind === "readGenerationPage") {
 		const page = facts.pages.get(command.objectId);
 		const cursor = command.cursor === undefined ? undefined : decodeGenerationPageCursor(command.cursor);
 		return (
 			page !== undefined &&
 			facts.pages.size === 1 &&
 			facts.heads.size === 0 &&
-			facts.objects.size === 0 &&
+			facts.generations.size === 0 &&
 			facts.blobs.size === 0 &&
 			facts.promotions.size === 0 &&
 			page.afterGenerationId === (cursor?.generationId ?? null) &&
 			page.records.length <= command.limit + 1
 		);
-	} else {
-		objectIds.add(command.objectId);
-		if (command.kind === "putCachedBlob" || command.kind === "promoteReference") blobIds.add(command.digest);
-		if (command.kind === "promoteReference") allowedPromotions.add(promotionKey(command));
-		if (command.kind === "completeGeneration") {
-			const generation = facts.objects
-				.get(command.objectId)
-				?.generations.find(({ generationId }) => generationId === command.generationId);
-			for (const reference of generation?.closure ?? []) {
-				allowedPromotions.add(promotionKey({ ...command, digest: reference.digest }));
-			}
-		}
 	}
-	if (
-		facts.heads.size !== 0 ||
-		facts.pages.size !== 0 ||
-		facts.objects.size !== objectIds.size ||
-		facts.blobs.size !== blobIds.size
-	) {
+	if (command.kind === "getBlob")
+		return (
+			facts.blobs.size === 1 &&
+			facts.blobs.has(command.digest) &&
+			facts.heads.size === 0 &&
+			facts.generations.size === 0 &&
+			facts.pages.size === 0 &&
+			facts.promotions.size === 0
+		);
+	if (!facts.generations.has(generationKey(command.objectId, command.generationId)) || facts.pages.size !== 0)
 		return false;
+	if (facts.heads.size !== 1 || !facts.heads.has(command.objectId)) return false;
+	const blobCommand = command.kind === "putCachedBlob" || command.kind === "promoteReference" ? command : undefined;
+	if (
+		facts.blobs.size !== (blobCommand === undefined ? 0 : 1) ||
+		(blobCommand !== undefined && !facts.blobs.has(blobCommand.digest))
+	)
+		return false;
+	const promotionCount = command.kind === "promoteReference" && facts.promotions.has(promotionKey(command)) ? 1 : 0;
+	if (facts.promotions.size !== promotionCount) return false;
+	if (command.kind === "swapHead") {
+		const head = facts.heads.get(command.objectId);
+		const dynamic = head?.kind === "present" && head.generationId !== command.generationId ? head.generationId : null;
+		return (
+			facts.generations.size === 1 + (dynamic === null ? 0 : 1) &&
+			(dynamic === null || facts.generations.has(generationKey(command.objectId, dynamic)))
+		);
 	}
-	for (const id of objectIds) if (!facts.objects.has(id)) return false;
-	for (const id of blobIds) if (!facts.blobs.has(id)) return false;
-	for (const key of facts.promotions.keys()) if (!allowedPromotions.has(key)) return false;
-	return true;
+	return facts.generations.size === 1;
+}
+function seedOwner(command: StorageAdapterCommand, loaded: LoadedFacts): TransitionOwner {
+	const owner = new TransitionOwner("strict");
+	if ("objectId" in command)
+		owner.seedObjectState({
+			head: loaded.heads.get(command.objectId) ?? { kind: "none", objectId: command.objectId },
+			generations: [...loaded.generations.values()].filter((value): value is GenerationRecord => value !== null),
+		});
+	for (const blob of loaded.blobs.values()) if (blob.bytes !== null) owner.seedBlob(blob.digest, blob.bytes);
+	for (const value of loaded.promotions.values()) owner.markPromoted(value.objectId, value.generationId, value.digest);
+	return owner;
 }
 
-function promotionKey(value: { objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }): string {
-	return `${value.objectId}\0${value.generationId}\0${value.digest}`;
-}
-
-function execute(
-	owner: TransitionOwner,
-	command: StorageAdapterCommand,
-	loaded: LoadedFacts
-): StoreResult<StorageAdapterResultValue> {
-	switch (command.kind) {
-		case "readHead": {
-			const head = loaded.heads.get(command.objectId);
-			return head === undefined ? { ok: false, reason: "INVALID_ARGUMENT" } : { ok: true, value: head };
-		}
-		case "readGenerationPage": {
-			const page = loaded.pages.get(command.objectId);
-			if (page === undefined) return { ok: false, reason: "INVALID_ARGUMENT" };
+/**
+ * Evaluates a detached command over exact bounded facts.
+ * @param prepared - Canonical prepared command and its exact load requirements.
+ * @param facts - Detached facts loaded for those requirements.
+ * @param authorization - Optional opaque candidate-closure authorization.
+ * @returns The stable result and bounded persistence writes.
+ */
+export function evaluateStorageAdapterCommand(
+	prepared: PreparedStorageAdapterCommand,
+	facts: readonly StorageAdapterFact[],
+	authorization?: unknown
+): StorageAdapterEvaluation {
+	const canonical = canonicalPrepared(prepared);
+	if (canonical === undefined) return invalidEvaluation();
+	if (
+		isClosedArray(facts) &&
+		facts.length === 1 &&
+		isClosedRecord(facts[0], ["kind"]) &&
+		facts[0].kind === "store-closed"
+	)
+		return { result: { ok: false, reason: "STORE_CLOSED" }, writes: EMPTY_WRITES };
+	const loaded = loadFacts(canonical.command, facts);
+	if (loaded === undefined) return invalidEvaluation();
+	const owner = seedOwner(canonical.command, loaded);
+	const command = canonical.command;
+	let result: StoreResult<StorageAdapterResultValue>;
+	if (command.kind === "readHead") {
+		const head = loaded.heads.get(command.objectId);
+		result = head === undefined ? { ok: false, reason: "INVALID_ARGUMENT" } : { ok: true, value: head };
+	} else if (command.kind === "readGenerationPage") {
+		const page = loaded.pages.get(command.objectId);
+		if (page === undefined) result = { ok: false, reason: "INVALID_ARGUMENT" };
+		else {
 			const generations = page.records.slice(0, command.limit);
-			const lastGeneration = generations.at(-1);
-			return {
+			const last = generations.at(-1);
+			result = {
 				ok: true,
 				value: {
 					generations,
 					nextCursor:
-						page.records.length > command.limit && lastGeneration !== undefined
-							? encodeGenerationPageCursor(command.objectId, lastGeneration.generationId)
+						page.records.length > command.limit && last !== undefined
+							? encodeGenerationPageCursor(command.objectId, last.generationId)
 							: null,
 				},
 			};
 		}
-		case "getBlob":
-			return owner.getBlob(command.digest);
-		case "beginGeneration":
-			return owner.beginGeneration({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				baseExpectedHead: command.baseExpectedHead,
-				closure: command.closure,
-			});
-		case "putCachedBlob":
-			return owner.putCachedBlob({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				digest: command.digest,
-				bytes: command.bytes,
-			});
-		case "promoteReference":
-			return owner.promoteReference({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				digest: command.digest,
-			});
-		case "completeGeneration":
-			return owner.completeGeneration({ objectId: command.objectId, generationId: command.generationId });
-		case "swapHead":
-			return owner.swapHead({
-				objectId: command.objectId,
-				generationId: command.generationId,
-				expectedHead: command.expectedHead,
-			});
-		case "discardGeneration":
-			return owner.discardGeneration({ objectId: command.objectId, generationId: command.generationId });
+	} else if (command.kind === "getBlob") result = owner.getBlob(command.digest);
+	else if (command.kind === "beginGeneration")
+		result = owner.beginGeneration({
+			objectId: command.objectId,
+			generationId: command.generationId,
+			baseExpectedHead: command.baseExpectedHead,
+			closure: command.closure,
+		});
+	else if (command.kind === "putCachedBlob")
+		result = owner.putCachedBlob({
+			objectId: command.objectId,
+			generationId: command.generationId,
+			digest: command.digest,
+			bytes: command.bytes,
+		});
+	else if (command.kind === "promoteReference")
+		result = owner.promoteReference({
+			objectId: command.objectId,
+			generationId: command.generationId,
+			digest: command.digest,
+		});
+	else if (command.kind === "completeGeneration")
+		result = owner.completeGenerationAuthorized(
+			{ objectId: command.objectId, generationId: command.generationId },
+			authorization as Authorization
+		);
+	else if (command.kind === "swapHead")
+		result = owner.swapHeadAuthorized(
+			{ objectId: command.objectId, generationId: command.generationId, expectedHead: command.expectedHead },
+			authorization as Authorization
+		);
+	else result = owner.discardGeneration({ objectId: command.objectId, generationId: command.generationId });
+	if (!result.ok) return { result, writes: EMPTY_WRITES };
+	const writes: StorageAdapterWrite[] = [];
+	if (command.kind === "putCachedBlob" && (result.value as { inserted: boolean }).inserted)
+		writes.push({ kind: "insert-blob", digest: command.digest, bytes: new Uint8Array(command.bytes) });
+	else if (command.kind === "promoteReference" && !loaded.promotions.has(promotionKey(command)))
+		writes.push({
+			kind: "insert-promotion",
+			objectId: command.objectId,
+			generationId: command.generationId,
+			digest: command.digest,
+		});
+	else if (
+		command.kind === "beginGeneration" ||
+		command.kind === "completeGeneration" ||
+		command.kind === "discardGeneration"
+	)
+		writes.push(generationWrite(result.value as GenerationRecord));
+	else if (command.kind === "swapHead") {
+		const swap = result.value as {
+			head: Exclude<ExpectedHead, { kind: "none" }>;
+			supersededGenerationId: GenerationId | null;
+		};
+		if (swap.supersededGenerationId !== null) {
+			const previous = owner.readGenerationRecord(command.objectId, swap.supersededGenerationId);
+			if (!previous.ok || previous.value === null) return invalidEvaluation();
+			writes.push(generationWrite(previous.value));
+		}
+		const candidate = owner.readGenerationRecord(command.objectId, command.generationId);
+		if (!candidate.ok || candidate.value === null) return invalidEvaluation();
+		writes.push(generationWrite(candidate.value), {
+			kind: "replace-head",
+			objectId: command.objectId,
+			record: encodeHeadRecordV1(swap.head),
+		});
+	}
+	return { result, writes: Object.freeze(writes) };
+}
+function generationWrite(generation: GenerationRecord): StorageAdapterWrite {
+	return {
+		kind: "replace-generation",
+		objectId: generation.objectId,
+		generationId: generation.generationId,
+		record: encodeGenerationRecordV1(generation),
+	};
+}
+function invalidEvaluation(): StorageAdapterEvaluation {
+	return { result: { ok: false, reason: "INVALID_ARGUMENT" }, writes: EMPTY_WRITES };
+}
+function requirementKey(requirement: StorageAdapterLoadRequirement): string {
+	switch (requirement.kind) {
+		case "head":
+			return `head\0${requirement.objectId}`;
+		case "generation":
+			return `generation\0${requirement.objectId}\0${requirement.generationId}`;
+		case "generation-page":
+			return `generation-page\0${requirement.objectId}\0${requirement.afterGenerationId ?? ""}\0${requirement.limitPlusOne}`;
+		case "blob":
+			return `blob\0${requirement.digest}`;
+		case "promotion":
+			return `promotion\0${requirement.objectId}\0${requirement.generationId}\0${requirement.digest}`;
 	}
 }
+function isRequirement(value: unknown): value is StorageAdapterLoadRequirement {
+	if (isClosedRecord(value, ["kind", "objectId"]) && value.kind === "head") return isStorageObjectId(value.objectId);
+	if (isClosedRecord(value, ["kind", "objectId", "generationId"]) && value.kind === "generation")
+		return isStorageObjectId(value.objectId) && isGenerationId(value.generationId);
+	if (
+		isClosedRecord(value, ["kind", "objectId", "afterGenerationId", "limitPlusOne"]) &&
+		value.kind === "generation-page"
+	)
+		return (
+			isStorageObjectId(value.objectId) &&
+			(value.afterGenerationId === null || isGenerationId(value.afterGenerationId)) &&
+			typeof value.limitPlusOne === "number" &&
+			Number.isSafeInteger(value.limitPlusOne) &&
+			value.limitPlusOne >= 2 &&
+			value.limitPlusOne <= MAX_GENERATION_PAGE_ROWS + 1
+		);
+	if (isClosedRecord(value, ["kind", "digest"]) && value.kind === "blob") return isBlobDigest(value.digest);
+	return (
+		isClosedRecord(value, ["kind", "objectId", "generationId", "digest"]) &&
+		value.kind === "promotion" &&
+		isStorageObjectId(value.objectId) &&
+		isGenerationId(value.generationId) &&
+		isBlobDigest(value.digest)
+	);
+}
+function canonicalPrepared(value: unknown): PreparedStorageAdapterCommand | undefined {
+	if (!isClosedRecord(value, ["command", "requirements"]) || !isClosedArray(value.requirements)) return undefined;
+	const prepared = prepareStorageAdapterCommand(value.command);
+	if (!prepared.ok || prepared.value.requirements.length !== value.requirements.length) return undefined;
+	for (let index = 0; index < prepared.value.requirements.length; index++) {
+		const supplied = value.requirements[index];
+		const expected = prepared.value.requirements[index];
+		if (expected === undefined || !isRequirement(supplied) || requirementKey(supplied) !== requirementKey(expected))
+			return undefined;
+	}
+	return prepared.value;
+}
+
+// recoverActiveGeneration is the mandatory backend transaction owner; the
+// controller above supplies its one-reference-at-a-time closure verification.

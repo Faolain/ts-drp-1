@@ -7,6 +7,7 @@ export {
 export { createMemoryAheDurableStore } from "./memory.js";
 export type {
 	AheDurableStore,
+	ActiveGenerationSnapshot,
 	BlobDigest,
 	ClosureDigest,
 	ExpectedHead,

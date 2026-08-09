@@ -86,6 +86,21 @@ export type GenerationPage = {
 	readonly generations: readonly GenerationRecord[];
 	readonly nextCursor: GenerationPageCursor | null;
 };
+export type ActiveGenerationSnapshot =
+	| Readonly<{
+			kind: "empty";
+			head: NoHead;
+			adoptedGeneration: null;
+			recomputedClosureDigest: null;
+			references: readonly [];
+	  }>
+	| Readonly<{
+			kind: "active";
+			head: PresentHead;
+			adoptedGeneration: GenerationRecord;
+			recomputedClosureDigest: ClosureDigest;
+			references: readonly GenerationRef[];
+	  }>;
 
 export type StoreCapabilities = {
 	readonly durability: "ephemeral" | "strict";
@@ -100,6 +115,7 @@ export interface AheDurableStore {
 		readonly cursor?: GenerationPageCursor;
 		readonly limit: number;
 	}): Promise<StoreResult<GenerationPage>>;
+	recoverActiveGeneration(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>>;
 	getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>>;
 	beginGeneration(input: {
 		readonly objectId: StorageObjectId;

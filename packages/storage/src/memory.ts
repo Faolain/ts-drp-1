@@ -7,6 +7,7 @@ import {
 import { encodeGenerationRecordV1, encodeHeadRecordV1 } from "./codecs.js";
 import { TransitionOwner } from "./internal/transition.js";
 import type {
+	ActiveGenerationSnapshot,
 	AheDurableStore,
 	BlobDigest,
 	ExpectedHead,
@@ -68,6 +69,9 @@ class MemoryAheDurableStore implements AheDurableStore {
 	 */
 	public getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
 		return Promise.resolve(this.owner.getBlob(digest));
+	}
+	public recoverActiveGeneration(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>> {
+		return Promise.resolve(this.owner.recoverActiveGeneration(objectId));
 	}
 
 	/**

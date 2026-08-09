@@ -1,6 +1,9 @@
 import {
+	type ActiveGenerationSnapshot,
 	type AheDurableStore,
 	type BlobDigest,
+	decodeGenerationRecordV1,
+	decodeHeadRecordV1,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationPage,
@@ -18,6 +21,7 @@ import {
 	PersistedStorageError,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
+	storageAdapterClosureVerifier,
 	type StorageAdapterCommand,
 	type StorageAdapterEvaluation,
 	type StorageAdapterFact,
@@ -46,9 +50,14 @@ const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
 });
 
 const OPERATION_STORES = Object.freeze({
-	beginGeneration: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
-	completeGeneration: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_PROMOTIONS_STORE]),
-	discardGeneration: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
+	beginGeneration: Object.freeze([PHASE_2D_GENERATIONS_STORE, PHASE_2D_OBJECTS_STORE]),
+	completeGeneration: Object.freeze([
+		PHASE_2D_BLOBS_STORE,
+		PHASE_2D_GENERATIONS_STORE,
+		PHASE_2D_OBJECTS_STORE,
+		PHASE_2D_PROMOTIONS_STORE,
+	]),
+	discardGeneration: Object.freeze([PHASE_2D_GENERATIONS_STORE, PHASE_2D_OBJECTS_STORE]),
 	getBlob: Object.freeze([PHASE_2D_BLOBS_STORE]),
 	promoteReference: Object.freeze([
 		PHASE_2D_OBJECTS_STORE,
@@ -56,10 +65,15 @@ const OPERATION_STORES = Object.freeze({
 		PHASE_2D_BLOBS_STORE,
 		PHASE_2D_PROMOTIONS_STORE,
 	]),
-	putCachedBlob: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_BLOBS_STORE]),
+	putCachedBlob: Object.freeze([PHASE_2D_BLOBS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_OBJECTS_STORE]),
 	readGenerationPage: Object.freeze([PHASE_2D_GENERATIONS_STORE]),
 	readHead: Object.freeze([PHASE_2D_OBJECTS_STORE]),
-	swapHead: Object.freeze([PHASE_2D_OBJECTS_STORE, PHASE_2D_GENERATIONS_STORE]),
+	swapHead: Object.freeze([
+		PHASE_2D_BLOBS_STORE,
+		PHASE_2D_GENERATIONS_STORE,
+		PHASE_2D_OBJECTS_STORE,
+		PHASE_2D_PROMOTIONS_STORE,
+	]),
 } satisfies Readonly<Record<StorageAdapterCommand["kind"], readonly string[]>>);
 
 class StrictDurabilityCapabilityError extends Error {
@@ -77,6 +91,11 @@ class IdbAdapterLifecycle {
 	private connection: IDBDatabase | undefined;
 	private poisoned = false;
 	private resolveClose: (() => void) | undefined;
+	private readonly invalidators = new Set<() => void>();
+
+	public onInvalidation(invalidator: () => void): void {
+		this.invalidators.add(invalidator);
+	}
 
 	public attach(database: IDBDatabase): void {
 		if (this.closePromise !== undefined) {
@@ -110,6 +129,7 @@ class IdbAdapterLifecycle {
 	}
 
 	public close(): Promise<void> {
+		for (const invalidate of this.invalidators) invalidate();
 		this.closePromise ??= new Promise((resolve) => {
 			this.resolveClose = resolve;
 		});
@@ -139,8 +159,11 @@ class PoisonedOperationError extends Error {
 
 class IdbAheDurableStore implements AheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
+	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
 
-	public constructor(private readonly lifecycle: IdbAdapterLifecycle) {}
+	public constructor(private readonly lifecycle: IdbAdapterLifecycle) {
+		lifecycle.onInvalidation(() => this.recoveryCertificates.clear());
+	}
 
 	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
 		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;
@@ -156,6 +179,11 @@ class IdbAheDurableStore implements AheDurableStore {
 
 	public getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
 		return this.run(commandWithKind("getBlob", { digest })) as Promise<StoreResult<Uint8Array | null>>;
+	}
+	public recoverActiveGeneration(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return Promise.resolve(prepared);
+		return this.runRecovery(objectId);
 	}
 
 	public beginGeneration(input: {
@@ -209,6 +237,7 @@ class IdbAheDurableStore implements AheDurableStore {
 	}
 
 	public close(): Promise<void> {
+		this.recoveryCertificates.clear();
 		return this.lifecycle.close();
 	}
 
@@ -233,14 +262,53 @@ class IdbAheDurableStore implements AheDurableStore {
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
+			const objectId = "objectId" in prepared.command ? prepared.command.objectId : undefined;
+			const authorityStores =
+				mutation &&
+				objectId !== undefined &&
+				(operation === "completeGeneration" || operation === "swapHead" || this.recoveryCertificates.has(objectId));
 			transaction = mutation
-				? database.transaction([...OPERATION_STORES[operation]], "readwrite", { durability: "strict" })
+				? database.transaction(authorityStores ? allAuthorityStores() : [...OPERATION_STORES[operation]], "readwrite", {
+						durability: "strict",
+					})
 				: database.transaction([...OPERATION_STORES[operation]], "readonly");
 			completion = transactionOutcome(transaction);
 			if (mutation && transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
+			if (mutation) {
+				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
+				const recovered = await this.ensureCertificate(
+					transaction,
+					prepared.command.objectId,
+					operation === "completeGeneration" || operation === "swapHead"
+				);
+				if (!recovered.ok) {
+					abortIfActive(transaction);
+					await completion;
+					return this.lifecycle.latchPoison(recovered.reason as PersistedStorageError["reason"]);
+				}
+			}
 
 			const facts = await this.loadFacts(transaction, prepared);
-			const evaluation = evaluateStorageAdapterCommand(prepared, facts);
+			let evaluation = evaluateStorageAdapterCommand(prepared, facts);
+			if (prepared.command.kind === "completeGeneration" || prepared.command.kind === "swapHead") {
+				if (!evaluation.result.ok && evaluation.result.reason !== "INVALID_ARGUMENT") {
+					abortIfActive(transaction);
+					await completion;
+					return evaluation.result;
+				}
+				const authorization = await this.verifyCandidate(
+					transaction,
+					prepared.command.objectId,
+					prepared.command.generationId,
+					facts
+				);
+				if (authorization === undefined || !authorization.ok) {
+					abortIfActive(transaction);
+					await completion;
+					return authorization ?? { ok: false, reason: "INVALID_ARGUMENT" };
+				}
+				evaluation = evaluateStorageAdapterCommand(prepared, facts, authorization.value);
+			}
 			if (!evaluation.result.ok) {
 				abortIfActive(transaction);
 				await completion;
@@ -248,9 +316,17 @@ class IdbAheDurableStore implements AheDurableStore {
 			}
 			if (mutation) await this.applyWrites(transaction, evaluation);
 			const outcome = await completion;
-			if (!outcome.ok) return substrateFailure(outcome.cause);
+			if (!outcome.ok) {
+				this.recoveryCertificates.clear();
+				return substrateFailure(outcome.cause);
+			}
+			if (operation === "swapHead" && evaluation.result.ok) {
+				const value = evaluation.result.value as Readonly<{ head: PresentHead }>;
+				this.recoveryCertificates.set(prepared.command.objectId, headFingerprint(value.head));
+			}
 			return evaluation.result;
 		} catch (cause) {
+			this.recoveryCertificates.clear();
 			const semanticResult =
 				cause instanceof PersistedStorageError
 					? this.lifecycle.latchPoison(cause.reason)
@@ -268,10 +344,6 @@ class IdbAheDurableStore implements AheDurableStore {
 		prepared: PreparedStorageAdapterCommand
 	): Promise<readonly StorageAdapterFact[]> {
 		const facts: StorageAdapterFact[] = [];
-		const objectStates = new Map<
-			StorageObjectId,
-			Readonly<{ head: ExpectedHead; generations: readonly GenerationRecord[] }>
-		>();
 		const loadedBlobs = new Set<BlobDigest>();
 		const loadedPromotions = new Set<string>();
 		for (const requirement of prepared.requirements) {
@@ -312,57 +384,29 @@ class IdbAheDurableStore implements AheDurableStore {
 					});
 					break;
 				}
-				case "object-state": {
-					const headRow = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
-					const rows = await this.request(
-						transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAll(generationPrefix(requirement.objectId))
-					);
-					const classified = classifyPersistedState({
-						generationRows: rows.map((row) => ({
-							generationId: rowProperty(row, "generationId"),
-							objectId: rowProperty(row, "objectId"),
-							record: rowProperty(row, "record"),
-						})),
-						headRow:
-							headRow === undefined
-								? null
-								: { objectId: rowProperty(headRow, "objectId"), record: rowProperty(headRow, "record") },
-						kind: "physical",
-						objectId: requirement.objectId,
-					});
-					if (!classified.ok) throw new PersistedStorageError(classified.reason);
-					if (classified.value.kind !== "object-state") {
-						throw new Error("persisted classifier returned the wrong fact kind");
-					}
-					facts.push(classified.value.fact);
-					objectStates.set(requirement.objectId, classified.value.state);
+				case "generation":
+					await this.loadGeneration(transaction, requirement.objectId, requirement.generationId, facts);
 					break;
-				}
 				case "blob":
 					await this.loadBlob(transaction, requirement.digest, facts, loadedBlobs);
 					break;
 				case "promotion":
 					await this.loadPromotion(transaction, requirement, facts, loadedPromotions);
 					break;
-				case "generation-closure": {
-					const state = objectStates.get(requirement.objectId);
-					if (state === undefined) throw new Error("generation closure loaded without its object state");
-					const generation = state.generations.find((candidate) => candidate.generationId === requirement.generationId);
-					for (const reference of generation?.closure ?? []) {
-						await this.loadPromotion(
-							transaction,
-							{
-								objectId: requirement.objectId,
-								generationId: requirement.generationId,
-								digest: reference.digest,
-							},
-							facts,
-							loadedPromotions
-						);
-					}
-					break;
-				}
 			}
+		}
+		if (prepared.command.kind === "swapHead") {
+			const headFact = facts.find(
+				(fact): fact is Extract<StorageAdapterFact, { kind: "head" }> => fact.kind === "head"
+			);
+			const decoded =
+				headFact?.headRecord === null || headFact === undefined ? undefined : decodeHeadRecordV1(headFact.headRecord);
+			if (
+				decoded?.ok === true &&
+				decoded.value.kind === "present" &&
+				decoded.value.generationId !== prepared.command.generationId
+			)
+				await this.loadGeneration(transaction, prepared.command.objectId, decoded.value.generationId, facts);
 		}
 		return facts;
 	}
@@ -371,6 +415,231 @@ class IdbAheDurableStore implements AheDurableStore {
 		const value = await requestValue(request);
 		if (this.lifecycle.isPoisoned()) throw new PoisonedOperationError();
 		return value;
+	}
+
+	private async runRecovery(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>> {
+		const database = this.lifecycle.startOperation();
+		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
+		let transaction: IDBTransaction | undefined;
+		let completion: Promise<TransactionOutcome> | undefined;
+		try {
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			transaction = database.transaction(allAuthorityStores(), "readwrite", { durability: "strict" });
+			completion = transactionOutcome(transaction);
+			if (transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
+			const result = await this.recoverWithinTransaction(transaction, objectId);
+			if (!result.ok) {
+				abortIfActive(transaction);
+				await completion;
+				return this.lifecycle.latchPoison(result.reason as PersistedStorageError["reason"]);
+			}
+			const outcome = await completion;
+			if (!outcome.ok) {
+				this.recoveryCertificates.clear();
+				return substrateFailure(outcome.cause);
+			}
+			const snapshot = freezeRecoverySnapshot(result.value);
+			this.recoveryCertificates.set(objectId, headFingerprint(snapshot.head));
+			return { ok: true, value: snapshot };
+		} catch (cause) {
+			if (transaction !== undefined) abortIfActive(transaction);
+			if (completion !== undefined) await completion;
+			if (cause instanceof PoisonedOperationError) return { ok: false, reason: "STORE_POISONED" };
+			this.recoveryCertificates.clear();
+			return substrateFailure(cause);
+		} finally {
+			this.lifecycle.finishOperation();
+		}
+	}
+
+	private async readHeadInTransaction(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId
+	): Promise<StoreResult<ExpectedHead>> {
+		const row = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(objectId));
+		const classified = classifyPersistedState({
+			kind: "head",
+			objectId,
+			row: row === undefined ? null : { objectId: rowProperty(row, "objectId"), record: rowProperty(row, "record") },
+		});
+		return classified.ok && classified.value.kind === "head"
+			? { ok: true, value: classified.value.head }
+			: (classified as StoreResult<ExpectedHead>);
+	}
+
+	private async ensureCertificate(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId,
+		required: boolean
+	): Promise<StoreResult<undefined>> {
+		const head = await this.readHeadInTransaction(transaction, objectId);
+		if (!head.ok) return head;
+		if (this.recoveryCertificates.get(objectId) === headFingerprint(head.value)) return { ok: true, value: undefined };
+		if (!required && !this.recoveryCertificates.has(objectId)) return { ok: true, value: undefined };
+		const recovered = await this.recoverWithinTransaction(transaction, objectId);
+		if (!recovered.ok) return recovered;
+		this.recoveryCertificates.set(objectId, headFingerprint(recovered.value.head));
+		return { ok: true, value: undefined };
+	}
+
+	private async recoverWithinTransaction(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId
+	): Promise<StoreResult<ActiveGenerationSnapshot>> {
+		const headResult = await this.readHeadInTransaction(transaction, objectId);
+		if (!headResult.ok) return headResult;
+		let after: GenerationId | null = null;
+		let adopted: GenerationRecord | null = null;
+		let count = 0;
+		let failure: "NON_CANONICAL_RECORD" | "UNSUPPORTED_STORAGE_SCHEMA" | undefined;
+		for (;;) {
+			const rows = await this.request(
+				transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAll(generationPageRange(objectId, after), 129)
+			);
+			for (const row of rows) {
+				const classified = classifyPersistedState({
+					kind: "generation",
+					objectId,
+					row: {
+						objectId: rowProperty(row, "objectId"),
+						generationId: rowProperty(row, "generationId"),
+						record: rowProperty(row, "record"),
+					},
+				});
+				if (!classified.ok)
+					failure =
+						failure === "UNSUPPORTED_STORAGE_SCHEMA" || classified.reason === "UNSUPPORTED_STORAGE_SCHEMA"
+							? "UNSUPPORTED_STORAGE_SCHEMA"
+							: "NON_CANONICAL_RECORD";
+				else if (classified.value.kind === "generation" && classified.value.generation.state === "Adopted") {
+					count++;
+					adopted ??= classified.value.generation;
+				}
+			}
+			if (rows.length < 129) break;
+			const last = rowProperty(rows.at(-1), "generationId");
+			if (typeof last !== "string") return { ok: false, reason: "NON_CANONICAL_RECORD" };
+			after = last as GenerationId;
+		}
+		if (failure !== undefined) return { ok: false, reason: failure };
+		const head = headResult.value;
+		if (head.kind === "none")
+			return count === 0
+				? {
+						ok: true,
+						value: { kind: "empty", head, adoptedGeneration: null, recomputedClosureDigest: null, references: [] },
+					}
+				: { ok: false, reason: "NON_CANONICAL_RECORD" };
+		if (
+			count !== 1 ||
+			adopted === null ||
+			adopted.generationId !== head.generationId ||
+			adopted.closureDigest !== head.closureDigest
+		)
+			return { ok: false, reason: "NON_CANONICAL_RECORD" };
+		const verified = await this.verifyClosure(transaction, objectId, adopted, "adopted");
+		if (!verified.ok) return verified;
+		return {
+			ok: true,
+			value: {
+				kind: "active",
+				head: { ...head },
+				adoptedGeneration: {
+					...adopted,
+					baseExpectedHead: { ...adopted.baseExpectedHead },
+					closure: adopted.closure.map((r) => ({ ...r })),
+				},
+				recomputedClosureDigest: adopted.closureDigest,
+				references: adopted.closure.map((r) => ({ ...r })),
+			},
+		};
+	}
+
+	private async loadGeneration(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId,
+		generationId: GenerationId,
+		facts: StorageAdapterFact[]
+	): Promise<void> {
+		const row = await this.request(transaction.objectStore(PHASE_2D_GENERATIONS_STORE).get([objectId, generationId]));
+		if (row === undefined) {
+			facts.push({ kind: "generation", objectId, generationId, generationRecord: null });
+			return;
+		}
+		const classified = classifyPersistedState({
+			kind: "generation",
+			objectId,
+			row: {
+				objectId: rowProperty(row, "objectId"),
+				generationId: rowProperty(row, "generationId"),
+				record: rowProperty(row, "record"),
+			},
+		});
+		if (!classified.ok) throw new PersistedStorageError(classified.reason);
+		if (classified.value.kind !== "generation") throw new Error("wrong classifier kind");
+		facts.push({ kind: "generation", objectId, generationId, generationRecord: classified.value.record });
+	}
+
+	private async verifyCandidate(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId,
+		generationId: GenerationId,
+		facts: readonly StorageAdapterFact[]
+	): Promise<StoreResult<unknown> | undefined> {
+		const fact = facts.find(
+			(value): value is Extract<StorageAdapterFact, { kind: "generation" }> =>
+				value.kind === "generation" && value.objectId === objectId && value.generationId === generationId
+		);
+		if (fact?.generationRecord === null || fact === undefined) return undefined;
+		const decoded = decodeGenerationRecordV1(fact.generationRecord);
+		if (!decoded.ok) return { ok: false, reason: "NON_CANONICAL_RECORD" };
+		return this.verifyClosure(transaction, objectId, decoded.value, "candidate");
+	}
+
+	private verifyClosure(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId,
+		generation: GenerationRecord,
+		mode: "adopted" | "candidate"
+	): Promise<StoreResult<unknown>> {
+		const session = storageAdapterClosureVerifier.start(generation, mode);
+		return new Promise((resolve, reject) => {
+			const advance = (): void => {
+				if (this.lifecycle.isPoisoned()) {
+					reject(new PoisonedOperationError());
+					return;
+				}
+				const verificationRequest = storageAdapterClosureVerifier.next(session);
+				if (verificationRequest === null) {
+					resolve(storageAdapterClosureVerifier.finish(session));
+					return;
+				}
+				const request =
+					verificationRequest.kind === "promotion"
+						? transaction
+								.objectStore(PHASE_2D_PROMOTIONS_STORE)
+								.get([objectId, generation.generationId, verificationRequest.reference.digest])
+						: transaction.objectStore(PHASE_2D_BLOBS_STORE).get(verificationRequest.reference.digest);
+				request.addEventListener(
+					"success",
+					() => {
+						if (verificationRequest.kind === "promotion")
+							storageAdapterClosureVerifier.acceptPromotion(session, request.result !== undefined);
+						else
+							storageAdapterClosureVerifier.acceptBlob(
+								session,
+								request.result === undefined ? null : rowProperty(request.result, "bytes")
+							);
+						advance();
+					},
+					{ once: true }
+				);
+				request.addEventListener("error", () => reject(request.error ?? new Error("IndexedDB request failed")), {
+					once: true,
+				});
+			};
+			advance();
+		});
 	}
 
 	private async loadBlob(
@@ -451,6 +720,10 @@ function isMutation(kind: StorageAdapterCommand["kind"]): kind is Phase2dMutatio
 	return kind !== "readHead" && kind !== "readGenerationPage" && kind !== "getBlob";
 }
 
+function allAuthorityStores(): string[] {
+	return [PHASE_2D_BLOBS_STORE, PHASE_2D_GENERATIONS_STORE, PHASE_2D_OBJECTS_STORE, PHASE_2D_PROMOTIONS_STORE];
+}
+
 function commandWithKind(kind: StorageAdapterCommand["kind"], input: unknown): unknown {
 	if (typeof input !== "object" || input === null || Array.isArray(input)) return { kind, invalidInput: input };
 	const descriptors = Object.getOwnPropertyDescriptors(input);
@@ -495,6 +768,12 @@ function promotionKey(value: { objectId: StorageObjectId; generationId: Generati
 	return `${value.objectId}\0${value.generationId}\0${value.digest}`;
 }
 
+function headFingerprint(head: ExpectedHead): string {
+	return head.kind === "none"
+		? `none\0${head.objectId}`
+		: `present\0${head.objectId}\0${head.generationId}\0${head.revision}\0${head.closureDigest}`;
+}
+
 function requestValue<T>(request: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
 		request.addEventListener("success", () => resolve(request.result), { once: true });
@@ -537,6 +816,27 @@ function abortIfActive(transaction: IDBTransaction): void {
 
 function substrateFailure(cause: unknown): StoreResult<never> {
 	return { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+}
+
+function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGenerationSnapshot {
+	if (snapshot.kind === "empty") {
+		return Object.freeze({
+			...snapshot,
+			head: Object.freeze({ ...snapshot.head }),
+			references: Object.freeze([] as []),
+		});
+	}
+	const adoptedGeneration = Object.freeze({
+		...snapshot.adoptedGeneration,
+		baseExpectedHead: Object.freeze({ ...snapshot.adoptedGeneration.baseExpectedHead }),
+		closure: Object.freeze(snapshot.adoptedGeneration.closure.map((reference) => Object.freeze({ ...reference }))),
+	});
+	return Object.freeze({
+		...snapshot,
+		head: Object.freeze({ ...snapshot.head }),
+		adoptedGeneration,
+		references: Object.freeze(snapshot.references.map((reference) => Object.freeze({ ...reference }))),
+	});
 }
 
 /**

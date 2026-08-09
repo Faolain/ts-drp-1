@@ -1,4 +1,5 @@
 import type {
+	ActiveGenerationSnapshot,
 	BlobDigest,
 	ExpectedHead,
 	GenerationId,
@@ -9,6 +10,7 @@ import type {
 	StorageRejectionReason,
 	StoreResult,
 } from "../types.js";
+import { acceptBlob, acceptPromotion, accepts, type Authorization, finish, next, start } from "./closure-verifier.js";
 import { checkedHeadRevision, digestBlob, digestClosure } from "../values.js";
 import {
 	bytesEqual,
@@ -41,6 +43,12 @@ type MutableObject = {
 	generationIds: GenerationId[];
 };
 
+type SwapCandidate = Readonly<{
+	object: MutableObject;
+	generation: MutableGeneration;
+	expectedHead: ExpectedHead;
+}>;
+
 type TransitionDurability = "ephemeral" | "strict";
 
 const MAX_INTERNAL_GENERATION_PAGE_ROWS = 129;
@@ -59,6 +67,26 @@ function asRecord(value: MutableGeneration): GenerationRecord {
 	return cloneGeneration(value);
 }
 
+function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGenerationSnapshot {
+	if (snapshot.kind === "empty") {
+		return Object.freeze({
+			...snapshot,
+			head: Object.freeze({ ...snapshot.head }),
+			references: Object.freeze([] as []),
+		});
+	}
+	return Object.freeze({
+		...snapshot,
+		head: Object.freeze({ ...snapshot.head }),
+		adoptedGeneration: Object.freeze({
+			...snapshot.adoptedGeneration,
+			baseExpectedHead: Object.freeze({ ...snapshot.adoptedGeneration.baseExpectedHead }),
+			closure: Object.freeze(snapshot.adoptedGeneration.closure.map((reference) => Object.freeze({ ...reference }))),
+		}),
+		references: Object.freeze(snapshot.references.map((reference) => Object.freeze({ ...reference }))),
+	});
+}
+
 /**
  * Owns the package's lifecycle, integrity and exact-CAS semantics. Runtime
  * adapters supply atomic persistence around these synchronous transitions.
@@ -69,12 +97,24 @@ export class TransitionOwner {
 	private readonly blobs = new Map<BlobDigest, Uint8Array>();
 	private readonly promoted = new Set<string>();
 	private closed = false;
+	private poisoned = false;
 
 	/**
 	 *
 	 * @param durability - Input value.
 	 */
 	public constructor(private readonly durability: TransitionDurability) {}
+
+	private lifecycleFailure(): StoreResult<never> | undefined {
+		if (this.closed) return rejected("STORE_CLOSED");
+		if (this.poisoned) return rejected("STORE_POISONED");
+		return undefined;
+	}
+
+	private latchIntegrityFailure<T>(reason: Exclude<StorageRejectionReason, "SUBSTRATE_FAILURE">): StoreResult<T> {
+		this.poisoned = true;
+		return rejected(reason);
+	}
 
 	/**
 	 * Reads one detached head+journal snapshot.
@@ -83,7 +123,8 @@ export class TransitionOwner {
 	 */
 	public readObjectState(objectId: StorageObjectId): StoreResult<TransitionObjectState> {
 		if (!isStorageObjectId(objectId)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const object = this.objects.get(objectId);
 		if (object === undefined) {
 			return { ok: true, value: { head: { kind: "none", objectId }, generations: [] } };
@@ -104,7 +145,8 @@ export class TransitionOwner {
 	 */
 	public readHead(objectId: StorageObjectId): StoreResult<ExpectedHead> {
 		if (!isStorageObjectId(objectId)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const object = this.objects.get(objectId);
 		return {
 			ok: true,
@@ -133,7 +175,8 @@ export class TransitionOwner {
 		) {
 			return rejected("INVALID_ARGUMENT");
 		}
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const object = this.objects.get(objectId);
 		if (object === undefined) return { ok: true, value: [] };
 		const start = firstGenerationAfter(object.generationIds, afterGenerationId);
@@ -158,7 +201,8 @@ export class TransitionOwner {
 		generationId: GenerationId
 	): StoreResult<GenerationRecord | null> {
 		if (!isStorageObjectId(objectId) || !isGenerationId(generationId)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const generation = this.findGeneration(objectId, generationId);
 		return { ok: true, value: generation === undefined ? null : asRecord(generation) };
 	}
@@ -170,7 +214,8 @@ export class TransitionOwner {
 	 */
 	public getBlob(digest: BlobDigest): StoreResult<Uint8Array | null> {
 		if (!isBlobDigest(digest)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const value = this.blobs.get(digest);
 		return { ok: true, value: value === undefined ? null : new Uint8Array(value) };
 	}
@@ -204,9 +249,12 @@ export class TransitionOwner {
 			if (copied === undefined) return rejected("INVALID_ARGUMENT");
 			closure.push(copied);
 		}
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const existingObject = this.objects.get(input.objectId);
 		if (existingObject?.generations.has(input.generationId) === true) return rejected("GENERATION_EXISTS");
+		const currentHead = existingObject?.head ?? { kind: "none" as const, objectId: input.objectId };
+		if (!headsEqual(currentHead, baseExpectedHead)) return rejected("BASE_HEAD_MISMATCH");
 		if (closure.length === 0) return rejected("EMPTY_CLOSURE");
 		closure.sort((left, right) => compareCanonicalText(left.digest, right.digest));
 		for (let index = 1; index < closure.length; index++) {
@@ -262,7 +310,8 @@ export class TransitionOwner {
 		if (!isStorageObjectId(input.objectId) || !isGenerationId(input.generationId) || !isBlobDigest(input.digest)) {
 			return rejected("INVALID_ARGUMENT");
 		}
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const generation = this.findGeneration(input.objectId, input.generationId);
 		if (generation === undefined) return rejected("GENERATION_NOT_FOUND");
 		if (generation.state !== "Staged") return rejected("ILLEGAL_TRANSITION");
@@ -289,7 +338,8 @@ export class TransitionOwner {
 		digest: BlobDigest;
 	}): StoreResult<undefined> {
 		if (!this.validGenerationDigestInput(input)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		if (this.durability === "ephemeral") return rejected("DURABILITY_UNAVAILABLE");
 		const generation = this.findGeneration(input.objectId, input.generationId);
 		if (generation === undefined) return rejected("GENERATION_NOT_FOUND");
@@ -315,19 +365,92 @@ export class TransitionOwner {
 		generationId: GenerationId;
 	}): StoreResult<GenerationRecord> {
 		if (!this.validGenerationInput(input)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const generation = this.findGeneration(input.objectId, input.generationId);
 		if (generation === undefined) return rejected("GENERATION_NOT_FOUND");
 		if (generation.state !== "Staged") return rejected("ILLEGAL_TRANSITION");
-		for (const reference of [...generation.closure].sort((left, right) =>
-			compareCanonicalText(left.digest, right.digest)
-		)) {
-			if (!this.promoted.has(this.promotionKey(input.objectId, input.generationId, reference.digest))) {
-				return rejected("BLOB_UNPROMOTED");
-			}
-		}
+		const authorization = this.verifyGenerationClosure(generation, "candidate");
+		if (!authorization.ok) return authorization;
 		generation.state = "Complete";
 		return { ok: true, value: asRecord(generation) };
+	}
+
+	/**
+	 * Completes a staged generation using verifier-issued authority.
+	 * @param input - Addressed staged generation.
+	 * @param input.objectId - Canonical object identity.
+	 * @param input.generationId - Canonical generation identity.
+	 * @param authorization - Exact candidate-closure authorization.
+	 * @returns The completed generation or stable rejection.
+	 */
+	public completeGenerationAuthorized(
+		input: { objectId: StorageObjectId; generationId: GenerationId },
+		authorization: Authorization
+	): StoreResult<GenerationRecord> {
+		if (!this.validGenerationInput(input)) return rejected("INVALID_ARGUMENT");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
+		const generation = this.findGeneration(input.objectId, input.generationId);
+		if (generation === undefined) return rejected("GENERATION_NOT_FOUND");
+		if (generation.state !== "Staged") return rejected("ILLEGAL_TRANSITION");
+		if (!accepts(authorization, asRecord(generation), "candidate")) return rejected("INVALID_ARGUMENT");
+		generation.state = "Complete";
+		return { ok: true, value: asRecord(generation) };
+	}
+
+	/**
+	 * Recovers and verifies the one active generation at a stable snapshot.
+	 * @param objectId - Canonical object identity.
+	 * @returns Frozen recovery metadata or the first integrity failure.
+	 */
+	public recoverActiveGeneration(objectId: StorageObjectId): StoreResult<ActiveGenerationSnapshot> {
+		if (!isStorageObjectId(objectId)) return rejected("INVALID_ARGUMENT");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
+
+		const object = this.objects.get(objectId);
+		const head = object === undefined ? ({ kind: "none", objectId } as const) : cloneHead(object.head);
+		const generations = object?.generationIds.map((id) => indexedGenerationRecord(object, id)) ?? [];
+		const adopted = generations.filter((generation) => generation.state === "Adopted");
+		const relationalFailure =
+			(head.kind === "none" && adopted.length !== 0) ||
+			(head.kind === "present" &&
+				(adopted.length !== 1 ||
+					adopted[0]?.generationId !== head.generationId ||
+					adopted[0].closureDigest !== head.closureDigest));
+		if (relationalFailure) return this.latchIntegrityFailure("NON_CANONICAL_RECORD");
+
+		if (head.kind === "none") {
+			return {
+				ok: true,
+				value: freezeRecoverySnapshot({
+					kind: "empty",
+					head,
+					adoptedGeneration: null,
+					recomputedClosureDigest: null,
+					references: [],
+				}),
+			};
+		}
+
+		const generation = adopted[0];
+		if (generation === undefined) return this.latchIntegrityFailure("NON_CANONICAL_RECORD");
+		const verification = this.verifyGenerationClosure(generation, "adopted");
+		if (!verification.ok) {
+			if (verification.reason === "SUBSTRATE_FAILURE") throw new Error("in-memory verifier returned substrate failure");
+			return this.latchIntegrityFailure(verification.reason);
+		}
+		return {
+			ok: true,
+			value: freezeRecoverySnapshot({
+				kind: "active",
+				head: { ...head },
+				adoptedGeneration: cloneGeneration(generation),
+				recomputedClosureDigest: generation.closureDigest,
+				references: generation.closure.map((reference) => ({ ...reference })),
+			}),
+		};
 	}
 
 	/**
@@ -343,6 +466,40 @@ export class TransitionOwner {
 		generationId: GenerationId;
 		expectedHead: ExpectedHead;
 	}): StoreResult<{ head: PresentHead; supersededGenerationId: GenerationId | null }> {
+		const candidate = this.preflightSwap(input);
+		if (!candidate.ok) return candidate;
+		const authorization = this.verifyGenerationClosure(candidate.value.generation, "candidate");
+		if (!authorization.ok) return authorization;
+		return this.adoptVerifiedSwap(candidate.value, authorization.value);
+	}
+
+	/**
+	 * Adopts a candidate using verifier-issued authority after semantic preflight.
+	 * @param input - Exact compare-and-swap request.
+	 * @param input.objectId - Canonical object identity.
+	 * @param input.generationId - Complete candidate identity.
+	 * @param input.expectedHead - Exact expected head.
+	 * @param authorization - Exact candidate-closure authorization.
+	 * @returns The adopted head and superseded generation, or stable rejection.
+	 */
+	public swapHeadAuthorized(
+		input: {
+			objectId: StorageObjectId;
+			generationId: GenerationId;
+			expectedHead: ExpectedHead;
+		},
+		authorization: Authorization
+	): StoreResult<{ head: PresentHead; supersededGenerationId: GenerationId | null }> {
+		const candidate = this.preflightSwap(input);
+		if (!candidate.ok) return candidate;
+		return this.adoptVerifiedSwap(candidate.value, authorization);
+	}
+
+	private preflightSwap(input: {
+		objectId: StorageObjectId;
+		generationId: GenerationId;
+		expectedHead: ExpectedHead;
+	}): StoreResult<SwapCandidate> {
 		if (!isClosedRecord(input, ["objectId", "generationId", "expectedHead"])) {
 			return rejected("INVALID_ARGUMENT");
 		}
@@ -351,7 +508,8 @@ export class TransitionOwner {
 		}
 		const expectedHead = copyExpectedHead(input.expectedHead, input.objectId);
 		if (expectedHead === undefined) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const object = this.objects.get(input.objectId);
 		const generation = object?.generations.get(input.generationId);
 		if (object === undefined || generation === undefined) return rejected("GENERATION_NOT_FOUND");
@@ -361,6 +519,15 @@ export class TransitionOwner {
 		if (expectedHead.kind === "present" && expectedHead.revision === Number.MAX_SAFE_INTEGER) {
 			return rejected("REVISION_EXHAUSTED");
 		}
+		return { ok: true, value: { object, generation, expectedHead } };
+	}
+
+	private adoptVerifiedSwap(
+		candidate: SwapCandidate,
+		authorization: Authorization
+	): StoreResult<{ head: PresentHead; supersededGenerationId: GenerationId | null }> {
+		const { expectedHead, generation, object } = candidate;
+		if (!accepts(authorization, asRecord(generation), "candidate")) return rejected("INVALID_ARGUMENT");
 		const revision = checkedHeadRevision(expectedHead.kind === "none" ? 1 : expectedHead.revision + 1);
 		let supersededGenerationId: GenerationId | null = null;
 		if (object.head.kind === "present") {
@@ -373,13 +540,31 @@ export class TransitionOwner {
 		generation.state = "Adopted";
 		const head: PresentHead = {
 			kind: "present",
-			objectId: input.objectId,
-			generationId: input.generationId,
+			objectId: generation.objectId,
+			generationId: generation.generationId,
 			revision,
 			closureDigest: generation.closureDigest,
 		};
 		object.head = head;
 		return { ok: true, value: { head: { ...head }, supersededGenerationId } };
+	}
+
+	private verifyGenerationClosure(
+		generation: GenerationRecord,
+		mode: "adopted" | "candidate"
+	): StoreResult<Authorization> {
+		const session = start(generation, mode);
+		for (let request = next(session); request !== null; request = next(session)) {
+			if (request.kind === "promotion") {
+				acceptPromotion(
+					session,
+					this.promoted.has(this.promotionKey(generation.objectId, generation.generationId, request.reference.digest))
+				);
+			} else {
+				acceptBlob(session, this.blobs.get(request.reference.digest));
+			}
+		}
+		return finish(session);
 	}
 
 	/**
@@ -394,7 +579,8 @@ export class TransitionOwner {
 		generationId: GenerationId;
 	}): StoreResult<GenerationRecord> {
 		if (!this.validGenerationInput(input)) return rejected("INVALID_ARGUMENT");
-		if (this.closed) return rejected("STORE_CLOSED");
+		const lifecycleFailure = this.lifecycleFailure();
+		if (lifecycleFailure !== undefined) return lifecycleFailure;
 		const generation = this.findGeneration(input.objectId, input.generationId);
 		if (generation === undefined) return rejected("GENERATION_NOT_FOUND");
 		if (generation.state !== "Staged" && generation.state !== "Complete") {

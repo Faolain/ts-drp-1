@@ -1,4 +1,5 @@
 import {
+	type ActiveGenerationSnapshot,
 	type AheDurableStore,
 	type BlobDigest,
 	decodeGenerationRecordV1,
@@ -20,6 +21,7 @@ import {
 	PersistedStorageError,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
+	storageAdapterClosureVerifier,
 	type StorageAdapterCommand,
 	type StorageAdapterEvaluation,
 	type StorageAdapterFact,
@@ -97,8 +99,6 @@ CREATE TABLE IF NOT EXISTS promotions (
 `;
 
 type DatabaseRow = Record<string, unknown>;
-type ObjectJournalState = Readonly<{ head: ExpectedHead; generations: readonly GenerationRecord[] }>;
-
 const EXPECTED_COLUMNS = Object.freeze({
 	blobs: Object.freeze([
 		Object.freeze({ name: "digest", notnull: 0, pk: 1, type: "TEXT" }),
@@ -135,6 +135,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 	private closed = false;
 	private poisoned = false;
+	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
 
 	public constructor(
 		private readonly connection: DatabaseSync,
@@ -156,6 +157,13 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 	public getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
 		return this.run(commandWithKind("getBlob", { digest })) as Promise<StoreResult<Uint8Array | null>>;
+	}
+	public recoverActiveGeneration(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return Promise.resolve(prepared);
+		if (this.closed) return Promise.resolve({ ok: false, reason: "STORE_CLOSED" });
+		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
+		return Promise.resolve(this.recoverTransaction(objectId));
 	}
 
 	public beginGeneration(input: {
@@ -211,6 +219,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 	public close(): Promise<void> {
 		if (!this.closed) {
 			this.closed = true;
+			this.recoveryCertificates.clear();
 			this.connection.close();
 		}
 		return Promise.resolve();
@@ -235,9 +244,34 @@ class SqliteAheDurableStore implements AheDurableStore {
 			if (mutation) {
 				this.connection.exec("BEGIN IMMEDIATE");
 				transactionActive = true;
+				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
+				const recovered = this.ensureCertificate(
+					prepared.command.objectId,
+					operation === "completeGeneration" || operation === "swapHead"
+				);
+				if (!recovered.ok) {
+					this.poisoned = true;
+					this.connection.exec("ROLLBACK");
+					transactionActive = false;
+					return recovered;
+				}
 			}
 			const facts = this.loadFacts(prepared);
-			const evaluation = evaluateStorageAdapterCommand(prepared, facts);
+			let evaluation = evaluateStorageAdapterCommand(prepared, facts);
+			if (prepared.command.kind === "completeGeneration" || prepared.command.kind === "swapHead") {
+				if (!evaluation.result.ok && evaluation.result.reason !== "INVALID_ARGUMENT") {
+					this.connection.exec("ROLLBACK");
+					transactionActive = false;
+					return evaluation.result;
+				}
+				const authorization = this.verifyCandidate(prepared.command.objectId, prepared.command.generationId, facts);
+				if (authorization === undefined || !authorization.ok) {
+					this.connection.exec("ROLLBACK");
+					transactionActive = false;
+					return authorization ?? { ok: false, reason: "INVALID_ARGUMENT" };
+				}
+				evaluation = evaluateStorageAdapterCommand(prepared, facts, authorization.value);
+			}
 			if (!evaluation.result.ok) {
 				if (transactionActive) {
 					this.connection.exec("ROLLBACK");
@@ -258,7 +292,12 @@ class SqliteAheDurableStore implements AheDurableStore {
 				transactionActive = false;
 			}
 			result = evaluation.result;
+			if (mutation && operation === "swapHead" && result.ok) {
+				const swap = result.value as Readonly<{ head: PresentHead }>;
+				this.recoveryCertificates.set(prepared.command.objectId, headFingerprint(swap.head));
+			}
 		} catch (cause) {
+			this.recoveryCertificates.clear();
 			const persistedReason = cause instanceof PersistedStorageError ? cause.reason : undefined;
 			if (persistedReason !== undefined) this.poisoned = true;
 			if (transactionActive) {
@@ -278,7 +317,6 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 	private loadFacts(prepared: PreparedStorageAdapterCommand): readonly StorageAdapterFact[] {
 		const facts: StorageAdapterFact[] = [];
-		const objectStates = new Map<StorageObjectId, ObjectJournalState>();
 		const loadedBlobs = new Set<BlobDigest>();
 		const loadedPromotions = new Set<string>();
 		for (const requirement of prepared.requirements) {
@@ -323,69 +361,48 @@ class SqliteAheDurableStore implements AheDurableStore {
 					});
 					break;
 				}
-				case "object-state": {
-					const loaded = this.loadObjectState(requirement.objectId);
-					facts.push(loaded.fact);
-					objectStates.set(requirement.objectId, loaded.state);
+				case "generation":
+					this.loadGeneration(requirement.objectId, requirement.generationId, facts);
 					break;
-				}
 				case "blob":
 					this.loadBlob(requirement.digest, facts, loadedBlobs);
 					break;
 				case "promotion":
 					this.loadPromotion(requirement, facts, loadedPromotions);
 					break;
-				case "generation-closure": {
-					const state = objectStates.get(requirement.objectId);
-					if (state === undefined) throw new Error("generation closure loaded without its object state");
-					const generation = state.generations.find((record) => record.generationId === requirement.generationId);
-					for (const reference of generation?.closure ?? []) {
-						this.loadPromotion(
-							{
-								objectId: requirement.objectId,
-								generationId: requirement.generationId,
-								digest: reference.digest,
-							},
-							facts,
-							loadedPromotions
-						);
-					}
-					break;
-				}
 			}
+		}
+		if (prepared.command.kind === "swapHead") {
+			const headFact = facts.find(
+				(fact): fact is Extract<StorageAdapterFact, { kind: "head" }> => fact.kind === "head"
+			);
+			const decoded =
+				headFact?.headRecord === null || headFact === undefined ? undefined : decodeHeadRecordV1(headFact.headRecord);
+			if (
+				decoded?.ok === true &&
+				decoded.value.kind === "present" &&
+				decoded.value.generationId !== prepared.command.generationId
+			)
+				this.loadGeneration(prepared.command.objectId, decoded.value.generationId, facts);
 		}
 		return facts;
 	}
-
-	private loadObjectState(objectId: StorageObjectId): Readonly<{
-		fact: Extract<StorageAdapterFact, { kind: "object-state" }>;
-		state: ObjectJournalState;
-	}> {
-		const object = this.connection.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
-			| DatabaseRow
-			| undefined;
-		const rows = this.connection
-			.prepare("SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id")
-			.all(objectId) as DatabaseRow[];
+	private loadGeneration(objectId: StorageObjectId, generationId: GenerationId, facts: StorageAdapterFact[]): void {
+		const row = this.connection
+			.prepare("SELECT record FROM generations WHERE object_id = ? AND generation_id = ?")
+			.get(objectId, generationId) as DatabaseRow | undefined;
+		if (row === undefined) {
+			facts.push({ kind: "generation", objectId, generationId, generationRecord: null });
+			return;
+		}
 		const classified = classifyPersistedState({
-			generationRows: rows.map((row) => ({
-				generationId: row.generation_id,
-				objectId,
-				record: row.record,
-			})),
-			headRow:
-				object === undefined ? null : { objectId, record: object.head_record === null ? null : object.head_record },
-			kind: "physical",
+			kind: "generation",
 			objectId,
+			row: { objectId, generationId, record: row.record },
 		});
 		if (!classified.ok) throw new PersistedStorageError(classified.reason);
-		if (classified.value.kind !== "object-state") {
-			throw new Error("persisted classifier returned the wrong fact kind");
-		}
-		return {
-			fact: classified.value.fact,
-			state: classified.value.state,
-		};
+		if (classified.value.kind !== "generation") throw new Error("persisted classifier returned wrong kind");
+		facts.push({ kind: "generation", objectId, generationId, generationRecord: classified.value.record });
 	}
 
 	private loadBlob(digest: BlobDigest, facts: StorageAdapterFact[], loaded: Set<BlobDigest>): void {
@@ -409,6 +426,176 @@ class SqliteAheDurableStore implements AheDurableStore {
 			.get(scope.objectId, scope.generationId, scope.digest);
 		if (row !== undefined) facts.push({ kind: "promotion", ...scope });
 		loaded.add(key);
+	}
+
+	private recoverTransaction(objectId: StorageObjectId): StoreResult<ActiveGenerationSnapshot> {
+		let active = false;
+		try {
+			this.connection.exec("BEGIN IMMEDIATE");
+			active = true;
+			const result = this.recoverWithinTransaction(objectId);
+			if (!result.ok) {
+				this.poisoned = true;
+				this.connection.exec("ROLLBACK");
+				active = false;
+				return result;
+			}
+			this.connection.exec("COMMIT");
+			active = false;
+			const snapshot = freezeRecoverySnapshot(result.value);
+			this.recoveryCertificates.set(objectId, headFingerprint(snapshot.head));
+			return { ok: true, value: snapshot };
+		} catch (cause) {
+			this.recoveryCertificates.clear();
+			if (active)
+				try {
+					this.connection.exec("ROLLBACK");
+				} catch {
+					/* preserve cause */
+				}
+			return { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+		}
+	}
+
+	private ensureCertificate(objectId: StorageObjectId, required: boolean): StoreResult<undefined> {
+		const head = this.readHeadWithinTransaction(objectId);
+		if (!head.ok) return head;
+		if (this.recoveryCertificates.get(objectId) === headFingerprint(head.value)) return { ok: true, value: undefined };
+		if (!required && !this.recoveryCertificates.has(objectId)) return { ok: true, value: undefined };
+		const recovered = this.recoverWithinTransaction(objectId);
+		if (!recovered.ok) return recovered;
+		this.recoveryCertificates.set(objectId, headFingerprint(recovered.value.head));
+		return { ok: true, value: undefined };
+	}
+
+	private readHeadWithinTransaction(objectId: StorageObjectId): StoreResult<ExpectedHead> {
+		const row = this.connection.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
+			| DatabaseRow
+			| undefined;
+		const classified = classifyPersistedState({
+			kind: "head",
+			objectId,
+			row: row === undefined ? null : { objectId, record: row.head_record },
+		});
+		return classified.ok && classified.value.kind === "head"
+			? { ok: true, value: classified.value.head }
+			: (classified as StoreResult<ExpectedHead>);
+	}
+
+	private recoverWithinTransaction(objectId: StorageObjectId): StoreResult<ActiveGenerationSnapshot> {
+		const headResult = this.readHeadWithinTransaction(objectId);
+		if (!headResult.ok) return headResult;
+		let after: string | null = null;
+		let adopted: GenerationRecord | null = null;
+		let adoptedCount = 0;
+		let failure: "NON_CANONICAL_RECORD" | "UNSUPPORTED_STORAGE_SCHEMA" | undefined;
+		for (;;) {
+			const rows = (
+				after === null
+					? this.connection
+							.prepare(
+								"SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id LIMIT ?"
+							)
+							.all(objectId, 129)
+					: this.connection
+							.prepare(
+								"SELECT generation_id, record FROM generations WHERE object_id = ? AND generation_id > ? ORDER BY generation_id LIMIT ?"
+							)
+							.all(objectId, after, 129)
+			) as DatabaseRow[];
+			for (const row of rows) {
+				const classified = classifyPersistedState({
+					kind: "generation",
+					objectId,
+					row: { objectId, generationId: row.generation_id, record: row.record },
+				});
+				if (!classified.ok)
+					failure =
+						failure === "UNSUPPORTED_STORAGE_SCHEMA" || classified.reason === "UNSUPPORTED_STORAGE_SCHEMA"
+							? "UNSUPPORTED_STORAGE_SCHEMA"
+							: "NON_CANONICAL_RECORD";
+				else if (classified.value.kind === "generation" && classified.value.generation.state === "Adopted") {
+					adoptedCount++;
+					adopted ??= classified.value.generation;
+				}
+			}
+			if (rows.length < 129) break;
+			after = String(rows.at(-1)?.generation_id);
+		}
+		if (failure !== undefined) return { ok: false, reason: failure };
+		const head = headResult.value;
+		if (head.kind === "none")
+			return adoptedCount === 0
+				? {
+						ok: true,
+						value: { kind: "empty", head, adoptedGeneration: null, recomputedClosureDigest: null, references: [] },
+					}
+				: { ok: false, reason: "NON_CANONICAL_RECORD" };
+		if (
+			adoptedCount !== 1 ||
+			adopted === null ||
+			adopted.generationId !== head.generationId ||
+			adopted.closureDigest !== head.closureDigest
+		)
+			return { ok: false, reason: "NON_CANONICAL_RECORD" };
+		const verified = this.verifyClosure(objectId, adopted, "adopted");
+		if (!verified.ok) return verified;
+		return {
+			ok: true,
+			value: {
+				kind: "active",
+				head: { ...head },
+				adoptedGeneration: {
+					...adopted,
+					baseExpectedHead: { ...adopted.baseExpectedHead },
+					closure: adopted.closure.map((r) => ({ ...r })),
+				},
+				recomputedClosureDigest: adopted.closureDigest,
+				references: adopted.closure.map((r) => ({ ...r })),
+			},
+		};
+	}
+
+	private verifyCandidate(
+		objectId: StorageObjectId,
+		generationId: GenerationId,
+		facts: readonly StorageAdapterFact[]
+	): StoreResult<unknown> | undefined {
+		const fact = facts.find(
+			(value): value is Extract<StorageAdapterFact, { kind: "generation" }> =>
+				value.kind === "generation" && value.objectId === objectId && value.generationId === generationId
+		);
+		if (fact?.generationRecord === null || fact === undefined) return undefined;
+		const decoded = decodeGenerationRecordV1(fact.generationRecord);
+		if (!decoded.ok) return { ok: false, reason: "NON_CANONICAL_RECORD" };
+		return this.verifyClosure(objectId, decoded.value, "candidate");
+	}
+
+	private verifyClosure(
+		objectId: StorageObjectId,
+		generation: GenerationRecord,
+		mode: "adopted" | "candidate"
+	): StoreResult<unknown> {
+		const session = storageAdapterClosureVerifier.start(generation, mode);
+		for (
+			let request = storageAdapterClosureVerifier.next(session);
+			request !== null;
+			request = storageAdapterClosureVerifier.next(session)
+		) {
+			if (request.kind === "promotion") {
+				const present =
+					this.connection
+						.prepare("SELECT 1 FROM promotions WHERE object_id = ? AND generation_id = ? AND digest = ?")
+						.get(objectId, generation.generationId, request.reference.digest) !== undefined;
+				storageAdapterClosureVerifier.acceptPromotion(session, present);
+			} else {
+				const row = this.connection
+					.prepare("SELECT bytes FROM blobs WHERE digest = ?")
+					.get(request.reference.digest) as DatabaseRow | undefined;
+				storageAdapterClosureVerifier.acceptBlob(session, row === undefined ? null : row.bytes);
+			}
+		}
+		return storageAdapterClosureVerifier.finish(session);
 	}
 
 	private applyWrites(evaluation: StorageAdapterEvaluation, operation: SqliteMutationOperation): void {
@@ -488,6 +675,12 @@ class SqliteAheDurableStore implements AheDurableStore {
 
 function isMutation(kind: StorageAdapterCommand["kind"]): kind is SqliteMutationOperation {
 	return kind !== "readHead" && kind !== "readGenerationPage" && kind !== "getBlob";
+}
+
+function headFingerprint(head: ExpectedHead): string {
+	return head.kind === "none"
+		? `none\0${head.objectId}`
+		: `present\0${head.objectId}\0${head.generationId}\0${head.revision}\0${head.closureDigest}`;
 }
 
 function commandWithKind(kind: StorageAdapterCommand["kind"], input: unknown): unknown {
@@ -586,6 +779,25 @@ function configureConnection(connection: DatabaseSync): void {
 	if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	connection.exec("PRAGMA journal_mode = WAL");
 	connection.exec("PRAGMA synchronous = FULL");
+}
+
+function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGenerationSnapshot {
+	if (snapshot.kind === "empty")
+		return Object.freeze({
+			...snapshot,
+			head: Object.freeze({ ...snapshot.head }),
+			references: Object.freeze([] as []),
+		});
+	return Object.freeze({
+		...snapshot,
+		head: Object.freeze({ ...snapshot.head }),
+		adoptedGeneration: Object.freeze({
+			...snapshot.adoptedGeneration,
+			baseExpectedHead: Object.freeze({ ...snapshot.adoptedGeneration.baseExpectedHead }),
+			closure: Object.freeze(snapshot.adoptedGeneration.closure.map((reference) => Object.freeze({ ...reference }))),
+		}),
+		references: Object.freeze(snapshot.references.map((reference) => Object.freeze({ ...reference }))),
+	});
 }
 
 /**
