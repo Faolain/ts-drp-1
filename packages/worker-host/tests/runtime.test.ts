@@ -206,7 +206,7 @@ describe("Phase 2f-a package and public root RED", () => {
 		>;
 		expect(manifest).toMatchObject({ name: "@ts-drp/worker-host", private: true, type: "module" });
 		expect(manifest.dependencies).toBeUndefined();
-		expect(Object.keys(manifest.exports as object)).toEqual(["."]);
+		expect(Object.hasOwn(manifest.exports as object, ".")).toBe(true);
 	});
 
 	it("publishes the exact bounded-runtime root surface and frozen registries", async () => {

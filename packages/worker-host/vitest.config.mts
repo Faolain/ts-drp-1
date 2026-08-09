@@ -5,6 +5,8 @@ export default defineConfig({
 	root: fileURLToPath(new URL(".", import.meta.url)),
 	resolve: {
 		alias: {
+			"@ts-drp/worker-host/host": fileURLToPath(new URL("./src/host.ts", import.meta.url)),
+			"@ts-drp/worker-host/worker": fileURLToPath(new URL("./src/worker.ts", import.meta.url)),
 			"@ts-drp/worker-host": fileURLToPath(new URL("./src/index.ts", import.meta.url)),
 		},
 	},

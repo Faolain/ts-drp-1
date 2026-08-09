@@ -4,7 +4,9 @@
 		"exactOptionalPropertyTypes": true,
 		"noEmit": true,
 		"paths": {
-			"@ts-drp/worker-host": ["./src/index.ts"]
+			"@ts-drp/worker-host": ["./src/index.ts"],
+			"@ts-drp/worker-host/host": ["./src/host.ts"],
+			"@ts-drp/worker-host/worker": ["./src/worker.ts"]
 		}
 	},
 	"include": ["src/**/*.ts", "tests/**/*.ts"]
