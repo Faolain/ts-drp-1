@@ -189,6 +189,249 @@ const EMPTY_WRITES: readonly StorageAdapterWrite[] = Object.freeze([]);
 const MAX_GENERATION_PAGE_ROWS = 128;
 const GENERATION_PAGE_CURSOR_PREFIX = "ts-drp-storage/generation-page/v1\0";
 
+type PersistedStorageReason = "NON_CANONICAL_RECORD" | "UNSUPPORTED_STORAGE_SCHEMA";
+
+type PersistedGenerationRow = Readonly<{
+	objectId: unknown;
+	generationId: unknown;
+	record: unknown;
+}>;
+
+type PersistedHeadRow = Readonly<{ objectId: unknown; record: unknown }> | null;
+
+type PersistedObjectStateSource =
+	| Readonly<{
+			kind: "adapter-fact";
+			objectId: StorageObjectId;
+			headRecord: unknown;
+			generationRecords: readonly unknown[];
+	  }>
+	| Readonly<{
+			kind: "physical";
+			objectId: StorageObjectId;
+			headRow: PersistedHeadRow;
+			generationRows: readonly PersistedGenerationRow[];
+	  }>;
+
+type ClassifiedPersistedObjectState = Readonly<{
+	fact: Extract<StorageAdapterFact, { kind: "object-state" }>;
+	state: TransitionObjectState;
+}>;
+
+type PersistedStateSource =
+	| Readonly<{ kind: "head"; objectId: StorageObjectId; row: PersistedHeadRow }>
+	| Readonly<{ kind: "generation"; objectId: StorageObjectId; row: PersistedGenerationRow }>
+	| PersistedObjectStateSource;
+
+type ClassifiedPersistedState =
+	| Readonly<{ kind: "head"; head: ExpectedHead; record: Uint8Array | null }>
+	| Readonly<{ kind: "generation"; generation: GenerationRecord; record: Uint8Array }>
+	| (ClassifiedPersistedObjectState & Readonly<{ kind: "object-state" }>);
+
+/** A semantic persisted-state failure, kept distinct from substrate exceptions. */
+export class PersistedStorageError extends Error {
+	/**
+	 * Creates an internal semantic failure.
+	 * @param reason - Stable persisted-state rejection reason.
+	 */
+	public constructor(public readonly reason: PersistedStorageReason) {
+		super(reason);
+		this.name = "PersistedStorageError";
+	}
+}
+
+type PersistedClassification<T> =
+	| Readonly<{ ok: true; value: T }>
+	| Readonly<{ ok: false; reason: PersistedStorageReason }>;
+
+function persistedFailure<T>(reason: PersistedStorageReason): PersistedClassification<T> {
+	return { ok: false, reason };
+}
+
+function mergePersistedReasons(
+	left: PersistedStorageReason | undefined,
+	right: PersistedStorageReason
+): PersistedStorageReason {
+	return left === "UNSUPPORTED_STORAGE_SCHEMA" || right === "UNSUPPORTED_STORAGE_SCHEMA"
+		? "UNSUPPORTED_STORAGE_SCHEMA"
+		: "NON_CANONICAL_RECORD";
+}
+
+function copyPersistedBytes(value: unknown): Uint8Array | undefined {
+	return value instanceof Uint8Array && !hasSharedBacking(value) ? new Uint8Array(value) : undefined;
+}
+
+/**
+ * Classifies one persisted head row and detaches its canonical value and bytes.
+ * @param objectId - Object whose physical row was addressed.
+ * @param row - Raw physical head row, or null when absent.
+ * @returns Detached canonical head or its stable persisted rejection.
+ */
+function classifyPersistedHead(
+	objectId: StorageObjectId,
+	row: PersistedHeadRow
+): PersistedClassification<Readonly<{ head: ExpectedHead; record: Uint8Array | null }>> {
+	if (row === null) return { ok: true, value: { head: { kind: "none", objectId }, record: null } };
+	if (row.record === null) {
+		return row.objectId === objectId
+			? { ok: true, value: { head: { kind: "none", objectId }, record: null } }
+			: persistedFailure("NON_CANONICAL_RECORD");
+	}
+	const record = copyPersistedBytes(row.record);
+	if (record === undefined) return persistedFailure("NON_CANONICAL_RECORD");
+	const decoded = decodeHeadRecordV1(record);
+	if (!decoded.ok) {
+		return persistedFailure(decoded.reason === "UNSUPPORTED_STORAGE_SCHEMA" ? decoded.reason : "NON_CANONICAL_RECORD");
+	}
+	if (row.objectId !== objectId || decoded.value.kind !== "present" || decoded.value.objectId !== objectId) {
+		return persistedFailure("NON_CANONICAL_RECORD");
+	}
+	return { ok: true, value: { head: decoded.value, record } };
+}
+
+/**
+ * Classifies one physically keyed generation row and detaches its canonical value and bytes.
+ * @param objectId - Object whose physical range was addressed.
+ * @param row - Raw physical generation row.
+ * @returns Detached canonical generation or its stable persisted rejection.
+ */
+function classifyPersistedGeneration(
+	objectId: StorageObjectId,
+	row: PersistedGenerationRow
+): PersistedClassification<Readonly<{ generation: GenerationRecord; record: Uint8Array }>> {
+	const record = copyPersistedBytes(row.record);
+	if (record === undefined) return persistedFailure("NON_CANONICAL_RECORD");
+	const decoded = decodeGenerationRecordV1(record);
+	if (!decoded.ok) {
+		return persistedFailure(decoded.reason === "UNSUPPORTED_STORAGE_SCHEMA" ? decoded.reason : "NON_CANONICAL_RECORD");
+	}
+	if (
+		row.objectId !== objectId ||
+		decoded.value.objectId !== objectId ||
+		row.generationId !== decoded.value.generationId
+	) {
+		return persistedFailure("NON_CANONICAL_RECORD");
+	}
+	return { ok: true, value: { generation: decoded.value, record } };
+}
+
+function classifyPersistedGenerations(
+	objectId: StorageObjectId,
+	rows: readonly PersistedGenerationRow[]
+): PersistedClassification<Readonly<{ generations: readonly GenerationRecord[]; records: readonly Uint8Array[] }>> {
+	const generations: GenerationRecord[] = [];
+	const records: Uint8Array[] = [];
+	const ids = new Set<GenerationId>();
+	let failure: PersistedStorageReason | undefined;
+	for (const row of rows) {
+		const classified = classifyPersistedGeneration(objectId, row);
+		if (!classified.ok) {
+			failure = mergePersistedReasons(failure, classified.reason);
+			continue;
+		}
+		if (ids.has(classified.value.generation.generationId)) {
+			failure = mergePersistedReasons(failure, "NON_CANONICAL_RECORD");
+			continue;
+		}
+		ids.add(classified.value.generation.generationId);
+		generations.push(classified.value.generation);
+		records.push(classified.value.record);
+	}
+	return failure === undefined
+		? { ok: true, value: { generations: Object.freeze(generations), records: Object.freeze(records) } }
+		: persistedFailure(failure);
+}
+
+/**
+ * Owns persisted full-journal decoding, physical-key binding and relational precedence.
+ * Strict backends supply physical rows; the adapter-fact branch preserves direct fact validation.
+ * @param source - Physical backend rows or a direct adapter fact.
+ * @returns Detached canonical journal state or its stable persisted rejection.
+ */
+function classifyPersistedObjectState(
+	source: PersistedObjectStateSource
+): PersistedClassification<ClassifiedPersistedObjectState> {
+	const physical = source.kind === "physical";
+	let headClassification: ReturnType<typeof classifyPersistedHead>;
+	let rows: readonly PersistedGenerationRow[];
+	if (physical) {
+		headClassification = classifyPersistedHead(source.objectId, source.headRow);
+		rows = source.generationRows;
+	} else {
+		headClassification =
+			source.headRecord === null
+				? classifyPersistedHead(source.objectId, null)
+				: classifyPersistedHead(source.objectId, { objectId: source.objectId, record: source.headRecord });
+		rows = source.generationRecords.map((record) => {
+			const bytes = copyPersistedBytes(record);
+			if (bytes === undefined) return { objectId: source.objectId, generationId: undefined, record };
+			const decoded = decodeGenerationRecordV1(bytes);
+			return {
+				objectId: source.objectId,
+				generationId: decoded.ok ? decoded.value.generationId : undefined,
+				record: bytes,
+			};
+		});
+	}
+	const generationsClassification = classifyPersistedGenerations(source.objectId, rows);
+	if (!headClassification.ok || !generationsClassification.ok) {
+		const headReason = headClassification.ok ? undefined : headClassification.reason;
+		const generationReason = generationsClassification.ok ? undefined : generationsClassification.reason;
+		return persistedFailure(
+			headReason === undefined
+				? (generationReason as PersistedStorageReason)
+				: generationReason === undefined
+					? headReason
+					: mergePersistedReasons(headReason, generationReason)
+		);
+	}
+	const { head, record: headRecord } = headClassification.value;
+	const { generations, records: generationRecords } = generationsClassification.value;
+	const adopted = generations.filter(({ state }) => state === "Adopted");
+	if (head.kind === "none" ? adopted.length !== 0 : adopted.length !== 1) {
+		return persistedFailure("NON_CANONICAL_RECORD");
+	}
+	if (
+		head.kind === "present" &&
+		(adopted[0]?.generationId !== head.generationId || adopted[0].closureDigest !== head.closureDigest)
+	) {
+		return persistedFailure("NON_CANONICAL_RECORD");
+	}
+	return {
+		ok: true,
+		value: {
+			fact: Object.freeze({
+				generationRecords,
+				headRecord,
+				kind: "object-state",
+				objectId: source.objectId,
+			}),
+			state: { generations, head },
+		},
+	};
+}
+
+/**
+ * Classifies one tagged persisted head, generation or full-journal source.
+ * This is the strict backends' only semantic persisted-state entrypoint.
+ * @param source - Raw physical rows or one direct adapter fact.
+ * @returns Detached canonical state or its stable persisted rejection.
+ */
+export function classifyPersistedState(
+	source: PersistedStateSource
+): PersistedClassification<ClassifiedPersistedState> {
+	if (source.kind === "head") {
+		const classified = classifyPersistedHead(source.objectId, source.row);
+		return classified.ok ? { ok: true, value: { kind: "head", ...classified.value } } : classified;
+	}
+	if (source.kind === "generation") {
+		const classified = classifyPersistedGeneration(source.objectId, source.row);
+		return classified.ok ? { ok: true, value: { kind: "generation", ...classified.value } } : classified;
+	}
+	const classified = classifyPersistedObjectState(source);
+	return classified.ok ? { ok: true, value: { kind: "object-state", ...classified.value } } : classified;
+}
+
 function invalidPreparation(): StoreResult<PreparedStorageAdapterCommand> {
 	return { ok: false, reason: "INVALID_ARGUMENT" };
 }
@@ -614,38 +857,14 @@ function copyAndValidateFacts(command: StorageAdapterCommand, facts: unknown): L
 			if (!isStorageObjectId(fact.objectId) || objects.has(fact.objectId) || !isClosedArray(fact.generationRecords)) {
 				return undefined;
 			}
-			let head: ExpectedHead = { kind: "none", objectId: fact.objectId };
-			if (fact.headRecord !== null) {
-				const bytes = copyBytes(fact.headRecord);
-				if (bytes === undefined) return undefined;
-				const decoded = decodeHeadRecordV1(bytes);
-				if (!decoded.ok || decoded.value.kind !== "present" || decoded.value.objectId !== fact.objectId)
-					return undefined;
-				head = decoded.value;
-			}
-			const generations: GenerationRecord[] = [];
-			const ids = new Set<GenerationId>();
-			for (const recordBytes of fact.generationRecords) {
-				const bytes = copyBytes(recordBytes);
-				if (bytes === undefined) return undefined;
-				const decoded = decodeGenerationRecordV1(bytes);
-				if (!decoded.ok || decoded.value.objectId !== fact.objectId || ids.has(decoded.value.generationId)) {
-					return undefined;
-				}
-				ids.add(decoded.value.generationId);
-				generations.push(decoded.value);
-			}
-			const adopted = generations.filter(({ state }) => state === "Adopted");
-			if (head.kind === "none" && adopted.length !== 0) return undefined;
-			if (
-				head.kind === "present" &&
-				(adopted.length !== 1 ||
-					adopted[0]?.generationId !== head.generationId ||
-					adopted[0].closureDigest !== head.closureDigest)
-			) {
-				return undefined;
-			}
-			objects.set(fact.objectId, { head, generations });
+			const classified = classifyPersistedObjectState({
+				generationRecords: fact.generationRecords,
+				headRecord: fact.headRecord,
+				kind: "adapter-fact",
+				objectId: fact.objectId,
+			});
+			if (!classified.ok) return undefined;
+			objects.set(fact.objectId, classified.value.state);
 			continue;
 		}
 		if (isClosedRecord(fact, ["kind", "digest", "bytes"]) && fact.kind === "blob") {

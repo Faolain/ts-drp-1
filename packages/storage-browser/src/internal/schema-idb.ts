@@ -82,6 +82,7 @@ class BrowserStorageBlockedError extends Error {
 
 class BrowserStorageSchemaError extends Error {
 	readonly code = "UNEXPECTED_SCHEMA_VERSION";
+	readonly reason = "UNSUPPORTED_STORAGE_SCHEMA";
 
 	constructor() {
 		super("unexpected browser storage schema/version");

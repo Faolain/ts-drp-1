@@ -150,7 +150,7 @@ describe("Phase 2e1 Node SQLite bounded-read RED", () => {
 			generationId: GENERATION_B,
 			objectId: OBJECT_A,
 		});
-		expect(rejected).toMatchObject({ ok: false, reason: "SUBSTRATE_FAILURE" });
+		expect(rejected).toMatchObject({ ok: false, reason: "NON_CANONICAL_RECORD" });
 		await store.close();
 
 		const oracle = new DatabaseSync(filename, { readOnly: true });
@@ -206,7 +206,7 @@ describe("Phase 2e1 Node SQLite bounded-read RED", () => {
 
 		store = createSqliteAheDurableStore({ filename });
 		const result = await splitRead(store, "readGenerationPage", { limit: 1, objectId: OBJECT_A });
-		expect.soft(result).toMatchObject({ ok: false, reason: "SUBSTRATE_FAILURE" });
+		expect.soft(result).toMatchObject({ ok: false, reason: "NON_CANONICAL_RECORD" });
 		const firstPage = result as {
 			readonly ok?: boolean;
 			readonly value?: {

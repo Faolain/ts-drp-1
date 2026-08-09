@@ -15,7 +15,9 @@ import {
 	type StoreResult,
 } from "@ts-drp/storage";
 import {
+	classifyPersistedState,
 	evaluateStorageAdapterCommand,
+	PersistedStorageError,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
 	type StorageAdapterCommand,
@@ -97,9 +99,42 @@ CREATE TABLE IF NOT EXISTS promotions (
 type DatabaseRow = Record<string, unknown>;
 type ObjectJournalState = Readonly<{ head: ExpectedHead; generations: readonly GenerationRecord[] }>;
 
+const EXPECTED_COLUMNS = Object.freeze({
+	blobs: Object.freeze([
+		Object.freeze({ name: "digest", notnull: 0, pk: 1, type: "TEXT" }),
+		Object.freeze({ name: "bytes", notnull: 1, pk: 0, type: "BLOB" }),
+	]),
+	generations: Object.freeze([
+		Object.freeze({ name: "object_id", notnull: 1, pk: 1, type: "TEXT" }),
+		Object.freeze({ name: "generation_id", notnull: 1, pk: 2, type: "TEXT" }),
+		Object.freeze({ name: "record", notnull: 1, pk: 0, type: "BLOB" }),
+	]),
+	objects: Object.freeze([
+		Object.freeze({ name: "object_id", notnull: 0, pk: 1, type: "TEXT" }),
+		Object.freeze({ name: "head_record", notnull: 0, pk: 0, type: "BLOB" }),
+	]),
+	promotions: Object.freeze([
+		Object.freeze({ name: "object_id", notnull: 1, pk: 1, type: "TEXT" }),
+		Object.freeze({ name: "generation_id", notnull: 1, pk: 2, type: "TEXT" }),
+		Object.freeze({ name: "digest", notnull: 1, pk: 3, type: "TEXT" }),
+	]),
+} as const);
+
+const EXPECTED_FOREIGN_KEY_COLUMNS = Object.freeze({
+	blobs: Object.freeze([]),
+	generations: Object.freeze(["objects:object_id:object_id"]),
+	objects: Object.freeze([]),
+	promotions: Object.freeze([
+		"blobs:digest:digest",
+		"generations:generation_id:generation_id",
+		"generations:object_id:object_id",
+	]),
+} as const);
+
 class SqliteAheDurableStore implements AheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 	private closed = false;
+	private poisoned = false;
 
 	public constructor(
 		private readonly connection: DatabaseSync,
@@ -187,6 +222,7 @@ class SqliteAheDurableStore implements AheDurableStore {
 		if (this.closed) {
 			return Promise.resolve(evaluateStorageAdapterCommand(prepared.value, [{ kind: "store-closed" }]).result);
 		}
+		if (this.poisoned) return Promise.resolve({ ok: false, reason: "STORE_POISONED" });
 		return Promise.resolve(this.execute(prepared.value));
 	}
 
@@ -223,6 +259,8 @@ class SqliteAheDurableStore implements AheDurableStore {
 			}
 			result = evaluation.result;
 		} catch (cause) {
+			const persistedReason = cause instanceof PersistedStorageError ? cause.reason : undefined;
+			if (persistedReason !== undefined) this.poisoned = true;
 			if (transactionActive) {
 				try {
 					this.connection.exec("ROLLBACK");
@@ -230,7 +268,9 @@ class SqliteAheDurableStore implements AheDurableStore {
 					// The primary substrate failure remains the public cause.
 				}
 			}
-			return { ok: false, reason: "SUBSTRATE_FAILURE", cause };
+			return persistedReason === undefined
+				? { ok: false, reason: "SUBSTRATE_FAILURE", cause }
+				: { ok: false, reason: persistedReason };
 		}
 		if (mutation) this.crashObserver?.({ operation, edge: "after-commit" });
 		return result;
@@ -247,8 +287,15 @@ class SqliteAheDurableStore implements AheDurableStore {
 					const row = this.connection
 						.prepare("SELECT head_record FROM objects WHERE object_id = ?")
 						.get(requirement.objectId) as DatabaseRow | undefined;
+					const classified = classifyPersistedState({
+						kind: "head",
+						objectId: requirement.objectId,
+						row: row === undefined ? null : { objectId: requirement.objectId, record: row.head_record },
+					});
+					if (!classified.ok) throw new PersistedStorageError(classified.reason);
+					if (classified.value.kind !== "head") throw new Error("persisted classifier returned the wrong fact kind");
 					facts.push({
-						headRecord: row === undefined || row.head_record === null ? null : databaseBytes(row.head_record),
+						headRecord: classified.value.record,
 						kind: "head",
 						objectId: requirement.objectId,
 					});
@@ -317,45 +364,27 @@ class SqliteAheDurableStore implements AheDurableStore {
 		const object = this.connection.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
 			| DatabaseRow
 			| undefined;
-		let head: ExpectedHead = { kind: "none", objectId };
-		let headRecord: Uint8Array | null = null;
-		if (object !== undefined && object.head_record !== null) {
-			headRecord = databaseBytes(object.head_record);
-			const decoded = decodeHeadRecordV1(headRecord);
-			if (!decoded.ok || decoded.value.kind !== "present" || decoded.value.objectId !== objectId) {
-				throw new Error("invalid persisted head record");
-			}
-			head = decoded.value;
-		}
 		const rows = this.connection
 			.prepare("SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id")
 			.all(objectId) as DatabaseRow[];
-		const generationRecords: Uint8Array[] = [];
-		const generations: GenerationRecord[] = [];
-		for (const row of rows) {
-			const record = databaseBytes(row.record);
-			const decoded = decodeGenerationRecordV1(record);
-			if (!decoded.ok || decoded.value.objectId !== objectId || decoded.value.generationId !== row.generation_id) {
-				throw new Error("invalid persisted generation record");
-			}
-			generationRecords.push(record);
-			generations.push(decoded.value);
-		}
-		const adopted = generations.filter(({ state }) => state === "Adopted");
-		if (head.kind === "none" && adopted.length !== 0) {
-			throw new Error("persisted adopted generation has no head");
-		}
-		if (
-			head.kind === "present" &&
-			(adopted.length !== 1 ||
-				adopted[0]?.generationId !== head.generationId ||
-				adopted[0].closureDigest !== head.closureDigest)
-		) {
-			throw new Error("persisted head does not name its exact adopted generation");
+		const classified = classifyPersistedState({
+			generationRows: rows.map((row) => ({
+				generationId: row.generation_id,
+				objectId,
+				record: row.record,
+			})),
+			headRow:
+				object === undefined ? null : { objectId, record: object.head_record === null ? null : object.head_record },
+			kind: "physical",
+			objectId,
+		});
+		if (!classified.ok) throw new PersistedStorageError(classified.reason);
+		if (classified.value.kind !== "object-state") {
+			throw new Error("persisted classifier returned the wrong fact kind");
 		}
 		return {
-			fact: { kind: "object-state", objectId, headRecord, generationRecords },
-			state: { head, generations },
+			fact: classified.value.fact,
+			state: classified.value.state,
 		};
 	}
 
@@ -476,24 +505,87 @@ function databaseBytes(value: unknown): Uint8Array {
 }
 
 function boundGenerationRecord(row: DatabaseRow, objectId: StorageObjectId): Uint8Array {
-	const record = databaseBytes(row.record);
-	const decoded = decodeGenerationRecordV1(record);
-	if (!decoded.ok || decoded.value.objectId !== objectId || decoded.value.generationId !== row.generation_id) {
-		throw new Error("SQLite generation key does not match its canonical record");
-	}
-	return record;
+	const classified = classifyPersistedState({
+		kind: "generation",
+		objectId,
+		row: { generationId: row.generation_id, objectId, record: row.record },
+	});
+	if (!classified.ok) throw new PersistedStorageError(classified.reason);
+	if (classified.value.kind !== "generation") throw new Error("persisted classifier returned the wrong fact kind");
+	return classified.value.record;
 }
 
 function requireOneChange(changes: number | bigint, label: string): void {
 	if (Number(changes) !== 1) throw new Error(`${label} did not affect exactly one row`);
 }
 
+function hasExpectedPhysicalSchema(connection: DatabaseSync): boolean {
+	const tables = connection
+		.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+		.all() as DatabaseRow[];
+	const expectedNames = Object.keys(EXPECTED_COLUMNS).sort();
+	if (tables.length !== expectedNames.length || tables.some((row, index) => row.name !== expectedNames[index])) {
+		return false;
+	}
+	for (const tableName of expectedNames as (keyof typeof EXPECTED_COLUMNS)[]) {
+		const columns = connection.prepare(`PRAGMA table_info("${tableName}")`).all() as DatabaseRow[];
+		const expectedColumns = EXPECTED_COLUMNS[tableName];
+		if (
+			columns.length !== expectedColumns.length ||
+			columns.some((column, index) => {
+				const expected = expectedColumns[index];
+				return (
+					expected === undefined ||
+					column.name !== expected.name ||
+					column.type !== expected.type ||
+					Number(column.notnull) !== expected.notnull ||
+					Number(column.pk) !== expected.pk ||
+					column.dflt_value !== null
+				);
+			})
+		) {
+			return false;
+		}
+		const foreignKeyColumns = (connection.prepare(`PRAGMA foreign_key_list("${tableName}")`).all() as DatabaseRow[])
+			.map((row) => `${String(row.table)}:${String(row.from)}:${String(row.to)}`)
+			.sort();
+		const expectedForeignKeyColumns = [...EXPECTED_FOREIGN_KEY_COLUMNS[tableName]].sort();
+		if (
+			foreignKeyColumns.length !== expectedForeignKeyColumns.length ||
+			foreignKeyColumns.some((value, index) => value !== expectedForeignKeyColumns[index])
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
 function configureConnection(connection: DatabaseSync): void {
 	connection.exec("PRAGMA busy_timeout = 1000");
+	connection.exec("PRAGMA foreign_keys = ON");
+	const tableCount = (
+		connection
+			.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+			.get() as DatabaseRow
+	).count;
+	if (Number(tableCount) === 0) {
+		connection.exec("BEGIN IMMEDIATE");
+		try {
+			connection.exec(SCHEMA);
+			if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
+			connection.exec("COMMIT");
+		} catch (error) {
+			try {
+				connection.exec("ROLLBACK");
+			} catch {
+				// Preserve the primary schema-creation failure.
+			}
+			throw error;
+		}
+	}
+	if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	connection.exec("PRAGMA journal_mode = WAL");
 	connection.exec("PRAGMA synchronous = FULL");
-	connection.exec("PRAGMA foreign_keys = ON");
-	connection.exec(SCHEMA);
 }
 
 /**

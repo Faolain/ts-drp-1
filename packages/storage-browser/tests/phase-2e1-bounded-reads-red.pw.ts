@@ -45,7 +45,7 @@ test("real Chromium retains broad missing-head/surviving-Adopted rejection befor
 	await expect(run(page, "runPhase2e1BroadInvariant")).resolves.toEqual({
 		generationRows: 1,
 		headRows: 1,
-		reason: "INVALID_ARGUMENT",
+		reason: "NON_CANONICAL_RECORD",
 	});
 });
 
@@ -54,7 +54,7 @@ test("real Chromium fails closed when an IndexedDB compound key disagrees with i
 }) => {
 	await expect(run(page, "runPhase2e1PhysicalKeyMismatch")).resolves.toEqual({
 		continuationGenerationIds: [],
-		pageReason: "SUBSTRATE_FAILURE",
+		pageReason: "NON_CANONICAL_RECORD",
 		publishedGenerationIds: [],
 		rowCount: 5,
 		rows: [

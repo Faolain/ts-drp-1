@@ -217,7 +217,12 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 		expect(Object.keys(manifest.exports ?? {})).toEqual([".", "./contract", "./adapter"]);
 		expect(manifest.exports?.["./internal/transition"]).toBeUndefined();
 		expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@ts-drp/canonical"]);
-		expect(Object.keys(adapter).sort()).toEqual(["evaluateStorageAdapterCommand", "prepareStorageAdapterCommand"]);
+		expect(Object.keys(adapter).sort()).toEqual([
+			"PersistedStorageError",
+			"classifyPersistedState",
+			"evaluateStorageAdapterCommand",
+			"prepareStorageAdapterCommand",
+		]);
 		expect(declaredExports).toEqual([
 			"PreparedStorageAdapterCommand",
 			"StorageAdapterCommand",
@@ -226,6 +231,7 @@ describe("Phase 2c-a durable adapter facade RED", () => {
 			"StorageAdapterLoadRequirement",
 			"StorageAdapterResultValue",
 			"StorageAdapterWrite",
+			"classifyPersistedState",
 			"evaluateStorageAdapterCommand",
 			"prepareStorageAdapterCommand",
 		]);

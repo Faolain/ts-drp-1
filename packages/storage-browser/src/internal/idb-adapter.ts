@@ -1,7 +1,6 @@
 import {
 	type AheDurableStore,
 	type BlobDigest,
-	decodeGenerationRecordV1,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationPage,
@@ -14,7 +13,9 @@ import {
 	type StoreResult,
 } from "@ts-drp/storage";
 import {
+	classifyPersistedState,
 	evaluateStorageAdapterCommand,
+	PersistedStorageError,
 	type PreparedStorageAdapterCommand,
 	prepareStorageAdapterCommand,
 	type StorageAdapterCommand,
@@ -74,6 +75,7 @@ class IdbAdapterLifecycle {
 	private activeOperations = 0;
 	private closePromise: Promise<void> | undefined;
 	private connection: IDBDatabase | undefined;
+	private poisoned = false;
 	private resolveClose: (() => void) | undefined;
 
 	public attach(database: IDBDatabase): void {
@@ -90,6 +92,16 @@ class IdbAdapterLifecycle {
 		if (database === undefined) return undefined;
 		this.activeOperations += 1;
 		return database;
+	}
+
+	public isPoisoned(): boolean {
+		return this.poisoned;
+	}
+
+	public latchPoison(reason: PersistedStorageError["reason"]): StoreResult<never> {
+		if (this.poisoned) return { ok: false, reason: "STORE_POISONED" };
+		this.poisoned = true;
+		return { ok: false, reason };
 	}
 
 	public finishOperation(): void {
@@ -115,6 +127,13 @@ class IdbAdapterLifecycle {
 		const resolve = this.resolveClose;
 		this.resolveClose = undefined;
 		if (resolve !== undefined) queueMicrotask(resolve);
+	}
+}
+
+class PoisonedOperationError extends Error {
+	public constructor() {
+		super("operation observed a poisoned store");
+		this.name = "PoisonedOperationError";
 	}
 }
 
@@ -201,6 +220,7 @@ class IdbAheDurableStore implements AheDurableStore {
 			return evaluateStorageAdapterCommand(prepared.value, [{ kind: "store-closed" }]).result;
 		}
 		try {
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
 			return await this.execute(database, prepared.value);
 		} finally {
 			this.lifecycle.finishOperation();
@@ -231,9 +251,15 @@ class IdbAheDurableStore implements AheDurableStore {
 			if (!outcome.ok) return substrateFailure(outcome.cause);
 			return evaluation.result;
 		} catch (cause) {
+			const semanticResult =
+				cause instanceof PersistedStorageError
+					? this.lifecycle.latchPoison(cause.reason)
+					: cause instanceof PoisonedOperationError
+						? ({ ok: false, reason: "STORE_POISONED" } as const)
+						: undefined;
 			if (transaction !== undefined) abortIfActive(transaction);
 			if (completion !== undefined) await completion;
-			return substrateFailure(cause);
+			return semanticResult ?? substrateFailure(cause);
 		}
 	}
 
@@ -242,22 +268,35 @@ class IdbAheDurableStore implements AheDurableStore {
 		prepared: PreparedStorageAdapterCommand
 	): Promise<readonly StorageAdapterFact[]> {
 		const facts: StorageAdapterFact[] = [];
-		const generationRows = new Map<StorageObjectId, readonly unknown[]>();
+		const objectStates = new Map<
+			StorageObjectId,
+			Readonly<{ head: ExpectedHead; generations: readonly GenerationRecord[] }>
+		>();
 		const loadedBlobs = new Set<BlobDigest>();
 		const loadedPromotions = new Set<string>();
 		for (const requirement of prepared.requirements) {
 			switch (requirement.kind) {
 				case "head": {
-					const headRow = await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
+					const headRow = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
+					const classified = classifyPersistedState({
+						kind: "head",
+						objectId: requirement.objectId,
+						row:
+							headRow === undefined
+								? null
+								: { objectId: rowProperty(headRow, "objectId"), record: rowProperty(headRow, "record") },
+					});
+					if (!classified.ok) throw new PersistedStorageError(classified.reason);
+					if (classified.value.kind !== "head") throw new Error("persisted classifier returned the wrong fact kind");
 					facts.push({
-						headRecord: headRow === undefined ? null : (rowProperty(headRow, "record") as Uint8Array),
+						headRecord: classified.value.record,
 						kind: "head",
 						objectId: requirement.objectId,
 					});
 					break;
 				}
 				case "generation-page": {
-					const rows = await requestValue(
+					const rows = await this.request(
 						transaction
 							.objectStore(PHASE_2D_GENERATIONS_STORE)
 							.getAll(
@@ -274,17 +313,29 @@ class IdbAheDurableStore implements AheDurableStore {
 					break;
 				}
 				case "object-state": {
-					const headRow = await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
-					const rows = await requestValue(
+					const headRow = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
+					const rows = await this.request(
 						transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAll(generationPrefix(requirement.objectId))
 					);
-					facts.push({
-						kind: "object-state",
+					const classified = classifyPersistedState({
+						generationRows: rows.map((row) => ({
+							generationId: rowProperty(row, "generationId"),
+							objectId: rowProperty(row, "objectId"),
+							record: rowProperty(row, "record"),
+						})),
+						headRow:
+							headRow === undefined
+								? null
+								: { objectId: rowProperty(headRow, "objectId"), record: rowProperty(headRow, "record") },
+						kind: "physical",
 						objectId: requirement.objectId,
-						headRecord: headRow === undefined ? null : (rowProperty(headRow, "record") as Uint8Array),
-						generationRecords: rows.map((row) => rowProperty(row, "record") as Uint8Array),
 					});
-					generationRows.set(requirement.objectId, rows);
+					if (!classified.ok) throw new PersistedStorageError(classified.reason);
+					if (classified.value.kind !== "object-state") {
+						throw new Error("persisted classifier returned the wrong fact kind");
+					}
+					facts.push(classified.value.fact);
+					objectStates.set(requirement.objectId, classified.value.state);
 					break;
 				}
 				case "blob":
@@ -294,20 +345,10 @@ class IdbAheDurableStore implements AheDurableStore {
 					await this.loadPromotion(transaction, requirement, facts, loadedPromotions);
 					break;
 				case "generation-closure": {
-					const rows = generationRows.get(requirement.objectId);
-					if (rows === undefined) throw new Error("generation closure loaded without its object state");
-					const row = rows.find((candidate) => rowProperty(candidate, "generationId") === requirement.generationId);
-					const record = rowProperty(row, "record");
-					if (!(record instanceof Uint8Array)) break;
-					const decoded = decodeGenerationRecordV1(new Uint8Array(record));
-					if (
-						!decoded.ok ||
-						decoded.value.objectId !== requirement.objectId ||
-						decoded.value.generationId !== requirement.generationId
-					) {
-						break;
-					}
-					for (const reference of decoded.value.closure) {
+					const state = objectStates.get(requirement.objectId);
+					if (state === undefined) throw new Error("generation closure loaded without its object state");
+					const generation = state.generations.find((candidate) => candidate.generationId === requirement.generationId);
+					for (const reference of generation?.closure ?? []) {
 						await this.loadPromotion(
 							transaction,
 							{
@@ -326,6 +367,12 @@ class IdbAheDurableStore implements AheDurableStore {
 		return facts;
 	}
 
+	private async request<T>(request: IDBRequest<T>): Promise<T> {
+		const value = await requestValue(request);
+		if (this.lifecycle.isPoisoned()) throw new PoisonedOperationError();
+		return value;
+	}
+
 	private async loadBlob(
 		transaction: IDBTransaction,
 		digest: BlobDigest,
@@ -333,7 +380,7 @@ class IdbAheDurableStore implements AheDurableStore {
 		loaded: Set<BlobDigest>
 	): Promise<void> {
 		if (loaded.has(digest)) return;
-		const row = await requestValue(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(digest));
+		const row = await this.request(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(digest));
 		facts.push({
 			kind: "blob",
 			digest,
@@ -350,7 +397,7 @@ class IdbAheDurableStore implements AheDurableStore {
 	): Promise<void> {
 		const key = promotionKey(scope);
 		if (loaded.has(key)) return;
-		const row = await requestValue(
+		const row = await this.request(
 			transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).get([scope.objectId, scope.generationId, scope.digest])
 		);
 		if (row !== undefined) facts.push({ kind: "promotion", ...scope });
@@ -430,21 +477,18 @@ function rowProperty(value: unknown, key: string): unknown {
 }
 
 function boundGenerationRecord(row: unknown, objectId: StorageObjectId): Uint8Array {
-	const record = rowProperty(row, "record");
-	const physicalObjectId = rowProperty(row, "objectId");
-	const physicalGenerationId = rowProperty(row, "generationId");
-	if (!(record instanceof Uint8Array)) throw new Error("IndexedDB returned a non-binary generation record");
-	const copied = new Uint8Array(record);
-	const decoded = decodeGenerationRecordV1(copied);
-	if (
-		!decoded.ok ||
-		physicalObjectId !== objectId ||
-		decoded.value.objectId !== objectId ||
-		decoded.value.generationId !== physicalGenerationId
-	) {
-		throw new Error("IndexedDB generation key does not match its canonical record");
-	}
-	return copied;
+	const classified = classifyPersistedState({
+		kind: "generation",
+		objectId,
+		row: {
+			generationId: rowProperty(row, "generationId"),
+			objectId: rowProperty(row, "objectId"),
+			record: rowProperty(row, "record"),
+		},
+	});
+	if (!classified.ok) throw new PersistedStorageError(classified.reason);
+	if (classified.value.kind !== "generation") throw new Error("persisted classifier returned the wrong fact kind");
+	return classified.value.record;
 }
 
 function promotionKey(value: { objectId: StorageObjectId; generationId: GenerationId; digest: BlobDigest }): string {
