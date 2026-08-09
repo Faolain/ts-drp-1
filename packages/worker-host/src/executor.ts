@@ -170,11 +170,15 @@ export function executeBounded<T, R>(
 		let producerSettled = false;
 		let terminalObserved = false;
 		const closeSource = (): Promise<void> => {
-			if (sourceFinished || iterator?.return === undefined) return Promise.resolve();
-			const returnSource = iterator.return.bind(iterator);
-			sourceClosePromise ??= Promise.resolve()
-				.then(() => returnSource())
-				.then(() => undefined);
+			if (sourceFinished || iterator === undefined) return Promise.resolve();
+			const activeIterator = iterator;
+			sourceClosePromise ??= Promise.resolve().then(() => {
+				if (sourceFinished) return;
+				const returnSource: unknown = activeIterator.return;
+				if (typeof returnSource !== "function") return;
+				const callable = returnSource as (this: typeof activeIterator) => unknown;
+				return Promise.resolve(callable.call(activeIterator)).then(() => undefined);
+			});
 			return sourceClosePromise;
 		};
 		const onCallerAbort = (): void => {
@@ -286,7 +290,7 @@ export function executeBounded<T, R>(
 					? error
 					: new WorkerHostError("worker-host-task-failed", "Bounded execution failed", { cause: error });
 			} finally {
-				if (!sourceFinished && iterator?.return !== undefined) {
+				if (!sourceFinished && iterator !== undefined) {
 					try {
 						await closeSource();
 					} catch (error) {
