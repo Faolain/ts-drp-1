@@ -2,6 +2,7 @@ import {
 	type AheDurableStore,
 	decodeGenerationRecordV1,
 	digestBlob,
+	digestClosure,
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
 	type ExpectedHead,
@@ -20,6 +21,7 @@ import {
 	deletePhase2dDatabase,
 	gateNextPhase2dTransactionTerminal,
 	type Phase2dTerminalGate,
+	probePhase2e3BlobRequestPeak,
 	rawPhase2dAliasGenerationRecord,
 	rawPhase2dClearHead,
 	rawPhase2dCount,
@@ -29,6 +31,7 @@ import {
 	rawPhase2e2Delete,
 	rawPhase2e2Put,
 	rawPhase2e2Snapshot,
+	rawPhase2e3PutMany,
 	requestPhase2dVersionchange,
 	withFailingGenerationRead,
 	withFailingHeadWrite,
@@ -76,6 +79,14 @@ async function splitRead(
 		return { ok: false, reason: "SUBSTRATE_FAILURE", cause: new Error("SPLIT_READ_NOT_IMPLEMENTED") };
 	}
 	return Reflect.apply(callable, store, [input]) as Promise<StoreResult<unknown>>;
+}
+
+async function recoverActive(store: object, objectId: StorageObjectId): Promise<StoreResult<unknown>> {
+	const callable = Reflect.get(store, "recoverActiveGeneration");
+	if (typeof callable !== "function") {
+		return { ok: false, reason: "SUBSTRATE_FAILURE", cause: "RECOVERY_NOT_IMPLEMENTED" };
+	}
+	return Reflect.apply(callable, store, [objectId]) as Promise<StoreResult<unknown>>;
 }
 
 type QuiescentStoreView = Readonly<{
@@ -291,11 +302,16 @@ async function runBoundedCompletionTrace(): Promise<unknown> {
 		});
 		await store.close();
 		return {
-			reads: traced.calls.filter((call) => call.method === "get" || call.method === "getAll"),
+			blobReads: traced.calls.filter((call) => call.method === "get" && call.store === "blobs").length,
+			peakOutstandingBlobGets: traced.peakOutstandingBlobGets,
+			promotionReads: traced.calls.filter((call) => call.method === "get" && call.store === "promotions").length,
 			result: traced.result.ok
 				? { reason: "OK", state: traced.result.value.state }
 				: { reason: traced.result.reason, state: null },
 			transactions: traced.transactions,
+			unboundedGenerationReads: traced.calls.filter(
+				(call) => call.method === "getAll" && call.store === "generations" && call.count === undefined
+			).length,
 			writes: traced.calls.filter((call) => call.method === "add" || call.method === "put"),
 		};
 	} catch (error) {
@@ -892,6 +908,282 @@ async function runPhase2e2OpenFailure(): Promise<unknown> {
 	}
 }
 
+async function seedPhase2e3Adopted(name: string): Promise<Readonly<{ adopted: GenerationRecord; head: ExpectedHead }>> {
+	const store = await createPhase2d2aRedStore({ databaseName: name });
+	await stageComplete(store, OBJECT_A, GENERATION_A);
+	const swapped = await store.swapHead({
+		expectedHead: noHead(OBJECT_A),
+		generationId: GENERATION_A,
+		objectId: OBJECT_A,
+	});
+	if (!swapped.ok) throw new Error(`Phase 2e3 fixture swap failed: ${swapped.reason}`);
+	await store.close();
+	const row = (await rawPhase2dGet(name, "generations", [OBJECT_A, GENERATION_A])) as
+		| { readonly record?: unknown }
+		| undefined;
+	if (!(row?.record instanceof Uint8Array)) throw new Error("Phase 2e3 adopted row missing");
+	const decoded = decodeGenerationRecordV1(row.record);
+	if (!decoded.ok) throw new Error(`Phase 2e3 adopted row invalid: ${decoded.reason}`);
+	return { adopted: decoded.value, head: swapped.value.head };
+}
+
+async function runPhase2e3RecoveryShapes(): Promise<unknown> {
+	const emptyName = databaseName("phase-2e3-empty");
+	const activeName = databaseName("phase-2e3-active");
+	try {
+		const emptyStore = await createPhase2d2aRedStore({ databaseName: emptyName });
+		const empty = await recoverActive(emptyStore, OBJECT_A);
+		await emptyStore.close();
+
+		const fixture = await seedPhase2e3Adopted(activeName);
+		const activeStore = await createPhase2d2aRedStore({ databaseName: activeName });
+		const first = await recoverActive(activeStore, OBJECT_A);
+		if (first.ok) {
+			try {
+				const references = Reflect.get(first.value as object, "references");
+				if (Array.isArray(references)) references.splice(0);
+			} catch {
+				// Deeply frozen output is an equally valid detachment boundary.
+			}
+		}
+		const second = await recoverActive(activeStore, OBJECT_A);
+		await activeStore.close();
+		return { empty, expected: fixture, first, second };
+	} finally {
+		await deletePhase2dDatabase(emptyName);
+		await deletePhase2dDatabase(activeName);
+	}
+}
+
+async function runPhase2e3MultiPageRecovery(): Promise<unknown> {
+	const name = databaseName("phase-2e3-multi-page");
+	try {
+		const created = await createPhase2d2aRedStore({ databaseName: name });
+		await created.close();
+		const payload = Uint8Array.of(42);
+		const reference = { byteLength: payload.byteLength, digest: must(digestBlob(payload)) };
+		const closureDigest = must(digestClosure([reference]));
+		const rows: unknown[] = [];
+		for (let index = 0; index < 130; index++) {
+			const generationId = must(parseGenerationId((index + 16).toString(16).padStart(64, "0")));
+			const generation: GenerationRecord = {
+				baseExpectedHead: noHead(OBJECT_A),
+				closure: [reference],
+				closureDigest,
+				generationId,
+				objectId: OBJECT_A,
+				state: "Discarded",
+			};
+			rows.push({ generationId, objectId: OBJECT_A, record: encodeGenerationRecordV1(generation) });
+		}
+		await rawPhase2e3PutMany(name, "generations", rows);
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		const traced = await withPhase2dTransactionTrace(async (mark) => {
+			mark("recoverActiveGeneration");
+			return recoverActive(store, OBJECT_A);
+		});
+		await store.close();
+		return {
+			generationReads: traced.calls.filter(
+				(call) => call.operation === "recoverActiveGeneration" && call.store === "generations"
+			),
+			result: traced.result,
+			transactions: traced.transactions.filter((transaction) => transaction.operation === "recoverActiveGeneration"),
+		};
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runPhase2e3AuthorityGap(): Promise<unknown> {
+	const name = databaseName("phase-2e3-authority-gap");
+	try {
+		const fixture = await seedPhase2e3Adopted(name);
+		if (fixture.head.kind !== "present") throw new Error("Phase 2e3 head fixture missing");
+		const headFive = { ...fixture.head, revision: must(parseHeadRevision(5)) };
+		await rawPhase2e2Put(name, "objects", { objectId: OBJECT_A, record: encodeHeadRecordV1(headFive) });
+
+		const staging = await createPhase2d2aRedStore({ databaseName: name });
+		await stageComplete(staging, OBJECT_A, GENERATION_B, PAYLOAD_B, headFive);
+		await staging.close();
+		await rawPhase2e2Delete(name, "objects", OBJECT_A);
+
+		const before = await rawPhase2e2Snapshot(name);
+		const store = await createPhase2d2aRedStore({ databaseName: name });
+		const traced = await withPhase2dTransactionTrace(async (mark) => {
+			mark("swapHead-authority-gap");
+			return store.swapHead({
+				expectedHead: noHead(OBJECT_A),
+				generationId: GENERATION_B,
+				objectId: OBJECT_A,
+			});
+		});
+		const afterRoot = await splitRead(store, "readHead", OBJECT_A);
+		await store.close();
+		return {
+			afterRoot: reason(afterRoot),
+			boundedGenerationReads: traced.calls.filter(
+				(call) =>
+					call.operation === "swapHead-authority-gap" && call.store === "generations" && call.count !== undefined
+			).length,
+			blobReads: traced.calls.filter(
+				(call) => call.operation === "swapHead-authority-gap" && call.store === "blobs" && call.method === "get"
+			).length,
+			reason: reason(traced.result),
+			transactions: traced.transactions.filter((transaction) => transaction.operation === "swapHead-authority-gap"),
+			writes: traced.calls.filter(
+				(call) => call.operation === "swapHead-authority-gap" && (call.method === "add" || call.method === "put")
+			),
+			zeroWrites: deepBytesEqual(before, await rawPhase2e2Snapshot(name)),
+		};
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
+async function runPhase2e3VerifierMatrix(): Promise<unknown> {
+	const candidate: unknown[] = [];
+	for (const [damage, replacement, expected] of [
+		["missing", null, "BLOB_MISSING"],
+		["wrong-length", Uint8Array.of(9), "BLOB_CORRUPT"],
+		["wrong-digest", Uint8Array.of(9, 8, 7, 6), "BLOB_CORRUPT"],
+		["wrong-type", "not-bytes", "BLOB_CORRUPT"],
+	] as const) {
+		const name = databaseName(`phase-2e3-candidate-${damage}`);
+		try {
+			let store = await createPhase2d2aRedStore({ databaseName: name });
+			const begun = await begin(store, OBJECT_A, GENERATION_A, PAYLOAD_A);
+			if (!begun.ok) throw new Error(`candidate begin failed: ${begun.reason}`);
+			if (
+				!(
+					await store.putCachedBlob({
+						bytes: PAYLOAD_A,
+						digest: DIGEST_A,
+						generationId: GENERATION_A,
+						objectId: OBJECT_A,
+					})
+				).ok
+			)
+				throw new Error("candidate cache failed");
+			if (!(await store.promoteReference({ digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A })).ok)
+				throw new Error("candidate promotion failed");
+			await store.close();
+			if (replacement === null) await rawPhase2e2Delete(name, "blobs", DIGEST_A);
+			else await rawPhase2e2Put(name, "blobs", { bytes: replacement, digest: DIGEST_A });
+			const before = await rawPhase2e2Snapshot(name);
+			store = await createPhase2d2aRedStore({ databaseName: name });
+			const traced = await withPhase2dTransactionTrace(async (mark) => {
+				mark("completeGeneration-reverify");
+				return store.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+			});
+			const later = await splitRead(store, "readHead", OBJECT_A);
+			await store.close();
+			candidate.push({
+				blobReads: traced.calls.filter(
+					(call) => call.operation === "completeGeneration-reverify" && call.store === "blobs" && call.method === "get"
+				).length,
+				damage,
+				expected,
+				later: reason(later),
+				reason: reason(traced.result),
+				zeroWrites: deepBytesEqual(before, await rawPhase2e2Snapshot(name)),
+			});
+		} finally {
+			await deletePhase2dDatabase(name);
+		}
+	}
+	const incrementalName = databaseName("phase-2e3-incremental");
+	let incremental: unknown;
+	try {
+		let store = await createPhase2d2aRedStore({ databaseName: incrementalName });
+		const begun = await store.beginGeneration({
+			baseExpectedHead: noHead(OBJECT_A),
+			closure: [
+				{ byteLength: PAYLOAD_A.byteLength, digest: DIGEST_A },
+				{ byteLength: PAYLOAD_B.byteLength, digest: DIGEST_B },
+			],
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		if (!begun.ok) throw new Error(`incremental begin failed: ${begun.reason}`);
+		for (const [digest, payload] of [
+			[DIGEST_A, PAYLOAD_A],
+			[DIGEST_B, PAYLOAD_B],
+		] as const) {
+			if (!(await store.putCachedBlob({ bytes: payload, digest, generationId: GENERATION_A, objectId: OBJECT_A })).ok)
+				throw new Error("incremental cache failed");
+			if (!(await store.promoteReference({ digest, generationId: GENERATION_A, objectId: OBJECT_A })).ok)
+				throw new Error("incremental promotion failed");
+		}
+		await store.close();
+		await rawPhase2e2Delete(incrementalName, "blobs", DIGEST_B);
+		store = await createPhase2d2aRedStore({ databaseName: incrementalName });
+		const traced = await withPhase2dTransactionTrace(async (mark) => {
+			mark("completeGeneration-incremental");
+			return store.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		});
+		await store.close();
+		const mutant = await withPhase2dTransactionTrace(async (mark) => {
+			mark("batched-blob-mutant");
+			return probePhase2e3BlobRequestPeak(incrementalName, [DIGEST_A, DIGEST_B], true);
+		});
+		incremental = {
+			blobKeys: traced.calls
+				.filter(
+					(call) =>
+						call.operation === "completeGeneration-incremental" && call.store === "blobs" && call.method === "get"
+				)
+				.map(({ key }) => key),
+			expectedKeys: [DIGEST_A, DIGEST_B],
+			mutantPeak: mutant.peakOutstandingBlobGets,
+			peak: traced.peakOutstandingBlobGets,
+			reason: reason(traced.result),
+			writes: traced.calls.filter(
+				(call) =>
+					call.operation === "completeGeneration-incremental" && (call.method === "add" || call.method === "put")
+			),
+		};
+	} finally {
+		await deletePhase2dDatabase(incrementalName);
+	}
+	const adopted: unknown[] = [];
+	for (const [damage, expected] of [
+		["unpromoted", "ADOPTED_BLOB_UNPROMOTED"],
+		["missing", "ADOPTED_BLOB_MISSING"],
+		["corrupt", "ADOPTED_BLOB_CORRUPT"],
+	] as const) {
+		const name = databaseName(`phase-2e3-adopted-${damage}`);
+		try {
+			await seedPhase2e3Adopted(name);
+			if (damage === "unpromoted") {
+				await rawPhase2e2Delete(name, "promotions", [OBJECT_A, GENERATION_A, DIGEST_A]);
+			} else if (damage === "missing") {
+				await rawPhase2e2Delete(name, "blobs", DIGEST_A);
+			} else {
+				await rawPhase2e2Put(name, "blobs", { bytes: Uint8Array.of(0), digest: DIGEST_A });
+			}
+			const before = await rawPhase2e2Snapshot(name);
+			const store = await createPhase2d2aRedStore({ databaseName: name });
+			const first = await recoverActive(store, OBJECT_A);
+			const later = await recoverActive(store, OBJECT_A);
+			const zeroWrites = deepBytesEqual(before, await rawPhase2e2Snapshot(name));
+			await store.close();
+			const afterClose = await recoverActive(store, OBJECT_A);
+			adopted.push({
+				afterClose: reason(afterClose),
+				damage,
+				expected,
+				first: reason(first),
+				later: reason(later),
+				zeroWrites,
+			});
+		} finally {
+			await deletePhase2dDatabase(name);
+		}
+	}
+	return { adopted, candidate, incremental };
+}
+
 async function runCloseQuiescence(): Promise<unknown> {
 	const name = databaseName("close-quiescence");
 	let gate: Phase2dTerminalGate<StoreResult<GenerationRecord>> | undefined;
@@ -1029,6 +1321,10 @@ const harness = Object.freeze({
 	runPhase2e2OpenFailure,
 	runPhase2e2PoisonLifecycle,
 	runPhase2e2TaxonomyMatrix,
+	runPhase2e3AuthorityGap,
+	runPhase2e3MultiPageRecovery,
+	runPhase2e3RecoveryShapes,
+	runPhase2e3VerifierMatrix,
 	runPersistenceAndCopies,
 	runSameDigestDifferentBytes,
 	runSharedContract,

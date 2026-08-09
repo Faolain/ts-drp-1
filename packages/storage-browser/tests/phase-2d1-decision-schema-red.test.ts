@@ -1,4 +1,4 @@
-import type { StorageAdapterLoadRequirement, StorageAdapterWrite } from "@ts-drp/storage/adapter";
+import type { StorageAdapterWrite } from "@ts-drp/storage/adapter";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,6 +11,7 @@ import { requirePhase2dDecisionConsumptionReady } from "./opfs-idb-spike/fixture
 const PACKAGE_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LINK_PATH = "tests/opfs-idb-spike/artifacts/phase-2d-storage-substrate-decision-link-v1.json";
 type Phase2dStore = "blobs" | "generations" | "objects" | "promotions";
+type Phase2e3LoadKind = "blob" | "generation" | "generation-page" | "head" | "promotion";
 
 function isDeeplyFrozen(value: unknown): boolean {
 	if (typeof value !== "object" || value === null) return true;
@@ -21,12 +22,11 @@ function isDeeplyFrozen(value: unknown): boolean {
 const ADAPTER_STORE_OWNERSHIP = Object.freeze({
 	loads: {
 		"blob": ["blobs"],
-		"generation-closure": ["generations", "promotions"],
+		"generation": ["generations"],
 		"generation-page": ["generations"],
 		"head": ["objects"],
-		"object-state": ["objects", "generations"],
 		"promotion": ["promotions"],
-	} satisfies Record<StorageAdapterLoadRequirement["kind"], readonly Phase2dStore[]>,
+	} satisfies Record<Phase2e3LoadKind, readonly Phase2dStore[]>,
 	writes: {
 		"insert-blob": "blobs",
 		"insert-promotion": "promotions",
@@ -74,10 +74,9 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 		expect(ADAPTER_STORE_OWNERSHIP).toEqual({
 			loads: {
 				"blob": ["blobs"],
-				"generation-closure": ["generations", "promotions"],
+				"generation": ["generations"],
 				"generation-page": ["generations"],
 				"head": ["objects"],
-				"object-state": ["objects", "generations"],
 				"promotion": ["promotions"],
 			},
 			writes: {
@@ -87,6 +86,14 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 				"replace-head": "objects",
 			},
 		});
+		const adapterSource = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "../storage/src/adapter.ts"), "utf8");
+		const browserAdapterSource = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts"), "utf8");
+		expect.soft(adapterSource).toContain('kind: "generation"');
+		expect.soft(adapterSource).not.toContain('kind: "object-state"');
+		expect.soft(adapterSource).not.toContain('kind: "generation-closure"');
+		expect.soft(browserAdapterSource).not.toContain('case "object-state"');
+		expect.soft(browserAdapterSource).not.toContain("generation closure loaded without its object state");
+		expect.soft(browserAdapterSource).not.toContain("getAll(generationPrefix(");
 	});
 
 	it("keeps the package private and exposes no package export map", () => {

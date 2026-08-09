@@ -14,7 +14,9 @@ describe("Phase 2e2 persisted taxonomy and poison contract RED", () => {
 		]) {
 			expect.soft(source).toContain(`| "${reason}"`);
 		}
-		expect.soft(source).not.toContain("recoverActiveGeneration(");
+		// Phase 2e3 deliberately supersedes 2e2's temporary no-recovery guard. The
+		// atomic authority flip is now indivisible with the public recovery surface.
+		expect.soft(source).toContain("recoverActiveGeneration(");
 	});
 
 	it("keeps malformed persisted bytes noncanonical in the shared codecs", () => {

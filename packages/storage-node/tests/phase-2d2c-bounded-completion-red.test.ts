@@ -91,7 +91,7 @@ afterEach(async () => {
 });
 
 describe("Phase 2d2c SQLite bounded completion RED", () => {
-	it("loads every promotion and zero blob payload values inside the real completion transaction", async () => {
+	it("reverifies each promoted blob incrementally inside the real completion transaction", async () => {
 		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
 		const payloads = await prepareTwoReferenceGeneration(store, OBJECT_A, GENERATION_A);
 		const traced = await withSqliteStatementTrace(() =>
@@ -102,7 +102,7 @@ describe("Phase 2d2c SQLite bounded completion RED", () => {
 		expect.soft(traced.sql.filter((sql) => sql === "BEGIN IMMEDIATE")).toHaveLength(1);
 		expect.soft(traced.sql.filter((sql) => sql === "COMMIT")).toHaveLength(1);
 		expect.soft(traced.sql.filter((sql) => sql.startsWith("SELECT 1 FROM promotions"))).toHaveLength(2);
-		expect.soft(traced.sql.filter((sql) => sql.startsWith("SELECT bytes FROM blobs"))).toEqual([]);
+		expect.soft(traced.sql.filter((sql) => sql.startsWith("SELECT bytes FROM blobs"))).toHaveLength(2);
 		expect.soft(traced.sql.filter((sql) => sql.startsWith("UPDATE generations SET record"))).toHaveLength(1);
 		for (const payload of payloads) {
 			const blob = await store.getBlob(must(digestBlob(payload)));

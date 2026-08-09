@@ -10,6 +10,7 @@ export interface Phase2dTransactionTrace {
 export interface Phase2dStoreCallTrace {
 	readonly method: "add" | "get" | "getAll" | "put";
 	readonly count?: number;
+	readonly key?: unknown;
 	readonly operation: string;
 	readonly query?: Readonly<{
 		readonly lower: unknown;
@@ -128,6 +129,53 @@ export async function rawPhase2e2Put(name: string, storeName: string, row: unkno
 	try {
 		const transaction = database.transaction(storeName, "readwrite", { durability: "strict" });
 		transaction.objectStore(storeName).put(row);
+		await transactionCompletion(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Inserts a bounded test-owned batch in one transaction for the Phase 2e3
+ * multi-page recovery fixture. This remains the sole raw-IDB corruption owner.
+ * @param name - Isolated database name.
+ * @param storeName - Physical store to alter.
+ * @param rows - Test-owned raw rows.
+ */
+export async function rawPhase2e3PutMany(name: string, storeName: string, rows: readonly unknown[]): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(storeName, "readwrite", { durability: "strict" });
+		const store = transaction.objectStore(storeName);
+		for (const row of rows) store.put(row);
+		await transactionCompletion(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Deterministic control for the one-authoritative-blob-request probe. The
+ * `batched` mutant deliberately issues both gets before either settles.
+ * @param name - Isolated database name.
+ * @param digests - Two physical blob keys.
+ * @param batched - Whether to issue the unsafe batched mutant.
+ */
+export async function probePhase2e3BlobRequestPeak(
+	name: string,
+	digests: readonly [string, string],
+	batched: boolean
+): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction("blobs", "readonly");
+		const store = transaction.objectStore("blobs");
+		if (batched) {
+			await Promise.all([requestResult(store.get(digests[0])), requestResult(store.get(digests[1]))]);
+		} else {
+			await requestResult(store.get(digests[0]));
+			await requestResult(store.get(digests[1]));
+		}
 		await transactionCompletion(transaction);
 	} finally {
 		database.close();
@@ -435,6 +483,7 @@ export async function withForcedPhase2dDurability<T>(
  */
 export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: string) => void) => Promise<T>): Promise<{
 	readonly calls: Phase2dStoreCallTrace[];
+	readonly peakOutstandingBlobGets: number;
 	readonly result: T;
 	readonly transactions: Phase2dTransactionTrace[];
 }> {
@@ -445,6 +494,8 @@ export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: str
 	const originalPut = IDBObjectStore.prototype.put;
 	const transactions: Phase2dTransactionTrace[] = [];
 	const calls: Phase2dStoreCallTrace[] = [];
+	let outstandingBlobGets = 0;
+	let peakOutstandingBlobGets = 0;
 	let operation = "unscoped";
 	const mark = (value: string): void => {
 		operation = value;
@@ -476,8 +527,19 @@ export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: str
 		this: IDBObjectStore,
 		query: IDBValidKey | IDBKeyRange
 	): IDBRequest<unknown> {
-		calls.push({ method: "get", operation, store: this.name });
-		return originalGet.call(this, query);
+		const phase2e3KeyTrace = /authority-gap|recoverActiveGeneration|reverify|incremental|batched/.test(operation);
+		calls.push({ ...(phase2e3KeyTrace ? { key: query } : {}), method: "get", operation, store: this.name });
+		const request = originalGet.call(this, query);
+		if (this.name === "blobs") {
+			outstandingBlobGets++;
+			peakOutstandingBlobGets = Math.max(peakOutstandingBlobGets, outstandingBlobGets);
+			const release = (): void => {
+				outstandingBlobGets--;
+			};
+			request.addEventListener("success", release, { once: true });
+			request.addEventListener("error", release, { once: true });
+		}
+		return request;
 	};
 	IDBObjectStore.prototype.getAll = function tracedGetAll(
 		this: IDBObjectStore,
@@ -511,7 +573,8 @@ export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: str
 		return key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);
 	};
 	try {
-		return { calls, result: await run(mark), transactions };
+		const result = await run(mark);
+		return { calls, peakOutstandingBlobGets, result, transactions };
 	} finally {
 		IDBDatabase.prototype.transaction = originalTransaction;
 		IDBObjectStore.prototype.add = originalAdd;

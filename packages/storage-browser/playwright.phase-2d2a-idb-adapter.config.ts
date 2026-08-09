@@ -6,6 +6,7 @@ export default defineConfig({
 		"phase-2d2a-idb-adapter-red.pw.ts",
 		"phase-2e1-bounded-reads-red.pw.ts",
 		"phase-2e2-taxonomy-poison-red.pw.ts",
+		"phase-2e3-recovery-authority-red.pw.ts",
 	],
 	fullyParallel: false,
 	workers: 1,

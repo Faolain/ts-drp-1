@@ -70,25 +70,23 @@ test("promoteReference owns missing and corrupt closure bytes without mutating j
 	});
 });
 
-test("completion loads every promotion but zero blob values in one strict generation-write transaction", async ({
+test("completion incrementally reverifies every promotion and blob in one strict bounded transaction", async ({
 	page,
 }) => {
 	await expect(run(page, "runBoundedCompletionTrace")).resolves.toEqual({
-		reads: [
-			{ method: "get", operation: "completeGeneration", store: "objects" },
-			{ method: "getAll", ...generationRange("completeGeneration") },
-			{ method: "get", operation: "completeGeneration", store: "promotions" },
-			{ method: "get", operation: "completeGeneration", store: "promotions" },
-		],
+		blobReads: 2,
+		peakOutstandingBlobGets: 1,
+		promotionReads: 2,
 		result: { reason: "OK", state: "Complete" },
 		transactions: [
 			{
 				durability: "strict",
 				mode: "readwrite",
 				operation: "completeGeneration",
-				stores: ["generations", "objects", "promotions"],
+				stores: ["blobs", "generations", "objects", "promotions"],
 			},
 		],
+		unboundedGenerationReads: 0,
 		writes: [{ method: "put", operation: "completeGeneration", store: "generations" }],
 	});
 });
