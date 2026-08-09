@@ -1,12 +1,16 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { build } from "esbuild";
 
-export async function bundleBrowserFixture(entry: URL, format: "esm" | "iife"): Promise<string> {
+export async function bundleBrowserFixture(
+	entry: URL,
+	format: "esm" | "iife",
+	globalName = "Phase2fBHandshake"
+): Promise<string> {
 	const result = await build({
 		bundle: true,
 		entryPoints: [entry.pathname],
 		format,
-		...(format === "iife" ? { globalName: "Phase2fBHandshake" } : {}),
+		...(format === "iife" ? { globalName } : {}),
 		platform: "browser",
 		target: "es2022",
 		write: false,

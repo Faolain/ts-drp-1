@@ -33,7 +33,7 @@ test("ready ordering and never-ready recovery produce exact engine custody", asy
 	expect(["firefox", "webkit"]).toContain(browserName);
 	const [pageSource, workerSource] = await Promise.all([
 		bundleBrowserFixture(new URL("./fixtures/page-entry.ts", import.meta.url), "iife"),
-		bundleBrowserFixture(new URL("./fixtures/positive.worker.ts", import.meta.url), "esm"),
+		bundleBrowserFixture(new URL("./fixtures/positive-worker.ts", import.meta.url), "esm"),
 	]);
 	await page.setContent("<!doctype html><title>worker-host handshake</title>");
 	await page.addScriptTag({ content: pageSource });

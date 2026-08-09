@@ -1146,7 +1146,20 @@ importers:
         specifier: ^3.24.2
         version: 3.24.2
 
-  packages/worker-host: {}
+  packages/worker-host:
+    devDependencies:
+      '@ts-drp/canonical':
+        specifier: workspace:*
+        version: link:../canonical
+      '@ts-drp/compaction':
+        specifier: workspace:*
+        version: link:../compaction
+      esbuild:
+        specifier: ^0.25.3
+        version: 0.25.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.8.2
 
 packages:
 

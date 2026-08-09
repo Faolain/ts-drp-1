@@ -20,7 +20,7 @@ describe("Phase 2f-b authoritative browser gate configuration RED", () => {
 
 	it("requires real synchronous delay and endpoint timestamps rather than elapsed self-attestation", () => {
 		const delay = readFileSync(new URL("./browser/fixtures/delay-evaluation.ts", import.meta.url), "utf8");
-		const worker = readFileSync(new URL("./browser/fixtures/positive.worker.ts", import.meta.url), "utf8");
+		const worker = readFileSync(new URL("./browser/fixtures/positive-worker.ts", import.meta.url), "utf8");
 		expect(delay).toMatch(/performance\.now\(\)\s*\+\s*1_500/u);
 		expect(worker).toMatch(/^import\s+"\.\/delay-evaluation\.js";/u);
 		expect(worker).toMatch(/readySentAtMs\s*=\s*performance\.now\(\)/u);

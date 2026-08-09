@@ -1,6 +1,4 @@
 import "./delay-evaluation.js";
-// Deliberately unresolved until the production ./worker subpath exists at GREEN.
-// eslint-disable-next-line import/no-unresolved
 import { serveWorkerTasks, type WorkerHostScope } from "@ts-drp/worker-host/worker";
 
 let readySentAtMs = Number.NaN;
