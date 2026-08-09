@@ -3671,6 +3671,109 @@ vote transaction, exact key/index authority, first real version bump,
 migration, `onblocked`, durable-before-gossip mutation and outbox behavior.
 Phase 2e owns public packaging. Neither deferral is partial 2d work.
 
+#### Phase 2d2d accepted closure — four-store private v1
+
+Phase 2d2d is accepted at tests/assets-only RED `8570f38` and production-only
+GREEN `bdafac5`. RED changes exactly three existing test/harness files and
+freezes one finite semantic matrix: the private-v1 authority contains exactly
+`objects`, `generations`, `blobs` and `promotions`, every store has zero
+indexes, the speculative vote aliases are absent, fresh and independently
+seeded exact four-store databases open, and an independently seeded historical
+five-store v1 rejects without migration or physical mutation. It also removes
+the stale `blobs` entry from the test-local completion ownership fixture and
+preserves decision-link, strict-durability, schema-error, compound-key,
+`db.onversionchange`, blocked-upgrade and package-privacy controls.
+
+The frozen RED file SHA-256 values are
+`ba4bbef78a2efdda798420729a146eb95f3c17531bc0a5da2c73c8e83985abff`,
+`d90bb9089993a70ffcfc699d5c0220f029d8299a5f10c385528619af908a9661`
+and `0a4a858c86cd4441b9d1cd940d2e61351453c22205a0e572e754139bfcab7102`.
+Focused RED is one failed / three passed. Chromium RED is exactly three failed
+/ nine passed: production still creates five stores, rejects an exact four-
+store database and accepts the historical five-store database. Phase-2d2a is
+9/9 and Phase-2d2b(i) is 3/3. The committed package diagnostic is two failed /
+171 passed because the clean-checkout wrapper independently reproduces the
+same authority failure; it is not a second production defect. The RED evidence-
+manifest digest is
+`38db03dda8b57a19fed87d036b74cb3957356e191c6988d0feef400994d1ad42`.
+
+GREEN changes only `packages/storage-browser/src/internal/schema-idb.ts`.
+It deletes the speculative `votes` store/index and their two positional
+aliases. Because private v1 now has no indexes and no out-of-line/null-key
+store, creation and validation are simplified to their exact present contract
+rather than retaining unreachable generic index/null-key branches. Version
+remains `1`; there is no migration, compatibility path, vote mutation or
+public export. The exact diff is six insertions / forty deletions.
+
+At committed GREEN, focused authority is 4/4, Phase-2d1 Chromium is 12/12,
+Phase-2d2a Chromium is 9/9, Phase-2d2b(i) Chromium is 3/3,
+ownership/governance is 8/8, and the package is 22/22 files and 173/173 tests,
+including the clean-checkout wrapper. Upstream storage build, storage-browser
+typecheck/build, zero-warning ESLint, Prettier, production-only diff and
+custody checks are green. The GREEN evidence-manifest digest is
+`4b11fa595193a859af9ce58d9e4fa8363b0e5edf60a18bc743586bf4ad73d8fc`.
+
+The independent acceptance loop unanimously found no blocker and no reward
+hacking:
+
+- genuine Grok 4.5/high session
+  `019fe3f7-7abe-7860-a78c-9a69caf5210c` returned `APPROVED`, no blockers and
+  `2D2D_MAY_CLOSE: yes`; exact result SHA-256
+  `2fea349d5c5b5a3c78aa408c931de0b6e64f16bce72075e421c973245497d8a4`,
+  raw-envelope SHA-256
+  `eb4ac4a1449ac23995eeaac9043837ffc66442e9a3f81ec7cd57cf83b475aa1c`
+  and artifact-integrity-manifest SHA-256
+  `d25b5603b21f61c8d33da4ade4906ba48032c3b6789b7ced1ab3583a3c74fc8f`;
+- exact Kimi 3/high/100 session
+  `6770e15c-d42d-43b5-a545-eb30d8c08eaf` returned `APPROVED`, no blockers,
+  `REWARD_HACKING: no` and `2D2D_MAY_CLOSE: yes`; exact result SHA-256
+  `61962aadea435865f9ca96edec06fe99b976db829af99e2a14c55c3d0ffe5c7f`,
+  raw-stream SHA-256
+  `83000ceead02fecd898d7a571c63a0b6d7c62d2ffa378896bc1571519e405f48`
+  and artifact-integrity-manifest SHA-256
+  `a3f4dea0e19c11de3a96a3fda1ce37a02176da70ac807bd692f1a689b41ca576`;
+- final Opus 5/xhigh session
+  `ffb222dd-a9dc-43ec-a820-63c328919925` returned `APPROVED`,
+  `CONTRACT_SATISFIED: yes`, no blockers and `2D2D_MAY_CLOSE: yes`; exact
+  result SHA-256
+  `7af9ce4a89673dc1803bdbb525f2cdd38dadf67317bcb12d4fb69af31d8cf187`,
+  raw-stream SHA-256
+  `40e7118a2d11d1acae4544d93337b3092efdbd28d024666c3764bc7f8dad17d1`
+  and artifact-integrity-manifest SHA-256
+  `25287591cc8e5fea45469caa14a57c053a6d31e7f660753ad51cdb1380c865e9`.
+  All 66 assistant events authenticate as Opus 5 at requested xhigh effort and
+  use only Read/Grep/Glob. Small automatic Haiku metadata performed no review
+  or helper work.
+
+Carry these accepted nonblocking findings to their named owners:
+
+1. Phase 5c must atomically restore index-aware creation and validation,
+   out-of-line/null-key handling, the real `storageMeta`/`voteSlots`/
+   `signerState`/`voteOutbox` authority, the first version bump, migration,
+   `onblocked` and vote mutations. The empty `indexes` field is retained as an
+   explicit authority anchor, not evidence that this later work exists.
+2. The test-local `ADAPTER_STORE_OWNERSHIP` runtime equality repeats its local
+   literal. Its `satisfies` clauses still provide compile-time exhaustiveness;
+   production transaction ownership remains covered by the browser adapter
+   suites. Do not grow a static analyzer for this fixture.
+3. Positional schema-alias declaration types can widen. The removed vote
+   aliases are proven absent at runtime; future 5c authority should use name-
+   keyed ownership rather than relying on positional literal inference.
+4. Successful ESLint is silent. The GREEN combined log therefore did not show
+   the command even though the controller recorded success; Kimi independently
+   reran focused zero-warning lint on production and all three RED files. Later
+   slices must preserve an explicit command and exit-status record.
+5. The first precommit full-package diagnostic correctly failed because its
+   clean-checkout wrapper copied tracked RED. Only the authoritative postcommit
+   173/173 run is counted. An initial RED `tee` path error and incomplete
+   streaming capture are retained as superseded evidence, not passing gates.
+
+With both 2d2c and 2d2d accepted, the Phase 2d component is conditionally
+closed under the finite remaining-scope authorization. This enables no live
+Discord/chat or MMORPG path: Phase 2e still owns recovery and public packaging,
+Phase 5c owns the real vote transaction and first upgrade, and the Phase 2 exit
+gate remains open.
+
 ### Exit gate (Phase 2)
 
 Kill-point matrix green on chromium + firefox + webkit with declared-equals-observed coverage; multi-tab,
