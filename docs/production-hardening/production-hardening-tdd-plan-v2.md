@@ -4020,6 +4020,95 @@ classification/precedence owner. Backend decode/I/O adapters report facts or raw
 failure only; they do not invent divergent semantic reasons. Full-journal
 canonicality remains the active authority through this slice.
 
+##### Phase 2e2 closure checkpoint — persisted taxonomy and poison lifecycle
+
+Phase 2e2 is accepted at tests-only RED commit
+`7720895` and production GREEN commit
+`13f488489eaae644681ae3acbd4dea9e2ed8c26b`. The frozen RED covers canonical
+unknown envelopes, malformed persisted bytes, absent/non-`Adopted`/mismatched
+head targets, multiple `Adopted` rows, physical-key disagreement, open-time
+schema incompatibility, zero-write rejection, first-root/queued/later/close
+lifecycle and caller/substrate controls on Node SQLite and real Chromium
+IndexedDB. On the old production, Node collapsed semantic corruption to
+`SUBSTRATE_FAILURE`, IndexedDB broad loading collapsed it to `INVALID_ARGUMENT`,
+no poison latch existed and incompatible schema could return a handle.
+
+The GREEN adds exactly the four ratified public reasons and one tagged shared
+`classifyPersistedState` entrypoint plus one typed semantic carrier. That owner
+detaches bytes, binds physical keys, merges full-journal failures with
+`UNSUPPORTED_STORAGE_SCHEMA` precedence, and enforces the retained broad
+exactly-one-`Adopted` invariant. Backends no longer parse error strings or invent
+semantic reasons. SQLite validates an existing physical schema through read-only
+introspection before WAL/schema creation, while a fresh database creates the
+accepted schema once. IndexedDB latches the first semantic root before abort or
+transaction completion and rechecks poison after each queued request activates;
+therefore one root wins, queued/later calls see `STORE_POISONED`, and successful
+idempotent close makes valid later calls see `STORE_CLOSED`. Caller-invalid and
+genuine substrate failures do not latch poison. The three `ADOPTED_BLOB_*`
+reasons are type-only here; private whole-journal mutation authority remains and
+no recovery/composite authority was added.
+
+Three old structural expectations were intentionally superseded rather than
+silently weakened: the strict adapter-author export allowlist now admits only the
+one classifier and typed carrier, and Phase 2e1's temporary Node/Chromium
+`SUBSTRATE_FAILURE`/`INVALID_ARGUMENT` corruption expectations now require
+`NON_CANONICAL_RECORD`. The Phase 2e2 causal files remain byte-identical. This is
+the expected semantic handoff recorded by the 2e1 closure, not a test rewrite to
+make the GREEN pass.
+
+Accepted verification is shared 125/125, Node 29 pass plus one opt-in long
+campaign skip, browser Vitest 174/174 from a post-commit clean checkout,
+Chromium combined adapter/2e1/2e2 16/16, schema 12/12, closure 3/3 and browser
+governance 10/10. Builds, all three storage package typechecks, explicit non-empty
+zero-warning lint, Prettier, diff, custody and frozen-RED checks passed. The six
+Node mutation scenarios, 25 crash checkpoints, mutation SQL and write ordering
+are unchanged, so no redundant long kill campaign ran. Workspace typecheck is
+still red only in the unrelated Phase 1i-b object fixtures recorded at 2e1. One
+review-time targeted Vitest invocation inherited the repository coverage
+threshold and printed a misleading workspace-wide coverage table; the same four
+files passed 24/24 with coverage disabled. Prefer an explicit
+`--coverage.enabled=false` for bounded reviewer reruns.
+
+Independent acceptance was unanimous:
+
+- genuine Grok 4.5/high session
+  `019fe504-6f58-7811-8156-ca68c99d2fd7` returned `APPROVED` and
+  `2E2_MAY_CLOSE: yes`; result/raw/integrity SHA-256 values are
+  `9ddc1f06f3f11190aa86fc77e1d4a131044481f7898905742e4a5ccde2d773cd`,
+  `9bbcc6b08c93a6b2cf016be00069ba25855363b714ca5dabcbfb249503faec3b`
+  and `e7aeb042b7c81c8981d48c9457fe64ee8a26acce4108ab0807e08f626eca3c6e`;
+- exact Kimi 3/high/max-100 session
+  `1b999574-31f7-4309-a60a-202a219719cd` returned `APPROVED` and
+  `2E2_MAY_CLOSE: yes`; raw/result/integrity SHA-256 values are
+  `87ee1bc876294498b1acda3eb580c7f1e344d8eac2e8893e418e31de9c6e08fa`,
+  `79069927190f05a444677cfae2094a195f7cd58b600a7c3e1a9250d7b9f4d5a5`
+  and `f0c30fdea1ddb8a7b29285d180c0d52b39fb794e62e84ea7d7755126794867c1`;
+- genuine Opus 5/xhigh session
+  `f5163acc-7cd0-4226-9baf-b8b35396b470` used only direct
+  `Read`/`Grep`/`Glob`, returned `APPROVED` and `2E2_MAY_CLOSE: yes`, and
+  produced result/raw/integrity SHA-256 values
+  `684a4448624f99bb0b2bd296d62b520e182177b4dbc2b26e5d8387f89eb6153d`,
+  `e2b54e9d56eb8bfe54d5ee915674e9bde3d392fb22408c1bad4d4ba5eabe51d5`
+  and `2ef6e01917374ab32363ba33dcf9449746510620f97557cdf03b122bc3d136d4`.
+
+Deferred ownership is explicit. A physical IndexedDB object row with
+`record: null` is the legitimate no-head representation; the broad invariant
+still rejects any surviving `Adopted` row, while 2e4 may pin finer empty-row
+precision. Phase 2e3's incremental verifier owns non-byte persisted blob
+classification; 2e4 must freeze matching backend behavior and must not leave the
+current browser `INVALID_ARGUMENT` fallback. Canonical wrong-kind envelope
+classification is a defensible `UNSUPPORTED_STORAGE_SCHEMA` reading; if 2e3
+recovery branches on that distinction, settle it before those branches,
+otherwise 2e4 or a correction quorum owns the precision. Phase 2e4 also freezes
+the explicit later-call result after a genuine `SUBSTRATE_FAILURE`. Public pages
+return the first physical semantic failure while the soon-to-be-deleted broad
+loader merges unsupported-wins; 2e3 must state recovery precedence explicitly
+and delete the broad owner atomically. Its RED must also supersede 2e2's
+tests-only `not.toContain("recoverActiveGeneration(")` guard rather than editing
+around it. Browser request-inventory strengthening remains 2e5. None of these
+deferrals enables the Discord/chat or MMORPG golden path before 2e3 and the
+remaining semantic phases.
+
 #### Slice 2e3 — atomic recovery and bounded mutation authority flip
 
 **Causal RED.** One cross-package tests-only RED freezes shared, memory, browser
