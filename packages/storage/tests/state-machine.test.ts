@@ -203,7 +203,13 @@ describe("Phase 2a five-state journal", () => {
 describe("Phase 2a head CAS and atomicity", () => {
 	it("exact none-head swap succeeds at revision 1", () => {
 		const harness = createTransitionHarness();
-		harness.seedObjectState({ head: noHead(), generations: [record({ state: "Complete" })] });
+		const payload = bytes(1);
+		const candidate = record({ closure: [ref(payload)], state: "Complete" });
+		const reference = candidate.closure[0];
+		if (reference === undefined) throw new Error("candidate closure fixture mismatch");
+		harness.seedObjectState({ head: noHead(), generations: [candidate] });
+		harness.seedBlob(reference.digest, payload);
+		harness.markPromoted(OBJECT_A, GENERATION_A, reference.digest);
 		const result = harness.swapHead({ objectId: OBJECT_A, generationId: GENERATION_A, expectedHead: noHead() });
 		expect(result).toMatchObject({ ok: true, value: { head: { revision: 1 }, supersededGenerationId: null } });
 	});
@@ -212,12 +218,18 @@ describe("Phase 2a head CAS and atomicity", () => {
 		const harness = createTransitionHarness();
 		const previous = record({ state: "Adopted", generationId: GENERATION_A });
 		const head = presentHead({ generationId: GENERATION_A, closureDigest: previous.closureDigest });
+		const payload = bytes(2);
 		const next = record({
+			closure: [ref(payload)],
 			state: "Complete",
 			generationId: GENERATION_B,
 			baseExpectedHead: head,
 		});
+		const reference = next.closure[0];
+		if (reference === undefined) throw new Error("candidate closure fixture mismatch");
 		harness.seedObjectState({ head, generations: [previous, next] });
+		harness.seedBlob(reference.digest, payload);
+		harness.markPromoted(OBJECT_A, GENERATION_B, reference.digest);
 		const result = harness.swapHead({ objectId: OBJECT_A, generationId: GENERATION_B, expectedHead: head });
 		expect(result).toMatchObject({
 			ok: true,
@@ -275,13 +287,23 @@ describe("Phase 2a head CAS and atomicity", () => {
 
 	it("linearizes competing exact-CAS swaps with one winner", async () => {
 		const harness = createTransitionHarness();
+		const firstPayload = bytes(1);
+		const secondPayload = bytes(2);
+		const first = record({ closure: [ref(firstPayload)], state: "Complete", generationId: GENERATION_A });
+		const second = record({ closure: [ref(secondPayload)], state: "Complete", generationId: GENERATION_B });
 		harness.seedObjectState({
 			head: noHead(),
-			generations: [
-				record({ state: "Complete", generationId: GENERATION_A }),
-				record({ state: "Complete", generationId: GENERATION_B }),
-			],
+			generations: [first, second],
 		});
+		for (const [generation, payload] of [
+			[first, firstPayload],
+			[second, secondPayload],
+		] as const) {
+			const reference = generation.closure[0];
+			if (reference === undefined) throw new Error("candidate closure fixture mismatch");
+			harness.seedBlob(reference.digest, payload);
+			harness.markPromoted(OBJECT_A, generation.generationId, reference.digest);
+		}
 		const outcomes = await Promise.all(
 			[GENERATION_A, GENERATION_B].map((generationId) =>
 				harness.swapHead({ objectId: OBJECT_A, generationId, expectedHead: noHead() })

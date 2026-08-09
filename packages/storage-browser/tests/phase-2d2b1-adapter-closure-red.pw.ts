@@ -42,7 +42,7 @@ test("a successful second head adoption supersedes revision 1 with exactly three
 				durability: "strict",
 				mode: "readwrite",
 				operation: "swapHeadRevision2",
-				stores: ["generations", "objects"],
+				stores: ["blobs", "generations", "objects", "promotions"],
 			},
 		],
 		writes: [
