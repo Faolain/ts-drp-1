@@ -4408,6 +4408,67 @@ matrix is green, then retire it. Initial database creation/version upgrade is no
 smuggled into the eighteen-case mutation matrix; a schema-migration owner must
 add an explicit case if that lifecycle claim is required.
 
+##### Phase 2e5 accepted and closed
+
+Phase 2e5 is accepted at normative checkpoint `c74a483`. Freeze the complete
+lineage: initial RED `54cf282`, production GREEN `1634d66`, corrective RED
+`04bd0fa`, corrective GREEN `c5cc4bf`, and the quorum-approved plan amendment
+`c74a483`. The initial RED was tests/config/assets only and failed solely on the
+extra physical head reads. The production GREEN changed only the real browser
+adapter. The corrective RED changed only the fourth inventory test and was exact
+three-pass/one-fail against the old edge helper. Its GREEN changed only the test
+fixture/helper and left both production and the corrective test byte-identical.
+
+Final executable evidence is Phase 2e5 4/4, declared-equals-observed 16/16 over
+15 transactions, 52 requests and 10 writes, prior Chromium 2d–2e4 22/22,
+browser Vitest 176/176, shared storage 133/133 and Node 54 passed with its one
+existing opt-in long-campaign skip. All three storage package typechecks and
+builds, traced zero-warning ESLint, Prettier and custody checks pass. The
+corrected edge authority derives eight scenarios, ten post-write edges and eight
+post-complete edges with eighteen unique IDs and zero invalid edges.
+
+Fresh corrected-candidate reviews accepted the result. Grok 4.5/high session
+`019fe665-3d01-7a32-88b2-0a9dddbe8448` returned `APPROVED`, no blockers or
+reward hacking; its raw/result SHA-256 values are
+`6a006711f6aa2d57a131918f0e246f27c4f6be31750146926120352855c0fb8b` and
+`8267d84edcfd4fae19b430255feb23fe7b4b89832cfcf3d577420ecd335577e9`.
+Its docs follow-up session `019fe66f-bb3c-7663-a01e-ed6f81fe77cc` also
+approved; prompt/raw/result/integrity SHA-256 values are
+`41c71262c55c4f5c2ea2a8d90d281a18ce8ae8832fa22a1d8f05680541cd665a`,
+`ed23d771cbe9d49419b9b980396139da2df86fd8b3158018f09ae39a1a594d5b`,
+`0157c84692fe31c40ba7c590a34dff3b133eb2f6f466e2cbb395db078fcc4918`
+and `6d04fb61d437c9adb4563b5fd40da35b2372f7aa2068df5538cabf2d6de48642`.
+
+Genuine Kimi 3/high/max-100 session `3d9df77c-1bfa-4748-9062-35e76583c1c3`
+accepted every executable byte and requested only the now-landed plan amendment.
+Its exact-HEAD follow-up session `ae5db27f-e38e-4ec8-bd48-63a09c7ec08d`
+returned `DOCS_BLOCKER_RESOLVED: yes` and `2E5_MAY_CLOSE: yes`; follow-up
+prompt/raw/result/integrity SHA-256 values are
+`99d9ad4537e9b6c97c49ba6a14f614ade565f4fbdd9e1aade4bd22cc3bada11f`,
+`5f5cc9bb143d26e08010b9aab2447e062d29b82b2f4f2398ea327509e9b0de6b`,
+`1282a668ed0b67c3c80362f171855164255dd5c10c692d340225ece0058cd42f`
+and `390f2bc3a31e854ba9ef75e62ec232b180c14451847b707682bbb6bdc7628730`.
+
+Final Opus 5/xhigh session `26af6a6f-48fd-46fa-b2ca-31dfb087987d`
+returned `APPROVED`, zero blockers, no reward hacking and `2E5_MAY_CLOSE: yes`.
+Prompt/raw/result/integrity SHA-256 values are
+`59437e292afcfe3e133724c27d256642f5204cecb998ef6743a7710f2755dd8e`,
+`8fe556d0266f8f2543550111aac910b028ba3692ce957cd655b6ea6729f39d8d`,
+`73d699a4f121ea11eeb0a9b72d2516599ceef174a66762050ba80c012691a365`
+and `ccb9b4496b414998c838ba06c9a165660809d8108351c8ed0062951d27cdbbc8`.
+All substantive assistant messages authenticated as `claude-opus-5`; a permitted
+automatic Haiku metadata/helper call used 4,405 input and 23 output tokens and
+performed no review work.
+
+Two evidence gotchas are closed rather than hidden. The production GREEN agent's
+voluntary nested Codex review executed the protected untracked Phase 0g2 REDs,
+which failed as expected for unrelated unimplemented work; it made no edit and
+custody remained clean. Separately, Kimi inspected the Grok directory while its
+buffered controller was still finalizing and temporarily reported a hollow
+artifact. The exact-HEAD follow-up rechecked the finalized non-empty bytes and
+explicitly retracted that finding. Neither Discord/chat nor MMORPG is enabled by
+2e5; the settlement/process-death proof remains Phase 2e6.
+
 #### Slice 2e6 — real browser process-death adoption matrix
 
 At every ratified durability-distinguishing edge derived above, freeze the
