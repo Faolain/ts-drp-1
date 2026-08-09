@@ -127,7 +127,7 @@ describe("Phase 2e1 bounded public reads RED", () => {
 				nextCursor: null,
 			},
 		});
-		expect.soft(await callSplitRead(store, "readGenerationPage", { objectId: OBJECT_A, limit: 2 })).toMatchObject({
+		expect.soft(await callSplitRead(store, "readGenerationPage", { objectId: OBJECT_A, limit: 1 })).toMatchObject({
 			ok: true,
 			value: { generations: [{ generationId: GENERATION_A, state: "Staged" }] },
 		});

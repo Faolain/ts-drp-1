@@ -138,7 +138,11 @@ async function readStoreView(store) {
 	let cursor;
 	do {
 		const page = await successful(
-			await store.readGenerationPage({ cursor, limit: 128, objectId: OBJECT }),
+			await store.readGenerationPage({
+				...(cursor === undefined ? {} : { cursor }),
+				limit: 128,
+				objectId: OBJECT,
+			}),
 			"readGenerationPage"
 		);
 		generations.push(...page.generations);

@@ -22,6 +22,8 @@ const ADAPTER_STORE_OWNERSHIP = Object.freeze({
 	loads: {
 		"blob": ["blobs"],
 		"generation-closure": ["generations", "promotions"],
+		"generation-page": ["generations"],
+		"head": ["objects"],
 		"object-state": ["objects", "generations"],
 		"promotion": ["promotions"],
 	} satisfies Record<StorageAdapterLoadRequirement["kind"], readonly Phase2dStore[]>,
@@ -73,6 +75,8 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 			loads: {
 				"blob": ["blobs"],
 				"generation-closure": ["generations", "promotions"],
+				"generation-page": ["generations"],
+				"head": ["objects"],
 				"object-state": ["objects", "generations"],
 				"promotion": ["promotions"],
 			},

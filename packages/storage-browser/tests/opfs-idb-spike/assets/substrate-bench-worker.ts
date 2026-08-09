@@ -94,22 +94,21 @@ function objectFact(snapshot: MutableSnapshot): StorageAdapterFact {
 function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnapshot): StorageAdapterFact[] {
 	const facts: StorageAdapterFact[] = [];
 	for (const requirement of prepared.requirements) {
-		const requirementKind: string = requirement.kind;
-		if (requirementKind === "head") {
+		if (requirement.kind === "head") {
 			facts.push({
 				kind: "head",
-				objectId: OBJECT_ID,
+				objectId: requirement.objectId,
 				headRecord: snapshot.headRecord === null ? null : new Uint8Array(snapshot.headRecord),
-			} as unknown as StorageAdapterFact);
-		} else if (requirementKind === "generation-page") {
+			});
+		} else if (requirement.kind === "generation-page") {
 			facts.push({
-				afterGenerationId: null,
+				afterGenerationId: requirement.afterGenerationId,
 				generationRecords: [...snapshot.generationRecords.entries()]
 					.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
 					.map(([, bytes]) => new Uint8Array(bytes)),
 				kind: "generation-page",
-				objectId: OBJECT_ID,
-			} as unknown as StorageAdapterFact);
+				objectId: requirement.objectId,
+			});
 		} else if (requirement.kind === "object-state") {
 			facts.push(objectFact(snapshot));
 		} else if (requirement.kind === "blob") {
@@ -119,7 +118,7 @@ function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnap
 			if (snapshot.promotions.has(promotionKey(requirement.objectId, requirement.generationId, requirement.digest))) {
 				facts.push(requirement);
 			}
-		} else {
+		} else if (requirement.kind === "generation-closure") {
 			const encoded = snapshot.generationRecords.get(requirement.generationId);
 			if (encoded === undefined) continue;
 			const decoded = decodeGenerationRecordV1(encoded);
@@ -136,6 +135,9 @@ function factsFor(prepared: PreparedStorageAdapterCommand, snapshot: MutableSnap
 					});
 				}
 			}
+		} else {
+			const unsupported: never = requirement;
+			throw new Error(`unsupported storage load requirement: ${String(unsupported)}`);
 		}
 	}
 	return facts;

@@ -68,7 +68,11 @@ async function readStoreView(store: object, objectId: StorageObjectId): Promise<
 	const generations: GenerationRecord[] = [];
 	let cursor: unknown;
 	do {
-		const page = await callSplitRead(store, "readGenerationPage", { cursor, limit: 128, objectId });
+		const page = await callSplitRead(store, "readGenerationPage", {
+			...(cursor === undefined ? {} : { cursor }),
+			limit: 128,
+			objectId,
+		});
 		if (!page.ok) return page;
 		const value = page.value as { readonly generations: readonly GenerationRecord[]; readonly nextCursor: unknown };
 		generations.push(...value.generations);

@@ -25,7 +25,7 @@ test("real Chromium exposes detached head and bounded exclusive pages with pre-I
 			ok: true,
 			value: { generations: [{ generationId: GENERATION_C, state: "Staged" }], nextCursor: null },
 		},
-		firstHead: { ok: true, value: { generationId: GENERATION_A, kind: "present", revision: 1 } },
+		firstHead: { ok: true, value: { generationId: GENERATION_A, kind: "present", revision: 99 } },
 		firstPage: {
 			ok: true,
 			value: { generations: [{ generationId: GENERATION_A }, { generationId: GENERATION_B }] },
