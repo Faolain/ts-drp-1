@@ -59,6 +59,7 @@ describe("Phase 2b structural controls", () => {
 			"playwright.phase-2d2a-idb-adapter.config.ts",
 			"playwright.phase-2d2b1-adapter-closure.config.ts",
 			"playwright.phase-2e5-browser-inventory.config.ts",
+			"playwright.phase-2e6-real-process-death.config.ts",
 		]);
 		const build = readJson("packages/storage-browser/tsconfig.build.json");
 		expect(build.exclude).toEqual([
@@ -69,6 +70,7 @@ describe("Phase 2b structural controls", () => {
 			"playwright.phase-2d2a-idb-adapter.config.ts",
 			"playwright.phase-2d2b1-adapter-closure.config.ts",
 			"playwright.phase-2e5-browser-inventory.config.ts",
+			"playwright.phase-2e6-real-process-death.config.ts",
 		]);
 	});
 
@@ -138,7 +140,9 @@ describe("Phase 2b structural controls", () => {
 		const root = readJson("package.json");
 		expect(root.scripts).toMatchObject({
 			"e2e-test:storage-browser":
-				"pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e5-browser-inventory.config.ts --fail-on-flaky-tests",
+				"pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e5-browser-inventory.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e6-real-process-death.config.ts --fail-on-flaky-tests",
 		});
+		const phase2e6Setup = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "tests/phase-2e6-global-setup.ts"), "utf8");
+		expect(phase2e6Setup).toContain("return () => fs.rmSync(assetDirectory, { force: true, recursive: true })");
 	});
 });

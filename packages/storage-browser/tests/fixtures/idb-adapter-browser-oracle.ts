@@ -1,10 +1,123 @@
 import type { BlobDigest } from "@ts-drp/storage";
 
+import type { Phase2e6DeclaredEdge, Phase2e6TraceEvent } from "./phase-2e6-real-process-death-contract.js";
+
 export interface Phase2dTransactionTrace {
 	readonly durability: "default" | "relaxed" | "strict";
 	readonly mode: "readonly" | "readwrite" | "versionchange";
 	readonly operation: string;
 	readonly stores: readonly string[];
+}
+
+/**
+ * Intercepts actual adapter request settlements before adapter listeners run.
+ * @param edge - Exact data-derived arm edge.
+ * @param signal - Worker-owned blocking signal.
+ * @param onArm - Synchronous relay invoked at the requested settlement.
+ * @param run - Actual adapter operation to observe.
+ * @returns Operation result and exact occurrence-sensitive trace.
+ */
+export async function withPhase2e6SettlementTrace<T>(
+	edge: Phase2e6DeclaredEdge,
+	signal: SharedArrayBuffer,
+	onArm: (trace: readonly Phase2e6TraceEvent[], transactionCount: number) => void,
+	run: () => Promise<T>
+): Promise<{ readonly result: T; readonly trace: readonly Phase2e6TraceEvent[] }> {
+	const originalTransaction = IDBDatabase.prototype.transaction;
+	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
+	const originalAdd = IDBObjectStore.prototype.add;
+	const originalGet = IDBObjectStore.prototype.get;
+	const originalGetAll = IDBObjectStore.prototype.getAll;
+	const originalPut = IDBObjectStore.prototype.put;
+	const trace: Phase2e6TraceEvent[] = [];
+	let requestIndex = 0;
+	let transactionCount = 0;
+	const target = edge.id.replace(/\/after$/u, "/success");
+	const reached = (event: Phase2e6TraceEvent): void => {
+		trace.push(Object.freeze(event));
+		if (event.id !== target) return;
+		const cell = new Int32Array(signal);
+		if (Atomics.compareExchange(cell, 0, 0, 1) !== 0) throw new Error("requested arm reached more than once");
+		onArm(Object.freeze([...trace]), transactionCount);
+		Atomics.wait(cell, 0, 1);
+	};
+	const observe = <TResult>(
+		kind: "add" | "get" | "getAll" | "put",
+		store: string,
+		request: IDBRequest<TResult>
+	): IDBRequest<TResult> => {
+		const base = `${edge.scenarioId}/request-${String(requestIndex++).padStart(2, "0")}-${kind}-${store}`;
+		reached({ id: `${base}/created`, kind: "request-created" });
+		request.addEventListener("success", () => reached({ id: `${base}/success`, kind: "request-success" }), {
+			once: true,
+		});
+		return request;
+	};
+	IDBDatabase.prototype.transaction = function phase2e6Transaction(
+		this: IDBDatabase,
+		stores: string | string[],
+		mode?: IDBTransactionMode,
+		options?: IDBTransactionOptions
+	): IDBTransaction {
+		const transaction = originalTransaction.call(this, stores, mode, options);
+		transactionCount += 1;
+		originalTransactionAddEventListener.call(
+			transaction,
+			"complete",
+			() => reached({ id: `${edge.scenarioId}/transaction-terminal-complete/success`, kind: "transaction-complete" }),
+			{ once: true }
+		);
+		return transaction;
+	};
+	IDBObjectStore.prototype.add = function phase2e6Add(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		return observe(
+			"add",
+			this.name,
+			key === undefined ? originalAdd.call(this, value) : originalAdd.call(this, value, key)
+		);
+	};
+	IDBObjectStore.prototype.get = function phase2e6Get(
+		this: IDBObjectStore,
+		query: IDBValidKey | IDBKeyRange
+	): IDBRequest<unknown> {
+		return observe("get", this.name, originalGet.call(this, query));
+	};
+	IDBObjectStore.prototype.getAll = function phase2e6GetAll(
+		this: IDBObjectStore,
+		query?: IDBValidKey | IDBKeyRange | null,
+		count?: number
+	): IDBRequest<unknown[]> {
+		return observe(
+			"getAll",
+			this.name,
+			count === undefined ? originalGetAll.call(this, query) : originalGetAll.call(this, query, count)
+		);
+	};
+	IDBObjectStore.prototype.put = function phase2e6Put(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		return observe(
+			"put",
+			this.name,
+			key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key)
+		);
+	};
+	try {
+		return { result: await run(), trace: Object.freeze([...trace]) };
+	} finally {
+		IDBDatabase.prototype.transaction = originalTransaction;
+		IDBTransaction.prototype.addEventListener = originalTransactionAddEventListener;
+		IDBObjectStore.prototype.add = originalAdd;
+		IDBObjectStore.prototype.get = originalGet;
+		IDBObjectStore.prototype.getAll = originalGetAll;
+		IDBObjectStore.prototype.put = originalPut;
+	}
 }
 
 export interface Phase2dStoreCallTrace {

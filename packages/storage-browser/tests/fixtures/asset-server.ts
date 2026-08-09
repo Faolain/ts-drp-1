@@ -6,7 +6,7 @@ import path from "node:path";
 export interface AssetServer {
 	readonly baseURL: string;
 	close(): Promise<void>;
-	issueTransitionURL(): string;
+	issueTransitionURL(asset?: string): string;
 	revoke(token: string): void;
 }
 
@@ -36,6 +36,9 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 		"seed-entry.js",
 		"oracle.html",
 		"oracle-entry.js",
+		"phase-2e6.html",
+		"phase-2e6-real-process-death.js",
+		"phase-2e6-real-process-death-worker.js",
 	]);
 	const tokens = new Set<string>();
 	const server = http.createServer((request, response) => {
@@ -91,10 +94,11 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 			resolve({
 				baseURL,
 				close: (): Promise<void> => closeServer(server),
-				issueTransitionURL: (): string => {
+				issueTransitionURL: (asset = "index.html"): string => {
+					if (!allowed.has(asset)) throw new TypeError("transition asset is not allowed");
 					const token = randomUUID();
 					tokens.add(token);
-					return `${baseURL}/transition/${token}/index.html`;
+					return `${baseURL}/transition/${token}/${asset}`;
 				},
 				revoke: (token): void => {
 					tokens.delete(token);
