@@ -44,6 +44,17 @@ type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob"
 
 type TransactionOutcome = Readonly<{ ok: true }> | Readonly<{ cause: unknown; ok: false }>;
 
+type HeadFact = Extract<StorageAdapterFact, { kind: "head" }>;
+
+type TransactionHeadObservation = Readonly<{
+	fact: HeadFact;
+	head: ExpectedHead;
+}>;
+
+type TransactionHeadObservationResult =
+	| Readonly<{ ok: true; value: TransactionHeadObservation }>
+	| Readonly<{ ok: false; reason: PersistedStorageError["reason"] }>;
+
 const STRICT_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({
 	durability: "strict",
 	signingEligibility: "backend-capability-required",
@@ -286,6 +297,7 @@ class IdbAheDurableStore implements AheDurableStore {
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
 			const objectId = "objectId" in prepared.command ? prepared.command.objectId : undefined;
+			let headObservation: TransactionHeadObservation | undefined;
 			const authorityStores =
 				mutation &&
 				objectId !== undefined &&
@@ -299,9 +311,16 @@ class IdbAheDurableStore implements AheDurableStore {
 			if (mutation && transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
 			if (mutation) {
 				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
+				const observed = await this.observeHead(transaction, prepared.command.objectId);
+				if (!observed.ok) {
+					abortIfActive(transaction);
+					await completion;
+					return this.lifecycle.latchPoison(observed.reason);
+				}
+				headObservation = observed.value;
 				const recovered = await this.ensureCertificate(
 					transaction,
-					prepared.command.objectId,
+					headObservation,
 					operation === "completeGeneration" || operation === "swapHead"
 				);
 				if (!recovered.ok) {
@@ -311,7 +330,7 @@ class IdbAheDurableStore implements AheDurableStore {
 				}
 			}
 
-			const facts = await this.loadFacts(transaction, prepared);
+			const facts = await this.loadFacts(transaction, prepared, headObservation);
 			let evaluation = evaluateStorageAdapterCommand(prepared, facts);
 			if (prepared.command.kind === "completeGeneration" || prepared.command.kind === "swapHead") {
 				if (!evaluation.result.ok && evaluation.result.reason !== "INVALID_ARGUMENT") {
@@ -364,7 +383,8 @@ class IdbAheDurableStore implements AheDurableStore {
 
 	private async loadFacts(
 		transaction: IDBTransaction,
-		prepared: PreparedStorageAdapterCommand
+		prepared: PreparedStorageAdapterCommand,
+		headObservation?: TransactionHeadObservation
 	): Promise<readonly StorageAdapterFact[]> {
 		const facts: StorageAdapterFact[] = [];
 		const loadedBlobs = new Set<BlobDigest>();
@@ -372,22 +392,10 @@ class IdbAheDurableStore implements AheDurableStore {
 		for (const requirement of prepared.requirements) {
 			switch (requirement.kind) {
 				case "head": {
-					const headRow = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(requirement.objectId));
-					const classified = classifyPersistedState({
-						kind: "head",
-						objectId: requirement.objectId,
-						row:
-							headRow === undefined
-								? null
-								: { objectId: rowProperty(headRow, "objectId"), record: rowProperty(headRow, "record") },
-					});
-					if (!classified.ok) throw new PersistedStorageError(classified.reason);
-					if (classified.value.kind !== "head") throw new Error("persisted classifier returned the wrong fact kind");
-					facts.push({
-						headRecord: classified.value.record,
-						kind: "head",
-						objectId: requirement.objectId,
-					});
+					const observed = headObservation ?? (await this.requiredHeadObservation(transaction, requirement.objectId));
+					if (observed.fact.objectId !== requirement.objectId)
+						throw new Error("transaction head observation has the wrong object scope");
+					facts.push(observed.fact);
 					break;
 				}
 				case "generation-page": {
@@ -479,31 +487,46 @@ class IdbAheDurableStore implements AheDurableStore {
 		}
 	}
 
-	private async readHeadInTransaction(
+	private async observeHead(
 		transaction: IDBTransaction,
 		objectId: StorageObjectId
-	): Promise<StoreResult<ExpectedHead>> {
+	): Promise<TransactionHeadObservationResult> {
 		const row = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(objectId));
 		const classified = classifyPersistedState({
 			kind: "head",
 			objectId,
 			row: row === undefined ? null : { objectId: rowProperty(row, "objectId"), record: rowProperty(row, "record") },
 		});
-		return classified.ok && classified.value.kind === "head"
-			? { ok: true, value: classified.value.head }
-			: (classified as StoreResult<ExpectedHead>);
+		if (!classified.ok) return classified;
+		if (classified.value.kind !== "head") throw new Error("persisted classifier returned the wrong fact kind");
+		return {
+			ok: true,
+			value: {
+				fact: { headRecord: classified.value.record, kind: "head", objectId },
+				head: classified.value.head,
+			},
+		};
+	}
+
+	private async requiredHeadObservation(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId
+	): Promise<TransactionHeadObservation> {
+		const observed = await this.observeHead(transaction, objectId);
+		if (!observed.ok) throw new PersistedStorageError(observed.reason);
+		return observed.value;
 	}
 
 	private async ensureCertificate(
 		transaction: IDBTransaction,
-		objectId: StorageObjectId,
+		headObservation: TransactionHeadObservation,
 		required: boolean
 	): Promise<StoreResult<undefined>> {
-		const head = await this.readHeadInTransaction(transaction, objectId);
-		if (!head.ok) return head;
-		if (this.recoveryCertificates.get(objectId) === headFingerprint(head.value)) return { ok: true, value: undefined };
+		const objectId = headObservation.fact.objectId;
+		if (this.recoveryCertificates.get(objectId) === headFingerprint(headObservation.head))
+			return { ok: true, value: undefined };
 		if (!required && !this.recoveryCertificates.has(objectId)) return { ok: true, value: undefined };
-		const recovered = await this.recoverWithinTransaction(transaction, objectId);
+		const recovered = await this.recoverWithinTransaction(transaction, objectId, headObservation);
 		if (!recovered.ok) return recovered;
 		this.recoveryCertificates.set(objectId, headFingerprint(recovered.value.head));
 		return { ok: true, value: undefined };
@@ -511,10 +534,16 @@ class IdbAheDurableStore implements AheDurableStore {
 
 	private async recoverWithinTransaction(
 		transaction: IDBTransaction,
-		objectId: StorageObjectId
+		objectId: StorageObjectId,
+		headObservation?: TransactionHeadObservation
 	): Promise<StoreResult<ActiveGenerationSnapshot>> {
-		const headResult = await this.readHeadInTransaction(transaction, objectId);
-		if (!headResult.ok) return headResult;
+		const observed: TransactionHeadObservationResult =
+			headObservation === undefined
+				? await this.observeHead(transaction, objectId)
+				: { ok: true, value: headObservation };
+		if (!observed.ok) return observed;
+		if (observed.value.fact.objectId !== objectId)
+			throw new Error("transaction head observation has the wrong object scope");
 		let after: GenerationId | null = null;
 		let adopted: GenerationRecord | null = null;
 		let count = 0;
@@ -549,7 +578,7 @@ class IdbAheDurableStore implements AheDurableStore {
 			after = last as GenerationId;
 		}
 		if (failure !== undefined) return { ok: false, reason: failure };
-		const head = headResult.value;
+		const head = observed.value.head;
 		if (head.kind === "none")
 			return count === 0
 				? {
