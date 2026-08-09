@@ -2,10 +2,15 @@ import { expect, type Page, test } from "@playwright/test";
 
 const OBJECT_A = `phase-2d2a-a:${"a".repeat(32)}`;
 const GENERATION_A = "a".repeat(64);
+const GENERATION_X = `${"a".repeat(63)}f`;
 const GENERATION_B = "b".repeat(64);
 const GENERATION_C = "c".repeat(64);
+const GENERATION_D = "d".repeat(64);
 
-async function run(page: Page, method: "runPhase2e1BoundedReads" | "runPhase2e1BroadInvariant"): Promise<unknown> {
+async function run(
+	page: Page,
+	method: "runPhase2e1BoundedReads" | "runPhase2e1BroadInvariant" | "runPhase2e1PhysicalKeyMismatch"
+): Promise<unknown> {
 	await page.goto("/");
 	await page.waitForFunction(() => "phase2d2aAdapterHarness" in globalThis);
 	return page.evaluate(async (selected) => {
@@ -41,5 +46,23 @@ test("real Chromium retains broad missing-head/surviving-Adopted rejection befor
 		generationRows: 1,
 		headRows: 1,
 		reason: "INVALID_ARGUMENT",
+	});
+});
+
+test("real Chromium fails closed when an IndexedDB compound key disagrees with its canonical record", async ({
+	page,
+}) => {
+	await expect(run(page, "runPhase2e1PhysicalKeyMismatch")).resolves.toEqual({
+		continuationGenerationIds: [],
+		pageReason: "SUBSTRATE_FAILURE",
+		publishedGenerationIds: [],
+		rowCount: 5,
+		rows: [
+			{ canonicalGenerationId: GENERATION_C, physicalGenerationId: GENERATION_A },
+			{ canonicalGenerationId: GENERATION_D, physicalGenerationId: GENERATION_X },
+			{ canonicalGenerationId: GENERATION_B, physicalGenerationId: GENERATION_B },
+			{ canonicalGenerationId: GENERATION_C, physicalGenerationId: GENERATION_C },
+			{ canonicalGenerationId: GENERATION_D, physicalGenerationId: GENERATION_D },
+		],
 	});
 });

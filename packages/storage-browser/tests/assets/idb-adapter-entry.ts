@@ -1,5 +1,6 @@
 import {
 	type AheDurableStore,
+	decodeGenerationRecordV1,
 	digestBlob,
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
@@ -18,6 +19,7 @@ import {
 	deletePhase2dDatabase,
 	gateNextPhase2dTransactionTerminal,
 	type Phase2dTerminalGate,
+	rawPhase2dAliasGenerationRecord,
 	rawPhase2dClearHead,
 	rawPhase2dCount,
 	rawPhase2dGet,
@@ -32,8 +34,10 @@ import { createPhase2d2aRedStore } from "../fixtures/idb-adapter-red-scaffold.js
 const OBJECT_A = must(parseStorageObjectId(`phase-2d2a-a:${"a".repeat(32)}`));
 const OBJECT_B = must(parseStorageObjectId(`phase-2d2a-b:${"b".repeat(32)}`));
 const GENERATION_A = must(parseGenerationId("a".repeat(64)));
+const GENERATION_X = must(parseGenerationId(`${"a".repeat(63)}f`));
 const GENERATION_B = must(parseGenerationId("b".repeat(64)));
 const GENERATION_C = must(parseGenerationId("c".repeat(64)));
+const GENERATION_D = must(parseGenerationId("d".repeat(64)));
 const PAYLOAD_A = Uint8Array.of(1, 2, 3, 4);
 const PAYLOAD_B = Uint8Array.of(9, 8, 7);
 const DIGEST_A = must(digestBlob(PAYLOAD_A));
@@ -576,6 +580,68 @@ async function runPhase2e1BroadInvariant(): Promise<unknown> {
 	}
 }
 
+async function runPhase2e1PhysicalKeyMismatch(): Promise<unknown> {
+	const name = databaseName("phase-2e1-physical-key-mismatch");
+	try {
+		let store = await createPhase2d2aRedStore({ databaseName: name });
+		if (!(await begin(store, OBJECT_A, GENERATION_B, PAYLOAD_A)).ok) throw new Error("generation B seed failed");
+		if (!(await begin(store, OBJECT_A, GENERATION_C, PAYLOAD_B)).ok) throw new Error("generation C seed failed");
+		if (!(await begin(store, OBJECT_A, GENERATION_D, PAYLOAD_A)).ok) throw new Error("generation D seed failed");
+		await store.close();
+		await rawPhase2dAliasGenerationRecord(name, OBJECT_A, GENERATION_C, GENERATION_A);
+		await rawPhase2dAliasGenerationRecord(name, OBJECT_A, GENERATION_D, GENERATION_X);
+
+		store = await createPhase2d2aRedStore({ databaseName: name });
+		const page = await splitRead(store, "readGenerationPage", { limit: 1, objectId: OBJECT_A });
+		const pageValue = page.ok && typeof page.value === "object" && page.value !== null ? page.value : undefined;
+		const publishedRows = pageValue === undefined ? undefined : Reflect.get(pageValue, "generations");
+		const publishedGenerationIds = Array.isArray(publishedRows)
+			? publishedRows.map((row) => (typeof row === "object" && row !== null ? Reflect.get(row, "generationId") : null))
+			: [];
+		const cursor = pageValue === undefined ? undefined : Reflect.get(pageValue, "nextCursor");
+		const continuation =
+			typeof cursor === "string"
+				? await splitRead(store, "readGenerationPage", { cursor, limit: 1, objectId: OBJECT_A })
+				: undefined;
+		const continuationValue =
+			continuation?.ok === true && typeof continuation.value === "object" && continuation.value !== null
+				? continuation.value
+				: undefined;
+		const continuationRows =
+			continuationValue === undefined ? undefined : Reflect.get(continuationValue, "generations");
+		const continuationGenerationIds = Array.isArray(continuationRows)
+			? continuationRows.map((row) =>
+					typeof row === "object" && row !== null ? Reflect.get(row, "generationId") : null
+				)
+			: [];
+		await store.close();
+
+		const rows = await Promise.all(
+			[GENERATION_A, GENERATION_X, GENERATION_B, GENERATION_C, GENERATION_D].map(async (physicalGenerationId) => {
+				const row = (await rawPhase2dGet(name, "generations", [OBJECT_A, physicalGenerationId])) as
+					| { readonly generationId?: unknown; readonly record?: unknown }
+					| undefined;
+				const decoded = row?.record instanceof Uint8Array ? decodeGenerationRecordV1(row.record) : undefined;
+				return {
+					canonicalGenerationId: decoded?.ok === true ? decoded.value.generationId : null,
+					physicalGenerationId: row?.generationId ?? null,
+				};
+			})
+		);
+		return {
+			continuationGenerationIds,
+			pageReason: reason(page),
+			publishedGenerationIds,
+			rowCount: await rawPhase2dCount(name, "generations"),
+			rows,
+		};
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error) };
+	} finally {
+		await deletePhase2dDatabase(name);
+	}
+}
+
 async function runCloseQuiescence(): Promise<unknown> {
 	const name = databaseName("close-quiescence");
 	let gate: Phase2dTerminalGate<StoreResult<GenerationRecord>> | undefined;
@@ -708,6 +774,7 @@ const harness = Object.freeze({
 	runOwnershipTrace,
 	runPhase2e1BoundedReads,
 	runPhase2e1BroadInvariant,
+	runPhase2e1PhysicalKeyMismatch,
 	runPersistenceAndCopies,
 	runSameDigestDifferentBytes,
 	runSharedContract,

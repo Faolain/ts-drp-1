@@ -1,5 +1,6 @@
 import {
 	type AheDurableStore,
+	decodeGenerationRecordV1,
 	digestBlob,
 	type ExpectedHead,
 	type GenerationId,
@@ -17,8 +18,10 @@ import { createSqliteAheDurableStore } from "../src/index.js";
 
 const OBJECT_A = must(parseStorageObjectId(`phase-2e1-node-a:${"a".repeat(32)}`));
 const GENERATION_A = must(parseGenerationId("1".repeat(64)));
+const GENERATION_X = must(parseGenerationId(`${"1".repeat(63)}f`));
 const GENERATION_B = must(parseGenerationId("2".repeat(64)));
 const GENERATION_C = must(parseGenerationId("3".repeat(64)));
+const GENERATION_D = must(parseGenerationId("4".repeat(64)));
 const temporaryDirectories: string[] = [];
 
 function must<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
@@ -158,6 +161,92 @@ describe("Phase 2e1 Node SQLite bounded-read RED", () => {
 			expect(oracle.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(OBJECT_A)).toEqual({
 				head_record: null,
 			});
+		} finally {
+			oracle.close();
+		}
+	});
+
+	it("fails closed when a physical SQLite generation key disagrees with its canonical record", async () => {
+		const filename = await databaseFilename();
+		let store = createSqliteAheDurableStore({ filename });
+		await stage(store, GENERATION_B, Uint8Array.of(2), noHead());
+		await stage(store, GENERATION_C, Uint8Array.of(3), noHead());
+		await stage(store, GENERATION_D, Uint8Array.of(4), noHead());
+		await store.close();
+
+		const corruptor = new DatabaseSync(filename);
+		const canonicalB = new Uint8Array(
+			(
+				corruptor
+					.prepare("SELECT record FROM generations WHERE object_id = ? AND generation_id = ?")
+					.get(OBJECT_A, GENERATION_B) as { record: Uint8Array }
+			).record
+		);
+		const canonicalC = new Uint8Array(
+			(
+				corruptor
+					.prepare("SELECT record FROM generations WHERE object_id = ? AND generation_id = ?")
+					.get(OBJECT_A, GENERATION_C) as { record: Uint8Array }
+			).record
+		);
+		const canonicalD = new Uint8Array(
+			(
+				corruptor
+					.prepare("SELECT record FROM generations WHERE object_id = ? AND generation_id = ?")
+					.get(OBJECT_A, GENERATION_D) as { record: Uint8Array }
+			).record
+		);
+		corruptor
+			.prepare("UPDATE generations SET generation_id = ? WHERE object_id = ? AND generation_id = ?")
+			.run(GENERATION_A, OBJECT_A, GENERATION_C);
+		corruptor
+			.prepare("UPDATE generations SET generation_id = ? WHERE object_id = ? AND generation_id = ?")
+			.run(GENERATION_X, OBJECT_A, GENERATION_D);
+		corruptor.close();
+
+		store = createSqliteAheDurableStore({ filename });
+		const result = await splitRead(store, "readGenerationPage", { limit: 1, objectId: OBJECT_A });
+		expect.soft(result).toMatchObject({ ok: false, reason: "SUBSTRATE_FAILURE" });
+		const firstPage = result as {
+			readonly ok?: boolean;
+			readonly value?: {
+				readonly generations?: readonly { readonly generationId?: unknown }[];
+				readonly nextCursor?: unknown;
+			};
+		};
+		const publishedGenerationIds =
+			firstPage.ok === true ? (firstPage.value?.generations ?? []).map(({ generationId }) => generationId) : [];
+		let continuationGenerationIds: unknown[] = [];
+		if (firstPage.ok === true && typeof firstPage.value?.nextCursor === "string") {
+			const continuation = (await splitRead(store, "readGenerationPage", {
+				cursor: firstPage.value.nextCursor,
+				limit: 1,
+				objectId: OBJECT_A,
+			})) as {
+				readonly ok?: boolean;
+				readonly value?: { readonly generations?: readonly { readonly generationId?: unknown }[] };
+			};
+			if (continuation.ok === true) {
+				continuationGenerationIds = (continuation.value?.generations ?? []).map(({ generationId }) => generationId);
+			}
+		}
+		expect.soft(publishedGenerationIds).toEqual([]);
+		expect.soft(continuationGenerationIds).toEqual([]);
+		await store.close();
+
+		const oracle = new DatabaseSync(filename, { readOnly: true });
+		try {
+			const rows = oracle
+				.prepare("SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id")
+				.all(OBJECT_A) as Array<{ generation_id: string; record: Uint8Array }>;
+			expect.soft(rows.map(({ generation_id }) => generation_id)).toEqual([GENERATION_A, GENERATION_X, GENERATION_B]);
+			expect.soft(new Uint8Array(rows[0]?.record ?? [])).toEqual(canonicalC);
+			expect.soft(new Uint8Array(rows[1]?.record ?? [])).toEqual(canonicalD);
+			expect.soft(new Uint8Array(rows[2]?.record ?? [])).toEqual(canonicalB);
+			const decodedA = decodeGenerationRecordV1(new Uint8Array(rows[0]?.record ?? []));
+			const decodedX = decodeGenerationRecordV1(new Uint8Array(rows[1]?.record ?? []));
+			expect.soft(decodedA).toMatchObject({ ok: true, value: { generationId: GENERATION_C } });
+			expect.soft(decodedX).toMatchObject({ ok: true, value: { generationId: GENERATION_D } });
 		} finally {
 			oracle.close();
 		}

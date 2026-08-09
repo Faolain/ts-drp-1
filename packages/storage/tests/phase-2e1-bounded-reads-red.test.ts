@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
 	bytes,
@@ -20,8 +20,10 @@ import {
 	type StorageAdapterWrite,
 } from "../src/adapter.js";
 import { encodeGenerationRecordV1, encodeHeadRecordV1 } from "../src/codecs.js";
+import { TransitionOwner } from "../src/internal/transition.js";
 import { createMemoryAheDurableStore } from "../src/memory.js";
 import type { GenerationRecord } from "../src/types.js";
+import { parseGenerationId } from "../src/values.js";
 
 const MAX_GENERATION_PAGE_ROWS = 128;
 
@@ -54,6 +56,12 @@ async function callSplitRead(
 
 function writeKinds(writes: readonly StorageAdapterWrite[]): readonly string[] {
 	return writes.map(({ kind }) => kind);
+}
+
+function generationIdAt(index: number): GenerationRecord["generationId"] {
+	const parsed = parseGenerationId(index.toString(16).padStart(64, "0"));
+	if (!parsed.ok) throw new Error(`invalid generated identity: ${parsed.reason}`);
+	return parsed.value;
 }
 
 describe("Phase 2e1 bounded public reads RED", () => {
@@ -151,6 +159,68 @@ describe("Phase 2e1 bounded public reads RED", () => {
 				reason: "INVALID_ARGUMENT",
 			});
 		}
+	});
+
+	it("keeps public memory pages bounded without invoking the private broad mutation snapshot", async () => {
+		const store = createMemoryAheDurableStore();
+		const generationIds = Array.from({ length: MAX_GENERATION_PAGE_ROWS + 1 }, (_, index) => generationIdAt(index + 1));
+		for (const generationId of generationIds) {
+			const result = await store.beginGeneration({
+				baseExpectedHead: noHead(),
+				closure: [ref(bytes(1))],
+				generationId,
+				objectId: OBJECT_A,
+			});
+			if (!result.ok) throw new Error(`seed failed: ${result.reason}`);
+		}
+
+		const broadRead = vi.spyOn(TransitionOwner.prototype, "readObjectState").mockImplementation(() => {
+			throw new Error("public bounded read invoked private broad state");
+		});
+		let publicReadError: unknown;
+		try {
+			expect.soft(await store.readHead(OBJECT_A)).toEqual({ ok: true, value: noHead() });
+			const first = await store.readGenerationPage({ limit: MAX_GENERATION_PAGE_ROWS, objectId: OBJECT_A });
+			if (!first.ok || first.value.nextCursor === null) throw new Error("expected bounded continuation cursor");
+			expect.soft(first.value.generations).toHaveLength(MAX_GENERATION_PAGE_ROWS);
+			expect.soft(first.value.generations[0]?.generationId).toBe(generationIds[0]);
+			expect.soft(first.value.generations.at(-1)?.generationId).toBe(generationIds[MAX_GENERATION_PAGE_ROWS - 1]);
+			expect
+				.soft(
+					await store.readGenerationPage({
+						cursor: first.value.nextCursor,
+						limit: MAX_GENERATION_PAGE_ROWS,
+						objectId: OBJECT_A,
+					})
+				)
+				.toEqual({
+					ok: true,
+					value: {
+						generations: [expect.objectContaining({ generationId: generationIds[MAX_GENERATION_PAGE_ROWS] })],
+						nextCursor: null,
+					},
+				});
+			expect.soft(broadRead).not.toHaveBeenCalled();
+		} catch (error) {
+			publicReadError = error;
+		} finally {
+			broadRead.mockRestore();
+			await store.close();
+		}
+
+		const mutationAuthority = new TransitionOwner("ephemeral");
+		const internal = mutationAuthority.beginGeneration({
+			baseExpectedHead: noHead(),
+			closure: [ref(bytes(2))],
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		expect.soft(internal.ok).toBe(true);
+		expect.soft(mutationAuthority.readObjectState(OBJECT_A)).toMatchObject({
+			ok: true,
+			value: { generations: [{ generationId: GENERATION_A }] },
+		});
+		if (publicReadError !== undefined) throw publicReadError;
 	});
 
 	it("does not advertise independently fetched pages as one object snapshot", () => {

@@ -112,6 +112,33 @@ export async function rawPhase2dClearHead(name: string, objectId: string): Promi
 }
 
 /**
+ * Copies one canonical generation record under a deliberately different physical key.
+ * @param name - Isolated database name.
+ * @param objectId - Object component of both compound keys.
+ * @param sourceGenerationId - Canonical source row whose record bytes are retained.
+ * @param physicalGenerationId - Deliberately mismatched physical key component.
+ */
+export async function rawPhase2dAliasGenerationRecord(
+	name: string,
+	objectId: string,
+	sourceGenerationId: string,
+	physicalGenerationId: string
+): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction("generations", "readwrite", { durability: "strict" });
+		const store = transaction.objectStore("generations");
+		const source = await requestResult(store.get([objectId, sourceGenerationId]));
+		const record = typeof source === "object" && source !== null ? Reflect.get(source, "record") : undefined;
+		if (!(record instanceof Uint8Array)) throw new Error("source generation row is missing canonical bytes");
+		store.put({ generationId: physicalGenerationId, objectId, record: new Uint8Array(record) });
+		await transactionCompletion(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+/**
  * Requests a real version upgrade and waits for the upgraded connection to open.
  * @param name - Isolated database name.
  * @param version - Higher schema version used only to trigger versionchange.
