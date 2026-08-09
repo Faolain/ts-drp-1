@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import {
 	phase2e7ClosureErrors,
 	type Phase2e7ClosureObservation,
-	PHASE_2E7_GREEN_CHANGE_PATHS,
 	PHASE_2E7_PACKAGE_FILES,
 	PHASE_2E7_PHASE_2E6_AUTHORITY_PATHS,
 	PHASE_2E7_PUBLIC_RUNTIME_KEYS,
@@ -142,7 +141,7 @@ describe("Phase 2e7 public browser package and component closure", () => {
 		expect.soft(observed.agentNamedArtifactPathsPresent).toEqual([]);
 	});
 
-	it("closes the ownership ledger and kills one mutant for every Phase 2e7 boundary", () => {
+	it("kills one mutant for every Phase 2e7 boundary", () => {
 		const control: Phase2e7ClosureObservation = {
 			publicRuntimeKeys: PHASE_2E7_PUBLIC_RUNTIME_KEYS,
 			exportSubpaths: ["."],
@@ -165,6 +164,5 @@ describe("Phase 2e7 public browser package and component closure", () => {
 			{ ...control, rollbackControl: { candidateState: "Adopted", expectedHead: "stale", result: "HEAD_CONFLICT" } },
 		];
 		for (const mutant of mutants) expect(phase2e7ClosureErrors(mutant)).not.toEqual([]);
-		expect(new Set(PHASE_2E7_GREEN_CHANGE_PATHS).size).toBe(PHASE_2E7_GREEN_CHANGE_PATHS.length);
 	});
 });

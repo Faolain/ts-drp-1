@@ -1,27 +1,12 @@
 export const PHASE_2E7_PUBLIC_RUNTIME_KEYS = Object.freeze(["createBrowserAheDurableStore"] as const);
 
-export const PHASE_2E7_PACKAGE_FILES = Object.freeze(["src", "dist", "!dist/test", "!**/*.tsbuildinfo"] as const);
-
-export const PHASE_2E7_GREEN_CHANGE_PATHS = Object.freeze([
-	"package.json",
-	"packages/storage-browser/package.json",
-	"packages/storage-browser/src/index.ts",
-	"packages/storage-browser/tsconfig.json",
-	"packages/storage-browser/tsconfig.build.json",
-	"packages/storage-browser/playwright.phase-2e6-real-process-death.config.ts",
-	"packages/storage-browser/tests/phase-2e6-real-process-death-red.pw.ts",
-	"packages/storage-browser/tests/phase-2e6-real-process-death.pw.ts",
-	"packages/storage-browser/tests/phase-2e6-real-process-death-contract-red.test.ts",
-	"packages/storage-browser/tests/assets/phase-2e6-real-process-death-entry.ts",
-	"packages/storage-browser/tests/assets/phase-2e6-real-process-death-worker.ts",
-	"packages/storage-browser/tests/fixtures/phase-2e6-real-process-death-contract.ts",
-	"packages/storage-browser/tests/fixtures/phase-2e6-real-process-death-validator.ts",
-	"packages/storage-browser/tests/fixtures/idb-ownership-checker.ts",
-	"packages/storage-browser/tests/idb-ownership-controls.test.ts",
-	"packages/storage-browser/tests/idb-ownership-nested-controls.test.ts",
-	"packages/storage-browser/tests/structural-controls.test.ts",
-	"packages/storage-browser/tests/phase-2e5-browser-inventory-governance-red.test.ts",
-	"packages/storage-browser/tests/fixtures/phase-2e5-browser-inventory-authority.ts",
+export const PHASE_2E7_PACKAGE_FILES = Object.freeze([
+	"src",
+	"dist",
+	"!dist/test",
+	"!dist/tests",
+	"!dist/playwright*",
+	"!**/*.tsbuildinfo",
 ] as const);
 
 export const PHASE_2E7_PHASE_2E6_AUTHORITY_PATHS = Object.freeze({

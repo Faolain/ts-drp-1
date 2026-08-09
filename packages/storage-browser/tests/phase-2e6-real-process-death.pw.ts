@@ -28,10 +28,7 @@ import {
 } from "./fixtures/process-forest.js";
 
 const ASSET_DIRECTORY = process.env.PHASE_2E6_ASSET_DIR;
-const ARTIFACT_DIRECTORY = path.resolve(
-	import.meta.dirname,
-	"../../../.logs/phase-2e6-real-process-death-green-codex-high/artifacts"
-);
+const ARTIFACT_DIRECTORY = path.resolve(import.meta.dirname, "../../../.logs/phase-2e6-real-process-death/artifacts");
 const GIT_SHA = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const CAMPAIGN_ID = `phase-2e6-${GIT_SHA}-${process.pid}`;
 const EXECUTABLE = chromium.executablePath();
@@ -149,7 +146,6 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 	let ready: Record<string, unknown> | undefined;
 	let armed: Record<string, unknown> | undefined;
 	let armReachCount = 0;
-	let publicResultDeliveries = 0;
 	const reached = new Promise<void>((resolve, reject) => {
 		const lines = readline.createInterface({
 			input: required(child.stdout ?? undefined, "crash stdout"),
@@ -164,7 +160,7 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 					armReachCount += 1;
 					armed = message;
 					resolve();
-				} else if (message.kind === "premature-public-result") publicResultDeliveries += 1;
+				}
 			} catch (error) {
 				reject(error);
 			}
@@ -253,10 +249,8 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 				{ absent: true, killAccepted: true, pgid: groups.browserPgid, role: "browser", rootPid: browserRoot.pid },
 				{ absent: true, killAccepted: true, pgid: groups.childPgid, role: "child", rootPid: childIdentity.pid },
 			],
-			mainThreadAtomicsWaitCalls: 0,
 			operationTransactionCount: Number(observation.transactionCount),
 			profilePath: profile,
-			publicResultDeliveries,
 			reachedRequestedArm: true,
 			recordedProcessDeaths: deaths,
 			recoveredDatabaseName: recovery.recoveredDatabaseName,

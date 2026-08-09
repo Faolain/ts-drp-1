@@ -37,25 +37,6 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		]),
 	],
 	[
-		path.join(PACKAGE_DIRECTORY, "src/internal/instrumented-idb.ts"),
-		new Set([
-			"open",
-			"createObjectStore",
-			"transaction",
-			"objectStore",
-			"add",
-			"openCursor",
-			"continue",
-			"put",
-			"commit",
-			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/fixtures/oracle-idb.ts"),
-		new Set(["open", "transaction", "objectStore", "openCursor", "continue", "close"]),
-	],
-	[
 		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/strict-idb-harness.ts"),
 		new Set([
 			"open",

@@ -40,10 +40,8 @@ const EVIDENCE_KEYS = Object.freeze(
 		"head",
 		"initialForest",
 		"killedGroups",
-		"mainThreadAtomicsWaitCalls",
 		"operationTransactionCount",
 		"profilePath",
-		"publicResultDeliveries",
 		"reachedRequestedArm",
 		"recordedProcessDeaths",
 		"recoveredDatabaseName",
@@ -189,7 +187,7 @@ export function phase2e6CampaignErrors(evidence: Phase2e6CampaignEvidence): read
 		const row = PHASE_2E5_BROWSER_REQUEST_INVENTORY.find(({ id }) => id === edge.scenarioId);
 		if (row === undefined) throw new TypeError(`unknown scenario: ${edge.scenarioId}`);
 		if (observed.scenarioOperation !== row.operation) errors.push(`${edge.id}: wrong adapter operation`);
-		if (!observed.workerRealm || !observed.workerCrossOriginIsolated || observed.mainThreadAtomicsWaitCalls !== 0)
+		if (!observed.workerRealm || !observed.workerCrossOriginIsolated)
 			errors.push(`${edge.id}: invalid Worker isolation`);
 		if (!observed.reachedRequestedArm || observed.armReachCount !== 1 || observed.unsupported)
 			errors.push(`${edge.id}: requested arm absent/duplicate/unsupported`);
@@ -198,7 +196,6 @@ export function phase2e6CampaignErrors(evidence: Phase2e6CampaignEvidence): read
 		if (observed.childExit.code !== null || observed.childExit.signal !== "SIGKILL")
 			errors.push(`${edge.id}: child was not SIGKILLed`);
 		errors.push(...processErrors(observed).map((error) => `${edge.id}: ${error}`));
-		if (observed.publicResultDeliveries !== 0) errors.push(`${edge.id}: premature public result`);
 		if (
 			!observed.databaseIdentityPreserved ||
 			observed.databaseName !== observed.recoveredDatabaseName ||

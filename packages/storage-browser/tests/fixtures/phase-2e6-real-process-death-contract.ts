@@ -56,9 +56,7 @@ export interface Phase2e6CaseEvidence {
 		Readonly<{ absent: true; killAccepted: true; pgid: number; role: "browser"; rootPid: number }>,
 		Readonly<{ absent: true; killAccepted: true; pgid: number; role: "child"; rootPid: number }>,
 	];
-	readonly mainThreadAtomicsWaitCalls: number;
 	readonly operationTransactionCount: number;
-	readonly publicResultDeliveries: number;
 	readonly profilePath: string;
 	readonly recordedProcessDeaths: readonly Readonly<{
 		readonly birthToken: string;

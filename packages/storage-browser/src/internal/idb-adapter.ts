@@ -36,7 +36,7 @@ import {
 	PHASE_2D_PROMOTIONS_STORE,
 } from "./schema-idb.js";
 
-export interface Phase2dAheDurableStoreOptions {
+export interface BrowserAheDurableStoreOptions {
 	readonly databaseName: string;
 }
 
@@ -901,7 +901,7 @@ function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGener
  * @returns A strict durable-store adapter over one validated connection.
  * @internal
  */
-export async function createPhase2dAheDurableStore(options: Phase2dAheDurableStoreOptions): Promise<AheDurableStore> {
+export async function createBrowserAheDurableStore(options: BrowserAheDurableStoreOptions): Promise<AheDurableStore> {
 	const lifecycle = new IdbAdapterLifecycle();
 	const opaqueDatabase = await openPhase2dInternalDatabase(options, () => {
 		void lifecycle.close();

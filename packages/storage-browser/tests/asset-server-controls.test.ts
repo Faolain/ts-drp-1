@@ -18,13 +18,7 @@ afterEach(async () => {
 describe("closed browser asset server controls", () => {
 	it("serves only token-owned assets with isolation and no-store headers", async () => {
 		directory = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2b-server-"));
-		for (const name of [
-			"index.html",
-			"page-entry.js",
-			"worker-entry.js",
-			"phase-2e7.html",
-			"phase-2e7-publication-component.js",
-		])
+		for (const name of ["index.html", "phase-2e7.html", "phase-2e7-publication-component.js"])
 			fs.writeFileSync(path.join(directory, name), name);
 		server = await startAssetServer(directory);
 		const transitionURL = server.issueTransitionURL();

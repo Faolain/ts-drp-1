@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
 	testDir: "./tests",
-	testMatch: "phase-2e6-real-process-death-red.pw.ts",
+	testMatch: "phase-2e6-real-process-death.pw.ts",
 	forbidOnly: true,
 	fullyParallel: false,
 	workers: 1,

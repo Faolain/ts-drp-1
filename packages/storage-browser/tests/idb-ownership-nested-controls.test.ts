@@ -18,15 +18,4 @@ describe("Phase 2b exported-signature and browser-graph controls", () => {
 			fs.rmSync(directory, { recursive: true, force: true });
 		}
 	}, 60_000);
-
-	it("keeps transition, seed, and recovery browser source graphs disjoint", () => {
-		const root = path.resolve(import.meta.dirname, "..");
-		const transition = fs.readFileSync(path.join(root, "tests/assets/page-entry.ts"), "utf8");
-		const seed = fs.readFileSync(path.join(root, "tests/assets/seed-entry.ts"), "utf8");
-		const oracle = fs.readFileSync(path.join(root, "tests/assets/oracle-entry.ts"), "utf8");
-		expect(transition).not.toContain("oracle-idb");
-		expect(transition).not.toContain("seedInstrumentedDatabase");
-		expect(seed).not.toContain("oracle-idb");
-		expect(oracle).not.toContain("instrumented-idb");
-	});
 });

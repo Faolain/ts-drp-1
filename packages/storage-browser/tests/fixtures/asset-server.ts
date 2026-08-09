@@ -30,12 +30,6 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 	const root = fs.realpathSync(assetDirectory);
 	const allowed = new Set([
 		"index.html",
-		"page-entry.js",
-		"worker-entry.js",
-		"seed.html",
-		"seed-entry.js",
-		"oracle.html",
-		"oracle-entry.js",
 		"phase-2e6.html",
 		"phase-2e6-real-process-death.js",
 		"phase-2e6-real-process-death-worker.js",

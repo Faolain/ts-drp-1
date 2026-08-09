@@ -54,15 +54,13 @@ describe("Phase 2e5 browser inventory authority", () => {
 		const mutants: readonly Phase2e5AuthorityInput[] = [
 			{
 				...control,
-				rootCommand: "pnpm exec playwright test --config packages/storage-browser/playwright.storage-browser.config.ts",
+				rootCommand: "pnpm exec playwright test --config packages/storage-browser/missing-storage-browser.config.ts",
 			},
 			{
 				...control,
-				ciCommands: [
-					"pnpm exec playwright test --config packages/storage-browser/playwright.storage-browser.config.ts",
-				],
+				ciCommands: ["pnpm exec playwright test --config packages/storage-browser/missing-storage-browser.config.ts"],
 			},
-			{ ...control, configMatch: "crash-driver.pw.ts" },
+			{ ...control, configMatch: "missing-browser-matrix.pw.ts" },
 			{ ...control, matrixExists: false },
 			{ ...control, matrixSource: "" },
 			{ ...control, matrixSource: "test.skip('decorative', () => undefined);" },

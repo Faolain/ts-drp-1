@@ -1,9 +1,0 @@
-{
-	"database-open": 0,
-	"transition-begin": 1,
-	"preflight-cursor-open": 2,
-	"preflight-cursor-continue": 3,
-	"left-write": 4,
-	"right-write": 5,
-	"transaction-complete": 6
-}

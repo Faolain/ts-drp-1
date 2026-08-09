@@ -9,8 +9,6 @@ import {
 	type StorageObjectId,
 } from "@ts-drp/storage";
 import { runStoreContract } from "@ts-drp/storage/contract";
-// RED: the publishable package root is intentionally absent until Phase 2e7 GREEN.
-// eslint-disable-next-line import/no-unresolved
 import { type BrowserAheDurableStoreOptions, createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 
 function must<T>(result: ParseResult<T>): T {
@@ -90,9 +88,8 @@ async function runPublicComponent(): Promise<unknown> {
 		const finalHead = await reopened.readHead(objectId);
 		return {
 			contract,
-			// eslint-disable-next-line import/no-unresolved -- RED root resolution is the causal boundary.
 			publicKeys: Object.keys(await import("@ts-drp/storage-browser")).sort(),
-			reopened: blob.ok && [...blob.value].join(",") === [...bytes].join(","),
+			reopened: blob.ok && blob.value !== null && [...blob.value].join(",") === [...bytes].join(","),
 			rollbackControl: {
 				candidateState: candidate?.state,
 				finalHeadGeneration: finalHead.ok && finalHead.value.kind === "present" ? finalHead.value.generationId : null,

@@ -11,7 +11,7 @@ import {
 	type StorageObjectId,
 } from "@ts-drp/storage";
 
-import { createPhase2dAheDurableStore } from "../../src/internal/idb-adapter.js";
+import { createBrowserAheDurableStore } from "../../src/index.js";
 import {
 	rawPhase2e6DatabaseIdentity,
 	rawPhase2e6PersistentImage,
@@ -118,7 +118,7 @@ async function recoverDatabase(databaseName: string, scenarioId: string, seededH
 	const lifecycle = tracePhase2e6DatabaseLifecycle();
 	let store: AheDurableStore | undefined;
 	try {
-		store = await createPhase2dAheDurableStore({ databaseName });
+		store = await createBrowserAheDurableStore({ databaseName });
 		const recovery = await store.recoverActiveGeneration(OBJECT);
 		const recoveredHeadResult = await store.readHead(OBJECT);
 		const sentinelPage = await store.readGenerationPage({ limit: 128, objectId: SENTINEL_OBJECT });
@@ -219,8 +219,8 @@ async function recoverDatabase(databaseName: string, scenarioId: string, seededH
 
 async function runControls(): Promise<unknown> {
 	const databaseName = `phase-2e6-controls-${crypto.randomUUID()}`;
-	const first = await createPhase2dAheDurableStore({ databaseName });
-	const observer = await createPhase2dAheDurableStore({ databaseName });
+	const first = await createBrowserAheDurableStore({ databaseName });
+	const observer = await createBrowserAheDurableStore({ databaseName });
 	try {
 		await stageComplete(first, OBJECT, GENERATION_A, PAYLOAD_A, noHead(OBJECT));
 		const adoptedA = await first.swapHead({

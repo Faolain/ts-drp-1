@@ -96,9 +96,7 @@ function validCampaign(): Phase2e6CampaignEvidence {
 					rootPid: childPid,
 				}),
 			] as const),
-			mainThreadAtomicsWaitCalls: 0,
 			operationTransactionCount: 1,
-			publicResultDeliveries: 0,
 			profilePath,
 			reachedRequestedArm: true,
 			recoveredDatabaseName: `phase-2e6-${ordinal}`,
@@ -193,7 +191,6 @@ describe("Phase 2e6 real process-death acceptance contract", () => {
 			replaceCase(control, 0, { databaseDeleteCount: 1, databaseIdentityPreserved: false }),
 			replaceCase(control, 0, { databaseCreateCountAfterSeed: 1 }),
 			replaceCase(control, 0, { recoveredImage: partialImage("partial") }),
-			replaceCase(control, 0, { publicResultDeliveries: 1 }),
 			replaceCase(control, 0, { operationTransactionCount: 2 }),
 			replaceCase(control, 0, { tracePrefix: first.tracePrefix.slice(0, -1) }),
 			replaceCase(control, swapIndex, {

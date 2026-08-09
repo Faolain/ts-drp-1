@@ -10,11 +10,9 @@ import type {
 	StoreResult,
 } from "@ts-drp/storage";
 
-export interface Phase2dAheDurableStoreOptions {
-	readonly databaseName: string;
-}
+import type { BrowserAheDurableStoreOptions } from "../../src/index.js";
 
-type Phase2dAheDurableStoreFactory = (options: Phase2dAheDurableStoreOptions) => Promise<AheDurableStore>;
+type BrowserAheDurableStoreFactory = (options: BrowserAheDurableStoreOptions) => Promise<AheDurableStore>;
 
 type Phase2e1PublicStore = Pick<
 	AheDurableStore,
@@ -123,7 +121,7 @@ class InertStrictRedStore implements Phase2e1PublicStore {
  * @param options - Isolated production database options.
  * @returns The real private adapter when present, otherwise the behavioral RED scaffold.
  */
-export async function createPhase2d2aRedStore(options: Phase2dAheDurableStoreOptions): Promise<AheDurableStore> {
+export async function createPhase2d2aRedStore(options: BrowserAheDurableStoreOptions): Promise<AheDurableStore> {
 	const productionModulePath = ["..", "..", "src", "internal", "idb-adapter.js"].join("/");
 	let candidate: unknown;
 	try {
@@ -132,9 +130,9 @@ export async function createPhase2d2aRedStore(options: Phase2dAheDurableStoreOpt
 		return new InertStrictRedStore() as unknown as AheDurableStore;
 	}
 	if (typeof candidate === "object" && candidate !== null) {
-		const factory = Reflect.get(candidate, "createPhase2dAheDurableStore");
+		const factory = Reflect.get(candidate, "createBrowserAheDurableStore");
 		if (typeof factory === "function") {
-			return (factory as Phase2dAheDurableStoreFactory)(options);
+			return (factory as BrowserAheDurableStoreFactory)(options);
 		}
 	}
 	return new InertStrictRedStore() as unknown as AheDurableStore;

@@ -9,7 +9,7 @@ import {
 	type StorageObjectId,
 } from "@ts-drp/storage";
 
-import { createPhase2dAheDurableStore } from "../../src/internal/idb-adapter.js";
+import { createBrowserAheDurableStore } from "../../src/index.js";
 import {
 	type Phase2e6DatabaseLifecycleTrace,
 	tracePhase2e6DatabaseLifecycle,
@@ -82,7 +82,7 @@ async function stageComplete(
 }
 
 async function seed(databaseName: string, scenarioId: string): Promise<ExpectedHead> {
-	const store = await createPhase2dAheDurableStore({ databaseName });
+	const store = await createBrowserAheDurableStore({ databaseName });
 	try {
 		if (!(await begin(store, SENTINEL_OBJECT, SENTINEL_GENERATION, noHead(SENTINEL_OBJECT), PAYLOAD_B)).ok)
 			throw new Error("distinguishing sentinel did not commit");
@@ -164,7 +164,7 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 			const input = exactRun(event.data);
 			const seededHead = await seed(input.databaseName, input.edge.scenarioId);
 			lifecycleTrace = tracePhase2e6DatabaseLifecycle();
-			store = await createPhase2dAheDurableStore({ databaseName: input.databaseName });
+			store = await createBrowserAheDurableStore({ databaseName: input.databaseName });
 			const activeStore = store;
 			if (
 				input.edge.scenarioId === "begin-generation-certificate-match" ||

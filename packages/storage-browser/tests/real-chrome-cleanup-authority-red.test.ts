@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validCorrectiveCampaign } from "./fixtures/corrective-artifact-fixtures.js";
+import { processFailureBase } from "./fixtures/corrective-artifact-fixtures.js";
 import type { ProcessIdentity } from "./fixtures/process-forest.js";
 import { finalizeFailedRun, type FinalizeFailedRunInput } from "./fixtures/run-finalizer.js";
 import { inspectSettledRunOwnership, profileDispositionFor } from "./fixtures/settled-run-lifecycle.js";
@@ -15,23 +15,8 @@ const CONTROLLER_PGID = 900;
 const CHILD_PID = 410;
 const BROWSER_PID = 420;
 
-const PASS_CANDIDATE = validCorrectiveCampaign().find((artifact) => artifact.runKind === "discovery");
-if (PASS_CANDIDATE?.runKind !== "discovery") throw new TypeError("missing discovery fixture");
-const PASS = PASS_CANDIDATE;
-
 function failureBase(): FinalizeFailedRunInput["base"] {
-	return Object.freeze({
-		schemaVersion: PASS.schemaVersion,
-		browser: PASS.browser,
-		databaseName: PASS.databaseName,
-		expectedDigests: PASS.expectedDigests,
-		gitSha: PASS.gitSha,
-		objectId: PASS.objectId,
-		platform: PASS.platform,
-		profilePath: PASS.profilePath,
-		runId: PASS.runId,
-		runKind: PASS.runKind,
-	});
+	return processFailureBase();
 }
 
 function identity(
