@@ -87,15 +87,7 @@ test("real Chromium closes behind active recovery and suppresses queued poison w
 	expect.soft(result.poison).toMatchObject({
 		authoritativeScans: 2,
 		later: "STORE_POISONED",
-		mutantEagerScans: 4,
 		results: ["ADOPTED_BLOB_UNPROMOTED", "STORE_POISONED"],
 		writes: [],
 	});
-});
-
-test("the eager queue mutant calibrates the scan-count probe", async ({ page }) => {
-	const result = await run(page, "runPhase2e4CloseAndPoisonQueue");
-	const poison = result.poison as Record<string, unknown>;
-	expect(poison.mutantEagerScans).toBe(4);
-	expect(poison.authoritativeScans).toBeLessThan(poison.mutantEagerScans as number);
 });

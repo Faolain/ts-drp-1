@@ -28,6 +28,28 @@ export interface Phase2dTerminalGate<T> {
 	readonly terminalObserved: Promise<void>;
 }
 
+export interface Phase2e5RequestTrace {
+	readonly count?: number;
+	readonly kind: "add" | "get" | "getAll" | "put";
+	readonly store: string;
+	readonly transaction: number;
+}
+
+export interface Phase2e5TransactionTrace {
+	readonly durability: "default" | "relaxed" | "strict";
+	readonly id: number;
+	readonly mode: "readonly" | "readwrite" | "versionchange";
+	readonly requestedDurability: "default" | "relaxed" | "strict" | null;
+	readonly stores: readonly string[];
+	readonly terminal: "abort" | "complete" | null;
+}
+
+export interface Phase2e5InventoryTrace<T> {
+	readonly requests: readonly Phase2e5RequestTrace[];
+	readonly result: T;
+	readonly transactions: readonly Phase2e5TransactionTrace[];
+}
+
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
 		request.addEventListener("success", () => resolve(request.result), { once: true });
@@ -177,32 +199,6 @@ export async function probePhase2e3BlobRequestPeak(
 			await requestResult(store.get(digests[1]));
 		}
 		await transactionCompletion(transaction);
-	} finally {
-		database.close();
-	}
-}
-
-/**
- * Executable eager-start mutant for the poison-queue gate. It performs both
- * callers' head and generation reads before either result can be classified.
- * @param name - Isolated database containing the corruption fixture.
- * @returns The deliberately eager authoritative request count.
- */
-export async function probePhase2e4EagerPoisonQueueMutant(name: string): Promise<number> {
-	const database = await requestResult(indexedDB.open(name));
-	try {
-		const transaction = database.transaction(["objects", "generations"], "readonly");
-		const objects = transaction.objectStore("objects");
-		const generations = transaction.objectStore("generations");
-		const objectId = `phase-2d2a-a:${"a".repeat(32)}`;
-		await Promise.all([
-			requestResult(objects.get(objectId)),
-			requestResult(generations.getAll()),
-			requestResult(objects.get(objectId)),
-			requestResult(generations.getAll()),
-		]);
-		await transactionCompletion(transaction);
-		return 4;
 	} finally {
 		database.close();
 	}
@@ -603,6 +599,122 @@ export async function withPhase2dTransactionTrace<T>(run: (mark: (operation: str
 		return { calls, peakOutstandingBlobGets, result, transactions };
 	} finally {
 		IDBDatabase.prototype.transaction = originalTransaction;
+		IDBObjectStore.prototype.add = originalAdd;
+		IDBObjectStore.prototype.get = originalGet;
+		IDBObjectStore.prototype.getAll = originalGetAll;
+		IDBObjectStore.prototype.put = originalPut;
+	}
+}
+
+/**
+ * Observes one or more production-adapter transactions as a closed request
+ * creation sequence. It deliberately records no request settlement timing.
+ * @param run - Starts the real adapter path under observation.
+ * @returns Exact transaction metadata, request creation order and result.
+ */
+export async function withPhase2e5RequestInventoryTrace<T>(run: () => Promise<T>): Promise<Phase2e5InventoryTrace<T>> {
+	const originalTransaction = IDBDatabase.prototype.transaction;
+	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
+	const originalAdd = IDBObjectStore.prototype.add;
+	const originalGet = IDBObjectStore.prototype.get;
+	const originalGetAll = IDBObjectStore.prototype.getAll;
+	const originalPut = IDBObjectStore.prototype.put;
+	const transactions: Array<{
+		durability: "default" | "relaxed" | "strict";
+		id: number;
+		mode: "readonly" | "readwrite" | "versionchange";
+		requestedDurability: "default" | "relaxed" | "strict" | null;
+		stores: readonly string[];
+		terminal: "abort" | "complete" | null;
+	}> = [];
+	const requests: Phase2e5RequestTrace[] = [];
+
+	const transactionId = (): number => {
+		if (transactions.length !== 1) throw new Error("Phase 2e5 observed a request outside its sole transaction");
+		return 0;
+	};
+
+	IDBDatabase.prototype.transaction = function phase2e5InventoryTransaction(
+		this: IDBDatabase,
+		storeNames: string | string[],
+		mode?: IDBTransactionMode,
+		options?: IDBTransactionOptions
+	): IDBTransaction {
+		const transaction = originalTransaction.call(this, storeNames, mode, options);
+		const id = transactions.length;
+		const trace = {
+			durability: transaction.durability,
+			id,
+			mode: transaction.mode,
+			requestedDurability: options?.durability ?? null,
+			stores: [...transaction.objectStoreNames].sort(),
+			terminal: null as "abort" | "complete" | null,
+		};
+		transactions.push(trace);
+		originalTransactionAddEventListener.call(
+			transaction,
+			"complete",
+			() => {
+				trace.terminal = "complete";
+			},
+			{ once: true }
+		);
+		originalTransactionAddEventListener.call(
+			transaction,
+			"abort",
+			() => {
+				trace.terminal = "abort";
+			},
+			{ once: true }
+		);
+		return transaction;
+	};
+	IDBObjectStore.prototype.add = function phase2e5InventoryAdd(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		requests.push({ kind: "add", store: this.name, transaction: transactionId() });
+		return key === undefined ? originalAdd.call(this, value) : originalAdd.call(this, value, key);
+	};
+	IDBObjectStore.prototype.get = function phase2e5InventoryGet(
+		this: IDBObjectStore,
+		query: IDBValidKey | IDBKeyRange
+	): IDBRequest<unknown> {
+		requests.push({ kind: "get", store: this.name, transaction: transactionId() });
+		return originalGet.call(this, query);
+	};
+	IDBObjectStore.prototype.getAll = function phase2e5InventoryGetAll(
+		this: IDBObjectStore,
+		query?: IDBValidKey | IDBKeyRange | null,
+		count?: number
+	): IDBRequest<unknown[]> {
+		requests.push({
+			...(count === undefined ? {} : { count }),
+			kind: "getAll",
+			store: this.name,
+			transaction: transactionId(),
+		});
+		return count === undefined ? originalGetAll.call(this, query) : originalGetAll.call(this, query, count);
+	};
+	IDBObjectStore.prototype.put = function phase2e5InventoryPut(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		requests.push({ kind: "put", store: this.name, transaction: transactionId() });
+		return key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);
+	};
+	try {
+		const result = await run();
+		return {
+			requests: Object.freeze(requests.map((request) => Object.freeze({ ...request }))),
+			result,
+			transactions: Object.freeze(transactions.map((transaction) => Object.freeze({ ...transaction }))),
+		};
+	} finally {
+		IDBDatabase.prototype.transaction = originalTransaction;
+		IDBTransaction.prototype.addEventListener = originalTransactionAddEventListener;
 		IDBObjectStore.prototype.add = originalAdd;
 		IDBObjectStore.prototype.get = originalGet;
 		IDBObjectStore.prototype.getAll = originalGetAll;

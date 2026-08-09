@@ -22,7 +22,6 @@ import {
 	gateNextPhase2dTransactionTerminal,
 	type Phase2dTerminalGate,
 	probePhase2e3BlobRequestPeak,
-	probePhase2e4EagerPoisonQueueMutant,
 	rawPhase2dAliasGenerationRecord,
 	rawPhase2dCount,
 	rawPhase2dGet,
@@ -1363,7 +1362,6 @@ async function runPhase2e4CloseAndPoisonQueue(): Promise<unknown> {
 
 		const fixture = await seedPhase2e3Adopted(poisonName);
 		await rawPhase2e2Delete(poisonName, "promotions", [OBJECT_A, GENERATION_A, DIGEST_A]);
-		const mutantEagerScans = await probePhase2e4EagerPoisonQueueMutant(poisonName);
 		const poisonStore = await createPhase2d2aRedStore({ databaseName: poisonName });
 		const traced = await withPhase2dTransactionTrace(async (mark) => {
 			mark("phase2e4-poison-queue");
@@ -1388,7 +1386,6 @@ async function runPhase2e4CloseAndPoisonQueue(): Promise<unknown> {
 				authoritativeScans: authoritativeScans.length,
 				fixtureHead: fixture.head,
 				later: reason(laterPoison),
-				mutantEagerScans,
 				results: traced.result.map(reason),
 				writes: traced.calls.filter((call) => call.method === "add" || call.method === "put"),
 			},

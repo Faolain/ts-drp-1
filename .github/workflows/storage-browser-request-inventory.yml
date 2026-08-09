@@ -1,4 +1,4 @@
-name: Storage browser process death
+name: Storage browser request inventory
 
 on:
   push:
@@ -11,10 +11,10 @@ permissions:
   contents: read
 
 jobs:
-  process-death:
-    name: Chromium process death (${{ matrix.os }})
+  request-inventory:
+    name: Chromium adapter inventory (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 75
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

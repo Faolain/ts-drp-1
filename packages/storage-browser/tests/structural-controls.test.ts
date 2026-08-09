@@ -58,6 +58,7 @@ describe("Phase 2b structural controls", () => {
 			"playwright.phase-2d1-schema.config.ts",
 			"playwright.phase-2d2a-idb-adapter.config.ts",
 			"playwright.phase-2d2b1-adapter-closure.config.ts",
+			"playwright.phase-2e5-browser-inventory.config.ts",
 		]);
 		const build = readJson("packages/storage-browser/tsconfig.build.json");
 		expect(build.exclude).toEqual([
@@ -67,6 +68,7 @@ describe("Phase 2b structural controls", () => {
 			"playwright.phase-2d1-schema.config.ts",
 			"playwright.phase-2d2a-idb-adapter.config.ts",
 			"playwright.phase-2d2b1-adapter-closure.config.ts",
+			"playwright.phase-2e5-browser-inventory.config.ts",
 		]);
 	});
 
@@ -116,18 +118,27 @@ describe("Phase 2b structural controls", () => {
 		}
 	});
 
-	it("wires the exact Playwright matcher and root runner", () => {
-		const config = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "playwright.storage-browser.config.ts"), "utf8");
+	it("supersedes the toy matcher with the dedicated real-adapter inventory authority", () => {
+		const config = fs.readFileSync(
+			path.join(PACKAGE_DIRECTORY, "playwright.phase-2e5-browser-inventory.config.ts"),
+			"utf8"
+		);
+		const retainedCrashConfig = fs.readFileSync(
+			path.join(PACKAGE_DIRECTORY, "playwright.storage-browser.config.ts"),
+			"utf8"
+		);
 		const setup = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "tests/global-setup.ts"), "utf8");
-		expect(config).toContain('testMatch: "crash-driver.pw.ts"');
+		expect(config).toContain('testMatch: "phase-2e5-browser-request-inventory-red.pw.ts"');
 		expect(config).toContain("workers: 1");
 		expect(config).toContain("fullyParallel: false");
+		expect(config).toContain("forbidOnly: true");
+		expect(retainedCrashConfig).toContain('testMatch: "crash-driver.pw.ts"');
 		expect(setup).toContain('".logs/phase-2b-process-death/artifacts"');
 		expect(setup).not.toContain("green-codex-high");
 		const root = readJson("package.json");
 		expect(root.scripts).toMatchObject({
 			"e2e-test:storage-browser":
-				"pnpm exec playwright test --config packages/storage-browser/playwright.storage-browser.config.ts",
+				"pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e5-browser-inventory.config.ts --fail-on-flaky-tests",
 		});
 	});
 });
