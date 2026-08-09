@@ -22,6 +22,7 @@ import {
 	gateNextPhase2dTransactionTerminal,
 	type Phase2dTerminalGate,
 	probePhase2e3BlobRequestPeak,
+	probePhase2e4EagerPoisonQueueMutant,
 	rawPhase2dAliasGenerationRecord,
 	rawPhase2dCount,
 	rawPhase2dGet,
@@ -1106,6 +1107,298 @@ async function runPhase2e3VerifierMatrix(): Promise<unknown> {
 	return { adopted, candidate, incremental };
 }
 
+async function runPhase2e4LifecycleMatrix(): Promise<unknown> {
+	const explicitName = databaseName("phase-2e4-explicit-reopen");
+	const concurrentName = databaseName("phase-2e4-concurrent");
+	const completionName = databaseName("phase-2e4-completion");
+	const substrateName = databaseName("phase-2e4-substrate");
+	try {
+		await seedPhase2e3Adopted(explicitName);
+		let explicitStore = await createPhase2d2aRedStore({ databaseName: explicitName });
+		const initial = await recoverActive(explicitStore, OBJECT_A);
+		await rawPhase2e2Put(explicitName, "blobs", { bytes: Uint8Array.of(0), digest: DIGEST_A });
+		const unchangedHeadRoot = await recoverActive(explicitStore, OBJECT_A);
+		const poisoned = await recoverActive(explicitStore, OBJECT_A);
+		await explicitStore.close();
+		const closed = await recoverActive(explicitStore, OBJECT_A);
+		explicitStore = await createPhase2d2aRedStore({ databaseName: explicitName });
+		const reopenedRoot = await recoverActive(explicitStore, OBJECT_A);
+		await explicitStore.close();
+		await rawPhase2e2Put(explicitName, "blobs", { bytes: PAYLOAD_A, digest: DIGEST_A });
+		const repaired = await createPhase2d2aRedStore({ databaseName: explicitName });
+		const repairedResult = await recoverActive(repaired, OBJECT_A);
+		await repaired.close();
+
+		const firstHead = await seedPhase2e3Adopted(concurrentName);
+		const first = await createPhase2d2aRedStore({ databaseName: concurrentName });
+		const second = await createPhase2d2aRedStore({ databaseName: concurrentName });
+		await recoverActive(first, OBJECT_A);
+		await stageComplete(second, OBJECT_A, GENERATION_B, PAYLOAD_B, firstHead.head);
+		const advanced = await second.swapHead({
+			expectedHead: firstHead.head,
+			generationId: GENERATION_B,
+			objectId: OBJECT_A,
+		});
+		if (!advanced.ok) throw new Error(`Phase 2e4 concurrent advance failed: ${advanced.reason}`);
+		await rawPhase2e2Delete(concurrentName, "promotions", [OBJECT_A, GENERATION_B, DIGEST_B]);
+		const beforeStale = await rawPhase2e2Snapshot(concurrentName);
+		const staleTrace = await withPhase2dTransactionTrace(async (mark) => {
+			mark("phase2e4-stale-certificate");
+			return beginFrom(first, OBJECT_A, GENERATION_C, firstHead.head, Uint8Array.of(7));
+		});
+		const staleLater = await splitRead(first, "readHead", OBJECT_A);
+		await first.close();
+		await second.close();
+
+		const completion = await createPhase2d2aRedStore({ databaseName: completionName });
+		const begun = await begin(completion, OBJECT_A, GENERATION_A);
+		if (!begun.ok) throw new Error(`Phase 2e4 completion begin failed: ${begun.reason}`);
+		const cached = await completion.putCachedBlob({
+			bytes: PAYLOAD_A,
+			digest: DIGEST_A,
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		if (!cached.ok) throw new Error(`Phase 2e4 completion cache failed: ${cached.reason}`);
+		const beforePromotion = await completion.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		const promoted = await completion.promoteReference({
+			digest: DIGEST_A,
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		const afterPromotion = await completion.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		await completion.close();
+
+		const substrate = await createPhase2d2aRedStore({ databaseName: substrateName });
+		const substrateBegun = await begin(substrate, OBJECT_A, GENERATION_A);
+		if (!substrateBegun.ok) throw new Error(`Phase 2e4 substrate begin failed: ${substrateBegun.reason}`);
+		await substrate.putCachedBlob({
+			bytes: PAYLOAD_A,
+			digest: DIGEST_A,
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		await substrate.promoteReference({ digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A });
+		await recoverActive(substrate, OBJECT_A);
+		const substrateFailure = await withFailingGenerationRead(() => recoverActive(substrate, OBJECT_A));
+		const substrateRetryTrace = await withPhase2dTransactionTrace(async (mark) => {
+			mark("phase2e4-substrate-retry");
+			return substrate.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		});
+		const substrateLater = await splitRead(substrate, "readHead", OBJECT_A);
+		await substrate.close();
+
+		return {
+			completion: {
+				afterPromotion: reason(afterPromotion),
+				beforePromotion: reason(beforePromotion),
+				promoted: reason(promoted),
+			},
+			concurrent: {
+				later: reason(staleLater),
+				reason: reason(staleTrace.result),
+				recoveryPages: staleTrace.calls.filter(
+					(call) =>
+						call.operation === "phase2e4-stale-certificate" && call.store === "generations" && call.method === "getAll"
+				).length,
+				zeroWrites: deepBytesEqual(beforeStale, await rawPhase2e2Snapshot(concurrentName)),
+				writes: staleTrace.calls.filter((call) => call.method === "add" || call.method === "put"),
+			},
+			explicit: {
+				closed: reason(closed),
+				initial: reason(initial),
+				poisoned: reason(poisoned),
+				reopenedRoot: reason(reopenedRoot),
+				repaired: reason(repairedResult),
+				unchangedHeadRoot: reason(unchangedHeadRoot),
+			},
+			substrate: {
+				failure: reason(substrateFailure),
+				later: reason(substrateLater),
+				recoveryPages: substrateRetryTrace.calls.filter(
+					(call) =>
+						call.operation === "phase2e4-substrate-retry" && call.store === "generations" && call.method === "getAll"
+				).length,
+				retry: reason(substrateRetryTrace.result),
+			},
+		};
+	} finally {
+		await Promise.all(
+			[explicitName, concurrentName, completionName, substrateName].map((name) => deletePhase2dDatabase(name))
+		);
+	}
+}
+
+async function runPhase2e4PhysicalDamageMatrix(): Promise<unknown> {
+	const swaps: unknown[] = [];
+	for (const [damage, expected] of [
+		["unpromoted", "BLOB_UNPROMOTED"],
+		["missing", "BLOB_MISSING"],
+		["corrupt", "BLOB_CORRUPT"],
+	] as const) {
+		const name = databaseName(`phase-2e4-swap-${damage}`);
+		try {
+			const store = await createPhase2d2aRedStore({ databaseName: name });
+			await stageComplete(store, OBJECT_A, GENERATION_A);
+			if (damage === "unpromoted") await rawPhase2e2Delete(name, "promotions", [OBJECT_A, GENERATION_A, DIGEST_A]);
+			else if (damage === "missing") await rawPhase2e2Delete(name, "blobs", DIGEST_A);
+			else await rawPhase2e2Put(name, "blobs", { bytes: Uint8Array.of(0), digest: DIGEST_A });
+			const before = await rawPhase2e2Snapshot(name);
+			const result = await store.swapHead({
+				expectedHead: noHead(OBJECT_A),
+				generationId: GENERATION_A,
+				objectId: OBJECT_A,
+			});
+			const later = await splitRead(store, "readHead", OBJECT_A);
+			const zeroWrites = deepBytesEqual(before, await rawPhase2e2Snapshot(name));
+			if (damage === "unpromoted")
+				await rawPhase2e2Put(name, "promotions", {
+					digest: DIGEST_A,
+					generationId: GENERATION_A,
+					objectId: OBJECT_A,
+				});
+			else await rawPhase2e2Put(name, "blobs", { bytes: PAYLOAD_A, digest: DIGEST_A });
+			const retry = reason(
+				await store.swapHead({
+					expectedHead: noHead(OBJECT_A),
+					generationId: GENERATION_A,
+					objectId: OBJECT_A,
+				})
+			);
+			await store.close();
+			swaps.push({
+				damage,
+				expected,
+				later: reason(later),
+				reason: reason(result),
+				retry,
+				zeroWrites,
+			});
+		} finally {
+			await deletePhase2dDatabase(name);
+		}
+	}
+
+	const candidateTypeName = databaseName("phase-2e4-candidate-type");
+	const adoptedTypeName = databaseName("phase-2e4-adopted-type");
+	const nullName = databaseName("phase-2e4-null-head");
+	const orphanName = databaseName("phase-2e4-null-head-adopted");
+	try {
+		const candidate = await createPhase2d2aRedStore({ databaseName: candidateTypeName });
+		const begun = await begin(candidate, OBJECT_A, GENERATION_A);
+		if (!begun.ok) throw new Error("Phase 2e4 candidate type begin failed");
+		await candidate.putCachedBlob({
+			bytes: PAYLOAD_A,
+			digest: DIGEST_A,
+			generationId: GENERATION_A,
+			objectId: OBJECT_A,
+		});
+		await candidate.promoteReference({ digest: DIGEST_A, generationId: GENERATION_A, objectId: OBJECT_A });
+		await rawPhase2e2Put(candidateTypeName, "blobs", { bytes: "not-bytes", digest: DIGEST_A });
+		const candidateType = await candidate.completeGeneration({ generationId: GENERATION_A, objectId: OBJECT_A });
+		const candidateLater = await splitRead(candidate, "readHead", OBJECT_A);
+		await candidate.close();
+
+		await seedPhase2e3Adopted(adoptedTypeName);
+		await rawPhase2e2Put(adoptedTypeName, "blobs", { bytes: "not-bytes", digest: DIGEST_A });
+		const adopted = await createPhase2d2aRedStore({ databaseName: adoptedTypeName });
+		const adoptedType = await recoverActive(adopted, OBJECT_A);
+		const adoptedLater = await recoverActive(adopted, OBJECT_A);
+		await adopted.close();
+
+		const nullCreated = await createPhase2d2aRedStore({ databaseName: nullName });
+		await nullCreated.close();
+		await rawPhase2e2Put(nullName, "objects", { objectId: OBJECT_A, record: null });
+		const empty = await createPhase2d2aRedStore({ databaseName: nullName });
+		const nullHead = await recoverActive(empty, OBJECT_A);
+		await empty.close();
+
+		await seedPhase2e3Adopted(orphanName);
+		await rawPhase2e2Put(orphanName, "objects", { objectId: OBJECT_A, record: null });
+		const orphan = await createPhase2d2aRedStore({ databaseName: orphanName });
+		const survivingAdopted = await recoverActive(orphan, OBJECT_A);
+		const orphanLater = await recoverActive(orphan, OBJECT_A);
+		await orphan.close();
+
+		return {
+			nullRows: {
+				empty: reason(nullHead),
+				orphanLater: reason(orphanLater),
+				survivingAdopted: reason(survivingAdopted),
+			},
+			swaps,
+			wrongTypes: {
+				adopted: reason(adoptedType),
+				adoptedLater: reason(adoptedLater),
+				candidate: reason(candidateType),
+				candidateLater: reason(candidateLater),
+			},
+		};
+	} finally {
+		await Promise.all(
+			[candidateTypeName, adoptedTypeName, nullName, orphanName].map((name) => deletePhase2dDatabase(name))
+		);
+	}
+}
+
+async function runPhase2e4CloseAndPoisonQueue(): Promise<unknown> {
+	const closeName = databaseName("phase-2e4-close-recovery");
+	const poisonName = databaseName("phase-2e4-poison-queue");
+	let gate: Phase2dTerminalGate<StoreResult<unknown>> | undefined;
+	try {
+		const closeStore = await createPhase2d2aRedStore({ databaseName: closeName });
+		gate = gateNextPhase2dTransactionTerminal(() => recoverActive(closeStore, OBJECT_A));
+		await gate.started;
+		const operation = gate.operation;
+		const close = closeStore.close();
+		const queuedAfterClose = await splitRead(closeStore, "readHead", OBJECT_A);
+		const firstSettlement = await Promise.race([
+			close.then(() => "close" as const),
+			gate.terminalObserved.then(() => "transaction-terminal" as const),
+		]);
+		gate.release();
+		const operationResult = await operation;
+		await close;
+		const laterAfterClose = await splitRead(closeStore, "readHead", OBJECT_A);
+
+		const fixture = await seedPhase2e3Adopted(poisonName);
+		await rawPhase2e2Delete(poisonName, "promotions", [OBJECT_A, GENERATION_A, DIGEST_A]);
+		const mutantEagerScans = await probePhase2e4EagerPoisonQueueMutant(poisonName);
+		const poisonStore = await createPhase2d2aRedStore({ databaseName: poisonName });
+		const traced = await withPhase2dTransactionTrace(async (mark) => {
+			mark("phase2e4-poison-queue");
+			return Promise.all([recoverActive(poisonStore, OBJECT_A), recoverActive(poisonStore, OBJECT_A)]);
+		});
+		const laterPoison = await recoverActive(poisonStore, OBJECT_A);
+		await poisonStore.close();
+		const authoritativeScans = traced.calls.filter(
+			(call) =>
+				call.operation === "phase2e4-poison-queue" &&
+				((call.store === "objects" && call.method === "get") ||
+					(call.store === "generations" && call.method === "getAll"))
+		);
+		return {
+			close: {
+				firstSettlement,
+				later: reason(laterAfterClose),
+				operation: reason(operationResult),
+				queued: reason(queuedAfterClose),
+			},
+			poison: {
+				authoritativeScans: authoritativeScans.length,
+				fixtureHead: fixture.head,
+				later: reason(laterPoison),
+				mutantEagerScans,
+				results: traced.result.map(reason),
+				writes: traced.calls.filter((call) => call.method === "add" || call.method === "put"),
+			},
+		};
+	} finally {
+		gate?.release();
+		await Promise.all([deletePhase2dDatabase(closeName), deletePhase2dDatabase(poisonName)]);
+	}
+}
+
 async function runCloseQuiescence(): Promise<unknown> {
 	const name = databaseName("close-quiescence");
 	let gate: Phase2dTerminalGate<StoreResult<GenerationRecord>> | undefined;
@@ -1245,6 +1538,9 @@ const harness = Object.freeze({
 	runPhase2e3MultiPageRecovery,
 	runPhase2e3RecoveryShapes,
 	runPhase2e3VerifierMatrix,
+	runPhase2e4CloseAndPoisonQueue,
+	runPhase2e4LifecycleMatrix,
+	runPhase2e4PhysicalDamageMatrix,
 	runPersistenceAndCopies,
 	runSameDigestDifferentBytes,
 	runSharedContract,

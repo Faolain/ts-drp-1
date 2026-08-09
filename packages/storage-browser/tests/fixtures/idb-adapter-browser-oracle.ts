@@ -183,6 +183,32 @@ export async function probePhase2e3BlobRequestPeak(
 }
 
 /**
+ * Executable eager-start mutant for the poison-queue gate. It performs both
+ * callers' head and generation reads before either result can be classified.
+ * @param name - Isolated database containing the corruption fixture.
+ * @returns The deliberately eager authoritative request count.
+ */
+export async function probePhase2e4EagerPoisonQueueMutant(name: string): Promise<number> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(["objects", "generations"], "readonly");
+		const objects = transaction.objectStore("objects");
+		const generations = transaction.objectStore("generations");
+		const objectId = `phase-2d2a-a:${"a".repeat(32)}`;
+		await Promise.all([
+			requestResult(objects.get(objectId)),
+			requestResult(generations.getAll()),
+			requestResult(objects.get(objectId)),
+			requestResult(generations.getAll()),
+		]);
+		await transactionCompletion(transaction);
+		return 4;
+	} finally {
+		database.close();
+	}
+}
+
+/**
  * Deletes one raw row to seed a relational contradiction.
  * @param name - Isolated database name.
  * @param storeName - Physical store to alter.
