@@ -4259,6 +4259,94 @@ checkpoints unless 2e1/2e3 changed executable SQL shape; if they did, rederive a
 freeze the inventory/count honestly rather than preserving the numeral. Do not
 rerun a redundant long campaign when the inventory is unchanged.
 
+##### Phase 2e4 closure checkpoint — recovery lifecycle and backend acceptance
+
+Phase 2e4 is accepted at tests/assets-only RED
+`b1b00ab38d0a2e6fbd6ac6bdc27e158e3b064a78` and production-only GREEN
+`ec7ede8a4d9de7b45a80ee046c43028eb844432a`. The finite Node and real-Chromium
+matrix freezes explicit same-head re-verification, first-root/poison/close and
+reopen/repair behavior, post-promotion physical damage with zero-write retry,
+stale-certificate invalidation after another handle advances the head,
+completion-before-promotion retry, genuine substrate-failure recovery,
+non-byte/null-row parity and close during active recovery. The existing fast
+SQLite campaign remains the authority for the unchanged six-operation,
+25-checkpoint inventory; the redundant opt-in long campaign was not rerun.
+
+The RED isolated two production defects rather than manufacturing a broad
+failure surface. SQLite string-coerced a non-text physical generation key at a
+page boundary, could repeat the same page and collapsed the watchdog failure to
+`SUBSTRATE_FAILURE` without poisoning. IndexedDB let a queued explicit recovery
+begin one authoritative read before the preceding semantic root latched poison.
+The GREEN validates SQLite's physical continuation key with the canonical
+generation-ID parser before reuse. The browser lifecycle now owns a FIFO
+explicit-recovery turn: the uncontended holder continues synchronously, while a
+queued holder rechecks close and poison before creating a transaction and
+releases its turn in `finally`. This store-incarnation-wide serialization is a
+conservative correctness boundary; IndexedDB already serializes the overlapping
+readwrite scope, so per-object recovery concurrency is only a later throughput
+refinement.
+
+One implementation gotcha is retained because it protects a non-obvious browser
+contract. An initial gate unconditionally awaited an already-resolved turn,
+moving uncontended transaction creation to a later microtask. The established
+terminal-event oracle installs its transaction observation only around the
+synchronous call boundary, so that version timed out twice. The accepted design
+has a synchronous uncontended path, matching every ordinary adapter operation;
+five repeated queue runs confirm the corrected handoff. Tests were not edited
+to accommodate either GREEN attempt.
+
+Final evidence is shared storage 133/133, Node 54 passed plus one explicit
+opt-in-long skip, real Chromium 23/23, browser infrastructure 174/174 and five
+repeated queue probes. All three storage package typechecks and builds,
+Prettier, frozen-RED, diff and custody checks pass. The original ESLint outputs
+were empty because a successful zero-warning invocation is silent; the
+controller reran the two changed production files with command tracing and
+exit-status capture. That non-empty evidence has SHA-256
+`9a590f27f0d60fd791f85e6d4e794c057ae5d4643748292ca64645dfab6de52a`.
+
+Independent acceptance is unanimous:
+
+- genuine Grok 4.5/high session
+  `019fe5ef-15ea-7060-b562-1724eab290bc` returned `APPROVED`, no blockers,
+  no reward hacking and `2E4_MAY_CLOSE: yes`; prompt/raw/result/integrity
+  SHA-256 values are
+  `48cff3e5d3fdffe3cc08cf19042de4eff421eb49f8ebf2554d061cdabc3de977`,
+  `7d6822cb2ade042cdc7e8e170bcd68065f3b1c52bee3c4639c3fcc16bc736fb3`,
+  `7d2bf9bac90dbeb4d25181d099eb1bde5999fe28e60d84fa4fd3d19930a2f1f6`
+  and `3ec12104e7fb5ebcb7808647056308f30645edeb83392dbb243e710866e40f1a`;
+- exact Kimi 3/high/max-100 session
+  `659a839e-f409-4ea5-84bd-3f26bd70e1bd` used 29 reasoning steps and 44
+  read-only calls, returning `APPROVED`, no blockers, no reward hacking and
+  `2E4_MAY_CLOSE: yes`; prompt/raw/result/integrity SHA-256 values are
+  `d7570e3e73d65ec62a955249f4618923f8134466d19689bdefd88095d6ef797f`,
+  `d2905ef235377769b383c9ae2627f175ad2318bc690965312f2b5d505e517353`,
+  `2ca446ef7ea1426b8ec78bde08ed6ff7b9b9e24b0f3752845f63e7779cd3e029`
+  and `ca1979a488f7f5fe0ba950889c81aedac4ad4ea244f08ed56a6d65a94617a3e7`;
+- genuine Opus 5/xhigh session
+  `1fbfcbb8-174b-4cec-aaf6-17a08337f14f` returned `APPROVED`, no blockers,
+  no reward hacking and `2E4_MAY_CLOSE: yes`; result/raw/prompt/integrity
+  SHA-256 values are
+  `e292fe2b24e8c3ce7535d070f7d8512d6549d887baa042503b1317f32be89513`,
+  `a55380b12a77122d0ca790edbc3fbc8a0a5a15fdaf813572653a172102ef055f`,
+  `fd5b34d376e83185a15c27d65d3f834472a254bf51752277ac8aee061c81975a`
+  and `0494df0a61e33e8a167572fbbde50157cb35662464e951f7951895304ec66507`.
+  All substantive review work authenticated as `claude-opus-5`; a permitted
+  automatic Haiku metadata/helper call used 3,417 input and 24 output tokens.
+
+Residuals are explicit. Phase 2e5 must delete or replace the decorative browser
+"eager mutant": it uses raw IDB and returns a literal four, so the real causal
+authority is the production trace's exact three-to-two scan reduction, not the
+mutant comparison. Phase 2e5 also owns declared-equals-observed inventory for a
+mutation that enters certificate recovery. A later correction quorum may align
+the double-corruption `UNSUPPORTED_STORAGE_SCHEMA` precedence: Node's new cursor
+guard can return `NON_CANONICAL_RECORD` before the sticky merge, while browser
+continuation safely accepts a string cursor after classifier key binding. Both
+current paths terminate, fail closed, poison and write nothing, so this is reason
+precision rather than an adoption-safety gap. Ad-hoc `getBlob` wrong-type parity
+remains outside the ratified verifier path. Phase 2e6 still owns process-death
+adoption, Phase 2e7 publication and the Phase-2 exit still owns Firefox/WebKit.
+Neither Discord/chat nor MMORPG is enabled by 2e4.
+
 #### Slice 2e5 — real browser request inventory and CI authority
 
 Freeze the declared real adapter request/transaction inventory before any kill
