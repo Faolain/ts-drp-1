@@ -4355,14 +4355,71 @@ under its package config before deleting the toy `records`-store harness.
 Explicitly supersede the current matcher, root-script and tsconfig structural
 lists; deletion or an unobserved/extra request must fail the inventory gate.
 
+##### Phase 2e5 edge-scope assumption correction — ratified before closure
+
+The complete request inventory and the process-death matrix are related but are
+not identical. The inventory remains the finite authority for every public
+adapter operation, request order, transaction scope, write set and terminal
+event. Process death is useful only at durability-distinguishing settlement
+points inside successful write transactions. Killing around standalone reads,
+zero-write recovery, intentional abort/poison or lifecycle operations can only
+recover the old image and therefore cannot falsify an old-versus-new durability
+claim. Likewise, a closure-only oracle is insufficient for staging mutations:
+only `swapHead` changes the active closure, while the other successful mutations
+change generation, blob or promotion records.
+
+The correction quorum therefore ratified the data-derived matrix owned by
+`phase2e6Edges`: select successful `readwrite`/`complete` rows with a non-empty
+declared write set; arm once after each declared write settles and once after
+transaction completion but before the public result settles. The current
+inventory derives eight scenarios, ten post-write edges and eight post-complete
+edges: exactly eighteen cases. Request indices remain part of the edge identity,
+so repeated writes of the same kind and store cannot collapse. All reads remain
+cheap declared-equals-observed controls, including recovery reads inside the
+selected mutation transactions; they do not each require a redundant process
+kill.
+
+The original 164-edge helper/test was not merely expensive. It treated
+before/after aliases and nonpublishing transactions as kill cases, and its fourth
+test restated the helper's own formula while occupying one of the authority
+gate's four executable-test slots. Freeze the corrected lineage: initial
+tests/config/assets RED `54cf282`, production-only head-observation GREEN
+`1634d66`, tests-only causal edge-scope RED `04bd0fa`, and tests/assets-only
+derived-edge GREEN `c5cc4bf`. The corrective RED rejects the old helper while the
+other three browser inventory controls remain green; the corrected helper is
+input-sensitive to removed writes, abort terminals, readonly transactions and
+zero-write rows. The production GREEN is unchanged by the correction.
+
+The exact Phase 2e6 oracle is an image oracle. At every post-write/pre-complete
+edge, reopen must retain the sentinel and the exact old persistent image, with
+the public result demonstrably unsettled. At every post-complete/pre-result edge,
+reopen must retain the sentinel and the exact complete new persistent image.
+Every request/transaction event reached before the kill must still match the
+Phase 2e5 declaration exactly. For the two `swapHead` rows, image equality also
+proves old active closure XOR new active closure and monotone head movement; for
+the other six rows the active head and closure intentionally remain unchanged.
+
+Phase 2e5 traces request creation, not settlement. Phase 2e6 must attach these
+identities to real request-success and transaction-complete hooks in an isolated
+Worker, prove the detached browser process group actually died, and fail closed
+when a requested arm point is absent, duplicated, skipped or timed out. Preserve
+the toy process-death harness only as arming prior art until the real adapter
+matrix is green, then retire it. Initial database creation/version upgrade is not
+smuggled into the eighteen-case mutation matrix; a schema-migration owner must
+add an explicit case if that lifecycle claim is required.
+
 #### Slice 2e6 — real browser process-death adoption matrix
 
-At every declared request edge, freeze the Worker, kill the actual detached
-browser process group without graceful close, reopen and run recovery. Every case
-contains the distinguishing committed sentinel and yields exactly sentinel + old
-complete closure XOR sentinel + new complete closure. Missing, mixed, deleted,
-timed-out, skipped or unsupported evidence fails. Competing same/future/rollback
-candidates remain monotone; stale expected revision is `HEAD_CONFLICT`.
+At every ratified durability-distinguishing edge derived above, freeze the
+Worker, kill the actual detached browser process group without graceful close,
+reopen and run recovery. Every case contains the distinguishing committed
+sentinel and yields exactly the old persistent image or the complete new
+persistent image, never deletion or a mix. The public result is unsettled at
+every pre-complete edge and is still unpublished at every post-complete edge.
+Only `swapHead` additionally yields old active closure XOR new active closure.
+Missing, mixed, deleted, timed-out, skipped, duplicated or unsupported evidence
+fails. Competing same/future/rollback candidates remain monotone; stale expected
+revision is `HEAD_CONFLICT`.
 
 #### Slice 2e7 — browser publication and component acceptance
 
