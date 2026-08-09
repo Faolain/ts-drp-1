@@ -15,6 +15,14 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./host": {
+			"types": "./dist/src/host.d.ts",
+			"import": "./dist/src/host.js"
+		},
+		"./worker": {
+			"types": "./dist/src/worker.d.ts",
+			"import": "./dist/src/worker.js"
 		}
 	},
 	"scripts": {
