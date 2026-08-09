@@ -1,10 +1,21 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { bytes, GENERATION_A, GENERATION_B, must, noHead, OBJECT_A, presentHead, record, ref } from "./fixtures.js";
+import {
+	bytes,
+	GENERATION_A,
+	GENERATION_B,
+	must,
+	noHead,
+	OBJECT_A,
+	OBJECT_B,
+	presentHead,
+	record,
+	ref,
+} from "./fixtures.js";
 import { createTransitionHarness } from "./internal-harness.js";
 import * as adapter from "../src/adapter.js";
-import { encodeGenerationRecordV1 } from "../src/codecs.js";
+import { decodeGenerationRecordV1, encodeGenerationRecordV1 } from "../src/codecs.js";
 import { createMemoryAheDurableStore, parseHeadRevision, type StoreResult } from "../src/index.js";
 
 type RecoveryValue = Readonly<{
@@ -175,34 +186,119 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 	});
 
 	it("publishes one runtime-neutral verifier controller and opaque candidate authorization", () => {
+		const payloads = [bytes(1, 2, 3), bytes(4, 5, 6)];
+		const callerGeneration = record({ closure: payloads.map(ref) });
+		const canonicalBytes = encodeGenerationRecordV1(callerGeneration);
+		const independentlyDecoded = decodeGenerationRecordV1(new Uint8Array(canonicalBytes));
+		if (!independentlyDecoded.ok) throw new Error(`canonical fixture failed decode: ${independentlyDecoded.reason}`);
+		const canonicalGeneration = independentlyDecoded.value;
+		const differentBaseGeneration = {
+			...canonicalGeneration,
+			baseExpectedHead: presentHead({
+				closureDigest: canonicalGeneration.closureDigest,
+				generationId: GENERATION_B,
+			}),
+		};
+
+		// Executable calibration: a mutable session and a token bound to only the
+		// old four-field subset are both exploitable by ordinary reflective code.
+		const weakSession = { generation: canonicalGeneration, index: 0, phase: "promotion" };
+		const weakFinish = (): boolean => weakSession.phase === "complete";
+		expect(Reflect.set(weakSession, "phase", "complete")).toBe(true);
+		expect(weakFinish()).toBe(true);
+		const weakAuthorization = { generation: canonicalGeneration };
+		const weakAccepts = (generation: typeof canonicalGeneration): boolean =>
+			weakAuthorization.generation.objectId === generation.objectId &&
+			weakAuthorization.generation.generationId === generation.generationId &&
+			weakAuthorization.generation.closureDigest === generation.closureDigest &&
+			weakAuthorization.generation.state === generation.state;
+		expect(weakAccepts(differentBaseGeneration)).toBe(true);
+
 		const controller = Reflect.get(adapter, "storageAdapterClosureVerifier") as ClosureVerifierController | undefined;
 		expect(controller).toBeDefined();
 		if (controller === undefined) return;
 		expect(Object.keys(controller).sort()).toEqual(["acceptBlob", "acceptPromotion", "finish", "next", "start"]);
 
-		const payloads = [bytes(1, 2, 3), bytes(4, 5, 6)];
-		const generation = record({ closure: payloads.map(ref) });
-		const session = controller.start(generation, "candidate");
-		for (let index = 0; index < payloads.length; index++) {
-			expect.soft(controller.next(session)).toEqual({ kind: "promotion", reference: generation.closure[index] });
-			controller.acceptPromotion(session, true);
-			expect.soft(controller.next(session)).toEqual({ kind: "blob", reference: generation.closure[index] });
-			controller.acceptBlob(session, payloads[index] ?? null);
+		const earlySession = controller.start(canonicalGeneration, "candidate");
+		expect.soft(typeof earlySession).toBe("object");
+		expect.soft(Object.isFrozen(earlySession)).toBe(true);
+		expect.soft(Reflect.ownKeys(earlySession as object)).toEqual([]);
+		for (const [property, value] of [
+			["generation", differentBaseGeneration],
+			["index", canonicalGeneration.closure.length],
+			["phase", "complete"],
+		] as const) {
+			expect.soft(Reflect.set(earlySession as object, property, value), property).toBe(false);
+			expect
+				.soft(Reflect.defineProperty(earlySession as object, property, { configurable: true, value }), property)
+				.toBe(false);
 		}
-		expect.soft(controller.next(session)).toBeNull();
-		const authorization = controller.finish(session);
-		expect.soft(authorization.ok).toBe(true);
+		try {
+			(earlySession as { phase?: unknown }).phase = "complete";
+		} catch {
+			// Strict-mode assignment may throw instead of returning false.
+		}
+		expect.soft(Reflect.ownKeys(earlySession as object)).toEqual([]);
+		expect.soft(controller.finish(earlySession)).toMatchObject({ ok: false });
+
+		const verify = (session: unknown): StoreResult<unknown> => {
+			for (let index = 0; index < payloads.length; index++) {
+				const expectedPromotion = {
+					kind: "promotion",
+					reference: canonicalGeneration.closure[index],
+				} as const;
+				const offeredPromotion = controller.next(session);
+				expect.soft(offeredPromotion).toEqual(expectedPromotion);
+				if (index === 0 && offeredPromotion !== null) {
+					const hostileReference = ref(bytes(9, 9, 9));
+					const offeredReference = Reflect.get(offeredPromotion, "reference") as object;
+					Reflect.set(offeredPromotion, "kind", "blob");
+					Reflect.set(offeredPromotion, "reference", hostileReference);
+					Reflect.set(offeredReference, "digest", hostileReference.digest);
+					Reflect.set(offeredReference, "byteLength", hostileReference.byteLength);
+					expect.soft(controller.next(session)).toEqual(expectedPromotion);
+				}
+				controller.acceptPromotion(session, true);
+				expect.soft(controller.next(session)).toEqual({
+					kind: "blob",
+					reference: canonicalGeneration.closure[index],
+				});
+				controller.acceptBlob(session, payloads[index] ?? null);
+			}
+			expect.soft(controller.next(session)).toBeNull();
+			return controller.finish(session);
+		};
+
+		const detachedSession = controller.start(callerGeneration, "candidate");
+		(callerGeneration.closure as unknown as unknown[]).splice(0, callerGeneration.closure.length, ref(bytes(9)));
+		expect.soft(Reflect.set(callerGeneration.baseExpectedHead, "objectId", OBJECT_B)).toBe(true);
+		expect
+			.soft(
+				Reflect.set(
+					callerGeneration,
+					"baseExpectedHead",
+					presentHead({ closureDigest: callerGeneration.closureDigest, generationId: GENERATION_B })
+				)
+			)
+			.toBe(true);
+		expect.soft(Reflect.set(callerGeneration, "state", "Discarded")).toBe(true);
+		const detachedAuthorization = verify(detachedSession);
+		expect.soft(detachedAuthorization.ok).toBe(true);
+		if (!detachedAuthorization.ok) return;
+		expect.soft(typeof detachedAuthorization.value).toBe("object");
+		expect.soft(Object.isFrozen(detachedAuthorization.value)).toBe(true);
+		expect.soft(Reflect.ownKeys(detachedAuthorization.value as object)).toEqual([]);
 
 		const prepared = adapter.prepareStorageAdapterCommand({
 			generationId: GENERATION_A,
 			kind: "completeGeneration",
 			objectId: OBJECT_A,
 		});
-		if (!prepared.ok || !authorization.ok) return;
-		const facts = [
+		if (!prepared.ok) return;
+		const facts = (generationRecord: Uint8Array): readonly unknown[] => [
 			{
 				generationId: GENERATION_A,
-				generationRecord: encodeGenerationRecordV1(generation),
+				generationRecord,
 				kind: "generation",
 				objectId: OBJECT_A,
 			},
@@ -212,11 +308,23 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 			loaded: readonly unknown[],
 			authorization?: unknown
 		) => unknown;
-		expect.soft(evaluate(prepared.value, facts, authorization.value)).toMatchObject({
+		expect.soft(independentlyDecoded.value).not.toBe(callerGeneration);
+		expect.soft(evaluate(prepared.value, facts(canonicalBytes), detachedAuthorization.value)).toMatchObject({
 			result: { ok: true, value: { state: "Complete" } },
 			writes: [{ kind: "replace-generation" }],
 		});
-		expect.soft(evaluate(prepared.value, facts, Object.freeze({}))).toEqual({
+
+		const bindingAuthorization = verify(controller.start(canonicalGeneration, "candidate"));
+		if (!bindingAuthorization.ok) return;
+		expect
+			.soft(
+				evaluate(prepared.value, facts(encodeGenerationRecordV1(differentBaseGeneration)), bindingAuthorization.value)
+			)
+			.toEqual({
+				result: { ok: false, reason: "INVALID_ARGUMENT" },
+				writes: [],
+			});
+		expect.soft(evaluate(prepared.value, facts(canonicalBytes), Object.freeze({}))).toEqual({
 			result: { ok: false, reason: "INVALID_ARGUMENT" },
 			writes: [],
 		});
