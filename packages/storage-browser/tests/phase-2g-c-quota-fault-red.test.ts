@@ -1,3 +1,4 @@
+import type { StorageRejectionReason } from "@ts-drp/storage";
 import { describe, expect, it } from "vitest";
 
 import { phase2e6Edges, PHASE_2E5_BROWSER_REQUEST_INVENTORY } from "./fixtures/phase-2e5-browser-request-inventory.js";
@@ -130,7 +131,10 @@ describe("Phase 2g-c finite quota-fault acceptance contract", () => {
 	});
 
 	it("requires armed invalid and semantic rejections to remain zero-write and zero-fault", () => {
-		for (const resultReason of ["INVALID_ARGUMENT", "GENERATION_ALREADY_EXISTS"] as const) {
+		for (const resultReason of [
+			"INVALID_ARGUMENT",
+			"GENERATION_EXISTS",
+		] as const satisfies readonly StorageRejectionReason[]) {
 			expect(phase2gRejectedInputErrors({ faultArmed: true, faultsFired: 0, resultReason, writesObserved: 0 })).toEqual(
 				[]
 			);

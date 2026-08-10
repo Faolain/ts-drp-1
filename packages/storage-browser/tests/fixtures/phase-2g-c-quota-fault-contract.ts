@@ -1,9 +1,16 @@
+import type { StorageRejectionReason } from "@ts-drp/storage";
+
 import {
 	phase2e5InventoryErrors,
 	type Phase2e5InventoryRow,
 	type Phase2e5ObservedRow,
 	PHASE_2E5_BROWSER_REQUEST_INVENTORY,
 } from "./phase-2e5-browser-request-inventory.js";
+
+const REJECTED_INPUT_REASONS = new Set<string>([
+	"INVALID_ARGUMENT",
+	"GENERATION_EXISTS",
+] as const satisfies readonly StorageRejectionReason[]);
 
 const HISTORICAL_IDS = Object.freeze([
 	"begin-generation-empty",
@@ -240,8 +247,7 @@ export function phase2gRejectedInputErrors(evidence: Phase2gRejectedInputEvidenc
 	if (!evidence.faultArmed) errors.push("rejected-input fault was not armed");
 	if (evidence.writesObserved !== 0) errors.push("rejected input issued a write");
 	if (evidence.faultsFired !== 0) errors.push("rejected input fired a fault");
-	if (!new Set(["INVALID_ARGUMENT", "GENERATION_ALREADY_EXISTS"]).has(evidence.resultReason))
-		errors.push("rejected input lost its existing result");
+	if (!REJECTED_INPUT_REASONS.has(evidence.resultReason)) errors.push("rejected input lost its existing result");
 	return Object.freeze(errors);
 }
 
