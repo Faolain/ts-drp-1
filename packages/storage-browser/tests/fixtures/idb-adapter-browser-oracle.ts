@@ -958,9 +958,10 @@ export async function withPhase2e5RequestInventoryTrace<T>(run: () => Promise<T>
 
 /**
  * Injects one genuine same-realm quota exception at a trace-selected write edge.
- * Creation throws before the native request is returned, settlement aborts the
- * selected native request's transaction, and terminal aborts after the final
- * declared write settles but before transaction completion.
+ * Creation throws before the native request is returned, settlement dispatches
+ * the selected native request's error before aborting as its consequence, and
+ * terminal aborts after the final declared write settles but before transaction
+ * completion.
  * @param arm - Trace-derived request or terminal occurrence.
  * @param run - Starts the real adapter operation under the fault instrument.
  * @returns Exact request/transaction trace, original quota cause, and counters.
@@ -973,6 +974,7 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	const originalRequestAddEventListener = IDBRequest.prototype.addEventListener;
 	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
 	const originalAbort = IDBTransaction.prototype.abort;
+	const originalDispatchEvent = EventTarget.prototype.dispatchEvent;
 	const originalAdd = IDBObjectStore.prototype.add;
 	const originalGet = IDBObjectStore.prototype.get;
 	const originalGetAll = IDBObjectStore.prototype.getAll;
@@ -992,6 +994,7 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	let selectedRequestError: unknown;
 	let settlementAbortConsequenceOrder = 0;
 	let settlementIndependentAbortScheduled = false;
+	let settlementRequestErrorDispatchActive = false;
 	let settlementRequestErrorEvents = 0;
 	let settlementRequestErrorOrder = 0;
 	let settlementRequestSuccessEvents = 0;
@@ -1059,21 +1062,45 @@ export async function withPhase2gQuotaFaultTrace<T>(
 		if (write && arm.target === "settlement" && arm.requestIndex === requestIndex) {
 			const transaction = request.transaction;
 			if (transaction === null) throw new Error("selected quota request has no transaction");
-			Object.defineProperty(request, "error", { configurable: true, get: () => fault });
-			originalRequestAddEventListener.call(request, "error", () => {
-				settlementRequestErrorEvents++;
-				settlementRequestErrorOrder = ++eventOrder;
-				selectedRequestError = request.error;
-			});
-			originalRequestAddEventListener.call(request, "success", () => {
-				settlementRequestSuccessEvents++;
-				++eventOrder;
-			});
 			settlementIndependentAbortScheduled = true;
+			Object.defineProperty(request, "error", { configurable: true, get: () => fault });
+			originalRequestAddEventListener.call(
+				request,
+				"error",
+				() => {
+					settlementRequestErrorEvents++;
+					settlementRequestErrorOrder = ++eventOrder;
+					selectedRequestError = request.error;
+				},
+				{ once: true }
+			);
+			originalRequestAddEventListener.call(
+				request,
+				"success",
+				() => {
+					settlementRequestSuccessEvents++;
+					++eventOrder;
+				},
+				{ once: true }
+			);
 			queueMicrotask(() => {
 				faultsFired++;
-				settlementAbortConsequenceOrder = ++eventOrder;
-				originalAbort.call(transaction);
+				originalRequestAddEventListener.call(
+					request,
+					"error",
+					() => {
+						settlementIndependentAbortScheduled = !settlementRequestErrorDispatchActive;
+						settlementAbortConsequenceOrder = ++eventOrder;
+						originalAbort.call(transaction);
+					},
+					{ once: true }
+				);
+				settlementRequestErrorDispatchActive = true;
+				try {
+					originalDispatchEvent.call(request, new Event("error", { bubbles: true, cancelable: true }));
+				} finally {
+					settlementRequestErrorDispatchActive = false;
+				}
 			});
 		}
 		if (write && arm.target === "terminal" && arm.terminalWriteIndex === requestIndex) {
