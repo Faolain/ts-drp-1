@@ -1096,7 +1096,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2g-a**    | Public runtime-neutral capacity observation in `@ts-drp/storage` plus the sole no-argument same-realm browser binding. Inspection never requests persistence; only the host/user-gesture path calls `persist`. Closed outcomes cover unsupported, granted/not-granted, exception/invalid response, and complete/incomplete/unsafe/inconsistent estimates. No private-mode inference, signer authorization, schema, Node capacity, or test injection export.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | local-safe  | observation atomic      | Table-driven fake-port RED plus ≤60 s/engine inspection/nonprompting smoke; GREEN is the neutral module/root export and browser binding only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **2g-b**    | Profile-bounded advisory stage admission. Required safe-integer `maxClosureReferences`, `maxStageCostBytes`, and `reserveBytes`; cost is exact encoded staged record plus declared bytes for globally missing blobs. Dedup uses one metadata-only batch `getKey` presence probe and never reads blob values. Known capacity admits on equality; every unusable estimate permits only the same profile-bounded attempt; actual writes remain authoritative. `AheDurableStore` and shared rejection taxonomy stay unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | local-safe  | refusal before mutation | Boundary/overflow/dedup/unavailable-estimate/ordering RED with positive real stage and mutants; GREEN adds neutral controller/types and the browser store subtype's bounded probe.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **2g-c**    | Tests-only quota-fault characterization/acceptance over the trace-derived successful mutation inventory, extended with present-head supersession. Inject genuine same-realm quota errors at every write creation, settlement, and terminal edge; require the complete four-store old image after reopen and exact complete-new image after retry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | coordinated | transaction atomic      | Current trace checksum is 9 transactions/13 writes/35 derived edges (historical frozen subset 8/10/28); runner derives rather than hard-codes. Chromium full matrix plus one bounded engine-generated control; representative Firefox/WebKit cases in 2h. Production GREEN only if a real defect is reproduced.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **2h**      | **Ratified browser validation composite v4, implemented as the independently executable 2h-a…2h-e decomposition below.** Add the package-local `playwright.protocol-v2.config.ts`, closed validator/aggregate and dormant manual CI topology first; then the three browser-surface scenarios, capacity/quota scenarios, the exact process-death matrix, and only finally gate activation/preservation closure. This slice is tests/config/scripts/CI/evidence only: no vote CAS, production source, browser schema, public API, package export, runtime dependency or protocol change. Phase 5c remains the sole owner of the first real vote-store/schema bump and vote transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | local-safe  | sliceable               | Exact registry is 15 non-kill plus 54 mechanically derived kill tuples = 69. GREEN requires the closed per-tuple schema and scenario evidence, bounded responsiveness thresholds, identical POSIX hard-kill proof, one GitSha/RunId-bound fail-closed aggregate, all 69 unique `verdict:pass` records and all five diagnostic arrays empty. 2h-a stays manual/non-gating until 2h-e. Phase 2h closure preserves 2e5/2e6/2e7/2f/2g but does not close Phase 2; 2i, 2l and every other exit conjunct remain mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **2h**      | **Ratified browser validation composite v4, implemented as the independently executable 2h-a…2h-e decomposition below.** Add the package-local `playwright.protocol-v2.config.ts`, closed validator/aggregate and dormant manual CI topology first; then the three browser-surface scenarios, capacity/quota scenarios, the exact process-death matrix, and only finally gate activation/preservation closure. This slice is tests/config/scripts/CI/evidence only: no vote CAS, production source, browser schema, public API, package export, runtime dependency or protocol change. Phase 5c remains the sole owner of the first real vote-store/schema bump and vote transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | local-safe  | sliceable               | Exact registry is 15 non-kill plus 54 mechanically derived kill tuples = 69. GREEN requires the closed per-tuple schema and scenario evidence, bounded responsiveness thresholds, Linux-only identical POSIX hard-kill proof with non-Linux failure before record/signal/publication, one GitSha/RunId-bound fail-closed aggregate, all 69 unique `verdict:pass` records and all five diagnostic arrays empty. 2h-a stays manual/non-gating until 2h-e. Phase 2h closure preserves 2e5/2e6/2e7/2f/2g but does not close Phase 2; 2i, 2l and every other exit conjunct remain mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **2i**      | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | local-safe  | sliceable               | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | local-safe  | sliceable               | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **2k**      | **Browser-matrix currency.** At `fbdb396`, root pins `@playwright/test` exactly `1.61.1`, bundling Chromium/Chrome for Testing `149.0.7827.55`. `examples/network-spike` still declares `^1.49.1`, resolving a second installed `playwright-core@1.51.1`, although its own e2e script delegates to the root binary. Measure release-time currency instead of preserving either historical premise; add a scheduled bump and make staleness visible.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | sliceable               | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -2611,6 +2611,8 @@ engine has exactly `{name,brand,browserVersion,userAgent,playwrightVersion}`. na
 
 os has exactly `{platform,arch,release}`. platform is linux | darwin, arch is x64 | arm64 and release is OsRelease. device has exactly `{class,profile,emulated}` where class is desktop-playwright, emulated is false and profile is Desktop Chrome for chromium, Desktop Firefox for firefox or Desktop Safari for webkit. Desktop WebKit and any desktop mobile emulation are not installed Safari, real Safari/iOS or real Chrome/Android evidence. Later real-device/release evidence requires a reviewed schema extension rather than being forced into v1.
 
+The complete 69-tuple aggregate and every Phase 2h process-death record are Linux-only. A Phase 2h process-death record with another platform is invalid, and the test-side aggregate validator requires one byte-identical closed Linux `os` object across all 69 accepted records. Darwin may produce honest non-kill diagnostics, but Phase 2h process-death stops before any record construction, arming, signal authority, signal, recovery or publication, leaving the aggregate fail-closed. This does not remove the lower cross-platform Chromium-only Phase 2e6 preservation campaign. During 2h-d, manual native `ubuntu-latest` execution retains and validates each engine's complete pre-signal forest; Phase 2h-d cannot close on contradiction or without all three captures, and 2h-e later activates that workflow as the merge gate.
+
 webLocksMode is available-not-used when navigator.locks exists and navigator.locks.request is callable in the tested same realm, otherwise unavailable. Phase 2h never calls request and never claims Locks-on coverage. For each engine, all records must agree with the capacity tuple's observed value.
 
 persistenceMode is granted | not-granted | unsupported | unavailable-exception | unavailable-invalid-response, the exact flattening of the capacity tuple's PersistenceObservation. Inspection never calls persist. Every record for one engine carries the same observed persistenceMode; values are recorded, not pinned.
@@ -2673,7 +2675,7 @@ HardKillEvidence has exactly `{mechanism,processForestCommand,browserRootLocator
 
 mechanism is posix-two-pgid-sigstop-sigkill/v1. processForestCommand is exactly `LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=`. browserRootLocator is profile-and-executable-argument-match. contentProcessClass is chromium-renderer for chromium, firefox-contentproc for firefox or webkit-webcontent for webkit. caseEvidence is the same Phase2e6CaseEvidence object carried in process-death scenarioEvidence, not a second independently authored summary.
 
-All engines use the identical ratified POSIX mechanism: capture the complete process forest; prove unique child and browser roots leading two distinct PGIDs outside the controller; prove the browser root matches the fresh profile and executable; prove at least one owned engine content process using only the declared class predicate (Chromium command contains renderer, Firefox contains contentproc, WebKit contains WebContent or WebKitWebProcess); SIGSTOP and identity-pin the child group; SIGSTOP and revalidate the browser group; freeze the exact current owned union; SIGKILL the browser PGID first and child PGID second without resume, delay or graceful API; require child exit `{code:null,signal:"SIGKILL"}`; require both negative-PGID probes to return ESRCH; and prove every frozen pid/birthToken is absent or has a different birthToken. No other engine-equivalent substitute is admissible.
+On Linux, all engines use the identical ratified POSIX mechanism: capture the complete process forest; pin the unique controller, isolated Node child root and browser root; prove the browser root is a direct child of the isolated child, the child and browser roots uniquely lead two distinct PGIDs, and the controller PGID is outside both; bind the engine-specific root to the exact configured executable/script and canonical profile; prove at least one witness through the single explicit campaign classifier (Chromium exact executable/profile/`--type=renderer` with same-PGID zygote ancestry; Firefox exact executable, `-contentproc`, root-bound `-parentPid`, and terminal canonical positive-safe-integer `tab`, with same-PGID forkserver ancestry and no child-profile requirement; WebKit exact profile-bound `bash pw_run.sh` wrapper, exact derived profile-bound `minibrowser-wpe/bin/MiniBrowser`, and exact derived same-PGID `minibrowser-wpe/bin/WPEWebProcess`); SIGSTOP and identity-pin the child group; SIGSTOP and revalidate the browser group; freeze the exact current owned union; SIGKILL browser PGID first and child PGID second without resume, delay or graceful API; require child exit `{code:null,signal:"SIGKILL"}`; require both negative-PGID probes to return ESRCH; and prove every frozen pid/birthToken absent or changed. Reparented non-content auxiliaries never become witness, signal authority, owned-union, or launched/cleanup-census members. On Darwin, Phase 2h fails before any record construction, arming, signal authority, signal, recovery or publication. The lower Chromium-only Phase 2e6 campaign uses its separately exact Darwin app-root/direct-Renderer-helper predicate with the same child/controller separation. No graceful, unsupported, timing/path-attributed XPC, engine-equivalent substitute or reduced registry is admissible.
 
 Before the 54-tuple campaign, 2h-d runs one bounded arming measurement per engine at probe edge swap-head-certificate-match/request-05-put-objects/after. ArmingMeasurement has exactly:
 
@@ -3239,6 +3241,164 @@ owners:
 Phase 2h-c closes only the six capacity/quota tuples. Continue next with 2h-d
 as a separate tests-only RED and distinct GREEN; 2h-e activation, Phase 2h and
 Phase 2 remain open.
+
+#### Phase 2h-d assumption-correction quorum — host/content authority v6
+
+The signed tests-only 2h-d RED is
+`bd84d18f8f5a38cf1e3cca60d79004cee60f8010`. Its first GREEN attempt exposed a
+false host assumption rather than a normal implementation defect. The ratified
+normative contract had treated broad `renderer`, `contentproc` and
+`WebContent|WebKitWebProcess` text as if they proved the same two-PGID
+ownership mechanism on every supported host. Bounded read-only capture instead
+proved:
+
+1. Linux Chromium uses exact same-executable/profile `--type=renderer`
+   descendants through zygotes; Linux Firefox uses same-PGID forkserver
+   descendants with exact `-contentproc`, root-bound `-parentPid` and terminal
+   positive ordinal `tab`, without repeating the profile; Linux WebKit uses
+   `bash pw_run.sh` → profile-bound `minibrowser-wpe/bin/MiniBrowser` →
+   same-PGID `minibrowser-wpe/bin/WPEWebProcess`.
+2. Darwin Firefox 1532 uses direct-child profile-bound `plugin-container`
+   processes and no `-contentproc`. Darwin WebKit 2311 launchd-reparents
+   GPU/WebContent/Networking XPC processes to PPID 1 in separate PGIDs with no
+   profile or run token. Timing/install-path association cannot authorize a
+   signal. No Darwin signal was sent during the audit.
+3. The lower signed Phase 2e6 Chromium campaign remains valid on Darwin. Its
+   browser root is a direct child of the pinned isolated Node child, not the
+   test controller; child and browser roots lead separate owned PGIDs and the
+   controller PGID is outside both. A renderer is a direct browser-root child
+   in the browser PGID with exact profile, exact `--type=renderer`, and the
+   structurally derived app-bundle Renderer-helper executable. The standalone
+   diagnostic capture omitted the isolated child and therefore is evidence for
+   the helper path only, not campaign parentage.
+4. Exact amd64 emulation loaded pages while distorting Chromium/Firefox argv
+   into all-zygote/all-forkserver shapes and duplicating or stripping argv0.
+   It is not native-x64 authority. Phase 2h-d must obtain all three complete
+   native-x64 pre-signal forests by manual `ubuntu-latest` dispatch and abort
+   the whole engine before record/signal/publication on contradiction. Phase
+   2h-e later activates the already-proven workflow as the merge gate.
+
+The exact ratified correction is
+`.logs/phase-2h-d-content-witness-v6-quorum/proposal.md`, SHA-256
+`5fce4722c2790f779f44571af1b203214655feaf14660b3fecb6124aa1e5c051`.
+Fresh Codex-high, exact Kimi 3/high/max-100 and Claude Opus 5/xhigh all
+ratified those bytes with no blocker. Opus independently hashed the file with
+read-only hashing enabled. Its substantive pass used `claude-opus-5`; CLI
+accounting also reported a small automatic Haiku helper entry, which is
+allowed and was not the reviewer. The correction changes no production source,
+protocol, public API, package export, runtime dependency, source-owned Phase
+2e6 evidence schema, `HardKillEvidence` key, aggregate key or registry tuple.
+
+The implementation boundary is:
+
+- The shared pure classifier owns only the Phase 2e6/2h two-PGID campaign
+  proof: forest validation, source replay, Phase 2h validation, staged freeze,
+  runner and publication verification. Required authority is platform, engine
+  class, exact configured executable/script, canonical profile, isolated child
+  root, browser root, child/browser PGIDs and controller exclusion. The live
+  producer pins a unique controller identity; stored replay uses the already
+  closed `controllerPgid` plus stored child/browser identities. No new
+  controller evidence key or late filesystem/process lookup is permitted.
+- Lower settled-run/failure cleanup owners preserve their separately signed,
+  narrower semantics. Migrate `settled-failure-ownership` only as its explicit
+  call signature requires; do not force unrelated cleanup fixtures through the
+  campaign profile predicate to remove textual duplication.
+- Profiles are created beneath `fs.realpathSync(os.tmpdir())`, equal their
+  realpath while live, and are launched, pinned and stored with the same bytes.
+  A noncanonical `/var/folders/...` authority rejects. Never recanonicalize
+  after deletion or rewrite archived `/var` bytes to `/private/var`.
+- Known executable/profile/PID values use exact boundary or adjacent-argument
+  matches, never substring `includes` or whitespace tokenization. This is
+  load-bearing for paths containing spaces and for PID `12` versus `127`.
+- Reparented profileless crashpad handlers are outside witnesses, signal
+  authority, owned unions and launched/cleanup censuses on both measured
+  hosts. A referenced handler may be diagnostic attributable evidence; an
+  unreferenced peer is not. A genuine profile-bound launched survivor still
+  fails cleanup, so exclusion is not a cleanup proof.
+- `webkit-webcontent` remains the closed class label, not an argv substring.
+  `minibrowser-wpe` and Darwin direct Renderer-helper parentage are deliberately
+  fail-closed; future topology drift returns to correction quorum.
+- The all-69 byte-identical closed Linux `os` invariant is owned by
+  `tests/fixtures/phase-2h-a-aggregate.ts`. It is a cross-record acceptance
+  rule, not a schema extension. The two earlier plan passages saying
+  “identical POSIX two-process-group kill proof” and that unsupported/skipped
+  54-tuples fail remain compatible: section 4 now limits a passing Phase 2h
+  aggregate to Linux, while Darwin fails rather than skips.
+- `fast-check ^4.9.0` is already an accepted root development dependency and
+  lockfile entry. A fixed-seed short-run pure property is optional; deterministic
+  path-space, role, parentage and aggregate controls remain normative. No source
+  analyzer or general command tokenizer is authorized.
+
+One fresh Codex-high tests-only corrective RED may edit the tracked test
+owners/callers enumerated by the v6 proposal: process forest and controls;
+staged freeze; mechanically affected settled-failure/lifecycle controls; Phase
+2e6 validator/contract/campaign/crash-child; Phase 2h controls, record,
+aggregate and focused governance; both frozen 2h-d REDs; and the Phase 2e7
+publication census only if its tracked-path census changes. It must not adopt
+or commit the untracked GREEN runner/producer, test config, workflow or the
+three config-census changes. Those are distinct GREEN work. Every amended
+`bd84d18` assertion records its `(baseline,current)` failing pair, and RED must
+fail causally against the unreconciled implementation rather than merely
+observe the pre-existing draft.
+
+That corrective RED must prove:
+
+1. Darwin Phase 2h stops before record construction, arming, signal, recovery
+   and publication on Chromium plus the measured Firefox plugin-container and
+   WebKit XPC shapes; the WebKit negative rejects despite matching the legacy
+   broad regex. Darwin Chromium Phase 2e6 authority never grants a Phase 2h
+   record.
+2. Darwin Chromium Phase 2e6 accepts only isolated-child-parented root,
+   controller outside both PGIDs, exact app/profile and direct structural
+   Renderer-helper. It rejects wrong role/bundle/helper/version/profile/PGID,
+   controller-parented root, transitive renderer and broken ancestry. A
+   multi-version control binds the actual observed renderer command and rejects
+   `Versions/A`, rather than selecting any installed well-formed version.
+3. Linux Chromium, Firefox and WebKit symmetrically require unique controller,
+   child and browser roots, isolated-child browser parentage, distinct root-led
+   PGIDs and controller exclusion. All exact positives and named role, token,
+   path, profile, root-parent, PGID, ancestry, ordinal, platform and class
+   mutants reject. Profile prefix collision `<p>2`, PID `12` versus `127`, and
+   macOS space-bearing full needles are explicit.
+4. Firefox socket/rdd/utility negatives keep every other field valid so the
+   terminal canonical `N tab` token is provably the sole discriminator.
+   A wrong-profile, wrong-PGID or out-of-closure `--type=renderer` directly
+   rejects through `validatePhase2hRecord`, preventing the broad-regex owner
+   from returning.
+5. Linux WebKit accepts native `bash <pw_run.sh>` and exact derived children.
+   The finite space-free Linux emulation guard rejects `/usr/bin/bash bash`,
+   duplicated exact absolute executable, `/usr/bin/node node`, argv0-stripped
+   collector and `minibrowser-gtk` shapes without tokenizing macOS paths.
+6. Native-x64 admission contradiction aborts the whole engine before any
+   record/signal/publication and retains the complete capture as workflow
+   evidence.
+7. Crashpad referenced/unreferenced diagnostics remain outside ownership, while
+   a genuine profile-bound survivor fails cleanup.
+8. Campaign platform/class/executable/profile/controller-PGID/child/browser
+   authority is compile-time mandatory and mirrored through forest, replay,
+   record, freeze and publication. Lower cleanup controls keep their original
+   claims.
+9. JSON-round-tripped offline evidence after profile deletion performs zero
+   filesystem calls; live canonical profile equality, noncanonical rejection
+   and byte-preserving stored replay are explicit. Lower Phase 2e6 derives
+   platform from its existing artifact provenance, and closed evidence/provenance
+   key-set controls prove no new key was introduced.
+10. `aggregatePhase2h` rejects any non-Linux process-death record, mixed
+    platform/arch/release or otherwise non-byte-identical `os` across the 69,
+    while the byte-identical Linux 69 control passes.
+11. Every standing Phase 2b/2e6/2e7 assertion retains its semantic claim,
+    including real Darwin and Linux Chromium 18-edge Phase 2e6 campaigns.
+
+After the signed causal RED, a distinct Codex-high GREEN may reconcile the
+preserved draft. GREEN owns the untracked runner/producer, dedicated workflow,
+test config and all three exact config-census expectations (2h-a governance,
+2h-b and 2h-c) in the same signed commit. It must replace the draft's unmeasured
+900-second/300-second values with bounds derived from the real campaign. GREEN
+closure runs focused RED, complete package, real cross-platform Chromium Phase
+2e6, Phase 2e7, complete Linux arm64 campaign, manual native-x64 three-engine
+admission, typecheck/build, traced nonempty lint, formatting and diff gates to
+logs. Grok 4.5/high, exact Kimi 3/high/max-100 and final Opus/xhigh acceptance
+remain mandatory. Phase 2h-d, 2h-e, Phase 2h and Phase 2 remain open.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
