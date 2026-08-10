@@ -6,6 +6,7 @@ import {
 	parseStorageObjectId,
 	type StorageCapabilityReport,
 } from "@ts-drp/storage";
+import { createHash } from "node:crypto";
 
 import { PHASE_2E5_BROWSER_REQUEST_INVENTORY } from "./phase-2e5-browser-request-inventory.js";
 import {
@@ -57,6 +58,26 @@ const CAPACITY_REPORT: StorageCapabilityReport = Object.freeze({
 
 function hex(value: string): string {
 	return [...value].map((character) => character.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+}
+
+function stableEvidenceValue(value: unknown): unknown {
+	if (value instanceof Uint8Array) return { bytes: [...value] };
+	if (Array.isArray(value)) return value.map((entry) => stableEvidenceValue(entry));
+	if (typeof value === "object" && value !== null) {
+		const record = value as Record<string, unknown>;
+		return Object.fromEntries(
+			Object.keys(record)
+				.sort()
+				.map((key) => [key, stableEvidenceValue(record[key])])
+		);
+	}
+	return value;
+}
+
+function evidenceImageDigest(value: unknown): string {
+	return createHash("sha256")
+		.update(JSON.stringify(stableEvidenceValue(value)), "utf8")
+		.digest("hex");
 }
 
 function quotaImage(label: string): Phase2gWholeImage {
@@ -328,7 +349,7 @@ function scenarioEvidence(tuple: Phase2hTupleDescriptor, ordinal: number): Phase
 				edgeId: caseEvidence.edgeId,
 				edgeTarget: required(tuple.edge ?? undefined, "process edge").target,
 				expectedState: caseEvidence.expectedState,
-				recoveredImageDigest: "3".repeat(64),
+				recoveredImageDigest: evidenceImageDigest(caseEvidence.recoveredImage),
 				tag: "process-death",
 				tracePrefixLength: caseEvidence.tracePrefix.length,
 			});
