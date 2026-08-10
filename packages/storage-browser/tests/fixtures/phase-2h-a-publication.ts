@@ -6,11 +6,12 @@ import path from "node:path";
 import {
 	type Phase2hAggregate,
 	type Phase2hDiagnosticIdentity,
+	phase2hExtraIdentity,
 	phase2hOverflowIdentity,
 	type Phase2hSubmissionCensus,
 } from "./phase-2h-a-aggregate.js";
 import type { Phase2hValidationRecord } from "./phase-2h-a-record.js";
-import { type Phase2hEngineName, PHASE_2H_ENGINES } from "./phase-2h-a-registry.js";
+import { type Phase2hEngineName, phase2hTuple, PHASE_2H_ENGINES } from "./phase-2h-a-registry.js";
 
 export interface Phase2hRunLayout {
 	readonly aggregatePath: string;
@@ -138,9 +139,18 @@ export function createPhase2hPublisher(
 				return "rejected-bound";
 			}
 			const identity = input.record.tupleId;
+			const tuple = phase2hTuple(identity);
+			if (tuple === undefined) {
+				invalid.add(phase2hExtraIdentity(identity));
+				return "rejected-bound";
+			}
 			if (seen.has(identity)) {
 				markDuplicate(identity, input.project);
 				return "duplicate";
+			}
+			if (tuple.engine !== input.project) {
+				invalid.add(tuple.tupleId);
+				return "rejected-bound";
 			}
 			seen.add(identity);
 			const recordPath = path.join(layout.runRoot, "records", input.project, `${encodeURIComponent(identity)}.json`);

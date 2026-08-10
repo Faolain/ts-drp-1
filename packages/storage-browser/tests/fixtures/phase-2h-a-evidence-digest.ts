@@ -14,6 +14,48 @@ function stableEvidenceValue(value: unknown): unknown {
 	return value;
 }
 
+const MAX_EVIDENCE_DEPTH = 512;
+const MAX_EVIDENCE_NODES = 100_000;
+
+function boundedAcyclicEvidence(value: unknown): boolean {
+	const active = new WeakSet<object>();
+	let nodes = 0;
+	const stack: Array<Readonly<{ depth: number; entering: boolean; value: unknown }>> = [
+		{ depth: 0, entering: true, value },
+	];
+	while (stack.length > 0) {
+		const frame = stack.pop();
+		if (frame === undefined) return false;
+		if (typeof frame.value !== "object" || frame.value === null) continue;
+		if (!frame.entering) {
+			active.delete(frame.value);
+			continue;
+		}
+		if (frame.depth > MAX_EVIDENCE_DEPTH || ++nodes > MAX_EVIDENCE_NODES || active.has(frame.value)) return false;
+		active.add(frame.value);
+		stack.push({ depth: frame.depth, entering: false, value: frame.value });
+		const children =
+			frame.value instanceof Uint8Array ? [] : Array.isArray(frame.value) ? frame.value : Object.values(frame.value);
+		for (let index = children.length - 1; index >= 0; index--)
+			stack.push({ depth: frame.depth + 1, entering: true, value: children[index] });
+	}
+	return true;
+}
+
+/**
+ * Serializes untrusted evidence only when traversal is bounded and acyclic.
+ * @param value - Candidate evidence graph.
+ * @returns Stable JSON, or null for a hostile graph.
+ */
+export function phase2hBoundedStableEvidenceJson(value: unknown): string | null {
+	try {
+		if (!boundedAcyclicEvidence(value)) return null;
+		return phase2hStableEvidenceJson(value);
+	} catch {
+		return null;
+	}
+}
+
 /**
  * Serializes evidence with recursive key ordering and byte-array custody.
  * @param value - Evidence image or source-owned case value.

@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+
 export interface ProcessIdentity {
 	readonly birthToken: string;
 	readonly command: string;
@@ -7,9 +10,24 @@ export interface ProcessIdentity {
 	readonly state: string;
 }
 
-export interface StagedFreezeAuthority {
+export type ProcessContentClass = "chromium-renderer" | "firefox-contentproc" | "webkit-webcontent";
+export type ProcessCampaignPlatform = "darwin" | "linux";
+export type ProcessCampaignScope = "phase2e6" | "phase2h";
+
+export interface ProcessCampaignAuthority {
 	readonly browserRoot: ProcessIdentity;
 	readonly childRoot: ProcessIdentity;
+	readonly contentProcessClass: ProcessContentClass;
+	readonly controllerPgid: number;
+	readonly executablePath: string;
+	readonly platform: ProcessCampaignPlatform;
+	readonly profilePath: string;
+	readonly scope: ProcessCampaignScope;
+}
+
+export type ProcessRootAuthority = Omit<ProcessCampaignAuthority, "browserRoot">;
+
+export interface StagedFreezeAuthority extends ProcessCampaignAuthority {
 	readonly initialForest: readonly ProcessIdentity[];
 }
 
@@ -18,8 +36,8 @@ const PROCESS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\
 export const PROCESS_FOREST_ARGUMENTS = Object.freeze(["-A", "-ww", "-o", "pid=,ppid=,pgid=,lstart=,state=,command="]);
 
 /**
- * Captures the complete process table using the ratified C-locale command.
- * @returns Parsed full process identities.
+ * Captures and parses the complete C-locale process table.
+ * @returns Frozen process identities.
  */
 export function captureProcessForest(): readonly ProcessIdentity[] {
 	return parseProcessForest(
@@ -32,10 +50,10 @@ export function captureProcessForest(): readonly ProcessIdentity[] {
 }
 
 /**
- * Returns the transitive descendant closure including the root.
- * @param forest - Complete process-table capture.
- * @param rootPid - Owned isolated child root.
- * @returns Stable forest subset reachable through parent IDs.
+ * Returns one root's transitive descendant closure.
+ * @param forest - Complete process forest.
+ * @param rootPid - Closure root PID.
+ * @returns Frozen descendant closure including the root.
  */
 export function processClosure(forest: readonly ProcessIdentity[], rootPid: number): readonly ProcessIdentity[] {
 	const owned = new Set([rootPid]);
@@ -52,28 +70,209 @@ export function processClosure(forest: readonly ProcessIdentity[], rootPid: numb
 	return Object.freeze(forest.filter((identity) => owned.has(identity.pid)));
 }
 
+function exactPrefix(command: string, needle: string): boolean {
+	return command === needle || (command.startsWith(needle) && command.charAt(needle.length) === " ");
+}
+
+function exactArgument(command: string, argument: string): boolean {
+	let from = 0;
+	for (;;) {
+		const index = command.indexOf(argument, from);
+		if (index < 0) return false;
+		const before = index === 0 || command.charAt(index - 1) === " ";
+		const after = index + argument.length === command.length || command.charAt(index + argument.length) === " ";
+		if (before && after) return true;
+		from = index + 1;
+	}
+}
+
+function exactAdjacent(command: string, flag: string, value: string): boolean {
+	return exactArgument(command, `${flag} ${value}`);
+}
+
+function validCanonicalProfile(platform: ProcessCampaignPlatform, profile: string): boolean {
+	if (!path.posix.isAbsolute(profile) || profile.includes("\0")) return false;
+	// On measured Darwin hosts /var is the noncanonical alias of /private/var.
+	return platform !== "darwin" || !profile.startsWith("/var/");
+}
+
+function rootMatches(identity: ProcessIdentity, authority: ProcessRootAuthority): boolean {
+	if (!validCanonicalProfile(authority.platform, authority.profilePath)) return false;
+	if (authority.platform === "darwin") {
+		return (
+			authority.scope === "phase2e6" &&
+			authority.contentProcessClass === "chromium-renderer" &&
+			exactPrefix(identity.command, authority.executablePath) &&
+			exactArgument(identity.command, `--user-data-dir=${authority.profilePath}`)
+		);
+	}
+	if (authority.scope !== "phase2h" && authority.scope !== "phase2e6") return false;
+	switch (authority.contentProcessClass) {
+		case "chromium-renderer":
+			return (
+				exactPrefix(identity.command, authority.executablePath) &&
+				exactArgument(identity.command, `--user-data-dir=${authority.profilePath}`) &&
+				!exactPrefix(identity.command, `${authority.executablePath} ${authority.executablePath}`)
+			);
+		case "firefox-contentproc":
+			return (
+				exactPrefix(identity.command, authority.executablePath) &&
+				exactAdjacent(identity.command, "-profile", authority.profilePath) &&
+				!exactPrefix(identity.command, `${authority.executablePath} ${authority.executablePath}`)
+			);
+		case "webkit-webcontent":
+			return (
+				exactPrefix(identity.command, `bash ${authority.executablePath}`) &&
+				exactArgument(identity.command, `--user-data-dir=${authority.profilePath}`) &&
+				!exactPrefix(identity.command, `/usr/bin/bash bash ${authority.executablePath}`) &&
+				!exactPrefix(identity.command, `${authority.executablePath} ${authority.executablePath}`) &&
+				!exactPrefix(identity.command, `/usr/bin/node node ${authority.executablePath}`)
+			);
+	}
+}
+
+function darwinRendererExecutable(executablePath: string, command: string): string | undefined {
+	const suffix = ".app/Contents/MacOS/";
+	const marker = executablePath.lastIndexOf(suffix);
+	if (marker <= 0) return undefined;
+	const bundle = executablePath.slice(0, marker + 4);
+	const browser = executablePath.slice(marker + suffix.length);
+	if (browser.length === 0 || bundle !== executablePath.slice(0, marker + 4)) return undefined;
+	const prefix = `${bundle}/Contents/Frameworks/${browser} Framework.framework/Versions/`;
+	const helperSuffix = `/Helpers/${browser} Helper (Renderer).app/Contents/MacOS/${browser} Helper (Renderer)`;
+	if (!command.startsWith(prefix)) return undefined;
+	const end = command.indexOf(helperSuffix, prefix.length);
+	if (end < 0) return undefined;
+	const version = command.slice(prefix.length, end);
+	if (!/^[0-9]+(?:\.[0-9]+)*$/u.test(version)) return undefined;
+	return `${prefix}${version}${helperSuffix}`;
+}
+
+function hasLinuxWitness(
+	forest: readonly ProcessIdentity[],
+	browser: ProcessIdentity,
+	authority: ProcessCampaignAuthority
+): boolean {
+	const closure = processClosure(forest, browser.pid);
+	const descendants = closure.filter(({ pid, pgid }) => pid !== browser.pid && pgid === browser.pgid);
+	switch (authority.contentProcessClass) {
+		case "chromium-renderer":
+			return descendants.some((identity) => {
+				const zygote = closure.find(({ pid }) => pid === identity.ppid);
+				return (
+					exactPrefix(identity.command, authority.executablePath) &&
+					exactArgument(identity.command, "--type=renderer") &&
+					exactArgument(identity.command, `--user-data-dir=${authority.profilePath}`) &&
+					zygote !== undefined &&
+					zygote.ppid === browser.pid &&
+					zygote.pgid === browser.pgid &&
+					exactPrefix(zygote.command, authority.executablePath) &&
+					exactArgument(zygote.command, "--type=zygote") &&
+					exactArgument(zygote.command, `--user-data-dir=${authority.profilePath}`)
+				);
+			});
+		case "firefox-contentproc":
+			return descendants.some((identity) => {
+				if (
+					!exactPrefix(identity.command, authority.executablePath) ||
+					!exactArgument(identity.command, "-contentproc") ||
+					!exactAdjacent(identity.command, "-parentPid", String(browser.pid))
+				)
+					return false;
+				const forkserver = closure.find(({ pid }) => pid === identity.ppid);
+				const match = /(?:^| )(\d+) tab$/u.exec(identity.command);
+				return (
+					match !== null &&
+					/^[1-9]\d*$/u.test(match[1] ?? "") &&
+					Number.isSafeInteger(Number(match[1])) &&
+					forkserver !== undefined &&
+					forkserver.ppid === browser.pid &&
+					forkserver.pgid === browser.pgid &&
+					exactPrefix(forkserver.command, authority.executablePath) &&
+					exactArgument(forkserver.command, "-contentproc") &&
+					exactAdjacent(forkserver.command, "-parentPid", String(browser.pid)) &&
+					/(?:^| )1 forkserver$/u.test(forkserver.command)
+				);
+			});
+		case "webkit-webcontent": {
+			const installation = path.posix.dirname(authority.executablePath);
+			const miniPath = `${installation}/minibrowser-wpe/bin/MiniBrowser`;
+			const webPath = `${installation}/minibrowser-wpe/bin/WPEWebProcess`;
+			return descendants.some(
+				(mini) =>
+					exactPrefix(mini.command, miniPath) &&
+					exactArgument(mini.command, `--user-data-dir=${authority.profilePath}`) &&
+					processClosure(closure, mini.pid).some(
+						(web) => web.pid !== mini.pid && web.pgid === browser.pgid && exactPrefix(web.command, webPath)
+					)
+			);
+		}
+	}
+}
+
+function hasDarwinPhase2e6Witness(
+	forest: readonly ProcessIdentity[],
+	browser: ProcessIdentity,
+	authority: ProcessCampaignAuthority
+): boolean {
+	if (authority.scope !== "phase2e6" || authority.contentProcessClass !== "chromium-renderer") return false;
+	return forest.some((identity) => {
+		if (identity.ppid !== browser.pid || identity.pgid !== browser.pgid) return false;
+		const helper = darwinRendererExecutable(authority.executablePath, identity.command);
+		return (
+			helper !== undefined &&
+			exactPrefix(identity.command, helper) &&
+			exactArgument(identity.command, "--type=renderer") &&
+			exactArgument(identity.command, `--user-data-dir=${authority.profilePath}`)
+		);
+	});
+}
+
 /**
- * Locates the unique Chromium root directly owned by the isolated child.
- * @param forest - Complete process-table capture.
- * @param childPid - Isolated Node child PID.
- * @param profilePath - Exact fresh persistent-profile path.
- * @returns The unique browser root identity.
+ * Locates the one direct browser root matching exact trusted authority.
+ * @param forest - Complete live forest.
+ * @param childPid - Pinned isolated-child PID.
+ * @param profilePath - Canonical live profile bytes.
+ * @param authority - Exact platform, class, executable and controller authority.
+ * @returns Unique direct browser root.
  */
 export function locateBrowserRoot(
 	forest: readonly ProcessIdentity[],
 	childPid: number,
-	profilePath: string
+	profilePath: string,
+	authority: ProcessRootAuthority
 ): ProcessIdentity {
-	const candidates = forest.filter(
-		(identity) => identity.ppid === childPid && identity.command.includes(`--user-data-dir=${profilePath}`)
-	);
+	if (authority.childRoot.pid !== childPid || authority.profilePath !== profilePath) {
+		throw new TypeError("browser-root authority disagrees with requested child/profile");
+	}
+	const candidates = forest.filter((identity) => identity.ppid === childPid && rootMatches(identity, authority));
 	if (candidates.length !== 1) throw new TypeError(`expected one browser root, observed ${candidates.length}`);
 	return candidates[0] as ProcessIdentity;
 }
 
 /**
- * Parses one exact C-locale process-table capture.
- * @param output - Raw `ps` output.
+ * Retains the complete raw admission forest before exact root classification.
+ * @param forest - Complete live process forest.
+ * @param childPid - Pinned isolated-child PID.
+ * @param profilePath - Canonical live profile bytes.
+ * @param authority - Exact platform, class, executable and controller authority.
+ * @param retain - Create-only raw contradiction-evidence owner.
+ * @returns Unique direct browser root.
+ */
+export function retainThenLocateBrowserRoot(
+	forest: readonly ProcessIdentity[],
+	childPid: number,
+	profilePath: string,
+	authority: ProcessRootAuthority,
+	retain: (capture: readonly ProcessIdentity[]) => void
+): ProcessIdentity {
+	retain(forest);
+	return locateBrowserRoot(forest, childPid, profilePath, authority);
+}
+
+/**
+ * Parses the ratified C-locale ps output.
+ * @param output - Raw process-table bytes decoded as text.
  * @returns Frozen process identities.
  */
 export function parseProcessForest(output: string): readonly ProcessIdentity[] {
@@ -94,63 +293,66 @@ export function parseProcessForest(output: string): readonly ProcessIdentity[] {
 				ppid < 0 ||
 				!Number.isSafeInteger(pgid) ||
 				pgid <= 0
-			) {
+			)
 				throw new TypeError("pid/pgid must be positive and ppid must be non-negative safe integers");
-			}
 			return Object.freeze({
+				birthToken: match[4] as string,
+				command: match[6] as string,
+				pgid,
 				pid,
 				ppid,
-				pgid,
-				birthToken: match[4] as string,
 				state: match[5] as string,
-				command: match[6] as string,
 			});
 		});
 }
 
 /**
- * Validates the synthetic two-group ownership proof.
- * @param forest - Parsed process identities.
- * @param childPid - Detached Node child root.
- * @param browserPid - Detached Chromium root.
- * @returns The two group IDs and complete owned PID set.
+ * Validates root, group and exact engine-witness authority.
+ * @param forest - Complete or stored owned forest.
+ * @param childPid - Pinned isolated-child PID.
+ * @param browserPid - Pinned browser-root PID.
+ * @param authority - Trusted campaign authority outside evidence schema.
+ * @returns The two authorized PGIDs and owned union.
  */
 export function validateTwoGroupForest(
 	forest: readonly ProcessIdentity[],
 	childPid: number,
-	browserPid: number
+	browserPid: number,
+	authority: ProcessCampaignAuthority
 ): { readonly browserPgid: number; readonly childPgid: number; readonly ownedPids: readonly number[] } {
 	if (!validUniqueForest(forest)) throw new TypeError("forest contains malformed or ambiguous process identity");
-	const child = forest.filter((process) => process.pid === childPid);
-	const browser = forest.filter((process) => process.pid === browserPid);
-	if (child.length !== 1 || browser.length !== 1) throw new TypeError("forest requires unique child and browser roots");
-	const childPgid = child[0]?.pgid;
-	const browserPgid = browser[0]?.pgid;
-	if (childPgid === undefined || browserPgid === undefined || childPgid === browserPgid) {
-		throw new TypeError("forest requires exactly two distinct process groups");
-	}
-	if (childPid !== childPgid || browserPid !== browserPgid || browser[0]?.ppid !== childPid) {
+	if (authority.scope === "phase2h" && authority.platform !== "linux")
+		throw new TypeError("Phase 2h process-death requires Linux host authority");
+	if (authority.childRoot.pid !== childPid || authority.browserRoot.pid !== browserPid)
+		throw new TypeError("forest roots disagree with campaign authority");
+	const child = exactStableIdentity(forest, authority.childRoot);
+	const browser = exactStableIdentity(forest, authority.browserRoot);
+	if (child === undefined || browser === undefined)
+		throw new TypeError("forest requires unique pinned child and browser roots");
+	if (child.pgid === browser.pgid) throw new TypeError("forest requires exactly two distinct process groups");
+	if (child.pid !== child.pgid || browser.pid !== browser.pgid || browser.ppid !== child.pid)
 		throw new TypeError("forest requires root-led child and browser process groups");
-	}
-	const owned = forest.filter((process) => process.pgid === childPgid || process.pgid === browserPgid);
-	const browserGroup = owned.filter((process) => process.pgid === browserPgid);
-	const browserDescendants = processClosure(browserGroup, browserPid);
-	if (!browserDescendants.some((process) => process.pid !== browserPid && /renderer/u.test(process.command))) {
-		throw new TypeError("forest requires at least one browser renderer");
-	}
-	const identities = new Set(owned.map((process) => `${process.pid}:${process.birthToken}`));
-	if (identities.size !== owned.length) throw new TypeError("forest contains ambiguous process identity");
-	return Object.freeze({ childPgid, browserPgid, ownedPids: Object.freeze(owned.map((process) => process.pid)) });
+	if (authority.controllerPgid === child.pgid || authority.controllerPgid === browser.pgid)
+		throw new TypeError("controller overlaps owned process groups");
+	if (!rootMatches(browser, authority)) throw new TypeError("browser root executable/profile authority mismatch");
+	const witness =
+		authority.platform === "linux"
+			? hasLinuxWitness(forest, browser, authority)
+			: hasDarwinPhase2e6Witness(forest, browser, authority);
+	if (!witness) throw new TypeError(`forest requires exact ${authority.contentProcessClass} witness`);
+	const owned = forest.filter((identity) => identity.pgid === child.pgid || identity.pgid === browser.pgid);
+	return Object.freeze({
+		browserPgid: browser.pgid,
+		childPgid: child.pgid,
+		ownedPids: Object.freeze(owned.map(({ pid }) => pid)),
+	});
 }
 
 /**
- * Proves that every initially observed child-group member stopped while both
- * group roots retain their exact non-state identities. Browser leaves are not
- * part of this first-stage proof because Chromium may replace them before its
- * group is stopped.
- * @param forest - Current complete process-table capture.
- * @param authority - Roots and initial owned forest validated before signaling.
- * @returns Whether the child group is safely stopped for the second stage.
+ * Checks the child-first staged stop against mirrored authority.
+ * @param forest - Current complete forest.
+ * @param authority - Previously validated campaign and initial forest.
+ * @returns Whether the child stage is safely frozen.
  */
 export function childGroupStoppedForFreeze(
 	forest: readonly ProcessIdentity[],
@@ -158,10 +360,11 @@ export function childGroupStoppedForFreeze(
 ): boolean {
 	const authorized = validatedFreezeAuthority(authority);
 	if (authorized === undefined || !validUniqueForest(forest)) return false;
-	const childRoot = exactStableIdentity(forest, authority.childRoot);
-	const browserRoot = exactStableIdentity(forest, authority.browserRoot);
-	if (childRoot === undefined || browserRoot === undefined) return false;
-
+	if (
+		exactStableIdentity(forest, authority.childRoot) === undefined ||
+		exactStableIdentity(forest, authority.browserRoot) === undefined
+	)
+		return false;
 	const currentChildGroup = forest.filter(({ pgid }) => pgid === authorized.childPgid);
 	if (currentChildGroup.length === 0 || !currentChildGroup.every(stoppedOrZombie)) return false;
 	return authorized.initialChildGroup.every((initial) => {
@@ -171,13 +374,10 @@ export function childGroupStoppedForFreeze(
 }
 
 /**
- * Freezes the current members of the two previously authorized process groups
- * after both groups have stopped. Departed initial browser leaves are omitted;
- * replacement leaves are admitted only through the already authorized browser
- * PGID and the complete current topology proof.
- * @param forest - Current complete process-table capture.
- * @param authority - Roots and initial owned forest validated before signaling.
- * @returns Frozen current owned union, or undefined for incomplete evidence.
+ * Revalidates both stopped groups and freezes their exact current union.
+ * @param forest - Current complete forest.
+ * @param authority - Previously validated campaign and initial forest.
+ * @returns Frozen owned union or undefined on contradiction.
  */
 export function freezeCurrentOwnedUnion(
 	forest: readonly ProcessIdentity[],
@@ -188,23 +388,22 @@ export function freezeCurrentOwnedUnion(
 	if (
 		exactStableIdentity(forest, authority.childRoot) === undefined ||
 		exactStableIdentity(forest, authority.browserRoot) === undefined
-	) {
+	)
 		return undefined;
-	}
 	try {
-		const groups = validateTwoGroupForest(forest, authority.childRoot.pid, authority.browserRoot.pid);
+		const groups = validateTwoGroupForest(forest, authority.childRoot.pid, authority.browserRoot.pid, authority);
 		if (groups.childPgid !== authorized.childPgid || groups.browserPgid !== authorized.browserPgid) return undefined;
 	} catch {
 		return undefined;
 	}
 	const owned = forest.filter(({ pgid }) => pgid === authorized.childPgid || pgid === authorized.browserPgid);
-	if (!owned.every(stoppedOrZombie)) return undefined;
-	return Object.freeze([...owned]);
+	return owned.every(stoppedOrZombie) ? Object.freeze([...owned]) : undefined;
 }
 
 function validUniqueForest(forest: readonly ProcessIdentity[]): boolean {
-	if (!Array.isArray(forest) || !forest.every(validIdentity)) return false;
-	return new Set(forest.map(({ pid }) => pid)).size === forest.length;
+	return (
+		Array.isArray(forest) && forest.every(validIdentity) && new Set(forest.map(({ pid }) => pid)).size === forest.length
+	);
 }
 
 function validIdentity(identity: ProcessIdentity): boolean {
@@ -250,40 +449,30 @@ function stoppedOrZombie(identity: ProcessIdentity): boolean {
 	return /T|Z/u.test(identity.state);
 }
 
-function validatedFreezeAuthority(authority: StagedFreezeAuthority):
-	| {
-			readonly browserPgid: number;
-			readonly childPgid: number;
-			readonly initialChildGroup: readonly ProcessIdentity[];
-	  }
+function validatedFreezeAuthority(
+	authority: StagedFreezeAuthority
+):
+	| { readonly browserPgid: number; readonly childPgid: number; readonly initialChildGroup: readonly ProcessIdentity[] }
 	| undefined {
 	if (
-		typeof authority !== "object" ||
-		authority === null ||
 		!validIdentity(authority.childRoot) ||
 		!validIdentity(authority.browserRoot) ||
 		!validUniqueForest(authority.initialForest)
-	) {
+	)
 		return undefined;
-	}
-	if (
-		exactStableIdentity(authority.initialForest, authority.childRoot) === undefined ||
-		exactStableIdentity(authority.initialForest, authority.browserRoot) === undefined
-	) {
-		return undefined;
-	}
 	try {
-		const groups = validateTwoGroupForest(authority.initialForest, authority.childRoot.pid, authority.browserRoot.pid);
-		if (groups.childPgid !== authority.childRoot.pgid || groups.browserPgid !== authority.browserRoot.pgid) {
-			return undefined;
-		}
+		const groups = validateTwoGroupForest(
+			authority.initialForest,
+			authority.childRoot.pid,
+			authority.browserRoot.pid,
+			authority
+		);
 		return Object.freeze({
-			childPgid: groups.childPgid,
 			browserPgid: groups.browserPgid,
+			childPgid: groups.childPgid,
 			initialChildGroup: Object.freeze(authority.initialForest.filter(({ pgid }) => pgid === groups.childPgid)),
 		});
 	} catch {
 		return undefined;
 	}
 }
-import { execFileSync } from "node:child_process";

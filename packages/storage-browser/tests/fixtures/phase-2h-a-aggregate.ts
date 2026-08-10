@@ -510,6 +510,20 @@ export function aggregatePhase2h(input: Phase2hAggregationInput): Phase2hAggrega
 		}
 	}
 
+	const acceptedRecords = [...accepted.values()];
+	const referenceOs = acceptedRecords[0]?.os;
+	const referenceOsBytes = referenceOs === undefined ? undefined : phase2hStableEvidenceJson(referenceOs);
+	for (const [tupleId, record] of [...accepted]) {
+		if (
+			referenceOs === undefined ||
+			referenceOs.platform !== "linux" ||
+			phase2hStableEvidenceJson(record.os) !== referenceOsBytes
+		) {
+			accepted.delete(tupleId);
+			invalid.add(tupleId);
+		}
+	}
+
 	const records = Object.freeze(
 		PHASE_2H_REQUIRED_TUPLE_IDS.flatMap((tupleId) => {
 			const record = accepted.get(tupleId);

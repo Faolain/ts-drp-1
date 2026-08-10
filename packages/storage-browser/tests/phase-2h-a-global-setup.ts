@@ -25,6 +25,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 		await build({
 			bundle: true,
 			entryPoints: {
+				"phase-2e6-real-process-death": path.join(
+					packageDirectory,
+					"tests/assets/phase-2e6-real-process-death-entry.ts"
+				),
+				"phase-2e6-real-process-death-worker": path.join(
+					packageDirectory,
+					"tests/assets/phase-2e6-real-process-death-worker.ts"
+				),
 				"phase-2g-a-capacity-entry": path.join(packageDirectory, "tests/assets/phase-2g-a-capacity-entry.ts"),
 				"phase-2h-a-inert-entry": path.join(packageDirectory, "tests/assets/phase-2h-a-inert-entry.ts"),
 				"phase-2h-b-browser-surfaces": path.join(packageDirectory, "tests/assets/phase-2h-b-browser-surfaces-entry.ts"),
@@ -43,6 +51,22 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 			platform: "browser",
 			target: "es2022",
 		});
+		await build({
+			bundle: true,
+			entryPoints: {
+				"phase-2e6-crash-child": path.join(packageDirectory, "tests/process/phase-2e6-crash-child.ts"),
+			},
+			format: "esm",
+			outdir: assetDirectory,
+			packages: "external",
+			platform: "node",
+			target: "node22",
+		});
+		fs.writeFileSync(
+			path.join(assetDirectory, "phase-2e6.html"),
+			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2e6-real-process-death.js"></script>',
+			"utf8"
+		);
 		fs.writeFileSync(
 			path.join(assetDirectory, "phase-2h-a.html"),
 			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2h-a-inert-entry.js"></script>',
@@ -61,6 +85,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 		process.env.PHASE_2H_A_ASSET_DIR = assetDirectory;
 		process.env.PHASE_2H_A_GIT_SHA = layout.gitSha;
 		process.env.PHASE_2H_A_RUN_ID = layout.runId;
+		const admissionDirectory = path.join(
+			packageDirectory,
+			"test-results/phase-2h-native-admission",
+			layout.gitSha,
+			layout.runId
+		);
+		fs.mkdirSync(admissionDirectory, { recursive: true });
+		process.env.PHASE_2H_NATIVE_ADMISSION_DIR = admissionDirectory;
 		const publisher = createPhase2hPublisher(layout);
 		const parent = await startPhase2hParentPublisher(layout, publisher);
 		process.env.PHASE_2H_A_SUBMISSION_URLS = JSON.stringify(parent.submissionURLs);
@@ -82,6 +114,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 				if (closeFailure !== undefined) throw closeFailure;
 			} finally {
 				delete process.env.PHASE_2H_A_SUBMISSION_URLS;
+				delete process.env.PHASE_2H_NATIVE_ADMISSION_DIR;
 				fs.rmSync(assetDirectory, { force: true, recursive: true });
 			}
 		};

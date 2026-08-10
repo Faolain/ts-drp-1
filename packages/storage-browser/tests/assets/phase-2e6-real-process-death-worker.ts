@@ -187,6 +187,7 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 						trace,
 						transactionCount,
 						version: 1,
+						workerScope: self.constructor.name,
 					}),
 				() => executeOperation(activeStore, input.edge.scenarioId, seededHead)
 			);
@@ -200,6 +201,7 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 					Reflect.get(observed.result, "ok") === true,
 				trace: observed.trace,
 				version: 1,
+				workerScope: self.constructor.name,
 			});
 		} catch (error) {
 			self.postMessage({ detail: error instanceof Error ? error.message : String(error), kind: "failure", version: 1 });
@@ -210,4 +212,4 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 	})();
 });
 
-self.postMessage({ crossOriginIsolated, kind: "ready", version: 1 });
+self.postMessage({ crossOriginIsolated, kind: "ready", version: 1, workerScope: self.constructor.name });

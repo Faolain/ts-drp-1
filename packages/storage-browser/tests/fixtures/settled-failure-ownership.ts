@@ -1,5 +1,4 @@
 import type { ProcessIdentity } from "./process-forest.js";
-import { validateTwoGroupForest } from "./process-forest.js";
 
 export interface SettledFailureOwnership {
 	readonly evidenceState: OwnershipEvidenceState;
@@ -46,6 +45,44 @@ function hasExactArgument(command: string, argument: string): boolean {
 	);
 }
 
+function validateSettledTwoGroupForest(
+	forest: readonly ProcessIdentity[],
+	childPid: number,
+	browserPid: number
+): Readonly<{ browserPgid: number; childPgid: number }> {
+	const child = forest.filter(({ pid }) => pid === childPid);
+	const browser = forest.filter(({ pid }) => pid === browserPid);
+	if (child.length !== 1 || browser.length !== 1) throw new TypeError("settled roots are ambiguous");
+	const childRoot = child[0] as ProcessIdentity;
+	const browserRoot = browser[0] as ProcessIdentity;
+	if (
+		childRoot.pgid !== childPid ||
+		browserRoot.pgid !== browserPid ||
+		browserRoot.ppid !== childPid ||
+		childRoot.pgid === browserRoot.pgid
+	)
+		throw new TypeError("settled roots do not lead two groups");
+	const descendants = new Set([browserPid]);
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const row of forest) {
+			if (descendants.has(row.ppid) && !descendants.has(row.pid)) {
+				descendants.add(row.pid);
+				changed = true;
+			}
+		}
+	}
+	if (
+		!forest.some(
+			({ command, pgid, pid }) =>
+				pid !== browserPid && pgid === browserPid && descendants.has(pid) && /renderer/u.test(command)
+		)
+	)
+		throw new TypeError("settled browser group lacks renderer evidence");
+	return Object.freeze({ browserPgid: browserRoot.pgid, childPgid: childRoot.pgid });
+}
+
 /**
  * Discovers the two groups owned by one failed settled child while its direct
  * browser relationship and exact persistent profile are still observable.
@@ -82,7 +119,7 @@ export function inspectSettledFailureOwnership(
 			throw new TypeError(`expected one exact profile browser root, observed ${browserCandidates.length}`);
 		}
 		const browserRoot = browserCandidates[0] as ProcessIdentity;
-		const groups = validateTwoGroupForest(forest, childPid, browserRoot.pid);
+		const groups = validateSettledTwoGroupForest(forest, childPid, browserRoot.pid);
 		if (
 			child.length !== 1 ||
 			controller.length !== 1 ||

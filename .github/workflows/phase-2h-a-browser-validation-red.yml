@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  inert-contract-red:
-    name: Inert 69-tuple aggregate RED
+  native-process-death-campaign:
+    name: Native x64 three-engine Phase 2h-d admission and campaign
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -23,8 +23,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - name: Run the package-local inert Phase 2h-a config
+      - name: Run the package-local Phase 2h campaign config
         run: pnpm exec playwright test --config packages/storage-browser/playwright.protocol-v2.config.ts --fail-on-flaky-tests
+      - name: Require all native-x64 pre-signal admission captures
+        run: |
+          test "$(find packages/storage-browser/test-results/phase-2h-native-admission -name chromium.json -type f | wc -l)" -eq 1
+          test "$(find packages/storage-browser/test-results/phase-2h-native-admission -name firefox.json -type f | wc -l)" -eq 1
+          test "$(find packages/storage-browser/test-results/phase-2h-native-admission -name webkit.json -type f | wc -l)" -eq 1
       - name: Upload aggregate, tuple evidence and traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -35,3 +40,4 @@ jobs:
             packages/storage-browser/test-results/phase-2h/ahe-storage-validation.json
             packages/storage-browser/test-results/phase-2h/phase-2h/**
             packages/storage-browser/test-results/playwright-phase-2h-a/**
+            packages/storage-browser/test-results/phase-2h-native-admission/**

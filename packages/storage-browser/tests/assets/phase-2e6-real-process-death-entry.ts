@@ -36,6 +36,7 @@ interface WorkerObservation {
 	readonly ok?: boolean;
 	readonly trace?: readonly unknown[];
 	readonly version: number;
+	readonly workerScope?: string;
 }
 
 declare global {
@@ -206,6 +207,7 @@ async function recoverDatabase(databaseName: string, scenarioId: string, seededH
 			databaseDeleteCount: lifecycle.deleteCount,
 			databaseIdentityPreserved: recoveredDatabaseName === databaseName && sentinelRetained,
 			head,
+			recoveredHead,
 			recoveredDatabaseName,
 			recoveredImage,
 			recoveryResult: resultReason(recovery),
@@ -340,6 +342,86 @@ function observeWorker(
 window.phase2e6RunOne = (edge, databaseName): Promise<WorkerObservation> => observeWorker(edge, databaseName);
 window.phase2e6Recover = recoverDatabase;
 window.phase2e6RunControls = runControls;
+
+async function measureArming(
+	edge: (typeof PHASE_2E6_DECLARED_EDGES)[number]
+): Promise<Readonly<Record<string, unknown>>> {
+	if (!crossOriginIsolated || typeof SharedArrayBuffer === "undefined")
+		throw new TypeError("Phase 2h arming measurement requires SharedArrayBuffer isolation");
+	const worker = new Worker("./phase-2e6-real-process-death-worker.js", { type: "module" });
+	const signal = new SharedArrayBuffer(4);
+	const cell = new Int32Array(signal);
+	let armHitCount = 0;
+	let transactionTerminal = false;
+	let hitAt = 0;
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			worker.terminate();
+			reject(new Error(`arming measurement timeout: ${edge.id}`));
+		}, 10_000);
+		worker.addEventListener("message", (event: MessageEvent<unknown>) => {
+			const message = event.data as WorkerObservation;
+			if (message.kind === "ready") {
+				worker.postMessage({
+					databaseName: `phase-2h-arm-${crypto.randomUUID()}`,
+					edge,
+					kind: "run",
+					signal,
+					version: 1,
+				});
+				return;
+			}
+			if (message.kind === "armed") {
+				armHitCount += 1;
+				hitAt = performance.now();
+				const cellAtHit = Atomics.load(cell, 0);
+				setTimeout(() => {
+					const blockedForMs = performance.now() - hitAt;
+					const terminalWhileBlocked = transactionTerminal;
+					Atomics.store(cell, 0, 2);
+					const notifyWoken = Atomics.notify(cell, 0, 1);
+					Reflect.set(worker, "phase2hMeasurement", {
+						armHitCount,
+						blockedForMs,
+						cellAtHit,
+						notifyWoken,
+						transactionTerminalWhileBlocked: terminalWhileBlocked,
+						workerCrossOriginIsolated: message.crossOriginIsolated === true,
+						workerScope: message.workerScope,
+					});
+				}, 110);
+				return;
+			}
+			transactionTerminal =
+				message.trace?.some(
+					(item) => typeof item === "object" && item !== null && Reflect.get(item, "kind") === "transaction-complete"
+				) === true;
+			const measured = Reflect.get(worker, "phase2hMeasurement") as Record<string, unknown> | undefined;
+			if (message.kind !== "premature-public-result" || measured === undefined) {
+				clearTimeout(timeout);
+				worker.terminate();
+				reject(new Error(message.detail ?? "arming measurement failed"));
+				return;
+			}
+			clearTimeout(timeout);
+			worker.terminate();
+			resolve(
+				Object.freeze({
+					...measured,
+					finalCellValue: Atomics.load(cell, 0),
+					transactionTerminalAfterResume: transactionTerminal ? "complete" : "abort",
+				})
+			);
+		});
+		worker.addEventListener("error", (error) => {
+			clearTimeout(timeout);
+			worker.terminate();
+			reject(error);
+		});
+	});
+}
+
+Reflect.set(globalThis, "phase2e6MeasureArming", measureArming);
 
 async function runPhase2e6RedProbe(): Promise<readonly WorkerObservation[]> {
 	if (!crossOriginIsolated || typeof SharedArrayBuffer === "undefined") {

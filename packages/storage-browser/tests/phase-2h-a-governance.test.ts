@@ -18,8 +18,13 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(protocolConfig.testMatch).toEqual([
 			"phase-2h-b-browser-surfaces-red.pw.ts",
 			"phase-2h-c-capacity-quota-red.pw.ts",
+			"phase-2h-d-process-death-producer.pw.ts",
 			"phase-2h-d-process-death-red.pw.ts",
 		]);
+		const orderedMatches = Array.isArray(protocolConfig.testMatch) ? protocolConfig.testMatch.map(String) : [];
+		expect(orderedMatches.indexOf("phase-2h-d-process-death-producer.pw.ts")).toBe(
+			orderedMatches.indexOf("phase-2h-d-process-death-red.pw.ts") - 1
+		);
 		expect(protocolConfig.fullyParallel).toBe(false);
 		expect(protocolConfig.workers).toBe(1);
 		expect(protocolConfig.retries).toBe(0);

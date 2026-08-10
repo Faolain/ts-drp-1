@@ -1,4 +1,5 @@
 import {
+	decodeHeadRecordV1,
 	type ExpectedHead,
 	parseClosureDigest,
 	parseGenerationId,
@@ -16,7 +17,7 @@ import {
 	type Phase2gQuotaCaseEvidence,
 	type Phase2gQuotaEdge,
 } from "./phase-2g-c-quota-fault-contract.js";
-import { phase2hEvidenceImageDigest, phase2hStableEvidenceJson } from "./phase-2h-a-evidence-digest.js";
+import { phase2hBoundedStableEvidenceJson, phase2hEvidenceImageDigest } from "./phase-2h-a-evidence-digest.js";
 import {
 	type Phase2hEngineName,
 	type Phase2hScenario,
@@ -384,6 +385,8 @@ function validateHardKill(
 	caseEvidence: Phase2e6CaseEvidence,
 	errors: string[]
 ): value is Phase2hHardKillEvidence {
+	const observedCase = isObject(value) ? phase2hBoundedStableEvidenceJson(value.caseEvidence) : null;
+	const scenarioCase = phase2hBoundedStableEvidenceJson(caseEvidence);
 	if (
 		!hasKeys(value, [
 			"armingMeasurement",
@@ -397,22 +400,47 @@ function validateHardKill(
 		value.processForestCommand !== "LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=" ||
 		value.browserRootLocator !== "profile-and-executable-argument-match" ||
 		value.contentProcessClass !== CONTENT_PROCESS_CLASS[tuple.engine] ||
-		phase2hStableEvidenceJson(value.caseEvidence) !== phase2hStableEvidenceJson(caseEvidence)
+		observedCase === null ||
+		observedCase !== scenarioCase
 	) {
 		errors.push("hardKillEvidence is invalid or is not bound to scenario caseEvidence");
 		return false;
 	}
 	if (!validateArming(value.armingMeasurement, tuple.engine, errors)) return false;
-	const processToken = {
-		chromium: /renderer/u,
-		firefox: /contentproc/u,
-		webkit: /WebContent|WebKitWebProcess/u,
-	}[tuple.engine];
-	if (!caseEvidence.frozenForest.some(({ command }) => processToken.test(command))) {
-		errors.push("hardKillEvidence lacks the declared engine content-process class");
-		return false;
-	}
 	return true;
+}
+
+function physicalValue(hex: unknown): unknown {
+	if (typeof hex !== "string" || !/^(?:[0-9a-f]{2})*$/u.test(hex)) throw new TypeError("invalid physical hex");
+	return JSON.parse(Buffer.from(hex, "hex").toString("utf8")) as unknown;
+}
+
+function physicalBytes(value: unknown): Uint8Array {
+	const candidate = Array.isArray(value)
+		? value
+		: hasKeys(value, ["$bytes"]) && Array.isArray(value.$bytes)
+			? value.$bytes
+			: null;
+	if (candidate === null || !candidate.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255))
+		throw new TypeError("physical bytes are malformed");
+	return Uint8Array.from(candidate as number[]);
+}
+
+function quotaOldPresentHead(value: Phase2gQuotaCaseEvidence): ExpectedHead | null {
+	try {
+		const present: ExpectedHead[] = [];
+		for (const row of value.before.stores.objects) {
+			const key = physicalValue(row.keyBytesHex);
+			const stored = physicalValue(row.valueBytesHex);
+			if (typeof key !== "string" || !parseStorageObjectId(key).ok || !isObject(stored)) return null;
+			const decoded = decodeHeadRecordV1(physicalBytes(stored.record));
+			if (!decoded.ok || decoded.value.objectId !== key) return null;
+			if (decoded.value.kind === "present") present.push(decoded.value);
+		}
+		return present.length === 1 ? (present[0] ?? null) : null;
+	} catch {
+		return null;
+	}
 }
 
 function validateScenario(
@@ -572,6 +600,13 @@ function validateScenario(
 						(error) => `quota-fault: ${error}`
 					)
 				);
+				const oldHead = quotaOldPresentHead(value.caseEvidence as Phase2gQuotaCaseEvidence);
+				if (
+					oldHead?.kind !== "present" ||
+					recovered?.kind !== "present" ||
+					phase2hBoundedStableEvidenceJson(oldHead) !== phase2hBoundedStableEvidenceJson(recovered)
+				)
+					errors.push("quota-fault recoveredHead is not the unique present head in source-owned old-image bytes");
 			} catch {
 				errors.push("quota-fault source-owned case evidence threw during validation");
 			}
@@ -685,6 +720,8 @@ export function validatePhase2hRecord(value: unknown, expected: Phase2hRecordExp
 		!isBoundedText(value.os.release)
 	)
 		errors.push("OS evidence is invalid");
+	if (tuple?.scenario === "process-death" && isObject(value.os) && value.os.platform !== "linux")
+		errors.push("process-death records require Linux host authority");
 	if (
 		engineExpected === undefined ||
 		!hasKeys(value.device, ["class", "emulated", "profile"]) ||

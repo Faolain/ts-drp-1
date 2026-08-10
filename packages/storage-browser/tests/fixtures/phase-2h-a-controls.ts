@@ -1,4 +1,5 @@
 import {
+	encodeHeadRecordV1,
 	type ExpectedHead,
 	parseClosureDigest,
 	parseGenerationId,
@@ -56,8 +57,15 @@ const CAPACITY_REPORT: StorageCapabilityReport = Object.freeze({
 	quota: Object.freeze({ reason: "unsupported", status: "unavailable" }),
 });
 
-function hex(value: string): string {
-	return [...value].map((character) => character.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+function physical(value: unknown): unknown {
+	if (value instanceof Uint8Array) return { $bytes: [...value] };
+	if (Array.isArray(value)) return value.map(physical);
+	if (typeof value !== "object" || value === null) return value;
+	return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, physical(nested)]));
+}
+
+function hex(value: unknown): string {
+	return Buffer.from(JSON.stringify(physical(value)), "utf8").toString("hex");
 }
 
 function quotaImage(label: string): Phase2gWholeImage {
@@ -67,7 +75,12 @@ function quotaImage(label: string): Phase2gWholeImage {
 		stores: Object.freeze({
 			blobs: Object.freeze([{ keyBytesHex: hex("blob"), valueBytesHex: hex(`blob:${label}`) }]),
 			generations: Object.freeze([{ keyBytesHex: hex("generation"), valueBytesHex: hex(`generation:${label}`) }]),
-			objects: Object.freeze([{ keyBytesHex: hex("head"), valueBytesHex: hex(`head:${label}`) }]),
+			objects: Object.freeze([
+				{
+					keyBytesHex: hex(PRESENT_HEAD.objectId),
+					valueBytesHex: hex({ objectId: PRESENT_HEAD.objectId, record: encodeHeadRecordV1(PRESENT_HEAD) }),
+				},
+			]),
 			promotions: Object.freeze([{ keyBytesHex: hex("promotion"), valueBytesHex: hex(`promotion:${label}`) }]),
 		}),
 	});
