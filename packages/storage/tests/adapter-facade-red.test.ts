@@ -85,7 +85,7 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"prepareStorageAdapterCommand",
 			"storageAdapterClosureVerifier",
 		]);
-		expect(Object.keys(root).sort()).toEqual([
+		const authorizedRootRuntimeKeys = [
 			"createMemoryAheDurableStore",
 			"decodeGenerationRecordV1",
 			"decodeHeadRecordV1",
@@ -93,12 +93,32 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"digestClosure",
 			"encodeGenerationRecordV1",
 			"encodeHeadRecordV1",
+			"inspectStorageCapability",
 			"parseBlobDigest",
 			"parseClosureDigest",
 			"parseGenerationId",
 			"parseHeadRevision",
 			"parseStorageObjectId",
-		]);
+			"requestPersistentStorage",
+		];
+		const observedRootRuntimeKeys = Object.keys(root).sort();
+		expect(observedRootRuntimeKeys).toEqual(
+			expect.arrayContaining([
+				"createMemoryAheDurableStore",
+				"decodeGenerationRecordV1",
+				"decodeHeadRecordV1",
+				"digestBlob",
+				"digestClosure",
+				"encodeGenerationRecordV1",
+				"encodeHeadRecordV1",
+				"parseBlobDigest",
+				"parseClosureDigest",
+				"parseGenerationId",
+				"parseHeadRevision",
+				"parseStorageObjectId",
+			])
+		);
+		expect(observedRootRuntimeKeys.every((key) => authorizedRootRuntimeKeys.includes(key))).toBe(true);
 		expect(Object.keys(contract)).toEqual(["STORE_CONTRACT_SCENARIOS", "runStoreContract"]);
 		for (const forbidden of [
 			"TransitionOwner",

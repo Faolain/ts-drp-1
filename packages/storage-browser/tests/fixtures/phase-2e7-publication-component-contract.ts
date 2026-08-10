@@ -1,4 +1,9 @@
-export const PHASE_2E7_PUBLIC_RUNTIME_KEYS = Object.freeze(["createBrowserAheDurableStore"] as const);
+// Phase 2g-a supersedes the old singleton roster with one additive, neutral
+// capacity binding while preserving the root-only package boundary.
+export const PHASE_2E7_PUBLIC_RUNTIME_KEYS = Object.freeze([
+	"createBrowserAheDurableStore",
+	"createBrowserStorageCapacityPort",
+] as const);
 
 export const PHASE_2E7_PACKAGE_FILES = Object.freeze([
 	"src",

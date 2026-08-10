@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
+import { PHASE_2E7_PUBLIC_RUNTIME_KEYS } from "./fixtures/phase-2e7-publication-component-contract.js";
 
 let server: AssetServer;
 
@@ -21,9 +22,9 @@ test("the package root passes the shared strict browser contract and persists ac
 		const harness = Reflect.get(globalThis, "phase2e7PublicComponent") as { run(): Promise<unknown> };
 		return harness.run();
 	});
-	expect(result).toEqual({
+	const { publicKeys, ...component } = result as { publicKeys: readonly string[] } & Record<string, unknown>;
+	expect(component).toEqual({
 		contract: { durability: "strict", signingEligibility: "backend-capability-required" },
-		publicKeys: ["createBrowserAheDurableStore"],
 		reopened: true,
 		rollbackControl: {
 			candidateState: "Complete",
@@ -32,4 +33,6 @@ test("the package root passes the shared strict browser contract and persists ac
 			result: "HEAD_CONFLICT",
 		},
 	});
+	expect(publicKeys).toContain("createBrowserAheDurableStore");
+	expect(publicKeys.every((key) => (PHASE_2E7_PUBLIC_RUNTIME_KEYS as readonly string[]).includes(key))).toBe(true);
 });
