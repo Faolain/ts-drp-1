@@ -1528,6 +1528,66 @@ responsiveness proxy. The real 4,096-operation blueprint fold and its frame
 budget remain Phase 4a work, consuming worker-host without adding transport or
 telemetry surface unless a later reviewed consumer contract requires it.
 
+##### Phase 2f-c and Phase 2f accepted and closed
+
+Phase 2f-c closes at corrective GREEN `758fca4`. Its workload RED/GREEN are
+`91b39d3` and `9e9b85b`; the later PR-tier RED/GREEN are `79366ee` and
+`758fca4`. The workload GREEN adds only the private emitted worker and its
+source-tree census manifest. It performs the ratified 4,096-operation-plus-
+anchor linearization, bounded canonical encoding and single compact-Merkle
+accumulation in a module Worker, then emits one bounded summary. The emitted
+artifact and browser oracle agree on exact order, count and root while the page
+counter remains zero.
+
+The first complete review chain approved the workload semantics but final Opus
+also proved that the two browser configs were not reachable from any pull-
+request workflow. Because the ratified contract says every 2f gate is PR tier,
+this was corrected rather than carried forward: the tests-only RED semantically
+pins one root aggregate and its PR-workflow reachability, and the two-line GREEN
+adds that aggregate plus its invocation after the existing Grid gate. The
+command preserves shell failure propagation and runs the Firefox/WebKit
+handshake and Chromium workload with retries disabled and flaky-test rejection.
+
+Final corrective evidence records 108/108 worker-host tests, Firefox/WebKit 4/4,
+Chromium 3/3, package typecheck/build, traced nonempty ESLint, Prettier, JSON/YAML
+validation and unchanged frozen-RED custody. The workload evidence additionally
+records the 77,428-byte/22-input emitted artifact, 19,550-byte summary, exact
+root/order/count, workspace typecheck 36/36 after excluding only the unchanged
+object/node baselines, and all 32 package builds. Evidence is retained under the
+four `phase-2f-c-{emitted-graph,pr-tier}-{red,green}-codex-high` log directories.
+
+The final corrective reviewers all returned `APPROVED` with no blockers:
+Grok 4.5/high session `a7e9cf64-5e24-4a46-8a82-7512fb21ba52`, a fresh genuine
+Kimi 3/high/max-100 run whose result SHA-256 is
+`d6e61f6387a2d2a7e25e63d50985cdbbd6f3bd6c888bf264625a38f0c0338b9a`,
+and Opus 5/xhigh session `bf9c1521-39e3-4437-9c4e-ac3f60ae703a`. The Opus
+result SHA-256 is
+`cdac1baaf9e5c5d6a477db2169b427de4939408498ad3871b9f7a69393e0d342`.
+No accepted reviewer used Fable, Agent/Task or a helper model.
+
+Accepted residuals remain explicit. Synchronous graph construction and
+topological ordering cannot observe cancellation until the Worker event loop
+yields; measured preparation remained roughly 65–105 ms against the default
+five-second acknowledgement window. The census intentionally owns literal
+`*.worker.ts` files, so alternate naming or symlinked workers are a maintenance
+risk rather than implicitly governed entries. The source manifest is CI/build
+tooling and is not packed; the private task is wire-advertised but not exported;
+`constructor.name` is only one part of the compounded Worker-custody proof; and
+external dependency sources are bounded by the final-artifact scan rather than
+per-file local scanning. The `./host` bare-import allowance is compliant because
+the contract permits all three worker-host roots.
+
+The lean PR governor proves the exact committed path but is not a shell or YAML
+interpreter. Some hypothetical rewrites could preserve its structural matches
+while removing flaky-test flags, masking a command failure, moving Grid order,
+adding job conditions, or satisfying raw config controls through comments or
+cross-file attribution. The accepted command has none of those defects, both
+browser configs independently fix `retries: 0`, and three adversarial reviewers
+agreed that growing a syntax-form matrix would be disproportionate. The current
+browser addition costs about eighteen seconds inside the existing ten-minute
+job; a separate job or tighter Grid timeout remains optional if that budget
+later grows. Phase 2f-d remains optional and trigger-gated. Phase 2g may start.
+
 #### Slice gates, budgets and deferred 2f-d
 
 2f-a RED pins synchronous option rejection including batch zero, per-item abort,
