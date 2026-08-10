@@ -275,12 +275,22 @@ export interface Phase2gQuotaFaultTrace<T> extends Phase2e5InventoryTrace<T> {
 	readonly selectedRequestError: unknown;
 	readonly selectedOccurrenceInTrace: boolean;
 	readonly settlementAbortAttributedToRequestError: boolean;
+	readonly settlementExplicitHarnessAbortCalls: number;
 	readonly settlementIndependentAbortScheduled: boolean;
+	readonly settlementNativeRequestFailureObserved: boolean;
+	readonly settlementNativeRequestFailureDefaultAllowed: boolean;
 	readonly settlementRequestErrorBeforeAbortConsequence: boolean;
 	readonly settlementRequestErrorEvents: number;
 	readonly settlementRequestErrorIsSameRealmQuotaFault: boolean;
+	readonly settlementRequestReadyStateDoneAtTrustedError: boolean;
+	readonly settlementSyntheticDispatchCalls: number;
+	readonly settlementSyntheticRequestSuccessEvents: number;
 	readonly settlementRequestSuccessEvents: number;
 	readonly settlementTransactionAbortAfterRequestError: boolean;
+	readonly settlementTransactionAbortAfterTrustedRequestError: boolean;
+	readonly settlementTrustedRequestErrorEvents: number;
+	readonly settlementTrustedRequestSuccessEvents: number;
+	readonly settlementTrustedTransactionAbortEvents: number;
 	readonly writesObserved: number;
 }
 
@@ -975,6 +985,8 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
 	const originalAbort = IDBTransaction.prototype.abort;
 	const originalDispatchEvent = EventTarget.prototype.dispatchEvent;
+	const nativeRequestErrorGetter = Object.getOwnPropertyDescriptor(IDBRequest.prototype, "error")?.get;
+	if (nativeRequestErrorGetter === undefined) throw new Error("native IDBRequest.error getter is unavailable");
 	const originalAdd = IDBObjectStore.prototype.add;
 	const originalGet = IDBObjectStore.prototype.get;
 	const originalGetAll = IDBObjectStore.prototype.getAll;
@@ -993,12 +1005,22 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	let eventOrder = 0;
 	let selectedRequestError: unknown;
 	let settlementAbortConsequenceOrder = 0;
+	let settlementExplicitHarnessAbortCalls = 0;
 	let settlementIndependentAbortScheduled = false;
+	let settlementNativeRequestFailureObserved = false;
+	let settlementNativeRequestFailureDefaultAllowed = false;
 	let settlementRequestErrorDispatchActive = false;
 	let settlementRequestErrorEvents = 0;
 	let settlementRequestErrorOrder = 0;
+	let settlementRequestReadyStateDoneAtTrustedError = false;
 	let settlementRequestSuccessEvents = 0;
+	let settlementSyntheticDispatchCalls = 0;
+	let settlementSyntheticRequestSuccessEvents = 0;
 	let settlementTransactionAbortOrder = 0;
+	let settlementTrustedRequestErrorEvents = 0;
+	let settlementTrustedRequestErrorOrder = 0;
+	let settlementTrustedRequestSuccessEvents = 0;
+	let settlementTrustedTransactionAbortEvents = 0;
 	let terminalCount = 0;
 	let writesObserved = 0;
 
@@ -1034,8 +1056,9 @@ export async function withPhase2gQuotaFaultTrace<T>(
 		originalTransactionAddEventListener.call(
 			transaction,
 			"abort",
-			() => {
+			(event: Event) => {
 				settlementTransactionAbortOrder = ++eventOrder;
+				if (event.isTrusted) settlementTrustedTransactionAbortEvents++;
 				trace.terminal = "abort";
 				terminalCount++;
 			},
@@ -1083,6 +1106,24 @@ export async function withPhase2gQuotaFaultTrace<T>(
 				},
 				{ once: true }
 			);
+			originalRequestAddEventListener.call(request, "error", (event: Event) => {
+				if (!event.isTrusted) return;
+				settlementTrustedRequestErrorEvents++;
+				settlementTrustedRequestErrorOrder = ++eventOrder;
+				settlementRequestReadyStateDoneAtTrustedError ||= request.readyState === "done";
+				if (request.readyState === "done") {
+					const nativeError = nativeRequestErrorGetter.call(request);
+					settlementNativeRequestFailureObserved ||=
+						nativeError instanceof DOMException && nativeError.name !== "AbortError";
+				}
+				queueMicrotask(() => {
+					settlementNativeRequestFailureDefaultAllowed ||= !event.defaultPrevented;
+				});
+			});
+			originalRequestAddEventListener.call(request, "success", (event: Event) => {
+				if (event.isTrusted) settlementTrustedRequestSuccessEvents++;
+				else settlementSyntheticRequestSuccessEvents++;
+			});
 			queueMicrotask(() => {
 				faultsFired++;
 				originalRequestAddEventListener.call(
@@ -1091,12 +1132,14 @@ export async function withPhase2gQuotaFaultTrace<T>(
 					() => {
 						settlementIndependentAbortScheduled = !settlementRequestErrorDispatchActive;
 						settlementAbortConsequenceOrder = ++eventOrder;
+						settlementExplicitHarnessAbortCalls++;
 						originalAbort.call(transaction);
 					},
 					{ once: true }
 				);
 				settlementRequestErrorDispatchActive = true;
 				try {
+					settlementSyntheticDispatchCalls++;
 					originalDispatchEvent.call(request, new Event("error", { bubbles: true, cancelable: true }));
 				} finally {
 					settlementRequestErrorDispatchActive = false;
@@ -1176,7 +1219,10 @@ export async function withPhase2gQuotaFaultTrace<T>(
 				settlementRequestErrorOrder > 0 &&
 				settlementRequestErrorOrder < settlementAbortConsequenceOrder &&
 				!settlementIndependentAbortScheduled,
+			settlementExplicitHarnessAbortCalls,
 			settlementIndependentAbortScheduled,
+			settlementNativeRequestFailureObserved,
+			settlementNativeRequestFailureDefaultAllowed,
 			settlementRequestErrorBeforeAbortConsequence:
 				settlementRequestErrorOrder > 0 && settlementRequestErrorOrder < settlementAbortConsequenceOrder,
 			settlementRequestErrorEvents,
@@ -1184,9 +1230,17 @@ export async function withPhase2gQuotaFaultTrace<T>(
 				selectedRequestError === fault &&
 				selectedRequestError instanceof DOMException &&
 				selectedRequestError.name === "QuotaExceededError",
+			settlementRequestReadyStateDoneAtTrustedError,
 			settlementRequestSuccessEvents,
+			settlementSyntheticDispatchCalls,
+			settlementSyntheticRequestSuccessEvents,
 			settlementTransactionAbortAfterRequestError:
 				settlementRequestErrorOrder > 0 && settlementRequestErrorOrder < settlementTransactionAbortOrder,
+			settlementTransactionAbortAfterTrustedRequestError:
+				settlementTrustedRequestErrorOrder > 0 && settlementTrustedRequestErrorOrder < settlementTransactionAbortOrder,
+			settlementTrustedRequestErrorEvents,
+			settlementTrustedRequestSuccessEvents,
+			settlementTrustedTransactionAbortEvents,
 			transactions: Object.freeze(transactions.map((transaction) => Object.freeze({ ...transaction }))),
 			writesObserved,
 		};

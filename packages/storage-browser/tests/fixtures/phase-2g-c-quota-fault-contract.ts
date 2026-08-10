@@ -163,12 +163,22 @@ export interface Phase2gQuotaCaseEvidence {
 	readonly retryResult: string;
 	readonly selectedOccurrenceInTrace: boolean;
 	readonly settlementAbortAttributedToRequestError: boolean;
+	readonly settlementExplicitHarnessAbortCalls: number;
 	readonly settlementIndependentAbortScheduled: boolean;
+	readonly settlementNativeRequestFailureObserved: boolean;
+	readonly settlementNativeRequestFailureDefaultAllowed: boolean;
 	readonly settlementRequestErrorBeforeAbortConsequence: boolean;
 	readonly settlementRequestErrorEvents: number;
 	readonly settlementRequestErrorIsSameRealmQuotaFault: boolean;
+	readonly settlementRequestReadyStateDoneAtTrustedError: boolean;
 	readonly settlementRequestSuccessEvents: number;
+	readonly settlementSyntheticDispatchCalls: number;
+	readonly settlementSyntheticRequestSuccessEvents: number;
 	readonly settlementTransactionAbortAfterRequestError: boolean;
+	readonly settlementTransactionAbortAfterTrustedRequestError: boolean;
+	readonly settlementTrustedRequestErrorEvents: number;
+	readonly settlementTrustedRequestSuccessEvents: number;
+	readonly settlementTrustedTransactionAbortEvents: number;
 	readonly staleRecoveryCertificateCleared: boolean;
 	readonly storeRemainedOpenAndUnpoisoned: boolean;
 }
@@ -250,6 +260,22 @@ export function phase2gQuotaCaseErrors(edge: Phase2gQuotaEdge, evidence: Phase2g
 			errors.push("settlement used an independently scheduled transaction abort");
 		if (!evidence.adapterObservedIdenticalSettlementCause)
 			errors.push("adapter did not observe the identical selected request error cause");
+		if (
+			evidence.settlementTrustedRequestErrorEvents !== 1 ||
+			!evidence.settlementRequestReadyStateDoneAtTrustedError ||
+			!evidence.settlementNativeRequestFailureObserved
+		)
+			errors.push("settlement selected request did not reach a native failed done state on one trusted error");
+		if (evidence.settlementTrustedRequestSuccessEvents !== 0 || evidence.settlementSyntheticRequestSuccessEvents !== 0)
+			errors.push("settlement selected request published a later native or synthetic success");
+		if (
+			evidence.settlementTrustedTransactionAbortEvents !== 1 ||
+			!evidence.settlementTransactionAbortAfterTrustedRequestError ||
+			!evidence.settlementNativeRequestFailureDefaultAllowed
+		)
+			errors.push("settlement transaction did not abort by native default semantics after the trusted request error");
+		if (evidence.settlementExplicitHarnessAbortCalls !== 0 || evidence.settlementSyntheticDispatchCalls !== 0)
+			errors.push("settlement harness explicitly aborted or synthetically dispatched an event");
 	}
 	if (!evidence.operationReturnedAfterTerminal) errors.push("success/failure published before transaction terminal");
 	if (!evidence.storeRemainedOpenAndUnpoisoned) errors.push("quota poisoned or closed the store");
