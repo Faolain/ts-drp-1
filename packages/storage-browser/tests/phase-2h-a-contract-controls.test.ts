@@ -58,6 +58,21 @@ const COVERAGE_LEDGER = Object.freeze([
 	["finite-bound", "513th attempt and 1,025th entry have one global run-root overflow identity"],
 ] as const satisfies readonly (readonly [CoverageArea, string])[]);
 
+function compareUtf8(left: string, right: string): number {
+	const leftBytes = new TextEncoder().encode(left);
+	const rightBytes = new TextEncoder().encode(right);
+	const length = Math.min(leftBytes.byteLength, rightBytes.byteLength);
+	for (let index = 0; index < length; index++) {
+		const difference = (leftBytes[index] ?? 0) - (rightBytes[index] ?? 0);
+		if (difference !== 0) return difference;
+	}
+	return leftBytes.byteLength - rightBytes.byteLength;
+}
+
+function ascendingUtf8(values: readonly string[]): readonly string[] {
+	return Object.freeze([...values].sort(compareUtf8));
+}
+
 function aggregate(
 	entries: readonly Phase2hRawEntry[],
 	census?: Readonly<{ duplicateIdentities: readonly string[]; invalidIdentities: readonly string[] }>
@@ -151,9 +166,57 @@ describe("Phase 2h-a frozen contract controls", () => {
 	it("reports the authorized inert campaign as the exact 69/54 failure census", () => {
 		const observed = aggregate(phase2hStructuralEntries());
 		expect(observed.records).toEqual([]);
-		expect(observed.missingTupleIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS);
-		expect(observed.missingKillPoints).toEqual(PHASE_2H_KILL_TUPLE_IDS);
+		expect(observed.requiredTupleIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS);
+		expect(observed.missingKillPoints).toEqual(ascendingUtf8(PHASE_2H_KILL_TUPLE_IDS));
+		expect(observed.missingTupleIds).toEqual(ascendingUtf8(PHASE_2H_REQUIRED_TUPLE_IDS));
 		expect(observed.verdict).toBe("fail");
+	});
+
+	it("RED: invalidates one engine's complete process campaign when one individually valid arming measurement drifts", () => {
+		const engine = "webkit";
+		const affectedTupleIds = PHASE_2H_KILL_TUPLE_IDS.filter((tupleId) => tupleId.endsWith(`/${engine}`));
+		const [mutatedTupleId] = affectedTupleIds;
+		if (mutatedTupleId === undefined) throw new TypeError("WebKit process-death control registry is empty");
+		const records = phase2hControlRecords();
+		const mutatedRecords = records.map((record) => {
+			if (record.tupleId !== mutatedTupleId) return record;
+			if (record.hardKillEvidence === null) throw new TypeError("process-death control lacks hard-kill evidence");
+			return {
+				...record,
+				hardKillEvidence: {
+					...record.hardKillEvidence,
+					armingMeasurement: { ...record.hardKillEvidence.armingMeasurement, blockedForMs: 101 },
+				},
+			};
+		});
+		const mutated = mutatedRecords.find(({ tupleId }) => tupleId === mutatedTupleId);
+		if (mutated === undefined) throw new TypeError("mutated process-death control is absent");
+		expect(mutatedRecords.filter((record, index) => record !== records[index])).toHaveLength(1);
+		expect(
+			validatePhase2hRecord(mutated, {
+				gitSha: PHASE_2H_CONTROL_GIT_SHA,
+				project: engine,
+				runId: PHASE_2H_CONTROL_RUN_ID,
+			}).errors
+		).toEqual([]);
+
+		const observed = aggregate([
+			...phase2hStructuralEntries(),
+			...mutatedRecords.map((record) => phase2hRecordEntry(record)),
+		]);
+		const affected = new Set(affectedTupleIds);
+		const recordIds = observed.records.map(({ tupleId }) => tupleId);
+		expect(affectedTupleIds).toHaveLength(18);
+		expect(observed.verdict).toBe("fail");
+		expect(recordIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS.filter((tupleId) => !affected.has(tupleId)));
+		expect(observed.missingTupleIds).toEqual(ascendingUtf8(affectedTupleIds));
+		expect(observed.missingKillPoints).toEqual(ascendingUtf8(affectedTupleIds));
+		expect(observed.invalidRecordIds).toEqual(ascendingUtf8(affectedTupleIds));
+		for (const tupleId of PHASE_2H_KILL_TUPLE_IDS.filter((candidate) => !affected.has(candidate))) {
+			expect(recordIds).toContain(tupleId);
+			expect(observed.missingTupleIds).not.toContain(tupleId);
+			expect(observed.invalidRecordIds).not.toContain(tupleId);
+		}
 	});
 
 	it("rejects the finite v2 record mutants without changing their filename owner", () => {

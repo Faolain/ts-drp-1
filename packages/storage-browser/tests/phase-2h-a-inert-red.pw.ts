@@ -7,6 +7,21 @@ import { PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_REQUIRED_TUPLE_IDS } from "./fixtures
 
 let server: AssetServer;
 
+function compareUtf8(left: string, right: string): number {
+	const leftBytes = new TextEncoder().encode(left);
+	const rightBytes = new TextEncoder().encode(right);
+	const length = Math.min(leftBytes.byteLength, rightBytes.byteLength);
+	for (let index = 0; index < length; index++) {
+		const difference = (leftBytes[index] ?? 0) - (rightBytes[index] ?? 0);
+		if (difference !== 0) return difference;
+	}
+	return leftBytes.byteLength - rightBytes.byteLength;
+}
+
+function ascendingUtf8(values: readonly string[]): readonly string[] {
+	return Object.freeze([...values].sort(compareUtf8));
+}
+
 test.beforeAll(async () => {
 	const assetDirectory = process.env.PHASE_2H_A_ASSET_DIR;
 	if (assetDirectory === undefined || !fs.existsSync(assetDirectory))
@@ -42,7 +57,8 @@ test("authorized inert campaign emits no records and cannot satisfy the complete
 		runId,
 	});
 	expect(aggregate.records).toEqual([]);
-	expect(aggregate.missingTupleIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS);
-	expect(aggregate.missingKillPoints).toEqual(PHASE_2H_KILL_TUPLE_IDS);
+	expect(aggregate.requiredTupleIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS);
+	expect(aggregate.missingTupleIds).toEqual(ascendingUtf8(PHASE_2H_REQUIRED_TUPLE_IDS));
+	expect(aggregate.missingKillPoints).toEqual(ascendingUtf8(PHASE_2H_KILL_TUPLE_IDS));
 	expect(aggregate.verdict).toBe("pass");
 });

@@ -27,6 +27,21 @@ const CANDIDATE_RED_LEDGER = Object.freeze([
 	"fatal missing structural topology",
 ] as const);
 
+function compareUtf8(left: string, right: string): number {
+	const leftBytes = new TextEncoder().encode(left);
+	const rightBytes = new TextEncoder().encode(right);
+	const length = Math.min(leftBytes.byteLength, rightBytes.byteLength);
+	for (let index = 0; index < length; index++) {
+		const difference = (leftBytes[index] ?? 0) - (rightBytes[index] ?? 0);
+		if (difference !== 0) return difference;
+	}
+	return leftBytes.byteLength - rightBytes.byteLength;
+}
+
+function ascendingUtf8(values: readonly string[]): readonly string[] {
+	return Object.freeze([...values].sort(compareUtf8));
+}
+
 function candidate(
 	entries: readonly Phase2hRawEntry[],
 	census?: Readonly<{ duplicateIdentities: readonly string[]; invalidIdentities: readonly string[] }>
@@ -54,8 +69,9 @@ describe("Phase 2h-a typed candidate RED", () => {
 	it("truthfully emits zero records and the exact authorized 69/54 inert census", () => {
 		const observed = candidate(phase2hStructuralEntries());
 		expect(observed.records).toEqual([]);
-		expect(observed.missingTupleIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS);
-		expect(observed.missingKillPoints).toEqual(PHASE_2H_KILL_TUPLE_IDS);
+		expect(observed.requiredTupleIds).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS);
+		expect(observed.missingTupleIds).toEqual(ascendingUtf8(PHASE_2H_REQUIRED_TUPLE_IDS));
+		expect(observed.missingKillPoints).toEqual(ascendingUtf8(PHASE_2H_KILL_TUPLE_IDS));
 		expect(observed).toMatchObject({
 			duplicateTupleIds: [],
 			extraTupleIds: [],
