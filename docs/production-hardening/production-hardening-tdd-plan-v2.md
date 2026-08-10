@@ -1093,7 +1093,9 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2f-b**    | Versioned byte-bounded ready-handshake transport over one caller-supplied Worker endpoint. Queue until one valid `ready`, bind its accepted task set, enforce bounded request/chunk/result storage, cancel acknowledgement and terminal recovery. Never replay, respawn or hide a Worker constructor policy.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | local-safe  | sliceable               | Firefox + WebKit `worker-handshake.pw.ts`: immediate same-task submit crosses a deliberately slow module evaluation only after `ready`, never-ready times out, ordering is worker-observed, queue/protocol/cancel/termination mutants fail and no case hangs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **2f-c**    | Exact emitted-worker graph gate plus real off-main-thread integration. Esbuild owns module resolution; two bounded syntax predicates reject dynamic import and top-level `await`/`for await`. The workload is 4,096 operation vertices plus one anchor: Kahn order, bounded canonical encoding and compact-Merkle accumulation in a dedicated Worker. No reducer/fold/hash owner enters worker-host.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | local-safe  | sliceable               | Chromium proves a causal Long Tasks observer and `<50 ms` during the real workload; Firefox/WebKit own handshake evidence only. Root/order/Merkle/custody counters kill hollow or main-thread mutants. The real 4,096-operation blueprint fold remains exclusively Phase 4a                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **2f-d**    | Optional future bulk-crypto task owned by worker-host only if a merged production UI-thread consumer and release-matrix benchmark show representative synchronous `hashDomain` work at p95 ≥50 ms. No placeholder, hash import, wire kind or WASM lands in Phase 2f.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | local-safe  | deferred/optional       | Not a Phase 2f closure gate. If the trigger later fires, freeze a new TDD contract that preserves `@ts-drp/canonical.hashDomain` as the only framing/digest owner and evaluates audited prior art before authoring WASM                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **2g**      | Quota, persistence, private mode, rollback pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | coordinated | unpin rule atomic       | `quota-rollback.spec.ts`: `QuotaExceededError` injected at **every** mutating request never moves the head; estimate below margin refuses a new stage **before** destructive cleanup; a forged mirror receipt can **never** unpin the last usable signer rollback (`RollbackPinned`, not success)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **2g-a**    | Public runtime-neutral capacity observation in `@ts-drp/storage` plus the sole no-argument same-realm browser binding. Inspection never requests persistence; only the host/user-gesture path calls `persist`. Closed outcomes cover unsupported, granted/not-granted, exception/invalid response, and complete/incomplete/unsafe/inconsistent estimates. No private-mode inference, signer authorization, schema, Node capacity, or test injection export.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | local-safe  | observation atomic      | Table-driven fake-port RED plus ≤60 s/engine inspection/nonprompting smoke; GREEN is the neutral module/root export and browser binding only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **2g-b**    | Profile-bounded advisory stage admission. Required safe-integer `maxClosureReferences`, `maxStageCostBytes`, and `reserveBytes`; cost is exact encoded staged record plus declared bytes for globally missing blobs. Dedup uses one metadata-only batch `getKey` presence probe and never reads blob values. Known capacity admits on equality; every unusable estimate permits only the same profile-bounded attempt; actual writes remain authoritative. `AheDurableStore` and shared rejection taxonomy stay unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | local-safe  | refusal before mutation | Boundary/overflow/dedup/unavailable-estimate/ordering RED with positive real stage and mutants; GREEN adds neutral controller/types and the browser store subtype's bounded probe.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **2g-c**    | Tests-only quota-fault characterization/acceptance over the trace-derived successful mutation inventory, extended with present-head supersession. Inject genuine same-realm quota errors at every write creation, settlement, and terminal edge; require the complete four-store old image after reopen and exact complete-new image after retry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | coordinated | transaction atomic      | Current trace checksum is 9 transactions/13 writes/35 derived edges (historical frozen subset 8/10/28); runner derives rather than hard-codes. Chromium full matrix plus one bounded engine-generated control; representative Firefox/WebKit cases in 2h. Production GREEN only if a real defect is reproduced.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **2h**      | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | local-safe  | sliceable               | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2i**      | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | local-safe  | sliceable               | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | local-safe  | sliceable               | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -1615,6 +1617,445 @@ new TDD contract must then preserve canonical as the only framing/digest owner
 and assess existing audited prior art before authoring WASM. This optional work
 remains after the golden paths unless that measured trigger fires earlier.
 
+### Phase 2g assumption-correction quorum — executable capacity seam v1
+
+The former Phase 2g row incorrectly combined quota, persistence, private-mode
+inference, rollback pins and receipt handling without an executable boundary.
+Phase 2g owns only runtime-neutral capacity observation with one same-realm
+browser binding, profile-bounded advisory admission before a new browser
+generation stage, and whole-physical-image atomicity under request-time browser
+quota failure. It adds no durable schema, pin, receipt, release state, deletion
+command, cleanup authority, signer eligibility, private-mode detector or shared
+storage rejection reason.
+
+The no-edit audit SHA-256 is
+`4cee869229ae545f814e01e5e5582fe2abdf5ae18e276a2feb9f68539116a195`.
+Codex-high reconciled and ratified the 425-line canonical contract SHA-256
+`aca9698632a925c567c82fffc449abb17b03ce9be95acca9642c5942d4cbfa17`.
+Fresh genuine Kimi 3/high/max-100 session
+`27fd1125-e63e-4d81-aa3b-5512efd32c97` ratified that exact hash; its result
+SHA-256 is
+`94d79c268058fc2ad6eb49f65330d3524019eee94990535ed0c40cb5918fe769`.
+Fresh Opus 5/xhigh session `4c43b4bc-a9ac-4aff-b066-30f46e081b70` also
+matched and approved it; its retained result SHA-256 is
+`c0975864bc8a8fac45b2fbf65dda76efd766cbfefeee12d712638e2f6c0625d2`.
+Small automatic Haiku helper usage in the Opus controller was disclosed and is
+non-authoritative. All three authorities returned the amendment executable.
+
+#### 2g-a — neutral capacity facts and sole browser binding
+
+`@ts-drp/storage` adds `src/capacity.ts`, re-exported only from its existing
+package root. Export-map keys remain exactly `.`, `./contract` and `./adapter`;
+the latter two gain no capacity export. The public surface is:
+
+```ts
+export type StorageCapacityPort = Readonly<{
+	persisted?: () => unknown;
+	persist?: () => unknown;
+	estimate?: () => unknown;
+}>;
+
+export type PersistenceObservation =
+	| Readonly<{ status: "unsupported" }>
+	| Readonly<{ status: "granted" }>
+	| Readonly<{ status: "not-granted" }>
+	| Readonly<{ status: "unavailable"; reason: "exception" | "invalid-response" }>;
+
+export type QuotaObservation =
+	| Readonly<{
+			status: "available";
+			usageBytes: number;
+			quotaBytes: number;
+			availableBytes: number;
+	  }>
+	| Readonly<{
+			status: "unavailable";
+			reason: "unsupported" | "exception" | "incomplete" | "unsafe" | "inconsistent";
+	  }>;
+
+export type StorageCapabilityReport = Readonly<{
+	persistence: PersistenceObservation;
+	quota: QuotaObservation;
+}>;
+
+export type PersistenceRequestResult =
+	| Readonly<{ status: "already-granted" | "granted" | "denied" | "unsupported" }>
+	| Readonly<{ status: "unavailable"; reason: "exception" | "invalid-response" }>;
+
+export function inspectStorageCapability(port: StorageCapacityPort): Promise<StorageCapabilityReport>;
+export function requestPersistentStorage(port: StorageCapacityPort): Promise<PersistenceRequestResult>;
+```
+
+`@ts-drp/storage-browser` adds exactly one runtime export:
+
+```ts
+export function createBrowserStorageCapacityPort(): StorageCapacityPort;
+```
+
+It accepts no injected platform object, captures safe same-realm wrappers around
+`globalThis.navigator?.storage`, and is the sole production
+`navigator.storage` owner. Structurally compatible fake ports test the neutral
+contract; there is no exported test constructor, fault hook, factory option,
+environment switch or injected `StorageManager` seam.
+
+Inspection never calls `persist()`. It calls callable `persisted()` at most
+once, then callable `estimate()` at most once, and attempts the second axis even
+when the first is unavailable. Missing/non-callable members are `unsupported`;
+throws/rejections are `exception`; non-boolean persistence is
+`invalid-response`. Quota is available only when own `usage` and `quota` are
+non-negative safe integers with `usage <= quota`; `availableBytes = quota -
+usage`. Missing fields are `incomplete`, invalid numbers are `unsafe`, and
+`usage > quota` is `inconsistent`. There is no coercion, rounding, sentinel,
+cache, raw exception in the report or cross-axis inference.
+
+`requestPersistentStorage` alone may call `persist()`, and the host/Track-P
+composition invokes it only after explaining eviction risk and obtaining the
+applicable gesture. It calls `persisted()` first: `true` returns
+`already-granted` and skips `persist`; otherwise callable `persist()` is called
+at most once. A lone callable `persist` is usable when `persisted` is absent;
+missing both is `unsupported`. A throwing/rejecting `persisted()` is
+`unavailable`/`exception` and skips `persist`; `persisted() === false` plus an
+absent/non-callable `persist` is `unsupported`, while `denied` means callable
+`persist()` returned `false`.
+
+Import, browser-store create/open/recovery, inspection and stage admission call
+`persist()` exactly zero times. Storage owns no consent UI. There is no
+`private`, `incognito`, user-agent, quota-threshold or browser-brand branch.
+Persistence discourages eviction; it is not permanence, strict transaction
+durability or authorization. Unsupported/denied/exceptional persistence leaves
+a successfully opened strict store usable as a replica and does not bar
+staging. Phase 5c/5e2/5f owns signer enrollment; a grant is at most one
+necessary fact.
+
+The fresh tests-only RED pins absent methods, already granted, explicit grant,
+denial, lone `persist`, every throw/rejection/non-boolean response, all estimate
+classifications, call order/count, frozen closed records, no automatic request
+and no private-mode vocabulary. Positive granted and denied reports both
+succeed. A ≤60-second-per-engine Chromium/Firefox/WebKit inspection smoke
+records but never pins environmental values and proves no prompt/request.
+GREEN adds only `capacity.ts`, root exports and the browser binding.
+
+#### 2g-b — bounded stage admission and metadata-only dedup
+
+The neutral capacity module also exports:
+
+```ts
+export type CapacityProfile = Readonly<{
+	maxClosureReferences: number; // positive safe integer
+	maxStageCostBytes: number; // positive safe integer
+	reserveBytes: number; // non-negative safe integer
+}>;
+
+export interface BlobExistencePort {
+	probeBlobPresence(digests: readonly BlobDigest[]): Promise<StoreResult<readonly boolean[]>>;
+}
+
+export type StageCost = Readonly<{
+	stagedGenerationRecordBytes: number;
+	missingBlobBytes: number;
+	totalBytes: number;
+}>;
+
+export type StageAdmission =
+	| Readonly<{
+			admitted: true;
+			basis: "measured" | "bounded-unavailable-estimate";
+			stageCostBytes: number;
+			requiredBytes: number;
+			availableBytes?: number;
+	  }>
+	| Readonly<{
+			admitted: false;
+			reason: "STAGE_COST_LIMIT_EXCEEDED" | "QUOTA_HEADROOM_INSUFFICIENT" | "ARITHMETIC_UNSAFE";
+			stageCostBytes?: number;
+			requiredBytes?: number;
+			availableBytes?: number;
+	  }>;
+
+export type AdmittedBeginResult =
+	| Readonly<{
+			kind: "begun";
+			admission: Extract<StageAdmission, { admitted: true }>;
+			record: GenerationRecord;
+	  }>
+	| Readonly<{
+			kind: "refused";
+			admission: Extract<StageAdmission, { admitted: false }>;
+	  }>
+	| Readonly<{
+			kind: "input-rejected";
+			reason: "INVALID_ARGUMENT" | "SHARED_BUFFER_INPUT";
+	  }>
+	| Readonly<{
+			kind: "store-rejected";
+			phase: "presence" | "begin";
+			result: Extract<StoreResult<never>, { ok: false }>;
+	  }>;
+
+export function parseCapacityProfile(value: unknown): ParseResult<CapacityProfile>;
+export function createStageAdmissionController(
+	input: Readonly<{
+		store: AheDurableStore & BlobExistencePort;
+		capacity: StorageCapacityPort;
+		profile: CapacityProfile;
+	}>
+): Readonly<{
+	beginAdmittedGeneration(input: Parameters<AheDurableStore["beginGeneration"]>[0]): Promise<AdmittedBeginResult>;
+}>;
+```
+
+`StageCost` is documentation-only vocabulary: the public surface has no
+`computeStageCost` or other producer, and the controller's sole method is
+`beginAdmittedGeneration`. `SHARED_BUFFER_INPUT` is shared-union reuse and is
+structurally unreachable for current begin/profile inputs; no SAB rule may be
+invented to manufacture that arm.
+
+The browser-specific composition type belongs only to
+`@ts-drp/storage-browser`:
+
+```ts
+export interface BrowserAheDurableStore extends AheDurableStore, BlobExistencePort {}
+```
+
+The existing browser factory keeps its runtime key and returns
+`Promise<BrowserAheDurableStore>`. Its one new method performs one bounded
+read-only `blobs` transaction, uses `getKey` for each unique digest, and returns
+a frozen positional boolean array. It never uses `get`, materializes a blob,
+hashes/serializes bytes, or exposes any row/key beyond requested existence.
+Tests cover normal input, closed/poisoned lifecycle, substrate failure,
+detachment and close. This is a production metadata capability, not a test
+injection point; `AheDurableStore`, memory and Node remain unchanged.
+
+For the detached, digest-sorted, duplicate-free closure and exact staged record
+that existing `beginGeneration` would construct:
+
+```text
+stagedGenerationRecordBytes = byteLength(encodeGenerationRecordV1(stagedRecord))
+missingBlobBytes            = checked sum(ref.byteLength where presence[index] == false)
+stageCostBytes              = checked add(stagedGenerationRecordBytes, missingBlobBytes)
+requiredBytes               = checked add(stageCostBytes, profile.reserveBytes)
+availableBytes              = quotaBytes - usageBytes // only for an available observation
+
+profile admissible iff maxClosureReferences > 0,
+                      maxStageCostBytes > 0,
+                      reserveBytes >= 0,
+                      all are safe integers, and
+                      maxStageCostBytes + reserveBytes is safe
+
+admit known iff stageCostBytes <= maxStageCostBytes
+             and availableBytes >= requiredBytes // equality admits
+
+admit unavailable-estimate iff stageCostBytes <= maxStageCostBytes
+```
+
+Every operand/intermediate is a non-negative safe integer; overflow returns
+`ARITHMETIC_UNSAFE`. There is no default reserve, ratio, magic margin, infinity
+sentinel or unbounded unknown path. Profile values are required host-owned
+operational configuration, not consensus inputs; a changed profile requires
+reviewed configuration evidence.
+
+Unsupported, exceptional, incomplete, unsafe and inconsistent estimates all
+take the `bounded-unavailable-estimate` positive path only after closure-count
+and stage-byte ceilings pass. Unknown therefore cannot brick the browser golden
+path or authorize unbounded work. The estimate is fresh and single-use per
+attempt, never cached, has no TTL and is advisory rather than a reservation;
+the actual write remains authoritative.
+
+Cost includes the exact staged-record bytes plus declared bytes for globally
+missing immutable content-addressed blobs; each existing blob is charged zero
+exactly once. IDB keys/framing/pages, journals, transient replacement
+amplification, concurrent origin use and later promotion/head replacement are
+not falsely measured. `reserveBytes` is the explicit policy allowance for those
+opaque costs. Actual quota failure remains authoritative.
+
+Exact order and precedence are:
+
+1. Controller construction validates/freezes the profile. Invalid configuration
+   throws `TypeError` before a port or store call.
+2. Each call validates and detaches the exact closed begin input, including the
+   existing SAB rule. Structural failure returns `input-rejected` first.
+3. Enforce `maxClosureReferences`, construct/encode the staged record when
+   semantically constructible, and reject if its bytes alone exceed
+   `maxStageCostBytes`, bounding work before any digest probe.
+4. Invoke `store.probeBlobPresence` exactly once over sorted unique digests. A
+   rejection returns `store-rejected`/`phase:"presence"`; no estimate or
+   mutation follows.
+5. Compute checked missing-byte cost. Overflow/profile refusal precedes estimate
+   and mutation.
+6. Invoke `estimate()` exactly once and no other capacity-port member. Known
+   insufficiency returns `refused`; unavailable estimate admits only the
+   already profile-bounded attempt.
+7. On admission call `store.beginGeneration` exactly once with detached input.
+   It remains the sole semantic/lifecycle/CAS mutation authority and rechecks
+   state. Failure is `store-rejected`/`phase:"begin"`; success is `begun`.
+
+Empty/duplicate closures are not `input-rejected`: structural preparation
+accepts them and `beginGeneration` rejects them semantically. They surface as
+`store-rejected`/`phase:"begin"` unless an earlier profile ceiling refuses. The
+exact encoded-record pin applies only where `beginGeneration` would construct a
+record. Invalid input precedes all work; presence lifecycle/substrate results
+precede quota; profile refusal precedes estimate; known insufficiency precedes
+mutation; begin semantics/CAS remain authoritative after admission. No cleanup,
+delete, discard or persistence request occurs. Known quota refusal proves zero
+mutating IDB requests, not zero bounded metadata reads.
+
+The RED covers profile shape/extra/accessor/inherited/unsafe values; closure
+limit; exact encoded staged bytes; no/partial/full dedup; one batch probe and
+zero blob-value egress; probe failure; checked overflow; `required - 1`,
+equality and `required + 1`; every unavailable-estimate bounded-positive arm;
+known insufficiency with zero mutation; one fresh estimate; no persistence
+request; and a real memory/fake positive begin. Mutants kill `>` equality,
+omitted reserve, all-blob charging, caller-asserted presence, `getBlob`
+materialization, stale estimate reuse, reject-unknown, unsafe-number coercion
+and mutation before refusal. An optional fixed-seed `fast-check` tier is
+authorized as a test/dev dependency but capped at 300 pure-arithmetic cases and
+three seconds. No browser fuzzing, Jazzer.js, jsfuzz, TypeNFuzz, Shfz or broad
+Stryker campaign is authorized.
+
+#### 2g-c — trace-derived quota-fault acceptance
+
+The frozen `PHASE_2E5_BROWSER_REQUEST_INVENTORY` historically has eight
+successful write-bearing transactions and ten real `add`/`put` occurrences:
+`10 creation + 10 settlement + 8 terminal = 28` edges. Its separate 2e6
+process-death census remains 18. This omits a materially distinct production
+branch already traced by `phase-2d2b1-adapter-closure-red.pw.ts`: swapping over
+a present adopted head performs three ordered writes—supersede old generation,
+adopt candidate, replace head—rather than two for an empty-head swap.
+
+The tests-only `PHASE_2G_QUOTA_REQUEST_INVENTORY` therefore combines selected
+frozen 2e5 rows with one real, declared-equals-observed
+`swap-head-present-supersession` row. It does not rewrite the historical 2e5
+constant or 18-edge 2e6 census. At amendment HEAD:
+
+```text
+successful write transactions = 8 + 1 = 9
+actual write occurrences       = 10 + 3 = 13
+quota fault edges               = 13 creation + 13 settlement + 9 terminal = 35
+```
+
+The runner derives cases from observed transaction/request traces and never
+loops over a handwritten 35. `8/10/28` and `9/13/35` are drift checks, not
+authorities. Added, removed or reordered writes fail declaration-vs-observation,
+automatically change derived cases and require deliberate numeral amendment.
+Reads and already-aborting/no-write rows add no quota edge.
+
+Each edge uses real IndexedDB and a same-realm genuine
+`DOMException("quota exceeded", "QuotaExceededError")`:
+
+- creation throws before the real `add`/`put` request is returned;
+- settlement fails the selected request and causes real transaction abort
+  before success is observed; and
+- terminal issues all declared writes, then terminates the real transaction
+  with the quota cause before `complete` is published.
+
+The result remains
+`{ok:false, reason:"SUBSTRATE_FAILURE", cause:<the original same-realm DOMException>}`.
+No `QUOTA_EXCEEDED` enters `StorageRejectionReason`, and name-only objects are
+not reclassified. Quota failure clears stale recovery certificates, never
+poisons/closes the store, and unfaulted retry succeeds. Persisted corruption
+remains the sole poison owner.
+
+Before fault, snapshot schema version/store census and every key/value byte in
+all four stores, including an unrelated object with adopted closure and an
+unrelated global blob. After returned failure, close/reopen and require exact
+whole-image equality. Remove the fault, retry and compare against the
+complete-new image from the same unfaulted scenario in an isolated database.
+Require `before != expectedNew` and `faultsFired === 1`; head-only equality is
+forbidden.
+
+Positive/hollow controls kill a head-only oracle with one leaked blob, missing
+promotion row, success published before terminal completion, poison-on-quota,
+swallowed/replaced cause, out-of-trace fault index and omitted present-head
+supersession write. Invalid input/semantic rejection with a staged fault returns
+the existing result with zero write requests and zero fault firings.
+
+One bounded Chromium control must produce an engine-generated—not
+harness-supplied—quota failure via the pinned engine's supported quota override,
+with a 15-second/16-MiB capped fill fallback. Failure to produce a genuine fault
+fails rather than skips; the deterministic matrix remains separate evidence.
+The Chromium-only serial full matrix targets ≤20 seconds and hard-fails at 60.
+Firefox/WebKit each run one representative request edge plus inspection under
+2h; real grant/quota values are never pinned. Those engines are a Phase 2 exit
+conjunct, not a prerequisite blocking 2g-c authorship or sign-off before 2h.
+
+2g-c is tests-only characterization/acceptance. Its RED is causally the absent
+trace/fault/oracle instrument, never a fabricated production failure. If the
+existing adapter passes, GREEN may remain test-only. A reproduced production
+defect receives a fresh distinct GREEN limited to that defect. Any production
+transaction/request change reruns affected 2e5 declaration/observation and
+changed 2e6 process-death edges; otherwise existing 18-edge evidence is reused
+with an exact governance assertion.
+
+#### Receipt correction and named 7b-r deferral
+
+The former 2g receipt sentence is superseded, not waived. A forged, malformed,
+wrongly bound, untrusted, replayed or bad-signature receipt returns
+`RECEIPT_INVALID` during canonical verification before retention arithmetic and
+before any release-state mutation. `ROLLBACK_PINNED` applies only after
+authentication when release would leave fewer than the committed minimum of
+currently usable signer rollback generations. Neither reason enters shared
+`StorageRejectionReason`; both belong to a later release-specific result union.
+
+The named **7b-r receipt-authenticated rollback-release** slice is blocked on:
+
+1. Phase 3 installing committed `availabilityPolicyDigest` in the epoch anchor;
+2. Phase 5c's first schema bump and durable incarnation, signer
+   continuity/state, outbox and revision/CAS facts;
+3. verified adoption/commit-QC evidence from Phase 6a;
+4. Phase 7b's committed availability policy; and
+5. a governed protocol-v3 `registryVersion` bump adding canonical
+   artifact-bound availability-receipt bytes, a `/v3` domain, signed-envelope
+   classification, suite role, enrolled-mirror trust root, object/epoch/anchor/
+   artifact/generation/closure/policy binding, challenge freshness, replay
+   scope, distinct-mirror threshold and ordering/dedup rules.
+
+Receipt verification occurs outside the transaction and yields a module-private
+verified release intent bound to observed revision. One strict 7b-r transaction
+rechecks head/generation/policy/storage revisions and current usable rollback
+facts, then updates release state only. `releaseRollbackGeneration` never
+deletes. Phase 6b is the sole physical deletion authority and consumes a
+committed release as only one member of its existing conjunction: verified QC,
+durable adoption, minimum usable rollbacks, availability satisfied and
+categorized outbox. No release path deletes bytes and no receipt alone
+authorizes deletion.
+
+#### Closure, preservation and Phase 2 exit
+
+- **2g-a close:** frozen fake-port matrix, call counters, positive grant/deny
+  controls, packed public consumer, no-test-injection/no-private-mode audits,
+  three-engine nonprompting inspection, package typecheck/build/lint/tests and
+  logged hashes are green.
+- **2g-b close:** safe profile parser, exact formula/limits, metadata-only batch
+  probe, dedup, every unavailable-estimate bounded-positive path, equality,
+  overflow, zero-mutation refusal, real stage control, named mutants, packed
+  consumer and package typecheck/build/lint/tests are green and logged.
+- **2g-c close:** frozen 8/10/28 and extended 9/13/35 trace checks, every derived
+  full-image/reopen/retry case, genuine Chromium control, hollow controls,
+  representative 2h Firefox/WebKit cases and preserved Phase-2a-through-2e
+  suites are green and logged. Production changes rerun affected 2e5/2e6
+  evidence.
+- **Global preservation:** browser schema stays v1 with exactly `objects`,
+  `generations`, `blobs` and `promotions`; Phase 5c remains the first real schema
+  bump. Persistence codecs, adapter write vocabulary, `AheDurableStore`,
+  `StoreCapabilities`, `StorageRejectionReason`, memory and Node behavior stay
+  unchanged. No delete/clear/pin/receipt/release production path is added.
+  Protected files/stashes remain untouched. Root typecheck/build/lint/tests run
+  to logs with known unrelated baselines stated rather than hidden.
+- **Phase 2 exit:** browser 2g-a/b/c plus their Phase-2h engine matrix are
+  required. Quota/persistence are browser obligations; Node is preservation
+  evidence only and has no Phase-2 capacity port. Phase 2 makes no receipt, pin,
+  release, signer or deletion claim.
+
+Retain these gotchas: estimates race and reserve nothing; unusable estimates do
+not brick the golden path but profile ceilings prevent unbounded attempts;
+persistence discourages eviction but cannot prevent user deletion; private
+browsing is not detected; dedup never materializes blob bodies or trusts caller
+assertions; head-only oracles miss non-head leaks/deletions; quota can fail at
+creation, settlement or terminal and is not persisted corruption; historical
+28 is accurate but incomplete for supersession while 35 is a derived checksum,
+not a magic loop bound; forged receipts are `RECEIPT_INVALID`, while
+`ROLLBACK_PINNED` is an authenticated policy refusal.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
@@ -1771,7 +2212,8 @@ absent -> Staged -> Complete -> Adopted -> Superseded
   candidate `Complete`.
 - `discardGeneration` permits only `Staged | Complete -> Discarded`. Every other
   edge, including superseded discard or re-adoption, returns
-  `ILLEGAL_TRANSITION`; rollback release/deletion remains 2g/7b. `Superseded`
+  `ILLEGAL_TRANSITION`; rollback release remains 7b-r and physical deletion
+  remains solely 6b. `Superseded`
   and `Discarded` are terminal in 2a. Cleanup is never part of commit.
 
 #### Narrow store surface and linearization
@@ -2013,10 +2455,11 @@ mapping requires a new storage schema version with no v1 fallback. No 2a
 production durable data exists to migrate before those owners land.
 
 Phase 2a does not define or implement IDB/SQLite/OPFS schemas, kill points or
-process death, recovery/cleanup, quota/persistence/rollback release, workers,
-Web Locks, vote/signer/outbox transactions, durable issuance, snapshot/QC
-semantic verification, archives or compatibility/migration behavior. Those
-remain owned by 2b–2l, 4, 5c and 7.
+process death, recovery, workers, Web Locks, vote/signer/outbox transactions,
+durable issuance, snapshot/QC semantic verification, archives or
+compatibility/migration behavior. Quota/persistence remains owned by 2g-a/b/c,
+cleanup and physical deletion solely by 6b, and rollback release by 7b-r; the
+other listed work retains its named 2b–2l, 4, 5c and 7 owners.
 
 **Gotchas fixed by the quorum.** Do not reintroduce them during RED/GREEN:
 
@@ -3732,9 +4175,9 @@ Carry these accepted residuals to their named owners rather than overstating
    exit gate owns the kill-point matrix. A cross-connection immutable race is
    fail-closed today but has not earned the semantic `IMMUTABLE_CONFLICT`
    claim.
-10. Votes/anti-equivocation, migrations, quota, recovery, cleanup/GC, durable
-    issuance/outbox and a public production surface retain their existing
-    2d/2e/2g/2l/5c owners. Phase 2d2a advances the durable local foundation for
+10. Votes/anti-equivocation, migrations, quota/persistence, recovery, cleanup/GC,
+    durable issuance/outbox and a public production surface retain their
+    2d/2e/2g-a/b/c/6b/2l/5c owners. Phase 2d2a advances the durable local foundation for
     both Discord/chat and MMORPG; it proves neither golden path.
 
 #### Phase 2d2b(i) accepted closure — adapter lifecycle and retained evidence
@@ -3853,8 +4296,9 @@ Carry these accepted residuals to their existing owners:
    authority task, so neither Phase 2d2b nor full Phase 2d closes here.
 9. Existing owners remain unchanged for malformed-row taxonomy and recovery
    (2e), engines (2h), cross-tab/multi-connection behavior (2i/5c), kill and
-   coverage gates (Phase 2 exit), and votes, migrations, quota, GC, durable
-   issuance/outbox and the public production surface (2d/2e/2g/2l/5c).
+   coverage gates (Phase 2 exit), and votes, migrations, quota/persistence,
+   cleanup/GC, durable issuance/outbox and the public production surface
+   (2d/2e/2g-a/b/c/6b/2l/5c).
 10. Root scripts for these direct Playwright invocations and a declared
     `esbuild` test dependency remain Phase 2h/CI-topology work.
 
@@ -3972,7 +4416,8 @@ Carry these accepted nonblocking findings to their named owners:
    database remediation and recovery belong to 2e; bounded staging and
    materialization belong to 2d/2e under the standing shared-contract quorum;
    engines belong to 2h; cross-tab/multi-connection behavior to 2i/5c;
-   kill-point and coverage gates to the Phase 2 exit gate; quota/GC to 2g;
+   kill-point and coverage gates to the Phase 2 exit gate; quota/persistence to
+   2g-a/b/c; cleanup/GC and physical deletion solely to 6b;
    durable issuance/outbox to 2l; and the public production surface to later
    2d packaging.
 5. The prior 2d2b(i) lifecycle strengthenings and root-script/CI-topology work
@@ -4157,8 +4602,9 @@ Carry these accepted findings and execution gotchas to their bounded owners:
 3. The Node no-read probe currently detects SQL text. A stronger engine-level
    read counter may replace it at the 2e/Phase 2 exit instrumentation gate.
 4. Physical loss/corruption after promotion, full-closure recovery and the
-   journal/per-object read bound remain Phase 2e; promotion retention/GC
-   remains 2g; browser referential-integrity and multi-connection behavior
+   journal/per-object read bound remain Phase 2e; rollback release remains
+   7b-r and promotion cleanup/physical GC remains solely 6b; browser
+   referential-integrity and multi-connection behavior
    remain 2e/2i/5c; votes remain 2d2d/5c; public packaging remains 2e.
 5. Node child-process preservation must rebuild both shared storage and
    storage-node first; one pre-rebuild run honestly loaded stale `dist`. An
@@ -5112,8 +5558,10 @@ Publish only `@ts-drp/storage-browser` after the real recovery and kill evidence
 is green. Explicitly supersede package privacy, exports, files and toy-manifest
 structural controls in this slice; Node stays private. Run the proportionate
 three-engine/Phase-2 exit evidence owned by 2h rather than silently claiming it
-from Chromium-only 2e work. Semantic manifest/QC/tail roles remain 4c/6, quota/
-retention remains 2g, vote transactions remain 5c, durable issuance remains 2l,
+from Chromium-only 2e work. Semantic manifest/QC/tail roles remain 4c/6,
+quota/persistence remains 2g-a/b/c, rollback release remains 7b-r, physical
+cleanup/deletion remains solely 6b, vote transactions remain 5c, durable
+issuance remains 2l,
 and neither Discord/chat nor MMORPG is enabled by 2e alone.
 
 ##### Phase 2e7 accepted and closed
@@ -5703,11 +6151,12 @@ eviction matrix green.
 **Goal:** for chat the messages _are_ the state; a snapshot alone cannot remove them. Two-tier hot/cold.
 The root **codecs** already landed in Phase 3e — this phase is segmentation, paging and retention.
 
-| Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                  | RED test → GREEN                                                                                                                                                                     |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **7a** | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests                                                                                                                                                                        | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a 1M-message room downloads O(hot + window), verified by **network-byte accounting** in the chat e2e    |
-| **7b** | Availability policy as a **committed** value. `availabilityPolicyDigest` is installed in the anchor from Phase 3 onward; the initial no-mirror profile is a valid **explicit** policy: `mode:"local-only", minRollbackGenerations:2, minLocalCopies:1, minMirrorReceipts:0`. Receipts are signed artifact-bound local pruning evidence — **not consensus, and not a permanence claim**. | `availability-policy.test.ts`: a no-mirror room prunes only with a local snapshot and two rollback generations; a receipt for the wrong artifact/object/epoch never satisfies policy |
-| **7c** | Privacy/retention: per-segment encryption, certified key-erasure, honest deletion UX                                                                                                                                                                                                                                                                                                    | Certified key-erasure renders retained ciphertext unreadable to conforming clients; documented residual-risk statement                                                               |
+| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **7a**   | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests                                                                                                                                                                                                                                                                                       | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a 1M-message room downloads O(hot + window), verified by **network-byte accounting** in the chat e2e                                                                                                                                                                                                                                                                                                          |
+| **7b**   | Availability policy as a **committed** value. `availabilityPolicyDigest` is installed in the anchor from Phase 3 onward; the initial no-mirror profile is a valid **explicit** policy: `mode:"local-only", minRollbackGenerations:2, minLocalCopies:1, minMirrorReceipts:0`. Receipts are signed artifact-bound local pruning evidence — **not consensus, and not a permanence claim**.                                                                                                                | `availability-policy.test.ts`: a no-mirror room prunes only with a local snapshot and two rollback generations; a receipt for the wrong artifact/object/epoch never satisfies policy                                                                                                                                                                                                                                                                                                       |
+| **7b-r** | **Receipt-authenticated rollback release, after its prerequisites and a governed protocol-v3 registry bump.** Canonically verify artifact-bound availability receipts before retention arithmetic, derive a module-private release intent bound to observed revision, and atomically recheck head/generation/policy/storage revisions plus usable rollback facts before updating release state only. `releaseRollbackGeneration` never deletes; Phase 6b remains the sole physical deletion authority. | Forged/malformed/wrongly bound/untrusted/replayed/bad-signature receipts return `RECEIPT_INVALID` before arithmetic or release mutation. Only an authenticated but policy-unsafe release returns `ROLLBACK_PINNED`. No receipt alone deletes bytes; 6b still requires verified QC, durable adoption, minimum usable rollbacks, satisfied availability and categorized outbox. This row is blocked on Phase 3, 5c, 6a, 7b and the receipt registry bump detailed in the Phase 2g amendment. |
+| **7c**   | Privacy/retention: per-segment encryption, certified key-erasure, honest deletion UX                                                                                                                                                                                                                                                                                                                                                                                                                   | Certified key-erasure renders retained ciphertext unreadable to conforming clients; documented residual-risk statement                                                                                                                                                                                                                                                                                                                                                                     |
 
 > Round 1's _"randomized deletion/churn retains ≥1 valid copy at target probability"_ is a property of the
 > **availability model**, verifiable by the model alone — as a code gate it is vacuous, and an unspecified
