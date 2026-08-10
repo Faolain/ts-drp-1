@@ -3093,6 +3093,153 @@ owners. Phase 2h-b closes only the nine browser-surface tuples. Continue next
 with 2h-c as a separate tests-only RED and distinct GREEN. Phase 2h and Phase 2
 remain open.
 
+#### Phase 2h-c implementation closure — capacity and representative quota accepted
+
+Phase 2h-c is accepted and closed at signed GREEN
+`9c35c2a39c943e8cfde851a267d44a6177cd4f53`, tree
+`8ace1cc3b95a324ca22ea1fe3c3a593a2cefc59b`. The separate signed tests-only
+RED `6a701c8e3484b2e353659b16a8c0971353336896` froze one real capacity and one
+representative source-derived quota-fault obligation in each of Chromium,
+Firefox and WebKit while preserving the three accepted 2h-b browser-surface
+controls. GREEN left both frozen RED files byte-identical and changed only
+tests, fixtures and the package-local Playwright configuration. It changed no
+production source, storage schema, wire domain, public API, package export,
+dependency, lockfile, workflow or root script.
+
+The causal RED was exactly six missing-producer failures, capacity and
+quota-fault once per engine, while the three 2h-b controls passed. Its honest
+candidate-bound aggregate remained 9 records, 60 missing tuples, 54 missing
+kill points, empty duplicate/extra/invalid arrays and verdict `fail`. GREEN
+passed 9/9 across the three engines and produced exactly the first 15 registry
+records in registry order, with 54 missing process-death tuples, 54 missing
+kill points, empty duplicate/extra/invalid arrays and verdict `fail`.
+
+Capacity uses the production `createBrowserStorageCapacityPort` and
+`inspectStorageCapability` paths. The `navigator.storage.persist` trap is
+installed before module loading and factory capture, observes zero calls and
+is restored in `finally`. The complete report and both arms are validated as
+closed and frozen in the page realm; quota bytes and grant outcomes are
+retained rather than pinned. Each engine's `webLocksMode` and
+`persistenceMode` are checked against its capacity tuple by the aggregate.
+
+Quota-fault derives exactly
+`swap-head-certificate-match/request-05-put-objects/settlement` from the
+source-owned 35-edge inventory. The source-owned Phase 2g validator proves the
+same-realm `QuotaExceededError`, request-error-before-abort ordering,
+native-default abort, old image after reopen and successful retry to the new
+image. The four evidence-image digests use the single Phase 2h serializer. The
+accepted edge's subject has an old head of `none`; the seeded unrelated
+adoption is therefore the old image's unique present head. Reading that head
+after a real close/reopen and before retry satisfies the existing phrase “the
+old present head.” This is recorded as a unique-referent interpretation, not a
+plan amendment and not permission to generalize an unbound sentinel.
+
+The GREEN also removed an obsolete test-scaffold dependency from the shared
+Phase 2g quota instrument. That scaffold resolved a server-relative dynamic
+import only under the dedicated Phase 2g server; under the tokenized flat Phase
+2h asset server it selected its inert store and caused the observed
+`SUBSTRATE_FAILURE` during seeding. The instrument now calls the already
+exported production `createBrowserAheDurableStore` owner directly. The original
+35-case matrix and genuine Chromium engine-generated quota control remain
+unchanged and pass, so no Chromium-only evidence was relabelled cross-engine.
+Asset scratch custody also moved beneath ignored `test-results`, discharging
+2h-b carry-forward 9 at its stated next-global-setup-edit trigger.
+
+The immutable GREEN gates are unified browser execution 9/9, 15/15 focused
+tests, 152/152 complete `storage-browser` package tests across 33 files, Phase
+2g-a preservation 3/3, the complete Phase 2g-c matrix and engine quota control
+3/3, standalone Phase 2h-b 3/3 with its 9/60/54 aggregate, Phase 2e7 1/1,
+Phase 2f-c 3/3, `storage-browser` and `worker-host` typecheck/build, traced
+nonempty scoped ESLint over all five changed files with zero errors/warnings,
+Prettier and diff checks. The RED and GREEN evidence-manifest SHA-256 values
+are respectively
+`6843c766c4edda42c13bb2ac9c8d83a5aaa72795ee8d815e86b174d5fc29c85a`
+and
+`b20f78cde29772346cbf24dd0510f940dc3ac34a1dd1d446a10bcdcd37e2dcdc`.
+
+Independent final acceptance is unanimous:
+
+- native Grok 4.5/high session
+  `019fec4a-bb58-7a11-9592-d473ac4d99cc` returned `ACCEPTED`,
+  `PHASE_2H_C_MAY_CLOSE: yes` and `OPUS_MAY_START: yes`; result and manifest
+  SHA-256 values are
+  `47af1b90d47a1bd298ec7e9da66efcb6e91df74492bf271f8924532bebb351f3`
+  and
+  `517cf6c55d406d69db36bff3c51754835dcbe77d5bcab63b53383ef939e4f7c7`.
+  A first fresh read-only attempt was cancelled at its first tool boundary and
+  is retained as non-authoritative evidence;
+- exact Kimi 3/high with both 100-step controls, session
+  `b2124606-4e38-499b-b18c-36ebd67b04f4`, completed with 61 StepBegins and 60
+  read-only tool calls and returned `ACCEPTED`,
+  `PHASE_2H_C_MAY_CLOSE: yes` and `OPUS_MAY_START: yes`; result and manifest
+  SHA-256 values are
+  `0da59b9fec025eea0a84555413de27c9a619212b7c7cc8f3a98b12ff42468297`
+  and
+  `4d1395c51d4caac49fc9b58cfec93f38da22fec787a74c42deea6f56c3a98fda`;
+  and
+- final Claude-skill Opus 5/xhigh session
+  `c11bc883-aa19-4ee9-bb58-6c82409923b2` fixed an independent provisional
+  acceptance before reading either peer and returned `ACCEPTED`,
+  `PHASE_2H_C_MAY_CLOSE: yes` and `BLOCKERS: none`; result and manifest
+  SHA-256 values are
+  `46032b9e3d48b552670933f5731c1f34dbbc57d049288f4e75dbc18c55b9bfd6`
+  and
+  `29563a4febf7860dc28be563731fdc2ff33923867487d036dcdb58a0c5d9584b`.
+  All 155 substantive assistant events used `claude-opus-5`. The native
+  envelope also reports a small automatic Haiku metadata charge of 2,131
+  input/23 output tokens; it produced no assistant event, repository tool
+  call, reasoning stream or verdict. No Fable review was used.
+
+The controller independently verified both commit signatures and all RED,
+GREEN, Grok, Kimi and Opus manifests. No assumption correction or plan
+amendment is needed. Preserve these bounded carry-forwards under their explicit
+owners:
+
+1. **Before 2h-d publishes 54 more recovered heads**, bind the quota-fault
+   `recoveredHead` to its source/provenance or normatively freeze the equivalent
+   source-owned relation. For this accepted edge, explicitly preserve that the
+   subject old head is `none` and the post-reopen, pre-retry unrelated adoption
+   is the old image's unique present head. Do not reuse the current unpinned
+   `objectId` pattern as a generic old/new sentinel.
+2. **During 2h-d**, run the separately executable inert campaign once at the
+   current candidate after the shared-global-setup changes. Structural
+   isolation remains sound and the unified real campaign passed repeatedly,
+   but 2h-c did not execute that diagnostic configuration at its exact GREEN
+   tree.
+3. **At 2h-e before merge-gate activation**, add an explicit real-inspection
+   provenance witness or remove `selectInspectionApi`'s shape-compatible test
+   fallback. The real export is present and independently controlled at this
+   tree, so this is not a 2h-c blocker, but `realFactory` currently witnesses
+   only the browser-capacity factory.
+4. **At 2h-e**, recompute quota-fault's four published image digests from its
+   carried `caseEvidence` in the Phase 2h validator, as process-death already
+   does. The current producer computes them with the shared routine and the
+   source-owned validator independently enforces the raw image relations, so
+   the accepted candidate is sound; the validator should nevertheless own the
+   binding before gate activation.
+5. **2h-b carry-forward 1 fired on the 2h-c harness edit and was not
+   discharged.** Re-own its authored `digestCalls`, `requestBeforeReady`,
+   `productionFactory`, `pageCounter` and `pageScope` claims to 2h-d/2h-e and
+   replace them with call/message-boundary observations before final closure.
+   Carry-forward 2 remains conditional because 2h-c did not edit the browser
+   surface entry module; if it is touched later, instrument the worker event
+   census rather than relying on either window boolean.
+6. The authoritative finalizer and candidate-bound aggregate remain the only
+   gate evidence. The zero-byte intermediate aggregate capture in the GREEN
+   evidence is superseded by the later complete SHA-bound captures and is not
+   an acceptance source.
+7. 2h-b carry-forward 6 did not trigger because publication topology did not
+   change; carry-forward 8 remains owned by 2h-e because real and inert output
+   custody is still shared. The remaining 2h-b timing, real-tick, `N > 1`,
+   finalizer and full-package obligations stay live under their stated owners.
+8. All six Phase 2h-a carry-forwards remain live under their existing 2h-d/2h-e
+   owners. In particular, total hostile hard-kill validation and census tuple
+   membership must be closed before 2h-d acceptance.
+
+Phase 2h-c closes only the six capacity/quota tuples. Continue next with 2h-d
+as a separate tests-only RED and distinct GREEN; 2h-e activation, Phase 2h and
+Phase 2 remain open.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
