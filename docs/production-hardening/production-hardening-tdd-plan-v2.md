@@ -1735,6 +1735,105 @@ succeed. A ≤60-second-per-engine Chromium/Firefox/WebKit inspection smoke
 records but never pins environmental values and proves no prompt/request.
 GREEN adds only `capacity.ts`, root exports and the browser binding.
 
+##### Phase 2g-a accepted and closed
+
+Phase 2g-a is accepted and closed at production GREEN
+`f3c9b73f988d1d0ed305de865fdf33ef89cbe2a1` (tree
+`fe9032150321068ade6cecbe2bb670007e408ba8`) over frozen tests-only RED
+`1258769df5fea399ba2ca8a873516d4590a3fd4d`. RED changed only its 13
+test/fixture/config files and failed exactly 5/78 focused tests plus one
+`realFactory=false` assertion in each of Chromium, Firefox and WebKit. GREEN
+changed exactly the three authorized production files: neutral
+`capacity.ts`, the storage root exports and the no-argument browser binding.
+No test, plan, package metadata, export map, runtime dependency or lockfile
+changed in GREEN. The 13 RED blobs are identical at GREEN HEAD.
+
+Exact-HEAD acceptance is 78/78 focused, 195/195 storage, 92/92
+storage-browser including the recursive clean-checkout gate, and 3/3 across
+Chromium/Firefox/WebKit; the prior Phase 2e7 Chromium control remains 1/1.
+Both package typechecks and builds pass, the baseline-excluding workspace
+typecheck is 36/36, the full configured recursive build passes, and traced
+production ESLint is exit 0 with 136 nonempty lines and no diagnostics.
+Prettier, diff, packed runtime/declaration consumers, exact root/export/dependency
+rosters and the sole runtime-package `navigator.storage` owner all pass. Root
+`pnpm typecheck` still stops only at the unchanged Phase 1i-b node helper
+diagnostics; the package-CWD storage Vitest wrapper retains its pre-existing
+workspace-configuration startup error, so the root-scoped 195/195 run is
+authoritative. RED and GREEN evidence lives under
+`.logs/phase-2g-a-capacity-{red,green}-codex-high/`; their result SHA-256 values
+are respectively
+`2c9f2c58126c0ba19ddcd05f7899e39356d55a86c6f0581137d336432efd9e4d`
+and
+`251021c44bb0fcb27a58ced85a9f058d54bfb8dfe5f2bfd911e4e64fc3b3a69e`.
+
+Fresh peer-blind Grok 4.5/high and exact Kimi 3/high with both 100-step
+controls independently accepted the candidate. Their result SHA-256 values are
+`5b9d6c309f63ec6b364da5e0110e5effc73d7d5abfb5eeaff91b22a1e10062fa`
+and
+`8aeafdb83216ca63d1dc9d729e0732a0828143f739ea4ea7a46ab349725239d8`.
+Final Claude-skill Opus 5/xhigh session
+`82bc194e-fdf6-4c4e-9df6-0f5c931ecd88` accepted with no blocker and both
+closure/start flags `yes`; its result SHA-256 is
+`3965e75a2b9c3b8007ae136cb96d4efcc9826c5dad999119be87d5bca9df9c20`.
+The final session used only `claude-opus-5` at native xhigh, with no Haiku,
+Sonnet, Fable or web helper. All three authoritative reviews left tracked
+files, index, five stashes and protected untracked paths unchanged.
+
+Preserve the review-custody disclosure. The first Grok controller prompt used
+stale status vocabulary; that session was cancelled without a verdict and its
+artifacts are explicitly `preliminary-invalid-*`. A fresh prompt quoting this
+committed contract produced the authoritative Grok approval. The Kimi prompt
+also contained stale paraphrases, but Kimi detected them, retracted them and
+adjudicated explicitly against this committed section; its controller confirms
+the launched route was `/Users/aristotle/.local/bin/kimi-cli` v1.49.0 with
+`kimi-code/k3 --thinking`, not the unrelated older `kimi` PATH shim visible
+inside the review sandbox. Opus independently considered both anomalies and
+found neither contaminated the authoritative results.
+
+Retain these bounded residuals and ownership notes without reopening 2g-a:
+
+- The browser declaration uses one private structurally exact alias rather
+  than spelling the imported `StorageCapacityPort` name. Packed type equality
+  proves the public shape is exact; the alias preserves the older Phase 2e7
+  isolated consumer. Update that stale isolated declaration fixture before a
+  future change requires literal named-type emission rather than adding
+  compatibility production ballast.
+- A hostile or non-browser-conformant throwing/null `navigator` or `storage`
+  getter can make factory construction throw. Real Chromium, Firefox and
+  WebKit do not expose that shape, and the ratified contract does not make the
+  ambient browser global an adversarial input. Method/result throws remain
+  contained. Reopen only with a supported-host counterexample or a contract
+  change.
+- Own estimate accessors may run once; throwing accessors are contained as
+  `exception`. The contract requires own values and noncoercion, not own data
+  descriptors. `-0` is accepted as the non-negative safe integer zero and has
+  no distinct byte-count meaning.
+- The 2g-a smoke deliberately records rather than pins environmental payloads
+  and can observe a thin/empty port. Phase 2h must retain the actual payload in
+  its full browser exit evidence; 2g-b/c still own admission and quota-fault
+  behavior.
+- During the docs-only closure recheck, two default-timeout runs under heavy
+  concurrent local process load reached 75/78 and timed out only the three
+  `npm pack`/temporary-consumer assertions at their inherited 10-second limit;
+  there was no assertion mismatch. The same frozen suite with a bounded
+  30-second per-test timeout passed 78/78 in 50.28 seconds, while the accepted
+  exact-HEAD GREEN had already passed the default timeout in 13.54 seconds.
+  Keep ordinary tests fast, but give these three explicitly process-spawning
+  packaging checks a scoped reviewed timeout if CI telemetry shows the same
+  contention rather than widening the package or workspace timeout globally.
+- The old, unshipped
+  `packages/protocol-v2/conformance/ahe-reference/src/indexeddb-store.js`
+  directly reads `navigator.storage` and may call `persist()` automatically.
+  It predates this runtime-package seam and is not a shipped package owner, so
+  it does not block 2g-a. Reference regeneration must rename/route or retire
+  that colliding helper before the conformance reference is treated as a
+  golden-path implementation; it must not become a second production owner.
+
+Phase 2g-b may now start as a distinct TDD item. The user has authorized
+`fast-check` as a test/dev dependency for its optional fixed-seed,
+pure-arithmetic tier, still bounded to at most 300 cases and three seconds. It
+does not belong in 2g-a and was not added here.
+
 #### 2g-b — bounded stage admission and metadata-only dedup
 
 The neutral capacity module also exports:
