@@ -75,6 +75,25 @@ export async function rawPhase2e6DatabaseIdentity(databaseName: string): Promise
 	return matchCount === 1 ? matchedName : null;
 }
 
+/**
+ * Reads the actual schema identity of an existing production browser store.
+ * @param databaseName - Exact production database identity.
+ * @returns Version and native schema store-name projection.
+ */
+export async function rawPhase2hDatabaseSchema(
+	databaseName: string
+): Promise<Readonly<{ storeNames: readonly string[]; version: number }>> {
+	const database = await requestResult(indexedDB.open(databaseName));
+	try {
+		return Object.freeze({
+			storeNames: Object.freeze([...database.objectStoreNames]),
+			version: database.version,
+		});
+	} finally {
+		database.close();
+	}
+}
+
 function phase2e6Plain(value: unknown): unknown {
 	if (value instanceof Uint8Array) return [...value];
 	if (Array.isArray(value)) return value.map(phase2e6Plain);

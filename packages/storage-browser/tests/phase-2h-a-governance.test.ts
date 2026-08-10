@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 
+import inertConfig from "../playwright.protocol-v2-inert.config.js";
 import protocolConfig from "../playwright.protocol-v2.config.js";
 import { phase2hCoverageErrors, type Phase2hCoverageMeasurement } from "./fixtures/phase-2h-a-coverage.js";
 
@@ -14,7 +15,7 @@ function json(file: string): Record<string, unknown> {
 
 describe("Phase 2h-a configuration and governance", () => {
 	it("pins the package-local three-engine serial config outside the RunId root", () => {
-		expect(protocolConfig.testMatch).toBe("phase-2h-a-inert-red.pw.ts");
+		expect(protocolConfig.testMatch).toBe("phase-2h-b-browser-surfaces-red.pw.ts");
 		expect(protocolConfig.fullyParallel).toBe(false);
 		expect(protocolConfig.workers).toBe(1);
 		expect(protocolConfig.retries).toBe(0);
@@ -24,13 +25,19 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(path.resolve("packages/storage-browser", String(protocolConfig.outputDir))).not.toContain(
 			path.resolve("packages/storage-browser/test-results/phase-2h") + path.sep
 		);
+		expect(inertConfig.testMatch).toBe("phase-2h-a-inert-red.pw.ts");
+		expect(inertConfig.globalSetup).toBe(protocolConfig.globalSetup);
+		expect(inertConfig.projects?.map(({ name }) => name)).toEqual(["chromium", "firefox", "webkit"]);
+		expect(inertConfig.outputDir).not.toBe(protocolConfig.outputDir);
 	});
 
 	it("typechecks but build-excludes the config using the established package pattern", () => {
 		const typecheck = json("packages/storage-browser/tsconfig.json");
 		const build = json("packages/storage-browser/tsconfig.build.json");
 		expect(typecheck.include).toContain("playwright.protocol-v2.config.ts");
+		expect(typecheck.include).toContain("playwright.protocol-v2-inert.config.ts");
 		expect(build.exclude).toContain("playwright.protocol-v2.config.ts");
+		expect(build.exclude).toContain("playwright.protocol-v2-inert.config.ts");
 	});
 
 	it("keeps the workflow dormant, direct-config-only and upload-on-always", () => {

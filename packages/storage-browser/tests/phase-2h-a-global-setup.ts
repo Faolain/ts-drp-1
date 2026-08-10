@@ -3,13 +3,19 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
-import { phase2hGitSha, preparePhase2hRun, writePhase2hAggregate } from "./fixtures/phase-2h-a-publication.js";
+import {
+	createPhase2hPublisher,
+	phase2hGitSha,
+	preparePhase2hRun,
+	writePhase2hAggregate,
+} from "./fixtures/phase-2h-a-publication.js";
+import { startPhase2hParentPublisher } from "./fixtures/phase-2h-b-parent-publisher.js";
 
 /**
- * Creates one fresh inert Phase 2h-a invocation and its browser-neutral asset.
+ * Creates one fresh Phase 2h invocation, its browser assets and sole publisher.
  * @returns Finalizer that always writes the bound failing aggregate when able.
  */
-export default async function globalSetup(): Promise<() => void> {
+export default async function globalSetup(): Promise<() => Promise<void>> {
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
 	const repositoryDirectory = path.resolve(packageDirectory, "../..");
 	const assetDirectory = fs.mkdtempSync(path.join(packageDirectory, ".phase-2h-a-assets-"));
@@ -18,6 +24,15 @@ export default async function globalSetup(): Promise<() => void> {
 			bundle: true,
 			entryPoints: {
 				"phase-2h-a-inert-entry": path.join(packageDirectory, "tests/assets/phase-2h-a-inert-entry.ts"),
+				"phase-2h-b-browser-surfaces": path.join(packageDirectory, "tests/assets/phase-2h-b-browser-surfaces-entry.ts"),
+				"phase-2h-b-main-thread-oracle": path.join(
+					repositoryDirectory,
+					"packages/worker-host/tests/browser/fixtures/phase-2h-b-oracle-entry.ts"
+				),
+				"phase-2h-b-operation-workload": path.join(
+					repositoryDirectory,
+					"packages/worker-host/src/operation-workload.worker.ts"
+				),
 			},
 			format: "esm",
 			outdir: assetDirectory,
@@ -29,6 +44,11 @@ export default async function globalSetup(): Promise<() => void> {
 			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2h-a-inert-entry.js"></script>',
 			"utf8"
 		);
+		fs.writeFileSync(
+			path.join(assetDirectory, "phase-2h-b.html"),
+			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2h-b-main-thread-oracle.js"></script><script type="module" src="./phase-2h-b-browser-surfaces.js"></script>',
+			"utf8"
+		);
 		const gitSha = phase2hGitSha(repositoryDirectory);
 		const layout = preparePhase2hRun({
 			gitSha,
@@ -37,15 +57,27 @@ export default async function globalSetup(): Promise<() => void> {
 		process.env.PHASE_2H_A_ASSET_DIR = assetDirectory;
 		process.env.PHASE_2H_A_GIT_SHA = layout.gitSha;
 		process.env.PHASE_2H_A_RUN_ID = layout.runId;
-		return () => {
+		const publisher = createPhase2hPublisher(layout);
+		const parent = await startPhase2hParentPublisher(layout, publisher);
+		process.env.PHASE_2H_A_SUBMISSION_URLS = JSON.stringify(parent.submissionURLs);
+		return async () => {
+			let closeFailure: unknown;
 			try {
+				try {
+					await parent.close();
+				} catch (error) {
+					closeFailure = error;
+				}
 				const aggregate = aggregatePhase2h({
 					...readPhase2hRunEntries(layout.runRoot),
+					census: publisher.census(),
 					gitSha: layout.gitSha,
 					runId: layout.runId,
 				});
 				writePhase2hAggregate(layout, aggregate);
+				if (closeFailure !== undefined) throw closeFailure;
 			} finally {
+				delete process.env.PHASE_2H_A_SUBMISSION_URLS;
 				fs.rmSync(assetDirectory, { force: true, recursive: true });
 			}
 		};

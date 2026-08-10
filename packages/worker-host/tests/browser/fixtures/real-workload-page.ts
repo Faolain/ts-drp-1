@@ -14,6 +14,12 @@ export interface WorkloadOracle {
 	readonly root: string;
 }
 
+export interface RepeatedWorkloadOracle {
+	readonly count: number;
+	readonly orderLength: number;
+	readonly root: string;
+}
+
 export interface WorkloadSummary extends WorkloadOracle {
 	readonly items: number;
 	readonly pageCounter: number;
@@ -69,6 +75,27 @@ export function computeMainThreadOracle(): WorkloadOracle {
 	return {
 		count: orderedHashes.length,
 		order: orderedHashes.map((hash) => Number.parseInt(hash.slice(-8), 16)),
+		root: hex(accumulator.root()),
+	};
+}
+
+/**
+ * Independently derives the Merkle root and exact totals for back-to-back
+ * executions of the authoritative Phase 2f-c workload.
+ * @param repetitionCount - Number of accepted identical worker executions.
+ * @returns Root and totals for the concatenated authoritative vertex sequence.
+ */
+export function computeRepeatedMainThreadOracle(repetitionCount: number): RepeatedWorkloadOracle {
+	if (!Number.isSafeInteger(repetitionCount) || repetitionCount < 1 || repetitionCount > 256)
+		throw new TypeError("workload repetition count is outside the Phase 2h bound");
+	const vertices = graph();
+	const orderedHashes = topologicalOrder(vertices, ANCHOR_HASH);
+	const accumulator = new CompactMerkleAccumulator();
+	for (let repetition = 0; repetition < repetitionCount; repetition++)
+		for (const hash of orderedHashes) accumulator.append(encodeCanonical(vertices.get(hash)));
+	return {
+		count: orderedHashes.length * repetitionCount,
+		orderLength: orderedHashes.length * repetitionCount,
 		root: hex(accumulator.root()),
 	};
 }

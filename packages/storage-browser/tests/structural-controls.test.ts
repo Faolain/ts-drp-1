@@ -31,6 +31,8 @@ describe("storage-browser structural controls", () => {
 			"playwright.phase-2e5-browser-inventory.config.ts",
 			"playwright.phase-2e6-real-process-death.config.ts",
 			"playwright.phase-2e7-publication-component.config.ts",
+			"playwright.protocol-v2.config.ts",
+			"playwright.protocol-v2-inert.config.ts",
 		]);
 		const build = readJson("packages/storage-browser/tsconfig.build.json");
 		expect(build.exclude).toEqual([
@@ -42,6 +44,8 @@ describe("storage-browser structural controls", () => {
 			"playwright.phase-2e5-browser-inventory.config.ts",
 			"playwright.phase-2e6-real-process-death.config.ts",
 			"playwright.phase-2e7-publication-component.config.ts",
+			"playwright.protocol-v2.config.ts",
+			"playwright.protocol-v2-inert.config.ts",
 		]);
 	});
 
