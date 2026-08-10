@@ -2177,6 +2177,130 @@ transaction/request change reruns affected 2e5 declaration/observation and
 changed 2e6 process-death edges; otherwise existing 18-edge evidence is reused
 with an exact governance assertion.
 
+##### 2g-c implementation closure — native-failure oracle accepted
+
+Phase 2g-c is accepted and closed at tests-only GREEN
+`57e3b2f2eb2c7757403696345858057d1d08420a`. Its corrective lineage is
+retained because it records why a passing settlement oracle is not sufficient
+unless the selected request genuinely fails:
+
+- Initial tests-only RED `d1c9331a9b3efb714d76909f59115ec1af63960b`
+  established the trace-derived matrix, complete-image rollback/reopen/retry
+  oracle and genuine Chromium engine control. Taxonomy corrective RED
+  `a703b5e893f7a3c92301a0a327b4ad8de8e5c94b` replaced the nonexistent
+  `GENERATION_ALREADY_EXISTS` spelling with the public
+  `GENERATION_EXISTS` reason without widening the result contract.
+- Initial tests-only GREEN `dcb72cde478cdc1095092fe2448a582f0b46e7b4`
+  passed the outcome matrix but did not prove settlement causality: it exposed
+  the quota object through `request.error` and independently aborted the
+  transaction. Causality RED `3e3255a018826cbf00b91458fe23a926f81c8a1d`
+  froze request-error identity/order and forbade an independent abort.
+- Synthetic-event GREEN `235b008e1712cba9891dde81c12455bf8a8db3b8`
+  was also invalid. It dispatched a synthetic request error while the native
+  request remained pending, then relied on a harness abort for rollback; the
+  apparent request cause and the physical rollback cause were different.
+  Grok therefore rejected it even though the frozen outcome assertions passed.
+- Native-failure RED `f61abfc733b0822a2498aa89c87bd31638ebf9b2`
+  requires a trusted request error at `readyState === "done"`, a real native
+  non-`AbortError` failure, no selected-request success, default-allowed error
+  handling, a later trusted transaction abort and zero synthetic dispatch or
+  explicit harness abort. Final GREEN `57e3b2f` satisfies that contract without
+  changing production: at the selected traced occurrence it does not issue the
+  intended `add`/`put`; it issues one same-store duplicate-key `add` against a
+  preseeded inline-key canary. The browser consequently produces a genuine
+  trusted/done `ConstraintError` request. A tests-only own `request.error`
+  getter exposes the exact injected same-realm `QuotaExceededError` identity to
+  the unchanged adapter, while the prototype getter continues to prove the
+  underlying native failure. This seam is acceptable because the engine, not
+  the harness, fails the selected request and drives rollback semantics; the
+  adapter remains name-agnostic, reports the exact injected cause, and the
+  intended value cannot become observable in the aborted transaction.
+
+The accepted evidence is bounded and causal. The final focused Chromium suite
+is 3/3 with all 35 derived cases split 13 creation / 13 settlement / 9 terminal;
+focused unit is 6/6, the package is 27 files / 100 tests, and ownership is 8/8.
+Preserved 2e5 is 4/4 and 2e6 is 1/1 over its 18 arms. Package typecheck/build,
+traced nonempty scoped ESLint, Prettier/diff checks and the recursive root build
+are green. Root typecheck retains only the previously recorded Phase 1i-b
+Node-fixture TS1360/TS2322 baseline and no storage-browser diagnostic. The
+32-entry GREEN evidence manifest has SHA-256
+`760a6cea89979111dd5c6175de867c5b7043438aad32810f205c54487f880816`.
+
+Independent acceptance authenticated the exact commit/tree/parent, frozen RED
+owners, tests-only scope and retained evidence:
+
+- Grok 4.5/high session `5deaae02-e5f8-4e49-b400-f624351d4eb2`
+  returned `APPROVED`; result SHA-256
+  `e2070c4c07d7ca8c9ba6a4379541127486fb1c1e7c445a8c7832adbfe6d0f11d`.
+- Genuine Kimi 3/high with the 100-step cap, session
+  `e5c22099-0b3c-45bf-b83b-ff64381d3155`, returned `APPROVED` and
+  `OPUS_MAY_RUN: yes`; result SHA-256
+  `adfb640e0a475726069e0561ba4f6a0bb2eab7f44924a6243f14a078c12b649b`.
+  Its first process was stopped after substantive completion while it continued
+  optional inspection; a bounded terminal-only recovery resumed the same
+  authenticated session/model/100-step controls and emitted the complete
+  verdict. Preserve separately that fresh session
+  `95fc9fa6-2c7f-4424-b57e-7bc1d06e3471` failed authentication with HTTP 401
+  before a turn began (zero steps/tools), produced no verdict and was neither
+  resumed nor counted.
+- Genuine `claude-opus-5` at native xhigh, session
+  `3a6a31a1-6d81-4244-b17f-cdef7b0e88b3`, returned `APPROVED`,
+  `PHASE_2G_C_MAY_CLOSE: yes`, `PHASE_2H_MAY_START: yes` and
+  `PLAN_AMENDMENT_REQUIRED: no`; result SHA-256
+  `b9171c20e3b13e53b9463a23f9883a078c8e36ca70c67ac19673ba84e1be54ff`.
+  Its terminal `modelUsage` contains only `claude-opus-5`; no automatic helper
+  model was used. No Fable review was used for this closure.
+
+Retain the following accepted 2g-c findings and governance gotchas:
+
+- Three forbidden-action telemetry fields are constant zero/false. The
+  forbidden mechanisms are absent and independent live trusted/done/native-
+  error/success/order predicates make the present oracle causal, but a future
+  edit could reintroduce an action while leaving those constants unchanged;
+  replace them with live counters when that harness surface next changes.
+- The contract phrase "native default semantics" is imprecise. The proximate
+  observed abort is the unchanged production `abortIfActive` reaction after a
+  genuinely failed request, although the unprevented native error would also
+  default-abort. This is wording debt, not a causality gap.
+- The committed default-prevention predicate samples early relative to every
+  later listener/default action. Retained one-off telemetry also sampled
+  `defaultPrevented` after dispatch and found it false, but that richer field is
+  not part of a repository-rerunnable suite.
+- The literal canary digest is coupled across files to the unrelated payload.
+  It was independently recomputed and a mismatch fails loudly at runtime, but
+  future fixture edits should keep that coupling explicit.
+- Replacing a selected production `put` as well as `add` with a duplicate
+  `add` is a deliberate fault-model substitution: the original write kind and
+  occurrence remain trace-derived and recorded, but the production value never
+  enters the transaction. Sequential request handling and complete rollback
+  make the substitution inert for the asserted image and cause properties.
+- The richest causal telemetry—prototype/native error name, after-dispatch
+  default state and abort-call attribution—is retained in `.logs` rather than
+  directly rerunnable from the committed suite. The committed live predicates
+  are sufficient for closure; do not cite the one-off telemetry alone as a
+  future regression gate.
+- Whole-image comparison remains application-canonical JSON over `getAll()`
+  plus inline keys, not literal physical IDB bytes. The hard-coded store census,
+  9/13/35 drift numerals, 15-second/16-MiB engine-control caps with no exercised
+  fill fallback, oracle size and Firefox/WebKit deferral to 2h are accepted
+  bounded residuals. Root typecheck's Phase 1i-b baseline remains unrelated.
+- During the otherwise read-only Opus review, Opus wrote exactly
+  `/tmp/actual.patch`; the controller later wrote exactly
+  `/tmp/opus-result-display` while extracting the result. Neither was inside
+  the repository. Both review-created paths were removed with explicit root
+  authorization and verified absent; repository files, stashes and protected
+  untracked paths remained unchanged. Preserve this custody deviation rather
+  than repeating the reviewer's inaccurate all-read-only process claim.
+
+The summary phrase that formerly placed representative Firefox/WebKit cases in
+the **2g-c close** checklist conflicted with the more specific normative rule
+above. This closure applies that existing specificity: 2g-c may sign off before
+2h, while Firefox/WebKit representatives remain mandatory for the aggregate
+Phase 2 exit. Kimi accepted that deferral and Opus expressly returned no plan
+amendment required, 2g-c may close and 2h may start. This is a summary
+clarification, not an assumption or behavior change, and Phase 2 is not yet
+claimed complete.
+
 #### Receipt correction and named 7b-r deferral
 
 The former 2g receipt sentence is superseded, not waived. A forged, malformed,
@@ -2222,9 +2346,9 @@ authorizes deletion.
   consumer and package typecheck/build/lint/tests are green and logged.
 - **2g-c close:** frozen 8/10/28 and extended 9/13/35 trace checks, every derived
   full-image/reopen/retry case, genuine Chromium control, hollow controls,
-  representative 2h Firefox/WebKit cases and preserved Phase-2a-through-2e
-  suites are green and logged. Production changes rerun affected 2e5/2e6
-  evidence.
+  and preserved Phase-2a-through-2e suites are green and logged. Representative
+  Firefox/WebKit cases remain owned by 2h and are required for Phase 2 exit,
+  not 2g-c slice sign-off. Production changes rerun affected 2e5/2e6 evidence.
 - **Global preservation:** browser schema stays v1 with exactly `objects`,
   `generations`, `blobs` and `promotions`; Phase 5c remains the first real schema
   bump. Persistence codecs, adapter write vocabulary, `AheDurableStore`,
