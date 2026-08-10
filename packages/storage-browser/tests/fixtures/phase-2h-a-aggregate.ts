@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { phase2hStableEvidenceJson } from "./phase-2h-a-evidence-digest.js";
 import { type Phase2hValidationRecord, validatePhase2hRecord } from "./phase-2h-a-record.js";
 import {
 	type Phase2hEngineName,
@@ -493,14 +494,30 @@ export function aggregatePhase2h(input: Phase2hAggregationInput): Phase2hAggrega
 		}
 	}
 
+	for (const engine of PHASE_2H_ENGINES) {
+		const processRecords: [string, Phase2hValidationRecord][] = [];
+		const armingMeasurements = new Set<string>();
+		for (const entry of accepted) {
+			const [, record] = entry;
+			if (record.engine.name !== engine || record.hardKillEvidence === null) continue;
+			processRecords.push(entry);
+			armingMeasurements.add(phase2hStableEvidenceJson(record.hardKillEvidence.armingMeasurement));
+		}
+		if (armingMeasurements.size <= 1) continue;
+		for (const [tupleId] of processRecords) {
+			accepted.delete(tupleId);
+			invalid.add(tupleId);
+		}
+	}
+
 	const records = Object.freeze(
 		PHASE_2H_REQUIRED_TUPLE_IDS.flatMap((tupleId) => {
 			const record = accepted.get(tupleId);
 			return record === undefined ? [] : [record];
 		})
 	);
-	const missingTupleIds = Object.freeze(PHASE_2H_REQUIRED_TUPLE_IDS.filter((tupleId) => !accepted.has(tupleId)));
-	const missingKillPoints = Object.freeze(PHASE_2H_KILL_TUPLE_IDS.filter((tupleId) => !accepted.has(tupleId)));
+	const missingTupleIds = sortedUnique(PHASE_2H_REQUIRED_TUPLE_IDS.filter((tupleId) => !accepted.has(tupleId)));
+	const missingKillPoints = sortedUnique(PHASE_2H_KILL_TUPLE_IDS.filter((tupleId) => !accepted.has(tupleId)));
 	const duplicateTupleIds = sortedUnique(duplicate);
 	const extraTupleIds = sortedUnique(extra);
 	const invalidRecordIds = sortedUnique(invalid);
