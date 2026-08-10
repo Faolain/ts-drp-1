@@ -4,10 +4,7 @@ import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 
 import protocolConfig from "../playwright.protocol-v2.config.js";
-import {
-	type Phase2hCoverageMeasurement,
-	referencePhase2hCoverageErrors,
-} from "./fixtures/phase-2h-a-coverage-reference.js";
+import { phase2hCoverageErrors, type Phase2hCoverageMeasurement } from "./fixtures/phase-2h-a-coverage.js";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
@@ -88,7 +85,7 @@ describe("Phase 2h-a configuration and governance", () => {
 			lh: 35_000,
 			worktree: "after",
 		};
-		expect(referencePhase2hCoverageErrors(before, after)).toEqual([]);
+		expect(phase2hCoverageErrors(before, after)).toEqual([]);
 		const mutants = [
 			{ ...after, command: "different" },
 			{ ...after, gitSha: "b".repeat(40) },
@@ -96,6 +93,6 @@ describe("Phase 2h-a configuration and governance", () => {
 			{ ...after, lf: after.lf + 1 },
 			{ ...after, lh: after.lh + 1 },
 		] as const;
-		for (const mutant of mutants) expect(referencePhase2hCoverageErrors(before, mutant)).not.toEqual([]);
+		for (const mutant of mutants) expect(phase2hCoverageErrors(before, mutant)).not.toEqual([]);
 	});
 });

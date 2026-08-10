@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { PHASE_2E6_DECLARED_EDGES } from "./fixtures/phase-2e6-real-process-death-contract.js";
 import {
+	aggregatePhase2h,
 	consumeCurrentPhase2hAggregate,
 	type Phase2hAggregate,
 	phase2hDecodedIdentityReason,
@@ -14,7 +15,6 @@ import {
 	type Phase2hRawEntry,
 	phase2hStructuralEntries,
 	readPhase2hRunEntries,
-	referenceAggregatePhase2h,
 } from "./fixtures/phase-2h-a-aggregate.js";
 import {
 	phase2hControlEntries,
@@ -23,8 +23,8 @@ import {
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
 } from "./fixtures/phase-2h-a-controls.js";
-import { createReferencePhase2hPublisher, preparePhase2hRun } from "./fixtures/phase-2h-a-publication-reference.js";
-import { referenceValidatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
+import { createPhase2hPublisher, preparePhase2hRun } from "./fixtures/phase-2h-a-publication.js";
+import { validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
 import type { Phase2hValidationRecord } from "./fixtures/phase-2h-a-record.js";
 import {
 	PHASE_2H_CONTRACT_EDGE_IDS,
@@ -62,7 +62,7 @@ function aggregate(
 	entries: readonly Phase2hRawEntry[],
 	census?: Readonly<{ duplicateIdentities: readonly string[]; invalidIdentities: readonly string[] }>
 ): Phase2hAggregate {
-	return referenceAggregatePhase2h({
+	return aggregatePhase2h({
 		census,
 		entries,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
@@ -92,7 +92,7 @@ function fallbackIdentity(reason: string, scope: string, raw: Uint8Array): strin
 	return `entry-${reason}-sha256:${createHash("sha256").update(preimage).digest("hex")}`;
 }
 
-describe("Phase 2h-a frozen reference/oracle", () => {
+describe("Phase 2h-a frozen contract controls", () => {
 	it("has a complete finite coverage ledger rather than a parser or fuzz matrix", () => {
 		expect(COVERAGE_LEDGER.map(([area]) => area)).toEqual([
 			"registry",
@@ -125,7 +125,7 @@ describe("Phase 2h-a frozen reference/oracle", () => {
 			const tuple = PHASE_2H_TUPLES[index];
 			if (tuple === undefined) throw new TypeError("control tuple missing");
 			expect(
-				referenceValidatePhase2hRecord(record, {
+				validatePhase2hRecord(record, {
 					gitSha: PHASE_2H_CONTROL_GIT_SHA,
 					project: tuple.engine,
 					runId: PHASE_2H_CONTROL_RUN_ID,
@@ -364,7 +364,7 @@ describe("Phase 2h-a frozen reference/oracle", () => {
 				outputBase: temporary,
 				uuid: "00000000-0000-4000-8000-000000000000",
 			});
-			const publisher = createReferencePhase2hPublisher(layout);
+			const publisher = createPhase2hPublisher(layout);
 			const record = controlRecord("capacity/webkit");
 			expect(publisher.submit({ project: "webkit", record })).toBe("accepted");
 			expect(publisher.census()).toEqual({ duplicateIdentities: [], invalidIdentities: [] });
@@ -373,9 +373,9 @@ describe("Phase 2h-a frozen reference/oracle", () => {
 			expect(fs.readFileSync(path.join(layout.runRoot, "records/webkit/capacity%2Fwebkit.json"))).toEqual(firstBytes);
 			expect(publisher.census().duplicateIdentities).toEqual([record.tupleId]);
 			expect(fs.readdirSync(path.join(layout.runRoot, "records/chromium"))).toEqual([]);
-			const observed = referenceAggregatePhase2h({
+			const observed = aggregatePhase2h({
 				census: publisher.census(),
-				entries: readPhase2hRunEntries(layout.runRoot),
+				...readPhase2hRunEntries(layout.runRoot),
 				gitSha: layout.gitSha,
 				runId: layout.runId,
 			});
@@ -394,7 +394,7 @@ describe("Phase 2h-a frozen reference/oracle", () => {
 				outputBase: temporary,
 				uuid: "00000000-0000-4000-8000-000000000000",
 			});
-			const publisher = createReferencePhase2hPublisher(layout);
+			const publisher = createPhase2hPublisher(layout);
 			const record = controlRecord("capacity/webkit");
 			for (let index = 0; index < 512; index++) {
 				const distinct = { ...record, tupleId: `extra-${index}` } as typeof record;

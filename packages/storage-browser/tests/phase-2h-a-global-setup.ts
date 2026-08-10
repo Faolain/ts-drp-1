@@ -2,13 +2,8 @@ import { build } from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
 
-import { readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
-import {
-	phase2hGitSha,
-	preparePhase2hRun,
-	writePhase2hAggregate,
-} from "./fixtures/phase-2h-a-publication-reference.js";
-import { PHASE_2H_A_INERT_CANDIDATE } from "./fixtures/phase-2h-a-subject.js";
+import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
+import { phase2hGitSha, preparePhase2hRun, writePhase2hAggregate } from "./fixtures/phase-2h-a-publication.js";
 
 /**
  * Creates one fresh inert Phase 2h-a invocation and its browser-neutral asset.
@@ -44,8 +39,8 @@ export default async function globalSetup(): Promise<() => void> {
 		process.env.PHASE_2H_A_RUN_ID = layout.runId;
 		return () => {
 			try {
-				const aggregate = PHASE_2H_A_INERT_CANDIDATE.aggregate({
-					entries: readPhase2hRunEntries(layout.runRoot),
+				const aggregate = aggregatePhase2h({
+					...readPhase2hRunEntries(layout.runRoot),
 					gitSha: layout.gitSha,
 					runId: layout.runId,
 				});

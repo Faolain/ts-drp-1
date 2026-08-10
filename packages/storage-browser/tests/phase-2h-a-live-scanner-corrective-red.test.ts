@@ -6,25 +6,21 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+	aggregatePhase2h,
 	type Phase2hRawEntry,
 	phase2hStructuralEntries,
 	readPhase2hRunEntries,
-	referenceAggregatePhase2h,
 } from "./fixtures/phase-2h-a-aggregate.js";
 import {
 	phase2hControlRecords,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
 } from "./fixtures/phase-2h-a-controls.js";
-import {
-	createReferencePhase2hPublisher,
-	type Phase2hRunLayout,
-	preparePhase2hRun,
-} from "./fixtures/phase-2h-a-publication-reference.js";
+import { createPhase2hPublisher, type Phase2hRunLayout, preparePhase2hRun } from "./fixtures/phase-2h-a-publication.js";
 import {
 	type Phase2hRecordValidation,
 	type Phase2hValidationRecord,
-	referenceValidatePhase2hRecord,
+	validatePhase2hRecord,
 } from "./fixtures/phase-2h-a-record.js";
 
 const RECORD_BODY_LIMIT = 4_194_304;
@@ -82,7 +78,7 @@ function fakeStats(entryKind: "directory" | "file" | "symlink", size = 0): fs.St
 }
 
 function validate(record: unknown, project: "chromium" | "firefox" | "webkit"): Phase2hRecordValidation {
-	return referenceValidatePhase2hRecord(record, {
+	return validatePhase2hRecord(record, {
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
 		project,
 		runId: PHASE_2H_CONTROL_RUN_ID,
@@ -107,9 +103,9 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 		const invalidPath = path.join(layout.runRoot, "records/chromium/%zz.json");
 		fs.writeFileSync(invalidPath, "body-must-not-be-read");
 		const readSpy = vi.spyOn(fs, "readFileSync");
-		const entries = readPhase2hRunEntries(layout.runRoot);
-		const observed = referenceAggregatePhase2h({
-			entries,
+		const scan = readPhase2hRunEntries(layout.runRoot);
+		const observed = aggregatePhase2h({
+			...scan,
 			gitSha: layout.gitSha,
 			runId: layout.runId,
 		});
@@ -157,8 +153,8 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 			fs.closeSync(descriptor);
 		}
 		const readSpy = vi.spyOn(fs, "readFileSync");
-		const observed = referenceAggregatePhase2h({
-			entries: readPhase2hRunEntries(layout.runRoot),
+		const observed = aggregatePhase2h({
+			...readPhase2hRunEntries(layout.runRoot),
 			gitSha: layout.gitSha,
 			runId: layout.runId,
 		});
@@ -198,10 +194,10 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 			}
 			return stat;
 		});
-		let observed: ReturnType<typeof referenceAggregatePhase2h> | undefined;
+		let observed: ReturnType<typeof aggregatePhase2h> | undefined;
 		expect(() => {
-			observed = referenceAggregatePhase2h({
-				entries: readPhase2hRunEntries(layout.runRoot),
+			observed = aggregatePhase2h({
+				...readPhase2hRunEntries(layout.runRoot),
 				gitSha: layout.gitSha,
 				runId: layout.runId,
 			});
@@ -293,7 +289,7 @@ describe("Phase 2h-a missing marker controls", () => {
 			kind: "file",
 			scope: "collisions/webkit",
 		};
-		const observed = referenceAggregatePhase2h({
+		const observed = aggregatePhase2h({
 			entries: [...phase2hStructuralEntries(), entry],
 			gitSha: PHASE_2H_CONTROL_GIT_SHA,
 			runId: PHASE_2H_CONTROL_RUN_ID,
@@ -304,7 +300,7 @@ describe("Phase 2h-a missing marker controls", () => {
 
 	it("retains duplicate and invalid census when collision-marker publication fails", () => {
 		const layout = freshLayout("phase-2h-marker-failure-");
-		const publisher = createReferencePhase2hPublisher(layout, { failMarkerWrite: true });
+		const publisher = createPhase2hPublisher(layout, { failMarkerWrite: true });
 		const record = controlRecord("capacity/webkit");
 		expect(publisher.submit({ project: "webkit", record })).toBe("accepted");
 		expect(publisher.submit({ project: "webkit", record })).toBe("duplicate");
@@ -313,9 +309,9 @@ describe("Phase 2h-a missing marker controls", () => {
 			invalidIdentities: [record.tupleId],
 		});
 		expect(fs.readdirSync(path.join(layout.runRoot, "collisions/webkit"))).toEqual([]);
-		const observed = referenceAggregatePhase2h({
+		const observed = aggregatePhase2h({
 			census: publisher.census(),
-			entries: readPhase2hRunEntries(layout.runRoot),
+			...readPhase2hRunEntries(layout.runRoot),
 			gitSha: layout.gitSha,
 			runId: layout.runId,
 		});

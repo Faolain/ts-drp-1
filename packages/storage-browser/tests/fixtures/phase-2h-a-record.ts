@@ -16,6 +16,7 @@ import {
 	type Phase2gQuotaCaseEvidence,
 	type Phase2gQuotaEdge,
 } from "./phase-2g-c-quota-fault-contract.js";
+import { phase2hEvidenceImageDigest, phase2hStableEvidenceJson } from "./phase-2h-a-evidence-digest.js";
 import {
 	type Phase2hEngineName,
 	type Phase2hScenario,
@@ -210,25 +211,6 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function stable(value: unknown): string {
-	return JSON.stringify(value, (_key, nested) => {
-		if (nested instanceof Uint8Array) return { bytes: [...nested] };
-		if (!isObject(nested)) return nested;
-		return Object.fromEntries(Object.entries(nested).sort(([left], [right]) => compareBytes(left, right)));
-	});
-}
-
-function compareBytes(left: string, right: string): number {
-	const leftBytes = new TextEncoder().encode(left);
-	const rightBytes = new TextEncoder().encode(right);
-	const length = Math.min(leftBytes.length, rightBytes.length);
-	for (let index = 0; index < length; index++) {
-		const difference = (leftBytes[index] ?? 0) - (rightBytes[index] ?? 0);
-		if (difference !== 0) return difference;
-	}
-	return leftBytes.length - rightBytes.length;
-}
-
 function isFiniteNonNegative(value: unknown): value is number {
 	return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
@@ -414,12 +396,12 @@ function validateHardKill(
 		value.processForestCommand !== "LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=" ||
 		value.browserRootLocator !== "profile-and-executable-argument-match" ||
 		value.contentProcessClass !== expectedClass[tuple.engine] ||
-		stable(value.caseEvidence) !== stable(caseEvidence) ||
-		!validateArming(value.armingMeasurement, tuple.engine, errors)
+		phase2hStableEvidenceJson(value.caseEvidence) !== phase2hStableEvidenceJson(caseEvidence)
 	) {
 		errors.push("hardKillEvidence is invalid or is not bound to scenario caseEvidence");
 		return false;
 	}
+	if (!validateArming(value.armingMeasurement, tuple.engine, errors)) return false;
 	const processToken = {
 		chromium: /renderer/u,
 		firefox: /contentproc/u,
@@ -514,6 +496,7 @@ function validateScenario(
 			break;
 		}
 		case "browser-store": {
+			const operationSequence = Array.isArray(value.operationSequence) ? value.operationSequence : [];
 			if (
 				!hasKeys(value, [
 					"allResults",
@@ -524,7 +507,7 @@ function validateScenario(
 					"reopened",
 					"tag",
 				]) ||
-				!sameStrings(value.operationSequence as readonly string[], [
+				!sameStrings(operationSequence as readonly string[], [
 					"beginGeneration",
 					"putCachedBlob",
 					"promoteReference",
@@ -617,12 +600,20 @@ function validateScenario(
 				errors.push("process-death scenario evidence is malformed or mismatched");
 				break;
 			}
-			const caseEvidence = value.caseEvidence as Phase2e6CaseEvidence;
-			if (value.tracePrefixLength !== caseEvidence.tracePrefix?.length) {
+			if (!isObject(value.caseEvidence) || !Array.isArray(value.caseEvidence.tracePrefix)) {
+				errors.push("process-death case evidence is malformed");
+				break;
+			}
+			const caseEvidence = value.caseEvidence as unknown as Phase2e6CaseEvidence;
+			if (value.tracePrefixLength !== caseEvidence.tracePrefix.length) {
 				errors.push("process-death trace prefix length is unbound");
 				break;
 			}
 			try {
+				if (value.recoveredImageDigest !== phase2hEvidenceImageDigest(caseEvidence.recoveredImage)) {
+					errors.push("process-death recovered image digest is unbound");
+					break;
+				}
 				errors.push(...phase2e6CaseErrors(edge, caseEvidence));
 			} catch {
 				errors.push("process-death source-owned case evidence threw during validation");
@@ -634,15 +625,12 @@ function validateScenario(
 }
 
 /**
- * Test-only reference oracle for one untrusted schema-v1 record.
+ * Validates one untrusted schema-v1 browser-validation record.
  * @param value - Parsed candidate body.
  * @param expected - Trusted Git, run and Playwright-project provenance.
  * @returns Closed errors and a typed record only when schema/evidence validate.
  */
-export function referenceValidatePhase2hRecord(
-	value: unknown,
-	expected: Phase2hRecordExpectation
-): Phase2hRecordValidation {
+export function validatePhase2hRecord(value: unknown, expected: Phase2hRecordExpectation): Phase2hRecordValidation {
 	const errors: string[] = [];
 	if (!hasKeys(value, RECORD_KEYS))
 		return Object.freeze({ errors: ["record top-level schema is not closed"], record: null });
@@ -718,10 +706,18 @@ export function referenceValidatePhase2hRecord(
 	}
 
 	if (tuple !== undefined) {
-		validateScenario(value.scenarioEvidence, tuple, recovered, value.persistenceMode as Phase2hPersistenceMode, errors);
+		const scenarioValid = validateScenario(
+			value.scenarioEvidence,
+			tuple,
+			recovered,
+			value.persistenceMode as Phase2hPersistenceMode,
+			errors
+		);
 		if (tuple.scenario === "process-death") {
-			const scenario = value.scenarioEvidence as Extract<Phase2hScenarioEvidence, { tag: "process-death" }>;
-			validateHardKill(value.hardKillEvidence, tuple, scenario.caseEvidence, errors);
+			if (scenarioValid) {
+				const scenario = value.scenarioEvidence as Extract<Phase2hScenarioEvidence, { tag: "process-death" }>;
+				validateHardKill(value.hardKillEvidence, tuple, scenario.caseEvidence, errors);
+			}
 		} else if (value.hardKillEvidence !== null) errors.push("non-process scenario carries hardKillEvidence");
 	}
 

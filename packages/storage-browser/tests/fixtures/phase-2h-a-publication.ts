@@ -20,7 +20,7 @@ export interface Phase2hRunLayout {
 	readonly runRoot: string;
 }
 
-export interface Phase2hReferencePublisher {
+export interface Phase2hPublisher {
 	census(): Phase2hSubmissionCensus;
 	submit(
 		input: Readonly<{ project: Phase2hEngineName; record: Phase2hValidationRecord }>
@@ -84,15 +84,15 @@ export function writePhase2hAggregate(layout: Phase2hRunLayout, aggregate: Phase
 }
 
 /**
- * Test-only reference publisher for create-only/collision controls.
+ * Publishes create-only validation records and owns the bounded collision census.
  * @param layout - Fresh current invocation layout.
  * @param options - Optional marker failure injection for the named control.
  * @returns Bounded publisher and census.
  */
-export function createReferencePhase2hPublisher(
+export function createPhase2hPublisher(
 	layout: Phase2hRunLayout,
 	options: Readonly<{ failMarkerWrite?: boolean }> = {}
-): Phase2hReferencePublisher {
+): Phase2hPublisher {
 	let attempts = 0;
 	let bounded = false;
 	const seen = new Set<Phase2hDiagnosticIdentity>();

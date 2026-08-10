@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { type Phase2hValidationRecord, referenceValidatePhase2hRecord } from "./phase-2h-a-record.js";
+import { type Phase2hValidationRecord, validatePhase2hRecord } from "./phase-2h-a-record.js";
 import {
 	type Phase2hEngineName,
 	phase2hTuple,
@@ -48,6 +48,7 @@ export type Phase2hRawEntryKind = "directory" | "fifo" | "file" | "other" | "soc
 export interface Phase2hRawEntry {
 	readonly basename: Uint8Array;
 	readonly body?: Uint8Array;
+	readonly bodyDisposition?: "overlong" | "read-failed";
 	readonly kind: Phase2hRawEntryKind;
 	readonly scope: Phase2hScope;
 }
@@ -74,9 +75,15 @@ export interface Phase2hAggregate {
 
 export interface Phase2hAggregationInput {
 	readonly census?: Phase2hSubmissionCensus;
+	readonly directoryEntryOverflow?: boolean;
 	readonly entries: readonly Phase2hRawEntry[];
 	readonly gitSha: string;
 	readonly runId: string;
+}
+
+export interface Phase2hRunScan {
+	readonly directoryEntryOverflow: boolean;
+	readonly entries: readonly Phase2hRawEntry[];
 }
 
 interface AttributedRecord {
@@ -250,7 +257,12 @@ function projectScope(scope: Phase2hScope): Phase2hEngineName | undefined {
 }
 
 function bodyValue(entry: Phase2hRawEntry): unknown {
-	if (entry.body === undefined || entry.body.byteLength === 0 || entry.body.byteLength > RECORD_BODY_LIMIT)
+	if (
+		entry.bodyDisposition !== undefined ||
+		entry.body === undefined ||
+		entry.body.byteLength === 0 ||
+		entry.body.byteLength > RECORD_BODY_LIMIT
+	)
 		return undefined;
 	let text: string;
 	try {
@@ -303,7 +315,7 @@ function attributedRecord(
 			record: null,
 		});
 	}
-	const validation = referenceValidatePhase2hRecord(value, { gitSha, project, runId });
+	const validation = validatePhase2hRecord(value, { gitSha, project, runId });
 	return Object.freeze({
 		canonical: true,
 		diagnosticIdentity: filename.diagnosticIdentity,
@@ -320,19 +332,23 @@ function diagnosticIdentity(value: unknown): value is Phase2hDiagnosticIdentity 
 	);
 }
 
-function collisionMarker(entry: Phase2hRawEntry, gitSha: string, runId: string): Phase2hDiagnosticIdentity | undefined {
-	if (entry.kind !== "file") return undefined;
+function collisionMarkerDigest(basename: Uint8Array): string | null {
 	let name: string;
 	try {
-		name = new TextDecoder("utf-8", { fatal: true }).decode(entry.basename);
+		name = new TextDecoder("utf-8", { fatal: true }).decode(basename);
 	} catch {
-		return undefined;
+		return null;
 	}
-	const match = /^([0-9a-f]{64})\.collision\.json$/u.exec(name);
+	return /^([0-9a-f]{64})\.collision\.json$/u.exec(name)?.[1] ?? null;
+}
+
+function collisionMarker(entry: Phase2hRawEntry, gitSha: string, runId: string): Phase2hDiagnosticIdentity | undefined {
+	if (entry.kind !== "file") return undefined;
+	const markerDigest = collisionMarkerDigest(entry.basename);
 	const value = bodyValue(entry);
 	const project = entry.scope.startsWith("collisions/") ? entry.scope.slice("collisions/".length) : "";
 	if (
-		match === null ||
+		markerDigest === null ||
 		(project !== "chromium" && project !== "firefox" && project !== "webkit") ||
 		typeof value !== "object" ||
 		value === null ||
@@ -348,7 +364,7 @@ function collisionMarker(entry: Phase2hRawEntry, gitSha: string, runId: string):
 		marker.runId !== runId ||
 		marker.project !== project ||
 		!diagnosticIdentity(marker.diagnosticIdentity) ||
-		digest(utf8(marker.diagnosticIdentity)) !== match[1]
+		digest(utf8(marker.diagnosticIdentity)) !== markerDigest
 	)
 		return undefined;
 	return marker.diagnosticIdentity;
@@ -392,11 +408,11 @@ function requireStructuralDirectories(entries: readonly Phase2hRawEntry[]): void
 }
 
 /**
- * Test-only reference oracle over the bounded raw-entry seam.
+ * Aggregates one bounded raw-entry census into the closed Phase 2h artifact.
  * @param input - Current invocation identity, entries and publisher census.
  * @returns Closed pass/fail aggregate.
  */
-export function referenceAggregatePhase2h(input: Phase2hAggregationInput): Phase2hAggregate {
+export function aggregatePhase2h(input: Phase2hAggregationInput): Phase2hAggregate {
 	requireStructuralDirectories(input.entries);
 	const entries = [...input.entries].sort((left, right) => {
 		const scopeDifference = scopeIndex(left.scope) - scopeIndex(right.scope);
@@ -449,7 +465,8 @@ export function referenceAggregatePhase2h(input: Phase2hAggregationInput): Phase
 		}
 	}
 
-	if (nonStructuralCount > ENTRY_LIMIT) invalid.add(phase2hOverflowIdentity("directory-entry-bound", input.runId));
+	if (nonStructuralCount > ENTRY_LIMIT || input.directoryEntryOverflow === true)
+		invalid.add(phase2hOverflowIdentity("directory-entry-bound", input.runId));
 	for (const [identity, count] of attributions) if (count >= 2) duplicate.add(identity);
 	for (const identity of markerDuplicates) duplicate.add(identity);
 	for (const identity of duplicate) invalid.add(identity);
@@ -551,35 +568,133 @@ function kind(stat: fs.Stats): Phase2hRawEntryKind {
 	return "other";
 }
 
-function entriesAt(scope: Phase2hScope, directory: string): readonly Phase2hRawEntry[] {
-	const names = fs.readdirSync(directory, { encoding: "buffer" });
-	return names.map((basename) => {
-		const complete = Buffer.concat([Buffer.from(`${directory}${path.sep}`), basename]);
-		const stat = fs.lstatSync(complete);
-		return Object.freeze({
-			basename: Uint8Array.from(basename),
-			body: stat.isFile() ? Uint8Array.from(fs.readFileSync(complete)) : undefined,
-			kind: kind(stat),
-			scope,
-		});
+const READ_CHUNK_SIZE = 64 * 1_024;
+
+function listedNames(directory: string): readonly Buffer[] {
+	return fs.readdirSync(directory, { encoding: "buffer" }).sort(compareRaw);
+}
+
+function entryPath(directory: string, basename: Uint8Array): Buffer {
+	return Buffer.concat([Buffer.from(`${directory}${path.sep}`), Buffer.from(basename)]);
+}
+
+function boundedBody(file: Buffer, observed: fs.Stats): Pick<Phase2hRawEntry, "body" | "bodyDisposition"> {
+	if (observed.size > RECORD_BODY_LIMIT) return Object.freeze({ bodyDisposition: "overlong" });
+	let descriptor: number | undefined;
+	try {
+		descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+		const opened = fs.fstatSync(descriptor);
+		if (!opened.isFile()) return Object.freeze({ bodyDisposition: "read-failed" });
+		if (opened.size > RECORD_BODY_LIMIT) return Object.freeze({ bodyDisposition: "overlong" });
+		const chunks: Buffer[] = [];
+		let total = 0;
+		while (total <= RECORD_BODY_LIMIT) {
+			const remaining = RECORD_BODY_LIMIT + 1 - total;
+			const chunk = Buffer.allocUnsafe(Math.min(READ_CHUNK_SIZE, remaining));
+			const count = fs.readSync(descriptor, chunk, 0, chunk.byteLength, null);
+			if (count === 0) break;
+			chunks.push(chunk.subarray(0, count));
+			total += count;
+		}
+		if (total > RECORD_BODY_LIMIT) return Object.freeze({ bodyDisposition: "overlong" });
+		return Object.freeze({ body: Uint8Array.from(Buffer.concat(chunks, total)) });
+	} catch {
+		return Object.freeze({ bodyDisposition: "read-failed" });
+	} finally {
+		if (descriptor !== undefined) {
+			try {
+				fs.closeSync(descriptor);
+			} catch {
+				// The bounded read disposition is already fixed; close failure cannot make bytes valid.
+			}
+		}
+	}
+}
+
+function shouldReadBody(entry: Phase2hRawEntry): boolean {
+	if (entry.kind !== "file") return false;
+	if (entry.scope.startsWith("collisions/")) return collisionMarkerDigest(entry.basename) !== null;
+	const project = projectScope(entry.scope);
+	if (project === undefined) return false;
+	const filename = decodeFilename(entry);
+	if (!filename.canonical || filename.extra || filename.requiredTupleId === null) return false;
+	return phase2hTuple(filename.requiredTupleId)?.engine === project;
+}
+
+function liveEntry(scope: Phase2hScope, directory: string, basename: Buffer): Phase2hRawEntry {
+	const complete = entryPath(directory, basename);
+	const stat = fs.lstatSync(complete);
+	const entry: Phase2hRawEntry = Object.freeze({
+		basename: Uint8Array.from(basename),
+		kind: kind(stat),
+		scope,
 	});
+	if (!shouldReadBody(entry)) return entry;
+	return Object.freeze({ ...entry, ...boundedBody(complete, stat) });
+}
+
+function scanResult(entries: readonly Phase2hRawEntry[], directoryEntryOverflow: boolean): Phase2hRunScan {
+	return Object.freeze({ directoryEntryOverflow, entries: Object.freeze(entries) });
 }
 
 /**
  * Reads the exact nine-scope filesystem layout through raw basename bytes.
  * @param runRoot - Fresh current RunId root.
- * @returns Raw-entry scanner input.
+ * @returns Bounded raw-entry scanner input plus global overflow disposition.
  */
-export function readPhase2hRunEntries(runRoot: string): readonly Phase2hRawEntry[] {
+export function readPhase2hRunEntries(runRoot: string): Phase2hRunScan {
 	const recordsRoot = path.join(runRoot, "records");
 	const collisionsRoot = path.join(runRoot, "collisions");
-	const entries = [
-		...entriesAt("run-root", runRoot),
-		...entriesAt("records-root", recordsRoot),
-		...entriesAt("collisions-root", collisionsRoot),
-		...PHASE_2H_ENGINES.flatMap((project) => entriesAt(`records/${project}`, path.join(recordsRoot, project))),
-		...PHASE_2H_ENGINES.flatMap((project) => entriesAt(`collisions/${project}`, path.join(collisionsRoot, project))),
-	];
+	const structuralScopes = Object.freeze([
+		Object.freeze({ directory: runRoot, scope: "run-root" as const }),
+		Object.freeze({ directory: recordsRoot, scope: "records-root" as const }),
+		Object.freeze({ directory: collisionsRoot, scope: "collisions-root" as const }),
+	]);
+	const listings = new Map<keyof typeof STRUCTURAL, readonly Buffer[]>();
+	const entries: Phase2hRawEntry[] = [];
+
+	for (const { directory, scope } of structuralScopes) {
+		const names = listedNames(directory);
+		listings.set(scope, names);
+		for (const expected of STRUCTURAL[scope]) {
+			const basename = names.find((candidate) => compareRaw(candidate, utf8(expected)) === 0);
+			if (basename === undefined)
+				throw new TypeError(`Phase 2h expected structural directory is absent or invalid: ${scope}/${expected}`);
+			const stat = fs.lstatSync(entryPath(directory, basename));
+			if (!stat.isDirectory() || stat.isSymbolicLink())
+				throw new TypeError(`Phase 2h expected structural directory is absent or invalid: ${scope}/${expected}`);
+			entries.push(Object.freeze({ basename: Uint8Array.from(basename), kind: "directory" as const, scope }));
+		}
+	}
+
+	let processed = 0;
+	for (const { directory, scope } of structuralScopes) {
+		const expected = STRUCTURAL[scope];
+		for (const basename of listings.get(scope) ?? []) {
+			if (expected.some((name) => compareRaw(basename, utf8(name)) === 0)) continue;
+			if (processed >= ENTRY_LIMIT) return scanResult(entries, true);
+			entries.push(liveEntry(scope, directory, basename));
+			processed += 1;
+		}
+	}
+
+	const projectScopes = [
+		...PHASE_2H_ENGINES.map((project) => ({
+			directory: path.join(recordsRoot, project),
+			scope: `records/${project}` as const,
+		})),
+		...PHASE_2H_ENGINES.map((project) => ({
+			directory: path.join(collisionsRoot, project),
+			scope: `collisions/${project}` as const,
+		})),
+	] as const;
+	for (const { directory, scope } of projectScopes) {
+		for (const basename of listedNames(directory)) {
+			if (processed >= ENTRY_LIMIT) return scanResult(entries, true);
+			entries.push(liveEntry(scope, directory, basename));
+			processed += 1;
+		}
+	}
 	requireStructuralDirectories(entries);
-	return Object.freeze(entries);
+	return scanResult(entries, false);
 }

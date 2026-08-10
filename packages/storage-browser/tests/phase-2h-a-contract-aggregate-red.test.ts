@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	aggregatePhase2h,
 	type Phase2hAggregate,
 	phase2hOverflowIdentity,
 	type Phase2hRawEntry,
@@ -13,9 +14,8 @@ import {
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
 } from "./fixtures/phase-2h-a-controls.js";
-import type { Phase2hValidationRecord } from "./fixtures/phase-2h-a-record.js";
+import { type Phase2hValidationRecord, validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
 import { phase2hTuple, PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_REQUIRED_TUPLE_IDS } from "./fixtures/phase-2h-a-registry.js";
-import { PHASE_2H_A_INERT_CANDIDATE } from "./fixtures/phase-2h-a-subject.js";
 
 const CANDIDATE_RED_LEDGER = Object.freeze([
 	"complete record validation",
@@ -31,7 +31,7 @@ function candidate(
 	entries: readonly Phase2hRawEntry[],
 	census?: Readonly<{ duplicateIdentities: readonly string[]; invalidIdentities: readonly string[] }>
 ): Phase2hAggregate {
-	return PHASE_2H_A_INERT_CANDIDATE.aggregate({
+	return aggregatePhase2h({
 		census,
 		entries,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
@@ -69,7 +69,7 @@ describe("Phase 2h-a typed candidate RED", () => {
 		const tuple = phase2hTuple(value.tupleId);
 		if (tuple === undefined) throw new TypeError("derived RED tuple is absent");
 		expect(
-			PHASE_2H_A_INERT_CANDIDATE.validateRecord(value, {
+			validatePhase2hRecord(value, {
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
 				project: tuple.engine,
 				runId: PHASE_2H_CONTROL_RUN_ID,

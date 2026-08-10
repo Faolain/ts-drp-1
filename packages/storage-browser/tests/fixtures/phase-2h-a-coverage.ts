@@ -18,7 +18,7 @@ export interface Phase2hCoverageMeasurement {
  * @param after - Same-toolchain collection with the config present.
  * @returns Exact fail-closed measurement errors.
  */
-export function referencePhase2hCoverageErrors(
+export function phase2hCoverageErrors(
 	before: Phase2hCoverageMeasurement,
 	after: Phase2hCoverageMeasurement
 ): readonly string[] {
