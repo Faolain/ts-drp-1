@@ -140,6 +140,11 @@ function processCase(tuple: Phase2hTupleDescriptor, ordinal: number): Phase2e6Ca
 	const childPid = 20_000 + ordinal * 10;
 	const browserPid = childPid + 1;
 	const profilePath = `/tmp/phase-2h-${tuple.engine}-${ordinal}`;
+	const executable = {
+		chromium: "/opt/playwright/chromium/chrome",
+		firefox: "/opt/playwright/firefox/firefox",
+		webkit: "/ms-playwright/webkit-2311/pw_run.sh",
+	}[tuple.engine];
 	const child = Object.freeze({
 		birthToken: `child-${ordinal}`,
 		command: "node phase-2h-crash-child",
@@ -148,33 +153,49 @@ function processCase(tuple: Phase2hTupleDescriptor, ordinal: number): Phase2e6Ca
 		ppid: 19_000,
 		state: "T",
 	});
+	const browserCommand = {
+		chromium: `${executable} --user-data-dir=${profilePath}`,
+		firefox: `${executable} -profile ${profilePath} -no-remote`,
+		webkit: `bash ${executable} --user-data-dir=${profilePath}`,
+	}[tuple.engine];
 	const browserRoot = Object.freeze({
 		birthToken: `browser-${ordinal}`,
-		command: `/opt/${tuple.engine} --user-data-dir=${profilePath}`,
+		command: browserCommand,
 		pgid: browserPid,
 		pid: browserPid,
 		ppid: childPid,
 		state: "T",
 	});
-	const processToken = {
-		chromium: "renderer",
-		firefox: "contentproc renderer",
-		webkit: "WebContent renderer",
-	}[tuple.engine];
-	const content = Object.freeze({
-		birthToken: `content-${ordinal}`,
-		command: `${tuple.engine} ${processToken}`,
+	const ancestor = Object.freeze({
+		birthToken: `ancestor-${ordinal}`,
+		command: {
+			chromium: `${executable} --type=zygote --user-data-dir=${profilePath}`,
+			firefox: `${executable} -contentproc -parentPid ${browserPid} 1 forkserver`,
+			webkit: `/ms-playwright/webkit-2311/minibrowser-wpe/bin/MiniBrowser --user-data-dir=${profilePath}`,
+		}[tuple.engine],
 		pgid: browserPid,
 		pid: childPid + 2,
 		ppid: browserPid,
 		state: "T",
 	});
-	const forest = Object.freeze([child, browserRoot, content]);
+	const content = Object.freeze({
+		birthToken: `content-${ordinal}`,
+		command: {
+			chromium: `${executable} --type=renderer --user-data-dir=${profilePath}`,
+			firefox: `${executable} -contentproc -parentPid ${browserPid} 1 tab`,
+			webkit: `/ms-playwright/webkit-2311/minibrowser-wpe/bin/WPEWebProcess`,
+		}[tuple.engine],
+		pgid: browserPid,
+		pid: childPid + 3,
+		ppid: ancestor.pid,
+		state: "T",
+	});
+	const forest = Object.freeze([child, browserRoot, ancestor, content]);
 	const tracePrefix = phase2e6ExpectedTracePrefix(edge);
 	const oldHead = row.operation === "swapHead" ? `head-${ordinal}` : null;
 	return Object.freeze({
 		armReachCount: 1,
-		browserExecutable: `/opt/${tuple.engine}`,
+		browserExecutable: executable,
 		browserRoot,
 		child,
 		childExit: Object.freeze({ code: null, signal: "SIGKILL" }),

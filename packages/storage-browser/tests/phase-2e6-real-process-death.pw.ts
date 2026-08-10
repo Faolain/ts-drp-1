@@ -34,6 +34,21 @@ const CAMPAIGN_ID = `phase-2e6-${GIT_SHA}-${process.pid}`;
 const EXECUTABLE = chromium.executablePath();
 let server: AssetServer;
 
+interface Phase2e6LiveAuthority extends StagedFreezeAuthority {
+	readonly contentProcessClass: "chromium-renderer";
+	readonly controllerPgid: number;
+	readonly executablePath: string;
+	readonly platform: "darwin" | "linux";
+	readonly profilePath: string;
+	readonly scope: "phase2e6";
+}
+
+function campaignPlatform(): Phase2e6LiveAuthority["platform"] {
+	if (process.platform !== "darwin" && process.platform !== "linux")
+		throw new TypeError(`unsupported Phase 2e6 campaign platform ${process.platform}`);
+	return process.platform;
+}
+
 test.beforeAll(async () => {
 	if (ASSET_DIRECTORY === undefined) throw new TypeError("Phase 2e6 global setup did not install assets");
 	fs.rmSync(ARTIFACT_DIRECTORY, { force: true, recursive: true });
@@ -108,7 +123,7 @@ async function recoverEdge(
 }
 
 async function runControls(): Promise<Record<string, unknown>> {
-	const profile = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2e6-controls-"));
+	const profile = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "phase-2e6-controls-"));
 	try {
 		return await inFreshPersistentContext(profile, async (page) => {
 			await page.waitForFunction(() => typeof window.phase2e6RunControls === "function");
@@ -121,7 +136,8 @@ async function runControls(): Promise<Record<string, unknown>> {
 
 async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal: number): Promise<unknown> {
 	const runId = phase2e6RunId(edge, ordinal);
-	const profile = fs.mkdtempSync(path.join(os.tmpdir(), `phase-2e6-${runId}-`));
+	const profile = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), `phase-2e6-${runId}-`));
+	if (fs.realpathSync(profile) !== profile) throw new TypeError("Phase 2e6 profile is not canonical");
 	const databaseName = `phase-2e6-${runId}`;
 	const transitionURL = server.issueTransitionURL("phase-2e6.html");
 	const token = required(new URL(transitionURL).pathname.split("/")[2], "transition token");
@@ -182,11 +198,27 @@ async function runEdge(edge: (typeof PHASE_2E6_DECLARED_EDGES)[number], ordinal:
 		expect(observation.trace).toEqual(phase2e6ExpectedTracePrefix(edge));
 		const all = captureProcessForest();
 		const initial = processClosure(all, childIdentity.pid);
-		const groups = validateTwoGroupForest(initial, childIdentity.pid, browserRoot.pid);
 		const controller = all.find(({ pid }) => pid === process.pid);
-		if (controller === undefined || controller.pgid === groups.childPgid || controller.pgid === groups.browserPgid)
+		if (controller === undefined) throw new TypeError("controller identity missing");
+		const authority: Phase2e6LiveAuthority = {
+			browserRoot,
+			childRoot: childIdentity,
+			contentProcessClass: "chromium-renderer",
+			controllerPgid: controller.pgid,
+			executablePath: EXECUTABLE,
+			initialForest: initial,
+			platform: campaignPlatform(),
+			profilePath: profile,
+			scope: "phase2e6",
+		};
+		const groups = Reflect.apply(validateTwoGroupForest, undefined, [
+			initial,
+			childIdentity.pid,
+			browserRoot.pid,
+			authority,
+		]) as ReturnType<typeof validateTwoGroupForest>;
+		if (controller.pgid === groups.childPgid || controller.pgid === groups.browserPgid)
 			throw new TypeError("controller overlaps owned group");
-		const authority: StagedFreezeAuthority = { browserRoot, childRoot: childIdentity, initialForest: initial };
 		process.kill(-groups.childPgid, "SIGSTOP");
 		await poll((forest) => childGroupStoppedForFreeze(forest, authority), "child group did not stop");
 		process.kill(-groups.browserPgid, "SIGSTOP");
@@ -312,5 +344,11 @@ test("eighteen actual-adapter settlement arms hard-kill detached Chromium before
 		},
 		{ campaignId: CAMPAIGN_ID, gitSha: GIT_SHA }
 	);
-	expect(phase2e6CampaignErrors(campaign)).toEqual([]);
+	expect(
+		phase2e6CampaignErrors(campaign, {
+			contentProcessClass: "chromium-renderer",
+			platform: campaignPlatform(),
+			scope: "phase2e6",
+		})
+	).toEqual([]);
 });

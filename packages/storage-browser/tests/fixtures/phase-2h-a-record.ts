@@ -8,7 +8,7 @@ import {
 } from "@ts-drp/storage";
 
 import type { Phase2e6CaseEvidence } from "./phase-2e6-real-process-death-contract.js";
-import { phase2e6CaseErrors } from "./phase-2e6-real-process-death-validator.js";
+import { type Phase2e6CampaignPlatform, phase2e6CaseErrors } from "./phase-2e6-real-process-death-validator.js";
 import {
 	declaredPhase2gObservations,
 	derivePhase2gQuotaEdges,
@@ -31,6 +31,12 @@ export type Phase2hPersistenceMode =
 	| "unsupported"
 	| "unavailable-exception"
 	| "unavailable-invalid-response";
+
+const CONTENT_PROCESS_CLASS = Object.freeze({
+	chromium: "chromium-renderer",
+	firefox: "firefox-contentproc",
+	webkit: "webkit-webcontent",
+} as const);
 
 export interface Phase2hEngineEvidence {
 	readonly brand: "Playwright Chromium" | "Playwright Firefox" | "Playwright WebKit";
@@ -378,11 +384,6 @@ function validateHardKill(
 	caseEvidence: Phase2e6CaseEvidence,
 	errors: string[]
 ): value is Phase2hHardKillEvidence {
-	const expectedClass = {
-		chromium: "chromium-renderer",
-		firefox: "firefox-contentproc",
-		webkit: "webkit-webcontent",
-	} as const;
 	if (
 		!hasKeys(value, [
 			"armingMeasurement",
@@ -395,7 +396,7 @@ function validateHardKill(
 		value.mechanism !== "posix-two-pgid-sigstop-sigkill/v1" ||
 		value.processForestCommand !== "LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=" ||
 		value.browserRootLocator !== "profile-and-executable-argument-match" ||
-		value.contentProcessClass !== expectedClass[tuple.engine] ||
+		value.contentProcessClass !== CONTENT_PROCESS_CLASS[tuple.engine] ||
 		phase2hStableEvidenceJson(value.caseEvidence) !== phase2hStableEvidenceJson(caseEvidence)
 	) {
 		errors.push("hardKillEvidence is invalid or is not bound to scenario caseEvidence");
@@ -419,6 +420,7 @@ function validateScenario(
 	tuple: Phase2hTupleDescriptor,
 	recovered: ExpectedHead | null,
 	persistenceMode: Phase2hPersistenceMode,
+	platform: Phase2e6CampaignPlatform | undefined,
 	errors: string[]
 ): value is Phase2hScenarioEvidence {
 	if (!isObject(value) || value.tag !== tuple.scenario) {
@@ -610,11 +612,21 @@ function validateScenario(
 				break;
 			}
 			try {
+				if (platform === undefined) {
+					errors.push("process-death host platform is unavailable");
+					break;
+				}
 				if (value.recoveredImageDigest !== phase2hEvidenceImageDigest(caseEvidence.recoveredImage)) {
 					errors.push("process-death recovered image digest is unbound");
 					break;
 				}
-				errors.push(...phase2e6CaseErrors(edge, caseEvidence));
+				errors.push(
+					...phase2e6CaseErrors(edge, caseEvidence, {
+						contentProcessClass: CONTENT_PROCESS_CLASS[tuple.engine],
+						platform,
+						scope: "phase2h",
+					})
+				);
 			} catch {
 				errors.push("process-death source-owned case evidence threw during validation");
 			}
@@ -706,11 +718,15 @@ export function validatePhase2hRecord(value: unknown, expected: Phase2hRecordExp
 	}
 
 	if (tuple !== undefined) {
+		const os = isObject(value.os) ? value.os : undefined;
+		const platform =
+			os?.platform === "darwin" || os?.platform === "linux" ? (os.platform as Phase2e6CampaignPlatform) : undefined;
 		const scenarioValid = validateScenario(
 			value.scenarioEvidence,
 			tuple,
 			recovered,
 			value.persistenceMode as Phase2hPersistenceMode,
+			platform,
 			errors
 		);
 		if (tuple.scenario === "process-death") {

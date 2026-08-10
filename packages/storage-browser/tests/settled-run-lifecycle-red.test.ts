@@ -59,4 +59,31 @@ describe("settled run lifecycle", () => {
 		expect(profileDispositionFor({ kind: "pass" })).toBe("remove");
 		expect(profileDispositionFor({ kind: "finalization-failed" })).toBe("retain");
 	});
+
+	it("preserves lower cleanup scope: ignores profileless crashpad but retains a genuine profile-bound survivor", () => {
+		const base = [
+			identity(901, 1, 900, "node test-controller.js"),
+			identity(420, 1, 420, `${EXECUTABLE} --user-data-dir=${PROFILE}`),
+			identity(421, 420, 420, `${EXECUTABLE} --type=renderer`),
+		];
+		const crashpad = identity(430, 1, 430, `${EXECUTABLE} --type=crashpad-handler`);
+		const diagnostic = inspectSettledRunOwnership([...base, crashpad], context());
+		expect(diagnostic.ownedGroups).toEqual([420]);
+		expect(diagnostic.recordedForest.map(({ pid }) => pid)).not.toContain(430);
+
+		const survivor = identity(440, 1, 440, `${EXECUTABLE} --user-data-dir=${PROFILE}`);
+		const unresolved = inspectSettledRunOwnership(
+			[...base, crashpad, survivor, identity(441, 440, 440, `${EXECUTABLE} --type=renderer`)],
+			context()
+		);
+		expect(unresolved.ownedGroups).toEqual([420, 440]);
+		expect(unresolved.validatedGroups).toEqual([]);
+		expect(
+			profileDispositionFor({
+				finalization: { unresolvedOwnedGroups: unresolved.ownedGroups },
+				kind: "failed-finalized",
+				ownershipEvidenceState: unresolved.evidenceState,
+			})
+		).toBe("retain");
+	});
 });

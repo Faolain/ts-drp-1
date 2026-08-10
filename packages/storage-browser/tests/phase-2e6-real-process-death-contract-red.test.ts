@@ -1,3 +1,8 @@
+import childProcess from "node:child_process";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PHASE_2E5_BROWSER_REQUEST_INVENTORY } from "./fixtures/phase-2e5-browser-request-inventory.js";
@@ -15,6 +20,12 @@ import {
 	phase2e6RunId,
 } from "./fixtures/phase-2e6-real-process-death-validator.js";
 
+const LINUX_PHASE_2E6_REPLAY = Object.freeze({
+	contentProcessClass: "chromium-renderer" as const,
+	platform: "linux" as const,
+	scope: "phase2e6" as const,
+});
+
 function partialImage(label: string): Phase2e6CaseEvidence["recoveredImage"] {
 	return Object.freeze({
 		blobs: Object.freeze([{ bytes: [1, 2, 3], digest: `${label}-blob` }]),
@@ -29,7 +40,39 @@ function required<T>(value: T | undefined, label: string): T {
 	return value;
 }
 
-function validCampaign(): Phase2e6CampaignEvidence {
+function trapOfflineLookups(action: () => void): readonly string[] {
+	const calls: string[] = [];
+	const originals: Array<Readonly<{ descriptor: PropertyDescriptor; key: PropertyKey; owner: object }>> = [];
+	const instrument = (owner: object, prefix: string): void => {
+		for (const key of Reflect.ownKeys(owner)) {
+			const descriptor = Object.getOwnPropertyDescriptor(owner, key);
+			if (descriptor?.configurable !== true || typeof descriptor.value !== "function") continue;
+			originals.push({ descriptor, key, owner });
+			Object.defineProperty(owner, key, {
+				...descriptor,
+				value: (..._args: readonly unknown[]): never => {
+					const label = `${prefix}${String(key)}`;
+					calls.push(label);
+					throw new TypeError(`offline replay performed ${label}`);
+				},
+			});
+		}
+	};
+	const promises = fs.promises;
+	try {
+		instrument(promises, "fs.promises.");
+		instrument(fs, "fs.");
+		instrument(childProcess, "child_process.");
+		syncBuiltinESMExports();
+		action();
+	} finally {
+		for (const { descriptor, key, owner } of originals.reverse()) Object.defineProperty(owner, key, descriptor);
+		syncBuiltinESMExports();
+	}
+	return Object.freeze(calls);
+}
+
+function validCampaign(profileRoot?: string): Phase2e6CampaignEvidence {
 	const cases = PHASE_2E6_DECLARED_EDGES.map((edge, ordinal): Phase2e6CaseEvidence => {
 		const row = required(
 			PHASE_2E5_BROWSER_REQUEST_INVENTORY.find(({ id }) => id === edge.scenarioId),
@@ -39,7 +82,14 @@ function validCampaign(): Phase2e6CampaignEvidence {
 		const oldHead = row.operation === "swapHead" ? `head-${ordinal}` : null;
 		const childPid = 10_000 + ordinal * 10;
 		const browserPid = childPid + 1;
-		const profilePath = `/tmp/phase-2e6-profile-${ordinal}`;
+		const profilePath =
+			profileRoot === undefined
+				? `/tmp/phase-2e6-profile-${ordinal}`
+				: ((): string => {
+						const directory = path.join(profileRoot, String(ordinal));
+						fs.mkdirSync(directory);
+						return fs.realpathSync(directory);
+					})();
 		const child = Object.freeze({
 			birthToken: `child-${ordinal}`,
 			command: "node crash-child",
@@ -56,15 +106,23 @@ function validCampaign(): Phase2e6CampaignEvidence {
 			ppid: childPid,
 			state: "T",
 		});
-		const renderer = Object.freeze({
-			birthToken: `renderer-${ordinal}`,
-			command: "chromium --type=renderer",
+		const zygote = Object.freeze({
+			birthToken: `zygote-${ordinal}`,
+			command: `/opt/chromium --type=zygote --user-data-dir=${profilePath}`,
 			pgid: browserPid,
 			pid: childPid + 2,
 			ppid: browserPid,
 			state: "T",
 		});
-		const forest = Object.freeze([child, browserRoot, renderer]);
+		const renderer = Object.freeze({
+			birthToken: `renderer-${ordinal}`,
+			command: `/opt/chromium --type=renderer --user-data-dir=${profilePath}`,
+			pgid: browserPid,
+			pid: childPid + 3,
+			ppid: zygote.pid,
+			state: "T",
+		});
+		const forest = Object.freeze([child, browserRoot, zygote, renderer]);
 		return Object.freeze({
 			armReachCount: 1,
 			browserExecutable: "/opt/chromium",
@@ -168,7 +226,7 @@ describe("Phase 2e6 real process-death acceptance contract", () => {
 
 	it("rejects every required causal and anti-vacuity mutant", () => {
 		const control = validCampaign();
-		expect(phase2e6CampaignErrors(control)).toEqual([]);
+		expect(phase2e6CampaignErrors(control, LINUX_PHASE_2E6_REPLAY)).toEqual([]);
 		const first = required(control.cases[0], "first case");
 		const swapIndex = control.cases.findIndex(({ scenarioOperation }) => scenarioOperation === "swapHead");
 		const malformed: readonly Phase2e6CampaignEvidence[] = [
@@ -199,40 +257,64 @@ describe("Phase 2e6 real process-death acceptance contract", () => {
 			{ ...control, staleExpectedRevision: "OK" as "HEAD_CONFLICT" },
 			{ ...control, competingRecovery: { ...control.competingRecovery, rollback: "REGRESSED" as "MONOTONE" } },
 		];
-		for (const mutant of malformed) expect(phase2e6CampaignErrors(mutant)).not.toEqual([]);
+		for (const mutant of malformed) expect(phase2e6CampaignErrors(mutant, LINUX_PHASE_2E6_REPLAY)).not.toEqual([]);
 	});
 
 	it("binds every closed artifact to the reviewed candidate, campaign, edge, profile, and database", () => {
-		const control = validCampaign();
-		const provenance = Object.freeze({ campaignId: "phase-2e6-contract", gitSha: "a".repeat(40) });
-		const artifacts = control.cases.map(
-			(evidence, index): Phase2e6ArtifactEnvelope =>
-				Object.freeze({
-					campaignId: provenance.campaignId,
-					evidence,
-					gitSha: provenance.gitSha,
-					runId: phase2e6RunId(required(PHASE_2E6_DECLARED_EDGES[index], "edge"), index),
-					schemaVersion: 1,
-				})
-		);
-		const controls = {
-			competingRecovery: control.competingRecovery,
-			staleExpectedRevision: control.staleExpectedRevision,
-		};
-		expect(phase2e6CampaignErrors(phase2e6CampaignFromArtifacts(artifacts, controls, provenance))).toEqual([]);
+		const profileRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "phase-2e6-offline-replay-"));
+		try {
+			const control = validCampaign(profileRoot);
+			const provenance = Object.freeze({ campaignId: "phase-2e6-contract", gitSha: "a".repeat(40) });
+			const artifacts = control.cases.map(
+				(evidence, index): Phase2e6ArtifactEnvelope =>
+					Object.freeze({
+						campaignId: provenance.campaignId,
+						evidence,
+						gitSha: provenance.gitSha,
+						runId: phase2e6RunId(required(PHASE_2E6_DECLARED_EDGES[index], "edge"), index),
+						schemaVersion: 1,
+					})
+			);
+			const controls = {
+				competingRecovery: control.competingRecovery,
+				staleExpectedRevision: control.staleExpectedRevision,
+			};
+			expect(
+				phase2e6CampaignErrors(phase2e6CampaignFromArtifacts(artifacts, controls, provenance), LINUX_PHASE_2E6_REPLAY)
+			).toEqual([]);
+			const offline = JSON.parse(JSON.stringify(artifacts)) as readonly unknown[];
+			fs.rmSync(profileRoot, { recursive: true });
+			const lookupCalls = trapOfflineLookups(() => {
+				expect(
+					phase2e6CampaignErrors(phase2e6CampaignFromArtifacts(offline, controls, provenance), LINUX_PHASE_2E6_REPLAY)
+				).toEqual([]);
+			});
+			expect(lookupCalls).toEqual([]);
+			expect(Object.keys(required(artifacts[0], "first artifact")).sort()).toEqual([
+				"campaignId",
+				"evidence",
+				"gitSha",
+				"runId",
+				"schemaVersion",
+			]);
+			expect(Object.keys(required(artifacts[0], "first artifact").evidence)).not.toContain("platform");
 
-		const withArtifact = (index: number, artifact: unknown): readonly unknown[] =>
-			artifacts.map((value, itemIndex) => (itemIndex === index ? artifact : value));
-		const first = required(artifacts[0], "first artifact");
-		const second = required(artifacts[1], "second artifact");
-		const malformed: readonly (readonly unknown[])[] = [
-			withArtifact(0, { ...first, gitSha: "b".repeat(40) }),
-			withArtifact(0, { ...first, campaignId: "another-campaign" }),
-			withArtifact(0, { ...first, runId: "wrong-edge" }),
-			withArtifact(0, { ...first, extra: true }),
-			withArtifact(1, { ...second, evidence: { ...second.evidence, profilePath: first.evidence.profilePath } }),
-			withArtifact(1, { ...second, evidence: { ...second.evidence, databaseName: first.evidence.databaseName } }),
-		];
-		for (const values of malformed) expect(() => phase2e6CampaignFromArtifacts(values, controls, provenance)).toThrow();
+			const withArtifact = (index: number, artifact: unknown): readonly unknown[] =>
+				artifacts.map((value, itemIndex) => (itemIndex === index ? artifact : value));
+			const first = required(artifacts[0], "first artifact");
+			const second = required(artifacts[1], "second artifact");
+			const malformed: readonly (readonly unknown[])[] = [
+				withArtifact(0, { ...first, gitSha: "b".repeat(40) }),
+				withArtifact(0, { ...first, campaignId: "another-campaign" }),
+				withArtifact(0, { ...first, runId: "wrong-edge" }),
+				withArtifact(0, { ...first, extra: true }),
+				withArtifact(1, { ...second, evidence: { ...second.evidence, profilePath: first.evidence.profilePath } }),
+				withArtifact(1, { ...second, evidence: { ...second.evidence, databaseName: first.evidence.databaseName } }),
+			];
+			for (const values of malformed)
+				expect(() => phase2e6CampaignFromArtifacts(values, controls, provenance)).toThrow();
+		} finally {
+			fs.rmSync(profileRoot, { force: true, recursive: true });
+		}
 	});
 });

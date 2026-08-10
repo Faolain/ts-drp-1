@@ -1,7 +1,28 @@
 import { chromium } from "@playwright/test";
 
 import type { Phase2e6DeclaredEdge } from "../fixtures/phase-2e6-real-process-death-contract.js";
-import { captureProcessForest, locateBrowserRoot, processClosure } from "../fixtures/process-forest.js";
+import {
+	captureProcessForest,
+	locateBrowserRoot,
+	processClosure,
+	type ProcessIdentity,
+} from "../fixtures/process-forest.js";
+
+interface Phase2e6RootAuthority {
+	readonly childRoot: ProcessIdentity;
+	readonly contentProcessClass: "chromium-renderer";
+	readonly controllerPgid: number;
+	readonly executablePath: string;
+	readonly platform: "darwin" | "linux";
+	readonly profilePath: string;
+	readonly scope: "phase2e6";
+}
+
+function campaignPlatform(): Phase2e6RootAuthority["platform"] {
+	if (process.platform !== "darwin" && process.platform !== "linux")
+		throw new TypeError(`unsupported Phase 2e6 campaign platform ${process.platform}`);
+	return process.platform;
+}
 
 function required(name: string): string {
 	const value = process.env[name];
@@ -30,7 +51,23 @@ async function run(): Promise<never> {
 	const forest = captureProcessForest();
 	const child = forest.find(({ pid }) => pid === process.pid);
 	if (child === undefined) throw new TypeError("crash child identity missing");
-	const browserRoot = locateBrowserRoot(forest, process.pid, profilePath);
+	const controller = forest.find(({ pid }) => pid === process.ppid);
+	if (controller === undefined) throw new TypeError("crash controller identity missing");
+	const authority: Phase2e6RootAuthority = {
+		childRoot: child,
+		contentProcessClass: "chromium-renderer",
+		controllerPgid: controller.pgid,
+		executablePath,
+		platform: campaignPlatform(),
+		profilePath,
+		scope: "phase2e6",
+	};
+	const browserRoot = Reflect.apply(locateBrowserRoot, undefined, [
+		forest,
+		process.pid,
+		profilePath,
+		authority,
+	]) as ProcessIdentity;
 	write({
 		browserRoot,
 		child,

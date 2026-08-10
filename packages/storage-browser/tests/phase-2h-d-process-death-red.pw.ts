@@ -60,7 +60,16 @@ function processEvidence(record: Phase2hValidationRecord): void {
 		.soft(scenario.tracePrefixLength, `${record.tupleId}: trace prefix length`)
 		.toBe(scenario.caseEvidence.tracePrefix.length);
 	expect.soft(scenario.caseEvidence.unsupported, `${record.tupleId}: supported hard kill`).toBe(false);
-	expect.soft(phase2e6CaseErrors(tuple.edge, scenario.caseEvidence), `${record.tupleId}: source oracle`).toEqual([]);
+	expect
+		.soft(
+			phase2e6CaseErrors(tuple.edge, scenario.caseEvidence, {
+				contentProcessClass: CONTENT_PROCESS_CLASS[tuple.engine],
+				platform: record.os.platform,
+				scope: "phase2h",
+			}),
+			`${record.tupleId}: source oracle`
+		)
+		.toEqual([]);
 
 	const hardKill = record.hardKillEvidence;
 	expect.soft(hardKill, `${record.tupleId}: hard-kill evidence`).not.toBeNull();

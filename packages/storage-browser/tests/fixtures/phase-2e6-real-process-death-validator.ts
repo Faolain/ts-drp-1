@@ -11,8 +11,18 @@ import {
 	freezeCurrentOwnedUnion,
 	processClosure,
 	type ProcessIdentity,
+	type StagedFreezeAuthority,
 	validateTwoGroupForest,
 } from "./process-forest.js";
+
+interface ProcessDeathReplayAuthority extends StagedFreezeAuthority {
+	readonly contentProcessClass: ProcessDeathReplayProvenance["contentProcessClass"];
+	readonly controllerPgid: number;
+	readonly executablePath: string;
+	readonly platform: Phase2e6CampaignPlatform;
+	readonly profilePath: string;
+	readonly scope: ProcessDeathReplayProvenance["scope"];
+}
 
 export interface Phase2e6ArtifactEnvelope {
 	readonly campaignId: string;
@@ -20,6 +30,14 @@ export interface Phase2e6ArtifactEnvelope {
 	readonly gitSha: string;
 	readonly runId: string;
 	readonly schemaVersion: 1;
+}
+
+export type Phase2e6CampaignPlatform = "darwin" | "linux";
+
+export interface ProcessDeathReplayProvenance {
+	readonly contentProcessClass: "chromium-renderer" | "firefox-contentproc" | "webkit-webcontent";
+	readonly platform: Phase2e6CampaignPlatform;
+	readonly scope: "phase2e6" | "phase2h";
 }
 
 const EVIDENCE_KEYS = Object.freeze(
@@ -116,11 +134,27 @@ export function phase2e6RunId(edge: Phase2e6DeclaredEdge, index: number): string
 	return `${String(index).padStart(2, "0")}-${edge.id.replaceAll("/", "-")}`;
 }
 
-function processErrors(observed: Phase2e6CaseEvidence): readonly string[] {
+function processErrors(observed: Phase2e6CaseEvidence, provenance: ProcessDeathReplayProvenance): readonly string[] {
 	try {
 		const initial = observed.initialForest as readonly ProcessIdentity[];
 		const frozen = observed.frozenForest as readonly ProcessIdentity[];
-		const initialGroups = validateTwoGroupForest(initial, observed.child.pid, observed.browserRoot.pid);
+		const authority: ProcessDeathReplayAuthority = {
+			browserRoot: observed.browserRoot,
+			childRoot: observed.child,
+			contentProcessClass: provenance.contentProcessClass,
+			controllerPgid: observed.controllerPgid,
+			executablePath: observed.browserExecutable,
+			initialForest: initial,
+			platform: provenance.platform,
+			profilePath: observed.profilePath,
+			scope: provenance.scope,
+		};
+		const initialGroups = Reflect.apply(validateTwoGroupForest, undefined, [
+			initial,
+			observed.child.pid,
+			observed.browserRoot.pid,
+			authority,
+		]) as ReturnType<typeof validateTwoGroupForest>;
 		if (processClosure(initial, observed.child.pid).length !== initial.length)
 			return ["initial forest escapes child ownership"];
 		if (
@@ -130,11 +164,7 @@ function processErrors(observed: Phase2e6CaseEvidence): readonly string[] {
 			return ["browser executable/profile provenance mismatch"];
 		if (observed.controllerPgid === initialGroups.childPgid || observed.controllerPgid === initialGroups.browserPgid)
 			return ["controller overlaps owned process groups"];
-		const acceptedFrozen = freezeCurrentOwnedUnion(frozen, {
-			browserRoot: observed.browserRoot,
-			childRoot: observed.child,
-			initialForest: initial,
-		});
+		const acceptedFrozen = freezeCurrentOwnedUnion(frozen, authority);
 		if (acceptedFrozen === undefined || stable(acceptedFrozen) !== stable(frozen))
 			return ["frozen owned union is invalid"];
 		const expectedGroups = [
@@ -174,9 +204,14 @@ function expectedWrites(edge: Phase2e6DeclaredEdge): number {
  * Applies the existing source-owned oracle to one declared process-death edge.
  * @param edge - Exact derived Phase 2e6 edge.
  * @param observed - One complete case-evidence payload.
+ * @param provenance - Trusted host, engine-class and campaign-scope provenance supplied outside the evidence schema.
  * @returns Every fail-closed case mismatch.
  */
-export function phase2e6CaseErrors(edge: Phase2e6DeclaredEdge, observed: Phase2e6CaseEvidence): readonly string[] {
+export function phase2e6CaseErrors(
+	edge: Phase2e6DeclaredEdge,
+	observed: Phase2e6CaseEvidence,
+	provenance: ProcessDeathReplayProvenance
+): readonly string[] {
 	const errors: string[] = [];
 	const row = PHASE_2E5_BROWSER_REQUEST_INVENTORY.find(({ id }) => id === edge.scenarioId);
 	if (row === undefined) throw new TypeError(`unknown scenario: ${edge.scenarioId}`);
@@ -189,7 +224,7 @@ export function phase2e6CaseErrors(edge: Phase2e6DeclaredEdge, observed: Phase2e
 		errors.push(`${edge.id}: trace prefix mismatch`);
 	if (observed.childExit.code !== null || observed.childExit.signal !== "SIGKILL")
 		errors.push(`${edge.id}: child was not SIGKILLed`);
-	errors.push(...processErrors(observed).map((error) => `${edge.id}: ${error}`));
+	errors.push(...processErrors(observed, provenance).map((error) => `${edge.id}: ${error}`));
 	if (
 		!observed.databaseIdentityPreserved ||
 		observed.databaseName !== observed.recoveredDatabaseName ||
@@ -223,9 +258,13 @@ export function phase2e6CaseErrors(edge: Phase2e6DeclaredEdge, observed: Phase2e
 /**
  * Applies the complete process, image, recovery, and control oracle.
  * @param evidence - Closed campaign evidence.
+ * @param provenance - Trusted host, engine-class and campaign-scope provenance supplied by the live or replay caller.
  * @returns Every fail-closed acceptance error.
  */
-export function phase2e6CampaignErrors(evidence: Phase2e6CampaignEvidence): readonly string[] {
+export function phase2e6CampaignErrors(
+	evidence: Phase2e6CampaignEvidence,
+	provenance: ProcessDeathReplayProvenance
+): readonly string[] {
 	const errors: string[] = [];
 	const actualIds = evidence.cases.map(({ edgeId }) => edgeId);
 	const expectedIds = PHASE_2E6_DECLARED_EDGES.map(({ id }) => id);
@@ -234,7 +273,7 @@ export function phase2e6CampaignErrors(evidence: Phase2e6CampaignEvidence): read
 	for (const edge of PHASE_2E6_DECLARED_EDGES) {
 		const observed = evidence.cases.find(({ edgeId }) => edgeId === edge.id);
 		if (observed === undefined) continue;
-		errors.push(...phase2e6CaseErrors(edge, observed));
+		errors.push(...phase2e6CaseErrors(edge, observed, provenance));
 	}
 	if (evidence.staleExpectedRevision !== "HEAD_CONFLICT") errors.push("stale expected revision did not conflict");
 	if (
