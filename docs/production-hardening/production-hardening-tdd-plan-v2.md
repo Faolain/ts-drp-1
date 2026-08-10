@@ -1913,8 +1913,15 @@ The browser-specific composition type belongs only to
 `@ts-drp/storage-browser`:
 
 ```ts
-export interface BrowserAheDurableStore extends AheDurableStore, BlobExistencePort {}
+export type BrowserAheDurableStore = AheDurableStore & BlobExistencePort;
 ```
+
+The intersection alias is normative. The original interface spelling described
+the composed shape, but TypeScript does not consider an interface declaration
+identical to the intersection in the frozen packed `Equal` consumer. The
+Codex-high GREEN, Kimi 3/high/100 review and final Opus/xhigh review agree that
+the alias is the exact public declaration required here; this is a declaration
+spelling correction, not a widened runtime contract.
 
 The existing browser factory keeps its runtime key and returns
 `Promise<BrowserAheDurableStore>`. Its one new method performs one bounded
@@ -2010,6 +2017,91 @@ and mutation before refusal. An optional fixed-seed `fast-check` tier is
 authorized as a test/dev dependency but capped at 300 pure-arithmetic cases and
 three seconds. No browser fuzzing, Jazzer.js, jsfuzz, TypeNFuzz, Shfz or broad
 Stryker campaign is authorized.
+
+##### 2g-b implementation closure — bounded admission accepted
+
+Phase 2g-b closed at GREEN `1c46f2b95853eff131d2e3f73b30aa4f7a2cab01`
+after frozen tests-only RED `adb295cde23161b98c03accde43a8f63e679719e`.
+The RED failed only on the absent production admission and browser-presence
+surfaces: the focused tier was 53/57 and the real Chromium oracle 0/1. The
+GREEN changes exactly four production files and passes the same gates at
+57/57 and 1/1. It adds the safe profile/parser and checked cost arithmetic,
+one fresh advisory estimate, bounded-positive unavailable-estimate behavior,
+exact equality admission, metadata-only dedup, and the composed browser store
+without changing memory or Node ownership.
+
+The user-authorized `fast-check` dependency is root dev-only. Its sole 2g-b
+property tier uses fixed seed `0x20b2026`, 250 pure-arithmetic cases, and ran in
+459 ms, inside the ratified 300-case/three-second ceiling. It is coverage for
+checked arithmetic, not a production dependency or a substitute for the named
+boundary examples.
+
+One tests-only corrective RED was required before GREEN. The old synthetic
+packed-consumer stubs for 2e7 and 2g-a declared none of `BlobDigest`,
+`StoreResult` or `BlobExistencePort`; however, the final emitted declaration
+causally failed only with `TS2694` for `BlobExistencePort`. Corrective commit
+`72fdc9498258f4eb1f954dfc18a599a7cf774bad` therefore adds only that minimal
+empty interface to the two historical stubs. A declaration suppression and
+compatibility production ballast were explicitly rejected. All twelve files
+from the original 2g-b RED remain byte-identical at GREEN HEAD.
+
+Exact-HEAD verification additionally passed storage 250/250, storage-browser
+94/94 including the clean-checkout pack consumer, the preserved 2g-a browser
+suite 62/62 and three-engine gate 3/3, the 2e7 Chromium oracle 1/1, package
+typecheck/build, a 150-line traced scoped ESLint run with zero diagnostics,
+Prettier/diff checks, the baseline-excluding workspace typecheck 36/36, and the
+recursive workspace build. Root typecheck retains only the already recorded,
+unrelated Phase 1i-b object/node fixture diagnostics. GREEN evidence has a
+38-entry manifest SHA-256
+`9baecc9969bbfd03136a0905fa0fdfa794c18ba823c60a3fb3b42b2e5e312e32`;
+its verification summary SHA-256 is
+`1c40c09e7807f4e2a909a6f2132c4dafc5755ae3cf121485d0e7172dd6a21a03`.
+
+Independent review accepted the slice without a corrective production round:
+
+- Grok 4.5/high session `b12a8077-6391-4e6f-b45c-1eea3ea27bbb`
+  returned `APPROVED`; result SHA-256
+  `93c32bfd46315e7d1d83a22a39abcf2728415c75f59cc5b7b29afdcba5e52b7d`.
+- Genuine Kimi 3/high with the 100-step cap, session
+  `6a574942-c3dc-41c7-950e-0560f4bc2fe5`, returned `APPROVED` after 39
+  steps/65 tools; result SHA-256
+  `16367fc4edf6b65291707a7ce2abeaf39ec21d3e61cdd782b6eeea3897f96ab2`.
+- Genuine `claude-opus-5` at native xhigh, session
+  `2708bb42-e868-41a4-9e0e-0697d5a91cc7`, returned `APPROVED`,
+  `PHASE_2G_B_MAY_CLOSE: yes` and `PHASE_2G_C_MAY_START: yes`; result
+  SHA-256
+  `20d9a06efee290da42fe491585acff06107cbb01dc40db1f13999370c3895d64`.
+  No Haiku/helper, Fable, subagent, web or MCP was used. The bridge completed
+  its reasoning but twice failed to publish substantive final text; two
+  bounded same-session recoveries preserved the authenticated review and the
+  final JSON-mode recovery emitted the verdict. No model or session was
+  substituted.
+
+Retain these bounded 2g-b residuals and ownership notes:
+
+- Production suppresses missing-byte charge only for exact `true`; short or
+  malformed non-boolean presence entries are conservatively charged. The
+  frozen scaffold uses exact `false`, but all GREEN behavior selects production
+  exports, and no value can make production charge less. Pinning hostile typed
+  violations is optional tests-only hardening, not a closure blocker.
+- A nonconformant port returning `{ok:true, value:null}` can reject with a
+  `TypeError`, but it fails closed before estimate or mutation. The in-repo
+  stores honor the total `StoreResult` contract. Do not widen this slice into
+  an adversarial-port contract without the plan-amendment quorum.
+- Empty and duplicate closures deliberately delegate to the authoritative
+  `beginGeneration` semantic rejection after the raw count ceiling, with zero
+  presence probe and zero estimate. The controller does not reproduce that
+  invariant or fabricate an unmeasured record.
+- The public presence probe itself performs one bounded transaction; the
+  admission controller owns the digest-count ceiling. Quota estimates remain
+  advisory and reserve nothing. Real creation, settlement and terminal quota
+  faults remain wholly owned by 2g-c.
+
+This is the sustainable browser-golden-path direction: unavailable capacity
+telemetry cannot brick a bounded Discord/MMORPG stage, known insufficiency
+cannot mutate, and cached content costs metadata lookups rather than blob-body
+reads. It makes no persistence, private-mode, cleanup, receipt, signer,
+deletion, Phase 2-exit or complete-golden-path claim.
 
 #### 2g-c — trace-derived quota-fault acceptance
 
