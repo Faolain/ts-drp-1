@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/method-signature-style -- mirrors the neutral function-valued port */
-export { type BrowserAheDurableStoreOptions, createBrowserAheDurableStore } from "./internal/idb-adapter.js";
+export {
+	type BrowserAheDurableStore,
+	type BrowserAheDurableStoreOptions,
+	createBrowserAheDurableStore,
+} from "./internal/idb-adapter.js";
 
 type BrowserStorageCapacityPort = Readonly<{
 	persisted?: () => unknown;

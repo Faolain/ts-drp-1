@@ -2,6 +2,7 @@ import {
 	type ActiveGenerationSnapshot,
 	type AheDurableStore,
 	type BlobDigest,
+	type BlobExistencePort,
 	decodeGenerationRecordV1,
 	decodeHeadRecordV1,
 	type ExpectedHead,
@@ -10,6 +11,7 @@ import {
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
+	parseBlobDigest,
 	type PresentHead,
 	type StorageObjectId,
 	type StoreCapabilities,
@@ -39,6 +41,8 @@ import {
 export interface BrowserAheDurableStoreOptions {
 	readonly databaseName: string;
 }
+
+export type BrowserAheDurableStore = AheDurableStore & BlobExistencePort;
 
 type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readGenerationPage" | "readHead">;
 
@@ -191,7 +195,7 @@ class PoisonedOperationError extends Error {
 	}
 }
 
-class IdbAheDurableStore implements AheDurableStore {
+class IdbAheDurableStore implements BrowserAheDurableStore {
 	public readonly capabilities = STRICT_CAPABILITIES;
 	private readonly recoveryCertificates = new Map<StorageObjectId, string>();
 
@@ -214,6 +218,45 @@ class IdbAheDurableStore implements AheDurableStore {
 	public getBlob(digest: BlobDigest): Promise<StoreResult<Uint8Array | null>> {
 		return this.run(commandWithKind("getBlob", { digest })) as Promise<StoreResult<Uint8Array | null>>;
 	}
+
+	public async probeBlobPresence(digests: readonly BlobDigest[]): Promise<StoreResult<readonly boolean[]>> {
+		const copied = copyPresenceDigests(digests);
+		if (copied === undefined) return { ok: false, reason: "INVALID_ARGUMENT" };
+		const database = this.lifecycle.startOperation();
+		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
+		let transaction: IDBTransaction | undefined;
+		let completion: Promise<TransactionOutcome> | undefined;
+		try {
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			transaction = database.transaction(PHASE_2D_BLOBS_STORE, "readonly");
+			completion = transactionOutcome(transaction);
+			const store = transaction.objectStore(PHASE_2D_BLOBS_STORE);
+			const uniqueDigests: BlobDigest[] = [];
+			const uniqueIndex: Record<string, number> = Object.create(null) as Record<string, number>;
+			for (const digest of copied) {
+				if (uniqueIndex[digest] !== undefined) continue;
+				uniqueIndex[digest] = uniqueDigests.length;
+				uniqueDigests.push(digest);
+			}
+			const uniqueValues = await Promise.all(
+				uniqueDigests.map(async (digest) => (await this.request(store.getKey(digest))) !== undefined)
+			);
+			const values = copied.map((digest) => uniqueValues[uniqueIndex[digest] ?? -1] ?? false);
+			const outcome = await completion;
+			if (!outcome.ok) return substrateFailure(outcome.cause);
+			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+			return { ok: true, value: Object.freeze(values) };
+		} catch (cause) {
+			if (transaction !== undefined) abortIfActive(transaction);
+			if (completion !== undefined) await completion;
+			return cause instanceof PoisonedOperationError
+				? { ok: false, reason: "STORE_POISONED" }
+				: substrateFailure(cause);
+		} finally {
+			this.lifecycle.finishOperation();
+		}
+	}
+
 	public recoverActiveGeneration(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>> {
 		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
 		if (!prepared.ok) return Promise.resolve(prepared);
@@ -805,6 +848,23 @@ function rowProperty(value: unknown, key: string): unknown {
 	return descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
 }
 
+function copyPresenceDigests(value: unknown): readonly BlobDigest[] | undefined {
+	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== value.length + 1 || !keys.includes("length")) return undefined;
+	const copied: BlobDigest[] = [];
+	for (let index = 0; index < value.length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || !descriptor.enumerable || !("value" in descriptor)) {
+			return undefined;
+		}
+		const parsed = typeof descriptor.value === "string" ? parseBlobDigest(descriptor.value) : undefined;
+		if (parsed?.ok !== true) return undefined;
+		copied.push(parsed.value);
+	}
+	return copied;
+}
+
 function boundGenerationRecord(row: unknown, objectId: StorageObjectId): Uint8Array {
 	const classified = classifyPersistedState({
 		kind: "generation",
@@ -900,7 +960,9 @@ function freezeRecoverySnapshot(snapshot: ActiveGenerationSnapshot): ActiveGener
  * @param options - Isolated schema-owned database options.
  * @returns A strict durable-store adapter over one validated connection.
  */
-export async function createBrowserAheDurableStore(options: BrowserAheDurableStoreOptions): Promise<AheDurableStore> {
+export async function createBrowserAheDurableStore(
+	options: BrowserAheDurableStoreOptions
+): Promise<BrowserAheDurableStore> {
 	const lifecycle = new IdbAdapterLifecycle();
 	const opaqueDatabase = await openPhase2dInternalDatabase(options, () => {
 		void lifecycle.close();

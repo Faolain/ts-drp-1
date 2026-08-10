@@ -4,11 +4,21 @@ export {
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
 } from "./codecs.js";
-export { inspectStorageCapability, requestPersistentStorage } from "./capacity.js";
+export {
+	createStageAdmissionController,
+	inspectStorageCapability,
+	parseCapacityProfile,
+	requestPersistentStorage,
+} from "./capacity.js";
 export type {
+	AdmittedBeginResult,
+	BlobExistencePort,
+	CapacityProfile,
 	PersistenceObservation,
 	PersistenceRequestResult,
 	QuotaObservation,
+	StageAdmission,
+	StageCost,
 	StorageCapabilityReport,
 	StorageCapacityPort,
 } from "./capacity.js";
