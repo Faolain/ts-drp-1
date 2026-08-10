@@ -2,7 +2,11 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
 	testDir: "./tests",
-	testMatch: ["phase-2h-b-browser-surfaces-red.pw.ts", "phase-2h-c-capacity-quota-red.pw.ts"],
+	testMatch: [
+		"phase-2h-b-browser-surfaces-red.pw.ts",
+		"phase-2h-c-capacity-quota-red.pw.ts",
+		"phase-2h-d-process-death-red.pw.ts",
+	],
 	forbidOnly: true,
 	fullyParallel: false,
 	globalSetup: "./tests/phase-2h-a-global-setup.ts",

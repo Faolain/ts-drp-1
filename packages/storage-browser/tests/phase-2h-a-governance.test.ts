@@ -18,6 +18,7 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(protocolConfig.testMatch).toEqual([
 			"phase-2h-b-browser-surfaces-red.pw.ts",
 			"phase-2h-c-capacity-quota-red.pw.ts",
+			"phase-2h-d-process-death-red.pw.ts",
 		]);
 		expect(protocolConfig.fullyParallel).toBe(false);
 		expect(protocolConfig.workers).toBe(1);

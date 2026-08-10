@@ -16,6 +16,7 @@ describe("Phase 2h-c bounded capacity/quota producer census", () => {
 		expect(protocolConfig.testMatch).toEqual([
 			"phase-2h-b-browser-surfaces-red.pw.ts",
 			"phase-2h-c-capacity-quota-red.pw.ts",
+			"phase-2h-d-process-death-red.pw.ts",
 		]);
 		expect(protocolConfig.projects?.map(({ name }) => name)).toEqual(["chromium", "firefox", "webkit"]);
 		expect(protocolConfig.fullyParallel).toBe(false);

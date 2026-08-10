@@ -23,6 +23,7 @@ describe("Phase 2h-b browser-surface execution topology", () => {
 		expect(protocolConfig.testMatch).toEqual([
 			"phase-2h-b-browser-surfaces-red.pw.ts",
 			"phase-2h-c-capacity-quota-red.pw.ts",
+			"phase-2h-d-process-death-red.pw.ts",
 		]);
 		expect(protocolConfig.globalSetup).toBe("./tests/phase-2h-a-global-setup.ts");
 	});
