@@ -2852,6 +2852,123 @@ The current v1 engine vocabulary is desktop Playwright regression evidence only.
 
 Phase 2h adds no vote schema, signing eligibility, receipt, pin, release, cleanup/deletion, private-mode inference, persistence request, relaxed durability, legacy/plain ID, public network dependency or production fault hook. Optional Phase 0n numeric expansion remains after the golden paths. A measured unsupported strict-durability or arming capability is a genuine fail/find-and-reslice outcome, never a hidden fallback.
 
+#### Phase 2h-a implementation closure — aggregate contract accepted
+
+Phase 2h-a is accepted and closed at signed GREEN
+`670dcf7ece845a2f41e118b6f0d23f95a636c6d0`. It closes only the contract,
+registry, validator, bounded scanner/aggregate, publisher, synthetic controls,
+package-local Playwright topology, asset server and dormant manual workflow.
+It closes no real browser producer: the honest aggregate remains `fail` with
+zero records, 69 missing tuples and 54 missing kill points until 2h-b through
+2h-d exist. Root-script and merge-gate activation remain exclusively 2h-e.
+
+Retain the exact TDD lineage:
+
+- tests-only initial RED `92c7186931e63e62a87f715f88cb54c860cf7f54`
+  froze the 69/54 registry, closed record and aggregate shape, diagnostic
+  ownership, publisher collision semantics, coverage arithmetic and dormant
+  workflow;
+- tests-only scanner corrective RED
+  `c65d20d05eb02d9a5d08d0105144be2e73fd3a87` froze structural real-directory
+  validation, no-follow bounded reads, filename-owned read failures, total
+  scenario-evidence validation and the 1,024-entry/512-attempt boundaries;
+- initial GREEN `169915bb665952a12350c1101d53f107d89fecce`
+  implemented the bounded owner without a temporary subject/reference seam;
+- tests-only order/arming corrective RED
+  `a2eeeff4213fb2e95e9c5ecb43caa6ca4353f20c` proved the two missing arrays
+  were not yet unsigned-UTF-8 sorted and one individually valid but different
+  WebKit arming measurement still produced a false complete pass; and
+- final GREEN `670dcf7ece845a2f41e118b6f0d23f95a636c6d0`
+  routes both missing arrays through the existing locale-free byte sorter and
+  invalidates only the affected engine's accepted process-death campaign when
+  its arming measurements disagree. It never compares different engines,
+  because the engine field makes cross-engine identity impossible.
+
+The final bounded gates are 47/47 focused tests, the existing fixed-seed
+fast-check totality control at 200 runs, package typecheck/build, traced
+nonempty scoped ESLint with zero errors/warnings, Prettier and diff checks,
+real Phase 2e7 1/1 and the full 18-edge Phase 2e6 process-death preservation
+run 1/1. The post-commit inert Playwright matrix fails exactly three times,
+once per engine and only at the deliberate final verdict assertion. Its
+candidate-SHA-bound aggregate is exactly 0/69/54 with empty duplicate, extra
+and invalid arrays and both missing arrays byte-sorted. The initial and final
+GREEN evidence-manifest SHA-256 values are respectively
+`4c068ba6dbf7ae80b317bb2a62599a63a8950625f5d9c458df23b4845aa7adb8`
+and
+`8ac7c8c7cbc6ed56ef064db8064f366a41c3ed992bc8a88a4b4bbafebe0bec5f`.
+
+Independent final acceptance is unanimous:
+
+- native Grok 4.5/high session
+  `fc572f76-52e7-4bc2-95b0-76e19b208e72` returned `ACCEPTED` and
+  `PHASE_2H_A_MAY_CLOSE: yes`; result and manifest SHA-256 values are
+  `ae52468d8f5b60715ec1d5bce531f51c564cc92c7d7529e6802350b7ca17f583`
+  and
+  `fcea2c1351165788a93ba6948000175824da5ffa44731f3b88fd525d2991ce5f`;
+- exact Kimi 3/high with both 100-step controls, session
+  `e02536fb-97fb-4957-9a82-77da93ebb9b7`, completed in 41 steps with only
+  Shell/ReadFile/Grep and returned `ACCEPTED`,
+  `PHASE_2H_A_MAY_CLOSE: yes` and `OPUS_MAY_START: yes`; result and manifest
+  SHA-256 values are
+  `b1a2c7097f1893fefd0ebf9944ecc38ea198bf13c12e59b385ae4a6092f316bd`
+  and
+  `5f73bced5ad1b4d9baaadf04236c2931bca3aab5280d094689477ee46790583e`;
+  and
+- final Claude-skill Opus 5/xhigh session
+  `8f9ff6e2-18bc-40ff-872b-2ea8aab75ad6` returned `ACCEPTED`,
+  `PHASE_2H_A_MAY_CLOSE: yes` and `BLOCKERS: none`; result and manifest
+  SHA-256 values are
+  `aa8995037f2c2a65fda5257c6935f4d043b46609c5cff5103182e331c133c63c`
+  and
+  `5c3401588766207401b7dc489b52586ed416d3cc5474faaa44a4a71f47aae292`.
+  All 150 substantive assistant events used `claude-opus-5`. The native
+  envelope also reports a small automatic Haiku metadata charge of 2,191
+  input/19 output tokens; it produced no assistant event, tool call, reasoning
+  stream or verdict. No Fable review was used.
+
+The controller independently verified the signed GREEN and every referenced
+manifest, including RED paths against their immutable Git objects where later
+GREEN commits had legitimately changed the working-tree files. Preserve these
+accepted carry-forwards with explicit owners rather than reopening 2h-a
+informally:
+
+1. **Before 2h-d acceptance**, make hard-kill validation total over hostile
+   `hardKillEvidence.caseEvidence`. The current stable-JSON comparison can
+   recurse deeply enough to throw; that is fail-closed through an absent
+   aggregate, but 2h-d should wrap it like the existing scenario-evidence
+   validator and extend the bounded totality property to hard-kill evidence.
+2. **Before 2h-d producers publish**, validate publisher-census tuple IDs as
+   registry members instead of relying only on the typed sole parent caller.
+   This preserves the section 8.2 bounded diagnostic union structurally.
+3. **At 2h-e before merge-gate activation**, close collision-marker
+   `diagnosticIdentity` to the exact RequiredTupleId / `extra-sha256` /
+   14-member `entry-<reason>-sha256` union and 160-byte ceiling. The current
+   wider lowercase-hyphen reason regex can only add a failure, never create a
+   pass, but it should not survive into a required aggregate gate.
+4. **At 2h-e or the next scanner edit**, retarget the three corrective
+   no-body-read spies from the superseded `readFileSync` primitive to the
+   current `openSync`/`readSync` owner. The implementation is correct and the
+   original RED was causal, but those prospective regression assertions no
+   longer observe the live read seam.
+5. **2h-e bounded-memory refinement is optional but preferred:** scanner
+   entries currently retain every accepted body until aggregation, so the
+   ratified 1,024-entry × 4-MiB bounds admit a theoretical roughly 4-GiB peak.
+   A streaming validate-and-discard design may reduce that peak only if it
+   preserves the exact global scope/byte order, duplicate attribution and
+   skipped-input non-observation. Do not weaken the ratified caps merely to
+   hide the retained-memory consequence.
+6. Strengthen the output-directory governance assertion in the constrained
+   ancestor direction and keep project-directory/collision-marker diagnostic
+   precedence explicit when 2h-e revisits the gate. The monotone attempt
+   counter after attempt 512, stable canonical JSON versus raw JSON spelling,
+   fixed seed recorded in the corrective RED evidence, synthetic positive
+   fixture and fatal absent-RunId-root behavior are accepted and need no
+   compatibility workaround.
+
+These are fail-closed, test-strength or pre-activation obligations, not
+permission to claim 2h-b/2h-c/2h-d evidence early. Continue next with 2h-b as a
+separate tests-only RED and distinct GREEN. Phase 2h and Phase 2 remain open.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
