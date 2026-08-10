@@ -2969,6 +2969,130 @@ These are fail-closed, test-strength or pre-activation obligations, not
 permission to claim 2h-b/2h-c/2h-d evidence early. Continue next with 2h-b as a
 separate tests-only RED and distinct GREEN. Phase 2h and Phase 2 remain open.
 
+#### Phase 2h-b implementation closure — browser surfaces accepted
+
+Phase 2h-b is accepted and closed at signed GREEN
+`ee4bc8dc07c92f952f2fc3514d9251564f123c9f`, tree
+`534a741f16f983119a1e8e96f1f866fcceab718b`. The separate signed tests-only
+RED `c3be2ba241149b8e3b87dd2d170c08b6afa409b6` froze the configuration
+transition and the exact three-scenario browser matrix. GREEN left both RED
+files byte-identical and added only tests, fixtures, Playwright configuration
+and TypeScript census/configuration changes. It changed no production source,
+browser schema, wire domain, public API, package export, dependency, lockfile,
+workflow or root script.
+
+The accepted producer runs one real same-Window WebCrypto known-answer check,
+the authoritative Phase 2f-c module Worker workload with an independently
+computed Window oracle, and the production browser store's begin/stage,
+promotion, completion, head-swap, close, reopen and recovery path in each of
+Chromium, Firefox and WebKit. One invocation-wide loopback parent owns
+create-only publication and final aggregation; the request body is closed to
+`{record}` and cannot select its trusted project directory. The measured
+three-engine run passed 3/3 and produced exactly the first nine registry records
+in registry order. Its honest partial aggregate is 9 records, 60 missing tuples,
+54 missing kill points, no duplicate/extra/invalid identities and verdict
+`fail`. The separately executable inert configuration still fails exactly once
+per engine at the deliberate final-verdict assertion and produces the honest
+0/69/54 failing aggregate.
+
+The immutable GREEN gates are 136/136 focused tests, 148/148 complete
+`storage-browser` package tests across 32 files, three-engine Playwright 3/3,
+Phase 2e7 preservation 1/1, Phase 2f-c preservation 3/3,
+`storage-browser` and `worker-host` typecheck/build, traced nonempty scoped
+ESLint over 11 TypeScript files with zero errors/warnings, Prettier and diff
+checks. The GREEN evidence-manifest SHA-256 is
+`c96bba59214f9f1e9d318fe4ae9a36306006fb2f0f9ce61c7d353e2222af7fb9`.
+
+Independent final acceptance is unanimous:
+
+- native Grok 4.5/high session
+  `019febfe-83c2-7a11-b8e1-524e89f4590d` returned `ACCEPTED` and
+  `PHASE_2H_B_MAY_CLOSE: yes`; result and manifest SHA-256 values are
+  `bb9de8db2c013746ce5f179e2c1c78f0ad3eb0bcf2d65e2bcc26ed0d1b9ca769`
+  and
+  `1ae9071004c16ed5158c7c7f59141f407fdfdf9ecfd25078cbb4094f31a8ceb2`;
+- exact Kimi 3/high with both 100-step controls, session
+  `3e89c3e1-396e-46bf-b0c4-9426a49853ed`, completed in 25 steps with only
+  Shell and ReadFile, and returned `ACCEPTED`,
+  `PHASE_2H_B_MAY_CLOSE: yes` and `OPUS_MAY_START: yes`; result and manifest
+  SHA-256 values are
+  `b36be55de13110b984b02d00ba3eebf2e08238685927df906ad37af39a6dfdc9`
+  and
+  `37118283a93b4b37fc0049bc5fe9e1ff4ddceca0995b1956e1925966db005ce8`;
+  and
+- final Claude-skill Opus 5/xhigh session
+  `70c1b7e2-cb19-439e-a1e9-ba7d040e66cc` returned `ACCEPTED`,
+  `PHASE_2H_B_MAY_CLOSE: yes` and `BLOCKERS: none`; result and manifest
+  SHA-256 values are
+  `276b8cdb5130a252be3c4b9c5a35a9bc00e2e0bd3413ec9d32188a6da82cabe9`
+  and
+  `5733927be3e5d097913c1b016b10de7a62a1065425533b187e2ab1a6fd90d63f`.
+  All 224 substantive assistant events used `claude-opus-5`. The native
+  envelope also reports a small automatic Haiku metadata charge of 1,876
+  input/22 output tokens; it produced no assistant event, repository tool
+  call, reasoning stream or verdict. No Fable review was used.
+
+The controller independently verified both commit signatures and the GREEN,
+Grok, Kimi and Opus manifests. Preserve the following accepted gotchas under
+their explicit later owners; none can turn a failing 2h-b campaign into a pass:
+
+1. **At the next 2h-c harness edit**, replace authored custody claims
+   (`digestCalls`, `requestBeforeReady`, `productionFactory`, `pageCounter` and
+   `pageScope`) with observations at their actual call/message boundaries.
+   Their underlying properties hold now, but the current booleans are not the
+   evidence.
+2. **Do not use either worker window boolean as proof.** Both
+   `workerResultInsideWindow` and `workerConstructedInsideWindow` reduce to
+   statement order plus monotonic-clock tautologies. Preserve the causal
+   sampler-before-construction/result-before-close ordering, raw offset
+   publication and independent Node recomputation; instrument an event census
+   when 2h-c next touches this entry module.
+3. The current sample count includes the authored opening zero and terminal
+   `windowMs` boundary. The real runs still had 24–53 timer ticks and passed
+   with margin. **At 2h-e**, keep the frozen threshold and separately report
+   real timer ticks so the boundary samples cannot conceal cadence erosion.
+4. WebKit observed 26 samples over 184.92 ms against a 5 ms target. This is an
+   honest pass, but the 20-sample floor can become the binding fail-closed
+   condition on a different CI host. **2h-e owns monitoring this without
+   weakening the ratified threshold.**
+5. All three real runs completed with `repetitionCount === 1`. The `N > 1`
+   repeated-root implementation was reviewed structurally but not reached by
+   those browser measurements. **Before 2h-e closure**, retain a bounded
+   deterministic control that exercises `N > 1`; do not manufacture idle time
+   or change the real threshold merely to obtain it.
+6. The one parent currently passes all three opaque submission URLs through one
+   environment value; trusted project ownership still comes from the URL path,
+   never the untrusted body. **When 2h-c edits publication topology**, deliver
+   only the active project's endpoint to that project while preserving one
+   invocation-wide parent and exact project census.
+7. Mid-test aggregates intentionally omit the parent attempt census; the
+   authoritative teardown aggregate includes it after the serial submission
+   chain drains. **2h-c/2h-e must preserve the authoritative finalizer and must
+   not promote the mid-test aggregate to gate evidence.**
+8. Real and inert configs currently target the same aggregate path. An inert
+   run can only replace `fail` with `fail`, but **2h-e must give diagnostic/inert
+   execution separate output custody or order it so it cannot replace the
+   current required-gate artifact.**
+9. Asset scratch directories are removed on caught setup failure and normal
+   teardown but are not ignored if the process is killed before teardown
+   registration. **At the next global-setup edit**, place them beneath governed
+   ignored test output or add equally bounded crash-safe custody.
+10. This GREEN repaired a pre-existing exact-census mismatch that made the full
+    package test fail at the accepted 2h-a ancestor even though 2h-a's focused
+    gates passed. The repair is in scope and the package now passes 148/148.
+    **Every remaining 2h slice must run both focused and complete package tests
+    before acceptance**, as the normative 2h-e contract already requires.
+11. The browser `.pw.ts` did not itself execute red at the RED commit because
+    Playwright discovered zero tests; the causal RED signal was the two frozen
+    configuration failures plus zero discovery. This is retained as historical
+    evidence quality, not retroactively described as a browser assertion
+    failure.
+
+All six Phase 2h-a carry-forwards above remain live with their stated 2h-d/2h-e
+owners. Phase 2h-b closes only the nine browser-surface tuples. Continue next
+with 2h-c as a separate tests-only RED and distinct GREEN. Phase 2h and Phase 2
+remain open.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
