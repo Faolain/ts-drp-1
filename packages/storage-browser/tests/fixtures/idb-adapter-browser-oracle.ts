@@ -261,6 +261,21 @@ export interface Phase2e5InventoryTrace<T> {
 	readonly transactions: readonly Phase2e5TransactionTrace[];
 }
 
+export interface Phase2gQuotaFaultArm {
+	readonly requestIndex?: number;
+	readonly target: "creation" | "settlement" | "terminal";
+	readonly terminalWriteIndex?: number;
+}
+
+export interface Phase2gQuotaFaultTrace<T> extends Phase2e5InventoryTrace<T> {
+	readonly fault: DOMException;
+	readonly faultArmed: boolean;
+	readonly faultsFired: number;
+	readonly operationReturnedAfterTerminal: boolean;
+	readonly selectedOccurrenceInTrace: boolean;
+	readonly writesObserved: number;
+}
+
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
 		request.addEventListener("success", () => resolve(request.result), { once: true });
@@ -922,6 +937,186 @@ export async function withPhase2e5RequestInventoryTrace<T>(run: () => Promise<T>
 			requests: Object.freeze(requests.map((request) => Object.freeze({ ...request }))),
 			result,
 			transactions: Object.freeze(transactions.map((transaction) => Object.freeze({ ...transaction }))),
+		};
+	} finally {
+		IDBDatabase.prototype.transaction = originalTransaction;
+		IDBTransaction.prototype.addEventListener = originalTransactionAddEventListener;
+		IDBObjectStore.prototype.add = originalAdd;
+		IDBObjectStore.prototype.get = originalGet;
+		IDBObjectStore.prototype.getAll = originalGetAll;
+		IDBObjectStore.prototype.put = originalPut;
+	}
+}
+
+/**
+ * Injects one genuine same-realm quota exception at a trace-selected write edge.
+ * Creation throws before the native request is returned, settlement aborts the
+ * selected native request's transaction, and terminal aborts after the final
+ * declared write settles but before transaction completion.
+ * @param arm - Trace-derived request or terminal occurrence.
+ * @param run - Starts the real adapter operation under the fault instrument.
+ * @returns Exact request/transaction trace, original quota cause, and counters.
+ */
+export async function withPhase2gQuotaFaultTrace<T>(
+	arm: Phase2gQuotaFaultArm,
+	run: () => Promise<T>
+): Promise<Phase2gQuotaFaultTrace<T>> {
+	const originalTransaction = IDBDatabase.prototype.transaction;
+	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
+	const originalAbort = IDBTransaction.prototype.abort;
+	const originalAdd = IDBObjectStore.prototype.add;
+	const originalGet = IDBObjectStore.prototype.get;
+	const originalGetAll = IDBObjectStore.prototype.getAll;
+	const originalPut = IDBObjectStore.prototype.put;
+	const requests: Phase2e5RequestTrace[] = [];
+	const transactions: Array<{
+		durability: "default" | "relaxed" | "strict";
+		id: number;
+		mode: "readonly" | "readwrite" | "versionchange";
+		requestedDurability: "default" | "relaxed" | "strict" | null;
+		stores: readonly string[];
+		terminal: "abort" | "complete" | null;
+	}> = [];
+	const fault = new DOMException("quota exceeded", "QuotaExceededError");
+	let faultsFired = 0;
+	let terminalCount = 0;
+	let writesObserved = 0;
+
+	const transactionId = (): number => {
+		if (transactions.length !== 1) throw new Error("Phase 2g observed a request outside its sole transaction");
+		return 0;
+	};
+	IDBDatabase.prototype.transaction = function phase2gQuotaTransaction(
+		this: IDBDatabase,
+		storeNames: string | string[],
+		mode?: IDBTransactionMode,
+		options?: IDBTransactionOptions
+	): IDBTransaction {
+		const transaction = originalTransaction.call(this, storeNames, mode, options);
+		const trace = {
+			durability: transaction.durability,
+			id: transactions.length,
+			mode: transaction.mode,
+			requestedDurability: options?.durability ?? null,
+			stores: [...transaction.objectStoreNames].sort(),
+			terminal: null as "abort" | "complete" | null,
+		};
+		transactions.push(trace);
+		originalTransactionAddEventListener.call(
+			transaction,
+			"complete",
+			() => {
+				trace.terminal = "complete";
+				terminalCount++;
+			},
+			{ once: true }
+		);
+		originalTransactionAddEventListener.call(
+			transaction,
+			"abort",
+			() => {
+				trace.terminal = "abort";
+				terminalCount++;
+			},
+			{ once: true }
+		);
+		return transaction;
+	};
+
+	const observe = <TResult>(
+		kind: Phase2e5RequestTrace["kind"],
+		store: IDBObjectStore,
+		invoke: () => IDBRequest<TResult>,
+		count?: number
+	): IDBRequest<TResult> => {
+		const requestIndex = requests.length;
+		requests.push({ ...(count === undefined ? {} : { count }), kind, store: store.name, transaction: transactionId() });
+		const write = kind === "add" || kind === "put";
+		if (write) writesObserved++;
+		if (write && arm.target === "creation" && arm.requestIndex === requestIndex) {
+			faultsFired++;
+			throw fault;
+		}
+		const request = invoke();
+		if (write && arm.target === "settlement" && arm.requestIndex === requestIndex) {
+			const transaction = request.transaction;
+			if (transaction === null) throw new Error("selected quota request has no transaction");
+			Object.defineProperty(request, "error", { configurable: true, get: () => fault });
+			queueMicrotask(() => {
+				faultsFired++;
+				originalAbort.call(transaction);
+			});
+		}
+		if (write && arm.target === "terminal" && arm.terminalWriteIndex === requestIndex) {
+			const transaction = request.transaction;
+			if (transaction === null) throw new Error("terminal quota request has no transaction");
+			originalTransactionAddEventListener.call(
+				request,
+				"success",
+				() => {
+					faultsFired++;
+					Object.defineProperty(transaction, "error", { configurable: true, get: () => fault });
+					originalAbort.call(transaction);
+				},
+				{ once: true }
+			);
+		}
+		return request;
+	};
+
+	IDBObjectStore.prototype.add = function phase2gQuotaAdd(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		return observe("add", this, () =>
+			key === undefined ? originalAdd.call(this, value) : originalAdd.call(this, value, key)
+		);
+	};
+	IDBObjectStore.prototype.get = function phase2gQuotaGet(
+		this: IDBObjectStore,
+		query: IDBValidKey | IDBKeyRange
+	): IDBRequest<unknown> {
+		return observe("get", this, () => originalGet.call(this, query));
+	};
+	IDBObjectStore.prototype.getAll = function phase2gQuotaGetAll(
+		this: IDBObjectStore,
+		query?: IDBValidKey | IDBKeyRange | null,
+		count?: number
+	): IDBRequest<unknown[]> {
+		return observe(
+			"getAll",
+			this,
+			() => (count === undefined ? originalGetAll.call(this, query) : originalGetAll.call(this, query, count)),
+			count
+		);
+	};
+	IDBObjectStore.prototype.put = function phase2gQuotaPut(
+		this: IDBObjectStore,
+		value: unknown,
+		key?: IDBValidKey
+	): IDBRequest<IDBValidKey> {
+		return observe("put", this, () =>
+			key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key)
+		);
+	};
+
+	try {
+		const result = await run();
+		const selectedOccurrenceInTrace =
+			arm.target === "terminal"
+				? arm.terminalWriteIndex !== undefined && ["add", "put"].includes(requests[arm.terminalWriteIndex]?.kind ?? "")
+				: arm.requestIndex !== undefined && requests[arm.requestIndex] !== undefined;
+		return {
+			fault,
+			faultArmed: true,
+			faultsFired,
+			operationReturnedAfterTerminal: transactions.length > 0 && terminalCount === transactions.length,
+			requests: Object.freeze(requests.map((request) => Object.freeze({ ...request }))),
+			result,
+			selectedOccurrenceInTrace,
+			transactions: Object.freeze(transactions.map((transaction) => Object.freeze({ ...transaction }))),
+			writesObserved,
 		};
 	} finally {
 		IDBDatabase.prototype.transaction = originalTransaction;

@@ -16,6 +16,11 @@ import {
 	withPhase2e5RequestInventoryTrace,
 } from "../fixtures/idb-adapter-browser-oracle.js";
 import { createPhase2d2aRedStore } from "../fixtures/idb-adapter-red-scaffold.js";
+import {
+	preparePhase2gEngineQuotaControl,
+	runPhase2gDeterministicMatrix,
+	runPhase2gEngineQuotaControl,
+} from "../fixtures/phase-2g-c-quota-fault-instrument.js";
 
 const OBJECT = must(parseStorageObjectId(`phase-2g-c:${"c".repeat(32)}`));
 const GENERATION_A = must(parseGenerationId("a".repeat(64)));
@@ -85,24 +90,21 @@ async function runPresentHeadTrace(): Promise<
 	}
 }
 
-// RED seam: GREEN installs the tests-only trace/fault/whole-image runner here.
-// No production injection hook is introduced or assumed.
 function runDeterministicMatrix(): Promise<unknown> {
-	return Promise.resolve(
-		Object.freeze({
-			cases: Object.freeze([]),
-			errors: Object.freeze(["Phase 2g-c trace/fault/whole-image test instrument is absent"]),
-			testInstrumentPresent: false,
-		})
-	);
+	return runPhase2gDeterministicMatrix();
 }
 
-function runEngineGeneratedControl(): Promise<unknown> {
-	return Promise.resolve(Object.freeze({ engineControlPresent: false }));
+function runEngineGeneratedControl(supportedOverrideAttempted: boolean): Promise<unknown> {
+	return runPhase2gEngineQuotaControl(supportedOverrideAttempted);
 }
 
 Reflect.set(
 	globalThis,
 	"phase2gCQuotaFaultHarness",
-	Object.freeze({ runDeterministicMatrix, runEngineGeneratedControl, runPresentHeadTrace })
+	Object.freeze({
+		prepareEngineGeneratedControl: preparePhase2gEngineQuotaControl,
+		runDeterministicMatrix,
+		runEngineGeneratedControl,
+		runPresentHeadTrace,
+	})
 );

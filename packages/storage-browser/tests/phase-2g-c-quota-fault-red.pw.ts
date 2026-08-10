@@ -72,8 +72,31 @@ test("runs all trace-derived full-image quota cases through the tests-only instr
 	expect(result.cases).toHaveLength(35);
 });
 
-test("produces one bounded engine-generated Chromium quota fault without skipping", async ({ page }) => {
-	const result = (await quotaHarness(page, "runEngineGeneratedControl")) as {
+test("produces one bounded engine-generated Chromium quota fault without skipping", async ({ context, page }) => {
+	await page.goto("/quota");
+	await page.waitForFunction(() => "phase2gCQuotaFaultHarness" in globalThis);
+	await page.evaluate(async () => {
+		const harness = Reflect.get(globalThis, "phase2gCQuotaFaultHarness") as Record<string, () => Promise<unknown>>;
+		await harness.prepareEngineGeneratedControl?.();
+	});
+	const session = await context.newCDPSession(page);
+	let engineResult: unknown;
+	let supportedOverrideAttempted = false;
+	try {
+		await session.send("Storage.overrideQuotaForOrigin", { origin: new URL(page.url()).origin, quotaSize: 1 });
+		supportedOverrideAttempted = true;
+		engineResult = await page.evaluate(async (attempted) => {
+			const harness = Reflect.get(globalThis, "phase2gCQuotaFaultHarness") as Record<
+				string,
+				(value: boolean) => Promise<unknown>
+			>;
+			return harness.runEngineGeneratedControl?.(attempted);
+		}, supportedOverrideAttempted);
+	} finally {
+		await session.send("Storage.overrideQuotaForOrigin", { origin: new URL(page.url()).origin });
+		await session.detach();
+	}
+	const result = engineResult as {
 		readonly engineControlPresent: boolean;
 		readonly evidence?: Parameters<typeof phase2gEngineQuotaErrors>[0];
 	};
