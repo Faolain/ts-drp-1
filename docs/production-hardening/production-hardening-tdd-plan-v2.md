@@ -1096,7 +1096,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2g-a**    | Public runtime-neutral capacity observation in `@ts-drp/storage` plus the sole no-argument same-realm browser binding. Inspection never requests persistence; only the host/user-gesture path calls `persist`. Closed outcomes cover unsupported, granted/not-granted, exception/invalid response, and complete/incomplete/unsafe/inconsistent estimates. No private-mode inference, signer authorization, schema, Node capacity, or test injection export.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | local-safe  | observation atomic      | Table-driven fake-port RED plus ≤60 s/engine inspection/nonprompting smoke; GREEN is the neutral module/root export and browser binding only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **2g-b**    | Profile-bounded advisory stage admission. Required safe-integer `maxClosureReferences`, `maxStageCostBytes`, and `reserveBytes`; cost is exact encoded staged record plus declared bytes for globally missing blobs. Dedup uses one metadata-only batch `getKey` presence probe and never reads blob values. Known capacity admits on equality; every unusable estimate permits only the same profile-bounded attempt; actual writes remain authoritative. `AheDurableStore` and shared rejection taxonomy stay unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | local-safe  | refusal before mutation | Boundary/overflow/dedup/unavailable-estimate/ordering RED with positive real stage and mutants; GREEN adds neutral controller/types and the browser store subtype's bounded probe.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **2g-c**    | Tests-only quota-fault characterization/acceptance over the trace-derived successful mutation inventory, extended with present-head supersession. Inject genuine same-realm quota errors at every write creation, settlement, and terminal edge; require the complete four-store old image after reopen and exact complete-new image after retry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | coordinated | transaction atomic      | Current trace checksum is 9 transactions/13 writes/35 derived edges (historical frozen subset 8/10/28); runner derives rather than hard-codes. Chromium full matrix plus one bounded engine-generated control; representative Firefox/WebKit cases in 2h. Production GREEN only if a real defect is reproduced.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **2h**      | **`playwright.protocol-v2.config.ts`** — dedicated, local, no public-Nostr dependency (storage correctness must not be hostage to relay flakiness). Fixed chromium/firefox/webkit projects, COOP/COEP, one worker per project, `retries: 0`, retained traces. Port the AHE harness's three checks into it — with real thresholds, since the bundle's `worker.ok` asserts no bound at all and **zero heartbeat samples still reports a zero max gap and passes**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | local-safe  | sliceable               | Every run emits `ahe-storage-validation.json`: schema version, git SHA, engine + branded version, OS/device, scenario, kill-point ID + edge, Web Locks mode, persistence mode, hard-kill PID evidence, recovered head, **full closure digest**, verdict. Aggregate passes only when every required tuple appears once, all verdicts are `pass`, and `missingKillPoints === []`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **2h**      | **Ratified browser validation composite v4, implemented as the independently executable 2h-a…2h-e decomposition below.** Add the package-local `playwright.protocol-v2.config.ts`, closed validator/aggregate and dormant manual CI topology first; then the three browser-surface scenarios, capacity/quota scenarios, the exact process-death matrix, and only finally gate activation/preservation closure. This slice is tests/config/scripts/CI/evidence only: no vote CAS, production source, browser schema, public API, package export, runtime dependency or protocol change. Phase 5c remains the sole owner of the first real vote-store/schema bump and vote transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | local-safe  | sliceable               | Exact registry is 15 non-kill plus 54 mechanically derived kill tuples = 69. GREEN requires the closed per-tuple schema and scenario evidence, bounded responsiveness thresholds, identical POSIX hard-kill proof, one GitSha/RunId-bound fail-closed aggregate, all 69 unique `verdict:pass` records and all five diagnostic arrays empty. 2h-a stays manual/non-gating until 2h-e. Phase 2h closure preserves 2e5/2e6/2e7/2f/2g but does not close Phase 2; 2i, 2l and every other exit conjunct remain mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **2i**      | **Primary-tab election** (Web Locks, advisory): one tab per origin owns network sync, cleanup and vote attempts; the others queue locally. Correctness MUST hold with the election off or the Locks API absent — the CAS (2d/5c) remains the boundary; the election removes same-origin `VoteConflictError` churn and duplicate sync work.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | local-safe  | sliceable               | `primary-tab.spec.ts`: two tabs, election on → exactly one performs sync/cleanup (spy counters on the secondary are 0); kill the primary → the secondary acquires the lock and takes over ≤ T; the full 5c multitab suite passes **unchanged** with election disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | local-safe  | sliceable               | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **2k**      | **Browser-matrix currency.** At `fbdb396`, root pins `@playwright/test` exactly `1.61.1`, bundling Chromium/Chrome for Testing `149.0.7827.55`. `examples/network-spike` still declares `^1.49.1`, resolving a second installed `playwright-core@1.51.1`, although its own e2e script delegates to the root binary. Measure release-time currency instead of preserving either historical premise; add a scheduled bump and make staleness visible.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | sliceable               | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -2370,6 +2370,487 @@ creation, settlement or terminal and is not persisted corruption; historical
 28 is accurate but incomplete for supersession while 35 is a derived checksum,
 not a magic loop bound; forged receipts are `RECEIPT_INVALID`, while
 `ROLLBACK_PINNED` is an authenticated policy refusal.
+
+### Phase 2h assumption-correction quorum — browser validation composite v4
+
+The original Phase 2h row bundled a dedicated browser config and a summary
+artifact, but left the exact AHE-check replacements, tuple registry, record and
+aggregate schemas, timing thresholds, hard-process-death proof, output
+ownership and activation sequence unspecified. It also risked implying that the
+reference vote CAS should be ported here even though Phase 5c owns the first
+real browser schema bump and vote transaction. A tests-only RED author would
+therefore have had to invent both the evidence contract and future production
+behavior.
+
+The ratified correction splits Phase 2h into five independently executable TDD
+items:
+
+- **2h-a:** closed contract, mechanically derived registry, validator,
+  aggregation, focused controls, package-local config, local server and a
+  dormant manual-only workflow;
+- **2h-b:** crypto digest, real Worker responsiveness and production browser
+  store scenarios in Chromium, Firefox and WebKit;
+- **2h-c:** complete capacity evidence and the representative derived quota
+  fault in all three engines;
+- **2h-d:** the 54-tuple, three-engine process-death campaign with one measured
+  arming contract and the identical POSIX two-process-group kill proof; and
+- **2h-e:** one-invocation aggregation, preservation, repository checks and only
+  then root-script/merge-gate activation.
+
+The exact registry is 15 non-kill tuples plus 18 authoritative storage edges
+crossed with three engines, or 15 + 54 = 69. Phase 2h is
+tests/config/scripts/CI/evidence only. It adds no vote CAS, production source,
+browser schema, public API, package export, runtime dependency, lockfile or wire
+domain. Browser schema v1 remains exactly
+`objects/generations/blobs/promotions`; Phase 5c remains the sole owner of the
+first real schema bump and vote transaction. Fast-check is already a development
+dependency and remains optional for pure validator mutation only, with one
+logged fixed seed, at most 300 runs and at most three seconds. It cannot replace
+the exact registry, named mutants or real browser/process evidence. Phase 2h
+closure does not close Phase 2.
+
+#### Ratification lineage and evidence custody
+
+The durable contract lineage is:
+
+- v1:
+  `ecb362bce710d9e86d7813912b872762cafc01818710f09a633cbdf5a408b08f`;
+- v2:
+  `6095aca33419e0083436271d5b83b007a8528ec2076d4803e3fdcf2edbda262e`;
+- v3:
+  `1f0b4a4f2113fa54391ef287a58daf1535f4c4cbc37fd3107a35decd99d9cb5c`;
+- v4:
+  `6b9dd85aab3492498e107bb490d767b659c06505c49b3e0223a60a2e2c6f41a0`.
+
+The rejected review evidence is retained rather than rewritten:
+
+- v1 Kimi result
+  `83f42b8a79a85982bb1122b0aac505266856586a96f555ad49984df8adde0de6`,
+  manifest
+  `37b514cc6ae72b50e7fdfcbf9d8c5b3e421942deb83bdd5b54c326fb8eeafc6a`;
+- v1 Opus result
+  `88c9d0d6115dc686ac9a8cb5ae733ef06aa3bd9f93f768fb530acd817ab1755c`,
+  manifest
+  `31afa83fcd112baf16bf5825f8e928af6680ee7a2216136cc9c084e9c6d9ee04`;
+- v2 Kimi authoritative follow-up result
+  `5a181f625dd9914f67c2d3f7229fd5488cfa7a76c6a715dea19a7b6e90e29fab`,
+  manifest
+  `e666007f051ece4cb08f827da6e096c3e31eace7ae90d26d03962c2c63926c5a`;
+- v3 Kimi result
+  `bf2377c26bd27c5466f976351ae2c2bf6bf7c58fe6000cd6ed62d926bbf4c031`,
+  manifest
+  `bfa96f211df064238d5d6d2d80618d7e3535dd163bfb756c0ef4b1187132ac9f`;
+  and
+- v3 Opus result
+  `3566ba11936f500c3baeb0e4b9abcc45f7ff0aea2a09b2a5e12c486f83cc4e87`,
+  manifest
+  `5a5b38060307650ae0583f5cb048666be291cc8c9b7849a0ed460900af19a8ec`.
+
+Codex-high agreed that the direct-v2 v4 composite closed the identified
+implementation choices. Fresh Kimi 3/high/max-100 session
+`aacaec2f-68a3-4b78-86ad-4d81e4c37ac2` ratified it with result
+`20703251bab71d462052bf915fc8fb63efc6f9557f25825320daa0d8c1404255`
+and manifest
+`68a3ee0c0dc40aee3687e503b63e73b136bdd3c1b592823bb9288d7333ca42f2`.
+Fresh Opus session
+`cc459ea5-3f59-4415-ad3b-32b0013a8959` ratified it with result
+`cec2d137b7185689bd8b73015a14caba7fece8f343af188fe0cb917799b0f1c3`
+and manifest
+`20de04f0c0a6f6814667c8ab9edcda8dfeba3a46f6e5c27d0b035e7ec79f2a64`.
+That invocation requested `opus --effort xhigh`, reported effective
+`claude-opus-5`, and exposed the xhigh request only in the invoking flag, not
+an in-session effective-effort field. It used no helper, subagent, Fable, web,
+browser or edit tool. Its automatic Haiku metadata/title accounting was 2,942
+input and 20 output tokens only; no Haiku assistant review event occurred. Both
+final reviewers were fresh and read-only.
+
+A quarantined v1 recovery attempt used bare `--continue`, selected unrelated
+Phase 2g-c session `e5c22099-0b3c-45bf-b83b-ff64381d3155`, and emitted an
+unrelated `APPROVED`. It is preserved as recovery-error evidence and supplies
+no Phase 2h verdict. The authoritative v1 Kimi Phase 2h session was
+`c7792993-fed5-481d-884d-aa7b927cc7ba` and returned
+`CHANGES_REQUESTED`.
+
+These hashes authenticate the decision history but are not normative inputs.
+The merged text below is complete and executable without reading any untracked
+artifact.
+
+#### Nonblocking implementation clarifications
+
+The final Opus review ratified v4 and offered eight nonblocking strengthenings.
+S1 and S2 are stated directly in the merged contract below as clarifications
+already entailed by its pass state and marker grammar; they do not alter the
+frozen v4 meaning. Preserve the remaining implementation gotchas:
+
+- **S3:** the `overlong-identity` reason is a defensive validator branch. A
+  live basename that passed the 512-byte raw-name bound cannot decode above 507
+  bytes after removing `.json`; test the branch directly rather than claiming a
+  constructible live/raw-entry filename.
+- **S4:** the worked example's “unless another unique collision-free pass record
+  exists” clause is vacuous because a second attribution makes both bodies
+  duplicates. Its named mutant unconditionally leaves `capacity/webkit`
+  missing.
+- **S5:** Playwright `outputDir` must not be an ancestor of
+  `packages/storage-browser/test-results/phase-2h/<runId>/`; runner cleanup
+  must not erase global-setup evidence.
+- **S6:** consumers bind the aggregate's `gitSha` and `runId` to the current
+  invocation in addition to requiring its existence, so reused-worktree output
+  cannot be accepted as current.
+- **S7:** an expected structural directory absent at scan time is a fatal
+  finalization error. Missing records already fail closed; implementations
+  should diagnose the structural failure directly.
+- **S8:** `\0` in each diagnostic domain tag denotes exactly one byte
+  `0x00`, matching the explicit separators.
+
+#### Merged normative Phase 2h contract
+
+#### 1. Finite TDD decomposition
+
+2h-a — contract, validator, aggregation and dormant execution topology
+
+Add a closed schema-v1 per-tuple record, the mechanically derived 69-tuple registry below, a fail-closed validator/aggregate and focused Vitest controls over synthetic records. Controls cover hollow/inert input, missing, duplicate, extra, malformed, wrong engine/brand, wrong git SHA, wrong run ID, cross-run splicing, wrong scenario tag, wrong evidence tag, non-pass verdict, zero/insufficient/unbound heartbeat evidence and absent/invalid hard-kill evidence.
+
+The 2h-a RED uses an authorized inert campaign that emits no per-tuple record. Its aggregate must fail with all 69 tuple IDs in missingTupleIds and all 54 kill tuple IDs in missingKillPoints while the complete synthetic positive fixture passes and every named mutant is rejected. GREEN implements only registry/validator/aggregate/control infrastructure and closes no browser obligation.
+
+2h-a authors packages/storage-browser/playwright.protocol-v2.config.ts, the local asset server and a dedicated workflow. The workflow has workflow_dispatch only: no push or pull_request trigger, no required status and no automatic or merge-blocking execution. Its manual job invokes the package-local Playwright config directly, installs all three engines and uploads the aggregate, raw tuple artifacts and traces under an if: always() step even when the inert or partial campaign fails. 2h-a does not add a root e2e-test script.
+
+2h-b — three browser-surface scenarios
+
+Run crypto-digest, worker-responsiveness and browser-store once in each exact engine. crypto-digest is a same-realm WebCrypto SHA-256 known-answer check. worker-responsiveness uses the ready-gated real Phase 2f-c module-Worker workload and the thresholds in section 5. browser-store executes the production browser store's begin/stage, blob cache, promotion, completion, head swap, close, reopen and recovery path. It does not add the inherited reference vote CAS because Phase 5c owns the first production vote store/schema.
+
+2h-c — cross-engine capacity and representative quota
+
+Run capacity and quota-fault once in each exact engine. capacity retains the complete real inspectStorageCapability report, never calls persist and does not pin environmental quota or grant values. quota-fault is exactly the trace-derived swap-head-certificate-match/request-05-put-objects/settlement edge. Chromium's accepted 35-case matrix and genuine engine-generated quota control remain preserved Chromium evidence and are not relabelled cross-engine.
+
+2h-d — cross-engine process death
+
+Run all 54 process-death tuples derived in section 2. Every engine uses the same frozen Phase 2e6 semantic edge, trace and old-or-new image oracle. Every tuple proves the POSIX two-process-group death contract and records the per-engine arming measurement in section 7. Unsupported, skipped, timed-out, graceful-close, reported-browser-close or reduced-registry outcomes fail.
+
+2h-e — activation, preservation and closure
+
+Aggregate all 69 tuples from one invocation. Preserve and rerun proportionate 2e5/2e6/2e7/2f/2g evidence. Run storage-browser package typecheck/build, focused and package tests, traced nonempty scoped lint, format/diff checks, root build/tests/lint/typecheck with only explicitly recorded unrelated baselines, and the existing coverage gate without lowering a threshold or adding a zero-coverage allowlist entry.
+
+2h-e adds root script e2e-test:protocol-v2 pointing to the exact package-local config. It changes the dedicated workflow from workflow_dispatch-only to pull_request/merge-gated execution (workflow_dispatch may remain), so the fail-closed complete aggregate becomes a required merge gate only after every producer exists. Upload remains if: always(). Phase 2h closure does not claim Phase 2 closure; 2i, 2l and every other Phase 2 exit conjunct remain mandatory.
+
+#### 2. Exact engines and required 69-tuple registry
+
+Engine order is the frozen tuple [chromium, firefox, webkit]. Scenario order is [crypto-digest, worker-responsiveness, browser-store, capacity, quota-fault, process-death]. Engine means the Playwright desktop engine, not installed Safari, iOS Safari, Android Chrome/WebView or a real device.
+
+The five non-kill scenario IDs are exactly:
+
+crypto-digest
+worker-responsiveness
+browser-store
+capacity
+quota-fault
+
+Their exact 15 tuple IDs, in registry order, are:
+
+crypto-digest/chromium
+crypto-digest/firefox
+crypto-digest/webkit
+worker-responsiveness/chromium
+worker-responsiveness/firefox
+worker-responsiveness/webkit
+browser-store/chromium
+browser-store/firefox
+browser-store/webkit
+capacity/chromium
+capacity/firefox
+capacity/webkit
+quota-fault/chromium
+quota-fault/firefox
+quota-fault/webkit
+
+The kill registry is derived at runtime from PHASE_2E6_DECLARED_EDGES in its authoritative order; neither an independently authored edge array nor a handwritten count is accepted. At this contract HEAD, that source projects exactly these 18 ordered edge IDs:
+
+begin-generation-empty/request-02-put-generations/after
+begin-generation-empty/transaction-terminal-complete/after
+begin-generation-certificate-match/request-02-put-generations/after
+begin-generation-certificate-match/transaction-terminal-complete/after
+put-cached-blob-staged/request-03-add-blobs/after
+put-cached-blob-staged/transaction-terminal-complete/after
+promote-reference-staged/request-04-add-promotions/after
+promote-reference-staged/transaction-terminal-complete/after
+complete-generation-empty-recovery/request-05-put-generations/after
+complete-generation-empty-recovery/transaction-terminal-complete/after
+swap-head-certificate-match/request-04-put-generations/after
+swap-head-certificate-match/request-05-put-objects/after
+swap-head-certificate-match/transaction-terminal-complete/after
+swap-head-fresh-recovery/request-05-put-generations/after
+swap-head-fresh-recovery/request-06-put-objects/after
+swap-head-fresh-recovery/transaction-terminal-complete/after
+discard-generation-staged/request-02-put-generations/after
+discard-generation-staged/transaction-terminal-complete/after
+
+For each edge ID above, in that order, its three exact tuple IDs are `${edge.id}/chromium`, `${edge.id}/firefox`, `${edge.id}/webkit`, in that engine order. This mechanically and explicitly derives 18 x 3 = 54 kill tuple IDs. The final required registry is the 15 listed non-kill tuple IDs followed by those 54 derived kill tuple IDs, exactly 69 total. Runtime construction must assert the authoritative edge projection still equals the 18-edge contract projection before creating the cross-product; any drift fails and requires reviewed reslicing rather than silently changing the gate.
+
+For a process-death tuple, killPointId equals the exact authoritative Phase2e6InventoryEdge.id. killEdge equals the exact string `${edge.edge}:${edge.target}` and is therefore closed to after:request or after:transaction-terminal. For every non-kill tuple, killPointId and killEdge are both null. No other mapping or spelling is accepted.
+
+#### 3. Closed evidence primitives and source-owned types
+
+GitSha is exactly 40 lowercase hexadecimal characters and equals git rev-parse HEAD for the tested worktree. HexDigest is exactly 64 lowercase hexadecimal characters. RunId has exact syntax `phase-2h/<GitSha>/<lowercase UUID-v4>`.
+
+EvidenceImageDigest is a test-evidence checksum only, never a protocol ClosureDigest or registered wire domain. It is lowercase SHA-256 over UTF-8 stable JSON of the closed image: object keys recursively sorted, array order preserved and Uint8Array represented as an object with sole key bytes whose value is its integer byte array. The exact same serializer and digest routine owns every old/new/reopen/retry/recovered image checksum.
+
+StorageObjectId, GenerationId, ClosureDigest, HeadRevision, ExpectedHead, StorageCapabilityReport, PersistenceObservation and QuotaObservation mean the existing exported @ts-drp/storage source-of-truth types and must pass their existing parsers/closed validation when read from JSON. Serialized ExpectedHead is exactly either `{kind:"none",objectId}` or `{kind:"present",objectId,generationId,revision,closureDigest}` with no extra key. HeadRevision is a non-negative safe integer.
+
+Phase2gQuotaCaseEvidence, Phase2e6CaseEvidence and Phase2e6TraceEvent mean the existing test contract source-of-truth types in phase-2g-c-quota-fault-contract.ts and phase-2e6-real-process-death-contract.ts. Their existing validators remain authoritative and may not be replaced by a weaker 2h copy.
+
+BoundedText is a nonempty string of at most 1,024 UTF-8 bytes with no NUL or unpaired surrogate. BrowserVersion, UserAgent and OsRelease are BoundedText. NonNegativeSafeInteger and PositiveSafeInteger have their ordinary exact meanings. FiniteNonNegativeMilliseconds is a finite number >= 0.
+
+#### 4. Closed record, engine, OS/device and modes
+
+One complete validation record has exactly these top-level keys and no others:
+
+schemaVersion, artifactKind, gitSha, runId, tupleId, engine, os, device, scenario, killPointId, killEdge, webLocksMode, persistenceMode, hardKillEvidence, recoveredHead, fullClosureDigest, scenarioEvidence, verdict
+
+schemaVersion is 1. artifactKind is ts-drp/ahe-storage-validation-record/v1. tupleId is exactly one member of the derived registry. scenario is closed to crypto-digest | worker-responsiveness | browser-store | capacity | quota-fault | process-death and equals the scenario encoded by tupleId. verdict is pass | fail; only pass can satisfy the aggregate.
+
+engine has exactly `{name,brand,browserVersion,userAgent,playwrightVersion}`. name is chromium | firefox | webkit. brand is respectively Playwright Chromium | Playwright Firefox | Playwright WebKit and must agree with name and the tupleId suffix. browserVersion is BrowserVersion from browser.version(). userAgent is UserAgent read in the tested realm. playwrightVersion equals the exact installed root @playwright/test package version used by the invocation; at the proposal HEAD it is 1.61.1.
+
+os has exactly `{platform,arch,release}`. platform is linux | darwin, arch is x64 | arm64 and release is OsRelease. device has exactly `{class,profile,emulated}` where class is desktop-playwright, emulated is false and profile is Desktop Chrome for chromium, Desktop Firefox for firefox or Desktop Safari for webkit. Desktop WebKit and any desktop mobile emulation are not installed Safari, real Safari/iOS or real Chrome/Android evidence. Later real-device/release evidence requires a reviewed schema extension rather than being forced into v1.
+
+webLocksMode is available-not-used when navigator.locks exists and navigator.locks.request is callable in the tested same realm, otherwise unavailable. Phase 2h never calls request and never claims Locks-on coverage. For each engine, all records must agree with the capacity tuple's observed value.
+
+persistenceMode is granted | not-granted | unsupported | unavailable-exception | unavailable-invalid-response, the exact flattening of the capacity tuple's PersistenceObservation. Inspection never calls persist. Every record for one engine carries the same observed persistenceMode; values are recorded, not pinned.
+
+killPointId and killEdge obey section 2. hardKillEvidence is non-null exactly for process-death and is null otherwise. recoveredHead is non-null exactly for browser-store, quota-fault and process-death and is an ExpectedHead. It is null for crypto-digest, worker-responsiveness and capacity. fullClosureDigest is null when recoveredHead is null or recoveredHead.kind is none; when recoveredHead.kind is present it is a ClosureDigest exactly equal to recoveredHead.closureDigest. This conditional is the only nullable storage case and cannot hide an active closure.
+
+scenarioEvidence is required, non-null and exactly one tagged union variant from section 6 whose tag equals scenario. Any extra/missing field, wrong tag, invalid source-owned payload, failed threshold or inconsistent summary makes the record invalid. A runner failure that prevents a complete record yields a missing tuple plus raw Playwright failure evidence; the aggregate never fabricates a pass-shaped sentinel.
+
+#### 5. Ready protocol and responsiveness
+
+The sampler opens before Worker construction and closes only after the result message is accepted; windowMs is that measured span. A separate positive-control window blocks the main thread for 200 ms and must record controlBlockMs >= 200 and controlGapMs >= 150. Positive-control samples are excluded from workload maxGapMs.
+
+The workload uses a 5 ms target interval. It passes only when windowMs >= 100, sampleCount >= max(20, floor(windowMs / 25)) and maxGapMs < 50. Zero, insufficient, window-unbound or non-finite samples fail. Worker construction, ready and every repeated workload execution stay inside the measured workload window.
+
+Repetition follows one closed algorithm: repetitionCount starts at zero; after each accepted exact workload output it increments by one; if measured windowMs is still below 100, the page immediately submits the identical next workload without timer, sleep or authored idle delay; it stops at the first accepted output for which windowMs >= 100. More than 256 repetitions, any unequal output or any timeout fails. This is the deterministic derived back-to-back repetition required when one reference workload is faster than 100 ms. The evidence records repetitionCount, and total count/orderLength/items/workerCounter equal 4,097 \* repetitionCount. The main-thread oracle independently derives the repeated-sequence root and exact totals.
+
+The Worker posts `{protocol:"ts-drp/worker-host",version:1,kind:"ready"}` before the page posts run. Ready timeout is 10,000 ms, each result timeout is 30,000 ms and timeout cleanup terminates the Worker and fails. Exact repeated root/order/count/items/custody evidence is mandatory; timer-only, hollow, Window-executed, forged-counter and falsified-root mutants fail.
+
+#### 6. Required scenarioEvidence union
+
+crypto-digest has exactly:
+
+`{tag:"crypto-digest",vectorId:"sha-256/browser-utf8/v1",expectedDigestHex:HexDigest,observedDigestHex:HexDigest,sameRealm:boolean}`
+
+The vector bytes are UTF-8 `browser`; expectedDigestHex is exactly d4c3e8a11256ab82a4fc72560eb4a2b0e87bad820c290dd9b03616de240aa6db, observedDigestHex must equal it, sameRealm must be true and the digest must come from that page realm's crypto.subtle.
+
+worker-responsiveness has exactly:
+
+`{tag:"worker-responsiveness",controlBlockMs,controlGapMs,windowMs,sampleCount,targetIntervalMs,maxGapMs,readyProtocolVersion,repetitionCount,workloadOutputs}`
+
+The five time fields are FiniteNonNegativeMilliseconds; sampleCount is NonNegativeSafeInteger; targetIntervalMs is exactly 5; readyProtocolVersion is exactly 1; repetitionCount is PositiveSafeInteger <= 256. workloadOutputs has exactly `{root,orderLength,count,items,workerCounter,workerScope,pageCounter,pageScope}`. root is HexDigest. orderLength, count, items and workerCounter are PositiveSafeInteger and each exactly 4,097 \* repetitionCount. workerScope is DedicatedWorkerGlobalScope, pageCounter is exactly 0 and pageScope is Window. All section 5 controls and thresholds apply.
+
+browser-store has exactly:
+
+`{tag:"browser-store",operationSequence,allResults,reopened,recoveryKind,expectedState,recoveredImageDigest}`
+
+operationSequence is exactly [beginGeneration, putCachedBlob, promoteReference, completeGeneration, swapHead, close, reopen, recoverActiveGeneration]. allResults is OK, reopened is true, recoveryKind is active, expectedState is new and recoveredImageDigest is EvidenceImageDigest. recoveredHead must be present and fullClosureDigest must equal it.
+
+capacity has exactly:
+
+`{tag:"capacity",report}`
+
+report is the complete frozen StorageCapabilityReport returned by inspectStorageCapability, including the exact PersistenceObservation and QuotaObservation. persistenceMode must be its exact flattening. Environmental values are retained but never pinned. persist call count is structurally and behaviorally zero.
+
+quota-fault has exactly:
+
+`{tag:"quota-fault",edgeId,edgeTarget,expectedState,oldImageDigest,afterReopenImageDigest,newImageDigest,retryImageDigest,retryOutcome,caseEvidence}`
+
+edgeId is exactly swap-head-certificate-match/request-05-put-objects/settlement, edgeTarget is settlement, expectedState is old, all four image fields are EvidenceImageDigest, retryOutcome is OK and caseEvidence is Phase2gQuotaCaseEvidence accepted by phase2gQuotaCaseErrors for that exact derived edge. oldImageDigest equals afterReopenImageDigest; newImageDigest differs from oldImageDigest; retryImageDigest equals newImageDigest. recoveredHead is the old present head and fullClosureDigest equals it.
+
+process-death has exactly:
+
+`{tag:"process-death",edgeId,edgeTarget,expectedState,armReachCount,tracePrefixLength,recoveredImageDigest,caseEvidence}`
+
+edgeId equals killPointId. edgeTarget is request | transaction-terminal and matches the authoritative edge. expectedState is old exactly for request and new exactly for transaction-terminal. armReachCount is exactly 1. tracePrefixLength is PositiveSafeInteger and equals caseEvidence.tracePrefix.length. recoveredImageDigest is EvidenceImageDigest of caseEvidence.recoveredImage. caseEvidence is Phase2e6CaseEvidence accepted by the existing Phase 2e6 validator, has edgeId, expectedState, armReachCount, unsupported:false and the exact authoritative trace prefix. recoveredHead/fullClosureDigest obey section 4.
+
+#### 7. Exact process-death and WebKit arming evidence
+
+HardKillEvidence has exactly `{mechanism,processForestCommand,browserRootLocator,contentProcessClass,armingMeasurement,caseEvidence}`.
+
+mechanism is posix-two-pgid-sigstop-sigkill/v1. processForestCommand is exactly `LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=`. browserRootLocator is profile-and-executable-argument-match. contentProcessClass is chromium-renderer for chromium, firefox-contentproc for firefox or webkit-webcontent for webkit. caseEvidence is the same Phase2e6CaseEvidence object carried in process-death scenarioEvidence, not a second independently authored summary.
+
+All engines use the identical ratified POSIX mechanism: capture the complete process forest; prove unique child and browser roots leading two distinct PGIDs outside the controller; prove the browser root matches the fresh profile and executable; prove at least one owned engine content process using only the declared class predicate (Chromium command contains renderer, Firefox contains contentproc, WebKit contains WebContent or WebKitWebProcess); SIGSTOP and identity-pin the child group; SIGSTOP and revalidate the browser group; freeze the exact current owned union; SIGKILL the browser PGID first and child PGID second without resume, delay or graceful API; require child exit `{code:null,signal:"SIGKILL"}`; require both negative-PGID probes to return ESRCH; and prove every frozen pid/birthToken is absent or has a different birthToken. No other engine-equivalent substitute is admissible.
+
+Before the 54-tuple campaign, 2h-d runs one bounded arming measurement per engine at probe edge swap-head-certificate-match/request-05-put-objects/after. ArmingMeasurement has exactly:
+
+`{schemaVersion,mechanism,engine,probeEdgeId,outcome,workerCrossOriginIsolated,workerScope,armHitCount,cellAtHit,blockedForMs,transactionTerminalWhileBlocked,notifyWoken,finalCellValue,transactionTerminalAfterResume,detail}`
+
+schemaVersion is 1. mechanism is idb-success-callback-sab-atomics-wait/v1. engine is chromium | firefox | webkit and matches the record engine. probeEdgeId is the fixed edge above. outcome is supported | unsupported | failed. workerCrossOriginIsolated is boolean. workerScope is DedicatedWorkerGlobalScope | unreached. armHitCount is NonNegativeSafeInteger. cellAtHit is 1 | null. blockedForMs is FiniteNonNegativeMilliseconds. transactionTerminalWhileBlocked is boolean | null. notifyWoken is 1 | null. finalCellValue is 2 | null. transactionTerminalAfterResume is complete | abort | null. detail is null or BoundedText.
+
+The only passing shape is outcome:supported, workerCrossOriginIsolated:true, workerScope:DedicatedWorkerGlobalScope, armHitCount:1, cellAtHit:1, blockedForMs>=100, transactionTerminalWhileBlocked:false, notifyWoken:1, finalCellValue:2, transactionTerminalAfterResume:complete and detail:null. The three engine measurements are retained verbatim; every process-death record for an engine carries byte-identical armingMeasurement evidence.
+
+If an engine records unsupported or failed, 2h-d stops before claiming its campaign. The resolution is a fresh correction quorum naming an alternative arming mechanism with the same 18 semantic edges, exact trace prefixes, POSIX death proof and old/new image oracle. It is never a skip, graceful close, unsupported pass or reduced registry.
+
+#### 8. Aggregate, run binding, diagnostic identity and output ownership — v4 replacement
+
+8.1 Closed output topology, traversal and finite bounds
+
+The RunId output root is exactly `packages/storage-browser/test-results/phase-2h/<runId>/`. Global setup creates that previously absent directory with create-only semantics, then creates `records`, `collisions` and all six project directories `records/<project>` and `collisions/<project>` for the three exact projects `chromium`, `firefox` and `webkit`. Existing RunId output is a fatal setup error and is never reused. The RunId directory, records, collision markers and aggregate are ignored execution evidence and are never checked in.
+
+The only valid layout below the RunId output root is:
+
+records/chromium/<record-name>
+records/firefox/<record-name>
+records/webkit/<record-name>
+collisions/chromium/<collision-name>
+collisions/firefox/<collision-name>
+collisions/webkit/<collision-name>
+
+The aggregate owner enumerates the nine scopes in this exact order: `run-root`, `records-root`, `collisions-root`, `records/chromium`, `records/firefox`, `records/webkit`, `collisions/chromium`, `collisions/firefox`, `collisions/webkit`. Within each scope it enumerates immediate entries by raw filename bytes in ascending unsigned bytewise order, uses lstat without following symlinks and never recurses below an unexpected entry.
+
+At `run-root`, only real directories named exactly `records` and `collisions` are structural entries. At `records-root` and `collisions-root`, only real directories named exactly `chromium`, `firefox` and `webkit` are structural entries. A wrong structural name at any of those three scopes is attributed with that scope and reason `wrong-layout`, regardless of its entry kind, and is not traversed. An expected structural name whose entry is not a real directory is attributed with that scope and reason `nonregular`. Inside a project scope, a directory uses reason `subdirectory`; a symlink, socket, FIFO or other non-regular entry uses `nonregular`. This precedence makes every unexpected entry directly under the RunId root attributable to scope `run-root` without inference.
+
+Entries in `collisions/<project>` are validated only under section 8.5's collision-marker grammar, never under section 8.3's record filename/body grammar. A valid marker contributes no `extra-sha256` identity to extraTupleIds; every marker filename/body defect is attributed exactly by the bounded `invalid-collision-marker` fallback.
+
+One record body is at most 4,194,304 bytes. One raw entry basename is at most 512 bytes. One decoded identity is at most 512 UTF-8 bytes. At most 512 record submissions and at most 1,024 non-structural immediate filesystem entries are processed. The eight exact structural directories do not consume the 1,024-entry allowance. The global entry allowance is consumed in the scope and byte order above. On the 1,025th non-structural entry, the owner emits exactly one `directory-entry-bound` fallback owned by scope `run-root`, stops the entire scan and never hashes, embeds or logs skipped names or bodies. The parent processes record submissions serially in receive order; on the 513th attempt it emits exactly one `record-attempt-bound` fallback owned by scope `run-root`, rejects that and all later attempts, and never hashes, embeds or logs their bodies. These limits do not change the required 69-tuple registry.
+
+8.2 Closed diagnostic identity type and frozen hashes
+
+RequiredTupleId is exactly one of section 2's 69 registry strings.
+
+DiagnosticIdentity is the disjoint ASCII union:
+
+1. a raw RequiredTupleId;
+2. `extra-sha256:<HexDigest>`; or
+3. `entry-<EntryReason>-sha256:<HexDigest>`.
+
+EntryReason is closed to:
+
+wrong-layout | subdirectory | nonregular | overlong-name | invalid-name-utf8 | nonascii-encoded-name | wrong-extension | malformed-percent | invalid-identity-utf8 | empty-identity | overlong-identity | invalid-collision-marker | record-attempt-bound | directory-entry-bound
+
+Every DiagnosticIdentity is ASCII, contains at most 160 bytes and cannot collide textually with a RequiredTupleId because the registry contains neither reserved prefix `extra-sha256:` nor `entry-`. No literal raw filename, malformed body value, exception text or other attacker-controlled unbounded string is a fallback identity.
+
+For a successfully decoded nonempty bounded identity string D that is not a RequiredTupleId, its identity is:
+
+`extra-sha256:` + lowercase SHA-256(UTF-8 `ts-drp/phase-2h-diagnostic-extra/v1\0` || UTF-8(D)).
+
+For an entry that cannot yield D, its identity is:
+
+`entry-<reason>-sha256:` + lowercase SHA-256(UTF-8 `ts-drp/phase-2h-diagnostic-entry/v1\0` || UTF-8(reason) || byte 0x00 || UTF-8(scope) || byte 0x00 || raw basename bytes).
+
+scope is exactly `run-root`, `records-root`, `collisions-root`, `records/chromium`, `records/firefox`, `records/webkit`, `collisions/chromium`, `collisions/firefox` or `collisions/webkit`.
+
+Both bound-overflow identities use this exact preimage and no other:
+
+UTF-8 `ts-drp/phase-2h-diagnostic-entry/v1\0` || UTF-8(reason) || byte 0x00 || UTF-8(`run-root`) || byte 0x00 || UTF-8(RunId)
+
+For them, reason is respectively `record-attempt-bound` or `directory-entry-bound`, scope is exactly `run-root`, RunId is encoded as UTF-8, and the component order and 0x00 separators above are normative. They never include skipped names, bodies, counts or arrival timestamps. SHA-256 collision or two entries resolving to one DiagnosticIdentity is treated as a duplicate and fails; no normalization or repair splits it.
+
+8.3 Exact record filename decoding, canonicalization and portable controls
+
+A record-name is canonically `encodeURIComponent(tupleId) + ".json"`, where encodeURIComponent is the ECMAScript algorithm and its percent hex digits are uppercase. The raw basename must be byte-for-byte ASCII equal to that result.
+
+Attribution is performed from the filename, never the untrusted body tupleId:
+
+1. Apply the structural and entry-kind precedence in section 8.1 using lstat without following the entry.
+2. Reject a raw basename longer than 512 bytes as `overlong-name`. Decode the raw basename as UTF-8 with fatal error handling and reject malformed bytes as `invalid-name-utf8`. A successfully decoded basename containing a non-ASCII scalar is `nonascii-encoded-name` because canonical encodeURIComponent output is ASCII.
+3. Require the raw basename to end in the exact final lowercase suffix `.json`. A missing suffix, different-case suffix, percent-encoded suffix or trailing material such as `.json.bak` is `wrong-extension`. Strip exactly the final `.json`. Dots are allowed in the remaining stem; for example, a canonical extra identity whose stem contains a dot, including `name.part.json`, is not rejected merely for that dot.
+4. Percent-decode the stem exactly once. Each `%` must be followed by two ASCII hexadecimal digits. Hex digits of either case are accepted for decoding, but canonical re-encoding remains uppercase. Interpret percent bytes as UTF-8 with fatal error handling and require Unicode scalar values; malformed percent syntax is `malformed-percent` and invalid UTF-8 or a surrogate encoding is `invalid-identity-utf8`.
+5. The decoded identity must be nonempty and at most 512 UTF-8 bytes; otherwise use `empty-identity` or `overlong-identity`. No NFC/NFD normalization, locale transform, path normalization or case folding occurs. Literal identity characters and registry membership are code-point and case exact.
+6. Compute DiagnosticIdentity from the decoded filename identity: the raw RequiredTupleId when it is a registry member, otherwise `extra-sha256`. Re-encode the decoded identity with encodeURIComponent and append `.json`. If the result is not byte-for-byte the raw basename, the entry is invalid but remains attributed to that decoded DiagnosticIdentity. Consequently lowercase percent hex, double encoding, unnecessary percent escapes and unescaped Unicode cannot become canonical aliases.
+7. A canonical record path also requires that the RequiredTupleId's engine suffix equals its project directory. A wrong project is invalid and attributed to the filename identity.
+
+For the concrete mismatch `records/webkit/capacity%2Fwebkit.json` whose body says `capacity/chromium`, diagnostic identity is `capacity/webkit`; `capacity/webkit` is invalid and missing unless another unique collision-free pass record exists. The untrusted body claim never attributes an error to `capacity/chromium`.
+
+Filename controls that a supported host filesystem cannot represent use synthetic raw directory entries at the same raw-entry scanner seam. This includes invalid UTF-8 bytes, basenames above the host NAME_MAX limit, case-distinct siblings on a case-insensitive volume and NFC/NFD-distinct siblings on a normalization-insensitive Darwin volume. Live-filesystem controls use only names that the mounted filesystem can represent. Neither path skips a control or changes scanner semantics; the seam is the unit boundary for impossible filename fixtures, not a claim that every supported filesystem can create them.
+
+8.4 Body parsing, valid-record membership and attribution
+
+Only after filename attribution succeeds does the owner read a bounded regular file. Read failure, empty body, overlong body, fatal UTF-8 failure, invalid JSON, JSON null/array/primitive, missing tupleId, non-string tupleId, malformed tupleId, filename/body mismatch, extra/missing closed key, wrong schema/evidence or any v2 validator failure makes the entry invalid under its filename DiagnosticIdentity.
+
+The body tupleId must equal the decoded filename identity exactly and must be a RequiredTupleId. A registry-nonmember filename is always in extraTupleIds and invalidRecordIds even when its body repeats the same nonmember string. A malformed body is never embedded in the aggregate.
+
+A valid canonical record is exactly one complete closed v2 validation record at a canonical project-scoped filename whose filename identity, body tupleId, engine/project, GitSha, RunId, scenario and evidence all validate, whose verdict is `pass`, and whose DiagnosticIdentity has exactly one attributed entry/submission and no valid collision marker. Only valid canonical records enter aggregate `records`.
+
+A complete record whose verdict is `fail` is invalid: it never enters `records`, its DiagnosticIdentity enters invalidRecordIds, and its RequiredTupleId remains in missingTupleIds and, when it is a kill member, in missingKillPoints. If an identity has a second attributed entry/submission or a valid collision marker, every body for that identity, including the first otherwise-pass body, is invalid and excluded from `records`; a required identity remains missing and a required kill identity remains a missing kill point. This disposition is independent of which bytes were published first.
+
+8.5 Observable duplicates without overwrite
+
+The single parent output owner receives bounded record envelopes from all projects and owns publication. Each envelope carries the trusted submitting project assigned by the Playwright project. The owner always publishes beneath that submitting project's `records/<project>` directory; it never chooses a directory from the untrusted body, claimed engine or tuple suffix. A mismatch is retained for the section 8.3 project/body checks. The owner maintains only a bounded per-invocation attempt census keyed by DiagnosticIdentity; this is not a journal and is discarded after finalization.
+
+The first canonical attempt uses create-only O_CREAT|O_EXCL publication at its submitting-project-scoped record path. It never overwrites. A second submission for the same DiagnosticIdentity, an EEXIST result, two directory entries attributed to the same DiagnosticIdentity, or a valid collision marker makes that identity a duplicate and invalid under section 8.4.
+
+A submission accepted by the parent and the single file that submission publishes are one logical attribution. An identity is a duplicate exactly when one of the four triggers in the preceding sentence occurs; the census receipt and its own successfully published file are never summed into two attributions.
+
+On a second submission or EEXIST, the owner creates at most one marker using O_CREAT|O_EXCL beneath the submitting project's directory at:
+
+`collisions/<project>/<lowercase SHA-256(UTF-8(DiagnosticIdentity))>.collision.json`
+
+The marker digest filename is exactly 64 lowercase hexadecimal characters. The collision marker is a closed object with exactly `{schemaVersion:1,artifactKind:"ts-drp/ahe-storage-validation-collision/v1",gitSha,runId,project,diagnosticIdentity}`. project is chromium | firefox | webkit and must match the directory. diagnosticIdentity is the bounded type in section 8.2 and its hash must match the filename. A preexisting valid marker already proves duplication and is not overwritten. An invalid marker is attributed by the bounded `invalid-collision-marker` fallback. If marker publication itself fails, the parent's bounded attempt census still places the duplicated identity in duplicateTupleIds and invalidRecordIds before the aggregate is serialized.
+
+Thus a duplicate attempt can never replace the first body or leave one valid file with a pass-shaped aggregate. At most one record and one collision marker exist for one identity/project, and the 512-attempt bound prevents an unbounded collision log.
+
+8.6 Directory disposition and deterministic arrays
+
+The owner scans only the exact layout in section 8.1. Structural-name, wrong-extension, subdirectory and nonregular errors receive the exact scoped fallback identity defined above. An undecodable percent escape, empty decoded stem, invalid UTF-8/surrogate or overlong basename/identity receives the exact reason in sections 8.2-8.3. Invalid JSON/non-object and every body tupleId defect remain attributed by the successfully decoded filename DiagnosticIdentity. No invalid input is copied into `records`.
+
+The five arrays have distinct closed element types:
+
+missingTupleIds: sorted unique RequiredTupleId[]
+missingKillPoints: sorted unique RequiredTupleId[] restricted to the 54 kill members
+duplicateTupleIds: sorted unique DiagnosticIdentity[]
+extraTupleIds: sorted unique `extra-sha256:<HexDigest>`[]
+invalidRecordIds: sorted unique DiagnosticIdentity[]
+
+Sorting is ascending unsigned UTF-8 byte order, never locale order. missingTupleIds contains each required member with zero valid canonical record under section 8.4. missingKillPoints is the same set difference restricted to required kill members. duplicateTupleIds contains every identity with two or more attributed record entries/submissions or a valid collision marker. extraTupleIds contains every successfully decoded bounded filename identity that is not a registry member. invalidRecordIds contains every identity with any invalid entry, verdict `fail`, collision or failed v2 validation. One identity may correctly appear in more than one diagnostic array.
+
+The overflow identities are additional bounded diagnostics, not RequiredTupleIds. They enter invalidRecordIds and make verdict fail; the corresponding bound may also leave required members missing because omitted entries/attempts never become records. Arrays are bounded by at most the 69 required identities, at most the 512 processed attempt identities, at most the 1,024 processed entry identities and exactly the two possible global overflow identities, with sort/dedup applied. No per-scope overflow fan-out occurs.
+
+8.7 Aggregate schema, RunId binding and fail-closed finalization
+
+Global setup generates RunId once, passes the same RunId and GitSha to all projects and creates no pass-shaped record. After the RunId root exists, the final aggregate owner writes `packages/storage-browser/test-results/phase-2h/ahe-storage-validation.json` during finalization even for a failed or partial Playwright invocation. It consumes only that fresh RunId layout. Missing launches/attempts stay missing.
+
+If the invocation fails before global setup creates a RunId root, no aggregate for that invocation is written. The manual 2h-a workflow and every later aggregate consumer require the current invocation's aggregate to exist and hard-fail an absent artifact; they never substitute a previous output, an empty object or a pass-shaped sentinel. Once the RunId root exists, setup or execution failure does not excuse finalization: the owner writes the closed failing aggregate if the process remains able to finalize. A process death that prevents finalization leaves no current aggregate and therefore fails the consumer.
+
+The aggregate retains exactly v2's closed keys:
+
+schemaVersion, artifactKind, gitSha, runId, requiredTupleIds, records, missingTupleIds, duplicateTupleIds, extraTupleIds, invalidRecordIds, missingKillPoints, verdict
+
+schemaVersion, artifactKind, GitSha, RunId and requiredTupleIds retain v2 semantics. `records` contains only valid canonical records under section 8.4, in requiredTupleIds order. Malformed, extra, non-pass, collided and otherwise invalid bodies are represented only by the bounded diagnostic arrays and never embedded. The aggregate passes only when all 69 required records occur exactly once, all are valid with verdict `pass`, every record shares aggregate GitSha/RunId, and all five arrays are empty. It fails otherwise.
+
+8.8 Focused 2h-a diagnostic mutants
+
+In addition to v2's existing controls, focused tests freeze these exact dispositions without broad fuzzing:
+
+- canonical filename/body match passes attribution;
+- `capacity%2Fwebkit.json` with body `capacity/chromium`, absent tupleId, non-string tupleId and malformed tupleId all attribute invalidity to `capacity/webkit` and leave that required member missing;
+- a complete `verdict:fail` record is absent from `records`, is invalid, and leaves its required and, when applicable, kill identity missing;
+- a duplicate or valid collision marker invalidates and removes the first otherwise-pass body, leaves the required identity missing, and populates duplicateTupleIds and invalidRecordIds;
+- canonical registry-nonmember filename/body yields one extra-sha256 identity in extraTupleIds and invalidRecordIds, never a raw unbounded string;
+- invalid JSON, null, array and primitive bodies attribute to the decoded filename identity and never enter records;
+- `%zz.json`, `.json`, fatal raw-name UTF-8, percent-encoded invalid UTF-8/surrogate, >512-byte basename and >512-byte decoded identity produce their exact bounded entry reason identities;
+- `.JSON`, `.json.bak`, an unexpected RunId-root entry, an unexpected structural-root entry, a nested project directory, symlink and FIFO produce the exact scoped wrong-extension, wrong-layout, subdirectory or nonregular identities without recursion/following;
+- a dotted stem ending in the one final lowercase `.json` is not rejected merely for the dot;
+- lowercase `%2f`, unnecessary percent escapes, double encoding and direct Unicode spelling are noncanonical, attributed deterministically and rejected; literal case and NFC/NFD-distinct extras remain distinct with no normalization;
+- filesystem-impossible filename cases run through the raw-entry seam on case/normalization-insensitive Darwin or NAME_MAX-limited volumes and have the same disposition as representable live entries;
+- canonical plus noncanonical aliases decoding to one identity populate duplicateTupleIds and invalidRecordIds and exclude all bodies;
+- a second create-only submission publishes under the submitting project, creates one lowercase-digest collision marker, preserves the first record bytes and makes aggregate verdict fail;
+- cross-project, 513-attempt and 1,025-entry controls freeze submitting-project ownership, exact global overflow identities, scope traversal and global-cap ownership;
+- an overwrite-on-EEXIST mutant, ignored-collision-marker mutant, body-owned-attribution mutant, literal-filename fallback mutant, locale-sort mutant and malformed-body-in-records mutant all fail.
+
+#### 9. Config, server, CI, coverage and timing truth
+
+The config is packages/storage-browser/playwright.protocol-v2.config.ts. packages/storage-browser/tsconfig.json includes it and packages/storage-browser/tsconfig.build.json excludes it exactly like the 2e5/2e6/2e7 configs. The three projects are exactly chromium/firefox/webkit, fullyParallel:false, workers:1, retries:0 and trace:retain-on-failure. Fixed ready/result/test/global timeouts fail rather than hang. The local server binds 127.0.0.1 only, uses no public relay/network and sends COOP same-origin, COEP require-corp, CORP same-origin and Cache-Control no-store. Traversal, absolute, unknown, unrevoked-token and realpath-escape requests fail closed.
+
+2h-a's workflow is manual-only workflow_dispatch, invokes the config directly and uploads aggregate/records/traces under if:always even when the job fails. It is neither automatic nor a merge gate. 2h-e adds the root script and pull_request required-gate activation only after 2h-b/c/d producers exist.
+
+Focused Vitest tests exercise registry/validator/aggregate logic; because test fixtures are excluded from lcov, they are not falsely claimed as production source coverage. Playwright execution is not represented as Vitest coverage. No threshold is lowered, no ignore directive is added and no zero-coverage allowlist entry is added.
+
+Fast-check is not useful for finite browser/process orchestration. It is already a dev dependency and may be used only for pure validator-record mutation with a fixed logged seed, at most 300 runs and at most 3 seconds. It may not replace the exact registry, named mutants or real browser/process evidence.
+
+During 2h-a RED, before adding `packages/storage-browser/playwright.protocol-v2.config.ts`, and again after adding it, run the same root Vitest coverage collection command with the same Node, pnpm, Vitest and coverage-provider versions. Preserve a concise log containing the exact command and versions, Git/worktree identity, aggregate lcov `LF` and `LH` totals, configured line threshold, the `SF`/`LF` entry for that exact package-root config when present, and the arithmetic before/after denominator delta. The after sample must demonstrate that the package-root config is inside the existing `packages/**/*.{ts,tsx}` denominator while test fixtures remain excluded. A missing measurement, hidden source exclusion or unexplained delta fails 2h-a. No coverage threshold is lowered, no ignore directive is added, and no zero-coverage allowlist entry is added.
+
+No heartbeat-gap distribution is added to the closed `scenarioEvidence`, aggregate schema or acceptance predicate. If a later measured CI breach shows that the already-closed responsiveness thresholds need diagnosis, a correction quorum may authorize one optional bounded debug attachment. Such an attachment is non-normative telemetry, cannot turn a failure into a pass and is not added speculatively.
+
+#### 10. Truthful boundaries and stop conditions
+
+The current v1 engine vocabulary is desktop Playwright regression evidence only. Real Safari/macOS, Safari/iOS, Chrome/Android, current/previous release currency, private/incognito, eviction, page lifecycle, Web Locks on/off, multitab voting and durable issuance remain with their named later owners/release gates. Any later attempt to add those records requires a reviewed schema extension rather than overloading a v1 value.
+
+Phase 2h adds no vote schema, signing eligibility, receipt, pin, release, cleanup/deletion, private-mode inference, persistence request, relaxed durability, legacy/plain ID, public network dependency or production fault hook. Optional Phase 0n numeric expansion remains after the golden paths. A measured unsupported strict-durability or arming capability is a genuine fail/find-and-reslice outcome, never a hidden fallback.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
