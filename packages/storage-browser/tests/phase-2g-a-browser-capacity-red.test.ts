@@ -105,7 +105,10 @@ describe("Phase 2g-a sole no-argument browser capacity binding RED", () => {
 			});
 			fs.writeFileSync(
 				path.join(storagePackage, "index.d.ts"),
-				`export interface AheDurableStore { close(): Promise<void> }
+				`// Exact Phase 2g-b shape is frozen by phase-2g-b-presence-red.test.ts.
+export interface BlobExistencePort {}
+
+export interface AheDurableStore { close(): Promise<void> }
 export type StorageCapacityPort = Readonly<{
 	persisted?: () => unknown;
 	persist?: () => unknown;

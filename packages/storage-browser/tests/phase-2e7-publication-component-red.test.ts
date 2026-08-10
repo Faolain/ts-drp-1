@@ -73,7 +73,10 @@ function writeKnownGoodStoragePackage(consumerDirectory: string): void {
 	});
 	fs.writeFileSync(
 		path.join(packageDirectory, "index.d.ts"),
-		`export interface AheDurableStore {
+		`// Exact Phase 2g-b shape is frozen by phase-2g-b-presence-red.test.ts.
+export interface BlobExistencePort {}
+
+export interface AheDurableStore {
 	readonly capabilities: Readonly<{
 		durability: "ephemeral" | "strict";
 		signingEligibility: "never" | "backend-capability-required";
