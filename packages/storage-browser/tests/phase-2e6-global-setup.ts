@@ -36,7 +36,7 @@ export default async function globalSetup(): Promise<() => void> {
 	});
 	fs.writeFileSync(
 		path.join(assetDirectory, "phase-2e6.html"),
-		'<!doctype html><meta charset="utf-8"><script type="module" src="/phase-2e6-real-process-death.js"></script>',
+		'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2e6-real-process-death.js"></script>',
 		"utf8"
 	);
 	process.env.PHASE_2E6_ASSET_DIR = assetDirectory;

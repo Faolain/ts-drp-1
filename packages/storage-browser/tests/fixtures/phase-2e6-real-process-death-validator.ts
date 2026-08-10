@@ -171,6 +171,56 @@ function expectedWrites(edge: Phase2e6DeclaredEdge): number {
 }
 
 /**
+ * Applies the existing source-owned oracle to one declared process-death edge.
+ * @param edge - Exact derived Phase 2e6 edge.
+ * @param observed - One complete case-evidence payload.
+ * @returns Every fail-closed case mismatch.
+ */
+export function phase2e6CaseErrors(edge: Phase2e6DeclaredEdge, observed: Phase2e6CaseEvidence): readonly string[] {
+	const errors: string[] = [];
+	const row = PHASE_2E5_BROWSER_REQUEST_INVENTORY.find(({ id }) => id === edge.scenarioId);
+	if (row === undefined) throw new TypeError(`unknown scenario: ${edge.scenarioId}`);
+	if (observed.edgeId !== edge.id) errors.push(`${edge.id}: wrong edge evidence`);
+	if (observed.scenarioOperation !== row.operation) errors.push(`${edge.id}: wrong adapter operation`);
+	if (!observed.workerRealm || !observed.workerCrossOriginIsolated) errors.push(`${edge.id}: invalid Worker isolation`);
+	if (!observed.reachedRequestedArm || observed.armReachCount !== 1 || observed.unsupported)
+		errors.push(`${edge.id}: requested arm absent/duplicate/unsupported`);
+	if (stable(observed.tracePrefix) !== stable(phase2e6ExpectedTracePrefix(edge)))
+		errors.push(`${edge.id}: trace prefix mismatch`);
+	if (observed.childExit.code !== null || observed.childExit.signal !== "SIGKILL")
+		errors.push(`${edge.id}: child was not SIGKILLed`);
+	errors.push(...processErrors(observed).map((error) => `${edge.id}: ${error}`));
+	if (
+		!observed.databaseIdentityPreserved ||
+		observed.databaseName !== observed.recoveredDatabaseName ||
+		observed.databaseDeleteCount !== 0 ||
+		observed.databaseCreateCountAfterSeed !== 0
+	)
+		errors.push(`${edge.id}: database deletion/recreation`);
+	if (!observed.sentinelRetained || observed.recoveryResult !== "OK")
+		errors.push(`${edge.id}: recovery/sentinel missing`);
+	if (observed.writeRequestCount !== expectedWrites(edge) || observed.writeRequestCount === 0)
+		errors.push(`${edge.id}: reached write count mismatch`);
+	if (observed.operationTransactionCount !== 1) errors.push(`${edge.id}: two-transaction operation`);
+	const state = edge.target === "request" ? "old" : "new";
+	if (
+		observed.expectedState !== state ||
+		stable(observed.recoveredImage) !== stable(phase2e6OracleImages(edge.scenarioId)[state])
+	)
+		errors.push(`${edge.id}: independent image oracle mismatch`);
+	if (row.operation === "swapHead") {
+		if (
+			observed.head.kind !== "swap" ||
+			!observed.head.monotone ||
+			observed.head.recovered !== (state === "old" ? observed.head.old : observed.head.new)
+		)
+			errors.push(`${edge.id}: swap head/closure XOR failed`);
+	} else if (observed.head.kind !== "unchanged" || observed.head.recovered !== observed.head.old)
+		errors.push(`${edge.id}: non-swap head changed`);
+	return Object.freeze(errors);
+}
+
+/**
  * Applies the complete process, image, recovery, and control oracle.
  * @param evidence - Closed campaign evidence.
  * @returns Every fail-closed acceptance error.
@@ -184,45 +234,7 @@ export function phase2e6CampaignErrors(evidence: Phase2e6CampaignEvidence): read
 	for (const edge of PHASE_2E6_DECLARED_EDGES) {
 		const observed = evidence.cases.find(({ edgeId }) => edgeId === edge.id);
 		if (observed === undefined) continue;
-		const row = PHASE_2E5_BROWSER_REQUEST_INVENTORY.find(({ id }) => id === edge.scenarioId);
-		if (row === undefined) throw new TypeError(`unknown scenario: ${edge.scenarioId}`);
-		if (observed.scenarioOperation !== row.operation) errors.push(`${edge.id}: wrong adapter operation`);
-		if (!observed.workerRealm || !observed.workerCrossOriginIsolated)
-			errors.push(`${edge.id}: invalid Worker isolation`);
-		if (!observed.reachedRequestedArm || observed.armReachCount !== 1 || observed.unsupported)
-			errors.push(`${edge.id}: requested arm absent/duplicate/unsupported`);
-		if (stable(observed.tracePrefix) !== stable(phase2e6ExpectedTracePrefix(edge)))
-			errors.push(`${edge.id}: trace prefix mismatch`);
-		if (observed.childExit.code !== null || observed.childExit.signal !== "SIGKILL")
-			errors.push(`${edge.id}: child was not SIGKILLed`);
-		errors.push(...processErrors(observed).map((error) => `${edge.id}: ${error}`));
-		if (
-			!observed.databaseIdentityPreserved ||
-			observed.databaseName !== observed.recoveredDatabaseName ||
-			observed.databaseDeleteCount !== 0 ||
-			observed.databaseCreateCountAfterSeed !== 0
-		)
-			errors.push(`${edge.id}: database deletion/recreation`);
-		if (!observed.sentinelRetained || observed.recoveryResult !== "OK")
-			errors.push(`${edge.id}: recovery/sentinel missing`);
-		if (observed.writeRequestCount !== expectedWrites(edge) || observed.writeRequestCount === 0)
-			errors.push(`${edge.id}: reached write count mismatch`);
-		if (observed.operationTransactionCount !== 1) errors.push(`${edge.id}: two-transaction operation`);
-		const state = edge.target === "request" ? "old" : "new";
-		if (
-			observed.expectedState !== state ||
-			stable(observed.recoveredImage) !== stable(phase2e6OracleImages(edge.scenarioId)[state])
-		)
-			errors.push(`${edge.id}: independent image oracle mismatch`);
-		if (row.operation === "swapHead") {
-			if (
-				observed.head.kind !== "swap" ||
-				!observed.head.monotone ||
-				observed.head.recovered !== (state === "old" ? observed.head.old : observed.head.new)
-			)
-				errors.push(`${edge.id}: swap head/closure XOR failed`);
-		} else if (observed.head.kind !== "unchanged" || observed.head.recovered !== observed.head.old)
-			errors.push(`${edge.id}: non-swap head changed`);
+		errors.push(...phase2e6CaseErrors(edge, observed));
 	}
 	if (evidence.staleExpectedRevision !== "HEAD_CONFLICT") errors.push("stale expected revision did not conflict");
 	if (

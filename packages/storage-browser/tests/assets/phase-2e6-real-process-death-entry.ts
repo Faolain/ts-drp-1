@@ -288,7 +288,7 @@ function observeWorker(
 	databaseName = `phase-2e6-red-${crypto.randomUUID()}`
 ): Promise<WorkerObservation> {
 	return new Promise((resolve, reject) => {
-		const worker = new Worker("/phase-2e6-real-process-death-worker.js", { type: "module" });
+		const worker = new Worker("./phase-2e6-real-process-death-worker.js", { type: "module" });
 		const signal = new SharedArrayBuffer(4);
 		const cell = new Int32Array(signal);
 		const timer = setTimeout(() => {

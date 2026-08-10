@@ -30,6 +30,8 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 	const root = fs.realpathSync(assetDirectory);
 	const allowed = new Set([
 		"index.html",
+		"phase-2h-a.html",
+		"phase-2h-a-inert-entry.js",
 		"phase-2e6.html",
 		"phase-2e6-real-process-death.js",
 		"phase-2e6-real-process-death-worker.js",
@@ -39,22 +41,21 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 	const tokens = new Set<string>();
 	const server = http.createServer((request, response) => {
 		const rawUrl = request.url ?? "";
+		if (!rawUrl.startsWith("/") || rawUrl.startsWith("//")) {
+			response.writeHead(404).end();
+			return;
+		}
 		let pathname: string;
 		try {
-			pathname = decodeURIComponent(new URL(rawUrl, "http://127.0.0.1").pathname).replace(/^\/+/, "");
+			pathname = decodeURIComponent(new URL(rawUrl, "http://127.0.0.1").pathname);
 		} catch {
 			response.writeHead(400).end();
 			return;
 		}
 		const parts = pathname.split("/");
-		const token = parts.length === 3 && parts[0] === "transition" ? parts[1] : undefined;
-		const asset = token === undefined ? pathname : (parts[2] ?? "");
-		if (
-			!allowed.has(asset) ||
-			pathname.includes("..") ||
-			path.isAbsolute(pathname) ||
-			(token !== undefined && !tokens.has(token))
-		) {
+		const token = parts.length === 4 && parts[1] === "transition" ? parts[2] : undefined;
+		const asset = token === undefined ? "" : (parts[3] ?? "");
+		if (!allowed.has(asset) || pathname.includes("..") || token === undefined || !tokens.has(token)) {
 			response.writeHead(404).end();
 			return;
 		}
@@ -63,19 +64,25 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 			response.writeHead(404).end();
 			return;
 		}
-		fs.readFile(candidate, (error, bytes) => {
-			if (error) {
+		fs.realpath(candidate, (realpathError, realCandidate) => {
+			if (realpathError || !realCandidate.startsWith(`${root}${path.sep}`)) {
 				response.writeHead(404).end();
 				return;
 			}
-			response.writeHead(200, {
-				"Content-Type": CONTENT_TYPES[path.extname(candidate)] ?? "application/octet-stream",
-				"Cache-Control": "no-store",
-				"Cross-Origin-Opener-Policy": "same-origin",
-				"Cross-Origin-Embedder-Policy": "require-corp",
-				"Cross-Origin-Resource-Policy": "same-origin",
+			fs.readFile(realCandidate, (error, bytes) => {
+				if (error) {
+					response.writeHead(404).end();
+					return;
+				}
+				response.writeHead(200, {
+					"Content-Type": CONTENT_TYPES[path.extname(realCandidate)] ?? "application/octet-stream",
+					"Cache-Control": "no-store",
+					"Cross-Origin-Opener-Policy": "same-origin",
+					"Cross-Origin-Embedder-Policy": "require-corp",
+					"Cross-Origin-Resource-Policy": "same-origin",
+				});
+				response.end(bytes);
 			});
-			response.end(bytes);
 		});
 	});
 	return new Promise((resolve, reject) => {

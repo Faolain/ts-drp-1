@@ -25,7 +25,7 @@ export default async function globalSetup(): Promise<() => void> {
 		});
 		fs.writeFileSync(
 			path.join(assetDirectory, "phase-2e7.html"),
-			'<!doctype html><meta charset="utf-8"><script type="module" src="/phase-2e7-publication-component.js"></script>',
+			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2e7-publication-component.js"></script>',
 			"utf8"
 		);
 		process.env.PHASE_2E7_ASSET_DIR = assetDirectory;

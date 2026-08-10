@@ -1,0 +1,37 @@
+name: Phase 2h-a browser validation RED
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inert-contract-red:
+    name: Inert 69-tuple aggregate RED
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Run the package-local inert Phase 2h-a config
+        run: pnpm exec playwright test --config packages/storage-browser/playwright.protocol-v2.config.ts --fail-on-flaky-tests
+      - name: Upload aggregate, tuple evidence and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-2h-a-browser-validation-red
+          if-no-files-found: error
+          path: |
+            packages/storage-browser/test-results/phase-2h/ahe-storage-validation.json
+            packages/storage-browser/test-results/phase-2h/phase-2h/**
+            packages/storage-browser/test-results/playwright-phase-2h-a/**
