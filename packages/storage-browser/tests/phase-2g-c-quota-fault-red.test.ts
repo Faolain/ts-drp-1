@@ -79,11 +79,12 @@ describe("Phase 2g-c finite quota-fault acceptance contract", () => {
 	});
 
 	it("kills every named hollow quota oracle", () => {
-		const edge = derivePhase2gQuotaEdges(declaredPhase2gObservations())[0];
+		const edge = derivePhase2gQuotaEdges(declaredPhase2gObservations()).find(({ target }) => target === "settlement");
 		if (edge === undefined) throw new Error("missing quota edge control");
 		const before = image("old");
 		const expectedNew = image("new");
 		const control: Phase2gQuotaCaseEvidence = {
+			adapterObservedIdenticalSettlementCause: true,
 			afterReopen: before,
 			before,
 			causeIsSameObject: true,
@@ -98,6 +99,13 @@ describe("Phase 2g-c finite quota-fault acceptance contract", () => {
 			retry: expectedNew,
 			retryResult: "OK",
 			selectedOccurrenceInTrace: true,
+			settlementAbortAttributedToRequestError: true,
+			settlementIndependentAbortScheduled: false,
+			settlementRequestErrorBeforeAbortConsequence: true,
+			settlementRequestErrorEvents: 1,
+			settlementRequestErrorIsSameRealmQuotaFault: true,
+			settlementRequestSuccessEvents: 0,
+			settlementTransactionAbortAfterRequestError: true,
 			staleRecoveryCertificateCleared: true,
 			storeRemainedOpenAndUnpoisoned: true,
 		};
@@ -121,8 +129,35 @@ describe("Phase 2g-c finite quota-fault acceptance contract", () => {
 			{ ...control, causeIsSameObject: false },
 			{ ...control, selectedOccurrenceInTrace: false },
 			{ ...control, staleRecoveryCertificateCleared: false },
+			{ ...control, settlementRequestErrorEvents: 0 },
+			{ ...control, settlementRequestErrorEvents: 2 },
+			{ ...control, settlementRequestSuccessEvents: 1 },
+			{ ...control, settlementRequestErrorIsSameRealmQuotaFault: false },
+			{ ...control, settlementRequestErrorBeforeAbortConsequence: false },
+			{ ...control, settlementTransactionAbortAfterRequestError: false },
+			{ ...control, settlementAbortAttributedToRequestError: false },
+			{ ...control, settlementIndependentAbortScheduled: true },
+			{ ...control, adapterObservedIdenticalSettlementCause: false },
 		];
 		for (const mutant of mutants) expect(phase2gQuotaCaseErrors(edge, mutant)).not.toEqual([]);
+
+		for (const nonSettlement of derivePhase2gQuotaEdges(declaredPhase2gObservations()).filter(
+			({ target }) => target !== "settlement"
+		)) {
+			expect(
+				phase2gQuotaCaseErrors(nonSettlement, {
+					...control,
+					adapterObservedIdenticalSettlementCause: false,
+					edgeId: nonSettlement.id,
+					settlementAbortAttributedToRequestError: false,
+					settlementRequestErrorBeforeAbortConsequence: false,
+					settlementRequestErrorEvents: 0,
+					settlementRequestErrorIsSameRealmQuotaFault: false,
+					settlementRequestSuccessEvents: 0,
+					settlementTransactionAbortAfterRequestError: false,
+				})
+			).toEqual([]);
+		}
 	});
 
 	it("kills omission of the real present-head supersession branch", () => {

@@ -5,8 +5,11 @@ import {
 	PHASE_2E5_BROWSER_REQUEST_INVENTORY,
 } from "./fixtures/phase-2e5-browser-request-inventory.js";
 import {
+	declaredPhase2gObservations,
 	derivePhase2gQuotaEdges,
 	phase2gEngineQuotaErrors,
+	phase2gQuotaCaseErrors,
+	type Phase2gQuotaCaseEvidence,
 	phase2gQuotaInventoryErrors,
 } from "./fixtures/phase-2g-c-quota-fault-contract.js";
 
@@ -63,13 +66,19 @@ test("observes the frozen eight transactions plus the real present-head superses
 
 test("runs all trace-derived full-image quota cases through the tests-only instrument", async ({ page }) => {
 	const result = (await quotaHarness(page, "runDeterministicMatrix")) as {
-		readonly cases: readonly unknown[];
+		readonly cases: readonly Phase2gQuotaCaseEvidence[];
 		readonly errors: readonly string[];
 		readonly testInstrumentPresent: boolean;
 	};
 	expect(result.testInstrumentPresent, "Phase 2g-c trace/fault/whole-image test instrument is absent").toBe(true);
-	expect(result.errors).toEqual([]);
 	expect(result.cases).toHaveLength(35);
+	const edges = derivePhase2gQuotaEdges(declaredPhase2gObservations());
+	const caseErrors = result.cases.flatMap((evidence, index) => {
+		const edge = edges[index];
+		return edge === undefined ? [] : phase2gQuotaCaseErrors(edge, evidence).map((error) => ({ edge, error }));
+	});
+	expect(caseErrors.filter(({ edge }) => edge.target !== "settlement")).toEqual([]);
+	expect(result.errors).toEqual([]);
 });
 
 test("produces one bounded engine-generated Chromium quota fault without skipping", async ({ context, page }) => {

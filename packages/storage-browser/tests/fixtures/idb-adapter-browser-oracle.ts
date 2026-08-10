@@ -272,7 +272,15 @@ export interface Phase2gQuotaFaultTrace<T> extends Phase2e5InventoryTrace<T> {
 	readonly faultArmed: boolean;
 	readonly faultsFired: number;
 	readonly operationReturnedAfterTerminal: boolean;
+	readonly selectedRequestError: unknown;
 	readonly selectedOccurrenceInTrace: boolean;
+	readonly settlementAbortAttributedToRequestError: boolean;
+	readonly settlementIndependentAbortScheduled: boolean;
+	readonly settlementRequestErrorBeforeAbortConsequence: boolean;
+	readonly settlementRequestErrorEvents: number;
+	readonly settlementRequestErrorIsSameRealmQuotaFault: boolean;
+	readonly settlementRequestSuccessEvents: number;
+	readonly settlementTransactionAbortAfterRequestError: boolean;
 	readonly writesObserved: number;
 }
 
@@ -962,6 +970,7 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	run: () => Promise<T>
 ): Promise<Phase2gQuotaFaultTrace<T>> {
 	const originalTransaction = IDBDatabase.prototype.transaction;
+	const originalRequestAddEventListener = IDBRequest.prototype.addEventListener;
 	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
 	const originalAbort = IDBTransaction.prototype.abort;
 	const originalAdd = IDBObjectStore.prototype.add;
@@ -979,6 +988,14 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	}> = [];
 	const fault = new DOMException("quota exceeded", "QuotaExceededError");
 	let faultsFired = 0;
+	let eventOrder = 0;
+	let selectedRequestError: unknown;
+	let settlementAbortConsequenceOrder = 0;
+	let settlementIndependentAbortScheduled = false;
+	let settlementRequestErrorEvents = 0;
+	let settlementRequestErrorOrder = 0;
+	let settlementRequestSuccessEvents = 0;
+	let settlementTransactionAbortOrder = 0;
 	let terminalCount = 0;
 	let writesObserved = 0;
 
@@ -1015,6 +1032,7 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			transaction,
 			"abort",
 			() => {
+				settlementTransactionAbortOrder = ++eventOrder;
 				trace.terminal = "abort";
 				terminalCount++;
 			},
@@ -1042,8 +1060,19 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			const transaction = request.transaction;
 			if (transaction === null) throw new Error("selected quota request has no transaction");
 			Object.defineProperty(request, "error", { configurable: true, get: () => fault });
+			originalRequestAddEventListener.call(request, "error", () => {
+				settlementRequestErrorEvents++;
+				settlementRequestErrorOrder = ++eventOrder;
+				selectedRequestError = request.error;
+			});
+			originalRequestAddEventListener.call(request, "success", () => {
+				settlementRequestSuccessEvents++;
+				++eventOrder;
+			});
+			settlementIndependentAbortScheduled = true;
 			queueMicrotask(() => {
 				faultsFired++;
+				settlementAbortConsequenceOrder = ++eventOrder;
 				originalAbort.call(transaction);
 			});
 		}
@@ -1114,7 +1143,23 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			operationReturnedAfterTerminal: transactions.length > 0 && terminalCount === transactions.length,
 			requests: Object.freeze(requests.map((request) => Object.freeze({ ...request }))),
 			result,
+			selectedRequestError,
 			selectedOccurrenceInTrace,
+			settlementAbortAttributedToRequestError:
+				settlementRequestErrorOrder > 0 &&
+				settlementRequestErrorOrder < settlementAbortConsequenceOrder &&
+				!settlementIndependentAbortScheduled,
+			settlementIndependentAbortScheduled,
+			settlementRequestErrorBeforeAbortConsequence:
+				settlementRequestErrorOrder > 0 && settlementRequestErrorOrder < settlementAbortConsequenceOrder,
+			settlementRequestErrorEvents,
+			settlementRequestErrorIsSameRealmQuotaFault:
+				selectedRequestError === fault &&
+				selectedRequestError instanceof DOMException &&
+				selectedRequestError.name === "QuotaExceededError",
+			settlementRequestSuccessEvents,
+			settlementTransactionAbortAfterRequestError:
+				settlementRequestErrorOrder > 0 && settlementRequestErrorOrder < settlementTransactionAbortOrder,
 			transactions: Object.freeze(transactions.map((transaction) => Object.freeze({ ...transaction }))),
 			writesObserved,
 		};

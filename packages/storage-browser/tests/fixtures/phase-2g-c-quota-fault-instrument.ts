@@ -384,6 +384,8 @@ async function runQuotaCase(edge: Phase2gQuotaEdge): Promise<Phase2gQuotaCaseEvi
 		const cause =
 			!faultTrace.result.ok && faultTrace.result.reason === "SUBSTRATE_FAILURE" ? faultTrace.result.cause : undefined;
 		return Object.freeze({
+			adapterObservedIdenticalSettlementCause:
+				edge.target === "settlement" && cause !== undefined && cause === faultTrace.selectedRequestError,
 			afterReopen,
 			before,
 			causeIsSameObject: cause === faultTrace.fault,
@@ -398,6 +400,13 @@ async function runQuotaCase(edge: Phase2gQuotaEdge): Promise<Phase2gQuotaCaseEvi
 			retry,
 			retryResult: outcome(retryResult),
 			selectedOccurrenceInTrace: faultTrace.selectedOccurrenceInTrace,
+			settlementAbortAttributedToRequestError: faultTrace.settlementAbortAttributedToRequestError,
+			settlementIndependentAbortScheduled: faultTrace.settlementIndependentAbortScheduled,
+			settlementRequestErrorBeforeAbortConsequence: faultTrace.settlementRequestErrorBeforeAbortConsequence,
+			settlementRequestErrorEvents: faultTrace.settlementRequestErrorEvents,
+			settlementRequestErrorIsSameRealmQuotaFault: faultTrace.settlementRequestErrorIsSameRealmQuotaFault,
+			settlementRequestSuccessEvents: faultTrace.settlementRequestSuccessEvents,
+			settlementTransactionAbortAfterRequestError: faultTrace.settlementTransactionAbortAfterRequestError,
 			staleRecoveryCertificateCleared: certificateCleared,
 			storeRemainedOpenAndUnpoisoned: stillOpen.ok,
 		});

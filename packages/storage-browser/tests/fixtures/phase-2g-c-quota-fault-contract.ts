@@ -147,6 +147,7 @@ export interface Phase2gWholeImage {
 }
 
 export interface Phase2gQuotaCaseEvidence {
+	readonly adapterObservedIdenticalSettlementCause: boolean;
 	readonly afterReopen: Phase2gWholeImage;
 	readonly before: Phase2gWholeImage;
 	readonly causeIsSameObject: boolean;
@@ -161,6 +162,13 @@ export interface Phase2gQuotaCaseEvidence {
 	readonly retry: Phase2gWholeImage;
 	readonly retryResult: string;
 	readonly selectedOccurrenceInTrace: boolean;
+	readonly settlementAbortAttributedToRequestError: boolean;
+	readonly settlementIndependentAbortScheduled: boolean;
+	readonly settlementRequestErrorBeforeAbortConsequence: boolean;
+	readonly settlementRequestErrorEvents: number;
+	readonly settlementRequestErrorIsSameRealmQuotaFault: boolean;
+	readonly settlementRequestSuccessEvents: number;
+	readonly settlementTransactionAbortAfterRequestError: boolean;
 	readonly staleRecoveryCertificateCleared: boolean;
 	readonly storeRemainedOpenAndUnpoisoned: boolean;
 }
@@ -226,6 +234,23 @@ export function phase2gQuotaCaseErrors(edge: Phase2gQuotaEdge, evidence: Phase2g
 	if (!evidence.causeIsSameRealmDOMException || evidence.causeName !== "QuotaExceededError")
 		errors.push("cause is not a genuine same-realm QuotaExceededError DOMException");
 	if (!evidence.causeIsSameObject) errors.push("quota cause was swallowed or replaced");
+	if (edge.target === "settlement") {
+		if (evidence.settlementRequestErrorEvents !== 1)
+			errors.push("settlement selected request did not publish exactly one error event");
+		if (evidence.settlementRequestSuccessEvents !== 0) errors.push("settlement selected request published success");
+		if (!evidence.settlementRequestErrorIsSameRealmQuotaFault)
+			errors.push("settlement selected request error is not the exact same-realm quota fault");
+		if (!evidence.settlementRequestErrorBeforeAbortConsequence)
+			errors.push("settlement abort consequence began before the selected request error");
+		if (!evidence.settlementTransactionAbortAfterRequestError)
+			errors.push("settlement transaction abort was not observed after the selected request error");
+		if (!evidence.settlementAbortAttributedToRequestError)
+			errors.push("settlement transaction abort is not attributed to the selected request-error path");
+		if (evidence.settlementIndependentAbortScheduled)
+			errors.push("settlement used an independently scheduled transaction abort");
+		if (!evidence.adapterObservedIdenticalSettlementCause)
+			errors.push("adapter did not observe the identical selected request error cause");
+	}
 	if (!evidence.operationReturnedAfterTerminal) errors.push("success/failure published before transaction terminal");
 	if (!evidence.storeRemainedOpenAndUnpoisoned) errors.push("quota poisoned or closed the store");
 	if (!evidence.staleRecoveryCertificateCleared) errors.push("stale recovery certificate survived quota failure");
