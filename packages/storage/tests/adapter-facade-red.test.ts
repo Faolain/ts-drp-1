@@ -86,6 +86,7 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"storageAdapterClosureVerifier",
 		]);
 		const authorizedRootRuntimeKeys = [
+			"createStageAdmissionController",
 			"createMemoryAheDurableStore",
 			"decodeGenerationRecordV1",
 			"decodeHeadRecordV1",
@@ -95,6 +96,7 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"encodeHeadRecordV1",
 			"inspectStorageCapability",
 			"parseBlobDigest",
+			"parseCapacityProfile",
 			"parseClosureDigest",
 			"parseGenerationId",
 			"parseHeadRevision",
