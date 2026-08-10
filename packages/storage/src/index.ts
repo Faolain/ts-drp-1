@@ -4,6 +4,14 @@ export {
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
 } from "./codecs.js";
+export { inspectStorageCapability, requestPersistentStorage } from "./capacity.js";
+export type {
+	PersistenceObservation,
+	PersistenceRequestResult,
+	QuotaObservation,
+	StorageCapabilityReport,
+	StorageCapacityPort,
+} from "./capacity.js";
 export { createMemoryAheDurableStore } from "./memory.js";
 export type {
 	AheDurableStore,
