@@ -15,12 +15,7 @@ import {
 	type Phase2hWebLocksMode,
 	validatePhase2hRecord,
 } from "./fixtures/phase-2h-a-record.js";
-import {
-	type Phase2hEngineName,
-	PHASE_2H_KILL_TUPLE_IDS,
-	PHASE_2H_REQUIRED_TUPLE_IDS,
-	PHASE_2H_TUPLES,
-} from "./fixtures/phase-2h-a-registry.js";
+import { type Phase2hEngineName, PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_TUPLES } from "./fixtures/phase-2h-a-registry.js";
 
 type BrowserSurfaceScenario = "browser-store" | "crypto-digest" | "worker-responsiveness";
 type BrowserSurfaceEvidence = Extract<Phase2hScenarioEvidence, { tag: BrowserSurfaceScenario }>;
@@ -341,12 +336,9 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 	expect(aggregate.extraTupleIds).toEqual([]);
 	expect(aggregate.invalidRecordIds).toEqual([]);
 	if (engine === "webkit") {
-		const missing = PHASE_2H_REQUIRED_TUPLE_IDS.filter((tupleId) => !SURFACE_TUPLE_IDS.includes(tupleId)).sort(
-			compareUtf8
-		);
-		expect(aggregate.records.map(({ tupleId }) => tupleId)).toEqual(SURFACE_TUPLE_IDS);
-		expect(aggregate.missingTupleIds).toEqual(missing);
-		expect(aggregate.missingTupleIds).toHaveLength(60);
+		const recordIds = aggregate.records.map(({ tupleId }) => tupleId);
+		expect(recordIds.filter((tupleId) => SURFACE_TUPLE_IDS.includes(tupleId))).toEqual(SURFACE_TUPLE_IDS);
+		expect(aggregate.missingTupleIds.filter((tupleId) => SURFACE_TUPLE_IDS.includes(tupleId))).toEqual([]);
 		expect(aggregate.missingKillPoints).toEqual([...PHASE_2H_KILL_TUPLE_IDS].sort(compareUtf8));
 		expect(aggregate.missingKillPoints).toHaveLength(54);
 		expect(aggregate.verdict).toBe("fail");

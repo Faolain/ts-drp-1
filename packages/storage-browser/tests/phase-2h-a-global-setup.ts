@@ -18,11 +18,14 @@ import { startPhase2hParentPublisher } from "./fixtures/phase-2h-b-parent-publis
 export default async function globalSetup(): Promise<() => Promise<void>> {
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
 	const repositoryDirectory = path.resolve(packageDirectory, "../..");
-	const assetDirectory = fs.mkdtempSync(path.join(packageDirectory, ".phase-2h-a-assets-"));
+	const assetRoot = path.join(packageDirectory, "test-results");
+	fs.mkdirSync(assetRoot, { recursive: true });
+	const assetDirectory = fs.mkdtempSync(path.join(assetRoot, "phase-2h-assets-"));
 	try {
 		await build({
 			bundle: true,
 			entryPoints: {
+				"phase-2g-a-capacity-entry": path.join(packageDirectory, "tests/assets/phase-2g-a-capacity-entry.ts"),
 				"phase-2h-a-inert-entry": path.join(packageDirectory, "tests/assets/phase-2h-a-inert-entry.ts"),
 				"phase-2h-b-browser-surfaces": path.join(packageDirectory, "tests/assets/phase-2h-b-browser-surfaces-entry.ts"),
 				"phase-2h-b-main-thread-oracle": path.join(
@@ -33,6 +36,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 					repositoryDirectory,
 					"packages/worker-host/src/operation-workload.worker.ts"
 				),
+				"phase-2h-c-quota-entry": path.join(packageDirectory, "tests/assets/phase-2h-c-quota-entry.ts"),
 			},
 			format: "esm",
 			outdir: assetDirectory,
@@ -46,7 +50,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 		);
 		fs.writeFileSync(
 			path.join(assetDirectory, "phase-2h-b.html"),
-			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2h-b-main-thread-oracle.js"></script><script type="module" src="./phase-2h-b-browser-surfaces.js"></script>',
+			'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-2h-b-main-thread-oracle.js"></script><script type="module" src="./phase-2h-b-browser-surfaces.js"></script><script type="module" src="./phase-2g-a-capacity-entry.js"></script><script type="module" src="./phase-2h-c-quota-entry.js"></script>',
 			"utf8"
 		);
 		const gitSha = phase2hGitSha(repositoryDirectory);

@@ -9,6 +9,7 @@ import {
 	type StorageObjectId,
 	type StoreResult,
 } from "@ts-drp/storage";
+import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 
 import {
 	deletePhase2dDatabase,
@@ -20,7 +21,6 @@ import {
 	withPhase2e5RequestInventoryTrace,
 	withPhase2gQuotaFaultTrace,
 } from "./idb-adapter-browser-oracle.js";
-import { createPhase2d2aRedStore } from "./idb-adapter-red-scaffold.js";
 import type { Phase2e5ObservedRow } from "./phase-2e5-browser-request-inventory.js";
 import {
 	derivePhase2gQuotaEdges,
@@ -151,7 +151,7 @@ function scenarioOperation(
 }
 
 async function createScenario(scenarioId: string, databaseName: string): Promise<Scenario> {
-	let store = await createPhase2d2aRedStore({ databaseName });
+	let store = await createBrowserAheDurableStore({ databaseName });
 	await seedUnrelated(store, databaseName);
 	const digestA = must(digestBlob(PAYLOAD_A));
 	let presentHead: PresentHead | undefined;
@@ -189,7 +189,7 @@ async function createScenario(scenarioId: string, databaseName: string): Promise
 		case "swap-head-fresh-recovery": {
 			await stageComplete(store, SUBJECT, GENERATION_A, PAYLOAD_A, noHead(SUBJECT));
 			await store.close();
-			store = await createPhase2d2aRedStore({ databaseName });
+			store = await createBrowserAheDurableStore({ databaseName });
 			const recovered = await store.recoverActiveGeneration(UNRELATED);
 			if (!recovered.ok) throw new Error(`reopened unrelated recovery certificate failed: ${recovered.reason}`);
 			break;
@@ -217,7 +217,7 @@ async function createScenario(scenarioId: string, databaseName: string): Promise
 }
 
 async function openExistingScenario(scenarioId: string, databaseName: string): Promise<Scenario> {
-	const store = await createPhase2d2aRedStore({ databaseName });
+	const store = await createBrowserAheDurableStore({ databaseName });
 	const headResult =
 		scenarioId === "begin-generation-certificate-match" || scenarioId === "swap-head-present-supersession"
 			? await store.readHead(SUBJECT)
@@ -348,11 +348,22 @@ async function certificateWasCleared(scenario: Scenario): Promise<boolean> {
 	}
 }
 
-async function runQuotaCase(edge: Phase2gQuotaEdge): Promise<Phase2gQuotaCaseEvidence> {
+export interface Phase2gQuotaCaseObservation {
+	readonly caseEvidence: Phase2gQuotaCaseEvidence;
+	readonly recoveredHead: PresentHead;
+}
+
+/**
+ * Runs one exact derived quota edge through the source-owned Phase 2g-c instrument.
+ * @param edge - Exact trace-derived quota edge selected by the caller.
+ * @returns Complete case evidence plus the genuine old present head observed after reopen.
+ */
+export async function runPhase2gQuotaCaseObservation(edge: Phase2gQuotaEdge): Promise<Phase2gQuotaCaseObservation> {
 	const faultName = `phase-2g-c-fault-${crypto.randomUUID()}`;
 	const expectedName = `phase-2g-c-expected-${crypto.randomUUID()}`;
 	let faultScenario: Scenario | undefined;
 	let expectedScenario: Scenario | undefined;
+	let retryScenario: Scenario | undefined;
 	try {
 		faultScenario = await createScenario(edge.scenarioId, faultName);
 		expectedScenario = await createScenario(edge.scenarioId, expectedName);
@@ -377,13 +388,17 @@ async function runQuotaCase(edge: Phase2gQuotaEdge): Promise<Phase2gQuotaCaseEvi
 		await faultScenario.store.close();
 		faultScenario = undefined;
 		const afterReopen = await rawWholeImage(faultName);
-		const retryScenario = await openExistingScenario(edge.scenarioId, faultName);
+		retryScenario = await openExistingScenario(edge.scenarioId, faultName);
+		const recovered = await retryScenario.store.readHead(UNRELATED);
+		if (!recovered.ok || recovered.value.kind !== "present")
+			throw new Error("quota oracle did not recover the old present head after reopen");
 		const retryResult = await retryScenario.run();
 		const retry = await rawWholeImage(faultName);
 		await retryScenario.store.close();
+		retryScenario = undefined;
 		const cause =
 			!faultTrace.result.ok && faultTrace.result.reason === "SUBSTRATE_FAILURE" ? faultTrace.result.cause : undefined;
-		return Object.freeze({
+		const caseEvidence = Object.freeze({
 			adapterObservedIdenticalSettlementCause:
 				edge.target === "settlement" && cause !== undefined && cause === faultTrace.selectedRequestError,
 			afterReopen,
@@ -420,9 +435,11 @@ async function runQuotaCase(edge: Phase2gQuotaEdge): Promise<Phase2gQuotaCaseEvi
 			staleRecoveryCertificateCleared: certificateCleared,
 			storeRemainedOpenAndUnpoisoned: stillOpen.ok,
 		});
+		return Object.freeze({ caseEvidence, recoveredHead: recovered.value });
 	} finally {
 		await faultScenario?.store.close();
 		await expectedScenario?.store.close();
+		await retryScenario?.store.close();
 		await deletePhase2dDatabase(faultName);
 		await deletePhase2dDatabase(expectedName);
 	}
@@ -487,7 +504,7 @@ export async function runPhase2gDeterministicMatrix(): Promise<
 	const edges = derivePhase2gQuotaEdges(observed);
 	const cases: Phase2gQuotaCaseEvidence[] = [];
 	for (const edge of edges) {
-		const evidence = await runQuotaCase(edge);
+		const evidence = (await runPhase2gQuotaCaseObservation(edge)).caseEvidence;
 		cases.push(evidence);
 		errors.push(...phase2gQuotaCaseErrors(edge, evidence).map((error) => `${edge.id}: ${error}`));
 	}
@@ -512,7 +529,7 @@ let engineDatabaseName: string | undefined;
  */
 export async function preparePhase2gEngineQuotaControl(): Promise<void> {
 	engineDatabaseName = `phase-2g-c-engine-${crypto.randomUUID()}`;
-	const store = await createPhase2d2aRedStore({ databaseName: engineDatabaseName });
+	const store = await createBrowserAheDurableStore({ databaseName: engineDatabaseName });
 	await store.close();
 }
 
@@ -542,7 +559,7 @@ export async function runPhase2gEngineQuotaControl(supportedOverrideAttempted: b
 	let observed: unknown;
 	let store: AheDurableStore | undefined;
 	try {
-		store = await createPhase2d2aRedStore({ databaseName: engineDatabaseName });
+		store = await createBrowserAheDurableStore({ databaseName: engineDatabaseName });
 		const result = await begin(store, SUBJECT, GENERATION_A, PAYLOAD_A, noHead(SUBJECT));
 		if (!result.ok && result.reason === "SUBSTRATE_FAILURE") observed = result.cause;
 	} finally {
