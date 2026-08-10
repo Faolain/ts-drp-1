@@ -294,6 +294,32 @@ export interface Phase2gQuotaFaultTrace<T> extends Phase2e5InventoryTrace<T> {
 	readonly writesObserved: number;
 }
 
+const PHASE_2G_SETTLEMENT_CANARY_OBJECT_ID = `phase-2g-c-unrelated:${"d".repeat(32)}`;
+const PHASE_2G_SETTLEMENT_CANARY_GENERATION_ID = "d".repeat(64);
+const PHASE_2G_SETTLEMENT_CANARY_DIGEST = "b0deb0cf0cf838277980653bc734cde47177b91cf3e4f29914fb03fcab69c3db";
+
+function phase2gSettlementCollision(storeName: string): unknown {
+	switch (storeName) {
+		case "blobs":
+			return { digest: PHASE_2G_SETTLEMENT_CANARY_DIGEST };
+		case "generations":
+			return {
+				generationId: PHASE_2G_SETTLEMENT_CANARY_GENERATION_ID,
+				objectId: PHASE_2G_SETTLEMENT_CANARY_OBJECT_ID,
+			};
+		case "objects":
+			return { objectId: PHASE_2G_SETTLEMENT_CANARY_OBJECT_ID };
+		case "promotions":
+			return {
+				digest: PHASE_2G_SETTLEMENT_CANARY_DIGEST,
+				generationId: PHASE_2G_SETTLEMENT_CANARY_GENERATION_ID,
+				objectId: PHASE_2G_SETTLEMENT_CANARY_OBJECT_ID,
+			};
+		default:
+			throw new Error(`Phase 2g settlement selected an unknown store: ${storeName}`);
+	}
+}
+
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
 		request.addEventListener("success", () => resolve(request.result), { once: true });
@@ -968,8 +994,8 @@ export async function withPhase2e5RequestInventoryTrace<T>(run: () => Promise<T>
 
 /**
  * Injects one genuine same-realm quota exception at a trace-selected write edge.
- * Creation throws before the native request is returned, settlement dispatches
- * the selected native request's error before aborting as its consequence, and
+ * Creation throws before the native request is returned, settlement replaces
+ * the selected write with a native duplicate-key failure, and
  * terminal aborts after the final declared write settles but before transaction
  * completion.
  * @param arm - Trace-derived request or terminal occurrence.
@@ -984,7 +1010,6 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	const originalRequestAddEventListener = IDBRequest.prototype.addEventListener;
 	const originalTransactionAddEventListener = IDBTransaction.prototype.addEventListener;
 	const originalAbort = IDBTransaction.prototype.abort;
-	const originalDispatchEvent = EventTarget.prototype.dispatchEvent;
 	const nativeRequestErrorGetter = Object.getOwnPropertyDescriptor(IDBRequest.prototype, "error")?.get;
 	if (nativeRequestErrorGetter === undefined) throw new Error("native IDBRequest.error getter is unavailable");
 	const originalAdd = IDBObjectStore.prototype.add;
@@ -1005,16 +1030,15 @@ export async function withPhase2gQuotaFaultTrace<T>(
 	let eventOrder = 0;
 	let selectedRequestError: unknown;
 	let settlementAbortConsequenceOrder = 0;
-	let settlementExplicitHarnessAbortCalls = 0;
-	let settlementIndependentAbortScheduled = false;
+	const settlementExplicitHarnessAbortCalls = 0;
+	const settlementIndependentAbortScheduled = false;
 	let settlementNativeRequestFailureObserved = false;
 	let settlementNativeRequestFailureDefaultAllowed = false;
-	let settlementRequestErrorDispatchActive = false;
 	let settlementRequestErrorEvents = 0;
 	let settlementRequestErrorOrder = 0;
 	let settlementRequestReadyStateDoneAtTrustedError = false;
 	let settlementRequestSuccessEvents = 0;
-	let settlementSyntheticDispatchCalls = 0;
+	const settlementSyntheticDispatchCalls = 0;
 	let settlementSyntheticRequestSuccessEvents = 0;
 	let settlementTransactionAbortOrder = 0;
 	let settlementTrustedRequestErrorEvents = 0;
@@ -1058,6 +1082,7 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			"abort",
 			(event: Event) => {
 				settlementTransactionAbortOrder = ++eventOrder;
+				settlementAbortConsequenceOrder = settlementTransactionAbortOrder;
 				if (event.isTrusted) settlementTrustedTransactionAbortEvents++;
 				trace.terminal = "abort";
 				terminalCount++;
@@ -1081,11 +1106,13 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			faultsFired++;
 			throw fault;
 		}
-		const request = invoke();
-		if (write && arm.target === "settlement" && arm.requestIndex === requestIndex) {
+		const selectedSettlement = write && arm.target === "settlement" && arm.requestIndex === requestIndex;
+		const request = selectedSettlement
+			? (originalAdd.call(store, phase2gSettlementCollision(store.name)) as unknown as IDBRequest<TResult>)
+			: invoke();
+		if (selectedSettlement) {
 			const transaction = request.transaction;
 			if (transaction === null) throw new Error("selected quota request has no transaction");
-			settlementIndependentAbortScheduled = true;
 			Object.defineProperty(request, "error", { configurable: true, get: () => fault });
 			originalRequestAddEventListener.call(
 				request,
@@ -1108,6 +1135,7 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			);
 			originalRequestAddEventListener.call(request, "error", (event: Event) => {
 				if (!event.isTrusted) return;
+				faultsFired++;
 				settlementTrustedRequestErrorEvents++;
 				settlementTrustedRequestErrorOrder = ++eventOrder;
 				settlementRequestReadyStateDoneAtTrustedError ||= request.readyState === "done";
@@ -1123,27 +1151,6 @@ export async function withPhase2gQuotaFaultTrace<T>(
 			originalRequestAddEventListener.call(request, "success", (event: Event) => {
 				if (event.isTrusted) settlementTrustedRequestSuccessEvents++;
 				else settlementSyntheticRequestSuccessEvents++;
-			});
-			queueMicrotask(() => {
-				faultsFired++;
-				originalRequestAddEventListener.call(
-					request,
-					"error",
-					() => {
-						settlementIndependentAbortScheduled = !settlementRequestErrorDispatchActive;
-						settlementAbortConsequenceOrder = ++eventOrder;
-						settlementExplicitHarnessAbortCalls++;
-						originalAbort.call(transaction);
-					},
-					{ once: true }
-				);
-				settlementRequestErrorDispatchActive = true;
-				try {
-					settlementSyntheticDispatchCalls++;
-					originalDispatchEvent.call(request, new Event("error", { bubbles: true, cancelable: true }));
-				} finally {
-					settlementRequestErrorDispatchActive = false;
-				}
 			});
 		}
 		if (write && arm.target === "terminal" && arm.terminalWriteIndex === requestIndex) {
