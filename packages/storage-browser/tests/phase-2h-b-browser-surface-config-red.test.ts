@@ -20,7 +20,10 @@ function expectBoundedSerialProjects(config: PlaywrightTestConfig): void {
 describe("Phase 2h-b browser-surface execution topology", () => {
 	it("moves the main three-engine config to the real browser-surface producer", () => {
 		expectBoundedSerialProjects(protocolConfig);
-		expect(protocolConfig.testMatch).toBe("phase-2h-b-browser-surfaces-red.pw.ts");
+		expect(protocolConfig.testMatch).toEqual([
+			"phase-2h-b-browser-surfaces-red.pw.ts",
+			"phase-2h-c-capacity-quota-red.pw.ts",
+		]);
 		expect(protocolConfig.globalSetup).toBe("./tests/phase-2h-a-global-setup.ts");
 	});
 

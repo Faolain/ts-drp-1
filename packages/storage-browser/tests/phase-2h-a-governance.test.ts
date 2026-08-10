@@ -15,7 +15,10 @@ function json(file: string): Record<string, unknown> {
 
 describe("Phase 2h-a configuration and governance", () => {
 	it("pins the package-local three-engine serial config outside the RunId root", () => {
-		expect(protocolConfig.testMatch).toBe("phase-2h-b-browser-surfaces-red.pw.ts");
+		expect(protocolConfig.testMatch).toEqual([
+			"phase-2h-b-browser-surfaces-red.pw.ts",
+			"phase-2h-c-capacity-quota-red.pw.ts",
+		]);
 		expect(protocolConfig.fullyParallel).toBe(false);
 		expect(protocolConfig.workers).toBe(1);
 		expect(protocolConfig.retries).toBe(0);
