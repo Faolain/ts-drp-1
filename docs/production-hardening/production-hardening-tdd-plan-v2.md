@@ -2612,7 +2612,7 @@ engine has exactly `{name,brand,browserVersion,userAgent,playwrightVersion}`. na
 
 os has exactly `{platform,arch,release}`. platform is linux | darwin, arch is x64 | arm64 and release is OsRelease. device has exactly `{class,profile,emulated}` where class is desktop-playwright, emulated is false and profile is Desktop Chrome for chromium, Desktop Firefox for firefox or Desktop Safari for webkit. Desktop WebKit and any desktop mobile emulation are not installed Safari, real Safari/iOS or real Chrome/Android evidence. Later real-device/release evidence requires a reviewed schema extension rather than being forced into v1.
 
-The complete 69-tuple aggregate and every Phase 2h process-death record are Linux-only. A Phase 2h process-death record with another platform is invalid, and the test-side aggregate validator requires one byte-identical closed Linux `os` object across all 69 accepted records. Darwin may produce honest non-kill diagnostics, but Phase 2h process-death stops before any record construction, arming, signal authority, signal, recovery or publication, leaving the aggregate fail-closed. This does not remove the lower cross-platform Chromium-only Phase 2e6 preservation campaign. During 2h-d, human-initiated native `ubuntu-latest` execution uses either default-branch workflow_dispatch or an explicitly authorized push of exactly docs/production-hardening-plan-v2 and retains and validates each engine's complete pre-signal forest; Phase 2h-d cannot close on contradiction or without all three captures, and 2h-e later removes the temporary push trigger while activating the workflow as the merge gate.
+The complete 69-tuple aggregate and every Phase 2h process-death record are Linux-only. A Phase 2h process-death record with another platform is invalid, and the test-side aggregate validator requires one byte-identical closed Linux `os` object across all 69 accepted records. Darwin may produce honest non-kill diagnostics, but Phase 2h process-death stops before any record construction, arming, signal authority, signal, recovery or publication, leaving the aggregate fail-closed. This does not remove the lower cross-platform Chromium-only Phase 2e6 preservation campaign. During 2h-d, native `ubuntu-latest` execution uses either default-branch workflow_dispatch or the temporary exact-feature-branch push transport and retains and validates each engine's complete pre-signal forest; Phase 2h-d cannot close on contradiction or without all three captures, and 2h-e later removes the temporary push trigger while activating the workflow as the merge gate. A plan-required repository push is an ordinary implementation action and does not require a separate per-commit user authorization unless the user explicitly restricts pushing; exact-head and evidence-custody requirements remain technical acceptance conditions.
 
 webLocksMode is available-not-used when navigator.locks exists and navigator.locks.request is callable in the tested same realm, otherwise unavailable. Phase 2h never calls request and never claims Locks-on coverage. For each engine, all records must agree with the capacity tuple's observed value.
 
@@ -3546,32 +3546,34 @@ fixture-only Codex-high GREEN follows. GREEN runs focused controls, all Phase
 nonempty lint to logs, followed by Grok 4.5/high, exact Kimi
 3/high/max-100 and final Opus/xhigh review.
 
-The prior next-run custody clauses are superseded only as follows. After that
-corrective RED/GREEN and their full reviews, a new explicit user-authorized
-push must have the accepted fixture-only corrective GREEN at the pushed head;
-no later commit may intervene. The only acceptable next native attempt has
-`run_attempt === 1`, event `push`, head branch exactly
-`docs/production-hardening-plan-v2`, and head SHA equal to both the accepted
-corrective GREEN and aggregate `gitSha`. Its permitted post-`5f5a72c` lineage
-is exactly accepted documentation checkpoints `ddbe140` and `da859f6`,
-tests-only trigger RED `83c2d94`, trigger-only GREEN `47cda5e`, this pre-RED
-plan amendment, the tests-only corrective RED and the fixture-only corrective
-GREEN. No other intervening commit is permitted. This amendment authorizes no
-push, dispatch, native execution, Phase 2h-d closure or Phase 2h-e work.
+The prior next-run custody clauses were satisfied and are now historical. The
+accepted fixture-only corrective GREEN was the pushed head with no intervening
+commit. The accepted native attempt had `run_attempt === 1`, event `push`, head
+branch exactly `docs/production-hardening-plan-v2`, and head SHA equal to both
+the corrective GREEN and aggregate `gitSha`. Its post-`5f5a72c` lineage was
+exactly accepted documentation checkpoints `ddbe140` and `da859f6`, tests-only
+trigger RED `83c2d94`, trigger-only GREEN `47cda5e`, plan amendment `62b2218`,
+tests-only corrective RED `2c626ef` and fixture-only corrective GREEN
+`8381063`. Repository pushes needed to continue this plan no longer require a
+separate per-commit user-authorization ceremony; an exact-SHA or clean-head
+constraint remains binding whenever evidence validity depends on it.
 
-#### Phase 2h-d implementation status — code accepted; native-x64 gate open
+#### Phase 2h-d implementation closure — native x64 accepted
 
 The ratified host/content-authority implementation is code-accepted at signed
-GREEN `5f5a72cf0487cabce98900dca2ae612ec0946800`, but the first native x64
-attempt at `47cda5e` failed on the passive PGID-zero observation assumption.
-Phase 2h-d is **not closed** and Phase 2h-e must not start. The current work is
-the bounded tests-only RED and fixture-only GREEN above; only after their full
-acceptance and a separately authorized exact corrective-GREEN push may a new
-native `ubuntu-latest` attempt supply three complete pre-signal forests and the
-ordered 69-record pass aggregate with empty missing/duplicate/extra/invalid
-diagnostics. That aggregate binds to the accepted corrective GREEN, not the
-earlier trigger-only GREEN, and is not expected to reuse the arm64 aggregate's
-`gitSha`. The existing amd64 emulation remains non-authoritative.
+GREEN `5f5a72cf0487cabce98900dca2ae612ec0946800`; the bounded passive-observation
+correction is accepted at signed GREEN
+`83810633323b8f33cc81b6f6e44129755ba7b8e4`. Phase 2h-d is **closed**, and
+Phase 2h-e may start. GitHub Actions run `31507603733`, job `93833074097`, was
+fresh attempt `1`, event `push`, on the exact feature branch and corrective
+GREEN. Every job step passed, including the package-local campaign, the
+separate all-engine pre-signal admission-capture gate and artifact upload.
+The downloaded aggregate is bound to that exact GREEN, contains the exact
+ordered 69 accepted records (23 per engine), has one byte-identical Linux x64
+`os` object, and has empty missing, duplicate, extra, invalid and missing-kill
+diagnostics. The earlier run `31461597178` remains permanently failed evidence
+and was neither rerun nor reclassified. The existing amd64 emulation remains
+non-authoritative and was not used for closure.
 
 The accepted TDD lineage after the v6 correction is:
 
@@ -3596,6 +3598,15 @@ The accepted TDD lineage after the v6 correction is:
    unregistered engines and dirty diagnostics fail closed. The final WebKit
    boundary still requires the exact ordered 69 and re-validates all 54 causal
    process-death records.
+4. Passive-observation RED
+   `2c626ef8ef17d9ddd95e5c0507eb379d2135b019` and fixture-only GREEN
+   `83810633323b8f33cc81b6f6e44129755ba7b8e4` separate complete host
+   observation (`pid > 0`, `ppid >= 0`, `pgid >= 0`) from authority
+   (`pgid > 0`). All roots, controller, owned closure, witnesses, frozen
+   identities, cleanup/signal targets and persisted evidence stay strictly
+   positive. The real host captures retained 122 of 180 Chromium rows, 121 of
+   179 Firefox rows and 121 of 175 WebKit rows with PGID zero, including
+   kernel-thread descendants; no row was filtered to obtain the pass.
 
 The shared-aggregate discovery is the durable rule: Phase 2h uses one
 GitSha/RunId/run root across project-batched Chromium, Firefox and WebKit.
@@ -3621,6 +3632,36 @@ Verification and independent acceptance are retained under `.logs/`:
   manifest `023f388f3da5d4d1c6fef252d58291432b65d9d933a25706e279f3f4b0683065`.
   All substantive review events used Opus; the reported automatic Haiku entry
   had no review contribution.
+- PGID-zero RED and GREEN verification:
+  `.logs/phase-2h-d-pgid0-red-codex-high/` manifest
+  `dc287b9a844832e5a3e103f6bdd1ffd4cde8aecc3f7023236c1d45f29e38b793`
+  and `.logs/phase-2h-d-pgid0-green-codex-high/` manifest
+  `39cd4cc682117c873fe30556896a71dd63188d3af1253804079a2f7bff83b6d1`;
+  focused 7/7, targeted process 68/68, all Phase 2h 103/103, affected
+  ownership/governance 8/8, complete post-commit storage-browser 235/235,
+  typecheck/build/format and traced nonempty lint pass.
+- PGID-zero independent acceptance: Grok 4.5/high result
+  `7224f1d026b442d6349bad38690aef282ce9a39b697d864baeada47bb66f0e20`;
+  exact Kimi 3/high/max-100 completed-result alias
+  `5b674f0d3a836dfdb45b9dbf9382d2fee33698f3acd40e1f46eb25343412b96b`
+  with integrity manifest
+  `d51777e17d3fa836b23a12412faea6c192a5cf8f08bdcf42d39eb40d16619e08`;
+  and final Opus 5/xhigh result
+  `3d07cd9e703f523463a2e658081b29174876d7e9ebba7bdf16e892946e892d4c`
+  with integrity manifest
+  `020d714cc832f9745213cf061c281825ed50590ac00f2cd453b554fd95334b95`.
+  The initial Kimi transport exit 143 remains excluded; the same authenticated
+  Kimi 3 session resumed and completed. Opus was substantive; its CLI also
+  reported 20 automatic Haiku output tokens with no decision contribution.
+- Accepted native x64 evidence:
+  `.logs/phase-2h-d-native-x64-run-31507603733/`, result SHA-256
+  `1d4487337fa367eb17127bdef0dc0c8e2e00895a8b5b0ffc9ed52eb5b0ba8b7e`;
+  aggregate SHA-256
+  `7a4a2973face913720c3c501b57e1992eae6862f3e975992d5dba98884094e59`.
+  The Chromium, Firefox and WebKit admission-capture SHA-256 digests are
+  `db1cadadc6fd032c8423a06a7f4cef7525343399cb121b73632c88172b8b89da`,
+  `fabfc87f4f7af4506278d62d501574ddff65117f90abedf260cedfc3ebe7f94e`
+  and `aa197a4fdeb088e83011a02f89bcc85eb1065ef9ad5fb456343d224266864ae2`.
 - Isolated native Linux arm64 evidence at the exact GREEN:
   `.logs/phase-2h-d-linux-arm64-container-5f5a72c-isolated/` passed 15/15 in
   2.2 minutes with 69/69, identical Linux arm64 `os`, the exact POSIX two-PGID
@@ -3656,6 +3697,18 @@ authority gate. Independent Grok and final Opus reviews explicitly concluded
 that reconciling the previously frozen b/c closed-world assertions was already
 inside the ratified 2h-d config-census scope; no new plan-assumption quorum was
 required.
+
+The final PGID-zero reviewers also recorded bounded sustainability notes: the
+admission runner and signal owner duplicate controller validation; root
+discovery filters invalid authority candidates before ambiguity counting; one
+RED `-0` assertion is narrower than its label; and
+`childGroupStoppedForFreeze` relies on effect-site closure revalidation rather
+than repeating it internally. None permits PGID zero to reach an authority or
+effect, and the native campaign exercised the real host shape. Revisit these
+only when those owners change or a causal RED demonstrates a bypass. GitHub
+also warned that several v4 actions' Node 20 runtimes are being forced onto
+Node 24; this is an upcoming workflow-maintenance item, not a Phase 2h-d
+acceptance failure.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
