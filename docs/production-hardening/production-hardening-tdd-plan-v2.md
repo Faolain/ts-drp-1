@@ -1098,7 +1098,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2g-c**    | Tests-only quota-fault characterization/acceptance over the trace-derived successful mutation inventory, extended with present-head supersession. Inject genuine same-realm quota errors at every write creation, settlement, and terminal edge; require the complete four-store old image after reopen and exact complete-new image after retry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | coordinated | transaction atomic      | Current trace checksum is 9 transactions/13 writes/35 derived edges (historical frozen subset 8/10/28); runner derives rather than hard-codes. Chromium full matrix plus one bounded engine-generated control; representative Firefox/WebKit cases in 2h. Production GREEN only if a real defect is reproduced.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **2h**      | **Ratified browser validation composite v4, implemented as the independently executable 2h-a…2h-e decomposition below.** Add the package-local `playwright.protocol-v2.config.ts`, closed validator/aggregate and initially dormant non-gating CI topology first; then the three browser-surface scenarios, capacity/quota scenarios, the exact process-death matrix, and only finally gate activation/preservation closure. This slice is tests/config/scripts/CI/evidence only: no vote CAS, production source, browser schema, public API, package export, runtime dependency or protocol change. Phase 5c remains the sole owner of the first real vote-store/schema bump and vote transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | sliceable               | Exact registry is 15 non-kill plus 54 mechanically derived kill tuples = 69. GREEN requires the closed per-tuple schema and scenario evidence, bounded responsiveness thresholds, Linux-only identical POSIX hard-kill proof with non-Linux failure before record/signal/publication, one GitSha/RunId-bound fail-closed aggregate, all 69 unique `verdict:pass` records and all five diagnostic arrays empty. The workflow stays non-gating until 2h-e; during 2h-d, human-initiated native evidence may use default-branch dispatch or the ratified temporary exact-feature-branch push. Phase 2h closure preserves 2e5/2e6/2e7/2f/2g but does not close Phase 2; 2j, 2k, 2l and every other exit conjunct remain mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2i**      | **Moved by the authorized Phase-2i correction; no standalone Phase-2 implementation.** Current tabs are distinct peers with distinct in-memory replicas and no authenticated cross-tab fan-out, so suppressing one tab's initial, periodic, peer-arrival or explicit sync, discovery, presence or authored gossip would harm the Discord/MMORPG golden paths rather than deduplicate equivalent work. All current per-tab networking remains unchanged. The first real advisory primary-tab owner lands atomically in 5c around dispatch of already committed durable `voteOutbox` bytes; 6b reuses that same scheduling owner for cleanup without transferring deletion authority. Any future single-tab network optimization requires a separately measured cross-tab replica/SharedWorker transport first.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | moved       | no standalone slice     | No Phase-2 RED/GREEN. Row retained without renumbering for auditability. 5c owns the real locks-on/off vote-dispatch matrix; 6b owns cleanup scheduling reuse and transactional deletion-precondition recheck.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per engine, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | local-safe  | sliceable               | `crypto-capability.spec.ts` on desktop chromium/firefox/webkit plus iPhone/Pixel Playwright emulation: asserts the **currently expected** matrix and fails on **any** change — improvement or regression. The emulation projects are desktop engines with mobile viewport/user-agent and prove engine-regression coverage only; they do **not** measure real iOS Safari or Android WebView crypto. Real-device `Ed25519: non-extractable` artifacts are required at the **Pre-release release gate**, after the full feature set is green end-to-end — not as a Phase −1 exit gate — see the Phase −1 Exit gate section and D.23.4. Emits the observed matrix **with each engine's build number** into `ahe-storage-validation.json`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per project, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite. This is a root-owned test/evidence/CI slice and does not modify protocol, production or browser-storage schema.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | local-safe  | sliceable               | Reuse `tests/platform/webcrypto-capability.pw.ts` and `playwright.platform-capability.config.ts` for desktop chromium/firefox/webkit plus `ios-safari-emulation` (iPhone 15/WebKit) and `android-chrome-emulation` (Pixel 7/Chromium). Assert the **currently expected** matrix and fail on **any** improvement or regression. Publish each engine/build, Playwright build and OS into the independently GitSha/RunId-bound `test-results/phase-2j/webcrypto-capability-matrix.json` (`ts-drp/webcrypto-capability-matrix/v1`) through that config's sole setup/finalization owner and a dedicated required PR workflow. The emulation rows are structurally desktop-engine emulation, never real-device evidence. Phase 2h's closed v1/69-record `ahe-storage-validation.json` is unchanged; the artifacts have independent RunIds and meet only at the exact candidate GitSha. Physical-device evidence remains a reviewed Pre-release extension or distinct artifact. Phase 2k alone owns version currency.                                                                                                                                                                                                                                                                                                               |
 | **2k**      | **Browser-matrix currency.** At `fbdb396`, root pins `@playwright/test` exactly `1.61.1`, bundling Chromium/Chrome for Testing `149.0.7827.55`. `examples/network-spike` still declares `^1.49.1`, resolving a second installed `playwright-core@1.51.1`, although its own e2e script delegates to the root binary. Measure release-time currency instead of preserving either historical premise; add a scheduled bump and make staleness visible.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | sliceable               | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **2l**      | **Durable author-sequence issuance transaction.** Implement the production adapter for the post-freeze 0g(ii-I) `transactIssue` contract. For one structural `(objectId, author)` scope, next counter, exact canonical-preimage bytes, signature, digest, issued record and outbox entry share one strict transaction; the internal build/sign closure cannot expose bytes outside that transaction. Browser and node backends implement the same contract.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | coordinated | issuance-record atomic  | Shared contract plus real IDB/SQLite hard-kill matrix: every request/statement/commit edge recovers either the old state or the exact new counter+envelope+outbox closure, never a counter-only or envelope-only state. Same-scope callers across tabs/processes are linearizable; different scopes progress independently; throw/rejection/commit failure advances nothing; retry reselects the unconsumed ordinal; restart never signs different content for an already committed ordinal. The in-memory implementation remains an explicitly ephemeral test double and cannot satisfy this gate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
@@ -2853,6 +2853,11 @@ No heartbeat-gap distribution is added to the closed `scenarioEvidence`, aggrega
 
 The current v1 engine vocabulary is desktop Playwright regression evidence only. Real Safari/macOS, Safari/iOS, Chrome/Android, current/previous release currency, private/incognito, eviction, page lifecycle, Web Locks on/off, multitab voting and durable issuance remain with their named later owners/release gates. Any later attempt to add those records requires a reviewed schema extension rather than overloading a v1 value.
 
+Phase 2j therefore discharges its standing WebCrypto obligation through its separately versioned
+companion artifact. It does not add a field, scenario, project or record to the Phase 2h v1 aggregate.
+Physical-device release evidence likewise requires a reviewed later extension or a distinct artifact;
+neither desktop mobile emulation nor a release row is forced into Phase 2h's closed vocabulary.
+
 Phase 2h adds no vote schema, signing eligibility, receipt, pin, release, cleanup/deletion, private-mode inference, persistence request, relaxed durability, legacy/plain ID, public network dependency or production fault hook. Optional Phase 0n numeric expansion remains after the golden paths. A measured unsupported strict-durability or arming capability is a genuine fail/find-and-reslice outcome, never a hidden fallback.
 
 #### Phase 2h-a implementation closure — aggregate contract accepted
@@ -3919,6 +3924,121 @@ The authorized correction is exact:
 This is a docs-only correction. It changes no source, test, schema, dependency,
 lockfile or public surface and authorizes no 5c/6b implementation before those
 ordered phases.
+
+### Phase 2j assumption correction — preserve the storage aggregate
+
+The fresh Codex-high tests-only RED owner stopped without editing, testing or
+committing at signed HEAD `f391153efb500d0f1eb133dfc4825cfb966aac4a`.
+The five-project standing matrix, honest mobile-emulation labels, exact
+fail-on-change comparison and browser-version annotation already existed. The
+remaining row requirement said to publish those results into
+`ahe-storage-validation.json`, but the later-ratified Phase 2h v1 contract
+accepts exactly 69 records, three desktop projects, six scenarios and twelve
+aggregate keys. Its validator rejects extra fields and its device vocabulary
+cannot truthfully represent the two emulation projects. Phase 2h also says a
+later evidence class needs a reviewed extension. Inventing one in a RED would
+have reopened an accepted process-death gate and violated tests-only ownership.
+
+The required correction quorum unanimously chose a separate companion artifact:
+
+- Codex high: result SHA-256
+  `a8fa339e73e3413b93300473ed62678bddbbcbae53c85dc3055e6fe240851b04`,
+  integrity-manifest SHA-256
+  `b82dc80b05f13e8caabb58ff58e906919541ab3f850d4aabf21564e7150a5e4f`;
+- Opus 5/xhigh session `0242c463-b955-4620-982d-1220da98ca0c`:
+  initial result SHA-256
+  `daa244da201a321fb3c19c298c308ab987437df840c60482080d01f968f3cbc1`,
+  same-session reconciliation SHA-256
+  `0d105735ffeaef7e1a60040c220294132ee26701c356c1d892344e62bb36d8ac`,
+  resealed integrity-manifest SHA-256
+  `c12e386be35619187f226aaaf22b8dfcbbb1238119fc56ad9e7b8450eb6e02c4`;
+- Kimi 3/high/max-100 session `24401fec-c953-451f-a4b0-b1067437fb86`:
+  result SHA-256
+  `5d02ff305785792e28d1a825306e087bbe085c83e14e07109c8ec7fda3fe150c`,
+  followed by fresh exact-consensus session
+  `f1712aaf-56df-44bb-9a6d-2f003e2c811d`, result SHA-256
+  `0ea2d919e4cc5bcf39efcdbe0dc90f67ffaff4c7d25dbacfb3e960be2141c75e`
+  and integrity-manifest SHA-256
+  `c55ade94d0d0a0d1356ad65b2486708cfe99b2db31a225b2fd54b71707b448be`.
+
+All three authorized this exact executable contract with no blocker:
+
+1. Every Phase 2h v1 source, schema, 69-record registry, config, workflow,
+   finalizer, consumer and root command remains unchanged. Phase 2j owns
+   `test-results/phase-2j/webcrypto-capability-matrix.json`, with exact identity
+   `{schemaVersion:1, artifactKind:"ts-drp/webcrypto-capability-matrix/v1"}`.
+   Its fresh RunId is exactly
+   `phase-2j/<40-lowercase-hex-GitSha>/<lowercase-UUID-v4>`. The two independent
+   runs join only at the exact candidate GitSha; there is no wrapper aggregate.
+2. Required projects are exactly, in order, `chromium`, `firefox`, `webkit`,
+   `ios-safari-emulation`, `android-chrome-emulation`. Trusted config identity
+   fixes the underlying engine and profile: desktop Chrome/Firefox/Safari are
+   `desktop-playwright`, `emulated:false`, `realDevice:false`; iPhone 15/WebKit
+   and Pixel 7/Chromium are `desktop-engine-mobile-emulation`,
+   `emulated:true`, `realDevice:false`. Every row requires its measured profile
+   user-agent match; no body claim or `browserName` alone selects provenance.
+3. A record has exactly `schemaVersion`, `artifactKind`, `gitSha`, `runId`,
+   `projectId`, `engine`, `os`, `device`, `evidenceClass`, `probes`, `verdict`.
+   `engine` is exactly `name`, `brand`, `browserVersion`, `playwrightVersion`;
+   `os` is exactly `platform`, `arch`, `release`, with platform closed to
+   `linux | darwin`, arch to `x64 | arm64` and bounded nonempty release;
+   `device` is exactly `profile`, `emulated`, `realDevice`,
+   `profileUserAgentMatch`. Record kind is
+   `ts-drp/webcrypto-capability-record/v1`.
+4. Required probes are exactly, in order, `ed25519`, `ecdsa-p256`,
+   `ecdsa-k256`. Each records `probeId`, `operation`, `algorithmName`,
+   `namedCurve`, `requestedExtractable`, `requestedUsages`, `observedOutcome`,
+   `failureKind`, `exceptionName`. Inputs are respectively Ed25519/null,
+   ECDSA/P-256 and ECDSA/K-256, all `generateKey`, `false`,
+   `["sign","verify"]`. The validator-owned expected outcomes are
+   `non-extractable`, `non-extractable`, `unsupported` for every project.
+5. Only a genuine same-realm `DOMException` named `NotSupportedError` is
+   `unsupported`. Success is classified from the returned private key's actual
+   `extractable` bit. A missing `subtle`, malformed key or every other exception
+   is bounded `probe-error`, retaining only a bounded exception name. It is a
+   structurally valid changed observation that always fails, not an invalid
+   record and never a remembered expected value.
+6. The aggregate has exactly `schemaVersion`, `artifactKind`, `gitSha`, `runId`,
+   `requiredProjectIds`, `requiredProbeIds`, `records`, `missingProjectIds`,
+   `duplicateProjectIds`, `invalidRecordIds`, `changedProbeIds`, `verdict`.
+   Complete changed records remain embedded in project order with `verdict:fail`;
+   invalid or duplicated records do not. Aggregate pass requires exactly five
+   passing records, fifteen ordered probes and all four bounded diagnostic
+   arrays empty.
+7. The setup owner removes or refuses a prior stable artifact before making a
+   fresh run root and keeps the authoritative RunId in its own closure. Each
+   fixed known project path is create-only; a fixed duplicate marker preserves
+   the first bytes and fails that identity. Finalization uses only those fixed
+   paths—no generalized filesystem scanner or identity grammar—and writes a
+   closed failing artifact after partial or failing test runs. Absence after
+   setup/process failure fails consumption; a body-repeated RunId cannot make a
+   stale artifact current.
+8. Reuse the existing config and standing test. Merge its annotation-only build
+   test into one `observe → publish → assert` test per project, so a real change
+   leaves its failing observation. Root `e2e-test:platform` stays the quick
+   local command. A dedicated required
+   `.github/workflows/phase-2j-webcrypto-capability.yml` PR/manual check invokes
+   the config directly, verifies kind/version/current checkout GitSha/current
+   RunId/pass, and always uploads the stable artifact, run records, duplicate
+   markers and traces. It neither imports nor edits Phase 2h.
+9. The restarted tests-only RED freezes the pure closed validator/publication
+   contract; strict exception classification; fixed provenance mappings;
+   create-only/partial/stale/duplicate behavior; fail on both gains and
+   regressions; workflow/config ownership; and a guard that Phase 2h still has
+   69 tuples, three projects, six scenarios and rejects an added capability
+   key. Do not use source-string ownership assertions or grow a general scanner.
+10. The first Linux run may honestly reveal a matrix difference, including
+    K-256 producing `TypeError` rather than `NotSupportedError`. That is a
+    find-and-reslice/quorum event, never permission to weaken exception
+    classification or silently edit the expected table. Phase 2k records and
+    gates currency separately. Physical-device release proof uses a reviewed
+    later extension or distinct artifact at the release SHA; it never widens
+    either current v1 artifact.
+
+This correction changes no code, dependency, lockfile, protocol byte, browser
+schema, public API or runtime behavior. It prevents a test-evidence concern
+from perturbing the Discord/chat or MMORPG paths while turning the already-fast
+standing matrix into a durable required check.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
@@ -8280,8 +8400,10 @@ Profile-scoped. Every item names an executable artifact.
       for legacy-plane cross-room replay, which is never fixed.
 - [ ] `soak-ledger.json`: `mismatches === 0`, `totalEpochs ≥ 1e5`, `consecutiveGreenDays ≥ 30`, four-way comparison.
 - [ ] Quint model green at n=4..7 + **bidirectional** trace conformance; counterexamples replayed as vitest.
-- [ ] `ahe-storage-validation.json` complete for chromium/firefox/webkit with `missingKillPoints === []`; real
-      Safari/macOS, Safari/iOS, Chrome/Android rows at the **exact release SHA**.
+- [ ] `ahe-storage-validation.json` complete for chromium/firefox/webkit with `missingKillPoints === []`.
+- [ ] Real Safari/macOS, Safari/iOS and Chrome/Android evidence is bound to the **exact release SHA** in a
+      reviewed release-schema extension or distinct physical-device artifact, never as rows forced into
+      the closed Phase 2h or Phase 2j v1 vocabularies.
 - [ ] Signer-profile decision implemented; `eviction-double-sign.spec.ts` green.
 - [ ] Per-package coverage thresholds met; zero-coverage allowlist **empty** for safety packages.
 - [ ] Profile-table numbers met in `benchmark.yml`, cold join measured on a **≥100-compacted-epoch** fixture.
@@ -8490,7 +8612,7 @@ instrumented throughout. "Lights up" = the earliest phase at which the step beco
 | 14  | A hostile peer floods: oversized batches, dependency bombs, rotated invalid hashes, 100 Sybil keys                | Honest peers stay inside fixed CPU/RAM/queue budgets; re-request rate stays bounded; no honest room is starved                                                                        | 1                      |
 | 15  | A user asks to delete their messages                                                                              | The product does exactly what the decision record says, and the UI copy does not promise more than key-erasure can deliver                                                            | 1 (record), 7 (crypto) |
 | 16  | Operator trips the kill-switch                                                                                    | Compaction halts fleet-wide within N seconds; drill log emitted; rollback telemetry increments                                                                                        | 1, 6                   |
-| 17  | Steps 1–16 on Chromium, Firefox and WebKit — **plus any shipped Electron build, at each version still supported** | Per-engine `ahe-storage-validation.json`, `missingKillPoints === []`, and real Safari/iOS + Chrome/Android rows at the release SHA                                                    | 2, 6                   |
+| 17  | Steps 1–16 on Chromium, Firefox and WebKit — **plus any shipped Electron build, at each version still supported** | Per-engine `ahe-storage-validation.json` with `missingKillPoints === []`; separately versioned real Safari/iOS + Chrome/Android evidence at the exact release SHA                     | 2, 6                   |
 
 **Exit:** golden path 1 green on the full matrix at one SHA = the chat product is shippable, and Train C's
 claim ("production-hardened signed-command rooms with bounded history") is earned rather than asserted.
