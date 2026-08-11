@@ -207,6 +207,155 @@ export interface StoppedCleanupRevalidation {
 	readonly groups: readonly number[];
 }
 
+type CampaignSignal = "SIGKILL" | "SIGSTOP";
+type CampaignSignalStage = "browser-stop" | "child-stop";
+
+interface PinnedCampaignSignalDependencies {
+	readonly authority: ProcessCampaignAuthority;
+	afterSignal?(stage: CampaignSignalStage): Promise<void>;
+	captureForest(): readonly ProcessIdentity[];
+	signal(target: number, signal: CampaignSignal | "SIGCONT"): void;
+}
+
+function samePinnedKernelIdentity(observed: ProcessIdentity, expected: ProcessIdentity): boolean {
+	return (
+		observed.pid === expected.pid &&
+		observed.ppid === expected.ppid &&
+		observed.pgid === expected.pgid &&
+		observed.birthToken === expected.birthToken
+	);
+}
+
+function resumeExactStoppedCandidates(
+	forest: readonly ProcessIdentity[],
+	expected: readonly ProcessIdentity[],
+	signal: PinnedCampaignSignalDependencies["signal"]
+): void {
+	for (const identity of expected) {
+		const observed = forest.find(({ pid }) => pid === identity.pid);
+		if (observed === undefined || !samePinnedKernelIdentity(observed, identity) || !/T/u.test(observed.state)) continue;
+		try {
+			signal(observed.pid, "SIGCONT");
+		} catch {
+			/* Resumption after a rejected stop boundary is best-effort. */
+		}
+	}
+}
+
+function validateControllerAuthority(forest: readonly ProcessIdentity[], authority: ProcessCampaignAuthority): void {
+	const controller = forest.filter(({ pid }) => pid === authority.childRoot.ppid);
+	if (controller.length !== 1 || controller[0]?.pgid !== authority.controllerPgid)
+		throw new TypeError("FOREST_CONTRADICTION: child controller authority changed");
+}
+
+function validateLiveChildGroup(
+	forest: readonly ProcessIdentity[],
+	authority: ProcessCampaignAuthority,
+	frozen: readonly ProcessIdentity[]
+): void {
+	if (new Set(forest.map(({ pid }) => pid)).size !== forest.length)
+		throw new TypeError("FOREST_CONTRADICTION: live child forest is ambiguous");
+	validateControllerAuthority(forest, authority);
+	const expected = frozen.filter(({ pgid }) => pgid === authority.childRoot.pgid);
+	const observed = forest.filter(({ pgid }) => pgid === authority.childRoot.pgid);
+	if (
+		expected.length === 0 ||
+		observed.length !== expected.length ||
+		!expected.every((identity) => {
+			const live = observed.find(({ pid }) => pid === identity.pid);
+			return live !== undefined && sameCleanupIdentity(live, identity) && /T|Z/u.test(live.state);
+		})
+	)
+		throw new TypeError("FOREST_CONTRADICTION: live child group authority changed");
+}
+
+/**
+ * Owns the live child-first stop and browser-first kill sequence. Every
+ * negative-PGID effect receives a fresh exact-authority capture.
+ * @param dependencies - Pinned authority, capture, signal, and optional live waits.
+ * @returns The exact stopped union captured immediately before the first kill.
+ */
+export async function executePinnedCampaignSignalSequence(
+	dependencies: PinnedCampaignSignalDependencies
+): Promise<readonly ProcessIdentity[]> {
+	const initial = dependencies.captureForest();
+	validateControllerAuthority(initial, dependencies.authority);
+	const groups = validateTwoGroupForest(
+		initial,
+		dependencies.authority.childRoot.pid,
+		dependencies.authority.browserRoot.pid,
+		dependencies.authority
+	);
+	const authority: StagedFreezeAuthority = { ...dependencies.authority, initialForest: initial };
+	let expected: readonly ProcessIdentity[] = initial.filter(
+		({ pgid }) => pgid === groups.childPgid || pgid === groups.browserPgid
+	);
+	let stopAccepted = false;
+	let cleanupAttempted = false;
+
+	const rejectCapture = (forest: readonly ProcessIdentity[], error: unknown): never => {
+		cleanupAttempted = true;
+		resumeExactStoppedCandidates(forest, expected, dependencies.signal);
+		throw error;
+	};
+
+	try {
+		dependencies.signal(-groups.childPgid, "SIGSTOP");
+		stopAccepted = true;
+		await dependencies.afterSignal?.("child-stop");
+
+		const beforeBrowserStop = dependencies.captureForest();
+		try {
+			validateControllerAuthority(beforeBrowserStop, dependencies.authority);
+			const current = validateTwoGroupForest(
+				beforeBrowserStop,
+				dependencies.authority.childRoot.pid,
+				dependencies.authority.browserRoot.pid,
+				dependencies.authority
+			);
+			if (
+				current.childPgid !== groups.childPgid ||
+				current.browserPgid !== groups.browserPgid ||
+				!childGroupStoppedForFreeze(beforeBrowserStop, authority)
+			)
+				throw new TypeError("FOREST_CONTRADICTION: child stop authority changed");
+		} catch (error) {
+			rejectCapture(beforeBrowserStop, error);
+		}
+		expected = beforeBrowserStop.filter(({ pgid }) => pgid === groups.childPgid || pgid === groups.browserPgid);
+		dependencies.signal(-groups.browserPgid, "SIGSTOP");
+		await dependencies.afterSignal?.("browser-stop");
+
+		const beforeBrowserKill = dependencies.captureForest();
+		let frozen: readonly ProcessIdentity[] | undefined;
+		try {
+			validateControllerAuthority(beforeBrowserKill, dependencies.authority);
+			frozen = freezeCurrentOwnedUnion(beforeBrowserKill, authority);
+		} catch (error) {
+			return rejectCapture(beforeBrowserKill, error);
+		}
+		if (frozen === undefined)
+			return rejectCapture(beforeBrowserKill, new TypeError("FOREST_CONTRADICTION: stopped union authority changed"));
+		expected = frozen;
+		dependencies.signal(-groups.browserPgid, "SIGKILL");
+
+		const beforeChildKill = dependencies.captureForest();
+		try {
+			validateLiveChildGroup(beforeChildKill, dependencies.authority, frozen);
+		} catch (error) {
+			rejectCapture(beforeChildKill, error);
+		}
+		dependencies.signal(-groups.childPgid, "SIGKILL");
+		return frozen;
+	} catch (error) {
+		if (stopAccepted && !cleanupAttempted) {
+			const forest = dependencies.captureForest();
+			resumeExactStoppedCandidates(forest, expected, dependencies.signal);
+		}
+		throw error;
+	}
+}
+
 /**
  * Revalidates positive-PID stops before any negative-PGID cleanup signal.
  * A changed identity is best-effort resumed and never becomes group authority.
@@ -509,17 +658,21 @@ export function createProcessDeathRunner(
 			const initial = processClosure(all, childIdentity.pid);
 			const authority: StagedFreezeAuthority = { ...admissionAuthority, initialForest: initial };
 			const groups = validateTwoGroupForest(initial, childIdentity.pid, browserRoot.pid, authority);
-			process.kill(-groups.childPgid, "SIGSTOP");
-			await poll((forest) => childGroupStoppedForFreeze(forest, authority), "child group did not stop");
-			process.kill(-groups.browserPgid, "SIGSTOP");
-			let frozen: readonly ProcessIdentity[] | undefined;
-			await poll(
-				(forest) => ((frozen = freezeCurrentOwnedUnion(forest, authority)), frozen !== undefined),
-				"owned union did not freeze"
-			);
-			if (frozen === undefined) throw new TypeError("frozen forest missing");
-			process.kill(-groups.browserPgid, "SIGKILL");
-			process.kill(-groups.childPgid, "SIGKILL");
+			const frozen = await executePinnedCampaignSignalSequence({
+				afterSignal: async (stage) => {
+					if (stage === "child-stop") {
+						await poll((forest) => childGroupStoppedForFreeze(forest, authority), "child group did not stop");
+					} else {
+						await poll(
+							(forest) => freezeCurrentOwnedUnion(forest, authority) !== undefined,
+							"owned union did not freeze"
+						);
+					}
+				},
+				authority,
+				captureForest: captureProcessForest,
+				signal: (target, signal) => process.kill(target, signal),
+			});
 			const childExit = await exit;
 			if (childExit.code !== null || childExit.signal !== "SIGKILL")
 				throw new TypeError("crash child was not SIGKILLed");

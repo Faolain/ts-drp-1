@@ -196,12 +196,11 @@ test("publishes the exact real 18-edge process-death batch for this engine", asy
 	});
 	const tuples = PHASE_2H_TUPLES.filter((tuple) => tuple.engine === engine && tuple.scenario === "process-death");
 	expect(tuples).toHaveLength(18);
-	let measurement: Phase2hArmingMeasurement | undefined;
+	const measurement = await armingMeasurement(engine, page);
 	const records: Phase2hValidationRecord[] = [];
 	for (const [ordinal, tuple] of tuples.entries()) {
 		if (tuple.edge === null) throw new TypeError(`process tuple lacks edge ${tuple.tupleId}`);
 		const result = await runner.runEdge(tuple.edge, ordinal);
-		measurement ??= await armingMeasurement(engine, page);
 		expect(
 			phase2e6CaseErrors(tuple.edge, result.caseEvidence, {
 				contentProcessClass: facts.contentProcessClass,
