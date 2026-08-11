@@ -242,10 +242,17 @@ export function locateBrowserRoot(
 	profilePath: string,
 	authority: ProcessRootAuthority
 ): ProcessIdentity {
-	if (authority.childRoot.pid !== childPid || authority.profilePath !== profilePath) {
+	if (
+		!validAuthorityIdentity(authority.childRoot) ||
+		!positiveSafeInteger(authority.controllerPgid) ||
+		authority.childRoot.pid !== childPid ||
+		authority.profilePath !== profilePath
+	) {
 		throw new TypeError("browser-root authority disagrees with requested child/profile");
 	}
-	const candidates = forest.filter((identity) => identity.ppid === childPid && rootMatches(identity, authority));
+	const candidates = forest.filter(
+		(identity) => validAuthorityIdentity(identity) && identity.ppid === childPid && rootMatches(identity, authority)
+	);
 	if (candidates.length !== 1) throw new TypeError(`expected one browser root, observed ${candidates.length}`);
 	return candidates[0] as ProcessIdentity;
 }
@@ -292,9 +299,9 @@ export function parseProcessForest(output: string): readonly ProcessIdentity[] {
 				!Number.isSafeInteger(ppid) ||
 				ppid < 0 ||
 				!Number.isSafeInteger(pgid) ||
-				pgid <= 0
+				pgid < 0
 			)
-				throw new TypeError("pid/pgid must be positive and ppid must be non-negative safe integers");
+				throw new TypeError("pid must be positive and ppid/pgid must be non-negative safe integers");
 			return Object.freeze({
 				birthToken: match[4] as string,
 				command: match[6] as string,
@@ -320,7 +327,14 @@ export function validateTwoGroupForest(
 	browserPid: number,
 	authority: ProcessCampaignAuthority
 ): { readonly browserPgid: number; readonly childPgid: number; readonly ownedPids: readonly number[] } {
-	if (!validUniqueForest(forest)) throw new TypeError("forest contains malformed or ambiguous process identity");
+	if (!validUniqueObservationForest(forest))
+		throw new TypeError("forest contains malformed or ambiguous process identity");
+	if (
+		!validAuthorityIdentity(authority.childRoot) ||
+		!validAuthorityIdentity(authority.browserRoot) ||
+		!positiveSafeInteger(authority.controllerPgid)
+	)
+		throw new TypeError("campaign roots and controller require positive process-group authority");
 	if (authority.scope === "phase2h" && authority.platform !== "linux")
 		throw new TypeError("Phase 2h process-death requires Linux host authority");
 	if (authority.childRoot.pid !== childPid || authority.browserRoot.pid !== browserPid)
@@ -329,6 +343,9 @@ export function validateTwoGroupForest(
 	const browser = exactStableIdentity(forest, authority.browserRoot);
 	if (child === undefined || browser === undefined)
 		throw new TypeError("forest requires unique pinned child and browser roots");
+	const closure = processClosure(forest, child.pid);
+	if (!closure.every(validAuthorityIdentity))
+		throw new TypeError("owned process closure requires positive process-group authority");
 	if (child.pgid === browser.pgid) throw new TypeError("forest requires exactly two distinct process groups");
 	if (child.pid !== child.pgid || browser.pid !== browser.pgid || browser.ppid !== child.pid)
 		throw new TypeError("forest requires root-led child and browser process groups");
@@ -359,7 +376,7 @@ export function childGroupStoppedForFreeze(
 	authority: StagedFreezeAuthority
 ): boolean {
 	const authorized = validatedFreezeAuthority(authority);
-	if (authorized === undefined || !validUniqueForest(forest)) return false;
+	if (authorized === undefined || !validUniqueObservationForest(forest)) return false;
 	if (
 		exactStableIdentity(forest, authority.childRoot) === undefined ||
 		exactStableIdentity(forest, authority.browserRoot) === undefined
@@ -384,7 +401,7 @@ export function freezeCurrentOwnedUnion(
 	authority: StagedFreezeAuthority
 ): readonly ProcessIdentity[] | undefined {
 	const authorized = validatedFreezeAuthority(authority);
-	if (authorized === undefined || !validUniqueForest(forest)) return undefined;
+	if (authorized === undefined || !validUniqueObservationForest(forest)) return undefined;
 	if (
 		exactStableIdentity(forest, authority.childRoot) === undefined ||
 		exactStableIdentity(forest, authority.browserRoot) === undefined
@@ -400,13 +417,15 @@ export function freezeCurrentOwnedUnion(
 	return owned.every(stoppedOrZombie) ? Object.freeze([...owned]) : undefined;
 }
 
-function validUniqueForest(forest: readonly ProcessIdentity[]): boolean {
+function validUniqueObservationForest(forest: readonly ProcessIdentity[]): boolean {
 	return (
-		Array.isArray(forest) && forest.every(validIdentity) && new Set(forest.map(({ pid }) => pid)).size === forest.length
+		Array.isArray(forest) &&
+		forest.every(validObservedIdentity) &&
+		new Set(forest.map(({ pid }) => pid)).size === forest.length
 	);
 }
 
-function validIdentity(identity: ProcessIdentity): boolean {
+function validObservedIdentity(identity: ProcessIdentity): boolean {
 	return (
 		typeof identity === "object" &&
 		identity !== null &&
@@ -415,7 +434,7 @@ function validIdentity(identity: ProcessIdentity): boolean {
 		Number.isSafeInteger(identity.ppid) &&
 		identity.ppid >= 0 &&
 		Number.isSafeInteger(identity.pgid) &&
-		identity.pgid > 0 &&
+		identity.pgid >= 0 &&
 		typeof identity.birthToken === "string" &&
 		identity.birthToken.length > 0 &&
 		typeof identity.command === "string" &&
@@ -423,6 +442,14 @@ function validIdentity(identity: ProcessIdentity): boolean {
 		typeof identity.state === "string" &&
 		identity.state.length > 0
 	);
+}
+
+function validAuthorityIdentity(identity: ProcessIdentity): boolean {
+	return validObservedIdentity(identity) && identity.pgid > 0;
+}
+
+function positiveSafeInteger(value: number): boolean {
+	return Number.isSafeInteger(value) && value > 0;
 }
 
 function sameNonStateIdentity(left: ProcessIdentity, right: ProcessIdentity): boolean {
@@ -455,9 +482,10 @@ function validatedFreezeAuthority(
 	| { readonly browserPgid: number; readonly childPgid: number; readonly initialChildGroup: readonly ProcessIdentity[] }
 	| undefined {
 	if (
-		!validIdentity(authority.childRoot) ||
-		!validIdentity(authority.browserRoot) ||
-		!validUniqueForest(authority.initialForest)
+		!validAuthorityIdentity(authority.childRoot) ||
+		!validAuthorityIdentity(authority.browserRoot) ||
+		!positiveSafeInteger(authority.controllerPgid) ||
+		!validUniqueObservationForest(authority.initialForest)
 	)
 		return undefined;
 	try {

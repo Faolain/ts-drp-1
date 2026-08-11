@@ -244,7 +244,13 @@ function resumeExactStoppedCandidates(
 
 function validateControllerAuthority(forest: readonly ProcessIdentity[], authority: ProcessCampaignAuthority): void {
 	const controller = forest.filter(({ pid }) => pid === authority.childRoot.ppid);
-	if (controller.length !== 1 || controller[0]?.pgid !== authority.controllerPgid)
+	if (
+		!Number.isSafeInteger(authority.controllerPgid) ||
+		authority.controllerPgid <= 0 ||
+		controller.length !== 1 ||
+		cleanupIdentity(controller[0]) === undefined ||
+		controller[0]?.pgid !== authority.controllerPgid
+	)
 		throw new TypeError("FOREST_CONTRADICTION: child controller authority changed");
 }
 
@@ -372,8 +378,19 @@ export function revalidateStoppedCleanupIdentities(
 	const errors: unknown[] = [];
 	const groups: number[] = [];
 	for (const identity of candidates) {
+		if (cleanupIdentity(identity) === undefined) {
+			if (Number.isSafeInteger(identity.pid) && identity.pid > 0) {
+				try {
+					resume(identity.pid);
+				} catch (error) {
+					errors.push(error);
+				}
+			}
+			errors.push(new TypeError(`UNRESOLVED_CLEANUP_GROUP: invalid group authority for ${identity.pgid}`));
+			continue;
+		}
 		const pinned = forest.find(({ pid }) => pid === identity.pid);
-		if (pinned !== undefined && sameCleanupIdentity(pinned, identity)) {
+		if (pinned !== undefined && cleanupIdentity(pinned) !== undefined && sameCleanupIdentity(pinned, identity)) {
 			groups.push(identity.pgid);
 			continue;
 		}
