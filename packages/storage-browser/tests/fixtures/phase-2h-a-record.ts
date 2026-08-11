@@ -567,6 +567,7 @@ function validateScenario(
 			break;
 		}
 		case "quota-fault": {
+			const caseEvidence = value.caseEvidence as Phase2gQuotaCaseEvidence;
 			if (
 				!hasKeys(value, [
 					"afterReopenImageDigest",
@@ -585,22 +586,24 @@ function validateScenario(
 				value.expectedState !== "old" ||
 				value.retryOutcome !== "OK" ||
 				!isHex(value.oldImageDigest, 64) ||
-				value.afterReopenImageDigest !== value.oldImageDigest ||
+				!isHex(value.afterReopenImageDigest, 64) ||
 				!isHex(value.newImageDigest, 64) ||
-				value.newImageDigest === value.oldImageDigest ||
-				value.retryImageDigest !== value.newImageDigest ||
+				!isHex(value.retryImageDigest, 64) ||
 				recovered?.kind !== "present"
 			) {
 				errors.push("quota-fault evidence digest or edge contract is invalid");
 				break;
 			}
 			try {
-				errors.push(
-					...phase2gQuotaCaseErrors(quotaEdge, value.caseEvidence as Phase2gQuotaCaseEvidence).map(
-						(error) => `quota-fault: ${error}`
-					)
-				);
-				const oldHead = quotaOldPresentHead(value.caseEvidence as Phase2gQuotaCaseEvidence);
+				if (
+					value.oldImageDigest !== phase2hEvidenceImageDigest(caseEvidence.before) ||
+					value.afterReopenImageDigest !== phase2hEvidenceImageDigest(caseEvidence.afterReopen) ||
+					value.newImageDigest !== phase2hEvidenceImageDigest(caseEvidence.expectedNew) ||
+					value.retryImageDigest !== phase2hEvidenceImageDigest(caseEvidence.retry)
+				)
+					errors.push("quota-fault image digests are unbound from source-owned case evidence");
+				errors.push(...phase2gQuotaCaseErrors(quotaEdge, caseEvidence).map((error) => `quota-fault: ${error}`));
+				const oldHead = quotaOldPresentHead(caseEvidence);
 				if (
 					oldHead?.kind !== "present" ||
 					recovered?.kind !== "present" ||

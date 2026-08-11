@@ -2,9 +2,7 @@ name: Phase 2h-a browser validation RED
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - docs/production-hardening-plan-v2
+  pull_request:
 
 permissions:
   contents: read

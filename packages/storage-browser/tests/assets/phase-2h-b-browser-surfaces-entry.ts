@@ -71,6 +71,12 @@ interface AcceptedOutput {
 	readonly workerCounter: number;
 }
 
+interface DigestCallEvent {
+	readonly algorithm: "SHA-256";
+	readonly inputBytes: readonly number[];
+	readonly realmScope: "Window";
+}
+
 function must<T>(result: ParseResult<T>): T {
 	if (!result.ok) throw new TypeError(`invalid Phase 2h-b fixture value: ${result.reason}`);
 	return result.value;
@@ -121,13 +127,29 @@ async function evidenceDigest(value: unknown): Promise<string> {
 	return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(preimage)));
 }
 
+async function observedNativeDigest(
+	algorithm: "SHA-256",
+	input: Uint8Array,
+	events: DigestCallEvent[]
+): Promise<ArrayBuffer> {
+	if (!(globalThis instanceof Window)) throw new TypeError("native digest boundary is outside Window");
+	const pending = crypto.subtle.digest(algorithm, input);
+	events.push(
+		Object.freeze({
+			algorithm,
+			inputBytes: Object.freeze([...input]),
+			realmScope: "Window",
+		})
+	);
+	return pending;
+}
+
 async function cryptoDigest(): Promise<unknown> {
 	const input = new TextEncoder().encode("browser");
-	let digestCalls = 0;
-	digestCalls += 1;
-	const observedDigestHex = hex(await crypto.subtle.digest("SHA-256", input));
+	const digestEvents: DigestCallEvent[] = [];
+	const observedDigestHex = hex(await observedNativeDigest("SHA-256", input, digestEvents));
 	return Object.freeze({
-		crypto: Object.freeze({ digestCalls, inputBytes: Object.freeze([...input]), realmScope: "Window" }),
+		crypto: Object.freeze({ digestEvents: Object.freeze(digestEvents) }),
 		evidence: Object.freeze({
 			expectedDigestHex: EXPECTED_DIGEST,
 			observedDigestHex,
@@ -178,18 +200,34 @@ function exactSummary(summary: WorkerSummary, oracle: WorkloadOracle): AcceptedO
 	});
 }
 
-async function workerResponsiveness(): Promise<unknown> {
+async function workerResponsiveness(
+	input: Readonly<{ minimumRepetitionCount: number }> = Object.freeze({ minimumRepetitionCount: 1 })
+): Promise<unknown> {
+	if (
+		!Number.isSafeInteger(input.minimumRepetitionCount) ||
+		input.minimumRepetitionCount < 1 ||
+		input.minimumRepetitionCount > MAX_REPETITIONS
+	)
+		throw new RangeError("Phase 2h-b minimum repetition count is outside the closed bound");
 	const control = await positiveControl();
 	const oracleOwner = mainThreadOracle();
 	const oracle = oracleOwner.computeMainThreadOracle();
 	const sampleOffsetsMs = [0];
 	const started = performance.now();
-	const sampler = setInterval(() => sampleOffsetsMs.push(performance.now() - started), TARGET_INTERVAL_MS);
+	let realTimerTickCount = 0;
+	const sampler = setInterval(() => {
+		realTimerTickCount += 1;
+		sampleOffsetsMs.push(performance.now() - started);
+	}, TARGET_INTERVAL_MS);
 	let worker: Worker | undefined;
-	let constructedAt = Number.NaN;
-	let acceptedAt = Number.NaN;
-	let readyCount = 0;
+	let workerConstructedAtMs = Number.NaN;
+	let workerResultAcceptedAtMs = Number.NaN;
 	let readyAccepted = false;
+	const messageBoundaryEvents: Array<
+		| Readonly<{ executionScope: string; kind: "done-message"; pageScope: string }>
+		| Readonly<{ kind: "ready-message" }>
+		| Readonly<{ kind: "request-post"; readyAtPost: boolean }>
+	> = [];
 	let pending:
 		| Readonly<{
 				id: string;
@@ -201,7 +239,7 @@ async function workerResponsiveness(): Promise<unknown> {
 	try {
 		const ready = new Promise<readonly string[]>((resolve, reject) => {
 			const timeout = setTimeout(() => reject(new Error("Phase 2h-b Worker ready timeout")), READY_TIMEOUT_MS);
-			constructedAt = performance.now();
+			workerConstructedAtMs = performance.now();
 			worker = new Worker(new URL("./phase-2h-b-operation-workload.js", import.meta.url), { type: "module" });
 			worker.onerror = (event): void => reject(new Error(`Phase 2h-b module Worker failed: ${event.message}`));
 			worker.onmessage = (event: MessageEvent<unknown>): void => {
@@ -211,7 +249,8 @@ async function workerResponsiveness(): Promise<unknown> {
 					return;
 				}
 				if (message.kind === "ready") {
-					readyCount += 1;
+					messageBoundaryEvents.push(Object.freeze({ kind: "ready-message" }));
+					const readyCount = messageBoundaryEvents.filter(({ kind }) => kind === "ready-message").length;
 					if (
 						readyCount !== 1 ||
 						!Array.isArray(message.accepts) ||
@@ -250,7 +289,15 @@ async function workerResponsiveness(): Promise<unknown> {
 						return;
 					}
 					try {
-						pending.resolve(JSON.parse(new TextDecoder().decode(chunks.payload)) as WorkerSummary);
+						const summary = JSON.parse(new TextDecoder().decode(chunks.payload)) as WorkerSummary;
+						messageBoundaryEvents.push(
+							Object.freeze({
+								executionScope: summary.workerScope,
+								kind: "done-message",
+								pageScope: globalThis.constructor.name,
+							})
+						);
+						pending.resolve(summary);
 					} catch (error) {
 						pending.reject(error);
 					}
@@ -281,6 +328,7 @@ async function workerResponsiveness(): Promise<unknown> {
 						resolve(value);
 					},
 				});
+				messageBoundaryEvents.push(Object.freeze({ kind: "request-post", readyAtPost: readyAccepted }));
 				if (!readyAccepted) throw new Error("attempted to request the Worker before ready");
 				worker?.postMessage({
 					id,
@@ -293,16 +341,23 @@ async function workerResponsiveness(): Promise<unknown> {
 			});
 			pending = undefined;
 			acceptedOutputs.push(exactSummary(summary, oracle));
-			acceptedAt = performance.now();
-			if (acceptedAt - started >= 100) break;
+			workerResultAcceptedAtMs = performance.now();
+			if (workerResultAcceptedAtMs - started >= 100 && acceptedOutputs.length >= input.minimumRepetitionCount) break;
 		}
-		const windowMs = acceptedAt - started;
+		const windowMs = workerResultAcceptedAtMs - started;
 		sampleOffsetsMs.push(windowMs);
 		clearInterval(sampler);
+		const samplerClosedAtMs = performance.now();
 		const repeated = oracleOwner.computeRepeatedMainThreadOracle(acceptedOutputs.length);
 		const total = TOTAL_VERTICES * acceptedOutputs.length;
 		if (repeated.count !== total || repeated.orderLength !== total)
 			throw new Error("repeated Window oracle totals drifted from accepted Worker executions");
+		const doneEvents = messageBoundaryEvents.filter(
+			(event): event is Extract<(typeof messageBoundaryEvents)[number], { kind: "done-message" }> =>
+				event.kind === "done-message"
+		);
+		if (doneEvents.length !== acceptedOutputs.length || doneEvents.some(({ pageScope }) => pageScope !== "Window"))
+			throw new Error("Worker results were not accepted at exact Window message boundaries");
 		return Object.freeze({
 			evidence: Object.freeze({
 				controlBlockMs: control.blockMs,
@@ -327,13 +382,23 @@ async function workerResponsiveness(): Promise<unknown> {
 			}),
 			worker: Object.freeze({
 				acceptedOutputs: Object.freeze(acceptedOutputs),
-				readyCount,
+				messageBoundaryCensus: Object.freeze({
+					pageScopeAtDone: doneEvents.at(-1)?.pageScope,
+					pageWorkloadCalls: doneEvents.filter(({ executionScope }) => executionScope === "Window").length,
+					readyMessages: messageBoundaryEvents.filter(({ kind }) => kind === "ready-message").length,
+					requestPosts: messageBoundaryEvents.filter(({ kind }) => kind === "request-post").length,
+					requestsBeforeReady: messageBoundaryEvents.filter(
+						(event) => event.kind === "request-post" && !event.readyAtPost
+					).length,
+				}),
+				realTimerTickCount,
 				repeatedSequenceOracleRoot: repeated.root,
-				requestBeforeReady: false,
+				samplerClosedAtMs,
+				samplerOpenedAtMs: started,
 				sampleOffsetsMs: Object.freeze(sampleOffsetsMs),
 				singleWorkloadOracleRoot: oracle.root,
-				workerConstructedInsideWindow: constructedAt >= started && constructedAt <= acceptedAt,
-				workerResultInsideWindow: acceptedAt >= constructedAt && acceptedAt <= started + windowMs,
+				workerConstructedAtMs,
+				workerResultAcceptedAtMs,
 			}),
 		});
 	} finally {
@@ -349,7 +414,12 @@ async function browserStore(): Promise<unknown> {
 	const bytes = Uint8Array.of(2, 8, 1, 8, 2, 8);
 	const digest = must(digestBlob(bytes));
 	const operations: string[] = [];
-	let store: AheDurableStore = await createBrowserAheDurableStore({ databaseName });
+	const factoryCallEvents: Array<Readonly<{ databaseName: string }>> = [];
+	const openStore = async (): Promise<AheDurableStore> => {
+		factoryCallEvents.push(Object.freeze({ databaseName }));
+		return createBrowserAheDurableStore({ databaseName });
+	};
+	let store: AheDurableStore = await openStore();
 	const requireOK = <T>(operation: string, result: StoreResult<T>): T => {
 		if (!result.ok) throw new Error(`${operation} failed: ${String(result.reason)}`);
 		operations.push("OK");
@@ -374,7 +444,7 @@ async function browserStore(): Promise<unknown> {
 		);
 		await store.close();
 		operations.push("OK");
-		store = await createBrowserAheDurableStore({ databaseName });
+		store = await openStore();
 		operations.push("OK");
 		const recovery = requireOK("recoverActiveGeneration", await store.recoverActiveGeneration(objectId));
 		if (recovery.kind !== "active") throw new Error("production browser store did not recover the active generation");
@@ -403,8 +473,8 @@ async function browserStore(): Promise<unknown> {
 			recoveredHead,
 			store: Object.freeze({
 				databaseVersion: schema.version,
+				factoryCallEvents: Object.freeze(factoryCallEvents),
 				operationResults: Object.freeze(operations),
-				productionFactory: true,
 				recoveredImage: recovery,
 				storeNames: schema.storeNames,
 			}),
@@ -442,6 +512,10 @@ async function runBrowserSurfaces(): Promise<unknown> {
 	});
 }
 
-Reflect.set(globalThis, "phase2hBBrowserSurfaces", Object.freeze({ run: runBrowserSurfaces }));
+Reflect.set(
+	globalThis,
+	"phase2hBBrowserSurfaces",
+	Object.freeze({ run: runBrowserSurfaces, runWorkerResponsiveness: workerResponsiveness })
+);
 
 export {};

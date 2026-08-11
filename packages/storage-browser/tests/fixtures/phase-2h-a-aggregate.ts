@@ -326,11 +326,12 @@ function attributedRecord(
 }
 
 function diagnosticIdentity(value: unknown): value is Phase2hDiagnosticIdentity {
-	return (
-		(typeof value === "string" && phase2hTuple(value) !== undefined) ||
-		(typeof value === "string" && /^extra-sha256:[0-9a-f]{64}$/u.test(value)) ||
-		(typeof value === "string" && /^entry-[a-z-]+-sha256:[0-9a-f]{64}$/u.test(value))
-	);
+	if (typeof value !== "string" || utf8(value).byteLength > 160) return false;
+	if (phase2hTuple(value) !== undefined || /^extra-sha256:[0-9a-f]{64}$/u.test(value)) return true;
+	return PHASE_2H_ENTRY_REASONS.some((reason) => {
+		const prefix = `entry-${reason}-sha256:`;
+		return value.startsWith(prefix) && /^[0-9a-f]{64}$/u.test(value.slice(prefix.length));
+	});
 }
 
 function collisionMarkerDigest(basename: Uint8Array): string | null {

@@ -344,14 +344,14 @@ function scenarioEvidence(tuple: Phase2hTupleDescriptor, ordinal: number): Phase
 			return Object.freeze({ report: CAPACITY_REPORT, tag: "capacity" });
 		case "quota-fault":
 			return Object.freeze({
-				afterReopenImageDigest: "1".repeat(64),
+				afterReopenImageDigest: phase2hEvidenceImageDigest(QUOTA_CASE.afterReopen),
 				caseEvidence: QUOTA_CASE,
 				edgeId: "swap-head-certificate-match/request-05-put-objects/settlement",
 				edgeTarget: "settlement",
 				expectedState: "old",
-				newImageDigest: "2".repeat(64),
-				oldImageDigest: "1".repeat(64),
-				retryImageDigest: "2".repeat(64),
+				newImageDigest: phase2hEvidenceImageDigest(QUOTA_CASE.expectedNew),
+				oldImageDigest: phase2hEvidenceImageDigest(QUOTA_CASE.before),
+				retryImageDigest: phase2hEvidenceImageDigest(QUOTA_CASE.retry),
 				retryOutcome: "OK",
 				tag: "quota-fault",
 			});
