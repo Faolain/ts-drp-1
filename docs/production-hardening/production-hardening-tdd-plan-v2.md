@@ -1083,7 +1083,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | Slice       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Class       | Atomic?                 | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **2a**      | `packages/storage/`: implement the exact **Phase 2a storage seam v1** below — runtime-neutral brands, five-state lifecycle, returned rejection taxonomy, exact persistence codecs, narrow `AheDurableStore`, shared scenarios, non-exported transition owner/harness, and one honest public in-memory model reporting `durability: "ephemeral"` and therefore never eligible for signing. No RAM store may claim strict durability.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | state machine atomic    | `state-machine.test.ts` + shared contract: non-vacuous positive/negative `Complete`, exact expected-head CAS, full graph, precedence, codec/copy isolation, global blob races, overflow and greenfield no-plain-ID controls defined below. RED is assertion-causal via an authorized permissive scaffold, never module-resolution-only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **2b**      | **Private browser hard-kill instrument on a trivial two-record payload.** `@ts-drp/storage-browser` owns one literal-ID instrumented IDB boundary plus an independent raw-IDB oracle allowlist. A page-owned `SharedArrayBuffer` lets a dedicated Worker block at seven reviewed points × both edges. Playwright 1.61.1 creates a separate browser PGID, so the parent freezes and `SIGKILL`s the detached Node child group and browser group independently, browser first; no graceful close is permitted on the crash graph. This proves transaction atomicity under **process death**, not fsync/power-loss durability, and exports no production store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | local-safe  | infra sliceable         | `crash-driver.pw.ts`: exactly 16 closed artifacts (14 tuples + discovery + arming), exact point/prefix coverage, Worker-authenticated 3 `not-reached` + 11 `strict` durability observations, genuine two-PGID death evidence, and `fixtureRecordsDigest` recovery of exactly 13 old + 1 new with `mixed === false`. Missing, extra, malformed, timed-out, skipped, `blocked` or unsupported evidence **fails the job**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **2b**      | **Private browser hard-kill instrument on a trivial two-record payload.** `@ts-drp/storage-browser` owns one literal-ID instrumented IDB boundary plus an independent raw-IDB oracle allowlist. A page-owned `SharedArrayBuffer` lets a dedicated Worker block at seven reviewed points × both edges. The historical Playwright `1.61.1` campaign observed a separate browser PGID, so the parent freezes and `SIGKILL`s the detached Node child group and browser group independently, browser first; no graceful close is permitted on the crash graph. That version is evidence, not a timeless literal: every accepted Playwright bump must bind the exact invocation-owned version and freshly re-observe the same topology before admission. This proves transaction atomicity under **process death**, not fsync/power-loss durability, and exports no production store.                                                                                                                                                                                                                                                                                                                                                                                                                                             | local-safe  | infra sliceable         | `crash-driver.pw.ts`: exactly 16 closed artifacts (14 tuples + discovery + arming), exact point/prefix coverage, Worker-authenticated 3 `not-reached` + 11 `strict` durability observations, genuine two-PGID death evidence, and `fixtureRecordsDigest` recovery of exactly 13 old + 1 new with `mixed === false`. Missing, extra, malformed, timed-out, skipped, `blocked` or unsupported evidence **fails the job**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **2c-a**    | `packages/storage-node/`: private/unpublished SQLite adapter over `@ts-drp/storage/adapter` until 2c-b closes. Use composite `(object_id,generation_id)` primary keys, WAL, live-verified `synchronous=FULL`, enforced foreign keys, `BEGIN IMMEDIATE` for every mutation and one consistent transaction for multi-statement reads. Load authoritative rows, run one fresh synchronous shared-semantic evaluation, persist only its exact writes, `COMMIT`, then return; no `await` or persistent RAM mirror may span the transaction. Any load/decode/write/commit failure rolls back, discards tentative state and returns `SUBSTRATE_FAILURE`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | local-safe  | transaction atomic      | Frozen strict store contract plus SQLite reopen, same-column composite-key collisions, populated integrity, raw live PRAGMAs/foreign-key enforcement, detachment and before-commit rollback. A bounded non-exported fault seam and inert strict-labeled RED wrapper are allowed only while the package is private; neither is reachable from the production export map. 2c-a proves single-process transaction behavior and configuration only and never closes 2c.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **2c-b**    | Child-process `SIGKILL` matrix at every mutating statement and commit edge, including the bounded long crash campaign. Recovery is exactly the old state or one complete new closure; never a mixed journal/head/blob/promotion state. Like 2b, this proves atomicity under **process death**, not fsync, torn-write or power-loss durability: `SIGKILL` cannot distinguish SQLite `FULL` from `NORMAL`, so the live pragma evidence remains separately mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | local-safe  | process-death atomic    | Every statement/commit kill recovers exactly old XOR complete-new, retry remains valid, WAL sidecars are retained or checkpointed correctly, and no successful result is published before `COMMIT`. Phase 2 exit requires both 2c-a and 2c-b.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **2-spike** | **OPFS-vs-IDB substrate decision, before the 2d schema freezes.** Run OPFS `createSyncAccessHandle` + `flush()` and IDB `durability:"strict"` through one byte-identical Worker-owned Phase-2a staged-generation / cached-blob / promotion / pointer-swap (`swapHead`) command script, driven only through the published `@ts-drp/storage/adapter` `prepareStorageAdapterCommand` / `evaluateStorageAdapterCommand` seam. Live-read IDB's reported durability and fail fatally on any downgrade. The File System and Storage standards place OPFS and IDB in distinct endpoints of the same default local bucket, so record `sameDefaultBucket:"normative"`; real pressure-eviction behavior has no deterministic ordinary-web/Playwright trigger, so record `sameEvictionBehavior:"unmeasured"` and `realPressureEviction:"unautomatable"`. A whole-bucket clear is only `deletion-not-eviction` evidence and cannot score the substrate choice or satisfy Phase-5 custody co-eviction. `AheDurableStore` remains substrate-neutral; 2d consumes the paired decision record and cited artifact digests. S2 measures no vote slot and makes no anti-equivocation, vote-transaction, signer-state or signer-safety claim; a benchmark command outside the eight accepted `StorageAdapterCommand` kinds disqualifies the run. | local-safe  | sliceable               | Private `opfs-idb-spike/`: `substrate-bench.pw.ts` runs both arms with one byte-identical script and correctness-before-timing; `strict-idb-capability.pw.ts` proves live strict read-back and zero-write fatal fallback; `bucket-clear-codeletion.pw.ts` proves both exact payloads survive reload before one whole-bucket clear, both are absent after it, a no-clear control survives and a second origin survives. Artifacts freeze the no-claim set, runtime engine builds, scope/basis/revisit trigger, fairness/concurrency shape and durability limits. Bench JSON has no winner field; the separate `storage-substrate-decision-v1.{md,json}` cites measured digests and limits its choice to the measured generation/blob/pointer-swap workload. It records vote-slot parity as unmeasured and non-citable, names 2d and 5c as the executable owners, and carries a revisit trigger. An OPFS choice additionally requires a separately reviewed account of how 2d/5c preserve exact-byte insert-if-absent CAS inside one strict transaction; latency alone cannot select a substrate lacking that boundary. Deferred real-pressure evidence is nonblocking unless a deterministic supported trigger appears. The 2d PR links the decision record or fails review; 2d is not blocked on a pressure-eviction oracle. |
@@ -4393,6 +4393,151 @@ Quorum evidence:
 All substantive Opus review output was Opus 5. Its small automatic Haiku
 accounting produced no review output. The amendment changes the plan only; the
 fresh RED starts from the signed amendment checkpoint.
+
+#### Phase 2k / 2h corrective requalification — invocation-owned Playwright version
+
+The two-checkpoint GREEN exercised the stop rule rather than weakening old
+evidence. Signed checkpoint A
+`1bc33c04f79b94705ce87f8c30a4baf7bab4e69c` implemented the Phase 2k policy,
+custody and gates while root remained on `1.61.1`; Phase 2k was 23/23 and the
+three actual engines passed while honestly reporting and release-blocking both
+delta-two channels. Signed provisional checkpoint B
+`507237bea96ceaf7f789a51a20a9f17efde13070` refreshed to Playwright `1.62.1`
+with one installed Playwright/test/core graph. Phase 2k remained 23/23 plus
+3/3 actual engines, and Phase 2j remained 5/5 with unchanged capability
+outcomes.
+
+The required Phase 2h re-run stopped before useful browser evidence because
+several test-infrastructure types, validators, controls and b/c/d producers had
+fossilized the proposal-time value `1.61.1`. The first causal failure was
+`phase-2h-b-browser-surfaces-red.pw.ts` expecting `1.61.1` and receiving
+`1.62.1`; later records were consequently absent. Darwin's separate Linux-only
+process-death guard also fired, as designed, but it is not the version defect.
+Checkpoint B is therefore provisional and unaccepted until the exact corrected
+candidate produces authoritative Linux evidence.
+
+This was an implementation assumption error, not a reason for an evidence-v2
+schema. The normative Phase 2h contract already says
+`engine.playwrightVersion` equals the exact installed root version used by the
+invocation, with `1.61.1` merely the value at the proposal HEAD. A second
+independent Codex-high, Kimi 3/high/max-100 and Opus 5/xhigh quorum, followed by
+unanimous exact reconciliation, authorizes the following correction.
+
+1. Keep both Phase 2h artifact kinds, schema version 1, closed record/aggregate
+   key sets, exact 69-record/three-engine/six-scenario registry, source-owned
+   scenario validation, create-only custody, Linux-only rule, hard-kill
+   mechanism and Phase 2j contract unchanged. A v2 label without a new field or
+   meaning would fragment custody and is forbidden.
+2. Reuse the bounded Phase 2k Playwright graph owner rather than duplicate lock
+   parsing. Its module must be explicitly main-module-only on CLI execution and
+   import with no output, exit-code or filesystem side effect. It exports only
+   the bounded current graph resolution/audit needed here; it does not become a
+   configurable dependency scanner.
+3. One Phase 2h test-infrastructure resolver privately mints an immutable
+   branded invocation identity. There is no exported cast or alternate mint.
+   Minting succeeds only when all seven legs agree on one canonical exact
+   stable-1.x value: root manifest pin; every workspace importer declaration;
+   root lock importer plus single package resolutions; exactly one installed
+   `@playwright/test`/`playwright`/`playwright-core` graph; resolution from the
+   Phase 2h config's realpath context; independently resolved runtime package
+   version; and that graph's `playwright-core/browsers.json`. A missing, ranged,
+   duplicated, noncanonical or disagreeing leg fails before a run exists.
+4. The config publishes only exact
+   `metadata.phase2hPlaywrightVersion`. `globalSetup(config)` performs a fresh,
+   context-keyed realpath resolution with no cross-context memoization and
+   compares the metadata before `preparePhase2hRun`, RunId creation, directory
+   creation or publication. A RED fixture with two disagreeing resolution
+   contexts must prove the abort precedes every run side effect.
+5. Thread the required branded version through the internal layout, publisher,
+   parent closure, `Phase2hRecordExpectation`, aggregation input, current
+   aggregate consumer and b/c/d producer self-checks. The existing record field
+   becomes a canonical stable-1.x string whose runtime validation requires
+   exact equality with the closure-owned expectation. All 69 records are
+   therefore uniform by construction. Records and aggregate bodies never
+   self-attest the expected version.
+6. Environment transport is only the child's mandatory comparison value. An
+   absent, malformed or forged environment value fails the child check; parent,
+   finalizer and aggregate remain closure-authoritative and reject the resulting
+   missing, invalid or mismatched evidence rather than consuming environment as
+   authority. Cleanup removes the transport on success and failure.
+7. A launched `browser.version()` disagreement with the same graph's
+   `browsers.json` uses a distinct stable tooling-identity diagnostic. It is not
+   mislabeled as a storage, process-death or durability failure.
+8. Export one explicit historical-control value, exactly `1.61.1`, and pass it
+   mechanically at old fixture/control call sites. An adjacency/allowlist sweep
+   distinguishes those justified historical references from executable current
+   literals. Historical artifacts remain immutable; the frozen S4 generator and
+   its old decision artifacts are not rerun or rewritten.
+
+The fresh Codex-high corrective RED is tests-only. It adds one focused
+table-driven Phase 2h version-requalification test and, only if essential, a
+test-local builder. It freezes: current `1.62.1` accepted only under matching
+trusted expectation; old `1.61.1` accepted only by explicit historical control;
+required parameter/no default; each one-leg graph/config/runtime mismatch;
+two-context pre-RunId abort; import side-effect safety; malformed/forged/absent
+environment; one mixed record in an otherwise complete 69 set; wrong expected
+version at current consumption; distinct browser-registry drift attribution;
+and unchanged v1 keys/kinds/69/3/6. It uses runtime fixtures, not source tokens,
+AST interpretation or a new scanner.
+
+Corrective GREEN may edit only the bounded Phase 2k graph owner and Phase 2h
+test config, resolver, setup, layout/publication, parent publisher, record and
+aggregate validators, controls, b/c/d producers/readers and mechanical test
+call sites that supply current or historical expectations. It changes no
+production source, public API, protocol byte, storage schema, registry,
+hard-kill semantics, Phase 2j expectation or historical artifact.
+
+Local verification includes the corrective tests, complete Phase 2h contract
+controls, Phase 2k 23/23 plus its three engines, Phase 2j 5/5, lint and
+typecheck. Darwin must continue to reject authoritative process-death admission
+before arming/signal/publication and cannot close this correction. Acceptance
+requires one new signed corrected checkpoint pushed at its exact SHA and an
+`ubuntu-latest` x64 run of the existing Phase 2h workflow with:
+
+- all 69 records in exact order, three engines and six scenarios;
+- all records carrying `playwrightVersion:"1.62.1"`, equal to manifest, every
+  importer, lock, installed graph, config context, runtime and browser registry;
+- all diagnostic arrays empty and aggregate `verdict:"pass"`;
+- all 54 process-death records retaining genuine browser-first two-PGID
+  SIGSTOP/SIGKILL evidence and all three native admissions; and
+- same-candidate Phase 2j 5/5 with byte-identical capability outcomes.
+
+If topology, capability outcomes, registry/schema/vocabulary, storage behavior
+or a Playwright major changes, stop and reslice. Otherwise later stable-1.x
+refreshes reuse this exact binding plus full Linux 69/69 and same-SHA Phase 2j
+without another plan amendment merely to change a version number.
+
+Quorum evidence:
+
+- Codex-high result SHA-256
+  `4e6c72fc46a84ff7ae890922c606955273e7a87a7a29446f58a89cc79af5da3b`,
+  manifest SHA-256
+  `695f881a059588b030187b11aaf8512e87b0549892c2546453a0f609188df6f3`;
+- Kimi 3/high/max-100 result SHA-256
+  `8bea6877a3a94ce6dff873496aff4a5a13164c136c3e7858078218b26915175a`,
+  manifest SHA-256
+  `4cb24b61c45e41c3a66c83c2e5d759081bfdc644054024184323b676c34ccf53`;
+- Opus 5/xhigh result SHA-256
+  `94c69902e884309420817dc4111a93a9d674e6cfa738ca75dc7f58bdce6ab7a0`,
+  initial manifest SHA-256
+  `fba2bb704d89d074ca65a3e56b5e2034f23d56d7fea763fbb15389f6db78f6f4`;
+- exact reconciliations: Kimi result SHA-256
+  `a7386a97ef6fba9201fdfb840d0eb1e4ec1eb41ab074e2c1c75a3169f1d1c5d4`
+  and manifest
+  `a0dfd4cfd91c4d62269d7c7ee0d1daf1967c55bf06020b0c1f298d1c25a78e45`;
+  Opus result SHA-256
+  `2693b2e55e2edb1aac65f624148582e685bb215239dda6aee05d5af5dfe0bcfa`
+  and updated manifest
+  `2f0b21f5cfd9e73822322ff34703f8e744ca1826a131f4eff720d7aa81ae687a`;
+  final five-refinement Kimi assent SHA-256
+  `404491ff63b988c1bf9334eddf8ef30e04a7247af15358f2920eddc37b616ed6`
+  and manifest
+  `3fd2b16d374a6f8e10cc404e03112ba61b0e01f61a55ed63d191ecf72dfa706a`;
+  Codex approved both exact reconciliations without changes.
+
+All substantive Opus output was Opus 5; its small automatic Haiku accounting
+produced no review conclusion. Provisional checkpoint B remains an auditable
+stop artifact, not accepted GREEN evidence.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
