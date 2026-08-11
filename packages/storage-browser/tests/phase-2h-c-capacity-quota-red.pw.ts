@@ -21,11 +21,8 @@ import {
 	type Phase2hWebLocksMode,
 	validatePhase2hRecord,
 } from "./fixtures/phase-2h-a-record.js";
-import {
-	type Phase2hEngineName,
-	PHASE_2H_KILL_TUPLE_IDS,
-	PHASE_2H_REQUIRED_TUPLE_IDS,
-} from "./fixtures/phase-2h-a-registry.js";
+import { type Phase2hEngineName } from "./fixtures/phase-2h-a-registry.js";
+import { phase2hCampaignCheckpointErrors } from "./fixtures/phase-2h-d-composed-campaign.js";
 
 interface CapacityObservation {
 	readonly factoryArity: 0;
@@ -324,16 +321,11 @@ test("RED: publishes only the exact trace-derived settlement quota case", async 
 	validateRecord(engine, record);
 	await submitToParent(engine, record);
 
-	if (engine === "webkit") {
-		const layout = currentLayout();
-		const diagnostic = aggregatePhase2h({
-			...readPhase2hRunEntries(layout.runRoot),
-			gitSha: layout.gitSha,
-			runId: layout.runId,
-		});
-		expect(diagnostic.records.map(({ tupleId }) => tupleId)).toEqual(PHASE_2H_REQUIRED_TUPLE_IDS.slice(0, 15));
-		expect(diagnostic.missingTupleIds).toEqual([...PHASE_2H_KILL_TUPLE_IDS].sort());
-		expect(diagnostic.missingKillPoints).toEqual([...PHASE_2H_KILL_TUPLE_IDS].sort());
-		expect(diagnostic.verdict).toBe("fail");
-	}
+	const layout = currentLayout();
+	const diagnostic = aggregatePhase2h({
+		...readPhase2hRunEntries(layout.runRoot),
+		gitSha: layout.gitSha,
+		runId: layout.runId,
+	});
+	expect(phase2hCampaignCheckpointErrors(diagnostic, { checkpoint: "non-kill-complete", engine })).toEqual([]);
 });

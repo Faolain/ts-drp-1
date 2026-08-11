@@ -15,7 +15,8 @@ import {
 	type Phase2hWebLocksMode,
 	validatePhase2hRecord,
 } from "./fixtures/phase-2h-a-record.js";
-import { type Phase2hEngineName, PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_TUPLES } from "./fixtures/phase-2h-a-registry.js";
+import { type Phase2hEngineName, PHASE_2H_TUPLES } from "./fixtures/phase-2h-a-registry.js";
+import { phase2hCampaignCheckpointErrors } from "./fixtures/phase-2h-d-composed-campaign.js";
 
 type BrowserSurfaceScenario = "browser-store" | "crypto-digest" | "worker-responsiveness";
 type BrowserSurfaceEvidence = Extract<Phase2hScenarioEvidence, { tag: BrowserSurfaceScenario }>;
@@ -97,17 +98,6 @@ const require = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = String((require("@playwright/test/package.json") as Readonly<{ version: unknown }>).version);
 
 let server: AssetServer;
-
-function compareUtf8(left: string, right: string): number {
-	const leftBytes = new TextEncoder().encode(left);
-	const rightBytes = new TextEncoder().encode(right);
-	const length = Math.min(leftBytes.byteLength, rightBytes.byteLength);
-	for (let index = 0; index < length; index++) {
-		const difference = (leftBytes[index] ?? 0) - (rightBytes[index] ?? 0);
-		if (difference !== 0) return difference;
-	}
-	return leftBytes.byteLength - rightBytes.byteLength;
-}
 
 function currentLayout(): Phase2hRunLayout {
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
@@ -335,12 +325,5 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 	expect(aggregate.duplicateTupleIds).toEqual([]);
 	expect(aggregate.extraTupleIds).toEqual([]);
 	expect(aggregate.invalidRecordIds).toEqual([]);
-	if (engine === "webkit") {
-		const recordIds = aggregate.records.map(({ tupleId }) => tupleId);
-		expect(recordIds.filter((tupleId) => SURFACE_TUPLE_IDS.includes(tupleId))).toEqual(SURFACE_TUPLE_IDS);
-		expect(aggregate.missingTupleIds.filter((tupleId) => SURFACE_TUPLE_IDS.includes(tupleId))).toEqual([]);
-		expect(aggregate.missingKillPoints).toEqual([...PHASE_2H_KILL_TUPLE_IDS].sort(compareUtf8));
-		expect(aggregate.missingKillPoints).toHaveLength(54);
-		expect(aggregate.verdict).toBe("fail");
-	}
+	expect(phase2hCampaignCheckpointErrors(aggregate, { checkpoint: "browser-surfaces-complete", engine })).toEqual([]);
 });

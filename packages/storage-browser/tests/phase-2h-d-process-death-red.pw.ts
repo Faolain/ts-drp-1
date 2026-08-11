@@ -7,10 +7,10 @@ import type { Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
 import type { Phase2hValidationRecord } from "./fixtures/phase-2h-a-record.js";
 import {
 	type Phase2hEngineName,
-	PHASE_2H_KILL_TUPLE_IDS,
 	PHASE_2H_REQUIRED_TUPLE_IDS,
 	PHASE_2H_TUPLES,
 } from "./fixtures/phase-2h-a-registry.js";
+import { phase2hCampaignCheckpointErrors } from "./fixtures/phase-2h-d-composed-campaign.js";
 
 const ACCEPTED_NON_KILL_COUNT = 15;
 const PROCESS_EDGES_PER_ENGINE = 18;
@@ -131,15 +131,15 @@ test("RED: publishes the exact ordered 18-edge hard-process-death batch for this
 		)
 		.toEqual(required.map(({ tupleId }) => tupleId));
 
-	if (engine === "webkit" && ownAccepted.length === 0) {
+	if (engine === "webkit")
 		expect
 			.soft(
-				aggregate.records.map(({ tupleId }) => tupleId),
-				"accepted 15-record prefix"
+				phase2hCampaignCheckpointErrors(aggregate, {
+					checkpoint: "campaign-complete",
+					engine,
+					validateProcessRecord: processEvidence,
+				}),
+				"complete composed campaign"
 			)
-			.toEqual(PHASE_2H_REQUIRED_TUPLE_IDS.slice(0, ACCEPTED_NON_KILL_COUNT));
-		expect.soft(aggregate.missingTupleIds).toEqual([...PHASE_2H_KILL_TUPLE_IDS].sort());
-		expect.soft(aggregate.missingKillPoints).toEqual([...PHASE_2H_KILL_TUPLE_IDS].sort());
-		expect.soft(aggregate.verdict).toBe("fail");
-	}
+			.toEqual([]);
 });
