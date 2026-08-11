@@ -3457,30 +3457,121 @@ captures and upload-on-always custody. Phase 2h-e must remove this temporary
 push trigger in the same change that adds the reviewed pull-request merge gate
 and root script.
 
-No push is authorized by this correction. After the RED/GREEN and their full
-reviews, an explicit user-authorized push must be the accepted trigger GREEN at
-the pushed head; no later commit may intervene. Custody records GitHub Actions
-`run_id`, `run_attempt`, event, head branch and head SHA. The only acceptable
-attempt has `run_attempt === 1`, event `push`, head branch exactly
+The trigger correction authorized no push by itself. The user later authorized
+the exact accepted trigger GREEN `47cda5eea4b6beaee186b9c9d094f0002f35d755`,
+which was pushed without an intervening commit and produced GitHub Actions run
+`31461597178`, attempt `1`, event `push`, on the exact feature branch and head.
+That attempt failed and is permanently retained as failed evidence; it is never
+rerun or reclassified. The PGID-zero observation correction below supersedes
+only this section's former next-run binding to the trigger GREEN. Native x64,
+exactly three complete pre-signal captures, the ordered 69/pass aggregate, five
+empty diagnostic arrays and downloaded artifact integrity remain mandatory.
+
+#### Phase 2h-d assumption-correction quorum — passive PGID-zero observation v3
+
+The authorized native x64 run exposed a real host-observation assumption that
+the isolated Linux arm64 container did not contain. Run `31461597178`, job
+`93686031010`, attempt `1`, failed on Ubuntu 24.04 x64 before any Chromium
+process-death record was published. `parseProcessForest()` rejected the
+complete host-wide `ps -A` observation at its `pgid <= 0` check; the same
+failure recurred for Firefox and WebKit, and missing producer/checkpoint records
+then cascaded. A bare Linux host may expose unrelated kernel rows with PGID
+zero, while the earlier container captures began at PID/PGID one. Filtering
+such a row would violate the complete-pre-signal-forest requirement.
+
+The failed attempt remains authoritative negative evidence. Its metadata,
+complete run log, extracted campaign log, artifact API response and downloaded
+artifacts are retained under
+`.logs/phase-2h-d-native-x64-run-31461597178/` and
+`.logs/phase-2h-d-native-x64-run-31461597178-artifacts/`. Their respective
+metadata, artifact-API, run-log, campaign-log and downloaded-manifest SHA-256
+digests are
+`7d9eb83a21b8bcc6a66d3c5a9888c51739798e45da08ef2a2cfe4d7d4aa79210`,
+`b0ab22cde37cc3f5befe76f98496add5daaca9d8d2c7bf82c79b0846751d2b2e`,
+`ff4ac0fc9dfe01a515f2aaef10c6b3607c083153502e2a98792a42cc6b5a73a5`,
+`46e2d748923ca2532a6dbb249fcb078d80e500f6f067a6ef19eda3b9c1306ecb`
+and `31824cd4c337fea4d18395039c69a07b0ca049e5dfee3509c56d4d8cfc7c98fe`.
+Artifact upload succeeded even though the campaign failed; capture-census
+acceptance was correctly skipped and no incomplete aggregate is promoted.
+
+The exact correction is
+`.logs/phase-2h-d-pgid0-observation-quorum/proposal.md`, SHA-256
+`d5c65087d53b8ce16faaf9bf45d49efc2ada956ac953ea887d60d906821c762c`.
+Fresh Codex-high ratified it in
+`.logs/phase-2h-d-pgid0-observation-quorum-codex-high/v3-verdict.md`, result
+SHA-256
+`9d208f2dfffb635540adc323125da6ccdc6a843e5fcc06d200422f651d59d3ea`.
+Exact Kimi 3/high/max-100 ratified it in fresh successful session
+`d7752811-d230-4903-bbb0-dee0c1cecd65`; its result at
+`.logs/phase-2h-d-pgid0-observation-quorum-kimi3-high-100-review/v3/retry-1/result.md`
+has SHA-256
+`bdb8b1fdcda41a0aefdb127dbffa2a266771537f5929663a2b46c030a911232d`.
+The preceding Kimi v3 process ended with exit 143 before a verdict and is
+retained as excluded stalled evidence, not a vote. Fresh Opus 5/xhigh session
+`85c76547-be15-4782-9fd4-bdf88c3734cc` ratified the same bytes at
+`.logs/phase-2h-d-pgid0-observation-quorum-opus-xhigh-review/v3/result.md`,
+result SHA-256
+`7710314db6b96347cab118a09e0cf0231fb3fadddfe709d5a8962ccd5de18400`.
+Its substantive model was `claude-opus-5`; no helper model authored or
+contributed to the decision. Duplicate/permission-interrupted Claude launch
+artifacts are excluded, and the accepted result is the same-session completion
+recorded by the v3 controller manifest.
+
+The ratified boundary distinguishes passive observation from authority:
+
+- `parseProcessForest()` accepts positive safe-integer PID, non-negative
+  safe-integer PPID and non-negative safe-integer observed PGID. It retains an
+  unrelated PGID-zero row in the complete forest instead of filtering it.
+- Every child/browser root, controller, content witness, owned or frozen
+  member, cleanup target, signal target and persisted evidence identity keeps a
+  strictly positive safe-integer PGID. JavaScript `-0 === 0`, so no zero value
+  may reach a negative-PGID `process.kill` call.
+- Complete-observation validation and strict authority/owned validation become
+  separate explicit predicates. A parse-only relaxation is insufficient, while
+  a global relaxation is unsafe. A PGID-zero row that enters a candidate child
+  closure fails before arming or signalling.
+- `Phase2e6CaseEvidence.initialForest`, `frozenForest`, child/browser roots,
+  controller/killed groups and failure-artifact owned forests keep their
+  positive-PGID schemas. There is no production source, public API, protocol,
+  aggregate key, record key or runtime-dependency change.
+
+One fresh Codex-high tests-only RED may now pin the real host shape: a complete
+forest retains one unrelated PGID-zero row while the unchanged positive
+campaign closure validates. It must also reject PGID zero at child/browser
+root, controller, witness/owned closure, freeze, cleanup and signal boundaries;
+preserve malformed/unsafe/duplicate/ambiguous controls; and keep Phase 2e6,
+Phase 2h-d, failure-artifact and signal-order meanings unchanged. A distinct
+fixture-only Codex-high GREEN follows. GREEN runs focused controls, all Phase
+2h tests, complete `storage-browser` tests, typecheck, build, format and traced
+nonempty lint to logs, followed by Grok 4.5/high, exact Kimi
+3/high/max-100 and final Opus/xhigh review.
+
+The prior next-run custody clauses are superseded only as follows. After that
+corrective RED/GREEN and their full reviews, a new explicit user-authorized
+push must have the accepted fixture-only corrective GREEN at the pushed head;
+no later commit may intervene. The only acceptable next native attempt has
+`run_attempt === 1`, event `push`, head branch exactly
 `docs/production-hardening-plan-v2`, and head SHA equal to both the accepted
-trigger GREEN and aggregate `gitSha`. A rerun cannot replace a failed,
-timed-out or contradictory first attempt. Native x64, exactly three complete
-pre-signal captures, the ordered 69/pass aggregate, five empty diagnostic
-arrays and downloaded artifact integrity remain mandatory.
+corrective GREEN and aggregate `gitSha`. Its permitted post-`5f5a72c` lineage
+is exactly accepted documentation checkpoints `ddbe140` and `da859f6`,
+tests-only trigger RED `83c2d94`, trigger-only GREEN `47cda5e`, this pre-RED
+plan amendment, the tests-only corrective RED and the fixture-only corrective
+GREEN. No other intervening commit is permitted. This amendment authorizes no
+push, dispatch, native execution, Phase 2h-d closure or Phase 2h-e work.
 
 #### Phase 2h-d implementation status — code accepted; native-x64 gate open
 
-The ratified host/content-authority implementation is now code-accepted at
-signed GREEN `5f5a72cf0487cabce98900dca2ae612ec0946800`. Phase 2h-d is **not
-closed** and Phase 2h-e must not start: the sole remaining gate is the
-human-initiated native `ubuntu-latest` x64 run through either allowed path,
-retaining complete pre-signal forests for all three engines and producing the
-exact ordered 69-record aggregate with a pass verdict and empty
-missing/duplicate/extra/invalid diagnostics. The authoritative x64 aggregate
-will bind to the later accepted trigger GREEN, whose only post-`5f5a72c`
-changes are the ratified plan checkpoint, tests-only RED and trigger-only
-GREEN; it is not expected to reuse the earlier arm64 aggregate's `gitSha`. The
-existing amd64 emulation remains non-authoritative.
+The ratified host/content-authority implementation is code-accepted at signed
+GREEN `5f5a72cf0487cabce98900dca2ae612ec0946800`, but the first native x64
+attempt at `47cda5e` failed on the passive PGID-zero observation assumption.
+Phase 2h-d is **not closed** and Phase 2h-e must not start. The current work is
+the bounded tests-only RED and fixture-only GREEN above; only after their full
+acceptance and a separately authorized exact corrective-GREEN push may a new
+native `ubuntu-latest` attempt supply three complete pre-signal forests and the
+ordered 69-record pass aggregate with empty missing/duplicate/extra/invalid
+diagnostics. That aggregate binds to the accepted corrective GREEN, not the
+earlier trigger-only GREEN, and is not expected to reuse the arm64 aggregate's
+`gitSha`. The existing amd64 emulation remains non-authoritative.
 
 The accepted TDD lineage after the v6 correction is:
 
