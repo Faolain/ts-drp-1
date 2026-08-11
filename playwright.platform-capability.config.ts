@@ -15,6 +15,8 @@ export default defineConfig({
 	expect: { timeout: 10_000 },
 	forbidOnly: Boolean(process.env.CI),
 	fullyParallel: true,
+	globalSetup: "./tests/platform/phase-2j-webcrypto-global-setup.ts",
+	outputDir: "./test-results/phase-2j/playwright",
 	projects: [
 		{ name: "chromium", use: { ...devices["Desktop Chrome"] } },
 		{ name: "firefox", use: { ...devices["Desktop Firefox"] } },
@@ -25,7 +27,7 @@ export default defineConfig({
 	reporter: "line",
 	retries: 0,
 	testDir: "./tests/platform",
-	testMatch: /.*\.pw\.ts/u,
+	testMatch: /webcrypto-capability\.pw\.ts/u,
 	timeout: 30_000,
 	use: { trace: "retain-on-failure" },
 });

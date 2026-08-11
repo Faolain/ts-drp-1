@@ -1,86 +1,163 @@
-import { expect, test } from "@playwright/test";
+import { devices, expect, test } from "@playwright/test";
+import playwrightPackage from "@playwright/test/package.json" with { type: "json" };
+import os from "node:os";
+import path from "node:path";
+
+import {
+	type Phase2jProbe,
+	phase2jProbeDescriptor,
+	phase2jProjectDescriptor,
+	type Phase2jProjectId,
+	type Phase2jPublicationLayout,
+	type Phase2jRecord,
+	PHASE_2J_PROBE_IDS,
+	PHASE_2J_PROJECT_IDS,
+	publishPhase2jRecord,
+} from "./fixtures/phase-2j-webcrypto-evidence.js";
 
 /**
- * WebCrypto capability matrix.
+ * Standing, fail-on-any-change WebCrypto evidence.
  *
- * Which curves `crypto.subtle.generateKey` accepts — and whether the resulting private key can be
- * made non-extractable — is a protocol input, not a detail. The v2 signature suite is Ed25519
- * precisely because secp256k1 is absent from WebCrypto on every engine, which makes it unusable
- * for a browser-held seal key that must be destroyed together with its vote log.
- *
- * This asserts the matrix **exactly**, so it fails on any change in either direction. A regression
- * is obviously interesting; so is an improvement, because a curve becoming available is a reason to
- * revisit the suite decision deliberately rather than to discover it years later. The matrix was
- * already ~15 months out of date once (Chromium 134 vs Chrome 137), and that staleness produced a
- * wrong answer about Ed25519 support.
- *
- * The iPhone and Pixel projects in `playwright.platform-capability.config.ts` are desktop
- * Playwright WebKit/Chromium with a mobile viewport and user-agent. They are useful engine-regression
- * proxies, but they do NOT exercise real iOS Safari or Android WebView engines, so they prove nothing
- * about mobile WebCrypto capability. Treating them as if they did would be a false assurance.
- *
- * Real-device iOS and Android measurements showing `Ed25519: non-extractable` are required at the
- * **Pre-release release gate**, after the whole feature set is green end-to-end — not as a Phase -1
- * exit gate. What that evidence gates is seal *custody*, which is a deployment-target property rather
- * than a design input: identity and vertex signing use synchronous `@noble/curves` and never touch
- * `crypto.subtle`, so an engine lacking non-extractable Ed25519 simply never holds a seal key while
- * still participating fully as a non-voter. See the plan's Phase -1 Exit gate section and D.23.4.
+ * The mobile rows are desktop Playwright engines using iPhone 15 and Pixel 7
+ * descriptors. They are engine-regression proxies, never physical-device proof.
+ * P-256 is measured but remains reserved; this test does not activate a suite.
  */
 
-type CurveSupport = "non-extractable" | "extractable" | "unsupported";
+function requiredEnvironment(name: "PHASE_2J_GIT_SHA" | "PHASE_2J_RUN_ID" | "PHASE_2J_RUN_ROOT"): string {
+	const value = process.env[name];
+	if (value === undefined || value.length === 0) throw new TypeError(`${name} was not established by global setup`);
+	return value;
+}
 
-/** The measured, reviewed matrix. Changing an entry is a deliberate act — see the doc comment. */
-const EXPECTED: Record<string, CurveSupport> = {
-	// Signature suite for v2 identity/vertex signatures and seal-voter keys.
-	"Ed25519": "non-extractable",
-	// Registry-recognized but reserved: it is not negotiable or accepted by the signature verifier.
-	"ECDSA P-256": "non-extractable",
-	// Never available in WebCrypto on any engine; this is why the seal key cannot be secp256k1.
-	"ECDSA K-256": "unsupported",
-};
+function currentLayout(): Phase2jPublicationLayout {
+	const outputBase = path.resolve("test-results/phase-2j");
+	return Object.freeze({
+		aggregatePath: path.join(outputBase, "webcrypto-capability-matrix.json"),
+		gitSha: requiredEnvironment("PHASE_2J_GIT_SHA"),
+		outputBase,
+		runId: requiredEnvironment("PHASE_2J_RUN_ID"),
+		runRoot: requiredEnvironment("PHASE_2J_RUN_ROOT"),
+	});
+}
 
-const ALGORITHMS: Record<string, EcKeyGenParams | Algorithm> = {
-	"Ed25519": { name: "Ed25519" },
-	"ECDSA P-256": { name: "ECDSA", namedCurve: "P-256" },
-	"ECDSA K-256": { name: "ECDSA", namedCurve: "K-256" },
-};
+function currentProjectId(value: string): Phase2jProjectId {
+	if (!(PHASE_2J_PROJECT_IDS as readonly string[]).includes(value))
+		throw new TypeError(`untrusted Phase 2j project: ${value}`);
+	return value as Phase2jProjectId;
+}
 
-test("WebCrypto curve support matches the reviewed matrix exactly", async ({ page, browserName }) => {
-	// Hermetic secure context: fulfil the document ourselves so `crypto.subtle` is available
-	// without reaching the network.
+test("observes, publishes and asserts the reviewed WebCrypto matrix", async ({ browser, browserName, page }) => {
 	await page.route("**/*", (route) =>
 		route.fulfill({ body: "<!doctype html><title>capability</title>", contentType: "text/html", status: 200 })
 	);
 	await page.goto("https://platform-capability.invalid/");
 
-	await expect(page.evaluate(() => Boolean(globalThis.isSecureContext && globalThis.crypto?.subtle))).resolves.toBe(
-		true
-	);
-
-	const observed = await page.evaluate(async (algorithms: Record<string, EcKeyGenParams | Algorithm>) => {
-		const result: Record<string, string> = {};
-		for (const [label, algorithm] of Object.entries(algorithms)) {
+	const observed = await page.evaluate(async () => {
+		const inputs = [
+			{ algorithmName: "Ed25519", namedCurve: null, probeId: "ed25519" },
+			{ algorithmName: "ECDSA", namedCurve: "P-256", probeId: "ecdsa-p256" },
+			{ algorithmName: "ECDSA", namedCurve: "K-256", probeId: "ecdsa-k256" },
+		] as const;
+		const probes: Array<{
+			algorithmName: "ECDSA" | "Ed25519";
+			exceptionName: null | string;
+			failureKind: "not-supported" | "probe-error" | null;
+			namedCurve: "K-256" | "P-256" | null;
+			observedOutcome: "extractable" | "non-extractable" | "probe-error" | "unsupported";
+			operation: "generateKey";
+			probeId: "ecdsa-k256" | "ecdsa-p256" | "ed25519";
+			requestedExtractable: false;
+			requestedUsages: readonly ["sign", "verify"];
+		}> = [];
+		for (const input of inputs) {
+			const algorithm: EcKeyGenParams | Algorithm =
+				input.namedCurve === null
+					? { name: input.algorithmName }
+					: { name: input.algorithmName, namedCurve: input.namedCurve };
+			let observation: Pick<(typeof probes)[number], "exceptionName" | "failureKind" | "observedOutcome">;
 			try {
+				if (globalThis.crypto?.subtle === undefined) throw new TypeError("SubtleCrypto unavailable");
 				const pair = (await crypto.subtle.generateKey(algorithm, false, ["sign", "verify"])) as CryptoKeyPair;
-				result[label] = pair.privateKey.extractable ? "extractable" : "non-extractable";
-			} catch {
-				result[label] = "unsupported";
+				if (typeof pair?.privateKey?.extractable !== "boolean") throw new TypeError("malformed key pair");
+				observation = {
+					exceptionName: null,
+					failureKind: null,
+					observedOutcome: pair.privateKey.extractable ? "extractable" : "non-extractable",
+				};
+			} catch (error) {
+				const unsupported = error instanceof DOMException && error.name === "NotSupportedError";
+				const exceptionName =
+					typeof error === "object" &&
+					error !== null &&
+					"name" in error &&
+					typeof error.name === "string" &&
+					error.name.length > 0 &&
+					error.name.length <= 256
+						? error.name
+						: null;
+				observation = unsupported
+					? {
+							exceptionName: "NotSupportedError",
+							failureKind: "not-supported",
+							observedOutcome: "unsupported",
+						}
+					: { exceptionName, failureKind: "probe-error", observedOutcome: "probe-error" };
 			}
+			probes.push({
+				...input,
+				...observation,
+				operation: "generateKey",
+				requestedExtractable: false,
+				requestedUsages: ["sign", "verify"],
+			});
 		}
-		return result;
-	}, ALGORITHMS);
+		return Object.freeze({
+			isSecureContext: globalThis.isSecureContext,
+			probes,
+			userAgent: navigator.userAgent,
+		});
+	});
 
-	// Equality, not a subset check: an unexpected *gain* must fail too.
+	const projectId = currentProjectId(test.info().project.name);
+	const descriptor = phase2jProjectDescriptor(projectId);
+	const platform = os.platform();
+	const arch = os.arch();
+	if (!(platform === "darwin" || platform === "linux") || !(arch === "arm64" || arch === "x64"))
+		throw new TypeError(`unsupported Phase 2j host: ${platform}/${arch}`);
+	const probes = observed.probes as readonly Phase2jProbe[];
+	const changed = probes.some(
+		(probe, index) =>
+			probe.observedOutcome !== phase2jProbeDescriptor(PHASE_2J_PROBE_IDS[index] ?? "ed25519").expectedOutcome
+	);
+	const record: Phase2jRecord = Object.freeze({
+		artifactKind: "ts-drp/webcrypto-capability-record/v1",
+		device: Object.freeze({
+			emulated: descriptor.emulated,
+			profile: descriptor.profile,
+			profileUserAgentMatch: observed.userAgent === devices[descriptor.profile].userAgent,
+			realDevice: false,
+		}),
+		engine: Object.freeze({
+			brand: descriptor.brand,
+			browserVersion: browser.version(),
+			name: browserName,
+			playwrightVersion: playwrightPackage.version,
+		}),
+		evidenceClass: descriptor.evidenceClass,
+		gitSha: requiredEnvironment("PHASE_2J_GIT_SHA"),
+		os: Object.freeze({ arch, platform, release: os.release() }),
+		probes,
+		projectId,
+		runId: requiredEnvironment("PHASE_2J_RUN_ID"),
+		schemaVersion: 1,
+		verdict: changed ? "fail" : "pass",
+	});
+
+	publishPhase2jRecord(currentLayout(), projectId, record);
+	test.info().annotations.push({ description: browser.version(), type: `engine-build:${projectId}` });
+	expect(observed.isSecureContext, `${projectId} did not run in a secure context`).toBe(true);
 	expect(
-		observed,
-		`WebCrypto curve support changed on ${browserName}. Re-review the v2 signature suite before updating this matrix.`
-	).toEqual(EXPECTED);
-});
-
-test("engine build is recorded for the release matrix", ({ browser, browserName }) => {
-	const version = browser.version();
-	// Not an assertion about *which* version — that belongs to the currency check. This exists so
-	// every capability result in CI carries the build that produced it.
-	expect(version, `${browserName} reported no version`).toMatch(/\d+/u);
-	test.info().annotations.push({ description: version, type: `engine-build:${browserName}` });
+		record.verdict,
+		`WebCrypto support changed on ${projectId}; preserve this observation and re-review before changing expectations.`
+	).toBe("pass");
 });
