@@ -19,11 +19,6 @@ export interface Phase2hCampaignCheckpointOptions {
 const BROWSER_SURFACE_SCENARIOS = new Set(["browser-store", "crypto-digest", "worker-responsiveness"]);
 const NON_KILL_TUPLE_IDS = Object.freeze(PHASE_2H_REQUIRED_TUPLE_IDS.slice(0, 15));
 
-function completedEngines(engine: Phase2hEngineName): ReadonlySet<Phase2hEngineName> {
-	const index = PHASE_2H_ENGINES.indexOf(engine);
-	return new Set(PHASE_2H_ENGINES.slice(0, index + 1));
-}
-
 function missingRequiredRecords(aggregate: Phase2hAggregate, requiredTupleIds: readonly string[]): readonly string[] {
 	const accepted = new Set(aggregate.records.map(({ tupleId }) => tupleId));
 	return requiredTupleIds.filter((tupleId) => !accepted.has(tupleId));
@@ -55,20 +50,27 @@ export function phase2hCampaignCheckpointErrors(
 	options: Phase2hCampaignCheckpointOptions
 ): readonly string[] {
 	const errors = diagnosticErrors(aggregate);
-	const engines = completedEngines(options.engine);
+	const engineIndex = PHASE_2H_ENGINES.indexOf(options.engine);
+	if (engineIndex < 0) {
+		errors.push("engine must be registered");
+		return errors;
+	}
+	const priorEngines = new Set(PHASE_2H_ENGINES.slice(0, engineIndex));
 
 	if (options.checkpoint === "browser-surfaces-complete") {
 		const required = PHASE_2H_TUPLES.filter(
-			({ engine, scenario }) => engines.has(engine) && BROWSER_SURFACE_SCENARIOS.has(scenario)
+			({ engine, scenario }) =>
+				priorEngines.has(engine) || (engine === options.engine && BROWSER_SURFACE_SCENARIOS.has(scenario))
 		).map(({ tupleId }) => tupleId);
 		for (const tupleId of missingRequiredRecords(aggregate, required)) errors.push(`missing ${tupleId}`);
 		return errors;
 	}
 
 	if (options.checkpoint === "non-kill-complete") {
-		const required = NON_KILL_TUPLE_IDS.filter((tupleId) =>
-			[...engines].some((engine) => tupleId.endsWith(`/${engine}`))
-		);
+		const required = PHASE_2H_TUPLES.filter(
+			({ engine, tupleId }) =>
+				priorEngines.has(engine) || (engine === options.engine && NON_KILL_TUPLE_IDS.includes(tupleId))
+		).map(({ tupleId }) => tupleId);
 		for (const tupleId of missingRequiredRecords(aggregate, required)) errors.push(`missing ${tupleId}`);
 		return errors;
 	}
