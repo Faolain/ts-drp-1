@@ -49,21 +49,51 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(build.exclude).toContain("playwright.protocol-v2-inert.config.ts");
 	});
 
-	it("keeps the workflow dormant, direct-config-only and upload-on-always", () => {
+	it("keeps the temporary exact-branch evidence trigger direct-config-only and upload-on-always", () => {
 		const workflowPath = path.join(repositoryRoot, ".github/workflows/phase-2h-a-browser-validation-red.yml");
 		const source = fs.readFileSync(workflowPath, "utf8");
 		const workflow = YAML.parse(source) as Record<string, unknown>;
 		const triggers = Reflect.get(workflow, "on") as Record<string, unknown>;
-		expect(Object.keys(triggers)).toEqual(["workflow_dispatch"]);
-		expect(source).not.toMatch(/^\s+(?:push|pull_request):/mu);
+		const permissions = workflow.permissions as Record<string, unknown>;
+		const jobs = workflow.jobs as Record<string, unknown>;
+		const job = jobs["native-process-death-campaign"] as Record<string, unknown>;
+		const steps = job.steps as Array<Record<string, unknown>>;
+
+		expect(Reflect.has(triggers, "pull_request")).toBe(false);
+		expect(Reflect.has(triggers, "pull_request_target")).toBe(false);
+		expect(permissions).toEqual({ contents: "read" });
+		expect(source).not.toContain("secrets.");
+		expect(Object.keys(jobs)).toEqual(["native-process-death-campaign"]);
+		expect(job["runs-on"]).toBe("ubuntu-latest");
+		expect(job["timeout-minutes"]).toBe(20);
 		expect(source).toContain(
 			"pnpm exec playwright test --config packages/storage-browser/playwright.protocol-v2.config.ts --fail-on-flaky-tests"
 		);
 		expect(source).toContain("playwright install --with-deps chromium firefox webkit");
-		expect(source).toContain("if: always()");
-		expect(source).toContain("packages/storage-browser/test-results/phase-2h/ahe-storage-validation.json");
-		expect(source).toContain("packages/storage-browser/test-results/phase-2h/phase-2h/**");
-		expect(source).toContain("packages/storage-browser/test-results/playwright-phase-2h-a/**");
+
+		const captureSteps = steps.filter(({ name }) => name === "Require all native-x64 pre-signal admission captures");
+		expect(captureSteps).toHaveLength(1);
+		expect(String(captureSteps[0]?.run).trim().split("\n")).toEqual([
+			'test "$(find packages/storage-browser/test-results/phase-2h-native-admission -name chromium.json -type f | wc -l)" -eq 1',
+			'test "$(find packages/storage-browser/test-results/phase-2h-native-admission -name firefox.json -type f | wc -l)" -eq 1',
+			'test "$(find packages/storage-browser/test-results/phase-2h-native-admission -name webkit.json -type f | wc -l)" -eq 1',
+		]);
+
+		const uploadSteps = steps.filter(({ uses }) => uses === "actions/upload-artifact@v4");
+		expect(uploadSteps).toHaveLength(1);
+		expect(uploadSteps[0]?.if).toBe("always()");
+		const upload = uploadSteps[0]?.with as Record<string, unknown>;
+		expect(upload.name).toBe("phase-2h-a-browser-validation-red");
+		expect(upload["if-no-files-found"]).toBe("error");
+		expect(String(upload.path).trim().split("\n")).toEqual([
+			"packages/storage-browser/test-results/phase-2h/ahe-storage-validation.json",
+			"packages/storage-browser/test-results/phase-2h/phase-2h/**",
+			"packages/storage-browser/test-results/playwright-phase-2h-a/**",
+			"packages/storage-browser/test-results/phase-2h-native-admission/**",
+		]);
+
+		expect(new Set(Object.keys(triggers))).toEqual(new Set(["workflow_dispatch", "push"]));
+		expect(triggers.push).toEqual({ branches: ["docs/production-hardening-plan-v2"] });
 	});
 
 	it("does not add the Phase 2h root script before 2h-e", () => {
