@@ -38,7 +38,7 @@ describe("Phase 2h-b browser-surface execution topology", () => {
 		const inertConfig = loaded.default;
 		expectBoundedSerialProjects(inertConfig);
 		expect(inertConfig.testMatch).toBe("phase-2h-a-inert-red.pw.ts");
-		expect(inertConfig.globalSetup).toBe("./tests/phase-2h-a-global-setup.ts");
+		expect(inertConfig.globalSetup).toBe("./tests/phase-2h-a-inert-global-setup.ts");
 		expect(inertConfig.outputDir).not.toBe(protocolConfig.outputDir);
 		const typecheck = JSON.parse(fs.readFileSync(path.join(packageDirectory, "tsconfig.json"), "utf8")) as {
 			include: string[];

@@ -22,9 +22,11 @@ type BrowserSurfaceScenario = "browser-store" | "crypto-digest" | "worker-respon
 type BrowserSurfaceEvidence = Extract<Phase2hScenarioEvidence, { tag: BrowserSurfaceScenario }>;
 
 interface CryptoCustody {
-	readonly digestCalls: 1;
-	readonly inputBytes: readonly number[];
-	readonly realmScope: "Window";
+	readonly digestEvents: readonly Readonly<{
+		readonly algorithm: "SHA-256";
+		readonly inputBytes: readonly number[];
+		readonly realmScope: "Window";
+	}>[];
 }
 
 interface WorkerCustody {
@@ -35,19 +37,27 @@ interface WorkerCustody {
 		readonly root: string;
 		readonly workerCounter: number;
 	}>[];
-	readonly readyCount: number;
+	readonly messageBoundaryCensus: Readonly<{
+		readonly pageScopeAtDone: "Window";
+		readonly pageWorkloadCalls: 0;
+		readonly readyMessages: 1;
+		readonly requestPosts: number;
+		readonly requestsBeforeReady: 0;
+	}>;
+	readonly realTimerTickCount: number;
 	readonly repeatedSequenceOracleRoot: string;
-	readonly requestBeforeReady: boolean;
+	readonly samplerClosedAtMs: number;
+	readonly samplerOpenedAtMs: number;
 	readonly sampleOffsetsMs: readonly number[];
 	readonly singleWorkloadOracleRoot: string;
-	readonly workerConstructedInsideWindow: boolean;
-	readonly workerResultInsideWindow: boolean;
+	readonly workerConstructedAtMs: number;
+	readonly workerResultAcceptedAtMs: number;
 }
 
 interface StoreCustody {
 	readonly databaseVersion: 1;
+	readonly factoryCallEvents: readonly Readonly<{ readonly databaseName: string }>[];
 	readonly operationResults: readonly string[];
-	readonly productionFactory: true;
 	readonly recoveredImage: unknown;
 	readonly storeNames: readonly string[];
 }
@@ -70,6 +80,13 @@ interface Phase2hBBrowserObservation {
 		evidence: Extract<BrowserSurfaceEvidence, { tag: "worker-responsiveness" }>;
 		worker: WorkerCustody;
 	}>;
+}
+
+interface Phase2hBBrowserHarness {
+	run(): Promise<Phase2hBBrowserObservation>;
+	runWorkerResponsiveness(
+		input: Readonly<{ minimumRepetitionCount: number }>
+	): Promise<Phase2hBBrowserObservation["workerResponsiveness"]>;
 }
 
 const ENGINE_FACTS = Object.freeze({
@@ -137,6 +154,24 @@ function maxGap(offsets: readonly number[]): number {
 	for (let index = 1; index < offsets.length; index++)
 		maximum = Math.max(maximum, (offsets[index] ?? 0) - (offsets[index - 1] ?? 0));
 	return maximum;
+}
+
+function expectWorkerCustody(worker: Phase2hBBrowserObservation["workerResponsiveness"]): void {
+	expect(worker.worker.messageBoundaryCensus).toEqual({
+		pageScopeAtDone: "Window",
+		pageWorkloadCalls: 0,
+		readyMessages: 1,
+		requestPosts: worker.evidence.repetitionCount,
+		requestsBeforeReady: 0,
+	});
+	expect(worker.worker.realTimerTickCount).toBe(worker.evidence.sampleCount - 2);
+	expect(worker.worker.realTimerTickCount).toBeGreaterThan(0);
+	expect(worker.worker.samplerOpenedAtMs).toBeLessThanOrEqual(worker.worker.workerConstructedAtMs);
+	expect(worker.worker.workerConstructedAtMs).toBeLessThanOrEqual(worker.worker.workerResultAcceptedAtMs);
+	expect(worker.worker.workerResultAcceptedAtMs).toBeLessThanOrEqual(worker.worker.samplerClosedAtMs);
+	expect(worker.worker.sampleOffsetsMs).toHaveLength(worker.evidence.sampleCount);
+	expect(worker.worker.sampleOffsetsMs[0]).toBeGreaterThanOrEqual(0);
+	expect(maxGap(worker.worker.sampleOffsetsMs)).toBeCloseTo(worker.evidence.maxGapMs, 6);
 }
 
 async function submitToParent(
@@ -225,15 +260,21 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 	await page.goto(server.issueTransitionURL("phase-2h-b.html"));
 	await page.waitForFunction(() => "phase2hBBrowserSurfaces" in globalThis);
 	const observation = await page.evaluate(async (): Promise<Phase2hBBrowserObservation> => {
-		const harness = Reflect.get(globalThis, "phase2hBBrowserSurfaces") as Readonly<{
-			run(): Promise<Phase2hBBrowserObservation>;
-		}>;
+		const harness = Reflect.get(globalThis, "phase2hBBrowserSurfaces") as Phase2hBBrowserHarness;
 		return harness.run();
 	});
 
 	expect(PLAYWRIGHT_VERSION).toBe("1.61.1");
 	expect(observation.cryptoDigest).toEqual({
-		crypto: { digestCalls: 1, inputBytes: [...new TextEncoder().encode("browser")], realmScope: "Window" },
+		crypto: {
+			digestEvents: [
+				{
+					algorithm: "SHA-256",
+					inputBytes: [...new TextEncoder().encode("browser")],
+					realmScope: "Window",
+				},
+			],
+		},
 		evidence: {
 			expectedDigestHex: EXPECTED_DIGEST,
 			observedDigestHex: EXPECTED_DIGEST,
@@ -244,13 +285,7 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 	});
 
 	const worker = observation.workerResponsiveness;
-	expect(worker.worker.readyCount).toBe(1);
-	expect(worker.worker.requestBeforeReady).toBe(false);
-	expect(worker.worker.workerConstructedInsideWindow).toBe(true);
-	expect(worker.worker.workerResultInsideWindow).toBe(true);
-	expect(worker.worker.sampleOffsetsMs).toHaveLength(worker.evidence.sampleCount);
-	expect(worker.worker.sampleOffsetsMs[0]).toBeGreaterThanOrEqual(0);
-	expect(maxGap(worker.worker.sampleOffsetsMs)).toBeCloseTo(worker.evidence.maxGapMs, 6);
+	expectWorkerCustody(worker);
 	expect(worker.evidence.controlBlockMs).toBeGreaterThanOrEqual(200);
 	expect(worker.evidence.controlGapMs).toBeGreaterThanOrEqual(150);
 	expect(worker.evidence.targetIntervalMs).toBe(5);
@@ -280,7 +315,11 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 	});
 
 	const stored = observation.browserStore;
-	expect(stored.store.productionFactory).toBe(true);
+	expect(stored.store.factoryCallEvents).toHaveLength(2);
+	expect(stored.store.factoryCallEvents.map(({ databaseName }) => databaseName)).toEqual([
+		stored.store.factoryCallEvents[0]?.databaseName,
+		stored.store.factoryCallEvents[0]?.databaseName,
+	]);
 	expect(stored.store.databaseVersion).toBe(1);
 	expect(stored.store.storeNames).toEqual(["blobs", "generations", "objects", "promotions"]);
 	expect(stored.store.operationResults).toEqual(OPERATION_SEQUENCE.map(() => "OK"));
@@ -321,9 +360,34 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 		runId: layout.runId,
 	});
 	const ownIds = SURFACE_TUPLE_IDS.filter((tupleId) => tupleId.endsWith(`/${engine}`));
-	expect(aggregate.records.map(({ tupleId }) => tupleId)).toEqual(expect.arrayContaining(ownIds));
+	const retainedOwnIds = aggregate.records.map(({ tupleId }) => tupleId).filter((tupleId) => ownIds.includes(tupleId));
+	const invalidOwnIds = aggregate.invalidRecordIds.filter((tupleId) => ownIds.includes(tupleId));
 	expect(aggregate.duplicateTupleIds).toEqual([]);
 	expect(aggregate.extraTupleIds).toEqual([]);
-	expect(aggregate.invalidRecordIds).toEqual([]);
-	expect(phase2hCampaignCheckpointErrors(aggregate, { checkpoint: "browser-surfaces-complete", engine })).toEqual([]);
+	if (platform() === "linux") {
+		expect(retainedOwnIds).toEqual(ownIds);
+		expect(aggregate.invalidRecordIds).toEqual([]);
+		expect(phase2hCampaignCheckpointErrors(aggregate, { checkpoint: "browser-surfaces-complete", engine })).toEqual([]);
+	} else {
+		expect(retainedOwnIds).toEqual([]);
+		expect(new Set(invalidOwnIds)).toEqual(new Set(ownIds));
+	}
+});
+
+test("RED: executes the real Worker path with a bounded deterministic N > 1 control", async ({ page }) => {
+	await page.goto(server.issueTransitionURL("phase-2h-b.html"));
+	await page.waitForFunction(() => "phase2hBBrowserSurfaces" in globalThis);
+	const result = await page.evaluate(async () => {
+		const harness = Reflect.get(globalThis, "phase2hBBrowserSurfaces") as Partial<Phase2hBBrowserHarness>;
+		if (typeof harness.runWorkerResponsiveness !== "function") return { kind: "absent" } as const;
+		return {
+			kind: "present" as const,
+			worker: await harness.runWorkerResponsiveness({ minimumRepetitionCount: 2 }),
+		};
+	});
+	expect(result.kind, "the bounded repeated-workload control must use the real Worker owner").toBe("present");
+	if (result.kind !== "present") return;
+	expect(result.worker.evidence.repetitionCount).toBe(2);
+	expect(result.worker.worker.acceptedOutputs).toHaveLength(2);
+	expectWorkerCustody(result.worker);
 });

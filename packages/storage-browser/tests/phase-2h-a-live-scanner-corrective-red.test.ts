@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import {
 	aggregatePhase2h,
@@ -50,6 +50,18 @@ function freshLayout(prefix: string): Phase2hRunLayout {
 
 function readTarget(value: unknown): string {
 	return Buffer.isBuffer(value) ? value.toString("utf8") : String(value);
+}
+
+function expectBodyWasNotOpened(openSpy: MockInstance, target: string): void {
+	expect(openSpy.mock.calls.filter(([candidate]) => readTarget(candidate) === target)).toEqual([]);
+}
+
+function expectBodyWasNotRead(openSpy: MockInstance, readSpy: MockInstance, target: string): void {
+	const descriptors = openSpy.mock.calls
+		.flatMap(([candidate], index) => (readTarget(candidate) === target ? [openSpy.mock.results[index]?.value] : []))
+		.filter((descriptor): descriptor is number => typeof descriptor === "number");
+	for (const descriptor of descriptors)
+		expect(readSpy.mock.calls.some(([candidate]) => candidate === descriptor)).toBe(false);
 }
 
 function stableJson(value: unknown): string {
@@ -102,7 +114,8 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 		const layout = freshLayout("phase-2h-invalid-name-");
 		const invalidPath = path.join(layout.runRoot, "records/chromium/%zz.json");
 		fs.writeFileSync(invalidPath, "body-must-not-be-read");
-		const readSpy = vi.spyOn(fs, "readFileSync");
+		const openSpy = vi.spyOn(fs, "openSync");
+		const readSpy = vi.spyOn(fs, "readSync");
 		const scan = readPhase2hRunEntries(layout.runRoot);
 		const observed = aggregatePhase2h({
 			...scan,
@@ -110,7 +123,8 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 			runId: layout.runId,
 		});
 		expect(observed.verdict).toBe("fail");
-		expect(readSpy.mock.calls.map(([target]) => readTarget(target))).not.toContain(invalidPath);
+		expectBodyWasNotOpened(openSpy, invalidPath);
+		expect(readSpy).not.toHaveBeenCalled();
 	});
 
 	it("RED: stops globally before reading a valid-looking entry after the 1,025th non-structural entry", () => {
@@ -138,9 +152,11 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 			if (["records", "collisions", "chromium", "firefox", "webkit"].includes(basename)) return fakeStats("directory");
 			return fakeStats(basename === targetName ? "file" : "symlink");
 		});
-		const readSpy = vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("{}"));
+		const openSpy = vi.spyOn(fs, "openSync");
+		const readSpy = vi.spyOn(fs, "readSync");
 		readPhase2hRunEntries(layout.runRoot);
-		expect(readSpy.mock.calls.map(([target]) => readTarget(target))).not.toContain(targetPath);
+		expectBodyWasNotOpened(openSpy, targetPath);
+		expect(readSpy).not.toHaveBeenCalled();
 	});
 
 	it("RED: detects byte 4,194,305 without an unbounded whole-file read", () => {
@@ -152,14 +168,15 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 		} finally {
 			fs.closeSync(descriptor);
 		}
-		const readSpy = vi.spyOn(fs, "readFileSync");
+		const openSpy = vi.spyOn(fs, "openSync");
+		const readSpy = vi.spyOn(fs, "readSync");
 		const observed = aggregatePhase2h({
 			...readPhase2hRunEntries(layout.runRoot),
 			gitSha: layout.gitSha,
 			runId: layout.runId,
 		});
 		expect(observed.invalidRecordIds).toContain("capacity/chromium");
-		expect(readSpy.mock.calls.map(([target]) => readTarget(target))).not.toContain(recordPath);
+		expectBodyWasNotRead(openSpy, readSpy, recordPath);
 	});
 
 	it("RED: rejects an expected structural symlink without descending into its target", () => {

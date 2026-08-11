@@ -13,8 +13,13 @@ function json(file: string): Record<string, unknown> {
 	return JSON.parse(fs.readFileSync(path.join(repositoryRoot, file), "utf8")) as Record<string, unknown>;
 }
 
+function isAncestor(ancestor: string, descendant: string): boolean {
+	const relative = path.relative(ancestor, descendant);
+	return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
 describe("Phase 2h-a configuration and governance", () => {
-	it("pins the package-local three-engine serial config outside the RunId root", () => {
+	it("pins the package-local three-engine serial config outside evidence and separates inert custody", () => {
 		expect(protocolConfig.testMatch).toEqual([
 			"phase-2h-b-browser-surfaces-red.pw.ts",
 			"phase-2h-c-capacity-quota-red.pw.ts",
@@ -31,11 +36,16 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(protocolConfig.projects?.map(({ name }) => name)).toEqual(["chromium", "firefox", "webkit"]);
 		expect(protocolConfig.use?.trace).toBe("retain-on-failure");
 		expect(protocolConfig.outputDir).toBe("./test-results/playwright-phase-2h-a");
-		expect(path.resolve("packages/storage-browser", String(protocolConfig.outputDir))).not.toContain(
-			path.resolve("packages/storage-browser/test-results/phase-2h") + path.sep
+		const runnerOutput = path.resolve("packages/storage-browser", String(protocolConfig.outputDir));
+		const runRoot = path.resolve(
+			"packages/storage-browser/test-results/phase-2h/phase-2h",
+			"a".repeat(40),
+			"00000000-0000-4000-8000-000000000000"
 		);
+		expect(isAncestor(runnerOutput, runRoot)).toBe(false);
+		expect(isAncestor(path.resolve("packages/storage-browser/test-results"), runRoot)).toBe(true);
 		expect(inertConfig.testMatch).toBe("phase-2h-a-inert-red.pw.ts");
-		expect(inertConfig.globalSetup).toBe(protocolConfig.globalSetup);
+		expect.soft(inertConfig.globalSetup).not.toBe(protocolConfig.globalSetup);
 		expect(inertConfig.projects?.map(({ name }) => name)).toEqual(["chromium", "firefox", "webkit"]);
 		expect(inertConfig.outputDir).not.toBe(protocolConfig.outputDir);
 	});
@@ -49,7 +59,29 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(build.exclude).toContain("playwright.protocol-v2-inert.config.ts");
 	});
 
-	it("keeps the temporary exact-branch evidence trigger direct-config-only and upload-on-always", () => {
+	it("keeps scratch crash-safe and teardown as the sole authoritative aggregate finalizer", () => {
+		const setupSource = fs.readFileSync(
+			path.join(repositoryRoot, "packages/storage-browser/tests/phase-2h-a-global-setup.ts"),
+			"utf8"
+		);
+		expect(setupSource).toContain('const assetRoot = path.join(packageDirectory, "test-results")');
+		expect(setupSource).not.toContain("os.tmpdir");
+		expect(setupSource.indexOf("await parent.close()", setupSource.indexOf("return async"))).toBeLessThan(
+			setupSource.indexOf("aggregatePhase2h({", setupSource.indexOf("return async"))
+		);
+		expect(setupSource.indexOf("aggregatePhase2h({", setupSource.indexOf("return async"))).toBeLessThan(
+			setupSource.indexOf("writePhase2hAggregate(layout, aggregate)", setupSource.indexOf("return async"))
+		);
+		for (const producer of Array.isArray(protocolConfig.testMatch) ? protocolConfig.testMatch : []) {
+			const producerSource = fs.readFileSync(
+				path.join(repositoryRoot, "packages/storage-browser/tests", String(producer)),
+				"utf8"
+			);
+			expect(producerSource).not.toContain("writePhase2hAggregate");
+		}
+	});
+
+	it("activates pull-request execution without the temporary push transport and preserves workflow custody", () => {
 		const workflowPath = path.join(repositoryRoot, ".github/workflows/phase-2h-a-browser-validation-red.yml");
 		const source = fs.readFileSync(workflowPath, "utf8");
 		const workflow = YAML.parse(source) as Record<string, unknown>;
@@ -59,8 +91,9 @@ describe("Phase 2h-a configuration and governance", () => {
 		const job = jobs["native-process-death-campaign"] as Record<string, unknown>;
 		const steps = job.steps as Array<Record<string, unknown>>;
 
-		expect(Reflect.has(triggers, "pull_request")).toBe(false);
-		expect(Reflect.has(triggers, "pull_request_target")).toBe(false);
+		expect.soft(Reflect.has(triggers, "pull_request")).toBe(true);
+		expect.soft(Reflect.has(triggers, "pull_request_target")).toBe(false);
+		expect.soft(Reflect.has(triggers, "push")).toBe(false);
 		expect(permissions).toEqual({ contents: "read" });
 		expect(source).not.toContain("secrets.");
 		expect(Object.keys(jobs)).toEqual(["native-process-death-campaign"]);
@@ -92,14 +125,17 @@ describe("Phase 2h-a configuration and governance", () => {
 			"packages/storage-browser/test-results/phase-2h-native-admission/**",
 		]);
 
-		expect(new Set(Object.keys(triggers))).toEqual(new Set(["workflow_dispatch", "push"]));
-		expect(triggers.push).toEqual({ branches: ["docs/production-hardening-plan-v2"] });
+		expect.soft(new Set(Object.keys(triggers))).toEqual(new Set(["workflow_dispatch", "pull_request"]));
 	});
 
-	it("does not add the Phase 2h root script before 2h-e", () => {
+	it("activates only the exact package-local Phase 2h root script", () => {
 		const rootPackage = json("package.json");
 		const scripts = rootPackage.scripts as Record<string, unknown>;
-		expect(scripts["e2e-test:protocol-v2"]).toBeUndefined();
+		expect
+			.soft(scripts["e2e-test:protocol-v2"])
+			.toBe(
+				"pnpm exec playwright test --config packages/storage-browser/playwright.protocol-v2.config.ts --fail-on-flaky-tests"
+			);
 		expect(scripts["e2e-test:storage-browser"]).not.toContain("protocol-v2");
 	});
 
