@@ -1,12 +1,6 @@
 {
-	"firstObservedBehindAtUtc": {
-		"chromium": "2026-08-11T12:00:00.000Z",
-		"firefox": "2026-08-11T12:00:00.000Z"
-	},
-	"observedBehindMajors": {
-		"chromium": 149,
-		"firefox": 151
-	},
+	"firstObservedBehindAtUtc": {},
+	"observedBehindMajors": {},
 	"safariReview": {
 		"currentVersion": "26.6",
 		"indexUrl": "https://developer.apple.com/documentation/safari-release-notes",
@@ -17,42 +11,42 @@
 	"sources": [
 		{
 			"assertedValue": "151.0.7922.77",
-			"fetchedAtUtc": "2026-08-11T12:00:00.000Z",
+			"fetchedAtUtc": "2026-08-11T22:04:36.313Z",
 			"file": "chrome-for-testing-last-known-good-versions.json",
 			"pointer": "/channels/Stable/version",
-			"sha256": "c32961adac91a99a08f156017ed5eb445ab89fdf2bff9094b6459fc03fe9499b",
+			"sha256": "f4019640ce5ac6dc4d3bab49aa4f090bd1dd814cc5f0ee8af1bfde9478fff8db",
 			"url": "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json"
 		},
 		{
 			"assertedValue": "152.0",
-			"fetchedAtUtc": "2026-08-11T12:00:00.000Z",
+			"fetchedAtUtc": "2026-08-11T22:04:36.313Z",
 			"file": "mozilla-firefox-history-major-releases.json",
 			"pointer": "/second-highest-normalized-stable",
-			"sha256": "f666ef772b82de1f70f02681627108e4846cd58c1ace119d91f5510b0d1b57aa",
+			"sha256": "7b19e2115a0eefa32fede88dc7399b0cc8b76b94f7db49e351f894c651d3fc0f",
 			"url": "https://product-details.mozilla.org/1.0/firefox_history_major_releases.json"
 		},
 		{
 			"assertedValue": "153.0.4",
-			"fetchedAtUtc": "2026-08-11T12:00:00.000Z",
+			"fetchedAtUtc": "2026-08-11T22:04:36.313Z",
 			"file": "mozilla-firefox-versions.json",
 			"pointer": "/LATEST_FIREFOX_VERSION",
-			"sha256": "9f3524f1aef0084558772bb6a95c3bc9fade4c920ee6ac6babdccfa218027a99",
+			"sha256": "34060aa65e65d0c728783e53a9aafdcdf89b6c8588b219eeae7baa18ba6a0bed",
 			"url": "https://product-details.mozilla.org/1.0/firefox_versions.json"
 		},
 		{
 			"assertedValue": "1.62.1",
-			"fetchedAtUtc": "2026-08-11T12:00:00.000Z",
+			"fetchedAtUtc": "2026-08-11T22:04:36.313Z",
 			"file": "npm-playwright-test-dist-tags.json",
 			"pointer": "/latest",
-			"sha256": "18faba4253302b8a747d86a993e73c76bdf9b9b94b425c099264f4b6964bbc51",
+			"sha256": "bcc8874c5e97fd04d65b1869a7d8385bce8e059e93288c9b2eb8c37e53707c45",
 			"url": "https://registry.npmjs.org/-/package/@playwright/test/dist-tags"
 		},
 		{
 			"assertedValue": "{\"chromium\":\"151.0.7922.34\",\"firefox\":\"153.0\",\"webkit\":\"26.5\"}",
-			"fetchedAtUtc": "2026-08-11T12:00:00.000Z",
+			"fetchedAtUtc": "2026-08-11T22:04:36.313Z",
 			"file": "playwright-browsers.json",
 			"pointer": "/browsers[installByDefault=true,name=chromium|firefox|webkit]/browserVersion",
-			"sha256": "acf55905bb8f9880463b9b3d2305fb1b36b054dd331275fa6095f8007091a806",
+			"sha256": "f306eed529599b1eaf2f8a85db9de2b23e1a3fe36c2b66434b7c9434fb627a99",
 			"url": "https://raw.githubusercontent.com/microsoft/playwright/v1.62.1/packages/playwright-core/browsers.json"
 		}
 	]
