@@ -255,7 +255,11 @@ describe("Phase 2j probe and record contract RED", () => {
 		class ForeignDOMException extends Error {
 			public override readonly name = "NotSupportedError";
 		}
-		for (const error of [new ForeignDOMException(), new DOMException("", "OperationError"), new TypeError("K-256")]) {
+		for (const error of [
+			new ForeignDOMException("foreign-sensitive-message"),
+			new DOMException("operation-sensitive-message", "OperationError"),
+			new TypeError("K-256"),
+		]) {
 			const observed = owner.classifyPhase2jProbe({ domExceptionConstructor: DOMException, error });
 			expect(observed.observedOutcome).toBe("probe-error");
 			expect(observed.failureKind).toBe("probe-error");
