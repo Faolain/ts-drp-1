@@ -3710,6 +3710,125 @@ also warned that several v4 actions' Node 20 runtimes are being forced onto
 Node 24; this is an upcoming workflow-maintenance item, not a Phase 2h-d
 acceptance failure.
 
+#### Phase 2h-e implementation closure — activation gate accepted
+
+Phase 2h-e and its parent Phase 2h are **closed** at signed GREEN
+`0401df3e72428cc130d1bf800e3aba3bf4a96ff7`, tree
+`01bc8844de84db49d496def6b6c5586e7b5d2ec7`, after signed tests-only RED
+`7d3d6dde4d8d045e195a320e150870e10ab088d9`. Phase 2 remains open: 2i, 2j,
+2k, 2l and every other Phase 2 exit conjunct remain mandatory. The next
+ordered implementation slice is 2i; this closure does not skip directly to a
+later row.
+
+The accepted TDD and evidence lineage is:
+
+- The RED froze five files and seven intended failures. It pinned removal of
+  the temporary exact-feature-branch push transport, `pull_request` plus
+  retained `workflow_dispatch`, read-only workflow permissions, the exact root
+  `e2e-test:protocol-v2` command, collision-identity closure, real inspection
+  identity without fallback, source-owned quota digests, observed digest /
+  Worker / timer / factory custody, an honest bounded N > 1 Worker control and
+  inert-output separation. RED result SHA-256 is
+  `459a283c3ac8ca30ec8562544565315011ca1eeae739f7ae1985ea62d79231e7`;
+  its frozen manifest SHA-256 is
+  `f76a3bc60b69af3a368b72563c1c26d8cf8994375c92e6a113074a181250836a`.
+- GREEN changed exactly nine workflow, root-script and test-fixture paths. It
+  changed no production source, schema, public export, dependency, lockfile,
+  threshold, ignore directive or zero-coverage allowlist. The five frozen RED
+  files remained byte-identical. Focused tests passed 25/25; the
+  storage-browser package passed 240/240 at the exact committed head; package
+  typecheck and build passed; the changed TypeScript paths passed traced
+  nonempty scoped lint; Chromium custody and the real N > 1 control passed
+  2/2; and the proportionate Phase 2e5/2e6/2e7/2f/2g preservation campaigns
+  passed. The separate inert campaign failed only its three deliberate
+  fail-closed verdict assertions and did not alter the required aggregate.
+  GREEN result SHA-256 is
+  `3ee4f141f7bce38dc3b752a6c0fddc804fa78c52718e7c74c9b47f87aa5f013f`;
+  its evidence-manifest SHA-256 is
+  `8c1560521511bdf03abfa675d29a733295433bec5c3d53f62f8f5e1c8d462047`.
+- Root build passed. Root typecheck retained only the two recorded Phase 1i
+  helper-fixture errors, and root lint retained the recorded 468-finding
+  baseline while scoped lint stayed clean. The broad root Vitest invocation
+  was bounded at five minutes because root discovery included protected log
+  probes and known RED suites; it is not represented as a green full-root
+  result. The existing coverage threshold was run without changing its
+  threshold or exclusions, but the resulting 0.58% number is **not** an
+  independent repository baseline: the package-scoped coverage command first
+  overwrote `coverage/lcov.info`, and `scripts/coverage.ts` then reread that
+  same file. This evidence-custody correction supersedes the earlier GREEN
+  result wording. It is nonblocking because the accepted diff adds no
+  production denominator and changes no coverage policy; future closure work
+  must regenerate a full-workspace LCOV input before calling the number a root
+  baseline.
+
+The required independent reviews accepted the exact GREEN with no blocker:
+
+- Grok 4.5/high normalized-result SHA-256
+  `0380a6269858ab73e24e7dcfd7e494e51fedc80a07f1a4fbc8ca9d7a0a16d8a5`,
+  integrity-manifest SHA-256
+  `4a0e27770ca9032875669cadfb76e64c535e41e31f9a16f30ea72b3a1e52381b`.
+- Kimi 3/high/max-100 result SHA-256
+  `03cba5a481af75ae96005ca24b3f321d4d750917054178187d5c4415a838a55b`,
+  integrity-manifest SHA-256
+  `c758ac03fbd708efd34e83b54aa72e144248f87744eab70f261eedcca14e933e`.
+  The authenticated session ended normally without resume. It created five
+  read-only `/tmp` copies despite the controller restriction; the controller
+  removed those exact paths and verified them absent, with no repository
+  mutation.
+- Final Opus 5/xhigh result SHA-256
+  `8ac952334151d743f3d3aa02008b3b9a0d62b9339b1ab754671031f8aa36c820`,
+  integrity-manifest SHA-256
+  `377dddd0ae92680af0f283d5771f9977a3bd5f914227c8a7b675ad60124ae2ec`.
+  Session `2437acd8-c9dd-49b1-817c-e34362d61d6c` ended normally after 121
+  turns. Every substantive message, tool selection and verdict came from
+  `claude-opus-5`; the CLI separately reported a 1,640-input / 22-output-token
+  automatic Haiku helper charge with no substantive contribution.
+
+The accepted GREEN was pushed as an ordinary implementation action without a
+separate authorization ceremony. Pull-request run `31521381395`, job
+`93878944798`, was fresh attempt `1`, event `pull_request`, and reported branch
+head `0401df3e72428cc130d1bf800e3aba3bf4a96ff7`. GitHub checked out synthetic
+merge commit `47f1f427c831d2d925231601939582e0c1f2a52d`, whose second parent is the
+exact GREEN and whose tree is byte-identical to the GREEN tree above. The job
+passed all 18 serial Playwright tests in 2.8 minutes, passed the separate
+Chromium/Firefox/WebKit admission-capture census, uploaded 73 files and
+completed in 4 minutes 49 seconds. Artifact `9113299943` has uploaded-zip
+SHA-256 `22a33118c9160590f68f200cc921374bcf1262ce811bce306d3820db4936ee31`.
+Its aggregate SHA-256 is
+`4f43470b4c0dd1c59449c700316d3d49bf284407f19e626a7e00b23ebdbfc077`:
+69 accepted records, exactly 23 per engine, one Linux x64 `os` value, all
+verdicts `pass`, and empty missing, duplicate, extra, invalid and missing-kill
+diagnostics. The aggregate correctly binds to the synthetic merge SHA rather
+than pretending that a `pull_request` checkout is the raw branch commit.
+
+Accepted nonblocking gotchas are recorded rather than hidden:
+
+1. The N > 1 control asks for a minimum of two executions but asserts exactly
+   two. A host completing two executions plus construction in under 100 ms may
+   legitimately perform a third and fail the gate. This is fail-closed only;
+   change it through a new causal RED if faster hosts reproduce it.
+2. The two `factoryCallEvents` names are compared with the first event's
+   randomly generated closure value, so that equality assertion is
+   self-referential. The real reopen proof remains the recovered committed head
+   plus raw IndexedDB schema read. The event list proves call adjacency and
+   count, not referential interception of the imported factory.
+3. `pageWorkloadCalls` partly restates a Worker scope already forced by
+   `exactSummary`; `pageScopeAtDone` is the independently observed page-side
+   field. The 160-byte collision ceiling is implemented correctly but the
+   closed identity union currently makes it defense in depth rather than the
+   causal reason the overlong mutant fails.
+4. `SERIAL_TEST_COUNT = 15` and its comment are stale after the RED expanded
+   the campaign to 18 tests. The derived global timeout is therefore tighter,
+   not looser, and the workflow's 20-minute bound still binds. Correct the
+   name/count only when a causal timeout or the next config edit warrants it.
+5. The GREEN evidence manifest covers the final GREEN logs rather than causal
+   RED logs 01-11; the separate frozen RED manifest and signed commit preserve
+   lineage. Explicit WebKit 20-sample margin telemetry and streaming
+   validate-and-discard remain optional follow-ups, not closure claims.
+6. Workflow, job and artifact names retain historical `RED` / `2h-d` wording.
+   This is cosmetic. The v4-actions Node 20-to-24 warning remains the already
+   recorded workflow-maintenance item.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
