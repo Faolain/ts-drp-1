@@ -4040,6 +4040,107 @@ schema, public API or runtime behavior. It prevents a test-evidence concern
 from perturbing the Discord/chat or MMORPG paths while turning the already-fast
 standing matrix into a durable required check.
 
+#### Phase 2j implementation closure — accepted companion evidence
+
+Phase 2j is accepted and closed. The tests-only RED is signed commit
+`d9a8e5b3f0abb5f6e2b0b87fb345497aa8d10284`. It produced thirteen causal
+failures for the absent evidence owner/config/workflow and retained three green
+controls for the five trusted project descriptors and Phase 2h's unchanged
+69-tuple/three-project/six-scenario/closed-aggregate contract. GREEN found one
+impossible RED assertion: an empty exception message was used as the forbidden
+substring even though every string contains `""`. Signed correction
+`8a801e8107f660032e96294e93d87e801f1f582c` changed only the two exception
+messages to nonempty sensitive sentinels and preserved the leak assertion.
+
+Signed GREEN `b66c5a5c4af4bd4585b644481643b0694537be98`, tree
+`efce5751d531295824f20f79adf75bfaaae7051a`, changes exactly six authorized
+test/config/workflow paths. It adds the fixed five-record/five-duplicate-marker
+evidence owner, setup-returned finalizer, current consumer and dedicated
+workflow; narrows the existing config to its sole standing spec; and merges the
+old annotation test into one `observe → publish → assert` test per project. It
+changes no production/package source, protocol byte, browser-storage schema,
+public API, dependency, lockfile, Phase 2h path or root command.
+
+Exact-head local evidence on Darwin/arm64 is:
+
+- frozen Phase 2j contract/governance: 16/16 green;
+- `pnpm e2e-test:platform`: 5/5 projects in 2.6 seconds;
+- Phase 2h preservation controls: 25/25 green;
+- scoped strict typecheck, lint, Prettier and diff checks: green;
+- current aggregate SHA-256
+  `c7a64fd09f1a69625d29c8c739ccde2aefe3c17a735938dddfb799c6fc159cab`,
+  five records/fifteen probes, all four diagnostic arrays empty and
+  `verdict:"pass"`.
+
+The required Linux PR admission is Actions run `31532498622`, job
+`93915668254`, artifact `9117523804`. All producer, consumer and upload steps
+passed. Downloaded aggregate SHA-256 is
+`5332d8635e03947d9d97f046e8856fd81a65594c4a932fbb3160d4165e20d4d0`:
+Linux/x64, Chromium `149.0.7827.55`, Firefox `151.0`, WebKit `26.5`, five
+records/fifteen probes, honest emulation labels, all diagnostics empty and
+`verdict:"pass"`. Every project measured Ed25519 and P-256 as
+`non-extractable`; K-256 produced a genuine same-realm `NotSupportedError` and
+was recorded as `unsupported`.
+
+The PR artifact truthfully binds to synthetic merge
+`af32f286d49c600d6cbb2db32cc2058423eb9671`, not by pretending the checkout was
+the raw branch commit. That merge has exact parents base
+`d041baffcd56f16c8a20564133a4a7fc108e8331` and candidate `b66c5a5…`, and its
+tree is byte-identical to candidate tree `efce5751…`. The Actions run API also
+binds head commit `b66c5a5…` to that tree. This is the already-ratified Phase 2h
+custody convention and lets both companion artifacts meet at the same tested
+checkout SHA. The merge ref is ephemeral, so this crosswalk is part of the
+durable closure record; if the base advances before merge, the new required
+merge-result run—not this run—governs.
+
+Independent acceptance is unanimous:
+
+- Grok 4.5/high session `019ff274-4cd5-7e73-a506-29921bb24637` returned
+  `ACCEPTED`; integrity-manifest SHA-256
+  `fa102db2cb432f596187adee291ff8412b7a53155b8223620d4f56b61875b92c`;
+- Kimi 3/high/max-100 session `0af762a5-63a7-4329-97d5-6fb7295730a0`
+  accepted the code, then fresh custody session
+  `5f72227c-5d63-47c9-b9d7-d801645b58ea` accepted the Linux synthetic-merge
+  proof and authorized closure; custody result SHA-256
+  `39287603959ece72300171f9836591eaa253352829f6bfe8f1cd9e7f73ebb8e8`,
+  integrity-manifest SHA-256
+  `086021c20f11496c57c67a04a70016b827856f1e01e787a617e57a497b7e5d75`;
+- Opus 5/xhigh session `074f06d8-7154-473c-9933-a68d7d88b7ce` accepted the
+  code; because its non-persistent bridge session could not be resumed after CI,
+  narrow fresh Opus 5/xhigh session `bc33f946-17dc-4913-9b40-39926536040f`
+  adjudicated only the completed Linux custody facts and authorized closure.
+  Final result SHA-256
+  `c8ce71c4321535e8847bb185651fa211d3962647f6e7e7f624d04e468081ee9a`,
+  integrity-manifest SHA-256
+  `89fe3b81ded2a3dca54b3c2b87a2ede7b4b2bf6132ccc1c99273b85607210a6f`.
+  All substantive review output was Opus 5; small automatic Haiku accounting
+  produced no review output.
+
+Accepted nonblocking gotchas and boundaries:
+
+1. `if:always()` artifact upload can add a second error when setup/install fails
+   before any evidence exists. The producer job is already red; this is custody
+   noise, not status masking.
+2. Observe-before-assert intentionally can leave a passing capability row when
+   a later secure-context assertion fails. Playwright remains red and the
+   consumer step is skipped, so no required-check bypass exists.
+3. The consumer re-derives and validates the aggregate and checks that all five
+   record files exist; it does not byte-compare those custody files with the
+   embedded records. Admission depends on the re-derived aggregate, not the
+   redundant file-presence check.
+4. `testMatch` now names the sole standing capability spec. A future platform
+   spec must be deliberately added rather than silently assumed to run here.
+5. Workflow actions remain tag-pinned at `@v4`, not commit-SHA-pinned. This is
+   optional supply-chain hardening under `contents:read`, not a Phase 2j defect.
+6. Full-repo lint/typecheck remain red only on protected log parser scope and
+   unrelated in-flight Phase 1i-b compact-history test typing. Phase 2j's scoped
+   checks, actual browsers and Phase 2h controls are green; this closure makes no
+   claim that those unrelated baselines are fixed.
+
+Phase 2 remains open. The next ordered implementation slice is 2k; real-device
+custody proof remains at the Pre-release gate and cannot be satisfied by these
+desktop-engine emulation rows.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
