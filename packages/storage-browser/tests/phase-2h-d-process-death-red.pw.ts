@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { phase2e6CaseErrors } from "./fixtures/phase-2e6-real-process-death-validator.js";
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
-import type { Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
+import { assertPhase2hWorkerPlaywrightVersion, type Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
 import type { Phase2hValidationRecord } from "./fixtures/phase-2h-a-record.js";
 import {
 	type Phase2hEngineName,
@@ -11,6 +12,7 @@ import {
 	PHASE_2H_TUPLES,
 } from "./fixtures/phase-2h-a-registry.js";
 import { phase2hCampaignCheckpointErrors } from "./fixtures/phase-2h-d-composed-campaign.js";
+import { resolvePhase2hPlaywrightIdentity } from "./fixtures/phase-2h-playwright-identity.js";
 
 const ACCEPTED_NON_KILL_COUNT = 15;
 const PROCESS_EDGES_PER_ENGINE = 18;
@@ -21,6 +23,11 @@ const CONTENT_PROCESS_CLASS = Object.freeze({
 	firefox: "firefox-contentproc",
 	webkit: "webkit-webcontent",
 } as const);
+const PLAYWRIGHT_IDENTITY = resolvePhase2hPlaywrightIdentity(fileURLToPath(import.meta.url));
+
+test.beforeAll(() => {
+	assertPhase2hWorkerPlaywrightVersion(process.env, PLAYWRIGHT_IDENTITY.playwrightVersion);
+});
 
 function engineName(value: string): Phase2hEngineName {
 	if (value !== "chromium" && value !== "firefox" && value !== "webkit")
@@ -36,8 +43,10 @@ function currentLayout(): Phase2hRunLayout {
 	const outputBase = path.join(packageDirectory, "test-results/phase-2h");
 	return Object.freeze({
 		aggregatePath: path.join(outputBase, "ahe-storage-validation.json"),
+		browserVersions: PLAYWRIGHT_IDENTITY.browserVersions,
 		gitSha,
 		outputBase,
+		playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 		runId,
 		runRoot: path.join(outputBase, runId),
 	});
@@ -97,7 +106,9 @@ test("RED: publishes the exact ordered 18-edge hard-process-death batch for this
 	const layout = currentLayout();
 	const aggregate = aggregatePhase2h({
 		...readPhase2hRunEntries(layout.runRoot),
+		browserVersions: layout.browserVersions,
 		gitSha: layout.gitSha,
+		playwrightVersion: layout.playwrightVersion,
 		runId: layout.runId,
 	});
 	const acceptedIds = aggregate.records.map(({ tupleId }) => tupleId);

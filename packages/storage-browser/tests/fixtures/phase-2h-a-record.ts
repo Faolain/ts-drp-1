@@ -43,7 +43,7 @@ export interface Phase2hEngineEvidence {
 	readonly brand: "Playwright Chromium" | "Playwright Firefox" | "Playwright WebKit";
 	readonly browserVersion: string;
 	readonly name: Phase2hEngineName;
-	readonly playwrightVersion: "1.61.1";
+	readonly playwrightVersion: string;
 	readonly userAgent: string;
 }
 
@@ -162,7 +162,9 @@ export interface Phase2hValidationRecord {
 }
 
 export interface Phase2hRecordExpectation {
+	readonly browserVersions?: Readonly<Record<Phase2hEngineName, string>>;
 	readonly gitSha: string;
+	readonly playwrightVersion?: string;
 	readonly project: Phase2hEngineName;
 	readonly runId: string;
 }
@@ -228,6 +230,10 @@ function isNonNegativeSafeInteger(value: unknown): value is number {
 
 function isPositiveSafeInteger(value: unknown): value is number {
 	return isNonNegativeSafeInteger(value) && value > 0;
+}
+
+function isCanonicalStablePlaywright1(value: unknown): value is string {
+	return typeof value === "string" && /^1\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(value);
 }
 
 function isHex(value: unknown, length: 40 | 64): value is string {
@@ -706,16 +712,31 @@ export function validatePhase2hRecord(value: unknown, expected: Phase2hRecordExp
 		errors.push("trusted submitting project does not match tuple engine");
 
 	const engineExpected = tuple === undefined ? undefined : ENGINE[tuple.engine];
+	const expectedPlaywrightVersion = Reflect.get(expected, "playwrightVersion") as unknown;
+	if (expectedPlaywrightVersion === undefined) errors.push("tooling-identity:playwright-expectation-absent");
+	else if (!isCanonicalStablePlaywright1(expectedPlaywrightVersion)) errors.push("tooling-identity:playwright-version");
+	const expectedBrowserVersion =
+		tuple === undefined
+			? undefined
+			: (Reflect.get(expected, "browserVersions") as Readonly<Record<string, unknown>> | undefined)?.[tuple.engine];
 	if (
 		engineExpected === undefined ||
 		!hasKeys(value.engine, ["brand", "browserVersion", "name", "playwrightVersion", "userAgent"]) ||
 		value.engine.name !== tuple?.engine ||
 		value.engine.brand !== engineExpected.brand ||
-		value.engine.playwrightVersion !== "1.61.1" ||
+		!isCanonicalStablePlaywright1(value.engine.playwrightVersion) ||
+		value.engine.playwrightVersion !== expectedPlaywrightVersion ||
 		!isBoundedText(value.engine.browserVersion) ||
 		!isBoundedText(value.engine.userAgent)
 	)
 		errors.push("engine evidence is invalid or disagrees with tuple/project");
+	if (
+		tuple !== undefined &&
+		(!isBoundedText(expectedBrowserVersion) ||
+			!isObject(value.engine) ||
+			value.engine.browserVersion !== expectedBrowserVersion)
+	)
+		errors.push("tooling-identity:browser-version");
 	if (
 		!hasKeys(value.os, ["arch", "platform", "release"]) ||
 		(value.os.platform !== "linux" && value.os.platform !== "darwin") ||

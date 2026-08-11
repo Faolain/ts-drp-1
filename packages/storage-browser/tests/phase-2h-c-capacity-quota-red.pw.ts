@@ -1,8 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { ExpectedHead, StorageCapabilityReport } from "@ts-drp/storage";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 import {
@@ -13,7 +13,7 @@ import {
 } from "./fixtures/phase-2g-c-quota-fault-contract.js";
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
 import { phase2hEvidenceImageDigest } from "./fixtures/phase-2h-a-evidence-digest.js";
-import type { Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
+import { assertPhase2hWorkerPlaywrightVersion, type Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
 import {
 	phase2hPersistenceMode,
 	type Phase2hPersistenceMode,
@@ -23,6 +23,7 @@ import {
 } from "./fixtures/phase-2h-a-record.js";
 import { type Phase2hEngineName } from "./fixtures/phase-2h-a-registry.js";
 import { phase2hCampaignCheckpointErrors } from "./fixtures/phase-2h-d-composed-campaign.js";
+import { resolvePhase2hPlaywrightIdentity } from "./fixtures/phase-2h-playwright-identity.js";
 
 interface CapacityObservation {
 	readonly factoryArity: 0;
@@ -65,8 +66,7 @@ const REPRESENTATIVE_EDGE = derivePhase2gQuotaEdges(declaredPhase2gObservations(
 );
 if (REPRESENTATIVE_EDGE === undefined) throw new TypeError("Phase 2h-c representative quota edge is absent");
 
-const require = createRequire(import.meta.url);
-const PLAYWRIGHT_VERSION = String((require("@playwright/test/package.json") as Readonly<{ version: unknown }>).version);
+const PLAYWRIGHT_IDENTITY = resolvePhase2hPlaywrightIdentity(fileURLToPath(import.meta.url));
 const engineObservations = new Map<Phase2hEngineName, EngineObservation>();
 let server: AssetServer;
 
@@ -78,8 +78,10 @@ function currentLayout(): Phase2hRunLayout {
 	const outputBase = path.join(packageDirectory, "test-results/phase-2h");
 	return Object.freeze({
 		aggregatePath: path.join(outputBase, "ahe-storage-validation.json"),
+		browserVersions: PLAYWRIGHT_IDENTITY.browserVersions,
 		gitSha,
 		outputBase,
+		playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 		runId,
 		runRoot: path.join(outputBase, runId),
 	});
@@ -107,7 +109,9 @@ function expectAcceptedSurfaceControls(engine: Phase2hEngineName): void {
 	const layout = currentLayout();
 	const diagnostic = aggregatePhase2h({
 		...readPhase2hRunEntries(layout.runRoot),
+		browserVersions: layout.browserVersions,
 		gitSha: layout.gitSha,
+		playwrightVersion: layout.playwrightVersion,
 		runId: layout.runId,
 	});
 	const acceptedIds = diagnostic.records
@@ -207,7 +211,7 @@ function commonRecord(
 			brand: ENGINE_FACTS[engine].brand,
 			browserVersion: observation.browserVersion,
 			name: engine,
-			playwrightVersion: PLAYWRIGHT_VERSION as "1.61.1",
+			playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 			userAgent: observation.userAgent,
 		},
 		gitSha: layout.gitSha,
@@ -225,12 +229,19 @@ function commonRecord(
 
 function validateRecord(engine: Phase2hEngineName, record: Phase2hValidationRecord): void {
 	const layout = currentLayout();
-	const validation = validatePhase2hRecord(record, { gitSha: layout.gitSha, project: engine, runId: layout.runId });
+	const validation = validatePhase2hRecord(record, {
+		browserVersions: layout.browserVersions,
+		gitSha: layout.gitSha,
+		playwrightVersion: layout.playwrightVersion,
+		project: engine,
+		runId: layout.runId,
+	});
 	expect(validation.errors).toEqual([]);
 	expect(validation.record).toBe(record);
 }
 
 test.beforeAll(async () => {
+	assertPhase2hWorkerPlaywrightVersion(process.env, PLAYWRIGHT_IDENTITY.playwrightVersion);
 	const assetDirectory = process.env.PHASE_2H_A_ASSET_DIR;
 	if (assetDirectory === undefined) throw new TypeError("Phase 2h generated asset directory is absent");
 	server = await startAssetServer(assetDirectory);
@@ -265,7 +276,9 @@ test("RED: publishes one complete real capacity report without requesting persis
 	engineObservations.set(engine, observed);
 	const prior = aggregatePhase2h({
 		...readPhase2hRunEntries(currentLayout().runRoot),
+		browserVersions: currentLayout().browserVersions,
 		gitSha: currentLayout().gitSha,
+		playwrightVersion: currentLayout().playwrightVersion,
 		runId: currentLayout().runId,
 	});
 	for (const record of prior.records.filter(({ tupleId }) => tupleId.endsWith(`/${engine}`)))
@@ -324,7 +337,9 @@ test("RED: publishes only the exact trace-derived settlement quota case", async 
 	const layout = currentLayout();
 	const diagnostic = aggregatePhase2h({
 		...readPhase2hRunEntries(layout.runRoot),
+		browserVersions: layout.browserVersions,
 		gitSha: layout.gitSha,
+		playwrightVersion: layout.playwrightVersion,
 		runId: layout.runId,
 	});
 	expect(phase2hCampaignCheckpointErrors(diagnostic, { checkpoint: "non-kill-complete", engine })).toEqual([]);

@@ -5,8 +5,10 @@ import { selectInspectionApi } from "./fixtures/phase-2g-a-inspection-scaffold.j
 import { aggregatePhase2h, type Phase2hRawEntry, phase2hStructuralEntries } from "./fixtures/phase-2h-a-aggregate.js";
 import {
 	phase2hControlRecords,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
 
@@ -43,8 +45,10 @@ function collisionMarker(identity: string): Phase2hRawEntry {
 
 function aggregate(entries: readonly Phase2hRawEntry[]): ReturnType<typeof aggregatePhase2h> {
 	return aggregatePhase2h({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		entries,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
 }
@@ -119,7 +123,9 @@ describe("Phase 2h-e activation RED", () => {
 			},
 		};
 		const observed = validatePhase2hRecord(mutant, {
+			browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 			gitSha: PHASE_2H_CONTROL_GIT_SHA,
+			playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 			project: "webkit",
 			runId: PHASE_2H_CONTROL_RUN_ID,
 		});

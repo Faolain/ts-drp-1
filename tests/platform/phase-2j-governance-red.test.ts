@@ -11,8 +11,10 @@ import {
 } from "../../packages/storage-browser/tests/fixtures/phase-2h-a-aggregate.js";
 import {
 	phase2hControlEntries,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "../../packages/storage-browser/tests/fixtures/phase-2h-a-controls.js";
 import {
 	PHASE_2H_ENGINES,
@@ -103,22 +105,31 @@ describe("Phase 2h non-widening guard", () => {
 
 	it("keeps the closed Phase 2h aggregate at twelve keys and rejects a capability key", () => {
 		const aggregate = aggregatePhase2h({
+			browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 			entries: phase2hControlEntries(),
 			gitSha: PHASE_2H_CONTROL_GIT_SHA,
+			playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 			runId: PHASE_2H_CONTROL_RUN_ID,
 		});
 		expect(aggregate.records).toHaveLength(69);
 		expect(Object.keys(aggregate)).toHaveLength(12);
 		expect(
 			consumeCurrentPhase2hAggregate(aggregate, {
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				runId: PHASE_2H_CONTROL_RUN_ID,
 			})
 		).toEqual(aggregate);
 		expect(() =>
 			consumeCurrentPhase2hAggregate(
 				{ ...aggregate, webcryptoCapability: { verdict: "pass" } },
-				{ gitSha: PHASE_2H_CONTROL_GIT_SHA, runId: PHASE_2H_CONTROL_RUN_ID }
+				{
+					browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
+					gitSha: PHASE_2H_CONTROL_GIT_SHA,
+					playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
+					runId: PHASE_2H_CONTROL_RUN_ID,
+				}
 			)
 		).toThrow(/closed/u);
 	});

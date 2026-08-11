@@ -9,8 +9,10 @@ import {
 import { phase2e6CaseErrors } from "./fixtures/phase-2e6-real-process-death-validator.js";
 import {
 	phase2hControlRecords,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { type Phase2hValidationRecord, validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
 import { PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_TUPLES } from "./fixtures/phase-2h-a-registry.js";
@@ -101,7 +103,9 @@ function replaceCaseEvidence(
 
 function validateRecord(record: unknown): ReturnType<typeof validatePhase2hRecord> {
 	return validatePhase2hRecord(record, {
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		project: "chromium",
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});

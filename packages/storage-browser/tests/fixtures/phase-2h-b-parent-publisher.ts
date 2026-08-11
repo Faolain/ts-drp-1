@@ -110,7 +110,9 @@ export function startPhase2hParentPublisher(
 			}
 			const candidate = soleRecord(body);
 			const validation = validatePhase2hRecord(candidate, {
+				browserVersions: layout.browserVersions,
 				gitSha: layout.gitSha,
+				playwrightVersion: layout.playwrightVersion,
 				project,
 				runId: layout.runId,
 			});

@@ -9,8 +9,10 @@ import {
 import {
 	phase2hControlRecords,
 	phase2hRecordEntry,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { type Phase2hEngineName, PHASE_2H_ENGINES } from "./fixtures/phase-2h-a-registry.js";
 import {
@@ -50,8 +52,10 @@ function aggregate(tupleIds: ReadonlySet<string>): Phase2hAggregate {
 		if (tupleIds.has(record.tupleId)) entries.push(phase2hRecordEntry(record));
 	}
 	return aggregatePhase2h({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		entries,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
 }

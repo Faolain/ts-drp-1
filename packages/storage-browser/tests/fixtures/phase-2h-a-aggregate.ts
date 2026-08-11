@@ -75,10 +75,12 @@ export interface Phase2hAggregate {
 }
 
 export interface Phase2hAggregationInput {
+	readonly browserVersions: Readonly<Record<Phase2hEngineName, string>>;
 	readonly census?: Phase2hSubmissionCensus;
 	readonly directoryEntryOverflow?: boolean;
 	readonly entries: readonly Phase2hRawEntry[];
 	readonly gitSha: string;
+	readonly playwrightVersion: string;
 	readonly runId: string;
 }
 
@@ -281,7 +283,9 @@ function bodyValue(entry: Phase2hRawEntry): unknown {
 function attributedRecord(
 	entry: Phase2hRawEntry,
 	filename: DecodedFilename,
+	browserVersions: Readonly<Record<Phase2hEngineName, string>>,
 	gitSha: string,
+	playwrightVersion: string,
 	runId: string
 ): AttributedRecord {
 	const project = projectScope(entry.scope);
@@ -316,7 +320,7 @@ function attributedRecord(
 			record: null,
 		});
 	}
-	const validation = validatePhase2hRecord(value, { gitSha, project, runId });
+	const validation = validatePhase2hRecord(value, { browserVersions, gitSha, playwrightVersion, project, runId });
 	return Object.freeze({
 		canonical: true,
 		diagnosticIdentity: filename.diagnosticIdentity,
@@ -457,7 +461,14 @@ export function aggregatePhase2h(input: Phase2hAggregationInput): Phase2hAggrega
 		const filename = decodeFilename(entry);
 		attributions.set(filename.diagnosticIdentity, (attributions.get(filename.diagnosticIdentity) ?? 0) + 1);
 		if (filename.extra) extra.add(filename.diagnosticIdentity);
-		const attributed = attributedRecord(entry, filename, input.gitSha, input.runId);
+		const attributed = attributedRecord(
+			entry,
+			filename,
+			input.browserVersions,
+			input.gitSha,
+			input.playwrightVersion,
+			input.runId
+		);
 		if (attributed.invalid || filename.extra || filename.requiredTupleId === null)
 			invalid.add(filename.diagnosticIdentity);
 		if (attributed.record !== null && attributed.record.verdict === "pass" && !attributed.invalid) {
@@ -569,7 +580,12 @@ export function aggregatePhase2h(input: Phase2hAggregationInput): Phase2hAggrega
  */
 export function consumeCurrentPhase2hAggregate(
 	value: unknown,
-	current: Readonly<{ gitSha: string; runId: string }>
+	current: Readonly<{
+		browserVersions: Readonly<Record<Phase2hEngineName, string>>;
+		gitSha: string;
+		playwrightVersion: string;
+		runId: string;
+	}>
 ): Phase2hAggregate {
 	if (
 		typeof value !== "object" ||
@@ -585,9 +601,33 @@ export function consumeCurrentPhase2hAggregate(
 		aggregate.artifactKind !== "ts-drp/ahe-storage-validation/v1" ||
 		aggregate.gitSha !== current.gitSha ||
 		aggregate.runId !== current.runId ||
-		!sameStrings(aggregate.requiredTupleIds, PHASE_2H_REQUIRED_TUPLE_IDS)
+		!sameStrings(aggregate.requiredTupleIds, PHASE_2H_REQUIRED_TUPLE_IDS) ||
+		aggregate.verdict !== "pass" ||
+		aggregate.records.length !== PHASE_2H_REQUIRED_TUPLE_IDS.length ||
+		!sameStrings(
+			aggregate.records.map(({ tupleId }) => tupleId),
+			PHASE_2H_REQUIRED_TUPLE_IDS
+		) ||
+		aggregate.duplicateTupleIds.length !== 0 ||
+		aggregate.extraTupleIds.length !== 0 ||
+		aggregate.invalidRecordIds.length !== 0 ||
+		aggregate.missingKillPoints.length !== 0 ||
+		aggregate.missingTupleIds.length !== 0
 	)
 		throw new TypeError("Phase 2h aggregate is stale or bound to another invocation");
+	for (const record of aggregate.records) {
+		const tuple = phase2hTuple(record.tupleId);
+		if (tuple === undefined) throw new TypeError("Phase 2h aggregate contains an unknown record identity");
+		const validation = validatePhase2hRecord(record, {
+			browserVersions: current.browserVersions,
+			gitSha: current.gitSha,
+			playwrightVersion: current.playwrightVersion,
+			project: tuple.engine,
+			runId: current.runId,
+		});
+		if (validation.record === null || validation.errors.length > 0)
+			throw new TypeError(`Phase 2h aggregate Playwright/tooling version mismatch: ${validation.errors.join(",")}`);
+	}
 	return aggregate;
 }
 

@@ -29,6 +29,12 @@ import { type Phase2hEngineName, type Phase2hTupleDescriptor, PHASE_2H_TUPLES } 
 
 export const PHASE_2H_CONTROL_GIT_SHA = "a".repeat(40);
 export const PHASE_2H_CONTROL_RUN_ID = `phase-2h/${PHASE_2H_CONTROL_GIT_SHA}/00000000-0000-4000-8000-000000000000`;
+export const PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION = "1.61.1";
+export const PHASE_2H_CONTROL_BROWSER_VERSIONS = Object.freeze({
+	chromium: "control-browser-1",
+	firefox: "control-browser-1",
+	webkit: "control-browser-1",
+} as const);
 
 function required<T>(value: T | undefined, label: string): T {
 	if (value === undefined) throw new TypeError(`missing Phase 2h control ${label}`);
@@ -260,9 +266,9 @@ function processCase(tuple: Phase2hTupleDescriptor, ordinal: number): Phase2e6Ca
 function engineEvidence(engine: Phase2hEngineName): Phase2hEngineEvidence {
 	return Object.freeze({
 		brand: ENGINE_BRANDS[engine],
-		browserVersion: "control-browser-1",
+		browserVersion: PHASE_2H_CONTROL_BROWSER_VERSIONS[engine],
 		name: engine,
-		playwrightVersion: "1.61.1",
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		userAgent: `phase-2h-control/${engine}`,
 	});
 }

@@ -10,13 +10,15 @@ import {
 	phase2hOverflowIdentity,
 	type Phase2hSubmissionCensus,
 } from "./phase-2h-a-aggregate.js";
-import type { Phase2hValidationRecord } from "./phase-2h-a-record.js";
+import { type Phase2hValidationRecord, validatePhase2hRecord } from "./phase-2h-a-record.js";
 import { type Phase2hEngineName, phase2hTuple, PHASE_2H_ENGINES } from "./phase-2h-a-registry.js";
 
 export interface Phase2hRunLayout {
 	readonly aggregatePath: string;
+	readonly browserVersions: Readonly<Record<Phase2hEngineName, string>>;
 	readonly gitSha: string;
 	readonly outputBase: string;
+	readonly playwrightVersion: string;
 	readonly runId: string;
 	readonly runRoot: string;
 }
@@ -49,7 +51,13 @@ export function phase2hGitSha(cwd: string): string {
  * @returns Current invocation layout.
  */
 export function preparePhase2hRun(
-	input: Readonly<{ gitSha: string; outputBase: string; uuid?: string }>
+	input: Readonly<{
+		browserVersions: Readonly<Record<Phase2hEngineName, string>>;
+		gitSha: string;
+		outputBase: string;
+		playwrightVersion: string;
+		uuid?: string;
+	}>
 ): Phase2hRunLayout {
 	const uuid = input.uuid ?? randomUUID();
 	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(uuid))
@@ -66,11 +74,27 @@ export function preparePhase2hRun(
 	}
 	return Object.freeze({
 		aggregatePath: path.join(input.outputBase, "ahe-storage-validation.json"),
+		browserVersions: Object.freeze({ ...input.browserVersions }),
 		gitSha: input.gitSha,
 		outputBase: input.outputBase,
+		playwrightVersion: input.playwrightVersion,
 		runId,
 		runRoot,
 	});
+}
+
+/**
+ * Requires the worker's independently observed installed version to equal the
+ * mandatory parent transport. The environment is a comparand, never a mint.
+ * @param environment - Child process environment.
+ * @param observedVersion - Freshly resolved installed package version.
+ */
+export function assertPhase2hWorkerPlaywrightVersion(environment: NodeJS.ProcessEnv, observedVersion: string): void {
+	const transported = environment.PHASE_2H_A_PLAYWRIGHT_VERSION;
+	const canonical = (value: unknown): value is string =>
+		typeof value === "string" && /^1\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(value);
+	if (!canonical(transported) || !canonical(observedVersion) || transported !== observedVersion)
+		throw new TypeError("tooling-identity:playwright-worker-environment");
 }
 
 /**
@@ -149,6 +173,17 @@ export function createPhase2hPublisher(
 				return "duplicate";
 			}
 			if (tuple.engine !== input.project) {
+				invalid.add(tuple.tupleId);
+				return "rejected-bound";
+			}
+			const validation = validatePhase2hRecord(input.record, {
+				browserVersions: layout.browserVersions,
+				gitSha: layout.gitSha,
+				playwrightVersion: layout.playwrightVersion,
+				project: input.project,
+				runId: layout.runId,
+			});
+			if (validation.record === null || validation.errors.length > 0) {
 				invalid.add(tuple.tupleId);
 				return "rejected-bound";
 			}

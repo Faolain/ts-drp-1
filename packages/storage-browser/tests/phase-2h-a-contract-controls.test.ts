@@ -20,8 +20,10 @@ import {
 	phase2hControlEntries,
 	phase2hControlRecords,
 	phase2hRecordEntry,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { createPhase2hPublisher, preparePhase2hRun } from "./fixtures/phase-2h-a-publication.js";
 import { validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
@@ -78,9 +80,11 @@ function aggregate(
 	census?: Readonly<{ duplicateIdentities: readonly string[]; invalidIdentities: readonly string[] }>
 ): Phase2hAggregate {
 	return aggregatePhase2h({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		census,
 		entries,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
 }
@@ -141,7 +145,9 @@ describe("Phase 2h-a frozen contract controls", () => {
 			if (tuple === undefined) throw new TypeError("control tuple missing");
 			expect(
 				validatePhase2hRecord(record, {
+					browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 					gitSha: PHASE_2H_CONTROL_GIT_SHA,
+					playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 					project: tuple.engine,
 					runId: PHASE_2H_CONTROL_RUN_ID,
 				}).errors,
@@ -194,7 +200,9 @@ describe("Phase 2h-a frozen contract controls", () => {
 		expect(mutatedRecords.filter((record, index) => record !== records[index])).toHaveLength(1);
 		expect(
 			validatePhase2hRecord(mutated, {
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				project: engine,
 				runId: PHASE_2H_CONTROL_RUN_ID,
 			}).errors
@@ -423,8 +431,10 @@ describe("Phase 2h-a frozen contract controls", () => {
 		const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2h-publisher-"));
 		try {
 			const layout = preparePhase2hRun({
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
 				outputBase: temporary,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				uuid: "00000000-0000-4000-8000-000000000000",
 			});
 			const publisher = createPhase2hPublisher(layout);
@@ -437,9 +447,11 @@ describe("Phase 2h-a frozen contract controls", () => {
 			expect(publisher.census().duplicateIdentities).toEqual([record.tupleId]);
 			expect(fs.readdirSync(path.join(layout.runRoot, "records/chromium"))).toEqual([]);
 			const observed = aggregatePhase2h({
+				browserVersions: layout.browserVersions,
 				census: publisher.census(),
 				...readPhase2hRunEntries(layout.runRoot),
 				gitSha: layout.gitSha,
+				playwrightVersion: layout.playwrightVersion,
 				runId: layout.runId,
 			});
 			expect(observed.duplicateTupleIds).toEqual([record.tupleId]);
@@ -453,8 +465,10 @@ describe("Phase 2h-a frozen contract controls", () => {
 		const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2h-bound-"));
 		try {
 			const layout = preparePhase2hRun({
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
 				outputBase: temporary,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				uuid: "00000000-0000-4000-8000-000000000000",
 			});
 			const publisher = createPhase2hPublisher(layout);
@@ -488,16 +502,17 @@ describe("Phase 2h-a frozen contract controls", () => {
 
 	it("hard-fails absent structural directories and absent/stale current aggregates", () => {
 		expect(() => aggregate([])).toThrow(/structural directory/u);
+		const invocation = {
+			browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
+			playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
+			runId: PHASE_2H_CONTROL_RUN_ID,
+		};
 		expect(() =>
-			consumeCurrentPhase2hAggregate(undefined, { gitSha: PHASE_2H_CONTROL_GIT_SHA, runId: PHASE_2H_CONTROL_RUN_ID })
+			consumeCurrentPhase2hAggregate(undefined, { ...invocation, gitSha: PHASE_2H_CONTROL_GIT_SHA })
 		).toThrow(/absent/u);
-		const current = aggregate(phase2hStructuralEntries());
-		expect(() =>
-			consumeCurrentPhase2hAggregate(current, { gitSha: "b".repeat(40), runId: PHASE_2H_CONTROL_RUN_ID })
-		).toThrow(/stale/u);
-		expect(
-			consumeCurrentPhase2hAggregate(current, { gitSha: PHASE_2H_CONTROL_GIT_SHA, runId: PHASE_2H_CONTROL_RUN_ID })
-		).toBe(current);
+		const current = aggregate(phase2hControlEntries());
+		expect(() => consumeCurrentPhase2hAggregate(current, { ...invocation, gitSha: "b".repeat(40) })).toThrow(/stale/u);
+		expect(consumeCurrentPhase2hAggregate(current, { ...invocation, gitSha: PHASE_2H_CONTROL_GIT_SHA })).toBe(current);
 	});
 
 	it("uses one literal NUL byte in ordinary and overflow hash preimages", () => {

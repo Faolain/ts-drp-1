@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 import type { ExpectedHead } from "@ts-drp/storage";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
 import { phase2hEvidenceImageDigest } from "./fixtures/phase-2h-a-evidence-digest.js";
-import type { Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
+import { assertPhase2hWorkerPlaywrightVersion, type Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
 import {
 	type Phase2hPersistenceMode,
 	type Phase2hScenarioEvidence,
@@ -17,6 +17,7 @@ import {
 } from "./fixtures/phase-2h-a-record.js";
 import { type Phase2hEngineName, PHASE_2H_TUPLES } from "./fixtures/phase-2h-a-registry.js";
 import { phase2hCampaignCheckpointErrors } from "./fixtures/phase-2h-d-composed-campaign.js";
+import { resolvePhase2hPlaywrightIdentity } from "./fixtures/phase-2h-playwright-identity.js";
 
 type BrowserSurfaceScenario = "browser-store" | "crypto-digest" | "worker-responsiveness";
 type BrowserSurfaceEvidence = Extract<Phase2hScenarioEvidence, { tag: BrowserSurfaceScenario }>;
@@ -111,8 +112,7 @@ const OPERATION_SEQUENCE = Object.freeze([
 	"reopen",
 	"recoverActiveGeneration",
 ]);
-const require = createRequire(import.meta.url);
-const PLAYWRIGHT_VERSION = String((require("@playwright/test/package.json") as Readonly<{ version: unknown }>).version);
+const PLAYWRIGHT_IDENTITY = resolvePhase2hPlaywrightIdentity(fileURLToPath(import.meta.url));
 
 let server: AssetServer;
 
@@ -124,8 +124,10 @@ function currentLayout(): Phase2hRunLayout {
 	const outputBase = path.join(packageDirectory, "test-results/phase-2h");
 	return Object.freeze({
 		aggregatePath: path.join(outputBase, "ahe-storage-validation.json"),
+		browserVersions: PLAYWRIGHT_IDENTITY.browserVersions,
 		gitSha,
 		outputBase,
+		playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 		runId,
 		runRoot: path.join(outputBase, runId),
 	});
@@ -222,7 +224,7 @@ function record(
 			brand: ENGINE_FACTS[engine].brand,
 			browserVersion,
 			name: engine,
-			playwrightVersion: PLAYWRIGHT_VERSION as "1.61.1",
+			playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 			userAgent: observation.userAgent,
 		}),
 		fullClosureDigest: storage ? observation.browserStore.fullClosureDigest : null,
@@ -244,6 +246,7 @@ function record(
 }
 
 test.beforeAll(async () => {
+	assertPhase2hWorkerPlaywrightVersion(process.env, PLAYWRIGHT_IDENTITY.playwrightVersion);
 	const assetDirectory = process.env.PHASE_2H_A_ASSET_DIR;
 	if (assetDirectory === undefined) throw new TypeError("Phase 2h generated asset directory is absent");
 	server = await startAssetServer(assetDirectory);
@@ -264,7 +267,6 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 		return harness.run();
 	});
 
-	expect(PLAYWRIGHT_VERSION).toBe("1.61.1");
 	expect(observation.cryptoDigest).toEqual({
 		crypto: {
 			digestEvents: [
@@ -340,7 +342,9 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 	for (const scenario of ["crypto-digest", "worker-responsiveness", "browser-store"] as const) {
 		const candidate = record(engine, browser.version(), observation, scenario);
 		const validation = validatePhase2hRecord(candidate, {
+			browserVersions: layout.browserVersions,
 			gitSha: layout.gitSha,
+			playwrightVersion: layout.playwrightVersion,
 			project: engine,
 			runId: layout.runId,
 		});
@@ -356,7 +360,9 @@ test("publishes nine causal browser-surface records while the 60-tuple remainder
 
 	const aggregate = aggregatePhase2h({
 		...readPhase2hRunEntries(layout.runRoot),
+		browserVersions: layout.browserVersions,
 		gitSha: layout.gitSha,
+		playwrightVersion: layout.playwrightVersion,
 		runId: layout.runId,
 	});
 	const ownIds = SURFACE_TUPLE_IDS.filter((tupleId) => tupleId.endsWith(`/${engine}`));

@@ -3,6 +3,10 @@ import fs from "node:fs";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 import { aggregatePhase2h, phase2hStructuralEntries } from "./fixtures/phase-2h-a-aggregate.js";
+import {
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
+} from "./fixtures/phase-2h-a-controls.js";
 import { PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_REQUIRED_TUPLE_IDS } from "./fixtures/phase-2h-a-registry.js";
 
 let server: AssetServer;
@@ -52,8 +56,10 @@ test("authorized inert campaign emits no records and cannot satisfy the complete
 	const runId = process.env.PHASE_2H_A_RUN_ID;
 	if (gitSha === undefined || runId === undefined) throw new TypeError("Phase 2h-a invocation identity is absent");
 	const aggregate = aggregatePhase2h({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		entries: phase2hStructuralEntries(),
 		gitSha,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		runId,
 	});
 	expect(aggregate.records).toEqual([]);

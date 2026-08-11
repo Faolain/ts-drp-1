@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -654,13 +655,21 @@ export function evaluateReleaseCandidate(input) {
 export function auditPlaywrightGraph(input) {
 	const errors = [];
 	const versions = isRecord(input) && isRecord(input.installedVersions) ? input.installedVersions : {};
-	if (!isRecord(input) || parseDottedVersion("playwright", input.rootPin) === null)
+	if (!isRecord(input) || parseDottedVersion("playwright", input.rootPin) === null || !input.rootPin.startsWith("1."))
 		errors.push("playwright-graph:root-pin");
 	for (const packageName of ["@playwright/test", "playwright", "playwright-core"]) {
-		const installed = Array.isArray(versions[packageName]) ? [...new Set(versions[packageName])] : [];
+		const installed = Array.isArray(versions[packageName]) ? versions[packageName] : [];
 		if (installed.length !== 1 || installed[0] !== input.rootPin) errors.push(`playwright-graph:${packageName}`);
 	}
-	if (!Array.isArray(input.installedPackageEntries) || input.installedPackageEntries.length !== 3)
+	const expectedEntries = [
+		`@playwright+test@${input.rootPin}`,
+		`playwright-core@${input.rootPin}`,
+		`playwright@${input.rootPin}`,
+	].sort();
+	if (
+		!Array.isArray(input.installedPackageEntries) ||
+		JSON.stringify([...input.installedPackageEntries].sort()) !== JSON.stringify(expectedEntries)
+	)
 		errors.push("playwright-graph:installed-entries");
 	if (!isRecord(input.manifests) || !isRecord(input.manifests["package.json"]))
 		errors.push("playwright-graph:manifests");
@@ -680,8 +689,54 @@ export function auditPlaywrightGraph(input) {
 		for (const [importerPath, importer] of Object.entries(input.lockImporters)) {
 			if (!isRecord(importer) || !isRecord(importer.devDependencies)) continue;
 			const declaration = importer.devDependencies["@playwright/test"];
-			if (declaration !== undefined && (!isRecord(declaration) || declaration.specifier !== input.rootPin))
+			if (
+				declaration !== undefined &&
+				(!isRecord(declaration) || declaration.specifier !== input.rootPin || declaration.version !== input.rootPin)
+			)
 				errors.push(`playwright-graph:lock-divergent:${importerPath}`);
+		}
+	}
+	if (isRecord(input.runtimeVersions) || Array.isArray(input.resolutionContexts) || isRecord(input.browserRegistry)) {
+		for (const packageName of ["@playwright/test", "playwright", "playwright-core"])
+			if (!isRecord(input.runtimeVersions) || input.runtimeVersions[packageName] !== input.rootPin)
+				errors.push(`playwright-graph:runtime:${packageName}`);
+		if (!Array.isArray(input.resolutionContexts) || input.resolutionContexts.length === 0) {
+			errors.push("playwright-graph:resolution-contexts");
+		} else {
+			const packageRealpaths = new Set();
+			for (const context of input.resolutionContexts) {
+				if (
+					!isRecord(context) ||
+					typeof context.callerRealpath !== "string" ||
+					!path.isAbsolute(context.callerRealpath) ||
+					typeof context.packageRealpath !== "string" ||
+					!path.isAbsolute(context.packageRealpath) ||
+					context.version !== input.rootPin
+				) {
+					errors.push("playwright-graph:resolution-context");
+					continue;
+				}
+				packageRealpaths.add(context.packageRealpath);
+			}
+			if (packageRealpaths.size !== 1) errors.push("playwright-graph:resolution-graph");
+		}
+		const registry = input.browserRegistry;
+		if (
+			!isRecord(registry) ||
+			typeof registry.browsersJsonRealpath !== "string" ||
+			typeof registry.corePackageRealpath !== "string" ||
+			path.dirname(registry.browsersJsonRealpath) !== path.dirname(registry.corePackageRealpath) ||
+			!Array.isArray(registry.browsers)
+		) {
+			errors.push("playwright-graph:browser-registry");
+		} else {
+			for (const engine of ["chromium", "firefox", "webkit"]) {
+				const rows = registry.browsers.filter(
+					(row) => isRecord(row) && row.name === engine && row.installByDefault === true
+				);
+				if (rows.length !== 1 || parseDottedVersion(engine, rows[0].browserVersion) === null)
+					errors.push(`playwright-graph:browser-registry:${engine}`);
+			}
 		}
 	}
 	return { errors: [...new Set(errors)].sort(), versions };
@@ -875,8 +930,22 @@ function checkedInput() {
 	};
 }
 
-function checkedDependencyInput() {
-	const lock = YAML.parse(fs.readFileSync(path.join(ROOT, "pnpm-lock.yaml"), "utf8"));
+function packageIdentity(requireFrom, packageName) {
+	const packageRealpath = fs.realpathSync(requireFrom.resolve(`${packageName}/package.json`));
+	const manifest = JSON.parse(fs.readFileSync(packageRealpath, "utf8"));
+	return { packageRealpath, version: manifest.version };
+}
+
+/**
+ * Resolves the bounded root Playwright graph from fresh caller realpaths.
+ * @param options Resolution contexts and repository root.
+ * @param options.callerRealpaths Existing importer paths to resolve independently.
+ * @param options.repositoryRoot Repository root whose manifest and lockfile are authoritative.
+ * @returns Auditable graph input, including runtime and browser-registry identity.
+ */
+export function resolvePlaywrightGraphInput({ callerRealpaths = [], repositoryRoot = ROOT } = {}) {
+	const root = fs.realpathSync(repositoryRoot);
+	const lock = YAML.parse(fs.readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"));
 	const versions = { "@playwright/test": [], "playwright": [], "playwright-core": [] };
 	for (const key of Object.keys(lock.packages)) {
 		for (const packageName of Object.keys(versions)) {
@@ -887,13 +956,24 @@ function checkedDependencyInput() {
 	const manifests = {};
 	for (const importerPath of Object.keys(lock.importers)) {
 		const manifestPath = importerPath === "." ? "package.json" : `${importerPath}/package.json`;
-		const absolute = path.join(ROOT, manifestPath);
-		if (fs.existsSync(absolute)) manifests[manifestPath] = readJson(manifestPath);
+		const absolute = path.join(root, manifestPath);
+		if (fs.existsSync(absolute)) manifests[manifestPath] = JSON.parse(fs.readFileSync(absolute, "utf8"));
 	}
 	const packageManifest = manifests["package.json"];
+	const rootRequire = createRequire(path.join(root, "package.json"));
+	const testIdentity = packageIdentity(rootRequire, "@playwright/test");
+	const playwrightIdentity = packageIdentity(createRequire(testIdentity.packageRealpath), "playwright");
+	const coreIdentity = packageIdentity(createRequire(playwrightIdentity.packageRealpath), "playwright-core");
+	const browsersJsonRealpath = fs.realpathSync(path.join(path.dirname(coreIdentity.packageRealpath), "browsers.json"));
+	const browserRegistry = JSON.parse(fs.readFileSync(browsersJsonRealpath, "utf8"));
+	const resolutionContexts = callerRealpaths.map((caller) => {
+		const callerRealpath = fs.realpathSync(caller);
+		const identity = packageIdentity(createRequire(callerRealpath), "@playwright/test");
+		return Object.freeze({ callerRealpath, packageRealpath: identity.packageRealpath, version: identity.version });
+	});
 	return {
 		installedPackageEntries: fs
-			.readdirSync(path.join(ROOT, "node_modules/.pnpm"))
+			.readdirSync(path.join(root, "node_modules/.pnpm"))
 			.filter(
 				(entry) =>
 					entry.startsWith("@playwright+test@") ||
@@ -903,8 +983,23 @@ function checkedDependencyInput() {
 		installedVersions: versions,
 		lockImporters: lock.importers,
 		manifests,
+		browserRegistry: {
+			browsers: browserRegistry.browsers,
+			browsersJsonRealpath,
+			corePackageRealpath: coreIdentity.packageRealpath,
+		},
+		resolutionContexts,
 		rootPin: packageManifest.devDependencies["@playwright/test"],
+		runtimeVersions: {
+			"@playwright/test": testIdentity.version,
+			"playwright": playwrightIdentity.version,
+			"playwright-core": coreIdentity.version,
+		},
 	};
+}
+
+function checkedDependencyInput() {
+	return resolvePlaywrightGraphInput({ callerRealpaths: [fileURLToPath(import.meta.url)] });
 }
 
 function runCli() {
@@ -933,4 +1028,5 @@ function runCli() {
 	process.exitCode = decision.exitCode;
 }
 
-runCli();
+const isMainModule = path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url);
+if (isMainModule) runCli();

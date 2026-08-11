@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+
+import { resolvePhase2hPlaywrightIdentity } from "./tests/fixtures/phase-2h-playwright-identity.js";
 
 // The retained 18-edge Chromium campaign measured 39.6s. The process bound is
 // three measured campaigns. Playwright enumerates 15 serial tests across the
@@ -7,8 +10,10 @@ import { defineConfig } from "@playwright/test";
 const MEASURED_18_EDGE_CAMPAIGN_MS = 39_600;
 const PROCESS_TEST_TIMEOUT_MS = MEASURED_18_EDGE_CAMPAIGN_MS * 3;
 const SERIAL_TEST_COUNT = 15;
+const playwrightIdentity = resolvePhase2hPlaywrightIdentity(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+	metadata: { phase2hPlaywrightVersion: playwrightIdentity.playwrightVersion },
 	testDir: "./tests",
 	testMatch: [
 		"phase-2h-b-browser-surfaces-red.pw.ts",

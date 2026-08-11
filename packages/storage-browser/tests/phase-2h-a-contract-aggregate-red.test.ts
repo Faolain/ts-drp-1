@@ -11,8 +11,10 @@ import {
 	phase2hControlEntries,
 	phase2hControlRecords,
 	phase2hRecordEntry,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { type Phase2hValidationRecord, validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
 import { phase2hTuple, PHASE_2H_KILL_TUPLE_IDS, PHASE_2H_REQUIRED_TUPLE_IDS } from "./fixtures/phase-2h-a-registry.js";
@@ -47,9 +49,11 @@ function candidate(
 	census?: Readonly<{ duplicateIdentities: readonly string[]; invalidIdentities: readonly string[] }>
 ): Phase2hAggregate {
 	return aggregatePhase2h({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		census,
 		entries,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
 }
@@ -86,7 +90,9 @@ describe("Phase 2h-a typed candidate RED", () => {
 		if (tuple === undefined) throw new TypeError("derived RED tuple is absent");
 		expect(
 			validatePhase2hRecord(value, {
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				project: tuple.engine,
 				runId: PHASE_2H_CONTROL_RUN_ID,
 			}).errors

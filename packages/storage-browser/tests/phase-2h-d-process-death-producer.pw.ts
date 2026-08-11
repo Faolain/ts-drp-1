@@ -1,8 +1,8 @@
 import { chromium, expect, firefox, type Page, test, webkit } from "@playwright/test";
 import type { ExpectedHead } from "@ts-drp/storage";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 import { createProcessDeathRunner } from "./fixtures/phase-2e6-process-death-runner.js";
@@ -10,13 +10,14 @@ import { PHASE_2E6_DECLARED_EDGES } from "./fixtures/phase-2e6-real-process-deat
 import { phase2e6CaseErrors } from "./fixtures/phase-2e6-real-process-death-validator.js";
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
 import { phase2hEvidenceImageDigest } from "./fixtures/phase-2h-a-evidence-digest.js";
-import type { Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
+import { assertPhase2hWorkerPlaywrightVersion, type Phase2hRunLayout } from "./fixtures/phase-2h-a-publication.js";
 import {
 	type Phase2hArmingMeasurement,
 	type Phase2hValidationRecord,
 	validatePhase2hRecord,
 } from "./fixtures/phase-2h-a-record.js";
 import { type Phase2hEngineName, PHASE_2H_TUPLES } from "./fixtures/phase-2h-a-registry.js";
+import { resolvePhase2hPlaywrightIdentity } from "./fixtures/phase-2h-playwright-identity.js";
 
 const PROCESS_FOREST_COMMAND = "LC_ALL=C ps -A -ww -o pid=,ppid=,pgid=,lstart=,state=,command=";
 const ARMING_EDGE = PHASE_2E6_DECLARED_EDGES.find(
@@ -48,8 +49,7 @@ const ENGINE = Object.freeze({
 		profile: "Desktop Safari",
 	}),
 } as const);
-const require = createRequire(import.meta.url);
-const PLAYWRIGHT_VERSION = String((require("@playwright/test/package.json") as { version: unknown }).version);
+const PLAYWRIGHT_IDENTITY = resolvePhase2hPlaywrightIdentity(fileURLToPath(import.meta.url));
 let server: AssetServer;
 
 function currentLayout(): Phase2hRunLayout {
@@ -60,8 +60,10 @@ function currentLayout(): Phase2hRunLayout {
 	const outputBase = path.join(packageDirectory, "test-results/phase-2h");
 	return Object.freeze({
 		aggregatePath: path.join(outputBase, "ahe-storage-validation.json"),
+		browserVersions: PLAYWRIGHT_IDENTITY.browserVersions,
 		gitSha,
 		outputBase,
+		playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 		runId,
 		runRoot: path.join(outputBase, runId),
 	});
@@ -89,7 +91,9 @@ function capacityRecord(engine: Phase2hEngineName): Phase2hValidationRecord {
 	const layout = currentLayout();
 	const aggregate = aggregatePhase2h({
 		...readPhase2hRunEntries(layout.runRoot),
+		browserVersions: layout.browserVersions,
 		gitSha: layout.gitSha,
+		playwrightVersion: layout.playwrightVersion,
 		runId: layout.runId,
 	});
 	const capacity = aggregate.records.find(({ tupleId }) => tupleId === `capacity/${engine}`);
@@ -165,6 +169,7 @@ async function armingMeasurement(engine: Phase2hEngineName, page: Page): Promise
 }
 
 test.beforeAll(async () => {
+	assertPhase2hWorkerPlaywrightVersion(process.env, PLAYWRIGHT_IDENTITY.playwrightVersion);
 	const assetDirectory = process.env.PHASE_2H_A_ASSET_DIR;
 	if (assetDirectory === undefined) throw new TypeError("Phase 2h generated asset directory is absent");
 	server = await startAssetServer(assetDirectory);
@@ -217,7 +222,7 @@ test("publishes the exact real 18-edge process-death batch for this engine", asy
 				brand: facts.brand,
 				browserVersion: browser.version(),
 				name: engine,
-				playwrightVersion: PLAYWRIGHT_VERSION as "1.61.1",
+				playwrightVersion: PLAYWRIGHT_IDENTITY.playwrightVersion,
 				userAgent,
 			}),
 			fullClosureDigest: recoveredHead.kind === "present" ? recoveredHead.closureDigest : null,
@@ -253,7 +258,13 @@ test("publishes the exact real 18-edge process-death batch for this engine", asy
 			webLocksMode: capacity.webLocksMode,
 		});
 		const layout = currentLayout();
-		const validation = validatePhase2hRecord(record, { gitSha: layout.gitSha, project: engine, runId: layout.runId });
+		const validation = validatePhase2hRecord(record, {
+			browserVersions: layout.browserVersions,
+			gitSha: layout.gitSha,
+			playwrightVersion: layout.playwrightVersion,
+			project: engine,
+			runId: layout.runId,
+		});
 		expect(validation.errors, tuple.tupleId).toEqual([]);
 		expect(validation.record).toBe(record);
 		records.push(record);

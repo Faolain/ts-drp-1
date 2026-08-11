@@ -3,6 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
+import {
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
+} from "./fixtures/phase-2h-a-controls.js";
 import { phase2hGitSha, preparePhase2hRun, writePhase2hAggregate } from "./fixtures/phase-2h-a-publication.js";
 
 /**
@@ -34,8 +38,10 @@ export default async function globalSetup(): Promise<() => void> {
 			"utf8"
 		);
 		const layout = preparePhase2hRun({
+			browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 			gitSha: phase2hGitSha(repositoryDirectory),
 			outputBase,
+			playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		});
 		process.env.PHASE_2H_A_ASSET_DIR = assetDirectory;
 		process.env.PHASE_2H_A_GIT_SHA = layout.gitSha;
@@ -46,7 +52,9 @@ export default async function globalSetup(): Promise<() => void> {
 					layout,
 					aggregatePhase2h({
 						...readPhase2hRunEntries(layout.runRoot),
+						browserVersions: layout.browserVersions,
 						gitSha: layout.gitSha,
+						playwrightVersion: layout.playwrightVersion,
 						runId: layout.runId,
 					})
 				);

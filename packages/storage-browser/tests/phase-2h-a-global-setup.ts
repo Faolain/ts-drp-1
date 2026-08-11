@@ -1,6 +1,8 @@
+import { type FullConfig } from "@playwright/test";
 import { build } from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { aggregatePhase2h, readPhase2hRunEntries } from "./fixtures/phase-2h-a-aggregate.js";
 import {
@@ -10,12 +12,36 @@ import {
 	writePhase2hAggregate,
 } from "./fixtures/phase-2h-a-publication.js";
 import { startPhase2hParentPublisher } from "./fixtures/phase-2h-b-parent-publisher.js";
+import { resolvePhase2hPlaywrightIdentity } from "./fixtures/phase-2h-playwright-identity.js";
+
+interface Phase2hInvocationDependencies {
+	resolvePlaywrightIdentity(callerRealpath: string): Readonly<{
+		browserVersions: Readonly<Record<"chromium" | "firefox" | "webkit", string>>;
+		playwrightVersion: string;
+	}>;
+}
+
+const DEFAULT_DEPENDENCIES: Phase2hInvocationDependencies = Object.freeze({
+	resolvePlaywrightIdentity: resolvePhase2hPlaywrightIdentity,
+});
 
 /**
  * Creates one fresh Phase 2h invocation, its browser assets and sole publisher.
+ * @param config Trusted Playwright configuration metadata.
+ * @param dependencies Private test seam for invocation-local identity resolution.
  * @returns Finalizer that always writes the bound failing aggregate when able.
  */
-export default async function globalSetup(): Promise<() => Promise<void>> {
+export default async function globalSetup(
+	config: Pick<FullConfig, "metadata">,
+	dependencies: Phase2hInvocationDependencies = DEFAULT_DEPENDENCIES
+): Promise<() => Promise<void>> {
+	const identity = dependencies.resolvePlaywrightIdentity(fileURLToPath(import.meta.url));
+	const metadata = config.metadata as Readonly<Record<string, unknown>>;
+	if (
+		Object.keys(metadata).sort().join("\0") !== "phase2hPlaywrightVersion" ||
+		metadata.phase2hPlaywrightVersion !== identity.playwrightVersion
+	)
+		throw new TypeError("tooling-identity:Playwright config/setup context version mismatch");
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
 	const repositoryDirectory = path.resolve(packageDirectory, "../..");
 	const assetRoot = path.join(packageDirectory, "test-results");
@@ -79,12 +105,15 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 		);
 		const gitSha = phase2hGitSha(repositoryDirectory);
 		const layout = preparePhase2hRun({
+			browserVersions: identity.browserVersions,
 			gitSha,
 			outputBase: path.join(packageDirectory, "test-results/phase-2h"),
+			playwrightVersion: identity.playwrightVersion,
 		});
 		process.env.PHASE_2H_A_ASSET_DIR = assetDirectory;
 		process.env.PHASE_2H_A_GIT_SHA = layout.gitSha;
 		process.env.PHASE_2H_A_RUN_ID = layout.runId;
+		process.env.PHASE_2H_A_PLAYWRIGHT_VERSION = identity.playwrightVersion;
 		const admissionDirectory = path.join(
 			packageDirectory,
 			"test-results/phase-2h-native-admission",
@@ -106,8 +135,10 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 				}
 				const aggregate = aggregatePhase2h({
 					...readPhase2hRunEntries(layout.runRoot),
+					browserVersions: layout.browserVersions,
 					census: publisher.census(),
 					gitSha: layout.gitSha,
+					playwrightVersion: layout.playwrightVersion,
 					runId: layout.runId,
 				});
 				writePhase2hAggregate(layout, aggregate);
@@ -115,10 +146,12 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 			} finally {
 				delete process.env.PHASE_2H_A_SUBMISSION_URLS;
 				delete process.env.PHASE_2H_NATIVE_ADMISSION_DIR;
+				delete process.env.PHASE_2H_A_PLAYWRIGHT_VERSION;
 				fs.rmSync(assetDirectory, { force: true, recursive: true });
 			}
 		};
 	} catch (error) {
+		delete process.env.PHASE_2H_A_PLAYWRIGHT_VERSION;
 		fs.rmSync(assetDirectory, { force: true, recursive: true });
 		throw error;
 	}

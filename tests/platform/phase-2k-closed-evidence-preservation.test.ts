@@ -14,8 +14,10 @@ import {
 } from "../../packages/storage-browser/tests/fixtures/phase-2h-a-aggregate.js";
 import {
 	phase2hControlEntries,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "../../packages/storage-browser/tests/fixtures/phase-2h-a-controls.js";
 import {
 	PHASE_2H_ENGINES,
@@ -33,8 +35,10 @@ afterEach(() => {
 describe("Phase 2k closed Phase 2h/2j preservation controls", () => {
 	it("leaves the closed Phase 2h v1/69 aggregate and three-engine six-scenario registry unchanged", () => {
 		const aggregate = aggregatePhase2h({
+			browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 			entries: phase2hControlEntries(),
 			gitSha: PHASE_2H_CONTROL_GIT_SHA,
+			playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 			runId: PHASE_2H_CONTROL_RUN_ID,
 		});
 		expect(PHASE_2H_REQUIRED_TUPLE_IDS).toHaveLength(69);
@@ -44,7 +48,9 @@ describe("Phase 2k closed Phase 2h/2j preservation controls", () => {
 		expect(aggregate.records).toHaveLength(69);
 		expect(
 			consumeCurrentPhase2hAggregate(aggregate, {
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				runId: PHASE_2H_CONTROL_RUN_ID,
 			})
 		).toEqual(aggregate);

@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/require-await -- runtime mocks preserve the producer's async dependency shapes. */
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { resolvePhase2hPlaywrightIdentity } from "./fixtures/phase-2h-playwright-identity.js";
 
 type RegisteredProducer = (fixtures: Readonly<Record<string, unknown>>) => Promise<void>;
 
@@ -80,6 +83,7 @@ vi.mock("./fixtures/phase-2h-a-record.js", () => ({
 }));
 
 const ORIGINAL_PLATFORM = process.platform;
+const PLAYWRIGHT_IDENTITY = resolvePhase2hPlaywrightIdentity(fileURLToPath(import.meta.url));
 
 function armingObservation(): Readonly<Record<string, unknown>> {
 	if (harness.measurement === "throwing") throw new TypeError("injected arming measurement exception");
@@ -117,6 +121,7 @@ beforeAll(async () => {
 	Object.defineProperty(process, "platform", { configurable: true, value: "linux" });
 	process.env.PHASE_2H_A_ASSET_DIR = "/tmp/phase-2h-assets";
 	process.env.PHASE_2H_A_GIT_SHA = "a".repeat(40);
+	process.env.PHASE_2H_A_PLAYWRIGHT_VERSION = PLAYWRIGHT_IDENTITY.playwrightVersion;
 	process.env.PHASE_2H_A_RUN_ID = `phase-2h/${"a".repeat(40)}/00000000-0000-4000-8000-000000000000`;
 	process.env.PHASE_2H_A_SUBMISSION_URLS = JSON.stringify({ chromium: "http://127.0.0.1:3000/submit" });
 	vi.stubGlobal(
@@ -142,6 +147,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await harness.afterAll?.();
+	delete process.env.PHASE_2H_A_PLAYWRIGHT_VERSION;
 	Object.defineProperty(process, "platform", { configurable: true, value: ORIGINAL_PLATFORM });
 	vi.unstubAllGlobals();
 });

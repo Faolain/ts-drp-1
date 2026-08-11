@@ -10,8 +10,10 @@ import {
 	phase2hControlEntries,
 	phase2hControlRecords,
 	phase2hRecordEntry,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { createPhase2hPublisher, preparePhase2hRun } from "./fixtures/phase-2h-a-publication.js";
 import { type Phase2hValidationRecord, validatePhase2hRecord } from "./fixtures/phase-2h-a-record.js";
@@ -34,7 +36,9 @@ function validate(
 	project: "chromium" | "firefox" | "webkit"
 ): ReturnType<typeof validatePhase2hRecord> {
 	return validatePhase2hRecord(record, {
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		project,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
@@ -42,8 +46,10 @@ function validate(
 
 function aggregateRecords(records: readonly Phase2hValidationRecord[]): ReturnType<typeof aggregatePhase2h> {
 	return aggregatePhase2h({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		entries: [...phase2hStructuralEntries(), ...records.map((record) => phase2hRecordEntry(record))],
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
 }
@@ -226,8 +232,10 @@ describe("Phase 2h-d finite process-death RED contract", () => {
 		const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2h-d-publisher-"));
 		try {
 			const layout = preparePhase2hRun({
+				browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 				gitSha: PHASE_2H_CONTROL_GIT_SHA,
 				outputBase: temporary,
+				playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 				uuid: "00000000-0000-4000-8000-000000000000",
 			});
 			const publisher = createPhase2hPublisher(layout);

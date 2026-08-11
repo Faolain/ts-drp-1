@@ -13,8 +13,10 @@ import {
 } from "./fixtures/phase-2h-a-aggregate.js";
 import {
 	phase2hControlRecords,
+	PHASE_2H_CONTROL_BROWSER_VERSIONS,
 	PHASE_2H_CONTROL_GIT_SHA,
 	PHASE_2H_CONTROL_RUN_ID,
+	PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 } from "./fixtures/phase-2h-a-controls.js";
 import { createPhase2hPublisher, type Phase2hRunLayout, preparePhase2hRun } from "./fixtures/phase-2h-a-publication.js";
 import {
@@ -42,8 +44,10 @@ function freshLayout(prefix: string): Phase2hRunLayout {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 	temporaryDirectories.push(temporary);
 	return preparePhase2hRun({
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
 		outputBase: path.join(temporary, "phase-2h"),
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		uuid: "00000000-0000-4000-8000-000000000000",
 	});
 }
@@ -91,7 +95,9 @@ function fakeStats(entryKind: "directory" | "file" | "symlink", size = 0): fs.St
 
 function validate(record: unknown, project: "chromium" | "firefox" | "webkit"): Phase2hRecordValidation {
 	return validatePhase2hRecord(record, {
+		browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 		gitSha: PHASE_2H_CONTROL_GIT_SHA,
+		playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 		project,
 		runId: PHASE_2H_CONTROL_RUN_ID,
 	});
@@ -119,7 +125,9 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 		const scan = readPhase2hRunEntries(layout.runRoot);
 		const observed = aggregatePhase2h({
 			...scan,
+			browserVersions: layout.browserVersions,
 			gitSha: layout.gitSha,
+			playwrightVersion: layout.playwrightVersion,
 			runId: layout.runId,
 		});
 		expect(observed.verdict).toBe("fail");
@@ -172,7 +180,9 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 		const readSpy = vi.spyOn(fs, "readSync");
 		const observed = aggregatePhase2h({
 			...readPhase2hRunEntries(layout.runRoot),
+			browserVersions: layout.browserVersions,
 			gitSha: layout.gitSha,
+			playwrightVersion: layout.playwrightVersion,
 			runId: layout.runId,
 		});
 		expect(observed.invalidRecordIds).toContain("capacity/chromium");
@@ -215,7 +225,9 @@ describe("Phase 2h-a live scanner corrective RED", () => {
 		expect(() => {
 			observed = aggregatePhase2h({
 				...readPhase2hRunEntries(layout.runRoot),
+				browserVersions: layout.browserVersions,
 				gitSha: layout.gitSha,
+				playwrightVersion: layout.playwrightVersion,
 				runId: layout.runId,
 			});
 		}).not.toThrow();
@@ -307,8 +319,10 @@ describe("Phase 2h-a missing marker controls", () => {
 			scope: "collisions/webkit",
 		};
 		const observed = aggregatePhase2h({
+			browserVersions: PHASE_2H_CONTROL_BROWSER_VERSIONS,
 			entries: [...phase2hStructuralEntries(), entry],
 			gitSha: PHASE_2H_CONTROL_GIT_SHA,
+			playwrightVersion: PHASE_2H_HISTORICAL_PLAYWRIGHT_VERSION,
 			runId: PHASE_2H_CONTROL_RUN_ID,
 		});
 		expect(observed.invalidRecordIds).toEqual([invalidMarkerIdentity(entry.scope, basename)]);
@@ -327,9 +341,11 @@ describe("Phase 2h-a missing marker controls", () => {
 		});
 		expect(fs.readdirSync(path.join(layout.runRoot, "collisions/webkit"))).toEqual([]);
 		const observed = aggregatePhase2h({
+			browserVersions: layout.browserVersions,
 			census: publisher.census(),
 			...readPhase2hRunEntries(layout.runRoot),
 			gitSha: layout.gitSha,
+			playwrightVersion: layout.playwrightVersion,
 			runId: layout.runId,
 		});
 		expect(observed.duplicateTupleIds).toContain(record.tupleId);
