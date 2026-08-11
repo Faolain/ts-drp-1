@@ -29,6 +29,7 @@
 		"e2e-test": "pnpm exec playwright test --config examples/grid/playwright.modular.config.ts --fail-on-flaky-tests",
 		"e2e-test:canvas-chat": "pnpm exec playwright test --config playwright.canvas-chat.config.ts --fail-on-flaky-tests",
 		"e2e-test:platform": "pnpm exec playwright test --config playwright.platform-capability.config.ts",
+		"e2e-test:browser-currency": "pnpm exec playwright test --config playwright.browser-currency.config.ts",
 		"e2e-test:protocol-v2": "pnpm exec playwright test --config packages/storage-browser/playwright.protocol-v2.config.ts --fail-on-flaky-tests",
 		"e2e-test:storage-browser": "pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e5-browser-inventory.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e6-real-process-death.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e7-publication-component.config.ts --fail-on-flaky-tests",
 		"e2e-test:worker-host": "pnpm exec playwright test --config packages/worker-host/playwright.phase-2f-b-handshake.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/worker-host/playwright.phase-2f-c-real-workload.config.ts --fail-on-flaky-tests",
@@ -38,6 +39,7 @@
 		"lint": "eslint .",
 		"lint:fix": "prettier --write '**/package.json' && eslint . --fix",
 		"postinstall": "node scripts/ensure-native-deps.mjs && pnpm build:packages",
+		"phase-2k:release-gate": "node scripts/phase-2k-browser-currency.mjs release-gate",
 		"proto-gen": "pnpm proto-gen:types",
 		"proto-gen:types": "buf generate packages/types/src/proto -o packages/types/src/proto",
 		"release": "release-it",
@@ -90,6 +92,7 @@
 	"private": true,
 	"release-it": {
 		"hooks": {
+			"before:init": "node scripts/phase-2k-browser-currency.mjs release-gate",
 			"after:bump": "pnpm i && pnpm lint:fix"
 		},
 		"plugins": {

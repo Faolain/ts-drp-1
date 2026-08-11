@@ -1,0 +1,31 @@
+name: Phase 2k browser currency refresh
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: phase-2k-browser-currency-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/phase-2k-browser-currency-refresh.mjs --branch chore/phase-2k-browser-currency
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/phase-2k-browser-currency
+          commit-message: "chore: refresh Phase 2k browser currency"
+          delete-branch: true
+          title: "chore: refresh Phase 2k browser currency"
