@@ -3400,6 +3400,100 @@ admission, typecheck/build, traced nonempty lint, formatting and diff gates to
 logs. Grok 4.5/high, exact Kimi 3/high/max-100 and final Opus/xhigh acceptance
 remain mandatory. Phase 2h-d, 2h-e, Phase 2h and Phase 2 remain open.
 
+#### Phase 2h-d implementation status — code accepted; native-x64 gate open
+
+The ratified host/content-authority implementation is now code-accepted at
+signed GREEN `5f5a72cf0487cabce98900dca2ae612ec0946800`. Phase 2h-d is **not
+closed** and Phase 2h-e must not start: the sole remaining gate is the manual
+native `ubuntu-latest` x64 run retaining complete pre-signal forests for all
+three engines and producing the exact ordered 69-record aggregate with a pass
+verdict and empty missing/duplicate/extra/invalid diagnostics. The existing
+amd64 emulation remains non-authoritative.
+
+The accepted TDD lineage after the v6 correction is:
+
+1. Corrective signal-order RED `e7c8dbbc756dbce4e8c64774b9a744e8fb89ebf1`
+   and GREEN `6874afa1c91948cbad57d8795dcbc7051571dc38` moved arming before
+   the first edge and made the live runner own fresh authority immediately
+   before each negative process-group signal. Command-insensitive positive-PID
+   `SIGCONT` remains intentional: matching pid/ppid/pgid/birth token identifies
+   the same kernel process whose stop is being undone, while destructive group
+   authority still requires the stricter command-bound identity.
+2. Composed-campaign RED `758b65f7eff6cbf1bfa00f1ef8dab8ed9d672994`
+   exposed that the earlier browser-surface and capacity checks treated one
+   shared, monotonically growing RunId as a closed snapshot. GREEN `8c04c4a`
+   fixed that composition but was rejected because its intermediate owner could
+   still accept sparse prior projects.
+3. Floor RED `dd45326283435a4ad85e7fadfadb7785d2dcf6c9` and final GREEN
+   `5f5a72cf0487cabce98900dca2ae612ec0946800` close that false-green. An
+   intermediate checkpoint now requires every registry tuple from strictly
+   prior Playwright projects plus the current engine's owned prefix. The six
+   schedule floors are 3/26/49 for browser surfaces and 5/28/51 for non-kill
+   evidence. Registered later tuples remain harmless monotonic additions;
+   unregistered engines and dirty diagnostics fail closed. The final WebKit
+   boundary still requires the exact ordered 69 and re-validates all 54 causal
+   process-death records.
+
+The shared-aggregate discovery is the durable rule: Phase 2h uses one
+GitSha/RunId/run root across project-batched Chromium, Firefox and WebKit.
+Intermediate assertions therefore own a schedule-derived presence floor, not
+the global absence of later-phase tuples. Project isolation would make the
+required single 69-record aggregate unreachable and is not an admissible fix.
+
+Verification and independent acceptance are retained under `.logs/`:
+
+- GREEN evidence manifest:
+  `.logs/phase-2h-d-checkpoint-floors-green-codex-high/`, SHA-256
+  `61fd712b473e91aee2e49b0975095a5918f91f7fa794a276c9617ae164ba0870`;
+  focused 24/24, Phase 2h preservation 72/72, complete storage-browser
+  228/228, typecheck/build/format/traced lint and 15-test discovery pass.
+- Grok 4.5/high acceptance:
+  `.logs/phase-2h-d-checkpoint-floors-green-grok45-high-review/`, artifact
+  manifest `4f79df155034a3448116a61ffbd1c00c564e7c638359fb1ff6eae2adb56256a6`.
+- Exact Kimi 3/high/max-100 acceptance:
+  `.logs/phase-2h-d-checkpoint-floors-green-kimi3-high-100-review/`, artifact
+  manifest `e5cf42fbe6a0e846101d8621beaca1047a1e93bbcb7609f411f7cc9aec598459`.
+- Final Opus 5/xhigh acceptance:
+  `.logs/phase-2h-d-checkpoint-floors-green-opus-xhigh-review/`, artifact
+  manifest `023f388f3da5d4d1c6fef252d58291432b65d9d933a25706e279f3f4b0683065`.
+  All substantive review events used Opus; the reported automatic Haiku entry
+  had no review contribution.
+- Isolated native Linux arm64 evidence at the exact GREEN:
+  `.logs/phase-2h-d-linux-arm64-container-5f5a72c-isolated/` passed 15/15 in
+  2.2 minutes with 69/69, identical Linux arm64 `os`, the exact POSIX two-PGID
+  mechanism, three retained engine captures and every diagnostic array empty.
+  The campaign log SHA-256 is
+  `7c87ec1e9e4dd013423b15c290de7b87678e7d41cd9d74968ac6caa2ec76d151`.
+  Exact-SHA lower Linux Phase 2e6 also passed all 18 arms at
+  `.logs/phase-2h-d-linux-arm64-lower-2e6-5f5a72c/`; log SHA-256
+  `7b44612958706afde79bc6b226790e7d9f885586949b7b66ff2b243c3db43029`.
+
+One failed exact-SHA Linux attempt is intentionally retained at
+`.logs/phase-2h-d-linux-arm64-container-5f5a72c/`. It ran concurrently with two
+review/probe workloads. Its Firefox producer crossed the 118.8-second per-test
+bound; Playwright teardown then closed the asset server, and
+`NS_ERROR_CONNECTION_REFUSED`, missing Firefox records and downstream WebKit
+checkpoint/final failures cascaded. The subsequent isolated run completed the
+Chromium, Firefox and WebKit producer campaigns in 23.3 seconds, 1.1 minutes
+and 27.3 seconds respectively and passed 15/15. Do not tune the measured
+timeout or weaken evidence from a contended run without an isolated
+reproduction.
+
+Accepted bounded residuals are documented rather than expanded into another
+general framework: the non-kill prefix currently relies on the closed registry
+ordering; an impossible typed checkpoint string falls into the stricter final
+branch; registered future tuples do not mask a required omission; two direct
+rows for the pre-browser-STOP and pre-child-KILL contradiction
+branches could improve regression localization, while the initial-capture
+branch needs no meaningful extra row; and an outer-catch cleanup
+`captureForest()` or finalizer failure can mask an earlier error while
+remaining fail-closed. Revisit these if the checkpoint or signal owners change.
+They are not substitutes for, or blockers beyond, the remaining native-x64
+authority gate. Independent Grok and final Opus reviews explicitly concluded
+that reconciling the previously frozen b/c closed-world assertions was already
+inside the ratified 2h-d config-census scope; no new plan-assumption quorum was
+required.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
