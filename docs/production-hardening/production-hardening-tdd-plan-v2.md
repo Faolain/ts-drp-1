@@ -1099,7 +1099,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2h**      | **Ratified browser validation composite v4, implemented as the independently executable 2h-a…2h-e decomposition below.** Add the package-local `playwright.protocol-v2.config.ts`, closed validator/aggregate and initially dormant non-gating CI topology first; then the three browser-surface scenarios, capacity/quota scenarios, the exact process-death matrix, and only finally gate activation/preservation closure. This slice is tests/config/scripts/CI/evidence only: no vote CAS, production source, browser schema, public API, package export, runtime dependency or protocol change. Phase 5c remains the sole owner of the first real vote-store/schema bump and vote transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | sliceable               | Exact registry is 15 non-kill plus 54 mechanically derived kill tuples = 69. GREEN requires the closed per-tuple schema and scenario evidence, bounded responsiveness thresholds, Linux-only identical POSIX hard-kill proof with non-Linux failure before record/signal/publication, one GitSha/RunId-bound fail-closed aggregate, all 69 unique `verdict:pass` records and all five diagnostic arrays empty. The workflow stays non-gating until 2h-e; during 2h-d, human-initiated native evidence may use default-branch dispatch or the ratified temporary exact-feature-branch push. Phase 2h closure preserves 2e5/2e6/2e7/2f/2g but does not close Phase 2; 2j, 2k, 2l and every other exit conjunct remain mandatory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2i**      | **Moved by the authorized Phase-2i correction; no standalone Phase-2 implementation.** Current tabs are distinct peers with distinct in-memory replicas and no authenticated cross-tab fan-out, so suppressing one tab's initial, periodic, peer-arrival or explicit sync, discovery, presence or authored gossip would harm the Discord/MMORPG golden paths rather than deduplicate equivalent work. All current per-tab networking remains unchanged. The first real advisory primary-tab owner lands atomically in 5c around dispatch of already committed durable `voteOutbox` bytes; 6b reuses that same scheduling owner for cleanup without transferring deletion authority. Any future single-tab network optimization requires a separately measured cross-tab replica/SharedWorker transport first.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | moved       | no standalone slice     | No Phase-2 RED/GREEN. Row retained without renumbering for auditability. 5c owns the real locks-on/off vote-dispatch matrix; 6b owns cleanup scheduling reuse and transactional deletion-precondition recheck.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per project, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite. This is a root-owned test/evidence/CI slice and does not modify protocol, production or browser-storage schema.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | local-safe  | sliceable               | Reuse `tests/platform/webcrypto-capability.pw.ts` and `playwright.platform-capability.config.ts` for desktop chromium/firefox/webkit plus `ios-safari-emulation` (iPhone 15/WebKit) and `android-chrome-emulation` (Pixel 7/Chromium). Assert the **currently expected** matrix and fail on **any** improvement or regression. Publish each engine/build, Playwright build and OS into the independently GitSha/RunId-bound `test-results/phase-2j/webcrypto-capability-matrix.json` (`ts-drp/webcrypto-capability-matrix/v1`) through that config's sole setup/finalization owner and a dedicated required PR workflow. The emulation rows are structurally desktop-engine emulation, never real-device evidence. Phase 2h's closed v1/69-record `ahe-storage-validation.json` is unchanged; the artifacts have independent RunIds and meet only at the exact candidate GitSha. Physical-device evidence remains a reviewed Pre-release extension or distinct artifact. Phase 2k alone owns version currency.                                                                                                                                                                                                                                                                                                               |
-| **2k**      | **Browser-matrix currency.** At `fbdb396`, root pins `@playwright/test` exactly `1.61.1`, bundling Chromium/Chrome for Testing `149.0.7827.55`. `examples/network-spike` still declares `^1.49.1`, resolving a second installed `playwright-core@1.51.1`, although its own e2e script delegates to the root binary. Measure release-time currency instead of preserving either historical premise; add a scheduled bump and make staleness visible.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | local-safe  | sliceable               | CI job asserts each bundled engine build is within N months of current stable and **warns** past that (reports-only — a browser release must never break the merge queue); the release matrix records exact build numbers, and a release is blocked if any engine is more than one major behind the stable channel it claims to cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **2k**      | **Browser-matrix currency, corrected into one root-owned TDD item with two ordered checkpoints.** First land the closed policy, checked official-source custody, offline evaluator, report/release gates and single-version dependency invariant. Then exercise that owner in a distinct signed checkpoint that moves the root Playwright pin from stale `1.61.1` to the current reviewed 1.x release, removes the hidden `1.51.1` graph, and reruns 2h/2j before the one final 2k review ceremony. Playwright WebKit is engine evidence only and never Safari evidence. This slice changes test/tool/config/CI/evidence and the bounded dependency/release-tooling owners named below; it changes no protocol byte, production runtime API, storage schema or closed 2h/2j artifact.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | local-safe  | two ordered checkpoints | Policy is exactly `{blockingMajorDelta:2,freshnessMonths:1,jsonSourceMaxAgeDays:14,safariReviewMaxAgeDays:180}` with UTC calendar arithmetic and checked raw authorities. PR currency drift is visible `warn` evidence and exits zero; candidate-authored schema, custody, runtime/lock or claim dishonesty fails. The pure pre-`release-it` gate blocks a claimed Chromium/Firefox channel at delta `>= 2` when a newer supported Playwright engine exists, while the independent published-ref job blocks npm/Buf/Docker before publication. Tooling ceiling may withdraw a claim only; it never manufactures coverage or waives AHE §21.5's existing Pre-release blocker. Acceptance requires one installed Playwright/test/core graph, actual Chromium/Firefox/WebKit launches matching the installed manifest, the closed GitSha/RunId-bound 2k artifact, successful/failed all-or-nothing refresh evidence, and green 2h/2j after the real bump.                                                                                                                                                                                                                                                                                                                                                                       |
 | **2l**      | **Durable author-sequence issuance transaction.** Implement the production adapter for the post-freeze 0g(ii-I) `transactIssue` contract. For one structural `(objectId, author)` scope, next counter, exact canonical-preimage bytes, signature, digest, issued record and outbox entry share one strict transaction; the internal build/sign closure cannot expose bytes outside that transaction. Browser and node backends implement the same contract.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | coordinated | issuance-record atomic  | Shared contract plus real IDB/SQLite hard-kill matrix: every request/statement/commit edge recovers either the old state or the exact new counter+envelope+outbox closure, never a counter-only or envelope-only state. Same-scope callers across tabs/processes are linearizable; different scopes progress independently; throw/rejection/commit failure advances nothing; retry reselects the unconsumed ordinal; restart never signs different content for an already committed ordinal. The in-memory implementation remains an explicitly ephemeral test double and cannot satisfy this gate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### Phase 2f assumption-correction quorum — executable worker-host v2
@@ -4140,6 +4140,259 @@ Accepted nonblocking gotchas and boundaries:
 Phase 2 remains open. The next ordered implementation slice is 2k; real-device
 custody proof remains at the Pre-release gate and cannot be satisfied by these
 desktop-engine emulation rows.
+
+### Phase 2k assumption-correction quorum — honest browser currency v1
+
+The fresh Codex-high RED owner correctly stopped without editing at signed HEAD
+`295740f4481cd87349124e12fea50d188e18823c`. The old row was not executable:
+`N` and its calendar semantics were undefined; no stable-channel authority or
+normalization was named; Playwright's patched WebKit could be confused with
+Safari; source failure, cache and artifact custody had no owner; the scheduled
+bump and nested dependency disposition were unspecified; and the existing
+`release:published` workflow is too late to block creation of a GitHub release.
+
+The audit also confirmed current actionable debt. Root Playwright `1.61.1`
+bundles Chromium `149.0.7827.55`, Firefox `151.0` and WebKit `26.5`, while the
+2026-08-11 official observations were Chrome for Testing stable
+`151.0.7922.77`, Firefox stable `153.0.4`, and npm Playwright `1.62.1`, whose
+bundles are Chromium `151.0.7922.34`, Firefox `153.0` and WebKit `26.5`.
+`examples/network-spike` separately resolved Playwright/core `1.51.1` even
+though its e2e command delegates to the root. Both claimed numeric channels are
+therefore two majors behind today; the first real refresh is part of 2k, not a
+future nice-to-have.
+
+Independent Codex-high, Kimi 3/high/max-100 and Opus 5/xhigh reviews all
+required an amendment. A bounded reconciliation then unanimously approved the
+following exact contract as sustainable and non-reward-hacking. The plan may
+change these constants or authorities only through another three-model
+assumption-correction quorum.
+
+#### Policy, clocks and channel truth
+
+1. The closed policy is exactly
+   `{blockingMajorDelta:2,freshnessMonths:1,jsonSourceMaxAgeDays:14,safariReviewMaxAgeDays:180}`.
+   The pure evaluator receives `nowUtc`; it never reads ambient time. Timestamps
+   are canonical millisecond RFC 3339 UTC. Adding one month preserves UTC time
+   and day when possible, clamps to the target month's last day, and warns only
+   when `nowUtc` is strictly greater than the deadline. Tests include Jan 31,
+   leap day, year rollover and the exact boundary millisecond.
+2. A claimed numeric channel is release-blocking at `majorDelta >= 2`, not
+   `> 2`. Versions use anchored per-channel dotted-integer grammars and
+   component-wise integer comparison. Whole-string `Number`, `parseFloat`,
+   lexicographic or locale comparison is forbidden.
+3. `firstObservedBehindAtUtc` starts when the scheduled owner first observes
+   the same `(channelId, observedMajor)` behind current stable; it resets when
+   the observed major changes or catches up. One continuous UTC calendar month
+   behind is an early warning. It is separate from the immediate delta-two
+   release blocker and the 14-day maximum release-source age.
+4. A tooling ceiling is not a pass. When the current stable is two or more
+   majors ahead but the candidate already runs the newest supported Playwright
+   engine, 2k records `not-covered` plus `tooling-ceiling` and leaves the
+   coverage obligation unmet. It may withdraw a false channel claim; it cannot
+   manufacture current coverage or waive the existing Pre-release matrix gate.
+
+#### Authorities and recoverable custody
+
+The sole checked snapshot is root `browser-currency-sources.json`. Five exact
+raw bodies, together under 10 KiB, are reviewed and checked in under
+`tests/fixtures/phase-2k/sources/`:
+
+- `chrome-for-testing-last-known-good-versions.json`, from
+  `https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json`,
+  exact pointer `/channels/Stable/version`;
+- `mozilla-firefox-versions.json`, from
+  `https://product-details.mozilla.org/1.0/firefox_versions.json`, exact pointer
+  `/LATEST_FIREFOX_VERSION`;
+- `mozilla-firefox-history-major-releases.json`, from
+  `https://product-details.mozilla.org/1.0/firefox_history_major_releases.json`;
+- `npm-playwright-test-dist-tags.json`, from
+  `https://registry.npmjs.org/-/package/@playwright/test/dist-tags`, exact
+  pointer `/latest`;
+- `playwright-browsers.json`, from the exact stable
+  `https://raw.githubusercontent.com/microsoft/playwright/v<VERSION>/packages/playwright-core/browsers.json`
+  tag selected by that npm value.
+
+Every consumer re-hashes the raw bytes, applies the exact pointer/selector,
+matches the snapshot's asserted value and validates its grammar. A digest
+without recoverable bytes is insufficient. Refresh is atomic across all five
+sources: timeout, TLS/HTTP, redirect, size, encoding, missing pointer, grammar,
+schema, cross-source or Playwright-major failure writes no source, snapshot,
+manifest, lockfile, commit or PR.
+
+Channel semantics are deliberately asymmetric where upstream truth is
+asymmetric:
+
+- Chromium compares the actual launched root Playwright Chromium version with
+  Chrome for Testing stable. No official machine-readable previous-stable fact
+  is fabricated; `previousStableVersion` is `null` with
+  `no-official-machine-readable-source`.
+- Patched Playwright Firefox is labeled `branded:false` and compares its engine
+  major with Mozilla stable. Previous Firefox is the second-highest normalized
+  official history entry; ESR/beta/nightly never substitute.
+- Playwright WebKit is `engine-only`: it records the installed and launched
+  build but has no Safari authority, Safari claim or numeric Safari delta.
+  Playwright's own documentation says its patched WebKit is derived from main
+  and cannot drive branded Safari.
+- Safari/macOS is a human-reviewed Apple release-notes observation with exact
+  index and permanent version URLs, beta excluded, explicit current/previous
+  values and a 180-day review warning. Arithmetic derivation is forbidden
+  because Apple's trains are not contiguous. It is not written by the bot and
+  does not become a physical run merely by being recorded.
+
+#### Currency is not the AHE browser matrix
+
+Phase 2k owns currency for what the root Playwright run actually launches. It
+does not add a second engine build, branded Safari or real devices. The artifact
+therefore contains exactly six fixed AHE §21.5 obligations—Chrome current and
+previous, Firefox current and previous, Safari/macOS current and previous—and
+leaves them `unmet`, owned by `pre-release-tier`, until matching physical or
+distinct-build evidence exists. These rows warn locally and are not a second
+2k release blocker because the already-named Pre-release tier is their global
+release blocker. An unevidenced `met` row is structural failure. Safari/iOS,
+Chrome/Android and the remaining §21.5 dimensions stay in that same existing
+Pre-release matrix; 2k neither satisfies nor weakens them.
+
+#### One dependency and refresh owner
+
+`.github/workflows/phase-2k-browser-currency-refresh.yml` is the sole networked
+owner: weekly Monday `05:23 UTC` plus manual dispatch, one non-cancelling
+concurrency group, fixed branch `chore/phase-2k-browser-currency`, human merge,
+no auto-merge. It accepts only the latest stable Playwright `1.x`, stages every
+source and edit in temporary storage, then atomically proposes the exact root
+pin, raw fixtures, snapshot and regenerated lock. A Playwright major change
+fails visibly and requires human design review.
+
+Dependabot remains byte-identical: its existing patch/minor ignores leave 1.x
+to 2k while it can still propose a major. The primary GREEN removes the stale
+`examples/network-spike` Playwright declaration and its `1.51.1` lock graph
+while preserving the root-delegated e2e command. This disposition is accepted
+only if package typecheck, e2e/list and installed resolution pass. If strict
+pnpm resolution genuinely requires a direct dependency, the only fallback is
+an exact literal equal to the root pin. In either case governance requires
+exactly one installed version each of `@playwright/test`, `playwright` and
+`playwright-core`, and every future workspace declaration must equal the exact
+root pin.
+
+#### Report, artifact and failure semantics
+
+`.github/workflows/phase-2k-browser-currency.yml` is a read-only PR/manual job.
+Its bounded config launches exactly root Chromium, Firefox and WebKit and
+requires each runtime version to equal the resolved root
+`playwright-core/browsers.json` entry. Upstream movement, one-month staleness,
+unknown stable, unmet coverage, old Playwright, tooling ceiling and Safari
+review age emit sorted annotations, the same job-summary rows and a valid
+`warn` artifact while exiting zero. Missing execution/finalization or
+candidate-owned malformed schema, wrong GitSha/RunId/digest/pointer, duplicate
+identity, runtime/lock mismatch, forbidden Safari claim or false coverage claim
+fails. The workflow contains no `continue-on-error`, `|| true`, `set +e` or
+placeholder success; upload is `if:always()` with missing files an error.
+
+The distinct stable artifact is
+`test-results/phase-2k/browser-matrix-currency.json`, kind
+`ts-drp/browser-matrix-currency/v1`, RunId
+`phase-2k/<40-lowercase-hex-GitSha>/<lowercase-UUID-v4>`, under the same
+create-only/current-invocation discipline as 2j. Its closed top level has
+exactly: `artifactKind`, `channels`, `coverageObligations`, `electron`,
+`evaluatedAtUtc`, `gitSha`, `invalidRowIds`, `missingChannelIds`, `playwright`,
+`policy`, `requiredChannelIds`, `runId`, `schemaVersion`, `sources`, `verdict`,
+`warnings`. Required channels are exactly
+`chromium, firefox, webkit, safari-macos` in that order. Verdict is derived:
+structural invalidity is `fail`, otherwise any warning is `warn`, otherwise
+`pass`. Diagnostics use closed vocabularies, fixed/code-unit ordering and
+explicit `null`; caller-asserted verdicts/deltas are never trusted. It does not
+import, wrap or widen closed 2h/2j evidence; the three artifacts relate only by
+the same exact candidate GitSha.
+
+#### Honest pre-publication boundary and Electron lifecycle
+
+The normal GitHub-release path gains one pure, zero-network, zero-write
+`release-it.hooks["before:init"]` command over the checked fixtures, snapshot,
+root manifest, lock and installed browser manifest. It aborts before a bump,
+tag or GitHub release on structural failure, stable unknown, JSON source older
+than 14 days, or a remediable claimed-channel delta of at least two.
+`release.yml` remains a published-ref workflow but gains an independent real
+launch/currency job that every npm, Buf and Docker publication path must depend
+on. Static tests prove publication reachability cannot bypass it.
+
+This is an honest two-boundary design, not a claim that GitHub offers a
+pre-`published` event: manually creating a GitHub release can bypass the local
+`release-it` hook, but cannot pass the automated package/image publication
+graph. Repository permissions/runbook and the already-required Pre-release
+matrix remain the authority for preventing that manual bypass; moving every
+other historical release check ahead of GitHub-release creation is not silently
+claimed by 2k.
+
+Electron is activated only by the existing exact `shipping-targets.json`
+manifest and 0j-d rules. Today's inactive manifest must produce one explicit
+inactive row and execute nothing. Every future shipped exact version must run
+its declared runner and return a closed
+`ts-drp/electron-runtime-observation/v1` receipt containing its own
+`process.versions.chrome`; that embedded Chromium enters the same Chrome
+currency arithmetic. Dependencies, lookalike manifests or release-feed entries
+cannot activate Electron. The existing synthetic shipped fixture makes this
+path non-vacuous while the real target remains inactive.
+
+#### TDD sequence and bounded proof
+
+Phase 2k remains one phase item and one final Grok/Kimi/Opus acceptance
+ceremony, with two independently signed GREEN checkpoints:
+
+1. policy/gates first—pure evaluator, source custody, closed artifact,
+   report/refresh/release governance, dependency disposition and Electron
+   inactive/active contract;
+2. first real refresh second—move `1.61.1` to the then-current reviewed stable
+   1.x, remove the `1.51.1` graph, launch all three root engines, and rerun the
+   complete 2h and 2j admission evidence. Any 2j capability change or 2h
+   process-death regression is a stop/reslice event, never permission to edit
+   an expected table or waive the bump.
+
+The fresh tests-only RED freezes table-driven adjacent good/bad controls for
+UTC month clamps/boundaries; delta `>=2`; anchored version parsing; raw
+hash/pointer/value custody; 14-day boundary; WebKit-as-Safari and fabricated
+previous-version rejection; warning-never-gates versus dishonesty-always-gates;
+single installed Playwright graph; atomic refresh/no partial writes; exact
+workflow reachability/no masking; runtime-versus-manifest identity;
+tooling-ceiling `not-covered`; inactive and synthetic-active Electron; and
+unchanged closed 2h/2j shapes. A small seeded fast-check run may cover calendar
+and dotted-integer invariants. No live web call, source-string scanner,
+general dependency updater or whole-repo mutation campaign belongs in the
+inner loop.
+
+Quick gates are focused Vitest, scoped lint/typecheck/Prettier and fixture-only
+refresh tests. Actual three-engine Linux launch runs once per candidate. Full
+2h/2j run after the real bump and at final acceptance, not on every edit. Live
+source success plus forced mid-refresh failure must prove one atomic PR/no-write
+pair. The final release-DAG dry run proves stale/unknown/delta-two/false-claim
+cases stop before their owned publication boundary and a synthetic valid
+candidate reaches it.
+
+Quorum evidence:
+
+- Codex-high result SHA-256
+  `2805686c69275cf5e403018de659f4f43ec7f128ee31a6589090f32a83d59533`,
+  manifest SHA-256
+  `2954a66bd6da496321132ccbf5976bc8e28051f0de1aceadbc45ddfd7b1ca8bf`;
+- fresh Kimi 3/high/max-100 result SHA-256
+  `52f7cc3a51606fd69dac41ae7a2ad710e5c19145de29fc1c9ba53ed20e5c3009`,
+  manifest SHA-256
+  `2ad3b7beaf090088a8f46e8a02b7043e19613d6e1c0257f1da6c79cc6a5876cc`;
+- Opus 5/xhigh superseding result SHA-256
+  `7c53c6bc121609f575f7a004e07e4f60920991f79a2a28e339540b10c43d3dea`,
+  manifest SHA-256
+  `7c2ac824684f19392a94c747788b79698afcf66a69ec4ab540d3fccd1563888e`;
+- unanimous reconciliation: Codex `APPROVE`; fresh Kimi 3/high/max-100 session
+  `d03bb5db-d8a7-4a35-be1d-8824c598a702`, result SHA-256
+  `aefa618f298913080591629e9e8816cb958174cad2c61125abbedb69c32427fb`,
+  manifest SHA-256
+  `ab261d9d64e7771b7b21d998398d8434617c938f85a0f25723bbe21b918c0b49`;
+  same-session Opus reconciliation result SHA-256
+  `8d465c26edc098aaf9ee9033daa31f2ce06acfc6f236926c918ee6071018f67e`,
+  manifest SHA-256
+  `25aead7db271a8eea77aece47144d47dc081b1e6c10752135856e94f2b1a0497`.
+
+All substantive Opus review output was Opus 5. Its small automatic Haiku
+accounting produced no review output. The amendment changes the plan only; the
+fresh RED starts from the signed amendment checkpoint.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
