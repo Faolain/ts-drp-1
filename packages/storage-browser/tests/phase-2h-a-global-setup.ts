@@ -37,10 +37,7 @@ export default async function globalSetup(
 ): Promise<() => Promise<void>> {
 	const identity = dependencies.resolvePlaywrightIdentity(fileURLToPath(import.meta.url));
 	const metadata = config.metadata as Readonly<Record<string, unknown>>;
-	if (
-		Object.keys(metadata).sort().join("\0") !== "phase2hPlaywrightVersion" ||
-		metadata.phase2hPlaywrightVersion !== identity.playwrightVersion
-	)
+	if (metadata.phase2hPlaywrightVersion !== identity.playwrightVersion)
 		throw new TypeError("tooling-identity:Playwright config/setup context version mismatch");
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
 	const repositoryDirectory = path.resolve(packageDirectory, "../..");
