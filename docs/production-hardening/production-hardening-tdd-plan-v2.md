@@ -6328,6 +6328,53 @@ Quorum evidence:
 pushed. A finding that changes an owner, byte preimage, domain, closed schema,
 taxonomy or Phase-3a ordering stops for a new correction quorum.
 
+#### D.93.11 — P2-a closure evidence
+
+P2-a is closed at signed production candidate
+`a38b5f51e02f36c4c1e782b4145a2b2bee66b759`. The implementation keeps the
+authoring compiler private and the catalog package inert: it reads one
+caller-owned directory into copied bytes, emits one byte-exact import-free
+artifact, runs the real bilateral lint rule, and publishes only the four atomic
+build products. Package binding, conformance execution, catalog admission and
+live authority remain owned by P2-b through P2-e.
+
+The causal lineage is:
+
+- initial tests-only RED `94169e908e4abcf4c525428941d0baafffdaa6ee`
+  (`10` causal failures and `5` independent controls), followed by GREEN
+  `18eb8192f0420f5165761e4d6748f7f957c00692`;
+- AST/type-governance RED `5c7ca7123bc058af27e4595e00a9295f0c222304`
+  and GREEN `a663592016c0a9850b197d956bfae9fd5be1793f`; and
+- string/comment RED `ceb5e6d42f071f7d43af8f697ae13876a5e5336d`
+  and final GREEN `a38b5f51e02f36c4c1e782b4145a2b2bee66b759`.
+
+The final owned matrix is `31/31`. It preserves Phase-0j-a/b at `142/142`,
+Phase-0j-c at `7` passed plus its intentional nightly skip, and legacy
+blueprints at `19/19`; package typecheck/build/test and changed-path lint,
+format and diff gates are green. Broad root typecheck still reports only the
+pre-existing compact-history fixture/helper debt, and broad root lint retains
+unrelated repository debt; neither is used as P2-a evidence.
+
+The raw evidence manifests are, in lineage order:
+
+- `4ac29f10799f32726478b899a799aa693dfd1cc244103b885910f3390f095170` /
+  `35ec5b160900119accf9e10c7f8289ad667dcb88c8b7d6bf55633b9a28a7e5d`;
+- `746aecfe6479ae53f44c28e865d6adc053bb022383cddc7cb62980e31e418a1b` /
+  `f1aadd7c8c26ff6b4711d7d9fe6e10973e632bf6dc7edd52c6586aa3c81b96cc`;
+  and
+- `3aed1c818062d16498ca2d41e54fd89ea96d4444aebc92ade231f2fdfc0fa9ae` /
+  `05f541a3383179a55f20dc49b0c410fb61854710e710de0a0a3e4c8474799bbe`.
+
+Fresh exact-candidate closure reviews independently authorize P2-a closure and
+P2-b start with no blocker: Grok 4.6/high seal
+`70d21d9bea5d686bc176835f1d10b906fa92cb5bb90af6a9ba60e687471b93bc`,
+Kimi 3/high/100 seal
+`36e6ff9e3083973fa5f6a5c01bd24aa4194a4b562864c3e07a158dd0b7782ac7`,
+and Opus 5/xhigh manifest
+`e6cdfbd12829d07808b5e6d9f3ca24e0dc26740a50664c432a2d18ceb36fef01`.
+P2-b must consume the exact artifact/package placeholders rather than widening
+P2-a or treating its private compiler as runtime authority.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
