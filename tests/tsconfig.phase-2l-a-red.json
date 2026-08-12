@@ -15,6 +15,7 @@
 	"files": [
 		"phase-2l-a-shared-issuance-contract.test.ts",
 		"phase-2l-a-b2-b3-corrective.test.ts",
-		"phase-2l-a-b4-b5-semantic-lineage-null.test.ts"
+		"phase-2l-a-b4-b5-semantic-lineage-null.test.ts",
+		"phase-2l-a-b6-b7-terminal-input-poison.test.ts"
 	]
 }

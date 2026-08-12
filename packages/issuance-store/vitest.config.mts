@@ -16,6 +16,7 @@ export default defineConfig({
 			"tests/phase-2l-a-shared-issuance-contract.test.ts",
 			"tests/phase-2l-a-b2-b3-corrective.test.ts",
 			"tests/phase-2l-a-b4-b5-semantic-lineage-null.test.ts",
+			"tests/phase-2l-a-b6-b7-terminal-input-poison.test.ts",
 		],
 	},
 });
