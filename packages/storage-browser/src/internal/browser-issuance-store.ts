@@ -276,6 +276,10 @@ function sameLineage(left: DurableLineage, right: DurableLineage): boolean {
 	return left.next === right.next && left.exhausted === right.exhausted;
 }
 
+function lineageConsumed(lineage: DurableLineage, authorSequence: number): boolean {
+	return lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
+}
+
 class BrowserIssuanceImplementation {
 	readonly #database: IDBDatabase;
 	readonly #transactions = new Set<IDBTransaction>();
@@ -368,9 +372,29 @@ class BrowserIssuanceImplementation {
 		const parsed = this.#parsePageInput(input);
 		const transaction = this.#startTransaction("readonly");
 		try {
-			const nativeRows = await requestResult(transaction.objectStore("issuanceOutbox").getAll());
-			const issuedRows = await requestResult(transaction.objectStore("issuedRecords").getAll());
+			const [nativeRows, issuedRows, lineageRows] = await Promise.all([
+				requestResult(transaction.objectStore("issuanceOutbox").getAll()),
+				requestResult(transaction.objectStore("issuedRecords").getAll()),
+				requestResult(transaction.objectStore("lineages").getAll()),
+			]);
 			await transactionResult(transaction);
+			const lineageByScope = new Map<string, DurableLineage>();
+			for (const raw of lineageRows) {
+				if (
+					!isClosedDurableIssuanceRecord(raw, ["author", "exhausted", "next", "objectId"]) ||
+					!isValidDurableScopeField(raw.author) ||
+					!isValidDurableScopeField(raw.objectId)
+				) {
+					throw this.#latchCorruption("stored lineage is malformed");
+				}
+				const scope = { author: raw.author, objectId: raw.objectId };
+				const lineage = copyNativeLineage(raw, scope);
+				const key = this.#scopeKey(scope);
+				if (lineage === undefined || lineageByScope.has(key)) {
+					throw this.#latchCorruption("stored lineage is malformed");
+				}
+				lineageByScope.set(key, lineage);
+			}
 			const issuedByKey = new Map<string, NativeIssuedRecord>();
 			for (const raw of issuedRows) {
 				const row = copyNativeIssued(raw);
@@ -384,6 +408,10 @@ class BrowserIssuanceImplementation {
 				const issued = issuedByKey.get(this.#recordKey(outbox, outbox.authorSequence));
 				if (issued === undefined || !this.#bytesEqual(issued.digest, outbox.digest)) {
 					throw this.#latchCorruption("outbox has no matching issued record");
+				}
+				const lineage = lineageByScope.get(this.#scopeKey(outbox));
+				if (lineage === undefined || !lineageConsumed(lineage, outbox.authorSequence)) {
+					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
 				}
 				issuedByKey.delete(this.#recordKey(outbox, outbox.authorSequence));
 				const commit = commitFromIssued(issued);
@@ -602,6 +630,10 @@ class BrowserIssuanceImplementation {
 
 	#recordKey(scope: DurableIssueScope, authorSequence: number): string {
 		return `${scope.objectId.length}:${scope.objectId}${scope.author.length}:${scope.author}:${authorSequence}`;
+	}
+
+	#scopeKey(scope: DurableIssueScope): string {
+		return `${scope.objectId.length}:${scope.objectId}${scope.author.length}:${scope.author}`;
 	}
 
 	#commitKey(commit: DurableIssueCommit): readonly [string, string, number] {
