@@ -86,14 +86,22 @@ function cloneLineage(lineage: DurableLineage): DurableLineage {
 	return { exhausted: lineage.exhausted, next: lineage.next };
 }
 
+function isSemanticallyValidLineage(lineage: DurableLineage): boolean {
+	return !lineage.exhausted || lineage.next === Number.MAX_SAFE_INTEGER;
+}
+
 function copyExactLineage(value: unknown, source: "caller" | "durable-observation"): DurableLineage {
-	if (!isRecord(value, ["exhausted", "next"]) || typeof value.exhausted !== "boolean" || !validOrdinal(value.next)) {
+	const exact =
+		isRecord(value, ["exhausted", "next"]) && typeof value.exhausted === "boolean" && validOrdinal(value.next)
+			? { exhausted: value.exhausted, next: value.next }
+			: undefined;
+	if (exact === undefined || !isSemanticallyValidLineage(exact)) {
 		if (source === "caller") {
 			throw new InvalidArgumentFailure("prior lineage must be an exact safe lineage record");
 		}
 		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation contains a malformed lineage");
 	}
-	return { exhausted: value.exhausted, next: value.next };
+	return exact;
 }
 
 function isClosedOutboxPageInput(value: unknown): value is Record<string, unknown> {
@@ -130,17 +138,23 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	readonly #poison?: IssuanceFailure;
 
 	constructor(options: EphemeralDurableIssuanceStoreOptions = {}) {
-		if (options.initialPoison === "recovery-corrupt") {
-			this.#poison = failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt");
-		}
+		let poison =
+			options.initialPoison === "recovery-corrupt"
+				? failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt")
+				: undefined;
 		for (const initial of options.initialLineages ?? []) {
 			validateScope(initial.scope);
 			validateLineage(initial);
+			if (!isSemanticallyValidLineage(initial)) {
+				poison ??= failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt");
+				continue;
+			}
 			this.#lineages.set(scopeKey(initial.scope), {
 				exhausted: initial.exhausted,
 				next: initial.next,
 			});
 		}
+		if (poison !== undefined) this.#poison = poison;
 	}
 
 	async close(): Promise<void> {
@@ -172,7 +186,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		}
 		const pageInput = input as DurableOutboxPageInput;
 		if (pageInput.scope !== undefined) validateScope(pageInput.scope);
-		const limit = pageInput.limit ?? DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT;
+		const limit = pageInput.limit === undefined ? DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT : pageInput.limit;
 		if (!Number.isInteger(limit) || limit < 1 || limit > MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT) {
 			throw new InvalidArgumentFailure("page limit is outside the closed range");
 		}
