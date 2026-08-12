@@ -48,6 +48,7 @@ jobs:
     uses: ./.github/workflows/npm-publish.yml
     needs:
       - phase-2k-browser-currency
+      - phase-0j-c-release-conformance
 
   publish_buf_registry:
     name: Publish buf files
