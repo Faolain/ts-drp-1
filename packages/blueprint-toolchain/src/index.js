@@ -8,6 +8,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
 
+/** @typedef {ReturnType<typeof import("@typescript-eslint/parser").parse>} BlueprintProgram */
+/** @typedef {{type:string, name?:string, left?:BindingNode, argument?:BindingNode, elements?:readonly (BindingNode|null)[], properties?:readonly {type:string, argument?:BindingNode, value?:BindingNode}[]}} BindingNode */
+
 const AUTHORING_KEYS = [
 	"artifactId",
 	"conformance",
@@ -70,6 +73,7 @@ const RESERVED_BINDINGS = new Set([
 	"with",
 	"yield",
 ]);
+/** @type {import("esbuild").TransformOptions} */
 const TRANSFORM_OPTIONS = {
 	charset: "ascii",
 	format: "esm",
@@ -185,20 +189,23 @@ function requireNonemptyString(value, context) {
 /** @param {unknown} value @param {string} context */
 function compileArgumentSchema(value, context) {
 	assertClosedRecord(value, SCHEMA_KEYS, context);
-	if (value.kind !== "closed-record" || !Array.isArray(value.fields)) throw new TypeError(`${context} is invalid`);
+	const schema = /** @type {Record<string, unknown>} */ (value);
+	if (schema.kind !== "closed-record" || !Array.isArray(schema.fields)) throw new TypeError(`${context} is invalid`);
 	let previous;
 	const fields = [];
-	for (let index = 0; index < value.fields.length; index++) {
-		const field = value.fields[index];
-		assertClosedRecord(field, FIELD_KEYS, `${context}.fields[${index}]`);
+	for (let index = 0; index < schema.fields.length; index++) {
+		const candidate = schema.fields[index];
+		assertClosedRecord(candidate, FIELD_KEYS, `${context}.fields[${index}]`);
+		const field = /** @type {Record<string, unknown>} */ (candidate);
 		const name = requireNonemptyString(field.name, `${context}.fields[${index}].name`);
 		if (previous !== undefined && compareCodePoints(previous, name) >= 0)
 			throw new TypeError(`${context} fields are unsorted`);
 		if (typeof field.required !== "boolean") throw new TypeError(`${context} required must be boolean`);
-		if (!["canonical-object", "safe-integer", "string"].includes(field.type)) {
+		const type = field.type;
+		if (type !== "canonical-object" && type !== "safe-integer" && type !== "string") {
 			throw new TypeError(`${context} field type is unsupported`);
 		}
-		fields.push({ name, required: field.required, type: field.type });
+		fields.push({ name, required: field.required, type });
 		previous = name;
 	}
 	return fields;
@@ -209,13 +216,14 @@ function validateArguments(value, fields, context) {
 	if (value === null || typeof value !== "object" || Array.isArray(value))
 		throw new TypeError(`${context} must be an object`);
 	const allowed = new Set(fields.map((field) => field.name));
-	for (const key of Object.keys(value)) if (!allowed.has(key)) throw new TypeError(`${context}.${key} is unknown`);
+	const record = /** @type {Record<string, unknown>} */ (value);
+	for (const key of Object.keys(record)) if (!allowed.has(key)) throw new TypeError(`${context}.${key} is unknown`);
 	for (const field of fields) {
 		if (!Object.hasOwn(value, field.name)) {
 			if (field.required) throw new TypeError(`${context}.${field.name} is required`);
 			continue;
 		}
-		const candidate = value[field.name];
+		const candidate = record[field.name];
 		if (field.type === "safe-integer" && !Number.isSafeInteger(candidate)) {
 			throw new TypeError(`${context}.${field.name} must be a safe integer`);
 		}
@@ -231,32 +239,39 @@ function validateArguments(value, fields, context) {
 	}
 }
 
-/** @param {unknown} pattern @param {Set<string>} bindings */
+/** @param {BindingNode} pattern @param {Set<string>} bindings */
 function addBindingNames(pattern, bindings) {
 	if (pattern.type === "Identifier") {
+		if (pattern.name === undefined) throw new TypeError("invalid identifier binding");
 		bindings.add(pattern.name);
 		return;
 	}
 	if (pattern.type === "AssignmentPattern") {
+		if (pattern.left === undefined) throw new TypeError("invalid assignment binding pattern");
 		addBindingNames(pattern.left, bindings);
 		return;
 	}
 	if (pattern.type === "RestElement") {
+		if (pattern.argument === undefined) throw new TypeError("invalid rest binding pattern");
 		addBindingNames(pattern.argument, bindings);
 		return;
 	}
 	if (pattern.type === "ArrayPattern") {
+		if (pattern.elements === undefined) throw new TypeError("invalid array binding pattern");
 		for (const element of pattern.elements) if (element !== null) addBindingNames(element, bindings);
 		return;
 	}
 	if (pattern.type === "ObjectPattern") {
+		if (pattern.properties === undefined) throw new TypeError("invalid object binding pattern");
 		for (const property of pattern.properties) {
-			addBindingNames(property.type === "RestElement" ? property.argument : property.value, bindings);
+			const binding = property.type === "RestElement" ? property.argument : property.value;
+			if (binding === undefined) throw new TypeError("invalid object binding property");
+			addBindingNames(binding, bindings);
 		}
 	}
 }
 
-/** @param {unknown} root */
+/** @param {BlueprintProgram} root */
 function moduleBindings(root) {
 	const bindings = new Set();
 	for (const node of root.body) {
@@ -264,13 +279,15 @@ function moduleBindings(root) {
 			bindings.add(node.id.name);
 		}
 		if (node.type === "VariableDeclaration") {
-			for (const declaration of node.declarations) addBindingNames(declaration.id, bindings);
+			for (const declaration of node.declarations) {
+				addBindingNames(/** @type {BindingNode} */ (declaration.id), bindings);
+			}
 		}
 	}
 	return bindings;
 }
 
-/** @param {unknown} root */
+/** @param {BlueprintProgram} root */
 function validateSourceAst(root) {
 	const forbidden = new Set([
 		"Decorator",
@@ -285,21 +302,28 @@ function validateSourceAst(root) {
 		"TSEnumDeclaration",
 		"TSModuleDeclaration",
 	]);
+	/** @param {unknown} value @param {number} functionDepth */
 	const visit = (value, functionDepth) => {
 		if (value === null || typeof value !== "object") return;
 		if (Array.isArray(value)) {
 			for (const item of value) visit(item, functionDepth);
 			return;
 		}
-		const node = value;
-		if (forbidden.has(node.type) || node.type.startsWith("TSDeclare") || node.declare === true) {
-			throw new TypeError(`blueprint.ts contains forbidden ${node.type}`);
+		const node = /** @type {Record<string, unknown>} */ (value);
+		const nodeType = node.type;
+		if (
+			typeof nodeType === "string" &&
+			(forbidden.has(nodeType) || nodeType.startsWith("TSDeclare") || node.declare === true)
+		) {
+			throw new TypeError(`blueprint.ts contains forbidden ${nodeType}`);
 		}
-		if (node.type === "AwaitExpression" && functionDepth === 0)
+		if (nodeType === "AwaitExpression" && functionDepth === 0)
 			throw new TypeError("blueprint.ts contains top-level await");
-		const nextDepth = ["ArrowFunctionExpression", "FunctionDeclaration", "FunctionExpression"].includes(node.type)
-			? functionDepth + 1
-			: functionDepth;
+		const nextDepth =
+			typeof nodeType === "string" &&
+			["ArrowFunctionExpression", "FunctionDeclaration", "FunctionExpression"].includes(nodeType)
+				? functionDepth + 1
+				: functionDepth;
 		for (const [key, child] of Object.entries(node)) {
 			if (!["loc", "parent", "range", "tokens", "comments"].includes(key)) visit(child, nextDepth);
 		}
@@ -307,7 +331,7 @@ function validateSourceAst(root) {
 	visit(root, 0);
 }
 
-/** @param {string} source */
+/** @param {string} source @param {typeof import("@typescript-eslint/parser")} parser */
 function parseSource(source, parser) {
 	const program = parser.parse(source, {
 		comment: true,
@@ -322,7 +346,7 @@ function parseSource(source, parser) {
 	return program;
 }
 
-/** @param {Buffer} authoringBytes @param {string} text @param {Set<string>} bindings */
+/** @param {Buffer} authoringBytes @param {string} text */
 function parseAuthoring(authoringBytes, text) {
 	const duplicateCheck = parseDocument(text, { uniqueKeys: true });
 	if (duplicateCheck.errors.length !== 0) throw new TypeError("blueprint.json contains duplicate or invalid keys");
@@ -408,10 +432,17 @@ function parseAuthoring(authoringBytes, text) {
 			assertBoundedCanonical(item.arguments);
 		}
 	}
-	if (countNegativeZero(conformance.prCases.map((item) => item.arguments)) !== 1) {
+	if (
+		countNegativeZero(/** @type {Record<string, unknown>[]} */ (conformance.prCases).map((item) => item.arguments)) !==
+		1
+	) {
 		throw new TypeError("PR arguments must contain exactly one negative-zero witness");
 	}
-	if (countNegativeZero(conformance.nightlyAdditionalCases.map((item) => item.arguments)) !== 0) {
+	if (
+		countNegativeZero(
+			/** @type {Record<string, unknown>[]} */ (conformance.nightlyAdditionalCases).map((item) => item.arguments)
+		) !== 0
+	) {
 		throw new TypeError("nightly arguments cannot contain negative zero");
 	}
 	encodeCanonical({
@@ -471,7 +502,7 @@ function repositoryRoot() {
 	}
 }
 
-/** @param {string} ruleSource */
+/** @param {string} ruleSource @returns {Promise<import("eslint").ESLint.Plugin>} */
 async function loadRule(ruleSource) {
 	const compiled = transformSync(ruleSource, {
 		charset: "utf8",
@@ -487,7 +518,7 @@ async function loadRule(ruleSource) {
 	return (await import(moduleUrl)).default;
 }
 
-/** @param {string} text @param {string} filename @param {'artifact'|'source'} kind @param {unknown} plugin */
+/** @param {string} text @param {string} filename @param {'artifact'|'source'} kind @param {import("eslint").ESLint.Plugin} plugin @param {import("eslint").Linter.Parser} parser @param {typeof import("eslint").Linter} LinterConstructor */
 function lintTarget(text, filename, kind, plugin, parser, LinterConstructor) {
 	const linter = new LinterConstructor();
 	const messages = linter.verify(

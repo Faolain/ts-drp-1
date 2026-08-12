@@ -2,7 +2,7 @@
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"allowJs": true,
-		"checkJs": false,
+		"checkJs": true,
 		"exactOptionalPropertyTypes": true,
 		"outDir": "dist"
 	},
