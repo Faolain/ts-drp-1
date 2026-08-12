@@ -86,6 +86,28 @@ function cloneLineage(lineage: DurableLineage): DurableLineage {
 	return { exhausted: lineage.exhausted, next: lineage.next };
 }
 
+function copyExactLineage(value: unknown, source: "caller" | "durable-observation"): DurableLineage {
+	if (!isRecord(value, ["exhausted", "next"]) || typeof value.exhausted !== "boolean" || !validOrdinal(value.next)) {
+		if (source === "caller") {
+			throw new InvalidArgumentFailure("prior lineage must be an exact safe lineage record");
+		}
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation contains a malformed lineage");
+	}
+	return { exhausted: value.exhausted, next: value.next };
+}
+
+function isClosedOutboxPageInput(value: unknown): value is Record<string, unknown> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+	const prototype: unknown = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return false;
+	const allowedKeys = ["afterKey", "limit", "scope"] as const;
+	return Reflect.ownKeys(value).every((key) => {
+		if (typeof key !== "string" || !allowedKeys.includes(key as (typeof allowedKeys)[number])) return false;
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		return descriptor !== undefined && "value" in descriptor && descriptor.enumerable;
+	});
+}
+
 function outboxKey(record: DurableIssuanceOutboxRecord): CompoundKey {
 	return [
 		record.commit.outboxEntry.scope.objectId,
@@ -145,10 +167,9 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	async readOutboxPage(input: DurableOutboxPageInput = {}): Promise<readonly DurableIssuanceOutboxRecord[]> {
 		await Promise.resolve();
 		this.#assertAvailable();
-		if (typeof input !== "object" || input === null || Array.isArray(input)) {
-			throw new InvalidArgumentFailure("page input must be a plain record");
+		if (!isClosedOutboxPageInput(input)) {
+			throw new InvalidArgumentFailure("page input must contain only own enumerable data options");
 		}
-		if (!isRecord(input, Object.keys(input))) throw new InvalidArgumentFailure("page input must be a plain record");
 		const pageInput = input as DurableOutboxPageInput;
 		if (pageInput.scope !== undefined) validateScope(pageInput.scope);
 		const limit = pageInput.limit ?? DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT;
@@ -266,10 +287,12 @@ function outboxMatchesIssued(outbox: NativeOutboxRecord, issued: DurableIssuedRe
  */
 export function classifyTerminalSuppression(input: TerminalClassificationInput): DurableIssueCommit {
 	const scope = cloneScope(input.scope);
+	const priorLineage = copyExactLineage(input.priorLineage, "caller");
 	if ("unreadable" in input.observation) throw new UnknownOutcomeFailure(scope);
 	const { issuedRecord, lineage, outboxRecord } = input.observation;
+	const observedLineage = copyExactLineage(lineage, "durable-observation");
 	const candidate = copyAndValidateCommit(input.candidate, scope, input.candidate.authorSequence);
-	const isConsumed = consumed(lineage, candidate.authorSequence);
+	const isConsumed = consumed(observedLineage, candidate.authorSequence);
 	const observedIssued = issuedRecord === null ? null : copyIssuedRecord(issuedRecord);
 	const observedOutbox = outboxRecord === null ? null : copyNativeOutboxRecord(outboxRecord);
 	if (
@@ -290,7 +313,7 @@ export function classifyTerminalSuppression(input: TerminalClassificationInput):
 	) {
 		return cloneCommit(candidate);
 	}
-	if (issuedRecord === null && outboxRecord === null && sameLineage(lineage, input.priorLineage)) {
+	if (issuedRecord === null && outboxRecord === null && sameLineage(observedLineage, priorLineage)) {
 		throw failure("ISSUANCE_SUBSTRATE_FAILURE", "commit was definitively not applied", "transient");
 	}
 	if (
