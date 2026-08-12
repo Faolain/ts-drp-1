@@ -130,6 +130,10 @@ function validateLineage(value: DurableLineage): void {
 	}
 }
 
+function recoveryPoison(): IssuanceFailure {
+	return Object.freeze(failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt"));
+}
+
 class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	readonly #issued = new Map<string, DurableIssueCommit>();
 	readonly #lineages = new Map<string, DurableLineage>();
@@ -138,15 +142,12 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	readonly #poison?: IssuanceFailure;
 
 	constructor(options: EphemeralDurableIssuanceStoreOptions = {}) {
-		let poison =
-			options.initialPoison === "recovery-corrupt"
-				? failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt")
-				: undefined;
+		let poison = options.initialPoison === "recovery-corrupt" ? recoveryPoison() : undefined;
 		for (const initial of options.initialLineages ?? []) {
 			validateScope(initial.scope);
 			validateLineage(initial);
 			if (!isSemanticallyValidLineage(initial)) {
-				poison ??= failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt");
+				poison ??= recoveryPoison();
 				continue;
 			}
 			this.#lineages.set(scopeKey(initial.scope), {
@@ -300,12 +301,21 @@ function outboxMatchesIssued(outbox: NativeOutboxRecord, issued: DurableIssuedRe
  * @returns The detached durable candidate when the observation proves it committed.
  */
 export function classifyTerminalSuppression(input: TerminalClassificationInput): DurableIssueCommit {
+	validateScope(input.scope);
 	const scope = cloneScope(input.scope);
 	const priorLineage = copyExactLineage(input.priorLineage, "caller");
+	if (priorLineage.exhausted) {
+		throw new InvalidArgumentFailure("prior lineage must remain selectable during terminal classification");
+	}
+	let candidate: DurableIssueCommit;
+	try {
+		candidate = copyAndValidateCommit(input.candidate, scope, priorLineage.next);
+	} catch {
+		throw new InvalidArgumentFailure("candidate must close the exact prior-lineage ordinal");
+	}
 	if ("unreadable" in input.observation) throw new UnknownOutcomeFailure(scope);
 	const { issuedRecord, lineage, outboxRecord } = input.observation;
 	const observedLineage = copyExactLineage(lineage, "durable-observation");
-	const candidate = copyAndValidateCommit(input.candidate, scope, input.candidate.authorSequence);
 	const isConsumed = consumed(observedLineage, candidate.authorSequence);
 	const observedIssued = issuedRecord === null ? null : copyIssuedRecord(issuedRecord);
 	const observedOutbox = outboxRecord === null ? null : copyNativeOutboxRecord(outboxRecord);
