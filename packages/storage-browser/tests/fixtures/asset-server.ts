@@ -48,6 +48,8 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 		"phase-2l-b-death.html",
 		"phase-2l-b-browser-death.js",
 		"phase-2l-b-browser-death-worker.js",
+		"phase-2l-d.html",
+		"phase-2l-d-browser-parity.js",
 	]);
 	const tokens = new Set<string>();
 	const server = http.createServer((request, response) => {
