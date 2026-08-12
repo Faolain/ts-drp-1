@@ -5639,6 +5639,77 @@ rejection unchanged, and bind the shared registry limit. The inherited root
 type/lint debt and one existing Node skip are disclosed but do not originate in
 this slice.
 
+#### Phase 2l-d parity and aggregate Phase 2l closure evidence
+
+Phase 2l-d and aggregate Phase 2l close on signed and pushed candidate
+`e07b2d8feaf6cd6d2f7f825212d38c91d9091334` (tree
+`7f489b43abd6668340f631064320dd311906c848`). The shared parity harness under
+`tests/fixtures/phase-2l-d/` is the continuing contract owner: it binds both
+real backend factories without adding a production API, preserves the shared
+registry limit and observable error/copy/build semantics, and records the
+physical differences that are intentionally backend-owned.
+
+The distinct parity RED `7f619be6209071e37de4f4365b6437bb9982a110`
+proved the real adapters already agreed and exposed one honest gap: the
+standing browser E2E command did not run the parity configuration. One-line
+GREEN `0916abca85afe5ea796c407a4c89da3cd84c0b39` made that gate permanent.
+Final review then found that browser outbox paging, unlike the accepted Node
+path, could return a complete issued/outbox pair without proving its lineage
+had consumed the ordinal. Corrective tests-only RED
+`4688a26908a1d2e59d0fa052a0131a9e80a57527` freezes absent,
+equality-unadvanced and lagging lineage failures with ordinary and exhausted-
+MAX controls. The final one-file GREEN `e07b2d8...` validates the full lineage/
+issued/outbox join inside the existing strict readonly transaction before any
+scope filtering, ordering, slicing or publication.
+
+The retained evidence establishes the invariants that matter beyond current
+file shape:
+
+- both real adapters pass the shared contract, including builder rejection
+  with unchanged old state, malformed-candidate nonpublication, detached full
+  envelope bytes, exact misuse taxonomy and the real 1,024/1,025 boundary;
+- backend-specific durability remains proven by the existing 16 browser and 18
+  Node genuine-death campaigns, separate admission recovery and all five
+  terminal-suppression outcomes per backend;
+- the root browser E2E gate preserves its prior order and now ends with parity,
+  so parity cannot silently become an opt-in-only check; and
+- Node and browser paging reject incomplete or unconsumed durable closures
+  before returning publication work, while retaining their ratified physical
+  transaction differences.
+
+Exact-candidate raw closure evidence is sealed under
+`.logs/phase-2l-d-e07b2d8-exact-head-closure-evidence/`. Browser parity passes
+3/3; the standing chain passes its inventory, genuine 18-arm inherited death,
+publication and parity legs. Its manifest SHA-256 is
+`8e4ead01c2bf728aae80506e051c891644cafacb215f6fadae2b7cc6cc3422b8`
+and its integrity-file SHA-256 is
+`a3f8644ed33ac1c8a7691dbd07f90d752bcc3c68c5edc9382fcc2bc4f719be35`.
+The corrective GREEN's broader evidence manifest SHA-256 is
+`5a0836b6b9f0a45ce8bc15151ce92d67deaf3938f3312dffe1eaa963da103d8f`.
+
+The final independent closure gates accept the code with no blocker:
+
+- Grok 4.6/high result/manifest SHA-256
+  `84e7273477de217fbc9a83c47738b71c1ed4912bc07bc93eb1e2f487d5c90236` /
+  `04a20a62585a2f415e3da529648907a9414cb4dc2c7c945d0a1615ab4f168e6a`;
+- fresh no-tools exact Kimi 3/high/100 reconciliation result/manifest SHA-256
+  `6085531e9b051e92df82e589622cd02fa6d909b8b73390a6194819fc906a5743` /
+  `6ba39c5a355a57acf1ea206dd885c26118f65af9acd96bf74e492b9ce4a1c137`;
+  and
+- final Opus 5/xhigh result/manifest SHA-256
+  `f11e6268b6cb24e6a16467887a43fe66654aafcb9e98b18b5d31593f3528893b` /
+  `45eb5567a8dc9932ab48a5aca2b9bc03e5e4305e03aecc2604f29fe921cad28f`,
+  with high-confidence `ACCEPT`, `PHASE_2L_D_MAY_CLOSE=yes`,
+  `PHASE_2L_MAY_CLOSE=yes` and no behavioral plan change.
+
+Later owners must not mistake closure for completion of publication. Phase 3a
+owns pending-to-published acknowledgement and ordering; Phase 6b owns deletion,
+retention and the full-join/batching scalability revisit. The browser's
+compiled but unreachable internal test control remains hygiene debt, not a
+consumer seam. Existing broad root type/lint and external-profile governance
+diagnostics remain disclosed inherited debt and do not weaken the exact owned
+gates above.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
