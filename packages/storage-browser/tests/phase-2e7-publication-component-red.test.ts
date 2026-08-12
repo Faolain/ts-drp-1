@@ -159,7 +159,7 @@ function currentClosure(): Phase2e7ClosureObservation {
 }
 
 describe("Phase 2e7 public browser package and component closure", () => {
-	it("freezes one stable public root and publishable workspace metadata", () => {
+	it("freezes the stable public root plus the issuance subpath and publishable workspace metadata", () => {
 		const metadata = json("packages/storage-browser/package.json");
 		expect.soft(metadata).not.toHaveProperty("private");
 		expect.soft(metadata).toMatchObject({
@@ -170,7 +170,10 @@ describe("Phase 2e7 public browser package and component closure", () => {
 			exports: { ".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" } },
 		});
 		expect.soft((metadata.scripts as Record<string, unknown> | undefined)?.prepack).toBe("tsc -b");
-		expect.soft(Object.keys((metadata.exports as Record<string, unknown> | undefined) ?? {})).toEqual(["."]);
+		expect.soft(metadata.exports).toEqual({
+			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
+			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+		});
 		expect.soft(fs.existsSync(workspacePath("packages/storage-browser/src/index.ts"))).toBe(true);
 	});
 

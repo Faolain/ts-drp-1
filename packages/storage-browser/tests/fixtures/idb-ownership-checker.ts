@@ -4,9 +4,14 @@ import ts from "typescript";
 
 const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 export const PACKAGE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../..");
+const IDB_ADAPTER_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts");
+const SCHEMA_IDB_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts");
+const ISSUANCE_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/browser-issuance-store.ts");
+const ISSUANCE_TEST_CONTROL_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/issuance-test-control.ts");
+const STRICT_MUTATION_OWNERS = new Set([IDB_ADAPTER_OWNER, SCHEMA_IDB_OWNER]);
 const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
 	[
-		path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts"),
+		IDB_ADAPTER_OWNER,
 		new Set([
 			"open",
 			"transaction",
@@ -23,7 +28,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		]),
 	],
 	[
-		path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts"),
+		SCHEMA_IDB_OWNER,
 		new Set([
 			"open",
 			"createObjectStore",
@@ -37,6 +42,24 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"addEventListener",
 		]),
 	],
+	[
+		ISSUANCE_OWNER,
+		new Set([
+			"open",
+			"createObjectStore",
+			"transaction",
+			"objectStore",
+			"get",
+			"getAll",
+			"add",
+			"put",
+			"delete",
+			"abort",
+			"close",
+			"addEventListener",
+		]),
+	],
+	[ISSUANCE_TEST_CONTROL_OWNER, new Set(["open", "transaction", "objectStore", "add", "close", "addEventListener"])],
 	[
 		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/strict-idb-harness.ts"),
 		new Set([
@@ -208,9 +231,7 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 		if (!governedRootNames.includes(source.fileName)) continue;
 		const normalized = path.resolve(source.fileName);
 		const enforceProductionStrictMutation =
-			options.ownerMethods !== undefined ||
-			normalized === path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts") ||
-			normalized === path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts");
+			options.ownerMethods !== undefined || STRICT_MUTATION_OWNERS.has(normalized);
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node)) {
 				if (ts.isElementAccessExpression(node.expression)) {

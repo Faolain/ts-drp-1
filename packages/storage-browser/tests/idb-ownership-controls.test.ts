@@ -16,7 +16,7 @@ describe("Phase 2b bounded TypeScript Program ownership checker", () => {
 		expect(auditIdbOwnership()).toEqual([]);
 	}, 60_000);
 
-	it("rejects a raw IDB call outside either owner", () => {
+	it("rejects a raw IDB call outside the exact governed owners", () => {
 		const directory = fs.mkdtempSync(path.join(os.tmpdir(), "phase-2b-idb-checker-"));
 		temporaryDirectories.push(directory);
 		const source = path.join(directory, "forbidden.ts");

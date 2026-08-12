@@ -10,13 +10,20 @@ function readJson(relativePath: string): Record<string, unknown> {
 }
 
 describe("storage-browser structural controls", () => {
-	it("publishes one root while storage-node remains private", () => {
+	it("preserves the browser root plus issuance subpath while storage-node remains private", () => {
 		const browser = readJson("packages/storage-browser/package.json");
 		const node = readJson("packages/storage-node/package.json");
 		expect(browser).not.toHaveProperty("private");
-		expect(Object.keys(browser.exports as object)).toEqual(["."]);
+		expect(browser.exports).toEqual({
+			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
+			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+		});
 		expect(node.private).toBe(true);
-		expect(browser.dependencies).toEqual({ "@ts-drp/canonical": "0.11.0", "@ts-drp/storage": "0.11.0" });
+		expect(browser.dependencies).toEqual({
+			"@ts-drp/canonical": "0.11.0",
+			"@ts-drp/issuance-store": "0.11.0",
+			"@ts-drp/storage": "0.11.0",
+		});
 	});
 
 	it("keeps all retained real browser authorities in typecheck and out of the package build", () => {

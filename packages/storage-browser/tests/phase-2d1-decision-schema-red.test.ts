@@ -96,13 +96,16 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 		expect.soft(browserAdapterSource).not.toContain("getAll(generationPrefix(");
 	});
 
-	it("publishes only the stable browser package root", () => {
+	it("preserves the stable browser root while publishing only the issuance subpath", () => {
 		const packageManifest = JSON.parse(
 			fs.readFileSync(path.join(PACKAGE_DIRECTORY, "package.json"), "utf8")
 		) as Readonly<Record<string, unknown>>;
 
 		expect(packageManifest).not.toHaveProperty("private");
-		expect(Object.keys(packageManifest.exports as object)).toEqual(["."]);
+		expect(packageManifest.exports).toEqual({
+			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
+			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+		});
 	});
 
 	it("binds production opening to the accepted S4 idb-strict decision link digest", () => {
