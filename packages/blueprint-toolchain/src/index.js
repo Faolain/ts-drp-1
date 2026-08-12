@@ -183,6 +183,18 @@ function countNegativeZero(value) {
 /** @param {unknown} value @param {string} context */
 function requireNonemptyString(value, context) {
 	if (typeof value !== "string" || value.length === 0) throw new TypeError(`${context} must be a nonempty string`);
+	for (let index = 0; index < value.length; index++) {
+		const unit = value.charCodeAt(index);
+		if (unit >= 0xd800 && unit <= 0xdbff) {
+			const next = value.charCodeAt(index + 1);
+			if (index + 1 >= value.length || next < 0xdc00 || next > 0xdfff) {
+				throw new TypeError(`${context} contains an unpaired surrogate`);
+			}
+			index++;
+		} else if (unit >= 0xdc00 && unit <= 0xdfff) {
+			throw new TypeError(`${context} contains an unpaired surrogate`);
+		}
+	}
 	return value;
 }
 
@@ -341,7 +353,14 @@ function parseSource(source, parser) {
 		sourceType: "module",
 		tokens: true,
 	});
-	if ((program.comments ?? []).length !== 0) throw new TypeError("blueprint.ts comments are forbidden");
+	for (const comment of program.comments ?? []) {
+		if (
+			comment.type === "Line" &&
+			/^\/\s*<reference\s+[^>]*\b(?:path|types|lib|no-default-lib)\s*=/u.test(comment.value)
+		) {
+			throw new TypeError("blueprint.ts reference directives are forbidden");
+		}
+	}
 	validateSourceAst(program);
 	return program;
 }
@@ -538,7 +557,9 @@ function lintTarget(text, filename, kind, plugin, parser, LinterConstructor) {
 		],
 		{ filename }
 	);
-	if (linter.getSourceCode()?.getAllComments().length !== 0) throw new TypeError(`${filename} comments are forbidden`);
+	if (kind === "artifact" && linter.getSourceCode()?.getAllComments().length !== 0) {
+		throw new TypeError(`${filename} comments are forbidden`);
+	}
 	if (messages.length !== 0) throw new TypeError(`${filename} failed deterministic lint`);
 }
 
