@@ -1100,7 +1100,7 @@ one-vote CAS and staged-adoption pointer swaps — build the substrate before th
 | **2i**      | **Moved by the authorized Phase-2i correction; no standalone Phase-2 implementation.** Current tabs are distinct peers with distinct in-memory replicas and no authenticated cross-tab fan-out, so suppressing one tab's initial, periodic, peer-arrival or explicit sync, discovery, presence or authored gossip would harm the Discord/MMORPG golden paths rather than deduplicate equivalent work. All current per-tab networking remains unchanged. The first real advisory primary-tab owner lands atomically in 5c around dispatch of already committed durable `voteOutbox` bytes; 6b reuses that same scheduling owner for cleanup without transferring deletion authority. Any future single-tab network optimization requires a separately measured cross-tab replica/SharedWorker transport first.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | moved       | no standalone slice     | No Phase-2 RED/GREEN. Row retained without renumbering for auditability. 5c owns the real locks-on/off vote-dispatch matrix; 6b owns cleanup scheduling reuse and transactional deletion-precondition recheck.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **2j**      | **WebCrypto capability matrix as a standing test.** Which curves support non-extractable key generation is a moving target and the plan must not encode a memory of it. Assert per project, per run, what `crypto.subtle.generateKey` actually accepts. P-256 remains in the measured matrix as a **reserved** capability, not an active suite. This is a root-owned test/evidence/CI slice and does not modify protocol, production or browser-storage schema.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | local-safe  | sliceable               | Reuse `tests/platform/webcrypto-capability.pw.ts` and `playwright.platform-capability.config.ts` for desktop chromium/firefox/webkit plus `ios-safari-emulation` (iPhone 15/WebKit) and `android-chrome-emulation` (Pixel 7/Chromium). Assert the **currently expected** matrix and fail on **any** improvement or regression. Publish each engine/build, Playwright build and OS into the independently GitSha/RunId-bound `test-results/phase-2j/webcrypto-capability-matrix.json` (`ts-drp/webcrypto-capability-matrix/v1`) through that config's sole setup/finalization owner and a dedicated required PR workflow. The emulation rows are structurally desktop-engine emulation, never real-device evidence. Phase 2h's closed v1/69-record `ahe-storage-validation.json` is unchanged; the artifacts have independent RunIds and meet only at the exact candidate GitSha. Physical-device evidence remains a reviewed Pre-release extension or distinct artifact. Phase 2k alone owns version currency.                                                                                                                                                                                                                                                                                                               |
 | **2k**      | **Browser-matrix currency, corrected into one root-owned TDD item with two ordered checkpoints.** First land the closed policy, checked official-source custody, offline evaluator, report/release gates and single-version dependency invariant. Then exercise that owner in a distinct signed checkpoint that moves the root Playwright pin from stale `1.61.1` to the current reviewed 1.x release, removes the hidden `1.51.1` graph, and reruns 2h/2j before the one final 2k review ceremony. Playwright WebKit is engine evidence only and never Safari evidence. This slice changes test/tool/config/CI/evidence and the bounded dependency/release-tooling owners named below; it changes no protocol byte, production runtime API, storage schema or closed 2h/2j artifact.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | local-safe  | two ordered checkpoints | Policy is exactly `{blockingMajorDelta:2,freshnessMonths:1,jsonSourceMaxAgeDays:14,safariReviewMaxAgeDays:180}` with UTC calendar arithmetic and checked raw authorities. PR currency drift is visible `warn` evidence and exits zero; candidate-authored schema, custody, runtime/lock or claim dishonesty fails. The pure pre-`release-it` gate blocks a claimed Chromium/Firefox channel at delta `>= 2` when a newer supported Playwright engine exists, while the independent published-ref job blocks npm/Buf/Docker before publication. Tooling ceiling may withdraw a claim only; it never manufactures coverage or waives AHE §21.5's existing Pre-release blocker. Acceptance requires one installed Playwright/test/core graph, actual Chromium/Firefox/WebKit launches matching the installed manifest, the closed GitSha/RunId-bound 2k artifact, successful/failed all-or-nothing refresh evidence, and green 2h/2j after the real bump.                                                                                                                                                                                                                                                                                                                                                                       |
-| **2l**      | **Durable author-sequence issuance transaction.** Implement the production adapter for the post-freeze 0g(ii-I) `transactIssue` contract. For one structural `(objectId, author)` scope, next counter, exact canonical-preimage bytes, signature, digest, issued record and outbox entry share one strict transaction; the internal build/sign closure cannot expose bytes outside that transaction. Browser and node backends implement the same contract.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | coordinated | issuance-record atomic  | Shared contract plus real IDB/SQLite hard-kill matrix: every request/statement/commit edge recovers either the old state or the exact new counter+envelope+outbox closure, never a counter-only or envelope-only state. Same-scope callers across tabs/processes are linearizable; different scopes progress independently; throw/rejection/commit failure advances nothing; retry reselects the unconsumed ordinal; restart never signs different content for an already committed ordinal. The in-memory implementation remains an explicitly ephemeral test double and cannot satisfy this gate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **2l**      | **Durable author-sequence issuance transaction, implemented as 2l-a…2l-d below.** The async `buildAndSign` closure executes exactly once per call and outside every mutation transaction or writer lock. One subsequent strict CAS transaction is the only writer: it atomically commits the selected lineage transition, immutable issued-envelope bytes and durable outbox reference. Closure bytes become externally observable only after confirmed successful commit. Browser and Node use separate greenfield issuance databases and never extend the Phase-2 AHE database.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | coordinated | issuance-record atomic  | Shared contract plus real IDB/SQLite hard-kill matrices recover old state or the exact new lineage+issued+outbox closure at every declared edge. Successful same-scope commits across tabs/processes are contiguous and linearizable; a racing call may reject `ISSUANCE_RETRY_REQUIRED` after one private, unpersisted build, and the adapter never rebuilds internally. A suspended build for one scope cannot block another scope's full commit; brief database writer sections may serialize. Ambiguous acknowledgement is classified by durable readback without an attempt token or exposure of uncommitted candidate bytes. The in-memory implementation remains an explicitly ephemeral test double and cannot satisfy this gate. Exact schema, API, errors, recovery, ownership and four-checkpoint TDD contract are ratified in the Phase 2l correction below.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### Phase 2f assumption-correction quorum — executable worker-host v2
 
@@ -4624,6 +4624,392 @@ currency for the one Playwright graph; physical Safari, real devices and the
 current/previous AHE §21.5 matrix remain explicitly unmet and Pre-release-owned.
 The provisional `507237b` checkpoint and failed Linux run remain auditable stop
 evidence rather than accepted success evidence.
+
+### Phase 2l assumption-correction quorum — durable issuance v1
+
+The fresh Codex-high RED owner correctly stopped before editing at signed HEAD
+`fed3a1baace066e33366f38934ed5832a713ba22`. The old row was not executable:
+`BuildAndSign` is async, so IndexedDB cannot keep a request-less mutation
+transaction alive while it signs; the current browser and Node AHE stores both
+reject added schema; Phase 5c owns the first real main-browser-database bump;
+and no issuance schema, production API, error contract, recovery seam or finite
+death inventory existed. A RED would therefore have invented production policy.
+
+The correction quorum and requested one-off Fable review converged on the
+following contract. It refines D.48 rather than weakening it: one transaction
+call invokes its trusted closure at most once, successful commits remain
+contiguous and linearizable, and no signed loser becomes durable or externally
+observable. The frozen contract never promised that every racing transaction
+call succeeds.
+
+#### Ownership and freeze boundary
+
+Add `@ts-drp/issuance-store` as the one shared owner of the v3 durable-issuance
+types, structural/byte validation, closed errors and backend-neutral
+conformance harness. Its production declarations define local structural
+mirrors of the issuance scope/envelope/record/outbox/commit/callback shapes and
+contain no protocol import. It declares `@ts-drp/protocol-v3` only as a
+development dependency for compile-only `import type` mutual-assignability
+tests; its runtime dependency set is exactly `@ts-drp/canonical`. Built
+JavaScript and declarations must contain no protocol-v3 module specifier. It
+neither copies the registered field/domain rules nor re-hashes or
+signature-verifies a commit. The protocol package and its dependencies,
+sources, frozen tests, registry, vectors, references and supplements remain
+byte-unchanged.
+
+The concrete capabilities are exported only from explicit
+`@ts-drp/storage-browser/issuance` and `@ts-drp/storage-node/issuance`
+subpaths. Neither backend root, `AheDurableStore`, the existing adapter command
+vocabulary nor any existing AHE database is widened. The explicitly ephemeral
+in-memory control and shared conformance helpers live only on test/conformance
+subpaths and no production entry may re-export them.
+
+#### Separate greenfield database identities and exact schemas
+
+Both factories take the authenticated primary-store identity and derive a
+distinct issuance identity injectively. The browser authority is exactly
+`${primaryDatabaseName}--drp-issuance-v1`; the Node authority is exactly
+`${primaryFilename}.drp-issuance-v1.sqlite`. Empty identities, equality with the
+primary identity, an issuance identity carrying an AHE schema, or a primary
+identity carrying the issuance schema fail closed before a write. Nothing is
+migrated, augmented, deleted or accepted through a legacy/plain-ID path.
+
+The browser database is version 1 with exactly three stores, native compound
+key paths, `autoIncrement:false` and zero secondary indexes:
+
+| Store            | Key                                  | Closed native value                                                             |
+| ---------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| `lineages`       | `[objectId, author]`                 | `{objectId, author, next, exhausted}`                                           |
+| `issuedRecords`  | `[objectId, author, authorSequence]` | `{objectId, author, authorSequence, canonicalPreimageBytes, digest, signature}` |
+| `issuanceOutbox` | `[objectId, author, authorSequence]` | `{objectId, author, authorSequence, digest, publishState}`                      |
+
+`publishState` is exactly `"pending" | "published"`; Phase 2l creates only
+`pending`. A no-op readwrite transaction must report
+`IDBTransaction.durability === "strict"` at admission, and every issuance
+writer uses `{durability:"strict"}` and rechecks that value before issuing a
+write request. Missing/downgraded support is
+`ISSUANCE_DURABILITY_UNAVAILABLE`, not a best-effort fallback. This deliberately
+restricts the browser capability to engines that expose strict durability; the
+standing browser/release gates must keep that limitation visible.
+
+The Node sibling file uses one normalized exact DDL authority for creation and
+verification, `PRAGMA user_version=1`, `journal_mode=WAL`,
+`synchronous=FULL`, `page_size=4096`, `busy_timeout=1000`, and the analogous
+three `WITHOUT ROWID` tables:
+
+| Table             | Exact application columns                                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lineages`        | `object_id TEXT`, `author TEXT`, `next INTEGER`, `exhausted INTEGER`, PK `(object_id,author)`                                                 |
+| `issued_records`  | scope columns, `author_sequence INTEGER`, `canonical_preimage BLOB`, `digest BLOB`, `signature BLOB`, PK `(object_id,author,author_sequence)` |
+| `issuance_outbox` | scope columns, `author_sequence INTEGER`, `digest BLOB`, `publish_state TEXT`, PK `(object_id,author,author_sequence)`                        |
+
+The RED freezes exact column spelling, affinity,
+`NOT NULL`, primary-key order, `CHECK(exhausted IN (0,1))`, safe-sequence
+checks, `CHECK(publish_state IN ('pending','published'))`, blob columns and the
+choice of no foreign keys. Every open verifies the same authority and expects
+normal `-wal`/`-shm` siblings. An extra/missing
+table, column, key, index, pragma or AHE-shaped schema is unsupported rather
+than migrated or repaired.
+
+Absence of a lineage means `{next:0, exhausted:false}`. No redundant revision
+counter or attempt-token table exists. For selected `s`, the transition is
+spelled as an explicit branch: `s === Number.MAX_SAFE_INTEGER ? s : s + 1`.
+The maximum ordinal commits once while changing `exhausted` to true; later
+calls reject before build/sign/write, and `MAX_SAFE_INTEGER + 1` is never
+computed as an ordinal. Boundary fixtures seed the raw backend layout through
+test-only handles, never a production sequence setter.
+
+#### Public API, validation and transaction algorithm
+
+The exact production surface is:
+
+```ts
+interface DurableIssueScope {
+	readonly author: string;
+	readonly objectId: string;
+}
+
+interface DurableSignedEnvelope {
+	readonly canonicalPreimageBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly signature: Uint8Array;
+}
+
+interface DurableIssuedRecord {
+	readonly authorSequence: number;
+	readonly envelope: DurableSignedEnvelope;
+	readonly scope: DurableIssueScope;
+}
+
+interface DurableIssuanceOutboxEntry extends DurableIssuedRecord {}
+
+interface DurableIssueCommit {
+	readonly authorSequence: number;
+	readonly envelope: DurableSignedEnvelope;
+	readonly issuedRecord: DurableIssuedRecord;
+	readonly outboxEntry: DurableIssuanceOutboxEntry;
+}
+
+type DurableBuildAndSign = (authorSequence: number) => Promise<DurableIssueCommit>;
+
+type DurableTransactIssue = (
+	scope: DurableIssueScope,
+	buildAndSign: DurableBuildAndSign
+) => Promise<DurableIssueCommit>;
+
+interface DurableIssuanceStore {
+	readonly transactIssue: DurableTransactIssue;
+	readIssued(scope: DurableIssueScope, authorSequence: number): Promise<DurableIssueCommit | null>;
+	readOutboxPage(input?: {
+		scope?: DurableIssueScope;
+		afterKey?: readonly [string, string, number] | null;
+		limit?: number;
+	}): Promise<readonly DurableIssuanceOutboxRecord[]>;
+	readLineage(scope: DurableIssueScope): Promise<{ next: number; exhausted: boolean }>;
+	close(): Promise<void>;
+}
+
+interface DurableIssuanceOutboxRecord {
+	readonly commit: DurableIssueCommit;
+	readonly publishState: "pending" | "published";
+}
+```
+
+`limit` is `1..128`, defaults to `64`, and pagination is exact compound-key
+lexicographic order, not insertion order. Scope strings are primitive,
+non-empty and use the existing v3 bound. To avoid an astral-order mismatch
+between native IDB and SQLite collation, v1 scans the candidate keyspace and
+uses one shared JavaScript UTF-16-code-unit comparator over
+`[objectId,author,authorSequence]` before applying `afterKey`, optional scope
+and limit; it never treats backend cursor order as authority. This scan cost is
+part of the Phase 3a revisit below. Every byte view is copied to a fresh
+non-shared buffer before validation and persistence; SharedArrayBuffer-backed
+views are commit-invalid. Reads and successful returns allocate fresh detached
+copies.
+
+Validation is deliberately structural and byte-level. The selected safe
+ordinal and exact scope must agree across the top-level commit and both nested
+records; the three logical envelope views must be byte-equal; and preimage,
+digest and signature must be non-empty `Uint8Array` values. The adapter may
+canonical-decode the preimage only to confirm its selected `objectId`, `author`
+and `authorSequence`. It does not become a second v3 registry, digest or
+signature authority. The frozen issuer remains responsible for cryptographic
+correctness; Phase 3a remains responsible for live author-key binding.
+
+For each `transactIssue` call:
+
+1. validate/copy scope and read one detached lineage snapshot;
+2. reject exhausted state before build/sign/write;
+3. call `buildAndSign(selected)` exactly once, outside every mutation
+   transaction and writer lock;
+4. copy, structurally validate and close the complete candidate without
+   exposing it;
+5. enter one short strict IDB readwrite transaction or SQLite
+   `BEGIN IMMEDIATE`, reread the exact prior `{next,exhausted}`, and CAS it;
+6. on mismatch, abort/rollback and reject `ISSUANCE_RETRY_REQUIRED`; never
+   call the closure again, persist or return the candidate;
+7. on match, use `add`/plain `INSERT` for absent lineage and immutable child
+   rows, or exact-prior `put` / `UPDATE ... WHERE next=? AND exhausted=?` with
+   one affected row for an existing lineage; atomically commit lineage,
+   issued bytes and the pending outbox reference; and
+8. resolve only after IDB `complete` / successful SQLite `COMMIT`, reconstructing
+   the exact `IssueCommit` from joined durable rows.
+
+An existing issued/outbox key while the lineage CAS still matches is corruption,
+not ordinary contention. A losing signed candidate remains private memory: no
+error carries it or its ordinal/digest, no hook receives it, and no caller can
+observe it. A synchronized `N`-way same-scope durable race therefore produces
+exactly one success, `N-1` retry-required promise rejections, one row and one
+lineage advance. A CAS loser always receives retry-required even when the
+winner exhausted the lineage; exhausted is returned only by a fresh pre-build
+refusal. A sequential or caller-retried driver still produces contiguous
+ordinals. The shared harness must not import the ephemeral double's all-success
+same-scope-wave expectation.
+
+There is no Web Lock, reservation, lease, primary election, process-local
+correctness mutex or writer lock across signing. A per-backend test must hold
+scope A inside the async build IPC barrier while scope B reaches a complete
+durable commit. SQLite and IDB writer sections may serialize briefly; no
+physical parallel-writer or fairness claim is made.
+
+All failures, including public misuse, are promise rejections so
+`transactIssue` remains structurally assignable to the frozen `TransactIssue`.
+Misuse rejects an `ISSUANCE_INVALID_ARGUMENT` `TypeError`; the closure's own
+synchronous throw or promise rejection propagates unchanged. The remaining
+closed codes are:
+
+- `ISSUANCE_EXHAUSTED`;
+- `ISSUANCE_COMMIT_INVALID` for the trusted closure contract only;
+- `ISSUANCE_RETRY_REQUIRED`;
+- `ISSUANCE_STORE_CLOSED`;
+- `ISSUANCE_UNSUPPORTED_SCHEMA`;
+- `ISSUANCE_DURABILITY_UNAVAILABLE`;
+- `ISSUANCE_SUBSTRATE_FAILURE` with closed `retryClass` of `transient`,
+  `resource-exhausted` or `permanent`;
+- `ISSUANCE_RECOVERY_CORRUPT`, which poisons the capability; and
+- `ISSUANCE_OUTCOME_UNKNOWN`, which is non-sticky.
+
+Quota/`SQLITE_FULL` is resource-exhausted; bounded IDB `blocked` and SQLite
+`BUSY` are transient; runtime `versionchange` closes the capability. After
+corruption every operation except `close()` rejects the same corruption. An
+unknown outcome does not retain or resurrect the private candidate: a later
+call starts from a fresh authoritative snapshot. Read methods and `close()`
+never resolve partial results.
+
+#### Ambiguous acknowledgement and durable outbox lifecycle
+
+After a live terminal/commit error, one bounded consistent readonly observation
+of lineage `L`, issued row `I` and outbox row `O` classifies the private
+candidate:
+
+`consumed(L, o)` is exactly `L.next > o || (L.exhausted && L.next === o)`;
+fixtures publish this predicate rather than relying on an implementation-local
+notion of advancement.
+
+1. exact candidate `I`, matching `O` in either valid publish state, and a
+   lineage that consumed that ordinal — even if later commits advanced it — is
+   success reconstructed only from durable rows;
+2. both rows absent and lineage equal to the exact prior snapshot is definitive
+   old-state `ISSUANCE_SUBSTRATE_FAILURE`;
+3. a mutually consistent foreign `I`/`O` at the selected ordinal with consumed
+   lineage is `ISSUANCE_RETRY_REQUIRED`, not corruption;
+4. one-sided rows, key/digest mismatch, advanced lineage without a complete
+   pair, or candidate rows with unadvanced lineage are
+   `ISSUANCE_RECOVERY_CORRUPT`; and
+5. an unreadable authority is `ISSUANCE_OUTCOME_UNKNOWN` carrying only its code
+   and caller-known scope—never candidate ordinal, digest, preimage, signature
+   or token.
+
+Process death produces no JavaScript result. Reopen observes old state or the
+exact new closure, and the durable outbox remains the recovery authority. The
+frozen API has no caller idempotency key, so Phase 2l makes no application-level
+exactly-once-intent claim; a blind retry after a committed response loss may
+create a new ordinal.
+
+Phase 2l never acknowledges, publishes, schedules, drains or deletes. Phase 3a
+must add only an exact key+digest CAS from `pending` to `published`; re-ack of
+the same published row is idempotent, missing is not success and no row is
+repaired. Phase 3a never deletes the reference. Phase 6b remains the sole
+physical deletion/retention authority after closed-epoch, categorized-outbox
+and all other transactional preconditions, so it cannot race a live/current
+issuance ambiguity readback. Issued-record retention is also 6b-owned.
+
+With zero secondary indexes, selecting pending rows scans the outbox. That
+cost is accepted for v1 and is a named Phase 3a revisit trigger: Phase 3a may
+maintain a volatile pending cache rebuilt from durable paging, while a durable
+index requires a governed issuance-schema v2. Same-scope contention likewise
+records signatures-per-success as a metric, not a flaky gate; caller FIFO is a
+3a-era optimization. Batched issuance changes the signed granularity and is a
+separately-quorummed post-3a follow-on, not hidden Phase 2l scope.
+
+#### Physical evidence and finite matrices
+
+The declared operation descriptor is the sole inventory authority. Browser
+evidence is exactly 16 tuples: fresh and existing-lineage scenarios crossed
+with `suspended-build`, `postbuild`, settled in-transaction `state-get`,
+settled `lineage-put`, settled `issued-add`, settled `outbox-add`, settled
+`abort` and post-`complete`. The pre-build snapshot death class is subsumed by
+`suspended-build`. Request-settlement gates synchronously block the dedicated
+worker before its event task returns, using the existing SAB/arm protocol;
+an async callback that lets IDB auto-commit is dishonest. `state-get` always
+means the mutation-transaction CAS reread.
+
+Node evidence is exactly 18 tuples: the same two lineage scenarios crossed
+with `suspended-build`, `postbuild`, after `BEGIN`, after the in-transaction
+`SELECT`, after `lineage-write`, after `issued INSERT`, after `outbox INSERT`,
+after `ROLLBACK` and after `COMMIT`. Statement IDs arm immediately after the
+named statement returns; `postbuild` is the pre-`BEGIN` edge and `COMMIT` is a
+non-vacuous post-durable-new edge. At least one kill reopens a non-empty WAL
+without deleting sidecars.
+
+`abort`/`ROLLBACK` are controlled alternative terminal paths, not claimed to
+co-occur with `complete`/`COMMIT` in one trace. Declared-versus-observed order,
+prefix fate, missing/extra/duplicate identifiers and every old-XOR-exact-new
+closure are gated with genuine detached browser-process-group death and Node
+child `SIGKILL`; graceful close, timer, synthetic throw or unsupported cases do
+not count. Deterministic fault tests separately cover ordinary abort/error.
+
+A distinct terminal-suppression ambiguity matrix has five cases per backend,
+ten total, matching the readback classification above. It is not process-death
+evidence. Its torn-state row uses a bounded, named, test-only fault seam that is
+unreachable from every production export. Fast runs execute each death tuple
+once; bounded repeated campaigns are opt-in and run only for concrete backend
+candidates and final exact-head acceptance.
+
+#### Four TDD checkpoints and acceptance
+
+Phase 2l remains one Phase-2 exit conjunct but is implemented as four ordered
+items. Per the standing user-requested loop, **each item** gets a fresh
+Codex-high tests-only RED, a distinct Codex-high GREEN, Grok 4.5/high review,
+exact Kimi 3/high with both 100-step controls, and final Opus 5/xhigh review.
+Typecheck, lint and proportionate tests are logged at each RED and GREEN.
+
+1. **2l-a — shared contract/conformance.** Freeze the exact API, type-only
+   dependency/dist guard, native record shapes, errors, copy/alias/SAB rules,
+   MAX-safe model, one-shot closure guard, deterministic races, readback and
+   ten-case ambiguity model. The ephemeral double is a labelled control only.
+2. **2l-b — browser adapter and real death.** Freeze the dedicated exact v1
+   schema, strict-durability admission, multitab race/progress, lifecycle,
+   declared request trace and 16 genuine-death tuples.
+3. **2l-c — Node adapter and real death.** Freeze exact DDL/pragmas, two-process
+   race/progress, WAL recovery, declared statement trace and 18 genuine-death
+   tuples.
+4. **2l-d — parity/closure.** Run the shared harness against both real adapters;
+   prove structural binding into the unmodified frozen issuer, including the
+   D.48 dependency/canonicalization edge; preserve 0g(ii-I), 0g(ii-S), 0i,
+   storage/AHE, Phase 2h/2k and greenfield guards; then perform one final
+   phase-wide exact-head acceptance ceremony in addition to the item review.
+
+An edit to the shared harness after 2l-b acceptance reopens both complete
+backend suites. Long death campaigns are not repeated after documentation-only
+or pure-codec changes. Phase 2l closes only durable local issuance. Discord and
+MMORPG still require Phase 3a live binding/publication and every later named
+consensus, execution, adoption, archive and release owner.
+
+#### Quorum evidence and one-off sense-check
+
+Initial independent amendment reviews:
+
+- Codex-high result SHA-256
+  `5a755c179503a7c4a3e35c478d06f65065a868d6dfedafbffe1ee064e212e891`,
+  manifest SHA-256
+  `5ad28cde26e84c5d2872f31a7e78729dd4010667fd36dbd3b0e811ee5f4ec1f1`;
+- exact Kimi 3/high/100 result SHA-256
+  `788ecd318c2de1df1c52efad9f62a1d2c91418f6fe5d735070d8a56c3a240898`,
+  manifest SHA-256
+  `16e34b930e239583a2eb27afc91c519bc8f347d26f1c4bba381e7d7d9bc88118`;
+- Opus 5/xhigh authoritative raw SHA-256
+  `306c9f6b087d12039e5ec055fec5086b42c7aae94087dc5aaf173e204dad922f`,
+  manifest SHA-256
+  `71840d7e1dc71e369660cf5ed4d07f6dc991de7018b0721a7393eb4aa4473dbf`.
+
+The original Opus attempt-token proposal was corrected before amendment: a
+random token pruned after a bounded window cannot distinguish an evicted
+committed attempt from a never-committed one. The ratified design contains no
+token or attempt table and uses private live readback plus permanent
+issued/outbox evidence instead.
+
+Final reconciliation was unanimous:
+
+- Codex-high approved the lifecycle-safe `pending -> published` correction
+  after identifying and closing the delete-ack/readback race;
+- exact Kimi 3/high/100 result SHA-256
+  `b1a754631dc586cc2d46b126f952ed2a832748dde9e55def6c0878552199791f`,
+  manifest SHA-256
+  `24bb915128bcce8ebf70ebcc422fa4e5b63039fe81e1171e9b0bbcb272b771af`;
+- Opus 5/xhigh raw SHA-256
+  `2e4cad53c4b6ab0f2e7c14217e845e946faabc32fe7ddbe021ef306fd9d23308`,
+  manifest SHA-256
+  `716a2b956c3808b8a3eb683357edb3ffbc0606f4a33f7f1560eeb5ef54ad6829`.
+
+The user-requested one-off Fable 5/xhigh sense-check independently agreed with
+the architecture and golden-path trajectory after the precision corrections
+above: result SHA-256
+`5507a8dc560a075ee0b5bd8fca42157967ba6e43c99284bc3b0aa6f3ce0d92da`,
+manifest SHA-256
+`3d3383651671ca537d60b9d43903ab974a53db290adf1269261dd90537b859e4`.
+Its small automatic Haiku metadata helper produced no substantive review
+output. Fable is not a recurring Phase 2l gate.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
