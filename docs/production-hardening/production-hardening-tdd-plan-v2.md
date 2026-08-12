@@ -5583,6 +5583,62 @@ Quorum evidence:
   `3c0308b34f114394f0e02f6c1b53347860576cb471eee322c1555993a87f47e1` /
   `d593235ba9ebcf59e89a5c09fb38beb39cb297a45ce4c699322db36efd24a739`.
 
+#### Phase 2l-c closure evidence
+
+Phase 2l-c closed on signed and pushed candidate
+`e122d312ae009a6dc5d4d5d194b530206172cd83` (tree
+`cd92bd662f3a4783a1422aa897fc7e886ca2807b`). Its distinct tests-only RED was
+`e5b9e42c844f20f9737da7afecdf195843a72b2c`; the first production GREEN was
+`97e4078450741f0511eebc8d01f728e116c3645a`. A preliminary Grok review found
+that paging validated issued/outbox pairing without proving the lineage had
+consumed each ordinal, and that the independent SQLite structural probes and
+raw evidence seal were missing. The corrective RED
+`b721a6a7f7097cc13a02788e4961893d248684ea` froze three causal lineage failures
+plus three controls; the final one-file production GREEN `e122d312...` reads
+lineages, issued records and outbox rows in one readonly snapshot and validates
+the complete join before filtering or returning results.
+
+The exact-head closure matrix is green:
+
+- the original Node suite is 23/23, including all 18 genuine SIGKILL tuples
+  and the separate interrupted-admission recovery;
+- the corrective suite is 6/6, including absent, equality-unadvanced and
+  lagging-lineage corruption plus ordinary and exhausted-MAX controls;
+- all five terminal-suppression outcomes execute through the real adapter;
+- the independent real-SQLite oracle checks exact `table_xinfo`, empty
+  `foreign_key_list`, the inherent primary-key indexes and the three-table-only
+  catalog without adding a second production schema parser;
+- shared issuance is 45/45, frozen protocol issuance is 20/20, existing Node
+  preservation is 54 passed/1 inherited skip, and browser registry, fast and
+  16-edge death preservation are green; and
+- storage-node typecheck/build, owned ESLint, Prettier and diff-check are
+  green. The 32-entry corrective GREEN evidence manifest SHA-256 is
+  `24a56004f92326bb9bd13aab023796d13b8d38b5659adaede6b2d2c378449ca2`
+  and verifies every retained raw artifact.
+
+Final independent reviews unanimously accept the candidate with no blocker:
+
+- clean Grok 4.5/high result SHA-256
+  `1eb030f95ecb5e9c8c584ec9d3fee106bacc1b1b68c5adcb4d26b6e686f909a0`
+  and integrity-file SHA-256
+  `e8a03823c1e285f324d7bb688bd0dc2909327b5f1d380fc3f18372e3c4812af6`;
+- exact Kimi 3/high/100 result SHA-256
+  `e8f53fbf4dea10f622aea586ebf39095aa6cd66e779bf23c28cf6d27fc0769b5`
+  and manifest SHA-256
+  `02bfdf51b0bbaaf5d4f32436491c3880969261608c5a7c13f37d9abfa3c94ada`;
+  and
+- Opus 5/xhigh review-manifest SHA-256
+  `887ee29cade54df5d2ff1b87b4ec3d5e553d088e1186a2f8d07225073f85f63b`,
+  with high-confidence `ACCEPT`, both disputed gaps closed and plan change
+  limited to this closure evidence.
+
+Nonblocking follow-through remains deliberately later-owned: the v1 full-join
+and canonical-preimage scan cost belongs to the Phase 3a/6b retention and
+batching revisit; 2l-d must keep the shared harness binding live, cover builder
+rejection unchanged, and bind the shared registry limit. The inherited root
+type/lint debt and one existing Node skip are disclosed but do not originate in
+this slice.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
