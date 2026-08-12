@@ -31,6 +31,7 @@ describe("Phase 2l-d parity inventory and public binding", () => {
 			"builder-async-rejection-identity",
 			"builder-exactly-once",
 			"malformed-candidate-old-state",
+			"complete-lineage-issued-outbox-recovery-closure",
 			"source-and-return-copy-detachment",
 			"public-misuse-taxonomy",
 			"pending-outbox",

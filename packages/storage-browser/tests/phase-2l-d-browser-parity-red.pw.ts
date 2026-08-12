@@ -4,7 +4,7 @@ import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
 
 declare global {
 	interface Window {
-		phase2lDRun(caseId: "golden-path" | "shared-conformance"): Promise<unknown>;
+		phase2lDRun(caseId: "golden-path" | "lineage-recovery" | "shared-conformance"): Promise<unknown>;
 	}
 }
 
@@ -18,7 +18,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => server.close());
 
-async function run(page: Page, caseId: "golden-path" | "shared-conformance"): Promise<unknown> {
+async function run(page: Page, caseId: "golden-path" | "lineage-recovery" | "shared-conformance"): Promise<unknown> {
 	const url = server.issueTransitionURL("phase-2l-d.html");
 	try {
 		await page.goto(url, { waitUntil: "load" });
@@ -28,6 +28,27 @@ async function run(page: Page, caseId: "golden-path" | "shared-conformance"): Pr
 		server.revoke(new URL(url).pathname.split("/")[2] ?? "");
 	}
 }
+
+test("rejects every unconsumed issued/outbox pair before publication and latches one corruption identity", async ({
+	page,
+}) => {
+	await expect(run(page, "lineage-recovery")).resolves.toEqual({
+		corrupt: [
+			{ builderCalls: 0, code: "ISSUANCE_RECOVERY_CORRUPT", publicationCount: 0, sticky: true },
+			{ builderCalls: 0, code: "ISSUANCE_RECOVERY_CORRUPT", publicationCount: 0, sticky: true },
+			{ builderCalls: 0, code: "ISSUANCE_RECOVERY_CORRUPT", publicationCount: 0, sticky: true },
+		],
+		valid: [
+			{ authorSequence: 0, issued: 0, pageCount: 1, publishState: "pending" },
+			{
+				authorSequence: Number.MAX_SAFE_INTEGER,
+				issued: Number.MAX_SAFE_INTEGER,
+				pageCount: 1,
+				publishState: "published",
+			},
+		],
+	});
+});
 
 test("matches the exact backend-neutral observable report", async ({ page }) => {
 	await expect(run(page, "shared-conformance")).resolves.toEqual({

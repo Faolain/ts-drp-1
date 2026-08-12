@@ -6,6 +6,7 @@
 		"builder-async-rejection-identity",
 		"builder-exactly-once",
 		"malformed-candidate-old-state",
+		"complete-lineage-issued-outbox-recovery-closure",
 		"source-and-return-copy-detachment",
 		"public-misuse-taxonomy",
 		"pending-outbox",
