@@ -12,6 +12,6 @@ export default defineConfig({
 		coverage: {
 			enabled: false,
 		},
-		include: ["tests/phase-2l-a-shared-issuance-contract.test.ts"],
+		include: ["tests/phase-2l-a-shared-issuance-contract.test.ts", "tests/phase-2l-a-b2-b3-corrective.test.ts"],
 	},
 });

@@ -12,5 +12,5 @@
 		},
 		"rootDir": ".."
 	},
-	"files": ["phase-2l-a-shared-issuance-contract.test.ts"]
+	"files": ["phase-2l-a-shared-issuance-contract.test.ts", "phase-2l-a-b2-b3-corrective.test.ts"]
 }
