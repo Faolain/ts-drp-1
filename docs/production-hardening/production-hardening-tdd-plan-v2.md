@@ -4669,10 +4669,19 @@ subpaths and no production entry may re-export them.
 Both factories take the authenticated primary-store identity and derive a
 distinct issuance identity injectively. The browser authority is exactly
 `${primaryDatabaseName}--drp-issuance-v1`; the Node authority is exactly
-`${primaryFilename}.drp-issuance-v1.sqlite`. Empty identities, equality with the
-primary identity, an issuance identity carrying an AHE schema, or a primary
-identity carrying the issuance schema fail closed before a write. Nothing is
-migrated, augmented, deleted or accepted through a legacy/plain-ID path.
+`${primaryFilename}.drp-issuance-v1.sqlite`. The supplied primary identity is
+an opaque, non-empty primitive naming input; derivation is a pure total string
+function and the derived identity is used verbatim.
+
+An empty or non-string primary identity, a derived identity equal to the
+primary identity, or a derived issuance store that does not present exactly
+the frozen issuance-v1 schema—including an AHE-shaped layout at the derived
+identity—fails closed before any write. Nothing is migrated, augmented,
+repaired, deleted or accepted through a legacy/plain-ID/default/alias path.
+Whether a factory may inspect the primary store itself is platform-owned, not
+a shared obligation. Browser inspection is prohibited by the 2l-b addendum
+below. Node policy remains undecided and belongs to 2l-c; the browser decision
+establishes no Node precedent.
 
 The browser database is version 1 with exactly three stores, native compound
 key paths, `autoIncrement:false` and zero secondary indexes:
@@ -5228,6 +5237,33 @@ The equivalent Node factory spelling is deliberately deferred to the separate
 2l-c correction: the existing Node AHE precedent is synchronous, so browser
 analogy cannot choose its issuance lifecycle honestly.
 
+##### Browser primary-identity opacity addendum
+
+`primaryDatabaseName` is a non-authoritative naming input. On every success
+and rejection path the factory must not inspect, enumerate, open, create,
+upgrade, delete or infer anything about a database bearing that name. It draws
+no conclusion from the primary database's existence or absence. This
+supersedes the earlier generic primary-side schema check for the browser: an
+absent primary must not be created, and a pre-existing primary sentinel must
+retain its exact version without an observed upgrade. Tests may independently
+create and inspect those sentinels; no production handle or probe is added.
+
+The derived issuance database remains fully fail-closed. Its name must be the
+exact suffix derivation above; version must be 1; creation is permitted only
+from `oldVersion === 0`; and its store set, ordered compound key paths,
+`autoIncrement` flags and empty index sets must exactly match issuance-v1. An
+AHE-shaped derived database is rejected simply because it is not the exact
+issuance schema—production must not import or hard-code Phase 5c store names or
+versions as a second predicate. No migration, repair, deletion or partial
+acceptance is allowed.
+
+This separation is the falsifiable authority boundary: Phase 2l-b owns exactly
+one connection to the derived issuance database and takes no dependency on the
+main database's existence, schema, version or lifecycle. Phase 5c remains sole
+owner of main-browser-database integrity and its first schema bump. Whether a
+Node factory may inspect its primary filesystem/SQLite path remains wholly
+undecided until 2l-c.
+
 Quorum evidence:
 
 - Codex-high initial result SHA-256
@@ -5250,6 +5286,23 @@ Quorum evidence:
   `fcc521b92ae3450a3750b1c8ab001f02261b9f6326751bb346cacdf2750b3428`,
   manifest SHA-256
   `518570184edfbcec6d79a7264820174ba77f796325c44455d5d2b8beb1170235`.
+
+The primary-schema contradiction was separately corrected by unanimous
+quorum after the restarted RED proved that IndexedDB has no non-mutating
+cross-database schema inspection:
+
+- Codex-high result SHA-256
+  `0fbf3ac88d3c548ded0c45ae645e82afd5f9179b350756218a31a4969904d6cb`,
+  manifest SHA-256
+  `152e237387761554dd5382342136bcd2a7aa5b03658fd603969221151870edb6`;
+- exact Kimi 3/high/100 result SHA-256
+  `04aed50661a02a0a7cb96fb29460e3fc4b55873e12e189942423e0550a65e4a1`,
+  manifest SHA-256
+  `926ce30ea156ccb13e946a3653c7729bb15bb0192fcbdf67bd3c6305a22be975`;
+- Opus 5/xhigh result SHA-256
+  `8e21f3b9da50ace424ff024482db460d932f2abb4a7d171bc36f1ab6b3ec220c`,
+  manifest SHA-256
+  `a5880f99d6ba32e6d8c9193cbef81752fdb6dd6869de265ed0d8e245efc28494`.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
