@@ -5288,8 +5288,8 @@ Quorum evidence:
   `518570184edfbcec6d79a7264820174ba77f796325c44455d5d2b8beb1170235`.
 
 The primary-schema contradiction was separately corrected by unanimous
-quorum after the restarted RED proved that IndexedDB has no non-mutating
-cross-database schema inspection:
+quorum after the restarted RED owner stopped before editing and proved that
+IndexedDB has no non-mutating cross-database schema inspection:
 
 - Codex-high result SHA-256
   `0fbf3ac88d3c548ded0c45ae645e82afd5f9179b350756218a31a4969904d6cb`,
@@ -5302,7 +5302,7 @@ cross-database schema inspection:
 - Opus 5/xhigh result SHA-256
   `8e21f3b9da50ace424ff024482db460d932f2abb4a7d171bc36f1ab6b3ec220c`,
   manifest SHA-256
-  `a5880f99d6ba32e6d8c9193cbef81752fdb6dd6869de265ed0d8e245efc28494`.
+  `a53185db3b93aa34b8a1e1bfda56dea4ba94811e4a4c0ca7027f2c253aeb47ff`.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
