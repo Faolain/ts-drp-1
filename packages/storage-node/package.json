@@ -22,6 +22,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./issuance": {
+			"types": "./dist/src/issuance.d.ts",
+			"import": "./dist/src/issuance.js"
 		}
 	},
 	"scripts": {
@@ -33,6 +37,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
+		"@ts-drp/issuance-store": "0.11.0",
 		"@ts-drp/storage": "0.11.0"
 	}
 }

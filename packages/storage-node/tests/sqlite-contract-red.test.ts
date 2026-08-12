@@ -122,7 +122,7 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 			private: manifest.private,
 		}).toEqual({
 			engines: { node: ">=22.13.0" },
-			exportSubpaths: ["."],
+			exportSubpaths: [".", "./issuance"],
 			private: true,
 		});
 		expect(Object.keys(storageNode)).toEqual(["createSqliteAheDurableStore"]);
