@@ -1,0 +1,42 @@
+{
+	"artifactDigestDomain": "ts-drp/blueprint-artifact/v3",
+	"blueprintDigestDomain": "ts-drp/blueprint-admission/v3",
+	"artifactDigest": "deff68c51303f07f08f9a6aa754140ca6f16aecd0564b3f94d855374c7d2adc4",
+	"blueprintDigest": "ffc9bbd19909d8950acceaa0591a18aba57c68cdcb071ec30c21e1dc29988716",
+	"packageSha256": "8944636c67538cce914910c5f2db616b9e9e8c7d7887fb3a73cd5eab01ec4bc6",
+	"packageByteLength": 600,
+	"package": {
+		"kind": "drp-blueprint-admission-package",
+		"protocolMajor": 3,
+		"schemaVersion": 1,
+		"implementation": {
+			"artifactId": "counter.v1",
+			"artifactDigest": "deff68c51303f07f08f9a6aa754140ca6f16aecd0564b3f94d855374c7d2adc4",
+			"runtimeProfile": "ecmascript-2024-sync-v1"
+		},
+		"manifest": {
+			"schemaVersion": 1,
+			"operationDiscriminator": "action",
+			"operations": [
+				{
+					"name": "add",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [{ "name": "value", "required": false, "type": "safe-integer" }]
+					}
+				},
+				{
+					"name": "read-value",
+					"argumentSchema": { "kind": "closed-record", "fields": [] }
+				},
+				{
+					"name": "set",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [{ "name": "value", "required": true, "type": "safe-integer" }]
+					}
+				}
+			]
+		}
+	}
+}
