@@ -4922,12 +4922,26 @@ separately-quorummed post-3a follow-on, not hidden Phase 2l scope.
 The declared operation descriptor is the sole inventory authority. Browser
 evidence is exactly 16 tuples: fresh and existing-lineage scenarios crossed
 with `suspended-build`, `postbuild`, settled in-transaction `state-get`,
-settled `lineage-put`, settled `issued-add`, settled `outbox-add`, settled
-`abort` and post-`complete`. The pre-build snapshot death class is subsumed by
-`suspended-build`. Request-settlement gates synchronously block the dedicated
-worker before its event task returns, using the existing SAB/arm protocol;
+settled in-transaction `lineage-write`, settled `issued-add`, settled
+`outbox-add`, `abort` and post-`complete`. The stable logical
+`lineage-write` descriptor must record the observed native store, method and
+key: fresh/absent lineage requires exactly one successful `lineages.add`,
+while existing-lineage requires exactly one successful exact-prior
+`lineages.put`. There is no ninth edge, fallback `put`, upsert or alternate
+method. A wrong store/method/key, missing/duplicate observation or fresh
+`add` collision is not a settled `lineage-write`.
+
+The four request-settlement edges are `state-get`, `lineage-write`,
+`issued-add` and `outbox-add`. Each arms synchronously inside its own successful
+request event task, after settlement and before that task returns or the next
+request is dispatched, using the existing SAB/arm protocol; a pre-issue arm or
 an async callback that lets IDB auto-commit is dishonest. `state-get` always
-means the mutation-transaction CAS reread.
+means the mutation-transaction CAS reread. `issued-add` and `outbox-add`
+remain native `add` in both scenarios; a collision does not settle the edge
+and, after a matched lineage CAS, enters the shared corruption/readback
+taxonomy. `abort` and `complete` are separately observed transaction-event
+edges, not request settlements. The pre-build snapshot death class is subsumed
+by `suspended-build`.
 
 Node evidence is exactly 18 tuples: the same two lineage scenarios crossed
 with `suspended-build`, `postbuild`, after `BEGIN`, after the in-transaction
@@ -4936,6 +4950,18 @@ after `ROLLBACK` and after `COMMIT`. Statement IDs arm immediately after the
 named statement returns; `postbuild` is the pre-`BEGIN` edge and `COMMIT` is a
 non-vacuous post-durable-new edge. At least one kill reopens a non-empty WAL
 without deleting sidecars.
+
+The browser `lineage-write` correction was unanimously authorized after the
+2l-b RED owner stopped rather than mislabel a fresh native `add` as `put`:
+Codex-high result/manifest SHA-256
+`447a63d7153b075f06db3ec6ef9770fb41489fa27c1516763976cbe6ab68a6bc` /
+`25e161f6199d579b4f456821f8d09252a7cda54f54910c00acc528717e08381c`;
+exact Kimi 3/high/100 result/manifest SHA-256
+`93a0de9a5864656157e70dc25f32e57014b30d662a51c0d935675892592392f9` /
+`bb45b1d2472be9ee7e409574c65ae012a65a848844b701bbea9076eeafd8a28c`;
+Opus 5/xhigh result/manifest SHA-256
+`6af53ffeb9509c63c94d8e3cecffae12d6e6ad3ceeb89873682c91359b363384` /
+`231c39befaac798b1c7bd6a6ecdc1b04d14ef088429b2ddb27b9cc8701262e2b`.
 
 `abort`/`ROLLBACK` are controlled alternative terminal paths, not claimed to
 co-occur with `complete`/`COMMIT` in one trace. Declared-versus-observed order,
