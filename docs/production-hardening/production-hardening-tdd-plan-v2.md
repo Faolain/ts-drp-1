@@ -5710,6 +5710,624 @@ consumer seam. Existing broad root type/lint and external-profile governance
 diagnostics remain disclosed inherited debt and do not weaken the exact owned
 gates above.
 
+### D.93 — Track P2 trusted blueprint authoring and application catalog
+
+Track P2 is the application-tooling prerequisite for Phase 3a. Its original
+one-row description named outcomes but not an executable owner, byte grammar,
+evidence schema, catalog boundary or resolver API. A tests-only RED therefore
+stopped before inventing those contracts. Codex-high, exact Kimi 3/high/100 and
+Opus 5/xhigh converged on the following additive correction after the direct
+0j-c release dependency was restored at signed commit `303ee26`.
+
+This section supersedes the underspecified Track-P2 row. Phase 3a must consume
+the resolver and exact ordering below; it may not infer a catalog interface or
+remap the published protocol-v3 preparer signatures.
+
+#### D.93.1 — Ownership and preserved boundaries
+
+Create exactly two packages:
+
+| Package                                        | Path                           | Publication | Surface                               |
+| ---------------------------------------------- | ------------------------------ | ----------- | ------------------------------------- |
+| `@ts-drp/blueprint-catalog` version `0.11.0`   | `packages/blueprint-catalog`   | published   | package root only                     |
+| `@ts-drp/blueprint-toolchain` version `0.11.0` | `packages/blueprint-toolchain` | private     | package root plus bin `drp-blueprint` |
+
+The catalog package owns the P2 canonical schemas and four evidence domains,
+catalog verification, public errors and the Phase-3a byte resolver. Its runtime
+dependencies are `@ts-drp/canonical`, `@ts-drp/errors`,
+`@ts-drp/protocol-v3` and exact `es-module-lexer@1.6.0`. The private toolchain
+owns authoring reads, deterministic emission, lint, generated 0j-c inputs,
+child-process conformance and catalog construction. It depends on the catalog
+package, canonical, protocol-v3, exact `esbuild@0.25.3`, exact
+`eslint@9.23.0`, workspace `eslint-plugin-ts-drp`, exact
+`@typescript-eslint/parser@8.29.0`, exact `es-module-lexer@1.6.0`, exact
+`yaml@2.8.0`, and Playwright only as a development dependency.
+
+The legacy `@ts-drp/blueprints` root and bundle remain byte/API preservation
+surfaces and are neither imported nor used as P2 fixtures. P2 adds no
+protocol-v3 root export or tooling subpath and does not modify the accepted
+0j-c runner, 0j fixtures/checkers/freeze policy,
+`.github/workflows/protocol-v3-blueprint-conformance.yml`, its accepted 0j-c
+jobs/edges or `shipping-targets.json`. P2 adds its own workflows and may add
+additive release `needs` edges for its reusable nightly gate; the frozen 0j-c
+workflow-contract test and direct `phase-0j-c-release-conformance` nightly
+dependency remain unedited and green. The unchanged 0j-c child remains the
+sole four-engine evaluator.
+
+#### D.93.2 — Private CLI and atomic products
+
+The private toolchain exposes exactly:
+
+```text
+drp-blueprint build --dir <authoring-directory> --out <bundle-directory> --tier pr|nightly
+drp-blueprint catalog --directory <catalog-directory> --bundle <bundle-directory>...
+drp-blueprint verify --directory <catalog-directory> --blueprint-digest <lowercase-64-hex>
+```
+
+Unknown or missing flags, repetition of any flag except catalog's `--bundle`,
+fewer than one `--bundle`, a repeated resolved bundle directory, implicit
+config/environment discovery, stdin or URL artifacts, network/package lookup,
+plugins, alternate emitters and output outside the explicit directory reject
+before creating an admissible product. Writes use same-directory temporary
+regular files and atomic rename only after complete validation. `verify` is
+exactly open plus resolve for the supplied digest and owns no additional
+validation semantics. `build --out` rejects a nonempty destination and uses
+the same stage-complete-then-rename rule as catalog construction.
+
+A successful build directory contains exactly `artifact.mjs`, `package.bin`,
+`lint.bin` and `receipt.bin`. The catalog command reads those four files from
+each bundle, recomputes every catalog-entry field, copies them under the fixed
+digest-derived names below and writes `catalog.bin`. Catalog construction
+rejects a nonempty destination before staging and, on success, leaves exactly
+`catalog.bin` plus four digest-derived files per entry; it stages that exact
+set in one same-parent temporary directory and renames only after complete
+validation, so no partial directory is admissible. There is no `bundle.bin`,
+build index or fifth product; adding one is a new byte contract requiring a
+correction quorum.
+
+#### D.93.3 — Closed read-once authoring input
+
+An authoring directory contains exactly `blueprint.json` and `blueprint.ts`.
+The caller-supplied directory is realpathed once; each file is a nonempty
+regular non-symlink, and every component strictly below that realpathed
+directory is a non-symlink parent. Absolute ancestors above the supplied
+directory are outside this check. Each file is read exactly once into copied
+bytes. UTF-8 decoding is fatal; BOM, `\r`, and anything other than exactly one
+final LF reject without normalization.
+
+`blueprint.json` uses `JSON.parse` for values and `yaml@2.8.0 parseDocument`
+only to reject duplicate keys at any depth. It is a closed own-data record with
+exactly:
+
+```text
+schemaVersion, kind, artifactId, runtimeProfile,
+operationDiscriminator, operations, conformance
+```
+
+The fixed values are `schemaVersion=1`,
+`kind="ts-drp-blueprint-authoring-source"` and
+`runtimeProfile="ecmascript-2024-sync-v1"`. `artifactId` is printable ASCII,
+1..128 bytes, with no whitespace, control, backslash or traversal spelling.
+`operationDiscriminator` is an ASCII identifier. `operations` is a nonempty
+array of exact records `{name,reducerBinding,argumentSchema}`. Reducer bindings
+are non-reserved ASCII JavaScript `BindingIdentifier`s valid in an ES2024 module;
+names and bindings are independently unique and strictly Unicode-code-point
+ascending; `argumentSchema` is the existing Phase-0i closed grammar.
+
+`conformance` is exactly
+`{corpusVersion,seed,initialState,prCases,nightlyAdditionalCases}`. Its case
+records are exactly `{id,action,arguments}`; ids are unique across both tiers,
+actions name declared operations and arguments pass their Phase-0i schemas.
+Values are bounded canonical-domain values of depth at most 32, except for one
+sanctioned `-0` witness in PR arguments. PR contains exactly that one negative
+zero and no other; `nightlyAdditionalCases` is nonempty and contains none.
+Nightly is the exact PR prefix followed by those additional cases, so the
+generated 0j-c contract satisfies the unchanged child's strict-superset check;
+no hidden selection or sorting occurs.
+
+The source is one TypeScript module with zero imports, exports, reference
+directives, decorators, JSX, namespace/enum/ambient declarations, top-level
+await or helper-requiring constructs. Each reducer binding resolves to a
+module-scope value. P2 defines no second runtime ABI: the generated artifact is
+the already accepted sole-`blueprint` Phase-0j-b envelope.
+
+#### D.93.4 — Deterministic artifact and lint evidence
+
+Emission is repository-resolved `esbuild@0.25.3`
+`transformSync(exactSourceText, options)`, never `build`, a PATH binary,
+filesystem/package resolution or a plugin. Options are exactly:
+
+```js
+{
+  loader: "ts", format: "esm", target: "es2024", platform: "neutral",
+  charset: "ascii", minify: false, minifyWhitespace: false,
+  minifyIdentifiers: false, minifySyntax: false, legalComments: "none",
+  sourcemap: false, treeShaking: false, keepNames: false, lineLimit: 0,
+  logLevel: "silent", sourcefile: "blueprint.ts",
+  tsconfigRaw: { compilerOptions: {
+    experimentalDecorators: false, useDefineForClassFields: true
+  } }
+}
+```
+
+Every unlisted transform option is omitted and any warning rejects. The
+transformed region must have no import/export syntax. Write `E(value)` for the
+sole string escaper defined below. For each operation in manifest/code-point
+name order, one `pairs` element is
+`E(operationName) + ": " + reducerBinding`. With no trailing comma, the exact
+epilogue bytes are:
+
+```text
+"export const blueprint = {\n  exportSchemaVersion: 1,\n  artifactId: "
++ E(artifactId)
++ ",\n  runtimeProfile: "
++ E("ecmascript-2024-sync-v1")
++ ",\n  reducers: { "
++ pairs.join(", ")
++ " }\n};\n"
+```
+
+`E(value)` is `JSON.stringify(value)` followed by
+replacement of every remaining UTF-16 code unit above U+007E with `\u` and four
+lowercase hexadecimal digits. Every epilogue string, including `artifactId`,
+`runtimeProfile` and every operation-name object key, is emitted solely by
+that escaper. Reducer-binding values are raw JavaScript identifiers and are
+never quoted or escaped. Operation names remain the existing Phase-0i
+nonempty strings and need not be `IdentifierName`s, so every key uses the
+escaped JSON string form and never an unquoted identifier. `charset:"ascii"`
+governs only the transformed region. Take `transformSync(...).code` as UTF-8,
+reject an empty, non-ASCII or U+000D-containing transformed region, strip every
+trailing U+000A, then concatenate exactly one U+000A and the epilogue. The
+epilogue already ends with one U+000A; append nothing else. The complete
+artifact is ASCII/BOM/CR-free and has exactly one final LF. The ordinary ESM
+lint parse must expose an empty comment set; this is a token check, never a raw
+search that could misclassify comment-like text inside a string. Exact
+`es-module-lexer@1.6.0` must report zero imports/import-meta and the sole export
+`blueprint`.
+
+The same copied artifact bytes are linted, domain-hashed, written and passed to
+later stages. Source and artifact lint run the real installed
+`drp/no-ambient-in-reducer` rule with inline config, ignore, cache and autofix
+disabled and tolerate zero diagnostics. The implementation imports and hashes
+the same copied regular-file bytes at
+`packages/eslint-plugin-ts-drp/src/index.ts`; no built/source split is allowed.
+The single
+lint-contract integrity preimage is exactly
+`packages/blueprint-toolchain/contracts/no-ambient-lint-v1.json`. Lint evidence
+also hashes the exact `blueprint.ts`, `blueprint.json` and `artifact.mjs`
+bytes. Two in-process builds, one fresh-process build and a clean Linux build
+must be byte-identical.
+
+`no-ambient-lint-v1.json` is a closed JSON record with exactly
+`{schemaVersion,ruleId,messages,eslintVersion,parserVersion,source,artifact}`.
+Fixed values are schema version 1, rule id
+`drp/no-ambient-in-reducer`, ESLint `9.23.0`, parser `8.29.0`, and a `messages`
+record whose exact nine keys and strings equal the accepted
+`tests/fixtures/phase-0j-a/no-ambient-contract.json` messages record. `source`
+is exactly
+`{filename:"blueprint.ts",files:["**/*.ts"],ecmaVersion:2024,sourceType:"module",parser:"@typescript-eslint/parser",noInlineConfig:true,reportUnusedDisableDirectives:false}`;
+`artifact` is the same closed record with filename `artifact.mjs`, files
+`["**/*.mjs"]` and no parser key. The toolchain resolves the named parser and
+real installed plugin directly; it accepts no contract-supplied module path,
+rule option, globals or additional language/linter option. The contract bytes
+use the displayed key order at every depth, compact JSON with no insignificant
+whitespace and exactly one final LF.
+
+Checked-in source and exact-artifact `Date.now()` goldens are lint-negative
+controls only and never enter the child path. The separately generated
+`ambientBad` control consumes every child sentinel class (`Date`,
+`Math.random`, `performance`, `timers`, `io`, `dom`) in at least one executed
+reducer, folds the engine-tagged sentinel returns into its outputs so the four
+per-engine bad-fixture digests disagree, and fails closed under the child's
+`#poison` throw mode. Its `lintRejected:true` comes from toolchain lint;
+`crossEngineDigestDisagreement:true` comes from comparing the four engines'
+`sentinel.badFixtureDigest` values. None may produce clean evidence, a receipt
+or a catalog entry.
+
+#### D.93.5 — Package and evidence identities
+
+The frozen identities remain:
+
+```text
+artifactDigest  = hashDomain("ts-drp/blueprint-artifact/v3", exactArtifactBytes)
+blueprintDigest = hashDomain("ts-drp/blueprint-admission/v3", canonicalPackageBytes)
+conformanceDigest = hashDomain(
+  "ts-drp/blueprint-conformance/v1",
+  encodeCanonical({state: finalState, outputs})
+)
+```
+
+The package is exactly the frozen five-key record
+`{kind,protocolMajor,schemaVersion,implementation,manifest}`. Implementation is
+exactly `{artifactId,artifactDigest,runtimeProfile}`. Manifest is the exact
+Phase-0i projection; author-only `reducerBinding` is dropped, and no source,
+tool, lint, corpus, receipt or catalog field enters package bytes. The
+toolchain calls genuine package-root `prepareBlueprintAdmission`, then genuine
+`prepareBlueprintRuntime` over the exact package/artifact pair, and discards
+both capabilities.
+
+P2 adds exactly four non-consensus domains over canonical bytes:
+
+```text
+ts-drp/blueprint-lint-evidence/v1
+ts-drp/blueprint-conformance-corpus/v1
+ts-drp/blueprint-conformance-receipt/v1
+ts-drp/blueprint-catalog/v1
+```
+
+They do not amend the protocol registry or any signed/anchor preimage. There is
+no `entryDigest` or fifth identity. The derived values are:
+
+```text
+lintEvidenceDigest       = hashDomain(lint domain, exact lint.bin bytes)
+corpusDigest             = hashDomain(corpus domain, exact canonical corpus bytes)
+conformanceReceiptDigest = hashDomain(receipt domain, exact receipt.bin bytes)
+catalogDigest            = hashDomain(catalog domain, exact catalog.bin bytes)
+```
+
+Corpus bytes are `encodeCanonical` of exact
+`{schemaVersion:1,corpusVersion,seed,initialState,prCases,nightlyAdditionalCases}`
+and are not a fifth build product. Canonical encoding normalizes negative zero,
+so `corpusDigest` intentionally does not witness the authored `-0` marker; the
+generated contract text and the child's raw-versus-detached count do. Plain
+SHA-256 is file-integrity metadata only.
+
+`lint.bin` is canonical encoding of exactly:
+
+```text
+{
+  schemaVersion:1, kind:"ts-drp-blueprint-lint-evidence",
+  artifactDigest, artifactSha256, sourceSha256, authoringSha256,
+  ruleId:"drp/no-ambient-in-reducer",
+  rulePackage:"eslint-plugin-ts-drp", ruleSourceSha256,
+  lintContractSha256, eslintVersion:"9.23.0", parserVersion:"8.29.0",
+  targets:[
+    {kind:"artifact",sha256:artifactSha256,diagnosticCount:0},
+    {kind:"source",sha256:sourceSha256,diagnosticCount:0}
+  ],
+  result:"clean"
+}
+```
+
+The five SHA fields are over, respectively, exact `artifact.mjs`,
+`blueprint.ts`, `blueprint.json`, the rule-source file and the lint-contract
+file named above. Target order is artifact then source.
+
+The evidence graph is acyclic: artifact → artifact/package identities;
+artifact → lint evidence; authored corpus → corpus identity; those identities
+plus validated 0j-c output → receipt; the four build products → catalog entry.
+Nothing references `catalogDigest`.
+
+#### D.93.6 — Unchanged 0j-c child and closed receipt
+
+The toolchain generates a temporary per-blueprint 0j-c contract plus exact
+controls named `ambientBad`, `thenable`, `intrinsicMutation`,
+`moduleGlobalDrift`, `noncanonicalIntermediate` and `sparseIntermediate`. It
+invokes unchanged
+`packages/protocol-v3/scripts/run-blueprint-conformance-v1.mjs --contract
+<generated> --tier pr|nightly` as a child. Generated contract/control paths are
+toolchain-owned single-segment temporary names, never caller-selected paths.
+Status zero, no signal and exactly one JSON stdout record are mandatory.
+Stderr is not a receipt channel: the driver ignores host/browser diagnostic
+stderr and fails closed on spawn failure, nonzero status, a signal, unparseable
+stdout, or more or less than one JSON record. This is the accepted 0j-c parent
+policy, not the 0j-d Electron wrapper's empty-stderr guard. The driver
+independently validates package/artifact/control digests, accounting and ids,
+exactly one Node/Chromium/Firefox/WebKit result, nonempty builds, the shared
+conformance digest and every replay/poison/intrinsic/control outcome. The
+child's `catalogEntry` is not a P2 catalog entry.
+
+The generated-contract writer recursively emits its closed JSON grammar with
+no insignificant whitespace and exactly one final LF. It emits keys and
+strings with `JSON.stringify`; it emits `Object.is(value,-0)` as the exact
+number token `-0`, other numbers with `JSON.stringify`, and arrays/records from
+their frozen field order without calling `JSON.stringify` on a composite.
+Thus the unchanged child's mandatory PR negative-zero observation survives.
+The generated contract has exactly the unchanged child's nine top-level keys
+`schemaVersion`, `runner`, `runtimeProfile`, `artifactDigestDomain`,
+`conformance`, `packageTemplate`, `artifacts`, `prOperations` and
+`nightlyOperations`, in that order, and no unknown key at any depth. `runner`
+is exactly `{relativePath,receiptSchemaVersion}`; `conformance` is exactly
+`{digestDomain,corpusVersion,seed,operationOrder,initialState,selectedIntrinsicDescriptorTargets,pr,nightly}`;
+`pr` is exactly `{total,selected,dropped}` and `nightly` exactly
+`{total,selected,dropped,additionalSelectedCaseIds}`. `packageTemplate` is the
+exact frozen five-key package. `artifacts` is exactly `primary` plus the six
+named controls, each `{file,artifactId}`. Filenames are toolchain-owned
+single-segment temporary names and are not product bytes. For primary
+`artifactId` `A` and control name `N` in
+`{ambientBad,thenable,intrinsicMutation,moduleGlobalDrift,noncanonicalIntermediate,sparseIntermediate}`,
+the control id is exactly `A + "::" + N`; reject before emission if it fails
+the D.93.3 `artifactId` grammar, including the 128-byte bound. Every generated
+artifact—primary and each control—exports exactly the primary manifest
+operation-name set through the same epilogue; control bodies differ, names do
+not. Operations are exact `{id,action,arguments}` records. Primary and
+generated control source bytes, filenames, artifact ids and digests are
+committed P2-c goldens; generation emits its transformed region, exact
+epilogue and single final LF with no intervening blank line. The generated
+contract fixes `artifactDigestDomain` to
+`ts-drp/blueprint-artifact/v3`, `conformance.digestDomain` to
+`ts-drp/blueprint-conformance/v1`,
+`runner.relativePath` to the unchanged child path,
+`runner.receiptSchemaVersion=1`,
+`conformance.operationOrder` to the PR action sequence, and
+`selectedIntrinsicDescriptorTargets` to this exact order:
+
+```text
+Array.prototype, Date.prototype, Function.prototype, JSON, Math,
+Object.prototype, Promise.prototype, Reflect
+```
+
+For each tier, generated accounting is exactly
+`{total:|cases|,selected:|cases|,dropped:0}`. Nightly additional selected ids
+are exactly the nonempty authored suffix in its existing order.
+
+`receipt.bin` is canonical encoding of an exact 20-key record:
+
+```text
+schemaVersion, kind, artifactId, runtimeProfile, blueprintDigest,
+artifactDigest, lintEvidenceDigest, corpusDigest, executionTier, result,
+conformanceDigest, corpusVersion, seed, operationOrder, selectedCaseIds,
+corpusAccounting, engines, controlArtifactDigests, controlOutcomes, runnerSha256
+```
+
+Fixed values are `schemaVersion=1`,
+`kind="ts-drp-blueprint-conformance-receipt"`, `result="passed"`, and
+`executionTier="pr"|"nightly"`. Operation order is the declared action sequence
+for the selected corpus; case ids retain corpus order. `corpusAccounting` is
+exactly `{pr:{total,selected,dropped},nightly:{total,selected,dropped}}`, using
+nonnegative safe integers with `selected+dropped=total`; selected counts equal
+the corresponding id counts and nightly is a strict PR-prefix superset.
+
+`engines` has exactly four records ordered node, chromium, firefox, webkit:
+`{name,build,conformanceDigest}`. Build is nonempty printable ASCII of at most
+512 bytes with no C0/DEL; every digest is lowercase 64-hex and all four agree.
+
+`controlArtifactDigests` is an exact record with the six control names above,
+each a lowercase 64-hex artifact digest. `controlOutcomes` is exactly:
+
+```text
+{
+  ambientBad:{lintRejected:true,crossEngineDigestDisagreement:true},
+  thenable:{executed:true,rejected:true},
+  intrinsicMutation:{detected:true},
+  moduleGlobalDrift:{detected:true},
+  noncanonicalIntermediate:{executed:true,rejected:true},
+  sparseIntermediate:{executed:true,rejected:true}
+}
+```
+
+`runnerSha256` is SHA-256 of the unchanged child file. No other key may appear
+at any depth. Failure emits no receipt. PR is development evidence only; only
+a passed nightly receipt with the full engine matrix is catalogable. Release
+reruns nightly and retains its direct 0j-c dependency.
+
+#### D.93.7 — Canonical flat catalog and verification
+
+One caller-supplied absolute catalog directory has fixed layout:
+
+```text
+catalog.bin
+<blueprintDigest>.artifact.mjs
+<blueprintDigest>.package.bin
+<blueprintDigest>.lint.bin
+<blueprintDigest>.receipt.bin
+```
+
+An empty `entries` array is admissible. For open, the caller-supplied location
+must be a nonempty absolute path to a real non-symlink directory; a relative,
+empty, absent or non-directory location is
+`BLUEPRINT_CATALOG_DIRECTORY_INVALID`. The directory is realpathed once.
+`catalog.bin` and each derived asset are nonempty regular non-symlinks beneath
+non-symlink parents strictly below that realpathed directory, with
+separator-bound realpath containment; a `catalog.bin` violation is
+`BLUEPRINT_CATALOG_FILE_UNREADABLE`, and absolute ancestors above the supplied
+directory are outside this check. Open does not enumerate or reject unrelated
+directory entries; `contains only` is a catalog-construction invariant, and no
+public error represents extras.
+
+`catalog.bin` is exact canonical encoding of:
+
+```text
+{
+  schemaVersion:1, kind:"ts-drp-trusted-blueprint-catalog",
+  entries:[{
+    blueprintDigest,artifactDigest,artifactId,runtimeProfile,
+    lintEvidenceDigest,conformanceReceiptDigest
+  }]
+}
+```
+
+Entries are strictly ascending by blueprint digest; blueprint digest, artifact
+digest and artifact id are independently unique. `blueprintDigests` is the
+frozen projection of that exact ascending entry order, including `[]` for an
+empty catalog. Filenames are derived and never stored.
+
+Open copies catalog bytes once, canonical-decodes/exact-reencodes, then copies
+each four-file group exactly once in entry order. It recomputes exactly the
+file-derivable identities `artifactDigest`, `blueprintDigest`,
+`lintEvidenceDigest`, `conformanceReceiptDigest`, `catalogDigest` and plain
+`artifactSha256`; every occurrence must agree. It exact-matches all kind/schema,
+rule/result/profile/tier/engine-name literals. Tool/source/corpus/conformance
+fields not derivable from the five files are grammar-validated and cross-bound
+where repeated, not falsely recomputed. The catalog package pins no lint or
+runner version; the private toolchain owns those pins.
+
+Open calls genuine `prepareBlueprintAdmission` over exact package bytes and
+discards the capability. It lexes exact artifact bytes for zero imports and the
+sole export without evaluating them. Every package/artifact/lint/nightly-
+receipt cross-pair fails before open returns. The resolver never calls
+`prepareBlueprintRuntime`, imports an artifact or invokes a reducer.
+
+#### D.93.8 — Public resolver and closed taxonomy
+
+The catalog root exports exactly the option, result, handle, open function and
+`BlueprintCatalogError extends DRPError` shapes below:
+
+```ts
+export interface TrustedBlueprintCatalogOptions {
+	readonly catalogDirectory: string;
+}
+export interface TrustedBlueprintCatalog {
+	readonly blueprintDigests: readonly string[];
+	readonly catalogDigest: string;
+	resolve(blueprintDigest: string): ResolvedBlueprintBytes;
+}
+export interface ResolvedBlueprintBytes {
+	readonly artifactDigest: string;
+	readonly artifactId: string;
+	readonly blueprintDigest: string;
+	readonly runtimeProfile: "ecmascript-2024-sync-v1";
+	readonly canonicalBlueprintPackageBytes: Uint8Array;
+	readonly exactArtifactBytes: Uint8Array;
+	readonly evidence: {
+		readonly catalogDigest: string;
+		readonly lintEvidenceDigest: string;
+		readonly conformanceReceiptDigest: string;
+		readonly conformanceDigest: string;
+		readonly conformanceTier: "nightly";
+		readonly conformanceResult: "passed";
+		readonly engines: readonly {
+			readonly name: "node" | "chromium" | "firefox" | "webkit";
+			readonly build: string;
+		}[];
+	};
+}
+export function openTrustedBlueprintCatalog(options: TrustedBlueprintCatalogOptions): TrustedBlueprintCatalog;
+export class BlueprintCatalogError extends DRPError {}
+```
+
+The catalog module calls exact `es-module-lexer@1.6.0` `initSync` during module
+evaluation; initialization is never deferred into public open or resolve. Open
+is synchronous and performs all I/O/validation once. Its frozen plain handle
+caches copied bytes; resolve is pure synchronous zero-I/O and returns fresh
+detached byte arrays and frozen records each call. A non-lowercase-64-hex or
+otherwise malformed request throws `BLUEPRINT_REQUEST_MALFORMED`; a valid
+digest absent from the frozen handle throws `BLUEPRINT_NOT_CATALOGUED`. The
+handle grants no runtime authority.
+
+Append these exact public codes. Their order below defines semantic open and
+resolve failure precedence; insertion into `@ts-drp/errors`
+`DRP_ERROR_CODES` follows that registry's existing alphabetized convention,
+so the append-only public commitment is the code set rather than this array
+order:
+
+```text
+BLUEPRINT_CATALOG_DIRECTORY_INVALID
+BLUEPRINT_CATALOG_FILE_UNREADABLE
+BLUEPRINT_CATALOG_BYTES_NONCANONICAL
+BLUEPRINT_CATALOG_SCHEMA_INVALID
+BLUEPRINT_CATALOG_ORDER_INVALID
+BLUEPRINT_CATALOG_DUPLICATE_IDENTITY
+BLUEPRINT_ENTRY_FILE_UNREADABLE
+BLUEPRINT_PACKAGE_BYTES_NONCANONICAL
+BLUEPRINT_PACKAGE_DIGEST_MISMATCH
+BLUEPRINT_PACKAGE_SCHEMA_INVALID
+BLUEPRINT_ARTIFACT_BYTES_INVALID
+BLUEPRINT_ARTIFACT_DIGEST_MISMATCH
+BLUEPRINT_ARTIFACT_PACKAGE_CROSS_PAIR
+BLUEPRINT_RUNTIME_PROFILE_UNSUPPORTED
+BLUEPRINT_LINT_EVIDENCE_INVALID
+BLUEPRINT_LINT_EVIDENCE_UNBOUND
+BLUEPRINT_CONFORMANCE_RECEIPT_INVALID
+BLUEPRINT_CONFORMANCE_RECEIPT_UNBOUND
+BLUEPRINT_CONFORMANCE_TIER_INSUFFICIENT
+BLUEPRINT_CONFORMANCE_ENGINE_MATRIX_INCOMPLETE
+BLUEPRINT_CONFORMANCE_RESULT_NOT_PASSED
+BLUEPRINT_REQUEST_MALFORMED
+BLUEPRINT_NOT_CATALOGUED
+```
+
+Catalog checks precede ascending entry checks; request codes are resolve-only.
+Messages expose no absolute path. `openTrustedBlueprintCatalog` and `resolve`
+throw only `BlueprintCatalogError` with a code above. Failures from genuine
+`prepareBlueprintAdmission` that remain after the catalog's own package-byte
+and digest checks map to `BLUEPRINT_PACKAGE_SCHEMA_INVALID`. Canonical codec
+failures over catalog or entry bytes map to the matching
+`*_BYTES_NONCANONICAL` or `*_SCHEMA_INVALID` code. No `TypeError`,
+`CanonicalEncodingError`, `CanonicalDecodingError`, lexer initialization error
+or other non-taxonomy throwable escapes the public surface. Toolchain-only
+failures use private `P2_*` codes and do not enter the public registry.
+
+#### D.93.9 — Exact Phase-3a handoff
+
+The application injects one reviewed `TrustedBlueprintCatalog` into the node v3
+composition root. Phase 3a must:
+
+1. authenticate the signed current anchor;
+2. extract its proven `blueprintDigest`;
+3. call `catalog.resolve(provenDigest)` and require returned digest equality;
+4. call published `prepareBlueprintAdmission` with exactly
+   `{canonicalBlueprintPackageBytes,expectedBlueprintDigest}`;
+5. await published `prepareBlueprintRuntime` with exactly
+   `{preparedBlueprintAdmission,canonicalBlueprintPackageBytes,
+expectedBlueprintDigest,exactArtifactBytes}`; and
+6. only then construct the index or subscribe/append.
+
+P2 and Phase 3a define no adapter, argument reordering, synthesized argument or
+byte re-projection. If the genuine signatures cannot accept the exact fields
+above, work stops for a correction quorum. Catalog open/resolve authenticates
+no anchor, returns/mints no 0i/0j capability, imports/evaluates no artifact and
+performs no subscription, issuance, append, reducer or fold. Every failure is
+before index construction or live effects. Phase 3a executes zero reducers;
+Phase 4a remains the first dispatch/fold owner.
+
+#### D.93.10 — Goldens, CI and ordered TDD slices
+
+Commit one forward-v3 chat/counter fixture, exact artifact/package/lint/corpus
+metadata, a clearly synthetic offline nightly receipt, a one-entry catalog and
+adjacent Date controls. Artifact, package and lint bytes are clean-checkout
+goldens. Catalog bytes are golden only when built from the committed synthetic
+receipt; live receipts are field-checked because engine build strings make
+their bytes environment-specific.
+
+Implement only through distinct Codex-high RED/GREEN pairs in order:
+
+1. **P2-a authoring/emitter/lint** — packages, read-once input, exact emission,
+   lint, Date controls, atomic failure and legacy/protocol/shipping preservation.
+2. **P2-b package binding** — exact package projection, separated artifact/
+   blueprint identities, genuine preparer validation and cross-pair mutants.
+3. **P2-c generic conformance** — generated controls/contract, unchanged child,
+   process guards, closed receipt, tiers and four real engines.
+4. **P2-d catalog** — canonical flat catalog, read-once open/pure resolve,
+   taxonomy, copy/provenance/cross-pair/symlink/tier/engine mutants.
+5. **P2-e guide/integration** — authoring guide, independently authored second
+   fixture, deterministic two-entry resolution, clean-clone rebuild,
+   declarations-only shipping pin and genuine 0i/0j handoff without live effects.
+
+PR runs bounded P2-a/b/d plus PR conformance. Nightly runs the strict corpus
+superset and four engines. Release depends directly on reusable P2 nightly and
+retains the direct 0j-c dependency. Every slice runs owned type/build/test/lint/
+format/freeze gates, Grok 4.6/high, exact Kimi 3 high/100 and final Opus xhigh.
+
+P2 proves publisher lint, exact identity, differential engine evidence and
+trusted-local catalog binding. It does not isolate hostile JavaScript, fetch
+network artifacts, solve catalog rotation/revocation/expiry, activate Electron
+while undeclared, or close Phase-0n numeric/locale policy. No live fold begins
+until its existing prerequisites close.
+
+Quorum evidence:
+
+- Codex-high proposal/reconciliation SHA-256
+  `627a9e9e720af218a09bef564264b8c3832ddf6c215bb4b65993a9e0af43005c` /
+  `8481266a9f2871b2e819f7bf5b4704e2d3151d2c047a544930ae9f8c8a5d0f99`;
+- clean exact Kimi 3/high/100 architectural reconciliation/final assent SHA-256
+  `b36660669fa730009f5746c51870a9c1e0d1ceac24886495ba707b0d5ee1dd38` /
+  `a75541e4d588b4126611e60bd4cacd8045f9fbe62ea9c621c178d7e0ea0d31f7`;
+  Kimi's high-level Proposal-C assent is retained while its contradictory
+  digest prose is explicitly superseded by D.93.5 and D.93.9; and
+- Opus 5/xhigh architecture/final exactness SHA-256
+  `94da184e493b6987949ec0e2eb2414c1866603eae674e0c769ca1dd80a3d1558` /
+  `c23fafff49070ff53e23dc4c1d50423c9fba22911289b994c8862475fa371d64`;
+- fresh Fable 5/xhigh final-assent SHA-256
+  `68e1ae997870a1168163d01f9ef9de64a6ab3d5b3072d7b529b3bdf451fbd81f`;
+  and
+- fresh Grok 4.6/high final-assent SHA-256
+  `f6ee32220767444efa35c9c1488587008cfa58f50ae972c4171045ec28247981`.
+
+`RED_MAY_START` is authorized only after this complete amendment is signed and
+pushed. A finding that changes an owner, byte preimage, domain, closed schema,
+taxonomy or Phase-3a ordering stops for a new correction quorum.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
@@ -9340,16 +9958,16 @@ under one `objectId` are forbidden), but the **rollout** is sliced: new rooms on
 acceptance supplement and the live-binder RED can execute its adversarial vectors. The Phase −1′ tuple
 remains immutable; the supplement is a separately governed post-freeze addendum.
 
-| Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Class        | Atomic?                                       | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **3a** | First live v3 vertex + anchor binder over the Phase −1′ registry; new object namespace + pubsub topic; `bytes canonical_preimage` plus `bytes signature` wire rule. The transport measures and verifies the exact received canonical-preimage bytes without re-encoding. Phase 3a exclusively signature-verifies the current epoch anchor, extracts its signed `blueprintDigest`, and passes that proven value as `expectedBlueprintDigest` into Phase 0i-v3 admission preparation and Phase-0j-b runtime preparation. At the `packages/node` composition root, construct one `CausalityIndex` per live object/epoch, bind `index.isAncestor.bind(index)` into the prepared admission context, and require both the genuine 0i admission capability and genuine 0j runtime capability bound to that same anchor-proven digest before subscription or the first live append. The composition root imports only `admitReceivedVertex` and `createAdmissionBoundTransactionalVertexIssuer` from the package root and structurally rejects either conformance-primitive name. A 0i capability alone proves package/ABI structure and never authorizes live activation; the synthetic unrealizable Phase-0i artifact digest remains live-inadmissible. Phase 3a resolves exact bytes only from the trusted application catalog emitted by Track P2 and composes Phase 2's durable `transactIssue` adapter so counter, exact signed envelope, issued record and outbox commit atomically before publication. Arbitrary third-party/network executable artifacts remain unsupported until the deferred isolated-VM work is resliced as an explicit pre-3a owner and passes the correction quorum. Admitted signed operations may be stored/forwarded, but 3a executes no blueprint, reducer or fold. Phase 0q owns the synchronous append discipline; 3a owns actual v3 anchor/ancestry wiring, received-byte consumption and publication of committed outbox records. Assert Phase 0p's epoch ceiling before the first live append; an anchor above the locally supported profile refuses to bind before subscription or index construction. | consensus-v3 | atomic per preimage + durable issuance record | Cross-room, cross-epoch, cross-anchor and cross-protocol replay are terminal. **Active three-plane cross-injection:** publish v3 envelopes onto legacy and v2 topics, legacy/v2 envelopes onto the v3 topic, and v2↔legacy traffic in both directions; every wrong-plane injection rejects. Live-binder REDs prove unknown hashes cannot create false antichain acceptance, accepted vertices append exactly once, rejected/pending/quarantined vertices never append, unbound/lying ancestry fails closed, the index resets only at a verified epoch transition, and the cap is enforced prepublication with a typed non-terminal, non-latched capacity outcome. Opposing final-slot schedules name no arrival-order winner; Phase 5 owns certified final membership. Received-byte mutation fails without re-encoding, and crashes expose either the old durable issuance state or the exact committed envelope/outbox—not a counter-only or envelope-only state. Missing/mismatched 0i or 0j capability, catalog/artifact mismatch, unsupported local profile or untrusted-source attempt fails before subscription/append. Author authentication remains before operation-schema terminal latching. An authenticated ABI-invalid operation causes zero accepted append/index publication and an instrumented zero blueprint/reducer/fold calls; raw invalid-envelope retention, if any, is explicitly non-admitted and cannot affect causality, acceptance or execution. |
-| **3b** | **Trust profile + genesis certificate.** `profileDigest`/`cryptoSuiteId` in genesis and every anchor. A new room defaults to `creator-trusted-v1`, quorum 1, and the UI/API status **must** read "Creator-trusted; not Byzantine-fault-tolerant." A **delegated** genesis (`delegated-trusted-v1`) names n delegate signers and an explicit quorum `k ≥ 2`, with PoP/acceptance from every delegate — **1-of-n is rejected at genesis** (two delegates closing the same epoch from different sync states would mint two valid QCs for different values: a fork with everyone honest). An attested genesis requires n≥4, unique accepted seal keys, PoP/acceptance from every signer, and a `q=⌈2n/3⌉` genesis certificate — **a lone creator cannot advertise attested mode.** Capability negotiation happens only at create/join; an existing anchor selects exactly one tuple; **negotiation MUST NOT downgrade an existing object.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | consensus-v3 | atomic                                        | `genesis-profile.test.ts`: one-signer `attested-bft-v1` **rejects**; a `delegated-trusted-v1` genesis with `k=1` **rejects**; one-signer creator profile succeeds and **cannot be network-downgraded or upgraded**. UI state is a **pure projection of the verified profile chain** — a copy test alone is theater, since copy can say "creator-trusted" while wire negotiation silently accepts attested evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **3c** | **Latched epoch ACL** — anchor ACL authorizes the whole epoch; ACL ops stage to the next anchor; moderation triggers an early close. **The ACL fixes land here**: admin becomes **revocable** (`acl/index.ts:129-132` is a documented no-op today) and resolver keys move to `(peer, group)` (`:219-221` discriminates only on the target peer, so `grant(P,Writer)` vs `revoke(P,Finality)` collide and one is silently dropped). Under latched authority a permanent un-revocable admin is an **epoch-poisoning primitive**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | consensus-v3 | atomic                                        | Authorization-vs-arrival-order property tests; concurrent `grant(P,Writer)` and `revoke(P,Finality)` **both** apply; compromised admin removable via handoff                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **3d** | Exact latched-ACL semantics as **pure functions**, defined _before_ 3c implements them (round 1 sequenced 4d after 4b — implementation against undefined semantics): envelope-admission authority, application-writer authority, ACL-operation authority + method preconditions, staged mutation order, `SignerSet_(e+1)` derivation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | consensus-v3 | sliceable                                     | Exhaustive grant/revoke/admin/key-rotation **epoch-straddle** tests; independent replay produces identical ACL bytes and signer sets                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **3e** | **RFC 9162 history root + archive-index root (empty is valid) + mandatory close manifest** — moved from round 1's Phase 7. `historyRoot` and `archiveIndexRoot` are **mandatory fields of every cut and anchor**; Phase 6 validates history continuity, so they cannot arrive after it. §13's `closeManifestDigest` becomes **mandatory, not optional** — otherwise two signers can agree on a nominal close root while using different leaf inputs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | consensus-v3 | root profile atomic                           | `close-manifest-root.test.ts`: permuted arrival maps produce identical manifest and root; a changed frontier, order, hash or byte length changes or rejects the root. Exhaustive small-N consistency/inclusion + published RFC 9162 test vectors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **3f** | **Frontier aggregation / tip-set**, landing **before** `maxDependencies = 16` is enforced. Today deps default to the **full frontier** (`hashgraph/index.ts:226`) and no cap exists anywhere in the repo; enabling the cap first would terminal-reject normal writes under concurrency — a silent write-failure storm.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | consensus-v3 | sliceable                                     | W=64 concurrent writers: dependency fan-out always ≤ `maxDependencies`, **no user-visible drop storms**; op-batching coalesces multiple mutations into one signed change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **3g** | **Rebase outbox**: original-author-only re-signing, idempotence by stable `clientOperationId`, per-operation policy (idempotent-rebase / transform / expire / manual-review), rate-limited so post-cut rebase storms cannot amplify                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | consensus-v3 | sliceable                                     | Non-author replacement **fails verification**; duplicate rebase delivery applies once; per-blueprint metamorphic test: uninterrupted execution ≡ every cut/rebase placement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **3h** | Migration record + **rehearsal gate**. The signed migration record is the only irreversible act in the whole plan and round 1 gave it no dry-run. Authorization is **creator-only or an externally pinned/threshold authority** — never "current authority", which is replay-influenceable until 3a lands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | coordinated  | sliceable                                     | Rehearsal E2E: after the dry run the room is **provably still on the legacy plane** (rollback intact); activation is a separate signed act                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Class        | Atomic?                                       | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **3a** | First live v3 vertex + anchor binder over the Phase −1′ registry; new object namespace + pubsub topic; `bytes canonical_preimage` plus `bytes signature` wire rule. The transport measures and verifies the exact received canonical-preimage bytes without re-encoding. Phase 3a exclusively signature-verifies the current epoch anchor, extracts its signed `blueprintDigest`, and passes that proven value as `expectedBlueprintDigest` into Phase 0i-v3 admission preparation and Phase-0j-b runtime preparation. At the `packages/node` composition root, construct one `CausalityIndex` per live object/epoch, bind `index.isAncestor.bind(index)` into the prepared admission context, and require both the genuine 0i admission capability and genuine 0j runtime capability bound to that same anchor-proven digest before subscription or the first live append. The composition root imports only the four application APIs `admitReceivedVertex`, `createAdmissionBoundTransactionalVertexIssuer`, `prepareBlueprintAdmission` and `prepareBlueprintRuntime` from the package root and structurally rejects either conformance-primitive name. A 0i capability alone proves package/ABI structure and never authorizes live activation; the synthetic unrealizable Phase-0i artifact digest remains live-inadmissible. Phase 3a resolves exact bytes only from the trusted application catalog emitted by Track P2 and composes Phase 2's durable `transactIssue` adapter so counter, exact signed envelope, issued record and outbox commit atomically before publication. Arbitrary third-party/network executable artifacts remain unsupported until the deferred isolated-VM work is resliced as an explicit pre-3a owner and passes the correction quorum. Admitted signed operations may be stored/forwarded, but 3a executes no blueprint, reducer or fold. Phase 0q owns the synchronous append discipline; 3a owns actual v3 anchor/ancestry wiring, received-byte consumption and publication of committed outbox records. Assert Phase 0p's epoch ceiling before the first live append; an anchor above the locally supported profile refuses to bind before subscription or index construction. | consensus-v3 | atomic per preimage + durable issuance record | Cross-room, cross-epoch, cross-anchor and cross-protocol replay are terminal. **Active three-plane cross-injection:** publish v3 envelopes onto legacy and v2 topics, legacy/v2 envelopes onto the v3 topic, and v2↔legacy traffic in both directions; every wrong-plane injection rejects. Live-binder REDs prove unknown hashes cannot create false antichain acceptance, accepted vertices append exactly once, rejected/pending/quarantined vertices never append, unbound/lying ancestry fails closed, the index resets only at a verified epoch transition, and the cap is enforced prepublication with a typed non-terminal, non-latched capacity outcome. Opposing final-slot schedules name no arrival-order winner; Phase 5 owns certified final membership. Received-byte mutation fails without re-encoding, and crashes expose either the old durable issuance state or the exact committed envelope/outbox—not a counter-only or envelope-only state. Missing/mismatched 0i or 0j capability, catalog/artifact mismatch, unsupported local profile or untrusted-source attempt fails before subscription/append. Author authentication remains before operation-schema terminal latching. An authenticated ABI-invalid operation causes zero accepted append/index publication and an instrumented zero blueprint/reducer/fold calls; raw invalid-envelope retention, if any, is explicitly non-admitted and cannot affect causality, acceptance or execution. |
+| **3b** | **Trust profile + genesis certificate.** `profileDigest`/`cryptoSuiteId` in genesis and every anchor. A new room defaults to `creator-trusted-v1`, quorum 1, and the UI/API status **must** read "Creator-trusted; not Byzantine-fault-tolerant." A **delegated** genesis (`delegated-trusted-v1`) names n delegate signers and an explicit quorum `k ≥ 2`, with PoP/acceptance from every delegate — **1-of-n is rejected at genesis** (two delegates closing the same epoch from different sync states would mint two valid QCs for different values: a fork with everyone honest). An attested genesis requires n≥4, unique accepted seal keys, PoP/acceptance from every signer, and a `q=⌈2n/3⌉` genesis certificate — **a lone creator cannot advertise attested mode.** Capability negotiation happens only at create/join; an existing anchor selects exactly one tuple; **negotiation MUST NOT downgrade an existing object.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | consensus-v3 | atomic                                        | `genesis-profile.test.ts`: one-signer `attested-bft-v1` **rejects**; a `delegated-trusted-v1` genesis with `k=1` **rejects**; one-signer creator profile succeeds and **cannot be network-downgraded or upgraded**. UI state is a **pure projection of the verified profile chain** — a copy test alone is theater, since copy can say "creator-trusted" while wire negotiation silently accepts attested evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **3c** | **Latched epoch ACL** — anchor ACL authorizes the whole epoch; ACL ops stage to the next anchor; moderation triggers an early close. **The ACL fixes land here**: admin becomes **revocable** (`acl/index.ts:129-132` is a documented no-op today) and resolver keys move to `(peer, group)` (`:219-221` discriminates only on the target peer, so `grant(P,Writer)` vs `revoke(P,Finality)` collide and one is silently dropped). Under latched authority a permanent un-revocable admin is an **epoch-poisoning primitive**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | consensus-v3 | atomic                                        | Authorization-vs-arrival-order property tests; concurrent `grant(P,Writer)` and `revoke(P,Finality)` **both** apply; compromised admin removable via handoff                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **3d** | Exact latched-ACL semantics as **pure functions**, defined _before_ 3c implements them (round 1 sequenced 4d after 4b — implementation against undefined semantics): envelope-admission authority, application-writer authority, ACL-operation authority + method preconditions, staged mutation order, `SignerSet_(e+1)` derivation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | consensus-v3 | sliceable                                     | Exhaustive grant/revoke/admin/key-rotation **epoch-straddle** tests; independent replay produces identical ACL bytes and signer sets                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **3e** | **RFC 9162 history root + archive-index root (empty is valid) + mandatory close manifest** — moved from round 1's Phase 7. `historyRoot` and `archiveIndexRoot` are **mandatory fields of every cut and anchor**; Phase 6 validates history continuity, so they cannot arrive after it. §13's `closeManifestDigest` becomes **mandatory, not optional** — otherwise two signers can agree on a nominal close root while using different leaf inputs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | consensus-v3 | root profile atomic                           | `close-manifest-root.test.ts`: permuted arrival maps produce identical manifest and root; a changed frontier, order, hash or byte length changes or rejects the root. Exhaustive small-N consistency/inclusion + published RFC 9162 test vectors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **3f** | **Frontier aggregation / tip-set**, landing **before** `maxDependencies = 16` is enforced. Today deps default to the **full frontier** (`hashgraph/index.ts:226`) and no cap exists anywhere in the repo; enabling the cap first would terminal-reject normal writes under concurrency — a silent write-failure storm.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | consensus-v3 | sliceable                                     | W=64 concurrent writers: dependency fan-out always ≤ `maxDependencies`, **no user-visible drop storms**; op-batching coalesces multiple mutations into one signed change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **3g** | **Rebase outbox**: original-author-only re-signing, idempotence by stable `clientOperationId`, per-operation policy (idempotent-rebase / transform / expire / manual-review), rate-limited so post-cut rebase storms cannot amplify                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | consensus-v3 | sliceable                                     | Non-author replacement **fails verification**; duplicate rebase delivery applies once; per-blueprint metamorphic test: uninterrupted execution ≡ every cut/rebase placement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **3h** | Migration record + **rehearsal gate**. The signed migration record is the only irreversible act in the whole plan and round 1 gave it no dry-run. Authorization is **creator-only or an externally pinned/threshold authority** — never "current authority", which is replay-influenceable until 3a lands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | coordinated  | sliceable                                     | Rehearsal E2E: after the dry run the room is **provably still on the legacy plane** (rollback intact); activation is a separate signed act                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 > **Phase 3a epoch-byte provenance and local-publication supplement.** Phase 3a is the exclusive
 > owner of parameters provenance and every live epoch-byte charge. Because registered `parameters`
