@@ -405,6 +405,16 @@ importers:
         specifier: 0.11.0
         version: link:../utils
 
+  packages/issuance-store:
+    dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
+    devDependencies:
+      '@ts-drp/protocol-v3':
+        specifier: 0.11.0
+        version: link:../protocol-v3
+
   packages/keychain:
     dependencies:
       '@bufbuild/protobuf':
