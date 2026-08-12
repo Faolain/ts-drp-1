@@ -4812,8 +4812,10 @@ For each `transactIssue` call:
    rows, or exact-prior `put` / `UPDATE ... WHERE next=? AND exhausted=?` with
    one affected row for an existing lineage; atomically commit lineage,
    issued bytes and the pending outbox reference; and
-8. resolve only after IDB `complete` / successful SQLite `COMMIT`, reconstructing
-   the exact `IssueCommit` from joined durable rows.
+8. resolve only after IDB `complete` / successful SQLite `COMMIT`, after one
+   independently copied durable-row observation proves the complete issued and
+   outbox closure byte-equal to the closed candidate; return a fresh detached
+   exact `IssueCommit`.
 
 An existing issued/outbox key while the lineage CAS still matches is corruption,
 not ordinary contention. A losing signed candidate remains private memory: no
@@ -4868,7 +4870,11 @@ notion of advancement.
 
 1. exact candidate `I`, matching `O` in either valid publish state, and a
    lineage that consumed that ordinal — even if later commits advanced it — is
-   success reconstructed only from durable rows;
+   success; the returned value is fresh, detached and byte-equal to that
+   independently copied durable closure. Whether those fresh allocations are
+   copied from the proven-equal closed candidate or the copied durable rows is
+   intentionally unobservable and is not a source-analysis or instrumentation
+   gate;
 2. both rows absent and lineage equal to the exact prior snapshot is definitive
    old-state `ISSUANCE_SUBSTRATE_FAILURE`;
 3. a mutually consistent foreign `I`/`O` at the selected ordinal with consumed
@@ -5010,6 +5016,28 @@ manifest SHA-256
 `3d3383651671ca537d60b9d43903ab974a53db290adf1269261dd90537b859e4`.
 Its small automatic Haiku metadata helper produced no substantive review
 output. Fable is not a recurring Phase 2l gate.
+
+The first 2l-a GREEN review then exposed an implementation-wording mismatch:
+literal allocation provenance cannot be observed after both candidate and
+durable rows are independently closed/copied, proven totally byte-equal and
+returned through a fresh detached graph. A corrective RED correctly stopped
+instead of introducing source analysis, provenance tags or a test-only API.
+The required correction quorum unanimously ratified the observable-equality
+wording above while retaining two causal GREEN blockers—malformed lineage
+validation and unknown paging keys—for a normal corrective RED:
+
+- Codex-high result SHA-256
+  `1d47f7d5d019edec42748328c2a8ef96c4b0ac8c33137e33d65228af125358c4`,
+  manifest SHA-256
+  `cb62ba9e1dfc95edd2ada988c03a0214a1aae31b364bbfeaf2a9e73978b98ec9`;
+- exact Kimi 3/high/100 result SHA-256
+  `ce5a99b9de6c1ab6f9d0f9c4d40202ad025052b8a9cbbcb5598fa063d228548b`,
+  manifest SHA-256
+  `2a69921da8b319eb557de7f735873443b89e6d30e9e438f934a12f89c0ed9db7`;
+- Opus 5/xhigh result SHA-256
+  `dc2afb871dd455391c85b238e4857f5f6923413195db658ab02809cf7590ff10`,
+  manifest SHA-256
+  `dac42485b774c9cc5fa832bdf026136a05dcf205071e41bd7fec3ce9da7edc8b`.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
