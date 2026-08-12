@@ -188,6 +188,14 @@ async function surfaceOptionsIdentity(): Promise<unknown> {
 }
 
 async function primaryOpacitySchemaAdmission(): Promise<unknown> {
+	const nativeControlName = `phase-2l-b-native-schema-${crypto.randomUUID()}`;
+	const nativeControl = await openRaw(nativeControlName, 1, (database) => {
+		database.createObjectStore("lineages", { keyPath: ["objectId", "author"] });
+		database.createObjectStore("issuedRecords", { keyPath: ["objectId", "author", "authorSequence"] });
+		database.createObjectStore("issuanceOutbox", { keyPath: ["objectId", "author", "authorSequence"] });
+	});
+	nativeControl.close();
+	const nativeSchemaControl = await rawSchema(nativeControlName);
 	const absentPrimary = `phase-2l-b-absent-${crypto.randomUUID()}`;
 	await withStore(absentPrimary, () => Promise.resolve(undefined));
 	const namesAfterAbsent = (await indexedDB.databases()).map(({ name }) => name);
@@ -206,6 +214,7 @@ async function primaryOpacitySchemaAdmission(): Promise<unknown> {
 	const badPrimary = aheShaped.slice(0, -SUFFIX.length);
 	const badError = await rejection(createBrowserDurableIssuanceStore({ primaryDatabaseName: badPrimary }));
 	await Promise.all([
+		deleteDatabase(nativeControlName),
 		deleteDatabase(`${absentPrimary}${SUFFIX}`),
 		deleteDatabase(primary),
 		deleteDatabase(derived),
@@ -214,6 +223,7 @@ async function primaryOpacitySchemaAdmission(): Promise<unknown> {
 	return {
 		absentPrimaryCreated: namesAfterAbsent.includes(absentPrimary),
 		badError,
+		nativeSchemaControl,
 		primaryObservation,
 		schema,
 	};

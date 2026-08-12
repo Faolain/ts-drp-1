@@ -1,16 +1,23 @@
 export const PHASE_2L_B_SCHEMA = Object.freeze({
 	databaseVersion: 1,
 	stores: Object.freeze([
-		Object.freeze({ autoIncrement: false, keyPath: Object.freeze(["objectId", "author"]), name: "lineages" }),
 		Object.freeze({
 			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "author", "authorSequence"]),
+			name: "issuanceOutbox",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
 			keyPath: Object.freeze(["objectId", "author", "authorSequence"]),
 			name: "issuedRecords",
 		}),
 		Object.freeze({
 			autoIncrement: false,
-			keyPath: Object.freeze(["objectId", "author", "authorSequence"]),
-			name: "issuanceOutbox",
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "author"]),
+			name: "lineages",
 		}),
 	]),
 });

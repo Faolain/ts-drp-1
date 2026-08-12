@@ -33,16 +33,23 @@ describe("Phase 2l-b literal browser issuance authorities", () => {
 		expect(PHASE_2L_B_SCHEMA).toEqual({
 			databaseVersion: 1,
 			stores: [
-				{ autoIncrement: false, keyPath: ["objectId", "author"], name: "lineages" },
 				{
 					autoIncrement: false,
+					indexes: [],
+					keyPath: ["objectId", "author", "authorSequence"],
+					name: "issuanceOutbox",
+				},
+				{
+					autoIncrement: false,
+					indexes: [],
 					keyPath: ["objectId", "author", "authorSequence"],
 					name: "issuedRecords",
 				},
 				{
 					autoIncrement: false,
-					keyPath: ["objectId", "author", "authorSequence"],
-					name: "issuanceOutbox",
+					indexes: [],
+					keyPath: ["objectId", "author"],
+					name: "lineages",
 				},
 			],
 		});

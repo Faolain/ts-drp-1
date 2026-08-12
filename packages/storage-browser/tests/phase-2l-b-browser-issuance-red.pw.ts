@@ -52,6 +52,7 @@ test("derived v1 schema is exact while primary identity remains completely opaqu
 	const value = await runCase(page, "primary-opacity-schema-admission");
 	expect(value.absentPrimaryCreated).toBe(false);
 	expect(value.primaryObservation).toEqual({ stores: ["sentinel"], version: 7 });
+	expect(value.nativeSchemaControl).toEqual(PHASE_2L_B_SCHEMA);
 	expect(value.schema).toEqual(PHASE_2L_B_SCHEMA);
 	expect(value.badError).toMatchObject({ code: "ISSUANCE_UNSUPPORTED_SCHEMA" });
 });
