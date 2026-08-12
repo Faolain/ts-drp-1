@@ -26,6 +26,16 @@ const publicationBoundaryRules = {
 	],
 };
 
+const trackP2aExactSourceFixtures = [
+	"tests/fixtures/track-p2-a/date-controls/blueprint.ts",
+	"tests/fixtures/track-p2-a/forward-counter/blueprint.ts",
+	"tests/fixtures/track-p2-a/literal-controls/blueprint.ts",
+];
+const trackP2aExactArtifactFixtures = [
+	"tests/fixtures/track-p2-a/date-controls/artifact.mjs",
+	"tests/fixtures/track-p2-a/forward-counter/artifact.mjs",
+];
+
 /** @type {import("typescript-eslint").ConfigArray} */
 const config = tsLintConfig(
 	{
@@ -273,6 +283,25 @@ const config = tsLintConfig(
 		rules: {
 			"@typescript-eslint/explicit-function-return-type": "off",
 			"jsdoc/require-jsdoc": "off",
+		},
+	},
+	{
+		files: trackP2aExactSourceFixtures,
+		rules: {
+			"@typescript-eslint/no-unused-vars": "off",
+		},
+	},
+	{
+		files: trackP2aExactArtifactFixtures,
+		rules: {
+			"@typescript-eslint/explicit-function-return-type": "off",
+			"prettier/prettier": "off",
+		},
+	},
+	{
+		files: ["tests/fixtures/track-p2-a/checkjs-bad-shape.js"],
+		rules: {
+			"jsdoc/check-tag-names": "off",
 		},
 	}
 );

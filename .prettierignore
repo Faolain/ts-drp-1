@@ -1,1 +1,5 @@
 packages/storage-browser/tests/opfs-idb-spike/artifacts/*.json
+packages/blueprint-toolchain/contracts/no-ambient-lint-v1.json
+tests/fixtures/track-p2-a/date-controls/artifact.mjs
+tests/fixtures/track-p2-a/forward-counter/artifact.mjs
+tests/fixtures/track-p2-a/no-ambient-lint-v1.json
