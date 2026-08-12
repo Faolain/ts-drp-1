@@ -515,6 +515,7 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 		const outbox = raw.prepare(
 			"INSERT INTO issuance_outbox(object_id,author,author_sequence,digest,publish_state) VALUES(?,?,?,?,?)"
 		);
+		const lineage = raw.prepare("INSERT INTO lineages(object_id,author,next,exhausted) VALUES(?,?,?,?)");
 		raw.exec("BEGIN IMMEDIATE");
 		for (let authorSequence = 0; authorSequence < 65; authorSequence++) {
 			const value = commit(PHASE_2L_C_SCOPE, authorSequence);
@@ -528,6 +529,7 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 			);
 			outbox.run(PHASE_2L_C_SCOPE.objectId, PHASE_2L_C_SCOPE.author, authorSequence, value.envelope.digest, "pending");
 		}
+		lineage.run(PHASE_2L_C_SCOPE.objectId, PHASE_2L_C_SCOPE.author, 65, 0);
 		for (const [scope, seed] of [
 			[{ author: "alice", objectId: "y-foreign" }, 11],
 			[{ author: "alice", objectId: "z-target" }, 12],
@@ -542,6 +544,7 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 				value.envelope.signature
 			);
 			outbox.run(scope.objectId, scope.author, 0, value.envelope.digest, "pending");
+			lineage.run(scope.objectId, scope.author, 1, 0);
 		}
 		raw.exec("COMMIT");
 		raw.close();
