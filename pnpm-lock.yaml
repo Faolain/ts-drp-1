@@ -1039,6 +1039,9 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../canonical
+      '@ts-drp/issuance-store':
+        specifier: 0.11.0
+        version: link:../issuance-store
       '@ts-drp/storage':
         specifier: 0.11.0
         version: link:../storage

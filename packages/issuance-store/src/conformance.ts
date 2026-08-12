@@ -1,19 +1,13 @@
 import {
-	durableIssuanceBytesEqual as bytesEqual,
 	cloneDurableIssueCommit as cloneCommit,
 	copyDurableIssueScope as cloneScope,
 	compareDurableIssuanceCompoundKeys as compareCompoundKey,
 	type DurableIssuanceCompoundKey as CompoundKey,
 	copyAndValidateDurableIssueCommit as copyAndValidateCommit,
-	copyDurableIssuanceBytes as copyBytes,
-	copyDurableIssuedRecord as copyIssuedRecord,
 	createDurableIssuanceFailure as failure,
 	DurableIssuanceInvalidArgumentError as InvalidArgumentFailure,
-	isClosedDurableIssuanceRecord as isRecord,
 	type DurableIssuanceContractError as IssuanceFailure,
-	durablePreimageMatchesScopeAndSequence as preimageMatches,
 	durableIssueScopesEqual as sameScope,
-	DurableIssuanceUnknownOutcomeError as UnknownOutcomeFailure,
 	assertDurableIssueScope as validateScope,
 	isValidDurableAuthorSequence as validOrdinal,
 	isValidDurableScopeField as validScopeField,
@@ -22,14 +16,18 @@ import { DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT, MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMI
 import type {
 	DurableBuildAndSign,
 	DurableIssuanceOutboxRecord,
-	DurableIssuancePublishState,
 	DurableIssuanceStore,
 	DurableIssueCommit,
-	DurableIssuedRecord,
 	DurableIssueScope,
 	DurableLineage,
 	DurableOutboxPageInput,
 } from "./types.js";
+
+export {
+	classifyDurableIssuanceTerminalSuppression as classifyTerminalSuppression,
+	type DurableIssuanceTerminalClassificationInput as TerminalClassificationInput,
+	type DurableIssuanceTerminalObservation as TerminalObservation,
+} from "./terminal.js";
 
 export { DURABLE_ISSUANCE_ERROR_CODES, DURABLE_ISSUANCE_RETRY_CLASSES } from "./types.js";
 
@@ -40,26 +38,6 @@ export const TERMINAL_SUPPRESSION_AMBIGUITY_CASES = Object.freeze(
 		)
 	)
 );
-
-interface NativeOutboxRecord {
-	readonly authorSequence: number;
-	readonly digest: Uint8Array;
-	readonly publishState: DurableIssuancePublishState;
-	readonly scope: DurableIssueScope;
-}
-
-export interface TerminalObservation {
-	readonly issuedRecord: DurableIssuedRecord | null;
-	readonly lineage: DurableLineage;
-	readonly outboxRecord: NativeOutboxRecord | null;
-}
-
-export interface TerminalClassificationInput {
-	readonly candidate: DurableIssueCommit;
-	readonly observation: TerminalObservation | { readonly unreadable: true };
-	readonly priorLineage: DurableLineage;
-	readonly scope: DurableIssueScope;
-}
 
 export interface EphemeralDurableIssuanceStoreOptions {
 	readonly initialLineages?: readonly {
@@ -88,20 +66,6 @@ function cloneLineage(lineage: DurableLineage): DurableLineage {
 
 function isSemanticallyValidLineage(lineage: DurableLineage): boolean {
 	return !lineage.exhausted || lineage.next === Number.MAX_SAFE_INTEGER;
-}
-
-function copyExactLineage(value: unknown, source: "caller" | "durable-observation"): DurableLineage {
-	const exact =
-		isRecord(value, ["exhausted", "next"]) && typeof value.exhausted === "boolean" && validOrdinal(value.next)
-			? { exhausted: value.exhausted, next: value.next }
-			: undefined;
-	if (exact === undefined || !isSemanticallyValidLineage(exact)) {
-		if (source === "caller") {
-			throw new InvalidArgumentFailure("prior lineage must be an exact safe lineage record");
-		}
-		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation contains a malformed lineage");
-	}
-	return exact;
 }
 
 function isClosedOutboxPageInput(value: unknown): value is Record<string, unknown> {
@@ -246,113 +210,6 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		if (this.#poison !== undefined) throw this.#poison;
 		if (this.#closed) throw failure("ISSUANCE_STORE_CLOSED", "durable issuance store is closed");
 	}
-}
-
-function consumed(lineage: DurableLineage, ordinal: number): boolean {
-	return lineage.next > ordinal || (lineage.exhausted && lineage.next === ordinal);
-}
-
-function recordMatches(record: DurableIssuedRecord, expected: DurableIssuedRecord, requireEnvelope: boolean): boolean {
-	return (
-		record.authorSequence === expected.authorSequence &&
-		sameScope(record.scope, expected.scope) &&
-		(!requireEnvelope ||
-			(bytesEqual(record.envelope.canonicalPreimageBytes, expected.envelope.canonicalPreimageBytes) &&
-				bytesEqual(record.envelope.digest, expected.envelope.digest) &&
-				bytesEqual(record.envelope.signature, expected.envelope.signature)))
-	);
-}
-
-function copyNativeOutboxRecord(value: unknown): NativeOutboxRecord | undefined {
-	if (
-		!isRecord(value, ["authorSequence", "digest", "publishState", "scope"]) ||
-		!validOrdinal(value.authorSequence) ||
-		(value.publishState !== "pending" && value.publishState !== "published")
-	) {
-		return undefined;
-	}
-	const digest = copyBytes(value.digest);
-	try {
-		validateScope(value.scope);
-	} catch {
-		return undefined;
-	}
-	if (digest === undefined) return undefined;
-	return {
-		authorSequence: value.authorSequence,
-		digest,
-		publishState: value.publishState,
-		scope: cloneScope(value.scope),
-	};
-}
-
-function outboxMatchesIssued(outbox: NativeOutboxRecord, issued: DurableIssuedRecord): boolean {
-	return (
-		outbox.authorSequence === issued.authorSequence &&
-		sameScope(outbox.scope, issued.scope) &&
-		bytesEqual(outbox.digest, issued.envelope.digest) &&
-		(outbox.publishState === "pending" || outbox.publishState === "published")
-	);
-}
-
-/**
- * Classifies one bounded terminal-suppression readback without persisting an attempt token.
- * @param input - Private candidate, prior lineage and one consistent durable observation.
- * @returns The detached durable candidate when the observation proves it committed.
- */
-export function classifyTerminalSuppression(input: TerminalClassificationInput): DurableIssueCommit {
-	validateScope(input.scope);
-	const scope = cloneScope(input.scope);
-	const priorLineage = copyExactLineage(input.priorLineage, "caller");
-	if (priorLineage.exhausted) {
-		throw new InvalidArgumentFailure("prior lineage must remain selectable during terminal classification");
-	}
-	let candidate: DurableIssueCommit;
-	try {
-		candidate = copyAndValidateCommit(input.candidate, scope, priorLineage.next);
-	} catch {
-		throw new InvalidArgumentFailure("candidate must close the exact prior-lineage ordinal");
-	}
-	if ("unreadable" in input.observation) throw new UnknownOutcomeFailure(scope);
-	const { issuedRecord, lineage, outboxRecord } = input.observation;
-	const observedLineage = copyExactLineage(lineage, "durable-observation");
-	const isConsumed = consumed(observedLineage, candidate.authorSequence);
-	const observedIssued = issuedRecord === null ? null : copyIssuedRecord(issuedRecord);
-	const observedOutbox = outboxRecord === null ? null : copyNativeOutboxRecord(outboxRecord);
-	if (
-		(issuedRecord !== null && observedIssued === undefined) ||
-		(outboxRecord !== null && observedOutbox === undefined)
-	) {
-		throw failure("ISSUANCE_RECOVERY_CORRUPT", "terminal readback contains a malformed durable row");
-	}
-
-	if (
-		observedIssued !== null &&
-		observedIssued !== undefined &&
-		observedOutbox !== null &&
-		observedOutbox !== undefined &&
-		isConsumed &&
-		recordMatches(observedIssued, candidate.issuedRecord, true) &&
-		outboxMatchesIssued(observedOutbox, observedIssued)
-	) {
-		return cloneCommit(candidate);
-	}
-	if (issuedRecord === null && outboxRecord === null && sameLineage(observedLineage, priorLineage)) {
-		throw failure("ISSUANCE_SUBSTRATE_FAILURE", "commit was definitively not applied", "transient");
-	}
-	if (
-		observedIssued !== null &&
-		observedIssued !== undefined &&
-		observedOutbox !== null &&
-		observedOutbox !== undefined &&
-		isConsumed &&
-		recordMatches(observedIssued, candidate.issuedRecord, false) &&
-		preimageMatches(observedIssued.envelope.canonicalPreimageBytes, scope, candidate.authorSequence) &&
-		outboxMatchesIssued(observedOutbox, observedIssued)
-	) {
-		throw failure("ISSUANCE_RETRY_REQUIRED", "another candidate committed the selected ordinal");
-	}
-	throw failure("ISSUANCE_RECOVERY_CORRUPT", "terminal readback does not form one durable closure");
 }
 
 /**
