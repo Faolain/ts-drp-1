@@ -5389,6 +5389,200 @@ the bounded full-join cost. The browser's internal test control remains
 compiled but unreachable from every package export and is explicit hygiene/
 ownership debt, never a consumer seam.
 
+#### Phase 2l-c Node factory, SQLite admission and lifecycle amendment
+
+The first 2l-c tests-only RED correctly stopped before editing. The shared
+contract fixed the Node subpath, derived filename, DDL/pragmas, transaction
+algorithm and evidence matrices, but deliberately left the factory spelling,
+input grammar, synchronous failure channel, primary-file authority and exact
+open/lifecycle rules to this checkpoint. The RED also retracted an obsolete
+controller premise: `buildAndSign` never runs under `BEGIN IMMEDIATE`; it runs
+exactly once outside every transaction and lock, followed by one short CAS
+writer. Codex-high, exact Kimi 3/high/100 and Opus 5/xhigh unanimously ratified
+the following Node-only contract.
+
+##### Exact public surface and options
+
+`@ts-drp/storage-node/issuance` exports exactly these two names:
+
+```ts
+import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+
+export interface NodeDurableIssuanceStoreOptions {
+	readonly primaryFilename: string;
+}
+
+export function createNodeDurableIssuanceStore(options: NodeDurableIssuanceStoreOptions): DurableIssuanceStore;
+```
+
+The factory is synchronous because validation, `node:sqlite` open and schema
+admission are synchronous. Factory misuse/open/admission failures throw the
+shared closed errors synchronously; every method on the returned five-member
+`DurableIssuanceStore` remains Promise-based. The returned frozen plain object
+has exactly `transactIssue`, `readIssued`, `readOutboxPage`, `readLineage` and
+`close` as enumerable own string keys and exposes no handle, filename, schema,
+reset, fault, concrete subtype or symbol. The package root stays byte-identical
+and gains no issuance symbol. Enabling changes are exactly the `"./issuance"`
+types/import export and runtime `@ts-drp/issuance-store` dependency; no direct
+canonical/protocol/third-party SQLite dependency is added.
+
+Runtime options use the same one-pass closed-record grammar as the browser,
+with only the key renamed. Capture the prototype once and require
+`Object.prototype` or `null`; capture `Reflect.ownKeys` once and require exactly
+`["primaryFilename"]`; capture that own descriptor once and require an
+enumerable data descriptor; use its captured primitive string value exactly
+once. Empty strings, arrays/functions/boxed/class/custom-prototype inputs,
+aliases, inherited/accessor/non-enumerable properties and every extra string,
+symbol or hidden own key throw `ISSUANCE_INVALID_ARGUMENT` before substrate
+contact. Proxy traps may observe or throw during this bounded inspection; a
+throw maps to the same invalid argument. No ordinary property `[[Get]]`,
+getter, coercion or second read occurs.
+
+`primaryFilename` is otherwise opaque and verbatim: whitespace is valid; no
+trim, Unicode/case normalization, resolution, realpath, encoding, hashing,
+extension or length policy is applied. U+0000 is the sole character-level
+rejection because it cannot be represented injectively through the native path
+API; it throws `ISSUANCE_INVALID_ARGUMENT` before open. The derived path is
+exactly `${primaryFilename}.drp-issuance-v1.sqlite`. Production imports no
+`node:fs`/`node:path`, never stats/opens/creates/reads/locks/deletes or infers
+the primary file or its sidecars, and never creates a parent directory. An
+absent primary, sentinel bytes, directory or AHE primary has no effect and
+remains untouched. The derived file and WAL/SHM sidecars are never deleted or
+repaired.
+
+##### One exact SQLite-v1 authority
+
+The three DDL statements already frozen above are module-private creation
+constants and the sole production schema oracle. Their executable strings have
+no leading/trailing whitespace, `IF NOT EXISTS` or trailing semicolon and end
+with `WITHOUT ROWID`. SQLite must store each constant byte-for-byte as its
+`sqlite_schema.sql`; runtime admission performs no whitespace/case normalizer
+and builds no second structural schema interpreter. It requires exactly the
+three table rows and no extra table/index/trigger/view. The exact bytes prove
+column spelling/order/affinity, `NOT NULL`, PK order, checks, no declared
+foreign keys and the `WITHOUT ROWID` choice. Independent `table_xinfo`,
+`foreign_key_list` and inherent-PK-index probes remain test-only oracles.
+
+Open the derived location with one `DatabaseSync` and the four explicit
+booleans `allowExtension:false`, `enableDoubleQuotedStringLiterals:false`,
+`enableForeignKeyConstraints:false`, `readOnly:false`; `open` uses its pinned
+default. Extensions are never enabled and no `PRAGMA foreign_keys` policy is
+introduced. Every result-bearing prepared `StatementSync` is configured once
+with `setReadBigInts(false)` before execution so safe SQL integers remain exact
+JS numbers.
+
+Admission order is:
+
+1. set/read back connection-local `busy_timeout=1000` and
+   `synchronous=FULL` (`2`);
+2. read `sqlite_schema`, `user_version`, `page_size` and `journal_mode`;
+3. classify as fresh only when the catalog has zero objects and
+   `user_version=0`;
+4. on fresh state, set/read `page_size=4096` before pages/WAL, require setting
+   `journal_mode=WAL` returns `wal`, then in one `BEGIN IMMEDIATE` execute the
+   three DDL constants separately in frozen order, set `user_version=1`, verify
+   their transactional catalog view and `COMMIT`;
+5. on existing state, perform no persistent write and require version 1,
+   page size 4096, WAL and the exact catalog; and
+6. on both paths, uniformly re-read all five pragmas and the exact catalog
+   before constructing the capability.
+
+DDL and `user_version` are transactional. A death/error before their commit
+recovers with empty catalog/version zero and may retry as fresh; page size/WAL
+already established are compatible fresh configuration. A partial/foreign/
+AHE-shaped catalog, an empty catalog with nonzero version, or any persistent
+pragma/catalog deviation is `ISSUANCE_UNSUPPORTED_SCHEMA`, never migrated,
+vacuumed, repaired or deleted. A bounded admission-kill control owns this
+pre-capability case and does not enlarge the 18 issuance-death tuples.
+
+Factory option misuse is `ISSUANCE_INVALID_ARGUMENT`; native path/open/access
+refusal is permanent `ISSUANCE_SUBSTRATE_FAILURE`; BUSY/LOCKED is transient;
+FULL/NOMEM/resource exhaustion is resource-exhausted; an existing readable
+wrong authority is `ISSUANCE_UNSUPPORTED_SCHEMA`; inability to establish the
+fresh WAL/FULL/page/version configuration without a more specific substrate
+failure is `ISSUANCE_DURABILITY_UNAVAILABLE`. Every post-open failure performs
+best-effort rollback when applicable, closes the connection, masks no original
+error and exposes no partial capability. Only full `ISSUANCE_*` codes and the
+shared error classes are normative.
+
+##### One connection, exact transaction and readback
+
+Each capability owns exactly one `DatabaseSync`, never reopens or pools, and
+uses no worker/mutex/queue/lease/reservation/election. `close()` marks closed,
+closes the connection once, never rejects and returns the identical memoized
+Promise on every call. JavaScript cannot interleave close into the synchronous
+writer section. Close during a suspended builder resolves promptly without
+waiting/cancelling it; a later closure failure preserves identity, malformed
+candidate remains commit-invalid, and a valid candidate sees store-closed
+before `BEGIN`. Sticky recovery corruption outranks closed.
+
+For each `transactIssue`, read/copy the prior and reject exhausted before the
+builder; invoke and await `buildAndSign` exactly once with no transaction or
+lock; copy/validate the candidate; then run one synchronous no-await writer:
+
+1. `BEGIN IMMEDIATE` once, with no busy retry;
+2. reread exact prior inside the transaction;
+3. require absent/present identity, non-exhaustion and candidate ordinal equal
+   the selected `next`, otherwise rollback `ISSUANCE_RETRY_REQUIRED`;
+4. absent lineage uses plain `INSERT`; existing uses an exact-prior guarded
+   `UPDATE` requiring one change; then plain issued and pending-outbox
+   `INSERT`s in fixed order;
+5. child-key collision or impossible matched-CAS write count rolls back and
+   latches shared recovery corruption; and
+6. `COMMIT`, followed by consistent durable readback before success.
+
+SQLite's brief file-wide writer serialization is stated honestly. A suspended
+scope-A builder holds no lock and cannot block scope B, but simultaneous short
+writer sections across scopes/processes may serialize. BUSY expiry is transient
+substrate failure, never forged retry-required; no rebuild/backoff/second
+`BEGIN` is allowed.
+
+Ordinary post-commit and ambiguous acknowledgement readback use one bounded
+same-connection readonly `BEGIN`, exact lineage/issued/outbox point reads, and
+`COMMIT`, after the mutation transaction has ended. After a mutation `COMMIT`
+throw, make one best-effort rollback before this snapshot. Snapshot acquisition
+failure is non-sticky tokenless `ISSUANCE_OUTCOME_UNKNOWN`; the existing shared
+classifier owns all other cases. The trace distinguishes readonly
+`BEGIN`/`COMMIT` from the named mutation statements.
+
+Paging never trusts SQLite `BINARY` order. It scans the bounded candidate
+keyspace and uses the shared JavaScript UTF-16 compound-key comparator before
+scope/afterKey/limit. The RED pins the U+10000 versus U+E000 inversion case;
+no collation, UDF or schema index is added.
+
+The 18 genuine SIGKILL tuples and five Node ambiguity outcomes remain exactly
+ratified. Each named statement boundary is one native call and is observed by
+a private test-owned preload, never production instrumentation. At least one
+death reopens a nonempty WAL without deleting sidecars; declared/observed trace
+order, old-XOR-exact-new recovery and process custody are mandatory.
+
+Quorum evidence:
+
+- Codex-high proposal result/manifest SHA-256
+  `e19dbc0f1c858bc3082a33e9a916e0152d2e533225660004be74c0a9cf93c819` /
+  `b8c6aadc3de1d3e89a6d2e5caec5d0fd029a89a2467e7a33c19fbdf437bb83c8`;
+- exact Kimi 3/high/100 proposal result/manifest SHA-256
+  `3c3e231052c623e1e5c030258a28d333e5a963a7742570a3b16bffaffabc4ee2` /
+  `e1a27aeabc180f2b9ec25ffd8a87e7f38e5fe204bba60a0cfbaeeb99c4c800f3`;
+- Opus 5/xhigh proposal result/manifest SHA-256
+  `d21412629f2718aab06cfbc2dd91dbf1bce183c31e515500af4a72123d386bc4` /
+  `ecefe350788a9e942f4293f83bb546a8559e4cb610b9d777e662b70f85579812`;
+- Codex-high reconciliation result/manifest SHA-256
+  `e99b94225ec49d895c09cb98495ec64110d89d414b2ed67200c8050787f3b8fd` /
+  `313183ba7afcac7824fce8e61ffcea1fd2327acad75a64ad0a3eea6eaab3f9c8`;
+- exact Kimi 3/high/100 reconciliation result/manifest SHA-256
+  `57ad6c1ad9639ad83618ed12fe01df98e33c5d6071a2307364cb899f9fbc4589` /
+  `0aec2e15694513158458414e304f18ee8d04fbc10860fa306d356ebec47209c5`;
+- Opus 5/xhigh final reconciliation result/manifest SHA-256
+  `411b269b2f14c0b830fc7cc7c7a9f0c74ae1978d7752c13d5c6b954c90941ae8` /
+  `6666126199f1bfb13e58794a903c98dfdf0e29b81ffa18aa22c834029b6bfe21`;
+- final Codex-high assent result/manifest SHA-256
+  `d176b9f93a21f25b2f673a434866b2d1bb769bb8b727e717237b664baa6c76a0` /
+  `081a21e2ce27e0ba1b37a16e2594cd8ab08df9fe85235daf6dc89a4baf877867`;
+- final exact Kimi 3/high/100 assent result/manifest SHA-256
+  `3c0308b34f114394f0e02f6c1b53347860576cb471eee322c1555993a87f47e1` /
+  `d593235ba9ebcf59e89a5c09fb38beb39cb297a45ce4c699322db36efd24a739`.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
