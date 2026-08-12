@@ -5093,6 +5093,164 @@ drift guard and the real-adapter harness/package wiring. Actual IndexedDB and
 SQLite durability, schema, kill and collision-latching evidence remains owned
 by 2l-b and 2l-c, not retroactively claimed by this closure.
 
+#### Phase 2l-b browser factory, closed options and lifecycle amendment
+
+The first 2l-b tests-only RED correctly stopped before editing. The ratified
+correction fixed the browser subpath, derived identity, schema, durability rule
+and returned shared contract, but named no callable factory or input shape. A
+RED choosing those public spellings would have invented API. Codex-high, exact
+Kimi 3/high/100 and Opus 5/xhigh unanimously ratified the following bounded
+browser-only correction; it establishes no Node spelling.
+
+##### Exact public surface and packaging
+
+`@ts-drp/storage-browser/issuance` exports exactly these two symbols and no
+others:
+
+```ts
+import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+
+export interface BrowserDurableIssuanceStoreOptions {
+	readonly primaryDatabaseName: string;
+}
+
+export function createBrowserDurableIssuanceStore(
+	options: BrowserDurableIssuanceStoreOptions
+): Promise<DurableIssuanceStore>;
+```
+
+The return type is the exact shared `DurableIssuanceStore`, not a browser
+subtype or intersection. The subpath re-exports no shared type, error, code,
+schema/name constant, concrete class or conformance helper. The package root
+remains byte-identical and exposes no issuance symbol. The enabling package
+changes are only the `"./issuance"` types/import export and a runtime
+`@ts-drp/issuance-store` dependency; the existing `"."` export stays
+unchanged. Internal placement below the subpath is free.
+
+The resolved capability has exactly the five enumerable own shared-contract
+members `transactIssue`, `readIssued`, `readOutboxPage`, `readLineage` and
+`close`. Neither it nor its prototype chain exposes a connection, database
+name/factory, schema/native handle, reset/delete/reopen/fault seam or browser
+subtype.
+
+##### Closed options and opaque identity
+
+Runtime input is one exact closed record: a non-null, non-array object whose
+prototype is `Object.prototype` or `null`, whose `Reflect.ownKeys` is exactly
+the string key `primaryDatabaseName`, and whose descriptor is an own,
+enumerable data descriptor. `writable` and `configurable` do not matter, so a
+frozen object literal is valid. Bare positional strings, missing/null/array/
+function/boxed/class inputs, `databaseName` or other aliases, extra string or
+symbol keys, inherited-only keys, accessors, non-enumerable keys, and non-string
+or empty values reject `ISSUANCE_INVALID_ARGUMENT`.
+
+Validation captures the prototype, own-key list and property descriptor once
+and applies the shared closed-record grammar directly to those captured
+values. Proxy traps may observe that bounded inspection or throw; a thrown
+inspection becomes the same invalid-argument Promise rejection. Validation
+performs no ordinary property `[[Get]]`, invokes no getter or coercion hook,
+and never re-reads the accepted descriptor or identity. It therefore does not
+call or modify the existing boolean closed-record helper, which intentionally
+does not return captured descriptors. All validation finishes before any
+IndexedDB call.
+
+`primaryDatabaseName` is an opaque primitive string whose `length >= 1`.
+Whitespace-only strings are valid. The implementation must not trim, pad,
+case-fold, Unicode-normalize, encode, hash or truncate it: such transforms
+would weaken the ratified injectivity. There is no 1024-unit database-name
+bound; that existing bound applies to issuance scope fields only. The derived
+name is exactly `${primaryDatabaseName}--drp-issuance-v1`, used verbatim.
+There is no positional/plain/legacy/default/alias identity, fallback or
+migration path, and the factory never opens, probes, upgrades or deletes the
+primary database.
+
+The factory returns a Promise for every runtime call shape and never throws
+synchronously. Public misuse rejects with the shared
+`DurableIssuanceInvalidArgumentError`; every other failure rejects through the
+existing closed shared taxonomy. No browser-only error is introduced.
+
+##### Resolution and strict-durability gate
+
+After validation the factory performs, in order:
+
+1. `indexedDB.open(derivedName, 1)` on realm-owned `globalThis.indexedDB`.
+   Upgrade is permitted only from `oldVersion === 0` with no pre-existing
+   store, and creates exactly the three ratified stores with their native
+   compound key paths, `autoIncrement:false` and zero indexes.
+2. On success, verify version 1 and the exact three-store set.
+3. Install the owned `versionchange` handler before any transaction.
+4. Create one no-op readwrite transaction over all three stores with
+   `{durability:"strict"}`; synchronously require
+   `transaction.durability === "strict"`, verify every store's key path,
+   `autoIncrement` and empty index set from that transaction, issue zero
+   requests, and await `complete`.
+5. Only after that completion resolve the five-member capability.
+
+The admission transaction is not retained. Missing or downgraded strict
+durability is `ISSUANCE_DURABILITY_UNAVAILABLE`. Version/store/key-path/
+auto-increment/index/AHE-shaped mismatch and open `VersionError` or upgrade
+`AbortError` are `ISSUANCE_UNSUPPORTED_SCHEMA`. A blocked open or another
+failure to create/complete admission is transient
+`ISSUANCE_SUBSTRATE_FAILURE`, except quota is resource-exhausted. Every failed
+path aborts any live transaction, closes any opened connection, removes its
+listeners and exposes no capability, handle or diagnostic object.
+
+##### One connection and close semantics
+
+A resolved capability owns one connection to the derived issuance database
+for its lifetime, never opens a second, never reopens after close and never
+touches another database. `close()` is non-rejecting and idempotent: every call
+returns the identical Promise. It promptly prevents new transactions, closes
+the connection, and resolves after the capability's own substrate
+transactions settle. It does not abort a writer already begun and never waits
+for an application callback.
+
+If close occurs while `transactIssue` is suspended in external
+`buildAndSign`, close neither invokes, cancels, races nor awaits the builder and
+resolves without it. A later closure throw/rejection propagates unchanged. A
+resolved candidate is structurally validated first; malformed bytes reject
+`ISSUANCE_COMMIT_INVALID`; a valid candidate then rejects
+`ISSUANCE_STORE_CLOSED` before any writer transaction. No candidate from that
+call is persisted, returned, logged or attached to an error. After close, all
+operations except `close` reject store-closed with the shared precedence;
+latched recovery corruption still outranks closed. Runtime `versionchange`
+invalidates the capability with the same semantics. No lock, lease, election,
+reservation or process-local mutex is held across signing.
+
+No production parameter, property, symbol, global/environment value or module
+side channel injects an `IDBFactory`, database identity/suffix, schema/version,
+native handle, reset/delete/clear operation, fault hook or instrumentation.
+Tests use real realm-owned IndexedDB plus private fixtures/process controls.
+The already-ratified private torn-state seam remains unreachable from every
+production export.
+
+The equivalent Node factory spelling is deliberately deferred to the separate
+2l-c correction: the existing Node AHE precedent is synchronous, so browser
+analogy cannot choose its issuance lifecycle honestly.
+
+Quorum evidence:
+
+- Codex-high initial result SHA-256
+  `45473c0365caef5ee33ce41ad3657a653b3e40122120a3dcda32ac6f8173440d`,
+  manifest SHA-256
+  `b998d4033df70fa02c29fc892cb13613da035d2404e12039b74c0feccf59a0c5`;
+- exact Kimi 3/high/100 initial result SHA-256
+  `ec7601f3354b741aa2205cd163e780ea5edae30729f2035d24ca21b75ab4c76c`,
+  manifest SHA-256
+  `4f21fca1be623f0de539406ef34c2ef090e877eda15625c6ca0a0d9e3903019e`;
+- Opus 5/xhigh result SHA-256
+  `153089abcce52e97722d54b54985c88260e9fafc42e083e983ad92c6371dc97c`,
+  manifest SHA-256
+  `a8ddfd32c0a5f8af3c62d61cbcfda6a5e8c163250819d6f4dac2cbfa56c95db5`;
+- Codex-high descriptor reconciliation SHA-256
+  `bd6507588011d7e90b828c105f86172d5f8be1d4d3c4e3e4a6f9f82d3bb3600d`,
+  manifest SHA-256
+  `84e2a3bb395220dda952e99a573d749961e28c03c32918aeb1c1c60a1e18e9aa`;
+- exact Kimi 3/high/100 final reconciliation SHA-256
+  `fcc521b92ae3450a3750b1c8ab001f02261b9f6326751bb346cacdf2750b3428`,
+  manifest SHA-256
+  `518570184edfbcec6d79a7264820174ba77f796325c44455d5d2b8beb1170235`.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
