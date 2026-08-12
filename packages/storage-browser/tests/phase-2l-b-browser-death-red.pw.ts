@@ -6,8 +6,17 @@ import path from "node:path";
 import readline from "node:readline";
 
 import { type AssetServer, startAssetServer } from "./fixtures/asset-server.js";
+import { executePinnedCampaignSignalSequence } from "./fixtures/phase-2e6-process-death-runner.js";
 import { type Phase2lBDeathTuple, PHASE_2L_B_DEATH_TUPLES } from "./fixtures/phase-2l-b-browser-issuance-contract.js";
-import { captureProcessForest, processClosure, type ProcessIdentity } from "./fixtures/process-forest.js";
+import {
+	captureProcessForest,
+	childGroupStoppedForFreeze,
+	freezeCurrentOwnedUnion,
+	processClosure,
+	type ProcessIdentity,
+	type StagedFreezeAuthority,
+	validateTwoGroupForest,
+} from "./fixtures/process-forest.js";
 
 const EXECUTABLE = chromium.executablePath();
 let server: AssetServer;
@@ -37,6 +46,25 @@ async function pollAbsent(frozen: readonly ProcessIdentity[]): Promise<void> {
 	}
 }
 
+async function pollForest(
+	predicate: (forest: readonly ProcessIdentity[]) => boolean,
+	detail: string
+): Promise<readonly ProcessIdentity[]> {
+	const deadline = Date.now() + 10_000;
+	for (;;) {
+		const forest = captureProcessForest();
+		if (predicate(forest)) return forest;
+		if (Date.now() >= deadline) throw new TypeError(`FOREST_CONTRADICTION: ${detail}`);
+		await sleep(20);
+	}
+}
+
+function campaignPlatform(): StagedFreezeAuthority["platform"] {
+	if (process.platform !== "darwin" && process.platform !== "linux")
+		throw new TypeError(`unsupported Phase 2l-b death platform ${process.platform}`);
+	return process.platform;
+}
+
 async function inFreshContext<T>(profile: string, run: (page: Page) => Promise<T>): Promise<T> {
 	const url = server.issueTransitionURL("phase-2l-b-death.html");
 	const token = required(new URL(url).pathname.split("/")[2], "transition token");
@@ -44,7 +72,7 @@ async function inFreshContext<T>(profile: string, run: (page: Page) => Promise<T
 	try {
 		const page = context.pages()[0] ?? (await context.newPage());
 		await page.goto(url, { waitUntil: "load" });
-		await page.waitForFunction(() => typeof window.phase2e6Recover === "function");
+		await page.waitForFunction(() => typeof window.phase2lBRecover === "function");
 		return await run(page);
 	} finally {
 		await context.close();
@@ -107,9 +135,9 @@ async function runTuple(edge: Phase2lBDeathTuple, ordinal: number): Promise<unkn
 		}
 		const childIdentity = required(ready?.child as ProcessIdentity | undefined, "child identity");
 		const browserRoot = required(ready?.browserRoot as ProcessIdentity | undefined, "browser identity");
-		const initial = captureProcessForest();
+		const all = captureProcessForest();
 		const controller = required(
-			initial.find(({ pid }) => pid === process.pid),
+			all.find(({ pid }) => pid === process.pid),
 			"controller identity"
 		);
 		if (childIdentity.pid !== child.pid || childIdentity.pgid !== child.pid)
@@ -118,11 +146,34 @@ async function runTuple(edge: Phase2lBDeathTuple, ordinal: number): Promise<unkn
 			throw new TypeError("browser root did not lead the second owned group");
 		if (controller.pgid === childIdentity.pgid || controller.pgid === browserRoot.pgid)
 			throw new TypeError("controller overlaps a death-owned process group");
-		const frozen = [...processClosure(initial, childIdentity.pid), ...processClosure(initial, browserRoot.pid)].filter(
-			({ pid }, index, rows) => pid !== process.pid && rows.findIndex((row) => row.pid === pid) === index
-		);
-		process.kill(-childIdentity.pgid, "SIGKILL");
-		process.kill(-browserRoot.pgid, "SIGKILL");
+		const initial = processClosure(all, childIdentity.pid);
+		const authority: StagedFreezeAuthority = {
+			browserRoot,
+			childRoot: childIdentity,
+			contentProcessClass: "chromium-renderer",
+			controllerPgid: controller.pgid,
+			executablePath: EXECUTABLE,
+			initialForest: initial,
+			platform: campaignPlatform(),
+			profilePath: profile,
+			scope: "phase2e6",
+		};
+		const groups = validateTwoGroupForest(initial, childIdentity.pid, browserRoot.pid, authority);
+		const frozen = await executePinnedCampaignSignalSequence({
+			afterSignal: async (stage) => {
+				if (stage === "child-stop") {
+					await pollForest((forest) => childGroupStoppedForFreeze(forest, authority), "child group did not stop");
+				} else {
+					await pollForest(
+						(forest) => freezeCurrentOwnedUnion(forest, authority) !== undefined,
+						"owned union did not freeze"
+					);
+				}
+			},
+			authority,
+			captureForest: captureProcessForest,
+			signal: (target, signal) => process.kill(target, signal),
+		});
 		const childExit = await exit;
 		expect(childExit.signal).toBe("SIGKILL");
 		await pollAbsent(frozen);
@@ -132,7 +183,15 @@ async function runTuple(edge: Phase2lBDeathTuple, ordinal: number): Promise<unkn
 				scenarioId: edge.id,
 			})
 		);
-		return { armCount, armed, candidateAvailable: true, childExit, frozenCount: frozen.length, recovery };
+		return {
+			armCount,
+			armed,
+			candidateAvailable: true,
+			childExit,
+			frozenCount: frozen.length,
+			killedGroups: [groups.browserPgid, groups.childPgid],
+			recovery,
+		};
 	} finally {
 		server.revoke(token);
 		try {
