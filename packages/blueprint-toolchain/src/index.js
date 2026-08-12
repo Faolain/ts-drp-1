@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, jsdoc/check-tag-names, jsdoc/no-types, jsdoc/require-param, jsdoc/require-param-description, jsdoc/require-returns, jsdoc/valid-types -- native JavaScript is the directly executable CLI source */
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
 import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
 import { transformSync } from "esbuild";
 import { createHash } from "node:crypto";
@@ -472,7 +473,7 @@ function parseAuthoring(authoringBytes, text) {
 		schemaVersion: 1,
 		seed,
 	});
-	return { artifactId, authoringBytes, operations };
+	return { artifactId, authoringBytes, operationDiscriminator: discriminator, operations };
 }
 
 /** @param {string} value */
@@ -509,6 +510,47 @@ async function emitArtifact(source, authoring) {
 		throw new TypeError("artifact must have no imports and the sole blueprint export");
 	}
 	return artifact;
+}
+
+/** @param {Uint8Array} artifact @param {{artifactId:string, operationDiscriminator:string, operations:readonly {name:string,fields:readonly {name:string,required:boolean,type:string}[]}[]}} authoring */
+async function preparePackageBinding(artifact, authoring) {
+	const canonicalBlueprintPackageBytes = encodeCanonical({
+		implementation: {
+			artifactDigest: domainHex("ts-drp/blueprint-artifact/v3", artifact),
+			artifactId: authoring.artifactId,
+			runtimeProfile: "ecmascript-2024-sync-v1",
+		},
+		kind: "drp-blueprint-admission-package",
+		manifest: {
+			operationDiscriminator: authoring.operationDiscriminator,
+			operations: authoring.operations.map((operation) => ({
+				argumentSchema: {
+					fields: operation.fields.map((field) => ({
+						name: field.name,
+						required: field.required,
+						type: field.type,
+					})),
+					kind: "closed-record",
+				},
+				name: operation.name,
+			})),
+			schemaVersion: 1,
+		},
+		protocolMajor: 3,
+		schemaVersion: 1,
+	});
+	const expectedBlueprintDigest = domainHex("ts-drp/blueprint-admission/v3", canonicalBlueprintPackageBytes);
+	const preparedBlueprintAdmission = prepareBlueprintAdmission({
+		canonicalBlueprintPackageBytes,
+		expectedBlueprintDigest,
+	});
+	await prepareBlueprintRuntime({
+		canonicalBlueprintPackageBytes,
+		exactArtifactBytes: artifact,
+		expectedBlueprintDigest,
+		preparedBlueprintAdmission,
+	});
+	return canonicalBlueprintPackageBytes;
 }
 
 function repositoryRoot() {
@@ -655,7 +697,7 @@ export async function buildBlueprint(authoringDirectory, outputDirectory) {
 	}
 	const artifact = await emitArtifact(sourceText, authoring);
 	const lintEvidence = await createLintEvidence(sourceBytes, authoringBytes, artifact);
-	const packagePlaceholder = encodeCanonical({ kind: "track-p2-b-package-placeholder", schemaVersion: 1 });
+	const packageBytes = await preparePackageBinding(artifact, authoring);
 	const receiptPlaceholder = encodeCanonical({ kind: "track-p2-c-receipt-placeholder", schemaVersion: 1 });
 
 	const output = path.resolve(outputDirectory);
@@ -671,7 +713,7 @@ export async function buildBlueprint(authoringDirectory, outputDirectory) {
 	try {
 		writeAtomicFile(path.join(stage, "artifact.mjs"), artifact);
 		writeAtomicFile(path.join(stage, "lint.bin"), lintEvidence);
-		writeAtomicFile(path.join(stage, "package.bin"), packagePlaceholder);
+		writeAtomicFile(path.join(stage, "package.bin"), packageBytes);
 		writeAtomicFile(path.join(stage, "receipt.bin"), receiptPlaceholder);
 		fs.renameSync(stage, output);
 	} catch (error) {
