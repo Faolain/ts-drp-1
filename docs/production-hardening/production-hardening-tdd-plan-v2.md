@@ -5039,6 +5039,60 @@ validation and unknown paging keys—for a normal corrective RED:
   manifest SHA-256
   `dac42485b774c9cc5fa832bdf026136a05dcf205071e41bd7fec3ce9da7edc8b`.
 
+#### Phase 2l-a shared-contract closure
+
+Phase 2l-a is complete at signed, pushed candidate `ad95bfd0616a6b09867a32218744c0a3995aa280`
+(tree `2f069e0ff70639c4ef31e5a0988af68f19d1ecd6`). The bounded TDD lineage is:
+
+- initial tests-only RED `9de42aaa026dec938565a5de61fbc0eb8dfc8ad6`
+  and package GREEN `0ed9bb406a573f0011aaf573440fb334239c1923`;
+- observable-equality wording correction `f0daa977db41c1591fc296eac18149df6d0f7f62`;
+- malformed-lineage/closed-page-options RED `eee769033d07ba91f67c404f5b8410683664f32c`
+  and GREEN `44e611436386c55e496f63fd15259649a4dfa0f9`;
+- semantic-exhaustion/null-limit RED `9f3220c586fbb0f248b7441e14ef6cbe473b5b84`
+  and GREEN `4a744ce40549965ac1f5c676e9d2301cda892a59`;
+- selected-snapshot/sticky-poison RED `0debc746b6e0c897facae5c8fce827116e7093a8`
+  and final GREEN `ad95bfd0616a6b09867a32218744c0a3995aa280`.
+
+The revisions closed seven finite findings without widening the public API or
+building a source analyzer: B1 was the proven-unobservable allocation-origin
+wording above; B2/B3 close durable lineage before classification and reject
+unknown paging keys; B4 rejects the impossible coupling `exhausted === true`
+below `MAX_SAFE_INTEGER`; B5 distinguishes an omitted limit from present
+`null`; B6 binds a terminal candidate to the exact non-exhausted prior
+snapshot before even an unreadable-outcome branch; and B7 makes the latched
+recovery-corruption discriminator runtime-immutable while preserving the
+frozen same-error identity. The final behavioral corpus is `45/45`; frozen
+Phase 0g(ii-I)/0g(ii-S) preservation is `20/20`; package typecheck, build,
+test-only compile, owned lint and formatting are green. Broad root typecheck
+and lint still report only the recorded inherited Phase 1i-b and workspace
+debt; they are not reclassified as Phase 2l-a success.
+
+Fresh final acceptance on the exact candidate was unanimous:
+
+- Grok 4.5/high result SHA-256
+  `5732285173b80e7672435e61f95ea37e29e7246461b511b3399941fd50e99892`,
+  manifest SHA-256
+  `2ecf5bc193482b664c3dfd20c7340ac770be692e7810547d2d602ff931a7b91b`;
+- exact Kimi 3/high/100 result SHA-256
+  `234329668b6942cfe765261e6c27145e671d6443d7836ab74997c82c25b52344`,
+  manifest SHA-256
+  `2b7971ab2ccbecfeb32e9aef7ddb8ca65275b4c1c99c53a494fd5e141d23d741`;
+- Opus 5/xhigh result SHA-256
+  `71e1d2a5ea1486221c4921da99a65275b64324a78a40da7f3c49c353c3231f53`,
+  manifest SHA-256
+  `cd38dfcfe3a53e4d593733290883fc5e3f5ac22b10f0b457a0a0bf8bdcc53007`.
+
+The final handoff is intentionally narrow. The terminal-suppression
+classifier embodies production ambiguity policy even though it currently
+lives on the conformance subpath. Before 2l-b/2l-c adapters consume it, place
+or promote that policy behind one shared production owner; do not duplicate
+it in each backend. Every ten-case ambiguity tuple must execute against each
+real backend in its owned slice. Phase 2l-d retains the shared registry-limit
+drift guard and the real-adapter harness/package wiring. Actual IndexedDB and
+SQLite durability, schema, kill and collision-latching evidence remains owned
+by 2l-b and 2l-c, not retroactively claimed by this closure.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
