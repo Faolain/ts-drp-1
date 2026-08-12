@@ -5330,6 +5330,65 @@ IndexedDB has no non-mutating cross-database schema inspection:
   manifest SHA-256
   `a53185db3b93aa34b8a1e1bfda56dea4ba94811e4a4c0ca7027f2c253aeb47ff`.
 
+#### Phase 2l-b browser-adapter closure
+
+Phase 2l-b is complete at signed, pushed candidate
+`fc135cb4fa56e97551c9e9c9a54ac8a3eaec9f85` (tree
+`4e63ac6841c264f45797e6f30d0cc05d590d7f0f`). The bounded implementation
+lineage is tests-only RED `3aa89fc099bd18770128aa5db4fafb0dd029929e`,
+schema-oracle correction `aaf059d77fe129fc0f8990a5bfc079a38b330ac6`,
+process-owner/recovery-symbol correction
+`780e86c9a35233f2fde032f44f654a7e29654249`, preservation-governance
+correction `1cfa45d2acc632eb2c763a83c43a2da9bd406763`, production GREEN
+`c216ac89b90e36e9cbbfa4cb7cca158fa0fc9a34`, and final state-get evidence
+correction `fc135cb4fa56e97551c9e9c9a54ac8a3eaec9f85`.
+
+The corrections are closure evidence, not hidden production relaxation:
+
+- the schema oracle now compares native lexicographic store order and each
+  observable empty index list;
+- the real-death controller uses the proven stopped/frozen complete process
+  union, browser-before-worker kill order and the correct 2l-b recovery symbol;
+- inherited export/dependency/IndexedDB ownership guards name only the exact
+  subpath, runtime dependency, production owner and private control;
+- `state-get` proves the exact `lineages.get` inside the tracked readwrite
+  three-store mutation transaction, after the pre-build readonly lookup and
+  before write requests. The parent checks native transaction/request IDs,
+  mode, store set and event order; an explicit old-first-get mutant is rejected.
+
+Final exact-candidate evidence is: Chromium fast `7/7`; Firefox/WebKit fast
+`14/14`; all five ambiguity outcomes; genuine browser death `16/16` with no
+profile-owned survivor; process/forest controls `52/52`; inherited Phase 2e6
+death `18/18`; shared/frozen/registry/ownership focus `76/76`; issuance-store
+`45/45`; and the post-correction exact-head storage-browser package gate
+`44/44` files and `285/285` tests, including its tracked clean-checkout guard.
+Package typecheck/build and owned lint/format/diff checks are green. Root
+typecheck/lint retain only documented inherited Phase 1i-b/workspace debt and
+are not misreported as green.
+
+Fresh final review evidence on the exact candidate:
+
+- Grok 4.5/high result SHA-256
+  `cf062e718a501dd79478be049e363656b80afe0883048e0a72b6a15a85d797c2`,
+  manifest SHA-256
+  `0dfa531ba89d2fcec8c7168919ee5a78130c260c42ab63e8b6556f0788b3abe2`;
+- exact Kimi 3/high/100 result SHA-256
+  `7e64d25bb8b5031077729e4669e059adf4da82024082a4d6bf07e58a31f917b7`,
+  manifest SHA-256
+  `f81582bb13e42d84520c0c9c0acc2e762a4db14e4f4a3733d10fbb11fea97303`;
+- Opus 5/xhigh result SHA-256
+  `422e0f198fb066d9d87df8f67c03de6acaa72a4969c46a9708c250b09d9659d0`,
+  manifest SHA-256
+  `a9c1386272c0cc5ab68b3d8670010c55dce3abb1157f739bf616204922b9bc9d`.
+
+This closure claims no Node durability or live publication. Phase 2l-c owns
+SQLite. Phase 2l-d must bind the shared harness/registry and retain the
+join/bijection guard. Phase 3a must preserve post-commit ambiguity readback
+while publishing; Phase 6b owns durable issued/outbox retention and may revisit
+the bounded full-join cost. The browser's internal test control remains
+compiled but unreachable from every package export and is explicit hygiene/
+ownership debt, never a consumer seam.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
