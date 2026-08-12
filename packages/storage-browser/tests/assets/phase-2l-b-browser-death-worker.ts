@@ -15,6 +15,12 @@ interface RunMessage {
 	readonly signal: SharedArrayBuffer;
 }
 
+interface TransactionEvidence {
+	readonly mode: string;
+	readonly stores: readonly string[];
+	readonly transactionId: string;
+}
+
 const SCOPE = Object.freeze({ author: "death-author", objectId: "death-object" });
 
 function commit(scope: Phase2lBScope, authorSequence: number, seed: number): Phase2lBCommit {
@@ -51,19 +57,35 @@ function errorMessage(error: unknown): string {
 
 async function run(input: RunMessage): Promise<never> {
 	const cell = new Int32Array(input.signal);
-	const trace: Array<Readonly<{ kind: string; method?: string; store?: string }>> = [];
+	const trace: Array<
+		Readonly<{
+			kind: string;
+			method?: string;
+			mode?: string;
+			requestId?: string;
+			store?: string;
+			stores?: readonly string[];
+			transactionId?: string;
+		}>
+	> = [];
+	const transactions = new WeakMap<IDBTransaction, TransactionEvidence>();
 	let targetTransaction: IDBTransaction | undefined;
+	let targetTransactionEvidence: TransactionEvidence | undefined;
+	let transactionCount = 0;
+	let requestCount = 0;
 	let armed = false;
-	const arm = (kind: string): never => {
+	const arm = (trigger: Readonly<{ kind: string; transactionId?: string }>): never => {
 		if (armed) throw new TypeError("duplicate Phase 2l-b death arm");
 		armed = true;
-		trace.push({ kind });
+		trace.push({ ...trigger, kind: "arm" });
 		Atomics.store(cell, 0, 1);
 		postMessage({
 			edgeId: input.edge.id,
 			kind: "armed",
 			selectedOrdinal: input.edge.scenario === "fresh" ? 0 : 1,
+			targetTransaction: targetTransactionEvidence ?? null,
 			trace,
+			trigger,
 		});
 		Atomics.notify(cell, 0);
 		Atomics.wait(cell, 0, 1);
@@ -82,23 +104,34 @@ async function run(input: RunMessage): Promise<never> {
 		if (input.edge.edge === "suspended-build") {
 			void opened.transactIssue(SCOPE, (selected: number) => {
 				void selected;
-				return arm("suspended-build");
+				trace.push({ kind: "build-invoked" });
+				return arm({ kind: "suspended-build" });
 			});
 			return await new Promise<never>(() => undefined);
 		}
 
 		IDBDatabase.prototype.transaction = function (...args: Parameters<IDBDatabase["transaction"]>): IDBTransaction {
 			const transaction = Reflect.apply(originalTransaction, this, args) as IDBTransaction;
-			if (args[1] === "readwrite" && [...transaction.objectStoreNames].includes("lineages")) {
+			const evidence: TransactionEvidence = Object.freeze({
+				mode: transaction.mode,
+				stores: Object.freeze([...transaction.objectStoreNames].sort()),
+				transactionId: `transaction-${++transactionCount}`,
+			});
+			Reflect.apply(WeakMap.prototype.set, transactions, [transaction, evidence]);
+			trace.push({ kind: "transaction-created", ...evidence });
+			if (transaction.mode === "readwrite" && evidence.stores.includes("lineages")) {
+				if (targetTransaction !== undefined) throw new TypeError("duplicate Phase 2l-b mutation transaction");
 				targetTransaction = transaction;
-				trace.push({ kind: "transaction-created" });
+				targetTransactionEvidence = evidence;
 				transaction.addEventListener("abort", () => {
-					trace.push({ kind: "abort" });
-					if (input.edge.edge === "abort") arm("abort");
+					const trigger = { kind: "abort", transactionId: evidence.transactionId };
+					trace.push(trigger);
+					if (input.edge.edge === "abort") arm(trigger);
 				});
 				transaction.addEventListener("complete", () => {
-					trace.push({ kind: "complete" });
-					if (input.edge.edge === "complete") arm("complete");
+					const trigger = { kind: "complete", transactionId: evidence.transactionId };
+					trace.push(trigger);
+					if (input.edge.edge === "complete") arm(trigger);
 				});
 			}
 			return transaction;
@@ -111,11 +144,31 @@ async function run(input: RunMessage): Promise<never> {
 			function (this: IDBObjectStore, ...args: never[]) {
 				const request = Reflect.apply(original, this, args) as IDBRequest;
 				const storeName = this.name;
-				trace.push({ kind: "request-created", method, store: storeName });
+				const transaction = Reflect.apply(WeakMap.prototype.get, transactions, [this.transaction]) as
+					| TransactionEvidence
+					| undefined;
+				if (transaction === undefined) throw new TypeError("request transaction was not observed");
+				const requestId = `request-${++requestCount}`;
+				const requestEvidence = {
+					method,
+					mode: transaction.mode,
+					requestId,
+					store: storeName,
+					stores: transaction.stores,
+					transactionId: transaction.transactionId,
+				};
+				trace.push({ kind: "request-created", ...requestEvidence });
 				request.addEventListener("success", () => {
-					trace.push({ kind: "request-success", method, store: storeName });
+					const trigger = { kind: "request-success", ...requestEvidence };
+					trace.push(trigger);
 					const native = input.edge.nativeRequest;
-					if (native !== null && native.method === method && native.store === storeName) arm(input.edge.edge);
+					if (
+						native !== null &&
+						native.method === method &&
+						native.store === storeName &&
+						this.transaction === targetTransaction
+					)
+						arm(trigger);
 					if (input.edge.edge === "abort" && method === "add" && storeName === "issuanceOutbox") {
 						targetTransaction?.abort();
 					}
@@ -127,8 +180,10 @@ async function run(input: RunMessage): Promise<never> {
 		IDBObjectStore.prototype.put = instrument("put", originalPut as never) as typeof originalPut;
 
 		void opened.transactIssue(SCOPE, (selected: number) => {
+			trace.push({ kind: "build-invoked" });
 			const candidate = commit(SCOPE, selected, 73);
-			if (input.edge.edge === "postbuild") return arm("postbuild");
+			if (input.edge.edge === "postbuild") return arm({ kind: "postbuild" });
+			trace.push({ kind: "build-resolved" });
 			return Promise.resolve(candidate);
 		});
 		return await new Promise<never>(() => undefined);

@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+	assertPhase2lBDeathArmEvidence,
 	PHASE_2L_B_AMBIGUITY_CASES,
 	PHASE_2L_B_DEATH_TUPLES,
 	PHASE_2L_B_EDGES,
@@ -88,6 +89,69 @@ describe("Phase 2l-b literal browser issuance authorities", () => {
 				store: "issuanceOutbox",
 			});
 		}
+	});
+
+	it("rejects the old self-labelled first-get arm and accepts the mutation reread trace", () => {
+		const tuple = PHASE_2L_B_DEATH_TUPLES.find(({ id }) => id === "fresh/state-get");
+		if (tuple === undefined) throw new TypeError("missing fresh state-get tuple");
+		const readonlyTransaction = {
+			mode: "readonly",
+			stores: ["issuanceOutbox", "issuedRecords", "lineages"],
+			transactionId: "transaction-1",
+		};
+		const readonlyRequest = {
+			method: "get",
+			mode: "readonly",
+			requestId: "request-1",
+			store: "lineages",
+			stores: readonlyTransaction.stores,
+			transactionId: readonlyTransaction.transactionId,
+		};
+		const oldFirstGetArm = {
+			edgeId: "fresh/state-get",
+			targetTransaction: null,
+			trace: [
+				{ kind: "transaction-created", ...readonlyTransaction },
+				{ kind: "request-created", ...readonlyRequest },
+				{ kind: "request-success", ...readonlyRequest },
+				{ kind: "arm", ...readonlyRequest },
+			],
+			trigger: { kind: "request-success", ...readonlyRequest },
+		};
+		expect(() => assertPhase2lBDeathArmEvidence(tuple, oldFirstGetArm)).toThrow(
+			"missing exact Phase 2l-b mutation transaction"
+		);
+
+		const mutationTransaction = {
+			mode: "readwrite",
+			stores: ["issuanceOutbox", "issuedRecords", "lineages"],
+			transactionId: "transaction-2",
+		};
+		const mutationRequest = {
+			method: "get",
+			mode: "readwrite",
+			requestId: "request-2",
+			store: "lineages",
+			stores: mutationTransaction.stores,
+			transactionId: mutationTransaction.transactionId,
+		};
+		const mutationRereadArm = {
+			edgeId: "fresh/state-get",
+			targetTransaction: mutationTransaction,
+			trace: [
+				{ kind: "transaction-created", ...readonlyTransaction },
+				{ kind: "request-created", ...readonlyRequest },
+				{ kind: "request-success", ...readonlyRequest },
+				{ kind: "build-invoked" },
+				{ kind: "build-resolved" },
+				{ kind: "transaction-created", ...mutationTransaction },
+				{ kind: "request-created", ...mutationRequest },
+				{ kind: "request-success", ...mutationRequest },
+				{ kind: "arm", ...mutationRequest },
+			],
+			trigger: { kind: "request-success", ...mutationRequest },
+		};
+		expect(() => assertPhase2lBDeathArmEvidence(tuple, mutationRereadArm)).not.toThrow();
 	});
 
 	it("requires controlled abort old and complete exact-new without creating a ninth edge", () => {
