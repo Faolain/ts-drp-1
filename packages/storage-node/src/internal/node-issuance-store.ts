@@ -49,6 +49,8 @@ interface NativeLineage extends DurableLineage {
 	readonly present: boolean;
 }
 
+interface NativeLineageRow extends DurableIssueScope, NativeLineage {}
+
 interface NativeIssuedRow extends DurableIssueScope {
 	readonly authorSequence: number;
 	readonly canonicalPreimageBytes: Uint8Array;
@@ -246,6 +248,17 @@ function rawLineage(value: unknown, present: boolean): NativeLineage | undefined
 	return { exhausted: exhausted === 1, next, present: true };
 }
 
+function copyLineageRow(value: unknown): NativeLineageRow | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const objectId = Reflect.get(value, "object_id");
+	const author = Reflect.get(value, "author");
+	const lineage = rawLineage(value, true);
+	if (!isValidDurableScopeField(objectId) || !isValidDurableScopeField(author) || lineage === undefined) {
+		return undefined;
+	}
+	return { author, objectId, ...lineage };
+}
+
 function readNativeLineage(
 	database: DatabaseSync,
 	scope: DurableIssueScope,
@@ -323,6 +336,10 @@ function sameLineage(left: NativeLineage, right: NativeLineage): boolean {
 	return left.present === right.present && left.next === right.next && left.exhausted === right.exhausted;
 }
 
+function lineageConsumed(lineage: DurableLineage, authorSequence: number): boolean {
+	return lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
+}
+
 class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
 	#closed = false;
@@ -380,10 +397,7 @@ class NodeIssuanceImplementation {
 			observation.issuedRecord.authorSequence !== authorSequence ||
 			observation.outboxRecord.authorSequence !== authorSequence ||
 			!bytesEqual(observation.issuedRecord.envelope.digest, observation.outboxRecord.digest) ||
-			!(
-				observation.lineage.next > authorSequence ||
-				(observation.lineage.exhausted && observation.lineage.next === authorSequence)
-			)
+			!lineageConsumed(observation.lineage, authorSequence)
 		) {
 			throw this.#latchCorruption("stored issued closure is incomplete or malformed");
 		}
@@ -402,6 +416,7 @@ class NodeIssuanceImplementation {
 		const parsed = this.#parsePageInput(input);
 		try {
 			this.#database.exec("BEGIN");
+			const lineageRows = statement(this.#database, "SELECT object_id,author,next,exhausted FROM lineages").all();
 			const issuedRows = statement(
 				this.#database,
 				"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records"
@@ -411,6 +426,12 @@ class NodeIssuanceImplementation {
 				"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox"
 			).all();
 			this.#database.exec("COMMIT");
+			const lineageByScope = new Map<string, NativeLineage>();
+			for (const raw of lineageRows) {
+				const row = copyLineageRow(raw);
+				if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
+				lineageByScope.set(this.#scopeKey(row), row);
+			}
 			const issuedByKey = new Map<string, NativeIssuedRow>();
 			for (const raw of issuedRows) {
 				const row = copyIssuedRow(raw);
@@ -424,6 +445,10 @@ class NodeIssuanceImplementation {
 				const issued = issuedByKey.get(this.#key(row, row.authorSequence));
 				if (issued === undefined || !bytesEqual(issued.digest, row.digest)) {
 					throw this.#latchCorruption("outbox has no matching issued record");
+				}
+				const lineage = lineageByScope.get(this.#scopeKey(row));
+				if (lineage === undefined || !lineageConsumed(lineage, row.authorSequence)) {
+					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
 				}
 				issuedByKey.delete(this.#key(row, row.authorSequence));
 				records.push({ commit: issuedCommit(issued), publishState: row.publishState });
@@ -688,7 +713,11 @@ class NodeIssuanceImplementation {
 	}
 
 	#key(scope: DurableIssueScope, authorSequence: number): string {
-		return `${scope.objectId.length}:${scope.objectId}${scope.author.length}:${scope.author}:${authorSequence}`;
+		return `${this.#scopeKey(scope)}:${authorSequence}`;
+	}
+
+	#scopeKey(scope: DurableIssueScope): string {
+		return `${scope.objectId.length}:${scope.objectId}${scope.author.length}:${scope.author}`;
 	}
 
 	#commitKey(commit: DurableIssueCommit): readonly [string, string, number] {
