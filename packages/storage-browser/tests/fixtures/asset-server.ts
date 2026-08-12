@@ -43,6 +43,11 @@ export function startAssetServer(assetDirectory: string): Promise<AssetServer> {
 		"phase-2e6-real-process-death-worker.js",
 		"phase-2e7.html",
 		"phase-2e7-publication-component.js",
+		"phase-2l-b.html",
+		"phase-2l-b-browser-issuance.js",
+		"phase-2l-b-death.html",
+		"phase-2l-b-browser-death.js",
+		"phase-2l-b-browser-death-worker.js",
 	]);
 	const tokens = new Set<string>();
 	const server = http.createServer((request, response) => {

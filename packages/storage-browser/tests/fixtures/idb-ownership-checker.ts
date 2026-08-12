@@ -122,6 +122,25 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2g-b-presence-entry.ts"),
 		new Set(["open", "deleteDatabase", "transaction", "objectStore", "put", "addEventListener", "close"]),
 	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-b-browser-issuance-entry.ts"),
+		new Set([
+			"open",
+			"deleteDatabase",
+			"databases",
+			"createObjectStore",
+			"transaction",
+			"objectStore",
+			"add",
+			"map",
+			"addEventListener",
+			"close",
+		]),
+	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-b-browser-death-worker.ts"),
+		new Set(["addEventListener", "abort"]),
+	],
 ]);
 
 export interface IdbOwnershipAuditOptions {
