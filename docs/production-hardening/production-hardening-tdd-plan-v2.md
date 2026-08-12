@@ -4539,6 +4539,92 @@ All substantive Opus output was Opus 5; its small automatic Haiku accounting
 produced no review conclusion. Provisional checkpoint B remains an auditable
 stop artifact, not accepted GREEN evidence.
 
+#### Phase 2k closure — Playwright 1.62.1 requalified without widening evidence
+
+The corrective implementation and its final Linux admission close Phase 2k at
+signed candidate `9031f0b10ef49c4cfd883daa3f1c0ebbd6100a97`, tree
+`437e6ecd3e3eef891ec2353e9907b269405706e8`. The preceding signed tests-only
+RED `e100b4b885e7f00ee7d9bb4c42f324d51590f625` added one causal CI-metadata
+case: a matching config-owned `phase2hPlaywrightVersion` must remain valid when
+Playwright adds its own `ci`, `gitCommit` and `gitDiff` metadata, while an
+absent, ranged or forged version still fails before directory creation,
+building, RunId allocation or publication. The RED was 38 pass / 1 causal
+failure; its post-commit evidence manifest SHA-256 is
+`30535b56a0029f9d5112bda4766d13257a2c2ac9b470b502b7cc19ddbc2b9af0`.
+
+The GREEN changes only `phase-2h-a-global-setup.ts`: it removes ownership of
+the shared metadata object's whole keyset and retains exact equality between
+the one config-owned version value and the independently audited installed
+graph identity. It does not trust Playwright-owned sibling metadata, record
+bodies or environment transport. Local closure was 39/39 corrective tests,
+147/147 complete Phase 2h unit/controls, an 18-test environment-free
+Playwright list, Chromium setup smoke 1/1, Phase 2k 23/23 plus three actual
+engines, and Phase 2j 16/16 plus five actual projects. Storage-browser
+typecheck and owned lint/Prettier/diff gates passed. The GREEN evidence manifest
+SHA-256 is
+`effa2b1ea5d4cf04b1149e9f874e2474e3f2197c09ee3b0a4335f52bf2904706`;
+the frozen corrective RED and all seven historical S4 hashes remained
+unchanged.
+
+The first exact-candidate Linux attempt, run `31547103839` against
+`2af58d1e28f4af82bf494b7796b864a0fae6edf3`, remains an intentional stop
+artifact. It failed before publication because global setup incorrectly
+required the entire Playwright-owned `FullConfig.metadata` namespace to have
+one key. The successful replacement evidence is:
+
+- Phase 2h run `31548324297`: closed v1 aggregate SHA-256
+  `21ea7e74380159cb224c1258fb3ab57743af0ab39e8fa92eb627d07449b75007`,
+  exact 69 records / three engines / six scenarios, 23 records per engine,
+  uniform Playwright `1.62.1`, empty diagnostics and verdict `pass`; all 54
+  process-death records retain two distinct accepted-and-absent PGIDs in
+  browser-then-child order, a SIGKILLed child, requested-arm evidence and no
+  unsupported case, with one native admission for each engine. The sealed run
+  directory manifest SHA-256 is
+  `a4e45f06bc04745cf9ba4b03d8e66c731039b0dce78ac1b5bec0e5f8ea012721`.
+- Phase 2j run `31548324292`: closed v1 artifact SHA-256
+  `7346d59112d4536760f3553397d7c76f10c63f392ce913e3b8fc49b3e5580801`,
+  five projects / fifteen probes, byte-identical capability outcomes, empty
+  diagnostics and verdict `pass`. The sealed run directory manifest SHA-256 is
+  `7450e9398287b2d587854799f5087e815253421b740f8128c32642a0a59801d0`.
+
+Both workflows checked out PR merge
+`b8d5b057e51f81c09d3893bee78b433da680a98a`, whose parents are base
+`d041baffcd56f16c8a20564133a4a7fc108e8331` and candidate `9031f0b`; its tree
+is exactly the signed candidate tree `437e6ecd`. The artifacts therefore bind
+the actual Actions checkout while the parent/tree crosswalk authenticates the
+candidate bytes. A base advance invalidates this crosswalk and requires a new
+run.
+
+Final independent acceptance was unanimous:
+
+- Grok 4.5/high: `ACCEPTED`, result SHA-256
+  `a0edd0e72c964a031197af9407a75b86784bc1200f5fe575b45f968d4bf2c945`,
+  manifest SHA-256
+  `25b6797285113968869333a43a90f8e16c55934ebda4a4a3ab6e9f01248b07f5`;
+- Kimi 3/high/max-100: `ACCEPTED`, result SHA-256
+  `d66ab6e031a08cefd198cd02748662a0ab64b45827dfb2c6c2786f1f4c56ea71`,
+  manifest SHA-256
+  `6faef5e091b8fee784be8157bc3d47efe2391e21170170e5951da12e417bcafb`;
+- Opus 5/xhigh: `ACCEPTED`, result SHA-256
+  `3be57f08b0fab99ef836e9821c20acbf15325366105e70cfb5e3118ee3b07644`,
+  manifest SHA-256
+  `e51b06c569a5f0ef9d2c0acf195cac2ee6ea6008323222554902423b64552d07`.
+  The initial deep Opus turn was interrupted after a measured no-output stall
+  and is retained as incomplete, not promoted to a verdict; same-session resume
+  was unavailable because persistence was disabled, so one tools-disabled
+  Opus xhigh reconciliation consumed the full preserved report plus only the
+  remaining evidence. Small automatic Haiku metadata accounting produced no
+  substantive review output.
+
+Closure does not erase the standing limitations. Root lint/typecheck still
+carry unchanged inherited out-of-scope debt. The local `before:init` hook can
+be bypassed by manually creating a GitHub release, while the independent
+published-ref job still gates npm/Buf/Docker publication. Phase 2k measures
+currency for the one Playwright graph; physical Safari, real devices and the
+current/previous AHE §21.5 matrix remain explicitly unmet and Pre-release-owned.
+The provisional `507237b` checkpoint and failed Linux run remain auditable stop
+evidence rather than accepted success evidence.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
