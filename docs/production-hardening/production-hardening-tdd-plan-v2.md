@@ -6407,6 +6407,48 @@ P2-c owns control generation, the unchanged four-engine child and the first
 real receipt; it must not re-project package bytes or retain either preparer
 capability.
 
+#### D.93.13 — P2-c closure evidence
+
+P2-c is closed at signed production candidate
+`5d05c424a18e75f2f3407773d81ad4b02cdd39de`. The private toolchain generates
+the exact source/artifact controls and compact contract, executes the unchanged
+Phase-0j-c child across PR and nightly tiers, validates the closed twenty-key
+receipt and its lint/conformance preimages, and atomically replaces P2-a's
+receipt placeholder. P2-d alone owns catalog assembly and activation.
+
+The prerequisite operation-ABI correction is signed as RED
+`58090d5711d338ee40bba0db7482b88766c07960` and GREEN
+`e53d200a4fe1aa9b0ae2086be4748e83e35eab0a`. The P2-c tests-only RED
+`a3b4bdf75d8aa2710e8ae2ab34eb138e40d76668` contains `425` causal failures
+and `3` real controls, including the exact `410`-member two-tier evidence
+mutation registry. Initial GREEN `98953073b2d72dc64449a7f36d7533d6154be569`
+made the full matrix `428/428`. Independent review then exposed operation-zero
+coupling in generated negative controls. Corrective REDs
+`d55b37af0dbe93da02198b08ef62b5646dd36e91` and
+`a9919775011a9f51e549907cc45f3dceafb6ce89` bind the causal oracle without
+depending on pre-execution telemetry; final GREEN `5d05c424a18e75f2f3407773d81ad4b02cdd39de`
+selects the first guaranteed PR action by name and derives repeated/later drift
+from the actual selected action sequence.
+
+The final corrective case is `1/1`, P2-c is `428/428`, and P2-a/b/ABI
+preservation is `44/44`. Toolchain typecheck/build/test, changed-path lint,
+Prettier, diff and root lint are green. Broad root typecheck retains only the
+pre-existing compact-history helper debt. The principal RED/GREEN evidence
+seals are `249c771db19250c698176701e5d9b949d996ba1435bd8bacf8ad778322f4b06d`,
+`c14062f190070a76eb1d05ae49b25f61bbaae2ddd8abafaa7acf061c160bfb56`,
+`5ca2f9e7fd762a029762ae2d665811c48161d3341f943b7b1177e1baf3d34d2b` and
+`d5e911ee5c58ba0b7565e1b9c8c66d677c9246e6acd52b4ad7e57404d8b822c2`.
+
+Fresh exact-candidate closure reviews independently authorize P2-c closure and
+P2-d start with no blocker: Grok 4.6/high seal
+`e30bf15d5bfae46102819f5d9fd9a5ebf159bbd4c5ce8839697cc3b3696f031a`,
+Kimi 3/high/100 seal
+`c418bd5b2a0e8d4a5c891390ba7a1ddb21d99cc081847eded1049266e820074d`,
+and Opus 5/xhigh manifest
+`44ab094d16bb457e0093fd01be26ee542645d87390ce3d01e41c39748325597a`.
+P2-d must consume the exact detached receipt/package/artifact bytes; it may not
+mint runtime authority or alter the unchanged conformance child.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
