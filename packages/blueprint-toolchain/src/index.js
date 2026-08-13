@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, jsdoc/check-tag-names, jsdoc/no-types, jsdoc/require-param, jsdoc/require-param-description, jsdoc/require-returns, jsdoc/valid-types -- native JavaScript is the directly executable CLI source */
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { openTrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
 import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
 import { transformSync } from "esbuild";
@@ -1380,6 +1381,121 @@ async function readRegularInput(filename) {
 	}
 }
 
+/** @param {string} bundleDirectory */
+async function readCatalogBundle(bundleDirectory) {
+	const supplied = path.resolve(bundleDirectory);
+	const stat = fs.lstatSync(supplied);
+	if (!stat.isDirectory() || stat.isSymbolicLink()) throw new TypeError("--bundle must be a directory");
+	const directory = fs.realpathSync(supplied);
+	const names = fs.readdirSync(directory).sort();
+	const expected = ["artifact.mjs", "lint.bin", "package.bin", "receipt.bin"];
+	if (names.length !== expected.length || names.some((name, index) => name !== expected[index])) {
+		throw new TypeError("bundle must contain exactly four build products");
+	}
+	const [artifactBytes, lintBytes, packageBytes, receiptBytes] = await Promise.all([
+		readRegularInput(path.join(directory, "artifact.mjs")),
+		readRegularInput(path.join(directory, "lint.bin")),
+		readRegularInput(path.join(directory, "package.bin")),
+		readRegularInput(path.join(directory, "receipt.bin")),
+	]);
+	let packageValue;
+	let lintValue;
+	let receiptValue;
+	try {
+		packageValue = decodeCanonical(packageBytes);
+		lintValue = decodeCanonical(lintBytes);
+		receiptValue = decodeCanonical(receiptBytes);
+	} catch {
+		throw new TypeError("bundle contains invalid canonical bytes");
+	}
+	if (
+		packageValue === null ||
+		typeof packageValue !== "object" ||
+		Array.isArray(packageValue) ||
+		lintValue === null ||
+		typeof lintValue !== "object" ||
+		Array.isArray(lintValue) ||
+		receiptValue === null ||
+		typeof receiptValue !== "object" ||
+		Array.isArray(receiptValue)
+	) {
+		throw new TypeError("bundle canonical products must be records");
+	}
+	const implementation = /** @type {Record<string, unknown>} */ (packageValue).implementation;
+	if (implementation === null || typeof implementation !== "object" || Array.isArray(implementation)) {
+		throw new TypeError("bundle package implementation is invalid");
+	}
+	const implementationRecord = /** @type {Record<string, unknown>} */ (implementation);
+	const blueprintDigest = domainHex("ts-drp/blueprint-admission/v3", packageBytes);
+	return {
+		directory,
+		blueprintDigest,
+		artifactBytes,
+		lintBytes,
+		packageBytes,
+		receiptBytes,
+		entry: {
+			blueprintDigest,
+			artifactDigest: implementationRecord.artifactDigest,
+			artifactId: implementationRecord.artifactId,
+			runtimeProfile: implementationRecord.runtimeProfile,
+			lintEvidenceDigest: domainHex("ts-drp/blueprint-lint-evidence/v1", lintBytes),
+			conformanceReceiptDigest: domainHex("ts-drp/blueprint-conformance-receipt/v1", receiptBytes),
+		},
+	};
+}
+
+/** @param {string} outputDirectory @param {readonly string[]} bundleDirectories */
+async function constructCatalog(outputDirectory, bundleDirectories) {
+	const output = path.resolve(outputDirectory);
+	if (fs.existsSync(output)) {
+		const stat = fs.lstatSync(output);
+		if (!stat.isDirectory() || stat.isSymbolicLink() || fs.readdirSync(output).length !== 0) {
+			throw new TypeError("--directory must not exist or must be empty");
+		}
+	}
+	const parent = path.dirname(output);
+	if (!fs.existsSync(parent) || !fs.lstatSync(parent).isDirectory()) {
+		throw new TypeError("--directory parent must exist");
+	}
+
+	const seen = new Set();
+	const resolvedBundles = [];
+	for (const bundleDirectory of bundleDirectories) {
+		const supplied = path.resolve(bundleDirectory);
+		const stat = fs.lstatSync(supplied);
+		if (!stat.isDirectory() || stat.isSymbolicLink()) throw new TypeError("--bundle must be a directory");
+		const real = fs.realpathSync(supplied);
+		if (seen.has(real)) throw new TypeError("--bundle directories must be distinct");
+		seen.add(real);
+		resolvedBundles.push(supplied);
+	}
+	const bundles = await Promise.all(resolvedBundles.map((directory) => readCatalogBundle(directory)));
+	bundles.sort((left, right) => left.blueprintDigest.localeCompare(right.blueprintDigest));
+	const catalogBytes = Buffer.from(
+		encodeCanonical({
+			schemaVersion: 1,
+			kind: "ts-drp-trusted-blueprint-catalog",
+			entries: bundles.map(({ entry }) => entry),
+		})
+	);
+	const stage = fs.mkdtempSync(path.join(parent, `.${path.basename(output)}.tmp-`));
+	try {
+		writeAtomicFile(path.join(stage, "catalog.bin"), catalogBytes);
+		for (const bundle of bundles) {
+			writeAtomicFile(path.join(stage, `${bundle.blueprintDigest}.artifact.mjs`), bundle.artifactBytes);
+			writeAtomicFile(path.join(stage, `${bundle.blueprintDigest}.package.bin`), bundle.packageBytes);
+			writeAtomicFile(path.join(stage, `${bundle.blueprintDigest}.lint.bin`), bundle.lintBytes);
+			writeAtomicFile(path.join(stage, `${bundle.blueprintDigest}.receipt.bin`), bundle.receiptBytes);
+		}
+		openTrustedBlueprintCatalog({ catalogDirectory: stage });
+		fs.renameSync(stage, output);
+	} catch (error) {
+		fs.rmSync(stage, { force: true, recursive: true });
+		throw error;
+	}
+}
+
 /** @param {string} authoringDirectory @param {string} outputDirectory @param {'pr'|'nightly'} [tier] */
 export async function buildBlueprint(authoringDirectory, outputDirectory, tier) {
 	const suppliedDirectory = path.resolve(authoringDirectory);
@@ -1442,18 +1558,66 @@ export async function buildBlueprint(authoringDirectory, outputDirectory, tier) 
 
 /** @param {readonly string[]} arguments_ */
 export async function runBlueprintCli(arguments_) {
-	if (arguments_[0] !== "build" || arguments_.length !== 7) throw new TypeError("invalid command grammar");
-	const values = new Map();
-	for (let index = 1; index < arguments_.length; index += 2) {
-		const flag = arguments_[index];
-		const value = arguments_[index + 1];
-		if (!["--dir", "--out", "--tier"].includes(flag) || values.has(flag) || value === undefined || value.length === 0) {
+	const command = arguments_[0];
+	if (command === "build") {
+		if (arguments_.length !== 7) throw new TypeError("invalid command grammar");
+		const values = new Map();
+		for (let index = 1; index < arguments_.length; index += 2) {
+			const flag = arguments_[index];
+			const value = arguments_[index + 1];
+			if (
+				!["--dir", "--out", "--tier"].includes(flag) ||
+				values.has(flag) ||
+				value === undefined ||
+				value.length === 0
+			) {
+				throw new TypeError("invalid build flags");
+			}
+			values.set(flag, value);
+		}
+		if (values.size !== 3 || !["pr", "nightly"].includes(values.get("--tier"))) {
 			throw new TypeError("invalid build flags");
 		}
-		values.set(flag, value);
+		await buildBlueprint(values.get("--dir"), values.get("--out"), values.get("--tier"));
+		return;
 	}
-	if (values.size !== 3 || !["pr", "nightly"].includes(values.get("--tier"))) {
-		throw new TypeError("invalid build flags");
+	if (command === "catalog") {
+		if (arguments_.length < 5 || arguments_.length % 2 === 0) throw new TypeError("invalid command grammar");
+		let directory;
+		const bundles = [];
+		for (let index = 1; index < arguments_.length; index += 2) {
+			const flag = arguments_[index];
+			const value = arguments_[index + 1];
+			if (value === undefined || value.length === 0) throw new TypeError("invalid catalog flags");
+			if (flag === "--directory" && directory === undefined) directory = value;
+			else if (flag === "--bundle") bundles.push(value);
+			else throw new TypeError("invalid catalog flags");
+		}
+		if (directory === undefined || bundles.length === 0) throw new TypeError("invalid catalog flags");
+		await constructCatalog(directory, bundles);
+		return;
 	}
-	await buildBlueprint(values.get("--dir"), values.get("--out"), values.get("--tier"));
+	if (command === "verify") {
+		if (arguments_.length !== 5) throw new TypeError("invalid command grammar");
+		const values = new Map();
+		for (let index = 1; index < arguments_.length; index += 2) {
+			const flag = arguments_[index];
+			const value = arguments_[index + 1];
+			if (
+				!["--directory", "--blueprint-digest"].includes(flag) ||
+				values.has(flag) ||
+				value === undefined ||
+				value.length === 0
+			) {
+				throw new TypeError("invalid verify flags");
+			}
+			values.set(flag, value);
+		}
+		if (values.size !== 2) throw new TypeError("invalid verify flags");
+		openTrustedBlueprintCatalog({ catalogDirectory: values.get("--directory") }).resolve(
+			values.get("--blueprint-digest")
+		);
+		return;
+	}
+	throw new TypeError("invalid command grammar");
 }
