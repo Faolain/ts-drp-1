@@ -51,10 +51,16 @@ type AuthoringValue = {
 	readonly operationDiscriminator: string;
 	readonly operations: readonly { readonly name: string }[];
 };
-type WorkflowStep = { readonly "continue-on-error"?: boolean; readonly "run"?: string };
+type WorkflowStep = {
+	readonly "continue-on-error"?: boolean;
+	readonly "env"?: Readonly<Record<string, string>>;
+	readonly "if"?: string;
+	readonly "run"?: string;
+};
 type WorkflowJob = {
 	readonly "continue-on-error"?: boolean;
 	readonly "if"?: string;
+	readonly "needs"?: string | readonly string[];
 	readonly "steps": readonly WorkflowStep[];
 	readonly "uses"?: string;
 	readonly "with"?: { readonly tier?: string };
@@ -134,6 +140,12 @@ function declarationExportNames(declaration: string): readonly string[] {
 		}
 	}
 	return names;
+}
+
+function guardAllowedTiers(script: string): readonly string[] {
+	const match = /^case "\$TRACK_P2_TIER" in\n {2}([a-z]+(?: \| [a-z]+)*)\) ;;\n {2}\*\) exit 1 ;;\nesac$/u.exec(script);
+	if (match?.[1] === undefined) throw new TypeError("tier guard must be one exact validation-only case statement");
+	return match[1].split(" | ");
 }
 
 async function buildSyntheticNightly(label: string, source: string): Promise<Bundle> {
@@ -482,7 +494,9 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 		expect(guide).toContain("Phase 3a");
 		expect(guide).toMatch(/reviewed.*local.*catalog/iu);
 		expect(guide).toMatch(/network.*unsupported/iu);
-		expect(guide).toMatch(/does not.*(execute|invoke).*(reducer|fold)/iu);
+		expect(guide).toContain("Controlled conformance executes reducers only inside the evidence harness.");
+		expect(guide).toContain("The catalog does not execute reducers or fold application state.");
+		expect(guide).toContain("Phase 3a executes zero reducers and completes preparation before any live effect.");
 		expect(guide).toMatch(/exact bytes/iu);
 		expect(guide).not.toMatch(/PreparedBlueprint[A-Za-z]+/u);
 	});
@@ -495,7 +509,33 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 		expect(workflow.on.schedule.length).toBeGreaterThan(0);
 		for (const schedule of workflow.on.schedule) expect(schedule.cron).toMatch(/\S/u);
 		expect(workflow.on.workflow_call.inputs.tier).toEqual({ required: true, type: "string" });
-		expect(Object.keys(workflow.jobs).sort()).toEqual(["track-p2-nightly", "track-p2-pr"]);
+		expect(Object.keys(workflow.jobs).sort()).toEqual(["track-p2-nightly", "track-p2-pr", "track-p2-tier-guard"]);
+		const guard = workflow.jobs["track-p2-tier-guard"];
+		expect(guard["continue-on-error"]).toBeUndefined();
+		expect(guard.if).toBeUndefined();
+		expect(guard.steps).toHaveLength(1);
+		expect(guard.steps[0].if).toBeUndefined();
+		expect(guard.steps[0].env).toEqual({
+			TRACK_P2_TIER:
+				"${{ github.event_name == 'pull_request' && 'pr' || github.event_name == 'schedule' && 'nightly' || inputs.tier }}",
+		});
+		const guardRun = guard.steps[0].run;
+		expect(guardRun).toBeTypeOf("string");
+		expect(guardAllowedTiers(guardRun as string)).toEqual(["pr", "nightly"]);
+		for (const tier of ["pr", "nightly"]) {
+			const result = spawnSync("bash", ["-eu", "-o", "pipefail", "-c", guardRun as string], {
+				env: { ...process.env, TRACK_P2_TIER: tier },
+			});
+			expect(result.status, `${tier}: ${result.stderr.toString("utf8")}`).toBe(0);
+		}
+		for (const tier of ["", "ci", "PR", "nightly "]) {
+			const result = spawnSync("bash", ["-eu", "-o", "pipefail", "-c", guardRun as string], {
+				env: { ...process.env, TRACK_P2_TIER: tier },
+			});
+			expect(result.status, `unsupported tier ${JSON.stringify(tier)} must fail closed`).not.toBe(0);
+		}
+		expect(workflow.jobs["track-p2-pr"].needs).toBe("track-p2-tier-guard");
+		expect(workflow.jobs["track-p2-nightly"].needs).toBe("track-p2-tier-guard");
 		expect(workflow.jobs["track-p2-pr"].if).toBe("${{ github.event_name == 'pull_request' || inputs.tier == 'pr' }}");
 		expect(workflow.jobs["track-p2-nightly"].if).toBe(
 			"${{ github.event_name == 'schedule' || inputs.tier == 'nightly' }}"
@@ -509,11 +549,22 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 		const allRuns = Object.values(workflow.jobs)
 			.flatMap((job) => job.steps)
 			.flatMap((step) => (typeof step.run === "string" ? [step.run] : []));
-		for (const test of contract.prTests) expect(prRuns.join("\n")).toContain(test);
-		expect(prRuns.join("\n")).toContain("--tier pr");
-		expect(prRuns.join("\n")).not.toContain("--tier nightly");
-		expect(nightlyRuns.join("\n")).toContain("--tier nightly");
-		expect(nightlyRuns.join("\n")).not.toContain("--tier pr");
+		expect(prRuns).toContain(`pnpm exec vitest run ${contract.prTests.join(" ")} --coverage.enabled=false`);
+		for (const [jobName, job] of Object.entries(workflow.jobs)) {
+			if (jobName === "track-p2-nightly") continue;
+			const runs = job.steps.flatMap((step) => (typeof step.run === "string" ? [step.run] : []));
+			for (const test of contract.nightlyTests) expect(runs.every((run) => !run.includes(test))).toBe(true);
+		}
+		expect(nightlyRuns).toContain(`pnpm exec vitest run ${contract.nightlyTests.join(" ")} --coverage.enabled=false`);
+		expect(prRuns).toContain(
+			'node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-pr" --tier pr'
+		);
+		expect(nightlyRuns).toContain(
+			'node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-nightly" --tier nightly'
+		);
+		expect(prRuns.every((run) => !run.includes("--tier nightly"))).toBe(true);
+		expect(nightlyRuns.every((run) => !run.includes("--tier pr"))).toBe(true);
+		expect(guardRun).not.toMatch(/\b(?:pnpm|node|vitest|drp-blueprint|build|test)\b/u);
 		for (const command of Object.values(contract.ownedGateCommands)) {
 			expect(prRuns).toContain(command);
 			expect(nightlyRuns).toContain(command);

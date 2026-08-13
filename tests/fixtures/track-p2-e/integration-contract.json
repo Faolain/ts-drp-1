@@ -22,10 +22,10 @@
 		"tests/track-p2-ab-operation-abi-corrective-red.test.ts",
 		"tests/track-p2-b-package-binding-red.test.ts",
 		"tests/track-p2-c-control-selection-corrective-red.test.ts",
-		"tests/track-p2-c-generic-conformance-red.test.ts",
 		"tests/track-p2-d-catalog-red.test.ts",
 		"tests/track-p2-e-guide-integration-red.test.ts"
 	],
+	"nightlyTests": ["tests/track-p2-c-generic-conformance-red.test.ts"],
 	"catalogPackageFiles": ["src", "dist", "!dist/test", "!**/*.tsbuildinfo"],
 	"catalogPackageDependencies": {
 		"@ts-drp/canonical": "0.11.0",
