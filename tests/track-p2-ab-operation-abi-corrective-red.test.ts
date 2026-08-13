@@ -33,6 +33,9 @@ const CORRECTIVE_ROOT = path.join(import.meta.dirname, "fixtures/track-p2-ab-ope
 const frozenAuthoring = JSON.parse(fs.readFileSync(path.join(FROZEN_ROOT, "blueprint.json"), "utf8")) as Authoring;
 const correctiveSource = fs.readFileSync(path.join(CORRECTIVE_ROOT, "blueprint.ts"));
 const correctiveArtifact = fs.readFileSync(path.join(CORRECTIVE_ROOT, "artifact.mjs"));
+const PRE_CORRECTION_ARTIFACT_DIGEST = "deff68c51303f07f08f9a6aa754140ca6f16aecd0564b3f94d855374c7d2adc4";
+const PRE_CORRECTION_PACKAGE_SHA256 = "8944636c67538cce914910c5f2db616b9e9e8c7d7887fb3a73cd5eab01ec4bc6";
+const PRE_CORRECTION_BLUEPRINT_DIGEST = "ffc9bbd19909d8950acceaa0591a18aba57c68cdcb071ec30c21e1dc29988716";
 const temporaryDirectories: string[] = [];
 
 function sha256(bytes: Uint8Array): string {
@@ -135,9 +138,9 @@ describe("Track P2-a/P2-b accepted reducer-input ABI corrective RED", () => {
 		expect(packageBytes.byteLength).toBe(correctedIdentities.packageByteLength);
 		expect(sha256(packageBytes)).toBe(correctedIdentities.packageSha256);
 		expect(domainHex("ts-drp/blueprint-admission/v3", packageBytes)).toBe(correctedIdentities.blueprintDigest);
-		expect(correctedIdentities.artifactDigest).not.toBe(frozenPackage.artifactDigest);
-		expect(correctedIdentities.packageSha256).not.toBe(frozenPackage.packageSha256);
-		expect(correctedIdentities.blueprintDigest).not.toBe(frozenPackage.blueprintDigest);
+		expect(correctedIdentities.artifactDigest).not.toBe(PRE_CORRECTION_ARTIFACT_DIGEST);
+		expect(correctedIdentities.packageSha256).not.toBe(PRE_CORRECTION_PACKAGE_SHA256);
+		expect(correctedIdentities.blueprintDigest).not.toBe(PRE_CORRECTION_BLUEPRINT_DIGEST);
 		expect(decodeCanonical(fs.readFileSync(path.join(output, "receipt.bin")))).toEqual({
 			kind: "track-p2-c-receipt-placeholder",
 			schemaVersion: 1,

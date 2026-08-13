@@ -1,5 +1,5 @@
 function addReducer(input) {
-  const value = input.arguments.value ?? 1;
+  const value = input.operation.arguments.value ?? 1;
   const state = input.state + value;
   return { output: state, state };
 }
@@ -7,7 +7,7 @@ function readReducer(input) {
   return { output: input.state, state: input.state };
 }
 function setReducer(input) {
-  const state = input.arguments.value ?? 0;
+  const state = input.operation.arguments.value ?? 0;
   return { output: state, state };
 }
 export const blueprint = {
