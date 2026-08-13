@@ -56,7 +56,16 @@ jobs:
           tests/track-p2-e-guide-integration-red.test.ts
           --coverage.enabled=false
       - name: Exercise PR conformance through the production CLI
-        run: node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-pr" --tier pr
+        run: |-
+          authoring="$RUNNER_TEMP/track-p2-pr-authoring"
+          cleanup() { rm -rf "$authoring"; }
+          trap cleanup EXIT
+          mkdir "$authoring"
+          cp tests/fixtures/track-p2-e/message-register/blueprint.json "$authoring/blueprint.json"
+          cp tests/fixtures/track-p2-e/message-register/blueprint.ts "$authoring/blueprint.ts"
+          node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir "$authoring" --out "$RUNNER_TEMP/track-p2-pr" --tier pr
+          cleanup
+          trap - EXIT
       - name: Typecheck the owned P2-e surface
         run: pnpm exec tsc -p tests/tsconfig.track-p2-e-guide-integration-red.json --noEmit
       - name: Build the published and private owners
@@ -97,7 +106,16 @@ jobs:
       - name: Run the strict Track P2 nightly matrix
         run: pnpm exec vitest run tests/track-p2-c-generic-conformance-red.test.ts --coverage.enabled=false
       - name: Exercise nightly conformance through the production CLI
-        run: node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-nightly" --tier nightly
+        run: |-
+          authoring="$RUNNER_TEMP/track-p2-nightly-authoring"
+          cleanup() { rm -rf "$authoring"; }
+          trap cleanup EXIT
+          mkdir "$authoring"
+          cp tests/fixtures/track-p2-e/message-register/blueprint.json "$authoring/blueprint.json"
+          cp tests/fixtures/track-p2-e/message-register/blueprint.ts "$authoring/blueprint.ts"
+          node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir "$authoring" --out "$RUNNER_TEMP/track-p2-nightly" --tier nightly
+          cleanup
+          trap - EXIT
       - name: Typecheck the owned P2-e surface
         run: pnpm exec tsc -p tests/tsconfig.track-p2-e-guide-integration-red.json --noEmit
       - name: Build the published and private owners
