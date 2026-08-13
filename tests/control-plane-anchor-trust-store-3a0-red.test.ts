@@ -743,12 +743,10 @@ describe("Phase 3a-0-B control-plane trust closure RED", () => {
 				trust: installed.trust as unknown as Parameters<typeof authenticateCurrentEpochAnchor>[0]["trust"],
 			})
 		).toMatchObject({ ok: true });
-		expect(genuineCallEvidence.authenticateInputs).toEqual([
-			expect.objectContaining({ trust: genuineCallEvidence.openedTrusts[0] }),
-		]);
-		expect(genuineCallEvidence.authenticateInputs).not.toEqual([
-			expect.objectContaining({ trust: genuineCallEvidence.installerTrusts[0] }),
-		]);
+		expect(genuineCallEvidence.authenticateInputs).toHaveLength(1);
+		const authenticatedTrust = (genuineCallEvidence.authenticateInputs[0] as { readonly trust: unknown }).trust;
+		expect(authenticatedTrust).toBe(genuineCallEvidence.openedTrusts[0]);
+		expect(authenticatedTrust).not.toBe(genuineCallEvidence.installerTrusts[0]);
 		const begun = observed.calls.find(({ method }) => method === "beginGeneration")?.input as
 			| { readonly closure: readonly GenerationRef[] }
 			| undefined;
