@@ -6375,6 +6375,38 @@ and Opus 5/xhigh manifest
 P2-b must consume the exact artifact/package placeholders rather than widening
 P2-a or treating its private compiler as runtime authority.
 
+#### D.93.12 — P2-b closure evidence
+
+P2-b is closed at signed production candidate
+`370b7fdd1c2732128b63ba3996b6afb155c08d3e`. The private toolchain now replaces
+only P2-a's package placeholder: it projects the closed five-key canonical
+package, keeps the artifact and admission digest domains distinct, invokes the
+genuine admission preparer and then awaits the genuine runtime preparer over
+the exact pair, and discards both capabilities before any output is staged.
+The receipt placeholder remains byte-identical and wholly P2-c-owned.
+
+The tests-only RED `707cfb7163224f1e3ed3e5cbd5965a4e9b9b0e51` produced seven causal
+failures and two controls; the GREEN changed only the private toolchain module
+and made the exact P2-b matrix `9/9` while preserving P2-a `31/31`. Package
+type/build/test, exact public-surface compilation, changed-path lint/format/diff,
+Phase-0j-a/b `142/142`, Phase-0j-c `7` passed plus its intentional nightly skip,
+and legacy blueprints `19/19` are green. The RED and GREEN evidence manifests
+are `a226ed40f9f67f1248caa5e5d34e72e58ed9b559b950f7a96ecd973b328ab623`
+and `1afa226875d204c606180fda5db1947ae7db83a676a6627e55072ec56d002057`;
+the independent signed-RED review manifest is
+`988a5c22c452d694e978298e3a2fe3f48eb21280c08d2ccd304636d8b6f8224d`.
+
+Fresh exact-candidate closure reviews independently authorize P2-b closure and
+P2-c start with no blocker: Grok 4.6/high seal
+`40f6feb6684ec890aa42690ac713b99c5667553945e6b451f08e46f3f16ae70d`,
+Kimi 3/high/100 seal
+`fbb6aafc4788dfe07af4a02b466661b9be3aced3587f9c976c15902453e1d101`,
+and Opus 5/xhigh manifest
+`8104e49a59a41e27f084a34320ef1ddb933629beaf3ea099191fce100c63800a`.
+P2-c owns control generation, the unchanged four-engine child and the first
+real receipt; it must not re-project package bytes or retain either preparer
+capability.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
