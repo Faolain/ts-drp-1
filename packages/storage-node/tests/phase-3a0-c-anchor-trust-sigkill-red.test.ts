@@ -1,9 +1,11 @@
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import { createMemoryAheDurableStore } from "@ts-drp/storage";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { bytesHex, makeCreatorMaterial } from "../../../tests/fixtures/phase-3a0-v3/controlled-anchor-trust.js";
@@ -91,7 +93,12 @@ const FAST_REPETITIONS = 1;
 const LONG_REPETITIONS = 5;
 const fixture = new URL("./fixtures/phase-3a0-c-anchor-trust-sigkill-child.mjs", import.meta.url);
 const contractUrl = new URL("../../../tests/fixtures/phase-3a0-c-v3/contract.json", import.meta.url);
+const packageTsconfigUrl = new URL("../tsconfig.json", import.meta.url);
+const dedicatedTsconfigUrl = new URL("../../../tests/fixtures/phase-3a0-c-v3/tsconfig.test.json", import.meta.url);
+const exactPackageExcludedTest = "tests/phase-3a0-c-anchor-trust-sigkill-red.test.ts";
 const temporaryDirectories: string[] = [];
+const temporaryFiles: string[] = [];
+const execFileAsync = promisify(execFile);
 const creatorMaterial = makeCreatorMaterial();
 const expectedAuthority: ExpectedAuthority = Object.freeze({
 	anchorDigest: creatorMaterial.anchorDigest,
@@ -353,6 +360,7 @@ async function runMatrix(repetitions: number): Promise<readonly string[]> {
 
 afterEach(async () => {
 	for (const directory_ of temporaryDirectories.splice(0)) await rm(directory_, { force: true, recursive: true });
+	for (const filename of temporaryFiles.splice(0)) await rm(filename, { force: true });
 });
 
 describe("Phase 3a-0-C storage-node creator-trust process death RED", () => {
@@ -443,6 +451,51 @@ describe("Phase 3a-0-C storage-node creator-trust process death RED", () => {
 			})
 		).toEqual({ ok: false, reason: "store-failed" });
 		await memory.close();
+	});
+
+	it("keeps the process-death fixture under its dedicated compiler without breaking the package typecheck", async () => {
+		const packageTsconfig = JSON.parse(await readFile(packageTsconfigUrl, "utf8")) as {
+			exclude?: readonly string[];
+		};
+		const dedicatedTsconfig = JSON.parse(await readFile(dedicatedTsconfigUrl, "utf8")) as {
+			files?: readonly string[];
+		};
+		expect(dedicatedTsconfig.files).toContain(
+			"../../../packages/storage-node/tests/phase-3a0-c-anchor-trust-sigkill-red.test.ts"
+		);
+		await expect(
+			execFileAsync("pnpm", ["exec", "tsc", "--noEmit", "--project", fileURLToPath(dedicatedTsconfigUrl)], {
+				cwd: fileURLToPath(new URL("../../../", import.meta.url)),
+			})
+		).resolves.toMatchObject({ stderr: "" });
+
+		const mutantUrl = new URL(`../tsconfig.phase-3a0-c-mutant-${process.pid}.json`, import.meta.url);
+		temporaryFiles.push(fileURLToPath(mutantUrl));
+		await writeFile(
+			mutantUrl,
+			`${JSON.stringify(
+				{
+					...packageTsconfig,
+					exclude: (packageTsconfig.exclude ?? []).filter((entry) => entry !== exactPackageExcludedTest),
+				},
+				null,
+				"\t"
+			)}\n`
+		);
+		let mutantDiagnostics = "";
+		try {
+			await execFileAsync("pnpm", ["exec", "tsc", "--noEmit", "--project", fileURLToPath(mutantUrl)], {
+				cwd: fileURLToPath(new URL("../", import.meta.url)),
+			});
+		} catch (error) {
+			const failure = error as Readonly<{ stderr?: string; stdout?: string }>;
+			mutantDiagnostics = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+		}
+		expect(mutantDiagnostics).toContain("TS2307");
+		expect(mutantDiagnostics).toContain("TS6059");
+		expect(mutantDiagnostics).toContain("TS6307");
+		expect(mutantDiagnostics).toContain(exactPackageExcludedTest);
+		expect(packageTsconfig.exclude).toEqual(["dist", "./*.d.ts", exactPackageExcludedTest]);
 	});
 
 	it.skipIf(RUN_LONG)("keeps the repeated real-death campaign explicitly nightly-only", () => {
