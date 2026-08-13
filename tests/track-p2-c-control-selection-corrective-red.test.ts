@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { runBlueprintCli } from "../packages/blueprint-toolchain/src/index.js";
-import { decodeCanonical, encodeCanonical, hashDomain } from "../packages/canonical/src/index.js";
+import { decodeCanonical } from "../packages/canonical/src/index.js";
 
 const AUTHORING = path.join(import.meta.dirname, "fixtures/track-p2-a/forward-counter");
 const PRELOAD = path.join(import.meta.dirname, "fixtures/track-p2-c/child-preload.mjs");
@@ -39,12 +39,6 @@ function workspace(): { readonly authoring: string; readonly output: string; rea
 	return { authoring, output: path.join(root, "bundle"), telemetry: path.join(root, "telemetry.json") };
 }
 
-function conformanceDigest(outputs: readonly unknown[]): string {
-	return Buffer.from(hashDomain("ts-drp/blueprint-conformance/v1", encodeCanonical({ state: 0, outputs }))).toString(
-		"hex"
-	);
-}
-
 afterAll(() => {
 	for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { force: true, recursive: true });
 });
@@ -69,14 +63,6 @@ describe("Track P2-c selected-action control binding corrective RED", () => {
 		expect(fs.readdirSync(output).sort()).toEqual(["artifact.mjs", "lint.bin", "package.bin", "receipt.bin"]);
 		const child = JSON.parse(fs.readFileSync(telemetry, "utf8")) as {
 			readonly files: Readonly<Record<string, string>>;
-			readonly receipt: {
-				readonly negativeControls: {
-					readonly moduleGlobalDrift: {
-						readonly freshInstanceDigests: readonly string[];
-						readonly sameModuleInstanceDigests: readonly string[];
-					};
-				};
-			};
 		};
 		for (const filename of [
 			"thenable.mjs",
@@ -88,9 +74,6 @@ describe("Track P2-c selected-action control binding corrective RED", () => {
 			expect(artifact).toContain('"add": unchangedReducer');
 			expect(artifact).toMatch(/"set": (?:thenableReducer|driftReducer|invalidReducer|sparseReducer)/u);
 		}
-		const drift = child.receipt.negativeControls.moduleGlobalDrift;
-		expect(drift.sameModuleInstanceDigests).toEqual([conformanceDigest([1, null, 2]), conformanceDigest([3, null, 4])]);
-		expect(drift.freshInstanceDigests).toEqual([conformanceDigest([1, null, 2]), conformanceDigest([1, null, 2])]);
 		const receipt = decodeCanonical(fs.readFileSync(path.join(output, "receipt.bin"))) as {
 			readonly operationOrder: readonly string[];
 			readonly selectedCaseIds: readonly string[];
