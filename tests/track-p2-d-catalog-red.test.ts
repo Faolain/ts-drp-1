@@ -28,7 +28,10 @@ const preparationProbe = vi.hoisted(() => ({
 }));
 const lexerProbe = vi.hoisted(() => ({ initSyncCalls: 0 }));
 
-vi.mock("es-module-lexer", async (importOriginal) => {
+// The catalog owns its own workspace dependency symlink. Mock that concrete
+// resolution so this probe observes the module evaluated by the catalog rather
+// than a separate optimizer identity rooted at this test file.
+vi.mock("../packages/blueprint-catalog/node_modules/es-module-lexer/dist/lexer.js", async (importOriginal) => {
 	const genuine = (await importOriginal()) as { initSync(): void };
 	return {
 		...(await importOriginal()),
@@ -497,7 +500,7 @@ describe("Track P2-d canonical catalog fixture and public resolver RED", () => {
 		for (const engine of resolved.evidence.engines) expect(Object.isFrozen(engine)).toBe(true);
 		expect(preparationProbe.admissionInputs).toEqual([
 			{
-				canonicalBlueprintPackageBytes: workspace.packageBytes,
+				canonicalBlueprintPackageBytes: new Uint8Array(workspace.packageBytes),
 				expectedBlueprintDigest: workspace.blueprintDigest,
 			},
 		]);
@@ -1068,13 +1071,15 @@ describe("Track P2-d private catalog construction and verify CLI RED", () => {
 		await expect(
 			runBlueprintCli(["catalog", "--directory", workspace.output, "--bundle", workspace.bundle])
 		).resolves.toBeUndefined();
-		expect(fs.readdirSync(workspace.output).sort()).toEqual([
-			`${value.blueprintDigest}.artifact.mjs`,
-			`${value.blueprintDigest}.lint.bin`,
-			`${value.blueprintDigest}.package.bin`,
-			`${value.blueprintDigest}.receipt.bin`,
-			"catalog.bin",
-		]);
+		expect(fs.readdirSync(workspace.output).sort()).toEqual(
+			[
+				`${value.blueprintDigest}.artifact.mjs`,
+				`${value.blueprintDigest}.lint.bin`,
+				`${value.blueprintDigest}.package.bin`,
+				`${value.blueprintDigest}.receipt.bin`,
+				"catalog.bin",
+			].sort()
+		);
 		expect(fs.readFileSync(path.join(workspace.output, "catalog.bin"))).toEqual(value.catalogBytes);
 		for (const [suffix, bytes] of [
 			["artifact.mjs", value.artifactBytes],
@@ -1172,13 +1177,15 @@ describe("Track P2-d private catalog construction and verify CLI RED", () => {
 			if (destination === workspace.output) {
 				expect(path.dirname(source.toString())).toBe(path.dirname(workspace.output));
 				const filenames = fs.readdirSync(source.toString()).sort();
-				expect(filenames).toEqual([
-					`${fixture().blueprintDigest}.artifact.mjs`,
-					`${fixture().blueprintDigest}.lint.bin`,
-					`${fixture().blueprintDigest}.package.bin`,
-					`${fixture().blueprintDigest}.receipt.bin`,
-					"catalog.bin",
-				]);
+				expect(filenames).toEqual(
+					[
+						`${fixture().blueprintDigest}.artifact.mjs`,
+						`${fixture().blueprintDigest}.lint.bin`,
+						`${fixture().blueprintDigest}.package.bin`,
+						`${fixture().blueprintDigest}.receipt.bin`,
+						"catalog.bin",
+					].sort()
+				);
 				for (const filename of filenames) {
 					const stat = fs.lstatSync(path.join(source.toString(), filename));
 					expect(stat.isFile()).toBe(true);
