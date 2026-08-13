@@ -6621,6 +6621,53 @@ and Codex-high sequencing reconciliation
 P2-e RED may resume only after these exact amendment bytes receive final
 Grok/Kimi/Opus assent and are signed and pushed.
 
+#### D.93.16 — P2-e and Track P2 closure evidence
+
+P2-e and Track P2 are closed at signed candidate
+`b494493994c97e5a47eeed11fa283f5750e3fd23`, tree
+`2e4bf44745707f56c0c8ba745d2230fce59d7b39`. P2-e adds the durable authoring
+guide, an independently authored second blueprint with exact artifact/package/
+lint/synthetic-nightly receipt goldens, deterministic two-entry catalog and
+fresh-process clean-worktree rebuild evidence, packed-root runtime and emitted
+declaration consumers, and the reusable PR/nightly/release gates. Its handoff
+starts with a test-injected proven digest and covers D.93.9 steps 3–6 only; it
+does not authenticate an anchor, evaluate a live artifact or enable an index,
+subscription, issuance, append, reducer or fold.
+
+The initial P2-e RED `f562e52acfdf016f740d27e33d9c9813f40e64ae` and
+workflow-ownership correction `70bb5c21b7eeb271ecb897ba430676f912254a50`
+freeze the guide, exact guard/PR/nightly job split, owned gates, release edge,
+clean-worktree bytes, package/declaration surface and injected-digest suffix.
+GREEN `17446ca1dc4820dc7210d0ff6551696e18c5b0e3` was followed by three bounded
+governance corrections: closed two-file workflow staging and byte-frozen
+Prettier ownership (`0df6e1f5957e110ea0310366a3aae6aa1208791a` →
+`de517865a300d6e8b6e1331c16fe29ad162df419`), exact artifact ESLint ownership
+(`00f373b10166206a317bd728c93a1e1a719b5718` →
+`9fc2af7e67b7c0724769d7c0a751329147ed88f1`) and a committed local test timeout
+that the literal workflow command needs (`79ddcd3a7f60447e323b8307e9af62fd9b1d4989`
+→ `b494493994c97e5a47eeed11fa283f5750e3fd23`). No correction changes the
+generated artifact; its SHA-256 remains
+`bceecd68c745fd9aa01448d2531eb96096667c7a166850b96a0080cdd3956f13`.
+
+The final literal workflow command passes P2-e `15/15` with no CLI or
+environment timeout override, P2-a through P2-d preservation is `555/555`, and
+the targeted type/lint/format/hash/diff, Actionlint, YAML, package and complete
+tracked-root lint gates are green. The final GREEN evidence manifest is
+`c7c0f8e87368fb1d5f30637a709f4c6b4a19507786653d6432b9edc0999bbb0f`.
+
+Fresh exact-candidate closure reviews independently authorize P2-e and Track P2
+closure with no blocker: Grok 4.6/high result
+`7d959416726810558426926d72d67ec81d4f7e45e44f5c422b3626da28106507`,
+Kimi 3/high/100 result
+`b8a56d4e6aa48f4c0282736b127d1e2a45d301573343cd4445e275cb2b4995ec`
+and Opus 5/xhigh result
+`d80e3646881142bc93b31795ccebd3101ff2c28c0b6056269db90d8fc48f1513`.
+
+This closure does not authorize Phase `3a-0`. D.93.15 still requires a separate
+correction quorum to freeze signer authority/trust-root provenance, the source
+and advancement of the trusted current-anchor digest/context, and the
+delegated/attested quorum-certificate decision before its RED may begin.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
