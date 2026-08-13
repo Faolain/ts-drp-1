@@ -7756,6 +7756,98 @@ tests-only RED owner. D must preserve the same authenticated old-or-exact-new
 boundary while adding the browser-owned reopen evidence; this ledger does not
 claim that D is implemented.
 
+#### D.93.22 — Phase 3a-0-D closure evidence and Phase 3a-1 handoff
+
+Phase `3a-0-D` is closed at signed evidence candidate
+`d8c21868e18cb7e1714b5b9773a5ab5a0485a213`, tree
+`2b532885041479dc0ea132025ae2a35976390c28`. This section is a bounded,
+non-normative evidence ledger only. D.93.17 and D.93.19 remain the normative
+trust contracts, and D.93.20/D.93.21 retain their scope and cautions unchanged.
+
+The single signed commit adds nine evidence/configuration paths and no
+production, plan, package-manifest, dependency or lockfile byte:
+
+- the storage-browser Playwright config, local asset server, global setup and
+  browser-parity test;
+- the dedicated browser entry, frozen contract, independently authored
+  material and TypeScript project; and
+- the root governance test that binds those owners.
+
+The nightly matrix has one closed meaning: creator reopen, combined-closure
+reopen and forced-nonstrict fail-closed each run once in Chromium, Firefox and
+WebKit, for `9/9` passing observations with one worker, no retry, no skip and no
+unsupported fallback. Creator and combined authority cross a genuine
+same-origin `page.reload` into a fresh realm. The reopened durable owner must
+recover the strict completed IndexedDB transaction, fixed object and genesis
+pin, exact head and provenance, byte-identical canonical trust record and exact
+trust ref. The combined generation also preserves that creator record/ref while
+adding its separately owned synthetic state. Independent controls enforce old
+XOR exact-new; mixed summaries, invalid authentication and deterministic shared
+failure cannot satisfy the oracle.
+
+Strict durability remains fail-closed rather than advisory. Successful writers
+request and recheck the live transaction's strict mode and publish only after
+the transaction completes. The forced-default control keeps the requested mode
+strict while downgrading the observed transaction; it must return
+`store-failed`, publish no capability or write and leave no object head. The
+summary's `strictDurability` flag reflects the store's static capability, so the
+live transaction check and forced-default control remain the load-bearing
+evidence.
+
+Ownership is dedicated without widening the package compiler. The browser
+fixture, server, setup, test and config are explicitly compiled by the Phase
+`3a-0-D` TypeScript project; the package's existing test include continues to
+own its in-package files, and no package-tsconfig exclusion or production test
+seam was added. The local server binds loopback, uses a per-run token and a
+closed realpath-checked asset allowlist, and serves no public network or stale
+cache path.
+
+Fresh execution on the signed tree passed the governance suite `2/2`, the
+combined Phase `3a-0-A`/B/C preservation set with sixty-five tests and one
+intentional nightly skip, and the nightly Playwright matrix `9/9`. The dedicated
+and package TypeScript gates passed, as did targeted ESLint, Prettier and
+diff-check. The matrix's three engines and three scenarios are all successful
+observations; no retry, hidden skip, fallback or unsupported branch contributes
+to those counts.
+
+The final independent quorum is unanimous:
+
+- Codex-high accepted the evidence RED, returned no direct P0-P2 finding and
+  marked it ready to sign with high confidence. Its result SHA-256 is
+  `3522c65135d26a233b6f154c25f0b582cf5fe691f9c07b96d5ae4187eb1e148f`.
+- Grok 4.6/high returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_D_MAY_CLOSE: yes`, `NEXT_SLICE_MAY_START: yes`, no blocker, no
+  plan change and high confidence. Its result and custody SHA-256 values are
+  `bcc2e58d9762328e27a37dae04085ba54cdf662bc2eb749fa3b6f43670c62c0b`
+  and `dfcec5d9c261bf0b3b626190a1fa6090866d0fe4242fbfc775c8d2f1c889adac`.
+- Kimi K3/high/100 returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_D_MAY_CLOSE: yes`, `NEXT_SLICE_MAY_START: yes`, no blocker and
+  high confidence. It requested only this descriptive ledger. Its result and
+  seal-index SHA-256 values are
+  `e33b37aaf9964e8694c0b992c64b92c58b91541a6ffc6fb3d4fd861ed14710d2`
+  and `bdefe3cde92e09edd0570804ecb7783f3f2c5b5fe517d6fd25a067f49056ce86`.
+- Opus 5/xhigh returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_D_MAY_CLOSE: yes`, `NEXT_SLICE_MAY_START: yes`, no blocker and
+  high confidence. It requested only this bounded non-normative ledger and no
+  change to D.93.17/D.93.19 or the D.93.20/D.93.21 scope. Its result and
+  integrity-manifest SHA-256 values are
+  `92446a038466d323251b1f6caa7f99cd4f19e9e85e10a50be3f5c56b8ee0d49e`
+  and `57cec5f0fbf0e92cd1f6e17339befe84739f6cc4e4d98bac8728e84b7bd675e4`.
+
+The evidence deliberately withholds browser process-death, eviction or quota
+clearing, physical-debris absence, fsync or power-loss durability, live-state
+construction, anchor advancement, delegated or attested profiles and quorum
+certificates. Three operational cautions remain non-normative: the nightly
+config has no repository scheduler owner yet; the governance-owned compiler can
+approach the root ten-second timeout on a cold cache; and an aborted mutant run
+can leave ignored build debris, which is neither evidence nor shipped content.
+
+Phase `3a-0-D` is closed. Phase `3a-1` may now begin with a different tests-only
+RED owner for the creator-only live binding. That slice must consume the
+authenticated current-anchor result before live-state authority without
+claiming delegated, attested or QC support; this ledger makes no claim that
+`3a-1` is implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
