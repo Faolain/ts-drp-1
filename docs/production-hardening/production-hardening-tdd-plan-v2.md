@@ -6484,6 +6484,143 @@ and Opus 5/xhigh manifest
 P2-e may add the guide, independently authored second fixture and integration
 evidence, but must not widen catalog authority or weaken these byte bindings.
 
+#### D.93.15 — Phase-3a current-anchor authentication seam
+
+D.93.9 assigns signed-current-anchor authentication and extraction of its
+proven `blueprintDigest` to Phase 3a, but the lawful protocol-v3 package root
+exports only four application APIs and none authenticates an epoch anchor. The
+Phase-3a row's four-name allow-list is therefore superseded only by adding the
+fifth application API below. Track P2-e remains bounded to D.93.9 steps 3–6:
+it receives an explicit test-injected proven digest, exercises catalog resolve
+and the genuine admission/runtime preparers, and neither calls, mocks, simulates
+nor claims anchor authentication. Phase 3a production may never accept a bare
+digest.
+
+The additive package-root surface is exactly:
+
+```ts
+export interface AuthenticateCurrentEpochAnchorInput {
+	readonly detachedSignature: Uint8Array;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly expectedCurrentAnchorDigest: string;
+	readonly expectedEpoch: number;
+	readonly expectedObjectId: string;
+	readonly expectedProfileDigest: string;
+	readonly expectedSignerSetDigest: string;
+	readonly signerPublicKey: RawEd25519PublicKey;
+}
+
+export type AuthenticateCurrentEpochAnchorResult =
+	| {
+			readonly ok: false;
+			readonly reason:
+				| "malformed-input"
+				| "anchor-decode-failed"
+				| "noncanonical-anchor"
+				| "anchor-schema-invalid"
+				| "inactive-crypto-suite"
+				| "object-id-mismatch"
+				| "epoch-mismatch"
+				| "profile-digest-mismatch"
+				| "signer-set-digest-mismatch"
+				| "anchor-not-current"
+				| "invalid-signature";
+	  }
+	| {
+			readonly ok: true;
+			readonly provenance: {
+				readonly anchorDigest: string;
+				readonly blueprintDigest: string;
+				readonly epoch: number;
+				readonly objectId: string;
+				readonly profileDigest: string;
+				readonly signerSetDigest: string;
+			};
+	  };
+
+export function authenticateCurrentEpochAnchor(
+	input: AuthenticateCurrentEpochAnchorInput
+): AuthenticateCurrentEpochAnchorResult;
+```
+
+It is synchronous, total, stateless and zero-I/O. The input is a closed plain
+record with exactly those eight own data properties and no symbol, accessor,
+inherited or extra key. Before validation or any other use, it snapshots the
+preimage bytes, signature bytes and raw public-key bytes exactly once; snapshot
+failure is `malformed-input`, and no returned byte shares backing storage.
+Expected object id is a well-formed string of `1..1024` UTF-16 units, epoch is a
+safe integer at least zero, all expected digests are lowercase 64-hex, the raw
+Ed25519 key is 32 bytes and the detached signature is 64 bytes. Nothing is
+coerced, normalized, lowercased or truncated.
+
+The copied preimage must canonical-decode and exact-reencode byte-for-byte. Its
+map order is canonical CBOR encoded-key order, not registry display order. The
+decoded record has exactly the frozen sixteen `drp-epoch-anchor` fields:
+`kind`, `protocolMajor`, `objectId`, `epoch`, `previousAnchor`, `cutDigest`,
+`stateDigest`, `aclDigest`, `historyRoot`, `historySize`, `archiveIndexRoot`,
+`blueprintDigest`, `signerSetDigest`, `parametersDigest`, `profileDigest` and
+`cryptoSuiteId`. `kind` is `"drp-epoch-anchor"`, protocol major is safe integer
+`3`, object and epoch obey the input bounds, history size is a nonnegative safe
+integer, all ten digest fields are lowercase 64-hex, and crypto suite is exactly
+`"ed25519-sha256-v3"`. The detached signature is never a seventeenth field and
+the frozen registry is not edited or version-bumped.
+
+Failure precedence is: closed input/snapshots and expected-value syntax;
+canonical decode; exact reencoding; exact field set and value rules (with a
+structurally valid non-active suite reported separately); object, epoch,
+profile and signer-set equality in that order; one
+`hashDomain("ts-drp/epoch-anchor/v3", copiedExactBytes)` computation and
+lowercase comparison with `expectedCurrentAnchorDigest`; then strict Ed25519
+verification over that same raw 32-byte digest with `{zip215:false}`. Verifier
+exceptions are `invalid-signature`. Only after all checks may the function
+extract `blueprintDigest` and return a deeply frozen success; failures are
+deeply frozen and no canonical-codec, validation, crypto or platform throwable
+escapes. No public error code, new domain, registry helper, generic verifier,
+capability, catalog handle or runtime authority is exported.
+
+Implementation is mandatory corrective slice `3a-0`, owned by
+`@ts-drp/protocol-v3` and landed immediately after P2-e, before any other Phase
+3a RED. It adds the function and its two types through `public.ts` and the
+existing package root, updates the public smoke allow-list from four to five,
+and exposes no subpath or conformance primitive. Its RED/GREEN must kill every
+reason/precedence, all sixteen value rules, missing/extra/reordered/noncanonical
+maps, mutation of every field, wrong key/signature, ZIP-215 acceptance,
+input-buffer mutation, cross-object/epoch/profile/signer-set/current-digest
+substitution and unfrozen/shared results. Phase `3a-0` remains blocked until its
+own quorum freezes signer authorization/trust-root provenance, the source and
+advancement of the trusted current-anchor digest/context, and whether delegated
+or attested profiles require a quorum certificate instead of one signature.
+This seam proves a signature against caller-injected trust and exact current
+context; it does not by itself prove signer authority.
+
+After `3a-0`, the composition root calls this fifth API first, refuses on
+`ok:false`, passes only `provenance.blueprintDigest` to `catalog.resolve` and
+requires returned equality, then prepares admission, awaits runtime preparation
+and only then constructs an index or enables subscription, issuance, append or
+fold. The authenticator itself performs none of those effects.
+
+The P2-e RED resumes only with these evidence corrections: committed exact
+artifact/package/lint and clearly synthetic nightly-receipt goldens for the
+independently authored second fixture; two in-process builds plus one genuine
+fresh-process clean-worktree rebuild equal to those bytes; PR and nightly tiers
+bound to their own workflow jobs, `workflow_call.inputs.tier`, the nightly
+input predicate, byte-diff step and no `continue-on-error`; owned
+type/build/test/lint/format/freeze gates; exact catalog runtime export equality,
+emitted declaration audit and packed-content/runtime consumer; and a
+test-only ESLint override that weakens no production rule. P2-e tests only the
+injected-proven-digest suffix and records no claim for D.93.9 steps 1–2.
+
+Correction-quorum evidence: Grok 4.6/high result
+`bcfd8f4eb17d0eb7bcf573a93cbe022e8006149ffabb8ca27cf85a08a19ae814`,
+Kimi 3/high/100 final assent
+`01c5e4a2941964addeb66b823271d3d1b1d21dd094920477377abeef2fa563f6`,
+Opus 5/xhigh result
+`c7de5f57aa477fed9093161a532f38a446192f57c87b3ed4f2554a4b50563d59`
+and Codex-high sequencing reconciliation
+`1ad2ec1f95c91052544236aa57fce1412b511035dd95f5e076b3b0a29970f252`.
+P2-e RED may resume only after these exact amendment bytes receive final
+Grok/Kimi/Opus assent and are signed and pushed.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
