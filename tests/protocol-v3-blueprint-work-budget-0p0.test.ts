@@ -293,8 +293,13 @@ describe("Phase 0p-0 additive blueprint work-budget governance causal RED", () =
 	it("[public-surface] keeps governance inside the existing preparer with no new runtime helper export", async () => {
 		const publicEntry = (await import("../packages/protocol-v3/src/public.ts")) as Record<string, unknown>;
 		expect(Object.keys(publicEntry).sort()).toEqual([
+			"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
 			"admitReceivedVertex",
+			"authenticateCurrentEpochAnchor",
 			"createAdmissionBoundTransactionalVertexIssuer",
+			"installCreatorAnchorTrustRoot",
+			"isAnchorTrustStateRecordBytes",
+			"openCurrentAnchorTrust",
 			"prepareBlueprintAdmission",
 			"prepareBlueprintRuntime",
 		]);

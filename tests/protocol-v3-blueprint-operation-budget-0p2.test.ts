@@ -423,10 +423,15 @@ describe("Phase 0p-2 authenticated whole-operation canonical byte budget causal 
 		});
 	});
 
-	it("[public-surface] preserves exactly the four package-root runtime exports", async () => {
+	it("[public-surface] preserves exactly the nine package-root runtime exports", async () => {
 		expect(Object.keys(await surface()).sort()).toEqual([
+			"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
 			"admitReceivedVertex",
+			"authenticateCurrentEpochAnchor",
 			"createAdmissionBoundTransactionalVertexIssuer",
+			"installCreatorAnchorTrustRoot",
+			"isAnchorTrustStateRecordBytes",
+			"openCurrentAnchorTrust",
 			"prepareBlueprintAdmission",
 			"prepareBlueprintRuntime",
 		]);
