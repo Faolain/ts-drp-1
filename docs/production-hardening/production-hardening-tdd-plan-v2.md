@@ -2313,7 +2313,10 @@ currently usable signer rollback generations. Neither reason enters shared
 
 The named **7b-r receipt-authenticated rollback-release** slice is blocked on:
 
-1. Phase 3 installing committed `availabilityPolicyDigest` in the epoch anchor;
+1. Phase 3 establishing the initial availability evidence owned by 3a-1/3b;
+   the frozen sixteen-field genesis anchor has no
+   `availabilityPolicyDigest`, while a successor binds that committed CutValue
+   field transitively through its certified `cutDigest` (D.93.17);
 2. Phase 5c's first schema bump and durable incarnation, signer
    continuity/state, outbox and revision/CAS facts;
 3. verified adoption/commit-QC evidence from Phase 6a;
@@ -6486,6 +6489,12 @@ evidence, but must not widen catalog authority or weaken these byte bindings.
 
 #### D.93.15 — Phase-3a current-anchor authentication seam
 
+> **Superseded by D.93.17.** This section records the pre-quorum seam and its
+> Track-P2 sequencing rationale only. D.93.17 replaces its eight-key caller-
+> asserted trust input, four-to-five package-root allow-list, result/provenance
+> shape, canonical-CBOR wording and unresolved trust decisions. No Phase-3a RED
+> may implement the API below.
+
 D.93.9 assigns signed-current-anchor authentication and extraction of its
 proven `blueprintDigest` to Phase 3a, but the lawful protocol-v3 package root
 exports only four application APIs and none authenticates an epoch anchor. The
@@ -6663,10 +6672,601 @@ Kimi 3/high/100 result
 and Opus 5/xhigh result
 `d80e3646881142bc93b31795ccebd3101ff2c28c0b6056269db90d8fc48f1513`.
 
-This closure does not authorize Phase `3a-0`. D.93.15 still requires a separate
-correction quorum to freeze signer authority/trust-root provenance, the source
-and advancement of the trusted current-anchor digest/context, and the
-delegated/attested quorum-certificate decision before its RED may begin.
+This closure did not itself authorize Phase `3a-0`. D.93.17 now records the
+separate correction quorum that freezes signer authority/trust-root provenance,
+the durable current-anchor context and the delegated/attested QC boundary.
+Creator-only `3a-0` RED may begin only after the exact D.93.17 amendment is
+signed and pushed; neither `3a-1` nor Phase 3b is a `3a-0` prerequisite.
+
+#### D.93.17 — Phase 3a-0 creator trust root and durable current-anchor context
+
+This amendment resolves every D.93.15 blocker and authorizes creator-only slice
+`3a-0`. It supersedes D.93.15's eight-key caller-asserted trust input,
+eleven-reason set, six-field provenance, four-to-five package-root allow-list
+and canonical-CBOR wording. The frozen epoch-anchor registry, strict
+Ed25519 supplement and every live-binder obligation remain unchanged.
+
+The binding choice is final: creator-only design **O**. Trust/currentness is one
+record inside the existing per-object `AheDurableStore` generation closure and
+moves with that closure's one exact expected-head CAS. There is no parallel
+trust store, object id, namespace, schema, trust port, transaction callback,
+ambient global or caller-asserted key/profile/quorum. Phase 3b is not a
+prerequisite. Delegated and attested profiles fail closed until their separately
+named later APIs and QC owners land.
+
+##### Codec, anchor schema and availability
+
+The active codec remains `drp-canonical-profile-1`, with
+`codec.cbor === false` and canonical object keys ordered by encoded key bytes as
+implemented by `@ts-drp/canonical`. Every D.93.15 reference to canonical CBOR
+order is replaced by that rule; this is a prose correction and changes no byte.
+
+The authoritative `drp-epoch-anchor` schema remains exactly these sixteen
+fields: `kind`, `protocolMajor`, `objectId`, `epoch`, `previousAnchor`,
+`cutDigest`, `stateDigest`, `aclDigest`, `historyRoot`, `historySize`,
+`archiveIndexRoot`, `blueprintDigest`, `signerSetDigest`, `parametersDigest`,
+`profileDigest` and `cryptoSuiteId`. There is no `availabilityPolicyDigest`
+field, seventeenth field, version bump, registry edit, new anchor domain or
+invented preimage. A successor anchor binds the `availabilityPolicyDigest`
+carried by its certified `CutValue` transitively through `cutDigest`. Genesis
+uses the all-zero `cutDigest`, so it has no such transitive binding.
+Creator-genesis availability selection/enforcement belongs to `3a-1`, certified
+genesis evidence belongs to Phase 3b, and successor binding/verification belongs
+to the Phase-5 CutValue/QC owner. None blocks creator `3a-0`.
+
+##### Trust identity and creator authority
+
+Trust identity is the out-of-band weak-subjectivity tuple
+`(objectId, pinnedGenesisAnchorDigest)`. `objectId` must parse as the greenfield
+`<creator>:<32 lowercase hex salt>` `StorageObjectId`, but it is scoping text,
+not authority: an attacker can self-sign a different genesis bearing the same
+text. The pin is the discriminator. A substituted invite selects another trust
+identity even when the `objectId` text matches, and `3a-0` cannot detect an
+already-substituted out-of-band pin. Create obtains the pin from locally verified
+genesis construction; join obtains it from an explicit Phase-3b invite. Network
+candidates never initialize or replace it. No legacy plain id is accepted.
+
+Immutable creator-genesis material is exactly four detached byte strings:
+
+1. exact canonical genesis `drp-epoch-anchor` preimage bytes;
+2. its exact 64-byte detached signature;
+3. exact canonical `signerSet` carrier bytes whose registered-domain digest
+   equals the signed anchor's `signerSetDigest`; and
+4. exact canonical `profile` carrier bytes whose registered-domain digest
+   equals the signed anchor's `profileDigest`.
+
+Genesis requires `epoch === 0`, `historySize === 0`, and both `previousAnchor`
+and `cutDigest` equal to lowercase 64-hex zero. `historyRoot` and
+`archiveIndexRoot` are not constrained to empty here; Phase 3e owns that profile.
+Protocol-v3 alone canonical-decodes both carriers, exact-reencodes them,
+recomputes their registered-domain digests, binds them to the signed anchor,
+requires a unique one-key signer list and resolves the verifying key. Node and
+control-plane never receive a signer key or decode profile/signer-set carriers.
+
+`3a-0` supports only `creator-trusted-v1`, exactly one unique signer,
+`quorum === 1`, and `cryptoSuiteId === "ed25519-sha256-v3"`. It verifies exactly
+one strict Ed25519 signature with `{zip215:false}` over the raw 32-byte
+`hashDomain("ts-drp/epoch-anchor/v3", exactReceivedAnchorBytes)` digest. At
+creator quorum one, that signature is the authority; wrapping it in a one-vote
+QC adds no authority and is forbidden. `ed25519-seal-v3` is structurally valid
+but inactive here and returns `inactive-crypto-suite`.
+
+`3a-0` implements no rotation, revocation, expiry, CRL, advancement or
+"newest-wins" rule. A different signer-set/profile digest rejects even when a
+different key verifies it. `delegated-trusted-v1`, including `k = 1`, and every
+`attested-bft-v1` input reject during install/open as
+`unsupported-trust-profile` and can never reach creator authentication.
+
+##### Canonical durable record
+
+Protocol-v3 owns one canonical local record, `drp-anchor-trust-state` version 1,
+with exactly twelve own enumerable string-keyed data fields:
+
+| Field                                      | Exact rule                                             |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `kind`                                     | `"drp-anchor-trust-state"`                             |
+| `version`                                  | safe integer `1`                                       |
+| `objectId`                                 | parsed `StorageObjectId`, equal to the embedded anchor |
+| `profileId`                                | `"creator-trusted-v1"`                                 |
+| `quorum`                                   | safe integer `1`                                       |
+| `genesisAnchorDigest`                      | immutable lowercase 64-hex pin                         |
+| `currentEpoch`                             | nonnegative safe integer                               |
+| `currentAnchorDigest`                      | lowercase 64-hex                                       |
+| `exactCanonicalCurrentAnchorPreimageBytes` | bytes                                                  |
+| `detachedCurrentAnchorSignature`           | exactly 64 bytes                                       |
+| `exactCanonicalSignerSetBytes`             | bytes                                                  |
+| `exactCanonicalProfileBytes`               | bytes                                                  |
+
+Signer-set/profile digests, the signer key and anchor digest are derived, never
+stored. The record itself is not signed; authority is the embedded anchor
+signature, reverified on every open. Storage is not an authority boundary.
+Encoded size is at most `ANCHOR_TRUST_STATE_MAX_RECORD_BYTES === 8192`; install
+returns `trust-state-too-large` before any write otherwise.
+
+The only new domain is local and non-consensus:
+`"ts-drp/anchor-trust-state/v1"`. Protocol-v3 owns it internally for the local
+record digest. It is never a signature domain or registry entry, and tests pin
+its absence from both protocol registries.
+
+##### Protocol-v3 package-root surface
+
+The protocol-v3 runtime root allow-list grows exactly from four to nine. The
+existing four remain unchanged:
+`admitReceivedVertex`, `createAdmissionBoundTransactionalVertexIssuer`,
+`prepareBlueprintAdmission` and `prepareBlueprintRuntime`. The five additions
+are exactly:
+
+```ts
+export const ANCHOR_TRUST_STATE_MAX_RECORD_BYTES: 8192;
+export function isAnchorTrustStateRecordBytes(bytes: Uint8Array): boolean;
+export function installCreatorAnchorTrustRoot(
+	input: InstallCreatorAnchorTrustRootInput
+): InstallCreatorAnchorTrustRootResult;
+export function openCurrentAnchorTrust(input: OpenCurrentAnchorTrustInput): OpenCurrentAnchorTrustResult;
+export function authenticateCurrentEpochAnchor(
+	input: AuthenticateCurrentEpochAnchorInput
+): AuthenticateCurrentEpochAnchorResult;
+```
+
+Associated public types are:
+
+```ts
+export interface CurrentAnchorTrust {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: number;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+	readonly profileId: "creator-trusted-v1";
+}
+
+export interface InstallCreatorAnchorTrustRootInput {
+	readonly detachedGenesisSignature: Uint8Array;
+	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type InstallCreatorAnchorTrustRootResult =
+	| {
+			readonly ok: false;
+			readonly reason:
+				| "malformed-input"
+				| "anchor-decode-failed"
+				| "noncanonical-anchor"
+				| "anchor-schema-invalid"
+				| "inactive-crypto-suite"
+				| "not-genesis-anchor"
+				| "object-id-invalid"
+				| "genesis-pin-mismatch"
+				| "signer-set-digest-mismatch"
+				| "profile-digest-mismatch"
+				| "unsupported-trust-profile"
+				| "signer-set-profile-mismatch"
+				| "trust-state-too-large"
+				| "invalid-signature";
+	  }
+	| {
+			readonly ok: true;
+			readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+			readonly trust: CurrentAnchorTrust;
+	  };
+
+export interface OpenCurrentAnchorTrustInput {
+	readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+	readonly expectedObjectId: string;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type OpenCurrentAnchorTrustResult =
+	| {
+			readonly ok: false;
+			readonly reason:
+				| "malformed-input"
+				| "record-decode-failed"
+				| "noncanonical-record"
+				| "record-schema-invalid"
+				| "unsupported-trust-state-version"
+				| "object-id-mismatch"
+				| "genesis-pin-mismatch"
+				| "unsupported-trust-profile"
+				| "trust-state-inconsistent"
+				| "invalid-signature";
+	  }
+	| { readonly ok: true; readonly trust: CurrentAnchorTrust };
+
+export interface AuthenticateCurrentEpochAnchorInput {
+	readonly detachedSignature: Uint8Array;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly trust: CurrentAnchorTrust;
+}
+
+export type AuthenticateCurrentEpochAnchorResult =
+	| {
+			readonly ok: false;
+			readonly reason:
+				| "malformed-input"
+				| "untrusted-context"
+				| "anchor-decode-failed"
+				| "noncanonical-anchor"
+				| "anchor-schema-invalid"
+				| "inactive-crypto-suite"
+				| "object-id-mismatch"
+				| "epoch-mismatch"
+				| "profile-digest-mismatch"
+				| "signer-set-digest-mismatch"
+				| "anchor-not-current"
+				| "invalid-signature";
+	  }
+	| {
+			readonly ok: true;
+			readonly provenance: {
+				readonly anchorDigest: string;
+				readonly blueprintDigest: string;
+				readonly epoch: number;
+				readonly objectId: string;
+				readonly parametersDigest: string;
+				readonly profileDigest: string;
+				readonly signerSetDigest: string;
+			};
+	  };
+```
+
+All three trust APIs are synchronous, total, stateless and zero-I/O. Each input
+is a closed record with exactly its listed own enumerable string-keyed data
+properties; byte inputs are non-shared `Uint8Array`s snapshotted exactly once
+before any other use. No result shares input backing storage. Every result is
+deeply frozen and no codec, validation, crypto or platform throwable escapes.
+Nothing is coerced, normalized, lowercased or truncated.
+
+`CurrentAnchorTrust` is a package-minted opaque capability backed by
+module-private `WeakMap` provenance. Its public fields are informational.
+Copying, spreading, serializing, reconstructing or `Object.create` cloning it
+does not preserve authority and yields `untrusted-context`. Private state holds
+the trusted signer key, exact current-anchor bytes/signature, profile/signer-set
+digests and quorum; none is exposed.
+
+`isAnchorTrustStateRecordBytes` is a total classifier, not a verifier. It returns
+`false`, never throws, for non-`Uint8Array`, shared-buffer, empty or oversized
+input, decode/reencode mismatch, non-record/non-closed value or wrong `kind`.
+It is version-agnostic and grants no authority; `openCurrentAnchorTrust` owns
+version and every record-field decision. No constructor, domain constant,
+generic verifier, codec helper, signer key, QC type, record encoder/decoder,
+`prepareAnchorTrustAdvance`, conformance primitive, runtime authority or new
+subpath is exported.
+
+##### Shared closure scanner and preservation check
+
+`@ts-drp/control-plane` owns the pure, total, identity-agnostic scanner over
+detached bytes. Protocol-v3 remains the sole trust-record decoder and kind
+classifier. The corrected public surface is:
+
+```ts
+export interface DetachedClosureCandidate {
+	readonly bytes: Uint8Array;
+	readonly ref: GenerationRef;
+}
+
+export interface InspectTrustClosureInput {
+	readonly candidates: readonly DetachedClosureCandidate[];
+	readonly closure: readonly GenerationRef[];
+}
+
+export type TrustClosureRejection =
+	| "malformed-input"
+	| "closure-invalid"
+	| "candidate-invalid"
+	| "candidate-not-in-closure"
+	| "candidate-duplicate"
+	| "candidate-not-scannable"
+	| "candidate-missing"
+	| "candidate-length-mismatch"
+	| "candidate-digest-mismatch"
+	| "trust-state-missing"
+	| "trust-state-ambiguous";
+
+export type InspectTrustClosureResult =
+	| { readonly ok: false; readonly reason: TrustClosureRejection }
+	| {
+			readonly ok: true;
+			readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+			readonly trustRef: GenerationRef;
+	  };
+
+export function inspectTrustClosure(input: InspectTrustClosureInput): InspectTrustClosureResult;
+
+export interface AssertTrustPreservedInput {
+	readonly candidates: readonly DetachedClosureCandidate[];
+	readonly closure: readonly GenerationRef[];
+	readonly expectedTrustRef: GenerationRef;
+}
+
+export type AssertTrustPreservedResult =
+	| { readonly ok: false; readonly reason: TrustClosureRejection | "trust-ref-not-preserved" }
+	| {
+			readonly ok: true;
+			readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+			readonly trustRef: GenerationRef;
+	  };
+
+export function assertTrustPreserved(input: AssertTrustPreservedInput): AssertTrustPreservedResult;
+```
+
+Scanner precedence and semantics are exact:
+
+1. `malformed-input`: the input is not a closed exact-key data record.
+2. `closure-invalid`: closure is not a dense nonempty array of exact
+   `{digest,byteLength}` refs, strictly ascending by lowercase-hex digest with
+   no duplicate and nonnegative safe byte length.
+3. `candidate-invalid`: candidates are not a dense array of exact
+   `{bytes,ref}` records with non-shared `Uint8Array` bytes; bytes are copied
+   once on entry.
+4. `candidate-not-in-closure`: a supplied ref is absent from closure.
+5. `candidate-duplicate`: two candidates name the same ref.
+6. `candidate-not-scannable`: the supplied candidate names a ref whose declared
+   `ref.byteLength` exceeds 8192. Oversized actual bytes paired with a declared
+   `ref.byteLength <= 8192` continue to step 8 and are
+   `candidate-length-mismatch`.
+7. `candidate-missing`: a closure ref at most 8192 bytes has no candidate. The
+   candidate set must equal the scannable set exactly; the caller cannot choose
+   which small blobs are visible.
+8. `candidate-length-mismatch`: copied length differs from `ref.byteLength`.
+9. `candidate-digest-mismatch`: `digestBlob(copiedBytes)` fails or differs from
+   `ref.digest`.
+10. The protocol-v3 classifier is called for every candidate. Zero classified
+    records is `trust-state-missing`; two or more is
+    `trust-state-ambiguous`. Every classified record counts, including a
+    foreign-object record, so one local plus one foreign is ambiguous.
+11. Exactly one returns only fresh bytes and its ref. The scanner reads or
+    reports no field and has no object-identity input.
+
+`assertTrustPreserved` runs that same scanner and only after uniqueness compares
+the returned `{digest,byteLength}` exactly with `expectedTrustRef`, otherwise
+`trust-ref-not-preserved`. It accepts no identity argument and makes no semantic
+comparison. `expectedTrustRef` must originate from a successful durable `open`.
+A foreign-only record therefore passes identity-agnostic scanning and is then
+rejected exclusively by protocol-v3 `openCurrentAnchorTrust` as
+`object-id-mismatch`; the durable owner returns `trust-rejected`, mints no
+capability and writes nothing.
+
+Cost is no I/O, at most one classifier call and 8192 decoded bytes per supplied
+candidate; the existing capacity profile bounds closure references. Oversized
+references are not loaded or decoded. The scanner rederives the same association
+the store uses: byte length equality plus `digestBlob(bytes) === ref.digest`.
+Durable open and the later combined-generation builder must use this one scanner
+so build and reopen behavior cannot drift.
+
+##### One durable head and exact CAS
+
+`@ts-drp/control-plane` owns the following exact exported asynchronous durable
+surface. It composes over the existing per-object `AheDurableStore`; storage
+backends and their public API are unchanged.
+
+```ts
+export interface CurrentAnchorTrustStoreOptions {
+	readonly store: AheDurableStore;
+	readonly objectId: StorageObjectId;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export interface CurrentAnchorTrustStore {
+	install(input: InstallCreatorAnchorTrustRootInput): Promise<InstallCurrentAnchorTrustResult>;
+	open(): Promise<OpenDurableCurrentAnchorTrustResult>;
+}
+
+export type InstallCurrentAnchorTrustResult =
+	| {
+			readonly ok: true;
+			readonly head: PresentHead;
+			readonly trust: CurrentAnchorTrust;
+			readonly trustRef: GenerationRef;
+	  }
+	| { readonly ok: false; readonly reason: "already-installed" | "trust-state-conflict" | "store-failed" }
+	| { readonly ok: false; readonly reason: "closure-rejected"; readonly cause: TrustClosureRejection }
+	| {
+			readonly ok: false;
+			readonly reason: "trust-rejected";
+			readonly cause: OpenCurrentAnchorTrustFailureReason;
+	  };
+
+export type OpenCurrentAnchorTrustFailureReason = Extract<
+	OpenCurrentAnchorTrustResult,
+	{ readonly ok: false }
+>["reason"];
+
+export type OpenDurableCurrentAnchorTrustResult =
+	| {
+			readonly ok: true;
+			readonly head: PresentHead;
+			readonly trust: CurrentAnchorTrust;
+			readonly trustRef: GenerationRef;
+	  }
+	| {
+			readonly ok: false;
+			readonly reason: "not-installed" | "store-failed" | "trust-state-unreadable";
+	  }
+	| { readonly ok: false; readonly reason: "closure-rejected"; readonly cause: TrustClosureRejection }
+	| {
+			readonly ok: false;
+			readonly reason: "trust-rejected";
+			readonly cause: OpenCurrentAnchorTrustFailureReason;
+	  };
+
+export function createCurrentAnchorTrustStore(options: CurrentAnchorTrustStoreOptions): CurrentAnchorTrustStore;
+```
+
+The install input is exactly the already-frozen
+`InstallCreatorAnchorTrustRootInput`; there is no second `genesisMaterial`
+wrapper or loose bag. Both success arms are exactly
+`{ok:true,trust,trustRef,head}`. All failures use only the closed unions above;
+no storage rejection or throwable escapes. The control-plane package also
+exports the scanner and preservation function above, but no `advance`, mutable
+state, test seam or caller callback.
+
+The initial generation closure contains exactly the trust ref. Every later
+per-object generation contains exactly one classified trust record beside all
+live state refs. Trust and state share one head, one closure and one CAS. A
+trust-only generation is forbidden after live state exists. `3a-1` owns the
+combined-generation builder and must preserve the exact ref; Phase 5e later
+replaces it atomically with the certified successor record in the same combined
+generation.
+
+Install performs all fallible work first: pure protocol-v3 genesis/carrier/pin/
+profile/signature/size verification, record construction, `digestBlob`/ref
+construction and `inspectTrustClosure` over the proposed one-ref closure. Only
+then may it read an absent head, begin the content-addressed generation, put and
+promote the blob, complete the generation and perform one
+`swapHead({expectedHead:{kind:"none",objectId}})`. That `swapHead` is the only
+authoritative durable act. A crash earlier leaves the previous absent head plus
+unreachable debris; retry is idempotent.
+
+Open is read-only: `readHead` (absent → `not-installed`) →
+`recoverActiveGeneration` → load and copy every
+closure blob at most 8192 bytes → `inspectTrustClosure` →
+`openCurrentAnchorTrust({exactCanonicalTrustStateRecordBytes,
+expectedObjectId:objectId,pinnedGenesisAnchorDigest})`. It returns the minted
+capability, unique `trustRef` and exact `PresentHead`. Store/integrity failure is
+`trust-state-unreadable`; scanner failure is the closed
+`{reason:"closure-rejected",cause}` arm; pure trust rejection is
+`{reason:"trust-rejected",cause}`. A foreign-only record scans successfully,
+then `openCurrentAnchorTrust` returns `object-id-mismatch`, and the durable owner
+returns `{ok:false,reason:"trust-rejected",cause:"object-id-mismatch"}`, mints
+no capability and writes nothing. Open never installs, writes, repairs or
+prefers one ambiguous record.
+
+Before `3a-1` stages any combined generation it loads/copies the exact candidate
+set and calls `assertTrustPreserved` outside every writer lock/CAS. Only after it
+passes may `beginGeneration`, `completeGeneration` and the sole `swapHead` run.
+No async/user callback runs in a transaction; the store exposes no long
+transaction handle. A stale expected head loses, reopens and rebuilds. It never
+retries with a stale ref/candidate set.
+
+Concurrent installs have exactly one winning absent-head CAS. A loser reopens
+and byte-compares: identical is `already-installed`; different bytes under the
+same textual object id are `trust-state-conflict`, never overwrite. On reopen,
+zero/multiple trust records, corrupt/missing/unpromoted blobs, noncanonical or
+unsupported record, mutated embedded anchor/signature and wrong pin/object all
+fail closed and never repair or mint a capability.
+
+Advancement is frozen but absent from `3a-0`. Phase 5e performs pure successor
+preparation outside durable work, then contributes the new trust ref to the same
+combined generation and makes one `swapHead` against the exact read head. A
+successor requires same object, `epoch === currentEpoch + 1`,
+`previousAnchor === currentAnchorDigest`, unchanged profile/signer-set digests
+except under Phase-5g handoff, and a valid certified signature/QC. Byte-identical
+current resubmission is replay and does no CAS; same epoch/different digest is
+equivocation; lower epoch is rollback; a higher nonsuccessor is `epoch-gap`.
+All reject without write.
+
+##### Creator API precedence and future certified profiles
+
+`authenticateCurrentEpochAnchor` evaluates exactly: malformed closed three-key
+input/snapshots; untrusted creator capability; anchor decode; exact reencode;
+exact sixteen-field schema/value rules; inactive suite; object mismatch; epoch
+mismatch; profile mismatch; signer-set mismatch; one current-anchor-domain hash
+and digest equality; strict signature. Only afterward may it return the seven
+proven fields `anchorDigest`, `blueprintDigest`, `epoch`, `objectId`,
+`parametersDigest`, `profileDigest` and `signerSetDigest`. A second decode or
+authority path is forbidden.
+
+`authenticateCurrentEpochAnchor` is permanently creator-only with exactly its
+three input keys. No optional, reserved or placeholder QC field is added.
+Phase 3b later adds `installCertifiedAnchorTrustRoot` and
+`openCertifiedAnchorTrust`, with a distinct `CertifiedAnchorTrust` capability
+and private provenance registry. Delegated requires `k >= 2`; attested requires
+`n >= 4`, `q = ceil(2n/3)` and the Phase-3b PoP/acceptance evidence. Certified
+rooms remain non-live until Phase 5's QC machinery exists.
+
+Phase 5a–5d owns the shared seal-vote/QC verifier; Phase 5e owns creator close
+and the first combined-generation advancement; Phase 5e2 adds exactly
+`authenticateCertifiedCurrentEpochAnchor` for delegated profiles; Phase 5f
+extends it to attested profiles; Phase 5g owns handoff/rotation. Grok's proposed
+`authenticateSuccessorEpochAnchorFromCommitQc` name is neither reserved nor
+exported. The protocol-v3 root allow-list grows 9→11 at Phase 3b and →12 at
+Phase 5e2; no existing name or closed input changes.
+
+##### Slice order, no effects and TDD
+
+The mandatory order is:
+
+1. `3a-0-A` tests-only RED for protocol-v3 pure creator trust APIs;
+2. `3a-0-B` tests-only RED by a different owner for control-plane scanner and
+   durable-memory composition;
+3. distinct protocol-v3 and control-plane GREEN owners;
+4. `3a-0-C` storage-node SIGKILL coverage and `3a-0-D` IndexedDB/Playwright
+   reopen parity;
+5. `3a-1` creator-only live binding;
+6. Phase 3b certified genesis, then 3c–3h, Phase 4, Phase 5a–5d, 5e, 5e2, 5f,
+   5g and Phase 6.
+
+There is no `3b-0` prerequisite. `3a-0` requires only closed Track P2 and the
+accepted 0g(ii-S) supplement. On failure and success it performs zero
+subscription, index construction, append, issuance, outbox publication, catalog
+resolve, artifact import/evaluation, reducer/fold/dispatch, ACL mutation,
+network I/O or timer work. The only permitted mutation is install's one
+successful head CAS. `3a-0` earns no live authority; the composition root must
+refuse before `catalog.resolve` when open/authenticate fails.
+
+`3a-0-A` creates only
+`tests/protocol-v3-anchor-trust-3a0.test.ts` and the exact
+`tests/fixtures/phase-3a0-v3/` contract/control/type-audit/export fixtures. It
+keeps eight independent controls green and causally pins the five new runtime
+exports, associated types, closed inputs/results, all sixteen anchor rules,
+genesis/pin/carrier/profile/signature checks, exact precedence, classifier and
+8192 cutoff, capability forgery/copy rejection, deep freezing, detached inputs/
+outputs and both registries byte-unchanged. Production, packages, registries,
+conformance, plan and dependencies are forbidden in RED.
+
+`3a-0-B` pins every scanner reason in precedence order; exact candidate-set,
+length/digest association and classifier calls; zero/one/two records; one local
+plus one foreign as ambiguous; foreign-only scan followed by pure
+`object-id-mismatch`; exact-ref preservation; check-before-stage ordering;
+initial install/open/reopen; concurrent conflict; simulated combined generations
+retaining/dropping/duplicating/replacing the trust ref; zero writes in open; no
+advance/test seam. Mandatory causal mutants include: scanner reads or reports
+any field of the classified record; scanner decodes the record itself instead
+of using the classifier; scanner excludes any record-kind candidate from the
+count; durable open skips `openCurrentAnchorTrust` after a successful scan;
+durable open mints a capability on `object-id-mismatch`;
+`assertTrustPreserved` accepts an object-identity argument; caller-selected
+candidates; first/last/digest ambiguity winners; late preservation checks; and
+trusting the caller's ref/bytes association.
+
+`3a-0-C` reuses the existing storage-node SIGKILL child pattern without widening
+test instrumentation and proves old-or-exact-new at every install boundary and
+a simulated combined-generation swap. `3a-0-D` proves byte-identical record,
+capability and trust ref after real browser reload. Browser process-death is not
+reproved; Phase 2e6 remains its owner. Fast RED/GREEN stays local; real death and
+browser parity remain long/nightly.
+
+Standing preservation is protocol-v3 root smoke 4→9 plus widened forbidden
+names; built-package/public-entry type audits; 0i, 0j-b/c, 0o and 0p; all three
+storage backend contract scenarios; Track P2 `555/555` plus `15/15`; owned
+type/build/test/lint/format/freeze; registries byte-identical. From `3a-1`
+forward, every combined-generation owner reruns closure preservation.
+
+The D.73 hostile virtual `Map.keys()` obligation, epoch-byte provenance,
+Phase-0p ceilings, three-plane injection, received-byte binding, issuance/outbox
+publication and every other live-binder invariant remain `3a-1` work. Phase 5
+still owns deterministic final membership. No arrival-order winner or
+`EPOCH_FULL` reinterpretation is introduced here.
+
+##### Quorum evidence and authorization
+
+The authoritative Opus 5/xhigh amendment and identity-owner correction are
+SHA-256 `6b14910ab7667b32aeb8ede119b27d4b60c2031fc64febe4ae66b9d109d8f34f`
+and `58a721769ab69f36e1e38eb158ad37a46ba5617085a8759b54443c990fb68689`.
+Kimi 3/high/100 chose corrected design O with SHA-256
+`9aea4e8c442e14c2cc2f2ef8a9abf7f84812a4b126aaf2ed71bdc1e2b40901d6`.
+Codex-high's final reconciliation, including the frozen sixteen-field
+availability correction and exact future API ownership, is SHA-256
+`185dd1e7ed6445c716715a7e4ef4ebc8f96c0828a777688f337aa7f16801eef8`.
+
+These decisions have no remaining blocker. Creator-only `3a-0-A` RED may begin
+only after these exact D.93.17 bytes are signed and pushed. Any change to an
+owner, byte preimage, domain, closed schema, capability, root allow-list,
+closure/scanner contract, taxonomy, precedence, phase ordering or availability
+ownership stops for a new correction quorum.
 
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
@@ -10298,6 +10898,20 @@ under one `objectId` are forbidden), but the **rollout** is sliced: new rooms on
 acceptance supplement and the live-binder RED can execute its adversarial vectors. The Phase −1′ tuple
 remains immutable; the supplement is a separately governed post-freeze addendum.
 
+> **D.93.17 Phase-3a row supersession.** Track P2 and D.93.17 are now also hard prerequisites.
+> Split the row into creator-only `3a-0` trust installation/open/authentication and `3a-1` live binding;
+> neither requires Phase 3b. The protocol-v3 package-root allow-list is nine at `3a-0`: the existing
+> `admitReceivedVertex`, `createAdmissionBoundTransactionalVertexIssuer`, `prepareBlueprintAdmission`
+> and `prepareBlueprintRuntime`, plus `installCreatorAnchorTrustRoot`, `openCurrentAnchorTrust`,
+> `authenticateCurrentEpochAnchor`, `isAnchorTrustStateRecordBytes` and
+> `ANCHOR_TRUST_STATE_MAX_RECORD_BYTES`. Therefore the 3a row's "only four application APIs" sentence
+> is superseded. `3a-0` creates no live effect and commits only a creator trust install through the one
+> existing per-object AHE combined-closure head CAS. `3a-1` begins only from an opened package-minted
+> `CurrentAnchorTrust`, preserves its exact trust ref in every combined generation, and then owns the
+> catalog/preparer/index/subscription/issuance/outbox and D.73 duties already listed in the row.
+> Delegated/attested genesis remains Phase 3b; certified current-anchor authentication is exactly
+> `authenticateCertifiedCurrentEpochAnchor` at Phase 5e2, extended to attested at Phase 5f.
+
 | Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Class        | Atomic?                                       | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **3a** | First live v3 vertex + anchor binder over the Phase −1′ registry; new object namespace + pubsub topic; `bytes canonical_preimage` plus `bytes signature` wire rule. The transport measures and verifies the exact received canonical-preimage bytes without re-encoding. Phase 3a exclusively signature-verifies the current epoch anchor, extracts its signed `blueprintDigest`, and passes that proven value as `expectedBlueprintDigest` into Phase 0i-v3 admission preparation and Phase-0j-b runtime preparation. At the `packages/node` composition root, construct one `CausalityIndex` per live object/epoch, bind `index.isAncestor.bind(index)` into the prepared admission context, and require both the genuine 0i admission capability and genuine 0j runtime capability bound to that same anchor-proven digest before subscription or the first live append. The composition root imports only the four application APIs `admitReceivedVertex`, `createAdmissionBoundTransactionalVertexIssuer`, `prepareBlueprintAdmission` and `prepareBlueprintRuntime` from the package root and structurally rejects either conformance-primitive name. A 0i capability alone proves package/ABI structure and never authorizes live activation; the synthetic unrealizable Phase-0i artifact digest remains live-inadmissible. Phase 3a resolves exact bytes only from the trusted application catalog emitted by Track P2 and composes Phase 2's durable `transactIssue` adapter so counter, exact signed envelope, issued record and outbox commit atomically before publication. Arbitrary third-party/network executable artifacts remain unsupported until the deferred isolated-VM work is resliced as an explicit pre-3a owner and passes the correction quorum. Admitted signed operations may be stored/forwarded, but 3a executes no blueprint, reducer or fold. Phase 0q owns the synchronous append discipline; 3a owns actual v3 anchor/ancestry wiring, received-byte consumption and publication of committed outbox records. Assert Phase 0p's epoch ceiling before the first live append; an anchor above the locally supported profile refuses to bind before subscription or index construction. | consensus-v3 | atomic per preimage + durable issuance record | Cross-room, cross-epoch, cross-anchor and cross-protocol replay are terminal. **Active three-plane cross-injection:** publish v3 envelopes onto legacy and v2 topics, legacy/v2 envelopes onto the v3 topic, and v2↔legacy traffic in both directions; every wrong-plane injection rejects. Live-binder REDs prove unknown hashes cannot create false antichain acceptance, accepted vertices append exactly once, rejected/pending/quarantined vertices never append, unbound/lying ancestry fails closed, the index resets only at a verified epoch transition, and the cap is enforced prepublication with a typed non-terminal, non-latched capacity outcome. Opposing final-slot schedules name no arrival-order winner; Phase 5 owns certified final membership. Received-byte mutation fails without re-encoding, and crashes expose either the old durable issuance state or the exact committed envelope/outbox—not a counter-only or envelope-only state. Missing/mismatched 0i or 0j capability, catalog/artifact mismatch, unsupported local profile or untrusted-source attempt fails before subscription/append. Author authentication remains before operation-schema terminal latching. An authenticated ABI-invalid operation causes zero accepted append/index publication and an instrumented zero blueprint/reducer/fold calls; raw invalid-envelope retention, if any, is explicitly non-admitted and cannot affect causality, acceptance or execution. |
@@ -10764,12 +11378,12 @@ eviction matrix green.
 **Goal:** for chat the messages _are_ the state; a snapshot alone cannot remove them. Two-tier hot/cold.
 The root **codecs** already landed in Phase 3e — this phase is segmentation, paging and retention.
 
-| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **7a**   | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests                                                                                                                                                                                                                                                                                       | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a 1M-message room downloads O(hot + window), verified by **network-byte accounting** in the chat e2e                                                                                                                                                                                                                                                                                                          |
-| **7b**   | Availability policy as a **committed** value. `availabilityPolicyDigest` is installed in the anchor from Phase 3 onward; the initial no-mirror profile is a valid **explicit** policy: `mode:"local-only", minRollbackGenerations:2, minLocalCopies:1, minMirrorReceipts:0`. Receipts are signed artifact-bound local pruning evidence — **not consensus, and not a permanence claim**.                                                                                                                | `availability-policy.test.ts`: a no-mirror room prunes only with a local snapshot and two rollback generations; a receipt for the wrong artifact/object/epoch never satisfies policy                                                                                                                                                                                                                                                                                                       |
-| **7b-r** | **Receipt-authenticated rollback release, after its prerequisites and a governed protocol-v3 registry bump.** Canonically verify artifact-bound availability receipts before retention arithmetic, derive a module-private release intent bound to observed revision, and atomically recheck head/generation/policy/storage revisions plus usable rollback facts before updating release state only. `releaseRollbackGeneration` never deletes; Phase 6b remains the sole physical deletion authority. | Forged/malformed/wrongly bound/untrusted/replayed/bad-signature receipts return `RECEIPT_INVALID` before arithmetic or release mutation. Only an authenticated but policy-unsafe release returns `ROLLBACK_PINNED`. No receipt alone deletes bytes; 6b still requires verified QC, durable adoption, minimum usable rollbacks, satisfied availability and categorized outbox. This row is blocked on Phase 3, 5c, 6a, 7b and the receipt registry bump detailed in the Phase 2g amendment. |
-| **7c**   | Privacy/retention: per-segment encryption, certified key-erasure, honest deletion UX                                                                                                                                                                                                                                                                                                                                                                                                                   | Certified key-erasure renders retained ciphertext unreadable to conforming clients; documented residual-risk statement                                                                                                                                                                                                                                                                                                                                                                     |
+| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **7a**   | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests                                                                                                                                                                                                                                                                                                                                    | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a 1M-message room downloads O(hot + window), verified by **network-byte accounting** in the chat e2e                                                                                                                                                                                                                                                                                                          |
+| **7b**   | Availability policy as a **committed** value. `availabilityPolicyDigest` is a committed `CutValue` field from Phase 3 onward and binds to a successor anchor transitively through its certified `cutDigest`; the frozen sixteen-field `drp-epoch-anchor` never carries it (D.93.17). The initial no-mirror profile is a valid **explicit** policy: `mode:"local-only", minRollbackGenerations:2, minLocalCopies:1, minMirrorReceipts:0`. Receipts are signed artifact-bound local pruning evidence — **not consensus, and not a permanence claim**. | `availability-policy.test.ts`: a no-mirror room prunes only with a local snapshot and two rollback generations; a receipt for the wrong artifact/object/epoch never satisfies policy                                                                                                                                                                                                                                                                                                       |
+| **7b-r** | **Receipt-authenticated rollback release, after its prerequisites and a governed protocol-v3 registry bump.** Canonically verify artifact-bound availability receipts before retention arithmetic, derive a module-private release intent bound to observed revision, and atomically recheck head/generation/policy/storage revisions plus usable rollback facts before updating release state only. `releaseRollbackGeneration` never deletes; Phase 6b remains the sole physical deletion authority.                                              | Forged/malformed/wrongly bound/untrusted/replayed/bad-signature receipts return `RECEIPT_INVALID` before arithmetic or release mutation. Only an authenticated but policy-unsafe release returns `ROLLBACK_PINNED`. No receipt alone deletes bytes; 6b still requires verified QC, durable adoption, minimum usable rollbacks, satisfied availability and categorized outbox. This row is blocked on Phase 3, 5c, 6a, 7b and the receipt registry bump detailed in the Phase 2g amendment. |
+| **7c**   | Privacy/retention: per-segment encryption, certified key-erasure, honest deletion UX                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Certified key-erasure renders retained ciphertext unreadable to conforming clients; documented residual-risk statement                                                                                                                                                                                                                                                                                                                                                                     |
 
 > Round 1's _"randomized deletion/churn retains ≥1 valid copy at target probability"_ is a property of the
 > **availability model**, verifiable by the model alone — as a code gate it is vacuous, and an unspecified
@@ -11091,33 +11705,33 @@ signer-profile eviction matrix are all green.
 Its §11 roadmap (15 items) and §12 blockers (10 items), each mapped to a slice. This is the coverage
 argument for "can an MMORPG-ready or chat-ready app be built on this."
 
-| Source item                                                          | Status                                                                                                                                           | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §11.1 commit object identity to blueprint/ABI/schema/runtime/genesis | **Covered, differently**                                                                                                                         | The genesis **anchor** commits `blueprintDigest`, `parametersDigest`, `signerSetDigest`, `profileDigest`, `availabilityPolicyDigest`, `archiveIndexRoot`; every vertex commits its `anchor`, so the chain binds the program. Phase 0i-v3 defines the canonical admission manifest/package whose domain-separated digest is that single `blueprintDigest`, including ABI/schema plus structurally bound implementation/runtime identity; Phase 0j still owns proving the implementation deterministic, and Phase 4a reuses rather than redefines the identity. `objectId` itself stays `creator:salt` — deliberately, so the blueprint can be **rotated by authority handoff** rather than being frozen into an immutable id. The invite pins the genesis anchor (Phase 3b + §15.3 weak subjectivity), which is what actually makes it verifiable                                                     |
-| §11.2 replace `JSON.stringify` content addressing                    | **Covered**                                                                                                                                      | Phase −1 registry + Phase 0a codec port; sorted-unique deps; domain separation; `encodingVersion`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| §11.3 deterministic execution environment                            | **Partial by design**                                                                                                                            | Phase 0j owns implementation/runtime-profile matching, ambient-API bans and cross-engine differential; Phase 0i-v3 owns only structural manifest/ABI identity. **0n** owns numeric determinism. **Deterministic WASM VM and true instruction metering remain deferred** — documented residual risk, not a silent one. Phase 0p owns anchored input/epoch bounds only, introduces no wall-clock, step or instruction budget into consensus, and defers collection-touch limits to Phase 4a                                                                                                                                                                                                                                                                                                                                                                                                            |
-| §11.4 enforce operation ABI                                          | **Open on the v3 plane; legacy parity pinned; v2 preserved**                                                                                     | Phase 0i-v3 owns digest-bound canonical manifest/ABI preparation and package-level remote/local admission; 0d establishes operation-schema terminality before acceptance; Phase 3a owns signed-anchor provenance plus live `accepted iff appended` composition; Phase 4a owns non-reflective dispatch/fold; **0p** owns anchored whole-operation canonical bytes and the epoch-capacity ceiling in place of gas, while collection-touch limits remain Phase 4a work. Do not call the full v3 property complete before Phase 4a                                                                                                                                                                                                                                                                                                                                                                       |
-| §11.5 serialize local mutations + author sequence                    | **Covered, successor freeze required**                                                                                                           | Phase 0g(i) local queue; Phase −1′ + 0g(ii-T/I) authenticated v3 sequence; **0o** remote same-author policy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| §11.6 publish resolver laws                                          | **Covered**                                                                                                                                      | Frozen five-action set (Phase −1 decision 9); AHE §7.2 resolver contract ported and hardened with `linearize.js`: resolver invoked only for concurrent vertices, isolated canonical clones, returned action validated, deterministic pair iteration order, **swap-cycle detection**, topological retained-order postcondition, fail-the-close on malformed/throwing resolver in both modes, staged state. `resolver-laws-property.test.ts` exercises the hash-pinned 407-graph PR corpus across three conflict partitions and exactly `min(8, \|V\|!)` pairwise-distinct insertion orders with beginning/interior/end anchor-position coverage where eight executions exist; focused tests separately pin all five actions, malformed results, throws, mutation isolation and both pair/multiple retained-causality regressions, including ancestry propagated solely through a dropped intermediate |
-| §11.7 replace complete-inventory sync                                | **Covered**                                                                                                                                      | Phase 1a (O(1) lookup), 1b (applied-set index), 1n (heads exchange, chunking, backpressure, caps), `sync-v2`. RIBLT deferred with a mandatory hash-list fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| §11.8 certified checkpoints and epochs                               | **Covered — this is the AHE spine**                                                                                                              | Phases 3–6. Checkpoint finality is defined independently of per-vertex attestation, which is exactly why the BLS `FinalityStore` is deprecated rather than upgraded                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| §11.9 replace dense causality structures                             | **Covered by capping, not replacing**                                                                                                            | Phase 0e exact ancestor bitsets are bounded by the hard epoch. Phase 0p pins `maxEpochVertices` anchor-inclusive: at the supported default total `V≤8192`, including one anchor and at most 8,191 ordinary vertices. Static full-width backing storage stays `8,388,608` bytes and append-built triangular rows `4,210,688` bytes (~4.016 MiB), before typed-array object and `Map` overhead; the anchor-exclusive `V=8193` branch is deleted. The registry grammar maximum of 1,000,000 is not a supported-scale promise: it implies `62,502,000,000` bytes triangular or `125,000,000,000` bytes static. Phase 3a refuses anchors above the local profile before binding. Sparse indexes/interval labels stay deferred. **Mobile profiles must lower `maxEpochVertices`**                                                                                                                          |
-| §11.10 batch operations                                              | **Covered**                                                                                                                                      | Phase 3f (op-batching into one signed change, alongside tip-set aggregation)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| §11.11 specify finality semantics                                    | **Covered**                                                                                                                                      | Phase 5 + the registry: a commit QC finalizes a `valueDigest`, authorizes adoption and gates pruning; `q=⌈2n/3⌉` pinned with `f=⌊(n−1)/3⌋`; formal model discharges the meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §11.12 equivocation and old-branch policy                            | **Now covered**                                                                                                                                  | Old branches are solved **objectively** by hard epochs (stale by envelope — no timeout, no replica-local memory). Same-author equivocation is **0o**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| §11.13 resource governance                                           | **Now covered**                                                                                                                                  | **1o** (complete table), plus 1f/1g/1k/1l, 2g, 3f, Track T                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| §11.14 durable adapters                                              | **Covered**                                                                                                                                      | Phase 2: `storage/` contract, `storage-browser/`, `storage-node/`; vertex log, generations, QCs, manifests, 2l author-sequence counter/envelope/outbox transaction, recovery, `exportGeneration` for backup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| §11.15 comparative benchmarks                                        | **Covered, narrower**                                                                                                                            | Profile gates + the CMP kill criterion. Deliberately per-object ceilings rather than their global matrix — but their 128-peer / 24-hour / 10M-op cases belong in the weekly tier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| §12.1 no blueprint commitment                                        | Covered (§11.1)                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.2 arbitrary JS determinism                                       | Partial by design (§11.3)                                                                                                                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.3 complete-history sync                                          | Covered (§11.7)                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.4 no certified snapshot / compaction                             | Covered (§11.8)                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.5 in-memory storage                                              | Covered (§11.14)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.6 expensive replay / cloning / conflict processing               | **Open until atomic-apply staging is history-independent** (D.5(j): `pruneSnapshots` still materializes every vertex key per checkpoint advance) | Phase 1d(i) removes full-state payload cloning from eligible stored per-vertex/checkpoint publication; the remaining `O(stateSize)` mutable reconstruction and local round trip stay open under Phase 1d(ii), while Phase 1d(iii) owns removal or a proved bound for checkpoint-prune whole-graph key materialization. The former ~120 MB/s figure is a baseline motivation estimate, not a post-1d(i) claim. Phase 1b removes the per-message `O(V)` rebuild; 0e caps causality.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| §12.7 equivocation / old dependencies                                | Covered (§11.12)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.8 finality ≠ BFT ordering                                        | Covered (§11.11)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.9 ABI + resource controls                                        | Covered (§11.4, §11.13)                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| §12.10 benchmark evidence                                            | Covered (§11.15)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Source item                                                          | Status                                                                                                                                           | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §11.1 commit object identity to blueprint/ABI/schema/runtime/genesis | **Covered, differently**                                                                                                                         | The genesis **anchor** commits `blueprintDigest`, `parametersDigest`, `signerSetDigest`, `profileDigest`, and `archiveIndexRoot`; its ZERO `cutDigest` carries no transitive availability binding. A successor binds the committed `CutValue.availabilityPolicyDigest` transitively through its certified `cutDigest`; the frozen sixteen-field anchor never gains a seventeenth field (D.93.17). Every vertex commits its `anchor`, so the chain binds the program. Phase 0i-v3 defines the canonical admission manifest/package whose domain-separated digest is that single `blueprintDigest`, including ABI/schema plus structurally bound implementation/runtime identity; Phase 0j still owns proving the implementation deterministic, and Phase 4a reuses rather than redefines the identity. `objectId` itself stays `creator:salt` — deliberately, so the blueprint can be **rotated by authority handoff** rather than being frozen into an immutable id. The invite pins the genesis anchor (Phase 3b + §15.3 weak subjectivity), which is what actually makes it verifiable |
+| §11.2 replace `JSON.stringify` content addressing                    | **Covered**                                                                                                                                      | Phase −1 registry + Phase 0a codec port; sorted-unique deps; domain separation; `encodingVersion`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| §11.3 deterministic execution environment                            | **Partial by design**                                                                                                                            | Phase 0j owns implementation/runtime-profile matching, ambient-API bans and cross-engine differential; Phase 0i-v3 owns only structural manifest/ABI identity. **0n** owns numeric determinism. **Deterministic WASM VM and true instruction metering remain deferred** — documented residual risk, not a silent one. Phase 0p owns anchored input/epoch bounds only, introduces no wall-clock, step or instruction budget into consensus, and defers collection-touch limits to Phase 4a                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| §11.4 enforce operation ABI                                          | **Open on the v3 plane; legacy parity pinned; v2 preserved**                                                                                     | Phase 0i-v3 owns digest-bound canonical manifest/ABI preparation and package-level remote/local admission; 0d establishes operation-schema terminality before acceptance; Phase 3a owns signed-anchor provenance plus live `accepted iff appended` composition; Phase 4a owns non-reflective dispatch/fold; **0p** owns anchored whole-operation canonical bytes and the epoch-capacity ceiling in place of gas, while collection-touch limits remain Phase 4a work. Do not call the full v3 property complete before Phase 4a                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| §11.5 serialize local mutations + author sequence                    | **Covered, successor freeze required**                                                                                                           | Phase 0g(i) local queue; Phase −1′ + 0g(ii-T/I) authenticated v3 sequence; **0o** remote same-author policy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| §11.6 publish resolver laws                                          | **Covered**                                                                                                                                      | Frozen five-action set (Phase −1 decision 9); AHE §7.2 resolver contract ported and hardened with `linearize.js`: resolver invoked only for concurrent vertices, isolated canonical clones, returned action validated, deterministic pair iteration order, **swap-cycle detection**, topological retained-order postcondition, fail-the-close on malformed/throwing resolver in both modes, staged state. `resolver-laws-property.test.ts` exercises the hash-pinned 407-graph PR corpus across three conflict partitions and exactly `min(8, \|V\|!)` pairwise-distinct insertion orders with beginning/interior/end anchor-position coverage where eight executions exist; focused tests separately pin all five actions, malformed results, throws, mutation isolation and both pair/multiple retained-causality regressions, including ancestry propagated solely through a dropped intermediate                                                                                                                                                                                     |
+| §11.7 replace complete-inventory sync                                | **Covered**                                                                                                                                      | Phase 1a (O(1) lookup), 1b (applied-set index), 1n (heads exchange, chunking, backpressure, caps), `sync-v2`. RIBLT deferred with a mandatory hash-list fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| §11.8 certified checkpoints and epochs                               | **Covered — this is the AHE spine**                                                                                                              | Phases 3–6. Checkpoint finality is defined independently of per-vertex attestation, which is exactly why the BLS `FinalityStore` is deprecated rather than upgraded                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| §11.9 replace dense causality structures                             | **Covered by capping, not replacing**                                                                                                            | Phase 0e exact ancestor bitsets are bounded by the hard epoch. Phase 0p pins `maxEpochVertices` anchor-inclusive: at the supported default total `V≤8192`, including one anchor and at most 8,191 ordinary vertices. Static full-width backing storage stays `8,388,608` bytes and append-built triangular rows `4,210,688` bytes (~4.016 MiB), before typed-array object and `Map` overhead; the anchor-exclusive `V=8193` branch is deleted. The registry grammar maximum of 1,000,000 is not a supported-scale promise: it implies `62,502,000,000` bytes triangular or `125,000,000,000` bytes static. Phase 3a refuses anchors above the local profile before binding. Sparse indexes/interval labels stay deferred. **Mobile profiles must lower `maxEpochVertices`**                                                                                                                                                                                                                                                                                                              |
+| §11.10 batch operations                                              | **Covered**                                                                                                                                      | Phase 3f (op-batching into one signed change, alongside tip-set aggregation)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| §11.11 specify finality semantics                                    | **Covered**                                                                                                                                      | Phase 5 + the registry: a commit QC finalizes a `valueDigest`, authorizes adoption and gates pruning; `q=⌈2n/3⌉` pinned with `f=⌊(n−1)/3⌋`; formal model discharges the meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §11.12 equivocation and old-branch policy                            | **Now covered**                                                                                                                                  | Old branches are solved **objectively** by hard epochs (stale by envelope — no timeout, no replica-local memory). Same-author equivocation is **0o**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| §11.13 resource governance                                           | **Now covered**                                                                                                                                  | **1o** (complete table), plus 1f/1g/1k/1l, 2g, 3f, Track T                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| §11.14 durable adapters                                              | **Covered**                                                                                                                                      | Phase 2: `storage/` contract, `storage-browser/`, `storage-node/`; vertex log, generations, QCs, manifests, 2l author-sequence counter/envelope/outbox transaction, recovery, `exportGeneration` for backup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| §11.15 comparative benchmarks                                        | **Covered, narrower**                                                                                                                            | Profile gates + the CMP kill criterion. Deliberately per-object ceilings rather than their global matrix — but their 128-peer / 24-hour / 10M-op cases belong in the weekly tier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| §12.1 no blueprint commitment                                        | Covered (§11.1)                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.2 arbitrary JS determinism                                       | Partial by design (§11.3)                                                                                                                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.3 complete-history sync                                          | Covered (§11.7)                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.4 no certified snapshot / compaction                             | Covered (§11.8)                                                                                                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.5 in-memory storage                                              | Covered (§11.14)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.6 expensive replay / cloning / conflict processing               | **Open until atomic-apply staging is history-independent** (D.5(j): `pruneSnapshots` still materializes every vertex key per checkpoint advance) | Phase 1d(i) removes full-state payload cloning from eligible stored per-vertex/checkpoint publication; the remaining `O(stateSize)` mutable reconstruction and local round trip stay open under Phase 1d(ii), while Phase 1d(iii) owns removal or a proved bound for checkpoint-prune whole-graph key materialization. The former ~120 MB/s figure is a baseline motivation estimate, not a post-1d(i) claim. Phase 1b removes the per-message `O(V)` rebuild; 0e caps causality.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| §12.7 equivocation / old dependencies                                | Covered (§11.12)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.8 finality ≠ BFT ordering                                        | Covered (§11.11)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.9 ABI + resource controls                                        | Covered (§11.4, §11.13)                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| §12.10 benchmark evidence                                            | Covered (§11.15)                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### The five-plane architecture (§10) maps to the tracks
 
