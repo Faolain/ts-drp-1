@@ -6449,6 +6449,41 @@ and Opus 5/xhigh manifest
 P2-d must consume the exact detached receipt/package/artifact bytes; it may not
 mint runtime authority or alter the unchanged conformance child.
 
+#### D.93.14 — P2-d closure evidence
+
+P2-d is closed at signed production candidate
+`286b21d111dbec4f168242d9c2633cca24b316b6`. The catalog package now owns the
+closed public taxonomy, eager lexer initialization, synchronous read-once
+catalog admission and pure detached resolution. The private toolchain owns
+atomic catalog construction and verification; neither owner evaluates an
+artifact, retains a preparer capability or creates live runtime authority.
+
+The tests-only RED `59c189e684c9415e644edae093d1f93cb9db56f2` and its two
+oracle corrections `2e9e2f4cfd8e09a3c8b99d79f500e19995c52c21` and
+`89c5a5900a5f41e16fbd2c08e473e4f1a1a10d30` freeze `72` causal failures and
+`10` independent controls. The corrections align sorted directory identity,
+detached byte representation and one eager lexer initialization per evaluated
+catalog module identity; production never observes test instrumentation.
+GREEN `286b21d111dbec4f168242d9c2633cca24b316b6` makes P2-d `82/82`, preserves
+P2-c `429/429` and P2-a/b/ABI `44/44`, and passes both package type/build/test
+and changed-path type/lint/format/diff gates. Broad root diagnostics retain only
+the documented unrelated compact-history and protected-log baselines.
+
+The final RED correction manifests are
+`70367892ff72c0670932a7bb7b351e04e91c00af1de479542118b7e92bec0ff3` and
+`0c60d5a78f22b0e5da422a214f951e4a8c0aa01e563ec800a913c47d11e25bb8`;
+the GREEN manifest is
+`bed81cdd2c402f05e57088eaa3f7bd7e23c48c593776b7cd904c616843df7a18`.
+Fresh exact-candidate closure reviews independently authorize P2-d closure and
+P2-e start with no blocker: Grok 4.6/high verdict
+`615c8581752a535beaeba70834e179bf52dc904fd06ef5c45cdf1c7213f57ec6`,
+Kimi 3/high/100 seal
+`275d39b95e503f106de06295fa05df3291be967786112caebc95c219ac10b70b`,
+and Opus 5/xhigh manifest
+`3cb8d2f21d07bbe848c06d9730ad090af48ec2078fda7d28f005480568dcb298`.
+P2-e may add the guide, independently authored second fixture and integration
+evidence, but must not widen catalog authority or weaken these byte bindings.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
