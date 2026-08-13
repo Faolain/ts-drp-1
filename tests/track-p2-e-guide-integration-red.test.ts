@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import ts from "typescript";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { parseDocument } from "yaml";
@@ -470,6 +471,47 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 		expect(before).toBe("bceecd68c745fd9aa01448d2531eb96096667c7a166850b96a0080cdd3956f13");
 		commandOutput("pnpm", contract.ownedGateCommands.format.split(" ").slice(1));
 		expect(sha256(fs.readFileSync(artifactPath))).toBe(before);
+	});
+
+	it("owns the exact generated artifact with one causal, test-only ESLint override", async () => {
+		const artifactPath = path.join(REPOSITORY_ROOT, P2E_EXACT_ARTIFACT);
+		const before = fs.readFileSync(artifactPath);
+		const configPath = path.join(REPOSITORY_ROOT, "eslint.config.mjs");
+		const configUrl = pathToFileURL(configPath).href;
+		const eslintConfig = (await import(`${configUrl}?track-p2-e=${Date.now()}`)).default as readonly {
+			readonly files?: readonly string[];
+			readonly rules?: Readonly<Record<string, unknown>>;
+		}[];
+		const exactOwners = eslintConfig.filter(({ files }) => files?.length === 1 && files[0] === P2E_EXACT_ARTIFACT);
+		expect(exactOwners).toHaveLength(1);
+		expect(exactOwners[0]?.rules).toEqual({
+			"@typescript-eslint/explicit-function-return-type": "off",
+			"prettier/prettier": "off",
+		});
+
+		const governedLint = spawnSync("pnpm", ["exec", "eslint", P2E_EXACT_ARTIFACT], {
+			cwd: REPOSITORY_ROOT,
+			encoding: "utf8",
+			timeout: 30_000,
+		});
+		expect(governedLint.status, `${governedLint.stdout}\n${governedLint.stderr}`).toBe(0);
+
+		const root = temporaryRoot("eslint-baseline");
+		const baselineConfig = path.join(root, "eslint.config.mjs");
+		fs.writeFileSync(
+			baselineConfig,
+			`import config from ${JSON.stringify(configUrl)};\nexport default config.filter(({ files }) => !(files?.length === 1 && files[0] === ${JSON.stringify(P2E_EXACT_ARTIFACT)}));\n`
+		);
+		const baselineLint = spawnSync("pnpm", ["exec", "eslint", "--config", baselineConfig, P2E_EXACT_ARTIFACT], {
+			cwd: REPOSITORY_ROOT,
+			encoding: "utf8",
+			timeout: 30_000,
+		});
+		expect(baselineLint.status).toBe(1);
+		expect(`${baselineLint.stdout}\n${baselineLint.stderr}`).toMatch(
+			/@typescript-eslint\/explicit-function-return-type/u
+		);
+		expect(fs.readFileSync(artifactPath)).toEqual(before);
 	});
 
 	it("audits emitted declarations and consumes the exact packed runtime without exposing the private toolchain", () => {
