@@ -251,10 +251,22 @@ function isWellFormedUtf16Text(value: string): boolean {
 	for (let index = 0; index < value.length; index++) {
 		const unit = value.charCodeAt(index);
 		if (unit >= 0xd800 && unit <= 0xdbff) {
+			if (index + 1 >= value.length) return false;
 			const next = value.charCodeAt(index + 1);
 			if (next < 0xdc00 || next > 0xdfff) return false;
 			index++;
 		} else if (unit >= 0xdc00 && unit <= 0xdfff) return false;
+	}
+	return true;
+}
+
+function isSignerId(value: unknown): value is string {
+	if (typeof value !== "string" || value.length === 0 || value.length > 512 || !isWellFormedUtf16Text(value)) {
+		return false;
+	}
+	for (let index = 0; index < value.length; index++) {
+		const unit = value.charCodeAt(index);
+		if (unit <= 0x1f || (unit >= 0x7f && unit <= 0x9f)) return false;
 	}
 	return true;
 }
@@ -371,13 +383,7 @@ function decodeCreatorCarriers(signerSetBytes: Uint8Array, profileBytes: Uint8Ar
 	const signer = signerSetDecoded.value[0];
 	if (!isClosedDataRecord(signer, ["publicKey", "signerId"])) return undefined;
 	if (typeof signer.publicKey !== "string" || !PUBLIC_KEY_HEX.test(signer.publicKey)) return undefined;
-	if (
-		typeof signer.signerId !== "string" ||
-		signer.signerId.length === 0 ||
-		signer.signerId.length > 512 ||
-		!isWellFormedUtf16Text(signer.signerId)
-	)
-		return undefined;
+	if (!isSignerId(signer.signerId)) return undefined;
 	const profile = profileDecoded.value;
 	if (!isClosedDataRecord(profile, ["cryptoSuiteId", "profileId", "quorum", "signers"])) return undefined;
 	if (typeof profile.profileId !== "string" || typeof profile.cryptoSuiteId !== "string") return undefined;
