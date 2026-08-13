@@ -7553,6 +7553,111 @@ independent assent, are signed and are pushed. This amendment authorizes no
 Phase `3a-0-B` production byte by itself and makes no claim that the scanner or
 durable owner is implemented.
 
+#### D.93.20 — Phase 3a-0-B closure evidence and Phase 3a-0-C handoff
+
+Phase `3a-0-B` is closed at signed candidate
+`f53f0acd1a5d0e7139586e21d06bb63ae55d756c`, tree
+`a84ec6892badf9eafd1033d883d36771a510842e`. It implements D.93.17's shared
+closure scanner and durable current-anchor trust owner under D.93.19's corrected
+genesis-admission boundary. It does not implement storage death parity, browser
+reopen parity, combined live-state construction, anchor advancement, certified
+profiles or QC. D.93.17 and D.93.19 remain the normative contracts; this section
+records why the implementation is accepted and where the next RED begins.
+
+The signed lineage starts from the pushed D.93.19 amendment
+`882544ccd5ef1eb6605a79a214d3629e032e960c` and forms one causal chain:
+
+| Commit                                     | Closure role                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `00f52ce6a509c6c66dc943ff91ef1d8d9535dd3b` | Initial tests-only scanner, durable-owner, taxonomy, authority and public-surface RED               |
+| `21c0b9bccad578ed383913dae0ec84d3c8e93411` | Corrected the fresh-success oracle to compare the fixed-owner-open capability by identity           |
+| `2d7a4f606738cfc75238a19e3c239589b73dc353` | Initial durable trust owner, control-plane exports and exact control-plane-only dependency wiring   |
+| `fdaac150dc1436702e9cbbd0de30868b58d8876e` | Tests-only RED for hostile post-await results, poisoned references and non-iterating dense recovery |
+| `e904af5ab631efdbb354dc97ebd7f81d2247bb28` | Totalized store-result snapshots, detached byte/ref handling and exact successful-swap binding      |
+| `7769c7d84af557d8c16a6b5e853d1824df3214d6` | Tests-only RED binding an absent-head installation to initial head revision `1`                     |
+| `f53f0acd1a5d0e7139586e21d06bb63ae55d756c` | Final one-condition GREEN requiring revision `1` before returning fresh trust                       |
+
+Production ownership is deliberately small. The durable logic lives in the
+control-plane trust owner and its existing package-root export. The only package
+wiring added direct runtime dependencies on protocol-v3 and storage at the
+workspace's exact `0.11.0` version; the lockfile change is confined to the
+control-plane importer. Protocol-v3, storage and storage-node gained no new
+runtime API, injection port, parallel trust store or advancement authority.
+The tests and declaration audit own the adversarial evidence rather than a
+production test seam.
+
+The durable authority handoff now has one meaning across fresh install and
+reopen. Fresh material first passes the genuine creator installer, preserving
+all fourteen failures as `genesis-rejected`. Its generated record must then pass
+the genuine fixed-owner open against the store's captured object identity and
+genesis pin; those failures remain `trust-rejected` under the distinct ten-cause
+open union. Only the fixed-owner-open capability may escape. Digest/ref
+construction and the identity-agnostic, decode-free scanner run next, before the
+first durable read. The scanner reports only the unique detached canonical trust
+record and ref; it does not report decoded fields or accept an identity argument.
+
+One strict-durable AHE store remains the sole state owner. The initial generation
+contains exactly one trust ref, and all fallible preparation precedes the single
+absent-head CAS. A successful CAS is accepted only when its detached result binds
+the exact object, generation, closure, initial revision `1` and null superseded
+generation. A mismatch returns `store-failed` without returning trust. A genuine
+head conflict instead reopens the winner and classifies byte-identical material
+as `already-installed` or different valid material as
+`trust-state-conflict`; present-head open is read-only. This initial-revision
+check does not claim or change the storage owner's later `N → N + 1` rule.
+
+Hostile durability results are treated as untrusted input after every `await`.
+Closed own-data-descriptor snapshots replace ordinary property access;
+recovered-reference arrays are copied by indexed descriptors rather than their
+iterator; typed-array bytes are copied through captured intrinsic accessors,
+reject shared backing and never retain a blob or ref alias. The corrected swap
+oracle binds closure digest and null supersession as well as object and
+generation. Throwing accessors, proxies, sparse arrays, poisoned iterators,
+malformed results and swapped nested values therefore collapse into the closed
+`store-failed` or `trust-state-unreadable` taxonomy instead of escaping or
+minting authority. The final revision-`1` check closes the remaining fresh-CAS
+result ambiguity.
+
+Fresh execution on the final tree passed Phase `3a-0-B` `28/28`, Phase
+`3a-0-A` `31/31`, the combined B/A/predecessor/control-plane preservation
+matrix `177/177`, and existing control-plane tests `78/78`. Control-plane
+typecheck, build, prepack/pack and packed-content inspection passed, as did
+targeted ESLint, Prettier and diff-check. The final revision-GREEN evidence
+manifest is SHA-256
+`bacd77fd52d6221beda55eab7e1d6b58ed3d144bdf786dcd51652ead508c2b8b`;
+the earlier hostile-totality GREEN evidence manifest is
+`07e06bf9305d90be8ead431d5e62ac2a32c1edc6acfed6bba4c89bdfaa5c12fe`.
+
+The final independent quorum is unanimous on the signed final candidate:
+
+- Grok 4.6/high returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_B_MAY_CLOSE: yes`, `NEXT_SLICE_MAY_START: yes`, no blocker, no
+  plan change and high confidence. Its result and seal SHA-256 values are
+  `5712860e56a3c3b8740cb684304da254a3d9c6587fd9fad8cc04cba02580168d`
+  and `e18bb5fa32bd4eb77824bdc16ec86950abffb47c28eacab2b7cdb19e6d728a60`.
+- Kimi K3/high/100 returned `CODE_VERDICT: APPROVE`,
+  `PHASE_3A0_B_MAY_CLOSE: yes`, `NEXT_START: 3a-0-C`, no blocker, no
+  normative plan change and high confidence. Its result and seal-index
+  SHA-256 values are
+  `2d9fa73a8a2f0b44dc3e1d0660c712aa2f44c427dae16efe8ca4b017fae5671d`
+  and `97c1714c2789d7ea94ae35951f21f2aa2feee36613fa191200b2d30ce1413062`.
+- Opus 5/xhigh returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_B_MAY_CLOSE: yes`, no blocker and high confidence. It requested
+  only this bounded closure ledger and explicitly no D.93.17/D.93.19 normative
+  edit. Its result and integrity-manifest SHA-256 values are
+  `621b24b6912686c203c66e037a027c5504de76c1c2ff8f96287b609a4bf58292`
+  and `71b29ff2395dd8c2caef10855c9bbcece55ad2b2d36b85e42e98d57b4e6bec27`.
+
+Phase `3a-0-C` may now start with a different tests-only RED owner. It adds
+storage-node SIGKILL old-or-exact-new evidence at every install boundary and one
+simulated combined-generation swap, reusing the existing SIGKILL child pattern
+without widening production instrumentation. Phase `3a-0-D` browser reopen
+parity remains next after C. The handoff keeps three implementation cautions:
+exercise successful installation only through a backend that reports strict
+durability, allocate a fresh `GenerationId` after a failed or losing attempt,
+and add no new store method, retry policy, result arm, authority surface or
+production seam. This closure makes no claim that C or D is implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
