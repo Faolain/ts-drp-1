@@ -507,6 +507,86 @@ function simulateLostCasStore(primary: AheDurableStore, winner: AheDurableStore)
 	});
 }
 
+const STORE_WRITE_METHODS = [
+	"beginGeneration",
+	"putCachedBlob",
+	"promoteReference",
+	"completeGeneration",
+	"swapHead",
+] as const satisfies readonly StoreMethod[];
+
+function adversarialStrictStore(
+	responses: Readonly<{
+		getBlob(): unknown;
+		readHead(): unknown;
+		recoverActiveGeneration(): unknown;
+	}>
+): Readonly<{ calls: StoreMethod[]; store: AheDurableStore }> {
+	const calls: StoreMethod[] = [];
+	const record = (method: StoreMethod): void => {
+		calls.push(method);
+	};
+	const rejectedWrite = (method: StoreMethod): Promise<never> => {
+		record(method);
+		return Promise.resolve({ cause: "UNEXPECTED_WRITE", ok: false, reason: "SUBSTRATE_FAILURE" } as never);
+	};
+	const store = Object.freeze({
+		capabilities: Object.freeze({
+			durability: "strict" as const,
+			signingEligibility: "backend-capability-required" as const,
+		}),
+		beginGeneration() {
+			return rejectedWrite("beginGeneration");
+		},
+		close() {
+			record("close");
+			return Promise.resolve();
+		},
+		completeGeneration() {
+			return rejectedWrite("completeGeneration");
+		},
+		discardGeneration() {
+			return rejectedWrite("discardGeneration");
+		},
+		getBlob() {
+			record("getBlob");
+			return Promise.resolve(responses.getBlob() as never);
+		},
+		promoteReference() {
+			return rejectedWrite("promoteReference");
+		},
+		putCachedBlob() {
+			return rejectedWrite("putCachedBlob");
+		},
+		readGenerationPage() {
+			return rejectedWrite("readGenerationPage");
+		},
+		readHead() {
+			record("readHead");
+			return Promise.resolve(responses.readHead() as never);
+		},
+		recoverActiveGeneration() {
+			record("recoverActiveGeneration");
+			return Promise.resolve(responses.recoverActiveGeneration() as never);
+		},
+		swapHead() {
+			return rejectedWrite("swapHead");
+		},
+	}) as AheDurableStore;
+	return { calls, store };
+}
+
+async function settledResult(operation: () => Promise<unknown>): Promise<unknown> {
+	try {
+		return await operation();
+	} catch (error) {
+		return Object.freeze({
+			message: error instanceof Error ? error.message : String(error),
+			threw: true as const,
+		});
+	}
+}
+
 function runPublicTypeAudit(): ReturnType<typeof spawnSync> {
 	return spawnSync(
 		process.execPath,
@@ -1145,6 +1225,368 @@ describe("Phase 3a-0-B control-plane trust closure RED", () => {
 			reason: "closure-rejected",
 		});
 		await ambiguousBackend.close();
+	});
+
+	it("[RED post-await head] closes throwing and malformed readHead results without writes or authority", async () => {
+		const createStore = requireExport<CreateCurrentAnchorTrustStore>("createCurrentAnchorTrustStore");
+		const material = makeCreatorMaterial();
+		const poisonedOk = Object.defineProperty({}, "ok", {
+			enumerable: true,
+			get(): never {
+				throw new Error("POISONED_READ_HEAD_OK");
+			},
+		});
+		const poisonedValue = Object.defineProperties(
+			{},
+			{
+				ok: { enumerable: true, value: true },
+				value: {
+					enumerable: true,
+					get(): never {
+						throw new Error("POISONED_READ_HEAD_VALUE");
+					},
+				},
+			}
+		);
+		const poisonedKind = Object.freeze({
+			ok: true,
+			value: Object.defineProperty({}, "kind", {
+				enumerable: true,
+				get(): never {
+					throw new Error("POISONED_READ_HEAD_KIND");
+				},
+			}),
+		});
+		const rows = [
+			["null-result", null],
+			["missing-value", Object.freeze({ ok: true })],
+			["invalid-head-kind", Object.freeze({ ok: true, value: Object.freeze({ kind: "bogus" }) })],
+			["poisoned-ok", poisonedOk],
+			["poisoned-value", poisonedValue],
+			["poisoned-kind", poisonedKind],
+		] as const;
+		const outcomes: unknown[] = [];
+		for (const [name, response] of rows) {
+			for (const phase of ["open", "install"] as const) {
+				const fake = adversarialStrictStore({
+					getBlob: () => ({ ok: false, reason: "STORE_CLOSED" }),
+					readHead: () => response,
+					recoverActiveGeneration: () => ({ ok: false, reason: "STORE_CLOSED" }),
+				});
+				const durable = createStore({
+					objectId: OBJECT_ID,
+					pinnedGenesisAnchorDigest: material.anchorDigest,
+					store: fake.store,
+				});
+				const result = await settledResult(() =>
+					phase === "open" ? durable.open() : durable.install(installInput(material))
+				);
+				outcomes.push({
+					name,
+					phase,
+					result,
+					writes: fake.calls.filter((method) => STORE_WRITE_METHODS.includes(method as never)),
+				});
+			}
+		}
+		expect(outcomes).toEqual(
+			rows.flatMap(([name]) =>
+				(["open", "install"] as const).map((phase) => ({
+					name,
+					phase,
+					result: { ok: false, reason: "store-failed" },
+					writes: [],
+				}))
+			)
+		);
+	});
+
+	it("[RED post-await recovery/blob] snapshots dense references without iterators and closes malformed store data", async () => {
+		const createStore = requireExport<CreateCurrentAnchorTrustStore>("createCurrentAnchorTrustStore");
+		const material = makeCreatorMaterial();
+		const entry = candidate(trustRecord(material));
+		const seed = createSqliteAheDurableStore({ filename: await databaseFilename() });
+		const head = await stageAndSwap(seed, OBJECT_ID, generationId("9"), noHead(OBJECT_ID), [entry]);
+		const recovered = await seed.recoverActiveGeneration(OBJECT_ID);
+		if (!recovered.ok || recovered.value.kind !== "active") throw new Error("SEED_RECOVERY_FAILED");
+		const active = recovered.value;
+		await seed.close();
+
+		const denseWithoutIterator = [Object.freeze({ ...entry.ref })];
+		Object.defineProperty(denseWithoutIterator, Symbol.iterator, {
+			configurable: true,
+			get(): never {
+				throw new Error("REFERENCES_ITERATOR_MUST_NOT_BE_READ");
+			},
+		});
+		const indexedAccessor: unknown[] = [];
+		Object.defineProperty(indexedAccessor, "0", {
+			enumerable: true,
+			get(): never {
+				throw new Error("POISONED_REFERENCE_INDEX");
+			},
+		});
+		indexedAccessor.length = 1;
+		const sparseReferences = new Array<GenerationRef>(1);
+		const nonArrayReferences = Object.freeze({ 0: entry.ref, length: 1 });
+		const poisonedReferenceByteLength = Object.defineProperties(
+			{},
+			{
+				byteLength: {
+					enumerable: true,
+					get(): never {
+						throw new Error("POISONED_REFERENCE_BYTE_LENGTH");
+					},
+				},
+				digest: { enumerable: true, value: entry.ref.digest },
+			}
+		);
+		const poisonedReferenceDigest = Object.defineProperties(
+			{},
+			{
+				byteLength: { enumerable: true, value: entry.ref.byteLength },
+				digest: {
+					enumerable: true,
+					get(): never {
+						throw new Error("POISONED_REFERENCE_DIGEST");
+					},
+				},
+			}
+		);
+		const poisonedRecoveryOk = Object.defineProperty({}, "ok", {
+			enumerable: true,
+			get(): never {
+				throw new Error("POISONED_RECOVERY_OK");
+			},
+		});
+		const poisonedRecoveryValue = Object.defineProperties(
+			{},
+			{
+				ok: { enumerable: true, value: true },
+				value: {
+					enumerable: true,
+					get(): never {
+						throw new Error("POISONED_RECOVERY_VALUE");
+					},
+				},
+			}
+		);
+		const poisonedRecoveryKind = Object.freeze({
+			ok: true,
+			value: Object.defineProperty({}, "kind", {
+				enumerable: true,
+				get(): never {
+					throw new Error("POISONED_RECOVERY_KIND");
+				},
+			}),
+		});
+		const poisonedRecoveryHead = Object.freeze({
+			ok: true,
+			value: Object.defineProperties(
+				{},
+				{
+					head: {
+						enumerable: true,
+						get(): never {
+							throw new Error("POISONED_RECOVERY_HEAD");
+						},
+					},
+					kind: { enumerable: true, value: "active" },
+				}
+			),
+		});
+		const poisonedRecoveryReferences = Object.freeze({
+			ok: true,
+			value: Object.defineProperties(
+				{},
+				{
+					head: { enumerable: true, value: head },
+					kind: { enumerable: true, value: "active" },
+					references: {
+						enumerable: true,
+						get(): never {
+							throw new Error("POISONED_RECOVERY_REFERENCES");
+						},
+					},
+				}
+			),
+		});
+		const poisonedBlobResult = Object.defineProperties(
+			{},
+			{
+				ok: { enumerable: true, value: true },
+				value: {
+					enumerable: true,
+					get(): never {
+						throw new Error("POISONED_BLOB_VALUE");
+					},
+				},
+			}
+		);
+		const poisonedBlobOk = Object.defineProperty({}, "ok", {
+			enumerable: true,
+			get(): never {
+				throw new Error("POISONED_BLOB_OK");
+			},
+		});
+		const poisonedBlobBytes = new Proxy(new Uint8Array(entry.bytes), {
+			get(_target, property): never {
+				throw new Error(`POISONED_BLOB_DATA:${String(property)}`);
+			},
+		});
+		const rows = [
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "already-installed" },
+				expectedOpen: { head, ok: true, trustRef: entry.ref },
+				name: "dense-poisoned-iterator-control",
+				recovery: { ok: true, value: { ...active, references: denseWithoutIterator } },
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "indexed-accessor",
+				recovery: { ok: true, value: { ...active, references: indexedAccessor } },
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "sparse-references",
+				recovery: { ok: true, value: { ...active, references: sparseReferences } },
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "non-array-references",
+				recovery: { ok: true, value: { ...active, references: nonArrayReferences } },
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-reference-byte-length",
+				recovery: { ok: true, value: { ...active, references: [poisonedReferenceByteLength] } },
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-reference-digest",
+				recovery: { ok: true, value: { ...active, references: [poisonedReferenceDigest] } },
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "malformed-recovery-result",
+				recovery: null,
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-recovery-ok",
+				recovery: poisonedRecoveryOk,
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-recovery-value",
+				recovery: poisonedRecoveryValue,
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-recovery-kind",
+				recovery: poisonedRecoveryKind,
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-recovery-head",
+				recovery: poisonedRecoveryHead,
+			},
+			{
+				blob: { ok: true, value: new Uint8Array(entry.bytes) },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-recovery-references",
+				recovery: poisonedRecoveryReferences,
+			},
+			{
+				blob: null,
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "malformed-blob-result",
+				recovery: { ok: true, value: { ...active, references: [entry.ref] } },
+			},
+			{
+				blob: poisonedBlobOk,
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-blob-ok",
+				recovery: { ok: true, value: { ...active, references: [entry.ref] } },
+			},
+			{
+				blob: poisonedBlobResult,
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-blob-value",
+				recovery: { ok: true, value: { ...active, references: [entry.ref] } },
+			},
+			{
+				blob: { ok: true, value: poisonedBlobBytes },
+				expectedInstall: { ok: false, reason: "store-failed" },
+				expectedOpen: { ok: false, reason: "trust-state-unreadable" },
+				name: "poisoned-blob-data",
+				recovery: { ok: true, value: { ...active, references: [entry.ref] } },
+			},
+		] as const;
+		const outcomes: unknown[] = [];
+		for (const row of rows) {
+			for (const phase of ["open", "install"] as const) {
+				const fake = adversarialStrictStore({
+					getBlob: () => row.blob,
+					readHead: () => ({ ok: true, value: head }),
+					recoverActiveGeneration: () => row.recovery,
+				});
+				const durable = createStore({
+					objectId: OBJECT_ID,
+					pinnedGenesisAnchorDigest: material.anchorDigest,
+					store: fake.store,
+				});
+				const result = await settledResult(() =>
+					phase === "open" ? durable.open() : durable.install(installInput(material))
+				);
+				outcomes.push({
+					name: row.name,
+					phase,
+					result,
+					writes: fake.calls.filter((method) => STORE_WRITE_METHODS.includes(method as never)),
+				});
+			}
+		}
+		expect(outcomes).toEqual(
+			rows.flatMap((row) =>
+				(["open", "install"] as const).map((phase) => ({
+					name: row.name,
+					phase,
+					result:
+						phase === "open" && row.expectedOpen.ok
+							? expect.objectContaining(row.expectedOpen)
+							: phase === "open"
+								? row.expectedOpen
+								: row.expectedInstall,
+					writes: [],
+				}))
+			)
+		);
 	});
 
 	it("[RED concurrency] gives one absent-head CAS winner and byte-classifies identical versus conflicting losers", async () => {
