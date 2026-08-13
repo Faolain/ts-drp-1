@@ -675,6 +675,7 @@ export function createCurrentAnchorTrustStore(options: CurrentAnchorTrustStoreOp
 					head.objectId !== objectId ||
 					head.generationId !== generationId ||
 					head.closureDigest !== completedRecord.closureDigest ||
+					head.revision !== 1 ||
 					swapValue?.supersededGenerationId !== null
 				)
 					return failure("store-failed");
