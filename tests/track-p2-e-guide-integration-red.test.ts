@@ -61,6 +61,7 @@ type WorkflowStep = {
 };
 type WorkflowJob = {
 	readonly "continue-on-error"?: boolean;
+	readonly "env"?: Readonly<Record<string, string>>;
 	readonly "if"?: string;
 	readonly "needs"?: string | readonly string[];
 	readonly "steps": readonly WorkflowStep[];
@@ -68,6 +69,7 @@ type WorkflowJob = {
 	readonly "with"?: { readonly tier?: string };
 };
 type WorkflowValue = {
+	readonly env?: Readonly<Record<string, string>>;
 	readonly jobs: Readonly<Record<string, WorkflowJob>>;
 	readonly on: {
 		readonly pull_request: unknown;
@@ -147,6 +149,33 @@ function declarationExportNames(declaration: string): readonly string[] {
 		}
 	}
 	return names;
+}
+
+function namedTestTimeout(sourceText: string, title: string): number | undefined {
+	const sourceFile = ts.createSourceFile(
+		"track-p2-e.test.ts",
+		sourceText,
+		ts.ScriptTarget.ESNext,
+		true,
+		ts.ScriptKind.TS
+	);
+	let timeout: number | undefined;
+	function visit(node: ts.Node): void {
+		if (
+			ts.isCallExpression(node) &&
+			ts.isIdentifier(node.expression) &&
+			node.expression.text === "it" &&
+			node.arguments[0] !== undefined &&
+			ts.isStringLiteral(node.arguments[0]) &&
+			node.arguments[0].text === title
+		) {
+			const timeoutNode = node.arguments[2];
+			if (timeoutNode !== undefined && ts.isNumericLiteral(timeoutNode)) timeout = Number(timeoutNode.text);
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(sourceFile);
+	return timeout;
 }
 
 function guardAllowedTiers(script: string): readonly string[] {
@@ -512,6 +541,27 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 			/@typescript-eslint\/explicit-function-return-type/u
 		);
 		expect(fs.readFileSync(artifactPath)).toEqual(before);
+	});
+
+	it("commits a bounded timeout on the real lint oracle without hiding one in workflow commands", () => {
+		const title = "owns the exact generated artifact with one causal, test-only ESLint override";
+		const sourceText = fs.readFileSync(import.meta.filename, "utf8");
+		expect(namedTestTimeout(sourceText, title)).toBe(30_000);
+
+		const workflow = parseDocument(fs.readFileSync(path.join(REPOSITORY_ROOT, contract.workflowPath), "utf8"), {
+			schema: "core",
+		}).toJS() as WorkflowValue;
+		const exactCommand = contract.ownedGateCommands.test;
+		const timeoutEnvironment = /VITEST_[A-Z_]*TIMEOUT/iu;
+		expect(Object.keys(workflow.env ?? {}).join("\n")).not.toMatch(timeoutEnvironment);
+		for (const jobName of ["track-p2-pr", "track-p2-nightly"] as const) {
+			const job = workflow.jobs[jobName];
+			const runs = job.steps.flatMap((step) => (typeof step.run === "string" ? [step.run] : []));
+			expect(runs.filter((run) => run === exactCommand)).toHaveLength(1);
+			expect(runs.join("\n")).not.toMatch(/(?:--test-?timeout|VITEST_[A-Z_]*TIMEOUT)/iu);
+			expect(Object.keys(job.env ?? {}).join("\n")).not.toMatch(timeoutEnvironment);
+			for (const step of job.steps) expect(Object.keys(step.env ?? {}).join("\n")).not.toMatch(timeoutEnvironment);
+		}
 	});
 
 	it("audits emitted declarations and consumes the exact packed runtime without exposing the private toolchain", () => {
