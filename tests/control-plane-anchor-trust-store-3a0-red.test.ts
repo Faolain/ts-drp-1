@@ -409,7 +409,7 @@ type StoreMethod = Exclude<keyof AheDurableStore, "capabilities">;
 
 function observeStore(
 	store: AheDurableStore,
-	options: Readonly<{ failFirstSwap?: boolean }> = {}
+	options: Readonly<{ failFirstSwap?: boolean; rewriteSwapRevision?: number }> = {}
 ): Readonly<{ calls: Array<Readonly<{ input: unknown; method: StoreMethod }>>; store: AheDurableStore }> {
 	const calls: Array<Readonly<{ input: unknown; method: StoreMethod }>> = [];
 	const record = (method: StoreMethod, input: unknown): void => {
@@ -459,17 +459,28 @@ function observeStore(
 			record("recoverActiveGeneration", input);
 			return store.recoverActiveGeneration(input);
 		},
-		swapHead(input: Parameters<AheDurableStore["swapHead"]>[0]) {
+		async swapHead(input: Parameters<AheDurableStore["swapHead"]>[0]) {
 			record("swapHead", input);
 			if (failSwap) {
 				failSwap = false;
-				return Promise.resolve({
+				return {
 					cause: "SIMULATED_CRASH_BEFORE_HEAD_CAS",
 					ok: false as const,
 					reason: "SUBSTRATE_FAILURE" as const,
-				});
+				};
 			}
-			return store.swapHead(input);
+			const result = await store.swapHead(input);
+			if (!result.ok || options.rewriteSwapRevision === undefined) return result;
+			return Object.freeze({
+				ok: true as const,
+				value: Object.freeze({
+					head: Object.freeze({
+						...result.value.head,
+						revision: options.rewriteSwapRevision as PresentHead["revision"],
+					}),
+					supersededGenerationId: result.value.supersededGenerationId,
+				}),
+			});
 		},
 	});
 	return { calls, store: wrapper };
@@ -1114,6 +1125,44 @@ describe("Phase 3a-0-B control-plane trust closure RED", () => {
 		]);
 		expect(backend.calls.filter(({ method }) => method === "swapHead")).toHaveLength(1);
 		await backend.store.close();
+	});
+
+	it("[RED initial CAS revision] accepts exact revision 1 and rejects a hostile revision 2 success without authority", async () => {
+		const createStore = requireExport<CreateCurrentAnchorTrustStore>("createCurrentAnchorTrustStore");
+		const material = makeCreatorMaterial();
+		const expectedMethods = [
+			"readHead",
+			"beginGeneration",
+			"putCachedBlob",
+			"promoteReference",
+			"completeGeneration",
+			"swapHead",
+		] as const satisfies readonly StoreMethod[];
+		const controlBackend = observeStore(createSqliteAheDurableStore({ filename: await databaseFilename() }));
+		const control = createStore({
+			objectId: OBJECT_ID,
+			pinnedGenesisAnchorDigest: material.anchorDigest,
+			store: controlBackend.store,
+		});
+		const installed = await control.install(installInput(material));
+		expect(installed).toMatchObject({ head: { revision: 1 }, ok: true });
+		expect(controlBackend.calls.map(({ method }) => method)).toEqual(expectedMethods);
+		await controlBackend.store.close();
+
+		const hostileBackend = observeStore(createSqliteAheDurableStore({ filename: await databaseFilename() }), {
+			rewriteSwapRevision: 2,
+		});
+		const hostile = createStore({
+			objectId: OBJECT_ID,
+			pinnedGenesisAnchorDigest: material.anchorDigest,
+			store: hostileBackend.store,
+		});
+		assertClosedFailure(await hostile.install(installInput(material)), { ok: false, reason: "store-failed" });
+		expect(hostileBackend.calls.map(({ method }) => method)).toEqual(expectedMethods);
+		expect(
+			hostileBackend.calls.slice(hostileBackend.calls.findIndex(({ method }) => method === "swapHead") + 1)
+		).toEqual([]);
+		await hostileBackend.store.close();
 	});
 
 	it("[RED reopen taxonomy] exposes exactly three fixed-option and five classifiable stored-record open causes", async () => {
