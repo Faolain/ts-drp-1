@@ -55,6 +55,8 @@ const trackP2cExactArtifactFixtures = [
 	"tests/fixtures/track-p2-c/thenable.mjs",
 ];
 const trackP2cHarnessFixtures = ["tests/fixtures/track-p2-c/child-preload.mjs"];
+const trackP2eExactSourceFixtures = ["tests/fixtures/track-p2-e/message-register/blueprint.ts"];
+const trackP2eHarnessFixtures = ["tests/fixtures/track-p2-e/build-synthetic-bundle.mjs"];
 
 /** @type {import("typescript-eslint").ConfigArray} */
 const config = tsLintConfig(
@@ -336,6 +338,20 @@ const config = tsLintConfig(
 		files: trackP2cHarnessFixtures,
 		rules: {
 			"@typescript-eslint/explicit-function-return-type": "off",
+		},
+	},
+	{
+		files: trackP2eExactSourceFixtures,
+		rules: {
+			"@typescript-eslint/no-unused-vars": "off",
+		},
+	},
+	{
+		files: trackP2eHarnessFixtures,
+		rules: {
+			"@typescript-eslint/explicit-function-return-type": "off",
+			"jsdoc/require-param": "off",
+			"jsdoc/require-returns": "off",
 		},
 	},
 	{
