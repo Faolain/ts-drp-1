@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -81,6 +82,7 @@ const FIRST_FIXTURE = path.join(REPOSITORY_ROOT, "tests/fixtures/track-p2-a/forw
 const SECOND_FIXTURE = path.join(REPOSITORY_ROOT, contract.secondFixtureDirectory);
 const GOLDEN_NAMES = contract.secondFixtureGoldens;
 const temporaryDirectories: string[] = [];
+const P2E_EXACT_ARTIFACT = "tests/fixtures/track-p2-e/message-register/artifact.mjs";
 
 function temporaryRoot(label: string): string {
 	const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), `track-p2-e-${label}-`));
@@ -115,6 +117,10 @@ function commandOutput(command: string, arguments_: readonly string[], cwd = REP
 	return execFileSync(command, [...arguments_], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
+function sha256(bytes: Uint8Array): string {
+	return createHash("sha256").update(bytes).digest("hex");
+}
+
 function declarationExportNames(declaration: string): readonly string[] {
 	const sourceFile = ts.createSourceFile("index.d.ts", declaration, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
 	const names: string[] = [];
@@ -146,6 +152,21 @@ function guardAllowedTiers(script: string): readonly string[] {
 	const match = /^case "\$TRACK_P2_TIER" in\n {2}([a-z]+(?: \| [a-z]+)*)\) ;;\n {2}\*\) exit 1 ;;\nesac$/u.exec(script);
 	if (match?.[1] === undefined) throw new TypeError("tier guard must be one exact validation-only case statement");
 	return match[1].split(" | ");
+}
+
+function closedAuthoringWorkflowScript(tier: "pr" | "nightly"): string {
+	const authoring = `$RUNNER_TEMP/track-p2-${tier}-authoring`;
+	return [
+		`authoring="${authoring}"`,
+		'cleanup() { rm -rf "$authoring"; }',
+		"trap cleanup EXIT",
+		'mkdir "$authoring"',
+		'cp tests/fixtures/track-p2-e/message-register/blueprint.json "$authoring/blueprint.json"',
+		'cp tests/fixtures/track-p2-e/message-register/blueprint.ts "$authoring/blueprint.ts"',
+		`node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir "$authoring" --out "$RUNNER_TEMP/track-p2-${tier}" --tier ${tier}`,
+		"cleanup",
+		"trap - EXIT",
+	].join("\n");
 }
 
 async function buildSyntheticNightly(label: string, source: string): Promise<Bundle> {
@@ -435,6 +456,22 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 		expect(JSON.stringify(shipping)).not.toMatch(/blueprint|toolchain|catalog/iu);
 	});
 
+	it("governs the exact P2-e artifact as byte-frozen input outside Prettier ownership", () => {
+		const ignored = fs
+			.readFileSync(path.join(REPOSITORY_ROOT, ".prettierignore"), "utf8")
+			.split("\n")
+			.filter((line) => line.length > 0);
+		expect(ignored.filter((line) => line === P2E_EXACT_ARTIFACT)).toEqual([P2E_EXACT_ARTIFACT]);
+	});
+
+	it("runs the real workflow-owned format gate without rewriting the exact artifact", () => {
+		const artifactPath = path.join(REPOSITORY_ROOT, P2E_EXACT_ARTIFACT);
+		const before = sha256(fs.readFileSync(artifactPath));
+		expect(before).toBe("bceecd68c745fd9aa01448d2531eb96096667c7a166850b96a0080cdd3956f13");
+		commandOutput("pnpm", contract.ownedGateCommands.format.split(" ").slice(1));
+		expect(sha256(fs.readFileSync(artifactPath))).toBe(before);
+	});
+
 	it("audits emitted declarations and consumes the exact packed runtime without exposing the private toolchain", () => {
 		commandOutput("pnpm", ["--filter", "@ts-drp/blueprint-catalog", "build"]);
 		const declarationPath = path.join(REPOSITORY_ROOT, "packages/blueprint-catalog/dist/src/index.d.ts");
@@ -556,12 +593,15 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 			for (const test of contract.nightlyTests) expect(runs.every((run) => !run.includes(test))).toBe(true);
 		}
 		expect(nightlyRuns).toContain(`pnpm exec vitest run ${contract.nightlyTests.join(" ")} --coverage.enabled=false`);
-		expect(prRuns).toContain(
-			'node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-pr" --tier pr'
-		);
-		expect(nightlyRuns).toContain(
-			'node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-nightly" --tier nightly'
-		);
+		for (const [tier, runs] of [
+			["pr", prRuns],
+			["nightly", nightlyRuns],
+		] as const) {
+			const productionBuilds = runs.filter((run) =>
+				run.includes("packages/blueprint-toolchain/bin/drp-blueprint.mjs build")
+			);
+			expect(productionBuilds).toEqual([closedAuthoringWorkflowScript(tier)]);
+		}
 		expect(prRuns.every((run) => !run.includes("--tier nightly"))).toBe(true);
 		expect(nightlyRuns.every((run) => !run.includes("--tier pr"))).toBe(true);
 		expect(guardRun).not.toMatch(/\b(?:pnpm|node|vitest|drp-blueprint|build|test)\b/u);
