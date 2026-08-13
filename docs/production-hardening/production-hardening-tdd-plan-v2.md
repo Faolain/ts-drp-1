@@ -7848,6 +7848,484 @@ authenticated current-anchor result before live-state authority without
 claiming delegated, attested or QC support; this ledger makes no claim that
 `3a-1` is implemented.
 
+#### D.93.23 — Phase 3a-1 creator preparation and activation split
+
+The former monolithic `3a-1` is superseded by `3a-1A` followed by `3a-1B`.
+Slice A authenticates and durably prepares one creator-genesis live generation;
+slice B consumes that preparation and is the first owner of a published live
+index or any live effect. Closing A does not close `3a-1`, authorize a certified
+profile or start Phase 3b.
+
+The split exists to keep the authoritative write independent of three missing
+live seams. Before B RED, separate amendments must freeze: authenticated vertex
+extraction into the existing live object without widening `AdmissionDecision`;
+a durable pending-to-published issuance/outbox transition; and exact
+transport/topic/subscription composition for the legacy, v2 and v3 planes.
+Those are B blockers, not reasons to defer the independently enforceable A
+boundary.
+
+##### Owner, surface and dependencies
+
+The sole A/B owner is the new private cross-runtime source module
+`packages/node/src/v3-live.ts`. It is not re-exported by `packages/node/src/index.ts`,
+the node runtime subpath or any package `exports` entry; it adds no `DRPNode`
+method and does not widen the protocol-v3 nine-value runtime root. The module
+may temporarily live in `@ts-drp/node` only while it remains platform-pure: no
+`node:*`, filesystem, `process`, environment, dynamic-import or runtime
+blueprint-catalog dependency. Before the first browser or certified-genesis
+consumer, and no later than Phase 3b, the source moves without semantic change
+to a closed cross-runtime `@ts-drp/v3-live` package. Its temporary location is
+not evidence that `@ts-drp/node` is the permanent cross-runtime composition
+root.
+
+The node package declares every direct runtime owner it imports: existing
+`@ts-drp/control-plane` plus `@ts-drp/protocol-v3`, `@ts-drp/storage`,
+`@ts-drp/compaction` and `@ts-drp/canonical`, all at the repository's exact
+workspace version policy. `@ts-drp/blueprint-catalog` is a development/type
+dependency only and appears solely in `import type`. A already-opened frozen
+`TrustedBlueprintCatalog` is supplied by the trusted local composition caller;
+A never opens a directory, retains a path or imports catalog production code.
+The resolver result remains untrusted and is accepted only after the genuine
+protocol preparers reproduce its identities.
+
+The private module exports exactly one callable A entry and its types to its
+future in-package B consumer:
+
+```ts
+export interface PrepareV3LiveGenerationInput {
+	readonly authenticationProfile: "creator-only";
+	readonly store: AheDurableStore;
+	readonly objectId: StorageObjectId;
+	readonly pinnedGenesisAnchorDigest: string;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly detachedSignature: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly catalog: TrustedBlueprintCatalog;
+}
+
+export type PrepareV3LiveFailureKind =
+	| "malformed-input"
+	| "trust-open-failed"
+	| "anchor-authentication-failed"
+	| "parameters-rejected"
+	| "blueprint-unresolved"
+	| "admission-rejected"
+	| "runtime-preparation-failed"
+	| "graph-rejected"
+	| "trust-not-preserved"
+	| "stale-head"
+	| "storage-failed"
+	| "internal-invariant";
+
+export interface V3LiveDescriptor {
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly anchorDigest: string;
+	readonly blueprintDigest: string;
+	readonly parametersDigest: string;
+	readonly profileDigest: string;
+	readonly signerSetDigest: string;
+	readonly artifactDigest: string;
+	readonly artifactId: string;
+	readonly catalogDigest: string;
+	readonly runtimeProfile: "ecmascript-2024-sync-v1";
+	readonly trustProfile: "creator-only";
+	readonly trustRef: GenerationRef;
+	readonly maxEpochVertices: number;
+	readonly maxEpochBytes: number;
+	readonly maxDependencies: number;
+	readonly vertexCount: 1;
+	readonly byteCharge: number;
+	readonly projectionDigest: BlobDigest;
+	readonly head: PresentHead;
+}
+
+declare const preparedV3LiveBrand: unique symbol;
+export type PreparedV3Live = Readonly<{ readonly [preparedV3LiveBrand]: true }>;
+
+export type PrepareV3LiveResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly capability: PreparedV3Live;
+			readonly descriptor: V3LiveDescriptor;
+	  }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: PrepareV3LiveFailureKind;
+			readonly detail: string;
+	  }>;
+
+export function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Promise<PrepareV3LiveResult>;
+```
+
+The input is an exact closed eight-key own-data record. Before the first await,
+A snapshots the exact store and catalog object identities and the scalar
+`authenticationProfile`, `objectId` and `pinnedGenesisAnchorDigest`, then makes
+detached copies of all three byte arrays with pristine intrinsics; shared
+backing is rejected. The pin must be lowercase 64-hex. `objectId` must pass the
+greenfield `parseStorageObjectId` parser, and the parsed value must equal the
+captured input spelling. Literal `creator-only`, those scalar rules and every
+key, descriptor, syntax, length and brand rule are validated before
+`createCurrentAnchorTrustStore`, the first store call or catalog operation.
+Any delegated/attested/certified or extra field is `malformed-input` at that
+same pre-I/O gate. The exact captured store reference and parsed object id are
+then passed unchanged to `createCurrentAnchorTrustStore` and every later raw
+store operation; substitution of either is forbidden. No loose options bag,
+callback, dependency-injection port, caller graph, decoded parameters, limits,
+admission/runtime value or index is accepted.
+
+##### Authentication, parameters and catalog preparation
+
+At module evaluation A captures the built-in `Map` constructor and
+`Map.prototype.get`, `has`, `set`, `keys` and `entries`, plus the exact Array,
+Object, Reflect and typed-array intrinsics used for snapshotting, indexing and
+freezing. Later prototype mutation cannot change their identity or behavior.
+
+A creates the existing fixed-object `CurrentAnchorTrustStore`, opens it, and
+requires a successful creator trust result whose `head.objectId` and
+`trust.objectId` both equal the captured and parsed object id. It then calls the
+genuine `authenticateCurrentEpochAnchor` with the copied anchor/signature and
+the opened trust. The proven epoch must be zero and the proven object must equal
+that same captured/store object id. A independently recomputes the protocol
+anchor digest with the public `hashDomain` owner imported from
+`@ts-drp/canonical` and requires the literal relation
+`bytesToLowerHex(hashDomain("ts-drp/epoch-anchor/v3", copiedExactAnchorPreimageBytes)) === capturedPin === proven.anchorDigest`.
+Here `capturedPin` is the pre-await copy of
+`pinnedGenesisAnchorDigest` and `proven` is the genuine authentication result;
+A may own only the byte-to-lowercase-hex rendering. It must not privately
+reimplement `hashDomain`, the `ts-drp/epoch-anchor/v3` domain framing or the
+exact anchor-preimage construction. The storage `digestBlob` domain is not used
+for this authority comparison. Every downstream object, epoch, anchor,
+blueprint, parameters and signer-set identity comes only from this genuine
+provenance; corresponding caller or decoded values are never authoritative.
+Trust-profile provenance is the opened `CurrentAnchorTrust.profileId`, which
+must be `creator-trusted-v1`; the projection's `trustProfile="creator-only"` is
+only A's selector label and is never substituted for or reported as trust
+provenance.
+
+The parameter carrier is canonical-decoded and exact-reencoded under the
+published `@ts-drp/protocol-v3/registry/registry-v1.json` `parameters` entry.
+It has exactly the registry's seven required safe-integer fields and its digest
+is recomputed using that entry's `ts-drp/parameters/v3` domain, then compared
+with the authenticated anchor's `parametersDigest`. No private copy of the
+registry schema or domain is allowed. The sole source for A's seven initial
+supported parameter values is the existing frozen `defaultParameters` record
+in `packages/protocol-v2/src/registry.ts`, the Phase-0p constant source; A does
+not redeclare those seven literals. A does not import protocol-v2 at runtime or
+deep-import that private record. Its production supported-profile entry stores
+only the precomputed parameters digest derived from that tuple and the runtime
+profile `ecmascript-2024-sync-v1`; descriptor maxima are copied from the
+authenticated decoded carrier after its recomputed digest selects that entry.
+The RED reads and parses that exact source through a workspace-relative
+filesystem path, never through a package or deep import. It derives the
+canonical seven-field tuple and digest independently, requires the production
+digest entry to equal that derivation, and implements the recursive sweep as a
+root-parameterized pure test function over every A production source, generated
+output, runtime import edge, declared dependency edge and code-generation path.
+Import- and dependency-edge checks cover only A's production dependency and
+lockfile closure: the test's workspace-relative source read neither trips that
+check nor creates an exemption from it. The sweep proves there is no protocol-v2
+runtime or deep import, generator edge, second seven-literal table, A-local
+default record or other parallel parameter owner: the only A production profile
+material is the precomputed parameters digest and runtime-profile label above.
+Test-only causal mutants run against temporary copies rooted at A's tree and
+independently add (1) a direct production protocol-v2 import, (2) an emitted
+generated-output copy of the seven values, (3) an indirect runtime-import path
+through another module, (4) a protocol-v2 manifest/lock dependency edge, (5) a
+generator input or template that reads or emits the defaults even when the real
+A tree has no generator path, and (6) a differently named parallel parameter
+record; each must fail its matching recursive sweep without touching production
+or adding a production seam. Thus the existing node dependency list remains
+exhaustive and no generation-time or runtime protocol-v2 edge is introduced.
+Registry-valid but absent
+parameter tuples, carrier decode failure, noncanonical bytes, wrong schema,
+missing/extra fields, a non-safe or out-of-registry integer, and digest/value
+disagreement are all `parameters-rejected` before catalog resolution. The
+authenticated creator
+`profileDigest` remains observable in the descriptor but is not a static
+allowlist key: it commits the signer-specific creator profile carrier already
+verified by `CurrentAnchorTrust`, so pinning one value would admit only one
+creator. Adding a mobile or other supported parameter tuple is a separately
+reviewed profile-table change, not a registry relaxation.
+
+Only then may A call `catalog.resolve` with the authenticated
+`blueprintDigest`. A snapshots the catalog digest and the complete resolved
+byte/evidence record and requires
+`catalogSnapshot.blueprintDigest === proven.blueprintDigest`; a mismatch is
+`blueprint-unresolved`. It then requires self-consistent catalog, blueprint and
+artifact identities and requires the resolved runtime profile to equal the
+profile recorded by the selected supported parameter tuple. A runtime-profile
+mismatch is `blueprint-unresolved` before either genuine preparer or artifact
+evaluation. A passes the copied canonical package bytes and
+`expectedBlueprintDigest: proven.blueprintDigest` to the genuine
+`prepareBlueprintAdmission`, then awaits the genuine `prepareBlueprintRuntime`
+with the exact package/artifact bytes, that same
+`expectedBlueprintDigest: proven.blueprintDigest` and the same admission
+capability. The genuine admission result must expose exactly the catalog
+snapshot's `blueprintDigest`; a mismatch is `admission-rejected`. The genuine
+runtime result must expose exactly that same `blueprintDigest` plus the catalog
+snapshot's `artifactDigest`, `artifactId` and runtime profile; a mismatch is
+`runtime-preparation-failed`. A `BlueprintCatalogError`,
+accessor/proxy failure or any other resolver throw is contained as
+`blueprint-unresolved`; preparer throws or rejections map only to their named
+stage. Unknown throw text, caller bytes and capability material never appear in
+`detail`.
+
+Failures are total, frozen and non-throwing. Their strict first-failure gate
+order is the twelve-member `PrepareV3LiveFailureKind` order above. Each external
+call is contained separately. Known closed nested failures produce a fixed
+path-free diagnostic; an otherwise unclassifiable internal throwable becomes
+`internal-invariant`. No later gate runs after a failure.
+
+##### Owned graph, projection and opaque authority
+
+A is creator-genesis preparation, so its complete authenticated initial graph
+is exactly one anchor vertex derived from authenticated anchor provenance:
+`hash=anchorDigest`, `kind="drp-epoch-anchor"`, `objectId`, `epoch=0` and an
+empty dependency list. Using only the captured intrinsics, A builds one
+owner-created built-in `Map`, the exact order `[anchorDigest]`, and one
+owner-created charge map whose only value is the copied exact anchor-preimage
+byte length. It proves identical graph/order/charge keysets, one charge per
+ordered hash, `vertexCount === order.length === chargeEntryCount === 1`, safe
+sum and the authenticated profile ceilings. It then constructs one genuine
+validation-only `CausalityIndex` with that owned graph, order and charges and
+immediately discards the index. No caller/network `ReadonlyMap`, subclass,
+proxy, iterator or post-import prototype lookup reaches the primitive.
+
+This validation discharges D.73's hostile graph-source, virtual-`Map.keys()` and
+charge-ownership obligation in A. It does not publish an index. B may construct
+the live index only from the same sealed owner-owned graph/order/charges via the
+module-private unseal; B accepts no second graph source and owns the published
+index and all later vertex extraction.
+
+The two local graph-digest preimages are closed plain own-data records with the
+exact keys, nesting, array order and construction order below. No symbol,
+accessor, inherited, omitted or extra property is accepted:
+
+```ts
+const orderedVertexHashesPreimage = {
+	kind: "v3-live-order-1",
+	orderedVertexHashes: [anchorDigest],
+};
+
+const graphChargePreimage = {
+	kind: "v3-live-graph-1",
+	vertices: [
+		{
+			hash: anchorDigest,
+			kind: "drp-epoch-anchor",
+			objectId,
+			epoch: 0,
+			dependencies: [],
+		},
+	],
+	charges: [{ hash: anchorDigest, byteCharge }],
+};
+```
+
+The field lists shown are the literal construction order. Both values are
+encoded with `@ts-drp/canonical` canonical profile 1, whose encoded object-key
+order remains authoritative; the arrays retain exactly the displayed order.
+`exactOrderPreimageBytes` is exactly
+`encodeCanonical(orderedVertexHashesPreimage)` and
+`exactGraphChargePreimageBytes` is exactly
+`encodeCanonical(graphChargePreimage)`. The assignments are exactly
+`orderedVertexHashesDigest =
+digestBlob(exactOrderPreimageBytes).value` and
+`graphDigest = digestBlob(exactGraphChargePreimageBytes).value`; either
+non-success is `internal-invariant` before projection construction. They
+introduce no consensus/signature domain.
+
+The local canonical live projection is the closed plain own-data record with
+exactly the following twenty fields in the displayed literal construction
+order, canonical profile-1 encoding and no extra field:
+
+```ts
+{
+	kind: "v3-live-generation-1",
+	objectId,
+	epoch,
+	anchorDigest,
+	blueprintDigest,
+	parametersDigest,
+	profileDigest,
+	signerSetDigest,
+	artifactDigest,
+	artifactId,
+	catalogDigest,
+	runtimeProfile,
+	trustProfile: "creator-only",
+	maxEpochVertices,
+	maxEpochBytes,
+	maxDependencies,
+	vertexCount,
+	byteCharge,
+	orderedVertexHashesDigest,
+	graphDigest
+}
+```
+
+Derivation order is normative: first construct the owner-created graph, order
+and charge containers; second construct and canonical-encode the two exact
+preimages above; third compute `orderedVertexHashesDigest` and `graphDigest`;
+fourth construct and canonical-encode the exact twenty-field projection as
+`exactProjectionBytes`; fifth compute
+`projectionDigest = digestBlob(exactProjectionBytes).value`; sixth construct
+`liveStateRef = {digest:projectionDigest,
+byteLength:exactProjectionBytes.byteLength}`; and seventh form the exact
+closure as a dense ordinary Array of length two whose indexed elements are
+detached closed own-data `{digest,byteLength}` records copied from `trustRef`
+and `liveStateRef`. The Array is sorted ascending by the lowercase 64-hex
+`digest` using the storage comparator
+`left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0`; ref
+object field construction order is exactly `digest`, then `byteLength`. Equal
+digests are rejected as `internal-invariant` before staging rather than given a
+tie-breaker. The array has no named or symbol expando and no hole.
+`projectionDigest` is deliberately not a self-referential projection field.
+No
+admission capability, runtime capability, reducer, function, index, raw byte,
+trust capability or arbitrary caller material is serializable into this
+record.
+
+`PreparedV3Live` is a type-only nominal token. Its runtime object is frozen and
+has no own enumerable data, serializer, primitive conversion or inspection
+hook. A module-private `WeakMap` holds all sensitive payload: opened
+trust/head/ref; authenticated provenance; detached package/artifact and
+parameter evidence; genuine admission/runtime capabilities; owned graph/order/
+charges; captured intrinsics; projection bytes/ref; and descriptor inputs.
+Copying, cloning, serializing, reconstructing or forging the token cannot find
+that payload. B's module-private consume deletes the entry before returning it;
+reuse is a closed `capability-consumed` B failure, never a throw. The returned
+deeply frozen descriptor is the only observation and contains only the exact
+digests, scalars, profile, maxima, ref and head shown above.
+
+##### One combined authority transition and reopen
+
+All decode, authentication, catalog/preparer work, graph construction, hashing,
+closure recovery and `assertTrustPreserved` finish outside every writer lock or
+transaction. The proposed digest-sorted closure is exactly the opened trust ref
+and the new live-state ref. The preservation candidate set contains detached
+bytes for every scannable ref, including the new projection, so the shared
+identity-agnostic scanner remains authoritative. A trust-only successor or a
+second trust record is forbidden. Any `assertTrustPreserved` failure maps to
+`trust-not-preserved` and returns before `beginGeneration` or any other staging
+operation.
+
+After the deterministic projection is known, initial and restart handling has
+only three states. An exact trust-only closure containing the opened trust ref
+may stage. The exact digest-sorted two-ref closure containing that trust ref and
+the locally recomputed live-state ref follows the no-CAS reopen path. Any other
+head or closure is `stale-head` before staging; A neither repairs, extends nor
+chooses among pre-existing live refs.
+
+For a trust-only current head, one attempt uses a fresh `GenerationId` and the
+existing AHE sequence: begin the generation against the exact opened head, put
+the projection blob, promote the preserved trust and projection refs, complete
+the generation, then issue one short `swapHead` CAS. Immediately before each
+of the at-most-two attempts, A reopens the trust ref, freshly loads and detaches
+the complete preservation candidate set for that reopened head, and reruns
+`assertTrustPreserved`; the first attempt's trust ref, candidates or
+preservation result cannot authorize the second. Any such fresh check failure
+is `trust-not-preserved` before that attempt stages. The CAS is the attempt's
+only authoritative act; staging failure leaves only unreachable debris. A
+successful result must bind exact object, generation, closure, prior revision
+plus one and the prior generation as superseded.
+
+Before minting any capability, A reopens through the durable trust owner and
+recovers the committed generation. It requires exact equality of head,
+preserved trust ref and projection ref and locally recomputes the projection
+digest. A process restart or repeated call performs the full authentication,
+catalog/runtime preparation and graph derivation again; if the current closure
+equals the exact digest-sorted two-ref set `{trustRef,liveStateRef}`, it mints a
+fresh process-local token after that same reopen comparison and performs no CAS.
+No branch treats insertion order as authority. It never deserializes a prior
+token.
+
+Every definite CAS loss and every ambiguous submit/storage outcome, on either
+attempt, first reopens before choosing a result. Reopen classification is
+exact, in this order:
+
+1. the exact matching digest-sorted trust-plus-projection winner follows the
+   no-CAS reopen path and may remint;
+2. a different authoritative head or any non-exact closure is `stale-head`;
+3. the same unchanged trust-only head after an ambiguous outcome is
+   `storage-failed`;
+4. the same unchanged trust-only head after the first definite loss permits
+   one additional attempt; after the second definite loss it is `stale-head`.
+
+Within a permitted retry in the same invocation, A retains the already
+authenticated deterministic payload, projection ref and genuine preparer
+capabilities; it refreshes the opened trust ref, complete detached candidate
+set, preservation decision, `GenerationId`, staging records and expected-head
+snapshot. Reusing a losing generation, stale trust ref, stale candidate set or
+head is forbidden. Across a call there may be at most two CAS calls, but exactly
+one combined CAS can become authoritative. No loss or ambiguous outcome returns
+before the mandatory reopen classification above.
+
+##### Zero effects, tests and B handoff
+
+A creates zero subscription, reducer invocation, fold/dispatch, application or
+proxy state, published index, append, author-sequence transaction, issuance or
+outbox publication, ACL mutation, callback, timer, network/topic work or raw
+catalog/preparer/trust exposure. The only successful mutation is the one
+combined-generation head CAS. Artifact import/evaluation is preparation, not
+reducer execution or live activation.
+
+The TDD order is exact and each item receives its own RED/GREEN/review cycle:
+
+1. `3a-1A-a` freezes the private surface, exact input copies, creator-only
+   pre-I/O pin/id/store binding, anchor-domain pin/provenance equality,
+   canonical public hash ownership, opened-trust versus selector-profile
+   semantics, trust/anchor/parameter/catalog/preparer order, the single
+   Phase-0p parameter source, recursive source/output/import/dependency/codegen
+   sweeps and their six causal edge mutants, catalog versus proven blueprint
+   equality, both exact `expectedBlueprintDigest` arguments, exact
+   admission/runtime emission identity, all twelve result kinds, catalog-throw
+   containment and zero live effects.
+2. `3a-1A-b` freezes the anchor-only owned graph, pristine-intrinsic behavior,
+   D.73 subclass/proxy/prototype-poison mutants, charge/key/order equality,
+   exact twenty-field bytes/ref and validation-only discarded index.
+3. `3a-1A-c` freezes preservation before staging, exact two-ref closure, one
+   authoritative CAS, result binding, reopen-before-mint, crash/ambiguous/lost
+   CAS including reopen after every first/second definite or ambiguous outcome,
+   freshly reopened trust/candidates plus a new preservation check immediately
+   before each attempt, exact-winner remint, one fresh retry, process-local token
+   forgery/copy/serialization/reuse, and the no-CAS restart path.
+
+Fast PR gates use bounded unit/storage controls plus source, built, packed,
+type, dependency, lockfile, lint, format and public-surface audits. Existing
+storage-node `SIGKILL` and three-engine strict-IDB patterns own real crash and
+browser-reopen evidence and remain nightly where their duration warrants it.
+The RED must prove no node-root/`DRPNode` or protocol-v3 runtime widening, no
+runtime catalog import, no `node:*` edge and no conformance/deep-import escape.
+
+`3a-1B` consumes only a genuine sealed A token and may not decode,
+reauthenticate, re-resolve or rederive caller material. It remains blocked
+exactly on authenticated vertex extraction into the existing live object, the
+durable pending-to-published issuance/outbox API, and transport/topic/
+subscription three-plane composition. Once those contracts are signed, B owns
+the published index built solely from A's sealed graph, reducer/application
+construction, received-byte admission and charging, local durable issuance and
+outbox publication, ACL/callback/timer wiring and all live effects. Phase 3b
+starts only after B closes.
+
+This section supersedes D.93.17 and the Phase-3a row only where they describe
+`3a-1` as one monolithic live-binding slice or assign the whole D.73 obligation
+to first index publication. D.93.17's creator trust APIs, one-store authority
+and exact trust-ref preservation remain unchanged. D.93.20 through D.93.22
+remain authenticated non-normative evidence ledgers; D.93.23 neither supersedes
+them nor promotes them into normative contracts.
+The Phase-3a row's catalog/preparer/index/subscription/issuance/outbox work is
+now ordered A then B as above; no other Phase-3 row or later ownership changes.
+
+The independent design quorum authorized this corrected split: Grok 4.6/high
+and Kimi K3/high/100 both returned `A_SPLIT`, amendment required and A RED after
+commit; the final native Opus 5/xhigh tools-empty reconciliation returned
+`CHOICE: A_SPLIT`, `AUTHORIZE: yes`, `PHASE_3A1_RED_MAY_START_AFTER_COMMIT: yes`
+and no A blocker. Its exact result is preserved under the controller's
+Phase-3a-1 reconciliation evidence. These bytes must receive final exact-byte
+Grok/Kimi/Opus assent and be signed and pushed before `3a-1A-a` RED starts.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
@@ -11491,6 +11969,19 @@ remains immutable; the supplement is a separately governed post-freeze addendum.
 > catalog/preparer/index/subscription/issuance/outbox and D.73 duties already listed in the row.
 > Delegated/attested genesis remains Phase 3b; certified current-anchor authentication is exactly
 > `authenticateCertifiedCurrentEpochAnchor` at Phase 5e2, extended to attested at Phase 5f.
+
+> **D.93.23 Phase-3a row supersession.** Deliver `3a-1` as private creator-only
+> preparation `3a-1A` followed by activation `3a-1B`. A authenticates trust,
+> anchor, parameters and catalog/preparer identities, validates the owned
+> anchor-only graph through a discarded `CausalityIndex`, and commits exactly
+> one combined trust-plus-live-projection generation before reopening and
+> minting an opaque process-local capability. A publishes no index and creates
+> no live effect. B consumes only that sealed capability and owns the published
+> index and activation. B RED remains blocked on the separately amended
+> authenticated-vertex extraction, durable pending-to-published issuance/outbox
+> transition and transport/topic/subscription three-plane contracts. The
+> protocol-v3 root remains nine and the node root/`DRPNode` surface remains
+> unchanged during A.
 
 | Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Class        | Atomic?                                       | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
