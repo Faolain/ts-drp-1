@@ -31,6 +31,8 @@
 	"dependencies": {
 		"@noble/curves": "2.2.0",
 		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
+		"@ts-drp/storage": "0.11.0",
 		"@ts-drp/types": "workspace:*"
 	},
 	"devDependencies": {

@@ -382,6 +382,12 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../canonical
+      '@ts-drp/protocol-v3':
+        specifier: 0.11.0
+        version: link:../protocol-v3
+      '@ts-drp/storage':
+        specifier: 0.11.0
+        version: link:../storage
       '@ts-drp/types':
         specifier: workspace:*
         version: link:../types

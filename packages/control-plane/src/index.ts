@@ -5,6 +5,22 @@ import type {
 	ControlPlaneRecoveryConfig,
 } from "@ts-drp/types";
 
+export { assertTrustPreserved, createCurrentAnchorTrustStore, inspectTrustClosure } from "./anchor-trust.js";
+export type {
+	AssertTrustPreservedInput,
+	AssertTrustPreservedResult,
+	CurrentAnchorTrustStore,
+	CurrentAnchorTrustStoreOptions,
+	DetachedClosureCandidate,
+	InspectTrustClosureInput,
+	InspectTrustClosureResult,
+	InstallCreatorAnchorTrustRootFailureReason,
+	InstallCurrentAnchorTrustResult,
+	OpenCurrentAnchorTrustFailureReason,
+	OpenDurableCurrentAnchorTrustResult,
+	TrustClosureRejection,
+} from "./anchor-trust.js";
+
 export { DISABLE_ENVELOPE_DOMAIN_V1, SignedDisableController } from "./signed-disable.js";
 export type {
 	DisableApplyFailureReason,
