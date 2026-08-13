@@ -30,10 +30,12 @@ const trackP2aExactSourceFixtures = [
 	"tests/fixtures/track-p2-a/date-controls/blueprint.ts",
 	"tests/fixtures/track-p2-a/forward-counter/blueprint.ts",
 	"tests/fixtures/track-p2-a/literal-controls/blueprint.ts",
+	"tests/fixtures/track-p2-ab-operation-abi/blueprint.ts",
 ];
 const trackP2aExactArtifactFixtures = [
 	"tests/fixtures/track-p2-a/date-controls/artifact.mjs",
 	"tests/fixtures/track-p2-a/forward-counter/artifact.mjs",
+	"tests/fixtures/track-p2-ab-operation-abi/artifact.mjs",
 ];
 
 /** @type {import("typescript-eslint").ConfigArray} */

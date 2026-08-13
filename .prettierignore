@@ -3,3 +3,4 @@ packages/blueprint-toolchain/contracts/no-ambient-lint-v1.json
 tests/fixtures/track-p2-a/date-controls/artifact.mjs
 tests/fixtures/track-p2-a/forward-counter/artifact.mjs
 tests/fixtures/track-p2-a/no-ambient-lint-v1.json
+tests/fixtures/track-p2-ab-operation-abi/artifact.mjs
