@@ -7359,6 +7359,200 @@ reopen/rebuild with a freshly allocated `GenerationId` rather than reusing a
 stale completed generation. These cautions add no result arm, retry policy,
 store method or authority surface to D.93.17.
 
+#### D.93.19 — Phase 3a-0-B durable genesis rejection and fixed-owner admission
+
+This is a narrow correction to D.93.17's durable install contract. It does not
+reopen Phase `3a-0-A`, widen protocol-v3 or change the shared scanner, storage
+surface, durable CAS, certified-anchor or live-state designs. Its purpose is to
+keep two different trust decisions truthful: the creator material supplied to
+`install` must first be admitted by the pure installer, and the resulting
+record must then be admitted against the durable store's fixed identity and
+genesis pin before any storage observation or mutation.
+
+This section supersedes exactly four earlier statements:
+
+1. D.93.17's `InstallCurrentAnchorTrustResult` declaration gains the
+   `genesis-rejected` arm below.
+2. D.93.17's statement that all failures use the unions shown there instead
+   means the corrected closed unions in this section.
+3. D.93.17's install-order sentence is replaced by the exact pure-installer →
+   fixed-owner-open → digest/ref → scanner → `readHead` order below.
+4. D.93.18's final handoff starts `3a-0-B` against D.93.17 as corrected here,
+   not against unchanged D.93.17.
+
+Every other D.93.17 and D.93.18 invariant remains normative, including the
+fresh-`GenerationId` retry caution after a losing head CAS.
+
+##### Corrected closed result surface
+
+`@ts-drp/control-plane` owns and exports the install-specific cause alias. It
+derives the union from protocol-v3's already-public result instead of copying
+fourteen literals:
+
+```ts
+export type InstallCreatorAnchorTrustRootFailureReason = Extract<
+	InstallCreatorAnchorTrustRootResult,
+	{ readonly ok: false }
+>["reason"];
+
+export type InstallCurrentAnchorTrustResult =
+	| {
+			readonly ok: true;
+			readonly head: PresentHead;
+			readonly trust: CurrentAnchorTrust;
+			readonly trustRef: GenerationRef;
+	  }
+	| { readonly ok: false; readonly reason: "already-installed" | "trust-state-conflict" | "store-failed" }
+	| {
+			readonly ok: false;
+			readonly reason: "genesis-rejected";
+			readonly cause: InstallCreatorAnchorTrustRootFailureReason;
+	  }
+	| { readonly ok: false; readonly reason: "closure-rejected"; readonly cause: TrustClosureRejection }
+	| {
+			readonly ok: false;
+			readonly reason: "trust-rejected";
+			readonly cause: OpenCurrentAnchorTrustFailureReason;
+	  };
+```
+
+`InstallCreatorAnchorTrustRootFailureReason` is exactly the installer's closed
+fourteen-reason failure union. `OpenCurrentAnchorTrustFailureReason` remains the
+distinct closed ten-reason open union. The existing `trust-rejected` arm is not
+retargeted or widened: durable install still uses it when the fixed-owner
+in-memory admission below rejects and when a present-head or lost-CAS path
+reopens stored bytes. `OpenDurableCurrentAnchorTrustResult` is unchanged.
+
+Protocol-v3 exports no new type or value. Its package root remains exactly nine
+runtime values and the seven Phase-`3a-0-A` public types; its source/built type
+audits, package smoke and registries remain byte-preserved. Control-plane's
+public-entry type audit adds the derived alias and corrected durable result,
+including mutual assignability between the alias and
+`Extract<InstallCreatorAnchorTrustRootResult,{readonly ok:false}>["reason"]`.
+
+##### Exact fresh-install order and authority handoff
+
+Before the first `AheDurableStore` call of any kind, fresh install performs
+these steps in order:
+
+1. Call the genuine package-root `installCreatorAnchorTrustRoot(input)` exactly
+   once with the caller's frozen input. On `{ok:false,reason}`, return exactly
+   `{ok:false,reason:"genesis-rejected",cause:reason}`. All fourteen causes are
+   lossless; no literal is normalized, widened, re-derived or mapped to
+   `trust-rejected`, `closure-rejected`, `store-failed`, `already-installed` or
+   `trust-state-conflict`, and no throwable escapes.
+2. On installer success, call the genuine package-root
+   `openCurrentAnchorTrust` exactly once with the generated
+   `exactCanonicalTrustStateRecordBytes`, `expectedObjectId` taken only from the
+   fixed `CurrentAnchorTrustStoreOptions.objectId`, and
+   `pinnedGenesisAnchorDigest` taken only from the fixed
+   `CurrentAnchorTrustStoreOptions.pinnedGenesisAnchorDigest`. This mandatory
+   in-memory admission is not a durable reopen and performs no I/O. On
+   `{ok:false,reason}`, return exactly
+   `{ok:false,reason:"trust-rejected",cause:reason}` before any store call.
+3. Use only the `CurrentAnchorTrust` capability minted by that mandatory open
+   for every subsequent result and operation. The earlier installer-minted
+   capability has no authorized use after the open: never return, expose,
+   serialize, store, pass to another API/callback or use it to authenticate.
+   Here “discard” means that observable non-use/non-egress rule, not a claim
+   about garbage-collection timing or private lexical liveness. Fresh success
+   therefore has the same fixed-owner provenance as every later durable open.
+4. Only after both pure calls succeed may control-plane compute the generated
+   record's digest/ref, construct the exact proposed one-ref closure and call
+   `inspectTrustClosure`. Scanner failure remains `closure-rejected`.
+5. Only after the scanner succeeds may install make its first store call,
+   `readHead`, then follow D.93.17's existing generation and single absent-head
+   CAS sequence. No digest, ref, scanner or store work may precede either pure
+   admission.
+
+This closes the store-option mismatch that the original order left open. A
+caller whose valid creator material names a different object cannot commit a
+record that every later `open()` rejects. Fixed-owner open preserves the
+protocol-v3 precedence: when both store identity and pin disagree,
+`object-id-mismatch` wins over `genesis-pin-mismatch`. Malformed fixed options
+remain `trust-rejected` with cause `malformed-input`. These decisions happen
+before `readHead`, so all such failures perform zero store calls.
+
+The only fresh generated-record open causes reachable without corrupting a
+genuine installer result are `object-id-mismatch`, `genesis-pin-mismatch` and
+`malformed-input`; the combined identity-and-pin mismatch is the required
+precedence case, not a fourth cause. A classifiable stored record can additionally
+reach `record-schema-invalid`, `unsupported-trust-state-version`,
+`unsupported-trust-profile`, `trust-state-inconsistent` or
+`invalid-signature` on present-head or lost-CAS reopen. Together with the three
+fresh causes, those are the eight open causes reachable through the durable
+owner. Undecodable or noncanonical stored bytes never reach
+`openCurrentAnchorTrust`: the genuine classifier returns false first, so the
+scanner owns them as `closure-rejected` with cause `trust-state-missing` in the
+single-record case. Reopen then returns `already-installed` only for
+byte-identical valid durable material or `trust-state-conflict` for different
+valid material. It preserves D.93.17's closed storage/scanner arms and
+D.93.18's fresh-`GenerationId` retry rule.
+
+##### RED evidence and sustainable test boundary
+
+The `3a-0-B` RED proves the sequencing without adding a production seam. Test
+code may wrap the genuine `@ts-drp/protocol-v3` package-root exports solely to
+delegate to the real implementations while recording call count, call order,
+returned capability identity and which minter produced it. It may likewise
+wrap the genuine `@ts-drp/storage` `digestBlob` export solely to delegate while
+recording its invocation order. Every wrapper uses one genuine module instance
+and may neither substitute an implementation nor alter any argument or result.
+The already-injected fake `AheDurableStore` records durable method calls and
+ordering. Production gains no injected trust API, digest callback, port,
+options field, constructor parameter, subpath, mutable hook or test-only
+export. `GenerationRef` construction has no separate observable timing; the
+RED pins its exact value and later scanner/store use instead of inspecting a
+private allocation moment.
+
+The bounded RED matrix must prove:
+
+- each of the fourteen installer causes through crafted caller material,
+  returning the identical `genesis-rejected` cause with zero store calls;
+- fixed object mismatch, fixed pin mismatch, their combined
+  `object-id-mismatch` precedence and malformed fixed options, each as
+  `trust-rejected` with zero store calls;
+- exactly one installer call followed by exactly one mandatory open on fresh
+  success, with the genuine digest invocation and `readHead` strictly later,
+  and the exact derived ref used by the proposed closure scanner and store;
+- returned fresh-success trust is exact open-minted identity, the installer
+  capability is never returned, exposed or used after fixed-owner open, and
+  the returned capability authenticates through the unchanged protocol-v3
+  API; no test asserts garbage collection or unobservable private retention;
+- present-head and lost-CAS stored-record reopens retain the open-cause
+  taxonomy for classifiable schema/version/profile/inconsistency/signature
+  cases, while undecodable and noncanonical stored bytes remain scanner-owned
+  `closure-rejected`/`trust-state-missing` cases;
+- the corrected control-plane type/declaration surface, while all Phase
+  `3a-0-A` runtime/type audits and frozen bytes remain unchanged.
+
+Fresh-path tests must not demand `record-decode-failed`, `noncanonical-record`,
+`record-schema-invalid`, `unsupported-trust-state-version`,
+`unsupported-trust-profile`, `trust-state-inconsistent` or
+`invalid-signature` from the genuine generated record. Making those states
+fresh-path-injectable would require the production seam forbidden above. On
+present-head and lost-CAS fake-store paths, `record-decode-failed` and
+`noncanonical-record` remain unreachable because the scanner classifies first;
+they must prove `closure-rejected`/`trust-state-missing` instead. The remaining
+five are classifiable stored-record `trust-rejected` causes.
+
+Mandatory mutants remove or change one property at a time: map an installer
+failure onto `trust-rejected`, `closure-rejected` or `store-failed`; touch the
+store before either pure call; invoke digest or the proposed-closure scanner
+before fixed-owner open; skip the mandatory open; source its identity or pin
+from caller material; reverse object-id/pin precedence; widen or rewrite either
+cause union; return, expose or use the installer capability after fixed-owner
+open; fail to reopen present/lost-CAS bytes; or add a production injection
+seam. Each must be killed by a behavioral or load-bearing type/public-surface
+assertion, not by source-token coincidence. There is deliberately no
+retain-only or ref-allocation-timing mutant because neither has a truthful
+observation under the permitted boundary.
+
+Phase `3a-0-B` RED may resume only after these exact D.93.19 bytes receive final
+independent assent, are signed and are pushed. This amendment authorizes no
+Phase `3a-0-B` production byte by itself and makes no claim that the scanner or
+durable owner is implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
