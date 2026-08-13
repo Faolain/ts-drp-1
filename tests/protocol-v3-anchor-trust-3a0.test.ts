@@ -548,8 +548,17 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 			profileSigners: [...material.signerSet, secondSigner],
 			signerSet: [...material.signerSet, secondSigner],
 		});
-		const oversized = makeCreatorMaterial({ objectId: `${"\u0800".repeat(990)}:${"a".repeat(32)}` });
+		const maximumSigner = {
+			...(material.signerSet[0] as Readonly<Record<string, unknown>>),
+			signerId: "\u0800".repeat(512),
+		};
+		const oversized = makeCreatorMaterial({
+			objectId: `${"\u0800".repeat(990)}:${"a".repeat(32)}`,
+			profileSigners: [maximumSigner],
+			signerSet: [maximumSigner],
+		});
 		expect(String(oversized.anchor.objectId)).toHaveLength(1023);
+		expect(maximumSigner.signerId).toHaveLength(512);
 		expect(makeTrustStateRecord(oversized).byteLength).toBeGreaterThan(contract.maxRecordBytes);
 		const installCreatorAnchorTrustRoot = await requireFunction("installCreatorAnchorTrustRoot");
 		for (const [input, reason] of [
