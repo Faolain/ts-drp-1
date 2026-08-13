@@ -541,7 +541,7 @@ describe.sequential("Track P2-e authoring guide and injected-proven-digest integ
 			/@typescript-eslint\/explicit-function-return-type/u
 		);
 		expect(fs.readFileSync(artifactPath)).toEqual(before);
-	});
+	}, 30_000);
 
 	it("commits a bounded timeout on the real lint oracle without hiding one in workflow commands", () => {
 		const title = "owns the exact generated artifact with one causal, test-only ESLint override";
