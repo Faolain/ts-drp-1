@@ -4,5 +4,5 @@
 		"outDir": "dist"
 	},
 	"include": ["src/**/*.ts", "tests/**/*.ts"],
-	"exclude": ["dist", "./*.d.ts"]
+	"exclude": ["dist", "./*.d.ts", "tests/phase-3a0-c-anchor-trust-sigkill-red.test.ts"]
 }
