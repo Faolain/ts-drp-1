@@ -10,6 +10,13 @@ jobs:
     with:
       tier: nightly
 
+  track-p2-release-conformance:
+    name: Track P2 blueprint catalog nightly conformance
+    secrets: inherit
+    uses: ./.github/workflows/track-p2-blueprint-catalog.yml
+    with:
+      tier: nightly
+
   phase-2k-browser-currency:
     name: Browser currency launch gate
     needs:
@@ -49,6 +56,7 @@ jobs:
     needs:
       - phase-2k-browser-currency
       - phase-0j-c-release-conformance
+      - track-p2-release-conformance
 
   publish_buf_registry:
     name: Publish buf files

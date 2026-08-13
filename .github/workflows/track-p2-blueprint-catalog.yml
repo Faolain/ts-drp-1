@@ -1,0 +1,118 @@
+name: Track P2 Blueprint Catalog
+
+on:
+  pull_request: {}
+  schedule:
+    - cron: "29 4 * * *"
+  workflow_call:
+    inputs:
+      tier:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  track-p2-tier-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TRACK_P2_TIER: ${{ github.event_name == 'pull_request' && 'pr' || github.event_name == 'schedule' && 'nightly' || inputs.tier }}
+        run: |-
+          case "$TRACK_P2_TIER" in
+            pr | nightly) ;;
+            *) exit 1 ;;
+          esac
+
+  track-p2-pr:
+    needs: track-p2-tier-guard
+    if: ${{ github.event_name == 'pull_request' || inputs.tier == 'pr' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: "22.x"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Run the bounded Track P2 PR matrix
+        run: >-
+          pnpm exec vitest run
+          tests/track-p2-a-authoring-emitter-lint-red.test.ts
+          tests/track-p2-a-opus-corrective-red.test.ts
+          tests/track-p2-a-string-comment-corrective-red.test.ts
+          tests/track-p2-ab-operation-abi-corrective-red.test.ts
+          tests/track-p2-b-package-binding-red.test.ts
+          tests/track-p2-c-control-selection-corrective-red.test.ts
+          tests/track-p2-d-catalog-red.test.ts
+          tests/track-p2-e-guide-integration-red.test.ts
+          --coverage.enabled=false
+      - name: Exercise PR conformance through the production CLI
+        run: node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-pr" --tier pr
+      - name: Typecheck the owned P2-e surface
+        run: pnpm exec tsc -p tests/tsconfig.track-p2-e-guide-integration-red.json --noEmit
+      - name: Build the published and private owners
+        run: pnpm --filter @ts-drp/blueprint-catalog build && pnpm --filter @ts-drp/blueprint-toolchain build
+      - name: Run the P2-e integration contract
+        run: pnpm exec vitest run tests/track-p2-e-guide-integration-red.test.ts --coverage.enabled=false
+      - name: Lint the owned source inputs
+        run: pnpm exec eslint tests/track-p2-e-guide-integration-red.test.ts tests/fixtures/track-p2-e/message-register/blueprint.ts
+      - name: Check formatting of the frozen P2-e inputs
+        run: pnpm exec prettier --check eslint.config.mjs tests/fixtures/track-p2-e tests/track-p2-e-guide-integration-red.test.ts tests/tsconfig.track-p2-e-guide-integration-red.json
+      - name: Freeze the committed goldens
+        run: git diff --exit-code -- tests/fixtures/track-p2-e/message-register/artifact.mjs tests/fixtures/track-p2-e/message-register/package.bin tests/fixtures/track-p2-e/message-register/lint.bin tests/fixtures/track-p2-e/message-register/receipt.bin
+      - name: Rebuild and byte-compare the committed goldens
+        run: |
+          node tests/fixtures/track-p2-e/build-synthetic-bundle.mjs tests/fixtures/track-p2-e/message-register "$RUNNER_TEMP/track-p2-golden"
+          for filename in artifact.mjs package.bin lint.bin receipt.bin; do
+            cmp "$RUNNER_TEMP/track-p2-golden/$filename" "tests/fixtures/track-p2-e/message-register/$filename"
+          done
+
+  track-p2-nightly:
+    needs: track-p2-tier-guard
+    if: ${{ github.event_name == 'schedule' || inputs.tier == 'nightly' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: "22.x"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Run the strict Track P2 nightly matrix
+        run: pnpm exec vitest run tests/track-p2-c-generic-conformance-red.test.ts --coverage.enabled=false
+      - name: Exercise nightly conformance through the production CLI
+        run: node packages/blueprint-toolchain/bin/drp-blueprint.mjs build --dir tests/fixtures/track-p2-e/message-register --out "$RUNNER_TEMP/track-p2-nightly" --tier nightly
+      - name: Typecheck the owned P2-e surface
+        run: pnpm exec tsc -p tests/tsconfig.track-p2-e-guide-integration-red.json --noEmit
+      - name: Build the published and private owners
+        run: pnpm --filter @ts-drp/blueprint-catalog build && pnpm --filter @ts-drp/blueprint-toolchain build
+      - name: Run the P2-e integration contract
+        run: pnpm exec vitest run tests/track-p2-e-guide-integration-red.test.ts --coverage.enabled=false
+      - name: Lint the owned source inputs
+        run: pnpm exec eslint tests/track-p2-e-guide-integration-red.test.ts tests/fixtures/track-p2-e/message-register/blueprint.ts
+      - name: Check formatting of the frozen P2-e inputs
+        run: pnpm exec prettier --check eslint.config.mjs tests/fixtures/track-p2-e tests/track-p2-e-guide-integration-red.test.ts tests/tsconfig.track-p2-e-guide-integration-red.json
+      - name: Freeze the committed goldens
+        run: git diff --exit-code -- tests/fixtures/track-p2-e/message-register/artifact.mjs tests/fixtures/track-p2-e/message-register/package.bin tests/fixtures/track-p2-e/message-register/lint.bin tests/fixtures/track-p2-e/message-register/receipt.bin
+      - name: Rebuild and byte-compare the committed goldens
+        run: |
+          node tests/fixtures/track-p2-e/build-synthetic-bundle.mjs tests/fixtures/track-p2-e/message-register "$RUNNER_TEMP/track-p2-golden"
+          for filename in artifact.mjs package.bin lint.bin receipt.bin; do
+            cmp "$RUNNER_TEMP/track-p2-golden/$filename" "tests/fixtures/track-p2-e/message-register/$filename"
+          done
