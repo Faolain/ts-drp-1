@@ -7658,6 +7658,104 @@ durability, allocate a fresh `GenerationId` after a failed or losing attempt,
 and add no new store method, retry policy, result arm, authority surface or
 production seam. This closure makes no claim that C or D is implemented.
 
+#### D.93.21 — Phase 3a-0-C closure evidence and Phase 3a-0-D handoff
+
+Phase `3a-0-C` is closed at signed candidate
+`462715922bd77bdf4966aa8420e082a427400b41`, tree
+`f617316c98c4de2ecb5985543bfd3b5714e42d82`. This section is a
+non-normative evidence ledger and handoff only. D.93.17 and D.93.19 remain the
+normative trust contracts, and D.93.20's scope and cautions are unchanged.
+
+The signed evidence-only lineage is one causal chain with no production-code,
+runtime-surface, dependency or lockfile delta:
+
+| Commit                                     | Closure role                                                                                       |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `f46244ecf7a932747ba6644fc2090a061377a2ec` | Initial storage-node creator-install and combined-swap process-death evidence                      |
+| `19b01ec7b123c78eb905306bdd56257a0b480bdb` | Tests-only RED freezing the dedicated compiler owner and exact package-typecheck exclusion         |
+| `462715922bd77bdf4966aa8420e082a427400b41` | One-line config GREEN adding only that literal package exclusion while retaining dedicated custody |
+
+The SQLite campaign reuses the existing private storage-node process-death
+instrument rather than adding a production seam. It covers exactly nineteen
+creator-install boundaries across generation begin, blob cache, promotion,
+generation completion and initial head swap, plus seven boundaries for the
+simulated combined-generation swap. Statement boundaries and both commit edges
+are exercised through real child `SIGKILL`; no successful authority result may
+be published before death.
+
+Recovery is judged by authority, not by incidental database layout. A fresh
+strict-SQLite process must reopen the durable trust owner and authenticate the
+current anchor against the fixed object, genesis pin, recovered head and exact
+expected provenance. The absent creator state must instead be exactly
+`not-installed` with no authentication. Independent old and new controls make
+the recovered state old XOR exact-new; mixed summaries, failed open or
+authentication and deterministic shared failures are rejected. An old recovery
+retries with a fixture-pinned fresh `GenerationId` and converges to the exact new
+authority, while an exact-new recovery remains exact-new. The ephemeral memory
+backend remains a negative and cannot return trust.
+
+These are deliberately bounded authority-state claims. They do not prove the
+absence of unreachable physical debris, a four-table physical image, fsync or
+power-loss durability, browser reopen parity, live-state admission, anchor
+advancement, delegated or attested profiles, or quorum certificates. The WAL
+observation proves custody for the process-death experiment only. The longer
+repetition remains explicitly nightly-only; Phase `3a-0-D` still owns the
+IndexedDB/Playwright browser-reopen counterpart.
+
+Compiler ownership is equally narrow. The storage-node package config excludes
+only the literal Phase `3a-0-C` integration test after its two pre-existing
+entries; it adds no glob and does not exclude the fixture family. The dedicated
+Phase `3a-0-C` TypeScript project remains the explicit owner and compiles the
+test with the required cross-package mappings. A causal removal mutant restores
+the package failure while the dedicated project remains valid, preventing the
+exclusion from becoming an unmeasured hiding place.
+
+Fresh execution on the final tree passed the Phase `3a-0-C` focused suite with
+six tests and one intentional nightly skip, the Phase `3a-0-A`/`3a-0-B`
+preservation set `59/59`, and the storage-node suite with eighty-nine tests and
+two intentional skips. The literal storage-node package typecheck and dedicated
+Phase C TypeScript project passed, as did targeted ESLint, Prettier and
+diff-check. The first single-file focused invocation passed its tests but exited
+nonzero because the repository-wide coverage threshold applied to that isolated
+file; the exact coverage-disabled rerun passed. That invocation artifact is not
+reported as a behavioral failure or silently omitted.
+
+The final independent quorum is unanimous on the signed final candidate:
+
+- Grok 4.6/high returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_C_MAY_CLOSE: yes`, `PHASE_3A0_D_MAY_START: yes`, no blocker, no
+  plan change and high confidence. Its result and custody SHA-256 values are
+  `31ece5621877853674c5b8d9a480ea470359390ad57f9432c9fb9fa7c321b72d`
+  and `1b14638aeaae00d126ed104df0e7b1c82a7e0c285ff3b1295bac47fd4bb075a7`.
+- Kimi K3/high/100 returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_C_MAY_CLOSE: yes`, `PHASE_3A0_D_MAY_START: yes`, no blocker, no
+  normative plan change and high confidence. Its result and seal-index SHA-256
+  values are
+  `502002133274edc667b05f55b365a160e162efc86a0fd866baf24782f6bc9071`
+  and `1256337a40f9d8a0a0e8b1e897617b5f67843ccce98f81ebef4ac31112929a75`.
+- Opus 5/xhigh returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_C_MAY_CLOSE: yes`, `PHASE_3A0_D_MAY_START: yes`, no blocker and
+  high confidence. It requested only this bounded non-normative closure ledger
+  and no D.93.17/D.93.19 normative edit. Its result and integrity-manifest
+  SHA-256 values are
+  `29544b2955e00cf72111ef86d25b96bd6cd1bffea7a351485fccba50f5e28c04`
+  and `5860ebe42d65b7f496541252df89c517d95d45c15a5033c1c3010f5c648b384a`.
+
+Four cautions carry forward without widening the contract. The exact fresh IDs
+are fixture-pinned so state comparison is deterministic; production freshness
+continues to belong to the existing generator. Old-or-exact-new is an
+authority-summary result, not a physical-table or debris assertion. The child
+uses built package bytes while in-process controls use source aliases, matching
+the inherited storage-node process-death pattern and requiring the ordinary
+build gate to remain current. Finally, an abrupt harness abort can leave the
+temporary package-tsconfig mutant as untracked debris, so cleanup must remain
+best-effort and such a file is never evidence.
+
+Phase `3a-0-C` is closed and Phase `3a-0-D` may start with a different
+tests-only RED owner. D must preserve the same authenticated old-or-exact-new
+boundary while adding the browser-owned reopen evidence; this ledger does not
+claim that D is implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
