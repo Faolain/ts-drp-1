@@ -7268,6 +7268,97 @@ owner, byte preimage, domain, closed schema, capability, root allow-list,
 closure/scanner contract, taxonomy, precedence, phase ordering or availability
 ownership stops for a new correction quorum.
 
+#### D.93.18 — Phase 3a-0-A closure evidence and Phase 3a-0-B handoff
+
+Phase `3a-0-A` is closed at signed candidate
+`e96b509a57939216cb6e116db7ddabead078357a`, tree
+`97f9c843f00fceb7955b0dcdc87ab37b0ef982cd`. It implements only D.93.17's
+pure protocol-v3 creator trust boundary. It does not implement the shared
+closure scanner, durable trust owner, storage death/reopen parity, live binding,
+certified profiles or QC.
+
+The signed lineage is one causal chain:
+
+| Commit                                     | Closure role                                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `b76d3106275e4cc7b21a00e9ee335656477b6d79` | Initial tests-only creator trust RED                                                                                 |
+| `d9aca402de73be5bfc95fddd07e6d79a8a06b521` | Corrected the oversized-record fixture so it crossed the registered bound without violating an earlier carrier bound |
+| `7ae254e0b74d4da7008db74be30510efa633abad` | Aligned predecessor preservation with D.93.17's exact nine-value public root                                         |
+| `b4ab4e2d66b4129284dcefea81468e779b02b9fd` | Creator-only install/open/authenticate GREEN                                                                         |
+| `14ab72d16043b84d645f373c612e76fa0484466b` | Tests-only RED for reachable C0, DEL and C1 signer controls                                                          |
+| `e5e269d1527695a5b46b3a411b7a2fcc053bbcb2` | Shared signer-id validation GREEN and terminal-high-surrogate correction in the private scalar helper                |
+| `dbf024408706de5db52c0fecd3f8e30ca173ba98` | First terminal-surrogate evidence correction; its public-helper reachability claim was later superseded              |
+| `e96b509a57939216cb6e116db7ddabead078357a` | Final honest private-source evidence and exact historical-mutant kill                                                |
+
+The authority invariant is the victim pin, not textual object identity. The
+installed pin is checked against the digest of the exact canonical genesis
+anchor before signer-carrier or signature admission. Open checks both expected
+object identity and that immutable pin before minting a new same-module
+capability. A self-consistent foreign creator key and genesis bearing the same
+object-id text therefore cannot replace the selected trust root. The opaque
+`WeakMap` provenance, copy/forgery rejection and zero-effect checks close the
+remaining capability path; no bare key, digest or reconstructed public object
+has authority.
+
+Signer evidence is split by reachability. C0, DEL and C1 are valid UTF-8 scalar
+values, so their exact failure taxonomy, precedence, immutability and
+no-capability results are tested through install/open. The 512/513 UTF-16-unit
+boundary and a paired non-BMP identity are likewise exercised through the
+public path, with the positive case continuing through authenticate. A lone
+surrogate has no valid UTF-8 scalar encoding: canonical decoding rejects
+`ED A0 80` before `isSignerId`. That carrier remains useful only as honestly
+named fatal-UTF-8 aggregation evidence; it is not evidence that the private
+scalar predicate ran.
+
+The terminal-surrogate invariant therefore has one deliberately bounded
+white-box owner. The tests parse the checked-in protocol-v3 source with the
+TypeScript AST, isolate and execute the actual private
+`isWellFormedUtf16Text` declaration in a zero-authority VM, and prove it has
+exactly the three production callers `isAnchorRecord`, `isSignerId` and
+`isStorageObjectIdText`. A mechanical AST-range mutant removes only the old
+missing terminal-bound guard and must flip the terminal-high case while
+preserving paired astral input. The harness exports no seam and is not a token
+analyzer, general interpreter or public end-to-end claim; any growth beyond
+this private unreachable boundary requires a new justification.
+
+Fresh execution on the final tree passed Phase `3a-0-A` `31/31` (the original
+`24/24` plus corrected signer evidence `7/7`), exact-nine predecessors `40/40`
+and preservation `111` passed plus one intentional
+`RUN_PHASE_0J_C_NIGHTLY` skip. The ordinary four-engine preflight ran and
+passed; its invocation-only 30-second timeout changed no repository byte.
+Protocol-v3 typecheck, source and built public audits, build, exact package
+smoke, targeted ESLint, Prettier and diff-check all passed. Every exercised
+frozen hash passed; there is no known stale frozen hash in this closure. The
+fresh-gate integrity manifest is SHA-256
+`4b58a292e8a98061dbd5a6858374db546013408feee702d52e0b8efeba3798c5`.
+
+The final independent quorum is unanimous:
+
+- Grok 4.6/high returned `CODE_VERDICT: PASS`,
+  `PHASE_3A0_A_MAY_CLOSE: yes`, `PHASE_3A0_B_MAY_START: yes`, no blocker, no
+  plan change and high confidence. Its result SHA-256 is
+  `2649764202083802080dcde5f324519ded25b35e4e2a1af34784676e1547eb1a`.
+- Kimi K3/high/100 first withheld closure solely for fresh execution evidence;
+  after the exact-tree gates above, its final delta assent returned
+  `CODE_VERDICT: PASS`, both phase decisions `yes`, no blocker, no plan change
+  and high confidence. Its result and seal-index SHA-256 values are
+  `5412fe6a64c3233169832517c8a8d701e6c51be4220cc0e8ccdd2d683f33e09a`
+  and `07bbd72b6f09b417b8318f56c18da3607373b884dbb3476d2073111ae089df11`.
+- Opus 5/xhigh returned `CODE_VERDICT: PASS`, `PHASE_3A0_A_CLOSE: yes`,
+  `PHASE_3A0_B_START: yes`, no blocker, no plan change and high confidence. Its
+  result and integrity-manifest SHA-256 values are
+  `23a8f4dfb16d74b68a3ecd6f827559183220ab15c5b5f1c8a8dad7e1cfc24b48`
+  and `56be4ba64aec4301ac31865af5fd0ea30ee6642183ef664f2fdda9cb5860b870`.
+
+Phase `3a-0-B` may now start with a different tests-only RED owner against the
+unchanged D.93.17 scanner and durable-owner contract. This statement does not
+claim that B is implemented. Two non-contract implementation cautions belong
+in its handoff rather than its public API: exercise successful durability only
+through a backend that reports strict durability, and after a losing head CAS
+reopen/rebuild with a freshly allocated `GenerationId` rather than reusing a
+stale completed generation. These cautions add no result arm, retry policy,
+store method or authority surface to D.93.17.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
