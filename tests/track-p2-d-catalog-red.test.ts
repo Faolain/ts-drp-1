@@ -68,6 +68,11 @@ import * as catalogNamespace from "../packages/blueprint-catalog/src/index.js";
 import { DRP_ERROR_CODES, DRPError } from "../packages/errors/src/index.js";
 import { runBlueprintCli } from "../packages/blueprint-toolchain/src/index.js";
 
+// Static imports above have finished, while no open/resolve/CLI call has run.
+// This snapshot therefore distinguishes required module-evaluation
+// initialization from an impermissible lazy first-use initialization.
+const lexerInitializationCallsAtModuleEvaluation = lexerProbe.initSyncCalls;
+
 type CatalogEntry = {
 	artifactDigest: string;
 	artifactId: string;
@@ -1265,7 +1270,12 @@ describe("Track P2-d public/package/governance and preservation controls", () =>
 
 	it("requires module-evaluation lexer initialization and forbids runtime authority in catalog source", () => {
 		const source = fs.readFileSync(path.join(REPOSITORY_ROOT, "packages/blueprint-catalog/src/index.ts"), "utf8");
-		expect(lexerProbe.initSyncCalls).toBe(1);
+		// This test graph evaluates the catalog twice by design: once from the
+		// direct source import above and once through the private toolchain's
+		// published package-root dependency. Each independent catalog module
+		// identity must initialize its exact lexer during module evaluation.
+		expect(lexerInitializationCallsAtModuleEvaluation).toBe(2);
+		expect(lexerProbe.initSyncCalls).toBe(lexerInitializationCallsAtModuleEvaluation);
 		expect(source).not.toContain("prepareBlueprintRuntime");
 		expect(source).not.toMatch(/\bimport\s*\(/u);
 	});
