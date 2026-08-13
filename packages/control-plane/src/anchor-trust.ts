@@ -21,6 +21,9 @@ import {
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const MAX_SCANNABLE_BYTES = 8192;
+const TYPED_ARRAY_PROTOTYPE = Object.getPrototypeOf(Uint8Array.prototype) as object;
+const TYPED_ARRAY_BUFFER_GETTER = Reflect.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, "buffer")?.get;
+const TYPED_ARRAY_BYTE_LENGTH_GETTER = Reflect.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, "byteLength")?.get;
 
 export type TrustClosureRejection =
 	| "malformed-input"
@@ -120,6 +123,8 @@ type OpenedStoredTrustResult =
 	| Readonly<{ cause: TrustClosureRejection; ok: false; reason: "closure-rejected" }>
 	| Readonly<{ cause: OpenCurrentAnchorTrustFailureReason; ok: false; reason: "trust-rejected" }>;
 
+type StoreResultSnapshot = Readonly<{ ok: true; value: unknown }> | Readonly<{ ok: false; reason: string }>;
+
 function failure<Reason extends string>(reason: Reason): Readonly<{ ok: false; reason: Reason }> {
 	return Object.freeze({ ok: false as const, reason });
 }
@@ -146,8 +151,35 @@ function snapshotClosedRecord(value: unknown, keys: readonly string[]): Readonly
 	return result;
 }
 
-function hasSharedBacking(bytes: Uint8Array): boolean {
-	return typeof SharedArrayBuffer !== "undefined" && bytes.buffer instanceof SharedArrayBuffer;
+function copyDetachedBytes(value: unknown): Uint8Array | undefined {
+	try {
+		if (
+			!(value instanceof Uint8Array) ||
+			TYPED_ARRAY_BUFFER_GETTER === undefined ||
+			TYPED_ARRAY_BYTE_LENGTH_GETTER === undefined
+		)
+			return undefined;
+		const buffer = Reflect.apply(TYPED_ARRAY_BUFFER_GETTER, value, []) as ArrayBufferLike;
+		const byteLength = Reflect.apply(TYPED_ARRAY_BYTE_LENGTH_GETTER, value, []) as number;
+		if (typeof SharedArrayBuffer !== "undefined" && buffer instanceof SharedArrayBuffer) return undefined;
+		if (!Number.isSafeInteger(byteLength) || byteLength < 0) return undefined;
+		const copied = new Uint8Array(byteLength);
+		for (let index = 0; index < byteLength; index += 1) {
+			const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));
+			if (
+				descriptor === undefined ||
+				!("value" in descriptor) ||
+				!Number.isInteger(descriptor.value) ||
+				(descriptor.value as number) < 0 ||
+				(descriptor.value as number) > 255
+			)
+				return undefined;
+			copied[index] = descriptor.value as number;
+		}
+		return copied;
+	} catch {
+		return undefined;
+	}
 }
 
 function snapshotDenseArray(value: unknown): readonly unknown[] | undefined {
@@ -185,6 +217,129 @@ function copyRef(value: unknown): GenerationRef | undefined {
 	});
 }
 
+function snapshotStoreResult(value: unknown): StoreResultSnapshot | undefined {
+	if (!isRecord(value)) return undefined;
+	const okDescriptor = Reflect.getOwnPropertyDescriptor(value, "ok");
+	if (
+		okDescriptor === undefined ||
+		okDescriptor.enumerable !== true ||
+		!("value" in okDescriptor) ||
+		typeof okDescriptor.value !== "boolean"
+	)
+		return undefined;
+	if (okDescriptor.value) {
+		const record = snapshotClosedRecord(value, ["ok", "value"]);
+		return record === undefined ? undefined : Object.freeze({ ok: true as const, value: record.value });
+	}
+	const reasonDescriptor = Reflect.getOwnPropertyDescriptor(value, "reason");
+	if (
+		reasonDescriptor === undefined ||
+		reasonDescriptor.enumerable !== true ||
+		!("value" in reasonDescriptor) ||
+		typeof reasonDescriptor.value !== "string"
+	)
+		return undefined;
+	return Object.freeze({ ok: false as const, reason: reasonDescriptor.value });
+}
+
+function snapshotPresentHead(value: unknown): PresentHead | undefined {
+	const record = snapshotClosedRecord(value, ["closureDigest", "generationId", "kind", "objectId", "revision"]);
+	if (
+		record === undefined ||
+		record.kind !== "present" ||
+		typeof record.objectId !== "string" ||
+		typeof record.generationId !== "string" ||
+		!DIGEST_HEX.test(record.generationId) ||
+		typeof record.closureDigest !== "string" ||
+		!DIGEST_HEX.test(record.closureDigest) ||
+		!Number.isSafeInteger(record.revision) ||
+		(record.revision as number) <= 0
+	)
+		return undefined;
+	return Object.freeze({
+		closureDigest: record.closureDigest as PresentHead["closureDigest"],
+		generationId: record.generationId as GenerationId,
+		kind: "present" as const,
+		objectId: record.objectId as StorageObjectId,
+		revision: record.revision as PresentHead["revision"],
+	});
+}
+
+function snapshotExpectedHead(value: unknown, objectId: StorageObjectId): ExpectedHead | undefined {
+	const kindDescriptor = isRecord(value) ? Reflect.getOwnPropertyDescriptor(value, "kind") : undefined;
+	if (kindDescriptor === undefined || !("value" in kindDescriptor)) return undefined;
+	if (kindDescriptor.value === "none") {
+		const record = snapshotClosedRecord(value, ["kind", "objectId"]);
+		return record?.objectId === objectId ? Object.freeze({ kind: "none" as const, objectId }) : undefined;
+	}
+	const present = snapshotPresentHead(value);
+	return present?.objectId === objectId ? present : undefined;
+}
+
+function sameExpectedHead(left: ExpectedHead, right: ExpectedHead): boolean {
+	return left.kind === "none"
+		? right.kind === "none" && left.objectId === right.objectId
+		: right.kind === "present" && sameHead(left, right);
+}
+
+function sameClosure(left: readonly GenerationRef[], right: readonly GenerationRef[]): boolean {
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index += 1) {
+		if (!sameRef(left[index] as GenerationRef, right[index] as GenerationRef)) return false;
+	}
+	return true;
+}
+
+function snapshotGenerationRecord(
+	value: unknown,
+	expected: Readonly<{
+		baseExpectedHead?: ExpectedHead;
+		closure?: readonly GenerationRef[];
+		generationId: GenerationId;
+		objectId: StorageObjectId;
+		state: "Adopted" | "Complete" | "Staged";
+	}>
+): Readonly<{ closure: readonly GenerationRef[]; closureDigest: string }> | undefined {
+	const record = snapshotClosedRecord(value, [
+		"baseExpectedHead",
+		"closure",
+		"closureDigest",
+		"generationId",
+		"objectId",
+		"state",
+	]);
+	if (
+		record === undefined ||
+		record.objectId !== expected.objectId ||
+		record.generationId !== expected.generationId ||
+		record.state !== expected.state ||
+		typeof record.closureDigest !== "string" ||
+		!DIGEST_HEX.test(record.closureDigest)
+	)
+		return undefined;
+	const baseExpectedHead = snapshotExpectedHead(record.baseExpectedHead, expected.objectId);
+	const closure = copyClosure(record.closure);
+	if (
+		baseExpectedHead === undefined ||
+		closure === undefined ||
+		(expected.baseExpectedHead !== undefined && !sameExpectedHead(baseExpectedHead, expected.baseExpectedHead)) ||
+		(expected.closure !== undefined && !sameClosure(closure, expected.closure))
+	)
+		return undefined;
+	return Object.freeze({ closure, closureDigest: record.closureDigest });
+}
+
+function snapshotStrictDurability(store: AheDurableStore): boolean {
+	try {
+		const descriptor = Reflect.getOwnPropertyDescriptor(store, "capabilities");
+		if (descriptor === undefined || !("value" in descriptor)) return false;
+		const record = snapshotClosedRecord(descriptor.value, ["durability", "signingEligibility"]);
+		return record?.durability === "strict" && record.signingEligibility === "backend-capability-required";
+	} catch {
+		return false;
+	}
+}
+
 function sameRef(left: GenerationRef, right: GenerationRef): boolean {
 	return left.byteLength === right.byteLength && left.digest === right.digest;
 }
@@ -212,14 +367,10 @@ function copyCandidates(value: unknown): readonly CopiedCandidate[] | undefined 
 		const entry = entries[index];
 		const record = snapshotClosedRecord(entry, ["bytes", "ref"]);
 		const ref = record === undefined ? undefined : copyRef(record.ref);
-		if (
-			record === undefined ||
-			!(record.bytes instanceof Uint8Array) ||
-			hasSharedBacking(record.bytes) ||
-			ref === undefined
-		)
-			return undefined;
-		candidates.push(Object.freeze({ bytes: new Uint8Array(record.bytes), ref }));
+		if (record === undefined || !(record.bytes instanceof Uint8Array) || ref === undefined) return undefined;
+		const bytes = copyDetachedBytes(record.bytes);
+		if (bytes === undefined) return undefined;
+		candidates.push(Object.freeze({ bytes, ref }));
 	}
 	return Object.freeze(candidates);
 }
@@ -317,6 +468,44 @@ function sameHead(left: PresentHead, right: PresentHead): boolean {
 	);
 }
 
+function snapshotActiveRecovery(
+	value: unknown,
+	expectedHead: PresentHead
+): Readonly<{ head: PresentHead; references: readonly GenerationRef[] }> | undefined {
+	const result = snapshotStoreResult(value);
+	if (result === undefined || !result.ok) return undefined;
+	const active = snapshotClosedRecord(result.value, [
+		"adoptedGeneration",
+		"head",
+		"kind",
+		"recomputedClosureDigest",
+		"references",
+	]);
+	if (active === undefined || active.kind !== "active") return undefined;
+	const head = snapshotPresentHead(active.head);
+	const references = copyClosure(active.references);
+	if (
+		head === undefined ||
+		references === undefined ||
+		!sameHead(head, expectedHead) ||
+		active.recomputedClosureDigest !== head.closureDigest
+	)
+		return undefined;
+	const adopted = snapshotGenerationRecord(active.adoptedGeneration, {
+		closure: references,
+		generationId: head.generationId,
+		objectId: head.objectId,
+		state: "Adopted",
+	});
+	if (adopted === undefined || adopted.closureDigest !== head.closureDigest) return undefined;
+	return Object.freeze({ head, references });
+}
+
+function snapshotLoadedBlob(value: unknown): Uint8Array | undefined {
+	const result = snapshotStoreResult(value);
+	return result?.ok === true ? copyDetachedBytes(result.value) : undefined;
+}
+
 function successfulOpen(value: OpenedStoredTrust): OpenDurableCurrentAnchorTrustResult {
 	return Object.freeze({
 		head: Object.freeze({ ...value.head }),
@@ -349,58 +538,52 @@ export function createCurrentAnchorTrustStore(options: CurrentAnchorTrustStoreOp
 	const store = options.store;
 
 	const openAtHead = async (expectedHead: PresentHead): Promise<OpenedStoredTrustResult> => {
-		let recovered: Awaited<ReturnType<AheDurableStore["recoverActiveGeneration"]>>;
 		try {
-			recovered = await store.recoverActiveGeneration(objectId);
+			const recovered = snapshotActiveRecovery(await store.recoverActiveGeneration(objectId), expectedHead);
+			if (recovered === undefined) return failure("trust-state-unreadable");
+			const candidates: DetachedClosureCandidate[] = [];
+			for (let index = 0; index < recovered.references.length; index += 1) {
+				const ref = recovered.references[index] as GenerationRef;
+				if (ref.byteLength > MAX_SCANNABLE_BYTES) continue;
+				const bytes = snapshotLoadedBlob(await store.getBlob(ref.digest));
+				if (bytes === undefined) return failure("trust-state-unreadable");
+				candidates.push(Object.freeze({ bytes, ref }));
+			}
+			const inspected = inspectTrustClosure({ candidates, closure: recovered.references });
+			if (!inspected.ok) return causedFailure("closure-rejected", inspected.reason);
+			const opened = openCurrentAnchorTrust({
+				exactCanonicalTrustStateRecordBytes: inspected.exactCanonicalTrustStateRecordBytes,
+				expectedObjectId: objectId,
+				pinnedGenesisAnchorDigest,
+			});
+			if (!opened.ok) return causedFailure("trust-rejected", opened.reason);
+			return Object.freeze({
+				ok: true as const,
+				value: Object.freeze({
+					bytes: inspected.exactCanonicalTrustStateRecordBytes,
+					head: recovered.head,
+					trust: opened.trust,
+					trustRef: inspected.trustRef,
+				}),
+			});
 		} catch {
 			return failure("trust-state-unreadable");
 		}
-		if (!recovered.ok || recovered.value.kind !== "active" || !sameHead(recovered.value.head, expectedHead)) {
-			return failure("trust-state-unreadable");
-		}
-		const candidates: DetachedClosureCandidate[] = [];
-		for (const ref of recovered.value.references) {
-			if (ref.byteLength > MAX_SCANNABLE_BYTES) continue;
-			let loaded: Awaited<ReturnType<AheDurableStore["getBlob"]>>;
-			try {
-				loaded = await store.getBlob(ref.digest);
-			} catch {
-				return failure("trust-state-unreadable");
-			}
-			if (!loaded.ok || loaded.value === null) return failure("trust-state-unreadable");
-			candidates.push({ bytes: loaded.value, ref });
-		}
-		const inspected = inspectTrustClosure({ candidates, closure: recovered.value.references });
-		if (!inspected.ok) return causedFailure("closure-rejected", inspected.reason);
-		const opened = openCurrentAnchorTrust({
-			exactCanonicalTrustStateRecordBytes: inspected.exactCanonicalTrustStateRecordBytes,
-			expectedObjectId: objectId,
-			pinnedGenesisAnchorDigest,
-		});
-		if (!opened.ok) return causedFailure("trust-rejected", opened.reason);
-		return Object.freeze({
-			ok: true as const,
-			value: Object.freeze({
-				bytes: inspected.exactCanonicalTrustStateRecordBytes,
-				head: recovered.value.head,
-				trust: opened.trust,
-				trustRef: inspected.trustRef,
-			}),
-		});
 	};
 
 	const open = async (): Promise<OpenDurableCurrentAnchorTrustResult> => {
-		if (store.capabilities.durability !== "strict") return failure("store-failed");
-		let read: Awaited<ReturnType<AheDurableStore["readHead"]>>;
+		if (!snapshotStrictDurability(store)) return failure("store-failed");
 		try {
-			read = await store.readHead(objectId);
+			const read = snapshotStoreResult(await store.readHead(objectId));
+			if (read === undefined || !read.ok) return failure("store-failed");
+			const head = snapshotExpectedHead(read.value, objectId);
+			if (head === undefined) return failure("store-failed");
+			if (head.kind === "none") return failure("not-installed");
+			const opened = await openAtHead(head);
+			return opened.ok ? successfulOpen(opened.value) : opened;
 		} catch {
 			return failure("store-failed");
 		}
-		if (!read.ok) return failure("store-failed");
-		if (read.value.kind === "none") return failure("not-installed");
-		const opened = await openAtHead(read.value);
-		return opened.ok ? successfulOpen(opened.value) : opened;
 	};
 
 	const install = async (input: InstallCreatorAnchorTrustRootInput): Promise<InstallCurrentAnchorTrustResult> => {
@@ -418,64 +601,106 @@ export function createCurrentAnchorTrustStore(options: CurrentAnchorTrustStoreOp
 		const trustRef = Object.freeze({ byteLength: exactBytes.byteLength, digest: digest.value });
 		const inspected = inspectTrustClosure({ candidates: [{ bytes: exactBytes, ref: trustRef }], closure: [trustRef] });
 		if (!inspected.ok) return causedFailure("closure-rejected", inspected.reason);
-		if (store.capabilities.durability !== "strict") return failure("store-failed");
+		if (!snapshotStrictDurability(store)) return failure("store-failed");
 
-		let read: Awaited<ReturnType<AheDurableStore["readHead"]>>;
 		try {
-			read = await store.readHead(objectId);
+			const read = snapshotStoreResult(await store.readHead(objectId));
+			if (read === undefined || !read.ok) return failure("store-failed");
+			const head = snapshotExpectedHead(read.value, objectId);
+			if (head === undefined) return failure("store-failed");
+			if (head.kind === "present") {
+				const existing = await openAtHead(head);
+				if (!existing.ok) return existing.reason === "trust-state-unreadable" ? failure("store-failed") : existing;
+				return sameBytes(existing.value.bytes, exactBytes)
+					? failure("already-installed")
+					: failure("trust-state-conflict");
+			}
 		} catch {
 			return failure("store-failed");
-		}
-		if (!read.ok) return failure("store-failed");
-		if (read.value.kind === "present") {
-			const existing = await openAtHead(read.value);
-			if (!existing.ok) return existing.reason === "trust-state-unreadable" ? failure("store-failed") : existing;
-			return sameBytes(existing.value.bytes, exactBytes)
-				? failure("already-installed")
-				: failure("trust-state-conflict");
 		}
 
 		const generationId = freshGenerationId();
 		if (generationId === undefined) return failure("store-failed");
 		const baseExpectedHead: ExpectedHead = Object.freeze({ kind: "none", objectId });
 		try {
-			const begun = await store.beginGeneration({
-				baseExpectedHead,
-				closure: [trustRef],
-				generationId,
-				objectId,
-			});
-			if (!begun.ok) return failure("store-failed");
-			const cached = await store.putCachedBlob({ bytes: exactBytes, digest: trustRef.digest, generationId, objectId });
-			if (!cached.ok) return failure("store-failed");
-			const promoted = await store.promoteReference({ digest: trustRef.digest, generationId, objectId });
-			if (!promoted.ok) return failure("store-failed");
-			const completed = await store.completeGeneration({ generationId, objectId });
-			if (!completed.ok) return failure("store-failed");
-			const swapped = await store.swapHead({ expectedHead: baseExpectedHead, generationId, objectId });
-			if (swapped.ok) {
+			const begun = snapshotStoreResult(
+				await store.beginGeneration({
+					baseExpectedHead,
+					closure: [trustRef],
+					generationId,
+					objectId,
+				})
+			);
+			const begunRecord =
+				begun?.ok === true
+					? snapshotGenerationRecord(begun.value, {
+							baseExpectedHead,
+							closure: [trustRef],
+							generationId,
+							objectId,
+							state: "Staged",
+						})
+					: undefined;
+			if (begunRecord === undefined) return failure("store-failed");
+			const cached = snapshotStoreResult(
+				await store.putCachedBlob({ bytes: exactBytes, digest: trustRef.digest, generationId, objectId })
+			);
+			const cachedValue = cached?.ok === true ? snapshotClosedRecord(cached.value, ["inserted"]) : undefined;
+			if (cachedValue === undefined || typeof cachedValue.inserted !== "boolean") return failure("store-failed");
+			const promoted = snapshotStoreResult(
+				await store.promoteReference({ digest: trustRef.digest, generationId, objectId })
+			);
+			if (promoted?.ok !== true || promoted.value !== undefined) return failure("store-failed");
+			const completed = snapshotStoreResult(await store.completeGeneration({ generationId, objectId }));
+			const completedRecord =
+				completed?.ok === true
+					? snapshotGenerationRecord(completed.value, {
+							baseExpectedHead,
+							closure: [trustRef],
+							generationId,
+							objectId,
+							state: "Complete",
+						})
+					: undefined;
+			if (completedRecord === undefined || completedRecord.closureDigest !== begunRecord.closureDigest)
+				return failure("store-failed");
+			const swapped = snapshotStoreResult(
+				await store.swapHead({ expectedHead: baseExpectedHead, generationId, objectId })
+			);
+			if (swapped?.ok === true) {
+				const swapValue = snapshotClosedRecord(swapped.value, ["head", "supersededGenerationId"]);
+				const head = swapValue === undefined ? undefined : snapshotPresentHead(swapValue.head);
+				if (
+					head === undefined ||
+					head.objectId !== objectId ||
+					head.generationId !== generationId ||
+					head.closureDigest !== completedRecord.closureDigest ||
+					swapValue?.supersededGenerationId !== null
+				)
+					return failure("store-failed");
 				return Object.freeze({
-					head: Object.freeze({ ...swapped.value.head }),
+					head,
 					ok: true as const,
 					trust: openedFresh.trust,
 					trustRef: Object.freeze({ ...trustRef }),
 				});
 			}
-			if (swapped.reason !== "HEAD_CONFLICT") return failure("store-failed");
+			if (swapped?.reason !== "HEAD_CONFLICT") return failure("store-failed");
 		} catch {
 			return failure("store-failed");
 		}
 
-		let winnerHead: Awaited<ReturnType<AheDurableStore["readHead"]>>;
 		try {
-			winnerHead = await store.readHead(objectId);
+			const winnerRead = snapshotStoreResult(await store.readHead(objectId));
+			if (winnerRead === undefined || !winnerRead.ok) return failure("store-failed");
+			const winnerHead = snapshotExpectedHead(winnerRead.value, objectId);
+			if (winnerHead?.kind !== "present") return failure("store-failed");
+			const winner = await openAtHead(winnerHead);
+			if (!winner.ok) return winner.reason === "trust-state-unreadable" ? failure("store-failed") : winner;
+			return sameBytes(winner.value.bytes, exactBytes) ? failure("already-installed") : failure("trust-state-conflict");
 		} catch {
 			return failure("store-failed");
 		}
-		if (!winnerHead.ok || winnerHead.value.kind !== "present") return failure("store-failed");
-		const winner = await openAtHead(winnerHead.value);
-		if (!winner.ok) return winner.reason === "trust-state-unreadable" ? failure("store-failed") : winner;
-		return sameBytes(winner.value.bytes, exactBytes) ? failure("already-installed") : failure("trust-state-conflict");
 	};
 
 	return Object.freeze({ install, open });
