@@ -37,6 +37,24 @@ const trackP2aExactArtifactFixtures = [
 	"tests/fixtures/track-p2-a/forward-counter/artifact.mjs",
 	"tests/fixtures/track-p2-ab-operation-abi/artifact.mjs",
 ];
+const trackP2cExactSourceFixtures = [
+	"tests/fixtures/track-p2-c/ambientBad.ts",
+	"tests/fixtures/track-p2-c/intrinsicMutation.ts",
+	"tests/fixtures/track-p2-c/moduleGlobalDrift.ts",
+	"tests/fixtures/track-p2-c/noncanonicalIntermediate.ts",
+	"tests/fixtures/track-p2-c/sparseIntermediate.ts",
+	"tests/fixtures/track-p2-c/thenable.ts",
+];
+const trackP2cExactArtifactFixtures = [
+	"tests/fixtures/track-p2-c/ambientBad.mjs",
+	"tests/fixtures/track-p2-c/intrinsicMutation.mjs",
+	"tests/fixtures/track-p2-c/moduleGlobalDrift.mjs",
+	"tests/fixtures/track-p2-c/noncanonicalIntermediate.mjs",
+	"tests/fixtures/track-p2-c/primary.mjs",
+	"tests/fixtures/track-p2-c/sparseIntermediate.mjs",
+	"tests/fixtures/track-p2-c/thenable.mjs",
+];
+const trackP2cHarnessFixtures = ["tests/fixtures/track-p2-c/child-preload.mjs"];
 
 /** @type {import("typescript-eslint").ConfigArray} */
 const config = tsLintConfig(
@@ -298,6 +316,26 @@ const config = tsLintConfig(
 		rules: {
 			"@typescript-eslint/explicit-function-return-type": "off",
 			"prettier/prettier": "off",
+		},
+	},
+	{
+		files: trackP2cExactSourceFixtures,
+		rules: {
+			"@typescript-eslint/explicit-function-return-type": "off",
+			"@typescript-eslint/no-unused-vars": "off",
+		},
+	},
+	{
+		files: trackP2cExactArtifactFixtures,
+		rules: {
+			"@typescript-eslint/explicit-function-return-type": "off",
+			"prettier/prettier": "off",
+		},
+	},
+	{
+		files: trackP2cHarnessFixtures,
+		rules: {
+			"@typescript-eslint/explicit-function-return-type": "off",
 		},
 	},
 	{
