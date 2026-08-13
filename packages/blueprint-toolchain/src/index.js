@@ -744,11 +744,11 @@ function compactJson(value) {
 		.join(",")}}`;
 }
 
-/** @param {string} name @param {number} index */
-function controlReducerBinding(name, index) {
+/** @param {string} name @param {string} operationName @param {string} selectedAction */
+function controlReducerBinding(name, operationName, selectedAction) {
 	if (name === "ambientBad") return "ambientReducer";
 	if (name === "intrinsicMutation") return "unchangedReducer";
-	if (index !== 0) return "unchangedReducer";
+	if (operationName !== selectedAction) return "unchangedReducer";
 	if (name === "thenable") return "thenableReducer";
 	if (name === "moduleGlobalDrift") return "driftReducer";
 	if (name === "noncanonicalIntermediate") return "invalidReducer";
@@ -791,15 +791,14 @@ function assertIntrinsicSnapshot(snapshot, context) {
 	return snapshot;
 }
 
-/** @param {readonly Record<string, any>[]} operations @param {unknown} initialState @param {number} ordinal */
-function expectedDriftDigest(operations, initialState, ordinal) {
-	return domainHex(
-		"ts-drp/blueprint-conformance/v1",
-		encodeCanonical({
-			state: initialState,
-			outputs: operations.map((_operation, index) => (index === 0 ? ordinal : null)),
-		})
-	);
+/** @param {readonly Record<string, any>[]} operations @param {unknown} initialState @param {string} selectedAction @param {number} initialOrdinal */
+function expectedDriftRun(operations, initialState, selectedAction, initialOrdinal) {
+	let ordinal = initialOrdinal;
+	const outputs = operations.map((operation) => (operation.action === selectedAction ? ++ordinal : null));
+	return {
+		digest: domainHex("ts-drp/blueprint-conformance/v1", encodeCanonical({ state: initialState, outputs })),
+		ordinal,
+	};
 }
 
 /**
@@ -881,6 +880,7 @@ function validateChildReceipt(rawReceipt, tier, authoring, artifacts) {
 	];
 	const selectedOperations = tier === "pr" ? prOperations : nightlyOperations;
 	const selectedIds = selectedOperations.map(({ id }) => id);
+	const selectedControlAction = prOperations[0].action;
 	const corpus = assertExactRecord(
 		receipt.corpus,
 		["corpusVersion", "seed", "operationOrder", "pr", "nightly"],
@@ -1058,12 +1058,17 @@ function validateChildReceipt(rawReceipt, tier, authoring, artifacts) {
 		["detected", "sameModuleInstanceDigests", "freshInstanceDigests"],
 		"child module-global control"
 	);
-	const freshDrift = expectedDriftDigest(selectedOperations, authoring.conformance.initialState, 1);
-	const secondDrift = expectedDriftDigest(selectedOperations, authoring.conformance.initialState, 2);
+	const firstDrift = expectedDriftRun(selectedOperations, authoring.conformance.initialState, selectedControlAction, 0);
+	const secondDrift = expectedDriftRun(
+		selectedOperations,
+		authoring.conformance.initialState,
+		selectedControlAction,
+		firstDrift.ordinal
+	);
 	if (
 		moduleGlobal.detected !== true ||
-		!canonicalEqual(moduleGlobal.sameModuleInstanceDigests, [freshDrift, secondDrift]) ||
-		!canonicalEqual(moduleGlobal.freshInstanceDigests, [freshDrift, freshDrift])
+		!canonicalEqual(moduleGlobal.sameModuleInstanceDigests, [firstDrift.digest, secondDrift.digest]) ||
+		!canonicalEqual(moduleGlobal.freshInstanceDigests, [firstDrift.digest, firstDrift.digest])
 	) {
 		throw new TypeError("child module-global evidence is invalid");
 	}
@@ -1189,21 +1194,6 @@ async function createConformanceReceipt(authoring, sourceBytes, artifact, packag
 	};
 	/** @type {Record<string, Buffer>} */
 	const artifacts = { primary: artifact };
-	/** @type {Record<string, {artifact:Buffer,artifactId:string,source:string}>} */
-	const controls = {};
-	for (const name of CONTROL_NAMES) {
-		const source = CONTROL_SOURCES[name];
-		const artifactId = artifactIdFor(name);
-		const operations = /** @type {{name:string,reducerBinding:string}[]} */ (
-			/** @type {Record<string, any>[]} */ (authoring.operations).map((operation, index) => ({
-				...operation,
-				reducerBinding: controlReducerBinding(name, index),
-			}))
-		);
-		controls[name] = { artifact: await emitArtifact(source, { artifactId, operations }), artifactId, source };
-		artifacts[name] = controls[name].artifact;
-	}
-	await proveAmbientLintRejects(CONTROL_SOURCES.ambientBad, "ambientBad.ts");
 	const prOperations = /** @type {Record<string, any>[]} */ (authoring.conformance.prCases).map(
 		({ id, action, arguments: arguments_ }) => ({
 			id,
@@ -1211,6 +1201,22 @@ async function createConformanceReceipt(authoring, sourceBytes, artifact, packag
 			arguments: arguments_,
 		})
 	);
+	const selectedControlAction = prOperations[0].action;
+	/** @type {Record<string, {artifact:Buffer,artifactId:string,source:string}>} */
+	const controls = {};
+	for (const name of CONTROL_NAMES) {
+		const source = CONTROL_SOURCES[name];
+		const artifactId = artifactIdFor(name);
+		const operations = /** @type {{name:string,reducerBinding:string}[]} */ (
+			/** @type {Record<string, any>[]} */ (authoring.operations).map((operation) => ({
+				...operation,
+				reducerBinding: controlReducerBinding(name, operation.name, selectedControlAction),
+			}))
+		);
+		controls[name] = { artifact: await emitArtifact(source, { artifactId, operations }), artifactId, source };
+		artifacts[name] = controls[name].artifact;
+	}
+	await proveAmbientLintRejects(CONTROL_SOURCES.ambientBad, "ambientBad.ts");
 	const nightlyOperations = [
 		...prOperations,
 		.../** @type {Record<string, any>[]} */ (authoring.conformance.nightlyAdditionalCases).map(
