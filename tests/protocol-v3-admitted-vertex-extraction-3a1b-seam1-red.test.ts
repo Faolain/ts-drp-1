@@ -604,7 +604,22 @@ function namedVariableStringArray(source: ts.SourceFile, ownerName: string): rea
 	return matches[0] ?? [];
 }
 
-function isSortedPublicRootKeysExpectation(call: ts.CallExpression): boolean {
+type PublicRootOwner =
+	| Readonly<{ kind: "identifier"; name: string }>
+	| Readonly<{ kind: "awaited-call"; name: string }>;
+
+function isPublicRootOwner(expression: ts.Expression, owner: PublicRootOwner): boolean {
+	if (owner.kind === "identifier") return ts.isIdentifier(expression) && expression.text === owner.name;
+	return (
+		ts.isAwaitExpression(expression) &&
+		ts.isCallExpression(expression.expression) &&
+		ts.isIdentifier(expression.expression.expression) &&
+		expression.expression.expression.text === owner.name &&
+		expression.expression.arguments.length === 0
+	);
+}
+
+function isSortedPublicRootKeysExpectation(call: ts.CallExpression, owner: PublicRootOwner): boolean {
 	if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "toEqual") return false;
 	const expectCall = call.expression.expression;
 	if (
@@ -628,11 +643,17 @@ function isSortedPublicRootKeysExpectation(call: ts.CallExpression): boolean {
 		ts.isIdentifier(keysCall.expression.expression) &&
 		keysCall.expression.expression.text === "Object" &&
 		keysCall.expression.name.text === "keys" &&
-		keysCall.arguments.length === 1
+		keysCall.arguments.length === 1 &&
+		keysCall.arguments[0] !== undefined &&
+		isPublicRootOwner(keysCall.arguments[0], owner)
 	);
 }
 
-function namedPublicSurfaceTestArray(source: ts.SourceFile, testName: string): readonly string[] {
+function namedPublicSurfaceTestArray(
+	source: ts.SourceFile,
+	testName: string,
+	owner: PublicRootOwner
+): readonly string[] {
 	const matches: Array<readonly string[]> = [];
 	const visit = (node: ts.Node): void => {
 		if (
@@ -647,7 +668,7 @@ function namedPublicSurfaceTestArray(source: ts.SourceFile, testName: string): r
 			const findAllowlist = (candidate: ts.Node): void => {
 				if (
 					ts.isCallExpression(candidate) &&
-					isSortedPublicRootKeysExpectation(candidate) &&
+					isSortedPublicRootKeysExpectation(candidate, owner) &&
 					candidate.arguments[0] !== undefined
 				) {
 					const values = stringArray(candidate.arguments[0]);
@@ -674,12 +695,26 @@ function runtimeAllowlist(path: string): readonly string[] {
 	if (path.endsWith("protocol-v3-blueprint-operation-budget-0p2.test.ts"))
 		return namedPublicSurfaceTestArray(
 			source,
-			"[public-surface] preserves exactly the ten package-root runtime exports"
+			"[public-surface] preserves exactly the ten package-root runtime exports",
+			{ kind: "awaited-call", name: "surface" }
 		);
 	if (path.endsWith("protocol-v3-blueprint-work-budget-0p0.test.ts"))
 		return namedPublicSurfaceTestArray(
 			source,
-			"[public-surface] keeps governance inside the existing preparer with no new runtime helper export"
+			"[public-surface] keeps governance inside the existing preparer with no new runtime helper export",
+			{ kind: "identifier", name: "publicEntry" }
+		);
+	if (path.endsWith("protocol-v3-equivocation-gossip-budget-0o-b2.test.ts"))
+		return namedPublicSurfaceTestArray(
+			source,
+			"[public-boundary] pins source, built and runtime closure for the deep-only composer",
+			{ kind: "identifier", name: "sourceRuntime" }
+		);
+	if (path.endsWith("protocol-v3-equivocation-author-projection-0o-b1b.test.ts"))
+		return namedPublicSurfaceTestArray(
+			source,
+			"[public-boundary] pins the closed source/built/runtime root and all three deep helpers",
+			{ kind: "identifier", name: "sourceRuntime" }
 		);
 	throw new Error(`SEAM1_UNKNOWN_RUNTIME_PIN_OWNER:${path}`);
 }
@@ -691,7 +726,7 @@ function assertExactRuntimePins(path: string): void {
 describe("D.93.27 public extraction seam tests-only RED", () => {
 	beforeEach(() => resetCalls());
 
-	it("pins the exact runtime root and all seven live source/type owners", async () => {
+	it("pins the exact runtime root and all nine live source/type owners", async () => {
 		for (const path of [
 			resolve(ROOT, "tests/fixtures/phase-3a0-v3/public-entry-type-audit.ts"),
 			resolve(ROOT, "tests/fixtures/phase-3a0-v3/built-package-type-audit.ts"),
@@ -704,6 +739,8 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 				"extractAdmittedReceivedVertex",
 			])
 				expect(audit, `${path}:${name}`).toMatch(new RegExp(`\\b${name}\\b`, "u"));
+			expect(audit).toContain("resolveAuthorPublicKey(author: string): RawEd25519PublicKey | undefined;");
+			expect(audit).not.toMatch(/readonly resolveAuthorPublicKey\s*:/u);
 		}
 
 		for (const path of [
@@ -711,6 +748,8 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 			resolve(ROOT, "tests/protocol-v3-anchor-trust-3a0.test.ts"),
 			resolve(ROOT, "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts"),
 			resolve(ROOT, "tests/protocol-v3-blueprint-work-budget-0p0.test.ts"),
+			resolve(ROOT, "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts"),
+			resolve(ROOT, "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts"),
 			resolve(ROOT, "tests/phase-3a1-a-live-preparation-red.test.ts"),
 		]) {
 			assertExactRuntimePins(path);
@@ -1214,6 +1253,37 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 				"EXPECTED_RUNTIME_EXPORTS"
 			)
 		).not.toEqual(EXPECTED_RUNTIME_EXPORTS);
+		const publicRootControl = ts.createSourceFile(
+			"public-root-control.ts",
+			`it("[public-root]", () => {
+				const sourceRuntime = {};
+				const unrelatedRuntime = {};
+				expect(Object.keys(unrelatedRuntime).sort()).toEqual(${JSON.stringify(EXPECTED_RUNTIME_EXPORTS)});
+				expect(Object.keys(sourceRuntime).sort()).toEqual(${JSON.stringify(EXPECTED_RUNTIME_EXPORTS)});
+			});`,
+			ts.ScriptTarget.Latest,
+			true,
+			ts.ScriptKind.TS
+		);
+		expect(
+			namedPublicSurfaceTestArray(publicRootControl, "[public-root]", {
+				kind: "identifier",
+				name: "sourceRuntime",
+			})
+		).toEqual(EXPECTED_RUNTIME_EXPORTS);
+		expect(() =>
+			namedPublicSurfaceTestArray(
+				ts.createSourceFile(
+					"public-root-mutant.ts",
+					publicRootControl.text.replace("Object.keys(sourceRuntime)", "Object.keys(unrelatedRuntime)"),
+					ts.ScriptTarget.Latest,
+					true,
+					ts.ScriptKind.TS
+				),
+				"[public-root]",
+				{ kind: "identifier", name: "sourceRuntime" }
+			)
+		).toThrow();
 
 		const good = `
 			function authenticateReceivedVertex(input) {

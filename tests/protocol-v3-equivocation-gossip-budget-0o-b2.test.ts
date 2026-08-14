@@ -574,8 +574,14 @@ describe("Phase 0o-b2 pure author gossip-budget causal RED", () => {
 		const sourceRuntime = await import(pathToFileURL(PUBLIC_ENTRY).href);
 		const packageRuntime = await import("@ts-drp/protocol-v3");
 		expect(Object.keys(sourceRuntime).sort()).toEqual([
+			"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
 			"admitReceivedVertex",
+			"authenticateCurrentEpochAnchor",
 			"createAdmissionBoundTransactionalVertexIssuer",
+			"extractAdmittedReceivedVertex",
+			"installCreatorAnchorTrustRoot",
+			"isAnchorTrustStateRecordBytes",
+			"openCurrentAnchorTrust",
 			"prepareBlueprintAdmission",
 			"prepareBlueprintRuntime",
 		]);
