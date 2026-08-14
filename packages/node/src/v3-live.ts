@@ -1,5 +1,6 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { CausalityIndex } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import {
 	authenticateCurrentEpochAnchor,
@@ -13,6 +14,8 @@ import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" wi
 import {
 	type AheDurableStore,
 	type BlobDigest,
+	digestBlob,
+	digestClosure,
 	type GenerationRef,
 	parseStorageObjectId,
 	type PresentHead,
@@ -35,6 +38,17 @@ const StringConstructor = String;
 const Uint8ArrayConstructor = Uint8Array;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const IntrinsicMap = Map;
+const MapPrototype = Map.prototype;
+const MapPrototypeEntries = Map.prototype.entries;
+const MapPrototypeGet = Map.prototype.get;
+const MapPrototypeHas = Map.prototype.has;
+const MapPrototypeKeys = Map.prototype.keys;
+const MapPrototypeSet = Map.prototype.set;
+const MapSizeGetter = ObjectGetOwnPropertyDescriptor(Map.prototype, "size")?.get;
+const MapIteratorPrototype = ObjectGetPrototypeOf(ReflectApply(MapPrototypeEntries, new IntrinsicMap(), []));
+const MapIteratorNext = ObjectGetOwnPropertyDescriptor(MapIteratorPrototype, "next")?.value;
+const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 const TypedArrayPrototype = ObjectGetPrototypeOf(Uint8Array.prototype) as object;
 const TypedArrayBufferGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "buffer")?.get;
 const TypedArrayByteLengthGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "byteLength")?.get;
@@ -192,6 +206,18 @@ interface ProvenanceSnapshot {
 	readonly parametersDigest: string;
 	readonly profileDigest: string;
 	readonly signerSetDigest: string;
+}
+
+interface OpenedTrustSnapshot {
+	readonly head: PresentHead;
+	readonly trust: CurrentAnchorTrust;
+	readonly trustRef: GenerationRef;
+}
+
+interface AcceptedParameters {
+	readonly maxDependencies: number;
+	readonly maxEpochBytes: number;
+	readonly maxEpochVertices: number;
 }
 
 function failure(kind: PrepareV3LiveFailureKind, detail: string): PrepareV3LiveResult {
@@ -551,17 +577,28 @@ function snapshotParameterRecord(value: unknown, schema: ParameterSchema): Plain
 	}
 }
 
-function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): boolean {
+function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): AcceptedParameters | undefined {
 	try {
-		if (PARAMETER_SCHEMA === undefined) return false;
+		if (PARAMETER_SCHEMA === undefined) return undefined;
 		const snapshot = snapshotParameterRecord(decodeCanonical(bytes), PARAMETER_SCHEMA);
-		if (snapshot === undefined) return false;
+		if (snapshot === undefined) return undefined;
 		const reencoded = encodeCanonical(snapshot);
-		if (!sameBytes(reencoded, bytes)) return false;
+		if (!sameBytes(reencoded, bytes)) return undefined;
 		const digest = bytesToLowerHex(hashDomain(PARAMETER_SCHEMA.domain, reencoded));
-		return digest === expectedDigest && digest === SUPPORTED_PARAMETER_PROFILE.parametersDigest;
+		if (digest !== expectedDigest || digest !== SUPPORTED_PARAMETER_PROFILE.parametersDigest) return undefined;
+		const maxDependencies = snapshot.maxDependencies;
+		const maxEpochBytes = snapshot.maxEpochBytes;
+		const maxEpochVertices = snapshot.maxEpochVertices;
+		return typeof maxDependencies === "number" &&
+			NumberIsSafeInteger(maxDependencies) &&
+			typeof maxEpochBytes === "number" &&
+			NumberIsSafeInteger(maxEpochBytes) &&
+			typeof maxEpochVertices === "number" &&
+			NumberIsSafeInteger(maxEpochVertices)
+			? ObjectFreeze({ maxDependencies, maxEpochBytes, maxEpochVertices })
+			: undefined;
 	} catch {
-		return false;
+		return undefined;
 	}
 }
 
@@ -665,7 +702,7 @@ function runtimeMatches(value: PreparedBlueprintRuntime, catalog: CatalogSnapsho
 	);
 }
 
-function snapshotOpenedTrust(value: unknown, expectedObjectId: string): CurrentAnchorTrust | undefined {
+function snapshotOpenedTrust(value: unknown, expectedObjectId: string): OpenedTrustSnapshot | undefined {
 	const result = snapshotClosedRecord(value, OPEN_RESULT_KEYS);
 	if (result === undefined || result.ok !== true) return undefined;
 	const head = snapshotClosedRecord(result.head, PRESENT_HEAD_KEYS);
@@ -696,7 +733,20 @@ function snapshotOpenedTrust(value: unknown, expectedObjectId: string): CurrentA
 	) {
 		return undefined;
 	}
-	return result.trust as CurrentAnchorTrust;
+	return ObjectFreeze({
+		head: ObjectFreeze({
+			closureDigest: head.closureDigest,
+			generationId: head.generationId,
+			kind: "present" as const,
+			objectId: head.objectId,
+			revision: head.revision,
+		}) as PresentHead,
+		trust: result.trust as CurrentAnchorTrust,
+		trustRef: ObjectFreeze({
+			byteLength: trustRef.byteLength,
+			digest: trustRef.digest,
+		}) as GenerationRef,
+	});
 }
 
 function snapshotAuthenticatedProvenance(value: unknown, expectedObjectId: string): ProvenanceSnapshot | undefined {
@@ -726,16 +776,100 @@ function snapshotAuthenticatedProvenance(value: unknown, expectedObjectId: strin
 	});
 }
 
+interface CapturedIteratorStep {
+	readonly done: boolean;
+	readonly value: unknown;
+}
+
+function nextCapturedMapIterator(iterator: unknown): CapturedIteratorStep | undefined {
+	try {
+		if (typeof MapIteratorNext !== "function") return undefined;
+		const result = ReflectApply(MapIteratorNext, iterator, []) as unknown;
+		if (!isObject(result)) return undefined;
+		const done = ObjectGetOwnPropertyDescriptor(result, "done");
+		const value = ObjectGetOwnPropertyDescriptor(result, "value");
+		if (done === undefined || !("value" in done) || typeof done.value !== "boolean") return undefined;
+		if (done.value === true) return ObjectFreeze({ done: true, value: undefined });
+		return value !== undefined && "value" in value ? ObjectFreeze({ done: false, value: value.value }) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function isExactOwnedSingleEntryMap(map: unknown, expectedKey: string, expectedValue: unknown): boolean {
+	try {
+		if (
+			!isObject(map) ||
+			ObjectGetPrototypeOf(map) !== MapPrototype ||
+			ReflectOwnKeys(map).length !== 0 ||
+			MapSizeGetter === undefined ||
+			ReflectApply(MapSizeGetter, map, []) !== 1 ||
+			ReflectApply(MapPrototypeHas, map, [expectedKey]) !== true ||
+			ReflectApply(MapPrototypeGet, map, [expectedKey]) !== expectedValue
+		) {
+			return false;
+		}
+		const keys = ReflectApply(MapPrototypeKeys, map, []) as unknown;
+		const firstKey = nextCapturedMapIterator(keys);
+		const lastKey = nextCapturedMapIterator(keys);
+		if (firstKey?.done !== false || firstKey.value !== expectedKey || lastKey?.done !== true) return false;
+		const entries = ReflectApply(MapPrototypeEntries, map, []) as unknown;
+		const firstEntry = nextCapturedMapIterator(entries);
+		const lastEntry = nextCapturedMapIterator(entries);
+		if (firstEntry?.done !== false || lastEntry?.done !== true || !ArrayIsArray(firstEntry.value)) return false;
+		const entryKey = ObjectGetOwnPropertyDescriptor(firstEntry.value, "0");
+		const entryValue = ObjectGetOwnPropertyDescriptor(firstEntry.value, "1");
+		return (
+			entryKey !== undefined &&
+			"value" in entryKey &&
+			entryKey.value === expectedKey &&
+			entryValue !== undefined &&
+			"value" in entryValue &&
+			entryValue.value === expectedValue
+		);
+	} catch {
+		return false;
+	}
+}
+
+function isLinearizationFailure(value: unknown): boolean {
+	if (!isObject(value)) return false;
+	try {
+		const brand = ObjectGetOwnPropertyDescriptor(value, DRP_ERROR_BRAND);
+		const code = ObjectGetOwnPropertyDescriptor(value, "code");
+		const name = ObjectGetOwnPropertyDescriptor(value, "name");
+		return (
+			brand !== undefined &&
+			"value" in brand &&
+			brand.value === true &&
+			code !== undefined &&
+			"value" in code &&
+			typeof code.value === "string" &&
+			name !== undefined &&
+			"value" in name &&
+			name.value === "LinearizationError"
+		);
+	} catch {
+		return false;
+	}
+}
+
+function copiedGenerationRef(digest: unknown, byteLength: unknown): GenerationRef | undefined {
+	return isDigestHex(digest) && typeof byteLength === "number" && NumberIsSafeInteger(byteLength) && byteLength > 0
+		? (ObjectFreeze({ digest, byteLength }) as GenerationRef)
+		: undefined;
+}
+
 /**
- * Authenticates and prepares one creator generation through the pre-graph A-a boundary.
+ * Authenticates and prepares one creator generation through the graph/projection A-b boundary.
  * @param input - Closed creator preparation input.
- * @returns A frozen stage result; A-a intentionally ends at graph-rejected.
+ * @returns A frozen stage result; A-b intentionally ends before trust preservation and staging.
  */
 export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Promise<PrepareV3LiveResult> {
 	const captured = captureInput(input);
 	if (captured === undefined) return failure("malformed-input", "creator preparation input is invalid");
 
-	let openedTrust: CurrentAnchorTrust;
+	let openedTrust: OpenedTrustSnapshot;
 	try {
 		const trustStore = createCurrentAnchorTrustStore({
 			objectId: captured.objectId,
@@ -757,7 +891,7 @@ export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInpu
 		const authenticated = authenticateCurrentEpochAnchor({
 			detachedSignature: captured.detachedSignature,
 			exactCanonicalAnchorPreimageBytes: captured.exactCanonicalAnchorPreimageBytes,
-			trust: openedTrust,
+			trust: openedTrust.trust,
 		});
 		const snapshot = snapshotAuthenticatedProvenance(authenticated, captured.objectId);
 		if (snapshot === undefined || snapshot.anchorDigest !== captured.pinnedGenesisAnchorDigest) {
@@ -781,7 +915,11 @@ export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInpu
 		return failure("anchor-authentication-failed", "current anchor digest is invalid");
 	}
 
-	if (!acceptedParameterDigest(captured.exactCanonicalParametersCarrierBytes, provenance.parametersDigest)) {
+	const parameters = acceptedParameterDigest(
+		captured.exactCanonicalParametersCarrierBytes,
+		provenance.parametersDigest
+	);
+	if (parameters === undefined) {
 		return failure("parameters-rejected", "creator parameters are unsupported");
 	}
 
@@ -829,5 +967,130 @@ export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInpu
 		return failure("runtime-preparation-failed", "blueprint runtime identity is invalid");
 	}
 
-	return failure("graph-rejected", "creator graph preparation is not implemented in A-a");
+	const byteCharge = typedArrayByteLength(captured.exactCanonicalAnchorPreimageBytes);
+	if (
+		byteCharge === undefined ||
+		byteCharge < 1 ||
+		byteCharge > parameters.maxEpochBytes ||
+		parameters.maxEpochVertices < 1
+	) {
+		return failure("graph-rejected", "creator graph exceeds authenticated limits");
+	}
+
+	const dependencies = finishDenseArray<string>([], 0);
+	const orderValues: string[] = [];
+	if (dependencies === undefined || !defineDenseElement(orderValues, 0, provenance.anchorDigest)) {
+		return failure("internal-invariant", "creator graph containers could not be constructed");
+	}
+	const order = finishDenseArray(orderValues, 1);
+	if (order === undefined) return failure("internal-invariant", "creator graph containers could not be constructed");
+	const vertex = ObjectFreeze({
+		hash: provenance.anchorDigest,
+		kind: "drp-epoch-anchor" as const,
+		objectId: provenance.objectId,
+		epoch: 0,
+		dependencies: dependencies as string[],
+	});
+	const vertices = new IntrinsicMap<string, typeof vertex>();
+	const charges = new IntrinsicMap<string, number>();
+	try {
+		ReflectApply(MapPrototypeSet, vertices, [provenance.anchorDigest, vertex]);
+		ReflectApply(MapPrototypeSet, charges, [provenance.anchorDigest, byteCharge]);
+	} catch {
+		return failure("internal-invariant", "creator graph containers could not be constructed");
+	}
+	if (
+		!isExactOwnedSingleEntryMap(vertices, provenance.anchorDigest, vertex) ||
+		!isExactOwnedSingleEntryMap(charges, provenance.anchorDigest, byteCharge) ||
+		order[0] !== provenance.anchorDigest
+	) {
+		return failure("graph-rejected", "creator graph ownership is invalid");
+	}
+	try {
+		new CausalityIndex(vertices, order, {
+			initialByteCharges: charges,
+			maxEpochBytes: parameters.maxEpochBytes,
+			maxEpochVertices: parameters.maxEpochVertices,
+		});
+	} catch (error) {
+		return isLinearizationFailure(error)
+			? failure("graph-rejected", "creator graph validation failed")
+			: failure("internal-invariant", "creator graph validation failed unexpectedly");
+	}
+
+	try {
+		const orderedVertexHashesPreimage = {
+			kind: "v3-live-order-1",
+			orderedVertexHashes: [provenance.anchorDigest],
+		};
+		const graphChargePreimage = {
+			kind: "v3-live-graph-1",
+			vertices: [
+				{
+					hash: provenance.anchorDigest,
+					kind: "drp-epoch-anchor",
+					objectId: provenance.objectId,
+					epoch: 0,
+					dependencies: [],
+				},
+			],
+			charges: [{ hash: provenance.anchorDigest, byteCharge }],
+		};
+		const exactOrderPreimageBytes = encodeCanonical(orderedVertexHashesPreimage);
+		const exactGraphChargePreimageBytes = encodeCanonical(graphChargePreimage);
+		const orderedVertexHashesDigest = (digestBlob(exactOrderPreimageBytes) as { readonly value?: BlobDigest }).value;
+		if (orderedVertexHashesDigest === undefined) {
+			return failure("internal-invariant", "creator order digest could not be derived");
+		}
+		const graphDigest = (digestBlob(exactGraphChargePreimageBytes) as { readonly value?: BlobDigest }).value;
+		if (graphDigest === undefined) {
+			return failure("internal-invariant", "creator graph digest could not be derived");
+		}
+		const projectionRecord = {
+			kind: "v3-live-generation-1",
+			objectId: provenance.objectId,
+			epoch: provenance.epoch,
+			anchorDigest: provenance.anchorDigest,
+			blueprintDigest: provenance.blueprintDigest,
+			parametersDigest: provenance.parametersDigest,
+			profileDigest: provenance.profileDigest,
+			signerSetDigest: provenance.signerSetDigest,
+			artifactDigest: catalog.artifactDigest,
+			artifactId: catalog.artifactId,
+			catalogDigest: catalog.catalogDigest,
+			runtimeProfile: catalog.runtimeProfile,
+			trustProfile: "creator-only",
+			maxEpochVertices: parameters.maxEpochVertices,
+			maxEpochBytes: parameters.maxEpochBytes,
+			maxDependencies: parameters.maxDependencies,
+			vertexCount: 1,
+			byteCharge,
+			orderedVertexHashesDigest,
+			graphDigest,
+		};
+		const exactProjectionBytes = encodeCanonical(projectionRecord);
+		const projectionDigest = (digestBlob(exactProjectionBytes) as { readonly value?: BlobDigest }).value;
+		const projectionByteLength = typedArrayByteLength(exactProjectionBytes);
+		const trustRef = copiedGenerationRef(openedTrust.trustRef.digest, openedTrust.trustRef.byteLength);
+		const liveStateRef = copiedGenerationRef(projectionDigest, projectionByteLength);
+		if (trustRef === undefined || liveStateRef === undefined || trustRef.digest === liveStateRef.digest) {
+			return failure("internal-invariant", "creator live projection reference is invalid");
+		}
+		const proposedClosure: GenerationRef[] = [];
+		const firstRef = trustRef.digest < liveStateRef.digest ? trustRef : liveStateRef;
+		const secondRef = firstRef === trustRef ? liveStateRef : trustRef;
+		if (
+			!defineDenseElement(proposedClosure, 0, firstRef) ||
+			!defineDenseElement(proposedClosure, 1, secondRef) ||
+			finishDenseArray(proposedClosure, 2) === undefined
+		) {
+			return failure("internal-invariant", "creator closure could not be constructed");
+		}
+		const closureDigest = digestClosure(proposedClosure);
+		if (!closureDigest.ok) return failure("internal-invariant", "creator closure digest could not be derived");
+	} catch {
+		return failure("internal-invariant", "creator graph projection could not be derived");
+	}
+
+	return failure("trust-not-preserved", "creator trust preservation is deferred to A-c");
 }

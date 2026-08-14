@@ -60,6 +60,7 @@
 		"@noble/secp256k1": "^2.2.3",
 		"@ts-drp/blueprints": "0.11.0",
 		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/compaction": "0.11.0",
 		"@ts-drp/control-plane": "workspace:*",
 		"@ts-drp/interval-discovery": "0.11.0",
 		"@ts-drp/interval-reconnect": "0.11.0",
