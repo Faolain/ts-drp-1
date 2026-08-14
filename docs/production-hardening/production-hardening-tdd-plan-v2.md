@@ -8326,6 +8326,72 @@ and no A blocker. Its exact result is preserved under the controller's
 Phase-3a-1 reconciliation evidence. These bytes must receive final exact-byte
 Grok/Kimi/Opus assent and be signed and pushed before `3a-1A-a` RED starts.
 
+#### D.93.24 — Phase 3a-1A-a closure evidence and Phase 3a-1A-b handoff
+
+Phase `3a-1A-a` is closed at signed production candidate
+`b10a35c171fd3141fcb785b18299d1c6b5ebb1be`, tree
+`e19f313bfed54504ccd4489f4305b03a1b5d2f8d`. This section is a bounded,
+non-normative evidence ledger. It does not change D.93.23, implement A-b or
+A-c, close A as a whole or authorize any Phase `3a-1B` live effect.
+
+The A-a boundary exists to make every caller-supplied identity and byte source
+lose authority before later graph, persistence and activation work begins. Its
+private owner is `packages/node/src/v3-live.ts`; the contract and its causal
+evidence remain in D.93.23 and the Phase `3a-1A-a` test/fixture surface. The
+accepted bytes add no node-root export, `DRPNode` method, protocol-v3 runtime
+value, public package subpath or A-b/A-c/1B owner. This keeps authentication,
+parameter selection and blueprint preparation reviewable without prematurely
+publishing an index or creating a reducer, subscription, issuance, outbox or
+other live authority.
+
+The signed lineage is `e4b3113` → `f845419` → `8d6527e` → `da5ac73` →
+`eafe3c1` → `1f26423` → `70b3b79` → `b10a35c`. The corrections made the RED
+oracles use the real store facade, kept the anchor, parameter and storage hash
+contexts independent, admitted only the published protocol-v3 parameter
+registry, hardened hostile-result and intrinsic snapshots, and finally removed
+one false catalog-backing assumption. They did not add a production injection
+seam or move work from A-b/A-c into A-a.
+
+The final backing rule is deliberately asymmetric. The three caller byte-array
+inputs remain distinct-backed at the synchronous pre-I/O boundary. The trusted
+catalog may return package and artifact views over one ordinary pooled
+`ArrayBuffer`, because the genuine catalog does so; each view is nevertheless
+validated independently as nonempty and not `SharedArrayBuffer`-backed, then
+copied into separate detached storage before either genuine preparer. Every
+catalog, blueprint, artifact, evidence, runtime-profile and proven-identity gate
+remains authoritative. Reintroducing a catalog cross-view backing-identity rule
+would reject valid output without strengthening ownership.
+
+Fresh evidence on the final tree passed the focused suite `8/8`, the Phase
+`3a-0` preservation set `61/61`, the dedicated TypeScript project, node build,
+targeted ESLint and Prettier, diff-check and packed-package inspection. The pack
+archive SHA-256 is
+`6df5e3ff392059f3831921a972ce7c40bd2588d861800e433c5bb04121d9443e`.
+The independent implementation review returned terminal `PASS` with no P0-P2
+finding; its result SHA-256 is
+`1061784c38dbe9d30dfa97fe504a5573ac97291c462b22205e3548134377df8b`.
+
+The ultimate closure quorum is unanimous:
+
+- Grok 4.6/high returned `PASS`, A-a close and A-b start, with no blocker or
+  plan change and high confidence. Its result SHA-256 is
+  `35bcf9c4877df45609db7a83bb79f87ac7954e696655c60edba335b5abc8163f`.
+- Kimi K3/high/100 returned `PASS`, A-a close and A-b start, with no blocker and
+  high confidence. It confirmed D.93.23 already distinguishes caller backing
+  from detached per-view catalog copies. Its result SHA-256 is
+  `52eb4fa2f4f1ac03bb6d8ebaddd2eccef41c2ac547981a140bc873e86a5594ee`.
+- Native Opus 5/xhigh session `89c32c5f-9074-4217-9943-9a0cf17e5f66`
+  returned `PASS`, A-a close and A-b start, no blocker and high confidence. Its
+  requested backing note is recorded above without changing the normative
+  contract. The result and transcript SHA-256 values are
+  `cf43f67cdcb6c40aa5335f7d4d50c98463faa8e60754486ace5db311f02ac702`
+  and `877cb5b088c6f407d03a6456c76cbd3c208ebd4da776edb6a3696e396e23a8f2`.
+
+Phase `3a-1A-a` is closed and `3a-1A-b` may start with a different tests-only
+RED owner. A-b still owns the anchor-only graph, pristine `Map` behavior,
+D.73 validation, exact projection bytes and the discarded validation-only
+index. Nothing in this ledger claims those obligations are implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
