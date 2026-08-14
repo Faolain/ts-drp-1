@@ -1,6 +1,6 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { type decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { type createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+import { type assertTrustPreserved, type createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import {
 	type authenticateCurrentEpochAnchor,
 	installCreatorAnchorTrustRoot,
@@ -43,6 +43,7 @@ import {
 	independentHashDomain,
 	makeCreatorMaterial,
 } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
+import graphProjectionGolden from "./fixtures/phase-3a1-ab-v3/graph-projection-golden.json" with { type: "json" };
 import packageGolden from "./fixtures/track-p2-b/forward-counter-package.json" with { type: "json" };
 import { type TrustedBlueprintCatalog } from "../packages/blueprint-catalog/src/index.js";
 import type { CausalityIndex } from "../packages/compaction/src/index.js";
@@ -57,7 +58,10 @@ type CompactionModule = Readonly<{
 	CausalityIndex: typeof CausalityIndex;
 }> &
 	Record<string, unknown>;
-type ControlPlaneModule = Readonly<{ createCurrentAnchorTrustStore: typeof createCurrentAnchorTrustStore }> &
+type ControlPlaneModule = Readonly<{
+	assertTrustPreserved: typeof assertTrustPreserved;
+	createCurrentAnchorTrustStore: typeof createCurrentAnchorTrustStore;
+}> &
 	Record<string, unknown>;
 type ProtocolV3Module = Readonly<{
 	authenticateCurrentEpochAnchor: typeof authenticateCurrentEpochAnchor;
@@ -98,6 +102,9 @@ const stageProbe = vi.hoisted(() => ({
 	parameterEncodeOutputCopies: [] as Uint8Array[],
 	parameterHashInputs: [] as readonly Uint8Array[][],
 	parameterHashInputCopies: [] as readonly Uint8Array[][],
+	preservationFailure: false,
+	preservationInputs: [] as unknown[],
+	preservationResults: [] as unknown[],
 	prepareInputs: [] as unknown[],
 	runtimeInputs: [] as unknown[],
 	runtimeInputCopies: [] as unknown[],
@@ -280,6 +287,17 @@ vi.mock("@ts-drp/control-plane", async (importOriginal) => {
 	const genuine = await importOriginal<ControlPlaneModule>();
 	return {
 		...genuine,
+		assertTrustPreserved(
+			input: Parameters<ControlPlaneModule["assertTrustPreserved"]>[0]
+		): ReturnType<ControlPlaneModule["assertTrustPreserved"]> {
+			stageProbe.events.push("trust.preserve");
+			stageProbe.preservationInputs.push(input);
+			const result = genuine.assertTrustPreserved(
+				stageProbe.preservationFailure ? { ...input, candidates: Object.freeze([]) } : input
+			);
+			stageProbe.preservationResults.push(result);
+			return result;
+		},
 		createCurrentAnchorTrustStore(
 			options: Parameters<ControlPlaneModule["createCurrentAnchorTrustStore"]>[0]
 		): ReturnType<ControlPlaneModule["createCurrentAnchorTrustStore"]> {
@@ -443,6 +461,7 @@ function resetStageProbe(): void {
 	stageProbe.trustOpenHashDepth = 0;
 	stageProbe.anchorHashMismatch = false;
 	stageProbe.graphValidationFailure = false;
+	stageProbe.preservationFailure = false;
 	stageProbe.expectedAnchorHex = undefined;
 	stageProbe.expectedParameterHex = undefined;
 	stageProbe.runtimeOutputMismatch = undefined;
@@ -744,9 +763,13 @@ function instrumentedStore(material = liveMaterial(), gate?: FirstAwaitGate): Ah
 			stageProbe.events.push("store.getBlob");
 			return Promise.resolve({ ok: true, value: new Uint8Array(trustStateBytes) });
 		},
-		beginGeneration(input) {
+		beginGeneration(_input) {
 			stageProbe.events.push("store.beginGeneration");
-			return target.beginGeneration(input);
+			return Promise.resolve({
+				ok: false as const,
+				reason: "SUBSTRATE_FAILURE" as const,
+				cause: "strict no-write A-c boundary",
+			});
 		},
 		putCachedBlob(input) {
 			stageProbe.events.push("store.putCachedBlob");
@@ -815,6 +838,15 @@ function expectFailure(result: PrepareV3LiveResult, kind: PrepareV3LiveFailureKi
 	expect(Object.isFrozen(result)).toBe(true);
 }
 
+function isStrictNoWriteACBoundary(result: PrepareV3LiveResult): boolean {
+	return result.ok === false && result.kind === "storage-failed" && typeof result.detail === "string";
+}
+
+function expectStrictNoWriteACBoundary(result: PrepareV3LiveResult): void {
+	expect(isStrictNoWriteACBoundary(result)).toBe(true);
+	expect(Object.isFrozen(result)).toBe(true);
+}
+
 interface StaticAudit {
 	readonly futureOrLiveEdges: readonly string[];
 	readonly violations: readonly string[];
@@ -867,13 +899,11 @@ const A_C_STAGE_IDENTIFIERS = new Set([
 	"putCachedBlob",
 	"putBlob",
 	"readGenerationPage",
-	"readHead",
 	"recoverActiveGeneration",
 	"recoverGeneration",
 	"swapHead",
 ]);
 const A_C_REQUIRED_CALL_ORDER = [
-	"readHead",
 	"recoverActiveGeneration",
 	"getBlob",
 	"assertTrustPreserved",
@@ -886,7 +916,6 @@ const A_C_REQUIRED_CALL_ORDER = [
 	"swapHead",
 ] as const;
 const A_C_STORE_CALLS = new Set([
-	"readHead",
 	"recoverActiveGeneration",
 	"getBlob",
 	"beginGeneration",
@@ -903,6 +932,7 @@ const A_C_FORBIDDEN_IDENTIFIERS = new Set([
 	"discardGeneration",
 	"promoteGeneration",
 	"putBlob",
+	"readHead",
 	"readGenerationPage",
 	"recoverGeneration",
 	"repairGeneration",
@@ -1203,7 +1233,7 @@ function isCapturedInputStoreCall(node: ts.CallExpression): boolean {
 		ts.isPropertyAccessExpression(receiver) &&
 		receiver.name.text === "store" &&
 		ts.isIdentifier(receiver.expression) &&
-		(receiver.expression.text === "captured" || receiver.expression.text === "input")
+		receiver.expression.text === "captured"
 	);
 }
 
@@ -1652,17 +1682,18 @@ import { parseGenerationId, parseHeadRevision } from "@ts-drp/storage";
 const preparedV3LivePayloads = new WeakMap();
 export async function prepareV3LiveGeneration(input) {
 	for (let attempt = 0; attempt < 2; attempt += 1) {
-		const head = await input.store.readHead(input.objectId);
-		const recovered = await input.store.recoverActiveGeneration(head);
-		const candidate = await input.store.getBlob(recovered.references[0]);
+		const opened = await trustStore.open();
+		const head = opened.head;
+		const recovered = await captured.store.recoverActiveGeneration(captured.objectId);
+		const candidate = await captured.store.getBlob(recovered.references[0]);
 		const preserved = assertTrustPreserved({ candidate, head });
 		const generationId = parseGenerationId(input.freshGenerationId()).value;
-		await input.store.beginGeneration({ generationId, head });
-		const projectionRef = await input.store.putCachedBlob({ generationId, bytes: input.projection });
-		await input.store.promoteReference({ generationId, ref: projectionRef });
-		const completed = await input.store.completeGeneration({ generationId });
+		await captured.store.beginGeneration({ generationId, head });
+		const projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });
+		await captured.store.promoteReference({ generationId, ref: projectionRef });
+		const completed = await captured.store.completeGeneration({ generationId });
 		const revision = parseHeadRevision(head.revision + 1).value;
-		const swapped = await input.store.swapHead({ completed, expected: head, revision });
+		const swapped = await captured.store.swapHead({ completed, expected: head, revision });
 		void preserved; void swapped;
 	}
 	const token = Object.freeze({});
@@ -1871,7 +1902,9 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		parameters.fill(0xff);
 		gate.release();
 		const result = await promise;
-		expectFailure(result, "trust-not-preserved");
+		expectStrictNoWriteACBoundary(result);
+		expect(stageProbe.events.at(-1)).toBe("store.beginGeneration");
+		expect(stageProbe.events.filter((event) => event === "store.beginGeneration")).toHaveLength(1);
 		const trustFactoryInput = stageProbe.trustFactoryInputs[0] as {
 			readonly objectId: StorageObjectId;
 			readonly pinnedGenesisAnchorDigest: string;
@@ -1888,7 +1921,8 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(authenticationInput.detachedSignature).toEqual(expectedSignature);
 		expect(authenticationInput.exactCanonicalAnchorPreimageBytes).not.toBe(anchor);
 		expect(authenticationInput.exactCanonicalAnchorPreimageBytes).toEqual(expectedAnchor);
-		expect(stageProbe.trustOpenHashInputs).toHaveLength(1);
+		expect(stageProbe.trustOpenHashInputs).toHaveLength(2);
+		for (const inputParts of stageProbe.trustOpenHashInputs) expect(inputParts[0]).toEqual(expectedAnchor);
 		expect(stageProbe.authenticationHashInputs).toHaveLength(1);
 		expect(stageProbe.authenticationHashInputs[0]?.[0]).not.toBe(authenticationInput.exactCanonicalAnchorPreimageBytes);
 		expect(stageProbe.authenticationHashInputs[0]?.[0]).toEqual(authenticationInput.exactCanonicalAnchorPreimageBytes);
@@ -1904,7 +1938,14 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 
 	it("orders trust, anchor, parameters, catalog, admission and awaited runtime before graph handoff", async () => {
 		const result = await controlledPrepare();
-		expectFailure(result, "trust-not-preserved");
+		expectStrictNoWriteACBoundary(result);
+		expect(
+			isStrictNoWriteACBoundary({
+				ok: false,
+				kind: "trust-not-preserved",
+				detail: "stale A-b terminal mutant",
+			})
+		).toBe(false);
 		expect(stageProbe.events).toEqual([
 			"trust.create",
 			"trust.open:start",
@@ -1925,6 +1966,17 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			"blueprint.runtime:start",
 			"blueprint.runtime:resolved",
 			"graph.validate",
+			"trust.open:start",
+			"store.readHead",
+			"store.recoverActiveGeneration",
+			"store.getBlob",
+			"trust.record.open",
+			"trust.open.hash",
+			"trust.open:resolved",
+			"store.recoverActiveGeneration",
+			"store.getBlob",
+			"trust.preserve",
+			"store.beginGeneration",
 		]);
 		const input = stageProbe.prepareInputs[0] as PrepareV3LiveInput;
 		const trustFactoryInput = stageProbe.trustFactoryInputs[0] as {
@@ -1938,7 +1990,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		const trustOpen = stageProbe.trustOpenResults[0] as { readonly ok: true; readonly trust: unknown };
 		const authenticationInput = stageProbe.authenticationInputs[0] as { readonly trust: unknown };
 		expect(authenticationInput.trust).toBe(trustOpen.trust);
-		expect(stageProbe.trustOpenHashInputs).toHaveLength(1);
+		expect(stageProbe.trustOpenHashInputs).toHaveLength(2);
 		expect(stageProbe.authenticationHashInputs).toHaveLength(1);
 		expect(stageProbe.authenticationHashInputs[0]?.[0]).not.toBe(
 			(stageProbe.authenticationInputs[0] as { readonly exactCanonicalAnchorPreimageBytes: Uint8Array })
@@ -1980,12 +2032,70 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(runtimeInput.exactArtifactBytes).toEqual(catalogResult.exactArtifactBytes);
 		expect(stageProbe.runtimeResults).toHaveLength(1);
 		expect(stageProbe.graphValidationInputs).toHaveLength(1);
+		expect(stageProbe.preservationInputs).toHaveLength(1);
+		const preservationInput = stageProbe.preservationInputs[0] as {
+			readonly candidates: readonly Readonly<{
+				readonly bytes: Uint8Array;
+				readonly ref: { readonly byteLength: number; readonly digest: string };
+			}>[];
+			readonly closure: readonly Readonly<{ readonly byteLength: number; readonly digest: string }>[];
+			readonly expectedTrustRef: Readonly<{ readonly byteLength: number; readonly digest: string }>;
+		};
+		expect(Reflect.ownKeys(preservationInput)).toEqual(["candidates", "closure", "expectedTrustRef"]);
+		expect(preservationInput.candidates).toHaveLength(2);
+		expect(preservationInput.closure).toHaveLength(2);
+		expect(preservationInput.closure.map(({ digest }) => digest)).toEqual(
+			preservationInput.closure
+				.map(({ digest }) => digest)
+				.slice()
+				.sort()
+		);
+		expect(preservationInput.candidates.map(({ ref }) => ref)).toEqual(preservationInput.closure);
+		const reopenedTrustRef = (
+			stageProbe.trustOpenResults[1] as {
+				readonly trustRef: Readonly<{ readonly byteLength: number; readonly digest: string }>;
+			}
+		).trustRef;
+		expect(preservationInput.expectedTrustRef).toEqual(reopenedTrustRef);
+		expect(preservationInput.closure).toContainEqual(reopenedTrustRef);
+		const nonTrustRefs = preservationInput.closure.filter(
+			({ byteLength, digest }) => digest !== reopenedTrustRef.digest || byteLength !== reopenedTrustRef.byteLength
+		);
+		expect(nonTrustRefs).toEqual([
+			{
+				byteLength: graphProjectionGolden.projectionByteLength,
+				digest: graphProjectionGolden.projectionDigest,
+			},
+		]);
+		const projectionCandidate = preservationInput.candidates.find(
+			({ ref }) => ref.digest === graphProjectionGolden.projectionDigest
+		);
+		const expectedProjectionBytes = hexBytes(graphProjectionGolden.projectionHex);
+		expect(digestBlob(expectedProjectionBytes).value).toBe(graphProjectionGolden.projectionDigest);
+		expect(projectionCandidate?.ref).toEqual(nonTrustRefs[0]);
+		expect(projectionCandidate?.bytes.byteLength).toBe(graphProjectionGolden.projectionByteLength);
+		expect(projectionCandidate?.bytes).not.toBe(expectedProjectionBytes);
+		expect(projectionCandidate?.bytes).toEqual(expectedProjectionBytes);
+		expect(digestBlob(projectionCandidate?.bytes as Uint8Array).value).toBe(graphProjectionGolden.projectionDigest);
+		expect(stageProbe.preservationResults).toEqual([
+			{ ok: true, exactCanonicalTrustStateRecordBytes: expect.any(Uint8Array), trustRef: expect.any(Object) },
+		]);
 		expect(stageProbe.liveEffects).toEqual([]);
+	});
+
+	it("stops a rejected exact two-ref preservation decision before the strict no-write stage boundary", async () => {
+		stageProbe.preservationFailure = true;
+		const result = await controlledPrepare();
+		expectFailure(result, "trust-not-preserved");
+		expect(stageProbe.preservationInputs).toHaveLength(1);
+		expect(stageProbe.preservationResults).toEqual([{ ok: false, reason: "candidate-missing" }]);
+		expect(stageProbe.events.at(-1)).toBe("trust.preserve");
+		expect(stageProbe.events).not.toContain("store.beginGeneration");
 	});
 
 	it("accepts distinct catalog byte views sharing one ordinary buffer and detaches both before preparation", async () => {
 		const result = await controlledPrepare({}, { catalogMutation: "shared-ordinary-backing" });
-		expectFailure(result, "trust-not-preserved");
+		expectStrictNoWriteACBoundary(result);
 		const fixture = blueprintFixture();
 		const catalogResult = stageProbe.catalogResults[0] as {
 			readonly canonicalBlueprintPackageBytes: Uint8Array;
@@ -2110,11 +2220,20 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 
 		for (const [name, mutate, expected] of [
 			[
+				"old-a-b-termination",
+				(source: string): string =>
+					source.replace(
+						/\tfor \(let attempt = 0; attempt < 2; attempt \+= 1\) \{[\s\S]*?\n\t\}/u,
+						'\treturn failure("trust-not-preserved", "stale A-b terminal");'
+					),
+				"a-c-stage:recoverActiveGeneration-count",
+			],
+			[
 				"extra-cas",
 				(source: string): string =>
 					source.replace(
 						"\t\tvoid preserved; void swapped;",
-						"\t\tawait input.store.swapHead({ completed, expected: head, revision });\n\t\tvoid preserved; void swapped;"
+						"\t\tawait captured.store.swapHead({ completed, expected: head, revision });\n\t\tvoid preserved; void swapped;"
 					),
 				"a-c-stage:swapHead-count",
 			],
@@ -2138,8 +2257,8 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				"operation-reorder",
 				(source: string): string =>
 					source.replace(
-						"\t\tawait input.store.beginGeneration({ generationId, head });\n\t\tconst projectionRef = await input.store.putCachedBlob({ generationId, bytes: input.projection });",
-						"\t\tconst projectionRef = await input.store.putCachedBlob({ generationId, bytes: input.projection });\n\t\tawait input.store.beginGeneration({ generationId, head });"
+						"\t\tawait captured.store.beginGeneration({ generationId, head });\n\t\tconst projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });",
+						"\t\tconst projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });\n\t\tawait captured.store.beginGeneration({ generationId, head });"
 					),
 				"a-c-stage:operation-order",
 			],
@@ -2150,8 +2269,15 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			],
 			[
 				"parallel-store-receiver",
-				(source: string): string => source.replace("input.store.readHead", "parallelStore.readHead"),
-				"a-c-stage:receiver:readHead",
+				(source: string): string =>
+					source.replace("captured.store.recoverActiveGeneration", "parallelStore.recoverActiveGeneration"),
+				"a-c-stage:receiver:recoverActiveGeneration",
+			],
+			[
+				"caller-store-reread",
+				(source: string): string =>
+					source.replace("captured.store.recoverActiveGeneration", "input.store.recoverActiveGeneration"),
+				"a-c-stage:receiver:recoverActiveGeneration",
 			],
 		] as const) {
 			const root = temporarySweepTree();
@@ -2275,7 +2401,6 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			"putBlob",
 			"putCachedBlob",
 			"readGenerationPage",
-			"readHead",
 			"recoverActiveGeneration",
 			"recoverGeneration",
 			"swapHead",

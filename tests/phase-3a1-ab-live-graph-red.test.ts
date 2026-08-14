@@ -43,6 +43,7 @@ type ProtocolV3Module = Readonly<{ prepareBlueprintRuntime: typeof prepareBluepr
 
 const graphProbe = vi.hoisted(() => ({
 	a_bCaptureActive: false,
+	a_bCaptureComplete: false,
 	closureDigestDepth: 0,
 	closureInputs: [] as (readonly unknown[])[],
 	derivationEvents: [] as (
@@ -66,6 +67,11 @@ const graphProbe = vi.hoisted(() => ({
 	poisonAfterRuntime: false,
 	poisonRestorers: [] as (() => void)[],
 	preCaptureDerivationEvents: [] as (
+		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "digest" }>
+		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "encode" }>
+		| Readonly<{ readonly kind: "closure" }>
+	)[],
+	postCaptureDerivationEvents: [] as (
 		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "digest" }>
 		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "encode" }>
 		| Readonly<{ readonly kind: "closure" }>
@@ -156,7 +162,10 @@ vi.mock("@ts-drp/canonical", async (importOriginal) => {
 			const bytes = genuine.encodeCanonical(value);
 			const copied = new Uint8Array(bytes);
 			if (!graphProbe.a_bCaptureActive) {
-				graphProbe.preCaptureDerivationEvents.push({ bytes: copied, kind: "encode" });
+				(graphProbe.a_bCaptureComplete
+					? graphProbe.postCaptureDerivationEvents
+					: graphProbe.preCaptureDerivationEvents
+				).push({ bytes: copied, kind: "encode" });
 				return bytes;
 			}
 			graphProbe.encodeInputs.push(value);
@@ -178,7 +187,10 @@ vi.mock("@ts-drp/storage", async (importOriginal) => {
 		digestBlob(bytes: Uint8Array): ReturnType<StorageModule["digestBlob"]> {
 			const copied = new Uint8Array(bytes);
 			if (!graphProbe.a_bCaptureActive) {
-				graphProbe.preCaptureDerivationEvents.push({ bytes: copied, kind: "digest" });
+				(graphProbe.a_bCaptureComplete
+					? graphProbe.postCaptureDerivationEvents
+					: graphProbe.preCaptureDerivationEvents
+				).push({ bytes: copied, kind: "digest" });
 				return genuine.digestBlob(bytes);
 			}
 			graphProbe.digestInputs.push(copied);
@@ -194,7 +206,10 @@ vi.mock("@ts-drp/storage", async (importOriginal) => {
 		},
 		digestClosure(closure: Parameters<StorageModule["digestClosure"]>[0]): ReturnType<StorageModule["digestClosure"]> {
 			if (!graphProbe.a_bCaptureActive) {
-				graphProbe.preCaptureDerivationEvents.push({ kind: "closure" });
+				(graphProbe.a_bCaptureComplete
+					? graphProbe.postCaptureDerivationEvents
+					: graphProbe.preCaptureDerivationEvents
+				).push({ kind: "closure" });
 				return genuine.digestClosure(closure);
 			}
 			graphProbe.closureInputs.push(closure);
@@ -204,6 +219,8 @@ vi.mock("@ts-drp/storage", async (importOriginal) => {
 				return genuine.digestClosure(closure);
 			} finally {
 				graphProbe.closureDigestDepth -= 1;
+				graphProbe.a_bCaptureActive = false;
+				graphProbe.a_bCaptureComplete = true;
 			}
 		},
 	};
@@ -227,6 +244,7 @@ vi.mock("@ts-drp/compaction", async (importOriginal) => {
 					graphProbe.encodeOutputs.length = 0;
 					graphProbe.indexCalls.length = 0;
 					graphProbe.a_bCaptureActive = true;
+					graphProbe.a_bCaptureComplete = false;
 				}
 				graphProbe.derivationEvents.push({ kind: "index" });
 				graphProbe.indexCalls.push({ options, order, vertices });
@@ -470,10 +488,14 @@ function strictTrustStore(material: CreatorMaterial): {
 			return Promise.resolve({ ok: true, value: new Uint8Array(trustBytes) });
 		},
 		beginGeneration(
-			input: Parameters<AheDurableStore["beginGeneration"]>[0]
+			_input: Parameters<AheDurableStore["beginGeneration"]>[0]
 		): ReturnType<AheDurableStore["beginGeneration"]> {
 			graphProbe.mutations.push("beginGeneration");
-			return target.beginGeneration(input);
+			return Promise.resolve({
+				ok: false as const,
+				reason: "SUBSTRATE_FAILURE" as const,
+				cause: "strict no-write A-c boundary",
+			});
 		},
 		putCachedBlob(
 			input: Parameters<AheDurableStore["putCachedBlob"]>[0]
@@ -570,6 +592,15 @@ async function prepare(context: FixtureContext): Promise<PrepareResult> {
 	const surface = await moduleSurface();
 	if (surface.prepareV3LiveGeneration === undefined) throw new TypeError("missing private preparation API");
 	return surface.prepareV3LiveGeneration(context.input);
+}
+
+function isStrictNoWriteACBoundary(result: PrepareResult): boolean {
+	return result.ok === false && result.kind === "storage-failed" && typeof result.detail === "string";
+}
+
+function expectStrictNoWriteACBoundary(result: PrepareResult): void {
+	expect(isStrictNoWriteACBoundary(result)).toBe(true);
+	expect(Object.isFrozen(result)).toBe(true);
 }
 
 function capturedA_bDigests(): readonly Uint8Array[] {
@@ -689,17 +720,17 @@ function ownerDerivationSourceShape(
 		return undefined;
 	}
 	const terminal = ownerBody.statements[ownerBody.statements.length - 1];
-	if (
-		terminal === undefined ||
-		!ts.isReturnStatement(terminal) ||
-		terminal.expression === undefined ||
-		!ts.isCallExpression(terminal.expression) ||
-		!ts.isIdentifier(terminal.expression.expression) ||
-		terminal.expression.expression.text !== "failure" ||
-		terminal.expression.arguments[0] === undefined ||
-		!ts.isStringLiteral(terminal.expression.arguments[0]) ||
-		terminal.expression.arguments[0].text !== "trust-not-preserved"
-	) {
+	const isStaleABTerminal =
+		terminal !== undefined &&
+		ts.isReturnStatement(terminal) &&
+		terminal.expression !== undefined &&
+		ts.isCallExpression(terminal.expression) &&
+		ts.isIdentifier(terminal.expression.expression) &&
+		terminal.expression.expression.text === "failure" &&
+		terminal.expression.arguments[0] !== undefined &&
+		ts.isStringLiteral(terminal.expression.arguments[0]) &&
+		terminal.expression.arguments[0].text === "trust-not-preserved";
+	if (isStaleABTerminal) {
 		return undefined;
 	}
 	const statementMayFallThrough = (statement: ts.Statement): boolean => {
@@ -931,6 +962,7 @@ function capturedMapConstructorOwner(sourceText: string):
 
 function resetDerivationProbe(): void {
 	graphProbe.a_bCaptureActive = false;
+	graphProbe.a_bCaptureComplete = false;
 	graphProbe.closureDigestDepth = 0;
 	graphProbe.closureInputs.length = 0;
 	graphProbe.derivationEvents.length = 0;
@@ -940,6 +972,7 @@ function resetDerivationProbe(): void {
 	graphProbe.encodeOutputs.length = 0;
 	graphProbe.indexCalls.length = 0;
 	graphProbe.preCaptureDerivationEvents.length = 0;
+	graphProbe.postCaptureDerivationEvents.length = 0;
 }
 
 function rawDerivationEventLabels(): readonly string[] {
@@ -953,6 +986,15 @@ function rawDerivationEventLabels(): readonly string[] {
 		if (event.kind === "encode" && event.label === "closure") return "encode:closure";
 		const hex = lowerHex(event.bytes);
 		const name = exactPreimages.get(hex) ?? `unknown:${hex}`;
+		return `${event.kind}:${name}`;
+	});
+}
+
+function postGraphDerivationEventLabels(): readonly string[] {
+	return graphProbe.postCaptureDerivationEvents.map((event) => {
+		if (event.kind === "closure") return "closure";
+		const hex = lowerHex(event.bytes);
+		const name = hex === golden.projectionHex ? "projection" : `other:${hex}`;
 		return `${event.kind}:${name}`;
 	});
 }
@@ -1002,13 +1044,14 @@ function ownerSourceOracleFixture(
 			}
 			${mode === "post-exit" ? `return failure("graph-rejected", "early");${derivation}` : ""}
 			${mode === "reachable" ? derivation : ""}
-			return failure("trust-not-preserved", "fixture");
+			return failure("storage-failed", "strict no-write A-c boundary");
 		}
 	`;
 }
 
 beforeEach(() => {
 	graphProbe.a_bCaptureActive = false;
+	graphProbe.a_bCaptureComplete = false;
 	graphProbe.closureDigestDepth = 0;
 	graphProbe.closureInputs.length = 0;
 	graphProbe.derivationEvents.length = 0;
@@ -1022,6 +1065,7 @@ beforeEach(() => {
 	graphProbe.mutations.length = 0;
 	graphProbe.poisonAfterRuntime = false;
 	graphProbe.preCaptureDerivationEvents.length = 0;
+	graphProbe.postCaptureDerivationEvents.length = 0;
 	for (const restore of graphProbe.poisonRestorers.splice(0).reverse()) restore();
 });
 
@@ -1030,7 +1074,14 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		const context = fixtureContext();
 		resetDerivationProbe();
 		const result = await prepare(context);
-		expect(result).toEqual({ ok: false, kind: "trust-not-preserved", detail: expect.any(String) });
+		expectStrictNoWriteACBoundary(result);
+		expect(
+			isStrictNoWriteACBoundary({
+				ok: false,
+				kind: "trust-not-preserved",
+				detail: "stale A-b terminal mutant",
+			})
+		).toBe(false);
 		expect(graphProbe.indexCalls).toHaveLength(1);
 		const call = graphProbe.indexCalls[0] as {
 			readonly vertices: ReadonlyMap<string, Readonly<Record<string, unknown>>>;
@@ -1063,13 +1114,14 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		expect(context.material.anchorBytes.byteLength).toBeLessThanOrEqual(PARAMETERS.maxEpochBytes);
 		expect(call.vertices.size).toBeLessThanOrEqual(PARAMETERS.maxEpochVertices);
 		expect(graphProbe.indexTouches).toEqual([]);
-		expect(graphProbe.mutations).toEqual([]);
+		expect(graphProbe.mutations).toEqual(["beginGeneration"]);
 	});
 
 	it("emits the two exact canonical preimages and storage-domain digest values", async () => {
 		const context = fixtureContext();
 		resetDerivationProbe();
-		await prepare(context);
+		const result = await prepare(context);
+		expectStrictNoWriteACBoundary(result);
 		const genuineStorage = await vi.importActual<StorageModule>("@ts-drp/storage");
 		expect(capturedA_bDigests().map(lowerHex)).toEqual([
 			golden.orderPreimageHex,
@@ -1082,13 +1134,14 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		expect(must(genuineStorage.digestBlob(bytesFromHex(golden.graphPreimageHex)))).toBe(golden.graphDigest);
 		expect(graphProbe.preCaptureDerivationEvents.some((event) => event.kind === "encode")).toBe(true);
 		expect(rawDerivationEventLabels()).toEqual(EXACT_A_B_DERIVATION_EVENTS);
+		expect(postGraphDerivationEventLabels()).toContain("digest:projection");
 	});
 
 	it("derives the exact twenty-field projection bytes, blob ref and dense sorted detached two-ref closure", async () => {
 		const context = fixtureContext();
 		resetDerivationProbe();
 		const result = await prepare(context);
-		expect(result).toEqual({ ok: false, kind: "trust-not-preserved", detail: expect.any(String) });
+		expectStrictNoWriteACBoundary(result);
 		expect(must(digestBlob(bytesFromHex(golden.projectionHex)))).toBe(golden.projectionDigest);
 		expect(graphProbe.closureInputs).toHaveLength(1);
 		const closure = graphProbe.closureInputs[0] as readonly unknown[];
@@ -1106,7 +1159,7 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		expect(closure[0]).not.toBe(context.trustRef);
 		expect(closure[1]).not.toBe(context.trustRef);
 		expect(new Set(refs.map((ref) => ref?.digest)).size).toBe(2);
-		expect(graphProbe.mutations).toEqual([]);
+		expect(graphProbe.mutations).toEqual(["beginGeneration"]);
 	});
 
 	it("captures every required graph intrinsic and contains post-import Map prototype poisoning", async () => {
@@ -1155,9 +1208,9 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		expect(ownDataFields(charges?.[0])).toEqual(GRAPH_CHARGE_FIELDS);
 		expect(ownDataFields(projection)).toEqual(PROJECTION_FIELDS);
 		expect(source).toMatch(/digestBlob\([\s\S]*?\)\.value/u);
-		expect(result).toEqual({ ok: false, kind: "trust-not-preserved", detail: expect.any(String) });
+		expectStrictNoWriteACBoundary(result);
 		expect(graphProbe.indexCalls).toHaveLength(1);
-		expect(graphProbe.mutations).toEqual([]);
+		expect(graphProbe.mutations).toEqual(["beginGeneration"]);
 	});
 
 	it("binds source evidence to the exported owner's reachable success path and rejects dead derivation decoys", () => {
@@ -1169,6 +1222,15 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		expect(ownerDerivationSourceShape(ownerSourceOracleFixture("branch"), "CapturedMap")).toBeUndefined();
 		expect(ownerDerivationSourceShape(ownerSourceOracleFixture("nested-terminating"), "CapturedMap")).toBeUndefined();
 		expect(ownerDerivationSourceShape(ownerSourceOracleFixture("post-exit"), "CapturedMap")).toBeUndefined();
+		expect(
+			ownerDerivationSourceShape(
+				ownerSourceOracleFixture("reachable").replace(
+					'failure("storage-failed", "strict no-write A-c boundary")',
+					'failure("trust-not-preserved", "stale A-b terminal")'
+				),
+				"CapturedMap"
+			)
+		).toBeUndefined();
 	});
 
 	it("maps a known validation refusal to graph-rejected and an unclassifiable graph failure to internal-invariant", async () => {
