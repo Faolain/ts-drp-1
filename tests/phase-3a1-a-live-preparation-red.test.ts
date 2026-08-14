@@ -1639,6 +1639,57 @@ function aCStageViolations(filename: string): readonly string[] {
 	return Object.freeze([...new Set(violations)].sort());
 }
 
+function expectedGeneratedStage(sourceFilename: string): string {
+	return ts.transpileModule(readFileSync(sourceFilename, "utf8"), {
+		compilerOptions: {
+			module: ts.ModuleKind.ESNext,
+			target: ts.ScriptTarget.ES2015,
+		},
+		fileName: sourceFilename,
+	}).outputText;
+}
+
+function generatedStageViolations(
+	sourceFilename: string,
+	generatedFilename: string,
+	stage: SweepStage
+): readonly string[] {
+	const generatedText = readFileSync(generatedFilename, "utf8");
+	const generated = ts.createSourceFile(
+		generatedFilename,
+		generatedText,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.JS
+	);
+	const violations: string[] = [];
+	if (generatedText !== expectedGeneratedStage(sourceFilename)) violations.push("generated-out-of-date");
+	const exports = exportedDeclarationNames(generatedFilename);
+	const expectedExports = stage === "through-a-c" ? ["prepareV3LiveGeneration"] : [];
+	if (exports.join("\u0000") !== expectedExports.join("\u0000")) violations.push("generated-export-surface");
+	let awaiterCount = 0;
+	let generatorCount = 0;
+	let weakMapOwnerCount = 0;
+	const visit = (node: ts.Node): void => {
+		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "__awaiter") {
+			awaiterCount += 1;
+		}
+		if (ts.isFunctionExpression(node) && node.asteriskToken !== undefined) generatorCount += 1;
+		if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "WeakMap") {
+			weakMapOwnerCount += 1;
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(generated);
+	if (stage === "through-a-c") {
+		if (awaiterCount !== 1 || generatorCount === 0) violations.push("generated-async-lowering");
+		if (weakMapOwnerCount !== 1) violations.push("generated-parallel-owner");
+	} else if (weakMapOwnerCount !== 0) {
+		violations.push("generated-parallel-owner");
+	}
+	return Object.freeze([...new Set(violations)].sort());
+}
+
 function recursiveFiles(directory: string): readonly string[] {
 	if (!existsSync(directory)) return [];
 	const output: string[] = [];
@@ -1849,13 +1900,13 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-source");
 	}
 	for (const filename of generatedGraph.files) {
-		futureOrLiveEdges.push(
-			...aBStageViolations(filename, stage === "through-a-c" && filename === generatedEntry ? stage : "through-a-b")
-		);
+		if (filename === generatedEntry) {
+			futureOrLiveEdges.push(...generatedStageViolations(entry, generatedEntry, stage));
+		}
 		if (stage === "through-a-c" && filename === generatedEntry) {
-			futureOrLiveEdges.push(...aCStageViolations(filename));
 			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
 		} else {
+			futureOrLiveEdges.push(...aBStageViolations(filename, "through-a-b"));
 			inspectFutureOrLive(filename, THROUGH_A_B_FORBIDDEN_IDENTIFIERS);
 		}
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-generated");
@@ -1930,11 +1981,13 @@ function temporarySweepTree(): string {
 		path.join(root, "packages/node/src/v3-live.ts"),
 		`import registry from "${PUBLISHED_PARAMETER_REGISTRY_SPECIFIER}" with { type: "json" };\nconst supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported; void registry;\n`
 	);
-	writeFileSync(
-		path.join(root, "packages/node/dist/src/v3-live.js"),
-		`import registry from "${PUBLISHED_PARAMETER_REGISTRY_SPECIFIER}" with { type: "json" };\nconst supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported; void registry;\n`
-	);
+	emitSweepGenerated(root);
 	return root;
+}
+
+function emitSweepGenerated(root: string): void {
+	const source = path.join(root, "packages/node/src/v3-live.ts");
+	writeFileSync(path.join(root, "packages/node/dist/src/v3-live.js"), expectedGeneratedStage(source));
 }
 
 function addABRuntimeDependency(root: string): void {
@@ -1975,9 +2028,8 @@ void closureDigest;
 
 function addABGraphProjectionStage(root: string): void {
 	addABRuntimeDependency(root);
-	for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
-		writeFileSync(path.join(root, filename), A_B_GRAPH_PROJECTION_STAGE_SOURCE, { flag: "a" });
-	}
+	writeFileSync(path.join(root, "packages/node/src/v3-live.ts"), A_B_GRAPH_PROJECTION_STAGE_SOURCE, { flag: "a" });
+	emitSweepGenerated(root);
 }
 
 const A_C_PERSISTENCE_STAGE_SOURCE = `
@@ -2026,9 +2078,8 @@ void consumePreparedV3Live;
 
 function addACPersistenceStage(root: string): void {
 	addABGraphProjectionStage(root);
-	for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
-		writeFileSync(path.join(root, filename), A_C_PERSISTENCE_STAGE_SOURCE, { flag: "a" });
-	}
+	writeFileSync(path.join(root, "packages/node/src/v3-live.ts"), A_C_PERSISTENCE_STAGE_SOURCE, { flag: "a" });
+	emitSweepGenerated(root);
 }
 
 afterAll(() => {
@@ -2533,6 +2584,22 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		const allowedAC = temporarySweepTree();
 		addACPersistenceStage(allowedAC);
 		expect(sourceSweep(allowedAC, "through-a-c")).toEqual({ futureOrLiveEdges: [], violations: [] });
+		const loweredAC = readFileSync(path.join(allowedAC, "packages/node/dist/src/v3-live.js"), "utf8");
+		expect(loweredAC.match(/\b__awaiter\b/gu)).not.toBeNull();
+		expect(loweredAC.match(/function\s*\*/gu)).not.toBeNull();
+
+		for (const [name, addition, expected] of [
+			["generated-export-escape", "\nexport { consumePreparedV3Live };\n", "generated-export-surface"],
+			["generated-parallel-owner", "\nconst parallelPrepared = new WeakMap();\n", "generated-parallel-owner"],
+			["generated-b-effect", "\nvoid subscribe;\n", "identifier:subscribe"],
+			["generated-forbidden-import", '\nimport "@ts-drp/protocol-v2";\n', "protocol-v2-indirect"],
+		] as const) {
+			const root = temporarySweepTree();
+			addACPersistenceStage(root);
+			writeFileSync(path.join(root, "packages/node/dist/src/v3-live.js"), addition, { flag: "a" });
+			const audit = sourceSweep(root, "through-a-c");
+			expect([...audit.futureOrLiveEdges, ...audit.violations], name).toContain(expected);
+		}
 
 		for (const [name, mutate, expected] of [
 			[
@@ -2845,6 +2912,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				`\n${[...identifiers].map((name) => `void ${name};`).join("\n")}\n`,
 				{ flag: "a" }
 			);
+			emitSweepGenerated(root);
 			const audit = sourceSweep(root);
 			expect(audit.futureOrLiveEdges, stage).toEqual([...identifiers].map((name) => `identifier:${name}`).sort());
 		}
