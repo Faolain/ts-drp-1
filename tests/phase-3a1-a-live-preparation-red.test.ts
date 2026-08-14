@@ -776,6 +776,12 @@ const A_A_RUNTIME_ROOTS = new Set([
 	"@ts-drp/protocol-v3",
 	"@ts-drp/storage",
 ]);
+const A_A_RUNTIME_DEPENDENCIES = Object.freeze({
+	"@ts-drp/canonical": Object.freeze({ manifest: "0.11.0", resolved: "link:../canonical" }),
+	"@ts-drp/control-plane": Object.freeze({ manifest: "workspace:*", resolved: "link:../control-plane" }),
+	"@ts-drp/protocol-v3": Object.freeze({ manifest: "0.11.0", resolved: "link:../protocol-v3" }),
+	"@ts-drp/storage": Object.freeze({ manifest: "0.11.0", resolved: "link:../storage" }),
+});
 const FUTURE_OR_LIVE_IDENTIFIERS = new Set([
 	"CausalityIndex",
 	"WebSocket",
@@ -914,6 +920,40 @@ function ownsLiteralParameterRecord(filename: string): boolean {
 	return found;
 }
 
+function nodeLockDependencies(lockfile: string): ReadonlyMap<string, Readonly<{ specifier: string; version: string }>> {
+	const lines = lockfile.split("\n");
+	const importerStart = lines.findIndex((line) => line === "  packages/node:");
+	if (importerStart < 0) return new Map();
+	const importerEnd = lines.findIndex((line, index) => index > importerStart && /^ {2}\S/u.test(line));
+	const importer = lines.slice(importerStart + 1, importerEnd < 0 ? undefined : importerEnd);
+	const dependenciesStart = importer.findIndex((line) => line === "    dependencies:");
+	if (dependenciesStart < 0) return new Map();
+	const dependencies = new Map<string, { specifier: string; version: string }>();
+	for (let index = dependenciesStart + 1; index < importer.length; index += 1) {
+		const key = /^ {6}(?:'(?<single>[^']+)'|"(?<double>[^"]+)"|(?<plain>[^'"\s][^:]*)):\s*$/u.exec(
+			importer[index] ?? ""
+		);
+		if (key === null) {
+			if (/^ {4}\S/u.test(importer[index] ?? "")) break;
+			continue;
+		}
+		const name = key.groups?.single ?? key.groups?.double ?? key.groups?.plain;
+		if (name === undefined) continue;
+		const fields = Object.fromEntries(
+			importer
+				.slice(index + 1, index + 3)
+				.map((line) => /^ {8}(?<field>specifier|version):\s*(?<value>\S.*)$/u.exec(line))
+				.filter((match): match is RegExpExecArray => match !== null)
+				.map((match) => [match.groups?.field, match.groups?.value])
+		);
+		dependencies.set(name, {
+			specifier: typeof fields.specifier === "string" ? fields.specifier : "",
+			version: typeof fields.version === "string" ? fields.version : "",
+		});
+	}
+	return dependencies;
+}
+
 function sourceSweep(root: string): StaticAudit {
 	const violations: string[] = [];
 	const futureOrLiveEdges: string[] = [];
@@ -938,8 +978,15 @@ function sourceSweep(root: string): StaticAudit {
 		if (dependencies?.["@ts-drp/protocol-v2"] !== undefined) violations.push(`protocol-v2-manifest:${kind}`);
 	}
 	const lockfile = readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8");
-	const nodeImporter = /^ {2}packages\/node:\n(?<body>(?: {4,}.*\n|\s*\n)*)/mu.exec(lockfile)?.groups?.body ?? "";
-	if (/@ts-drp\/protocol-v2/u.test(nodeImporter)) violations.push("protocol-v2-lockfile");
+	const lockedDependencies = nodeLockDependencies(lockfile);
+	if (lockedDependencies.has("@ts-drp/protocol-v2")) violations.push("protocol-v2-lockfile");
+	for (const [name, expected] of Object.entries(A_A_RUNTIME_DEPENDENCIES)) {
+		if (manifest.dependencies?.[name] !== expected.manifest) violations.push(`runtime-manifest:${name}`);
+		const locked = lockedDependencies.get(name);
+		if (locked?.specifier !== expected.manifest || locked.version !== expected.resolved) {
+			violations.push(`runtime-lockfile:${name}`);
+		}
+	}
 
 	const codeGenerationFiles = new Set<string>();
 	for (const filename of recursiveFiles(path.join(root, "packages/node"))) {
@@ -975,7 +1022,7 @@ function sourceSweep(root: string): StaticAudit {
 			if (A_A_RUNTIME_ROOTS.has(edge.specifier)) {
 				if (manifest.dependencies?.[edge.specifier] === undefined)
 					violations.push(`undeclared-runtime:${edge.specifier}`);
-				if (!nodeImporter.includes(`${edge.specifier}:`)) violations.push(`unlocked-runtime:${edge.specifier}`);
+				if (!lockedDependencies.has(edge.specifier)) violations.push(`unlocked-runtime:${edge.specifier}`);
 			}
 			if (
 				edge.typeOnly &&
@@ -1048,7 +1095,7 @@ function temporarySweepTree(): string {
 		JSON.stringify({
 			dependencies: {
 				"@ts-drp/canonical": "0.11.0",
-				"@ts-drp/control-plane": "0.11.0",
+				"@ts-drp/control-plane": "workspace:*",
 				"@ts-drp/protocol-v3": "0.11.0",
 				"@ts-drp/storage": "0.11.0",
 			},
@@ -1058,7 +1105,7 @@ function temporarySweepTree(): string {
 	);
 	writeFileSync(
 		path.join(root, "pnpm-lock.yaml"),
-		"lockfileVersion: '9.0'\nimporters:\n  packages/node:\n    dependencies: {}\n"
+		"lockfileVersion: '9.0'\nimporters:\n  packages/node:\n    dependencies:\n      '@ts-drp/canonical':\n        specifier: 0.11.0\n        version: link:../canonical\n      '@ts-drp/control-plane':\n        specifier: workspace:*\n        version: link:../control-plane\n      '@ts-drp/protocol-v3':\n        specifier: 0.11.0\n        version: link:../protocol-v3\n      '@ts-drp/storage':\n        specifier: 0.11.0\n        version: link:../storage\n"
 	);
 	writeFileSync(
 		path.join(root, "packages/node/src/v3-live.ts"),
@@ -1077,10 +1124,10 @@ afterAll(() => {
 });
 
 const PRIVATE_V3_LIVE_EXPORTS = [
-	"PreparedV3Live",
 	"PrepareV3LiveFailureKind",
 	"PrepareV3LiveGenerationInput",
 	"PrepareV3LiveResult",
+	"PreparedV3Live",
 	"V3LiveDescriptor",
 	"prepareV3LiveGeneration",
 ] as const;
@@ -1370,7 +1417,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		const cases: readonly [PrepareV3LiveFailureKind, Partial<PrepareV3LiveInput>, CatalogMutation, string, boolean?][] =
 			[
 				["trust-open-failed", { store: createMemoryAheDurableStore() }, "none", "trust.open:resolved"],
-				["anchor-authentication-failed", { detachedSignature: new Uint8Array(64) }, "none", "anchor.authenticate"],
+				["anchor-authentication-failed", { detachedSignature: new Uint8Array(64) }, "none", "anchor.authenticate.hash"],
 				["anchor-authentication-failed", {}, "none", "anchor.hash", true],
 				[
 					"parameters-rejected",
@@ -1399,6 +1446,10 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			expectFailure(await controlledPrepare(overrides, { anchorHashMismatch, catalogMutation }), kind);
 			expect(stageProbe.events.at(-1), kind).toBe(lastEvent);
 			if (kind === "parameters-rejected") expect(stageProbe.catalogRequests).toEqual([]);
+			if (overrides.detachedSignature !== undefined) {
+				expect(stageProbe.authenticationHashInputs).toHaveLength(1);
+				expect(stageProbe.anchorHashInputs).toEqual([]);
+			}
 			if (kind !== "runtime-preparation-failed") expect(stageProbe.runtimeResults, kind).toEqual([]);
 			expect(stageProbe.liveEffects, kind).toEqual([]);
 		}
@@ -1421,6 +1472,38 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 	it("uses a root-parameterized recursive hygiene sweep that kills all six owner-edge mutants", () => {
 		const clean = temporarySweepTree();
 		expect(sourceSweep(clean)).toEqual({ futureOrLiveEdges: [], violations: [] });
+		for (const [name, expected] of Object.entries(A_A_RUNTIME_DEPENDENCIES)) {
+			const manifestRoot = temporarySweepTree();
+			const manifestPath = path.join(manifestRoot, "packages/node/package.json");
+			const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+			manifest.dependencies[name] = "wrong";
+			writeFileSync(manifestPath, JSON.stringify(manifest));
+			expect(sourceSweep(manifestRoot).violations, name).toContain(`runtime-manifest:${name}`);
+
+			const lockRoot = temporarySweepTree();
+			const lockPath = path.join(lockRoot, "pnpm-lock.yaml");
+			const lockfile = readFileSync(lockPath, "utf8");
+			writeFileSync(
+				lockPath,
+				lockfile.replace(
+					`      '${name}':\n        specifier: ${expected.manifest}`,
+					`      '${name}':\n        specifier: wrong`
+				)
+			);
+			expect(sourceSweep(lockRoot).violations, name).toContain(`runtime-lockfile:${name}`);
+
+			const resolvedRoot = temporarySweepTree();
+			const resolvedLockPath = path.join(resolvedRoot, "pnpm-lock.yaml");
+			const resolvedLockfile = readFileSync(resolvedLockPath, "utf8");
+			writeFileSync(
+				resolvedLockPath,
+				resolvedLockfile.replace(
+					`      '${name}':\n        specifier: ${expected.manifest}\n        version: ${expected.resolved}`,
+					`      '${name}':\n        specifier: ${expected.manifest}\n        version: wrong`
+				)
+			);
+			expect(sourceSweep(resolvedRoot).violations, name).toContain(`runtime-lockfile:${name}`);
+		}
 		const mutations = [
 			["packages/node/src/v3-live.ts", '\nimport "@ts-drp/protocol-v2";\n', "protocol-v2-direct", undefined],
 			[
