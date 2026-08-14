@@ -9395,6 +9395,513 @@ design and quorum. Seam 3 RED or implementation, the complete Phase `3a-1B`,
 live activation and Phase 3b remain unauthorized. No seam 3 contract is
 defined here.
 
+#### D.93.31 — Phase 3a-1B prerequisite seam 3: exact legacy/v2/v3 transport, topic, subscription and outbox-publication composition
+
+This section is normative and freezes only the third D.93.26 prerequisite.
+Seam 1 is closed by D.93.27 and D.93.28; seam 2 is closed by D.93.29 and
+D.93.30. This section consumes their shipped APIs without changing either
+contract. It does not authorize the complete Phase `3a-1B`, a published live
+index, reducer or fold execution, application state, ACL wiring, Phase 3b or
+either golden-path application. Seam-3 RED may start only after this exact
+amendment receives independent exact-byte assent and is signed and pushed.
+
+##### Closed three-plane and ownership model
+
+The transport has exactly three planes:
+
+| Plane  | Live state                                                   | Topic and wire discriminator                                                 | Owner                                                                         |
+| ------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| legacy | unchanged and live, including both existing control topics   | existing raw object/topic strings and existing handled `MessageType` members | existing `DRPNode`, network and handler owners, byte- and behavior-compatible |
+| v2     | never live                                                   | no topic and no representable tag                                            | no runtime owner; rejected as an absent plane                                 |
+| v3     | live only for one successfully activated prepared generation | one derived topic and `MESSAGE_TYPE_V3_ENVELOPE = 11`                        | private `packages/node/src/v3-live.ts` composition owner                      |
+
+A fourth plane requires another amendment. No runtime protocol-v2 import,
+topic, queue, fallback or compatibility wrapper is added. Cross-plane rejection
+does not reinterpret legitimate legacy traffic whose wire object id differs
+from a shared control topic.
+
+The v3 topic is derived once, only from the unsealed D.93.23 authority, as:
+
+```text
+"drp/v3/1/" + bytesToLowerHex(
+  hashDomain(
+    "ts-drp/live-topic/v3",
+    utf8(objectId),
+    utf8(genesisAnchorDigest)
+  )
+)
+```
+
+`hashDomain` and UTF-8 encoding are the existing public canonical owners; the
+node may only render their digest as lowercase hexadecimal. The topic commits
+to the stable genesis anchor, not the current anchor. `queueId === topic`, and
+the wire `Message.objectId === topic`; neither string is storage-object,
+author, signer, creator, epoch or admission authority. The unsealed prepared
+payload remains the sole `objectId`, epoch, anchor, admission and runtime
+authority.
+
+The only private live owner remains `packages/node/src/v3-live.ts`. Its names
+may be imported by node-internal composition but are absent from the node root,
+every node runtime subpath, `DRPNode`, `IDRPNode` and protocol-v3. Internal
+routing integration in `packages/node/src/index.ts` changes no exported class
+shape or constructor. There is no second registry, broadcaster, topic owner,
+queue owner, transport listener or store.
+
+##### Exact network and generated-wire widening
+
+`DRPNetworkNode` and its implementing class gain exactly these two methods and
+no other network name, option, event or export:
+
+```ts
+publishMessage(topic: string, message: Message): Promise<true>;
+gossipTopicFor(message: Message): string | undefined;
+```
+
+Publication has one implementation-private encode/wait/publish core.
+`publishMessage` awaits that complete core, rejects when readiness or
+`pubsub.publish` fails, and resolves the literal primitive `true` only after
+local pubsub publication fulfills. Existing `broadcastMessage` delegates to
+the same core with the exact current topic argument already supplied to
+`broadcastMessage`; it neither derives nor substitutes a remembered or
+provenance topic. It preserves its exact catch, log and swallow behavior and
+its `Promise<void>` surface. Its resolution never authorizes an outbox
+transition. Neither method proves propagation, delivery, peer receipt or
+acknowledgement.
+
+Gossip topic provenance belongs to one module-private
+`WeakMap<Message, string>`. The authenticated, strictly signed gossipsub
+handler copies and binds the actual topic exactly once, only after successful
+message decode and sender authentication and immediately before it dispatches
+that exact decoded `Message` object. `gossipTopicFor` is an identity-only
+getter with no setter, enumerator or structural fallback. Decode failure,
+unsigned gossip, direct-stream ingress, local construction, a clone, wrapper,
+re-encode, re-decode or equal-content different object has no binding and
+returns `undefined`. The binding is transport provenance only and confers no
+author, signer, creator, object or admission authority; process restart leaves
+no usable stale message identity.
+
+The generated wire changes exactly as follows:
+
+```proto
+enum MessageType {
+  // existing values 0 through 10 remain byte-exact
+  MESSAGE_TYPE_V3_ENVELOPE = 11;
+}
+
+message V3Envelope {
+  bytes canonical_preimage = 1;
+  bytes signature = 2;
+}
+```
+
+The `.proto` source is authoritative and `messages_pb.ts` is regenerated only
+through the pinned root generator; a hand edit or second codec is forbidden.
+The existing `MessageSchema` is unchanged but its native enum deliberately
+admits tag 11. The legacy `messageHandlers` table adds the compile-mandatory
+tag-11 key with value `undefined`, so a rejected v3 frame cannot fall through
+to a legacy handler. All old numeric values, generated bytes and
+`UNRECOGNIZED` behavior remain exact.
+
+##### Closed private activation surface
+
+The private module surface is exactly:
+
+```ts
+export interface V3PlaneActivationInput {
+	readonly capability: PreparedV3Live;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly messageQueueManager: MessageQueueManager<Message>;
+	readonly networkNode: DRPNetworkNode;
+	readonly onAdmittedVertex: V3AdmittedVertexSink;
+	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
+}
+
+export type V3AdmittedVertexSink = (
+	delivery: Readonly<{
+		readonly vertex: AdmittedReceivedVertexView;
+		readonly exactReceivedCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+		readonly transportSender: string;
+	}>
+) => void | Promise<void>;
+
+export interface V3PlaneHandle {
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly topic: string;
+	readonly queueId: string;
+	publishPending(): Promise<V3EgressResult>;
+	deactivate(): void;
+}
+
+export type V3PlaneActivationResult =
+	| Readonly<{ ok: true; handle: V3PlaneHandle }>
+	| Readonly<{ ok: false; kind: V3PlaneActivationFailureKind; detail: string }>;
+
+export type V3PlaneActivationFailureKind =
+	| "malformed-input"
+	| "capability-consumed"
+	| "not-started"
+	| "topic-derivation-failed"
+	| "issuance-scope-mismatch"
+	| "queue-capacity"
+	| "subscribe-failed"
+	| "internal-invariant";
+
+export type V3EgressResult =
+	| Readonly<{ ok: true; kind: "empty" | "published" }>
+	| Readonly<{
+			ok: false;
+			kind: "not-active" | "store-failed" | "record-rejected" | "publish-failed" | "publication-state-unknown";
+			detail: string;
+	  }>;
+
+export function activateV3LivePlane(input: V3PlaneActivationInput): V3PlaneActivationResult;
+export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): boolean;
+```
+
+The activation input is one closed, plain, own-enumerable data record with
+exactly the seven displayed keys and no symbol, accessor, inherited or extra
+key. Step 1 captures its seven outer field values without traversing their
+nested records. After the sole step-2 capability consume, `issuanceScope` is
+independently copied and validated as the closed two-key record
+`{objectId, author}`. It is only a routing selector. `onAdmittedVertex` is the
+one private downstream handoff which the eventual complete B owner will bind
+to its existing live object; it is not an extraction, authentication,
+admission, index or store authority. Seam-3 tests may observe it, but this
+section does not construct or publish the future B index.
+
+Every result and delivery record is a fresh closed own-data value, is frozen,
+retains no caller buffer and uses fixed path-free, byte-free `detail` strings.
+Each newly installed registration owns one fresh frozen handle. The
+same-binding idempotent branch intentionally returns that exact active handle
+identity; only completed deactivation followed by a newly prepared token can
+install and return a fresh handle. The byte arrays delivered to the sink are
+fresh exclusive detached copies and are not frozen. Nothing throws
+synchronously across the private activation boundary.
+
+`@ts-drp/node` adds exactly the existing published
+`"@ts-drp/issuance-store": "0.11.0"` runtime dependency and the importer-only
+lock entry. `v3-live.ts` imports the genuine public six-method store and its
+types; it does not mirror them. Adapter factories remain only in the Node and
+Browser storage packages and are supplied by the trusted composition caller.
+No other dependency, manifest or export map changes.
+
+##### Atomic activation, registration and rollback
+
+Activation is synchronous: it contains no `await`, promise continuation or
+microtask boundary. First-failure precedence and effect order are exact:
+
+1. snapshot and validate only the closed outer seven-key input record and
+   capture each displayed field value; failure is `malformed-input`, with no
+   token consume or effect;
+2. call the existing module-private get-then-delete
+   `consumePreparedV3Live(capability)` exactly once, immediately after step 1
+   and nowhere else; absence is `capability-consumed`, with no derivation or
+   effect;
+3. copy and validate the closed scope, validate the unsealed prepared payload,
+   and require the copied selector's `objectId` to equal its object id; failure
+   is respectively `malformed-input`, `internal-invariant` or
+   `issuance-scope-mismatch`;
+4. require the exact network instance to be started; failure is `not-started`;
+5. derive the exact topic and queue id from the unsealed object id and genesis
+   anchor; failure is `topic-derivation-failed`;
+6. inspect the one module-private
+   `WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>`; the inner map
+   key is exactly the derived topic string, which is also the exact `queueId`.
+   A live entry
+   with the same queue-manager, issuance-store, sink and resolver object
+   identities, exact copied scope values, exact prepared object/epoch/anchor/
+   projection identity and current topic membership returns the existing
+   handle without stacking an effect. A different binding is
+   `internal-invariant`. An entry whose topic membership has disappeared is
+   stale and is retired by the cleanup rule before proceeding;
+7. after any required stale retirement, but before the first effect owned by
+   this new activation, require the queue to be absent:
+   `messageQueueManager.hasQueue(queueId) === false`. Also snapshot
+   `networkNode.getSubscribedTopics()` as a dense string array which does not
+   contain the derived topic. A foreign queue, foreign topic, malformed
+   subscription snapshot or other unowned collision is `internal-invariant`,
+   burns the already-consumed token and creates no new queue or network effect;
+8. call `messageQueueManager.subscribe(queueId, handler)` once, then require
+   `messageQueueManager.hasQueue(queueId) === true`. Only the exact
+   capacity exhaustion is `queue-capacity`; another failure is
+   `internal-invariant`;
+9. call `networkNode.subscribe(topic)` once, then independently require
+   `networkNode.getSubscribedTopics()` to snapshot as a dense string array
+   containing the exact topic. Absence or malformed observation is
+   `subscribe-failed`;
+10. install the complete registration and return its handle.
+
+Step 2 is the sole token-consumption locus. Every failure from step 3 onward,
+including registration and foreign-ownership collision inspection before the
+first subscribe, burns it; no branch peeks, restores, serializes or reuses it.
+A retry requires a newly prepared token. Registration and handle lookups
+revalidate current topic membership every time. A network restart retains
+JavaScript object identity but loses pubsub membership, so an old handle is
+stale, is retired and never silently reactivates. The normal node
+subscription-restorer does not learn about v3.
+
+Failure after the first effect performs continue-all reverse rollback over
+only this activation: remove its registration if installed, unsubscribe its
+exact network topic, and close/delete its exact queue. It neither removes a
+legacy queue nor tears down another activation. Because the existing network
+subscribe and unsubscribe methods own, catch and log their underlying
+failures, cleanup correctness is determined only by observable postconditions:
+after unsubscribe a fresh dense subscription snapshot must omit the exact
+topic, and after queue close `hasQueue(queueId)` must be `false`. The typed
+result preserves the original activation failure while every cleanup step is
+attempted; no capability is restored.
+
+`handle.deactivate()` is idempotent and continue-all. It first marks and
+removes this registration so ingress and egress fail closed, then unsubscribes
+only its topic and closes/deletes only its queue. It checks the same topic-absent
+and queue-absent postconditions after attempting every step. Failed stale
+retirement is `internal-invariant` and cannot authorize a replacement
+registration. Existing network methods retain their legacy-owned diagnostics;
+the v3 owner may emit at most one additional fixed postcondition diagnostic,
+without caught-value content, for one failed cleanup. Cleanup failure never
+restores the handle or token. Every later handle operation is `not-active` and
+performs no store or network work. Process restart has no durable activation
+state: the caller reopens, reprepares and activates with a fresh capability.
+
+##### Received ingress and exact Seam-1 handoff
+
+The node's existing single dispatch path calls only the internal, non-reexported
+`routeV3Ingress(networkNode, message)` before any discovery or legacy handler.
+That function is the sole executable ingress-routing seam: it queries
+`networkNode.gossipTopicFor(message)` on the exact received object and resolves
+the topic only through the same module-private registration `WeakMap` owned by
+activation. It returns `false` only when the message must continue through the
+unchanged legacy route. It returns `true` after it has claimed active-topic or
+tag-11 traffic, whether that traffic is rejected or enqueued through the
+registration's stored queue manager; the caller then stops the entire
+remaining dispatch path, including discovery and every legacy handler. Only a
+`false` return enters the existing discovery-then-legacy decision sequence.
+Prefix shape, wire `objectId`, queue existence and network membership are never
+substitutes for an active registration. The decision order is closed:
+
+1. a non-tag-11 message with no active v3 topic follows the legacy route
+   unchanged;
+2. any message on an active v3 topic which is not tag 11 or whose wire
+   `objectId` is not that topic is rejected before enqueue;
+3. any tag-11 message without same-identity gossip provenance equal to one
+   active v3 topic is rejected before decode and cannot fall through;
+4. only tag 11 with exact active topic provenance and exact wire topic is
+   enqueued to that topic's sole v3 queue.
+
+The queue handler rechecks the tag, topic provenance, wire topic, handle
+liveness and registration identity. It snapshots exact `message.data`, decodes
+that snapshot as `V3Envelope` exactly once, re-encodes that one decoded
+envelope with the pinned encoder, and requires the re-encoded bytes to equal
+the exact snapped `message.data`. Only after that envelope-canonicality check
+does it detach the two decoded byte fields. It never re-encodes either detached
+field as the received canonical preimage. It then calls the genuine synchronous
+package-root `extractAdmittedReceivedVertex` exactly once with the seven keys,
+in this order:
+
+```ts
+{
+	domain,
+	expectedAnchor,
+	preparedBlueprintAdmission,
+	receivedCanonicalPreimageBytes,
+	resolveAuthorPublicKey,
+	signature,
+	suiteId,
+}
+```
+
+`domain`, `expectedAnchor`, `preparedBlueprintAdmission` and `suiteId` come
+only from the unsealed prepared context; the resolver is the exact copied
+activation function; the two byte arrays are the detached envelope-field
+copies. The transport never re-encodes the canonical preimage, constructs a
+second admission path, inspects protocol-v3 trust internals or substitutes
+topic, sender or `issuanceScope.author` as author authority.
+
+Only `{ok:true, vertex}` reaches `onAdmittedVertex`, with that exact vertex,
+the detached received bytes and signature, and the authenticated transport
+sender for telemetry only. The three Seam-1 failures
+`malformed-input | not-authenticated | admission-rejected`, envelope failure,
+wrong-plane traffic and sink throw/rejection are caught and logged with a
+fixed bounded reason. They append, charge, publish, issue, mark and requeue
+nothing, do not disable the subscription, and do not escape the queue fanout.
+The sink receives no capability and its failure creates no egress retry or
+acknowledgement.
+
+##### Durable-record-authoritative outbound publication
+
+`publishPending()` is the only v3 egress path. Each registration owns one FIFO
+single-flight gate for it. Calls are never coalesced: every call retains a fresh
+result and begins its own work only after its predecessor settles. A queued call
+reached after deactivation returns `not-active` without store or network work.
+At entry, after every awaited page read, and immediately before publication,
+the active call revalidates the same handle, registration and exact current
+topic membership. A closed or stale handle returns `not-active` before any next
+effect. It copies the stored routing selector again and requires its object id
+to equal the unsealed object id.
+
+The issuance page API contains both `pending` and `published` rows. To avoid a
+published prefix starving later pending work, the handle walks deterministic
+one-record pages for the exact scope: the first call is
+`readOutboxPage({scope: copiedScope, limit: 1})`; each fully validated
+published row advances the exclusive `afterKey` to exactly
+`[objectId, author, authorSequence]` and reads the next page with the same
+scope and limit. Empty ends with `{ok:true, kind:"empty"}`. The scan has no
+caller-controlled cursor, sends at most one pending row, and retains no page
+or record after the call. Store rejection before transport is `store-failed`.
+Every page result is examined only after the post-await liveness revalidation;
+deactivation while a page read is pending therefore produces `not-active` and
+the returned page causes no publication.
+
+Every returned page and nested value is snapshotted without invoking getters,
+iterators or caller prototypes. Before either skipping or sending a row, the
+owner requires a dense one-element page; closed detached
+`DurableIssuanceOutboxRecord`, commit, issued-record, outbox-entry, scope and
+envelope shapes; identical safe author sequences; exact selector equality for
+both issued and outbox scopes; byte-equal canonical preimage, digest and
+signature across the commit's three envelope copies; and a publish state of
+exactly `pending` or `published`. Malformation, a cursor that does not advance,
+scope/object mismatch or inconsistent closure is `record-rejected` with no
+publish or mark. The durable row, never the caller selector, is sole authority
+for preimage, signature, scope, sequence and digest.
+
+For the first validated pending row, construct exactly one `Message` with
+`sender = networkNode.peerId`, tag 11, `objectId = topic`, and data equal to the
+pinned canonical encoding of one `V3Envelope` made from fresh copies of that
+row's canonical preimage and signature. Await
+`networkNode.publishMessage(topic, message)`. Rejection or any result other
+than the literal primitive `true` is `publish-failed`; no mark occurs and the
+row remains pending, except that deactivation after publication invocation and
+before mark invocation makes the transport outcome
+`publication-state-unknown` regardless of how that publication promise
+settles. It performs no mark.
+
+Only literal `true` permits exactly one
+`compareAndMarkOutboxPublished({authorSequence, digest, scope})`, using fresh
+detached comparison values from that same row, and only after one final active
+registration/topic revalidation immediately before invoking the mark. Once
+invoked, the mark is allowed to settle even if deactivation occurs, and its
+resolution or rejection maps normally without a second mark. Resolution returns
+`{ok:true, kind:"published"}` and means only that the local store observed the
+row published; it does not identify this invocation as the writer. Any mark
+rejection after successful transport is `publication-state-unknown`: the row
+may be pending or published, retry may send a duplicate, and the handle neither
+repairs nor infers. There is no delete, acknowledgement, receipt, delivery,
+exactly-once, republish loop or automatic drain. A later explicit call handles
+at most the next pending row by the same rules.
+
+`deactivate()` synchronously marks the registration inactive before cleanup and
+before admitting another queued egress call. It does not cancel an already
+invoked store or network promise. If it races an awaited page, publication or
+the pre-mark liveness boundary, the rules above determine the result; if it
+races an already invoked compare-and-mark, that one mark settles and no queued
+call starts work afterward.
+
+##### Error, restart and compatibility boundaries
+
+All activation and handle results use only the closed unions above. Unknown
+throws, hostile returned objects and log text are contained at their named
+stage; no unknown string, peer value, path, bytes, token material or store
+payload enters `detail`. Store errors before handoff do not leak the ten
+issuance-store codes through a parallel taxonomy; after a successful handoff,
+all mark failures are conservatively publication-state-unknown.
+
+The plane is at-least-once across transport/store ambiguity and process or
+network restart. Pending durable rows survive and may be sent again after a
+fresh authenticated prepare/activation. Topic bindings, handles, queues and
+registrations are process-local and are never reconstructed from payload or
+object id. Duplicate received frames may reach the future B sink; append
+idempotence, published index construction, charging and reducer/application
+effects remain whole-B owners and are not claimed here.
+
+Legacy behavior, direct sync, discovery, interval discovery, group-peer
+subscriptions, topic scoring, rendezvous and room presence remain unchanged.
+No group-peer-change subscription is created. V2 remains absent and rejected.
+The protocol-v3 root remains exact-ten; Seam 1 types/results are unchanged.
+The six-method issuance store, its schema, errors, adapters and publication
+semantics are unchanged.
+
+##### Authorized paths, RED slices and causal mutants
+
+Production GREEN is authorized to touch only:
+
+- `packages/types/src/network.ts` for the two network methods;
+- `packages/network/src/node.ts` for their shared core and private topic
+  binding;
+- the authoritative message `.proto` and its pinned generated TypeScript;
+- `packages/node/src/handlers.ts` for the explicit undefined tag-11 legacy
+  entry;
+- `packages/node/src/index.ts` for the one pre-legacy ingress decision call;
+- `packages/node/src/v3-live.ts` for the sole private plane owner;
+- `packages/node/package.json` and only its importer entry in `pnpm-lock.yaml`
+  for `@ts-drp/issuance-store` `0.11.0`.
+
+No validation schema, network manifest/export map, types manifest/export map,
+node export map, DRP object API, protocol-v3, issuance-store, storage adapter,
+legacy protocol or protocol-v2 production file is authorized.
+
+Seam-3 TDD is split into bounded RED/GREEN/review slices:
+
+1. `3a-1B-p3-a` freezes the shared truthful publish core, exact legacy
+   compatibility, identity-only gossip binding, generated tag/envelope, topic
+   bytes and public/package surfaces.
+2. `3a-1B-p3-b` freezes closed activation, atomic consume/burn, queue/network
+   registration, pre-effect foreign-ownership rejection, observable cleanup
+   postconditions, restart liveness, reverse rollback, deactivation and every
+   first-failure arm.
+3. `3a-1B-p3-c` freezes the sole `routeV3Ingress` decision before decode,
+   wrong-plane rejection, exact Seam-1 call and sink policy, deterministic
+   one-record outbox scan, per-registration FIFO single flight, same-row
+   truthful publish-before-mark, deactivation races, ambiguity, restart and
+   duplicate behavior.
+
+Each RED must contain non-hollow causal controls and kill at least these
+mutants: separate legacy and strict publication implementations; swallowed or
+coerced strict success; binding before authentication or by structural
+message equality; a public binder; tag/field/generator drift; current-anchor,
+bare-object or caller topic derivation; consuming an outer-malformed input or
+failing to consume exactly once before nested validation; peeking or restoring
+a token; effects before consume; a foreign existing queue or topic
+adopted or torn down; stacked queue/subscription/handler; queue or topic
+postcondition omitted; cleanup inferred from the void network call; prefix-,
+wire-object- or `hasQueue`-based activation inference; dead-handle reuse; a
+fresh handle returned by same-binding idempotence; partial or forward rollback;
+legacy tag-11 fallthrough; v3 off-topic/direct-stream admission; non-v3
+interception; second envelope decode or canonical-preimage re-encode; topic,
+sender or selector promoted to author authority; injected extraction bypass;
+published-prefix drain starvation; overlapping publication calls not serialized
+FIFO; queued work after deactivation; missing liveness revalidation at any page,
+publish or mark boundary; forged/cross-row bytes; compare-mark before literal
+transport success or with another row's sequence/digest/scope; mark after
+rejected publication; mark after deactivation before its invocation; an
+already invoked mark cancelled or repeated; duplicate or delivery claims;
+group-peer, protocol-v2, node-root, DRPNode, protocol-v3, schema, store or extra
+dependency widening.
+
+Fast PR gates include exact focused behavior, hostile totality, type/build,
+source/built/packed/public-surface, generator reproducibility, dependency and
+importer-only lock, ESLint, Prettier, diff and all Seam-1/Seam-2/A
+preservation. Nightly reuses the genuine multi-node gossipsub harness for
+signed-topic provenance, cross-plane injection, reconnect, mesh churn and
+allowed duplicate handoff. It does not add a test-only production port.
+
+##### Supersession and authorization boundary
+
+This section supersedes only D.93.26's third unresolved prerequisite, D.93.23's
+statement that transport/topic/subscription composition is unspecified, and
+the Phase-3a row where it leaves the v3 namespace, wire envelope,
+pre-subscription ordering and pending-to-published handoff unspecified. It
+does not change D.93.17, the A contract, Seam 1, Seam 2, their closure ledgers
+or any later phase.
+
+After these bytes receive final exact-byte assent and are signed and pushed,
+Seam-3 tests-only RED may start. Seam-3 GREEN closes only this prerequisite.
+The complete Phase `3a-1B`, its published live index, charging, reducer,
+application/ACL/effect wiring, Phase 3b and Discord/MMORPG golden paths remain
+unauthorized until separately designed, tested and closed.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
