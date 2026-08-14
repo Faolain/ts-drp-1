@@ -8568,6 +8568,261 @@ The next design step is the authenticated vertex-extraction seam. Nothing in
 this ledger claims any of those seams, Phase `3a-1B`, Phase 3b or a golden-path
 live activation is implemented.
 
+#### D.93.27 — Phase 3a-1B prerequisite seam 1: authenticated vertex extraction
+
+This section is normative and freezes only the first D.93.26 prerequisite. It
+does not authorize seam 2, seam 3, any Phase `3a-1B` RED, live activation,
+subscription, transport, issuance, outbox publication, storage mutation,
+reducer execution or Phase 3b. Seam 1 RED may start only after this amendment
+is independently reviewed, signed and pushed. The whole B slice remains
+unauthorized until all three prerequisite amendments are signed.
+
+The protocol-v3 package remains the sole authentication and admission owner.
+Its public root gains one sibling, `extractAdmittedReceivedVertex`, because the
+genuine prepared-admission provenance is private to that package and a node-side
+decoder would create a second authority. The sibling and the existing
+`admitReceivedVertex` facade share one unexported `decideReceivedVertex` core in
+`packages/protocol-v3/src/index.ts`. The sibling is re-exported only through the
+existing package root in `packages/protocol-v3/src/public.ts`; there is no new
+subpath, dependency, deep import, node/object API, capability or package owner.
+`verifyReceivedVertex` remains an index-only conformance primitive and remains
+forbidden at the public root.
+
+##### Public contract
+
+`AdmitReceivedVertexInput` and `AdmissionDecision` remain byte-, type- and
+behavior-compatible. The seam adds exactly these public names and shapes:
+
+```ts
+export type ExtractAdmittedReceivedVertexFailureReason = "malformed-input" | "not-authenticated" | "admission-rejected";
+
+export interface AdmittedReceivedVertexView {
+	readonly kind: "drp-vertex";
+	readonly protocolMajor: 3;
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchor: string;
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly logicalTime: number;
+	readonly dependencies: readonly string[];
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly digest: Uint8Array;
+}
+
+export type ExtractAdmittedReceivedVertexResult =
+	| Readonly<{
+			ok: false;
+			reason: ExtractAdmittedReceivedVertexFailureReason;
+	  }>
+	| Readonly<{ ok: true; vertex: AdmittedReceivedVertexView }>;
+
+export function extractAdmittedReceivedVertex(input: AdmitReceivedVertexInput): ExtractAdmittedReceivedVertexResult;
+```
+
+There is no separate extraction-input alias. Success has exactly `ok` and
+`vertex`; failure has exactly `ok` and `reason`. Neither shape contains
+`admitted`, `accepted`, a top-level digest, signature, resolver, prepared
+admission, A token, reducer, callback, capability or legacy protobuf field.
+
+The success vertex has exactly eleven own enumerable data keys in this order:
+`kind`, `protocolMajor`, `objectId`, `epoch`, `anchor`, `author`,
+`authorSequence`, `logicalTime`, `dependencies`, `operation`, `digest`. The
+first ten are the registered-vertex field order; the already-computed digest is
+last. There are no symbol or inherited keys. `kind` and `protocolMajor` remain
+the registry-owned literals `"drp-vertex"` and `3`.
+
+##### One decision and two compatible projections
+
+`decideReceivedVertex` owns exactly one authentication and admission decision:
+
+1. one canonical decode of the exact received preimage bytes and one
+   registered-vertex materialization, with no defaults, unknown fields,
+   reordering or array sorting;
+2. one expected-anchor comparison, one vertex-domain hash, one author-key
+   resolution and one strict Ed25519 verification with `zip215: false`;
+3. one genuine prepared-admission lookup and one operation ABI/canonical-byte
+   budget decision.
+
+Neither facade may decode, encode, hash, resolve a key, verify a signature,
+look up admission provenance or apply the ABI/budget decision a second time.
+The sibling must not call `admitReceivedVertex`, `verifyReceivedVertex`,
+`vertexPreimage`, `vertexCanonicalBytes`, `vertexDigest`,
+`digestReceivedVertexPreimage`, `detachCanonicalRecord` or any canonical
+round-trip helper.
+
+The existing facade preserves all current observables: its two exact shapes,
+unfrozen result objects, digest identity without a copy, absence of a closed-
+record snapshot gate, getter/proxy throw behavior, broad
+`{ admitted: false }` collapse and decode/encode/hash/verify/resolver counts.
+Moving the decision into the shared core must not make any of those observables
+more or less strict.
+
+The sibling alone first reuses the package's existing closed-input snapshot
+boundary. Before any fallible protocol work it captures exactly the seven
+`AdmitReceivedVertexInput` own enumerable data properties, rejects extra,
+missing, symbol, accessor, inherited or non-enumerable properties, copies the
+preimage and signature into fresh ordinary `Uint8Array`s, rejects shared
+backing, requires non-empty preimage bytes and a 64-byte signature, and requires
+the three scalar fields to be strings and the resolver to be a function. A
+throw or proxy failure while taking this snapshot is contained. The prepared
+admission and resolver are captured by identity only after the closed snapshot;
+the resolver is bound to the original caller object before it enters the core,
+so an ordinary method retains its original `this` semantics.
+
+The sibling snapshot is structural only. Registry domain and suite equality,
+expected-anchor syntax and equality, canonical/registry validity, public-key
+shape and signature validity remain in the shared authentication stage. The
+sibling must not duplicate those policy checks ahead of the core.
+
+##### Closed failure taxonomy and precedence
+
+The sibling is synchronous, total and non-throwing. It returns the first
+applicable closed reason in this order:
+
+1. `malformed-input` — the sibling cannot take the exact structural snapshot,
+   including an extra, missing, symbol, accessor, inherited or non-enumerable
+   key; non-plain input; snapshot/proxy throw; non-string scalar; non-function
+   resolver; non-`Uint8Array`, empty preimage, wrong signature length or shared-
+   backed byte input.
+2. `not-authenticated` — the shared authentication stage produces no
+   registered authenticated vertex, including a wrong domain or suite value,
+   malformed expected-anchor text, canonical decode or registered-field
+   failure, anchor mismatch, unresolved or malformed author key, strict
+   signature failure, contained authentication throw, or an otherwise
+   unprojectable authenticated record.
+3. `admission-rejected` — authentication succeeded but genuine prepared-
+   admission provenance, operation ABI or canonical-byte budget rejected, or a
+   throw was contained after admission processing began.
+
+No failure carries a vertex or digest. No success carries a reason. An
+otherwise unclassified post-snapshot failure is contained in the stage that
+owned the operation; it must not escape and must not create a fourth reason.
+The existing facade continues to collapse every core failure to its current
+`{ admitted: false }` result and retains its current external throw surface.
+
+##### Detached result ownership
+
+Projection constructs one fresh result graph from the already-decoded
+registered vertex. It uses module-evaluation-captured intrinsics and descriptor-
+based reads/writes so later mutation of globals, prototypes, iterators or
+inherited numeric setters cannot affect it. The captured set covers every
+intrinsic used to inspect descriptors and keys, allocate/copy supported
+canonical containers and typed arrays, define own data properties and freeze
+containers.
+
+The copy is recursive over the canonical value domain. Plain records and arrays
+are rebuilt from own enumerable string-keyed data properties, arrays are dense
+ordinary arrays, and each rebuilt record/array is frozen. `Map` and `Set` are
+fresh result-exclusive copies made with captured intrinsic traversal; their
+keys/values are recursively detached and the container object is frozen.
+Typed-array leaves, including the returned digest and byte leaves inside
+`operation`, are fresh ordinary result-exclusive copies and are deliberately
+not passed to `Object.freeze`, because freezing a non-empty typed array throws.
+The dependencies array is a fresh frozen string array. The operation, vertex
+and outer result records are frozen. Any residual JavaScript mutability of a
+typed-array, `Map` or `Set` leaf can affect only that returned result graph; it
+cannot reach caller input, protocol state, the core or a later result.
+
+Projection narrows all ten registered fields into the public view before
+construction. A narrowing failure is `not-authenticated`, not a new reason.
+No copied or frozen value becomes an executable capability. Mutating the
+caller's bytes or object graph after return cannot affect the view, and mutating
+a permitted mutable leaf in one view cannot affect any later call.
+
+##### Root surface and compatibility pins
+
+The protocol-v3 public runtime root grows from nine to exactly ten sorted names,
+adding `extractAdmittedReceivedVertex` between
+`createAdmissionBoundTransactionalVertexIssuer` and
+`installCreatorAnchorTrustRoot`. The public type surface adds exactly
+`AdmittedReceivedVertexView`, `ExtractAdmittedReceivedVertexFailureReason` and
+`ExtractAdmittedReceivedVertexResult`.
+
+The same GREEN must update every live root pin, without weakening its forbidden
+set:
+
+1. the explicit exports in `packages/protocol-v3/src/public.ts`;
+2. the package public-smoke required array;
+3. the Phase 3a-0 public-export contract fixture;
+4. the Phase 3a-0 anchor-trust runtime allow-list and title;
+5. the Phase 0p2 blueprint-operation-budget runtime allow-list and title;
+6. the Phase 0p0 blueprint-work-budget runtime allow-list and title; and
+7. the Phase 3a-1A live-preparation runtime allow-list.
+
+Existing source, built and packed public-entry audits remain the owners; no
+parallel audit project is introduced. Their conformance-primitive forbidden
+lists remain unchanged. The package version, export map and dependency graph
+are unchanged. The frozen Phase 0o-b supplement export guards that still pin an
+older root are pre-existing supplement-owner debt; seam 1 neither edits their
+freeze policies nor claims to repair them.
+
+##### Bounded 1B handoff and legacy non-authority
+
+A future `3a-1B` owner may call the sibling exactly once per received v3
+envelope only after the private A token has been consumed by get-then-delete. It
+must derive `expectedAnchor` and the genuine prepared admission from that
+consumed payload, not the wire or caller. The same envelope must not also pass
+through `admitReceivedVertex`, `verifyReceivedVertex`, object
+`authenticateVertices`, `authenticateIncomingVertices` or the legacy
+secp256k1 path.
+
+Protocol-v3 does not map the view to the legacy protobuf `Vertex`. Any later
+node-side copy is structural only and may not decode, hash, verify or infer
+authority again. This seam makes no claim that v3 author, operation,
+logical-time, digest or Ed25519 evidence corresponds to legacy peer, operation,
+timestamp, hash or secp256k1 fields. Legacy application remains a separate,
+non-authoritative mapping question for B.
+
+##### TDD slices, gates and causal mutants
+
+Seam 1 uses separate tests-only RED, bounded GREEN and independent review
+checkpoints. The RED must freeze:
+
+1. the exact ten-name runtime root, three new public types and unchanged
+   forbidden primitive/internal surface across source, built and packed entry;
+2. the byte/type/throw/result/digest-identity compatibility of
+   `admitReceivedVertex`, including its exact call-count controls;
+3. the three sibling failure reasons and first-failure precedence, with wrong
+   domain/suite mapping to `not-authenticated`, hostile snapshot inputs mapping
+   to `malformed-input`, and forged/cross-package admission and ABI/budget
+   failures mapping to `admission-rejected`;
+4. one valid fixture proving both facades share one decode/hash/resolver/strict-
+   verify/admission decision, while sibling digest and containers are equal but
+   detached;
+5. resolver method `this` preservation, exact eleven-key order, literal
+   registry constants, frozen ordinary containers and safe exclusive mutable
+   leaves for the full canonical operation domain;
+6. input-mutation, cross-result aliasing, prototype/iterator poisoning and
+   throwing-proxy controls; and
+7. no capability, node/object API, dependency, subpath, deep import, legacy
+   mapping or live effect.
+
+The RED must kill at least these independent mutants: a second decode, encode,
+hash, key resolution, signature verification, admission lookup or ABI/budget
+decision; a canonical round-trip used for detachment; the sibling routed
+through either public facade or a conformance primitive; an internal reference
+returned as digest/dependencies/operation; recursive freeze applied to a typed
+array; missing original-input resolver binding; domain/suite equality hoisted
+into `malformed-input`; either admission failure collapsed into
+`not-authenticated`; an added, omitted or reordered success key; an added
+failure reason; changed existing-facade result, throw or digest-identity
+behavior; a conformance primitive exported; an export subpath/dependency added;
+or a legacy protobuf mapping performed inside protocol-v3.
+
+Fast gates are the focused behavioral and hostile-input suites, source public-
+surface/type audits, protocol-v3 typecheck/build, targeted lint, Prettier and
+diff-check. Existing built and packed entry audits remain mandatory before
+GREEN acceptance. Long-running or multi-engine transport evidence is outside
+this non-live seam.
+
+This section supersedes only D.93.26 blocker 1 and any earlier seam-1 draft that
+would pre-validate registry policy, freeze typed arrays, detach through a codec
+round trip, omit original-resolver binding, or update only one runtime-export
+pin. D.93.17, D.93.23 and D.93.24-D.93.26 otherwise remain unchanged. Seam 1
+becomes ready for RED only after this exact amendment is reviewed, signed and
+pushed; seams 2 and 3 and the whole Phase `3a-1B` remain unauthorized.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
