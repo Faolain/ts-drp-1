@@ -66,6 +66,7 @@ const graphProbe = vi.hoisted(() => ({
 	mutations: [] as string[],
 	poisonAfterRuntime: false,
 	poisonRestorers: [] as (() => void)[],
+	pristineObjectFreeze: Object.freeze,
 	preCaptureDerivationEvents: [] as (
 		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "digest" }>
 		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "encode" }>
@@ -468,19 +469,19 @@ function strictTrustStore(material: CreatorMaterial): {
 		): ReturnType<AheDurableStore["recoverActiveGeneration"]> {
 			return Promise.resolve({
 				ok: true as const,
-				value: Object.freeze({
+				value: graphProbe.pristineObjectFreeze({
 					kind: "active",
 					head,
-					adoptedGeneration: Object.freeze({
-						baseExpectedHead: Object.freeze({ kind: "none" as const, objectId }),
-						closure: Object.freeze([trustRef]),
+					adoptedGeneration: graphProbe.pristineObjectFreeze({
+						baseExpectedHead: graphProbe.pristineObjectFreeze({ kind: "none" as const, objectId }),
+						closure: graphProbe.pristineObjectFreeze([trustRef]),
 						closureDigest,
 						generationId,
 						objectId,
 						state: "Adopted" as const,
 					}),
 					recomputedClosureDigest: closureDigest,
-					references: Object.freeze([trustRef]),
+					references: graphProbe.pristineObjectFreeze([trustRef]),
 				}),
 			});
 		},

@@ -1126,11 +1126,12 @@ function collectModuleGraph(entry: string): {
 	return { edges: Object.freeze(edges), files: Object.freeze([...files]) };
 }
 
-function aBStageViolations(filename: string): readonly string[] {
+function aBStageViolations(filename: string, stage: SweepStage): readonly string[] {
 	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
 	const importCounts = new Map<string, number>();
 	const useCounts = new Map<string, number>();
-	const digestBlobArguments = new Set<string>();
+	const digestBlobArguments = new Map<string, number>();
+	const digestBlobCalls: ts.CallExpression[] = [];
 	const violations: string[] = [];
 	const ownerFor = (name: string): string => (name === "CausalityIndex" ? A_B_RUNTIME_ROOT : "@ts-drp/storage");
 	const increment = (counts: Map<string, number>, name: string): void => {
@@ -1213,7 +1214,8 @@ function aBStageViolations(filename: string): readonly string[] {
 				allowed = parent.arguments.length === 1;
 				if (allowed && name === "digestClosure") allowed = ts.isIdentifier(parent.arguments[0]);
 				if (allowed && name === "digestBlob" && ts.isIdentifier(parent.arguments[0])) {
-					digestBlobArguments.add(parent.arguments[0].text);
+					increment(digestBlobArguments, parent.arguments[0].text);
+					digestBlobCalls.push(parent);
 				}
 			}
 			if (!allowed) violations.push(`a-b-stage:${name}`);
@@ -1223,7 +1225,7 @@ function aBStageViolations(filename: string): readonly string[] {
 	visit(source);
 	for (const [name, expectedUses] of [
 		["CausalityIndex", 1],
-		["digestBlob", 3],
+		["digestBlob", stage === "through-a-c" ? 4 : 3],
 		["digestClosure", 1],
 	] as const) {
 		const imports = importCounts.get(name) ?? 0;
@@ -1234,12 +1236,55 @@ function aBStageViolations(filename: string): readonly string[] {
 	}
 	if (
 		(importCounts.get("digestBlob") ?? 0) + (useCounts.get("digestBlob") ?? 0) > 0 &&
-		(digestBlobArguments.size !== 3 ||
-			!["exactGraphChargePreimageBytes", "exactOrderPreimageBytes", "exactProjectionBytes"].every((name) =>
-				digestBlobArguments.has(name)
-			))
+		!["exactGraphChargePreimageBytes", "exactOrderPreimageBytes", "exactProjectionBytes"].every(
+			(name) => digestBlobArguments.get(name) === 1
+		)
 	) {
 		violations.push("a-b-stage:digestBlob-preimages");
+	}
+	const derivationNames = new Set(["exactGraphChargePreimageBytes", "exactOrderPreimageBytes", "exactProjectionBytes"]);
+	const rawVerificationCalls = digestBlobCalls.filter((call) => {
+		const argument = call.arguments[0];
+		return ts.isIdentifier(argument) && !derivationNames.has(argument.text);
+	});
+	if (stage === "through-a-c") {
+		const rawCall = rawVerificationCalls[0];
+		const owner = rawCall === undefined ? undefined : containingFunction(rawCall);
+		const ownerCalls: ts.CallExpression[] = [];
+		const preservationCalls: ts.CallExpression[] = [];
+		if (owner !== undefined) {
+			const collectOwnerCalls = (node: ts.Node): void => {
+				if (ts.isFunctionLike(node) && node !== owner) return;
+				if (ts.isCallExpression(node)) ownerCalls.push(node);
+				ts.forEachChild(node, collectOwnerCalls);
+			};
+			collectOwnerCalls(owner);
+		}
+		const collectPreservationCalls = (node: ts.Node): void => {
+			if (ts.isCallExpression(node) && aCCallName(node) === "assertTrustPreserved") {
+				preservationCalls.push(node);
+			}
+			ts.forEachChild(node, collectPreservationCalls);
+		};
+		collectPreservationCalls(source);
+		const getBlobCall = ownerCalls.find((call) => aCCallName(call) === "getBlob");
+		const rawArgument = rawCall?.arguments[0];
+		const afterRaw = rawCall === undefined || owner === undefined ? "" : source.text.slice(rawCall.end, owner.end);
+		if (
+			rawVerificationCalls.length !== 1 ||
+			!ts.isIdentifier(rawArgument) ||
+			getBlobCall === undefined ||
+			preservationCalls.length !== 1 ||
+			getBlobCall.pos >= rawCall.pos ||
+			!afterRaw.includes(`${rawArgument.text}.byteLength`) ||
+			!afterRaw.includes(".byteLength") ||
+			!afterRaw.includes(".digest") ||
+			!afterRaw.includes("!==")
+		) {
+			violations.push("a-b-stage:digestBlob-raw-verification");
+		}
+	} else if (rawVerificationCalls.length !== 0) {
+		violations.push("a-b-stage:digestBlob-raw-verification");
 	}
 	return Object.freeze([...new Set(violations)].sort());
 }
@@ -1792,7 +1837,9 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 		inspect(parsed);
 	};
 	for (const filename of sourceGraph.files) {
-		futureOrLiveEdges.push(...aBStageViolations(filename));
+		futureOrLiveEdges.push(
+			...aBStageViolations(filename, stage === "through-a-c" && filename === entry ? stage : "through-a-b")
+		);
 		if (stage === "through-a-c" && filename === entry) {
 			futureOrLiveEdges.push(...aCStageViolations(filename));
 			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
@@ -1802,7 +1849,9 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-source");
 	}
 	for (const filename of generatedGraph.files) {
-		futureOrLiveEdges.push(...aBStageViolations(filename));
+		futureOrLiveEdges.push(
+			...aBStageViolations(filename, stage === "through-a-c" && filename === generatedEntry ? stage : "through-a-b")
+		);
 		if (stage === "through-a-c" && filename === generatedEntry) {
 			futureOrLiveEdges.push(...aCStageViolations(filename));
 			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
@@ -1939,7 +1988,10 @@ async function recoverPreservedTrust() {
 	const opened = await trustStore.open();
 	const head = opened.head;
 	const recovered = await captured.store.recoverActiveGeneration(captured.objectId);
-	const candidate = await captured.store.getBlob(recovered.references[0]);
+	const recoveredRef = recovered.references[0];
+	const candidate = await captured.store.getBlob(recoveredRef.digest);
+	const recoveredDigest = digestBlob(candidate).value;
+	if (candidate.byteLength !== recoveredRef.byteLength || recoveredDigest !== recoveredRef.digest) throw new TypeError("raw evidence");
 	const preserved = assertTrustPreserved({ candidate, head });
 	return { head, preserved };
 }
@@ -2519,6 +2571,33 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 						"\tconst { head, preserved } = await recoverPreservedTrust();\n\tfor (let attempt = 0; attempt < 2; attempt += 1) {"
 					),
 				"a-c-stage:retry-bound",
+			],
+			[
+				"missing-raw-verification",
+				(source: string): string =>
+					source.replace(
+						"const recoveredDigest = digestBlob(candidate).value;",
+						"const recoveredDigest = recoveredRef.digest;"
+					),
+				"a-b-stage:digestBlob-raw-verification",
+			],
+			[
+				"extra-raw-verification",
+				(source: string): string =>
+					source.replace(
+						"const recoveredDigest = digestBlob(candidate).value;",
+						"const recoveredDigest = digestBlob(candidate).value;\n\tvoid digestBlob(candidate);"
+					),
+				"a-b-stage:digestBlob-raw-verification",
+			],
+			[
+				"misplaced-raw-verification",
+				(source: string): string =>
+					source.replace(
+						"const candidate = await captured.store.getBlob(recoveredRef.digest);\n\tconst recoveredDigest = digestBlob(candidate).value;",
+						"const recoveredDigest = digestBlob(candidate).value;\n\tconst candidate = await captured.store.getBlob(recoveredRef.digest);"
+					),
+				"a-b-stage:digestBlob-raw-verification",
 			],
 			[
 				"false-branch-recovery",
