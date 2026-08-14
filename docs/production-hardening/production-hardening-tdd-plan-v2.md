@@ -8452,6 +8452,122 @@ RED owner. A-c still owns the fresh preservation check, bounded persistence and
 CAS/reopen behavior, and the opaque preparation token. Nothing in this ledger
 claims those obligations or any Phase `3a-1B` live effect are implemented.
 
+#### D.93.26 — Phase 3a-1A-c closure evidence and blocked Phase 3a-1B handoff
+
+Phase `3a-1A-c` is closed at signed production candidate
+`d10f115b2afd3e687a08467f30fa50a10e55c957`, tree
+`d2982e8532f0741ee3860b8b3f7deb03e9ecc599`. This section is a bounded,
+non-normative evidence ledger. It does not change D.93.23, D.93.24 or D.93.25,
+close `3a-1A` as a whole, authorize Phase `3a-1B` or Phase 3b, or claim any live
+effect.
+
+The A-c boundary exists so persistence can become authoritative without making
+the returned CAS value, a prior process token or a partially written generation
+authoritative. The private owner first uses the genuine durable trust owner,
+then performs one independent complete evidence pass through the same captured
+`AheDurableStore` and object id. That second pass does not reinterpret trust: it
+proves the exact head, digest-sorted closure, ref lengths and detached blob
+digests needed by preservation and restart classification. Semantic five-field
+head comparison avoids object identity, insertion order and serialization as
+authority. The mandatory durable reopen after every CAS outcome remains the
+only authority for minting; the CAS response itself is deliberately
+non-authoritative.
+
+Each permitted attempt refreshes the reopened trust ref, complete detached
+candidate set, preservation decision, generation id and expected head before
+the short begin/put/promote/complete/swap sequence. One definite loss may reuse
+only the deterministic authenticated projection and preparer capabilities; it
+must refresh every durability input before its second and final attempt. An
+exact reopened winner remints without another CAS, a different winner is stale,
+and an unchanged head after an ambiguous outcome is storage failure. The
+module-private `WeakMap` token is created only after that classification and is
+consumed once by get-then-delete. No index publication, reducer, subscription,
+issuance, outbox, transport, topic or other Phase `3a-1B` effect crosses this
+boundary.
+
+The RAW_PASS ownership question was resolved as a three-to-one reconciliation.
+Grok 4.6/high and Kimi K3/high/100 independently chose the additional same-store
+raw evidence pass with no public trust-owner widening, and the subsequent
+Codex-high corrective RED review accepted its causal same-store/same-object
+oracles. Native Opus 5/xhigh originally dissented in favor of adding detached
+bytes to the durable trust-owner result, because it considered a second raw
+reader a duplicate authority. The adopted contract retained the existing
+public trust result and treated the additional pass only as A-c evidence, not a
+second trust interpreter. The completed code then received a fresh source-
+grounded Opus 5/xhigh `PASS`, which explicitly ratified that ownership split,
+the exact logical read ledger and the mandatory reopen authority. This history
+is recorded because collapsing the two passes or widening the public trust
+result would silently reopen the same ownership question; it is not a new
+normative amendment.
+
+The complete signed lineage and its intentionally narrow ownership are:
+
+| Commit                                     | Tree                                       | Scope                                                   |
+| ------------------------------------------ | ------------------------------------------ | ------------------------------------------------------- |
+| `a1a325c7f21e8482f0635180d2b84ff50fe5701c` | `99771d6a833710e1ce37bf2ed1db05f709c809f1` | pushed D.93.25 A-b closure base                         |
+| `446a9e1a87d3bed60530a47643e165435d0b9231` | `2d2be9b22e00b7343a28e0c2dc82b62043dab556` | A-a governance transition to A-c                        |
+| `4a251b6de80648d0b09a0aa041fa1f6b00df2fa6` | `e0f023a91998af7b54f381e7528f91ac422d63a3` | A-c persistence RED and dedicated TypeScript fixture    |
+| `e52bc60e67596d640ce3e4e1865a5a0256613a66` | `02ba816a078fcaf4118104be47c4c2bbc8fa9a50` | same-store RAW_PASS ownership evidence                  |
+| `234f39848de350efef2a2dc82c7d55c420990a76` | `f87d8a60c4b121547be35ca3b2b83f6e34efac3d` | A-a/A-b transition through the A-c boundary             |
+| `ad31570fc348089ea9f7fbc29f8c7cc8cd02895e` | `f7b6dc7931ad2482188d0673a247985e5fb16fcb` | private A-c owner-graph governance                      |
+| `00f573aa0677a5f5831c28f71f8424db9f262a40` | `38421257039567e4f7b96bee0b1201ff1aab1e72` | prototype-poison and independent raw-digest evidence    |
+| `af27a8e49c38ff487429e9be851e5c8f435c17a3` | `7717d51d11b54cf85d313051367434a38d83fe1b` | source/generated A-c audit separation                   |
+| `d10f115b2afd3e687a08467f30fa50a10e55c957` | `d2982e8532f0741ee3860b8b3f7deb03e9ecc599` | sole production GREEN in `packages/node/src/v3-live.ts` |
+
+Every commit has a good Faolain signature. The seven local RED/corrective
+commits remain test/config/fixture evidence; the final GREEN changes only the
+private production owner. No package manifest, lockfile, public export, plan
+contract or Phase `3a-1B` path changed in the candidate.
+
+Fresh evidence on the final tree passed A-a `10/10`, A-b `10/10`, A-c `18/18`,
+the combined A-a/A-b/A-c suite `38/38`, and Phase `3a-0` preservation `61/61`.
+The node production build, all three dedicated TypeScript projects, targeted
+ESLint, Prettier and diff-check passed. The refactor-clean source audit found
+one owner/call site for each required reopen, preservation and staging
+operation. The broad node package typecheck and ordinary prepack remain blocked
+only by the inherited `compact-history-scale-1i-b.ts` union-narrowing errors at
+lines 152 and 157. That pre-existing debt is disclosed rather than hidden by
+the successful production build and dedicated type gates.
+
+The implementation and closure quorum is unanimous on the final bytes:
+
+- Codex `gpt-5.6-sol`/high session
+  `019fff88-04e4-7bc2-b755-8929c4ae329e` found one stale A-b JSDoc sentence,
+  accepted its bounded correction and returned terminal `VERDICT: PASS`. Its
+  terminal rereview and integrity-manifest SHA-256 values are
+  `0a1fbe4f1441231652f0fd85adc2d1b62774b01e0dc0c653beebe68286e1390d`
+  and `1bcb11d735264df2abc6e9d536d865af0af2a1530c3e3a4616a735b24b28d33a`.
+  The reviewer recorded no separate confidence label.
+- Native Grok 4.6/high session `019fff8c-a36f-7d20-92f9-ce7fd5344f7f`
+  returned `PASS`, A-c close, no A-c blocker, no normative plan change and high
+  confidence. Its result SHA-256 is
+  `c3e15b68631841ff8c417d624a1228c1ebbf03903caea3a1f394fb964d4d3b4f`.
+- Native Kimi K3/high/100 session `6ffed312-db39-453c-b0f8-cd05d362e66c`
+  returned `PASS`, A-c close, the three B blockers below and high confidence.
+  Its result and seal-index SHA-256 values are
+  `0581728047a4c1f3359d02b702abce803bd7ff5c885fa107c3fd01659a6aaedb`
+  and `bbf40d50f0e20eb274b61133898d695aa11622ae1e5bba62d2c7b715c41e3975`.
+- Native Opus 5/xhigh session `748345cf-6faf-4cdf-bd92-eceed7e63197`
+  returned `CODE_VERDICT: PASS`, A-c close, no direct P0-P2 finding and medium
+  confidence solely because the read-only reviewer could not execute gates.
+  It requested only this bounded ledger and no D.93.23 amendment. Its result
+  and integrity-manifest SHA-256 values are
+  `84f3197108059ae44d63865dee46f6c86a543ea699cd0b29baeea4562c37c21e`
+  and `0c68f382e2a7027247fe4e7cc6a0aae15f1f23f7232913289e633f0908bcf562`.
+
+Phase `3a-1A-c` is closed, but Phase `3a-1B` is not authorized. Before any B
+RED, separate reviewed and signed amendments must freeze, in order:
+
+1. authenticated vertex extraction into the existing live object without
+   widening `AdmissionDecision`;
+2. the durable pending-to-published issuance/outbox transition; and
+3. exact transport/topic/subscription composition for the legacy, v2 and v3
+   planes.
+
+The next design step is the authenticated vertex-extraction seam. Nothing in
+this ledger claims any of those seams, Phase `3a-1B`, Phase 3b or a golden-path
+live activation is implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
