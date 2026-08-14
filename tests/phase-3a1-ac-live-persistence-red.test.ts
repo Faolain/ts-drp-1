@@ -13,7 +13,9 @@ import {
 	digestBlob,
 	digestClosure,
 	type GenerationRef,
+	parseClosureDigest,
 	parseGenerationId,
+	parseHeadRevision,
 	parseStorageObjectId,
 	type PresentHead,
 	type StorageObjectId,
@@ -41,6 +43,7 @@ import { createSqliteAheDurableStore as createBuiltSqliteAheDurableStore } from 
 
 type ControlPlaneModule = Readonly<{
 	assertTrustPreserved(input: AssertTrustPreservedInput): AssertTrustPreservedResult;
+	createCurrentAnchorTrustStore: typeof createCurrentAnchorTrustStore;
 }> &
 	Record<string, unknown>;
 type ProtocolV3Module = Readonly<{ prepareBlueprintRuntime: typeof prepareBlueprintRuntime }> & Record<string, unknown>;
@@ -55,12 +58,33 @@ interface PreservationSnapshot {
 	readonly sourceExpectedTrustRef: AssertTrustPreservedInput["expectedTrustRef"];
 }
 
+interface TrustOpenSnapshot {
+	readonly resolvedEventOrdinal: number;
+	readonly startEventOrdinal: number;
+}
+
+interface PrepareInvocationSnapshot {
+	readonly endEventOrdinal: number;
+	readonly startEventOrdinal: number;
+}
+
+interface TrustStoreCreationSnapshot {
+	readonly objectId: StorageObjectId;
+	readonly pinnedGenesisAnchorDigest: string;
+	readonly startEventOrdinal: number;
+	readonly store: AheDurableStore;
+}
+
 const a_cProbe = vi.hoisted(() => ({
 	authentications: 0,
 	admissions: 0,
 	protocolRuntimes: 0,
 	preservationFailureAt: undefined as number | undefined,
 	preservations: [] as PreservationSnapshot[],
+	trustOpens: [] as TrustOpenSnapshot[],
+	invocations: [] as PrepareInvocationSnapshot[],
+	trustStoreCreations: [] as TrustStoreCreationSnapshot[],
+	trustOpenDepth: 0,
 	events: [] as string[],
 }));
 
@@ -72,6 +96,39 @@ vi.mock("@ts-drp/control-plane", async (importOriginal) => {
 	const genuine = await importOriginal<ControlPlaneModule>();
 	return {
 		...genuine,
+		createCurrentAnchorTrustStore(
+			input: Parameters<ControlPlaneModule["createCurrentAnchorTrustStore"]>[0]
+		): ReturnType<ControlPlaneModule["createCurrentAnchorTrustStore"]> {
+			const owner = genuine.createCurrentAnchorTrustStore(input);
+			a_cProbe.trustStoreCreations.push(
+				Object.freeze({
+					objectId: input.objectId,
+					pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+					startEventOrdinal: a_cProbe.events.length,
+					store: input.store,
+				})
+			);
+			return Object.freeze({
+				install: owner.install,
+				async open(): ReturnType<typeof owner.open> {
+					a_cProbe.events.push("trust.open:start");
+					a_cProbe.trustOpenDepth += 1;
+					const startEventOrdinal = a_cProbe.events.length - 1;
+					try {
+						return await owner.open();
+					} finally {
+						a_cProbe.trustOpenDepth -= 1;
+						a_cProbe.events.push("trust.open:resolved");
+						a_cProbe.trustOpens.push(
+							Object.freeze({
+								resolvedEventOrdinal: a_cProbe.events.length - 1,
+								startEventOrdinal,
+							})
+						);
+					}
+				},
+			});
+		},
 		assertTrustPreserved(input: AssertTrustPreservedInput): ReturnType<ControlPlaneModule["assertTrustPreserved"]> {
 			a_cProbe.events.push("trust.preserve");
 			a_cProbe.preservations.push(
@@ -187,6 +244,7 @@ interface OutcomeRecord {
 	readonly ordinal: number;
 	readonly method: keyof AheDurableStore;
 	readonly result: unknown;
+	readonly sourceResult: unknown;
 }
 
 type SwapHook = (
@@ -212,6 +270,7 @@ type StageSuccessMutation = Readonly<{
 	readonly method: StageSuccessMutationMethod;
 	readonly fault: StageSuccessMutationFault;
 }>;
+type RawEvidenceFault = "wrong-digest" | "wrong-length";
 
 interface FixtureContext {
 	readonly rawStore: AheDurableStore;
@@ -356,7 +415,8 @@ function observedStore(
 	hooks: SwapHook[] = [],
 	stageFailure?: StageFailure,
 	stageSuccessMutation?: StageSuccessMutation,
-	capabilities: AheDurableStore["capabilities"] = target.capabilities
+	capabilities: AheDurableStore["capabilities"] = target.capabilities,
+	rawEvidenceFault?: RawEvidenceFault
 ): AheDurableStore {
 	const record = (method: keyof AheDurableStore, input: unknown): number => {
 		const ordinal = calls.length;
@@ -434,10 +494,12 @@ function observedStore(
 				value: mutatedValue,
 			});
 		}
-		outcomes.push(Object.freeze({ ordinal, method, result: copiedInput(result) }));
+		outcomes.push(Object.freeze({ ordinal, method, result: copiedInput(result), sourceResult: result }));
 		return result as T;
 	};
 	let swapOrdinal = 0;
+	let rawEvidenceBlobOrdinal = 0;
+	let rawEvidenceRecoveryOrdinal = 0;
 	const failStage = (method: StageFailureMethod): StoreResult<never> | undefined => {
 		if (stageFailure?.method !== method) return undefined;
 		if (stageFailure.throws === true) throw new Error(`synthetic ${method} failure`);
@@ -455,11 +517,51 @@ function observedStore(
 		},
 		recoverActiveGeneration(input): ReturnType<AheDurableStore["recoverActiveGeneration"]> {
 			const ordinal = record("recoverActiveGeneration", input);
-			return settle(ordinal, "recoverActiveGeneration", target.recoverActiveGeneration(input));
+			const pending = target.recoverActiveGeneration(input).then((result) => {
+				if (
+					rawEvidenceFault !== "wrong-length" ||
+					a_cProbe.trustOpenDepth !== 0 ||
+					rawEvidenceRecoveryOrdinal > 0 ||
+					!result.ok ||
+					result.value.kind !== "active" ||
+					result.value.references.length === 0
+				) {
+					return result;
+				}
+				rawEvidenceRecoveryOrdinal += 1;
+				const [first, ...remaining] = result.value.references;
+				if (first === undefined) throw new TypeError("missing raw evidence reference");
+				return Object.freeze({
+					ok: true as const,
+					value: Object.freeze({
+						...result.value,
+						references: Object.freeze([
+							Object.freeze({ digest: first.digest, byteLength: first.byteLength + 1 }),
+							...remaining,
+						]),
+					}),
+				});
+			});
+			return settle(ordinal, "recoverActiveGeneration", pending);
 		},
 		getBlob(input): ReturnType<AheDurableStore["getBlob"]> {
 			const ordinal = record("getBlob", input);
-			return settle(ordinal, "getBlob", target.getBlob(input));
+			const pending = target.getBlob(input).then((result) => {
+				if (
+					rawEvidenceFault !== "wrong-digest" ||
+					a_cProbe.trustOpenDepth !== 0 ||
+					rawEvidenceBlobOrdinal > 0 ||
+					!result.ok ||
+					result.value === null
+				) {
+					return result;
+				}
+				rawEvidenceBlobOrdinal += 1;
+				const source = result.value;
+				const bytes = Uint8Array.from(source, (byte, index) => (index === 0 ? byte ^ 0xff : byte));
+				return Object.freeze({ ok: true as const, value: bytes });
+			});
+			return settle(ordinal, "getBlob", pending);
 		},
 		beginGeneration(input): ReturnType<AheDurableStore["beginGeneration"]> {
 			const ordinal = record("beginGeneration", input);
@@ -541,7 +643,8 @@ async function installTrust(
 async function fixtureContext(
 	hooks: SwapHook[] = [],
 	stageFailure?: StageFailure,
-	stageSuccessMutation?: StageSuccessMutation
+	stageSuccessMutation?: StageSuccessMutation,
+	rawEvidenceFault?: RawEvidenceFault
 ): Promise<FixtureContext> {
 	const directory = mkdtempSync(path.join(tmpdir(), "drp-3a1-ac-"));
 	directories.push(directory);
@@ -550,7 +653,16 @@ async function fixtureContext(
 	const installed = await installTrust(rawStore, material);
 	const calls: CallRecord[] = [];
 	const outcomes: OutcomeRecord[] = [];
-	const observed = observedStore(rawStore, calls, outcomes, hooks, stageFailure, stageSuccessMutation);
+	const observed = observedStore(
+		rawStore,
+		calls,
+		outcomes,
+		hooks,
+		stageFailure,
+		stageSuccessMutation,
+		rawStore.capabilities,
+		rawEvidenceFault
+	);
 	const objectId = must(parseStorageObjectId(String(material.anchor.objectId)));
 	const catalogResolutions = { value: 0 };
 	return Object.freeze({
@@ -579,10 +691,25 @@ async function privateSurface(): Promise<PrivateSurface> {
 	return import("../packages/node/src/v3-live.js") as Promise<PrivateSurface>;
 }
 
-async function prepare(context: FixtureContext): Promise<PrepareResult> {
-	const surface = await privateSurface();
+async function invokePrepare(surface: PrivateSurface, input: PrepareInput): Promise<PrepareResult> {
 	if (surface.prepareV3LiveGeneration === undefined) throw new TypeError("missing private preparation API");
-	return surface.prepareV3LiveGeneration(context.input);
+	a_cProbe.events.push("prepare:start");
+	const startEventOrdinal = a_cProbe.events.length - 1;
+	try {
+		return await surface.prepareV3LiveGeneration(input);
+	} finally {
+		a_cProbe.events.push("prepare:resolved");
+		a_cProbe.invocations.push(
+			Object.freeze({
+				endEventOrdinal: a_cProbe.events.length - 1,
+				startEventOrdinal,
+			})
+		);
+	}
+}
+
+async function prepare(context: FixtureContext): Promise<PrepareResult> {
+	return invokePrepare(await privateSurface(), context.input);
 }
 
 function expectFailure(result: PrepareResult, kind: string): void {
@@ -608,6 +735,64 @@ function stringKeys(value: unknown): readonly string[] {
 
 function outcomeFor(context: FixtureContext, call: CallRecord): unknown {
 	return context.outcomes.find(({ ordinal }) => ordinal === call.ordinal)?.result;
+}
+
+function sourceOutcomeFor(context: FixtureContext, call: CallRecord): unknown {
+	return context.outcomes.find(({ ordinal }) => ordinal === call.ordinal)?.sourceResult;
+}
+
+function samePresentHead(left: unknown, right: PresentHead): boolean {
+	if (typeof left !== "object" || left === null) return false;
+	return (
+		Reflect.get(left, "kind") === "present" &&
+		Reflect.get(left, "objectId") === right.objectId &&
+		Reflect.get(left, "generationId") === right.generationId &&
+		Reflect.get(left, "revision") === right.revision &&
+		Reflect.get(left, "closureDigest") === right.closureDigest
+	);
+}
+
+function aCTrustOpensForInvocation(invocationIndex: number): readonly TrustOpenSnapshot[] {
+	const invocation = a_cProbe.invocations[invocationIndex];
+	if (invocation === undefined) return [];
+	const invocationOpens = a_cProbe.trustOpens.filter(
+		(open) =>
+			open.startEventOrdinal > invocation.startEventOrdinal && open.resolvedEventOrdinal < invocation.endEventOrdinal
+	);
+	return invocationOpens.slice(1);
+}
+
+function aCTrustOpens(): readonly TrustOpenSnapshot[] {
+	return a_cProbe.invocations.flatMap((_, invocationIndex) => {
+		return aCTrustOpensForInvocation(invocationIndex);
+	});
+}
+
+function expectInvocationLedger(
+	context: FixtureContext,
+	invocationIndex: number,
+	expected: Readonly<{ readonly cas: number; readonly preservations: number; readonly reopens: number }>
+): void {
+	const invocation = a_cProbe.invocations[invocationIndex];
+	expect(invocation, `prepare invocation ${invocationIndex}`).toBeDefined();
+	if (invocation === undefined) throw new TypeError(`missing prepare invocation ${invocationIndex}`);
+	const within = (eventOrdinal: number): boolean =>
+		eventOrdinal > invocation.startEventOrdinal && eventOrdinal < invocation.endEventOrdinal;
+	const opens = a_cProbe.trustOpens.filter(({ startEventOrdinal }) => within(startEventOrdinal));
+	const creations = a_cProbe.trustStoreCreations.filter(({ startEventOrdinal }) => within(startEventOrdinal));
+	expect(creations, "one genuine durable trust owner per invocation").toHaveLength(1);
+	const creation = creations[0];
+	if (creation === undefined) throw new TypeError("missing durable trust owner creation");
+	expect(creation.store).toBe(context.observedStore);
+	expect(creation.objectId).toBe(context.input.objectId);
+	expect(creation.pinnedGenesisAnchorDigest).toBe(context.input.pinnedGenesisAnchorDigest);
+	expect(opens, "one A-a authentication open plus the exact A-c reopen ledger").toHaveLength(expected.reopens + 1);
+	expect(a_cProbe.preservations.filter(({ eventOrdinal }) => within(eventOrdinal))).toHaveLength(
+		expected.preservations
+	);
+	expect(
+		context.calls.filter(({ eventOrdinal, method }) => within(eventOrdinal) && method === "swapHead")
+	).toHaveLength(expected.cas);
 }
 
 function expectSuccessfulResult(value: unknown, expectedValueKeys: readonly string[]): unknown {
@@ -663,6 +848,123 @@ function expectExactSuccessfulStageOutputs(
 	expect(swapped.supersededGenerationId).toBe(context.initialHead.generationId);
 }
 
+function hasExactRawEvidenceCallShape(
+	calls: readonly Pick<CallRecord, "input" | "method">[],
+	objectId: StorageObjectId,
+	expectedRefs: readonly GenerationRef[]
+): boolean {
+	if (calls.length !== expectedRefs.length + 1) return false;
+	if (calls[0]?.method !== "recoverActiveGeneration" || calls[0].input !== objectId) return false;
+	for (let index = 0; index < expectedRefs.length; index += 1) {
+		const call = calls[index + 1];
+		if (call?.method !== "getBlob" || call.input !== expectedRefs[index]?.digest) return false;
+	}
+	return true;
+}
+
+function expectLogicalReopen(
+	context: FixtureContext,
+	trustOpen: TrustOpenSnapshot,
+	expectedHead: PresentHead,
+	expectedRefs: readonly GenerationRef[]
+): Readonly<{ readonly firstOrdinal: number; readonly lastOrdinal: number; readonly lastEventOrdinal: number }> {
+	const sortedRefs = [...expectedRefs].sort((left, right) =>
+		left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0
+	);
+	expect(expectedRefs, "authoritative closure refs are already digest-sorted").toEqual(sortedRefs);
+	expect(new Set(expectedRefs.map(({ digest }) => digest)).size).toBe(expectedRefs.length);
+	const internalCalls = context.calls.filter(
+		({ eventOrdinal }) => eventOrdinal > trustOpen.startEventOrdinal && eventOrdinal < trustOpen.resolvedEventOrdinal
+	);
+	expect(internalCalls.map(({ method }) => method)).toEqual([
+		"readHead",
+		"recoverActiveGeneration",
+		...expectedRefs.map(() => "getBlob" as const),
+	]);
+	const headCall = internalCalls[0];
+	const internalRecoveryCall = internalCalls[1];
+	if (headCall === undefined || internalRecoveryCall === undefined) {
+		throw new TypeError("missing genuine open internals");
+	}
+	expect(headCall.input).toBe(context.input.objectId);
+	expect(internalRecoveryCall.input).toBe(context.input.objectId);
+	const openedHead = Reflect.get(outcomeFor(context, headCall) as object, "value");
+	expect(Reflect.get(outcomeFor(context, headCall) as object, "ok")).toBe(true);
+	expect(samePresentHead(openedHead, expectedHead)).toBe(true);
+	const internallyRecovered = Reflect.get(outcomeFor(context, internalRecoveryCall) as object, "value") as Record<
+		string,
+		unknown
+	>;
+	expect(Reflect.get(outcomeFor(context, internalRecoveryCall) as object, "ok")).toBe(true);
+	expect(internallyRecovered.kind).toBe("active");
+	expect(samePresentHead(internallyRecovered.head, expectedHead)).toBe(true);
+	expect(internallyRecovered.references).toEqual(expectedRefs);
+	for (let index = 0; index < expectedRefs.length; index += 1) {
+		expect(internalCalls[index + 2]?.input).toBe(expectedRefs[index]?.digest);
+	}
+
+	const nextPreservation = a_cProbe.preservations.find(
+		({ eventOrdinal }) => eventOrdinal > trustOpen.resolvedEventOrdinal
+	);
+	const nextTokenSet = a_cProbe.events.findIndex(
+		(event, eventOrdinal) => eventOrdinal > trustOpen.resolvedEventOrdinal && event === "token.set"
+	);
+	const invocation = a_cProbe.invocations.find(
+		({ endEventOrdinal, startEventOrdinal }) =>
+			trustOpen.startEventOrdinal > startEventOrdinal && trustOpen.resolvedEventOrdinal < endEventOrdinal
+	);
+	const rawPassEnd = Math.min(
+		nextPreservation?.eventOrdinal ?? Number.POSITIVE_INFINITY,
+		nextTokenSet < 0 ? Number.POSITIVE_INFINITY : nextTokenSet,
+		invocation?.endEventOrdinal ?? Number.POSITIVE_INFINITY
+	);
+	const rawCalls = context.calls.filter(
+		({ eventOrdinal }) => eventOrdinal > trustOpen.resolvedEventOrdinal && eventOrdinal < rawPassEnd
+	);
+	expect(
+		hasExactRawEvidenceCallShape(rawCalls, context.input.objectId, expectedRefs),
+		"exactly one raw complete evidence pass"
+	).toBe(true);
+	const recoveryCall = rawCalls[0];
+	if (recoveryCall === undefined) throw new TypeError("missing raw durable generation recovery");
+	expect(recoveryCall.input).toBe(context.input.objectId);
+	const recovered = Reflect.get(outcomeFor(context, recoveryCall) as object, "value") as Record<string, unknown>;
+	expect(Reflect.get(outcomeFor(context, recoveryCall) as object, "ok")).toBe(true);
+	expect(recovered.kind).toBe("active");
+	expect(samePresentHead(recovered.head, expectedHead)).toBe(true);
+	expect(recovered.references).toEqual(expectedRefs);
+	let lastCall = recoveryCall;
+	for (let index = 0; index < expectedRefs.length; index += 1) {
+		const ref = expectedRefs[index] as GenerationRef;
+		const call = rawCalls[index + 1];
+		expect(call?.method).toBe("getBlob");
+		expect(call?.input).toBe(ref.digest);
+		if (call === undefined) throw new TypeError(`missing raw durable blob reload ${ref.digest}`);
+		lastCall = call;
+		const result = outcomeFor(context, call);
+		expect(Reflect.get(result as object, "ok")).toBe(true);
+		const bytes = Reflect.get(result as object, "value");
+		expect(bytes).toBeInstanceOf(Uint8Array);
+		expect((bytes as Uint8Array).buffer).toBeInstanceOf(ArrayBuffer);
+		expect((bytes as Uint8Array).byteLength).toBe(ref.byteLength);
+		expect(must(digestBlob(bytes as Uint8Array))).toBe(ref.digest);
+		const sourceBytes = Reflect.get(sourceOutcomeFor(context, call) as object, "value");
+		expect(sourceBytes).toBeInstanceOf(Uint8Array);
+		if (nextPreservation !== undefined && nextPreservation.eventOrdinal === rawPassEnd) {
+			const preserved = nextPreservation.sourceCandidates.find(
+				({ ref: candidateRef }) => candidateRef.digest === ref.digest
+			);
+			expect(preserved?.bytes).not.toBe(sourceBytes);
+			expect(preserved?.bytes.buffer).not.toBe((sourceBytes as Uint8Array).buffer);
+		}
+	}
+	return Object.freeze({
+		firstOrdinal: headCall.ordinal,
+		lastOrdinal: lastCall.ordinal,
+		lastEventOrdinal: lastCall.eventOrdinal,
+	});
+}
+
 function expectDurableReloadAfter(
 	context: FixtureContext,
 	afterOrdinal: number,
@@ -671,56 +973,10 @@ function expectDurableReloadAfter(
 ): Readonly<{ readonly firstOrdinal: number; readonly lastOrdinal: number; readonly lastEventOrdinal: number }> {
 	const afterCall = context.calls.find(({ ordinal }) => ordinal === afterOrdinal);
 	if (afterCall === undefined) throw new TypeError("missing reload boundary call");
-	const nextPreservation = a_cProbe.preservations.find(({ eventOrdinal }) => eventOrdinal > afterCall.eventOrdinal);
-	const later = context.calls.filter(
-		({ ordinal, eventOrdinal }) =>
-			ordinal > afterOrdinal && (nextPreservation === undefined || eventOrdinal < nextPreservation.eventOrdinal)
-	);
-	const headCall = later.find(
-		(call) =>
-			call.method === "readHead" &&
-			Reflect.get(outcomeFor(context, call) as object, "ok") === true &&
-			JSON.stringify(Reflect.get(outcomeFor(context, call) as object, "value")) === JSON.stringify(expectedHead)
-	);
-	expect(headCall, "durable head reload").toBeDefined();
-	if (headCall === undefined) throw new TypeError("missing durable head reload");
-	const recoveryCall = later.find(
-		(call) =>
-			call.ordinal > headCall.ordinal &&
-			call.method === "recoverActiveGeneration" &&
-			Reflect.get(outcomeFor(context, call) as object, "ok") === true
-	);
-	expect(recoveryCall, "durable generation recovery").toBeDefined();
-	if (recoveryCall === undefined) throw new TypeError("missing durable generation recovery");
-	const recovered = Reflect.get(outcomeFor(context, recoveryCall) as object, "value") as Record<string, unknown>;
-	expect(recovered.kind).toBe("active");
-	expect(recovered.head).toEqual(expectedHead);
-	expect(recovered.references).toEqual(expectedRefs);
-	const blobCalls = later.filter(
-		(call) =>
-			call.ordinal > recoveryCall.ordinal &&
-			call.method === "getBlob" &&
-			expectedRefs.some(({ digest }) => digest === call.input)
-	);
-	expect(blobCalls).toHaveLength(expectedRefs.length);
-	let lastCall = recoveryCall;
-	for (const ref of expectedRefs) {
-		const call = blobCalls.find(({ input }) => input === ref.digest);
-		expect(call, `durable blob reload ${ref.digest}`).toBeDefined();
-		if (call === undefined) throw new TypeError(`missing durable blob reload ${ref.digest}`);
-		if (call.ordinal > lastCall.ordinal) lastCall = call;
-		const result = outcomeFor(context, call);
-		expect(Reflect.get(result as object, "ok")).toBe(true);
-		const bytes = Reflect.get(result as object, "value");
-		expect(bytes).toBeInstanceOf(Uint8Array);
-		expect((bytes as Uint8Array).byteLength).toBe(ref.byteLength);
-		expect(must(digestBlob(bytes as Uint8Array))).toBe(ref.digest);
-	}
-	return Object.freeze({
-		firstOrdinal: headCall.ordinal,
-		lastOrdinal: lastCall.ordinal,
-		lastEventOrdinal: lastCall.eventOrdinal,
-	});
+	const trustOpen = aCTrustOpens().find(({ startEventOrdinal }) => startEventOrdinal > afterCall.eventOrdinal);
+	expect(trustOpen, "genuine durable trust-owner reopen").toBeDefined();
+	if (trustOpen === undefined) throw new TypeError("missing genuine durable trust-owner reopen");
+	return expectLogicalReopen(context, trustOpen, expectedHead, expectedRefs);
 }
 
 function closureRefs(context: FixtureContext): readonly GenerationRef[] {
@@ -733,6 +989,13 @@ function closureRefs(context: FixtureContext): readonly GenerationRef[] {
 			.map(copiedRef)
 			.sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
 	);
+}
+
+function expectInitialTrustOnlyReopen(context: FixtureContext, invocationIndex: number): void {
+	const initialReopen = aCTrustOpensForInvocation(invocationIndex)[0];
+	expect(initialReopen, "initial A-c trust-only reopen").toBeDefined();
+	if (initialReopen === undefined) throw new TypeError("missing initial A-c trust-only reopen");
+	expectLogicalReopen(context, initialReopen, context.initialHead, [context.trustRef]);
 }
 
 function headConflict(): StoreResult<never> {
@@ -1064,6 +1327,10 @@ beforeEach(() => {
 	a_cProbe.protocolRuntimes = 0;
 	a_cProbe.preservationFailureAt = undefined;
 	a_cProbe.preservations.length = 0;
+	a_cProbe.trustOpens.length = 0;
+	a_cProbe.invocations.length = 0;
+	a_cProbe.trustStoreCreations.length = 0;
+	a_cProbe.trustOpenDepth = 0;
 	a_cProbe.events.length = 0;
 });
 
@@ -1072,10 +1339,68 @@ afterEach(() => {
 });
 
 describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () => {
+	it("uses named-field head semantics and kills missing, duplicate and extra raw evidence passes", () => {
+		const objectId = must(parseStorageObjectId(`creator:${"d".repeat(32)}`));
+		const expectedHead = Object.freeze({
+			kind: "present" as const,
+			objectId,
+			generationId: must(parseGenerationId("1".repeat(64))),
+			revision: must(parseHeadRevision(7)),
+			closureDigest: must(parseClosureDigest("2".repeat(64))),
+		});
+		const reorderedHead = Object.freeze({
+			revision: expectedHead.revision,
+			closureDigest: expectedHead.closureDigest,
+			objectId: expectedHead.objectId,
+			kind: expectedHead.kind,
+			generationId: expectedHead.generationId,
+		});
+		expect(JSON.stringify(reorderedHead)).not.toBe(JSON.stringify(expectedHead));
+		expect(samePresentHead(reorderedHead, expectedHead)).toBe(true);
+		for (const mutant of [
+			{ ...reorderedHead, kind: "none" },
+			{ ...reorderedHead, objectId: must(parseStorageObjectId(`creator:${"e".repeat(32)}`)) },
+			{ ...reorderedHead, generationId: must(parseGenerationId("3".repeat(64))) },
+			{ ...reorderedHead, revision: must(parseHeadRevision(expectedHead.revision + 1)) },
+			{ ...reorderedHead, closureDigest: "4".repeat(64) },
+		]) {
+			expect(samePresentHead(mutant, expectedHead)).toBe(false);
+		}
+
+		const refs = Object.freeze([
+			Object.freeze({ digest: "5".repeat(64) as BlobDigest, byteLength: 17 }),
+			Object.freeze({ digest: "6".repeat(64) as BlobDigest, byteLength: 23 }),
+		]);
+		const recover = Object.freeze({ method: "recoverActiveGeneration" as const, input: objectId });
+		const firstBlob = Object.freeze({ method: "getBlob" as const, input: refs[0]?.digest });
+		const secondBlob = Object.freeze({ method: "getBlob" as const, input: refs[1]?.digest });
+		const valid = Object.freeze([recover, firstBlob, secondBlob]);
+		expect(hasExactRawEvidenceCallShape(valid, objectId, refs)).toBe(true);
+		for (const mutant of [
+			[],
+			[firstBlob, secondBlob],
+			[recover, recover, firstBlob, secondBlob],
+			[recover, firstBlob],
+			[recover, firstBlob, firstBlob, secondBlob],
+			[recover, secondBlob, firstBlob],
+			[recover, firstBlob, secondBlob, { method: "getBlob" as const, input: "7".repeat(64) }],
+			[{ method: "readHead" as const, input: objectId }, recover, firstBlob, secondBlob],
+			[
+				{ method: "recoverActiveGeneration" as const, input: must(parseStorageObjectId(`creator:${"f".repeat(32)}`)) },
+				firstBlob,
+				secondBlob,
+			],
+		] as const) {
+			expect(hasExactRawEvidenceCallShape(mutant, objectId, refs)).toBe(false);
+		}
+	});
+
 	it("preserves detached complete candidates immediately before exact SQLite staging and binds the successful head", async () => {
 		const context = await fixtureContext();
 		const result = await prepare(context);
 		expectSuccess(result);
+		expectInvocationLedger(context, 0, { reopens: 2, preservations: 1, cas: 1 });
+		expectInitialTrustOnlyReopen(context, 0);
 		const expectedClosure = closureRefs(context);
 		expect(a_cProbe.preservations).toHaveLength(1);
 		const preservation = a_cProbe.preservations[0] as PreservationSnapshot;
@@ -1142,6 +1467,8 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		a_cProbe.preservationFailureAt = 1;
 		const result = await prepare(context);
 		expectFailure(result, "trust-not-preserved");
+		expectInvocationLedger(context, 0, { reopens: 1, preservations: 1, cas: 0 });
+		expectInitialTrustOnlyReopen(context, 0);
 		expect(a_cProbe.preservations).toHaveLength(1);
 		expect(a_cProbe.preservations[0]?.closure).toEqual(closureRefs(context));
 		expect(mutationCalls(context.calls)).toEqual([]);
@@ -1151,10 +1478,13 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		const context = await fixtureContext();
 		const first = await prepare(context);
 		expectSuccess(first);
+		expectInvocationLedger(context, 0, { reopens: 2, preservations: 1, cas: 1 });
+		expectInitialTrustOnlyReopen(context, 0);
 		const swapsAfterFirst = context.calls.filter(({ method }) => method === "swapHead").length;
 		const restartBoundary = context.calls.at(-1)?.ordinal ?? -1;
 		const second = await prepare(context);
 		expectSuccess(second);
+		expectInvocationLedger(context, 1, { reopens: 1, preservations: 0, cas: 0 });
 		expect(second.capability).not.toBe(first.capability);
 		expect(second.descriptor).toEqual(first.descriptor);
 		expect(context.calls.filter(({ method }) => method === "swapHead")).toHaveLength(swapsAfterFirst);
@@ -1165,18 +1495,60 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		expectDurableReloadAfter(context, restartBoundary, second.descriptor.head, closureRefs(context));
 
 		const stale = await fixtureContext();
-		await stageAlternateHead(stale);
+		const alternate = await stageAlternateHead(stale);
 		stale.calls.length = 0;
+		stale.outcomes.length = 0;
+		const staleInvocation = a_cProbe.invocations.length;
 		const staleResult = await prepare(stale);
 		expectFailure(staleResult, "stale-head");
+		expectInvocationLedger(stale, staleInvocation, { reopens: 1, preservations: 0, cas: 0 });
+		const staleReopen = aCTrustOpensForInvocation(staleInvocation)[0];
+		expect(staleReopen).toBeDefined();
+		if (staleReopen === undefined) throw new TypeError("missing stale initial reopen");
+		expectLogicalReopen(stale, staleReopen, alternate.head, alternate.closure);
 		expect(mutationCalls(stale.calls)).toEqual([]);
+	});
+
+	it("makes raw evidence bytes load-bearing before preservation or staging", async () => {
+		for (const fault of ["wrong-length", "wrong-digest"] as const) {
+			const context = await fixtureContext([], undefined, undefined, fault);
+			const invocationIndex = a_cProbe.invocations.length;
+			const result = await prepare(context);
+			expectFailure(result, "storage-failed");
+			expectInvocationLedger(context, invocationIndex, { reopens: 1, preservations: 0, cas: 0 });
+			expect(a_cProbe.preservations).toEqual([]);
+			expect(mutationCalls(context.calls)).toEqual([]);
+			const invocation = a_cProbe.invocations[invocationIndex];
+			const trustOpen = aCTrustOpensForInvocation(invocationIndex)[0];
+			expect(invocation).toBeDefined();
+			expect(trustOpen).toBeDefined();
+			if (invocation === undefined || trustOpen === undefined) throw new TypeError("missing raw evidence window");
+			const rawCalls = context.calls.filter(
+				({ eventOrdinal }) => eventOrdinal > trustOpen.resolvedEventOrdinal && eventOrdinal < invocation.endEventOrdinal
+			);
+			expect(hasExactRawEvidenceCallShape(rawCalls, context.input.objectId, [context.trustRef])).toBe(true);
+			const recoveryCall = rawCalls[0];
+			const blobCall = rawCalls[1];
+			if (recoveryCall === undefined || blobCall === undefined) throw new TypeError("incomplete raw evidence pass");
+			const recovered = Reflect.get(outcomeFor(context, recoveryCall) as object, "value") as Record<string, unknown>;
+			const recoveredRefs = Reflect.get(recovered, "references") as readonly GenerationRef[];
+			expect(recoveredRefs).toHaveLength(1);
+			expect(recoveredRefs[0]?.digest).toBe(context.trustRef.digest);
+			expect(recoveredRefs[0]?.byteLength).toBe(context.trustRef.byteLength + (fault === "wrong-length" ? 1 : 0));
+			const rawBytes = Reflect.get(outcomeFor(context, blobCall) as object, "value") as Uint8Array;
+			expect(rawBytes.byteLength).toBe(context.trustRef.byteLength);
+			expect(must(digestBlob(rawBytes)) === context.trustRef.digest).toBe(fault === "wrong-length");
+		}
 	});
 
 	it("reopens an exact winner after definite or ambiguous swap outcomes and remints without a second CAS", async () => {
 		for (const outcome of [headConflict(), ambiguousFailure()]) {
 			const context = await fixtureContext([delegateThen(outcome)]);
+			const invocationIndex = a_cProbe.invocations.length;
 			const result = await prepare(context);
 			expectSuccess(result);
+			expectInvocationLedger(context, invocationIndex, { reopens: 2, preservations: 1, cas: 1 });
+			expectInitialTrustOnlyReopen(context, invocationIndex);
 			expect(context.calls.filter(({ method }) => method === "swapHead")).toHaveLength(1);
 			expect(result.descriptor.head.revision).toBe(context.initialHead.revision + 1);
 			const swapIndex = context.calls.findIndex(({ method }) => method === "swapHead");
@@ -1198,8 +1570,11 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 			};
 			const context = await fixtureContext([hook]);
 			contextBox.current = context;
+			const invocationIndex = a_cProbe.invocations.length;
 			const result = await prepare(context);
 			expectFailure(result, "stale-head");
+			expectInvocationLedger(context, invocationIndex, { reopens: 2, preservations: 1, cas: 1 });
+			expectInitialTrustOnlyReopen(context, invocationIndex);
 			expect(alternate).toBeDefined();
 			const swapCall = context.calls.find(({ method }) => method === "swapHead");
 			if (swapCall === undefined || alternate === undefined) throw new TypeError("missing alternate-winner evidence");
@@ -1212,6 +1587,8 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		const context = await fixtureContext([ambiguousWithoutWrite]);
 		const result = await prepare(context);
 		expectFailure(result, "storage-failed");
+		expectInvocationLedger(context, 0, { reopens: 2, preservations: 1, cas: 1 });
+		expectInitialTrustOnlyReopen(context, 0);
 		const swapIndex = context.calls.findIndex(({ method }) => method === "swapHead");
 		expect(swapIndex).toBeGreaterThan(-1);
 		expect(context.calls.slice(swapIndex + 1).map(({ method }) => method)).toContain("readHead");
@@ -1224,6 +1601,8 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		const context = await fixtureContext([conflictWithoutWrite]);
 		const result = await prepare(context);
 		expectSuccess(result);
+		expectInvocationLedger(context, 0, { reopens: 3, preservations: 2, cas: 2 });
+		expectInitialTrustOnlyReopen(context, 0);
 		const begins = context.calls
 			.filter(({ method }) => method === "beginGeneration")
 			.map(({ input }) => input as Parameters<AheDurableStore["beginGeneration"]>[0]);
@@ -1261,6 +1640,8 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		a_cProbe.preservationFailureAt = 2;
 		const result = await prepare(context);
 		expectFailure(result, "trust-not-preserved");
+		expectInvocationLedger(context, 0, { reopens: 2, preservations: 2, cas: 1 });
+		expectInitialTrustOnlyReopen(context, 0);
 		expect(a_cProbe.preservations).toHaveLength(2);
 		expect(context.calls.filter(({ method }) => method === "beginGeneration")).toHaveLength(1);
 		const swaps = context.calls.filter(({ method }) => method === "swapHead");
@@ -1275,6 +1656,8 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		const context = await fixtureContext([conflictWithoutWrite, conflictWithoutWrite]);
 		const result = await prepare(context);
 		expectFailure(result, "stale-head");
+		expectInvocationLedger(context, 0, { reopens: 3, preservations: 2, cas: 2 });
+		expectInitialTrustOnlyReopen(context, 0);
 		expect(context.calls.filter(({ method }) => method === "swapHead")).toHaveLength(2);
 		expect(a_cProbe.preservations).toHaveLength(2);
 		const secondSwap = context.calls.map(({ method }) => method).lastIndexOf("swapHead");
@@ -1293,8 +1676,11 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 			{ method: "completeGeneration" },
 		] as const) {
 			const context = await fixtureContext([], stageFailure);
+			const invocationIndex = a_cProbe.invocations.length;
 			const result = await prepare(context);
 			expectFailure(result, "storage-failed");
+			expectInvocationLedger(context, invocationIndex, { reopens: 1, preservations: 1, cas: 0 });
+			expectInitialTrustOnlyReopen(context, invocationIndex);
 			expect(a_cProbe.events).not.toContain("store.discardGeneration");
 			const failedIndex = context.calls.findIndex(({ method }) => method === stageFailure.method);
 			expect(context.calls.slice(failedIndex + 1).some(({ method }) => method === "swapHead")).toBe(false);
@@ -1322,8 +1708,11 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		];
 		for (const mutation of mutations) {
 			const context = await fixtureContext([], undefined, mutation);
+			const invocationIndex = a_cProbe.invocations.length;
 			const result = await prepare(context);
 			expectFailure(result, "storage-failed");
+			expectInvocationLedger(context, invocationIndex, { reopens: 1, preservations: 1, cas: 0 });
+			expectInitialTrustOnlyReopen(context, invocationIndex);
 			const malformedCall = context.calls.find((call) => call.method === mutation.method);
 			if (malformedCall === undefined) throw new TypeError(`missing ${mutation.method} malformed-success evidence`);
 			const malformedValue = Reflect.get(outcomeFor(context, malformedCall) as object, "value");
@@ -1361,8 +1750,11 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 
 		for (const fault of ["extra-key", "wrong-head", "wrong-superseded"] as const) {
 			const swapped = await fixtureContext([], undefined, { method: "swapHead", fault });
+			const invocationIndex = a_cProbe.invocations.length;
 			const result = await prepare(swapped);
 			expectSuccess(result);
+			expectInvocationLedger(swapped, invocationIndex, { reopens: 2, preservations: 1, cas: 1 });
+			expectInitialTrustOnlyReopen(swapped, invocationIndex);
 			const swapCall = swapped.calls.find(({ method }) => method === "swapHead");
 			if (swapCall === undefined) throw new TypeError("missing malformed swap evidence");
 			const malformedValue = Reflect.get(outcomeFor(swapped, swapCall) as object, "value") as Record<string, unknown>;
@@ -1441,7 +1833,7 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		try {
 			const surface = await privateSurface();
 			if (surface.prepareV3LiveGeneration === undefined) throw new TypeError("missing private preparation API");
-			const first = await surface.prepareV3LiveGeneration(context.input);
+			const first = await invokePrepare(surface, context.input);
 			expectSuccess(first);
 			const owner = instances.find(({ sets }) => sets.some(({ key }) => key === first.capability));
 			expect(owner, "private token owner").toBeDefined();
@@ -1467,7 +1859,7 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 			expect(owner.map.get(first.capability)).toBeDefined();
 
 			const restartBoundary = context.calls.at(-1)?.ordinal ?? -1;
-			const second = await surface.prepareV3LiveGeneration(context.input);
+			const second = await invokePrepare(surface, context.input);
 			expectSuccess(second);
 			expect(second.capability).not.toBe(first.capability);
 			const secondSet = owner.sets.find(({ key }) => key === second.capability);
@@ -1556,7 +1948,7 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 		});
 		const surface = await privateSurface();
 		if (surface.prepareV3LiveGeneration === undefined) throw new TypeError("missing private preparation API");
-		const result = await surface.prepareV3LiveGeneration(input);
+		const result = await invokePrepare(surface, input);
 		expectFailure(result, "trust-open-failed");
 		expect(await durable.rawStore.getBlob(durable.trustRef.digest)).toEqual({ ok: true, value: trustBlob.value });
 		expect(a_cProbe.preservations).toEqual([]);
