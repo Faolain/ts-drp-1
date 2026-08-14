@@ -3,6 +3,7 @@ const expected = [
 	"admitReceivedVertex",
 	"authenticateCurrentEpochAnchor",
 	"createAdmissionBoundTransactionalVertexIssuer",
+	"extractAdmittedReceivedVertex",
 	"installCreatorAnchorTrustRoot",
 	"isAnchorTrustStateRecordBytes",
 	"openCurrentAnchorTrust",

@@ -297,6 +297,7 @@ describe("Phase 0p-0 additive blueprint work-budget governance causal RED", () =
 			"admitReceivedVertex",
 			"authenticateCurrentEpochAnchor",
 			"createAdmissionBoundTransactionalVertexIssuer",
+			"extractAdmittedReceivedVertex",
 			"installCreatorAnchorTrustRoot",
 			"isAnchorTrustStateRecordBytes",
 			"openCurrentAnchorTrust",

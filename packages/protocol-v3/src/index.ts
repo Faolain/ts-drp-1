@@ -5,6 +5,42 @@ import { init as initializeModuleLexer, parse as parseModule } from "es-module-l
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
 import blueprintArtifactProfileJson from "../supplements/blueprint-artifact-profile-v1/profile.json" with { type: "json" };
 
+const intrinsicArray = Array;
+const intrinsicArrayIsArray = Array.isArray;
+const intrinsicFloat32Array = Float32Array;
+const intrinsicFloat64Array = Float64Array;
+const intrinsicFunctionBind = Function.prototype.bind;
+const intrinsicInt32Array = Int32Array;
+const intrinsicMap = Map;
+const intrinsicMapEntries = Map.prototype.entries;
+const intrinsicMapSet = Map.prototype.set;
+const intrinsicObjectCreate = Object.create;
+const intrinsicObjectDefineProperty = Object.defineProperty;
+const intrinsicObjectFreeze = Object.freeze;
+const intrinsicObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const intrinsicObjectGetPrototypeOf = Object.getPrototypeOf;
+const intrinsicObjectHasOwn = Object.hasOwn;
+const intrinsicObjectPrototype = Object.prototype;
+const intrinsicReflectApply = Reflect.apply;
+const intrinsicReflectOwnKeys = Reflect.ownKeys;
+const intrinsicSet = Set;
+const intrinsicSetAdd = Set.prototype.add;
+const intrinsicSetValues = Set.prototype.values;
+const intrinsicUint8Array = Uint8Array;
+const intrinsicUint32Array = Uint32Array;
+const intrinsicMapIteratorNext = intrinsicObjectGetOwnPropertyDescriptor(
+	intrinsicObjectGetPrototypeOf(intrinsicReflectApply(intrinsicMapEntries, new intrinsicMap(), [])),
+	"next"
+)?.value as (this: MapIterator<unknown>) => IteratorResult<unknown>;
+const intrinsicSetIteratorNext = intrinsicObjectGetOwnPropertyDescriptor(
+	intrinsicObjectGetPrototypeOf(intrinsicReflectApply(intrinsicSetValues, new intrinsicSet(), [])),
+	"next"
+)?.value as (this: SetIterator<unknown>) => IteratorResult<unknown>;
+const intrinsicSharedArrayBufferByteLengthGetter =
+	typeof SharedArrayBuffer === "undefined"
+		? undefined
+		: intrinsicObjectGetOwnPropertyDescriptor(SharedArrayBuffer.prototype, "byteLength")?.get;
+
 interface RegistryField {
 	readonly name: string;
 	readonly type: string;
@@ -243,6 +279,16 @@ function hasSharedBacking(bytes: Uint8Array): boolean {
 	return typeof SharedArrayBuffer !== "undefined" && bytes.buffer instanceof SharedArrayBuffer;
 }
 
+function hasCapturedSharedBacking(bytes: Uint8Array): boolean {
+	if (intrinsicSharedArrayBufferByteLengthGetter === undefined) return false;
+	try {
+		intrinsicReflectApply(intrinsicSharedArrayBufferByteLengthGetter, bytes.buffer, []);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
 	return compareBytes(left, right) === 0;
 }
@@ -282,16 +328,49 @@ function isStorageObjectIdText(value: unknown): value is string {
 	return /^[0-9a-f]{32}$/u.test(value.slice(separator + 1));
 }
 
-function isClosedDataRecord(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
-	if (!isPlainRecord(value)) return false;
+function isCapturedPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+	if (value === null || typeof value !== "object" || intrinsicArrayIsArray(value)) return false;
+	const prototype = intrinsicObjectGetPrototypeOf(value) as object | null;
+	return prototype === intrinsicObjectPrototype || prototype === null;
+}
+
+function isClosedDataRecord(
+	value: unknown,
+	keys: readonly string[],
+	useCapturedIntrinsics = false
+): value is Record<string, unknown> {
+	if (useCapturedIntrinsics ? !isCapturedPlainRecord(value) : !isPlainRecord(value)) return false;
+	const record = value as object;
 	try {
-		const ownKeys = Reflect.ownKeys(value);
-		if (ownKeys.length !== keys.length || ownKeys.some((key) => typeof key !== "string" || !keys.includes(key))) {
-			return false;
+		if (!useCapturedIntrinsics) {
+			const ownKeys = Reflect.ownKeys(record);
+			if (ownKeys.length !== keys.length || ownKeys.some((key) => typeof key !== "string" || !keys.includes(key))) {
+				return false;
+			}
+			for (const key of keys) {
+				const descriptor = Object.getOwnPropertyDescriptor(record, key);
+				if (descriptor === undefined || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) return false;
+			}
+			return true;
+		}
+		const ownKeys = intrinsicReflectOwnKeys(record);
+		if (ownKeys.length !== keys.length) return false;
+		for (const ownKey of ownKeys) {
+			if (typeof ownKey !== "string") return false;
+			let known = false;
+			for (const key of keys) {
+				if (ownKey === key) {
+					known = true;
+					break;
+				}
+			}
+			if (!known) return false;
 		}
 		for (const key of keys) {
-			const descriptor = Object.getOwnPropertyDescriptor(value, key);
-			if (descriptor === undefined || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) return false;
+			const descriptor = intrinsicObjectGetOwnPropertyDescriptor(record, key);
+			if (descriptor === undefined || !descriptor.enumerable || !intrinsicObjectHasOwn(descriptor, "value")) {
+				return false;
+			}
 		}
 		return true;
 	} catch {
@@ -302,16 +381,27 @@ function isClosedDataRecord(value: unknown, keys: readonly string[]): value is R
 function snapshotClosedInput(
 	input: unknown,
 	keys: readonly string[],
-	byteKeys: ReadonlySet<string>
+	byteKeys: ReadonlySet<string>,
+	useCapturedIntrinsics = false
 ): Record<string, unknown> | undefined {
-	if (!isClosedDataRecord(input, keys)) return undefined;
+	if (!isClosedDataRecord(input, keys, useCapturedIntrinsics)) return undefined;
 	const snapshot: Record<string, unknown> = {};
 	try {
 		for (const key of keys) {
-			const value = input[key];
+			let value: unknown;
+			if (useCapturedIntrinsics) {
+				const descriptor = intrinsicObjectGetOwnPropertyDescriptor(input, key);
+				if (descriptor === undefined || !intrinsicObjectHasOwn(descriptor, "value")) return undefined;
+				value = descriptor.value;
+			} else value = input[key];
 			if (byteKeys.has(key)) {
-				if (!(value instanceof Uint8Array) || hasSharedBacking(value)) return undefined;
-				snapshot[key] = new Uint8Array(value);
+				if (useCapturedIntrinsics) {
+					if (!(value instanceof intrinsicUint8Array) || hasCapturedSharedBacking(value)) return undefined;
+					snapshot[key] = new intrinsicUint8Array(value);
+				} else {
+					if (!(value instanceof Uint8Array) || hasSharedBacking(value)) return undefined;
+					snapshot[key] = new Uint8Array(value);
+				}
 			} else snapshot[key] = value;
 		}
 		return snapshot;
@@ -1004,7 +1094,7 @@ export interface TransactionalIssuerOptions {
 	readonly transactIssue: TransactIssue;
 }
 
-export interface AdmitReceivedVertexInput {
+interface AdmitReceivedVertexInputFields {
 	readonly domain: string;
 	readonly expectedAnchor: string;
 	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
@@ -1014,10 +1104,32 @@ export interface AdmitReceivedVertexInput {
 	readonly suiteId: string;
 }
 
+export type AdmitReceivedVertexInput = Readonly<AdmitReceivedVertexInputFields>;
+
 export interface AdmissionDecision {
 	readonly admitted: boolean;
 	readonly digest?: Uint8Array;
 }
+
+export type ExtractAdmittedReceivedVertexFailureReason = "malformed-input" | "not-authenticated" | "admission-rejected";
+
+export interface AdmittedReceivedVertexView {
+	readonly kind: "drp-vertex";
+	readonly protocolMajor: 3;
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchor: string;
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly logicalTime: number;
+	readonly dependencies: readonly string[];
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly digest: Uint8Array;
+}
+
+export type ExtractAdmittedReceivedVertexResult =
+	| Readonly<{ readonly ok: false; readonly reason: ExtractAdmittedReceivedVertexFailureReason }>
+	| Readonly<{ readonly ok: true; readonly vertex: AdmittedReceivedVertexView }>;
 
 export interface AdmissionBoundTransactionalIssuerOptions {
 	readonly author: string;
@@ -3365,17 +3477,28 @@ export function verifyEquivocationProof(input: VerifyEquivocationProofInput): Eq
 	}
 }
 
-/**
- * Authenticates exact received bytes and then applies a genuine prepared ABI.
- * @param input - Received vertex data and prepared application admission.
- * @returns Admission and, on success, the exact-received-byte digest.
- */
-export function admitReceivedVertex(input: AdmitReceivedVertexInput): AdmissionDecision {
+type ReceivedVertexDecision =
+	| Readonly<{ readonly kind: "not-authenticated" }>
+	| Readonly<{ readonly kind: "admission-rejected" }>
+	| Readonly<{ readonly authenticated: AuthenticatedReceivedVertex; readonly kind: "admitted" }>;
+
+const ADMIT_RECEIVED_VERTEX_INPUT_KEYS = [
+	"domain",
+	"expectedAnchor",
+	"preparedBlueprintAdmission",
+	"receivedCanonicalPreimageBytes",
+	"resolveAuthorPublicKey",
+	"signature",
+	"suiteId",
+] as const;
+const ADMIT_RECEIVED_VERTEX_BYTE_KEYS = new Set<string>(["receivedCanonicalPreimageBytes", "signature"]);
+
+function decideReceivedVertex(input: AdmitReceivedVertexInput): ReceivedVertexDecision {
 	const authenticated = authenticateReceivedVertex(input);
-	if (authenticated === undefined) return { admitted: false };
+	if (authenticated === undefined) return { kind: "not-authenticated" };
 	const preparedState = consumerPreparedAdmissionState(input);
 	if (preparedState === undefined) {
-		return { admitted: false };
+		return { kind: "admission-rejected" };
 	}
 	const operation = authenticated.preimage.operation;
 	const schema = operationSchemaForPreparedAdmission(operation, preparedState);
@@ -3383,7 +3506,221 @@ export function admitReceivedVertex(input: AdmitReceivedVertexInput): AdmissionD
 		schema === undefined ||
 		!operationWithinCanonicalByteBudget(operation as Readonly<Record<string, unknown>>, schema)
 	) {
-		return { admitted: false };
+		return { kind: "admission-rejected" };
 	}
-	return { admitted: true, digest: authenticated.digest };
+	return { authenticated, kind: "admitted" };
+}
+
+function extractFailure(
+	reason: ExtractAdmittedReceivedVertexFailureReason
+): Readonly<{ readonly ok: false; readonly reason: ExtractAdmittedReceivedVertexFailureReason }> {
+	return intrinsicObjectFreeze({ ok: false as const, reason });
+}
+
+function copyCanonicalForAdmittedView(value: unknown): unknown {
+	if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
+		return value;
+	}
+	if (value instanceof intrinsicUint8Array) return new intrinsicUint8Array(value);
+	if (value instanceof intrinsicFloat32Array) return new intrinsicFloat32Array(value);
+	if (value instanceof intrinsicFloat64Array) return new intrinsicFloat64Array(value);
+	if (value instanceof intrinsicInt32Array) return new intrinsicInt32Array(value);
+	if (value instanceof intrinsicUint32Array) return new intrinsicUint32Array(value);
+
+	if (intrinsicArrayIsArray(value)) {
+		const output = new intrinsicArray<unknown>(value.length);
+		for (let index = 0; index < value.length; index++) {
+			const descriptor = intrinsicObjectGetOwnPropertyDescriptor(value, String(index));
+			if (descriptor === undefined || !intrinsicObjectHasOwn(descriptor, "value")) {
+				throw new TypeError("canonical array must be dense data");
+			}
+			intrinsicObjectDefineProperty(output, String(index), {
+				configurable: true,
+				enumerable: true,
+				value: copyCanonicalForAdmittedView(descriptor.value),
+				writable: true,
+			});
+		}
+		return intrinsicObjectFreeze(output);
+	}
+
+	if (value instanceof intrinsicMap) {
+		const output = new intrinsicMap<unknown, unknown>();
+		const iterator = intrinsicReflectApply(intrinsicMapEntries, value, []);
+		for (;;) {
+			const step = intrinsicReflectApply(intrinsicMapIteratorNext, iterator, []);
+			if (step.done === true) break;
+			const entry = step.value as [unknown, unknown];
+			intrinsicReflectApply(intrinsicMapSet, output, [
+				copyCanonicalForAdmittedView(entry[0]),
+				copyCanonicalForAdmittedView(entry[1]),
+			]);
+		}
+		return intrinsicObjectFreeze(output);
+	}
+
+	if (value instanceof intrinsicSet) {
+		const output = new intrinsicSet<unknown>();
+		const iterator = intrinsicReflectApply(intrinsicSetValues, value, []);
+		for (;;) {
+			const step = intrinsicReflectApply(intrinsicSetIteratorNext, iterator, []);
+			if (step.done === true) break;
+			intrinsicReflectApply(intrinsicSetAdd, output, [copyCanonicalForAdmittedView(step.value)]);
+		}
+		return intrinsicObjectFreeze(output);
+	}
+
+	if (value === null || typeof value !== "object") {
+		throw new TypeError("unsupported canonical value");
+	}
+	const prototype = intrinsicObjectGetPrototypeOf(value);
+	if (prototype !== intrinsicObjectPrototype && prototype !== null) {
+		throw new TypeError("canonical record must be plain");
+	}
+	const output = intrinsicObjectCreate(intrinsicObjectPrototype) as Record<string, unknown>;
+	const keys = intrinsicReflectOwnKeys(value);
+	for (let index = 0; index < keys.length; index++) {
+		const key = keys[index];
+		if (typeof key !== "string") throw new TypeError("canonical record key must be a string");
+		const descriptor = intrinsicObjectGetOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || !descriptor.enumerable || !intrinsicObjectHasOwn(descriptor, "value")) {
+			throw new TypeError("canonical record property must be enumerable data");
+		}
+		intrinsicObjectDefineProperty(output, key, {
+			configurable: true,
+			enumerable: true,
+			value: copyCanonicalForAdmittedView(descriptor.value),
+			writable: true,
+		});
+	}
+	return intrinsicObjectFreeze(output);
+}
+
+function snapshotExtractInput(input: unknown): AdmitReceivedVertexInput | undefined {
+	const snapshot = snapshotClosedInput(input, ADMIT_RECEIVED_VERTEX_INPUT_KEYS, ADMIT_RECEIVED_VERTEX_BYTE_KEYS, true);
+	if (snapshot === undefined) return undefined;
+	const domain = snapshot.domain;
+	const expectedAnchor = snapshot.expectedAnchor;
+	const preparedBlueprintAdmission = snapshot.preparedBlueprintAdmission;
+	const receivedCanonicalPreimageBytes = snapshot.receivedCanonicalPreimageBytes;
+	const capturedResolver = snapshot.resolveAuthorPublicKey;
+	const signature = snapshot.signature;
+	const suiteId = snapshot.suiteId;
+	if (
+		typeof domain !== "string" ||
+		typeof expectedAnchor !== "string" ||
+		!(receivedCanonicalPreimageBytes instanceof intrinsicUint8Array) ||
+		receivedCanonicalPreimageBytes.byteLength === 0 ||
+		typeof capturedResolver !== "function" ||
+		!(signature instanceof intrinsicUint8Array) ||
+		signature.byteLength !== 64 ||
+		typeof suiteId !== "string"
+	) {
+		return undefined;
+	}
+	const resolveAuthorPublicKey = intrinsicReflectApply(intrinsicFunctionBind, capturedResolver, [input]) as (
+		author: string
+	) => RawEd25519PublicKey | undefined;
+	return {
+		domain,
+		expectedAnchor,
+		preparedBlueprintAdmission: preparedBlueprintAdmission as PreparedBlueprintAdmission,
+		receivedCanonicalPreimageBytes,
+		resolveAuthorPublicKey,
+		signature,
+		suiteId,
+	};
+}
+
+function admittedVertexView(authenticated: AuthenticatedReceivedVertex): AdmittedReceivedVertexView | undefined {
+	const preimage = authenticated.preimage;
+	const read = (name: string): unknown => {
+		const descriptor = intrinsicObjectGetOwnPropertyDescriptor(preimage, name);
+		return descriptor !== undefined && descriptor.enumerable && intrinsicObjectHasOwn(descriptor, "value")
+			? descriptor.value
+			: undefined;
+	};
+	const kind = read("kind");
+	const protocolMajor = read("protocolMajor");
+	const objectId = read("objectId");
+	const epoch = read("epoch");
+	const anchor = read("anchor");
+	const author = read("author");
+	const authorSequence = read("authorSequence");
+	const logicalTime = read("logicalTime");
+	const sourceDependencies = read("dependencies");
+	const sourceOperation = read("operation");
+	if (
+		kind !== "drp-vertex" ||
+		protocolMajor !== 3 ||
+		typeof objectId !== "string" ||
+		typeof epoch !== "number" ||
+		typeof anchor !== "string" ||
+		typeof author !== "string" ||
+		typeof authorSequence !== "number" ||
+		typeof logicalTime !== "number" ||
+		!intrinsicArrayIsArray(sourceDependencies) ||
+		!isCapturedPlainRecord(sourceOperation)
+	) {
+		return undefined;
+	}
+	for (let index = 0; index < sourceDependencies.length; index++) {
+		if (typeof sourceDependencies[index] !== "string") return undefined;
+	}
+	const dependencies = copyCanonicalForAdmittedView(sourceDependencies) as readonly string[];
+	const operation = copyCanonicalForAdmittedView(sourceOperation) as Readonly<Record<string, unknown>>;
+	const digest = new intrinsicUint8Array(authenticated.digest);
+	return intrinsicObjectFreeze({
+		kind,
+		protocolMajor,
+		objectId,
+		epoch,
+		anchor,
+		author,
+		authorSequence,
+		logicalTime,
+		dependencies,
+		operation,
+		digest,
+	});
+}
+
+/**
+ * Authenticates exact received bytes and then applies a genuine prepared ABI.
+ * @param input - Received vertex data and prepared application admission.
+ * @returns Admission and, on success, the exact-received-byte digest.
+ */
+export function admitReceivedVertex(input: AdmitReceivedVertexInput): AdmissionDecision {
+	const decision = decideReceivedVertex(input);
+	return decision.kind === "admitted" ? { admitted: true, digest: decision.authenticated.digest } : { admitted: false };
+}
+
+/**
+ * Authenticates and admits exact received bytes into a detached registered view.
+ * @param input - Received vertex data and prepared application admission.
+ * @returns A closed failure or the detached admitted vertex.
+ */
+export function extractAdmittedReceivedVertex(input: AdmitReceivedVertexInput): ExtractAdmittedReceivedVertexResult {
+	try {
+		const snapshot = snapshotExtractInput(input);
+		if (snapshot === undefined) return extractFailure("malformed-input");
+		let decision: ReceivedVertexDecision;
+		try {
+			decision = decideReceivedVertex(snapshot);
+		} catch {
+			return extractFailure("admission-rejected");
+		}
+		if (decision.kind === "not-authenticated") return extractFailure("not-authenticated");
+		if (decision.kind === "admission-rejected") return extractFailure("admission-rejected");
+		try {
+			const vertex = admittedVertexView(decision.authenticated);
+			return vertex === undefined
+				? extractFailure("not-authenticated")
+				: intrinsicObjectFreeze({ ok: true as const, vertex });
+		} catch {
+			return extractFailure("not-authenticated");
+		}
+	} catch {
+		return extractFailure("malformed-input");
+	}
 }

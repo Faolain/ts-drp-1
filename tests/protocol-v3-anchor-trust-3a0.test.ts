@@ -71,6 +71,7 @@ const EXPECTED_RUNTIME_EXPORTS = [
 	"admitReceivedVertex",
 	"authenticateCurrentEpochAnchor",
 	"createAdmissionBoundTransactionalVertexIssuer",
+	"extractAdmittedReceivedVertex",
 	"installCreatorAnchorTrustRoot",
 	"isAnchorTrustStateRecordBytes",
 	"openCurrentAnchorTrust",
@@ -369,7 +370,7 @@ describe("Phase 3a-0-A creator trust independent controls", () => {
 });
 
 describe("Phase 3a-0-A creator trust causal RED", () => {
-	it("[surface] exposes exactly nine runtime names and the literal 8192 cutoff", async () => {
+	it("[surface] exposes exactly ten runtime names and the literal 8192 cutoff", async () => {
 		const surface = await surfaceLoad;
 		expect(Object.keys(surface).sort()).toEqual([...EXPECTED_RUNTIME_EXPORTS]);
 		expect(surface.ANCHOR_TRUST_STATE_MAX_RECORD_BYTES).toBe(8192);

@@ -397,6 +397,7 @@ const PROTOCOL_V3_RUNTIME_EXPORTS = [
 	"admitReceivedVertex",
 	"authenticateCurrentEpochAnchor",
 	"createAdmissionBoundTransactionalVertexIssuer",
+	"extractAdmittedReceivedVertex",
 	"installCreatorAnchorTrustRoot",
 	"isAnchorTrustStateRecordBytes",
 	"openCurrentAnchorTrust",
