@@ -8823,6 +8823,89 @@ pin. D.93.17, D.93.23 and D.93.24-D.93.26 otherwise remain unchanged. Seam 1
 becomes ready for RED only after this exact amendment is reviewed, signed and
 pushed; seams 2 and 3 and the whole Phase `3a-1B` remain unauthorized.
 
+#### D.93.28 — Phase 3a-1B seam 1 closure ledger
+
+This section is a non-normative closure record for D.93.27. It changes none of
+that amendment's API, ownership, taxonomy, projection, compatibility or TDD
+rules. Its durable purpose is to record why seam 1 could close without creating
+a second authentication authority: the new public view and the legacy facade
+share one private decision, while only the new view receives a captured,
+detached and fail-closed ownership boundary. Later work must not merge those
+two projections in a way that silently changes the facade's historical result,
+throw or digest-identity behavior.
+
+The signed lineage is complete and intentionally split between contract,
+causal evidence, production and compatibility pins:
+
+| Commit                                     | Tree                                       | Scope                                                            |
+| ------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------- |
+| `9df5258f4c651af4b586cc590d697820c9ef766e` | `a861ad769046466604ab5db2b45dbd0e770b2216` | pushed normative D.93.27 seam contract                           |
+| `de27be517ef6a7c13653902763a4642225d96699` | `702fc27de06aae710f2294aeec5a64d6a302427f` | extraction RED, public type audits and dedicated TypeScript gate |
+| `1bbe5a03ff65434a3f7a8daccad908faa72ab91d` | `f1766a3e9ad4c582ec90f8a2486b4b2b4ad16fd0` | causal extraction-oracle correction                              |
+| `2b2591259025cae97900eab5b157faaae7f63d43` | `4a5b61ad41a2cda0852c909a782085b1815a437c` | exact runtime-pin title correction                               |
+| `392cf623a56f12fff74cebac46a7de40fea394b5` | `8b9bf48ab83e1cadef2645ce089e2ee628ed138a` | completion of the live runtime-pin evidence                      |
+| `6f5a1b070d34a26504d3b87f3c6883c3b73aa7c2` | `7e5b5eb9c9c876b9e5187ea2b72a76aeafd0de3d` | shared decision, extraction view and exact-ten public pins       |
+| `eb788d4fbcbb7ec1916197e859a4c8cf2ca93a5b` | `a924bbfe65c5a33fc2bb96d1f919538ac3fe9c6e` | hostile-intrinsic totality RED                                   |
+| `8a1c4aeca25ac06203d5f0c949c597943700e45f` | `d5ad55dd77555b5849d1d07ecfe7884ad24cadbb` | one-file captured-snapshot totality GREEN                        |
+
+Every commit has a good Faolain signature. The final totality correction is
+confined to `packages/protocol-v3/src/index.ts`: it captures numeric key
+conversion and set membership, and constructs the sibling snapshot through a
+null-prototype record plus captured data-descriptor writes. The uncaptured
+legacy snapshot branch remains behaviorally unchanged. The completed boundary
+therefore has one private decision core, the old two-shape facade, one exact
+eleven-key detached extraction view and an exact-ten public runtime root. No
+new dependency, subpath, capability, legacy mapping, node/object authority,
+storage mutation, live effect or seam 2/3 surface entered the package.
+
+The seven D.93.27 named root-pin owners and the two Phase 0o-b test-side live
+source-root lists now agree on the exact-ten root. The frozen Phase 0o-b
+supplement guard fixtures remain untouched historical debt, as D.93.27
+requires; this ledger neither repairs nor weakens their freeze policy.
+
+Fresh evidence on the final tree passed the hostile-input and totality suite
+`12/12`, the three-file extraction/pin-owner gate `45/45` and the Phase 3a-1A,
+0i, 0j-b, 0p0 and 0p2 preservation set `105/105`. The dedicated TypeScript
+fixture, protocol-v3 package typecheck, build, package test, public-package
+smoke, pack, targeted ESLint, Prettier and diff-check passed. The broad
+protocol-v3 diagnostic recorded `312` passing, `22` failing and one skipped
+test. Its failures remained confined to the inherited `0j-c`, `n1prime-b2a`,
+`n1prime-e3`, `n1prime-c2`, `n1prime-d` and `n1prime-d2` governance,
+reference and environment-sensitive files; no seam-1 or runtime-pin test
+failed. Those broad failures remain visible baseline debt and are not converted
+into a seam-specific exception.
+
+The implementation and final closure quorum is unanimous on the final bytes:
+
+- Codex `gpt-5.6-sol`/high session
+  `01a0004a-d88c-71c3-8414-25e10a74e24d` returned terminal
+  `VERDICT: PASS` with no direct P0-P2 finding. Its raw review JSONL SHA-256 is
+  `50ad033656f105319e133ebe564a054e508d73af82083150706d4cc621f1a7f4`.
+  The reviewer recorded no separate confidence label.
+- Native Grok 4.6/high session `01a00056-c639-7642-a8ba-dc5d97b96916`
+  returned `PASS`, seam 1 close, seam 2 amendment start only, no blocker and
+  confidence `0.88`. Its result and manifest SHA-256 values are
+  `5473937625e4cb8b5a4cc3180fa618228da2e5d48f13d163f45ed8e43c13bac0`
+  and `d0f7aa073cfcb93090e4d886dda05dd3407ca094b5629b944021dffad76fa4f3`.
+- Native Kimi K3/high/100 session `c8613b35-bbe6-4616-b8d5-788ed532df57`
+  returned `ACCEPTED`, seam 1 close, seam 2 amendment start only, no blocker
+  and high confidence. Its result and `SHA256SUMS` SHA-256 values are
+  `217ff8fd6b7ae244a8c1f9ade67754ff5e31368f655327e333f93af1a65acbc3`
+  and `cf140913ff297debaadf668c0bdc3194b16703de1fd366dbfe511f0794686eb7`.
+- Native Opus 5/xhigh session `27358c70-280c-421c-aaa6-e79f96fc424e`
+  returned `CODE_VERDICT: PASS`, seam 1 close, seam 2 amendment start only,
+  no blocker and high confidence. Its raw result, closure seal and native
+  transcript SHA-256 values are
+  `0a0ba5d897576ca9218ca4b2ad4f2342b132dfeaaf982bc47cf3b5a599abaa15`,
+  `391eeb53ee34dff3edb93ed85fa37ae98cfef2b3f130a0d8071fd1baddee4535`
+  and `cf44d5c9e145c69ed2b5d38285e0975718d74568e42fa73fe5072164f92a8cad`.
+
+Seam 1 is closed. This closure status supersedes only D.93.26's stale statement
+that none of its three prerequisite seams had been implemented; it does not
+alter D.93.27 or any earlier normative contract. Seam 2 may now enter separate
+amendment design and quorum. Seam 2 RED, seam 3, the whole Phase `3a-1B`, live
+activation and Phase 3b remain unauthorized.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
