@@ -8392,6 +8392,66 @@ RED owner. A-b still owns the anchor-only graph, pristine `Map` behavior,
 D.73 validation, exact projection bytes and the discarded validation-only
 index. Nothing in this ledger claims those obligations are implemented.
 
+#### D.93.25 — Phase 3a-1A-b closure evidence and Phase 3a-1A-c handoff
+
+Phase `3a-1A-b` is closed at signed production candidate
+`02e73a6faeaef7c1711ae2d235785d7ba9653975`, tree
+`1834fae33d816991077b2ae959f25d92542a87c2`. This section is a bounded,
+non-normative evidence ledger. It does not change D.93.23, implement A-c,
+close A as a whole or authorize any Phase `3a-1B` live effect.
+
+The A-b boundary exists so graph ownership, charging and deterministic live
+projection identity are settled before any persistence or authority token can
+exist. The normative byte grammar and ordering remain solely in D.93.23; the
+private production owner and the A-b test/fixture surface hold the implementation
+and causal evidence. The accepted path constructs and validates the creator
+anchor graph with one genuine, discarded `CausalityIndex`, derives the canonical
+graph/order preimages and projection, and computes the detached digest-sorted
+two-reference closure. It then stops at `trust-not-preserved`. This makes D.73's
+hostile-graph defense load-bearing without publishing an index or crossing the
+A-c preservation, staging, CAS and token boundary.
+
+The signed lineage is `ba759a5` → `9f7a467` → `9d0e1fa` → `5302e31` →
+`69b5c4f` → `02e73a6`. The first two commits kept the existing A-a governance
+and transition honest; the A-b RED then froze the independent graph/projection
+oracle. Its corrections limited derivation telemetry to the stage being
+measured and retained the original prototype-poison handles, so poisoned
+intrinsics and virtual `Map` behavior remain causal tests rather than harness
+artifacts. The final GREEN adds only the private node owner plus the direct
+compaction dependency and importer lock entry required by that owner. It adds no
+node-root or `DRPNode` surface, protocol-v3 runtime value, catalog runtime edge,
+A-c owner or Phase `3a-1B` effect.
+
+Fresh evidence on the final tree passed the A-b focused suite `10/10`, the
+combined A-a/A-b suite `19/19`, the Phase `3a-0` preservation set `61/61`, the
+dedicated TypeScript project and node build, targeted ESLint, Prettier and
+diff-check, and packed-package inspection. The ordinary package prepack remains
+blocked by the unchanged `compact-history-scale-1i-b.ts` type-error baseline;
+that disclosed repository baseline is not an A-b failure and was not hidden by
+the successful scoped build and pack evidence.
+
+The final independent closure quorum is unanimous:
+
+- Grok 4.6/high returned `PASS`, A-b close and A-c start, with no blocker or
+  plan change and medium confidence. Its result and manifest SHA-256 values are
+  `c0a6ae29dcd07ad67389c1b3704cb1e9b0f5bc17693780c4f898b2b2937850d5`
+  and `99ebeb89c1f266a671b9d401384f18c41238d5e15ad49aa9e12906757cee3bbe`.
+- Kimi K3/high/100 returned `PASS`, A-b close and A-c start, with no blocker or
+  plan change and high confidence. Its result and seal-index SHA-256 values are
+  `183ebbd29e6c33c13888e0b70664a8307db19e45e51141c0e42fda41e54248f4`
+  and `54f10fbfcbc38d3870483305745f01c00ffd75549f16670c8436c75ea8127676`.
+- Native Opus 5/xhigh session
+  `67adc421-70bc-4333-a12a-f051542aee14` returned `PASS`, A-b close and A-c
+  start, no blocker or plan change and high confidence. Its result and
+  integrity-manifest SHA-256 values are
+  `0d4ccdd11a84b84a3ffec37d7c4c7a034306fa2e5aa0514444dd3b952315ede9`
+  and `ffc04326de8de0aeeae20d8fe98ba83c392f82801779825c1324a6e585bceefd`.
+
+Phase `3a-1A-b` is closed and `3a-1A-c` may start with a different tests-only
+RED owner. A-c still owns the fresh preservation check, bounded persistence and
+CAS/reopen behavior, and the opaque preparation token. Nothing in this ledger
+claims those obligations or any Phase `3a-1B` live effect are implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
