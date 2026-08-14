@@ -161,6 +161,14 @@ function sha256Text(value: string): string {
 const EXPECTED_NODE_MANIFEST_SHA256 = "d8be49ebaf6c0cb5f3b6c4d2361890a5796ae3db667189cd3160f6272921fcce";
 const EXPECTED_NODE_IMPORTER_SHA256 = "26f699a0635262c4b7a32d7dedea0a6bb2baef15a0475db8395c42ba8e832f47";
 
+function exactNodeIssuanceImporterCount(importerText: string): number {
+	return (
+		importerText.match(
+			/(?:^|\n)\s+(['"]?)@ts-drp\/issuance-store\1:\s*\n\s+specifier:\s*0\.11\.0\s*\n\s+version:\s*link:\.\.\/issuance-store[\t ]*(?=\n|$)/gu
+		)?.length ?? 0
+	);
+}
+
 function nodeBoundaryViolations(manifestText: string, importerText: string): readonly string[] {
 	const violations: string[] = [];
 	let manifest: {
@@ -184,11 +192,7 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
 		violations.push("export-targets");
 	}
 	if (sha256Text(importerText) !== EXPECTED_NODE_IMPORTER_SHA256) violations.push("importer-bytes");
-	if (
-		importerText.match(
-			/['"]?@ts-drp\/issuance-store['"]?:\s*\n\s+specifier:\s*0\.11\.0\s*\n\s+version:\s*link:\.\.\/issuance-store/gu
-		)?.length !== 1
-	) {
+	if (exactNodeIssuanceImporterCount(importerText) !== 1) {
 		violations.push("issuance-importer");
 	}
 	return Object.freeze(violations);
@@ -1753,10 +1757,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		});
 		const lock = source("pnpm-lock.yaml");
 		const importer = lock.slice(lock.indexOf("  packages/node:"), lock.indexOf("  packages/object:"));
-		expect(importer.match(/['"]?@ts-drp\/issuance-store['"]?:/gu)).toHaveLength(1);
-		expect(importer).toMatch(
-			/@ts-drp\/issuance-store:\s*\n\s+specifier:\s*0\.11\.0\s*\n\s+version:\s*link:\.\.\/issuance-store/u
-		);
+		expect(exactNodeIssuanceImporterCount(importer)).toBe(1);
 		expect(nodeBoundaryViolations(manifestText, importer)).toEqual([]);
 
 		const manifestControl = manifestText.includes('"@ts-drp/issuance-store": "0.11.0"')
@@ -1772,6 +1773,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 					"      '@ts-drp/interval-runner':\n        specifier: 0.11.0\n        version: link:../interval-runner\n      '@ts-drp/issuance-store':\n        specifier: 0.11.0\n        version: link:../issuance-store\n"
 				);
 		expect(nodeBoundaryViolations(manifestControl, importerControl)).toEqual([]);
+		const unquotedImporterControl = importerControl.replace(
+			"      '@ts-drp/issuance-store':",
+			"      @ts-drp/issuance-store:"
+		);
+		expect(exactNodeIssuanceImporterCount(importerControl)).toBe(1);
+		expect(exactNodeIssuanceImporterCount(unquotedImporterControl)).toBe(1);
+		expect(nodeBoundaryViolations(manifestControl, unquotedImporterControl)).toEqual(["importer-bytes"]);
 		expect(
 			nodeBoundaryViolations(
 				manifestControl.replace('"@ts-drp/types": "0.11.0"', '"@ts-drp/types": "0.11.1"'),
@@ -1793,6 +1801,27 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				importerControl.replace(
 					"      '@ts-drp/issuance-store':\n        specifier: 0.11.0",
 					"      '@ts-drp/issuance-store':\n        specifier: 0.11.1"
+				)
+			)
+		).toContain("issuance-importer");
+		expect(
+			nodeBoundaryViolations(
+				manifestControl,
+				importerControl.replace("version: link:../issuance-store", "version: link:../storage")
+			)
+		).toContain("issuance-importer");
+		expect(
+			nodeBoundaryViolations(
+				manifestControl,
+				importerControl.replace("version: link:../issuance-store", "version: link:../issuance-store-evil")
+			)
+		).toContain("issuance-importer");
+		expect(
+			nodeBoundaryViolations(
+				manifestControl,
+				importerControl.replace(
+					"      '@ts-drp/issuance-store':\n        specifier: 0.11.0\n        version: link:../issuance-store\n",
+					""
 				)
 			)
 		).toContain("issuance-importer");
