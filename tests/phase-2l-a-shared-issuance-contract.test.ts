@@ -43,6 +43,11 @@ interface DurableLineage {
 }
 
 interface DurableIssuanceStore {
+	compareAndMarkOutboxPublished(input: {
+		readonly authorSequence: number;
+		readonly digest: Uint8Array;
+		readonly scope: DurableIssueScope;
+	}): Promise<void>;
 	transactIssue(
 		scope: DurableIssueScope,
 		buildAndSign: (authorSequence: number) => Promise<DurableIssueCommit>
@@ -102,6 +107,7 @@ function missingOwnerError(): Error {
 
 const ABSENT_STORE: DurableIssuanceStore = {
 	close: () => Promise.reject(missingOwnerError()),
+	compareAndMarkOutboxPublished: () => Promise.reject(missingOwnerError()),
 	readIssued: () => Promise.reject(missingOwnerError()),
 	readLineage: () => Promise.reject(missingOwnerError()),
 	readOutboxPage: () => Promise.reject(missingOwnerError()),
@@ -247,6 +253,7 @@ describe("Phase 2l-a package and closed contract", () => {
 		const store = createEphemeralDurableIssuanceStore();
 		expect(Object.keys(store).sort()).toEqual([
 			"close",
+			"compareAndMarkOutboxPublished",
 			"readIssued",
 			"readLineage",
 			"readOutboxPage",

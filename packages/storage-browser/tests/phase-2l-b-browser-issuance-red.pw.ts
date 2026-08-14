@@ -33,7 +33,14 @@ async function runCase(page: Page, caseId: string): Promise<JsonRecord> {
 
 test("exact two-symbol surface, closed options and opaque identity are promise-only", async ({ page }) => {
 	const value = await runCase(page, "surface-options-identity");
-	expect(value.keys).toEqual(["close", "readIssued", "readLineage", "readOutboxPage", "transactIssue"]);
+	expect(value.keys).toEqual([
+		"close",
+		"compareAndMarkOutboxPublished",
+		"readIssued",
+		"readLineage",
+		"readOutboxPage",
+		"transactIssue",
+	]);
 	expect(value.prototypeKeys).toEqual([]);
 	expect(value.closeSamePromise).toBe(true);
 	expect(value.getterCalls).toBe(0);

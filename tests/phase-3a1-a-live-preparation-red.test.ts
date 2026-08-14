@@ -1030,6 +1030,7 @@ const A_C_FORBIDDEN_IDENTIFIERS = new Set([
 	"repairGeneration",
 ]);
 const B_LIVE_IDENTIFIERS = new Set([
+	"compareAndMarkOutboxPublished",
 	"WebSocket",
 	"addEventListener",
 	"admitReceivedVertex",
@@ -2891,6 +2892,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			"admitReceivedVertex",
 			"append",
 			"callback",
+			"compareAndMarkOutboxPublished",
 			"createAdmissionBoundTransactionalVertexIssuer",
 			"dispatchMessage",
 			"fetch",

@@ -88,7 +88,7 @@ async function seedPair(
 /**
  * Opens one seeded issuance capability.
  * @param primaryFilename - Opaque primary filename used by the public factory.
- * @returns The admitted five-method issuance capability.
+ * @returns The admitted six-method issuance capability.
  */
 async function openStore(primaryFilename: string): Promise<DurableIssuanceStore> {
 	const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
