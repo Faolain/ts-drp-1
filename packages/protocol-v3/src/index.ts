@@ -25,7 +25,9 @@ const intrinsicReflectApply = Reflect.apply;
 const intrinsicReflectOwnKeys = Reflect.ownKeys;
 const intrinsicSet = Set;
 const intrinsicSetAdd = Set.prototype.add;
+const intrinsicSetHas = Set.prototype.has;
 const intrinsicSetValues = Set.prototype.values;
+const intrinsicString = String;
 const intrinsicUint8Array = Uint8Array;
 const intrinsicUint32Array = Uint32Array;
 const intrinsicMapIteratorNext = intrinsicObjectGetOwnPropertyDescriptor(
@@ -385,7 +387,7 @@ function snapshotClosedInput(
 	useCapturedIntrinsics = false
 ): Record<string, unknown> | undefined {
 	if (!isClosedDataRecord(input, keys, useCapturedIntrinsics)) return undefined;
-	const snapshot: Record<string, unknown> = {};
+	const snapshot: Record<string, unknown> = useCapturedIntrinsics ? intrinsicObjectCreate(null) : {};
 	try {
 		for (const key of keys) {
 			let value: unknown;
@@ -394,14 +396,29 @@ function snapshotClosedInput(
 				if (descriptor === undefined || !intrinsicObjectHasOwn(descriptor, "value")) return undefined;
 				value = descriptor.value;
 			} else value = input[key];
-			if (byteKeys.has(key)) {
+			const isByteKey = useCapturedIntrinsics
+				? intrinsicReflectApply(intrinsicSetHas, byteKeys, [key])
+				: byteKeys.has(key);
+			if (isByteKey) {
 				if (useCapturedIntrinsics) {
 					if (!(value instanceof intrinsicUint8Array) || hasCapturedSharedBacking(value)) return undefined;
-					snapshot[key] = new intrinsicUint8Array(value);
+					intrinsicObjectDefineProperty(snapshot, key, {
+						configurable: true,
+						enumerable: true,
+						value: new intrinsicUint8Array(value),
+						writable: true,
+					});
 				} else {
 					if (!(value instanceof Uint8Array) || hasSharedBacking(value)) return undefined;
 					snapshot[key] = new Uint8Array(value);
 				}
+			} else if (useCapturedIntrinsics) {
+				intrinsicObjectDefineProperty(snapshot, key, {
+					configurable: true,
+					enumerable: true,
+					value,
+					writable: true,
+				});
 			} else snapshot[key] = value;
 		}
 		return snapshot;
@@ -3530,11 +3547,12 @@ function copyCanonicalForAdmittedView(value: unknown): unknown {
 	if (intrinsicArrayIsArray(value)) {
 		const output = new intrinsicArray<unknown>(value.length);
 		for (let index = 0; index < value.length; index++) {
-			const descriptor = intrinsicObjectGetOwnPropertyDescriptor(value, String(index));
+			const key = intrinsicString(index);
+			const descriptor = intrinsicObjectGetOwnPropertyDescriptor(value, key);
 			if (descriptor === undefined || !intrinsicObjectHasOwn(descriptor, "value")) {
 				throw new TypeError("canonical array must be dense data");
 			}
-			intrinsicObjectDefineProperty(output, String(index), {
+			intrinsicObjectDefineProperty(output, key, {
 				configurable: true,
 				enumerable: true,
 				value: copyCanonicalForAdmittedView(descriptor.value),
