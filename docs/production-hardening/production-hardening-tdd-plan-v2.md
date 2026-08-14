@@ -8906,6 +8906,399 @@ alter D.93.27 or any earlier normative contract. Seam 2 may now enter separate
 amendment design and quorum. Seam 2 RED, seam 3, the whole Phase `3a-1B`, live
 activation and Phase 3b remain unauthorized.
 
+#### D.93.29 — Phase 3a-1B prerequisite seam 2: durable outbox publication transition
+
+This section is normative and freezes only the second D.93.26 prerequisite.
+Seam 1 is closed by D.93.27 and D.93.28; this section changes neither, and
+changes no D.36.4, Phase 2l, Phase 2l-a/b/c/d, Phase 0g2i or Phase 0g2s rule
+other than the exact supersessions named below. It does not authorize seam 3,
+transport/topic/subscription composition, any Phase `3a-1B` RED, live
+activation, reducer execution, retention or deletion, or Phase 3b. Phase 6b
+remains the sole physical deletion and retention authority. Seam-2 RED may
+start only after this exact amendment receives independent exact-byte assent
+and is signed and pushed.
+
+##### Owner, API and types
+
+`@ts-drp/issuance-store` remains the sole backend-neutral public contract
+owner. No second outbox store, receipt database, acknowledgement log, queue,
+reservation token, token authority, protocol-v3 persistence owner or adapter
+factory is created. Adapter factories remain only at
+`@ts-drp/storage-node/issuance` and `@ts-drp/storage-browser/issuance`.
+
+`DurableIssuanceStore` grows from exactly five methods to exactly six:
+
+```ts
+export interface DurableOutboxPublicationTransitionInput {
+	readonly authorSequence: number;
+	readonly digest: Uint8Array;
+	readonly scope: DurableIssueScope;
+}
+
+export interface DurableIssuanceStore {
+	readonly transactIssue: DurableTransactIssue;
+	compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void>;
+	readIssued(scope: DurableIssueScope, authorSequence: number): Promise<DurableIssueCommit | null>;
+	readOutboxPage(input?: DurableOutboxPageInput): Promise<readonly DurableIssuanceOutboxRecord[]>;
+	readLineage(scope: DurableIssueScope): Promise<DurableLineage>;
+	close(): Promise<void>;
+}
+```
+
+`DurableOutboxPublicationTransitionInput` is declared in
+`packages/issuance-store/src/types.ts` and reaches the package root through the
+existing `export *`. It is the only added public name and is fully erased.
+`DURABLE_ISSUANCE_ERROR_CODES`, `DURABLE_ISSUANCE_RETRY_CLASSES`,
+`TERMINAL_SUPPRESSION_AMBIGUITY_CASES`, both page-limit constants, the scope
+bound, and every existing runtime export of `.` and `./conformance` are
+unchanged. No result object, runtime export, error class or subpath is added.
+The input carries only comparison fields: a detached commit, issued/outbox
+record, canonical preimage, signature, acknowledgement, transport receipt,
+idempotency key or options object is rejected as needless and unsafe; the
+outbox row is the sole publication authority and the issued row is already
+immutable under `transactIssue`.
+
+A resolved `Promise<void>` means only that the exact addressed durable closure
+was observed as `published` by this store after the authoritative transition
+work. It does not identify this invocation as the sole writer and returns no
+durable material.
+
+##### Closed input validation
+
+Availability checks run first: latched poison, then closed. Before any durable
+I/O the input must be one plain closed record with exactly the own enumerable
+data keys `authorSequence`, `digest`, `scope`, validated with the existing
+`isClosedDurableIssuanceRecord`; symbol, inherited, accessor, omitted, extra or
+non-enumerable properties, non-plain and proxy-hostile inputs are rejected with
+the snapshot contained. Field order is top-level shape, then `scope`
+(`assertDurableIssueScope` plus `copyDurableIssueScope`), then
+`authorSequence` (`isValidDurableAuthorSequence`), then `digest`
+(`copyDurableIssuanceBytes`: nonempty, non-`SharedArrayBuffer`-backed and
+detached exactly once). The implementation retains no caller backing storage.
+Every failure, including public misuse, is a Promise rejection; the method
+never throws synchronously.
+
+##### State machine and meaning of `published`
+
+The only durable publication states remain the two the schema already declares
+(`CHECK(publish_state IN ('pending','published'))`; the browser native record's
+existing two-state shape):
+
+```text
+pending --exact key+digest comparison and one successful conditional mark--> published
+published --same exact key+digest--> published
+```
+
+The second edge is idempotent and resolves without a further logical
+transition. No API reverts `published` to `pending`, deletes the row, changes
+its digest, mutates issued bytes, mutates lineage or creates a second row.
+
+`published` is a purely local durable marker: this store has recorded that the
+addressed record must not be re-drained as `pending`. Seam 3 alone will own what
+authorizes the mark; seam 2 defines no transport and its meaning does not
+depend on any unfrozen contract. `published` is not peer receipt, remote
+admission, consensus, propagation completion or network exactly-once.
+Transport handoff and the durable mark are separate authoritative acts: a
+crash after handoff but before the mark leaves `pending` and permits a duplicate
+resend; a crash across the mark reopens to exact old `pending` or exact new
+`published`. Seam 3 must tolerate both duplicate handoff and replayed mark. No
+caller idempotency key or application-level exactly-once claim is added.
+
+##### Backend transition and readback
+
+No DDL, `PRAGMA`, `user_version`, catalog entry, database version, table,
+object store, key path, index, adapter subpath or admission-verification rule
+changes. Both backends already admit `published`; this seam is nevertheless the
+first production writer of that value, and the RED must prove that admission,
+catalog/PRAGMA byte-verification, reopen, `readIssued` and `readOutboxPage` all
+behave exactly as today with published rows present.
+
+Let `O = (L, I, X)` be the lineage, issued row and outbox row at
+`(objectId, author, authorSequence)`. `consumed(L, s)` is exactly
+`L.next > s || (L.exhausted && L.next === s)`. `closure-complete(O)` means:
+`I` and `X` are present and structurally valid per the existing row copiers;
+their compound keys are equal; `I.digest` is byte-equal to `X.digest`; `I`'s
+canonical preimage binds the same scope and ordinal through
+`durablePreimageMatchesScopeAndSequence`; and `consumed(L, s)`.
+
+Node performs one `BEGIN IMMEDIATE` transaction on the existing single
+connection with no `await` and no microtask between `BEGIN IMMEDIATE` and
+`COMMIT`:
+
+1. read `L`, `I` and `X` at the exact key using the existing writer-authority
+   table spelling;
+2. classify `O` by the table below;
+3. for the pending case only, run
+
+```sql
+UPDATE issuance_outbox
+SET publish_state = 'published'
+WHERE object_id = ?
+  AND author = ?
+  AND author_sequence = ?
+  AND digest = ?
+  AND publish_state = 'pending'
+```
+
+through the existing `setReadBigInts(false)` statement helper, requiring
+`changes === 1`;
+
+4. for the already-published case perform no write;
+5. `COMMIT`;
+6. perform exactly one bounded readonly readback on the same connection through
+   the existing private `#readTerminal` observation reader and classify.
+
+A `COMMIT` or readback failure is followed by best-effort rollback where
+applicable, then readback classification.
+
+Browser uses exactly one strict-durability `readwrite` transaction over the
+existing `['lineages', 'issuedRecords', 'issuanceOutbox']` scope, created by the
+existing `strictTransaction` helper and registered with the existing in-flight
+transaction set. It reads the same closure, classifies identically, and for the
+pending case issues exactly one `put` of the complete existing native outbox
+record with only `publishState` changed to `"published"`, requiring the returned
+key to equal `[objectId, author, authorSequence]`. Each request is dispatched
+from the microtask chained to the previous request's success so the transaction
+never auto-commits mid-sequence; no non-IDB await occurs inside it. The
+already-published case issues no `put`. The transaction must reach `complete`
+before one fresh readonly readback on the same database handle through the
+existing private `#readTerminal`. Strict-durability and schema failures keep
+their existing codes; an application-detected inconsistency aborts and
+poisons; a substrate abort is classified through readback. The IDB ownership
+allow-list and `src/internal/issuance-test-control.ts` are unchanged.
+
+The ephemeral conformance implementation mirrors this state machine, copying,
+poisoning, precedence and `void` result exactly, and remains explicitly
+non-durable with no crash claim.
+
+##### Classification ownership, precedence and closed taxonomy
+
+No error code, retry class, error class, registry arm or result type is added.
+`packages/issuance-store/src/terminal.ts` is not reused, widened or modified;
+`TERMINAL_SUPPRESSION_AMBIGUITY_CASES` stays exactly ten. Only the private
+per-adapter terminal observation readers and the existing exported
+`DurableIssuanceTerminalObservation` and
+`DurableIssuanceNativeOutboxRecord` shapes are reused. Publication
+classification is adapter-local and behaviorally identical across the three
+implementations, pinned by one shared RED. A shared private helper in
+issuance-store is forbidden because `index.ts` re-exports `terminal.ts`
+wholesale and the adapter packages may consume only the public package root, so
+any shared helper would become a new runtime export.
+
+The existing `classifyDurableIssuanceTerminalSuppression` is expressly not an
+authority for this transition. It is `publishState`-blind, may emit the
+forbidden `ISSUANCE_RETRY_REQUIRED`, and requires candidate/prior-lineage facts
+that this operation does not possess independently. Reconstructing those facts
+from the observed rows would make validation circular. The semantic table is:
+
+1. latched `ISSUANCE_RECOVERY_CORRUPT`, preserving one poison identity across
+   all six methods;
+2. `ISSUANCE_STORE_CLOSED`;
+3. `ISSUANCE_INVALID_ARGUMENT` as the existing
+   `DurableIssuanceInvalidArgumentError` `TypeError`, before any durable I/O;
+4. existing open/schema/durability failures;
+5. `ISSUANCE_SUBSTRATE_FAILURE` for transaction acquisition and I/O, using the
+   existing busy/locked/full mappings;
+6. observation classification, in this exact order:
+   - `I = null && X = null && !consumed(L, s)` becomes
+     `ISSUANCE_INVALID_ARGUMENT`. The addressed closure was never issued by
+     this store. There is no poison or write and the store remains fully
+     usable. This exposes nothing `readIssued` does not already expose.
+   - `closure-complete(O) && X.digest !== input.digest` by byte comparison
+     becomes `ISSUANCE_INVALID_ARGUMENT`. The caller addressed a different
+     closure; the durable state is internally consistent and is neither corrupt
+     nor a retryable CAS loss. There is no poison or write, and the error
+     carries only its code, never durable bytes.
+   - complete, digest-equal `pending` proceeds to the conditional mark.
+   - complete, digest-equal `published` resolves idempotently with no write.
+   - every other observation — one-sided row, malformed row, key or digest
+     disagreement between `I` and `X`, malformed preimage binding, rows present
+     with an unconsumed lineage, or both rows absent with `consumed(L, s)` —
+     latches `ISSUANCE_RECOVERY_CORRUPT`. No repair is attempted.
+7. a conditional update affecting any row count other than exactly one latches
+   `ISSUANCE_RECOVERY_CORRUPT`;
+8. readback classification:
+   - after a reported-successful commit, exactly complete, digest-equal
+     `published` resolves; anything else, including `pending`, latches
+     `ISSUANCE_RECOVERY_CORRUPT`; unreadable readback is the existing token-free
+     `ISSUANCE_OUTCOME_UNKNOWN`;
+   - after an ambiguous or failed commit, exact complete, digest-equal
+     `published` resolves; exact complete, digest-equal `pending` is
+     `ISSUANCE_SUBSTRATE_FAILURE` with `retryClass: "transient"` and is safely
+     retryable; unreadable is `ISSUANCE_OUTCOME_UNKNOWN`; everything else
+     latches `ISSUANCE_RECOVERY_CORRUPT`;
+   - if the store was poisoned or closed before readback could be taken, poison
+     wins, then `ISSUANCE_STORE_CLOSED`, matching the existing `transactIssue`
+     precedent.
+
+Only exact complete, digest-equal `pending` observed after an ambiguous or
+failed commit is a proven non-application. After a reported-successful commit,
+`pending` is never non-application; it is corruption.
+`ISSUANCE_COMMIT_INVALID`, `ISSUANCE_EXHAUSTED` and
+`ISSUANCE_RETRY_REQUIRED` are never produced. `ISSUANCE_OUTCOME_UNKNOWN`
+carries only its code and the copied caller-known scope — never digest,
+ordinal, publish state, preimage, signature or token.
+
+A `close()` or `versionchange` arriving after the transition is dispatched but
+before readback follows the existing `#commitCandidate` precedent: browser
+close waits for the registered in-flight transaction to settle, and Node close
+is idempotent and non-rejecting. If close prevents readback, rejection is
+poison-first then `ISSUANCE_STORE_CLOSED`, and neither confirms nor denies the
+transition. Callers may infer nothing from `ISSUANCE_OUTCOME_UNKNOWN` or
+post-dispatch `ISSUANCE_STORE_CLOSED` and must take a fresh durable read before
+any decision. Corruption poisons the capability and stops live publication.
+
+##### Concurrency
+
+Node same-process marks cannot interleave inside the synchronous writer;
+`BEGIN IMMEDIATE` plus the existing `busy_timeout` serializes cross-process
+contention, and expiry maps to transient substrate failure. Browser readwrite
+transactions over the same stores on one connection serialize in creation
+order, so a same-connection second mark observes `published` and issues no
+`put`; cross-connection marks may both issue a value-identical `put`. In all
+cases `N` concurrent exact marks yield exactly one logical transition, one row,
+no lineage change and every invocation resolves. The shared RED pins the
+same-connection case exactly and the cross-connection case only to its logical
+outcome, never a physical `put` count. A mark concurrent with `transactIssue`
+on the same scope serializes without deadlock because `buildAndSign` still runs
+outside every transaction.
+
+##### Compatibility, surfaces and deliberate supersessions
+
+Production changes are limited to `packages/issuance-store/src/types.ts` for
+the erased input type and sixth method,
+`packages/issuance-store/src/conformance.ts` for the ephemeral mirror,
+`packages/storage-node/src/internal/node-issuance-store.ts`,
+`packages/storage-browser/src/internal/browser-issuance-store.ts`, and the
+stale five-method JSDoc strings in those two internal files plus
+`packages/storage-node/src/issuance.ts` and
+`packages/storage-browser/src/issuance.ts`. Nothing else in production changes.
+
+This section supersedes exactly these frozen expectations and nothing else:
+
+1. `tests/phase-2l-a-shared-issuance-contract.test.ts` — the five-name
+   `Object.keys(store).sort()` inventory becomes six names including
+   `compareAndMarkOutboxPublished`; its local `DurableIssuanceStore` type mirror
+   gains the method.
+2. `packages/storage-browser/tests/phase-2l-b-browser-issuance-red.pw.ts` — the
+   five-name `value.keys` assertion becomes six names; its asset already reports
+   `Object.keys(store).sort()` and is unchanged.
+3. `packages/storage-node/tests/phase-2l-c-node-issuance-red.test.ts` — both
+   `Object.keys(result).sort()` and `Reflect.ownKeys(result).sort()` become six
+   names and the stale five-member title is corrected. The stale admitted
+   five-method capability JSDoc in
+   `phase-2l-c-node-issuance-corrective-red.test.ts` is corrected in the same
+   change.
+4. `tests/phase-3a1-a-live-preparation-red.test.ts` —
+   `compareAndMarkOutboxPublished` is added to `B_LIVE_IDENTIFIERS` and its
+   exact sorted assertion, between `callback` and
+   `createAdmissionBoundTransactionalVertexIssuer`, so B-live publication
+   cannot enter A-stage node sources.
+
+Byte-identical and explicitly not superseded are
+`packages/issuance-store/src/contract.ts`, `terminal.ts` and `index.ts`
+behavior and runtime exports; the ten error codes, three retry classes and
+ten-case ambiguity registry; the Node five-method mutant fixture, which
+remains a failing control; the 2l-b/2l-c contract fixtures and their existing
+death tuples and five-case ambiguity registries; every 2l-d parity fixture and
+test; both storage `src/index.ts` roots and their pinned hashes; every package
+manifest, export map, dependency set, version and `pnpm-lock.yaml`; the IDB
+ownership allow-list; `packages/node` production source, the node package root
+and `DRPNode`. Protocol-v3 gains no issuance-store dependency, API,
+publication capability or persistence ownership. Its issuer consumes only the
+function type `TransactIssue`, never `DurableIssuanceStore`, so the 2l-d
+mutual-assignability fixture remains valid and the D.93.27 exact-ten public root
+is untouched.
+
+##### RED owners, mutants and gates
+
+Seam 2 uses tests-only RED, bounded GREEN and independent review. The RED owners
+are:
+
+1. `tests/phase-3a1b-p2-outbox-publication-contract.test.ts` for shared
+   ephemeral behavior, declaration and runtime inventory audits;
+2. `packages/storage-node/tests/phase-3a1b-p2-node-outbox-publication-red.test.ts`
+   for real-adapter behavior and the exact pending-path statement trace
+   `begin-immediate, lineage-select, issued-read, outbox-read, outbox-update,
+mutation-commit, readonly-begin, lineage-select, issued-read, outbox-read,
+readonly-commit`, with no microtask inside the writer; the already-published
+   trace is identical minus `outbox-update`;
+3. `packages/storage-node/tests/phase-3a1b-p2-node-outbox-publication-death-red.test.ts`
+   with `tests/fixtures/phase-3a1b-p2-node-publication-contract.ts` and a private
+   seam-2 preload/child pair modeled on the 2l-c technique;
+4. `packages/storage-browser/tests/phase-3a1b-p2-browser-outbox-publication-death-red.pw.ts`
+   with its own seam-2 Playwright config, global setup, asset entry, death
+   worker, crash child and contract fixture, reusing the existing 2l-b
+   persistent-context SIGKILL, 2e6 runner and process-forest authority
+   unchanged.
+
+The shared RED pins the exact six-method inventory on the ephemeral double and
+both real facades at runtime. This is mandatory because the browser facade's
+null-prototype `Object.assign` cast can make a missing implementation typecheck.
+It also pins the Node facade frozen with `Object.prototype`, the browser facade
+null-prototype with zero prototype keys, the erased input declaration,
+unchanged runtime export list, closed input validation, one digest copy,
+pending-to-published success, idempotent exact repeat, immutable issued bytes
+and lineage, unchanged unaddressed rows, concurrent exact marks, never-issued
+and foreign-digest non-poisoning rejection, torn/erased poisoning, one poison
+identity across all six methods, idempotent close and zero new error codes.
+
+Mandatory causal mutants are: compare by key without digest; drop the pending
+guard; accept a foreign digest; classify never-issued as success, retry or
+poison; classify foreign digest as poison or retry; classify a consumed but
+absent closure as invalid rather than corrupt; skip issued, lineage or preimage
+closure validation; resolve on `pending` after reported-successful commit; swap
+the transient/corrupt mapping between ambiguous and successful paths; fabricate
+success for unreadable readback; expose digest, ordinal, state or token on
+unknown outcome; mutate issued bytes, outbox digest, lineage or an unaddressed
+row; add revert, delete or second-row paths; skip readback; use deferred Node
+`BEGIN`; accept row count other than one; introduce an `await` or microtask in
+the Node writer; split browser work across transactions; use non-strict
+durability; read back through a different connection or database handle;
+retain caller digest backing; accept extra, missing, symbol, accessor or
+inherited input; throw synchronously; reuse or widen
+`classifyDurableIssuanceTerminalSuppression`, the observation shapes or
+ten-case registry; produce `ISSUANCE_COMMIT_INVALID`, `ISSUANCE_EXHAUSTED` or
+`ISSUANCE_RETRY_REQUIRED`; add an error code, retry class or runtime export;
+omit the method from either real facade while declarations compile; claim
+network exactly-once or peer receipt; export at a storage root, node root or
+`DRPNode`; or add protocol-v3 publication ownership.
+
+Death evidence uses only armable boundaries. There is no during-commit or
+during-completion edge and no nondeterministic fate. Node has exactly fourteen
+tuples: two scenarios — single row and two rows with the unaddressed row
+byte-unchanged — crossed with `pre-begin`, `begin`, `closure-read`,
+`outbox-update`, `commit` armed immediately after `COMMIT` returns, and
+`readback`, plus two already-published tuples armed after the in-transaction
+read and after `COMMIT`. The first four edges reopen exact old `pending`; commit
+and readback reopen exact new `published`; already-published reopens
+`published`. At least one tuple reopens a nonempty WAL without deleting
+sidecars.
+
+Browser has exactly fourteen corresponding tuples under genuine
+persistent-context process death with fresh-context reopen: two scenarios
+crossed with `pre-transaction`, `transaction-created`, `closure-read`,
+`outbox-put` inside the settling request-success task, `complete` inside the
+transaction-complete event task, and `readback`, plus two already-published
+tuples. `outbox-put` and earlier reopen old `pending`; complete and readback
+reopen exact new `published`. Every tuple preserves all other rows, issued
+bytes and lineages exactly.
+
+Gates are the four seam-2 owners; the four superseded pin owners; full
+2l-a/2l-b/2l-c/2l-d suites; 0g2i and 0g2s preservation; both storage package
+suites; 2l-c and 2l-d compile fixtures; issuance-store, storage-node and
+storage-browser typecheck, build and pack; declaration, built-package,
+packed-package and runtime inventories in agreement; the 3a-1A live-preparation
+sweep; targeted ESLint, Prettier and diff-check.
+
+##### Authorization
+
+This section supersedes only D.93.26 blocker 2 and the four exact expectations
+named above. D.93.17, D.93.23-D.93.28, D.36.4 and every other Phase 2l rule
+remain unchanged. Seam-2 RED becomes authorized only after this exact
+amendment is reviewed, signed and pushed. Seam 3, the whole Phase `3a-1B`, live
+activation and Phase 3b remain unauthorized.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
