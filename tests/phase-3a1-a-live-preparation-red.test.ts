@@ -77,6 +77,8 @@ const stageProbe = vi.hoisted(() => ({
 	expectedParameterHex: undefined as string | undefined,
 	authenticationHashDepth: 0,
 	authenticationHashInputs: [] as readonly Uint8Array[][],
+	trustOpenHashDepth: 0,
+	trustOpenHashInputs: [] as readonly Uint8Array[][],
 	anchorHashInputs: [] as readonly Uint8Array[][],
 	anchorHashMismatch: false,
 	liveEffects: [] as string[],
@@ -131,11 +133,27 @@ vi.mock("@ts-drp/canonical", async (importOriginal) => {
 		},
 		hashDomain(domain: string, ...parts: readonly Uint8Array[]): Uint8Array {
 			if (domain === "ts-drp/epoch-anchor/v3" && parts.length === 1 && isExpectedAnchor(parts[0] as Uint8Array)) {
-				const authenticating = stageProbe.authenticationHashDepth > 0;
-				stageProbe.events.push(authenticating ? "anchor.authenticate.hash" : "anchor.hash");
-				(authenticating ? stageProbe.authenticationHashInputs : stageProbe.anchorHashInputs).push(parts);
+				const context =
+					stageProbe.trustOpenHashDepth > 0
+						? "trust-open"
+						: stageProbe.authenticationHashDepth > 0
+							? "authentication"
+							: "independent";
+				stageProbe.events.push(
+					context === "trust-open"
+						? "trust.open.hash"
+						: context === "authentication"
+							? "anchor.authenticate.hash"
+							: "anchor.hash"
+				);
+				(context === "trust-open"
+					? stageProbe.trustOpenHashInputs
+					: context === "authentication"
+						? stageProbe.authenticationHashInputs
+						: stageProbe.anchorHashInputs
+				).push(parts);
 				const digest = genuine.hashDomain(domain, ...parts);
-				if (!authenticating && stageProbe.anchorHashMismatch) {
+				if (context === "independent" && stageProbe.anchorHashMismatch) {
 					const mismatched = new Uint8Array(digest);
 					mismatched[0] = (mismatched[0] as number) ^ 0xff;
 					return mismatched;
@@ -247,7 +265,13 @@ vi.mock("@ts-drp/control-plane", async (importOriginal) => {
 				...owner,
 				async open(): ReturnType<typeof owner.open> {
 					stageProbe.events.push("trust.open:start");
-					const result = await owner.open();
+					stageProbe.trustOpenHashDepth += 1;
+					let result: Awaited<ReturnType<typeof owner.open>>;
+					try {
+						result = await owner.open();
+					} finally {
+						stageProbe.trustOpenHashDepth -= 1;
+					}
 					stageProbe.events.push("trust.open:resolved");
 					stageProbe.trustOpenResults.push(result);
 					return result;
@@ -391,6 +415,7 @@ function resetStageProbe(): void {
 	}
 	stageProbe.admissionOutputMismatch = false;
 	stageProbe.authenticationHashDepth = 0;
+	stageProbe.trustOpenHashDepth = 0;
 	stageProbe.anchorHashMismatch = false;
 	stageProbe.expectedAnchorHex = undefined;
 	stageProbe.expectedParameterHex = undefined;
@@ -1328,8 +1353,10 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(authenticationInput.detachedSignature).toEqual(expectedSignature);
 		expect(authenticationInput.exactCanonicalAnchorPreimageBytes).not.toBe(anchor);
 		expect(authenticationInput.exactCanonicalAnchorPreimageBytes).toEqual(expectedAnchor);
+		expect(stageProbe.trustOpenHashInputs).toHaveLength(1);
 		expect(stageProbe.authenticationHashInputs).toHaveLength(1);
-		expect(stageProbe.authenticationHashInputs[0]?.[0]).toBe(authenticationInput.exactCanonicalAnchorPreimageBytes);
+		expect(stageProbe.authenticationHashInputs[0]?.[0]).not.toBe(authenticationInput.exactCanonicalAnchorPreimageBytes);
+		expect(stageProbe.authenticationHashInputs[0]?.[0]).toEqual(authenticationInput.exactCanonicalAnchorPreimageBytes);
 		expect(stageProbe.anchorHashInputs).toHaveLength(1);
 		expect(stageProbe.anchorHashInputs[0]?.[0]).toBe(authenticationInput.exactCanonicalAnchorPreimageBytes);
 		expect(stageProbe.parameterDecodeInputs[0]).not.toBe(parameters);
@@ -1350,6 +1377,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			"store.recoverActiveGeneration",
 			"store.getBlob",
 			"trust.record.open",
+			"trust.open.hash",
 			"trust.open:resolved",
 			"anchor.authenticate",
 			"anchor.authenticate.hash",
@@ -1374,8 +1402,13 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		const trustOpen = stageProbe.trustOpenResults[0] as { readonly ok: true; readonly trust: unknown };
 		const authenticationInput = stageProbe.authenticationInputs[0] as { readonly trust: unknown };
 		expect(authenticationInput.trust).toBe(trustOpen.trust);
+		expect(stageProbe.trustOpenHashInputs).toHaveLength(1);
 		expect(stageProbe.authenticationHashInputs).toHaveLength(1);
-		expect(stageProbe.authenticationHashInputs[0]?.[0]).toBe(
+		expect(stageProbe.authenticationHashInputs[0]?.[0]).not.toBe(
+			(stageProbe.authenticationInputs[0] as { readonly exactCanonicalAnchorPreimageBytes: Uint8Array })
+				.exactCanonicalAnchorPreimageBytes
+		);
+		expect(stageProbe.authenticationHashInputs[0]?.[0]).toEqual(
 			(stageProbe.authenticationInputs[0] as { readonly exactCanonicalAnchorPreimageBytes: Uint8Array })
 				.exactCanonicalAnchorPreimageBytes
 		);
@@ -1447,6 +1480,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			expect(stageProbe.events.at(-1), kind).toBe(lastEvent);
 			if (kind === "parameters-rejected") expect(stageProbe.catalogRequests).toEqual([]);
 			if (overrides.detachedSignature !== undefined) {
+				expect(stageProbe.trustOpenHashInputs).toHaveLength(1);
 				expect(stageProbe.authenticationHashInputs).toHaveLength(1);
 				expect(stageProbe.anchorHashInputs).toEqual([]);
 			}
