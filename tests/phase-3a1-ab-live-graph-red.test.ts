@@ -83,6 +83,7 @@ vi.mock("@ts-drp/protocol-v3", async (importOriginal) => {
 			if (!graphProbe.poisonAfterRuntime) return result;
 			const define = Object.defineProperty;
 			const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+			const getPrototypeOf = Object.getPrototypeOf;
 			const reflectApply = Reflect.apply;
 			const testBasename = "phase-3a1-ab-live-graph-red.test.ts";
 			const calledDirectlyByV3Live = (): boolean => {
@@ -124,7 +125,7 @@ vi.mock("@ts-drp/protocol-v3", async (importOriginal) => {
 			for (const key of ["apply", "ownKeys"] as const) {
 				patch(Reflect, key, { configurable: true, value: scopedFunction(asIntrinsic(Reflect[key])), writable: true });
 			}
-			const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype) as object;
+			const typedArrayPrototype = getPrototypeOf(Uint8Array.prototype) as object;
 			for (const key of ["buffer", "byteLength"] as const) {
 				const original = getOwnPropertyDescriptor(typedArrayPrototype, key);
 				if (original?.get === undefined) throw new TypeError(`missing typed-array intrinsic ${key}`);
