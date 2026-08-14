@@ -620,9 +620,7 @@ function snapshotCatalog(catalog: TrustedBlueprintCatalog, value: unknown): Cata
 		canonicalBlueprintPackageBytes === undefined ||
 		typedArrayByteLength(canonicalBlueprintPackageBytes) === 0 ||
 		exactArtifactBytes === undefined ||
-		typedArrayByteLength(exactArtifactBytes) === 0 ||
-		typedArrayBuffer(record.canonicalBlueprintPackageBytes as Uint8Array) ===
-			typedArrayBuffer(record.exactArtifactBytes as Uint8Array)
+		typedArrayByteLength(exactArtifactBytes) === 0
 	) {
 		return undefined;
 	}
