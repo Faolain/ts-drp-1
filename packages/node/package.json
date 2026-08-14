@@ -38,6 +38,7 @@
 		"watch": "tsc -b -w"
 	},
 	"devDependencies": {
+		"@ts-drp/blueprint-catalog": "0.11.0",
 		"@ts-drp/test-utils": "0.11.0",
 		"@types/benchmark": "^2.1.5",
 		"benchmark": "^2.1.4",
@@ -58,6 +59,7 @@
 		"@noble/hashes": "^1.7.1",
 		"@noble/secp256k1": "^2.2.3",
 		"@ts-drp/blueprints": "0.11.0",
+		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/control-plane": "workspace:*",
 		"@ts-drp/interval-discovery": "0.11.0",
 		"@ts-drp/interval-reconnect": "0.11.0",
@@ -67,10 +69,12 @@
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",
 		"@ts-drp/object": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
 		"@ts-drp/relay-policy": "workspace:*",
 		"@ts-drp/rendezvous": "workspace:*",
 		"@ts-drp/routing-browser": "workspace:*",
 		"@ts-drp/routing-node": "workspace:*",
+		"@ts-drp/storage": "0.11.0",
 		"@ts-drp/tracer": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"@ts-drp/utils": "0.11.0",

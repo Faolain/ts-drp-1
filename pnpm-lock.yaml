@@ -766,6 +766,9 @@ importers:
       '@ts-drp/blueprints':
         specifier: 0.11.0
         version: link:../blueprints
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
       '@ts-drp/control-plane':
         specifier: workspace:*
         version: link:../control-plane
@@ -793,6 +796,9 @@ importers:
       '@ts-drp/object':
         specifier: 0.11.0
         version: link:../object
+      '@ts-drp/protocol-v3':
+        specifier: 0.11.0
+        version: link:../protocol-v3
       '@ts-drp/relay-policy':
         specifier: workspace:*
         version: link:../relay-policy
@@ -805,6 +811,9 @@ importers:
       '@ts-drp/routing-node':
         specifier: workspace:*
         version: link:../routing-node
+      '@ts-drp/storage':
+        specifier: 0.11.0
+        version: link:../storage
       '@ts-drp/tracer':
         specifier: 0.11.0
         version: link:../tracer
@@ -836,6 +845,9 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0
     devDependencies:
+      '@ts-drp/blueprint-catalog':
+        specifier: 0.11.0
+        version: link:../blueprint-catalog
       '@ts-drp/test-utils':
         specifier: 0.11.0
         version: link:../test-utils
