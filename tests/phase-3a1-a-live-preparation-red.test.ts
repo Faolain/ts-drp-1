@@ -641,53 +641,74 @@ function instrumentedStore(material = liveMaterial(), gate?: FirstAwaitGate): Ah
 	const baseExpectedHead = Object.freeze({ kind: "none" as const, objectId });
 	const head = Object.freeze({ kind: "present" as const, closureDigest, generationId, objectId, revision });
 	const target = createMemoryAheDurableStore();
-	return new Proxy(target, {
-		get(store, key, receiver): unknown {
-			if (key === "capabilities")
-				return Object.freeze({ durability: "strict", signingEligibility: "backend-capability-required" });
-			if (key === "readHead")
-				return async () => {
-					stageProbe.events.push("store.readHead");
-					if (gate !== undefined) {
-						gate.markEntered();
-						await gate.released;
-					}
-					return Promise.resolve({ ok: true as const, value: head });
-				};
-			if (key === "recoverActiveGeneration")
-				return () => {
-					stageProbe.events.push("store.recoverActiveGeneration");
-					return Promise.resolve({
-						ok: true as const,
-						value: Object.freeze({
-							kind: "active" as const,
-							head,
-							adoptedGeneration: Object.freeze({
-								baseExpectedHead,
-								closure: Object.freeze([ref]),
-								closureDigest,
-								generationId,
-								objectId,
-								state: "Adopted" as const,
-							}),
-							recomputedClosureDigest: closureDigest,
-							references: Object.freeze([ref]),
-						}),
-					});
-				};
-			if (key === "getBlob")
-				return () => {
-					stageProbe.events.push("store.getBlob");
-					return Promise.resolve({ ok: true as const, value: new Uint8Array(trustStateBytes) });
-				};
-			const value = Reflect.get(store, key, receiver) as unknown;
-			if (typeof value !== "function") return value;
-			return (...args: readonly unknown[]): unknown => {
-				stageProbe.events.push(`store.${String(key)}`);
-				return Reflect.apply(value, store, args);
-			};
+	const facade: AheDurableStore = Object.freeze({
+		capabilities: Object.freeze({ durability: "strict", signingEligibility: "backend-capability-required" }),
+		async readHead() {
+			stageProbe.events.push("store.readHead");
+			if (gate !== undefined) {
+				gate.markEntered();
+				await gate.released;
+			}
+			return { ok: true, value: head };
 		},
-	}) as AheDurableStore;
+		readGenerationPage(input) {
+			stageProbe.events.push("store.readGenerationPage");
+			return target.readGenerationPage(input);
+		},
+		recoverActiveGeneration() {
+			stageProbe.events.push("store.recoverActiveGeneration");
+			return Promise.resolve({
+				ok: true,
+				value: Object.freeze({
+					kind: "active",
+					head,
+					adoptedGeneration: Object.freeze({
+						baseExpectedHead,
+						closure: Object.freeze([ref]),
+						closureDigest,
+						generationId,
+						objectId,
+						state: "Adopted",
+					}),
+					recomputedClosureDigest: closureDigest,
+					references: Object.freeze([ref]),
+				}),
+			});
+		},
+		getBlob() {
+			stageProbe.events.push("store.getBlob");
+			return Promise.resolve({ ok: true, value: new Uint8Array(trustStateBytes) });
+		},
+		beginGeneration(input) {
+			stageProbe.events.push("store.beginGeneration");
+			return target.beginGeneration(input);
+		},
+		putCachedBlob(input) {
+			stageProbe.events.push("store.putCachedBlob");
+			return target.putCachedBlob(input);
+		},
+		promoteReference(input) {
+			stageProbe.events.push("store.promoteReference");
+			return target.promoteReference(input);
+		},
+		completeGeneration(input) {
+			stageProbe.events.push("store.completeGeneration");
+			return target.completeGeneration(input);
+		},
+		swapHead(input) {
+			stageProbe.events.push("store.swapHead");
+			return target.swapHead(input);
+		},
+		discardGeneration(input) {
+			stageProbe.events.push("store.discardGeneration");
+			return target.discardGeneration(input);
+		},
+		close() {
+			stageProbe.events.push("store.close");
+			return target.close();
+		},
+	});
+	return facade;
 }
 
 function baselineInput(
@@ -1348,7 +1369,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 	it("maps reachable A-a stage failures without starting a later stage or live effect", async () => {
 		const cases: readonly [PrepareV3LiveFailureKind, Partial<PrepareV3LiveInput>, CatalogMutation, string, boolean?][] =
 			[
-				["trust-open-failed", { store: createMemoryAheDurableStore() }, "none", "trust.open:start"],
+				["trust-open-failed", { store: createMemoryAheDurableStore() }, "none", "trust.open:resolved"],
 				["anchor-authentication-failed", { detachedSignature: new Uint8Array(64) }, "none", "anchor.authenticate"],
 				["anchor-authentication-failed", {}, "none", "anchor.hash", true],
 				[
