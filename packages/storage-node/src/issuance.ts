@@ -9,7 +9,7 @@ export interface NodeDurableIssuanceStoreOptions {
 /**
  * Creates one durable Node issuance capability over the exact derived SQLite authority.
  * @param options - Exact Node factory options.
- * @returns The shared five-method durable issuance capability.
+ * @returns The shared six-method durable issuance capability.
  */
 export function createNodeDurableIssuanceStore(options: NodeDurableIssuanceStoreOptions): DurableIssuanceStore {
 	return createNodeDurableIssuanceStoreImplementation(options);

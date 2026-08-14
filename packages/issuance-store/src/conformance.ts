@@ -1,12 +1,16 @@
 import {
 	cloneDurableIssueCommit as cloneCommit,
 	copyDurableIssueScope as cloneScope,
+	isClosedDurableIssuanceRecord as closedRecord,
 	compareDurableIssuanceCompoundKeys as compareCompoundKey,
 	type DurableIssuanceCompoundKey as CompoundKey,
 	copyAndValidateDurableIssueCommit as copyAndValidateCommit,
+	copyDurableIssuanceBytes as copyBytes,
 	createDurableIssuanceFailure as failure,
 	DurableIssuanceInvalidArgumentError as InvalidArgumentFailure,
 	type DurableIssuanceContractError as IssuanceFailure,
+	durablePreimageMatchesScopeAndSequence as preimageMatches,
+	durableIssuanceBytesEqual as sameBytes,
 	durableIssueScopesEqual as sameScope,
 	assertDurableIssueScope as validateScope,
 	isValidDurableAuthorSequence as validOrdinal,
@@ -21,6 +25,7 @@ import type {
 	DurableIssueScope,
 	DurableLineage,
 	DurableOutboxPageInput,
+	DurableOutboxPublicationTransitionInput,
 } from "./types.js";
 
 export {
@@ -98,12 +103,31 @@ function recoveryPoison(): IssuanceFailure {
 	return Object.freeze(failure("ISSUANCE_RECOVERY_CORRUPT", "durable issuance state is corrupt"));
 }
 
+function capturePublicationInput(input: unknown): DurableOutboxPublicationTransitionInput {
+	try {
+		if (!closedRecord(input, ["authorSequence", "digest", "scope"])) {
+			throw new InvalidArgumentFailure("publication input must be an exact own-data record");
+		}
+		validateScope(input.scope);
+		const scope = cloneScope(input.scope);
+		if (!validOrdinal(input.authorSequence)) {
+			throw new InvalidArgumentFailure("publication input contains an invalid ordinal");
+		}
+		const digest = copyBytes(input.digest);
+		if (digest === undefined) throw new InvalidArgumentFailure("publication input contains an invalid digest");
+		return { authorSequence: input.authorSequence, digest, scope };
+	} catch (error) {
+		if (error instanceof InvalidArgumentFailure) throw error;
+		throw new InvalidArgumentFailure("publication input could not be inspected as a closed record");
+	}
+}
+
 class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	readonly #issued = new Map<string, DurableIssueCommit>();
 	readonly #lineages = new Map<string, DurableLineage>();
 	readonly #outbox = new Map<string, DurableIssuanceOutboxRecord>();
 	#closed = false;
-	readonly #poison?: IssuanceFailure;
+	#poison?: IssuanceFailure;
 
 	constructor(options: EphemeralDurableIssuanceStoreOptions = {}) {
 		let poison = options.initialPoison === "recovery-corrupt" ? recoveryPoison() : undefined;
@@ -125,6 +149,44 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	async close(): Promise<void> {
 		await Promise.resolve();
 		this.#closed = true;
+	}
+
+	// Async is intentional: all capability failures are Promise rejections.
+	// eslint-disable-next-line @typescript-eslint/require-await
+	async compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void> {
+		// Backends add ISSUANCE_SUBSTRATE_FAILURE and ISSUANCE_OUTCOME_UNKNOWN;
+		// every owner retains ISSUANCE_INVALID_ARGUMENT, ISSUANCE_RECOVERY_CORRUPT,
+		// and ISSUANCE_STORE_CLOSED with the same precedence.
+		this.#assertAvailable();
+		const { authorSequence, digest, scope } = capturePublicationInput(input);
+		const key = recordKey(scope, authorSequence);
+		const issued = this.#issued.get(key);
+		const outbox = this.#outbox.get(key);
+		const lineage = this.#lineages.get(scopeKey(scope)) ?? { exhausted: false, next: 0 };
+		const consumed = lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
+		if (issued === undefined && outbox === undefined && !consumed) {
+			throw new InvalidArgumentFailure("publication address has never been issued");
+		}
+		if (issued === undefined || outbox === undefined || !consumed) throw this.#latchCorruption();
+		const commit = outbox.commit;
+		const complete =
+			commit.authorSequence === authorSequence &&
+			issued.authorSequence === authorSequence &&
+			sameScope(commit.outboxEntry.scope, scope) &&
+			sameScope(commit.issuedRecord.scope, scope) &&
+			sameScope(issued.outboxEntry.scope, scope) &&
+			sameScope(issued.issuedRecord.scope, scope) &&
+			sameBytes(commit.envelope.digest, issued.envelope.digest) &&
+			sameBytes(commit.envelope.digest, commit.outboxEntry.envelope.digest) &&
+			sameBytes(commit.envelope.digest, commit.issuedRecord.envelope.digest) &&
+			preimageMatches(issued.envelope.canonicalPreimageBytes, scope, authorSequence);
+		if (!complete) throw this.#latchCorruption();
+		if (!sameBytes(commit.envelope.digest, digest)) {
+			throw new InvalidArgumentFailure("publication digest does not identify the issued closure");
+		}
+		if (outbox.publishState === "pending") {
+			this.#outbox.set(key, { commit, publishState: "published" });
+		}
 	}
 
 	async readIssued(scope: DurableIssueScope, authorSequence: number): Promise<DurableIssueCommit | null> {
@@ -210,6 +272,11 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		if (this.#poison !== undefined) throw this.#poison;
 		if (this.#closed) throw failure("ISSUANCE_STORE_CLOSED", "durable issuance store is closed");
 	}
+
+	#latchCorruption(): IssuanceFailure {
+		this.#poison ??= recoveryPoison();
+		return this.#poison;
+	}
 }
 
 /**
@@ -223,6 +290,7 @@ export function createEphemeralDurableIssuanceStore(
 	const implementation = new EphemeralDurableIssuanceStore(options);
 	return {
 		close: () => implementation.close(),
+		compareAndMarkOutboxPublished: (input) => implementation.compareAndMarkOutboxPublished(input),
 		readIssued: (scope, authorSequence) => implementation.readIssued(scope, authorSequence),
 		readLineage: (scope) => implementation.readLineage(scope),
 		readOutboxPage: (input) => implementation.readOutboxPage(input),

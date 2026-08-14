@@ -73,8 +73,15 @@ export interface DurableOutboxPageInput {
 	readonly scope?: DurableIssueScope;
 }
 
+export interface DurableOutboxPublicationTransitionInput {
+	readonly authorSequence: number;
+	readonly digest: Uint8Array;
+	readonly scope: DurableIssueScope;
+}
+
 export interface DurableIssuanceStore {
 	readonly transactIssue: DurableTransactIssue;
+	compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void>;
 	readIssued(scope: DurableIssueScope, authorSequence: number): Promise<DurableIssueCommit | null>;
 	readOutboxPage(input?: DurableOutboxPageInput): Promise<readonly DurableIssuanceOutboxRecord[]>;
 	readLineage(scope: DurableIssueScope): Promise<DurableLineage>;

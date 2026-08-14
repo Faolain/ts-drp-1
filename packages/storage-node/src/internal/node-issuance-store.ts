@@ -14,12 +14,15 @@ import {
 	type DurableIssuanceNativeOutboxRecord,
 	type DurableIssuanceOutboxRecord,
 	type DurableIssuanceStore,
+	DurableIssuanceUnknownOutcomeError,
 	type DurableIssueCommit,
 	type DurableIssuedRecord,
 	type DurableIssueScope,
 	type DurableLineage,
 	type DurableOutboxPageInput,
+	type DurableOutboxPublicationTransitionInput,
 	durablePreimageMatchesScopeAndSequence,
+	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
@@ -362,6 +365,56 @@ class NodeIssuanceImplementation {
 		return this.#closePromise;
 	}
 
+	// Async is intentional: input and availability failures are Promise rejections.
+	// eslint-disable-next-line @typescript-eslint/require-await
+	async compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void> {
+		this.#assertAvailable();
+		const captured = this.#capturePublicationInput(input);
+		let began = false;
+		let committing = false;
+		try {
+			this.#database.exec("BEGIN IMMEDIATE");
+			began = true;
+			const observation = this.#queryTerminal(captured.scope, captured.authorSequence);
+			const status = this.#publicationStatus(observation, captured);
+			if (status === "never-issued") {
+				this.#database.exec("ROLLBACK");
+				began = false;
+				throw invalid("publication address has never been issued");
+			}
+			if (status === "foreign-digest") {
+				this.#database.exec("ROLLBACK");
+				began = false;
+				throw invalid("publication digest does not identify the issued closure");
+			}
+			if (status === "corrupt") throw this.#latchCorruption("publication closure is incomplete or malformed");
+			if (status === "pending") {
+				const changes = statement(
+					this.#database,
+					"UPDATE issuance_outbox SET publish_state = 'published' WHERE object_id=? AND author=? AND author_sequence=? AND digest=? AND publish_state = 'pending'"
+				).run(captured.scope.objectId, captured.scope.author, captured.authorSequence, captured.digest).changes;
+				if (changes !== 1) throw this.#latchCorruption("publication update changed an impossible row count");
+			}
+			committing = true;
+			this.#database.exec("COMMIT");
+			began = false;
+			committing = false;
+		} catch (error) {
+			if (began || committing) {
+				try {
+					this.#database.exec("ROLLBACK");
+				} catch {
+					// Preserve the publication failure.
+				}
+			}
+			if (committing) return this.#classifyPublicationReadback(captured, "ambiguous");
+			if (error === this.#poison) throw error;
+			if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
+			throw mapSubstrate(error, "publication write failed");
+		}
+		return this.#classifyPublicationReadback(captured, "success");
+	}
+
 	// Async is intentional: all capability failures are Promise rejections.
 	// eslint-disable-next-line @typescript-eslint/require-await
 	async readLineage(scope: DurableIssueScope): Promise<DurableLineage> {
@@ -597,45 +650,9 @@ class NodeIssuanceImplementation {
 	#readTerminal(scope: DurableIssueScope, authorSequence: number): TerminalReadback {
 		this.#database.exec("BEGIN");
 		try {
-			const lineage = readNativeLineage(this.#database, scope, "writer");
-			const issuedRaw = statement(
-				this.#database,
-				"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records WHERE object_id=? AND author=? AND author_sequence=?"
-			).get(scope.objectId, scope.author, authorSequence);
-			const outboxRaw = statement(
-				this.#database,
-				"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?"
-			).get(scope.objectId, scope.author, authorSequence);
+			const observation = this.#queryTerminal(scope, authorSequence);
 			this.#database.exec("COMMIT");
-			const issued = issuedRaw === undefined ? null : copyIssuedRow(issuedRaw);
-			const outbox = outboxRaw === undefined ? null : copyOutboxRow(outboxRaw);
-			if (lineage === undefined || issued === undefined || outbox === undefined) {
-				throw this.#latchCorruption("terminal readback contains a malformed row");
-			}
-			return {
-				issuedRecord:
-					issued === null
-						? null
-						: {
-								authorSequence: issued.authorSequence,
-								envelope: {
-									canonicalPreimageBytes: issued.canonicalPreimageBytes,
-									digest: issued.digest,
-									signature: issued.signature,
-								},
-								scope: { author: issued.author, objectId: issued.objectId },
-							},
-				lineage: { exhausted: lineage.exhausted, next: lineage.next },
-				outboxRecord:
-					outbox === null
-						? null
-						: {
-								authorSequence: outbox.authorSequence,
-								digest: outbox.digest,
-								publishState: outbox.publishState,
-								scope: { author: outbox.author, objectId: outbox.objectId },
-							},
-			};
+			return observation;
 		} catch (error) {
 			try {
 				this.#database.exec("ROLLBACK");
@@ -644,6 +661,114 @@ class NodeIssuanceImplementation {
 			}
 			throw error;
 		}
+	}
+
+	#queryTerminal(scope: DurableIssueScope, authorSequence: number): TerminalReadback {
+		const lineage = readNativeLineage(this.#database, scope, "writer");
+		const issuedRaw = statement(
+			this.#database,
+			"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records WHERE object_id=? AND author=? AND author_sequence=?"
+		).get(scope.objectId, scope.author, authorSequence);
+		const outboxRaw = statement(
+			this.#database,
+			"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?"
+		).get(scope.objectId, scope.author, authorSequence);
+		const issued = issuedRaw === undefined ? null : copyIssuedRow(issuedRaw);
+		const outbox = outboxRaw === undefined ? null : copyOutboxRow(outboxRaw);
+		if (lineage === undefined || issued === undefined || outbox === undefined) {
+			throw this.#latchCorruption("terminal readback contains a malformed row");
+		}
+		return {
+			issuedRecord:
+				issued === null
+					? null
+					: {
+							authorSequence: issued.authorSequence,
+							envelope: {
+								canonicalPreimageBytes: issued.canonicalPreimageBytes,
+								digest: issued.digest,
+								signature: issued.signature,
+							},
+							scope: { author: issued.author, objectId: issued.objectId },
+						},
+			lineage: { exhausted: lineage.exhausted, next: lineage.next },
+			outboxRecord:
+				outbox === null
+					? null
+					: {
+							authorSequence: outbox.authorSequence,
+							digest: outbox.digest,
+							publishState: outbox.publishState,
+							scope: { author: outbox.author, objectId: outbox.objectId },
+						},
+		};
+	}
+
+	#capturePublicationInput(input: DurableOutboxPublicationTransitionInput): DurableOutboxPublicationTransitionInput {
+		try {
+			if (!isClosedDurableIssuanceRecord(input, ["authorSequence", "digest", "scope"])) {
+				throw invalid("publication input must be an exact own-data record");
+			}
+			assertDurableIssueScope(input.scope);
+			const scope = copyDurableIssueScope(input.scope);
+			if (!isValidDurableAuthorSequence(input.authorSequence)) {
+				throw invalid("publication input contains an invalid ordinal");
+			}
+			const digest = copyDurableIssuanceBytes(input.digest);
+			if (digest === undefined) throw invalid("publication input contains an invalid digest");
+			return { authorSequence: input.authorSequence, digest, scope };
+		} catch (error) {
+			if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
+			throw invalid("publication input could not be inspected as a closed record");
+		}
+	}
+
+	#publicationStatus(
+		observation: TerminalReadback,
+		input: DurableOutboxPublicationTransitionInput
+	): "corrupt" | "foreign-digest" | "never-issued" | "pending" | "published" {
+		const { issuedRecord, lineage, outboxRecord } = observation;
+		const consumed = lineageConsumed(lineage, input.authorSequence);
+		if (issuedRecord === null && outboxRecord === null && !consumed) return "never-issued";
+		if (issuedRecord === null || outboxRecord === null || !consumed) return "corrupt";
+		if (
+			issuedRecord.authorSequence !== input.authorSequence ||
+			outboxRecord.authorSequence !== input.authorSequence ||
+			!this.#sameScope(issuedRecord.scope, input.scope) ||
+			!this.#sameScope(outboxRecord.scope, input.scope) ||
+			!bytesEqual(issuedRecord.envelope.digest, outboxRecord.digest) ||
+			!durablePreimageMatchesScopeAndSequence(
+				issuedRecord.envelope.canonicalPreimageBytes,
+				input.scope,
+				input.authorSequence
+			)
+		) {
+			return "corrupt";
+		}
+		if (!bytesEqual(issuedRecord.envelope.digest, input.digest)) return "foreign-digest";
+		return outboxRecord.publishState;
+	}
+
+	#classifyPublicationReadback(input: DurableOutboxPublicationTransitionInput, commit: "ambiguous" | "success"): void {
+		this.#assertAvailable();
+		let observation: TerminalReadback;
+		try {
+			observation = this.#readTerminal(input.scope, input.authorSequence);
+		} catch (error) {
+			if (error === this.#poison || error instanceof DurableIssuanceContractError) throw error;
+			throw new DurableIssuanceUnknownOutcomeError(input.scope);
+		}
+		this.#assertAvailable();
+		const status = this.#publicationStatus(observation, input);
+		if (status === "published") return;
+		if (status === "pending" && commit === "ambiguous") {
+			throw createDurableIssuanceFailure(
+				"ISSUANCE_SUBSTRATE_FAILURE",
+				"publication commit did not become durable",
+				"transient"
+			);
+		}
+		throw this.#latchCorruption("publication terminal readback is incomplete or malformed");
 	}
 
 	#assertAvailable(): void {
@@ -732,7 +857,7 @@ class NodeIssuanceImplementation {
 /**
  * Creates one exact Node SQLite issuance capability.
  * @param options - Untrusted exact Node factory options.
- * @returns A frozen plain five-method facade.
+ * @returns A frozen plain six-method facade.
  */
 export function createNodeDurableIssuanceStoreImplementation(options: unknown): DurableIssuanceStore {
 	const primaryFilename = capturePrimaryFilename(options);
@@ -752,6 +877,8 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown): 
 		const implementation = new NodeIssuanceImplementation(database);
 		return Object.freeze({
 			close: (): Promise<void> => implementation.close(),
+			compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
+				implementation.compareAndMarkOutboxPublished(input),
 			readIssued: (scope: DurableIssueScope, authorSequence: number) =>
 				implementation.readIssued(scope, authorSequence),
 			readLineage: (scope: DurableIssueScope) => implementation.readLineage(scope),

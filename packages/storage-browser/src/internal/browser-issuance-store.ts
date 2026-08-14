@@ -14,11 +14,14 @@ import {
 	type DurableIssuanceNativeOutboxRecord,
 	type DurableIssuanceOutboxRecord,
 	type DurableIssuanceStore,
+	DurableIssuanceUnknownOutcomeError,
 	type DurableIssueCommit,
 	type DurableIssuedRecord,
 	type DurableIssueScope,
 	type DurableLineage,
 	type DurableOutboxPageInput,
+	type DurableOutboxPublicationTransitionInput,
+	durablePreimageMatchesScopeAndSequence,
 	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
@@ -308,6 +311,72 @@ class BrowserIssuanceImplementation {
 		void this.close();
 	}
 
+	async compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void> {
+		// Publication owns ISSUANCE_INVALID_ARGUMENT, ISSUANCE_RECOVERY_CORRUPT,
+		// ISSUANCE_STORE_CLOSED, ISSUANCE_SUBSTRATE_FAILURE, and
+		// ISSUANCE_OUTCOME_UNKNOWN without delegating to terminal suppression.
+		this.#assertAvailable();
+		const captured = this.#capturePublicationInput(input);
+		let transaction: IDBTransaction;
+		try {
+			transaction = this.#startTransaction("readwrite");
+		} catch (error) {
+			this.#assertAvailable();
+			throw error;
+		}
+		const terminal = transactionResult(transaction);
+		let reason: Error | undefined;
+		try {
+			const key = [captured.scope.objectId, captured.scope.author, captured.authorSequence];
+			const rawLineage = await requestResult(
+				transaction.objectStore("lineages").get([captured.scope.objectId, captured.scope.author])
+			);
+			const rawIssued = await requestResult(transaction.objectStore("issuedRecords").get(key));
+			const rawOutbox = await requestResult(transaction.objectStore("issuanceOutbox").get(key));
+			let observation: TerminalReadback;
+			try {
+				observation = this.#terminalFromRaw(captured.scope, rawLineage, rawIssued, rawOutbox);
+			} catch (error) {
+				reason = error instanceof Error ? error : this.#latchCorruption("publication closure is unreadable");
+				transaction.abort();
+				throw reason;
+			}
+			const status = this.#publicationStatus(observation, captured);
+			if (status === "never-issued") reason = invalid("publication address has never been issued");
+			else if (status === "foreign-digest") {
+				reason = invalid("publication digest does not identify the issued closure");
+			} else if (status === "corrupt") {
+				reason = this.#latchCorruption("publication closure is incomplete or malformed");
+			} else if (status === "pending") {
+				const row = observation.outboxRecord;
+				if (row === null) throw this.#latchCorruption("publication outbox row disappeared");
+				const writtenKey = await requestResult(
+					transaction.objectStore("issuanceOutbox").put({
+						author: row.scope.author,
+						authorSequence: row.authorSequence,
+						digest: new Uint8Array(row.digest),
+						objectId: row.scope.objectId,
+						publishState: "published",
+					})
+				);
+				if (!this.#sameNativeRecordKey(writtenKey, captured.scope, captured.authorSequence)) {
+					reason = this.#latchCorruption("publication put returned an impossible key");
+					transaction.abort();
+				}
+			}
+			if (reason !== undefined) transaction.abort();
+			await terminal;
+			if (reason !== undefined) throw reason;
+		} catch {
+			await terminal.catch(() => undefined);
+			if (reason !== undefined) throw reason;
+			if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
+			return this.#classifyPublicationReadback(captured, "ambiguous");
+		}
+		this.#assertAvailable();
+		return this.#classifyPublicationReadback(captured, "success");
+	}
+
 	async readLineage(scope: DurableIssueScope): Promise<DurableLineage> {
 		this.#assertAvailable();
 		assertDurableIssueScope(scope);
@@ -528,6 +597,15 @@ class BrowserIssuanceImplementation {
 			requestResult(transaction.objectStore("issuanceOutbox").get(key)),
 		]);
 		await transactionResult(transaction);
+		return this.#terminalFromRaw(scope, rawLineage, rawIssued, rawOutbox);
+	}
+
+	#terminalFromRaw(
+		scope: DurableIssueScope,
+		rawLineage: unknown,
+		rawIssued: unknown,
+		rawOutbox: unknown
+	): TerminalReadback {
 		const lineage = rawLineage === undefined ? { exhausted: false, next: 0 } : copyNativeLineage(rawLineage, scope);
 		const issued = rawIssued === undefined ? null : copyNativeIssued(rawIssued);
 		const outbox = rawOutbox === undefined ? null : copyNativeOutbox(rawOutbox);
@@ -558,6 +636,83 @@ class BrowserIssuanceImplementation {
 							scope: { author: outbox.author, objectId: outbox.objectId },
 						},
 		};
+	}
+
+	#capturePublicationInput(input: DurableOutboxPublicationTransitionInput): DurableOutboxPublicationTransitionInput {
+		try {
+			if (!isClosedDurableIssuanceRecord(input, ["authorSequence", "digest", "scope"])) {
+				throw invalid("publication input must be an exact own-data record");
+			}
+			assertDurableIssueScope(input.scope);
+			const scope = copyDurableIssueScope(input.scope);
+			if (!isValidDurableAuthorSequence(input.authorSequence)) {
+				throw invalid("publication input contains an invalid ordinal");
+			}
+			const digest = copyDurableIssuanceBytes(input.digest);
+			if (digest === undefined) throw invalid("publication input contains an invalid digest");
+			return { authorSequence: input.authorSequence, digest, scope };
+		} catch (error) {
+			if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
+			throw invalid("publication input could not be inspected as a closed record");
+		}
+	}
+
+	#sameNativeRecordKey(value: IDBValidKey, scope: DurableIssueScope, authorSequence: number): boolean {
+		return (
+			Array.isArray(value) &&
+			value.length === 3 &&
+			value[0] === scope.objectId &&
+			value[1] === scope.author &&
+			value[2] === authorSequence
+		);
+	}
+
+	#publicationStatus(
+		observation: TerminalReadback,
+		input: DurableOutboxPublicationTransitionInput
+	): "corrupt" | "foreign-digest" | "never-issued" | "pending" | "published" {
+		const { issuedRecord, lineage, outboxRecord } = observation;
+		const consumed = lineageConsumed(lineage, input.authorSequence);
+		if (issuedRecord === null && outboxRecord === null && !consumed) return "never-issued";
+		if (issuedRecord === null || outboxRecord === null || !consumed) return "corrupt";
+		if (
+			issuedRecord.authorSequence !== input.authorSequence ||
+			outboxRecord.authorSequence !== input.authorSequence ||
+			!this.#sameScope(issuedRecord.scope, input.scope) ||
+			!this.#sameScope(outboxRecord.scope, input.scope) ||
+			!this.#bytesEqual(issuedRecord.envelope.digest, outboxRecord.digest) ||
+			!durablePreimageMatchesScopeAndSequence(
+				issuedRecord.envelope.canonicalPreimageBytes,
+				input.scope,
+				input.authorSequence
+			)
+		) {
+			return "corrupt";
+		}
+		if (!this.#bytesEqual(issuedRecord.envelope.digest, input.digest)) return "foreign-digest";
+		return outboxRecord.publishState;
+	}
+
+	async #classifyPublicationReadback(
+		input: DurableOutboxPublicationTransitionInput,
+		commit: "ambiguous" | "success"
+	): Promise<void> {
+		this.#assertAvailable();
+		let observation: TerminalReadback;
+		try {
+			observation = await this.#readTerminal(input.scope, input.authorSequence);
+		} catch (error) {
+			if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
+			if (error instanceof DurableIssuanceContractError) throw error;
+			throw new DurableIssuanceUnknownOutcomeError(input.scope);
+		}
+		this.#assertAvailable();
+		const status = this.#publicationStatus(observation, input);
+		if (status === "published") return;
+		if (status === "pending" && commit === "ambiguous") {
+			throw substrate("publication commit did not become durable", "transient");
+		}
+		throw this.#latchCorruption("publication terminal readback is incomplete or malformed");
 	}
 
 	#startTransaction(mode: IDBTransactionMode): IDBTransaction {
@@ -738,7 +893,7 @@ async function admitDatabase(database: IDBDatabase): Promise<void> {
 /**
  * Creates one strict-durability browser issuance capability over a dedicated derived IndexedDB database.
  * @param options - Untrusted exact browser factory options.
- * @returns The five-method shared issuance capability.
+ * @returns The six-method shared issuance capability.
  */
 export async function createBrowserDurableIssuanceStoreImplementation(options: unknown): Promise<DurableIssuanceStore> {
 	const primaryDatabaseName = captureOptions(options);
@@ -749,6 +904,8 @@ export async function createBrowserDurableIssuanceStoreImplementation(options: u
 		await admitDatabase(database);
 		const store = Object.assign(Object.create(null) as DurableIssuanceStore, {
 			close: (): Promise<void> => implementation.close(),
+			compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
+				implementation.compareAndMarkOutboxPublished(input),
 			readIssued: (scope: DurableIssueScope, authorSequence: number) =>
 				implementation.readIssued(scope, authorSequence),
 			readLineage: (scope: DurableIssueScope) => implementation.readLineage(scope),
