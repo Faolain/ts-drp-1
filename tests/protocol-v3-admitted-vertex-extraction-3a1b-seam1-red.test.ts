@@ -79,7 +79,7 @@ vi.mock("../packages/protocol-v3/node_modules/@noble/curves/ed25519.js", async (
 	};
 });
 
-const { encodeCanonical } = await import("@ts-drp/canonical");
+const { decodeCanonical, encodeCanonical } = await import("@ts-drp/canonical");
 
 interface RawPublicKey {
 	readonly bytes: Uint8Array;
@@ -341,6 +341,14 @@ function assertDetachedCanonicalCopy(actual: unknown, source: unknown, path = "o
 	}
 }
 
+function assertCanonicalZeroNormalization(vertex: Readonly<Record<string, unknown>>): void {
+	const nested = (vertex.operation as Record<string, unknown>).nested as Record<string, unknown>;
+	expect(Object.is((nested.float32 as Float32Array)[1], 0)).toBe(true);
+	expect(Object.is((nested.float32 as Float32Array)[1], -0)).toBe(false);
+	expect(Object.is((nested.float64 as Float64Array)[1], 0)).toBe(true);
+	expect(Object.is((nested.float64 as Float64Array)[1], -0)).toBe(false);
+}
+
 function vertexPreimage(operation: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
 	return {
 		kind: "drp-vertex",
@@ -431,14 +439,27 @@ async function validCase(
 	limit = 16_384
 ): Promise<{
 	readonly admission: unknown;
+	readonly independentlyDecodedVertex: Readonly<Record<string, unknown>>;
 	readonly input: AdmitInput;
 	readonly remote: RemoteCase;
 }> {
 	const admission = await preparedAdmission(limit);
 	const remote = signedRemote(operation);
+	const independentlyDecodedVertex = decodeCanonical(remote.bytes);
+	if (
+		independentlyDecodedVertex === null ||
+		typeof independentlyDecodedVertex !== "object" ||
+		Array.isArray(independentlyDecodedVertex)
+	)
+		throw new TypeError("SEAM1_INDEPENDENT_DECODE_NOT_RECORD");
 	const input = exactInput(remote, admission);
 	resetCalls();
-	return { admission, input, remote };
+	return {
+		admission,
+		independentlyDecodedVertex: independentlyDecodedVertex as Readonly<Record<string, unknown>>,
+		input,
+		remote,
+	};
 }
 
 function resolvedCallNames(declaration: ts.FunctionDeclaration): readonly string[] {
@@ -548,60 +569,129 @@ function auditDecisionOwnership(sourceText: string): readonly string[] {
 	return violations.sort();
 }
 
-function stringArrays(sourceText: string): readonly (readonly string[])[] {
-	const source = ts.createSourceFile("pin.ts", sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	const output: string[][] = [];
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+	while (
+		ts.isAsExpression(expression) ||
+		ts.isParenthesizedExpression(expression) ||
+		ts.isSatisfiesExpression(expression)
+	)
+		expression = expression.expression;
+	return expression;
+}
+
+function stringArray(expression: ts.Expression): readonly string[] | undefined {
+	const unwrapped = unwrapExpression(expression);
+	if (!ts.isArrayLiteralExpression(unwrapped) || !unwrapped.elements.every(ts.isStringLiteral)) return undefined;
+	return unwrapped.elements.map((element) => (element as ts.StringLiteral).text);
+}
+
+function namedVariableStringArray(source: ts.SourceFile, ownerName: string): readonly string[] {
+	const matches: Array<readonly string[]> = [];
+	for (const statement of source.statements) {
+		if (!ts.isVariableStatement(statement)) continue;
+		for (const declaration of statement.declarationList.declarations) {
+			if (
+				ts.isIdentifier(declaration.name) &&
+				declaration.name.text === ownerName &&
+				declaration.initializer !== undefined
+			) {
+				const values = stringArray(declaration.initializer);
+				if (values !== undefined) matches.push(values);
+			}
+		}
+	}
+	expect(matches, `${source.fileName}:${ownerName}`).toHaveLength(1);
+	return matches[0] ?? [];
+}
+
+function isSortedPublicRootKeysExpectation(call: ts.CallExpression): boolean {
+	if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "toEqual") return false;
+	const expectCall = call.expression.expression;
+	if (
+		!ts.isCallExpression(expectCall) ||
+		!ts.isIdentifier(expectCall.expression) ||
+		expectCall.expression.text !== "expect"
+	)
+		return false;
+	const sortCall = expectCall.arguments[0];
+	if (
+		sortCall === undefined ||
+		!ts.isCallExpression(sortCall) ||
+		!ts.isPropertyAccessExpression(sortCall.expression) ||
+		sortCall.expression.name.text !== "sort"
+	)
+		return false;
+	const keysCall = sortCall.expression.expression;
+	return (
+		ts.isCallExpression(keysCall) &&
+		ts.isPropertyAccessExpression(keysCall.expression) &&
+		ts.isIdentifier(keysCall.expression.expression) &&
+		keysCall.expression.expression.text === "Object" &&
+		keysCall.expression.name.text === "keys" &&
+		keysCall.arguments.length === 1
+	);
+}
+
+function namedPublicSurfaceTestArray(source: ts.SourceFile, testName: string): readonly string[] {
+	const matches: Array<readonly string[]> = [];
 	const visit = (node: ts.Node): void => {
-		if (ts.isArrayLiteralExpression(node) && node.elements.every(ts.isStringLiteral)) {
-			output.push(node.elements.map((element) => (element as ts.StringLiteral).text));
+		if (
+			ts.isCallExpression(node) &&
+			ts.isIdentifier(node.expression) &&
+			node.expression.text === "it" &&
+			ts.isStringLiteral(node.arguments[0]) &&
+			node.arguments[0].text === testName &&
+			node.arguments[1] !== undefined &&
+			ts.isFunctionLike(node.arguments[1])
+		) {
+			const findAllowlist = (candidate: ts.Node): void => {
+				if (
+					ts.isCallExpression(candidate) &&
+					isSortedPublicRootKeysExpectation(candidate) &&
+					candidate.arguments[0] !== undefined
+				) {
+					const values = stringArray(candidate.arguments[0]);
+					if (values?.[0] === "ANCHOR_TRUST_STATE_MAX_RECORD_BYTES") matches.push(values);
+				}
+				ts.forEachChild(candidate, findAllowlist);
+			};
+			findAllowlist(node.arguments[1]);
 		}
 		ts.forEachChild(node, visit);
 	};
 	visit(source);
-	return output;
+	expect(matches, `${source.fileName}:${testName}`).toHaveLength(1);
+	return matches[0] ?? [];
 }
 
-function runtimeArrays(path: string): readonly (readonly string[])[] {
-	return stringArrays(readFileSync(path, "utf8")).filter(
-		(values) => values.includes("admitReceivedVertex") && values.includes("prepareBlueprintRuntime")
-	);
+function runtimeAllowlist(path: string): readonly string[] {
+	const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	if (path.endsWith("public-export-contract.mjs")) return namedVariableStringArray(source, "expected");
+	if (path.endsWith("protocol-v3-anchor-trust-3a0.test.ts"))
+		return namedVariableStringArray(source, "EXPECTED_RUNTIME_EXPORTS");
+	if (path.endsWith("phase-3a1-a-live-preparation-red.test.ts"))
+		return namedVariableStringArray(source, "PROTOCOL_V3_RUNTIME_EXPORTS");
+	if (path.endsWith("protocol-v3-blueprint-operation-budget-0p2.test.ts"))
+		return namedPublicSurfaceTestArray(
+			source,
+			"[public-surface] preserves exactly the nine package-root runtime exports"
+		);
+	if (path.endsWith("protocol-v3-blueprint-work-budget-0p0.test.ts"))
+		return namedPublicSurfaceTestArray(
+			source,
+			"[public-surface] keeps governance inside the existing preparer with no new runtime helper export"
+		);
+	throw new Error(`SEAM1_UNKNOWN_RUNTIME_PIN_OWNER:${path}`);
 }
 
 function assertExactRuntimePins(path: string): void {
-	const arrays = runtimeArrays(path);
-	expect(arrays.length, path).toBeGreaterThan(0);
-	for (const values of arrays) expect(values, path).toEqual(EXPECTED_RUNTIME_EXPORTS);
+	expect(runtimeAllowlist(path), path).toEqual(EXPECTED_RUNTIME_EXPORTS);
 }
 
 describe("D.93.27 public extraction seam tests-only RED", () => {
 	beforeEach(() => resetCalls());
 
 	it("pins the exact runtime root and all seven live source/type owners", async () => {
-		expect(Object.keys(await surfaceLoad).sort()).toEqual(EXPECTED_RUNTIME_EXPORTS);
-
-		const publicSource = readFileSync(PUBLIC_ENTRY, "utf8");
-		for (const name of [
-			"extractAdmittedReceivedVertex",
-			"AdmittedReceivedVertexView",
-			"ExtractAdmittedReceivedVertexFailureReason",
-			"ExtractAdmittedReceivedVertexResult",
-		]) {
-			expect(publicSource, name).toMatch(new RegExp(`\\b${name}\\b`, "u"));
-		}
-
-		const smoke = protocolV3Package.scripts["smoke:public-package"];
-		expect(smoke).toContain("extractAdmittedReceivedVertex");
-		expect(smoke).not.toContain("verifyReceivedVertex', 'extractAdmittedReceivedVertex");
-		const requiredLiteral = /const required = \[(?<values>[^\]]*)\]/u.exec(smoke)?.groups?.values;
-		expect(requiredLiteral).toBeDefined();
-		expect(requiredLiteral?.match(/'([^']+)'/gu)?.map((quoted) => quoted.slice(1, -1))).toEqual(
-			EXPECTED_RUNTIME_EXPORTS
-		);
-		const forbiddenLiteral = /const forbidden = \[(?<values>[^\]]*)\]/u.exec(smoke)?.groups?.values;
-		expect(forbiddenLiteral).toBeDefined();
-		expect(forbiddenLiteral?.match(/'([^']+)'/gu)?.map((quoted) => quoted.slice(1, -1))).toEqual(
-			EXPECTED_FORBIDDEN_RUNTIME_EXPORTS
-		);
 		for (const path of [
 			resolve(ROOT, "tests/fixtures/phase-3a0-v3/public-entry-type-audit.ts"),
 			resolve(ROOT, "tests/fixtures/phase-3a0-v3/built-package-type-audit.ts"),
@@ -628,11 +718,37 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 		expect(readFileSync(resolve(ROOT, "tests/phase-3a1-a-live-preparation-red.test.ts"), "utf8")).toContain(
 			'"extractAdmittedReceivedVertex"'
 		);
+
+		const smoke = protocolV3Package.scripts["smoke:public-package"];
+		expect(smoke).toContain("extractAdmittedReceivedVertex");
+		expect(smoke).not.toContain("verifyReceivedVertex', 'extractAdmittedReceivedVertex");
+		const requiredLiteral = /const required = \[(?<values>[^\]]*)\]/u.exec(smoke)?.groups?.values;
+		expect(requiredLiteral).toBeDefined();
+		expect(requiredLiteral?.match(/'([^']+)'/gu)?.map((quoted) => quoted.slice(1, -1))).toEqual(
+			EXPECTED_RUNTIME_EXPORTS
+		);
+		const forbiddenLiteral = /const forbidden = \[(?<values>[^\]]*)\]/u.exec(smoke)?.groups?.values;
+		expect(forbiddenLiteral).toBeDefined();
+		expect(forbiddenLiteral?.match(/'([^']+)'/gu)?.map((quoted) => quoted.slice(1, -1))).toEqual(
+			EXPECTED_FORBIDDEN_RUNTIME_EXPORTS
+		);
+
+		const publicSource = readFileSync(PUBLIC_ENTRY, "utf8");
+		for (const name of [
+			"extractAdmittedReceivedVertex",
+			"AdmittedReceivedVertexView",
+			"ExtractAdmittedReceivedVertexFailureReason",
+			"ExtractAdmittedReceivedVertexResult",
+		]) {
+			expect(publicSource, name).toMatch(new RegExp(`\\b${name}\\b`, "u"));
+		}
+		expect(Object.keys(await surfaceLoad).sort()).toEqual(EXPECTED_RUNTIME_EXPORTS);
 	});
 
 	it("preserves the old facade exact shapes, unfrozen results, digest identity, throws and single-pass counts", async () => {
 		const admit = await admitFunction();
 		const valid = await validCase();
+		assertCanonicalZeroNormalization(valid.independentlyDecodedVertex);
 		const success = admit(valid.input);
 		expect(Object.keys(success)).toEqual(["admitted", "digest"]);
 		expect(success).toEqual({ admitted: true, digest: valid.remote.digest });
@@ -743,10 +859,15 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 		if (decodedVertex === undefined) throw new TypeError("SEAM1_DECODED_VERTEX_MISSING");
 		expect(first.vertex.dependencies).not.toBe(decodedVertex.dependencies);
 		expect(first.vertex.operation).not.toBe(decodedVertex.operation);
+		expect(first.vertex.dependencies).toEqual(valid.independentlyDecodedVertex.dependencies);
+		expect(first.vertex.operation).toEqual(valid.independentlyDecodedVertex.operation);
 		assertDetachedCanonicalCopy(first.vertex.dependencies, decodedVertex.dependencies, "dependencies");
 		assertDetachedCanonicalCopy(first.vertex.operation, decodedVertex.operation, "operation");
 
 		const nested = first.vertex.operation.nested as Record<string, unknown>;
+		const independentlyDecodedNested = (valid.independentlyDecodedVertex.operation as Record<string, unknown>)
+			.nested as Record<string, unknown>;
+		assertCanonicalZeroNormalization(valid.independentlyDecodedVertex);
 		const decodedNested = (decodedVertex.operation as Record<string, unknown>).nested as Record<string, unknown>;
 		expect(nested).not.toBe(decodedNested);
 		const array = nested.array as unknown[];
@@ -792,12 +913,14 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 		expect(second.vertex.digest).toEqual(valid.remote.digest);
 		expect(second.vertex.digest).not.toBe(first.vertex.digest);
 		const secondNested = second.vertex.operation.nested as Record<string, unknown>;
-		expect(secondNested.bytes).toEqual(Uint8Array.of(4, 5, 6));
-		expect((secondNested.array as unknown[])[1]).toEqual(Uint8Array.of(1, 2, 3));
-		expect(secondNested.float32).toEqual(new Float32Array([1.5, -0]));
-		expect(secondNested.float64).toEqual(new Float64Array([2.5, -0]));
-		expect(secondNested.int32).toEqual(new Int32Array([-3, 4]));
-		expect(secondNested.primitives).toEqual([null, false, 42, -1.25, "text"]);
+		expect(second.vertex.dependencies).toEqual(valid.independentlyDecodedVertex.dependencies);
+		expect(second.vertex.operation).toEqual(valid.independentlyDecodedVertex.operation);
+		expect(secondNested.bytes).toEqual(independentlyDecodedNested.bytes);
+		expect((secondNested.array as unknown[])[1]).toEqual((independentlyDecodedNested.array as readonly unknown[])[1]);
+		expect(secondNested.float32).toEqual(independentlyDecodedNested.float32);
+		expect(secondNested.float64).toEqual(independentlyDecodedNested.float64);
+		expect(secondNested.int32).toEqual(independentlyDecodedNested.int32);
+		expect(secondNested.primitives).toEqual(independentlyDecodedNested.primitives);
 		expect((secondNested.map as Map<unknown, unknown>).has("mutant")).toBe(false);
 		expect((secondNested.set as Set<unknown>).has("mutant")).toBe(false);
 		expect([...(secondNested.set as Set<unknown>)]).toContainEqual(new Uint32Array([9, 10]));
@@ -1070,6 +1193,28 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 	});
 
 	it("causally kills duplicate, aliased and facade-routed authority mutants", () => {
+		const pinOwnerControl = ts.createSourceFile(
+			"pin-owner-control.ts",
+			`const EXPECTED_RUNTIME_EXPORTS = ${JSON.stringify(EXPECTED_RUNTIME_EXPORTS)} as const;
+			 function unrelatedFilter() { return ["admitReceivedVertex", "prepareBlueprintAdmission", "prepareBlueprintRuntime"]; }`,
+			ts.ScriptTarget.Latest,
+			true,
+			ts.ScriptKind.TS
+		);
+		expect(namedVariableStringArray(pinOwnerControl, "EXPECTED_RUNTIME_EXPORTS")).toEqual(EXPECTED_RUNTIME_EXPORTS);
+		expect(
+			namedVariableStringArray(
+				ts.createSourceFile(
+					"pin-owner-mutant.ts",
+					pinOwnerControl.text.replace('"extractAdmittedReceivedVertex",', ""),
+					ts.ScriptTarget.Latest,
+					true,
+					ts.ScriptKind.TS
+				),
+				"EXPECTED_RUNTIME_EXPORTS"
+			)
+		).not.toEqual(EXPECTED_RUNTIME_EXPORTS);
+
 		const good = `
 			function authenticateReceivedVertex(input) {
 				decodeCanonical(); digestReceivedVertexPreimage(); input.resolveAuthorPublicKey(); verifyEd25519RegisteredDigest();
