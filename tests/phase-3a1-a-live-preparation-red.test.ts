@@ -536,6 +536,7 @@ type CatalogMutation =
 	| "runtime-output-artifact-id"
 	| "runtime-output-blueprint-digest"
 	| "runtime-output-profile"
+	| "shared-ordinary-backing"
 	| "throw";
 
 function temporaryCatalog(mutation: CatalogMutation = "none"): TrustedBlueprintCatalog {
@@ -563,18 +564,31 @@ function temporaryCatalog(mutation: CatalogMutation = "none"): TrustedBlueprintC
 			stageProbe.catalogRequests.push(requested);
 			if (mutation === "throw") throw new Error("synthetic private catalog failure");
 			if (requested !== blueprintDigest) throw new TypeError("not catalogued");
+			let resolvedPackageBytes =
+				mutation === "admission-package"
+					? new Uint8Array([...canonicalBlueprintPackageBytes, 0])
+					: new Uint8Array(canonicalBlueprintPackageBytes);
+			let resolvedArtifactBytes =
+				mutation === "runtime-artifact"
+					? new Uint8Array([...exactArtifactBytes, 0x0a])
+					: new Uint8Array(exactArtifactBytes);
+			if (mutation === "shared-ordinary-backing") {
+				const shared = new ArrayBuffer(canonicalBlueprintPackageBytes.byteLength + exactArtifactBytes.byteLength);
+				resolvedPackageBytes = new Uint8Array(shared, 0, canonicalBlueprintPackageBytes.byteLength);
+				resolvedArtifactBytes = new Uint8Array(
+					shared,
+					canonicalBlueprintPackageBytes.byteLength,
+					exactArtifactBytes.byteLength
+				);
+				resolvedPackageBytes.set(canonicalBlueprintPackageBytes);
+				resolvedArtifactBytes.set(exactArtifactBytes);
+			}
 			const result = Object.freeze({
 				artifactDigest: fixture.artifactDigest,
 				artifactId: fixture.artifactId,
 				blueprintDigest: mutation === "catalog-blueprint" ? "f".repeat(64) : blueprintDigest,
-				canonicalBlueprintPackageBytes:
-					mutation === "admission-package"
-						? new Uint8Array([...canonicalBlueprintPackageBytes, 0])
-						: new Uint8Array(canonicalBlueprintPackageBytes),
-				exactArtifactBytes:
-					mutation === "runtime-artifact"
-						? new Uint8Array([...exactArtifactBytes, 0x0a])
-						: new Uint8Array(exactArtifactBytes),
+				canonicalBlueprintPackageBytes: resolvedPackageBytes,
+				exactArtifactBytes: resolvedArtifactBytes,
 				runtimeProfile:
 					mutation === "catalog-runtime-profile" ? ("unsupported-runtime" as never) : "ecmascript-2024-sync-v1",
 				evidence: Object.freeze({
@@ -1467,6 +1481,49 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(runtimeInput.canonicalBlueprintPackageBytes).toBe(admissionInput.canonicalBlueprintPackageBytes);
 		expect(runtimeInput.exactArtifactBytes).not.toBe(catalogResult.exactArtifactBytes);
 		expect(runtimeInput.exactArtifactBytes).toEqual(catalogResult.exactArtifactBytes);
+		expect(stageProbe.runtimeResults).toHaveLength(1);
+		expect(stageProbe.liveEffects).toEqual([]);
+	});
+
+	it("accepts distinct catalog byte views sharing one ordinary buffer and detaches both before preparation", async () => {
+		const result = await controlledPrepare({}, { catalogMutation: "shared-ordinary-backing" });
+		expectFailure(result, "graph-rejected");
+		const fixture = blueprintFixture();
+		const catalogResult = stageProbe.catalogResults[0] as {
+			readonly canonicalBlueprintPackageBytes: Uint8Array;
+			readonly exactArtifactBytes: Uint8Array;
+		};
+		expect(catalogResult.canonicalBlueprintPackageBytes).not.toBe(catalogResult.exactArtifactBytes);
+		expect(catalogResult.canonicalBlueprintPackageBytes.byteLength).toBeGreaterThan(0);
+		expect(catalogResult.exactArtifactBytes.byteLength).toBeGreaterThan(0);
+		expect(catalogResult.canonicalBlueprintPackageBytes.buffer).toBe(catalogResult.exactArtifactBytes.buffer);
+		expect(catalogResult.canonicalBlueprintPackageBytes).toEqual(fixture.canonicalBlueprintPackageBytes);
+		expect(catalogResult.exactArtifactBytes).toEqual(fixture.exactArtifactBytes);
+
+		const admissionInput = stageProbe.admissionInputs[0] as {
+			readonly canonicalBlueprintPackageBytes: Uint8Array;
+			readonly expectedBlueprintDigest: string;
+		};
+		expect(admissionInput.expectedBlueprintDigest).toBe(fixture.blueprintDigest);
+		expect(admissionInput.canonicalBlueprintPackageBytes).not.toBe(catalogResult.canonicalBlueprintPackageBytes);
+		expect(admissionInput.canonicalBlueprintPackageBytes.buffer).not.toBe(
+			catalogResult.canonicalBlueprintPackageBytes.buffer
+		);
+		expect(admissionInput.canonicalBlueprintPackageBytes).toEqual(fixture.canonicalBlueprintPackageBytes);
+
+		const runtimeInput = stageProbe.runtimeInputs[0] as {
+			readonly canonicalBlueprintPackageBytes: Uint8Array;
+			readonly exactArtifactBytes: Uint8Array;
+			readonly expectedBlueprintDigest: string;
+			readonly preparedBlueprintAdmission: unknown;
+		};
+		expect(runtimeInput.expectedBlueprintDigest).toBe(fixture.blueprintDigest);
+		expect(runtimeInput.preparedBlueprintAdmission).toBe(stageProbe.admissionResults[0]);
+		expect(runtimeInput.canonicalBlueprintPackageBytes).toBe(admissionInput.canonicalBlueprintPackageBytes);
+		expect(runtimeInput.exactArtifactBytes).not.toBe(catalogResult.exactArtifactBytes);
+		expect(runtimeInput.exactArtifactBytes.buffer).not.toBe(catalogResult.exactArtifactBytes.buffer);
+		expect(runtimeInput.exactArtifactBytes.buffer).not.toBe(runtimeInput.canonicalBlueprintPackageBytes.buffer);
+		expect(runtimeInput.exactArtifactBytes).toEqual(fixture.exactArtifactBytes);
 		expect(stageProbe.runtimeResults).toHaveLength(1);
 		expect(stageProbe.liveEffects).toEqual([]);
 	});
