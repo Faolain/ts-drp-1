@@ -165,6 +165,7 @@ export async function createGenuinePreparedV3Fixture(
 		});
 		const prepared = await prepareV3LiveGeneration(input);
 		if (!prepared.ok) throw new TypeError(`live preparation failed: ${"kind" in prepared ? prepared.kind : "unknown"}`);
+		const receivedDependencyDigest = prepared.descriptor.anchorDigest;
 		const receivedCanonicalPreimageBytes = encodeCanonical({
 			kind: "drp-vertex",
 			protocolMajor: 3,
@@ -173,8 +174,8 @@ export async function createGenuinePreparedV3Fixture(
 			anchor: anchorDigest,
 			author: contract.signerId,
 			authorSequence: 0,
-			logicalTime: 0,
-			dependencies: [],
+			logicalTime: 1,
+			dependencies: [receivedDependencyDigest],
 			operation: { action: "add", value: 1 },
 		});
 		const receivedDigest = hashDomain("ts-drp/vertex/v3", receivedCanonicalPreimageBytes);
