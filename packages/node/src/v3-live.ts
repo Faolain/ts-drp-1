@@ -1,7 +1,7 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { CausalityIndex } from "@ts-drp/compaction";
-import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import {
 	authenticateCurrentEpochAnchor,
 	type CurrentAnchorTrust,
@@ -16,7 +16,11 @@ import {
 	type BlobDigest,
 	digestBlob,
 	digestClosure,
+	type ExpectedHead,
+	type GenerationId,
 	type GenerationRef,
+	parseGenerationId,
+	parseHeadRevision,
 	parseStorageObjectId,
 	type PresentHead,
 	type StorageObjectId,
@@ -52,6 +56,7 @@ const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 const TypedArrayPrototype = ObjectGetPrototypeOf(Uint8Array.prototype) as object;
 const TypedArrayBufferGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "buffer")?.get;
 const TypedArrayByteLengthGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "byteLength")?.get;
+const CryptoGetRandomValues = globalThis.crypto.getRandomValues;
 
 const INPUT_KEYS = [
 	"authenticationProfile",
@@ -88,6 +93,15 @@ const PRESENT_HEAD_KEYS = ["closureDigest", "generationId", "kind", "objectId", 
 const TRUST_KEYS = ["currentAnchorDigest", "currentEpoch", "genesisAnchorDigest", "objectId", "profileId"] as const;
 const TRUST_REF_KEYS = ["byteLength", "digest"] as const;
 const AUTHENTICATION_RESULT_KEYS = ["ok", "provenance"] as const;
+const ACTIVE_RECOVERY_KEYS = ["adoptedGeneration", "head", "kind", "recomputedClosureDigest", "references"] as const;
+const GENERATION_RECORD_KEYS = [
+	"baseExpectedHead",
+	"closure",
+	"closureDigest",
+	"generationId",
+	"objectId",
+	"state",
+] as const;
 const PROVENANCE_KEYS = [
 	"anchorDigest",
 	"blueprintDigest",
@@ -214,11 +228,42 @@ interface OpenedTrustSnapshot {
 	readonly trustRef: GenerationRef;
 }
 
+interface DurableStateSnapshot extends OpenedTrustSnapshot {
+	readonly candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];
+	readonly references: readonly GenerationRef[];
+}
+
+interface PreparedV3LivePayload {
+	readonly admission: PreparedBlueprintAdmission;
+	readonly catalog: CatalogSnapshot;
+	readonly charges: Map<string, number>;
+	readonly exactProjectionBytes: Uint8Array;
+	readonly input: CapturedInput;
+	readonly liveStateRef: GenerationRef;
+	readonly order: readonly string[];
+	readonly parameters: AcceptedParameters;
+	readonly provenance: ProvenanceSnapshot;
+	readonly proposedClosure: readonly GenerationRef[];
+	readonly runtime: PreparedBlueprintRuntime;
+	readonly trust: OpenedTrustSnapshot;
+	readonly vertices: Map<string, unknown>;
+}
+
 interface AcceptedParameters {
 	readonly maxDependencies: number;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
 }
+
+const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
+
+function consumePreparedV3Live(capability: PreparedV3Live): PreparedV3LivePayload | undefined {
+	const payload = preparedV3LiveAuthority.get(capability);
+	if (payload === undefined) return undefined;
+	preparedV3LiveAuthority.delete(capability);
+	return payload;
+}
+void consumePreparedV3Live;
 
 function failure(kind: PrepareV3LiveFailureKind, detail: string): PrepareV3LiveResult {
 	return ObjectFreeze({ detail, kind, ok: false as const });
@@ -296,7 +341,12 @@ function copyDetachedBytes(value: unknown): Uint8Array | undefined {
 		}
 		const byteLength = typedArrayByteLength(value);
 		if (byteLength === undefined) return undefined;
-		return new Uint8ArrayConstructor(value as Uint8Array);
+		const copy = new Uint8ArrayConstructor(value as Uint8Array);
+		const copyBuffer = typedArrayBuffer(copy);
+		if (copyBuffer === undefined) return undefined;
+		ObjectDefineProperty(copy, "buffer", { configurable: true, value: copyBuffer });
+		ObjectDefineProperty(copy, "byteLength", { configurable: true, value: byteLength });
+		return copy;
 	} catch {
 		return undefined;
 	}
@@ -860,18 +910,454 @@ function copiedGenerationRef(digest: unknown, byteLength: unknown): GenerationRe
 		: undefined;
 }
 
+type StoreResultSnapshot =
+	| Readonly<{ readonly ok: true; readonly value: unknown }>
+	| Readonly<{ readonly ok: false; readonly reason: string }>;
+
+function snapshotStoreResult(value: unknown): StoreResultSnapshot | undefined {
+	try {
+		if (!isObject(value)) return undefined;
+		const ok = ObjectGetOwnPropertyDescriptor(value, "ok");
+		if (ok === undefined || ok.enumerable !== true || !("value" in ok) || typeof ok.value !== "boolean") {
+			return undefined;
+		}
+		if (ok.value) {
+			const record = snapshotClosedRecord(value, ["ok", "value"]);
+			return record === undefined ? undefined : ObjectFreeze({ ok: true as const, value: record.value });
+		}
+		const reason = ObjectGetOwnPropertyDescriptor(value, "reason");
+		if (
+			reason === undefined ||
+			reason.enumerable !== true ||
+			!("value" in reason) ||
+			typeof reason.value !== "string"
+		) {
+			return undefined;
+		}
+		const keys = reason.value === "SUBSTRATE_FAILURE" ? ["cause", "ok", "reason"] : ["ok", "reason"];
+		return snapshotClosedRecord(value, keys) === undefined
+			? undefined
+			: ObjectFreeze({ ok: false as const, reason: reason.value });
+	} catch {
+		return undefined;
+	}
+}
+
+function copiedPresentHead(value: unknown, expectedObjectId: StorageObjectId): PresentHead | undefined {
+	const record = snapshotClosedRecord(value, PRESENT_HEAD_KEYS);
+	if (
+		record === undefined ||
+		record.kind !== "present" ||
+		record.objectId !== expectedObjectId ||
+		!isDigestHex(record.generationId) ||
+		!isDigestHex(record.closureDigest) ||
+		typeof record.revision !== "number" ||
+		!NumberIsSafeInteger(record.revision) ||
+		record.revision < 1
+	) {
+		return undefined;
+	}
+	return ObjectFreeze({
+		kind: "present" as const,
+		objectId: expectedObjectId,
+		generationId: record.generationId,
+		revision: record.revision,
+		closureDigest: record.closureDigest,
+	}) as PresentHead;
+}
+
+function copiedExpectedHead(value: unknown, expectedObjectId: StorageObjectId): ExpectedHead | undefined {
+	try {
+		const kind = isObject(value) ? ObjectGetOwnPropertyDescriptor(value, "kind") : undefined;
+		if (kind === undefined || !("value" in kind)) return undefined;
+		if (kind.value === "none") {
+			const record = snapshotClosedRecord(value, ["kind", "objectId"]);
+			return record?.objectId === expectedObjectId
+				? ObjectFreeze({ kind: "none" as const, objectId: expectedObjectId })
+				: undefined;
+		}
+		return copiedPresentHead(value, expectedObjectId);
+	} catch {
+		return undefined;
+	}
+}
+
+function sameHead(left: PresentHead, right: PresentHead): boolean {
+	return (
+		left.closureDigest === right.closureDigest &&
+		left.generationId === right.generationId &&
+		left.objectId === right.objectId &&
+		left.revision === right.revision
+	);
+}
+
+function sameRef(left: GenerationRef, right: GenerationRef): boolean {
+	return left.byteLength === right.byteLength && left.digest === right.digest;
+}
+
+function copiedGenerationRefs(value: unknown): readonly GenerationRef[] | undefined {
+	try {
+		if (!ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== ArrayPrototype) return undefined;
+		const length = ObjectGetOwnPropertyDescriptor(value, "length");
+		if (
+			length === undefined ||
+			!("value" in length) ||
+			typeof length.value !== "number" ||
+			!NumberIsSafeInteger(length.value) ||
+			length.value < 1 ||
+			length.value > 2
+		) {
+			return undefined;
+		}
+		const entries = snapshotDenseArray(value, length.value);
+		if (entries === undefined) return undefined;
+		const refs: GenerationRef[] = [];
+		let previous: string | undefined;
+		for (let index = 0; index < entries.length; index += 1) {
+			const record = snapshotClosedRecord(entries[index], TRUST_REF_KEYS);
+			const ref = copiedGenerationRef(record?.digest, record?.byteLength);
+			if (ref === undefined || (previous !== undefined && previous >= ref.digest)) return undefined;
+			if (!defineDenseElement(refs, index, ref)) return undefined;
+			previous = ref.digest;
+		}
+		return finishDenseArray(refs, entries.length);
+	} catch {
+		return undefined;
+	}
+}
+
+function sameClosure(left: readonly GenerationRef[], right: readonly GenerationRef[]): boolean {
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index += 1) {
+		if (!sameRef(left[index] as GenerationRef, right[index] as GenerationRef)) return false;
+	}
+	return true;
+}
+
+function copiedGenerationRecord(
+	value: unknown,
+	expected: Readonly<{
+		baseExpectedHead?: ExpectedHead;
+		closure: readonly GenerationRef[];
+		generationId: GenerationId;
+		objectId: StorageObjectId;
+		state: "Adopted" | "Complete" | "Staged";
+	}>
+): Readonly<{ readonly closureDigest: string }> | undefined {
+	const record = snapshotClosedRecord(value, GENERATION_RECORD_KEYS);
+	if (
+		record === undefined ||
+		record.objectId !== expected.objectId ||
+		record.generationId !== expected.generationId ||
+		record.state !== expected.state ||
+		!isDigestHex(record.closureDigest)
+	) {
+		return undefined;
+	}
+	const baseExpectedHead = copiedExpectedHead(record.baseExpectedHead, expected.objectId);
+	const closure = copiedGenerationRefs(record.closure);
+	return baseExpectedHead !== undefined &&
+		(expected.baseExpectedHead === undefined ||
+			(baseExpectedHead.kind === expected.baseExpectedHead.kind &&
+				(baseExpectedHead.kind === "none" ||
+					(expected.baseExpectedHead.kind === "present" && sameHead(baseExpectedHead, expected.baseExpectedHead))))) &&
+		closure !== undefined &&
+		sameClosure(closure, expected.closure)
+		? ObjectFreeze({ closureDigest: record.closureDigest })
+		: undefined;
+}
+
+function freshGenerationId(): GenerationId | undefined {
+	try {
+		const bytes = new Uint8ArrayConstructor(32);
+		const buffer = typedArrayBuffer(bytes);
+		if (buffer === undefined) return undefined;
+		ObjectDefineProperty(bytes, "buffer", { configurable: true, value: buffer });
+		ObjectDefineProperty(bytes, "byteLength", { configurable: true, value: 32 });
+		ReflectApply(CryptoGetRandomValues, globalThis.crypto, [bytes]);
+		const parsed = parseGenerationId(bytesToLowerHex(bytes));
+		return parsed.ok ? parsed.value : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+async function reopenDurableState(
+	captured: CapturedInput,
+	trustStore: ReturnType<typeof createCurrentAnchorTrustStore>
+): Promise<DurableStateSnapshot | undefined> {
+	try {
+		const opened = snapshotOpenedTrust(await trustStore.open(), captured.objectId);
+		if (opened === undefined) return undefined;
+		const recoveredResult = snapshotStoreResult(await captured.store.recoverActiveGeneration(captured.objectId));
+		if (recoveredResult?.ok !== true) return undefined;
+		const recovered = snapshotClosedRecord(recoveredResult.value, ACTIVE_RECOVERY_KEYS);
+		if (recovered === undefined || recovered.kind !== "active") return undefined;
+		const head = copiedPresentHead(recovered.head, captured.objectId);
+		const references = copiedGenerationRefs(recovered.references);
+		if (
+			head === undefined ||
+			!sameHead(head, opened.head) ||
+			references === undefined ||
+			recovered.recomputedClosureDigest !== head.closureDigest
+		) {
+			return undefined;
+		}
+		const candidates: Array<Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>> = [];
+		let evidenceValid = true;
+		let index = 0;
+		while (index < references.length) {
+			const ref = references[index] as GenerationRef;
+			const loaded = snapshotStoreResult(await captured.store.getBlob(ref.digest));
+			const bytes = loaded?.ok === true ? copyDetachedBytes(loaded.value) : undefined;
+			const digest = bytes === undefined ? undefined : digestBlob(bytes);
+			const copiedRef = copiedGenerationRef(ref.digest, ref.byteLength);
+			if (
+				bytes === undefined ||
+				bytes.byteLength !== ref.byteLength ||
+				digest?.ok !== true ||
+				digest.value !== ref.digest ||
+				copiedRef === undefined
+			) {
+				evidenceValid = false;
+				index += 1;
+				continue;
+			}
+			if (!defineDenseElement(candidates, index, ObjectFreeze({ bytes, ref: copiedRef }))) {
+				evidenceValid = false;
+			}
+			index += 1;
+		}
+		const adopted = copiedGenerationRecord(recovered.adoptedGeneration, {
+			closure: references,
+			generationId: head.generationId,
+			objectId: captured.objectId,
+			state: "Adopted",
+		});
+		if (!evidenceValid || adopted === undefined || adopted.closureDigest !== head.closureDigest) return undefined;
+		const frozenCandidates = finishDenseArray(candidates, references.length);
+		return frozenCandidates === undefined
+			? undefined
+			: ObjectFreeze({ ...opened, candidates: frozenCandidates, head, references });
+	} catch {
+		return undefined;
+	}
+}
+
+interface PreparedV3LiveMintInput {
+	readonly admission: PreparedBlueprintAdmission;
+	readonly byteCharge: number;
+	readonly captured: CapturedInput;
+	readonly catalog: CatalogSnapshot;
+	readonly charges: Map<string, number>;
+	readonly durableProjectionBytes: Uint8Array;
+	readonly liveStateRef: GenerationRef;
+	readonly order: readonly string[];
+	readonly parameters: AcceptedParameters;
+	readonly projectionDigest: BlobDigest;
+	readonly proposedClosure: readonly GenerationRef[];
+	readonly provenance: ProvenanceSnapshot;
+	readonly runtime: PreparedBlueprintRuntime;
+	readonly vertices: Map<string, unknown>;
+}
+
+interface PreparedV3LiveMint {
+	readonly capability: PreparedV3Live;
+	readonly descriptor: V3LiveDescriptor;
+	readonly payload: PreparedV3LivePayload;
+}
+
+function buildPreparedV3LiveMint(
+	input: PreparedV3LiveMintInput,
+	durable: DurableStateSnapshot
+): PreparedV3LiveMint | PrepareV3LiveResult {
+	let durableProjection: Uint8Array | undefined;
+	let index = 0;
+	while (index < durable.candidates.length) {
+		const candidate = durable.candidates[index];
+		if (candidate?.ref.digest === input.liveStateRef.digest) durableProjection = candidate.bytes;
+		index += 1;
+	}
+	if (durableProjection === undefined || !sameBytes(durableProjection, input.durableProjectionBytes)) {
+		return failure("stale-head", "durable creator projection does not match");
+	}
+	const descriptor = ObjectFreeze({
+		objectId: input.provenance.objectId,
+		epoch: input.provenance.epoch,
+		anchorDigest: input.provenance.anchorDigest,
+		blueprintDigest: input.provenance.blueprintDigest,
+		parametersDigest: input.provenance.parametersDigest,
+		profileDigest: input.provenance.profileDigest,
+		signerSetDigest: input.provenance.signerSetDigest,
+		artifactDigest: input.catalog.artifactDigest,
+		artifactId: input.catalog.artifactId,
+		catalogDigest: input.catalog.catalogDigest,
+		runtimeProfile: input.catalog.runtimeProfile,
+		trustProfile: "creator-only" as const,
+		trustRef: ObjectFreeze({ ...durable.trustRef }),
+		maxEpochVertices: input.parameters.maxEpochVertices,
+		maxEpochBytes: input.parameters.maxEpochBytes,
+		maxDependencies: input.parameters.maxDependencies,
+		vertexCount: 1 as const,
+		byteCharge: input.byteCharge,
+		projectionDigest: input.projectionDigest,
+		head: ObjectFreeze({ ...durable.head }),
+	}) satisfies V3LiveDescriptor;
+	const capability = ObjectFreeze({}) as PreparedV3Live;
+	const payload = ObjectFreeze({
+		admission: input.admission,
+		catalog: input.catalog,
+		charges: input.charges,
+		exactProjectionBytes: new Uint8ArrayConstructor(input.durableProjectionBytes),
+		input: input.captured,
+		liveStateRef: input.liveStateRef,
+		order: input.order,
+		parameters: input.parameters,
+		provenance: input.provenance,
+		proposedClosure: input.proposedClosure,
+		runtime: input.runtime,
+		trust: durable,
+		vertices: input.vertices,
+	}) satisfies PreparedV3LivePayload;
+	return ObjectFreeze({ capability, descriptor, payload });
+}
+
+type StagePreparedGenerationResult =
+	| Readonly<{ readonly ok: true; readonly swapResult: StoreResultSnapshot | undefined }>
+	| Readonly<{ readonly ok: false; readonly result: PrepareV3LiveResult }>;
+
+async function stagePreparedGeneration(
+	captured: CapturedInput,
+	current: DurableStateSnapshot,
+	proposedClosure: readonly GenerationRef[],
+	proposedClosureDigest: string,
+	liveStateRef: GenerationRef,
+	projectionBytesForStage: Uint8Array
+): Promise<StagePreparedGenerationResult> {
+	const generationId = freshGenerationId();
+	if (generationId === undefined) {
+		return ObjectFreeze({
+			ok: false as const,
+			result: failure("storage-failed", "creator generation identity could not be derived"),
+		});
+	}
+	try {
+		const begun = snapshotStoreResult(
+			await captured.store.beginGeneration({
+				baseExpectedHead: current.head,
+				closure: proposedClosure,
+				generationId,
+				objectId: captured.objectId,
+			})
+		);
+		const begunRecord =
+			begun?.ok === true
+				? copiedGenerationRecord(begun.value, {
+						baseExpectedHead: current.head,
+						closure: proposedClosure,
+						generationId,
+						objectId: captured.objectId,
+						state: "Staged",
+					})
+				: undefined;
+		if (begunRecord === undefined || begunRecord.closureDigest !== proposedClosureDigest) {
+			return ObjectFreeze({
+				ok: false as const,
+				result: failure("storage-failed", "creator generation staging failed"),
+			});
+		}
+		const cached = snapshotStoreResult(
+			await captured.store.putCachedBlob({
+				bytes: projectionBytesForStage,
+				digest: liveStateRef.digest,
+				generationId,
+				objectId: captured.objectId,
+			})
+		);
+		const cachedValue = cached?.ok === true ? snapshotClosedRecord(cached.value, ["inserted"]) : undefined;
+		if (cachedValue === undefined || typeof cachedValue.inserted !== "boolean") {
+			return ObjectFreeze({
+				ok: false as const,
+				result: failure("storage-failed", "creator projection staging failed"),
+			});
+		}
+		let index = 0;
+		while (index < proposedClosure.length) {
+			const promoted = snapshotStoreResult(
+				await captured.store.promoteReference({
+					digest: (proposedClosure[index] as GenerationRef).digest,
+					generationId,
+					objectId: captured.objectId,
+				})
+			);
+			if (promoted?.ok !== true || promoted.value !== undefined) {
+				return ObjectFreeze({
+					ok: false as const,
+					result: failure("storage-failed", "creator reference promotion failed"),
+				});
+			}
+			index += 1;
+		}
+		const completed = snapshotStoreResult(
+			await captured.store.completeGeneration({ generationId, objectId: captured.objectId })
+		);
+		const completedRecord =
+			completed?.ok === true
+				? copiedGenerationRecord(completed.value, {
+						baseExpectedHead: current.head,
+						closure: proposedClosure,
+						generationId,
+						objectId: captured.objectId,
+						state: "Complete",
+					})
+				: undefined;
+		if (completedRecord === undefined || completedRecord.closureDigest !== begunRecord.closureDigest) {
+			return ObjectFreeze({
+				ok: false as const,
+				result: failure("storage-failed", "creator generation completion failed"),
+			});
+		}
+		const expectedRevision = parseHeadRevision(current.head.revision + 1);
+		if (!expectedRevision.ok) {
+			return ObjectFreeze({
+				ok: false as const,
+				result: failure("storage-failed", "creator head revision is invalid"),
+			});
+		}
+		let swapResult: StoreResultSnapshot | undefined;
+		try {
+			swapResult = snapshotStoreResult(
+				await captured.store.swapHead({
+					expectedHead: current.head,
+					generationId,
+					objectId: captured.objectId,
+				})
+			);
+		} catch {
+			swapResult = undefined;
+		}
+		return ObjectFreeze({ ok: true as const, swapResult });
+	} catch {
+		return ObjectFreeze({
+			ok: false as const,
+			result: failure("storage-failed", "creator generation staging failed"),
+		});
+	}
+}
+
 /**
- * Authenticates and prepares one creator generation through the graph/projection A-b boundary.
+ * Authenticates, preserves and stages one creator generation through the private A-c boundary.
  * @param input - Closed creator preparation input.
- * @returns A frozen stage result; A-b intentionally ends before trust preservation and staging.
+ * @returns A frozen preparation result; live activation remains deferred.
  */
-export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Promise<PrepareV3LiveResult> {
+async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Promise<PrepareV3LiveResult> {
 	const captured = captureInput(input);
 	if (captured === undefined) return failure("malformed-input", "creator preparation input is invalid");
 
 	let openedTrust: OpenedTrustSnapshot;
+	let trustStore: ReturnType<typeof createCurrentAnchorTrustStore>;
 	try {
-		const trustStore = createCurrentAnchorTrustStore({
+		trustStore = createCurrentAnchorTrustStore({
 			objectId: captured.objectId,
 			pinnedGenesisAnchorDigest: captured.pinnedGenesisAnchorDigest,
 			store: captured.store,
@@ -1018,6 +1504,11 @@ export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInpu
 			: failure("internal-invariant", "creator graph validation failed unexpectedly");
 	}
 
+	let durableProjectionBytes: Uint8Array;
+	let projectionDigest: BlobDigest;
+	let liveStateRef: GenerationRef;
+	let proposedClosure: readonly GenerationRef[];
+	let proposedClosureDigest: string;
 	try {
 		const orderedVertexHashesPreimage = {
 			kind: "v3-live-order-1",
@@ -1069,28 +1560,168 @@ export async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInpu
 			graphDigest,
 		};
 		const exactProjectionBytes = encodeCanonical(projectionRecord);
-		const projectionDigest = (digestBlob(exactProjectionBytes) as { readonly value?: BlobDigest }).value;
+		const derivedProjectionDigest = (digestBlob(exactProjectionBytes) as { readonly value?: BlobDigest }).value;
 		const projectionByteLength = typedArrayByteLength(exactProjectionBytes);
 		const trustRef = copiedGenerationRef(openedTrust.trustRef.digest, openedTrust.trustRef.byteLength);
-		const liveStateRef = copiedGenerationRef(projectionDigest, projectionByteLength);
-		if (trustRef === undefined || liveStateRef === undefined || trustRef.digest === liveStateRef.digest) {
+		const derivedLiveStateRef = copiedGenerationRef(derivedProjectionDigest, projectionByteLength);
+		if (trustRef === undefined || derivedLiveStateRef === undefined || trustRef.digest === derivedLiveStateRef.digest) {
 			return failure("internal-invariant", "creator live projection reference is invalid");
 		}
-		const proposedClosure: GenerationRef[] = [];
-		const firstRef = trustRef.digest < liveStateRef.digest ? trustRef : liveStateRef;
-		const secondRef = firstRef === trustRef ? liveStateRef : trustRef;
+		const proposedClosureValues: GenerationRef[] = [];
+		const firstRef = trustRef.digest < derivedLiveStateRef.digest ? trustRef : derivedLiveStateRef;
+		const secondRef = firstRef === trustRef ? derivedLiveStateRef : trustRef;
 		if (
-			!defineDenseElement(proposedClosure, 0, firstRef) ||
-			!defineDenseElement(proposedClosure, 1, secondRef) ||
-			finishDenseArray(proposedClosure, 2) === undefined
+			!defineDenseElement(proposedClosureValues, 0, firstRef) ||
+			!defineDenseElement(proposedClosureValues, 1, secondRef)
 		) {
 			return failure("internal-invariant", "creator closure could not be constructed");
 		}
-		const closureDigest = digestClosure(proposedClosure);
+		const frozenClosure = finishDenseArray(proposedClosureValues, 2);
+		if (frozenClosure === undefined) {
+			return failure("internal-invariant", "creator closure could not be constructed");
+		}
+		const closureDigest = digestClosure(frozenClosure);
 		if (!closureDigest.ok) return failure("internal-invariant", "creator closure digest could not be derived");
+		projectionDigest = derivedLiveStateRef.digest;
+		liveStateRef = derivedLiveStateRef;
+		proposedClosure = frozenClosure;
+		proposedClosureDigest = closureDigest.value;
+		durableProjectionBytes = exactProjectionBytes;
 	} catch {
 		return failure("internal-invariant", "creator graph projection could not be derived");
 	}
 
-	return failure("trust-not-preserved", "creator trust preservation is deferred to A-c");
+	const mintInput = ObjectFreeze({
+		admission,
+		byteCharge,
+		captured,
+		catalog,
+		charges,
+		durableProjectionBytes,
+		liveStateRef,
+		order,
+		parameters,
+		projectionDigest,
+		proposedClosure,
+		provenance,
+		runtime,
+		vertices,
+	}) satisfies PreparedV3LiveMintInput;
+	let carried: DurableStateSnapshot | undefined;
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		let current = carried;
+		let stagedHead: PresentHead | undefined;
+		let swapResult: StoreResultSnapshot | undefined;
+		let awaitingOutcome = false;
+		carried = undefined;
+		while (true) {
+			if (current === undefined) current = await reopenDurableState(captured, trustStore);
+			if (current === undefined) return failure("storage-failed", "creator durable state could not be reopened");
+			const trustOnlyValues: GenerationRef[] = [];
+			const copiedTrustRef = copiedGenerationRef(current.trustRef.digest, current.trustRef.byteLength);
+			if (copiedTrustRef === undefined || !defineDenseElement(trustOnlyValues, 0, copiedTrustRef)) {
+				return failure("internal-invariant", "creator trust closure could not be copied");
+			}
+			const trustOnly = finishDenseArray(trustOnlyValues, 1);
+			if (trustOnly === undefined) return failure("internal-invariant", "creator trust closure could not be copied");
+			if (sameClosure(current.references, proposedClosure)) {
+				const mint = buildPreparedV3LiveMint(mintInput, current);
+				if ("ok" in mint) return mint;
+				const capability = mint.capability;
+				preparedV3LiveAuthority.set(capability, mint.payload);
+				return ObjectFreeze({ capability, descriptor: mint.descriptor, ok: true as const });
+			}
+			if (!sameClosure(current.references, trustOnly)) {
+				return failure("stale-head", "creator durable head is not an exact preparation predecessor");
+			}
+			if (awaitingOutcome) {
+				if (stagedHead === undefined || !sameHead(current.head, stagedHead)) {
+					return failure("stale-head", "another creator generation became authoritative");
+				}
+				const definiteLoss = swapResult?.ok === false && swapResult.reason === "HEAD_CONFLICT";
+				if (!definiteLoss) return failure("storage-failed", "creator head swap outcome is ambiguous");
+				if (attempt === 1) return failure("stale-head", "creator head swap lost twice");
+				carried = current;
+				break;
+			}
+
+			const candidates: Array<Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>> = [];
+			let closureIndex = 0;
+			while (closureIndex < proposedClosure.length) {
+				const ref = proposedClosure[closureIndex] as GenerationRef;
+				let bytes: Uint8Array | undefined;
+				if (ref.digest === liveStateRef.digest) {
+					bytes = copyDetachedBytes(durableProjectionBytes);
+				} else {
+					let candidateIndex = 0;
+					while (candidateIndex < current.candidates.length) {
+						const candidate = current.candidates[candidateIndex];
+						if (candidate?.ref.digest === ref.digest) bytes = copyDetachedBytes(candidate.bytes);
+						candidateIndex += 1;
+					}
+				}
+				const copiedRef = copiedGenerationRef(ref.digest, ref.byteLength);
+				if (
+					bytes === undefined ||
+					copiedRef === undefined ||
+					!defineDenseElement(candidates, closureIndex, ObjectFreeze({ bytes, ref: copiedRef }))
+				) {
+					return failure("internal-invariant", "creator preservation candidates could not be copied");
+				}
+				closureIndex += 1;
+			}
+			const frozenCandidates = finishDenseArray(candidates, proposedClosure.length);
+			const closureForPreservation = copiedGenerationRefs(proposedClosure);
+			const expectedTrustRef = copiedGenerationRef(current.trustRef.digest, current.trustRef.byteLength);
+			const projectionBytesForStage = copyDetachedBytes(durableProjectionBytes);
+			if (
+				frozenCandidates === undefined ||
+				closureForPreservation === undefined ||
+				expectedTrustRef === undefined ||
+				projectionBytesForStage === undefined
+			) {
+				return failure("internal-invariant", "creator preservation input could not be copied");
+			}
+			let preserved: unknown;
+			try {
+				preserved = assertTrustPreserved({
+					candidates: frozenCandidates,
+					closure: closureForPreservation,
+					expectedTrustRef,
+				});
+			} catch {
+				return failure("trust-not-preserved", "creator trust preservation failed");
+			}
+			const preservation = snapshotClosedRecord(preserved, ["exactCanonicalTrustStateRecordBytes", "ok", "trustRef"]);
+			const preservedRef =
+				preservation === undefined ? undefined : snapshotClosedRecord(preservation.trustRef, TRUST_REF_KEYS);
+			if (
+				preservation?.ok !== true ||
+				copyDetachedBytes(preservation.exactCanonicalTrustStateRecordBytes) === undefined ||
+				preservedRef === undefined ||
+				preservedRef.digest !== expectedTrustRef.digest ||
+				preservedRef.byteLength !== expectedTrustRef.byteLength
+			) {
+				return failure("trust-not-preserved", "creator trust preservation failed");
+			}
+
+			const staged = await stagePreparedGeneration(
+				captured,
+				current,
+				proposedClosure,
+				proposedClosureDigest,
+				liveStateRef,
+				projectionBytesForStage
+			);
+			if (!staged.ok) return staged.result;
+			stagedHead = current.head;
+			swapResult = staged.swapResult;
+			awaitingOutcome = true;
+			current = undefined;
+		}
+	}
+
+	return failure("internal-invariant", "creator preparation exhausted unexpectedly");
 }
+
+export { prepareV3LiveGeneration };
