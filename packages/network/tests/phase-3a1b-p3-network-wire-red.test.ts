@@ -486,6 +486,7 @@ describe("Phase 3a-1B Seam 3 network and generated-wire RED", () => {
 				"      '@types/object-inspect':",
 				"        specifier: ^1.13.0",
 				"        version: 1.13.0",
+				"",
 			].join("\n")
 		);
 		expect(source("packages/types/package.json")).not.toContain("V3Envelope");
