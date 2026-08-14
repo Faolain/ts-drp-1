@@ -9299,6 +9299,102 @@ remain unchanged. Seam-2 RED becomes authorized only after this exact
 amendment is reviewed, signed and pushed. Seam 3, the whole Phase `3a-1B`, live
 activation and Phase 3b remain unauthorized.
 
+#### D.93.30 — Phase 3a-1B seam 2 closure ledger
+
+This section is a non-normative closure record for D.93.29. It changes none of
+that amendment's API, ownership, taxonomy, storage or evidence rules. Its
+durable purpose is to preserve why a local publication marker could be added
+without silently becoming transport authority: publication remains a
+comparison-and-mark operation over an already issued closure, and neither its
+success nor its failure proves peer receipt or network exactly-once.
+
+The signed lineage has one evidence checkpoint and one bounded production
+checkpoint:
+
+| Commit                                     | Tree                                       | Scope                                                                   |
+| ------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------- |
+| `408842f9fb3cea706408e4e50fd89931fff5ab47` | `5ed0d0f1a6c6e71e97e7da8e15f3d337649c08b9` | tests-only shared, Node and Browser RED, death harnesses and exact pins |
+| `f9f1ed9a9197a97faf3d882adf50bd5f3663ff90` | `7ac134a95f782c9cff2abb78047e32fedcc4957f` | six production files total, including the two storage facades           |
+
+Both commits have good Faolain signatures. The production checkpoint grows the
+durable issuance capability to six methods while keeping `published` local to
+the durable outbox. Its six-file scope is exactly the shared type and
+conformance owners, the Node and Browser internal adapters, and their two
+storage facades. The adapters retain local classification because moving it
+into the shared package would widen its runtime surface. D.93.29 and signed
+tree `7ac134a95f782c9cff2abb78047e32fedcc4957f` remain the sole authorities for
+the transaction and readback mechanics. No schema, DDL, runtime export, error
+code, dependency, lockfile, protocol-v3 or node-root boundary changed.
+
+The causal evidence crossed both adapters' fourteen armable interruption
+boundaries. Node's SIGKILL evidence reopened the existing SQLite authority, and
+Browser used genuine persistent-context process death with fresh-context
+IndexedDB reopen. Both proved exact old `pending` or exact new `published`,
+preserved issued bytes, lineage and unaddressed rows, and retained the failing
+five-method and semantic mutants as controls. This evidence supports only the
+local state transition; it makes no transport, subscription, live activation
+or remote-delivery claim.
+
+Fresh gates on the final tree passed the shared and Node focused suite `15/15`,
+the complete Node death matrix, the genuine Browser control and death pair,
+issuance-store conformance `45/45`, and Phase 2l-a/c/d preservation `81/81`.
+The dedicated TypeScript fixture, all three package typechecks and builds,
+targeted ESLint, Prettier and diff-check also passed. The RED's exact fourteen
+Node and fourteen Browser cases are the source of truth for the death-matrix
+rosters rather than this ledger.
+
+The first independent Codex review found three bounded defects: the ephemeral
+owner consulted the outbox copy rather than the issued row for canonical
+preimage authority, used a broader exhausted-lineage predicate, and copied
+scope after ordinal and digest validation. The GREEN corrected all three.
+Codex `gpt-5.6-sol`/high session
+`01a000e5-2be8-7323-8789-3622beda4785` then returned terminal `PASS`, accepted
+the seam, found no remaining issue and recorded high confidence. Its final
+delta review SHA-256 is
+`1fb2410f3a3f1a43d0a7c959f0ebe31110831372563245063ebeddca9bf005e7`.
+
+The final closure reviews agree on the signed bytes:
+
+- Grok 4.6/high session `01a000e8-d435-78f0-9276-6fe61e70af12`
+  returned `PASS`, seam 2 close, no blocker and high confidence. It
+  conservatively left seam 3 amendment design disabled until this closure
+  ledger records the transition. Its result and metadata SHA-256 values are
+  `0e42ca2c3edeffbba9ccd908bcae009c9af8475bf92802a7f285ceda835536e0`
+  and `56abb0f29a364dc6ca5d53889ea38b38d4a3c7fcc0828c72f5024ca6d8eec787`.
+- Kimi K3/high/100 session `5431348b-a8b0-4f29-8aa9-575878574925`
+  returned `ACCEPTED`, seam 2 close, seam 3 amendment start only, no blocker
+  and high confidence. Its result SHA-256 is
+  `5005c8df045cf9dfefea4b884c33220896cdd6e900c0119983d247ef1acb8c60`;
+  its `SHA256SUMS` SHA-256 is
+  `b386924a867236fe6878719c39095808525147b5dc06b7d25380818a3b5f75f2`
+  and seals the raw stream, metadata and external native ledgers.
+- Native Opus 5/xhigh session `94abe6b0-1ebe-4bb4-a13c-9afdedd37a32`
+  reached `end_turn` with tools disabled and returned `PASS`, seam 2 close,
+  seam 3 amendment-design start only, no blocker and high confidence. Its raw
+  result, normalized result and session-evidence SHA-256 values are
+  `f9757dd8b06aff0b1ba63b98d8255e8e649a150b032ee9d953650a53235f4263`,
+  `ea44f74b62568a93466533a9578b21bd5703ee5de4999f74d6ec02f530bf13fb`
+  and `c927574fb093392dc6300a9c999ecb4e7c987c61d2e29d789f5df72700094349`.
+
+Two earlier Opus attempts are disclosed rather than treated as evidence: a
+read-only repository review and a larger packet synthesis exceeded their
+finite bounds without `TurnEnd`. Their no-verdict result SHA-256 values are
+`3312b7b591a49058c03d9414d79e1607a714b5a43efaf37d0cf74621912af0cc`
+and `5c967d4313f9dff26b7b7c559527b2f8e5093c40cd227af5206752ebd2dfa1bc`;
+both raw result files were empty and neither influenced closure.
+
+Kimi recorded one non-blocking adapter observation for later design awareness:
+a Browser failure to acquire the post-transition readback transaction follows
+the existing substrate-failure mapping, whereas an unreadable Node readback
+maps to unknown outcome. Both are non-poisoning and safe under D.93.29; this
+ledger does not redesign or normalize that inherited edge.
+
+Seam 2 is closed. This status supersedes only D.93.29's temporary withholding
+of the next design step: seam 3 may now enter a separate normative amendment
+design and quorum. Seam 3 RED or implementation, the complete Phase `3a-1B`,
+live activation and Phase 3b remain unauthorized. No seam 3 contract is
+defined here.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
