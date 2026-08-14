@@ -321,6 +321,8 @@ function createFakeNetwork(options: FakeNetworkOptions): {
 	];
 	const networkNode = {
 		broadcastMessage: vi.fn(() => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		changeTopicScoreParams: vi.fn(),
 		connect,
 		connectToBootstraps: vi.fn(() => Promise.resolve()),

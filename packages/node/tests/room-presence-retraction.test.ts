@@ -189,6 +189,8 @@ function fakeNetwork(): DRPNetworkNode {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn((): Promise<void> => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn((): Promise<void> => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn((): Promise<void> => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((): void => undefined),

@@ -53,6 +53,8 @@ function createFakeNetwork(): FakeNetworkControls {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn(() => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn(() => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn(() => Promise.resolve()),
 		subscribeToMessageQueue,
