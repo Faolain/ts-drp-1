@@ -2,9 +2,15 @@ import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { CausalityIndex } from "@ts-drp/compaction";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
+	type AdmitReceivedVertexInput,
+	type AdmittedReceivedVertexView,
 	authenticateCurrentEpochAnchor,
 	type CurrentAnchorTrust,
+	extractAdmittedReceivedVertex,
+	type ExtractAdmittedReceivedVertexFailureReason,
 	prepareBlueprintAdmission,
 	prepareBlueprintRuntime,
 	type PreparedBlueprintAdmission,
@@ -25,6 +31,7 @@ import {
 	type PresentHead,
 	type StorageObjectId,
 } from "@ts-drp/storage";
+import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
 const ArrayIsArray = Array.isArray;
 const ArrayPrototype = Array.prototype;
@@ -57,6 +64,9 @@ const TypedArrayPrototype = ObjectGetPrototypeOf(Uint8Array.prototype) as object
 const TypedArrayBufferGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "buffer")?.get;
 const TypedArrayByteLengthGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "byteLength")?.get;
 const CryptoGetRandomValues = globalThis.crypto.getRandomValues;
+const ConsoleObject = globalThis.console;
+const ConsoleWarn = ConsoleObject?.warn;
+const TextEncoderConstructor = TextEncoder;
 
 const INPUT_KEYS = [
 	"authenticationProfile",
@@ -116,6 +126,27 @@ const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	parametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
+const ACTIVATION_INPUT_KEYS = [
+	"capability",
+	"issuanceScope",
+	"issuanceStore",
+	"messageQueueManager",
+	"networkNode",
+	"onAdmittedVertex",
+	"resolveAuthorPublicKey",
+] as const;
+const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
+const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
+const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
+const ISSUED_RECORD_KEYS = ["authorSequence", "envelope", "scope"] as const;
+const OUTBOX_ENTRY_KEYS = ["authorSequence", "envelope", "scope"] as const;
+const SIGNED_ENVELOPE_KEYS = ["canonicalPreimageBytes", "digest", "signature"] as const;
+const V3_TOPIC_PREFIX = "drp/v3/1/";
+const vertexRegistry = parameterRegistry.kinds.vertex;
+const V3_VERTEX_DOMAIN = parameterRegistry.domains.vertex;
+const V3_VERTEX_SUITE_ID = parameterRegistry.cryptoSuites.active.find(
+	(entry: { readonly role: string }) => entry.role === "identityAndVertex"
+)?.suiteId;
 
 export interface PrepareV3LiveGenerationInput {
 	readonly authenticationProfile: "creator-only";
@@ -177,6 +208,56 @@ export type PrepareV3LiveResult =
 	| Readonly<{
 			readonly ok: false;
 			readonly kind: PrepareV3LiveFailureKind;
+			readonly detail: string;
+	  }>;
+
+export interface V3PlaneActivationInput {
+	readonly capability: PreparedV3Live;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly messageQueueManager: MessageQueueManager<Message>;
+	readonly networkNode: DRPNetworkNode;
+	readonly onAdmittedVertex: V3AdmittedVertexSink;
+	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
+}
+
+export type V3AdmittedVertexSink = (
+	delivery: Readonly<{
+		readonly vertex: AdmittedReceivedVertexView;
+		readonly exactReceivedCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+		readonly transportSender: string;
+	}>
+) => void | Promise<void>;
+
+export interface V3PlaneHandle {
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly topic: string;
+	readonly queueId: string;
+	publishPending(): Promise<V3EgressResult>;
+	deactivate(): void;
+}
+
+export type V3PlaneActivationFailureKind =
+	| "malformed-input"
+	| "capability-consumed"
+	| "not-started"
+	| "topic-derivation-failed"
+	| "issuance-scope-mismatch"
+	| "queue-capacity"
+	| "subscribe-failed"
+	| "internal-invariant";
+
+export type V3PlaneActivationResult =
+	| Readonly<{ readonly ok: true; readonly handle: V3PlaneHandle }>
+	| Readonly<{ readonly ok: false; readonly kind: V3PlaneActivationFailureKind; readonly detail: string }>;
+
+export type V3EgressResult =
+	| Readonly<{ readonly ok: true; readonly kind: "empty" | "published" }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "not-active" | "store-failed" | "record-rejected" | "publish-failed" | "publication-state-unknown";
 			readonly detail: string;
 	  }>;
 
@@ -1722,6 +1803,737 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 	}
 
 	return failure("internal-invariant", "creator preparation exhausted unexpectedly");
+}
+
+interface V3PlaneRegistration {
+	active: boolean;
+	handle: V3PlaneHandle;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly messageQueueManager: MessageQueueManager<Message>;
+	readonly networkNode: DRPNetworkNode;
+	readonly onAdmittedVertex: V3AdmittedVertexSink;
+	readonly payload: PreparedV3LivePayload;
+	readonly queueId: string;
+	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
+	readonly topic: string;
+	gate: Promise<void> | undefined;
+}
+
+const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+const HEX_DIGITS = "0123456789abcdef";
+
+function activationFailure(
+	kind: V3PlaneActivationFailureKind,
+	detail: string
+): Extract<V3PlaneActivationResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function egressFailure(
+	kind: Extract<V3EgressResult, { readonly ok: false }>["kind"],
+	detail: string
+): Extract<V3EgressResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function egressSuccess(kind: "empty" | "published"): Extract<V3EgressResult, { readonly ok: true }> {
+	return ObjectFreeze({ kind, ok: true as const });
+}
+
+function denseStrings(value: unknown): readonly string[] | undefined {
+	try {
+		if (!ArrayIsArray(value)) return undefined;
+		const lengthDescriptor = ObjectGetOwnPropertyDescriptor(value, "length");
+		if (
+			lengthDescriptor === undefined ||
+			!("value" in lengthDescriptor) ||
+			!NumberIsSafeInteger(lengthDescriptor.value)
+		) {
+			return undefined;
+		}
+		if (value.length !== lengthDescriptor.value) return undefined;
+		const result: string[] = [];
+		for (let index = 0; index < lengthDescriptor.value; index += 1) {
+			const descriptor = ObjectGetOwnPropertyDescriptor(value, StringConstructor(index));
+			if (descriptor === undefined || !("value" in descriptor) || typeof descriptor.value !== "string")
+				return undefined;
+			ObjectDefineProperty(result, StringConstructor(index), {
+				configurable: true,
+				enumerable: true,
+				value: descriptor.value,
+				writable: true,
+			});
+		}
+		return ObjectFreeze(result);
+	} catch {
+		return undefined;
+	}
+}
+
+function topicMembership(networkNode: DRPNetworkNode, topic: string): boolean | undefined {
+	try {
+		const topics = denseStrings(networkNode.getSubscribedTopics());
+		if (topics === undefined) return undefined;
+		for (let index = 0; index < topics.length; index += 1) if (topics[index] === topic) return true;
+		return false;
+	} catch {
+		return undefined;
+	}
+}
+
+function hasQueueGuarded(messageQueueManager: MessageQueueManager<Message>, queueId: string): boolean | undefined {
+	try {
+		const present = messageQueueManager.hasQueue(queueId);
+		return typeof present === "boolean" ? present : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function cleanupActivationEffects(
+	networkNode: DRPNetworkNode,
+	messageQueueManager: MessageQueueManager<Message>,
+	topic: string,
+	queueId: string,
+	networkSubscriptionAttempted: boolean
+): boolean {
+	if (networkSubscriptionAttempted) {
+		try {
+			networkNode.unsubscribe(topic);
+		} catch {
+			// Continue to the queue cleanup and observable postconditions.
+		}
+	}
+	try {
+		messageQueueManager.close(queueId);
+	} catch {
+		// Continue to both observable postconditions.
+	}
+	const topicAbsent = !networkSubscriptionAttempted || topicMembership(networkNode, topic) === false;
+	const queueAbsent = hasQueueGuarded(messageQueueManager, queueId) === false;
+	return topicAbsent && queueAbsent;
+}
+
+function activationFailureAfterCleanup(
+	kind: V3PlaneActivationFailureKind,
+	detail: string,
+	networkNode: DRPNetworkNode,
+	messageQueueManager: MessageQueueManager<Message>,
+	topic: string,
+	queueId: string,
+	networkSubscriptionAttempted: boolean
+): Extract<V3PlaneActivationResult, { readonly ok: false }> {
+	const cleanupComplete = cleanupActivationEffects(
+		networkNode,
+		messageQueueManager,
+		topic,
+		queueId,
+		networkSubscriptionAttempted
+	);
+	if (!cleanupComplete) {
+		try {
+			if (typeof ConsoleWarn === "function") {
+				ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-live:activation-cleanup-postcondition-failed"]);
+			}
+		} catch {
+			// The fixed cleanup diagnostic cannot replace the original activation failure.
+		}
+	}
+	return activationFailure(kind, detail);
+}
+
+function subscribeActivationQueue(
+	messageQueueManager: MessageQueueManager<Message>,
+	queueId: string,
+	handler: (message: Message) => void
+): "capacity" | "failed" | "ok" {
+	try {
+		messageQueueManager.subscribe(queueId, handler);
+		return "ok";
+	} catch (error) {
+		try {
+			const message = isObject(error) ? ObjectGetOwnPropertyDescriptor(error, "message") : undefined;
+			return message !== undefined && "value" in message && message.value === "Max number of queues reached"
+				? "capacity"
+				: "failed";
+		} catch {
+			return "failed";
+		}
+	}
+}
+
+function lowerHexDigest(bytes: Uint8Array): string | undefined {
+	const length = typedArrayByteLength(bytes);
+	if (length === undefined) return undefined;
+	let result = "";
+	for (let index = 0; index < length; index += 1) {
+		const byte = bytes[index];
+		if (byte === undefined) return undefined;
+		result += HEX_DIGITS[(byte >>> 4) & 0x0f] + HEX_DIGITS[byte & 0x0f];
+	}
+	return result;
+}
+
+function deriveV3Topic(payload: PreparedV3LivePayload): string | undefined {
+	try {
+		const objectId = payload.provenance.objectId;
+		const genesisAnchorDigest = payload.trust.trust.genesisAnchorDigest;
+		if (typeof objectId !== "string" || !isDigestHex(genesisAnchorDigest)) return undefined;
+		const encoder = new TextEncoderConstructor();
+		const digest = hashDomain("ts-drp/live-topic/v3", encoder.encode(objectId), encoder.encode(genesisAnchorDigest));
+		const hex = lowerHexDigest(digest);
+		return hex === undefined || hex.length !== 64 ? undefined : `${V3_TOPIC_PREFIX}${hex}`;
+	} catch {
+		return undefined;
+	}
+}
+
+function currentRegistration(registration: V3PlaneRegistration): boolean {
+	if (!registration.active) return false;
+	const registrations = v3PlaneRegistrations.get(registration.networkNode);
+	if (registrations?.get(registration.topic) !== registration) return false;
+	return topicMembership(registration.networkNode, registration.topic) === true;
+}
+
+function deactivateRegistration(registration: V3PlaneRegistration): boolean {
+	registration.active = false;
+	const registrations = v3PlaneRegistrations.get(registration.networkNode);
+	if (registrations?.get(registration.topic) === registration) registrations.delete(registration.topic);
+	try {
+		registration.networkNode.unsubscribe(registration.topic);
+	} catch {
+		// Continue to queue cleanup and both observable postconditions.
+	}
+	try {
+		registration.messageQueueManager.close(registration.queueId);
+	} catch {
+		// Continue to both observable postconditions.
+	}
+	const topicAbsent = topicMembership(registration.networkNode, registration.topic) === false;
+	const queueAbsent = hasQueueGuarded(registration.messageQueueManager, registration.queueId) === false;
+	return topicAbsent && queueAbsent;
+}
+
+function sameScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
+	return left.author === right.author && left.objectId === right.objectId;
+}
+
+function sameActivation(
+	registration: V3PlaneRegistration,
+	payload: PreparedV3LivePayload,
+	scope: DurableIssueScope,
+	input: PlainRecord
+): boolean {
+	return (
+		registration.active &&
+		registration.messageQueueManager === input.messageQueueManager &&
+		registration.issuanceStore === input.issuanceStore &&
+		registration.onAdmittedVertex === input.onAdmittedVertex &&
+		registration.resolveAuthorPublicKey === input.resolveAuthorPublicKey &&
+		sameScope(registration.issuanceScope, scope) &&
+		registration.payload.provenance.objectId === payload.provenance.objectId &&
+		registration.payload.provenance.epoch === payload.provenance.epoch &&
+		registration.payload.provenance.anchorDigest === payload.provenance.anchorDigest &&
+		registration.payload.liveStateRef.digest === payload.liveStateRef.digest
+	);
+}
+
+function copiedScope(value: unknown): DurableIssueScope | undefined {
+	const snapshot = snapshotClosedRecord(value, ISSUANCE_SCOPE_KEYS);
+	if (snapshot === undefined || typeof snapshot.author !== "string" || typeof snapshot.objectId !== "string") {
+		return undefined;
+	}
+	return ObjectFreeze({ author: snapshot.author, objectId: snapshot.objectId });
+}
+
+function payloadIsUsable(payload: PreparedV3LivePayload): boolean {
+	return (
+		isObject(payload) &&
+		typeof payload.provenance.objectId === "string" &&
+		payload.provenance.epoch === 0 &&
+		isDigestHex(payload.provenance.anchorDigest) &&
+		isObject(payload.admission) &&
+		isObject(payload.trust) &&
+		isObject(payload.trust.trust)
+	);
+}
+
+type V3IngressFailureCategory =
+	| ExtractAdmittedReceivedVertexFailureReason
+	| "envelope-rejected"
+	| "queue-rejected"
+	| "sink-rejected";
+
+function ingressFailureLog(category: V3IngressFailureCategory): void {
+	try {
+		if (typeof ConsoleWarn === "function") ReflectApply(ConsoleWarn, ConsoleObject, ["::v3-ingress", category]);
+	} catch {
+		// Logging is diagnostic-only and must not escape the queue boundary.
+	}
+}
+
+async function handleV3Ingress(registration: V3PlaneRegistration, message: Message): Promise<void> {
+	try {
+		if (!currentRegistration(registration)) return;
+		if (message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE) return;
+		if (registration.networkNode.gossipTopicFor(message) !== registration.topic) return;
+		if (message.objectId !== registration.topic) return;
+		let receivedCanonicalPreimageBytes: Uint8Array;
+		let signature: Uint8Array;
+		try {
+			const exactWireBytes = copyDetachedBytes(message.data);
+			if (exactWireBytes === undefined || exactWireBytes.byteLength === 0) {
+				ingressFailureLog("envelope-rejected");
+				return;
+			}
+			const decoded = V3Envelope.decode(exactWireBytes);
+			const canonicalEnvelope = V3Envelope.encode(decoded).finish();
+			if (!sameBytes(exactWireBytes, canonicalEnvelope)) {
+				ingressFailureLog("envelope-rejected");
+				return;
+			}
+			const detachedPreimage = copyDetachedBytes(decoded.canonicalPreimage);
+			const detachedSignature = copyDetachedBytes(decoded.signature);
+			if (detachedPreimage === undefined || detachedSignature === undefined) {
+				ingressFailureLog("envelope-rejected");
+				return;
+			}
+			receivedCanonicalPreimageBytes = detachedPreimage;
+			signature = detachedSignature;
+		} catch {
+			ingressFailureLog("envelope-rejected");
+			return;
+		}
+		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") {
+			ingressFailureLog("malformed-input");
+			return;
+		}
+		const domain = V3_VERTEX_DOMAIN;
+		const expectedAnchor = registration.payload.provenance.anchorDigest;
+		const preparedBlueprintAdmission = registration.payload.admission;
+		const resolveAuthorPublicKey = registration.resolveAuthorPublicKey;
+		const suiteId = V3_VERTEX_SUITE_ID;
+		let extracted;
+		try {
+			extracted = extractAdmittedReceivedVertex({
+				domain,
+				expectedAnchor,
+				preparedBlueprintAdmission,
+				receivedCanonicalPreimageBytes,
+				resolveAuthorPublicKey,
+				signature,
+				suiteId,
+			});
+		} catch {
+			ingressFailureLog("malformed-input");
+			return;
+		}
+		if (!extracted.ok) {
+			ingressFailureLog(extracted.reason);
+			return;
+		}
+		const delivery = ObjectFreeze({
+			vertex: extracted.vertex,
+			exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
+			signature: new Uint8ArrayConstructor(signature),
+			transportSender: message.sender,
+		});
+		try {
+			await registration.onAdmittedVertex(delivery);
+		} catch {
+			ingressFailureLog("sink-rejected");
+		}
+	} catch {
+		ingressFailureLog("envelope-rejected");
+	}
+}
+
+interface SnapshottedOutboxRow {
+	readonly authorSequence: number;
+	readonly canonicalPreimageBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly publishState: "pending" | "published";
+	readonly scope: DurableIssueScope;
+	readonly signature: Uint8Array;
+}
+
+function envelopeSnapshot(value: unknown):
+	| Readonly<{
+			canonicalPreimageBytes: Uint8Array;
+			digest: Uint8Array;
+			signature: Uint8Array;
+	  }>
+	| undefined {
+	const envelope = snapshotClosedRecord(value, SIGNED_ENVELOPE_KEYS);
+	if (envelope === undefined) return undefined;
+	const canonicalPreimageBytes = copyDetachedBytes(envelope.canonicalPreimageBytes);
+	const digest = copyDetachedBytes(envelope.digest);
+	const signature = copyDetachedBytes(envelope.signature);
+	return canonicalPreimageBytes === undefined || digest === undefined || signature === undefined
+		? undefined
+		: ObjectFreeze({ canonicalPreimageBytes, digest, signature });
+}
+
+function outboxRowSnapshot(value: unknown, selectedScope: DurableIssueScope): SnapshottedOutboxRow | undefined {
+	try {
+		const record = snapshotClosedRecord(value, OUTBOX_RECORD_KEYS);
+		if (record === undefined || (record.publishState !== "pending" && record.publishState !== "published"))
+			return undefined;
+		const commit = snapshotClosedRecord(record.commit, ISSUE_COMMIT_KEYS);
+		if (commit === undefined || !NumberIsSafeInteger(commit.authorSequence) || (commit.authorSequence as number) < 0) {
+			return undefined;
+		}
+		const issued = snapshotClosedRecord(commit.issuedRecord, ISSUED_RECORD_KEYS);
+		const outbox = snapshotClosedRecord(commit.outboxEntry, OUTBOX_ENTRY_KEYS);
+		if (issued === undefined || outbox === undefined) return undefined;
+		const issuedScope = copiedScope(issued.scope);
+		const outboxScope = copiedScope(outbox.scope);
+		if (
+			issued.authorSequence !== commit.authorSequence ||
+			outbox.authorSequence !== commit.authorSequence ||
+			issuedScope === undefined ||
+			outboxScope === undefined ||
+			!sameScope(issuedScope, outboxScope) ||
+			!sameScope(issuedScope, selectedScope)
+		) {
+			return undefined;
+		}
+		const envelope = envelopeSnapshot(commit.envelope);
+		const issuedEnvelope = envelopeSnapshot(issued.envelope);
+		const outboxEnvelope = envelopeSnapshot(outbox.envelope);
+		if (
+			envelope === undefined ||
+			issuedEnvelope === undefined ||
+			outboxEnvelope === undefined ||
+			!sameBytes(envelope.canonicalPreimageBytes, issuedEnvelope.canonicalPreimageBytes) ||
+			!sameBytes(envelope.canonicalPreimageBytes, outboxEnvelope.canonicalPreimageBytes) ||
+			!sameBytes(envelope.digest, issuedEnvelope.digest) ||
+			!sameBytes(envelope.digest, outboxEnvelope.digest) ||
+			!sameBytes(envelope.signature, issuedEnvelope.signature) ||
+			!sameBytes(envelope.signature, outboxEnvelope.signature)
+		) {
+			return undefined;
+		}
+		return ObjectFreeze({
+			authorSequence: commit.authorSequence as number,
+			canonicalPreimageBytes: envelope.canonicalPreimageBytes,
+			digest: envelope.digest,
+			publishState: record.publishState,
+			scope: issuedScope,
+			signature: envelope.signature,
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+function onePage(value: unknown): DurableIssuanceOutboxRecord | null | undefined {
+	try {
+		if (!ArrayIsArray(value)) return undefined;
+		const length = ObjectGetOwnPropertyDescriptor(value, "length");
+		if (length === undefined || !("value" in length) || (length.value !== 0 && length.value !== 1)) return undefined;
+		if (length.value === 0) return null;
+		const first = ObjectGetOwnPropertyDescriptor(value, "0");
+		return first === undefined || !("value" in first) ? undefined : (first.value as DurableIssuanceOutboxRecord);
+	} catch {
+		return undefined;
+	}
+}
+
+async function publishPending(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
+		return egressFailure("record-rejected", "v3 publication selector is invalid");
+	}
+	let afterKey: readonly [string, string, number] | undefined;
+	for (;;) {
+		let rawPage: unknown;
+		try {
+			rawPage = await registration.issuanceStore.readOutboxPage(
+				afterKey === undefined ? { scope, limit: 1 } : { afterKey, limit: 1, scope }
+			);
+		} catch {
+			return egressFailure("store-failed", "v3 publication store read failed");
+		}
+		if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+		const page = onePage(rawPage);
+		if (page === undefined) return egressFailure("record-rejected", "v3 publication record is invalid");
+		if (page === null) return egressSuccess("empty");
+		const row = outboxRowSnapshot(page, scope);
+		if (row === undefined) return egressFailure("record-rejected", "v3 publication record is invalid");
+		if (row.publishState === "published") {
+			const nextKey = ObjectFreeze([scope.objectId, scope.author, row.authorSequence] as const);
+			if (afterKey !== undefined && row.authorSequence <= afterKey[2]) {
+				return egressFailure("record-rejected", "v3 publication cursor did not advance");
+			}
+			afterKey = nextKey;
+			continue;
+		}
+		if (row.publishState !== "pending") return egressFailure("record-rejected", "v3 publication state is invalid");
+		const data = V3Envelope.encode({
+			canonicalPreimage: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+			signature: new Uint8ArrayConstructor(row.signature),
+		}).finish();
+		const message = Message.create({
+			data,
+			objectId: registration.topic,
+			sender: registration.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+		});
+		if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+		let publicationResult: unknown;
+		try {
+			publicationResult = await registration.networkNode.publishMessage(registration.topic, message);
+		} catch {
+			return currentRegistration(registration)
+				? egressFailure("publish-failed", "v3 publication failed")
+				: egressFailure("publication-state-unknown", "v3 publication state is unknown");
+		}
+		if (!currentRegistration(registration)) {
+			return egressFailure("publication-state-unknown", "v3 publication state is unknown");
+		}
+		if (publicationResult !== true) return egressFailure("publish-failed", "v3 publication failed");
+		if (!currentRegistration(registration)) {
+			return egressFailure("publication-state-unknown", "v3 publication state is unknown");
+		}
+		try {
+			await registration.issuanceStore.compareAndMarkOutboxPublished({
+				authorSequence: row.authorSequence,
+				digest: new Uint8ArrayConstructor(row.digest),
+				scope: ObjectFreeze({ ...row.scope }),
+			});
+		} catch {
+			return egressFailure("publication-state-unknown", "v3 publication state is unknown");
+		}
+		return egressSuccess("published");
+	}
+}
+
+function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+	const result =
+		registration.gate === undefined
+			? publishPending(registration)
+			: registration.gate.then(() => publishPending(registration));
+	registration.gate = result.then(
+		() => undefined,
+		() => undefined
+	);
+	return result;
+}
+
+function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
+	return ObjectFreeze({
+		objectId: registration.payload.provenance.objectId,
+		epoch: 0 as const,
+		topic: registration.topic,
+		queueId: registration.queueId,
+		publishPending: (): Promise<V3EgressResult> => enqueuePendingPublication(registration),
+		deactivate: (): void => {
+			if (!registration.active) return;
+			deactivateRegistration(registration);
+		},
+	});
+}
+
+/**
+ * Activates the private v3 transport plane from one prepared capability.
+ * @param rawInput - Closed activation bindings and the one-use prepared capability.
+ * @returns A frozen active handle or a closed activation failure.
+ */
+export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneActivationResult {
+	try {
+		const input = snapshotClosedRecord(rawInput, ACTIVATION_INPUT_KEYS);
+		if (input === undefined) return activationFailure("malformed-input", "v3 activation input is invalid");
+		const {
+			capability,
+			issuanceScope,
+			issuanceStore,
+			messageQueueManager,
+			networkNode,
+			onAdmittedVertex,
+			resolveAuthorPublicKey,
+		} = input;
+		const payload = consumePreparedV3Live(capability as PreparedV3Live);
+		if (payload === undefined) return activationFailure("capability-consumed", "v3 capability is unavailable");
+		const selectedScope = copiedScope(issuanceScope);
+		if (selectedScope === undefined) return activationFailure("malformed-input", "v3 issuance scope is invalid");
+		if (!payloadIsUsable(payload)) return activationFailure("internal-invariant", "v3 prepared state is invalid");
+		if (selectedScope.objectId !== payload.provenance.objectId) {
+			return activationFailure("issuance-scope-mismatch", "v3 issuance scope does not match");
+		}
+		if (
+			!isObject(issuanceStore) ||
+			!isObject(messageQueueManager) ||
+			!isObject(networkNode) ||
+			typeof onAdmittedVertex !== "function" ||
+			typeof resolveAuthorPublicKey !== "function"
+		) {
+			return activationFailure("malformed-input", "v3 activation binding is invalid");
+		}
+		const boundNetworkNode = networkNode as DRPNetworkNode;
+		if (typeof boundNetworkNode.peerId !== "string" || boundNetworkNode.peerId.length === 0) {
+			return activationFailure("not-started", "v3 network is not started");
+		}
+		const topic = deriveV3Topic(payload);
+		if (topic === undefined) return activationFailure("topic-derivation-failed", "v3 topic could not be derived");
+		const queueId = topic;
+		const boundQueueManager = messageQueueManager as MessageQueueManager<Message>;
+		const boundIssuanceStore = issuanceStore as DurableIssuanceStore;
+		const boundSink = onAdmittedVertex as V3AdmittedVertexSink;
+		const boundResolver = resolveAuthorPublicKey as AdmitReceivedVertexInput["resolveAuthorPublicKey"];
+		let registrations = v3PlaneRegistrations.get(boundNetworkNode);
+		const existing = registrations?.get(topic);
+		if (existing !== undefined) {
+			if (currentRegistration(existing)) {
+				return sameActivation(existing, payload, selectedScope, input)
+					? ObjectFreeze({ handle: existing.handle, ok: true as const })
+					: activationFailure("internal-invariant", "v3 registration binding conflicts");
+			}
+			if (!deactivateRegistration(existing)) {
+				return activationFailure("internal-invariant", "v3 stale registration could not be retired");
+			}
+		}
+		if (hasQueueGuarded(boundQueueManager, queueId) !== false) {
+			return activationFailure("internal-invariant", "v3 queue is already owned");
+		}
+		const subscribedTopics = denseStrings(boundNetworkNode.getSubscribedTopics());
+		let ownsTopic = false;
+		if (subscribedTopics !== undefined) {
+			for (let index = 0; index < subscribedTopics.length; index += 1) {
+				if (subscribedTopics[index] === topic) ownsTopic = true;
+			}
+		}
+		if (subscribedTopics === undefined || ownsTopic) {
+			return activationFailure("internal-invariant", "v3 topic is already owned");
+		}
+		let registration = undefined as unknown as V3PlaneRegistration;
+		let networkSubscriptionAttempted = false;
+		try {
+			const queueSubscription = subscribeActivationQueue(boundQueueManager, queueId, (message) => {
+				void handleV3Ingress(registration, message);
+			});
+			if (queueSubscription !== "ok") {
+				return queueSubscription === "capacity"
+					? activationFailureAfterCleanup(
+							"queue-capacity",
+							"v3 queue capacity is unavailable",
+							boundNetworkNode,
+							boundQueueManager,
+							topic,
+							queueId,
+							false
+						)
+					: activationFailureAfterCleanup(
+							"internal-invariant",
+							"v3 queue subscription failed",
+							boundNetworkNode,
+							boundQueueManager,
+							topic,
+							queueId,
+							false
+						);
+			}
+			if (hasQueueGuarded(boundQueueManager, queueId) !== true) {
+				return activationFailureAfterCleanup(
+					"internal-invariant",
+					"v3 queue subscription failed",
+					boundNetworkNode,
+					boundQueueManager,
+					topic,
+					queueId,
+					false
+				);
+			}
+			networkSubscriptionAttempted = true;
+			try {
+				boundNetworkNode.subscribe(topic);
+			} catch {
+				return activationFailureAfterCleanup(
+					"subscribe-failed",
+					"v3 topic subscription failed",
+					boundNetworkNode,
+					boundQueueManager,
+					topic,
+					queueId,
+					true
+				);
+			}
+			if (topicMembership(boundNetworkNode, topic) !== true) {
+				return activationFailureAfterCleanup(
+					"subscribe-failed",
+					"v3 topic subscription failed",
+					boundNetworkNode,
+					boundQueueManager,
+					topic,
+					queueId,
+					true
+				);
+			}
+			registration = {
+				active: true,
+				handle: undefined as unknown as V3PlaneHandle,
+				issuanceScope: selectedScope,
+				issuanceStore: boundIssuanceStore,
+				messageQueueManager: boundQueueManager,
+				networkNode: boundNetworkNode,
+				onAdmittedVertex: boundSink,
+				payload,
+				resolveAuthorPublicKey: boundResolver,
+				queueId: topic,
+				topic,
+				gate: undefined,
+			};
+			registration.handle = makeV3PlaneHandle(registration);
+			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
+			registrations.set(topic, registration);
+			v3PlaneRegistrations.set(boundNetworkNode, registrations);
+			return ObjectFreeze({ handle: registration.handle, ok: true as const });
+		} catch {
+			return activationFailureAfterCleanup(
+				"internal-invariant",
+				"v3 activation failed",
+				boundNetworkNode,
+				boundQueueManager,
+				topic,
+				queueId,
+				networkSubscriptionAttempted
+			);
+		}
+	} catch {
+		return activationFailure("internal-invariant", "v3 activation failed");
+	}
+}
+
+/**
+ * Claims and queues a v3 envelope before legacy discovery dispatch.
+ * @param networkNode - Exact network owner that authenticated the gossip message.
+ * @param message - Exact decoded message identity from network ingress.
+ * @returns Whether v3 owns the message and legacy dispatch must stop.
+ */
+export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): boolean {
+	try {
+		const gossipTopic = networkNode.gossipTopicFor(message);
+		if (gossipTopic === undefined) return message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
+		const registration = v3PlaneRegistrations.get(networkNode)?.get(gossipTopic);
+		if (registration === undefined || !currentRegistration(registration)) {
+			return message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
+		}
+		if (
+			message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE ||
+			message.objectId !== gossipTopic ||
+			gossipTopic !== registration.topic
+		) {
+			return true;
+		}
+		void registration.messageQueueManager
+			.enqueue(registration.queueId, message)
+			.catch(() => ingressFailureLog("queue-rejected"));
+		return true;
+	} catch {
+		return message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
+	}
 }
 
 export { prepareV3LiveGeneration };

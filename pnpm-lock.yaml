@@ -784,6 +784,9 @@ importers:
       '@ts-drp/interval-runner':
         specifier: 0.11.0
         version: link:../interval-runner
+      '@ts-drp/issuance-store':
+        specifier: 0.11.0
+        version: link:../issuance-store
       '@ts-drp/keychain':
         specifier: 0.11.0
         version: link:../keychain

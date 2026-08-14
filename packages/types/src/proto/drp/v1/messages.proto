@@ -15,6 +15,12 @@ enum MessageType {
   MESSAGE_TYPE_CUSTOM = 8;
   MESSAGE_TYPE_DRP_DISCOVERY = 9;
   MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE = 10;
+  MESSAGE_TYPE_V3_ENVELOPE = 11;
+}
+
+message V3Envelope {
+  bytes canonical_preimage = 1;
+  bytes signature = 2;
 }
 
 message Message {

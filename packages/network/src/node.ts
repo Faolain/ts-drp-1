@@ -6,7 +6,8 @@ import { bootstrap, type BootstrapComponents } from "@libp2p/bootstrap";
 import { circuitRelayServer, circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import { dcutr } from "@libp2p/dcutr";
-import { type GossipSub, gossipsub, type GossipsubOpts, StrictSign } from "@libp2p/gossipsub";
+import { type GossipSub, gossipsub, type GossipsubOpts, type SignedMessage, StrictSign } from "@libp2p/gossipsub";
+import { RPC } from "@libp2p/gossipsub/message";
 import {
 	createPeerScoreParams,
 	createTopicScoreParams,
@@ -123,6 +124,42 @@ export const BOOTSTRAP_NODES = [
 	"/dns4/bootstrap2.topology.gg/tcp/443/wss/p2p/16Uiu2HAmGjAVQyzgTCumpB9TuojKT4LZTBC5HRiZyuwGG9VHodLC",
 ];
 let log: Logger;
+const gossipTopics = new WeakMap<Message, string>();
+const PUBSUB_SIGN_PREFIX = new TextEncoder().encode("libp2p-pubsub:");
+const MIN_PUBSUB_SEQUENCE = BigInt(0);
+const MAX_PUBSUB_SEQUENCE = BigInt("18446744073709551615");
+
+function pubsubSignaturePreimage(message: SignedMessage): Uint8Array | undefined {
+	try {
+		if (message.sequenceNumber < MIN_PUBSUB_SEQUENCE || message.sequenceNumber > MAX_PUBSUB_SEQUENCE) return undefined;
+		const sequenceNumber = new Uint8Array(8);
+		new DataView(sequenceNumber.buffer).setBigUint64(0, message.sequenceNumber, false);
+		const encoded = RPC.Message.encode({
+			from: message.from.toMultihash().bytes,
+			data: message.data,
+			seqno: sequenceNumber,
+			topic: message.topic,
+			signature: undefined,
+			key: undefined,
+		});
+		const preimage = new Uint8Array(PUBSUB_SIGN_PREFIX.byteLength + encoded.byteLength);
+		preimage.set(PUBSUB_SIGN_PREFIX);
+		preimage.set(encoded, PUBSUB_SIGN_PREFIX.byteLength);
+		return preimage;
+	} catch {
+		return undefined;
+	}
+}
+
+async function validateToRawMessage(message: SignedMessage): Promise<boolean> {
+	const preimage = pubsubSignaturePreimage(message);
+	if (preimage === undefined) return false;
+	try {
+		return await message.key.verify(preimage, message.signature);
+	} catch {
+		return false;
+	}
+}
 
 const WARM_RELAY_RETRY_BASE_DELAY_MS = 100;
 const WARM_RELAY_RETRY_MAX_DELAY_MS = 2_000;
@@ -1781,14 +1818,41 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async broadcastMessage(topic: string, message: Message): Promise<void> {
 		try {
-			const messageBuffer = Message.encode(message).finish();
-			await this.waitForSubscriber(topic);
-			await this._pubsub?.publish(topic, messageBuffer);
-
+			await this.waitForPeersAndPublish(topic, message);
 			log.debug("::broadcastMessage: Successfuly broadcasted message to topic", topic);
 		} catch (e) {
 			log.error("::broadcastMessage:", e);
 		}
+	}
+
+	private async waitForPeersAndPublish(topic: string, message: Message): Promise<void> {
+		const messageBuffer = Message.encode(message).finish();
+		const pubsub = this._pubsub;
+		if (pubsub === undefined) throw new Error("Pubsub is unavailable");
+		await this.waitForSubscriber(topic);
+		if (this._pubsub !== pubsub) throw new Error("Pubsub changed during publication readiness");
+		await pubsub.publish(topic, messageBuffer);
+		if (this._pubsub !== pubsub) throw new Error("Pubsub changed during publication");
+	}
+
+	/**
+	 * Publish one exact message and surface readiness or transport failure.
+	 * @param topic - Authenticated topic selected by the private live-plane owner.
+	 * @param message - Exact message to encode and publish.
+	 * @returns Literal truth after the publication completes.
+	 */
+	async publishMessage(topic: string, message: Message): Promise<true> {
+		await this.waitForPeersAndPublish(topic, message);
+		return true;
+	}
+
+	/**
+	 * Read the authenticated gossip topic bound to one decoded message identity.
+	 * @param message - Exact decoded message delivered by signed gossip ingress.
+	 * @returns Its authenticated topic, or undefined outside signed gossip ingress.
+	 */
+	gossipTopicFor(message: Message): string | undefined {
+		return gossipTopics.get(message);
 	}
 
 	private async waitForSubscriber(topic: string, timeout = 1000): Promise<void> {
@@ -2004,12 +2068,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				log.error("::startEnqueueMessages::handleGossipsubMessage: unsigned message on StrictSign ingress");
 				return;
 			}
-			try {
-				if (!peerIdFromPublicKey(e.detail.msg.key).equals(e.detail.msg.from)) return;
-			} catch {
-				return;
-			}
-			this.handleGossipsubMessage(e.detail.msg.data, e.detail.msg.from.toString());
+			void this.handleSignedGossipsubMessage(e.detail.msg);
 		});
 		await this._node?.handle(
 			[...DRP_SYNC_PROTOCOLS],
@@ -2018,17 +2077,29 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		);
 	}
 
+	private async handleSignedGossipsubMessage(message: SignedMessage): Promise<void> {
+		try {
+			if (!peerIdFromPublicKey(message.key).equals(message.from)) return;
+			if (!(await validateToRawMessage(message))) return;
+			this.handleGossipsubMessage(message.data, message.from.toString(), message.topic);
+		} catch {
+			// Strict signed ingress fails closed.
+		}
+	}
+
 	private decodeAttributedMessage(data: Uint8Array, authenticatedSender: string): Message {
 		const message = Message.decode(data);
 		message.sender = authenticatedSender;
 		return message;
 	}
 
-	private handleGossipsubMessage(data: Uint8Array, authenticatedSender: string): void {
+	private handleGossipsubMessage(data: Uint8Array, authenticatedSender: string, topic: string): void {
 		try {
 			const message = this.decodeAttributedMessage(data, authenticatedSender);
 			if (isSyncProtocolMessage(message)) return;
-			this._messageQueue.enqueue(message).catch((e) => {
+			gossipTopics.set(message, topic);
+			const messageQueueCallback = this._messageQueue.enqueue(message);
+			messageQueueCallback.catch((e) => {
 				log.error("::startEnqueueMessages::enqueue:", e);
 			});
 		} catch (e) {

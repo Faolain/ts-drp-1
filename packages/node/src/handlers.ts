@@ -223,6 +223,7 @@ export const messageHandlers: Record<MessageType, HandlerRegistryEntry | undefin
 		vertexIngress: false,
 	},
 	[MessageType.MESSAGE_TYPE_CUSTOM]: undefined,
+	[MessageType.MESSAGE_TYPE_V3_ENVELOPE]: undefined,
 	[MessageType.UNRECOGNIZED]: undefined,
 };
 

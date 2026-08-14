@@ -106,15 +106,11 @@ import {
 	type SyncResponseBuildInput,
 } from "./sync-codec.js";
 import { clearNodeSyncState, clearObjectSyncState } from "./sync-state.js";
+import { routeV3Ingress } from "./v3-live.js";
 
 interface NodePeerCacheModule {
 	createFsPeerCacheStore(path: string): Promise<PeerCacheStore>;
 }
-
-const DISCOVERY_MESSAGE_TYPES = [
-	MessageType.MESSAGE_TYPE_DRP_DISCOVERY,
-	MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE,
-];
 
 const DISCOVERY_QUEUE_ID = "discovery";
 const NOSTR_SECRET_KEY_PATTERN = /^[0-9a-f]{64}$/u;
@@ -1183,7 +1179,12 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param msg - The message to dispatch.
 	 */
 	async dispatchMessage(msg: Message): Promise<void> {
-		if (DISCOVERY_MESSAGE_TYPES.includes(msg.type)) {
+		const routeV3IngressResult = routeV3Ingress(this.networkNode, msg);
+		if (routeV3IngressResult) return;
+		if (
+			msg.type === MessageType.MESSAGE_TYPE_DRP_DISCOVERY ||
+			msg.type === MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE
+		) {
 			await this.messageQueueManager.enqueue(DISCOVERY_QUEUE_ID, msg);
 			return;
 		}

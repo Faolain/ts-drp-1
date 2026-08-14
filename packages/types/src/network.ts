@@ -542,6 +542,12 @@ export interface DRPNetworkNode {
 	 */
 	broadcastMessage(topic: string, message: Message): Promise<void>;
 
+	/** Publishes through the strict gossip path and reports only local publication completion. */
+	publishMessage(topic: string, message: Message): Promise<true>;
+
+	/** Returns the authenticated gossip topic bound to this exact decoded message identity. */
+	gossipTopicFor(message: Message): string | undefined;
+
 	/**
 	 * Sends a message to a specific peer
 	 * @param peerId - The ID of the peer to send to

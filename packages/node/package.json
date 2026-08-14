@@ -65,6 +65,7 @@
 		"@ts-drp/interval-discovery": "0.11.0",
 		"@ts-drp/interval-reconnect": "0.11.0",
 		"@ts-drp/interval-runner": "0.11.0",
+		"@ts-drp/issuance-store": "0.11.0",
 		"@ts-drp/keychain": "0.11.0",
 		"@ts-drp/logger": "0.11.0",
 		"@ts-drp/message-queue": "0.11.0",
