@@ -9988,6 +9988,97 @@ path above. This section authorizes neither the GREEN now nor any compatibility
 layer, alternate generator, extra codec, full Phase `3a-1B`, live index,
 reducer/application effects, Phase 3b or either golden path.
 
+#### D.93.33 — Phase 3a-1B seam-3 closure ledger
+
+This section is a non-normative closure record for D.93.31 and D.93.32. It
+changes none of their transport, activation, wire, package, evidence or
+authorization rules. Its durable purpose is to preserve why the v3 transport
+plane can close without silently authorizing the complete live system: the
+transport now has one authenticated topic, one registration owner and one
+durable outbox handoff, while the future live index, charging, reducer,
+application/ACL/effect wiring and Phase 3b remain separate owners.
+
+The normative contract was frozen and pushed in two good-signed plan commits:
+
+| Commit                                     | Tree                                       | Authority                                       |
+| ------------------------------------------ | ------------------------------------------ | ----------------------------------------------- |
+| `d55e0d78ca024d57b0a64d5b4596c62db448d24a` | `11e1e94c05288c40ab433761b282fba0965a2b6e` | D.93.31 exact three-plane transport composition |
+| `4de2b31f39e88b820988a1aa4035977be2c870b2` | `ec6efcf91d9d027b85ba40adcec39a2fa49657e4` | D.93.32 generated-wire ownership correction     |
+
+The complete evidence and implementation lineage is also good-signed:
+
+| Commit                                     | Tree                                       | Scope                                                       |
+| ------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------- |
+| `3d8157c5e7a830e4e05a7706328aa10fe17b36fe` | `138d874d424785912cc316e43b287b42b85d5bd3` | initial Seam-3 tests-only RED                               |
+| `458db6d2cf13ae662065087e78fb49a657f53fc7` | `e68f8d5d74cbf144ce89f03b1e1897ee179559ac` | node importer-oracle correction                             |
+| `7610337c09c1d8444121004f2ff47fc15500cc64` | `5043d4862c715cbe4cabcb684f4b869a5719668e` | types importer-byte oracle correction                       |
+| `cb597b0defc2727071caa47ceefd719df619a0be` | `de389e2917ffc91133258e1082039e3100e6d01d` | valid received-vertex ingress fixture correction            |
+| `f7f7933c99418578c424e88b1943e98925252b73` | `a55c030875dfbe7cc2637b3ad6ff10dd661f85fe` | predecessor-governance restaging                            |
+| `1b663349b51a9946ca02a75362185c25e91e709f` | `73d9aeda91766b8270aba490d32263345d7e7f04` | mandatory network-fake completion                           |
+| `df72c0a98ce3431bdac1720e40521953822c23ef` | `b437f705f137a0feef6a2dc77c77f0cdc51b287d` | final ten-path production, manifest and importer-only GREEN |
+
+The final GREEN touches exactly the ten authorized D.93.31/D.93.32 paths and
+no test or plan path. Those amendments remain the source of truth for the
+path roster and exact mechanics. The closure boundary is the principle worth
+retaining here: strict publication reports only a fulfilled local transport
+write; gossip provenance remains exact decoded-object identity; activation
+consumes one prepared capability before effects; failed activation attempts
+continue through reverse cleanup and observable absence checks; ingress uses
+the genuine Seam-1 extractor; and outbox publication marks only the exact
+durable row after literal transport success. None of those facts grants remote
+receipt, exactly-once delivery, live-index publication or application
+execution.
+
+Fresh final-tree gates passed the Seam-3 focused suite `31/31`, the corrected
+predecessor subset `28/28`, and the complete A-a/A-b/A-c plus Seam-1/Seam-2
+preservation set `66/66`, including the Node SIGKILL publication checkpoint.
+The complete network package passed `162/162`. The dedicated Seam-3 TypeScript
+fixture, types and network package typechecks and builds, node build, generated
+wire/root source-built-packed consumers, targeted ESLint, Prettier and
+diff-check all passed. Types and network packed normally; node package contents
+were verified with lifecycle scripts disabled because of the inherited
+compact-history typecheck debt.
+
+The current Phase-3a0 direct diagnostic recorded `64` passing tests, the one
+already-authenticated stale storage-node tsconfig exact-array expectation and
+one intentional nightly skip. Node typecheck retained only the two inherited
+compact-history diagnostics at its existing helper boundary. The complete node
+package diagnostic recorded `374` passing tests, `26` inherited legacy
+sync/compact-history failures and two skips, with no direct Seam-3 failure.
+These disclosed baselines are not converted into closure claims and are not
+silently counted as GREEN evidence.
+
+The final local Codex `gpt-5.6-sol`/high review first required cleanup callers
+to observe failed rollback postconditions. The final bytes preserve the
+original activation failure, restore no capability or handle, and emit at most
+one fixed content-free cleanup diagnostic. Session
+`01a00284-dfb5-7e90-b5b4-daf7fc431357` then returned terminal `PASS` with no
+P0-P2 finding. Its result SHA-256 is
+`e5286a2a49d4f09df7ed4195d2b1d33f7a7f2b14911dda22d1eb59b9f1bc170d`.
+
+The three final independent closure reviews agree on the signed candidate:
+
+- Grok 4.6/high session `01a00289-f9fa-7123-bd80-92a7d7d35fa4`
+  returned `PASS`, Seam 3 close, full Phase `3a-1B` design only, no blocker and
+  medium confidence. Its result SHA-256 is
+  `1c8c9244a621f7a64eddf85c493f0be97cef888fc22880fa571a2fda414c7d1c`.
+- Kimi K3/high/100 session `0930aaa9-407b-4177-9f7a-25b16b00b5f2`
+  returned `ACCEPTED`, Seam 3 close, full Phase `3a-1B` design only, no blocker
+  and high confidence. Its result SHA-256 is
+  `6d6372dbd7b5498e1ad210199e3bc6ccbf276eb4e87f713f5c3e01101d661691`.
+- Native Opus 5/xhigh session `e3f517aa-ca98-411a-adc8-b095e193e86d`
+  reached `end_turn` after a strict read-only D.93.31/.32 and source/RED audit.
+  It returned `PASS`, Seam 3 close, full Phase `3a-1B` design only, no P0-P2
+  blocker and high confidence. Its result SHA-256 is
+  `f1364c90811dc3d920c56eee3bbbdc0e61dd0a64e01e0054cb79166ec549f453`.
+
+Seam 3 is closed. The complete Phase `3a-1B` may now enter design and normative
+amendment quorum only. Full-Phase RED, implementation, live-index publication,
+charging, reducer/fold execution, application/ACL/effect wiring, either golden
+path and Phase 3b remain unauthorized until that separate exact contract is
+reviewed, signed and pushed. This ledger does not amend D.93.31 or D.93.32 and
+does not claim that any part of the complete Phase `3a-1B` is implemented.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
