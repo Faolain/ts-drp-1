@@ -706,6 +706,7 @@ function ownerDerivationSourceShape(
 	  }>
 	| undefined {
 	const source = ts.createSourceFile(IMPLEMENTATION, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	if (source.statements.some((statement) => ts.isExportAssignment(statement))) return undefined;
 	const owners = source.statements.filter(
 		(statement): statement is ts.FunctionDeclaration =>
 			ts.isFunctionDeclaration(statement) && statement.name?.text === "prepareV3LiveGeneration"
@@ -713,9 +714,28 @@ function ownerDerivationSourceShape(
 	if (owners.length !== 1 || owners[0]?.body === undefined) return undefined;
 	const owner = owners[0];
 	const ownerBody = owner.body;
+	if (ownerBody === undefined || owner.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+		return undefined;
+	}
+	const ownerNamedExports = source.statements.flatMap((statement) => {
+		if (
+			!ts.isExportDeclaration(statement) ||
+			statement.moduleSpecifier !== undefined ||
+			statement.exportClause === undefined ||
+			!ts.isNamedExports(statement.exportClause)
+		) {
+			return [];
+		}
+		return statement.exportClause.elements.flatMap((element) => {
+			const localName = element.propertyName?.text ?? element.name.text;
+			return localName === "prepareV3LiveGeneration" ? [element] : [];
+		});
+	});
 	if (
-		ownerBody === undefined ||
-		owner.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) !== true
+		ownerNamedExports.length !== 1 ||
+		ownerNamedExports[0]?.name.text !== "prepareV3LiveGeneration" ||
+		ownerNamedExports[0].propertyName !== undefined ||
+		ownerNamedExports[0].isTypeOnly
 	) {
 		return undefined;
 	}
@@ -1024,7 +1044,7 @@ function ownerSourceOracleFixture(
 	`;
 	return `
 		const CapturedMap = Map;
-		export async function prepareV3LiveGeneration() {
+		async function prepareV3LiveGeneration() {
 			${mode === "branch" ? `if (false) {${derivation}}` : ""}
 			${
 				mode === "nested-terminating"
@@ -1046,6 +1066,7 @@ function ownerSourceOracleFixture(
 			${mode === "reachable" ? derivation : ""}
 			return failure("storage-failed", "strict no-write A-c boundary");
 		}
+		export { prepareV3LiveGeneration };
 	`;
 }
 
@@ -1222,6 +1243,39 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 		expect(ownerDerivationSourceShape(ownerSourceOracleFixture("branch"), "CapturedMap")).toBeUndefined();
 		expect(ownerDerivationSourceShape(ownerSourceOracleFixture("nested-terminating"), "CapturedMap")).toBeUndefined();
 		expect(ownerDerivationSourceShape(ownerSourceOracleFixture("post-exit"), "CapturedMap")).toBeUndefined();
+		expect(
+			ownerDerivationSourceShape(
+				ownerSourceOracleFixture("reachable").replace(
+					"export { prepareV3LiveGeneration };",
+					"export { prepareV3LiveGeneration }; export { prepareV3LiveGeneration };"
+				),
+				"CapturedMap"
+			)
+		).toBeUndefined();
+		expect(
+			ownerDerivationSourceShape(
+				`${ownerSourceOracleFixture("reachable")}\nexport default prepareV3LiveGeneration;\n`,
+				"CapturedMap"
+			)
+		).toBeUndefined();
+		expect(
+			ownerDerivationSourceShape(
+				ownerSourceOracleFixture("reachable").replace(
+					"export { prepareV3LiveGeneration };",
+					"export { prepareV3LiveGeneration as publicPrepareV3LiveGeneration };"
+				),
+				"CapturedMap"
+			)
+		).toBeUndefined();
+		expect(
+			ownerDerivationSourceShape(
+				ownerSourceOracleFixture("reachable").replace(
+					"async function prepareV3LiveGeneration()",
+					"export async function prepareV3LiveGeneration()"
+				),
+				"CapturedMap"
+			)
+		).toBeUndefined();
 		expect(
 			ownerDerivationSourceShape(
 				ownerSourceOracleFixture("reachable").replace(

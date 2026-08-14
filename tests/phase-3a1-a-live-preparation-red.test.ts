@@ -43,7 +43,6 @@ import {
 	independentHashDomain,
 	makeCreatorMaterial,
 } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
-import graphProjectionGolden from "./fixtures/phase-3a1-ab-v3/graph-projection-golden.json" with { type: "json" };
 import packageGolden from "./fixtures/track-p2-b/forward-counter-package.json" with { type: "json" };
 import { type TrustedBlueprintCatalog } from "../packages/blueprint-catalog/src/index.js";
 import type { CausalityIndex } from "../packages/compaction/src/index.js";
@@ -833,6 +832,98 @@ function controlledPrepare(
 	});
 }
 
+function independentlyObservedProjection(): Readonly<{
+	readonly bytes: Uint8Array;
+	readonly ref: Readonly<{ readonly byteLength: number; readonly digest: string }>;
+}> {
+	const authentication = stageProbe.authenticationResults[0] as
+		| Readonly<{ readonly ok: false }>
+		| Readonly<{
+				readonly ok: true;
+				readonly provenance: Readonly<{
+					readonly anchorDigest: string;
+					readonly blueprintDigest: string;
+					readonly epoch: number;
+					readonly objectId: string;
+					readonly parametersDigest: string;
+					readonly profileDigest: string;
+					readonly signerSetDigest: string;
+				}>;
+		  }>;
+	if (!authentication?.ok) throw new TypeError("missing authenticated A-a provenance");
+	const catalogResult = stageProbe.catalogResults[0] as Readonly<{
+		readonly artifactDigest: string;
+		readonly artifactId: string;
+		readonly blueprintDigest: string;
+		readonly evidence: Readonly<{ readonly catalogDigest: string }>;
+		readonly runtimeProfile: string;
+	}>;
+	const runtimeResult = stageProbe.runtimeResults[0] as Readonly<{
+		readonly artifactDigest: string;
+		readonly artifactId: string;
+		readonly blueprintDigest: string;
+		readonly runtimeProfile: string;
+	}>;
+	const graphInput = stageProbe.graphValidationInputs[0] as readonly [
+		ReadonlyMap<string, Readonly<Record<string, unknown>>>,
+		readonly string[],
+		Readonly<{
+			readonly initialByteCharges: ReadonlyMap<string, number>;
+			readonly maxEpochBytes: number;
+			readonly maxEpochVertices: number;
+		}>,
+	];
+	const [verticesByHash, order, graphOptions] = graphInput;
+	const orderRecord = Object.freeze({ kind: "v3-live-order-1", orderedVertexHashes: Object.freeze([...order]) });
+	const graphRecord = Object.freeze({
+		kind: "v3-live-graph-1",
+		vertices: Object.freeze(order.map((hash) => Object.freeze({ ...verticesByHash.get(hash) }))),
+		charges: Object.freeze(
+			order.map((hash) => Object.freeze({ hash, byteCharge: graphOptions.initialByteCharges.get(hash) }))
+		),
+	});
+	const orderedVertexHashesDigest = must(digestBlob(encodeCanonical(orderRecord)));
+	const graphDigest = must(digestBlob(encodeCanonical(graphRecord)));
+	const parameters = canonicalParameters();
+	const projection = Object.freeze({
+		kind: "v3-live-generation-1",
+		objectId: authentication.provenance.objectId,
+		epoch: authentication.provenance.epoch,
+		anchorDigest: authentication.provenance.anchorDigest,
+		blueprintDigest: catalogResult.blueprintDigest,
+		parametersDigest: parameterDigest(parameters),
+		profileDigest: authentication.provenance.profileDigest,
+		signerSetDigest: authentication.provenance.signerSetDigest,
+		artifactDigest: runtimeResult.artifactDigest,
+		artifactId: runtimeResult.artifactId,
+		catalogDigest: catalogResult.evidence.catalogDigest,
+		runtimeProfile: runtimeResult.runtimeProfile,
+		trustProfile: "creator-only",
+		maxEpochVertices: graphOptions.maxEpochVertices,
+		maxEpochBytes: graphOptions.maxEpochBytes,
+		maxDependencies: parameters.maxDependencies,
+		vertexCount: verticesByHash.size,
+		byteCharge: [...graphOptions.initialByteCharges.values()].reduce((total, value) => total + value, 0),
+		orderedVertexHashesDigest,
+		graphDigest,
+	});
+	if (
+		catalogResult.blueprintDigest !== authentication.provenance.blueprintDigest ||
+		runtimeResult.blueprintDigest !== authentication.provenance.blueprintDigest ||
+		catalogResult.artifactDigest !== runtimeResult.artifactDigest ||
+		catalogResult.artifactId !== runtimeResult.artifactId ||
+		catalogResult.runtimeProfile !== runtimeResult.runtimeProfile ||
+		authentication.provenance.parametersDigest !== projection.parametersDigest
+	) {
+		throw new TypeError("instrumented A-a projection inputs disagree");
+	}
+	const bytes = encodeCanonical(projection);
+	return Object.freeze({
+		bytes,
+		ref: Object.freeze({ byteLength: bytes.byteLength, digest: must(digestBlob(bytes)) }),
+	});
+}
+
 function expectFailure(result: PrepareV3LiveResult, kind: PrepareV3LiveFailureKind): void {
 	expect(result).toEqual({ ok: false, kind, detail: expect.any(String) });
 	expect(Object.isFrozen(result)).toBe(true);
@@ -942,7 +1033,6 @@ const B_LIVE_IDENTIFIERS = new Set([
 	"addEventListener",
 	"admitReceivedVertex",
 	"append",
-	"consumePreparedV3Live",
 	"createAdmissionBoundTransactionalVertexIssuer",
 	"callback",
 	"dispatchMessage",
@@ -1169,16 +1259,6 @@ function containingFunction(node: ts.Node): ts.FunctionLikeDeclaration | undefin
 	return undefined;
 }
 
-function containingForLoop(node: ts.Node): ts.ForStatement | undefined {
-	let current = node.parent;
-	while (current !== undefined) {
-		if (ts.isForStatement(current)) return current;
-		if (ts.isFunctionLike(current)) return undefined;
-		current = current.parent;
-	}
-	return undefined;
-}
-
 function isExactTwoAttemptLoop(node: ts.ForStatement): boolean {
 	const initializer = node.initializer;
 	const condition = node.condition;
@@ -1240,14 +1320,169 @@ function isCapturedInputStoreCall(node: ts.CallExpression): boolean {
 function aCStageViolations(filename: string): readonly string[] {
 	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
 	const violations: string[] = [];
-	const entryDeclarations = source.statements.filter(
-		(statement): statement is ts.FunctionDeclaration =>
-			ts.isFunctionDeclaration(statement) && statement.name?.text === "prepareV3LiveGeneration"
-	);
+	const topLevelFunctions = new Map<string, ts.FunctionDeclaration[]>();
+	for (const statement of source.statements) {
+		if (!ts.isFunctionDeclaration(statement) || statement.name === undefined) continue;
+		const declarations = topLevelFunctions.get(statement.name.text) ?? [];
+		declarations.push(statement);
+		topLevelFunctions.set(statement.name.text, declarations);
+	}
+	const entryDeclarations = topLevelFunctions.get("prepareV3LiveGeneration") ?? [];
 	if (entryDeclarations.length !== 1 || entryDeclarations[0]?.body === undefined) {
 		return Object.freeze(["a-c-stage:owner"]);
 	}
 	const entry = entryDeclarations[0];
+	const consumeDeclarations = topLevelFunctions.get("consumePreparedV3Live") ?? [];
+	if (consumeDeclarations.length !== 1 || consumeDeclarations[0]?.body === undefined) {
+		violations.push("a-c-stage:consumer-owner");
+	}
+	const consume = consumeDeclarations.length === 1 ? consumeDeclarations[0] : undefined;
+	const namedExports = source.statements.flatMap((statement) => {
+		if (
+			!ts.isExportDeclaration(statement) ||
+			statement.moduleSpecifier !== undefined ||
+			statement.exportClause === undefined ||
+			!ts.isNamedExports(statement.exportClause)
+		) {
+			return [];
+		}
+		return statement.exportClause.elements.map((element) => ({
+			exported: element.name.text,
+			local: element.propertyName?.text ?? element.name.text,
+			typeOnly: element.isTypeOnly,
+		}));
+	});
+	if (source.statements.some((statement) => ts.isExportAssignment(statement))) {
+		violations.push("a-c-stage:public-seam");
+	}
+	const entryExports = namedExports.filter(({ local }) => local === "prepareV3LiveGeneration");
+	if (
+		entry.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ||
+		entryExports.length !== 1 ||
+		entryExports[0]?.exported !== "prepareV3LiveGeneration" ||
+		entryExports[0].typeOnly
+	) {
+		violations.push("a-c-stage:entry-export");
+	}
+	for (const [name, declarations] of topLevelFunctions) {
+		if (name === "prepareV3LiveGeneration") continue;
+		if (
+			declarations.some((declaration) =>
+				declaration.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+			) ||
+			namedExports.some(({ local }) => local === name)
+		) {
+			violations.push("a-c-stage:public-seam");
+		}
+	}
+	const functionNames = new Set(topLevelFunctions.keys());
+	type ReachableFlow = {
+		readonly calls: Set<ts.CallExpression>;
+		readonly functions: Set<string>;
+		readonly loops: Array<Readonly<{ readonly node: ts.ForStatement; readonly operations: readonly string[] }>>;
+		readonly operations: string[];
+	};
+	const newFlow = (): ReachableFlow => ({ calls: new Set(), functions: new Set(), loops: [], operations: [] });
+	const flattenExpression = (node: ts.Node | undefined, stack: readonly string[], flow: ReachableFlow): void => {
+		if (node === undefined || ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+		if (ts.isCallExpression(node)) {
+			for (const argument of node.arguments) flattenExpression(argument, stack, flow);
+			flow.calls.add(node);
+			if (ts.isIdentifier(node.expression) && functionNames.has(node.expression.text)) {
+				flattenFunction(node.expression.text, stack, flow);
+				return;
+			}
+			const operation = aCCallName(node);
+			if (
+				operation !== undefined &&
+				A_C_REQUIRED_CALL_ORDER.includes(operation as (typeof A_C_REQUIRED_CALL_ORDER)[number])
+			) {
+				flow.operations.push(operation);
+			}
+			return;
+		}
+		ts.forEachChild(node, (child) => flattenExpression(child, stack, flow));
+	};
+	const flattenStatements = (
+		statements: readonly ts.Statement[],
+		stack: readonly string[],
+		flow: ReachableFlow
+	): boolean => {
+		for (const statement of statements) {
+			if (!flattenStatement(statement, stack, flow)) return false;
+		}
+		return true;
+	};
+	function flattenStatement(statement: ts.Statement, stack: readonly string[], flow: ReachableFlow): boolean {
+		if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) return true;
+		if (ts.isBlock(statement)) return flattenStatements(statement.statements, stack, flow);
+		if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) {
+			flattenExpression(statement.expression, stack, flow);
+			return false;
+		}
+		if (ts.isIfStatement(statement)) {
+			flattenExpression(statement.expression, stack, flow);
+			if (statement.expression.kind === ts.SyntaxKind.TrueKeyword) {
+				return flattenStatement(statement.thenStatement, stack, flow);
+			}
+			if (statement.expression.kind === ts.SyntaxKind.FalseKeyword) {
+				return statement.elseStatement === undefined || flattenStatement(statement.elseStatement, stack, flow);
+			}
+			const thenFalls = flattenStatement(statement.thenStatement, stack, flow);
+			const elseFalls = statement.elseStatement === undefined || flattenStatement(statement.elseStatement, stack, flow);
+			return thenFalls || elseFalls;
+		}
+		if (ts.isTryStatement(statement)) {
+			const tryFalls = flattenStatements(statement.tryBlock.statements, stack, flow);
+			const catchFalls =
+				statement.catchClause === undefined || flattenStatements(statement.catchClause.block.statements, stack, flow);
+			const finallyFalls =
+				statement.finallyBlock === undefined || flattenStatements(statement.finallyBlock.statements, stack, flow);
+			return finallyFalls && (tryFalls || catchFalls);
+		}
+		if (ts.isForStatement(statement)) {
+			flattenExpression(statement.initializer, stack, flow);
+			flattenExpression(statement.condition, stack, flow);
+			const before = flow.operations.length;
+			flattenStatement(statement.statement, stack, flow);
+			flattenExpression(statement.incrementor, stack, flow);
+			flow.loops.push(Object.freeze({ node: statement, operations: Object.freeze(flow.operations.slice(before)) }));
+			return true;
+		}
+		if (ts.isForInStatement(statement) || ts.isForOfStatement(statement)) {
+			flattenExpression(statement.expression, stack, flow);
+			flattenStatement(statement.statement, stack, flow);
+			return true;
+		}
+		if (ts.isWhileStatement(statement) || ts.isDoStatement(statement)) {
+			flattenExpression(statement.expression, stack, flow);
+			flattenStatement(statement.statement, stack, flow);
+			return true;
+		}
+		flattenExpression(statement, stack, flow);
+		return true;
+	}
+	function flattenFunction(name: string, stack: readonly string[], flow: ReachableFlow): boolean {
+		if (stack.includes(name)) {
+			violations.push("a-c-stage:recursive-helper");
+			return false;
+		}
+		const declarations = topLevelFunctions.get(name);
+		if (declarations?.length !== 1 || declarations[0]?.body === undefined) {
+			violations.push(`a-c-stage:helper:${name}`);
+			return false;
+		}
+		flow.functions.add(name);
+		return flattenStatements(declarations[0].body.statements, [...stack, name], flow);
+	}
+	const entryFlow = newFlow();
+	flattenFunction("prepareV3LiveGeneration", [], entryFlow);
+	const consumeFlow = newFlow();
+	if (consume !== undefined) flattenFunction("consumePreparedV3Live", [], consumeFlow);
+	if (entryFlow.functions.has("consumePreparedV3Live")) {
+		violations.push("a-c-stage:consumer-premature");
+	}
+
 	const callSites = new Map<string, ts.CallExpression[]>();
 	const weakMapOwners: Array<Readonly<{ name: string; statement: ts.VariableStatement }>> = [];
 	const visitAll = (node: ts.Node): void => {
@@ -1271,7 +1506,15 @@ function aCStageViolations(filename: string): readonly string[] {
 				const sites = callSites.get(name) ?? [];
 				sites.push(node);
 				callSites.set(name, sites);
-				if (containingFunction(node) !== entry) violations.push(`a-c-stage:owner:${name}`);
+				const owner = containingFunction(node);
+				if (
+					!ts.isFunctionDeclaration(owner) ||
+					owner.name === undefined ||
+					owner.parent !== source ||
+					!entryFlow.calls.has(node)
+				) {
+					violations.push(`a-c-stage:owner:${name}`);
+				}
 				if (A_C_STORE_CALLS.has(name) && !isCapturedInputStoreCall(node)) {
 					violations.push(`a-c-stage:receiver:${name}`);
 				}
@@ -1285,36 +1528,32 @@ function aCStageViolations(filename: string): readonly string[] {
 	const weakMapOwner = weakMapOwners[0];
 	if (
 		weakMapOwner !== undefined &&
-		weakMapOwner.statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) === true
+		(weakMapOwner.statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) === true ||
+			namedExports.some(({ local }) => local === weakMapOwner.name))
 	) {
 		violations.push("a-c-stage:public-seam");
 	}
 
-	const positions: number[] = [];
-	let attemptLoop: ts.ForStatement | undefined;
 	for (const name of A_C_REQUIRED_CALL_ORDER) {
 		const sites = callSites.get(name) ?? [];
-		if (sites.length !== 1) {
-			violations.push(`a-c-stage:${name}-count`);
-			continue;
-		}
-		const site = sites[0] as ts.CallExpression;
-		positions.push(site.getStart(source));
-		const loop = containingForLoop(site);
-		if (loop === undefined) violations.push(`a-c-stage:${name}-attempt`);
-		else if (attemptLoop === undefined) attemptLoop = loop;
-		else if (attemptLoop !== loop) violations.push(`a-c-stage:${name}-attempt`);
+		if (sites.length !== 1) violations.push(`a-c-stage:${name}-count`);
 	}
-	for (let index = 1; index < positions.length; index += 1) {
-		if ((positions[index - 1] as number) >= (positions[index] as number)) {
-			violations.push("a-c-stage:operation-order");
-			break;
-		}
+	if (entryFlow.operations.join("\u0000") !== A_C_REQUIRED_CALL_ORDER.join("\u0000")) {
+		violations.push("a-c-stage:operation-order");
 	}
-	if (attemptLoop === undefined || !isExactTwoAttemptLoop(attemptLoop)) violations.push("a-c-stage:retry-bound");
+	const stageLoops = entryFlow.loops.filter(({ operations }) => operations.length > 0);
+	if (
+		stageLoops.length !== 1 ||
+		!isExactTwoAttemptLoop((stageLoops[0] as { readonly node: ts.ForStatement }).node) ||
+		stageLoops[0]?.operations.join("\u0000") !== A_C_REQUIRED_CALL_ORDER.join("\u0000")
+	) {
+		violations.push("a-c-stage:retry-bound");
+	}
 
 	if (weakMapOwner !== undefined) {
 		let setCount = 0;
+		let getCount = 0;
+		let deleteCount = 0;
 		let otherAuthorityCount = 0;
 		const inspectAuthority = (node: ts.Node): void => {
 			if (
@@ -1323,8 +1562,23 @@ function aCStageViolations(filename: string): readonly string[] {
 				ts.isIdentifier(node.expression.expression) &&
 				node.expression.expression.text === weakMapOwner.name
 			) {
-				if (node.expression.name.text === "set" && containingFunction(node) === entry && node.arguments.length === 2) {
+				const owner = containingFunction(node);
+				if (node.expression.name.text === "set" && entryFlow.calls.has(node) && node.arguments.length === 2) {
 					setCount += 1;
+				} else if (
+					node.expression.name.text === "get" &&
+					owner === consume &&
+					consumeFlow.calls.has(node) &&
+					node.arguments.length === 1
+				) {
+					getCount += 1;
+				} else if (
+					node.expression.name.text === "delete" &&
+					owner === consume &&
+					consumeFlow.calls.has(node) &&
+					node.arguments.length === 1
+				) {
+					deleteCount += 1;
 				} else {
 					otherAuthorityCount += 1;
 				}
@@ -1333,6 +1587,7 @@ function aCStageViolations(filename: string): readonly string[] {
 		};
 		inspectAuthority(source);
 		if (setCount !== 1) violations.push("a-c-stage:WeakMap-set");
+		if (getCount !== 1 || deleteCount !== 1) violations.push("a-c-stage:WeakMap-consume");
 		if (otherAuthorityCount !== 0) violations.push("a-c-stage:WeakMap-surface");
 	}
 
@@ -1680,26 +1935,41 @@ const A_C_PERSISTENCE_STAGE_SOURCE = `
 import { assertTrustPreserved } from "@ts-drp/control-plane";
 import { parseGenerationId, parseHeadRevision } from "@ts-drp/storage";
 const preparedV3LivePayloads = new WeakMap();
-export async function prepareV3LiveGeneration(input) {
+async function recoverPreservedTrust() {
+	const opened = await trustStore.open();
+	const head = opened.head;
+	const recovered = await captured.store.recoverActiveGeneration(captured.objectId);
+	const candidate = await captured.store.getBlob(recovered.references[0]);
+	const preserved = assertTrustPreserved({ candidate, head });
+	return { head, preserved };
+}
+async function stagePreparedGeneration(input, head) {
+	const generationId = parseGenerationId(input.freshGenerationId()).value;
+	await captured.store.beginGeneration({ generationId, head });
+	const projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });
+	await captured.store.promoteReference({ generationId, ref: projectionRef });
+	const completed = await captured.store.completeGeneration({ generationId });
+	const revision = parseHeadRevision(head.revision + 1).value;
+	const swapped = await captured.store.swapHead({ completed, expected: head, revision });
+	void swapped;
+}
+function consumePreparedV3Live(token) {
+	const value = preparedV3LivePayloads.get(token);
+	if (value !== undefined) preparedV3LivePayloads.delete(token);
+	return value;
+}
+async function prepareV3LiveGeneration(input) {
 	for (let attempt = 0; attempt < 2; attempt += 1) {
-		const opened = await trustStore.open();
-		const head = opened.head;
-		const recovered = await captured.store.recoverActiveGeneration(captured.objectId);
-		const candidate = await captured.store.getBlob(recovered.references[0]);
-		const preserved = assertTrustPreserved({ candidate, head });
-		const generationId = parseGenerationId(input.freshGenerationId()).value;
-		await captured.store.beginGeneration({ generationId, head });
-		const projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });
-		await captured.store.promoteReference({ generationId, ref: projectionRef });
-		const completed = await captured.store.completeGeneration({ generationId });
-		const revision = parseHeadRevision(head.revision + 1).value;
-		const swapped = await captured.store.swapHead({ completed, expected: head, revision });
-		void preserved; void swapped;
+		const { head, preserved } = await recoverPreservedTrust();
+		await stagePreparedGeneration(input, head);
+		void preserved;
 	}
 	const token = Object.freeze({});
 	preparedV3LivePayloads.set(token, Object.freeze({ input }));
 	return token;
 }
+export { prepareV3LiveGeneration };
+void consumePreparedV3Live;
 `;
 
 function addACPersistenceStage(root: string): void {
@@ -2058,25 +2328,19 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		).trustRef;
 		expect(preservationInput.expectedTrustRef).toEqual(reopenedTrustRef);
 		expect(preservationInput.closure).toContainEqual(reopenedTrustRef);
+		const independentlyDerivedProjection = independentlyObservedProjection();
 		const nonTrustRefs = preservationInput.closure.filter(
 			({ byteLength, digest }) => digest !== reopenedTrustRef.digest || byteLength !== reopenedTrustRef.byteLength
 		);
-		expect(nonTrustRefs).toEqual([
-			{
-				byteLength: graphProjectionGolden.projectionByteLength,
-				digest: graphProjectionGolden.projectionDigest,
-			},
-		]);
+		expect(nonTrustRefs).toEqual([independentlyDerivedProjection.ref]);
 		const projectionCandidate = preservationInput.candidates.find(
-			({ ref }) => ref.digest === graphProjectionGolden.projectionDigest
+			({ ref }) => ref.digest === independentlyDerivedProjection.ref.digest
 		);
-		const expectedProjectionBytes = hexBytes(graphProjectionGolden.projectionHex);
-		expect(digestBlob(expectedProjectionBytes).value).toBe(graphProjectionGolden.projectionDigest);
 		expect(projectionCandidate?.ref).toEqual(nonTrustRefs[0]);
-		expect(projectionCandidate?.bytes.byteLength).toBe(graphProjectionGolden.projectionByteLength);
-		expect(projectionCandidate?.bytes).not.toBe(expectedProjectionBytes);
-		expect(projectionCandidate?.bytes).toEqual(expectedProjectionBytes);
-		expect(digestBlob(projectionCandidate?.bytes as Uint8Array).value).toBe(graphProjectionGolden.projectionDigest);
+		expect(projectionCandidate?.bytes.byteLength).toBe(independentlyDerivedProjection.ref.byteLength);
+		expect(projectionCandidate?.bytes).not.toBe(independentlyDerivedProjection.bytes);
+		expect(projectionCandidate?.bytes).toEqual(independentlyDerivedProjection.bytes);
+		expect(must(digestBlob(projectionCandidate?.bytes as Uint8Array))).toBe(independentlyDerivedProjection.ref.digest);
 		expect(stageProbe.preservationResults).toEqual([
 			{ ok: true, exactCanonicalTrustStateRecordBytes: expect.any(Uint8Array), trustRef: expect.any(Object) },
 		]);
@@ -2226,14 +2490,14 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 						/\tfor \(let attempt = 0; attempt < 2; attempt \+= 1\) \{[\s\S]*?\n\t\}/u,
 						'\treturn failure("trust-not-preserved", "stale A-b terminal");'
 					),
-				"a-c-stage:recoverActiveGeneration-count",
+				"a-c-stage:owner:recoverActiveGeneration",
 			],
 			[
 				"extra-cas",
 				(source: string): string =>
 					source.replace(
-						"\t\tvoid preserved; void swapped;",
-						"\t\tawait captured.store.swapHead({ completed, expected: head, revision });\n\t\tvoid preserved; void swapped;"
+						"\tvoid swapped;",
+						"\tawait captured.store.swapHead({ completed, expected: head, revision });\n\tvoid swapped;"
 					),
 				"a-c-stage:swapHead-count",
 			],
@@ -2248,6 +2512,33 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				"a-c-stage:retry-bound",
 			],
 			[
+				"recovery-outside-attempt",
+				(source: string): string =>
+					source.replace(
+						"\tfor (let attempt = 0; attempt < 2; attempt += 1) {\n\t\tconst { head, preserved } = await recoverPreservedTrust();",
+						"\tconst { head, preserved } = await recoverPreservedTrust();\n\tfor (let attempt = 0; attempt < 2; attempt += 1) {"
+					),
+				"a-c-stage:retry-bound",
+			],
+			[
+				"false-branch-recovery",
+				(source: string): string =>
+					source.replace(
+						"\t\tconst { head, preserved } = await recoverPreservedTrust();",
+						"\t\tif (false) { const { head, preserved } = await recoverPreservedTrust(); void head; void preserved; }\n\t\tconst head = undefined; const preserved = undefined;"
+					),
+				"a-c-stage:owner:recoverActiveGeneration",
+			],
+			[
+				"post-return-stage",
+				(source: string): string =>
+					source.replace(
+						"\t\tawait stagePreparedGeneration(input, head);",
+						"\t\treturn;\n\t\tawait stagePreparedGeneration(input, head);"
+					),
+				"a-c-stage:owner:beginGeneration",
+			],
+			[
 				"public-capability-seam",
 				(source: string): string =>
 					source.replace("const preparedV3LivePayloads", "export const preparedV3LivePayloads"),
@@ -2257,8 +2548,8 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				"operation-reorder",
 				(source: string): string =>
 					source.replace(
-						"\t\tawait captured.store.beginGeneration({ generationId, head });\n\t\tconst projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });",
-						"\t\tconst projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });\n\t\tawait captured.store.beginGeneration({ generationId, head });"
+						"\tawait captured.store.beginGeneration({ generationId, head });\n\tconst projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });",
+						"\tconst projectionRef = await captured.store.putCachedBlob({ generationId, bytes: input.projection });\n\tawait captured.store.beginGeneration({ generationId, head });"
 					),
 				"a-c-stage:operation-order",
 			],
@@ -2278,6 +2569,48 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				(source: string): string =>
 					source.replace("captured.store.recoverActiveGeneration", "input.store.recoverActiveGeneration"),
 				"a-c-stage:receiver:recoverActiveGeneration",
+			],
+			[
+				"aliased-helper",
+				(source: string): string =>
+					source.replace("await recoverPreservedTrust()", "await recoverPreservedTrustAlias()"),
+				"a-c-stage:owner:recoverActiveGeneration",
+			],
+			[
+				"exported-helper",
+				(source: string): string =>
+					source.replace("async function recoverPreservedTrust()", "export async function recoverPreservedTrust()"),
+				"a-c-stage:public-seam",
+			],
+			[
+				"aliased-entry-export",
+				(source: string): string =>
+					source.replace(
+						"export { prepareV3LiveGeneration };",
+						"export { prepareV3LiveGeneration as publicPrepareV3LiveGeneration };"
+					),
+				"a-c-stage:entry-export",
+			],
+			[
+				"exported-consumer",
+				(source: string): string =>
+					source.replace("function consumePreparedV3Live(token)", "export function consumePreparedV3Live(token)"),
+				"a-c-stage:public-seam",
+			],
+			[
+				"default-exported-entry",
+				(source: string): string => `${source}\nexport default prepareV3LiveGeneration;\n`,
+				"a-c-stage:public-seam",
+			],
+			[
+				"default-exported-consumer",
+				(source: string): string => `${source}\nexport default consumePreparedV3Live;\n`,
+				"a-c-stage:public-seam",
+			],
+			[
+				"duplicate-consumer",
+				(source: string): string => `${source}\nfunction consumePreparedV3Live(token) { return token; }\n`,
+				"a-c-stage:consumer-owner",
 			],
 		] as const) {
 			const root = temporarySweepTree();
@@ -2411,7 +2744,6 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			"admitReceivedVertex",
 			"append",
 			"callback",
-			"consumePreparedV3Live",
 			"createAdmissionBoundTransactionalVertexIssuer",
 			"dispatchMessage",
 			"fetch",
