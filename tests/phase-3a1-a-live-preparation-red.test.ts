@@ -45,11 +45,16 @@ import {
 } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
 import packageGolden from "./fixtures/track-p2-b/forward-counter-package.json" with { type: "json" };
 import { type TrustedBlueprintCatalog } from "../packages/blueprint-catalog/src/index.js";
+import type { CausalityIndex } from "../packages/compaction/src/index.js";
 
 type CanonicalModule = Readonly<{
 	decodeCanonical: typeof decodeCanonical;
 	encodeCanonical: typeof encodeCanonical;
 	hashDomain: typeof hashDomain;
+}> &
+	Record<string, unknown>;
+type CompactionModule = Readonly<{
+	CausalityIndex: typeof CausalityIndex;
 }> &
 	Record<string, unknown>;
 type ControlPlaneModule = Readonly<{ createCurrentAnchorTrustStore: typeof createCurrentAnchorTrustStore }> &
@@ -81,6 +86,8 @@ const stageProbe = vi.hoisted(() => ({
 	trustOpenHashInputs: [] as readonly Uint8Array[][],
 	anchorHashInputs: [] as readonly Uint8Array[][],
 	anchorHashMismatch: false,
+	graphValidationFailure: false,
+	graphValidationInputs: [] as unknown[][],
 	liveEffects: [] as string[],
 	openRecordInputs: [] as unknown[],
 	openRecordInputCopies: [] as unknown[],
@@ -104,6 +111,24 @@ const stageProbe = vi.hoisted(() => ({
 	trustFactoryInputs: [] as unknown[],
 	trustOpenResults: [] as unknown[],
 }));
+
+vi.mock("@ts-drp/compaction", async (importOriginal) => {
+	const genuine = await importOriginal<CompactionModule>();
+	return {
+		...genuine,
+		CausalityIndex: class InstrumentedCausalityIndex extends genuine.CausalityIndex {
+			constructor(...input: ConstructorParameters<typeof genuine.CausalityIndex>) {
+				stageProbe.events.push("graph.validate");
+				stageProbe.graphValidationInputs.push(input);
+				if (stageProbe.graphValidationFailure) {
+					super(input[0], [], input[2]);
+					throw new TypeError("genuine CausalityIndex accepted an incomplete order");
+				}
+				super(...input);
+			}
+		},
+	};
+});
 
 vi.mock("@ts-drp/canonical", async (importOriginal) => {
 	const genuine = await importOriginal<CanonicalModule>();
@@ -417,6 +442,7 @@ function resetStageProbe(): void {
 	stageProbe.authenticationHashDepth = 0;
 	stageProbe.trustOpenHashDepth = 0;
 	stageProbe.anchorHashMismatch = false;
+	stageProbe.graphValidationFailure = false;
 	stageProbe.expectedAnchorHex = undefined;
 	stageProbe.expectedParameterHex = undefined;
 	stageProbe.runtimeOutputMismatch = undefined;
@@ -1581,7 +1607,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		parameters.fill(0xff);
 		gate.release();
 		const result = await promise;
-		expectFailure(result, "graph-rejected");
+		expectFailure(result, "trust-not-preserved");
 		const trustFactoryInput = stageProbe.trustFactoryInputs[0] as {
 			readonly objectId: StorageObjectId;
 			readonly pinnedGenesisAnchorDigest: string;
@@ -1614,7 +1640,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 
 	it("orders trust, anchor, parameters, catalog, admission and awaited runtime before graph handoff", async () => {
 		const result = await controlledPrepare();
-		expectFailure(result, "graph-rejected");
+		expectFailure(result, "trust-not-preserved");
 		expect(stageProbe.events).toEqual([
 			"trust.create",
 			"trust.open:start",
@@ -1634,6 +1660,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			"blueprint.admission",
 			"blueprint.runtime:start",
 			"blueprint.runtime:resolved",
+			"graph.validate",
 		]);
 		const input = stageProbe.prepareInputs[0] as PrepareV3LiveInput;
 		const trustFactoryInput = stageProbe.trustFactoryInputs[0] as {
@@ -1688,12 +1715,13 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(runtimeInput.exactArtifactBytes).not.toBe(catalogResult.exactArtifactBytes);
 		expect(runtimeInput.exactArtifactBytes).toEqual(catalogResult.exactArtifactBytes);
 		expect(stageProbe.runtimeResults).toHaveLength(1);
+		expect(stageProbe.graphValidationInputs).toHaveLength(1);
 		expect(stageProbe.liveEffects).toEqual([]);
 	});
 
 	it("accepts distinct catalog byte views sharing one ordinary buffer and detaches both before preparation", async () => {
 		const result = await controlledPrepare({}, { catalogMutation: "shared-ordinary-backing" });
-		expectFailure(result, "graph-rejected");
+		expectFailure(result, "trust-not-preserved");
 		const fixture = blueprintFixture();
 		const catalogResult = stageProbe.catalogResults[0] as {
 			readonly canonicalBlueprintPackageBytes: Uint8Array;
@@ -1731,6 +1759,21 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(runtimeInput.exactArtifactBytes.buffer).not.toBe(runtimeInput.canonicalBlueprintPackageBytes.buffer);
 		expect(runtimeInput.exactArtifactBytes).toEqual(fixture.exactArtifactBytes);
 		expect(stageProbe.runtimeResults).toHaveLength(1);
+		expect(stageProbe.graphValidationInputs).toHaveLength(1);
+		expect(stageProbe.liveEffects).toEqual([]);
+	});
+
+	it("keeps a genuine validation refusal graph-rejected without entering A-c or a live effect", async () => {
+		stageProbe.graphValidationFailure = true;
+		const result = await controlledPrepare();
+		expectFailure(result, "graph-rejected");
+		expect(stageProbe.graphValidationInputs).toHaveLength(1);
+		expect(stageProbe.events.at(-1)).toBe("graph.validate");
+		expect(stageProbe.events).not.toContain("store.beginGeneration");
+		expect(stageProbe.events).not.toContain("store.putCachedBlob");
+		expect(stageProbe.events).not.toContain("store.promoteReference");
+		expect(stageProbe.events).not.toContain("store.completeGeneration");
+		expect(stageProbe.events).not.toContain("store.swapHead");
 		expect(stageProbe.liveEffects).toEqual([]);
 	});
 
