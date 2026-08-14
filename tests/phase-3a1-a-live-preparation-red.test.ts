@@ -1050,7 +1050,14 @@ const B_LIVE_IDENTIFIERS = new Set([
 ]);
 const THROUGH_A_B_FORBIDDEN_IDENTIFIERS = new Set([...A_C_STAGE_IDENTIFIERS, ...B_LIVE_IDENTIFIERS]);
 const THROUGH_A_C_FORBIDDEN_IDENTIFIERS = new Set([...A_C_FORBIDDEN_IDENTIFIERS, ...B_LIVE_IDENTIFIERS]);
-type SweepStage = "through-a-b" | "through-a-c";
+const SEAM3_ALLOWED_LIVE_IDENTIFIERS = new Set(["compareAndMarkOutboxPublished", "outbox", "subscribe"]);
+const THROUGH_SEAM3_FORBIDDEN_IDENTIFIERS = new Set([
+	...A_C_FORBIDDEN_IDENTIFIERS,
+	...[...B_LIVE_IDENTIFIERS].filter((name) => !SEAM3_ALLOWED_LIVE_IDENTIFIERS.has(name)),
+]);
+const SEAM3_RUNTIME_ROOTS = new Set(["@ts-drp/issuance-store", "@ts-drp/message-queue", "@ts-drp/types"]);
+const SEAM3_RUNTIME_DEPENDENCY = Object.freeze({ manifest: "0.11.0", resolved: "link:../issuance-store" });
+type SweepStage = "through-a-b" | "through-a-c" | "through-seam3";
 
 function moduleSpecifiers(filename: string): readonly ModuleEdge[] {
 	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
@@ -1364,7 +1371,7 @@ function isCapturedInputStoreCall(node: ts.CallExpression): boolean {
 	);
 }
 
-function aCStageViolations(filename: string): readonly string[] {
+function aCStageViolations(filename: string, allowSeam3 = false): readonly string[] {
 	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
 	const violations: string[] = [];
 	const topLevelFunctions = new Map<string, ts.FunctionDeclaration[]>();
@@ -1412,7 +1419,12 @@ function aCStageViolations(filename: string): readonly string[] {
 		violations.push("a-c-stage:entry-export");
 	}
 	for (const [name, declarations] of topLevelFunctions) {
-		if (name === "prepareV3LiveGeneration") continue;
+		if (
+			name === "prepareV3LiveGeneration" ||
+			(allowSeam3 && (name === "activateV3LivePlane" || name === "routeV3Ingress"))
+		) {
+			continue;
+		}
 		if (
 			declarations.some((declaration) =>
 				declaration.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
@@ -1571,14 +1583,31 @@ function aCStageViolations(filename: string): readonly string[] {
 	};
 	visitAll(source);
 
-	if (weakMapOwners.length !== 1) violations.push("a-c-stage:WeakMap-owner");
-	const weakMapOwner = weakMapOwners[0];
+	if (weakMapOwners.length !== (allowSeam3 ? 2 : 1)) violations.push("a-c-stage:WeakMap-owner");
+	const weakMapOwner = weakMapOwners.find(({ name }) =>
+		[...consumeFlow.calls].some(
+			(call) =>
+				ts.isPropertyAccessExpression(call.expression) &&
+				ts.isIdentifier(call.expression.expression) &&
+				call.expression.expression.text === name &&
+				call.expression.name.text === "get"
+		)
+	);
+	if (weakMapOwner === undefined) violations.push("a-c-stage:token-WeakMap-owner");
 	if (
 		weakMapOwner !== undefined &&
 		(weakMapOwner.statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) === true ||
 			namedExports.some(({ local }) => local === weakMapOwner.name))
 	) {
 		violations.push("a-c-stage:public-seam");
+	}
+	for (const owner of weakMapOwners) {
+		if (
+			owner.statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) === true ||
+			namedExports.some(({ local }) => local === owner.name)
+		) {
+			violations.push("a-c-stage:public-seam");
+		}
 	}
 
 	for (const name of A_C_REQUIRED_CALL_ORDER) {
@@ -1641,6 +1670,142 @@ function aCStageViolations(filename: string): readonly string[] {
 	return Object.freeze([...new Set(violations)].sort());
 }
 
+function seam3TopologyViolations(filename: string): readonly string[] {
+	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
+	const violations: string[] = [];
+	const weakMapOwners: string[] = [];
+	const observed = new Map<string, number>();
+	const expectedCalls = new Map<string, Readonly<{ readonly owner: string; readonly receiver: string }>>([
+		["compareAndMarkOutboxPublished", { owner: "publishPending", receiver: "registration.issuanceStore" }],
+		["queue-subscribe", { owner: "subscribeActivationQueue", receiver: "messageQueueManager" }],
+		["topic-subscribe", { owner: "activateV3LivePlane", receiver: "boundNetworkNode" }],
+	]);
+	const ownerName = (node: ts.Node): string | undefined => {
+		const owner = containingFunction(node);
+		return owner !== undefined && "name" in owner && owner.name !== undefined && ts.isIdentifier(owner.name)
+			? owner.name.text
+			: undefined;
+	};
+	const visit = (node: ts.Node): void => {
+		if (
+			ts.isVariableDeclaration(node) &&
+			node.parent.parent.parent === source &&
+			ts.isIdentifier(node.name) &&
+			node.initializer !== undefined &&
+			ts.isNewExpression(node.initializer) &&
+			ts.isIdentifier(node.initializer.expression) &&
+			node.initializer.expression.text === "WeakMap"
+		) {
+			weakMapOwners.push(node.name.text);
+		}
+		if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+			const method = node.expression.name.text;
+			const receiver = node.expression.expression.getText(source);
+			let key: string | undefined;
+			if (method === "compareAndMarkOutboxPublished") key = method;
+			if (method === "subscribe" && receiver === "messageQueueManager") key = "queue-subscribe";
+			if (method === "subscribe" && receiver === "boundNetworkNode") key = "topic-subscribe";
+			if (key !== undefined) {
+				observed.set(key, (observed.get(key) ?? 0) + 1);
+				const expected = expectedCalls.get(key);
+				if (expected === undefined || expected.owner !== ownerName(node) || expected.receiver !== receiver) {
+					violations.push(`seam3-owner:${key}`);
+				}
+			}
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(source);
+	if (weakMapOwners.length !== 2) violations.push("seam3-WeakMap-owners");
+	for (const [key] of expectedCalls) if (observed.get(key) !== 1) violations.push(`seam3-call:${key}`);
+	const registrationOwner = weakMapOwners.find((name) => {
+		let usedByActivate = false;
+		let usedByRoute = false;
+		const inspect = (node: ts.Node): void => {
+			if (ts.isIdentifier(node) && node.text === name) {
+				const owner = ownerName(node);
+				if (owner === "activateV3LivePlane") usedByActivate = true;
+				if (owner === "routeV3Ingress") usedByRoute = true;
+			}
+			ts.forEachChild(node, inspect);
+		};
+		inspect(source);
+		return usedByActivate && usedByRoute;
+	});
+	if (registrationOwner === undefined) violations.push("seam3-registration-owner");
+	return Object.freeze([...new Set(violations)].sort());
+}
+
+function nodeV3IngressViolations(sourceText: string): readonly string[] {
+	const source = ts.createSourceFile("packages/node/src/index.ts", sourceText, ts.ScriptTarget.Latest, true);
+	const violations: string[] = [];
+	const imports = source.statements.filter(
+		(statement): statement is ts.ImportDeclaration =>
+			ts.isImportDeclaration(statement) &&
+			ts.isStringLiteral(statement.moduleSpecifier) &&
+			/(?:^|\/)v3-live(?:\.[cm]?[jt]s)?$/u.test(statement.moduleSpecifier.text)
+	);
+	if (imports.length !== 1) violations.push("node-v3-import-count");
+	const imported = imports[0];
+	const bindings = imported?.importClause?.namedBindings;
+	if (
+		imported === undefined ||
+		imported.moduleSpecifier.text !== "./v3-live.js" ||
+		imported.importClause?.isTypeOnly !== false ||
+		imported.importClause.name !== undefined ||
+		bindings === undefined ||
+		!ts.isNamedImports(bindings) ||
+		bindings.elements.length !== 1 ||
+		bindings.elements[0]?.name.text !== "routeV3Ingress" ||
+		bindings.elements[0].propertyName !== undefined
+	) {
+		violations.push("node-v3-import-shape");
+	}
+	let dispatch: ts.MethodDeclaration | undefined;
+	const calls: ts.CallExpression[] = [];
+	const visit = (node: ts.Node): void => {
+		if (
+			ts.isMethodDeclaration(node) &&
+			ts.isIdentifier(node.name) &&
+			node.name.text === "dispatchMessage" &&
+			ts.isClassDeclaration(node.parent) &&
+			node.parent.name?.text === "DRPNode"
+		) {
+			dispatch = node;
+		}
+		if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "routeV3Ingress") {
+			calls.push(node);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(source);
+	if (calls.length !== 1) violations.push("node-v3-route-count");
+	const body = dispatch?.body?.statements;
+	const first = body?.[0];
+	const second = body?.[1];
+	const declaration =
+		first !== undefined && ts.isVariableStatement(first) ? first.declarationList.declarations[0] : undefined;
+	const call = declaration?.initializer;
+	const exactCall =
+		call !== undefined &&
+		ts.isCallExpression(call) &&
+		ts.isIdentifier(call.expression) &&
+		call.expression.text === "routeV3Ingress" &&
+		call.arguments.length === 2 &&
+		call.arguments[0]?.getText(source) === "this.networkNode" &&
+		call.arguments[1]?.getText(source) === "msg";
+	const exactReturn =
+		declaration !== undefined &&
+		ts.isIdentifier(declaration.name) &&
+		second !== undefined &&
+		ts.isIfStatement(second) &&
+		ts.isIdentifier(second.expression) &&
+		second.expression.text === declaration.name.text &&
+		ts.isReturnStatement(second.thenStatement);
+	if (!exactCall || !exactReturn) violations.push("node-v3-route-order");
+	return Object.freeze([...new Set(violations)].sort());
+}
+
 function expectedGeneratedStage(sourceFilename: string): string {
 	return ts.transpileModule(readFileSync(sourceFilename, "utf8"), {
 		compilerOptions: {
@@ -1667,7 +1832,12 @@ function generatedStageViolations(
 	const violations: string[] = [];
 	if (generatedText !== expectedGeneratedStage(sourceFilename)) violations.push("generated-out-of-date");
 	const exports = exportedDeclarationNames(generatedFilename);
-	const expectedExports = stage === "through-a-c" ? ["prepareV3LiveGeneration"] : [];
+	const expectedExports =
+		stage === "through-seam3"
+			? ["activateV3LivePlane", "prepareV3LiveGeneration", "routeV3Ingress"]
+			: stage === "through-a-c"
+				? ["prepareV3LiveGeneration"]
+				: [];
 	if (exports.join("\u0000") !== expectedExports.join("\u0000")) violations.push("generated-export-surface");
 	let awaiterCount = 0;
 	let generatorCount = 0;
@@ -1683,9 +1853,9 @@ function generatedStageViolations(
 		ts.forEachChild(node, visit);
 	};
 	visit(generated);
-	if (stage === "through-a-c") {
+	if (stage === "through-a-c" || stage === "through-seam3") {
 		if (awaiterCount !== 1 || generatorCount === 0) violations.push("generated-async-lowering");
-		if (weakMapOwnerCount !== 1) violations.push("generated-parallel-owner");
+		if (weakMapOwnerCount !== (stage === "through-seam3" ? 2 : 1)) violations.push("generated-parallel-owner");
 	} else if (weakMapOwnerCount !== 0) {
 		violations.push("generated-parallel-owner");
 	}
@@ -1798,6 +1968,18 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 			violations.push(`runtime-lockfile:${name}`);
 		}
 	}
+	if (stage === "through-seam3") {
+		if (manifest.dependencies?.["@ts-drp/issuance-store"] !== SEAM3_RUNTIME_DEPENDENCY.manifest) {
+			violations.push("runtime-manifest:@ts-drp/issuance-store");
+		}
+		const locked = lockedDependencies.get("@ts-drp/issuance-store");
+		if (
+			locked?.specifier !== SEAM3_RUNTIME_DEPENDENCY.manifest ||
+			locked.version !== SEAM3_RUNTIME_DEPENDENCY.resolved
+		) {
+			violations.push("runtime-lockfile:@ts-drp/issuance-store");
+		}
+	}
 
 	const codeGenerationFiles = new Set<string>();
 	for (const filename of recursiveFiles(path.join(root, "packages/node"))) {
@@ -1859,6 +2041,7 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 			const permitted =
 				A_A_RUNTIME_ROOTS.has(edge.specifier) ||
 				isABRuntimeEdge ||
+				(stage === "through-seam3" && SEAM3_RUNTIME_ROOTS.has(edge.specifier)) ||
 				edge.specifier === PUBLISHED_PARAMETER_REGISTRY_SPECIFIER ||
 				(edge.typeOnly && edge.specifier === "@ts-drp/blueprint-catalog");
 			if (!permitted) futureOrLiveEdges.push(`import:${edge.specifier}`);
@@ -1891,11 +2074,16 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 	};
 	for (const filename of sourceGraph.files) {
 		futureOrLiveEdges.push(
-			...aBStageViolations(filename, stage === "through-a-c" && filename === entry ? stage : "through-a-b")
+			...aBStageViolations(filename, stage !== "through-a-b" && filename === entry ? "through-a-c" : "through-a-b")
 		);
-		if (stage === "through-a-c" && filename === entry) {
-			futureOrLiveEdges.push(...aCStageViolations(filename));
-			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
+		if ((stage === "through-a-c" || stage === "through-seam3") && filename === entry) {
+			futureOrLiveEdges.push(...aCStageViolations(filename, stage === "through-seam3"));
+			if (stage === "through-seam3") {
+				futureOrLiveEdges.push(...seam3TopologyViolations(filename));
+				inspectFutureOrLive(filename, THROUGH_SEAM3_FORBIDDEN_IDENTIFIERS);
+			} else {
+				inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
+			}
 		} else {
 			inspectFutureOrLive(filename, THROUGH_A_B_FORBIDDEN_IDENTIFIERS);
 		}
@@ -1905,8 +2093,11 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 		if (filename === generatedEntry) {
 			futureOrLiveEdges.push(...generatedStageViolations(entry, generatedEntry, stage));
 		}
-		if (stage === "through-a-c" && filename === generatedEntry) {
-			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
+		if ((stage === "through-a-c" || stage === "through-seam3") && filename === generatedEntry) {
+			inspectFutureOrLive(
+				filename,
+				stage === "through-seam3" ? THROUGH_SEAM3_FORBIDDEN_IDENTIFIERS : THROUGH_A_C_FORBIDDEN_IDENTIFIERS
+			);
 		} else {
 			futureOrLiveEdges.push(...aBStageViolations(filename, "through-a-b"));
 			inspectFutureOrLive(filename, THROUGH_A_B_FORBIDDEN_IDENTIFIERS);
@@ -2094,8 +2285,16 @@ const PRIVATE_V3_LIVE_EXPORTS = [
 	"PrepareV3LiveGenerationInput",
 	"PrepareV3LiveResult",
 	"PreparedV3Live",
+	"V3AdmittedVertexSink",
+	"V3EgressResult",
 	"V3LiveDescriptor",
+	"V3PlaneActivationFailureKind",
+	"V3PlaneActivationInput",
+	"V3PlaneActivationResult",
+	"V3PlaneHandle",
+	"activateV3LivePlane",
 	"prepareV3LiveGeneration",
+	"routeV3Ingress",
 ] as const;
 
 function exportedDeclarationNames(filename: string): readonly string[] {
@@ -2143,7 +2342,9 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		const nodeRuntime = await import("../packages/node/src/runtime.js");
 		const protocolRoot = await import("../packages/protocol-v3/src/public.js");
 		expect.soft(typeof surface.prepareV3LiveGeneration).toBe("function");
-		expect.soft(Object.keys(surface)).toEqual(["prepareV3LiveGeneration"]);
+		expect
+			.soft(Object.keys(surface).sort())
+			.toEqual(["activateV3LivePlane", "prepareV3LiveGeneration", "routeV3Ingress"]);
 		expect.soft(exportedDeclarationNames(IMPLEMENTATION)).toEqual(PRIVATE_V3_LIVE_EXPORTS);
 		const implementationSource = existsSync(IMPLEMENTATION) ? readFileSync(IMPLEMENTATION, "utf8") : "";
 		expect.soft(implementationSource.match(/declare const preparedV3LiveBrand:\s*unique symbol;/gu)).toHaveLength(1);
@@ -2155,8 +2356,9 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			)
 			.toHaveLength(1);
 		const privateNames = new Set<string>(PRIVATE_V3_LIVE_EXPORTS);
+		const nodeIndexFilename = path.join(REPOSITORY_ROOT, "packages/node/src/index.ts");
 		for (const filename of [
-			path.join(REPOSITORY_ROOT, "packages/node/src/index.ts"),
+			nodeIndexFilename,
 			path.join(REPOSITORY_ROOT, "packages/node/src/runtime.ts"),
 			path.join(REPOSITORY_ROOT, "packages/protocol-v3/src/public.ts"),
 		]) {
@@ -2164,10 +2366,28 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				exportedDeclarationNames(filename).filter((name) => privateNames.has(name)),
 				filename
 			).toEqual([]);
-			expect(
-				moduleSpecifiers(filename).filter((edge) => /(?:^|\/)v3-live(?:\.[cm]?[jt]s)?$/u.test(edge.specifier)),
-				filename
-			).toEqual([]);
+			if (filename !== nodeIndexFilename) {
+				expect(
+					moduleSpecifiers(filename).filter((edge) => /(?:^|\/)v3-live(?:\.[cm]?[jt]s)?$/u.test(edge.specifier)),
+					filename
+				).toEqual([]);
+			}
+		}
+		const nodeIndexSource = readFileSync(nodeIndexFilename, "utf8");
+		expect(nodeV3IngressViolations(nodeIndexSource)).toEqual([]);
+		for (const mutant of [
+			nodeIndexSource.replace(
+				'import { routeV3Ingress } from "./v3-live.js";',
+				'import { routeV3Ingress as route } from "./v3-live.js";'
+			),
+			nodeIndexSource.replace(
+				"const routeV3IngressResult = routeV3Ingress(this.networkNode, msg);",
+				"const routeV3IngressResult = false;"
+			),
+			nodeIndexSource.replace("if (routeV3IngressResult) return;", "void routeV3IngressResult;"),
+			`${nodeIndexSource}\nimport { activateV3LivePlane } from "./v3-live.js";\n`,
+		]) {
+			expect(nodeV3IngressViolations(mutant)).not.toEqual([]);
 		}
 		expect(Object.keys(nodeRoot).sort()).toEqual(NODE_ROOT_EXPORTS);
 		expect(Object.keys(nodeRuntime).sort()).toEqual(NODE_RUNTIME_EXPORTS);
@@ -3029,8 +3249,35 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			}
 			if (expectedFutureEdge !== undefined) expect(audit.futureOrLiveEdges, filename).toContain(expectedFutureEdge);
 		}
-		const repositoryAudit = sourceSweep(REPOSITORY_ROOT, "through-a-c");
+		const repositoryAudit = sourceSweep(REPOSITORY_ROOT, "through-seam3");
 		expect(repositoryAudit.violations).toEqual([]);
 		expect(repositoryAudit.futureOrLiveEdges).toEqual([]);
+		const seam3Source = readFileSync(IMPLEMENTATION, "utf8");
+		expect(seam3TopologyViolations(IMPLEMENTATION)).toEqual([]);
+		for (const mutant of [
+			seam3Source.replace("messageQueueManager.subscribe(queueId, handler)", "subscribe(queueId, handler)"),
+			seam3Source.replace("boundNetworkNode.subscribe(topic)", "subscribe(topic)"),
+			seam3Source.replace("registration.issuanceStore.compareAndMarkOutboxPublished", "compareAndMarkOutboxPublished"),
+			`${seam3Source}\nconst escapedRegistrationOwner = new WeakMap();\n`,
+			`${seam3Source}\nfunction deadSubscriptionDecoy() { messageQueueManager.subscribe(queueId, handler); }\n`,
+		]) {
+			const root = temporarySweepTree();
+			addABRuntimeDependency(root);
+			const manifestPath = path.join(root, "packages/node/package.json");
+			const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+			manifest.dependencies["@ts-drp/issuance-store"] = SEAM3_RUNTIME_DEPENDENCY.manifest;
+			writeFileSync(manifestPath, JSON.stringify(manifest));
+			const lockPath = path.join(root, "pnpm-lock.yaml");
+			writeFileSync(
+				lockPath,
+				readFileSync(lockPath, "utf8").replace(
+					"    dependencies:\n",
+					`    dependencies:\n      '@ts-drp/issuance-store':\n        specifier: ${SEAM3_RUNTIME_DEPENDENCY.manifest}\n        version: ${SEAM3_RUNTIME_DEPENDENCY.resolved}\n`
+				)
+			);
+			writeFileSync(path.join(root, "packages/node/src/v3-live.ts"), mutant);
+			emitSweepGenerated(root);
+			expect(sourceSweep(root, "through-seam3").futureOrLiveEdges).not.toEqual([]);
+		}
 	});
 });

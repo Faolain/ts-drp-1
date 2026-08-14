@@ -1074,14 +1074,17 @@ function deepFrozen(value: unknown, seen = new Set<object>()): boolean {
 }
 
 interface TokenSourceAudit {
-	readonly hasPrivateWeakMap: boolean;
+	readonly privateWeakMapCount: number;
+	readonly hasPrivateRegistrationOwner: boolean;
 	readonly setsOnSuccessPath: boolean;
 	readonly consumesByGetAndDelete: boolean;
-	readonly forbiddenLiveEffects: readonly string[];
+	readonly seam3Topology: readonly string[];
+	readonly forbiddenFullBLiveEffects: readonly string[];
 }
 
 interface ExtractedTokenConsumer {
 	readonly ownerName: string;
+	readonly registrationOwnerName: string;
 	readonly helperName: string;
 	readonly helperSource: string;
 	readonly withoutDeleteSource: string;
@@ -1125,7 +1128,22 @@ function privateTokenExportEscapes(sourceText: string, privateNames: readonly st
 				.getModifiers(statement)
 				?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword || kind === ts.SyntaxKind.DefaultKeyword) ??
 				false);
-		if (exported && containsTaintedIdentifier(statement)) escapes.push(`exported-declaration:${statement.pos}`);
+		const allowedPrivateOwner =
+			ts.isFunctionDeclaration(statement) &&
+			(statement.name?.text === "activateV3LivePlane" || statement.name?.text === "routeV3Ingress");
+		if (exported && containsTaintedIdentifier(statement) && !allowedPrivateOwner) {
+			escapes.push(`exported-declaration:${statement.pos}`);
+		}
+		if (allowedPrivateOwner) {
+			const inspectReturns = (node: ts.Node): void => {
+				if (node !== statement && ts.isFunctionLike(node)) return;
+				if (ts.isReturnStatement(node) && node.expression !== undefined && containsTaintedIdentifier(node.expression)) {
+					escapes.push(`returned-authority:${node.pos}`);
+				}
+				ts.forEachChild(node, inspectReturns);
+			};
+			inspectReturns(statement);
+		}
 		if (ts.isExportDeclaration(statement) && statement.exportClause !== undefined) {
 			if (ts.isNamedExports(statement.exportClause)) {
 				for (const element of statement.exportClause.elements) {
@@ -1160,23 +1178,48 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 			}
 		}
 	}
-	expect(owners, "one private top-level WeakMap owner").toHaveLength(1);
-	const owner = owners[0];
-	if (owner === undefined) throw new TypeError("missing private token owner");
-
-	const ownerCalls: ts.CallExpression[] = [];
-	const visitOwnerCalls = (node: ts.Node): void => {
-		if (
-			ts.isCallExpression(node) &&
-			ts.isPropertyAccessExpression(node.expression) &&
-			ts.isIdentifier(node.expression.expression) &&
-			node.expression.expression.text === owner.name
-		) {
-			ownerCalls.push(node);
-		}
-		ts.forEachChild(node, visitOwnerCalls);
+	expect(owners, "token and Seam-3 registration WeakMap owners").toHaveLength(2);
+	const callsFor = (name: string): ts.CallExpression[] => {
+		const calls: ts.CallExpression[] = [];
+		const visit = (node: ts.Node): void => {
+			if (
+				ts.isCallExpression(node) &&
+				ts.isPropertyAccessExpression(node.expression) &&
+				ts.isIdentifier(node.expression.expression) &&
+				node.expression.expression.text === name
+			) {
+				calls.push(node);
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(source);
+		return calls;
 	};
-	visitOwnerCalls(source);
+	const tokenOwners = owners.filter(({ name }) => {
+		const methods = callsFor(name).map(({ expression }) => (expression as ts.PropertyAccessExpression).name.text);
+		return (
+			methods.filter((method) => method === "set").length === 1 &&
+			methods.filter((method) => method === "get").length === 1 &&
+			methods.filter((method) => method === "delete").length === 1 &&
+			methods.every((method) => ["delete", "get", "set"].includes(method))
+		);
+	});
+	expect(tokenOwners, "one private token WeakMap owner").toHaveLength(1);
+	const owner = tokenOwners[0];
+	if (owner === undefined) throw new TypeError("missing private token owner");
+	const registrationOwner = owners.find(({ name }) => name !== owner.name);
+	if (registrationOwner === undefined) throw new TypeError("missing private registration owner");
+	const registrationOwners = callsFor(registrationOwner.name)
+		.map((call) => {
+			let current: ts.Node | undefined = call;
+			while (current !== undefined && !ts.isFunctionDeclaration(current)) current = current.parent;
+			return current?.name?.text;
+		})
+		.filter((name): name is string => name !== undefined);
+	expect(registrationOwners).toContain("activateV3LivePlane");
+	expect(registrationOwners).toContain("routeV3Ingress");
+
+	const ownerCalls = callsFor(owner.name);
 	const methodNames = ownerCalls.map(({ expression }) => (expression as ts.PropertyAccessExpression).name.text);
 	expect(methodNames.filter((name) => name === "set")).toHaveLength(1);
 	expect(methodNames.filter((name) => name === "get")).toHaveLength(1);
@@ -1272,9 +1315,10 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 	const helperSource = helper.getText(source);
 	const deleteStart = deleteStatement.getStart(source) - helper.getStart(source);
 	const deleteEnd = deleteStatement.end - helper.getStart(source);
-	expect(privateTokenExportEscapes(sourceText, [owner.name, helper.name.text])).toEqual([]);
+	expect(privateTokenExportEscapes(sourceText, [owner.name, registrationOwner.name, helper.name.text])).toEqual([]);
 	return Object.freeze({
 		ownerName: owner.name,
+		registrationOwnerName: registrationOwner.name,
 		helperName: helper.name.text,
 		helperSource,
 		withoutDeleteSource: `${helperSource.slice(0, deleteStart)}${helperSource.slice(deleteEnd)}`,
@@ -1305,20 +1349,115 @@ function compileTokenConsumer(
 }
 
 function tokenSourceAudit(source: string): TokenSourceAudit {
-	const hasPrivateWeakMap = /const\s+\w+\s*=\s*new\s+WeakMap(?:<[^;]+>)?\s*\(/u.test(source);
-	const setsOnSuccessPath = /\.set\(\s*(?:capability|token)\s*,/u.test(source);
+	const parsed = ts.createSourceFile(IMPLEMENTATION, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const weakMapOwners: string[] = [];
+	const seam3Topology: string[] = [];
+	const forbiddenFullBLiveEffects: string[] = [];
+	const authorityCalls = new Map<
+		string,
+		Array<Readonly<{ readonly method: string; readonly owner: string | undefined }>>
+	>();
+	const forbiddenCalls = new Set([
+		"addEventListener",
+		"append",
+		"dispatch",
+		"discardGeneration",
+		"queueMicrotask",
+		"reducer",
+		"setInterval",
+		"setTimeout",
+		"transactIssue",
+	]);
+	const functionOwner = (node: ts.Node): string | undefined => {
+		let current = node.parent;
+		while (current !== undefined && !ts.isFunctionDeclaration(current)) current = current.parent;
+		return current?.name?.text;
+	};
+	const registrationUse = new Map<string, Set<string>>();
+	const visit = (node: ts.Node): void => {
+		if (
+			ts.isVariableDeclaration(node) &&
+			node.parent.parent.parent === parsed &&
+			ts.isIdentifier(node.name) &&
+			node.initializer !== undefined &&
+			ts.isNewExpression(node.initializer) &&
+			ts.isIdentifier(node.initializer.expression) &&
+			node.initializer.expression.text === "WeakMap"
+		) {
+			weakMapOwners.push(node.name.text);
+		}
+		if (ts.isIdentifier(node) && weakMapOwners.includes(node.text)) {
+			const owner = functionOwner(node);
+			if (owner !== undefined) {
+				const users = registrationUse.get(node.text) ?? new Set<string>();
+				users.add(owner);
+				registrationUse.set(node.text, users);
+			}
+		}
+		if (ts.isCallExpression(node)) {
+			const owner = functionOwner(node);
+			const expression = node.expression;
+			const method = ts.isPropertyAccessExpression(expression)
+				? expression.name.text
+				: ts.isIdentifier(expression)
+					? expression.text
+					: undefined;
+			const receiver = ts.isPropertyAccessExpression(expression) ? expression.expression.getText(parsed) : undefined;
+			if (
+				method !== undefined &&
+				ts.isPropertyAccessExpression(expression) &&
+				ts.isIdentifier(expression.expression) &&
+				weakMapOwners.includes(expression.expression.text)
+			) {
+				const calls = authorityCalls.get(expression.expression.text) ?? [];
+				calls.push(Object.freeze({ method, owner }));
+				authorityCalls.set(expression.expression.text, calls);
+			}
+			if (method === "subscribe" && owner === "subscribeActivationQueue" && receiver === "messageQueueManager") {
+				seam3Topology.push("queue-subscribe");
+			} else if (method === "subscribe" && owner === "activateV3LivePlane" && receiver === "boundNetworkNode") {
+				seam3Topology.push("topic-subscribe");
+			} else if (
+				method === "compareAndMarkOutboxPublished" &&
+				owner === "publishPending" &&
+				receiver === "registration.issuanceStore"
+			) {
+				seam3Topology.push("outbox-mark");
+			} else if (method === "subscribe" || method === "compareAndMarkOutboxPublished") {
+				forbiddenFullBLiveEffects.push(`${owner ?? "module"}:${method}`);
+			}
+			if (method !== undefined && forbiddenCalls.has(method)) forbiddenFullBLiveEffects.push(method);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	const hasPrivateRegistrationOwner = weakMapOwners.some((name) => {
+		const users = registrationUse.get(name);
+		return users?.has("activateV3LivePlane") === true && users.has("routeV3Ingress");
+	});
+	const tokenOwners = weakMapOwners.filter((name) => {
+		const calls = authorityCalls.get(name) ?? [];
+		return (
+			calls.filter(({ method, owner }) => method === "set" && owner === "prepareV3LiveGeneration").length === 1 &&
+			calls.filter(({ method, owner }) => method === "get" && owner === "consumePreparedV3Live").length === 1 &&
+			calls.filter(({ method, owner }) => method === "delete" && owner === "consumePreparedV3Live").length === 1
+		);
+	});
+	const tokenCalls = tokenOwners.length === 1 ? (authorityCalls.get(tokenOwners[0] as string) ?? []) : [];
+	const setsOnSuccessPath = tokenCalls.some(
+		({ method, owner }) => method === "set" && owner === "prepareV3LiveGeneration"
+	);
 	const consumesByGetAndDelete =
-		/function\s+\w*consume\w*\s*\([^)]*\)[\s\S]*?\.get\([^)]*\)[\s\S]*?\.delete\([^)]*\)/u.test(source);
-	const forbidden = [
-		"subscribe(",
-		"append(",
-		"dispatch(",
-		"setInterval(",
-		"setTimeout(",
-		"addEventListener(",
-		"discardGeneration(",
-	].filter((marker) => source.includes(marker));
-	return { hasPrivateWeakMap, setsOnSuccessPath, consumesByGetAndDelete, forbiddenLiveEffects: forbidden };
+		tokenCalls.some(({ method, owner }) => method === "get" && owner === "consumePreparedV3Live") &&
+		tokenCalls.some(({ method, owner }) => method === "delete" && owner === "consumePreparedV3Live");
+	return {
+		privateWeakMapCount: weakMapOwners.length,
+		hasPrivateRegistrationOwner,
+		setsOnSuccessPath,
+		consumesByGetAndDelete,
+		seam3Topology: Object.freeze(seam3Topology.sort()),
+		forbiddenFullBLiveEffects: Object.freeze(forbiddenFullBLiveEffects.sort()),
+	};
 }
 
 beforeEach(() => {
@@ -1900,26 +2039,42 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 			`${source}\nexport { ${evidence.helperName} };`,
 			`${source}\nconst escapedConsumer = ${evidence.helperName};\nexport { escapedConsumer };`,
 			`${source}\nexport { ${evidence.ownerName} as preparedV3LiveAuthority };`,
+			`${source}\nexport { ${evidence.registrationOwnerName} as v3LiveRegistrations };`,
 		]) {
-			expect(privateTokenExportEscapes(mutant, [evidence.ownerName, evidence.helperName])).not.toEqual([]);
+			expect(
+				privateTokenExportEscapes(mutant, [evidence.ownerName, evidence.registrationOwnerName, evidence.helperName])
+			).not.toEqual([]);
 		}
 	});
 
-	it("keeps WeakMap mint/consume ownership private and forbids cleanup claims or every Phase 3a-1B live effect", () => {
+	it("keeps token and Seam-3 registration ownership private while allowing only the signed subscription/outbox topology", () => {
 		const source = readFileSync(IMPLEMENTATION, "utf8");
 		expect(tokenSourceAudit(source)).toEqual({
-			hasPrivateWeakMap: true,
+			privateWeakMapCount: 2,
+			hasPrivateRegistrationOwner: true,
 			setsOnSuccessPath: true,
 			consumesByGetAndDelete: true,
-			forbiddenLiveEffects: [],
+			seam3Topology: ["outbox-mark", "queue-subscribe", "topic-subscribe"],
+			forbiddenFullBLiveEffects: [],
 		});
-		for (const mutant of [
-			source.replace(/new\s+WeakMap/u, "new Map"),
-			source.replace(/\.delete\(/u, ".has("),
-			`${source}\nsubscribe();`,
-			`${source}\ndiscardGeneration();`,
-		]) {
-			expect(tokenSourceAudit(mutant)).not.toEqual(tokenSourceAudit(source));
+		for (const [name, mutant] of [
+			["token owner", source.replace(/new\s+WeakMap/u, "new Map")],
+			["token consume", source.replace(/\.delete\(/u, ".has(")],
+			["queue owner", source.replace("messageQueueManager.subscribe(queueId, handler)", "subscribe(queueId, handler)")],
+			["topic owner", source.replace("boundNetworkNode.subscribe(topic)", "subscribe(topic)")],
+			[
+				"outbox owner",
+				source.replace("registration.issuanceStore.compareAndMarkOutboxPublished", "compareAndMarkOutboxPublished"),
+			],
+			["parallel owner", `${source}\nconst parallelRegistrationOwner = new WeakMap();`],
+			[
+				"dead topology",
+				`${source}\nfunction deadSubscriptionDecoy() { messageQueueManager.subscribe(queueId, handler); }`,
+			],
+			["append", `${source}\nappend();`],
+			["discard", `${source}\ndiscardGeneration();`],
+		] as const) {
+			expect(tokenSourceAudit(mutant), name).not.toEqual(tokenSourceAudit(source));
 		}
 	});
 
