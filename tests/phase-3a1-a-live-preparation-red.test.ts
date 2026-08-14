@@ -801,6 +801,8 @@ const A_A_RUNTIME_ROOTS = new Set([
 	"@ts-drp/protocol-v3",
 	"@ts-drp/storage",
 ]);
+const PUBLISHED_PARAMETER_REGISTRY_SPECIFIER = "@ts-drp/protocol-v3/registry/registry-v1.json";
+const PUBLISHED_PARAMETER_REGISTRY_EXPORT = "./registry/registry-v1.json";
 const A_A_RUNTIME_DEPENDENCIES = Object.freeze({
 	"@ts-drp/canonical": Object.freeze({ manifest: "0.11.0", resolved: "link:../canonical" }),
 	"@ts-drp/control-plane": Object.freeze({ manifest: "workspace:*", resolved: "link:../control-plane" }),
@@ -995,6 +997,12 @@ function sourceSweep(root: string): StaticAudit {
 		readonly peerDependencies?: Readonly<Record<string, string>>;
 		readonly scripts?: Readonly<Record<string, string>>;
 	};
+	const protocolManifest = JSON.parse(readFileSync(path.join(root, "packages/protocol-v3/package.json"), "utf8")) as {
+		readonly exports?: Readonly<Record<string, unknown>>;
+	};
+	if (protocolManifest.exports?.[PUBLISHED_PARAMETER_REGISTRY_EXPORT] !== PUBLISHED_PARAMETER_REGISTRY_EXPORT) {
+		violations.push("protocol-v3-registry-export");
+	}
 	for (const [kind, dependencies] of Object.entries({
 		dependencies: manifest.dependencies,
 		optionalDependencies: manifest.optionalDependencies,
@@ -1039,15 +1047,21 @@ function sourceSweep(root: string): StaticAudit {
 		if (/^@ts-drp\/protocol-v2(?:\/|$)/u.test(edge.specifier)) {
 			violations.push(edge.from === entry ? "protocol-v2-direct" : "protocol-v2-indirect");
 		}
-		if (/^@ts-drp\/[^/]+\//u.test(edge.specifier)) violations.push(`deep-import:${edge.specifier}`);
+		if (/^@ts-drp\/[^/]+\//u.test(edge.specifier) && edge.specifier !== PUBLISHED_PARAMETER_REGISTRY_SPECIFIER) {
+			violations.push(`deep-import:${edge.specifier}`);
+		}
 		if (!edge.specifier.startsWith(".")) {
 			const permitted =
-				A_A_RUNTIME_ROOTS.has(edge.specifier) || (edge.typeOnly && edge.specifier === "@ts-drp/blueprint-catalog");
+				A_A_RUNTIME_ROOTS.has(edge.specifier) ||
+				edge.specifier === PUBLISHED_PARAMETER_REGISTRY_SPECIFIER ||
+				(edge.typeOnly && edge.specifier === "@ts-drp/blueprint-catalog");
 			if (!permitted) futureOrLiveEdges.push(`import:${edge.specifier}`);
-			if (A_A_RUNTIME_ROOTS.has(edge.specifier)) {
-				if (manifest.dependencies?.[edge.specifier] === undefined)
-					violations.push(`undeclared-runtime:${edge.specifier}`);
-				if (!lockedDependencies.has(edge.specifier)) violations.push(`unlocked-runtime:${edge.specifier}`);
+			const dependencyRoot =
+				edge.specifier === PUBLISHED_PARAMETER_REGISTRY_SPECIFIER ? "@ts-drp/protocol-v3" : edge.specifier;
+			if (A_A_RUNTIME_ROOTS.has(dependencyRoot)) {
+				if (manifest.dependencies?.[dependencyRoot] === undefined)
+					violations.push(`undeclared-runtime:${dependencyRoot}`);
+				if (!lockedDependencies.has(dependencyRoot)) violations.push(`unlocked-runtime:${dependencyRoot}`);
 			}
 			if (
 				edge.typeOnly &&
@@ -1109,6 +1123,7 @@ function temporarySweepTree(): string {
 		"packages/node/src/v3-live.ts",
 		"packages/node/dist/src/v3-live.js",
 		"packages/node/package.json",
+		"packages/protocol-v3/package.json",
 		"pnpm-lock.yaml",
 	]) {
 		const target = path.join(root, filename);
@@ -1129,16 +1144,26 @@ function temporarySweepTree(): string {
 		})
 	);
 	writeFileSync(
+		path.join(root, "packages/protocol-v3/package.json"),
+		JSON.stringify({
+			exports: {
+				".": { import: "./dist/src/public.js", types: "./dist/src/public.d.ts" },
+				[PUBLISHED_PARAMETER_REGISTRY_EXPORT]: PUBLISHED_PARAMETER_REGISTRY_EXPORT,
+			},
+			name: "@ts-drp/protocol-v3",
+		})
+	);
+	writeFileSync(
 		path.join(root, "pnpm-lock.yaml"),
 		"lockfileVersion: '9.0'\nimporters:\n  packages/node:\n    dependencies:\n      '@ts-drp/canonical':\n        specifier: 0.11.0\n        version: link:../canonical\n      '@ts-drp/control-plane':\n        specifier: workspace:*\n        version: link:../control-plane\n      '@ts-drp/protocol-v3':\n        specifier: 0.11.0\n        version: link:../protocol-v3\n      '@ts-drp/storage':\n        specifier: 0.11.0\n        version: link:../storage\n"
 	);
 	writeFileSync(
 		path.join(root, "packages/node/src/v3-live.ts"),
-		`const supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported;\n`
+		`import registry from "${PUBLISHED_PARAMETER_REGISTRY_SPECIFIER}" with { type: "json" };\nconst supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported; void registry;\n`
 	);
 	writeFileSync(
 		path.join(root, "packages/node/dist/src/v3-live.js"),
-		`const supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported;\n`
+		`import registry from "${PUBLISHED_PARAMETER_REGISTRY_SPECIFIER}" with { type: "json" };\nconst supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported; void registry;\n`
 	);
 	return root;
 }
@@ -1537,6 +1562,29 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 				)
 			);
 			expect(sourceSweep(resolvedRoot).violations, name).toContain(`runtime-lockfile:${name}`);
+		}
+		for (const replacement of [undefined, "./registry/retargeted.json"] as const) {
+			const root = temporarySweepTree();
+			const manifestPath = path.join(root, "packages/protocol-v3/package.json");
+			const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+				exports: Record<string, unknown>;
+			};
+			if (replacement === undefined) Reflect.deleteProperty(manifest.exports, PUBLISHED_PARAMETER_REGISTRY_EXPORT);
+			else manifest.exports[PUBLISHED_PARAMETER_REGISTRY_EXPORT] = replacement;
+			writeFileSync(manifestPath, JSON.stringify(manifest));
+			expect(sourceSweep(root).violations, replacement ?? "missing").toContain("protocol-v3-registry-export");
+		}
+		for (const specifier of [
+			"@ts-drp/protocol-v3/conformance/vectors",
+			"@ts-drp/protocol-v3/formal/model",
+			"@ts-drp/protocol-v3/src/index.js",
+			"@ts-drp/protocol-v3/private",
+		]) {
+			const root = temporarySweepTree();
+			writeFileSync(path.join(root, "packages/node/src/v3-live.ts"), `\nimport "${specifier}";\n`, { flag: "a" });
+			const audit = sourceSweep(root);
+			expect(audit.violations, specifier).toContain(`deep-import:${specifier}`);
+			expect(audit.futureOrLiveEdges, specifier).toContain(`import:${specifier}`);
 		}
 		const mutations = [
 			["packages/node/src/v3-live.ts", '\nimport "@ts-drp/protocol-v2";\n', "protocol-v2-direct", undefined],
