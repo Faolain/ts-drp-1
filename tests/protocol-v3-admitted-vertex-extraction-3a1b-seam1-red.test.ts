@@ -27,7 +27,9 @@ const calls = vi.hoisted(() => ({
 	hash: 0,
 	resolver: 0,
 	verify: 0,
+	lastDecodeInput: undefined as Uint8Array | undefined,
 	lastDecodedVertex: undefined as Record<string, unknown> | undefined,
+	lastVertexHashInput: undefined as Uint8Array | undefined,
 	lastVertexDigest: undefined as Uint8Array | undefined,
 	verifyOptions: undefined as unknown,
 	afterEncode: undefined as (() => void) | undefined,
@@ -39,6 +41,7 @@ vi.mock("@ts-drp/canonical", async (importOriginal) => {
 		...actual,
 		decodeCanonical(bytes: Uint8Array): unknown {
 			calls.decode++;
+			calls.lastDecodeInput = bytes;
 			const decoded = actual.decodeCanonical(bytes);
 			if (
 				decoded !== null &&
@@ -57,6 +60,7 @@ vi.mock("@ts-drp/canonical", async (importOriginal) => {
 		},
 		hashDomain(domain: string, ...parts: readonly Uint8Array[]): Uint8Array {
 			if (domain === VERTEX_DOMAIN) calls.hash++;
+			if (domain === VERTEX_DOMAIN) calls.lastVertexHashInput = parts[0];
 			const digest = actual.hashDomain(domain, ...parts);
 			if (domain === VERTEX_DOMAIN) calls.lastVertexDigest = digest;
 			return digest;
@@ -194,10 +198,33 @@ function resetCalls(): void {
 	calls.hash = 0;
 	calls.resolver = 0;
 	calls.verify = 0;
+	calls.lastDecodeInput = undefined;
 	calls.lastDecodedVertex = undefined;
+	calls.lastVertexHashInput = undefined;
 	calls.lastVertexDigest = undefined;
 	calls.verifyOptions = undefined;
 	calls.afterEncode = undefined;
+}
+
+interface ProtocolCallCounts {
+	readonly decode: number;
+	readonly encode: number;
+	readonly hash: number;
+	readonly resolver: number;
+	readonly verify: number;
+}
+
+const ONE_PROTOCOL_PASS: ProtocolCallCounts = Object.freeze({ decode: 1, encode: 1, hash: 1, resolver: 1, verify: 1 });
+const ZERO_PROTOCOL_WORK: ProtocolCallCounts = Object.freeze({ decode: 0, encode: 0, hash: 0, resolver: 0, verify: 0 });
+
+function protocolCallCounts(): ProtocolCallCounts {
+	return {
+		decode: calls.decode,
+		encode: calls.encode,
+		hash: calls.hash,
+		resolver: calls.resolver,
+		verify: calls.verify,
+	};
 }
 
 function expectFrozenFailure(result: ExtractResult, reason: FailureReason, label?: string): void {
@@ -1039,6 +1066,213 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 			expect(calls, label).toMatchObject({ decode: 0, encode: 0, hash: 0, resolver: 0, verify: 0 });
 		}
 		expect(getterCalls).toBe(0);
+	});
+
+	it("captures numeric property-key conversion before valid extractor projection without changing the old facade", async () => {
+		const admit = await admitFunction();
+		const extract = await extractFunction();
+		const valid = await validCase();
+		const stringDescriptor = Object.getOwnPropertyDescriptor(globalThis, "String");
+		if (stringDescriptor === undefined) throw new TypeError("SEAM1_GLOBAL_STRING_DESCRIPTOR_MISSING");
+		const originalString = String;
+		let numericStringCalls = 0;
+		let oldResult: AdmissionDecision | undefined;
+		let oldDigestIdentity: Uint8Array | undefined;
+		let oldCounts: ProtocolCallCounts | undefined;
+		let extracted: ExtractResult | undefined;
+		let extractCounts: ProtocolCallCounts | undefined;
+		try {
+			Object.defineProperty(globalThis, "String", {
+				...stringDescriptor,
+				value: ((value?: unknown): string => {
+					if (typeof value === "number") {
+						numericStringCalls++;
+						throw new Error("SEAM1_POISON_NUMERIC_STRING");
+					}
+					return Reflect.apply(originalString, undefined, [value]);
+				}) as unknown as StringConstructor,
+			});
+
+			resetCalls();
+			oldResult = admit(valid.input);
+			oldDigestIdentity = calls.lastVertexDigest;
+			oldCounts = protocolCallCounts();
+			resetCalls();
+			extracted = extract(valid.input);
+			extractCounts = protocolCallCounts();
+		} finally {
+			Object.defineProperty(globalThis, "String", stringDescriptor);
+		}
+
+		expect(oldResult).toEqual({ admitted: true, digest: valid.remote.digest });
+		expect(oldResult?.digest).toBe(oldDigestIdentity);
+		expect(oldCounts).toEqual(ONE_PROTOCOL_PASS);
+		expect.soft(extracted?.ok).toBe(true);
+		expect.soft(extractCounts).toEqual(ONE_PROTOCOL_PASS);
+		expect.soft(numericStringCalls).toBe(0);
+	});
+
+	it("captures byte-key membership so copies and shared-backing rejection survive Set.has poison", async () => {
+		const admit = await admitFunction();
+		const extract = await extractFunction();
+		const valid = await validCase();
+		const material = keyMaterial();
+		const mutatingInput = copyInput(valid.input, {
+			resolveAuthorPublicKey(this: AdmitInput, author: string): RawPublicKey | undefined {
+				calls.resolver++;
+				this.receivedCanonicalPreimageBytes[0] ^= 0xff;
+				this.signature[0] ^= 0xff;
+				return author === admissionContract.vertex.author ? { bytes: material.publicKey, format: "raw" } : undefined;
+			},
+		});
+		const originalPreimageByte = mutatingInput.receivedCanonicalPreimageBytes[0];
+		const originalSignatureByte = mutatingInput.signature[0];
+		const sharedPreimage = new Uint8Array(new SharedArrayBuffer(valid.remote.bytes.byteLength));
+		sharedPreimage.set(valid.remote.bytes);
+		const sharedSignature = new Uint8Array(new SharedArrayBuffer(64));
+		sharedSignature.set(valid.remote.signature);
+		const sharedPreimageInput = copyInput(valid.input, { receivedCanonicalPreimageBytes: sharedPreimage });
+		const sharedSignatureInput = copyInput(valid.input, { signature: sharedSignature });
+		const originalSetHas = Set.prototype.has;
+		let byteKeyDispatches = 0;
+		let oldResult: AdmissionDecision | undefined;
+		let oldDigestIdentity: Uint8Array | undefined;
+		let copiedResult: ExtractResult | undefined;
+		let copiedCounts: ProtocolCallCounts | undefined;
+		let copiedDecodeInput: Uint8Array | undefined;
+		let copiedHashInput: Uint8Array | undefined;
+		let sharedPreimageResult: ExtractResult | undefined;
+		let sharedPreimageCounts: ProtocolCallCounts | undefined;
+		let sharedSignatureResult: ExtractResult | undefined;
+		let sharedSignatureCounts: ProtocolCallCounts | undefined;
+		try {
+			Set.prototype.has = function (this: Set<unknown>, value: unknown): boolean {
+				const isByteKeySet =
+					this.size === 2 &&
+					Reflect.apply(originalSetHas, this, ["receivedCanonicalPreimageBytes"]) &&
+					Reflect.apply(originalSetHas, this, ["signature"]);
+				if (isByteKeySet && (value === "receivedCanonicalPreimageBytes" || value === "signature")) {
+					byteKeyDispatches++;
+					return false;
+				}
+				return Reflect.apply(originalSetHas, this, [value]);
+			} as typeof Set.prototype.has;
+
+			resetCalls();
+			oldResult = admit(valid.input);
+			oldDigestIdentity = calls.lastVertexDigest;
+			resetCalls();
+			copiedResult = extract(mutatingInput);
+			copiedCounts = protocolCallCounts();
+			copiedDecodeInput = calls.lastDecodeInput;
+			copiedHashInput = calls.lastVertexHashInput;
+			mutatingInput.receivedCanonicalPreimageBytes[0] = originalPreimageByte;
+			mutatingInput.signature[0] = originalSignatureByte;
+			resetCalls();
+			sharedPreimageResult = extract(sharedPreimageInput);
+			sharedPreimageCounts = protocolCallCounts();
+			resetCalls();
+			sharedSignatureResult = extract(sharedSignatureInput);
+			sharedSignatureCounts = protocolCallCounts();
+		} finally {
+			Set.prototype.has = originalSetHas;
+			mutatingInput.receivedCanonicalPreimageBytes[0] = originalPreimageByte;
+			mutatingInput.signature[0] = originalSignatureByte;
+		}
+
+		expect(oldResult).toEqual({ admitted: true, digest: valid.remote.digest });
+		expect(oldResult?.digest).toBe(oldDigestIdentity);
+		expect.soft(copiedResult?.ok).toBe(true);
+		expect.soft(copiedCounts).toEqual(ONE_PROTOCOL_PASS);
+		expect.soft(copiedDecodeInput).toEqual(valid.remote.bytes);
+		expect.soft(copiedDecodeInput).not.toBe(mutatingInput.receivedCanonicalPreimageBytes);
+		expect.soft(copiedHashInput).toEqual(valid.remote.bytes);
+		expect.soft(copiedHashInput).not.toBe(mutatingInput.receivedCanonicalPreimageBytes);
+		if (sharedPreimageResult === undefined || sharedSignatureResult === undefined) {
+			throw new TypeError("SEAM1_SHARED_BACKING_RESULT_MISSING");
+		}
+		expect.soft(sharedPreimageResult, "shared-preimage-poisoned-membership").toEqual({
+			ok: false,
+			reason: "malformed-input",
+		});
+		expect.soft(Reflect.ownKeys(sharedPreimageResult), "shared-preimage-poisoned-membership").toEqual(["ok", "reason"]);
+		expect.soft(Object.isFrozen(sharedPreimageResult), "shared-preimage-poisoned-membership").toBe(true);
+		expect.soft(sharedSignatureResult, "shared-signature-poisoned-membership").toEqual({
+			ok: false,
+			reason: "malformed-input",
+		});
+		expect
+			.soft(Reflect.ownKeys(sharedSignatureResult), "shared-signature-poisoned-membership")
+			.toEqual(["ok", "reason"]);
+		expect.soft(Object.isFrozen(sharedSignatureResult), "shared-signature-poisoned-membership").toBe(true);
+		expect.soft(sharedPreimageCounts).toEqual(ZERO_PROTOCOL_WORK);
+		expect.soft(sharedSignatureCounts).toEqual(ZERO_PROTOCOL_WORK);
+		expect.soft(byteKeyDispatches).toBe(0);
+	});
+
+	it("uses setter-proof snapshot writes and preserves fail-closed numeric-setter behavior", async () => {
+		const admit = await admitFunction();
+		const extract = await extractFunction();
+		const valid = await validCase();
+		const domainDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, "domain");
+		const numericDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, "0");
+		let namedSetterCalls = 0;
+		let numericSetterCalls = 0;
+		let namedOldResult: AdmissionDecision | undefined;
+		let namedOldDigestIdentity: Uint8Array | undefined;
+		let namedExtracted: ExtractResult | undefined;
+		let namedExtractCounts: ProtocolCallCounts | undefined;
+		try {
+			Object.defineProperty(Object.prototype, "domain", {
+				configurable: true,
+				set: (): void => {
+					namedSetterCalls++;
+					throw new Error("SEAM1_POISON_NAMED_SETTER");
+				},
+			});
+
+			resetCalls();
+			namedOldResult = admit(valid.input);
+			namedOldDigestIdentity = calls.lastVertexDigest;
+			resetCalls();
+			namedExtracted = extract(valid.input);
+			namedExtractCounts = protocolCallCounts();
+		} finally {
+			if (domainDescriptor === undefined) Reflect.deleteProperty(Object.prototype, "domain");
+			else Object.defineProperty(Object.prototype, "domain", domainDescriptor);
+		}
+
+		let numericOldResult: AdmissionDecision | undefined;
+		let numericExtracted: ExtractResult | undefined;
+		let numericExtractCounts: ProtocolCallCounts | undefined;
+		try {
+			Object.defineProperty(Object.prototype, "0", {
+				configurable: true,
+				set: (): void => {
+					numericSetterCalls++;
+					throw new Error("SEAM1_POISON_NUMERIC_SETTER");
+				},
+			});
+			resetCalls();
+			numericOldResult = admit(valid.input);
+			resetCalls();
+			numericExtracted = extract(valid.input);
+			numericExtractCounts = protocolCallCounts();
+		} finally {
+			if (numericDescriptor === undefined) Reflect.deleteProperty(Object.prototype, "0");
+			else Object.defineProperty(Object.prototype, "0", numericDescriptor);
+		}
+
+		expect(namedOldResult).toEqual({ admitted: true, digest: valid.remote.digest });
+		expect(namedOldResult?.digest).toBe(namedOldDigestIdentity);
+		expect.soft(namedExtracted?.ok).toBe(true);
+		expect.soft(namedExtractCounts).toEqual(ONE_PROTOCOL_PASS);
+		expect.soft(namedSetterCalls).toBe(0);
+		expect(numericOldResult).toEqual({ admitted: false });
+		if (numericExtracted === undefined) throw new TypeError("SEAM1_NUMERIC_SETTER_RESULT_MISSING");
+		expectFrozenFailure(numericExtracted, "not-authenticated", "numeric-setter-poison");
+		expect(numericExtractCounts).toMatchObject({ resolver: 0, verify: 0 });
+		expect(numericSetterCalls).toBeGreaterThan(0);
 	});
 
 	it("keeps authentication and admission failure classes distinct with exact precedence", async () => {
