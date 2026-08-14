@@ -6,6 +6,7 @@ import {
 	createMemoryAheDurableStore,
 	digestBlob,
 	digestClosure,
+	parseBlobDigest,
 	parseGenerationId,
 	parseHeadRevision,
 	parseStorageObjectId,
@@ -41,11 +42,13 @@ type StorageModule = Readonly<{ digestBlob: typeof digestBlob; digestClosure: ty
 type ProtocolV3Module = Readonly<{ prepareBlueprintRuntime: typeof prepareBlueprintRuntime }> & Record<string, unknown>;
 
 const graphProbe = vi.hoisted(() => ({
+	a_bCaptureActive: false,
+	closureDigestDepth: 0,
 	closureInputs: [] as (readonly unknown[])[],
 	derivationEvents: [] as (
 		| Readonly<{ readonly kind: "closure" }>
 		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "digest" }>
-		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "encode" }>
+		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "encode"; readonly label?: "closure" }>
 		| Readonly<{ readonly kind: "index" }>
 	)[],
 	digestFailureBytes: undefined as Uint8Array | undefined,
@@ -62,6 +65,11 @@ const graphProbe = vi.hoisted(() => ({
 	mutations: [] as string[],
 	poisonAfterRuntime: false,
 	poisonRestorers: [] as (() => void)[],
+	preCaptureDerivationEvents: [] as (
+		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "digest" }>
+		| Readonly<{ readonly bytes: Uint8Array; readonly kind: "encode" }>
+		| Readonly<{ readonly kind: "closure" }>
+	)[],
 }));
 
 vi.mock("@ts-drp/protocol-v3", async (importOriginal) => {
@@ -146,9 +154,17 @@ vi.mock("@ts-drp/canonical", async (importOriginal) => {
 		encodeCanonical(value: unknown): Uint8Array {
 			const bytes = genuine.encodeCanonical(value);
 			const copied = new Uint8Array(bytes);
+			if (!graphProbe.a_bCaptureActive) {
+				graphProbe.preCaptureDerivationEvents.push({ bytes: copied, kind: "encode" });
+				return bytes;
+			}
 			graphProbe.encodeInputs.push(value);
 			graphProbe.encodeOutputs.push(copied);
-			graphProbe.derivationEvents.push({ bytes: copied, kind: "encode" });
+			graphProbe.derivationEvents.push({
+				bytes: copied,
+				kind: "encode",
+				...(graphProbe.closureDigestDepth > 0 ? { label: "closure" as const } : {}),
+			});
 			return bytes;
 		},
 	};
@@ -160,6 +176,10 @@ vi.mock("@ts-drp/storage", async (importOriginal) => {
 		...genuine,
 		digestBlob(bytes: Uint8Array): ReturnType<StorageModule["digestBlob"]> {
 			const copied = new Uint8Array(bytes);
+			if (!graphProbe.a_bCaptureActive) {
+				graphProbe.preCaptureDerivationEvents.push({ bytes: copied, kind: "digest" });
+				return genuine.digestBlob(bytes);
+			}
 			graphProbe.digestInputs.push(copied);
 			graphProbe.derivationEvents.push({ bytes: copied, kind: "digest" });
 			if (
@@ -172,9 +192,18 @@ vi.mock("@ts-drp/storage", async (importOriginal) => {
 			return genuine.digestBlob(bytes);
 		},
 		digestClosure(closure: Parameters<StorageModule["digestClosure"]>[0]): ReturnType<StorageModule["digestClosure"]> {
+			if (!graphProbe.a_bCaptureActive) {
+				graphProbe.preCaptureDerivationEvents.push({ kind: "closure" });
+				return genuine.digestClosure(closure);
+			}
 			graphProbe.closureInputs.push(closure);
 			graphProbe.derivationEvents.push({ kind: "closure" });
-			return genuine.digestClosure(closure);
+			graphProbe.closureDigestDepth += 1;
+			try {
+				return genuine.digestClosure(closure);
+			} finally {
+				graphProbe.closureDigestDepth -= 1;
+			}
 		},
 	};
 });
@@ -189,6 +218,15 @@ vi.mock("@ts-drp/compaction", async (importOriginal) => {
 				order?: ConstructorParameters<typeof genuine.CausalityIndex>[1],
 				options: ConstructorParameters<typeof genuine.CausalityIndex>[2] = {}
 			) {
+				if (!graphProbe.a_bCaptureActive) {
+					graphProbe.closureInputs.length = 0;
+					graphProbe.derivationEvents.length = 0;
+					graphProbe.digestInputs.length = 0;
+					graphProbe.encodeInputs.length = 0;
+					graphProbe.encodeOutputs.length = 0;
+					graphProbe.indexCalls.length = 0;
+					graphProbe.a_bCaptureActive = true;
+				}
 				graphProbe.derivationEvents.push({ kind: "index" });
 				graphProbe.indexCalls.push({ options, order, vertices });
 				if (graphProbe.indexFailure === "graph") {
@@ -310,6 +348,17 @@ const OWNER_DERIVATION_STEPS = [
 	"encode:projection",
 	"digest:projection",
 	"closure",
+] as const;
+const EXACT_A_B_DERIVATION_EVENTS = [
+	"index",
+	"encode:order",
+	"encode:graph",
+	"digest:order",
+	"digest:graph",
+	"encode:projection",
+	"digest:projection",
+	"closure",
+	"encode:closure",
 ] as const;
 
 function must<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
@@ -880,6 +929,8 @@ function capturedMapConstructorOwner(sourceText: string):
 }
 
 function resetDerivationProbe(): void {
+	graphProbe.a_bCaptureActive = false;
+	graphProbe.closureDigestDepth = 0;
 	graphProbe.closureInputs.length = 0;
 	graphProbe.derivationEvents.length = 0;
 	graphProbe.digestFailureBytes = undefined;
@@ -887,6 +938,7 @@ function resetDerivationProbe(): void {
 	graphProbe.encodeInputs.length = 0;
 	graphProbe.encodeOutputs.length = 0;
 	graphProbe.indexCalls.length = 0;
+	graphProbe.preCaptureDerivationEvents.length = 0;
 }
 
 function rawDerivationEventLabels(): readonly string[] {
@@ -897,6 +949,7 @@ function rawDerivationEventLabels(): readonly string[] {
 	]);
 	return graphProbe.derivationEvents.map((event) => {
 		if (event.kind !== "digest" && event.kind !== "encode") return event.kind;
+		if (event.kind === "encode" && event.label === "closure") return "encode:closure";
 		const hex = lowerHex(event.bytes);
 		const name = exactPreimages.get(hex) ?? `unknown:${hex}`;
 		return `${event.kind}:${name}`;
@@ -954,6 +1007,8 @@ function ownerSourceOracleFixture(
 }
 
 beforeEach(() => {
+	graphProbe.a_bCaptureActive = false;
+	graphProbe.closureDigestDepth = 0;
 	graphProbe.closureInputs.length = 0;
 	graphProbe.derivationEvents.length = 0;
 	graphProbe.digestFailureBytes = undefined;
@@ -965,6 +1020,7 @@ beforeEach(() => {
 	graphProbe.indexFailure = undefined;
 	graphProbe.mutations.length = 0;
 	graphProbe.poisonAfterRuntime = false;
+	graphProbe.preCaptureDerivationEvents.length = 0;
 	for (const restore of graphProbe.poisonRestorers.splice(0).reverse()) restore();
 });
 
@@ -1023,16 +1079,8 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 			golden.orderedVertexHashesDigest
 		);
 		expect(must(genuineStorage.digestBlob(bytesFromHex(golden.graphPreimageHex)))).toBe(golden.graphDigest);
-		expect(rawDerivationEventLabels()).toEqual([
-			"index",
-			"encode:order",
-			"encode:graph",
-			"digest:order",
-			"digest:graph",
-			"encode:projection",
-			"digest:projection",
-			"closure",
-		]);
+		expect(graphProbe.preCaptureDerivationEvents.some((event) => event.kind === "encode")).toBe(true);
+		expect(rawDerivationEventLabels()).toEqual(EXACT_A_B_DERIVATION_EVENTS);
 	});
 
 	it("derives the exact twenty-field projection bytes, blob ref and dense sorted detached two-ref closure", async () => {
@@ -1155,21 +1203,41 @@ describe.sequential("Phase 3a-1A-b owned graph and projection RED", () => {
 				[golden.orderPreimageHex, golden.graphPreimageHex].slice(0, failureOrdinal)
 			);
 			expect(rawDerivationEventLabels(), `digest ${failureOrdinal}`).toEqual(
-				["index", "encode:order", "encode:graph", "digest:order", "digest:graph"].slice(0, failureOrdinal + 3)
+				EXACT_A_B_DERIVATION_EVENTS.slice(0, failureOrdinal + 3)
 			);
 			expect(graphProbe.closureInputs, `digest ${failureOrdinal}`).toEqual([]);
 			expect(graphProbe.mutations, `digest ${failureOrdinal}`).toEqual([]);
 		}
 	});
 
-	it("keeps unknown canonical and storage derivation events visible in the raw ordered refusal log", () => {
+	it("keeps unknown canonical and storage derivation events visible after the genuine A-b capture boundary", async () => {
 		resetDerivationProbe();
-		graphProbe.derivationEvents.push(
-			{ bytes: Uint8Array.of(1), kind: "encode" },
-			{ bytes: Uint8Array.of(2), kind: "digest" },
-			{ kind: "closure" }
-		);
-		expect(rawDerivationEventLabels()).toEqual(["encode:unknown:01", "digest:unknown:02", "closure"]);
+		const compaction = await import("@ts-drp/compaction");
+		const vertex = {
+			hash: golden.anchorDigest,
+			kind: "drp-epoch-anchor" as const,
+			objectId: golden.objectId,
+			epoch: 0,
+			dependencies: [],
+		};
+		new compaction.CausalityIndex(new Map([[golden.anchorDigest, vertex]]), [golden.anchorDigest]);
+		const unknownEncoded = encodeCanonical({ kind: "unknown-after-a-b-capture" });
+		const unknownDigestBytes = Uint8Array.of(0xca, 0xfe);
+		digestBlob(unknownDigestBytes);
+		digestClosure([
+			{ digest: must(parseBlobDigest("0".repeat(64))), byteLength: 1 },
+			{ digest: must(parseBlobDigest("f".repeat(64))), byteLength: 1 },
+		]);
+		const raw = rawDerivationEventLabels();
+		expect(graphProbe.preCaptureDerivationEvents).toEqual([]);
+		expect(raw).toEqual([
+			"index",
+			`encode:unknown:${lowerHex(unknownEncoded)}`,
+			`digest:unknown:${lowerHex(unknownDigestBytes)}`,
+			"closure",
+			"encode:closure",
+		]);
+		expect(raw).not.toEqual(EXACT_A_B_DERIVATION_EVENTS);
 	});
 
 	it("kills exact byte, digest, field-order, ref-order and duplicate-ref oracle mutants", () => {
