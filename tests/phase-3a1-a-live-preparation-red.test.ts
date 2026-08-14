@@ -872,6 +872,41 @@ const A_C_STAGE_IDENTIFIERS = new Set([
 	"recoverGeneration",
 	"swapHead",
 ]);
+const A_C_REQUIRED_CALL_ORDER = [
+	"readHead",
+	"recoverActiveGeneration",
+	"getBlob",
+	"assertTrustPreserved",
+	"parseGenerationId",
+	"beginGeneration",
+	"putCachedBlob",
+	"promoteReference",
+	"completeGeneration",
+	"parseHeadRevision",
+	"swapHead",
+] as const;
+const A_C_STORE_CALLS = new Set([
+	"readHead",
+	"recoverActiveGeneration",
+	"getBlob",
+	"beginGeneration",
+	"putCachedBlob",
+	"promoteReference",
+	"completeGeneration",
+	"swapHead",
+]);
+const A_C_FORBIDDEN_IDENTIFIERS = new Set([
+	"createAnchorTrustStore",
+	"createIndexedDbAheDurableStore",
+	"createMemoryAheDurableStore",
+	"createSqliteAheDurableStore",
+	"discardGeneration",
+	"promoteGeneration",
+	"putBlob",
+	"readGenerationPage",
+	"recoverGeneration",
+	"repairGeneration",
+]);
 const B_LIVE_IDENTIFIERS = new Set([
 	"WebSocket",
 	"addEventListener",
@@ -891,7 +926,9 @@ const B_LIVE_IDENTIFIERS = new Set([
 	"subscribe",
 	"transactIssue",
 ]);
-const FUTURE_OR_LIVE_IDENTIFIERS = new Set([...A_C_STAGE_IDENTIFIERS, ...B_LIVE_IDENTIFIERS]);
+const THROUGH_A_B_FORBIDDEN_IDENTIFIERS = new Set([...A_C_STAGE_IDENTIFIERS, ...B_LIVE_IDENTIFIERS]);
+const THROUGH_A_C_FORBIDDEN_IDENTIFIERS = new Set([...A_C_FORBIDDEN_IDENTIFIERS, ...B_LIVE_IDENTIFIERS]);
+type SweepStage = "through-a-b" | "through-a-c";
 
 function moduleSpecifiers(filename: string): readonly ModuleEdge[] {
 	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
@@ -1087,6 +1124,191 @@ function aBStageViolations(filename: string): readonly string[] {
 	return Object.freeze([...new Set(violations)].sort());
 }
 
+function aCCallName(node: ts.CallExpression): string | undefined {
+	if (ts.isIdentifier(node.expression)) return node.expression.text;
+	if (ts.isPropertyAccessExpression(node.expression)) return node.expression.name.text;
+	return undefined;
+}
+
+function containingFunction(node: ts.Node): ts.FunctionLikeDeclaration | undefined {
+	let current = node.parent;
+	while (current !== undefined) {
+		if (ts.isFunctionLike(current)) return current;
+		current = current.parent;
+	}
+	return undefined;
+}
+
+function containingForLoop(node: ts.Node): ts.ForStatement | undefined {
+	let current = node.parent;
+	while (current !== undefined) {
+		if (ts.isForStatement(current)) return current;
+		if (ts.isFunctionLike(current)) return undefined;
+		current = current.parent;
+	}
+	return undefined;
+}
+
+function isExactTwoAttemptLoop(node: ts.ForStatement): boolean {
+	const initializer = node.initializer;
+	const condition = node.condition;
+	if (
+		initializer === undefined ||
+		!ts.isVariableDeclarationList(initializer) ||
+		(initializer.flags & ts.NodeFlags.Let) === 0 ||
+		initializer.declarations.length !== 1
+	) {
+		return false;
+	}
+	const declaration = initializer.declarations[0];
+	if (
+		declaration === undefined ||
+		!ts.isIdentifier(declaration.name) ||
+		declaration.initializer === undefined ||
+		!ts.isNumericLiteral(declaration.initializer) ||
+		declaration.initializer.text !== "0"
+	) {
+		return false;
+	}
+	const counter = declaration.name.text;
+	const incrementor = node.incrementor;
+	const exactIncrement =
+		incrementor !== undefined &&
+		((ts.isPostfixUnaryExpression(incrementor) &&
+			incrementor.operator === ts.SyntaxKind.PlusPlusToken &&
+			ts.isIdentifier(incrementor.operand) &&
+			incrementor.operand.text === counter) ||
+			(ts.isBinaryExpression(incrementor) &&
+				incrementor.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken &&
+				ts.isIdentifier(incrementor.left) &&
+				incrementor.left.text === counter &&
+				ts.isNumericLiteral(incrementor.right) &&
+				incrementor.right.text === "1"));
+	return (
+		exactIncrement &&
+		condition !== undefined &&
+		ts.isBinaryExpression(condition) &&
+		condition.operatorToken.kind === ts.SyntaxKind.LessThanToken &&
+		ts.isIdentifier(condition.left) &&
+		condition.left.text === counter &&
+		ts.isNumericLiteral(condition.right) &&
+		condition.right.text === "2"
+	);
+}
+
+function isCapturedInputStoreCall(node: ts.CallExpression): boolean {
+	if (!ts.isPropertyAccessExpression(node.expression)) return false;
+	const receiver = node.expression.expression;
+	return (
+		ts.isPropertyAccessExpression(receiver) &&
+		receiver.name.text === "store" &&
+		ts.isIdentifier(receiver.expression) &&
+		(receiver.expression.text === "captured" || receiver.expression.text === "input")
+	);
+}
+
+function aCStageViolations(filename: string): readonly string[] {
+	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
+	const violations: string[] = [];
+	const entryDeclarations = source.statements.filter(
+		(statement): statement is ts.FunctionDeclaration =>
+			ts.isFunctionDeclaration(statement) && statement.name?.text === "prepareV3LiveGeneration"
+	);
+	if (entryDeclarations.length !== 1 || entryDeclarations[0]?.body === undefined) {
+		return Object.freeze(["a-c-stage:owner"]);
+	}
+	const entry = entryDeclarations[0];
+	const callSites = new Map<string, ts.CallExpression[]>();
+	const weakMapOwners: Array<Readonly<{ name: string; statement: ts.VariableStatement }>> = [];
+	const visitAll = (node: ts.Node): void => {
+		if (ts.isVariableStatement(node) && node.parent === source) {
+			for (const declaration of node.declarationList.declarations) {
+				if (
+					ts.isIdentifier(declaration.name) &&
+					declaration.initializer !== undefined &&
+					ts.isNewExpression(declaration.initializer) &&
+					ts.isIdentifier(declaration.initializer.expression) &&
+					declaration.initializer.expression.text === "WeakMap" &&
+					declaration.initializer.arguments?.length === 0
+				) {
+					weakMapOwners.push({ name: declaration.name.text, statement: node });
+				}
+			}
+		}
+		if (ts.isCallExpression(node)) {
+			const name = aCCallName(node);
+			if (name !== undefined && A_C_REQUIRED_CALL_ORDER.includes(name as (typeof A_C_REQUIRED_CALL_ORDER)[number])) {
+				const sites = callSites.get(name) ?? [];
+				sites.push(node);
+				callSites.set(name, sites);
+				if (containingFunction(node) !== entry) violations.push(`a-c-stage:owner:${name}`);
+				if (A_C_STORE_CALLS.has(name) && !isCapturedInputStoreCall(node)) {
+					violations.push(`a-c-stage:receiver:${name}`);
+				}
+			}
+		}
+		ts.forEachChild(node, visitAll);
+	};
+	visitAll(source);
+
+	if (weakMapOwners.length !== 1) violations.push("a-c-stage:WeakMap-owner");
+	const weakMapOwner = weakMapOwners[0];
+	if (
+		weakMapOwner !== undefined &&
+		weakMapOwner.statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) === true
+	) {
+		violations.push("a-c-stage:public-seam");
+	}
+
+	const positions: number[] = [];
+	let attemptLoop: ts.ForStatement | undefined;
+	for (const name of A_C_REQUIRED_CALL_ORDER) {
+		const sites = callSites.get(name) ?? [];
+		if (sites.length !== 1) {
+			violations.push(`a-c-stage:${name}-count`);
+			continue;
+		}
+		const site = sites[0] as ts.CallExpression;
+		positions.push(site.getStart(source));
+		const loop = containingForLoop(site);
+		if (loop === undefined) violations.push(`a-c-stage:${name}-attempt`);
+		else if (attemptLoop === undefined) attemptLoop = loop;
+		else if (attemptLoop !== loop) violations.push(`a-c-stage:${name}-attempt`);
+	}
+	for (let index = 1; index < positions.length; index += 1) {
+		if ((positions[index - 1] as number) >= (positions[index] as number)) {
+			violations.push("a-c-stage:operation-order");
+			break;
+		}
+	}
+	if (attemptLoop === undefined || !isExactTwoAttemptLoop(attemptLoop)) violations.push("a-c-stage:retry-bound");
+
+	if (weakMapOwner !== undefined) {
+		let setCount = 0;
+		let otherAuthorityCount = 0;
+		const inspectAuthority = (node: ts.Node): void => {
+			if (
+				ts.isCallExpression(node) &&
+				ts.isPropertyAccessExpression(node.expression) &&
+				ts.isIdentifier(node.expression.expression) &&
+				node.expression.expression.text === weakMapOwner.name
+			) {
+				if (node.expression.name.text === "set" && containingFunction(node) === entry && node.arguments.length === 2) {
+					setCount += 1;
+				} else {
+					otherAuthorityCount += 1;
+				}
+			}
+			ts.forEachChild(node, inspectAuthority);
+		};
+		inspectAuthority(source);
+		if (setCount !== 1) violations.push("a-c-stage:WeakMap-set");
+		if (otherAuthorityCount !== 0) violations.push("a-c-stage:WeakMap-surface");
+	}
+
+	return Object.freeze([...new Set(violations)].sort());
+}
+
 function recursiveFiles(directory: string): readonly string[] {
 	if (!existsSync(directory)) return [];
 	const output: string[] = [];
@@ -1154,7 +1376,7 @@ function nodeLockDependencies(lockfile: string): ReadonlyMap<string, Readonly<{ 
 	return dependencies;
 }
 
-function sourceSweep(root: string): StaticAudit {
+function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAudit {
 	const violations: string[] = [];
 	const futureOrLiveEdges: string[] = [];
 	const entry = path.join(root, "packages/node/src/v3-live.ts");
@@ -1274,10 +1496,10 @@ function sourceSweep(root: string): StaticAudit {
 		}
 	}
 
-	const inspectFutureOrLive = (filename: string): void => {
+	const inspectFutureOrLive = (filename: string, identifiers: ReadonlySet<string>): void => {
 		const parsed = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
 		const inspect = (node: ts.Node): void => {
-			if (ts.isIdentifier(node) && FUTURE_OR_LIVE_IDENTIFIERS.has(node.text)) {
+			if (ts.isIdentifier(node) && identifiers.has(node.text)) {
 				futureOrLiveEdges.push(`identifier:${node.text}`);
 			}
 			ts.forEachChild(node, inspect);
@@ -1286,12 +1508,22 @@ function sourceSweep(root: string): StaticAudit {
 	};
 	for (const filename of sourceGraph.files) {
 		futureOrLiveEdges.push(...aBStageViolations(filename));
-		inspectFutureOrLive(filename);
+		if (stage === "through-a-c" && filename === entry) {
+			futureOrLiveEdges.push(...aCStageViolations(filename));
+			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
+		} else {
+			inspectFutureOrLive(filename, THROUGH_A_B_FORBIDDEN_IDENTIFIERS);
+		}
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-source");
 	}
 	for (const filename of generatedGraph.files) {
 		futureOrLiveEdges.push(...aBStageViolations(filename));
-		inspectFutureOrLive(filename);
+		if (stage === "through-a-c" && filename === generatedEntry) {
+			futureOrLiveEdges.push(...aCStageViolations(filename));
+			inspectFutureOrLive(filename, THROUGH_A_C_FORBIDDEN_IDENTIFIERS);
+		} else {
+			inspectFutureOrLive(filename, THROUGH_A_B_FORBIDDEN_IDENTIFIERS);
+		}
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-generated");
 	}
 	for (const filename of recursiveFiles(path.join(root, "packages/node/src"))) {
@@ -1411,6 +1643,38 @@ function addABGraphProjectionStage(root: string): void {
 	addABRuntimeDependency(root);
 	for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
 		writeFileSync(path.join(root, filename), A_B_GRAPH_PROJECTION_STAGE_SOURCE, { flag: "a" });
+	}
+}
+
+const A_C_PERSISTENCE_STAGE_SOURCE = `
+import { assertTrustPreserved } from "@ts-drp/control-plane";
+import { parseGenerationId, parseHeadRevision } from "@ts-drp/storage";
+const preparedV3LivePayloads = new WeakMap();
+export async function prepareV3LiveGeneration(input) {
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		const head = await input.store.readHead(input.objectId);
+		const recovered = await input.store.recoverActiveGeneration(head);
+		const candidate = await input.store.getBlob(recovered.references[0]);
+		const preserved = assertTrustPreserved({ candidate, head });
+		const generationId = parseGenerationId(input.freshGenerationId()).value;
+		await input.store.beginGeneration({ generationId, head });
+		const projectionRef = await input.store.putCachedBlob({ generationId, bytes: input.projection });
+		await input.store.promoteReference({ generationId, ref: projectionRef });
+		const completed = await input.store.completeGeneration({ generationId });
+		const revision = parseHeadRevision(head.revision + 1).value;
+		const swapped = await input.store.swapHead({ completed, expected: head, revision });
+		void preserved; void swapped;
+	}
+	const token = Object.freeze({});
+	preparedV3LivePayloads.set(token, Object.freeze({ input }));
+	return token;
+}
+`;
+
+function addACPersistenceStage(root: string): void {
+	addABGraphProjectionStage(root);
+	for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
+		writeFileSync(path.join(root, filename), A_C_PERSISTENCE_STAGE_SOURCE, { flag: "a" });
 	}
 }
 
@@ -1834,12 +2098,85 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(parameterDigest(parameters)).toBe("cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669");
 	});
 
-	it("stage-scopes the recursive hygiene sweep through A-b while killing A-c, 1B and owner-edge mutants", () => {
+	it("stage-scopes the recursive hygiene sweep through private A-c while killing repair, extra-CAS, seam and 1B mutants", () => {
 		const clean = temporarySweepTree();
 		expect(sourceSweep(clean)).toEqual({ futureOrLiveEdges: [], violations: [] });
 		const allowedAB = temporarySweepTree();
 		addABGraphProjectionStage(allowedAB);
 		expect(sourceSweep(allowedAB)).toEqual({ futureOrLiveEdges: [], violations: [] });
+		const allowedAC = temporarySweepTree();
+		addACPersistenceStage(allowedAC);
+		expect(sourceSweep(allowedAC, "through-a-c")).toEqual({ futureOrLiveEdges: [], violations: [] });
+
+		for (const [name, mutate, expected] of [
+			[
+				"extra-cas",
+				(source: string): string =>
+					source.replace(
+						"\t\tvoid preserved; void swapped;",
+						"\t\tawait input.store.swapHead({ completed, expected: head, revision });\n\t\tvoid preserved; void swapped;"
+					),
+				"a-c-stage:swapHead-count",
+			],
+			[
+				"third-attempt",
+				(source: string): string => source.replace("attempt < 2", "attempt < 3"),
+				"a-c-stage:retry-bound",
+			],
+			[
+				"nonadvancing-attempt",
+				(source: string): string => source.replace("attempt += 1", "attempt -= 1"),
+				"a-c-stage:retry-bound",
+			],
+			[
+				"public-capability-seam",
+				(source: string): string =>
+					source.replace("const preparedV3LivePayloads", "export const preparedV3LivePayloads"),
+				"a-c-stage:public-seam",
+			],
+			[
+				"operation-reorder",
+				(source: string): string =>
+					source.replace(
+						"\t\tawait input.store.beginGeneration({ generationId, head });\n\t\tconst projectionRef = await input.store.putCachedBlob({ generationId, bytes: input.projection });",
+						"\t\tconst projectionRef = await input.store.putCachedBlob({ generationId, bytes: input.projection });\n\t\tawait input.store.beginGeneration({ generationId, head });"
+					),
+				"a-c-stage:operation-order",
+			],
+			[
+				"dead-owner-decoy",
+				(source: string): string => `${source}\nasync function deadOwner(input) { await input.store.swapHead({}); }\n`,
+				"a-c-stage:owner:swapHead",
+			],
+			[
+				"parallel-store-receiver",
+				(source: string): string => source.replace("input.store.readHead", "parallelStore.readHead"),
+				"a-c-stage:receiver:readHead",
+			],
+		] as const) {
+			const root = temporarySweepTree();
+			addACPersistenceStage(root);
+			for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
+				const target = path.join(root, filename);
+				writeFileSync(target, mutate(readFileSync(target, "utf8")));
+			}
+			expect(sourceSweep(root, "through-a-c").futureOrLiveEdges, name).toContain(expected);
+		}
+
+		for (const forbidden of [
+			"discardGeneration",
+			"repairGeneration",
+			"createMemoryAheDurableStore",
+			"createSqliteAheDurableStore",
+			"subscribe",
+		] as const) {
+			const root = temporarySweepTree();
+			addACPersistenceStage(root);
+			for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
+				writeFileSync(path.join(root, filename), `\nvoid ${forbidden};\n`, { flag: "a" });
+			}
+			expect(sourceSweep(root, "through-a-c").futureOrLiveEdges, forbidden).toContain(`identifier:${forbidden}`);
+		}
 
 		const declaredWithoutOwner = temporarySweepTree();
 		addABRuntimeDependency(declaredWithoutOwner);
@@ -2085,7 +2422,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 			}
 			if (expectedFutureEdge !== undefined) expect(audit.futureOrLiveEdges, filename).toContain(expectedFutureEdge);
 		}
-		const repositoryAudit = sourceSweep(REPOSITORY_ROOT);
+		const repositoryAudit = sourceSweep(REPOSITORY_ROOT, "through-a-c");
 		expect(repositoryAudit.violations).toEqual([]);
 		expect(repositoryAudit.futureOrLiveEdges).toEqual([]);
 	});
