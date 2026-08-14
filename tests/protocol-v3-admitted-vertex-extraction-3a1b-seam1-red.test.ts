@@ -674,7 +674,7 @@ function runtimeAllowlist(path: string): readonly string[] {
 	if (path.endsWith("protocol-v3-blueprint-operation-budget-0p2.test.ts"))
 		return namedPublicSurfaceTestArray(
 			source,
-			"[public-surface] preserves exactly the nine package-root runtime exports"
+			"[public-surface] preserves exactly the ten package-root runtime exports"
 		);
 	if (path.endsWith("protocol-v3-blueprint-work-budget-0p0.test.ts"))
 		return namedPublicSurfaceTestArray(
