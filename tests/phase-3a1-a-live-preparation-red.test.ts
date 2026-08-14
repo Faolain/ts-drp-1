@@ -815,6 +815,7 @@ const A_A_RUNTIME_ROOTS = new Set([
 	"@ts-drp/protocol-v3",
 	"@ts-drp/storage",
 ]);
+const A_B_RUNTIME_ROOT = "@ts-drp/compaction";
 const PUBLISHED_PARAMETER_REGISTRY_SPECIFIER = "@ts-drp/protocol-v3/registry/registry-v1.json";
 const PUBLISHED_PARAMETER_REGISTRY_EXPORT = "./registry/registry-v1.json";
 const A_A_RUNTIME_DEPENDENCIES = Object.freeze({
@@ -823,34 +824,48 @@ const A_A_RUNTIME_DEPENDENCIES = Object.freeze({
 	"@ts-drp/protocol-v3": Object.freeze({ manifest: "0.11.0", resolved: "link:../protocol-v3" }),
 	"@ts-drp/storage": Object.freeze({ manifest: "0.11.0", resolved: "link:../storage" }),
 });
-const FUTURE_OR_LIVE_IDENTIFIERS = new Set([
-	"CausalityIndex",
+const A_B_RUNTIME_DEPENDENCY = Object.freeze({ manifest: "0.11.0", resolved: "link:../compaction" });
+const A_B_STAGE_IDENTIFIERS = new Set(["CausalityIndex", "digestBlob", "digestClosure"]);
+const A_C_STAGE_IDENTIFIERS = new Set([
+	"GenerationId",
+	"WeakMap",
+	"assertTrustPreserved",
+	"beginGeneration",
+	"completeGeneration",
+	"discardGeneration",
+	"getBlob",
+	"parseGenerationId",
+	"parseHeadRevision",
+	"promoteReference",
+	"promoteGeneration",
+	"putCachedBlob",
+	"putBlob",
+	"readGenerationPage",
+	"readHead",
+	"recoverActiveGeneration",
+	"recoverGeneration",
+	"swapHead",
+]);
+const B_LIVE_IDENTIFIERS = new Set([
 	"WebSocket",
 	"addEventListener",
 	"admitReceivedVertex",
 	"append",
-	"assertTrustPreserved",
-	"beginGeneration",
-	"completeGeneration",
 	"consumePreparedV3Live",
 	"createAdmissionBoundTransactionalVertexIssuer",
 	"callback",
-	"digestBlob",
-	"digestClosure",
 	"dispatchMessage",
 	"fetch",
 	"outbox",
-	"promoteGeneration",
-	"putBlob",
 	"queueMicrotask",
 	"reducer",
 	"reducers",
 	"setInterval",
 	"setTimeout",
 	"subscribe",
-	"swapHead",
 	"transactIssue",
 ]);
+const FUTURE_OR_LIVE_IDENTIFIERS = new Set([...A_C_STAGE_IDENTIFIERS, ...B_LIVE_IDENTIFIERS]);
 
 function moduleSpecifiers(filename: string): readonly ModuleEdge[] {
 	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
@@ -926,6 +941,124 @@ function collectModuleGraph(entry: string): {
 	};
 	visit(entry);
 	return { edges: Object.freeze(edges), files: Object.freeze([...files]) };
+}
+
+function aBStageViolations(filename: string): readonly string[] {
+	const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
+	const importCounts = new Map<string, number>();
+	const useCounts = new Map<string, number>();
+	const digestBlobArguments = new Set<string>();
+	const violations: string[] = [];
+	const ownerFor = (name: string): string => (name === "CausalityIndex" ? A_B_RUNTIME_ROOT : "@ts-drp/storage");
+	const increment = (counts: Map<string, number>, name: string): void => {
+		counts.set(name, (counts.get(name) ?? 0) + 1);
+	};
+	const isExactCausalityConstruction = (node: ts.NewExpression): boolean => {
+		if (
+			!ts.isExpressionStatement(node.parent) ||
+			node.arguments?.length !== 3 ||
+			!ts.isIdentifier(node.arguments[0]) ||
+			!ts.isIdentifier(node.arguments[1]) ||
+			!ts.isObjectLiteralExpression(node.arguments[2])
+		) {
+			return false;
+		}
+		const optionNames = node.arguments[2].properties.map((property) =>
+			ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) ? property.name.text : ""
+		);
+		return (
+			optionNames.length === 3 &&
+			["initialByteCharges", "maxEpochBytes", "maxEpochVertices"].every((name) => optionNames.includes(name))
+		);
+	};
+	for (const statement of source.statements) {
+		if (
+			!ts.isImportDeclaration(statement) ||
+			!ts.isStringLiteral(statement.moduleSpecifier) ||
+			statement.moduleSpecifier.text !== A_B_RUNTIME_ROOT
+		) {
+			continue;
+		}
+		const bindings = statement.importClause?.namedBindings;
+		if (
+			statement.importClause?.isTypeOnly !== false ||
+			statement.importClause.name !== undefined ||
+			bindings === undefined ||
+			!ts.isNamedImports(bindings) ||
+			bindings.elements.length !== 1 ||
+			bindings.elements[0]?.isTypeOnly !== false ||
+			bindings.elements[0].propertyName !== undefined ||
+			bindings.elements[0].name.text !== "CausalityIndex"
+		) {
+			violations.push("a-b-stage:compaction-import");
+		}
+	}
+	const visit = (node: ts.Node): void => {
+		if (ts.isIdentifier(node) && A_B_STAGE_IDENTIFIERS.has(node.text)) {
+			const name = node.text;
+			const parent = node.parent;
+			let allowed = false;
+			if (
+				ts.isImportSpecifier(parent) &&
+				parent.name === node &&
+				parent.propertyName === undefined &&
+				parent.isTypeOnly === false
+			) {
+				const namedImports = parent.parent;
+				const importClause = namedImports.parent;
+				const declaration = importClause.parent;
+				if (
+					ts.isNamedImports(namedImports) &&
+					ts.isImportClause(importClause) &&
+					importClause.isTypeOnly === false &&
+					ts.isImportDeclaration(declaration) &&
+					ts.isStringLiteral(declaration.moduleSpecifier) &&
+					declaration.moduleSpecifier.text === ownerFor(name)
+				) {
+					increment(importCounts, name);
+					allowed = true;
+				}
+			} else if (name === "CausalityIndex" && ts.isNewExpression(parent) && parent.expression === node) {
+				increment(useCounts, name);
+				allowed = isExactCausalityConstruction(parent);
+			} else if (
+				(name === "digestBlob" || name === "digestClosure") &&
+				ts.isCallExpression(parent) &&
+				parent.expression === node
+			) {
+				increment(useCounts, name);
+				allowed = parent.arguments.length === 1;
+				if (allowed && name === "digestClosure") allowed = ts.isIdentifier(parent.arguments[0]);
+				if (allowed && name === "digestBlob" && ts.isIdentifier(parent.arguments[0])) {
+					digestBlobArguments.add(parent.arguments[0].text);
+				}
+			}
+			if (!allowed) violations.push(`a-b-stage:${name}`);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(source);
+	for (const [name, expectedUses] of [
+		["CausalityIndex", 1],
+		["digestBlob", 3],
+		["digestClosure", 1],
+	] as const) {
+		const imports = importCounts.get(name) ?? 0;
+		const uses = useCounts.get(name) ?? 0;
+		if (imports + uses > 0 && (imports !== 1 || uses !== expectedUses)) {
+			violations.push(`a-b-stage:${name}`);
+		}
+	}
+	if (
+		(importCounts.get("digestBlob") ?? 0) + (useCounts.get("digestBlob") ?? 0) > 0 &&
+		(digestBlobArguments.size !== 3 ||
+			!["exactGraphChargePreimageBytes", "exactOrderPreimageBytes", "exactProjectionBytes"].every((name) =>
+				digestBlobArguments.has(name)
+			))
+	) {
+		violations.push("a-b-stage:digestBlob-preimages");
+	}
+	return Object.freeze([...new Set(violations)].sort());
 }
 
 function recursiveFiles(directory: string): readonly string[] {
@@ -1057,6 +1190,29 @@ function sourceSweep(root: string): StaticAudit {
 	}
 
 	const allEdges = [...sourceGraph.edges, ...generatedGraph.edges];
+	const hasABSourceRuntimeImport = allEdges.some(
+		(edge) => edge.typeOnly === false && edge.specifier === A_B_RUNTIME_ROOT && edge.from === entry
+	);
+	const hasABGeneratedRuntimeImport = allEdges.some(
+		(edge) => edge.typeOnly === false && edge.specifier === A_B_RUNTIME_ROOT && edge.from === generatedEntry
+	);
+	const hasABRuntimeImport = hasABSourceRuntimeImport || hasABGeneratedRuntimeImport;
+	const hasABRuntimeDeclaration = manifest.dependencies?.[A_B_RUNTIME_ROOT] !== undefined;
+	const hasABRuntimeLock = lockedDependencies.has(A_B_RUNTIME_ROOT);
+	if (hasABRuntimeImport || hasABRuntimeDeclaration || hasABRuntimeLock) {
+		if (!hasABRuntimeImport) violations.push(`runtime-import:${A_B_RUNTIME_ROOT}`);
+		if (!hasABSourceRuntimeImport) violations.push(`runtime-source:${A_B_RUNTIME_ROOT}`);
+		if (existsSync(generatedEntry) && !hasABGeneratedRuntimeImport) {
+			violations.push(`runtime-generated:${A_B_RUNTIME_ROOT}`);
+		}
+		if (manifest.dependencies?.[A_B_RUNTIME_ROOT] !== A_B_RUNTIME_DEPENDENCY.manifest) {
+			violations.push(`runtime-manifest:${A_B_RUNTIME_ROOT}`);
+		}
+		const locked = lockedDependencies.get(A_B_RUNTIME_ROOT);
+		if (locked?.specifier !== A_B_RUNTIME_DEPENDENCY.manifest || locked.version !== A_B_RUNTIME_DEPENDENCY.resolved) {
+			violations.push(`runtime-lockfile:${A_B_RUNTIME_ROOT}`);
+		}
+	}
 	for (const edge of allEdges) {
 		if (/^@ts-drp\/protocol-v2(?:\/|$)/u.test(edge.specifier)) {
 			violations.push(edge.from === entry ? "protocol-v2-direct" : "protocol-v2-indirect");
@@ -1065,8 +1221,13 @@ function sourceSweep(root: string): StaticAudit {
 			violations.push(`deep-import:${edge.specifier}`);
 		}
 		if (!edge.specifier.startsWith(".")) {
+			const isABRuntimeEdge =
+				edge.typeOnly === false &&
+				edge.specifier === A_B_RUNTIME_ROOT &&
+				(edge.from === entry || edge.from === generatedEntry);
 			const permitted =
 				A_A_RUNTIME_ROOTS.has(edge.specifier) ||
+				isABRuntimeEdge ||
 				edge.specifier === PUBLISHED_PARAMETER_REGISTRY_SPECIFIER ||
 				(edge.typeOnly && edge.specifier === "@ts-drp/blueprint-catalog");
 			if (!permitted) futureOrLiveEdges.push(`import:${edge.specifier}`);
@@ -1098,10 +1259,12 @@ function sourceSweep(root: string): StaticAudit {
 		inspect(parsed);
 	};
 	for (const filename of sourceGraph.files) {
+		futureOrLiveEdges.push(...aBStageViolations(filename));
 		inspectFutureOrLive(filename);
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-source");
 	}
 	for (const filename of generatedGraph.files) {
+		futureOrLiveEdges.push(...aBStageViolations(filename));
 		inspectFutureOrLive(filename);
 		if (ownsLiteralParameterRecord(filename)) violations.push("parallel-parameters-generated");
 	}
@@ -1180,6 +1343,49 @@ function temporarySweepTree(): string {
 		`import registry from "${PUBLISHED_PARAMETER_REGISTRY_SPECIFIER}" with { type: "json" };\nconst supported = { parametersDigest: "${parameterDigest()}", runtimeProfile: "ecmascript-2024-sync-v1" };\nvoid supported; void registry;\n`
 	);
 	return root;
+}
+
+function addABRuntimeDependency(root: string): void {
+	const manifestPath = path.join(root, "packages/node/package.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+		dependencies: Record<string, string>;
+	};
+	manifest.dependencies[A_B_RUNTIME_ROOT] = A_B_RUNTIME_DEPENDENCY.manifest;
+	writeFileSync(manifestPath, JSON.stringify(manifest));
+	const lockPath = path.join(root, "pnpm-lock.yaml");
+	const lockfile = readFileSync(lockPath, "utf8");
+	writeFileSync(
+		lockPath,
+		lockfile.replace(
+			"    dependencies:\n",
+			`    dependencies:\n      '${A_B_RUNTIME_ROOT}':\n        specifier: ${A_B_RUNTIME_DEPENDENCY.manifest}\n        version: ${A_B_RUNTIME_DEPENDENCY.resolved}\n`
+		)
+	);
+}
+
+const A_B_GRAPH_PROJECTION_STAGE_SOURCE = `
+import { CausalityIndex } from "@ts-drp/compaction";
+import { digestBlob, digestClosure } from "@ts-drp/storage";
+const exactOrderPreimageBytes = new Uint8Array([1]);
+const exactGraphChargePreimageBytes = new Uint8Array([2]);
+const exactProjectionBytes = new Uint8Array([3]);
+const orderedVertexHashesDigest = digestBlob(exactOrderPreimageBytes).value;
+const graphDigest = digestBlob(exactGraphChargePreimageBytes).value;
+const projectionDigest = digestBlob(exactProjectionBytes).value;
+const exactClosure = [{ digest: orderedVertexHashesDigest, byteLength: 1 }, { digest: projectionDigest, byteLength: 3 }];
+const closureDigest = digestClosure(exactClosure);
+const ownedGraph = new Map();
+const order = [];
+const charges = new Map();
+new CausalityIndex(ownedGraph, order, { initialByteCharges: charges, maxEpochBytes: 2, maxEpochVertices: 1 });
+void closureDigest;
+`;
+
+function addABGraphProjectionStage(root: string): void {
+	addABRuntimeDependency(root);
+	for (const filename of ["packages/node/src/v3-live.ts", "packages/node/dist/src/v3-live.js"]) {
+		writeFileSync(path.join(root, filename), A_B_GRAPH_PROJECTION_STAGE_SOURCE, { flag: "a" });
+	}
 }
 
 afterAll(() => {
@@ -1585,9 +1791,147 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect(parameterDigest(parameters)).toBe("cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669");
 	});
 
-	it("uses a root-parameterized recursive hygiene sweep that kills all six owner-edge mutants", () => {
+	it("stage-scopes the recursive hygiene sweep through A-b while killing A-c, 1B and owner-edge mutants", () => {
 		const clean = temporarySweepTree();
 		expect(sourceSweep(clean)).toEqual({ futureOrLiveEdges: [], violations: [] });
+		const allowedAB = temporarySweepTree();
+		addABGraphProjectionStage(allowedAB);
+		expect(sourceSweep(allowedAB)).toEqual({ futureOrLiveEdges: [], violations: [] });
+
+		const declaredWithoutOwner = temporarySweepTree();
+		addABRuntimeDependency(declaredWithoutOwner);
+		expect(sourceSweep(declaredWithoutOwner).violations).toContain(`runtime-import:${A_B_RUNTIME_ROOT}`);
+
+		for (const [field, replacement] of [
+			["manifest", "wrong"],
+			["specifier", "wrong"],
+			["version", "wrong"],
+		] as const) {
+			const root = temporarySweepTree();
+			addABGraphProjectionStage(root);
+			if (field === "manifest") {
+				const manifestPath = path.join(root, "packages/node/package.json");
+				const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+				manifest.dependencies[A_B_RUNTIME_ROOT] = replacement;
+				writeFileSync(manifestPath, JSON.stringify(manifest));
+			} else {
+				const lockPath = path.join(root, "pnpm-lock.yaml");
+				const lockfile = readFileSync(lockPath, "utf8");
+				writeFileSync(
+					lockPath,
+					lockfile.replace(
+						`${field}: ${field === "specifier" ? A_B_RUNTIME_DEPENDENCY.manifest : A_B_RUNTIME_DEPENDENCY.resolved}`,
+						`${field}: ${replacement}`
+					)
+				);
+			}
+			expect(sourceSweep(root).violations, field).toContain(
+				field === "manifest" ? `runtime-manifest:${A_B_RUNTIME_ROOT}` : `runtime-lockfile:${A_B_RUNTIME_ROOT}`
+			);
+		}
+
+		const extraABUse = temporarySweepTree();
+		addABGraphProjectionStage(extraABUse);
+		writeFileSync(path.join(extraABUse, "packages/node/src/v3-live.ts"), "\nvoid digestBlob(exactProjectionBytes);\n", {
+			flag: "a",
+		});
+		expect(sourceSweep(extraABUse).futureOrLiveEdges).toContain("a-b-stage:digestBlob");
+
+		for (const compactionImport of [
+			'import { CausalityIndex, linearizeEpoch } from "@ts-drp/compaction";',
+			'import Extra, { CausalityIndex } from "@ts-drp/compaction";',
+		]) {
+			const extraCompactionImport = temporarySweepTree();
+			addABGraphProjectionStage(extraCompactionImport);
+			const extraCompactionSource = path.join(extraCompactionImport, "packages/node/src/v3-live.ts");
+			writeFileSync(
+				extraCompactionSource,
+				readFileSync(extraCompactionSource, "utf8").replace(
+					'import { CausalityIndex } from "@ts-drp/compaction";',
+					compactionImport
+				)
+			);
+			expect(sourceSweep(extraCompactionImport).futureOrLiveEdges, compactionImport).toContain(
+				"a-b-stage:compaction-import"
+			);
+		}
+
+		const retainedIndex = temporarySweepTree();
+		addABGraphProjectionStage(retainedIndex);
+		const retainedIndexSource = path.join(retainedIndex, "packages/node/src/v3-live.ts");
+		writeFileSync(
+			retainedIndexSource,
+			readFileSync(retainedIndexSource, "utf8").replace(
+				"new CausalityIndex(ownedGraph, order,",
+				"const retainedValidationIndex = new CausalityIndex(ownedGraph, order,"
+			)
+		);
+		expect(sourceSweep(retainedIndex).futureOrLiveEdges).toContain("a-b-stage:CausalityIndex");
+
+		const indirectABOwner = temporarySweepTree();
+		addABRuntimeDependency(indirectABOwner);
+		writeFileSync(path.join(indirectABOwner, "packages/node/src/a-b-indirect.ts"), A_B_GRAPH_PROJECTION_STAGE_SOURCE, {
+			flag: "wx",
+		});
+		writeFileSync(path.join(indirectABOwner, "packages/node/src/v3-live.ts"), '\nimport "./a-b-indirect.js";\n', {
+			flag: "a",
+		});
+		const indirectAudit = sourceSweep(indirectABOwner);
+		expect(indirectAudit.violations).toContain(`runtime-import:${A_B_RUNTIME_ROOT}`);
+		expect(indirectAudit.futureOrLiveEdges).toContain(`import:${A_B_RUNTIME_ROOT}`);
+
+		expect([...A_C_STAGE_IDENTIFIERS].sort()).toEqual([
+			"GenerationId",
+			"WeakMap",
+			"assertTrustPreserved",
+			"beginGeneration",
+			"completeGeneration",
+			"discardGeneration",
+			"getBlob",
+			"parseGenerationId",
+			"parseHeadRevision",
+			"promoteGeneration",
+			"promoteReference",
+			"putBlob",
+			"putCachedBlob",
+			"readGenerationPage",
+			"readHead",
+			"recoverActiveGeneration",
+			"recoverGeneration",
+			"swapHead",
+		]);
+		expect([...B_LIVE_IDENTIFIERS].sort()).toEqual([
+			"WebSocket",
+			"addEventListener",
+			"admitReceivedVertex",
+			"append",
+			"callback",
+			"consumePreparedV3Live",
+			"createAdmissionBoundTransactionalVertexIssuer",
+			"dispatchMessage",
+			"fetch",
+			"outbox",
+			"queueMicrotask",
+			"reducer",
+			"reducers",
+			"setInterval",
+			"setTimeout",
+			"subscribe",
+			"transactIssue",
+		]);
+		for (const [stage, identifiers] of [
+			["a-c", A_C_STAGE_IDENTIFIERS],
+			["1b", B_LIVE_IDENTIFIERS],
+		] as const) {
+			const root = temporarySweepTree();
+			writeFileSync(
+				path.join(root, "packages/node/src/v3-live.ts"),
+				`\n${[...identifiers].map((name) => `void ${name};`).join("\n")}\n`,
+				{ flag: "a" }
+			);
+			const audit = sourceSweep(root);
+			expect(audit.futureOrLiveEdges, stage).toEqual([...identifiers].map((name) => `identifier:${name}`).sort());
+		}
 		for (const [name, expected] of Object.entries(A_A_RUNTIME_DEPENDENCIES)) {
 			const manifestRoot = temporarySweepTree();
 			const manifestPath = path.join(manifestRoot, "packages/node/package.json");
