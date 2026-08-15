@@ -11958,28 +11958,60 @@ legacy protected artifact is thawed. The old checker and policy bytes remain
 archival evidence; they are not edited, replaced in place or reported as
 passing on the current tree.
 
-The successor profile pins the last genuine green baseline and bootstrap
-parent for each legacy closure:
+The successor profile pins the reviewed baseline, its exact direct parent and
+the exact base against which that baseline's genuine checker must execute.
+`directParent` proves history; `checkerBase` proves the checker's intended
+atomic transition. They are distinct fields and must never be inferred from
+one another:
 
 ```text
-operation budget   80e2ea99a703a36b4c79af5f1fe46bd85b4dc357
-                   parent cfe52269427637e69c3707774c5c6e0ea7dc0c40
-work budget        264fcd7cda3b878263bef964c977b89690126850
-                   parent 136af9f6c01b33701caf39db55498d10c95096da
-author projection  636490a8a8ac6cd82495b0cabe773f039979cdfa
-                   parent 021ac088f4273ad0521ffafebd1fe258744a41f4
-gossip budget      d9891718d99da132c8f6268c681688f238527f7b
-                   parent 65144898541abb76951d2bc5357c4c30bae4f35e
-ACL reputation     ab98831c236410da52a8a7a6b17579af0f7e6298
-                   parent c0153727c45d3ab1f418b23a50c4a1daaffbde6d
+operation budget
+  baseline     80e2ea99a703a36b4c79af5f1fe46bd85b4dc357
+  directParent cfe52269427637e69c3707774c5c6e0ea7dc0c40
+  checkerBase  cfe52269427637e69c3707774c5c6e0ea7dc0c40
+work budget
+  baseline     264fcd7cda3b878263bef964c977b89690126850
+  directParent 136af9f6c01b33701caf39db55498d10c95096da
+  checkerBase  136af9f6c01b33701caf39db55498d10c95096da
+author projection
+  baseline     636490a8a8ac6cd82495b0cabe773f039979cdfa
+  directParent 021ac088f4273ad0521ffafebd1fe258744a41f4
+  checkerBase  021ac088f4273ad0521ffafebd1fe258744a41f4
+gossip budget
+  baseline     d9891718d99da132c8f6268c681688f238527f7b
+  directParent fdb6765c2d292a86c0fba2d8ac3a2acef420e354
+  checkerBase  65144898541abb76951d2bc5357c4c30bae4f35e
+ACL reputation
+  baseline     ab98831c236410da52a8a7a6b17579af0f7e6298
+  directParent c0153727c45d3ab1f418b23a50c4a1daaffbde6d
+  checkerBase  c0153727c45d3ab1f418b23a50c4a1daaffbde6d
 ```
 
 For each baseline the successor materializes an isolated temporary Git
 worktree at that exact commit, executes that commit's genuine checker against
-its recorded bootstrap parent and requires native `PASS`. A hand-authored
+its recorded `checkerBase` and requires native `PASS`. It separately proves
+that `directParent` is the commit's sole parent. A hand-authored
 claim, mocked child process, copied fixture checker or source analyzer cannot
 replace those executions. Temporary worktrees are removed in a `finally`
 path; validation mutates no active worktree, index or ref.
+
+The gossip correction additionally binds the exact chain
+`65144898541abb76951d2bc5357c4c30bae4f35e` →
+`fdb6765c2d292a86c0fba2d8ac3a2acef420e354` →
+`d9891718d99da132c8f6268c681688f238527f7b`, with trees
+`2d20db99755856e330f1316f83e4e233bb5783c6`,
+`7cdaa73c6fc91bfc83daed87c0bd6589f803c21a` and
+`4712ffe78c277ce2a524dfac0655b59cd27e1b00` respectively. The d989 profile
+must identify fdb exactly as `governance.supersedesProvisionalRed` and retain
+`provisionalAuthorizesGreen: false`. The fdb bundle is a provisional direct
+parent, not the base against which the corrective d989 checker is valid.
+At fdb the exact gossip test, checker, policy and contract SHA-256 values are,
+in that order,
+`61f1d9e6cb39cbf7d1cd7459402737fae2ed515a2f75691119862e76f0e026d6`,
+`114a181aa2aed0c3fb52094d9e4b0153f6490e4ad4afb31ecfd63e79040b63ec`,
+`c97dee6f195bc0d41b68cc4d7e176f998a8e23ede7162507048b3761f92e66d9`
+and `270779c7b7dd8e0e3f1b1e703a6a8cea9b40cf8c71ee34c883185f89e45a0fe7`.
+Omitting fdb or accepting any fourth governed gossip transition fails.
 
 ###### Exact historical-transition ledger
 
@@ -12003,6 +12035,7 @@ author-projection test
   392cf623 e28bc7fd27574d6e3c7c0963784ed93a3c32c3a02aba4af33b70f5e1e3bd72aa
 
 gossip-budget test
+  fdb6765c 61f1d9e6cb39cbf7d1cd7459402737fae2ed515a2f75691119862e76f0e026d6
   d9891718 24cc2e5a426de1e25a150196d822ae94cd4a63caabbaa9a697af28ae3d1d9855
   392cf623 6265273fa2bd123133dc8580fe2a699792a2a9b004e3c81841c911f3f7e87b02
 ```
@@ -12046,6 +12079,25 @@ their policy-pinned successor bytes in the same commit. No other governed path
 may change. After bootstrap, the four successor files and five successor
 workflows are immutable across the supplied merge base and current tree.
 
+Both linear `HEAD` and the genuine GitHub `pull_request` merge-ref topology are
+valid. In the latter, `HEAD` is a two-parent synthetic merge whose first parent
+is the checked-out upstream/base tip and whose second parent is the PR head.
+The nine governed bootstrap changes must occur together in exactly one
+non-merge commit on the PR-side ancestry after the computed merge base. An
+earlier unrelated RED commit is legal. The synthetic merge commit must preserve
+the PR head's governed tree byte-for-byte and is not itself counted as the
+bootstrap transition; merge-only or conflict-resolution changes to a governed
+path fail. Descendant mode applies the same rule while requiring zero governed
+PR-side changes. Other merge topology is not inferred as GitHub provenance.
+
+Every governed identity binds repository path, regular-blob object type,
+non-executable file mode, Git blob ID and SHA-256, not content bytes alone.
+Missing paths, symlinks, gitlinks, executable-mode flips and irregular
+worktree objects fail. Before reading current filesystem bytes, the checker
+requires zero staged and zero unstaged drift for every governed path. Unrelated
+dirty paths are outside this decision; an untracked or irregular fifth entry
+inside the successor directory is governed and fails.
+
 `freeze-policy.json` uses exact ordered path arrays and exact SHA-256 maps. It
 pins the checker separately, hashes `profile.json`, `spec.md` and all five
 reviewed workflow bytes, and lists the policy itself as its sole necessarily
@@ -12062,13 +12114,50 @@ superseded legacy checkers, including the ACL-reputation checker. Existing
 protocol-v2/protocol-v3 registry checkers and equivocation digest/evidence
 checkers remain genuinely executed where they already apply.
 
-At bootstrap, where the base has no successor checker, each workflow executes
-the current successor checker against the actual upstream merge base. After
-bootstrap, each workflow extracts the merge-base successor checker, executes
-it against the PR tree, then executes the current successor checker against
-the same merge base. Omitting either execution, changing a required job name,
-moving the ratchet to a non-required workflow, `continue-on-error`, conditional
-success, skipped ordinary CI or direct-push substitution fails governance.
+The public checker accepts the exact upstream target SHA, not a caller-chosen
+merge-base SHA. It computes the unique merge base of that target and current
+`HEAD`, requires that result to be exactly one commit and an ancestor of
+`HEAD`, and uses only that computed commit for bootstrap/descendant law. Each
+workflow freezes `git merge-base --all "$UPSTREAM_SHA" HEAD`, requires exactly
+one newline-delimited lowercase 40-hex result before any `git show` or checker
+execution, and uses that singleton for selecting a possible base checker. The
+selected SHA must equal the checker's independent `--all` singleton. A sibling
+commit, arbitrary older ancestor, zero/multiple-base result or caller-supplied
+fixed anchor is rejected without executing any base checker. A criss-cross
+history mutant proves the multiple-base case has zero checker executions.
+
+At bootstrap, where the computed base has no successor checker, each workflow
+executes the current successor checker against the upstream target. After
+bootstrap, each workflow extracts the computed-base successor checker,
+executes it against the PR tree and upstream target, then executes the current
+successor checker against the same upstream target. Omitting either execution,
+changing a required job identity, moving the ratchet to a non-required
+workflow, `continue-on-error`, conditional success, skipped ordinary CI or
+direct-push substitution fails governance.
+
+The five exact workflow/job identities are:
+
+```text
+Protocol v3 blueprint operation budget freeze
+  jobs.protocol-v3-blueprint-operation-budget
+  name: Require immutable protocol-v3 operation budget enforcement
+Protocol v3 blueprint work budget freeze
+  jobs.protocol-v3-blueprint-work-budget
+  name: Require immutable protocol-v3 blueprint work budget supplement
+Protocol v3 equivocation author projection freeze
+  jobs.protocol-v3-equivocation-author-projection
+  name: Require immutable protocol-v3 equivocation author projection supplement
+Protocol v3 equivocation gossip budget freeze
+  jobs.protocol-v3-equivocation-gossip-budget
+  name: Require immutable protocol-v3 equivocation gossip budget supplement
+Protocol v3 equivocation ACL reputation freeze
+  jobs.protocol-v3-equivocation-acl-reputation
+  no job-level name key
+```
+
+The ACL absence is exact; adding a job-level `name` is drift rather than a
+normalization. All five retain their workflow-level names, job keys and stated
+job-name presence or absence.
 
 ###### Strict TDD and oracle discipline
 
@@ -12079,17 +12168,73 @@ D.93.35.5 RED is limited to
 registry, generated file, dependency, lockfile or plan. RED fails only because
 the successor owner and atomic workflow routing are absent.
 
-RED executes the genuine candidate checker in temporary Git repositories and
-commits. Its positive cases are an exact atomic bootstrap and an unchanged
-post-bootstrap descendant. Its negative cases include partial successor
-presence; one through four workflow transitions; a retained ACL or other
-superseded checker call; changed legacy checker, policy, semantic test,
-fixture or other non-workflow artifact; an omitted current semantic hash;
-accepting a stale policy value as current; omitted latent gossip binding; a
-sixth thawed path; wrong baseline or transition commit; altered trigger,
-permission, checkout ref, timeout or job identity; base-only/current-only
-validation; an extra unhashed exception; and post-bootstrap successor or
-workflow drift.
+The nontrivial fixture programs are named at minimum
+`controlled-freeze-successor.mjs`, `temporary-repository-harness.mjs` and
+`successor-contract.json`. Workflow analyzer programs live under
+`analyzers/workflow/` and include clearly named `valid.yml`,
+`semantically-equivalent.yml`, `retained-legacy-checker.yml`,
+`missing-base-check.yml` and `changed-job-identity.yml` cases. Additional
+fixture names must describe one listed mutant rather than embed anonymous
+source strings in a test body.
+
+RED has two explicitly separate lanes. A named fixture-owned controlled
+checker exercises the temporary-repository harness's atomic-bootstrap and
+unchanged-descendant positive controls and surgical harness mutants. It is
+labeled test control, is not copied or imported by GREEN and is never evidence
+that the repository checker conforms. The repository candidate row invokes
+the exact future owner path and is the only causal RED; before GREEN it fails
+because that owner and atomic workflow routing are absent, not because the
+harness cannot execute.
+
+On GREEN the same repository row executes the genuine successor checker in
+temporary Git repositories and commits. Only those genuine executions may
+satisfy production acceptance. The controlled checker continues to prove the
+harness and mutants independently and cannot turn the repository row green.
+
+Bootstrap and unchanged-descendant positives each run twice: once with a
+linear PR head and once with a real two-parent synthetic GitHub-style merge
+commit whose upstream tip is first parent and PR head is second parent. They
+prove the one atomic governed transition belongs to the PR-side GREEN commit,
+not the merge ref, while the descendant permits an unrelated PR-side commit.
+
+Two controlled split histories make RED causality load-bearing rather than an
+aggregate absence check: one supplies the exact controlled four-file bundle
+with all five old workflows and fails only workflow routing; the other
+supplies the exact future workflow shapes with an absent or partial bundle and
+fails only owner/bootstrap completeness. The repository row still targets the
+future owner without fallback. A test that merely observes both owner and
+workflow absence at once is insufficient.
+
+The negative matrix includes partial successor presence; an extra, symlink or
+irregular fifth successor-directory entry; one through four workflow
+transitions; a retained ACL or other superseded checker call; changed legacy
+checker, policy, semantic test, fixture or other non-workflow artifact; an
+omitted current semantic hash; accepting a stale policy value as current;
+omitted latent gossip binding; a sixth thawed path; wrong baseline or
+transition commit; swapped/conflated `directParent` and `checkerBase`; a
+sibling, arbitrary-old or non-unique merge base; altered trigger, permission,
+checkout ref, timeout or exact job identity; base-only/current-only
+validation; an extra unhashed exception; a transient governed
+modify-then-revert commit whose terminal bytes match; and post-bootstrap
+successor or workflow drift. Object-mode negatives cover symlink, gitlink,
+non-blob, executable flip, missing path and staged or unstaged protected drift.
+Atomicity negatives split owner and workflow changes across commits even when
+their final tree is identical.
+
+The fixed-anchor inventory contains 58 distinct policy-listed paths: 8
+operation, 8 work, 14 author, 14 gossip and 14 ACL paths. Exactly five are the
+authorized workflows, leaving 53 immutable non-workflow paths. RED mutates
+every one of those 53 identities individually and requires rejection; category
+representatives or an aggregate count do not substitute for the complete
+sweep.
+
+The harness uses unique temporary repositories, real native Git commits and a
+bounded child timeout. Missing, hung, signaled or nonterminal child execution
+is a hard failure; `ENOENT` is never candidate absence success. Cleanup runs in
+`finally` and is itself asserted by the control lane. The candidate selector
+has no fallback from the exact future owner path to the controlled checker,
+and the production/default row cannot select the control through environment,
+argument or module-resolution state.
 
 Any custom workflow or source analyzer used by this RED has named, nontrivial
 positive and negative programs under
@@ -12103,6 +12248,18 @@ identity, native child-process outcomes, job execution or semantic-suite
 behavior. Genuine temporary-repository checker runs and the five real
 historical semantic suites remain the load-bearing causal evidence. This is
 the required test-oracle-discipline note for the successor closure ledger.
+Every harmless byte-different YAML positive accepted by the topology analyzer
+also has a control proving the genuine checker rejects those bytes under the
+exact workflow hash. Analyzer semantic equivalence never weakens the byte
+ratchet.
+
+Analyzer positives may vary comments, YAML key order, quoting or block style,
+step labels and harmless environment-variable spelling while preserving the
+same awaited decisions. The analyzer is not required to solve arbitrary shell
+or YAML equivalence and must not pin incidental indentation, line numbers,
+command whitespace, JSON key order, child-process API, temporary path or exact
+stderr/stack text. Native exit status plus the frozen checker's own terminal
+`PASS` marker is sufficient output evidence.
 
 GREEN changes exactly nine paths: the four successor-owner files and the five
 workflow files enumerated above. It changes no legacy checker, policy,
@@ -12119,6 +12276,9 @@ ACL-reputation suites with their existing controls and mutants; retained
 protocol-v2/v3 registry and equivocation digest/evidence freezes; protocol-v3
 typecheck/build/public/package smoke; static/format/diff checks; and full p5,
 D.93.17, anchor, admission, issuance, journal and Phase 3a preservation.
+Closure additionally requires the five actual always-triggered GitHub
+pull-request jobs to execute and pass; local workflow analysis cannot prove
+scheduling or remote job execution.
 
 After GREEN, independent exact-tree Codex, Grok, Kimi and Opus closure precede
 a signed push and bounded ledger. The ledger records the old checkers as
