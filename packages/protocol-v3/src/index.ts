@@ -29,7 +29,28 @@ const intrinsicSetHas = Set.prototype.has;
 const intrinsicSetValues = Set.prototype.values;
 const intrinsicString = String;
 const intrinsicUint8Array = Uint8Array;
+const intrinsicUint8ArrayPrototype = Uint8Array.prototype;
 const intrinsicUint32Array = Uint32Array;
+const intrinsicArrayBufferByteLengthGetter = intrinsicObjectGetOwnPropertyDescriptor(
+	ArrayBuffer.prototype,
+	"byteLength"
+)?.get as (this: ArrayBuffer) => number;
+const intrinsicArrayBufferPrototype = ArrayBuffer.prototype;
+const intrinsicArrayBufferResizableGetter = intrinsicObjectGetOwnPropertyDescriptor(
+	intrinsicArrayBufferPrototype,
+	"resizable"
+)?.get as ((this: ArrayBuffer) => boolean) | undefined;
+const intrinsicTypedArrayPrototype = intrinsicObjectGetPrototypeOf(intrinsicUint8ArrayPrototype);
+const intrinsicTypedArrayBufferGetter = intrinsicObjectGetOwnPropertyDescriptor(intrinsicTypedArrayPrototype, "buffer")
+	?.get as (this: Uint8Array) => ArrayBufferLike;
+const intrinsicTypedArrayByteLengthGetter = intrinsicObjectGetOwnPropertyDescriptor(
+	intrinsicTypedArrayPrototype,
+	"byteLength"
+)?.get as (this: Uint8Array) => number;
+const intrinsicTypedArrayByteOffsetGetter = intrinsicObjectGetOwnPropertyDescriptor(
+	intrinsicTypedArrayPrototype,
+	"byteOffset"
+)?.get as (this: Uint8Array) => number;
 const intrinsicMapIteratorNext = intrinsicObjectGetOwnPropertyDescriptor(
 	intrinsicObjectGetPrototypeOf(intrinsicReflectApply(intrinsicMapEntries, new intrinsicMap(), [])),
 	"next"
@@ -1100,6 +1121,8 @@ export type BuildAndSign = (authorSequence: number) => Promise<IssueCommit>;
 
 export type TransactIssue = (scope: IssueScope, buildAndSign: BuildAndSign) => Promise<IssueCommit>;
 
+export type SignRegisteredVertexDigest = (registeredDigest: Uint8Array) => Promise<Uint8Array>;
+
 export interface TransactionalVertexIssuer {
 	issue(input: LocalVertexInput): Promise<IssueCommit>;
 }
@@ -1148,13 +1171,24 @@ export type ExtractAdmittedReceivedVertexResult =
 	| Readonly<{ readonly ok: false; readonly reason: ExtractAdmittedReceivedVertexFailureReason }>
 	| Readonly<{ readonly ok: true; readonly vertex: AdmittedReceivedVertexView }>;
 
-export interface AdmissionBoundTransactionalIssuerOptions {
+type AdmissionBoundTransactionalIssuerCommonOptions = Readonly<{
 	readonly author: string;
 	readonly preparedBlueprintAdmission: PreparedBlueprintAdmission;
-	readonly privateKeySeed: Uint8Array;
 	readonly publicKey: RawEd25519PublicKey;
 	readonly transactIssue: TransactIssue;
-}
+}>;
+
+export type AdmissionBoundTransactionalIssuerOptions = AdmissionBoundTransactionalIssuerCommonOptions &
+	(
+		| Readonly<{
+				privateKeySeed: Uint8Array;
+				signRegisteredVertexDigest?: never;
+		  }>
+		| Readonly<{
+				privateKeySeed?: never;
+				signRegisteredVertexDigest: SignRegisteredVertexDigest;
+		  }>
+	);
 
 export interface BlueprintPreparationInput {
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
@@ -2137,19 +2171,40 @@ export function verifyEd25519RegisteredDigest(
  * @returns A stateless transactional issuer.
  */
 export function createTransactionalVertexIssuer(options: TransactionalIssuerOptions): TransactionalVertexIssuer {
-	return createTransactionalVertexIssuerCore(options);
-}
-
-function createTransactionalVertexIssuerCore(
-	options: TransactionalIssuerOptions,
-	operationAdmission?: (operation: Readonly<Record<string, unknown>>) => CompiledOperationSchema | undefined
-): TransactionalVertexIssuer {
-	if (!(options.privateKeySeed instanceof Uint8Array) || options.privateKeySeed.byteLength !== 32) {
+	if (!(options.privateKeySeed instanceof intrinsicUint8Array) || options.privateKeySeed.byteLength !== 32) {
 		throw new TypeError("private key seed must be a 32-byte Uint8Array");
 	}
+	const privateKeySeed = new intrinsicUint8Array(options.privateKeySeed);
+	const common = captureTransactionalIssuerCommon(options);
+	if (compareBytes(ed25519.getPublicKey(privateKeySeed), common.publicKeyBytes) !== 0) {
+		throw new TypeError("public and private Ed25519 keys do not match");
+	}
+	return createTransactionalVertexIssuerCore(common, { kind: "private-key-seed", privateKeySeed });
+}
+
+interface TransactionalIssuerCommonState {
+	readonly author: string;
+	readonly publicKeyBytes: Uint8Array;
+	readonly transactIssue: TransactIssue;
+}
+
+type TransactionalIssuerSigningState =
+	| Readonly<{ readonly kind: "private-key-seed"; readonly privateKeySeed: Uint8Array }>
+	| Readonly<{
+			readonly kind: "registered-digest-callback";
+			readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+	  }>;
+
+function captureTransactionalIssuerCommon(
+	options: Readonly<{
+		readonly author: string;
+		readonly publicKey: RawEd25519PublicKey;
+		readonly transactIssue: TransactIssue;
+	}>
+): TransactionalIssuerCommonState {
 	if (
 		options.publicKey.format !== "raw" ||
-		!(options.publicKey.bytes instanceof Uint8Array) ||
+		!(options.publicKey.bytes instanceof intrinsicUint8Array) ||
 		options.publicKey.bytes.byteLength !== 32
 	) {
 		throw new TypeError("public key must be a 32-byte raw Ed25519 key");
@@ -2158,14 +2213,48 @@ function createTransactionalVertexIssuerCore(
 		throw new TypeError("transactIssue must be a function");
 	}
 
-	const privateKeySeed = new Uint8Array(options.privateKeySeed);
-	const publicKeyBytes = new Uint8Array(options.publicKey.bytes);
-	if (compareBytes(ed25519.getPublicKey(privateKeySeed), publicKeyBytes) !== 0) {
-		throw new TypeError("public and private Ed25519 keys do not match");
-	}
+	return {
+		author: options.author,
+		publicKeyBytes: new intrinsicUint8Array(options.publicKey.bytes),
+		transactIssue: options.transactIssue,
+	};
+}
 
-	const author = options.author;
-	const transactIssue = options.transactIssue;
+const SIGNER_RESULT_ERROR = "signRegisteredVertexDigest must return a 64-byte Uint8Array";
+
+function copyExactRegisteredDigestSignature(value: unknown): Uint8Array {
+	try {
+		if (intrinsicObjectGetPrototypeOf(value) !== intrinsicUint8ArrayPrototype) {
+			throw new TypeError(SIGNER_RESULT_ERROR);
+		}
+		const bytes = value as Uint8Array;
+		if (
+			intrinsicReflectApply(intrinsicTypedArrayByteOffsetGetter, bytes, []) !== 0 ||
+			intrinsicReflectApply(intrinsicTypedArrayByteLengthGetter, bytes, []) !== 64
+		) {
+			throw new TypeError(SIGNER_RESULT_ERROR);
+		}
+		const buffer = intrinsicReflectApply(intrinsicTypedArrayBufferGetter, bytes, []);
+		if (
+			intrinsicObjectGetPrototypeOf(buffer) !== intrinsicArrayBufferPrototype ||
+			intrinsicReflectApply(intrinsicArrayBufferByteLengthGetter, buffer, []) !== 64 ||
+			(intrinsicArrayBufferResizableGetter !== undefined &&
+				intrinsicReflectApply(intrinsicArrayBufferResizableGetter, buffer, []))
+		) {
+			throw new TypeError(SIGNER_RESULT_ERROR);
+		}
+		return new intrinsicUint8Array(bytes);
+	} catch {
+		throw new TypeError(SIGNER_RESULT_ERROR);
+	}
+}
+
+function createTransactionalVertexIssuerCore(
+	common: TransactionalIssuerCommonState,
+	signingState: TransactionalIssuerSigningState,
+	operationAdmission?: (operation: Readonly<Record<string, unknown>>) => CompiledOperationSchema | undefined
+): TransactionalVertexIssuer {
+	const { author, publicKeyBytes, transactIssue } = common;
 
 	return {
 		async issue(input: LocalVertexInput): Promise<IssueCommit> {
@@ -2192,7 +2281,7 @@ function createTransactionalVertexIssuerCore(
 			};
 			const scope: IssueScope = { author, objectId: detachedInput.objectId };
 
-			return transactIssue(scope, (authorSequence) => {
+			return transactIssue(scope, async (authorSequence) => {
 				const canonicalPreimageBytes = vertexCanonicalBytes({
 					kind: "drp-vertex",
 					protocolMajor: 3,
@@ -2206,18 +2295,32 @@ function createTransactionalVertexIssuerCore(
 					operation: detachedInput.operation,
 				});
 				const digest = digestReceivedVertexPreimage(canonicalPreimageBytes);
+				let signature: Uint8Array;
+				if (signingState.kind === "private-key-seed") {
+					signature = ed25519.sign(digest, signingState.privateKeySeed);
+				} else {
+					const retainedDigest = new intrinsicUint8Array(digest);
+					const callbackDigest = new intrinsicUint8Array(digest);
+					const callbackResult = await intrinsicReflectApply(signingState.signRegisteredVertexDigest, undefined, [
+						callbackDigest,
+					]);
+					signature = copyExactRegisteredDigestSignature(callbackResult);
+					if (!verifyEd25519RegisteredDigest(signature, retainedDigest, publicKeyBytes)) {
+						throw new VertexValidationError("signRegisteredVertexDigest returned an invalid signature");
+					}
+				}
 				const envelope: SignedVertexEnvelope = {
 					canonicalPreimageBytes,
 					digest,
-					signature: ed25519.sign(digest, privateKeySeed),
+					signature,
 				};
 
-				return Promise.resolve({
+				return {
 					authorSequence,
 					envelope,
 					issuedRecord: { authorSequence, envelope, scope },
 					outboxEntry: { authorSequence, envelope, scope },
-				});
+				};
 			});
 		},
 	};
@@ -2238,7 +2341,48 @@ export function createAdmissionBoundTransactionalVertexIssuer(
 	if (preparedState === undefined) {
 		throw new TypeError("preparedBlueprintAdmission must be produced by prepareBlueprintAdmission");
 	}
-	return createTransactionalVertexIssuerCore(options, (operation) =>
+	let privateKeySeedDescriptor: PropertyDescriptor | undefined;
+	let signerDescriptor: PropertyDescriptor | undefined;
+	try {
+		privateKeySeedDescriptor = intrinsicObjectGetOwnPropertyDescriptor(options, "privateKeySeed");
+		signerDescriptor = intrinsicObjectGetOwnPropertyDescriptor(options, "signRegisteredVertexDigest");
+	} catch {
+		throw new TypeError("exactly one signing arm must be an own data property");
+	}
+	const hasPrivateKeySeed =
+		privateKeySeedDescriptor !== undefined && intrinsicObjectHasOwn(privateKeySeedDescriptor, "value");
+	const hasSigner = signerDescriptor !== undefined && intrinsicObjectHasOwn(signerDescriptor, "value");
+	if (hasPrivateKeySeed === hasSigner) {
+		throw new TypeError("exactly one signing arm must be an own data property");
+	}
+
+	const common = captureTransactionalIssuerCommon(options);
+	let signingState: TransactionalIssuerSigningState;
+	if (hasPrivateKeySeed) {
+		if (privateKeySeedDescriptor === undefined) throw new TypeError("private key seed is unavailable");
+		const privateKeySeed = privateKeySeedDescriptor.value;
+		if (!(privateKeySeed instanceof intrinsicUint8Array) || privateKeySeed.byteLength !== 32) {
+			throw new TypeError("private key seed must be a 32-byte Uint8Array");
+		}
+		const detachedPrivateKeySeed = new intrinsicUint8Array(privateKeySeed);
+		if (compareBytes(ed25519.getPublicKey(detachedPrivateKeySeed), common.publicKeyBytes) !== 0) {
+			throw new TypeError("public and private Ed25519 keys do not match");
+		}
+		signingState = { kind: "private-key-seed", privateKeySeed: detachedPrivateKeySeed };
+	} else {
+		if (signerDescriptor === undefined) throw new TypeError("registered digest signer is unavailable");
+		const signer = signerDescriptor.value;
+		if (typeof signer !== "function") throw new TypeError("signRegisteredVertexDigest must be a function");
+		if (common.author !== bytesToHex(common.publicKeyBytes)) {
+			throw new TypeError("author must equal the lowercase raw Ed25519 public key");
+		}
+		signingState = {
+			kind: "registered-digest-callback",
+			signRegisteredVertexDigest: signer as SignRegisteredVertexDigest,
+		};
+	}
+
+	return createTransactionalVertexIssuerCore(common, signingState, (operation) =>
 		operationSchemaForPreparedAdmission(operation, preparedState)
 	);
 }

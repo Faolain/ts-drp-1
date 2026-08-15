@@ -41,6 +41,7 @@ export type {
 	PreparedBlueprintAdmission,
 	PreparedBlueprintRuntime,
 	RawEd25519PublicKey,
+	SignRegisteredVertexDigest,
 	SignedVertexEnvelope,
 	TransactionalVertexIssuer,
 	TransactIssue,
