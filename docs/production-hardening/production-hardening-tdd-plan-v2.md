@@ -10882,6 +10882,51 @@ application state, live subscription or Phase 3b. Closing p4 will not authorize
 D.93.36 RED until the sibling custody prerequisite also closes and D.93.36's
 joint consumer contract is separately reviewed, signed and pushed.
 
+##### D.93.34.1 — executable adapter-pin transition correction
+
+This subsection is normative and corrects only the tests-only authorization
+boundary above. The shipped Node and Browser adapter manifests currently expose
+exactly `.` and `./issuance`, and their predecessor tests freeze those exact
+subpaths and dependency sets. D.93.34 requires the additive `./live-journal`
+subpath and direct `@ts-drp/live-journal` dependency in both adapters. A GREEN
+implementation therefore cannot satisfy both the new contract and the frozen
+predecessor bytes unless the exact old pin owners are permitted to transition.
+
+The p4 tests-only RED may modify exactly these eight existing test paths in
+addition to the new p4-named paths already authorized:
+
+- `packages/storage-node/tests/sqlite-contract-red.test.ts`;
+- `packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts`;
+- `packages/storage-browser/tests/phase-2d1-decision-schema-red.test.ts`;
+- `packages/storage-browser/tests/phase-2e7-publication-component-red.test.ts`;
+- `packages/storage-browser/tests/phase-2g-a-browser-capacity-red.test.ts`;
+- `packages/storage-browser/tests/structural-controls.test.ts`;
+- `tests/phase-2l-d-parity-governance-red.test.ts`;
+- `tests/phase-3a1b-p2-outbox-publication-contract.test.ts`.
+
+Each transition is exact and additive. The Node and Browser export inventories
+become exactly `.` / `./issuance` / `./live-journal`. The new subpath maps only
+to its same-package `dist/src/live-journal.js` and `.d.ts` pair. Each adapter's
+dependency inventory gains exactly `"@ts-drp/live-journal": "0.11.0"`; every
+pre-existing dependency, version, root export, issuance export, root source
+hash and public runtime root remains unchanged. The tests must continue to pin
+the old entries and bytes independently rather than replacing an old exact-set
+assertion with a subset assertion.
+
+The transition RED must be causal at the signed pre-p4 production tree: its
+only failures are the absent new dependency/subpath and their not-yet-built
+declaration/runtime targets. Existing AHE and issuance behavior and every old
+pin remain GREEN. Mutants must kill an extra export/dependency, a missing or
+retargeted old entry, a deep/private live-journal path, a wrong version, a root
+re-export, and a source-only declaration with no built/packed target.
+
+This correction authorizes no production, manifest, lock, source, schema or
+generated edit by the RED. It may be committed as a dedicated tests-only
+transition RED or included in the single reviewed p4 tests-only RED commit.
+Production GREEN remains limited to the owners named by D.93.34. No other
+predecessor test may change, and this correction does not relax any prior
+behavioral, schema, authority or non-widening assertion.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
