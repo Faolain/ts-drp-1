@@ -11362,6 +11362,441 @@ reviewed, signed and pushed before its RED. D.93.36, full-B RED or
 implementation, activation, reducer/fold, Phase 3b and deployment remain
 unauthorized.
 
+##### D.93.35.3 — authenticated current-epoch author authorization prerequisite
+
+This amendment closes the missing protocol-v3 authority decision between an
+authenticated current anchor and the Ed25519 author identity proved by D.93.35.
+It authorizes ordinary-writer membership only for the genuine current epoch of
+the existing `creator-trusted-v1` trust profile. It does not compose issuance,
+the live journal, the live causality index, ingress, egress or activation. It
+does not authorize D.93.36 RED or implementation.
+
+Key possession is still not authorization. The current anchor signer is not an
+implicit vertex author; the signer set is not an author list; and an operator
+resolver is not authenticated policy. D.93.17 remains exact: node,
+control-plane and public trust state receive no signer keys, roles or decoded
+signer-set carrier. `CurrentAnchorTrust` keeps its exact five fields and
+`authenticateCurrentEpochAnchor` keeps its exact input and seven-field success
+provenance.
+
+###### Exact complete-snapshot carrier
+
+The authority carrier is one closed canonical object with exactly these keys
+in the canonical schema:
+
+```ts
+interface CurrentEpochAuthorAuthorizationCarrier {
+	readonly authors: readonly string[];
+	readonly epoch: number;
+	readonly kind: "drp-author-authorization";
+	readonly objectId: string;
+	readonly profileId: "creator-author-authorization-v1";
+	readonly protocolMajor: 3;
+	readonly version: 1;
+}
+```
+
+The exact digest domain is the UTF-8 literal
+`ts-drp/author-authorization/v3`. `aclDigest` is exactly lowercase hexadecimal
+of:
+
+```text
+hashDomain(
+  "ts-drp/author-authorization/v3",
+  exactCanonicalAuthorAuthorizationBytes
+)
+```
+
+Only the existing protocol-v3 `hashDomain` framing owner may derive it. There
+is no raw hash, alternate domain, separator variant or second framing codec.
+The input bytes must be nonempty and at most **8192** bytes. Decoding must use
+the existing exact canonical decoder and byte-for-byte canonical equality;
+alternate encodings, extra or missing keys, and semantically equivalent
+re-encodings are rejected.
+
+`objectId` must satisfy the existing `isStorageObjectIdText` predicate.
+`epoch` is a safe nonnegative integer. The four literal fields above are exact.
+`authors` is a dense array of **1 through 64** entries. Every entry is exactly
+a lowercase 64-hex ASCII string and therefore also the raw 32-byte Ed25519
+public-key identity. There is no duplicate public-key field. Entries must
+already be in strict ascending unsigned byte-wise lexicographic order over
+their 64 ASCII bytes. Duplicate or out-of-order input is rejected; the runtime
+never normalizes or sorts it.
+
+The carrier is a complete snapshot. A signed current anchor authorizes exactly
+the carrier whose digest equals its `aclDigest` and whose `objectId` and
+`epoch` equal the authenticated anchor. A missing, zero, stale or mismatched
+digest grants no authority. A later authenticated anchor may replace the
+complete snapshot with a different `aclDigest`; there is no delta, inheritance,
+wildcard, delegation, deny list, role, rotation, revocation or implicit creator
+entry in this seam.
+
+###### Exact public surface
+
+The new `@ts-drp/protocol-v3/author-authorization` package subpath adds these
+exact public declarations:
+
+```ts
+export type AuthenticateCurrentEpochAnchorSuccessProvenance = Readonly<{
+	readonly anchorDigest: string;
+	readonly blueprintDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly parametersDigest: string;
+	readonly profileDigest: string;
+	readonly signerSetDigest: string;
+}>;
+
+export interface CurrentEpochAuthorAuthorization {
+	readonly aclDigest: string;
+	readonly currentAnchorDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly profileId: "creator-author-authorization-v1";
+}
+
+export interface OpenCurrentEpochAuthorAuthorizationInput {
+	readonly detachedAnchorSignature: Uint8Array;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly trust: CurrentAnchorTrust;
+}
+
+export type OpenCurrentEpochAuthorAuthorizationResult =
+	| Readonly<{ ok: false; reason: "malformed-input" }>
+	| Readonly<{
+			cause: AuthenticateCurrentEpochAnchorFailureReason;
+			ok: false;
+			reason: "anchor-rejected";
+	  }>
+	| Readonly<{
+			ok: false;
+			reason:
+				| "acl-decode-failed"
+				| "noncanonical-acl"
+				| "acl-schema-invalid"
+				| "unsupported-acl-version"
+				| "unsupported-acl-profile"
+				| "object-id-mismatch"
+				| "epoch-mismatch"
+				| "acl-digest-mismatch";
+	  }>
+	| Readonly<{
+			authorization: CurrentEpochAuthorAuthorization;
+			ok: true;
+			provenance: AuthenticateCurrentEpochAnchorSuccessProvenance;
+	  }>;
+
+export interface ResolveCurrentEpochAuthorizedAuthorInput {
+	readonly authorization: CurrentEpochAuthorAuthorization;
+	readonly author: string;
+}
+
+export type ResolveCurrentEpochAuthorizedAuthorResult =
+	| Readonly<{
+			ok: false;
+			reason: "malformed-input" | "untrusted-context" | "author-not-authorized";
+	  }>
+	| Readonly<{ ok: true; publicKey: RawEd25519PublicKey }>;
+
+export function openCurrentEpochAuthorAuthorization(
+	input: OpenCurrentEpochAuthorAuthorizationInput
+): OpenCurrentEpochAuthorAuthorizationResult;
+
+export function resolveCurrentEpochAuthorizedAuthor(
+	input: ResolveCurrentEpochAuthorizedAuthorInput
+): ResolveCurrentEpochAuthorizedAuthorResult;
+```
+
+`AuthenticateCurrentEpochAnchorFailureReason` is re-exported from the new
+subpath as a type only because it is the exact `anchor-rejected` cause.
+Factoring the old seven-field success provenance into the named type above
+changes no old field, result key or runtime value. The exact subpath type
+exports are
+`AuthenticateCurrentEpochAnchorFailureReason`,
+`AuthenticateCurrentEpochAnchorSuccessProvenance`,
+`CurrentEpochAuthorAuthorization`,
+`OpenCurrentEpochAuthorAuthorizationInput`,
+`OpenCurrentEpochAuthorAuthorizationResult`,
+`ResolveCurrentEpochAuthorizedAuthorInput` and
+`ResolveCurrentEpochAuthorizedAuthorResult`. The subpath runtime exports are
+exactly `openCurrentEpochAuthorAuthorization` and
+`resolveCurrentEpochAuthorizedAuthor`; it exports no third runtime value.
+There is no public carrier type, codec, mutable set, author-list getter or
+trust-state widening.
+
+The existing `@ts-drp/protocol-v3` package root remains byte-for-byte exact in
+its runtime inventory. In sorted order it remains exactly:
+
+```text
+ANCHOR_TRUST_STATE_MAX_RECORD_BYTES
+admitReceivedVertex
+authenticateCurrentEpochAnchor
+createAdmissionBoundTransactionalVertexIssuer
+extractAdmittedReceivedVertex
+installCreatorAnchorTrustRoot
+isAnchorTrustStateRecordBytes
+openCurrentAnchorTrust
+prepareBlueprintAdmission
+prepareBlueprintRuntime
+```
+
+This named subpath is the sole supersession of D.93.27's closed export-map rule.
+The manifest export map becomes exactly:
+
+```json
+{
+	".": {
+		"types": "./dist/src/public.d.ts",
+		"import": "./dist/src/public.js"
+	},
+	"./author-authorization": {
+		"types": "./dist/src/author-authorization.d.ts",
+		"import": "./dist/src/author-authorization.js"
+	},
+	"./registry/registry-v1.json": "./registry/registry-v1.json"
+}
+```
+
+The root exports none of the seven new types or two new values. Its existing
+`smoke:public-package` exact-ten inventory remains unchanged.
+
+###### Single authentication and capability owner
+
+`createAnchorTrustApi` remains the single factory and module-closure owner of a
+trust registry. Inside each genuine API closure, one private current-anchor
+authentication decision performs the existing decode, canonicality, schema,
+suite, context, digest and strict signature checks and retains the decoded
+`aclDigest` only in private success state. The old public authenticator invokes
+that decision once and projects its unchanged seven-field provenance. Each call
+to `openCurrentEpochAuthorAuthorization` invokes the same private decision
+exactly once, then uses its private `aclDigest`; it must not call the public
+facade, decode the anchor again, hash it again or verify it again.
+
+One new private module, `packages/protocol-v3/src/anchor-trust-singleton.ts`,
+calls `createAnchorTrustApi()` exactly once and exports only the six bound
+functions owned by that one API object. `src/public.ts` re-exports the existing
+four trust functions from this private owner while preserving its exact-ten
+root. New `src/author-authorization.ts` re-exports only the two authorization
+functions from the same owner and the exact seven types from `src/index.ts`.
+Neither entry calls the factory, holds another registry or exposes the API
+object. Direct internal/test callers of `createAnchorTrustApi()` still receive
+fresh isolated registries; the factory does not become a global singleton.
+
+The opener snapshots a closed own-data four-key input and copies all three byte
+arrays before semantic work. Its exact precedence is:
+
+1. hostile-safe closed input, ordinary non-shared copyable byte views,
+   signature length, nonempty anchor bytes, and nonempty carrier bytes no
+   greater than 8192; otherwise `malformed-input`;
+2. the one genuine current-anchor authentication decision; any failure becomes
+   `anchor-rejected` with the exact existing cause;
+3. carrier decode failure;
+4. noncanonical carrier;
+5. closed schema, author syntax/count/order/uniqueness and fixed-field shape;
+6. version;
+7. authorization profile;
+8. object identity;
+9. epoch;
+10. domain-separated `aclDigest` equality.
+
+The opener mints a new frozen `CurrentEpochAuthorAuthorization` only after all
+checks pass and registers it in one private authorization `WeakMap` owned by
+the same API closure as the trust `WeakMap`. The five public capability fields
+are exact context evidence for the later joint consumer, but structural
+equality never proves genuineness. The private capability state retains a
+copied, frozen authorization membership set and no signer-set or operator
+authority. There is no singleton capability: reopening the same authenticated
+bytes may mint another genuine equivalent capability in that API instance. A
+capability from another API instance, plain object, clone, proxy or
+serialization is not genuine.
+
+The resolver snapshots a closed own-data two-key input. It proves the genuine
+WeakMap capability before inspecting a hostile `author`. A malformed outer
+shape or a non-string/non-lowerhex64 author returns `malformed-input`; a
+well-shaped forged or foreign capability returns `untrusted-context`; a valid
+but absent author returns `author-not-authorized`. Success returns exactly a
+frozen `{ok:true,publicKey}` whose `publicKey` is a frozen closed
+`{format:"raw",bytes}` and whose bytes are a fresh ordinary, non-shared,
+offset-zero, full-backing 32-byte `Uint8Array`. Every result is closed and
+frozen. Reflection, proxy, accessor, shared, detached or copy failure is total
+and never throws across the public boundary.
+
+###### Repository-governed supplemental law
+
+The canonical carrier law has one repository-governed source under exactly:
+
+```text
+packages/protocol-v3/supplements/author-authorization-v1/check-freeze.mjs
+packages/protocol-v3/supplements/author-authorization-v1/freeze-policy.json
+packages/protocol-v3/supplements/author-authorization-v1/profile.json
+packages/protocol-v3/supplements/author-authorization-v1/schema.json
+packages/protocol-v3/supplements/author-authorization-v1/spec.md
+packages/protocol-v3/supplements/author-authorization-v1/vectors.json
+.github/workflows/protocol-v3-author-authorization.yml
+```
+
+The schema freezes the exact seven keys, constants, bounds and strict input
+ordering. Vectors freeze independent positive and negative canonical bytes and
+domain-separated digests. The policy protects the exact six supplement files
+and workflow, pins the checker hash separately, and hashes
+`profile.json`, `schema.json`, `spec.md`, `vectors.json` and the workflow. The
+policy itself is the sole necessarily unhashed protected artifact; no second
+exception is permitted. The checker/workflow verify those hashes,
+schema/vector agreement and source-law constants in ordinary CI. Mutants must
+kill an unlisted, missing, renamed or stale file, an extra self-hash exception,
+skipped ordinary CI, wrong domain/bounds/order and vector-only or schema-only
+drift.
+
+This supplement is repository governance and specification input consumed by
+its checker and workflow. It is not imported by runtime code, is not added to
+package `files` or `exports`, and promises no runtime subpath. The shipped
+protocol-v3 validator owns runtime behavior. There is no registry-v1,
+generated-source or parallel handwritten-codec change.
+
+###### Composition boundary and nonclaims
+
+Later local composition must resolve `keychain.localAuthorId` through this
+genuine capability before entering issuance and bind:
+
+```text
+authorization.objectId == IssueScope.objectId
+authorization.epoch    == current authenticated epoch
+resolved author         == IssueScope.author == issuer author
+                        == keychain.localAuthorId
+resolved raw key         == issuer copied raw public key
+```
+
+Later remote and replay composition must use a resolver closure backed by the
+same capability before existing strict signature and admission. There is no
+operator-map, raw-seed, signer-set, anchor-signer or implicit-creator fallback,
+and no separate local/remote membership list.
+
+This seam owns no store or cache. Carrier bytes remain untrusted input and the
+signed anchor digest remains authority. A fresh process must reopen from a
+genuine `CurrentAnchorTrust`, exact current-anchor preimage/signature and exact
+carrier bytes. The future D.93.36 joint-consumer amendment must separately
+freeze where those exact carrier bytes come from and how they remain available
+with the AHE/live-journal activation sequence. Until that reviewed amendment is
+signed and pushed, full-B RED, token consumption, live-index construction,
+effects and publication remain forbidden.
+
+This seam defines no later-epoch ACL transport, role semantics, quorum change,
+rotation, revocation, KMS/HSM, deployment, reducer/fold or Phase 3b behavior.
+
+###### Strict TDD boundary
+
+D.93.35.3 RED is p6-named tests, fixtures and governance assets only. It may
+add the seven supplemental/workflow paths above and new p6 owners under
+`tests/` and `tests/fixtures/phase-3a1b-p6/`. The supplement and workflow are
+RED governance assets, not GREEN production paths. RED may modify exactly two
+existing test owners and no others:
+
+- `tests/protocol-v3-anchor-trust-3a0.test.ts` adds
+  `src/anchor-trust-singleton.ts` to its exact audited graph, requires exactly
+  one `createAnchorTrustApi()` call in that private owner and zero factory calls
+  in either public entry, proves a genuine trust opened through the root is
+  accepted through the authorization subpath, and kills a two-factory/foreign-
+  capability mutant while retaining every old trust assertion;
+- `tests/protocol-v3-admitted-vertex-extraction-3a1b-seam1-red.test.ts` changes
+  only its exact manifest export-map pin from root plus registry to root plus
+  authorization subpath plus registry while retaining the root exact-ten
+  runtime inventory and every old extraction assertion.
+
+The four historical operation-budget, work-budget, author-projection and
+gossip-budget freeze closures remain byte-identical, including their tests,
+fixtures, policies, checkers, specifications and workflows. Their merge-base
+checkers must run against the actual upstream merge base and pass with the old
+hashes; the gossip-budget contract's author-projection hash remains unchanged.
+A direct-push or replacement-checker bypass is not a transition mechanism.
+
+The new authorization supplement checker is bootstrap-atomic. Against a base
+where all seven new governance artifacts are absent, it permits only all seven
+to appear together in the candidate and verifies their mutual policy hashes,
+schema/vector agreement, source-law constants and workflow wiring. Partial
+presence, an unlisted file, drift or an extra unhashed exception is rejected.
+After merge, the same checker treats that complete set as its ordinary
+immutable baseline; it never thaws or rewrites an older freeze closure.
+
+RED must fail because the authorization subpath, shared singleton owner,
+settled behavior or complete new governance bundle is absent, not because of
+module resolution, a malformed fixture, an invented error string, a changed
+root inventory or a weakened predecessor pin. If another existing owner is
+found to require modification, STOP and amend this exact enumeration before
+touching it.
+
+The RED must prove causally:
+
+- independent canonical goldens, the exact domain and 8192-byte bound, author
+  counts 0/1/64/65, unsigned-ASCII ordering, duplicates, uppercase/nonhex,
+  closed keys and byte-exact canonical equality;
+- genuine current-anchor authentication exactly once, exact failure-cause
+  mapping and precedence before carrier semantics;
+- exact carrier version/profile/object/epoch/digest precedence, including
+  zero, wrong-domain and stale carrier digests;
+- the old trust-five and provenance-seven shapes remain exact while genuine
+  WeakMap capabilities cannot be forged, cloned, serialized or moved between
+  API instances;
+- resolver hostile totality, valid-absent membership, and fresh exact raw-key
+  copies;
+- the same capability drives both a local p5 issuer-resolver harness and the
+  existing remote extraction resolver, with no operator or signer-set fallback;
+- source, built and packed root runtime exact ten; authorization-subpath runtime
+  exact two and exact seven type exports; exact three-entry manifest export
+  map; exact supplement inventory and ordinary-CI freeze execution;
+- p5, D.93.17, anchor trust, admission, issuance, journal and Phase 3a
+  preservation.
+
+Required mutants include wrong or raw digest domain; omitted object/epoch;
+empty, oversized, unsorted, normalized or duplicate authors; alternate or open
+carrier shape; digest-before-anchor authentication; duplicate anchor decode,
+hash or verification; widened old provenance; forged or structurally accepted
+capability; shared/aliased keys; implicit creator, anchor-signer, signer-set or
+operator fallback; separate local/remote lists; registry/generated/runtime
+root sediment; a third authorization-subpath value or type; separate singleton
+owners; a factory call in either public entry; extra dependency/export/type/
+runtime surface; and parallel durable authority.
+
+GREEN production is limited exactly to:
+
+- `packages/protocol-v3/src/index.ts`;
+- `packages/protocol-v3/src/anchor-trust-singleton.ts`;
+- `packages/protocol-v3/src/public.ts`;
+- `packages/protocol-v3/src/author-authorization.ts`;
+- `packages/protocol-v3/package.json`, changing only the exact
+  `./author-authorization` export-map entry stated above.
+
+`src/index.ts` extends each fresh factory closure with the settled private
+authentication decision, authorization `WeakMap` and two bound methods.
+`src/anchor-trust-singleton.ts` creates exactly one package-public owner and
+exports only its six bound functions. `src/public.ts` binds the existing four
+trust functions from that owner without changing its root export inventory;
+`src/author-authorization.ts` binds the two authorization values from the same
+owner and type-exports only the exact seven settled types. The singleton module
+itself is not a package export.
+
+The package name, version, dependencies, `files` and every script byte remain
+unchanged. No lockfile, registry-v1, generated source, node, control-plane,
+keychain, issuance, live-journal, AHE, supplemental governance or plan edit is
+authorized during GREEN.
+
+Gates include focused p6 tests; protocol-v3 typecheck/build/static/format;
+source, built and packed external consumers; root runtime exact ten and root
+type preservation; authorization-subpath runtime exact two and exact seven
+types; package exports exactly root, authorization subpath and registry; the
+unchanged exact-ten package smoke; all four historical merge-base freeze
+checkers with their old bytes and hashes; the new bootstrap-atomic ordinary-CI
+supplement checker; the one-owner cross-entry test and its second-owner mutant;
+existing p5, D.93.17, anchor trust, admission, extraction, issuance, journal,
+node and Phase 3a preservation; and genuine Chromium/Firefox/WebKit execution
+for the public resolver/strict-signature integration. After GREEN, exact-tree
+Codex, Grok, Kimi and Opus closure review precedes a bounded non-normative
+ledger and push. The ledger may authorize D.93.36 design only; it cannot
+authorize its RED or implementation.
+
+After this exact amendment is independently reviewed, signed and pushed, and
+only then, p6 tests-only RED may begin.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
