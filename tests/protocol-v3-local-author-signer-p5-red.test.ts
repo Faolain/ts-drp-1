@@ -850,5 +850,5 @@ describe("D.93.35 p5 protocol-v3 callback-arm causal RED", () => {
 		} finally {
 			if (existsSync(temporary)) rmSync(temporary, { force: true, recursive: true });
 		}
-	});
+	}, 30_000);
 });

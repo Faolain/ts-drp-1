@@ -56,8 +56,8 @@ function intrinsicSignatureHex(source: Uint8Array): string {
 }
 
 function expectFreshOrdinarySignature(returned: Uint8Array, dependencyOutput: Uint8Array): void {
-	expect(returned).not.toBe(dependencyOutput);
-	expect(returned.buffer).not.toBe(dependencyOutput.buffer);
+	expect(Object.is(returned, dependencyOutput)).toBe(false);
+	expect(Object.is(returned.buffer, dependencyOutput.buffer)).toBe(false);
 	expect(Object.getPrototypeOf(returned)).toBe(Uint8Array.prototype);
 	expect(returned.buffer).toBeInstanceOf(ArrayBuffer);
 	expect(returned.byteOffset).toBe(0);
