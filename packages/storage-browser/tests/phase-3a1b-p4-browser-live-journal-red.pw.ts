@@ -34,7 +34,7 @@ async function runCase(
 
 test("opens the exact five-method facade and native strict-IDB schema without touching primary", async ({ page }) => {
 	const value = await runCase(page, "surface-schema");
-	expect(value.keys).toEqual(P4_BROWSER_METHODS);
+	expect(value.keys).toEqual([...P4_BROWSER_METHODS].sort());
 	expect(value.primaryCreated).toBe(false);
 	expect(value.schema).toEqual({
 		stores: [

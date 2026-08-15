@@ -254,7 +254,7 @@ describe("D.93.34 p4-a frozen shared contract", () => {
 	it("installs exact creator genesis and exposes only one frozen five-method capability", async () => {
 		const store = await openCandidateStore();
 		try {
-			expect(Object.keys(store).sort()).toEqual(LIVE_JOURNAL_METHODS);
+			expect(Object.keys(store).sort()).toEqual([...LIVE_JOURNAL_METHODS].sort());
 			expect(Reflect.ownKeys(store)).toEqual(LIVE_JOURNAL_METHODS);
 			expect(Object.isFrozen(store)).toBe(true);
 			const { install, scope } = exactInputs();
@@ -380,7 +380,13 @@ describe("D.93.34 p4-a frozen shared contract", () => {
 			kind: "evidence-conflict",
 			ok: false,
 		});
-		expect(await store.appendAccepted({ ...values.local, vertexDigest: "f".repeat(64) })).toEqual({
+		expect(await store.appendAccepted({ ...values.local, vertexDigest: "f".repeat(64) })).toMatchObject({
+			idempotent: false,
+			journalSequence: 1,
+			ok: true,
+			sourceKind: "local-issued",
+		});
+		expect(await store.appendAccepted({ ...values.local, vertexDigest: "e".repeat(64) })).toEqual({
 			kind: "evidence-conflict",
 			ok: false,
 		});

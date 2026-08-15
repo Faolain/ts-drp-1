@@ -275,7 +275,7 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 		const primaryFilename = primary("surface");
 		const store = createNodeDurableLiveJournalStore({ primaryFilename });
 		try {
-			expect(Object.keys(store).sort()).toEqual(P4_NODE_METHODS);
+			expect(Object.keys(store).sort()).toEqual([...P4_NODE_METHODS].sort());
 			expect(fs.existsSync(primaryFilename)).toBe(false);
 			expect(fs.existsSync(`${primaryFilename}.drp-live-journal-v1.sqlite`)).toBe(true);
 		} finally {
