@@ -10927,6 +10927,60 @@ Production GREEN remains limited to the owners named by D.93.34. No other
 predecessor test may change, and this correction does not relax any prior
 behavioral, schema, authority or non-widening assertion.
 
+##### D.93.34.2 — durable live-journal closure ledger
+
+The p4 prerequisite is closed. The final reviewed tests-only boundary is signed
+commit `02ce5f96468186156e0de5e4d803f00032431d61`; the production implementation
+is its signed child `203cec5533cc5c2e6f492c91c260a0ea2397d737`, tree
+`256732e7f82f0eda3d25119080b9771fa54d889f`. Both use the Faolain signing key,
+and the complete p4 lineage remains contiguous with the signed D.93.34 and
+D.93.34.1 plan commits. The exact final production patch hash is
+`3d047ef38cf19fd5922b2d3045c8057be3fa0952bf33c9f2697c5ac3a86f2195`.
+
+The accepted implementation has one shared structural and result owner and two
+strict durability adapters. It adds no protocol, admission, issuance, AHE,
+network, control-plane or live-index authority. Full focused behavior,
+type/build/static, package-surface and preservation gates passed. The Node
+SQLite and Browser IndexedDB suites also passed their complete genuine
+death/reopen matrices, including every supported Browser engine. Hostile
+substrate probes confirmed that malformed durable scope or row state poisons
+before token/page disclosure and before an ordinary genesis or evidence
+conflict can mask corruption.
+
+The test-oracle discipline for this seam is now explicit:
+
+- custom source analyzers validate named positive and negative analyzer
+  fixtures; they do not prescribe production call topology or substitute for
+  runtime evidence;
+- embedded nontrivial programs live under the p4 fixture tree and identify
+  themselves as analyzer fixtures or runtime mutants;
+- substrate observers assert semantic partial orders and durable outcomes, not
+  incidental SQL spelling or bundle text order;
+- real Node and Browser adapter mutants, actual packed artifacts and genuine
+  death/reopen execution remain the load-bearing causal evidence.
+
+This correction was tests-only and evidence-preserving. It exposed harness
+overconstraints rather than a repeated normative-design defect, so no D.93.34
+amendment is implied. The plan's permitted ephemeral conformance mirror is not
+part of the shipped public surface; its absence grants no durability claim and
+does not alter the five-method contract.
+
+Fresh exact-tree closure review converged. Kimi K3/high/100 accepted the code
+with no P0/P1 blocker (session `f3677194-fc33-440e-a7f4-72171d4a9331`, result
+SHA `6ed7103a1d88e2cd828f4b354af42a9f6923e91ef7c8f76527f5d43e982bb692`).
+Native Grok 4.6/high returned terminal `PASS` in compact session
+`01a00654-413b-7f63-b23c-eda6efddb3ca`. Native Opus 5/xhigh returned terminal
+`PASS` in compact session `65614f52-09ad-4f70-a147-0bbdce9f1941` (raw SHA
+`b34cee094ff391a318d837c46df1793c96b1004eea6fb57c88edcee7ac05e5a6`).
+The earlier nonterminal Grok and Opus source-audit runs remain disclosed as
+`NO_VERDICT` and contribute no assent.
+
+This ledger authorizes D.93.35 design and amendment work only. D.93.35 RED or
+implementation requires its own independently reviewed, signed and pushed
+contract. D.93.36 remains blocked until the custody prerequisite closes and a
+separate joint-consumer contract is reviewed, signed and pushed. No full-B
+RED, activation composition, Phase 3b or live deployment is authorized here.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
