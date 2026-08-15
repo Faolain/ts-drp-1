@@ -11306,6 +11306,62 @@ unauthorized until that RED independently passes review and is signed. All
 D.93.35 identity, lifecycle, callback, mutation-order, nonauthorization and
 sequencing rules not explicitly corrected here remain normative and unchanged.
 
+##### D.93.35.2 — configured local-author custody closure ledger
+
+The p5 custody prerequisite is closed. The signed and pushed linear delivery
+lineage is:
+
+- corrected tests-only RED `5fec25bc9b476fb72cd54358df6239568a721b67`;
+- bounded two-test oracle correction
+  `3076d3e72d7bb896453233e40a66d8028d498098`;
+- production GREEN `fc9186f4c0199473024a36729bfb769113be293d`,
+  tree `c0fb82eef177cd7e89de414206a5ff8f96a64135`.
+
+Each commit has a good Faolain signature. At closure, HEAD, upstream and the
+remote branch resolve to the GREEN commit with ahead/behind `0/0`; the tracked
+tree and index are clean and the six pre-existing stashes remain preserved.
+The earlier contradictory RED is retained only on its recovery ref and is not
+an ancestor of this lineage.
+
+GREEN changes exactly `packages/keychain/src/keychain.ts`,
+`packages/protocol-v3/src/index.ts` and
+`packages/protocol-v3/src/public.ts`. The implementation has one shared issuer
+core. It adds no parallel signing path, runtime export, dependency, manifest,
+lockfile, registry, trust, node, journal or issuance owner.
+
+D.93.35.1 is material and closed as implemented. The private locked signer
+result may be a genuine `Buffer`, `Uint8Array` subclass or partial fixed-buffer
+view; captured intrinsics copy it to the exact ordinary full-backing public
+result. Caller digest and public protocol callback boundaries remain strict.
+The operation-budget tests use independently pinned exact 100/101-byte
+schema-v2 vectors and retain a measured greater-than-100-byte schema-v1 control,
+so no global cap was invented. The two-test corrective commit removes only a
+hostile-fixture formatter read and gives the genuine pack/type audit a bounded
+30-second allowance; it weakens no causal assertion.
+
+Authenticated execution evidence is focused p5 `37/37`; Keychain `27/27`;
+genuine Chromium/Firefox/WebKit parity `9/9`; Phase 3a/Seam preservation
+`105/105`; targeted protocol-v3 preservation `120/120`; issuance `45/45`; and
+all dedicated typecheck, build, public-smoke, pack, protocol-freeze, ESLint,
+Prettier and diff gates green. Broad-suite residuals remain pre-existing
+governance hash/scratch-commit and unrelated Node compact-history/network-sync
+baselines; they do not alter the focused or preservation evidence.
+
+Independent Codex-high accepted the exact GREEN with no P0-P2 findings. Fresh
+native Grok 4.6/high and Opus 5/xhigh both returned terminal `PASS`, no P0-P2
+blockers and `P5_MAY_CLOSE=yes`. Fresh Kimi K3/high/100 accepted the code, then
+returned `P5_MAY_CLOSE=yes` with high confidence after the exact signed lineage
+and gate evidence were pushed and reauthenticated.
+
+P5 proves deterministic configured local-author custody and strict verified
+registered-digest callback issuance only. Possession and author/public-key
+consistency are not authorization. D.93.17 trust law is unchanged. This ledger
+authorizes design and amendment work for the separate protocol-v3
+author-authorization prerequisite only. That amendment must be independently
+reviewed, signed and pushed before its RED. D.93.36, full-B RED or
+implementation, activation, reducer/fold, Phase 3b and deployment remain
+unauthorized.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
