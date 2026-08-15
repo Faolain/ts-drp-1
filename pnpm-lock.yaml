@@ -504,6 +504,15 @@ importers:
         specifier: ^1.13.0
         version: 1.13.0
 
+  packages/live-journal:
+    dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
+      '@ts-drp/storage':
+        specifier: 0.11.0
+        version: link:../storage
+
   packages/logger:
     dependencies:
       '@ts-drp/types':
@@ -1115,6 +1124,9 @@ importers:
       '@ts-drp/issuance-store':
         specifier: 0.11.0
         version: link:../issuance-store
+      '@ts-drp/live-journal':
+        specifier: 0.11.0
+        version: link:../live-journal
       '@ts-drp/storage':
         specifier: 0.11.0
         version: link:../storage
@@ -1124,6 +1136,9 @@ importers:
       '@ts-drp/issuance-store':
         specifier: 0.11.0
         version: link:../issuance-store
+      '@ts-drp/live-journal':
+        specifier: 0.11.0
+        version: link:../live-journal
       '@ts-drp/storage':
         specifier: 0.11.0
         version: link:../storage

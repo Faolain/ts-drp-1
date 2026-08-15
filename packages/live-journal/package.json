@@ -1,5 +1,5 @@
 {
-	"name": "@ts-drp/storage-browser",
+	"name": "@ts-drp/live-journal",
 	"version": "0.11.0",
 	"license": "MIT",
 	"repository": {
@@ -12,36 +12,24 @@
 		"src",
 		"dist",
 		"!dist/test",
-		"!dist/tests",
-		"!dist/playwright*",
 		"!**/*.tsbuildinfo"
 	],
 	"exports": {
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
-		},
-		"./issuance": {
-			"types": "./dist/src/issuance.d.ts",
-			"import": "./dist/src/issuance.js"
-		},
-		"./live-journal": {
-			"types": "./dist/src/live-journal.d.ts",
-			"import": "./dist/src/live-journal.js"
 		}
 	},
 	"scripts": {
 		"build": "tsc -b tsconfig.build.json",
 		"clean": "rm -rf dist/ node_modules/",
 		"prepack": "tsc -b",
-		"test": "pnpm --dir ../.. exec vitest run packages/storage-browser/tests --no-coverage --maxWorkers=1 --minWorkers=1",
+		"test": "vitest run",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
 		"@ts-drp/canonical": "0.11.0",
-		"@ts-drp/issuance-store": "0.11.0",
-		"@ts-drp/live-journal": "0.11.0",
 		"@ts-drp/storage": "0.11.0"
 	}
 }
