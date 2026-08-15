@@ -10981,6 +10981,255 @@ contract. D.93.36 remains blocked until the custody prerequisite closes and a
 separate joint-consumer contract is reviewed, signed and pushed. No full-B
 RED, activation composition, Phase 3b or live deployment is authorized here.
 
+##### D.93.35 — configured local-author Ed25519 custody and type-only signer port
+
+This amendment closes only the configured local-author custody prerequisite
+and the cryptographic signer port needed by the existing admission-bound
+transactional issuer. It does not authorize an author for any object, epoch,
+anchor or profile. Cryptographic possession and author/public-key consistency
+are not authorization. A separate, independently reviewed, signed and pushed
+protocol-v3 author-authorization amendment remains a hard predecessor of the
+full Phase 3a-1B joint-consumer contract.
+
+###### Existing dependency owner and exact derivation
+
+`packages/keychain/src/keychain.ts` remains the sole local-author secret owner.
+It reuses its existing direct `@libp2p/crypto@5.1.21` seeded Ed25519 API and
+existing direct `@noble/hashes@1.7.1` SHA-256/SHA-512 owner. Protocol-v3 keeps
+its existing direct `@noble/curves@2.2.0` strict verification owner. D.93.35
+adds no dependency, manifest, export-map or lockfile entry.
+
+For a nonempty configured `private_key_seed`, the exact local-author KDF is:
+
+```text
+seedBytes       = UTF8(private_key_seed)
+seed64          = SHA512(seedBytes)
+localAuthorSeed = SHA256(
+  UTF8("ts-drp-keychain/local-author-ed25519/v1") || 0x00 || seed64
+)
+localAuthorKey  = await generateKeyPairFromSeed("Ed25519", localAuthorSeed)
+```
+
+The ASCII domain and the single zero separator are literal. There is no
+UTF-16, hexadecimal-text, trimmed-string, raw `seed64`, prefix/slice or legacy
+secp256k1/BLS derivation fallback. An unpaired UTF-16 surrogate is rejected
+for local-author construction rather than being replacement-encoded. The
+existing secp256k1 and BLS derivation bytes and public surfaces stay unchanged.
+An absent or empty configured seed preserves the existing random secp256k1/BLS
+behavior but mints no random Ed25519 local author.
+
+Each `start()` snapshots the configured seed before its first await and derives
+all secp256k1, BLS and optional local-author candidates privately. A successful
+start publishes the complete candidate set in one synchronous no-await section;
+a successful seedless start publishes the legacy candidates and an unavailable
+local-author state. Any derivation or validation failure rejects and publishes
+none of that attempt: a first failed start leaves all three capabilities
+unavailable, while a failed restart after a prior success leaves the entire
+previously published set, including its local author, unchanged. There is no
+mixed old/new key set. The same configured seed in a restarted or fresh process
+derives the same author id and signature bytes; a changed seed selects a
+different issuance lineage with no migration, alias or fallback promise.
+
+JavaScript cannot guarantee secret erasure. The configured string, derivation
+temporaries, retained libp2p private-key object, engine/library copies and
+per-call copies may remain in managed memory. D.93.35 adds no raw seed/private
+key getter, serialization, inspection hook, zeroization API, stop hook, durable
+key record, rotation API, mnemonic, KMS/HSM or browser-nonextractable claim.
+
+###### Exact Keychain surface and copy boundary
+
+The `Keychain` class gains exactly these two members and no new module-level
+runtime export:
+
+```ts
+get localAuthorId(): string;
+signWithLocalAuthor(registeredDigest: Uint8Array): Promise<Uint8Array>;
+```
+
+`localAuthorId` is exactly the lowercase 64-hex encoding of the raw 32-byte
+Ed25519 public key. Before a successful configured start, and after a seedless
+start, its getter synchronously throws
+`Error("local author identity is unavailable")`. In the same states,
+`signWithLocalAuthor` returns a rejected Promise with that exact `Error` type and
+message before inspecting its argument. Neither member lazily derives or
+generates a key.
+
+`signWithLocalAuthor` accepts only an ordinary, non-shared 32-byte
+`Uint8Array` that is the complete view of its backing store: intrinsic
+`byteOffset === 0`, intrinsic `byteLength === 32` and backing
+`ArrayBuffer.byteLength === 32`. It rejects subclasses, proxies, accessors,
+shared backing, partial views and wrong shapes without exposing input bytes. It
+detaches the digest before the first await, invokes the retained Ed25519 signer
+once, awaits either synchronous or asynchronous dependency output, requires an
+ordinary non-shared 64-byte `Uint8Array` that likewise has intrinsic
+`byteOffset === 0` and a 64-byte backing `ArrayBuffer`, and returns a fresh
+copy. Caller mutation of the input or returned signature cannot change signed
+bytes or retained key state. This method is a registered-digest signer only,
+not a general message-signing oracle.
+
+###### Type-only protocol signer arm
+
+Protocol-v3 adds this one public type and re-exports it from `src/public.ts` as
+a type only:
+
+```ts
+export type SignRegisteredVertexDigest = (registeredDigest: Uint8Array) => Promise<Uint8Array>;
+```
+
+The package runtime root remains exactly its existing ten values.
+`AdmissionBoundTransactionalIssuerOptions` preserves its existing common
+field names and becomes the exclusive union:
+
+```ts
+type AdmissionBoundTransactionalIssuerCommonOptions = Readonly<{
+	author: string;
+	preparedBlueprintAdmission: PreparedBlueprintAdmission;
+	publicKey: RawEd25519PublicKey;
+	transactIssue: TransactIssue;
+}>;
+
+export type AdmissionBoundTransactionalIssuerOptions = AdmissionBoundTransactionalIssuerCommonOptions &
+	(
+		| Readonly<{
+				privateKeySeed: Uint8Array;
+				signRegisteredVertexDigest?: never;
+		  }>
+		| Readonly<{
+				privateKeySeed?: never;
+				signRegisteredVertexDigest: SignRegisteredVertexDigest;
+		  }>
+	);
+```
+
+The common helper type is private to the implementation. There is no second
+exported options bag, signer object, handle, flattened key or runtime signer
+value. Existing valid own-data raw-seed inputs and the conformance-only
+`createTransactionalVertexIssuer` behavior remain unchanged. The new exclusive
+application-options boundary intentionally rejects inherited or accessor
+custody fields on either arm; that hostile-shape tightening is not a change to
+valid raw-seed issuance bytes or mutation order.
+
+`createAdmissionBoundTransactionalVertexIssuer` first proves genuine
+module-private `PreparedBlueprintAdmission` provenance, before signing-arm
+inspection. It then selects exactly one own data-property arm without invoking
+an accessor or consulting the prototype. Both arms or neither arm fail
+synchronously. Callback construction copies the raw public key and captures
+the function once but invokes it zero times. On the callback arm only,
+`author` must equal lowercase hex of that copied raw public key at construction.
+
+For every callback-arm issuance attempt, the fixed order is:
+
+1. validate the caller operation against the prepared ABI;
+2. detach it and validate the detached operation and canonical-byte budget;
+3. enter the existing `transactIssue` owner and receive its
+   `authorSequence`;
+4. encode the exact registered preimage and derive its existing 32-byte
+   registered digest;
+5. retain one digest copy and pass a distinct fresh copy to
+   `signRegisteredVertexDigest` exactly once;
+6. await, validate and copy the exact 64-byte result;
+7. run existing strict
+   `verifyEd25519RegisteredDigest(signature, retainedDigest, publicKey)` with
+   `{zip215:false}`;
+8. only after successful verification construct and return the normal
+   envelope and `IssueCommit` to the transaction owner.
+
+Callback throw/rejection propagates without retry or fallback. Callback result
+capture accepts only a value whose prototype is exactly `Uint8Array.prototype`,
+whose backing store is an ordinary `ArrayBuffer`, whose intrinsic
+`byteOffset === 0`, and whose view and backing byte lengths are both exactly 64. Subclasses, proxies, accessors, shared backing, partial views,
+detached/inaccessible views and wrong type/length all throw
+`TypeError("signRegisteredVertexDigest must return a 64-byte Uint8Array")`;
+hostile reflection failures are caught and mapped to that same error. Capture
+copies every byte before verification. An admitted 64-byte signature that
+fails strict verification throws `VertexValidationError`. Every failure returns no
+`IssueCommit` and therefore permits no lineage, issued-record or outbox
+mutation. A genuine issuance retry recomputes bytes and digest and invokes the
+callback again; no ordinal-bound signature is reused. Callback mutation of its
+argument cannot affect verification because the issuer retains an independent
+digest copy. Returned signer bytes are never aliased into the envelope.
+
+###### Possession boundary and missing authorization owner
+
+Later composition must bind:
+
+```text
+issuer author == IssueScope.author == keychain.localAuthorId
+              == lowercaseHex(copied raw public key)
+```
+
+That equality and strict signature verification prove only self-consistent key
+possession. An operator-supplied author resolver may be closed, copied and
+frozen and may return fresh raw-key copies for exact configured names; unknown
+or malformed names return `undefined`. Such a map has no authenticated trust
+provenance and cannot authorize issuance.
+
+D.93.17 remains unchanged. `CurrentAnchorTrust` exposes no signer bytes or
+roles; node, control-plane and keychain do not decode signer-set/profile
+carriers, recover author keys from trust-record bytes or repurpose signer-set
+digests as an author list. A future protocol-v3-owned author-authorization seam
+must bind authenticated anchor/ACL provenance to the author public key. Its
+surface and bytes are deliberately deferred. Until that amendment closes,
+full-B composition, D.93.36 RED and any claim that an otherwise valid author
+may issue remain forbidden.
+
+###### TDD boundary and causal evidence
+
+The D.93.35 RED is tests/config/fixtures only. Its owners are p5-named tests in
+`packages/keychain/tests/`, one root protocol-v3 callback-arm suite, and
+p5-only fixtures/configuration under `tests/fixtures/phase-3a1b-p5/`. Browser
+parity uses a p5-named Playwright entry/spec/config without modifying production
+or predecessor tests. RED may make only exact additive type-audit transitions;
+runtime export inventories remain exact ten. It may not edit production,
+manifests, dependencies, lockfiles, registries, trust law, node,
+control-plane, issuance, journal or this plan.
+
+RED must prove, causally rather than textually:
+
+- exact KDF/public-key/signature vectors, seedless non-minting, same-seed fresh
+  process identity and changed-seed lineage separation;
+- unavailable-state precedence, hostile input/result totality, copy-before-
+  await, input/output freshness and honest retained-copy/non-zeroization law;
+- the exact type union, own-data arm selection, both/neither rejection,
+  genuine prepared-capability precedence and zero construction invocation;
+- callback placement inside the transaction build, exact digest bytes across
+  await, strict verification before commit, mutation/rejection taxonomies,
+  retry re-invocation and zero durable mutation on every failure;
+- unchanged raw-seed vectors, protocol-v3 runtime-ten surface, Keychain
+  secp256k1/BLS behavior and all D.93.17 trust boundaries;
+- genuine Node and Chromium/Firefox/WebKit parity using the locked dependency
+  path, with byte-identical author id/signature and protocol strict
+  verification. A browser resolution failure stops the slice; no alias or
+  polyfill invention is authorized.
+
+Required mutants include missing/changed KDF domain or separator, raw/prefixed
+`seed64`, replacement-encoded invalid seed, seedless random author, uppercase
+or base64 identity, shared/uncopied digest or signature, secret getter/general
+signer, runtime eleventh export, prototype/accessor arm selection, both-arm
+preference, callback at construction/outside transaction/after commit,
+callback-mutated verification input, skipped or ZIP-215 verification,
+signature reuse on retry, seed fallback, author/public-key mismatch and any
+trust-derived or operator-map authorization claim.
+
+GREEN production is limited exactly to:
+
+- `packages/keychain/src/keychain.ts`;
+- `packages/protocol-v3/src/index.ts`;
+- `packages/protocol-v3/src/public.ts`.
+
+No manifest, lock, registry, export-map, node, trust, issuance or journal edit
+is authorized. Gates include focused p5 tests; Keychain and protocol-v3
+typecheck/build/static/format; runtime-ten and additive declaration audits;
+built and packed external consumers; all protocol-v3 freeze checkers; existing
+Keychain, issuance, Node and Phase 3a preservation; and genuine three-engine
+browser parity.
+
+After this exact amendment is independently reviewed, signed and pushed, p5
+tests-only RED may start. P5 closure will authorize only deterministic
+configured custody and verified callback issuance. It will not authorize
+D.93.36, full-B activation, reducer/fold, author authorization, Phase 3b or live
+deployment.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
