@@ -34,7 +34,7 @@ function observe(edge, sql, details = {}) {
 }
 
 function table(sql, name) {
-	return new RegExp(`\\b(?:FROM|INTO|UPDATE)\\s+(?:${name}|"${name}"|\\\`${name}\\\`)\\b`, "iu").test(sql);
+	return new RegExp(`\\b(?:FROM|INTO|UPDATE)\\s+(?:${name}\\b|"${name}"|\`${name}\`)`, "iu").test(sql);
 }
 
 DatabaseSync.prototype.prepare = function (sql) {
