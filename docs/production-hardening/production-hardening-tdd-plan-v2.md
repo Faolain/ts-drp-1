@@ -11230,6 +11230,82 @@ configured custody and verified callback issuance. It will not authorize
 D.93.36, full-B activation, reducer/fold, author authorization, Phase 3b or live
 deployment.
 
+##### D.93.35.1 — private dependency-result and bounded-operation correction
+
+The first p5 GREEN attempt exposed two contradictions in the signed RED
+boundary. The locked Node implementation of `@libp2p/crypto@5.1.21` returns a
+genuine `Buffer` from Ed25519 `sign()`, so D.93.35's requirement that the
+Keychain-private dependency result itself have exactly
+`Uint8Array.prototype` cannot coexist with the required real dependency vector.
+Separately, the RED's oversized-operation case used the schema-v1 Phase-0i
+package, which declares no `maxCanonicalOperationBytes`; existing protocol law
+therefore correctly treats that package as unbounded. Neither conflict grants a
+public compatibility path or a global operation ceiling.
+
+Only the private Keychain dependency-result capture is corrected. The locked
+signer result must have the genuine internal `Uint8Array` typed-array brand,
+ordinary fixed-length, non-shared and non-detached `ArrayBuffer` backing, and
+intrinsic `byteLength === 64`. Resizable backing is rejected. A Node `Buffer`,
+another genuine `Uint8Array` subclass, or a partial view into a larger ordinary
+fixed-length buffer is admissible at this private boundary. Capture uses the
+saved `%TypedArray%.prototype[Symbol.toStringTag]` getter to require the exact
+`"Uint8Array"` brand, saved typed-array buffer/offset/length getters, the saved
+`ArrayBuffer.prototype.byteLength` getter to distinguish ordinary from shared
+or detached backing, the saved resizable getter when present, and saved
+`Uint8Array.prototype.set` to copy the exact view bytes into a newly allocated
+ordinary, offset-zero, full-backing 64-byte `Uint8Array`.
+It never invokes the source iterator, indexed user access, constructor,
+species, `slice`, spread or an overridable source method. The fresh ordinary
+copy is the only value returned from `signWithLocalAuthor`.
+
+A proxy, a non-`Uint8Array` typed array, shared backing, a detached or
+inaccessible view, wrong intrinsic length or any brand/reflection/copy failure
+rejects with exactly:
+
+```text
+TypeError("local author signer must return a 64-byte Uint8Array")
+```
+
+This relaxation applies nowhere else. The caller-supplied registered digest to
+`signWithLocalAuthor` remains an exact ordinary offset-zero/full-backing
+32-byte `Uint8Array`. The public protocol-v3
+`signRegisteredVertexDigest` callback result remains an exact ordinary
+offset-zero/full-backing 64-byte `Uint8Array` and retains its D.93.35 error.
+There is no public Buffer overload, signer type widening, runtime export,
+dependency, manifest, lockfile or authorization change.
+
+The corrected p5 RED must exercise the actual locked Node `Buffer` result and a
+genuine browser dependency result, then kill exact-prototype/full-backing
+dependency rejection, Buffer/partial-view rejection, spread/iterator/slice/
+species copying, non-`Uint8Array` typed-array acceptance, shared/detached
+or resizable acceptance and missing fresh-copy mutants. It must also kill a
+public `signWithLocalAuthor` return that is fresh but remains a `Buffer`, another
+subclass or a partial-backing view: the public return stays exact
+`Uint8Array.prototype`, offset zero and full 64-byte backing. Hostile subclasses
+may override ordinary methods and iteration; the intrinsic copy must remain
+unaffected.
+
+The operation-budget case must use a genuine prepared schema-v2 Phase-0p2
+work-budget package declaring `maxCanonicalOperationBytes: 100`. Its fixture
+independently constructs and byte-counts schema-valid operations whose canonical
+operation encodings are exactly 100 and 101 bytes using fixture-owned pinned
+bytes or an independent encoder, never the production encoder under test. Exact
+100 enters the transaction and signer path; exact 101 throws `RangeError`
+before transaction entry, signer invocation or mutation. The schema-v1 Phase-0i
+package must retain a large valid operation whose independently measured
+canonical operation encoding exceeds 100 bytes and that still enters issuance,
+proving there is no invented global cap. Tests may not infer a ceiling from
+payload size or replace the genuine prepared capability with a fake.
+
+This correction authorizes changes only to the new p5 test/fixture/config paths
+already named by D.93.35. The signed but unpushed contradictory RED is retained
+only as recovery evidence and must not become an ancestor of the corrected
+lineage. After this subsection is independently reviewed, signed and pushed, a
+fresh corrected tests-only RED may be composed on it. Production remains
+unauthorized until that RED independently passes review and is signed. All
+D.93.35 identity, lifecycle, callback, mutation-order, nonauthorization and
+sequencing rules not explicitly corrected here remain normative and unchanged.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
