@@ -154,7 +154,12 @@ test("genuine persistent-context death is old XOR exact-new at all 36 edges", as
 		server.revoke(recoveryInput.pathToken);
 		const expectedReady = tuple.terminalFate === "exact-new" || tuple.scenario !== "install-genesis";
 		const expectedRows = tuple.scenario === "install-genesis" || tuple.terminalFate === "old" ? 0 : 1;
-		expect(recovery.primary, tuple.id).toMatchObject({ ok: true, ready: expectedReady, rowCount: expectedRows });
+		if (expectedReady) {
+			expect(recovery.primary, tuple.id).toMatchObject({ ok: true, ready: true, rowCount: expectedRows });
+		} else {
+			expect(recovery.primary, tuple.id).toMatchObject({ ok: true, ready: false });
+			expect(Object.hasOwn(recovery.primary ?? {}, "rowCount"), tuple.id).toBe(false);
+		}
 		expect(recovery.raw, tuple.id).toEqual(recovery.expectedRaw);
 		expect(recovery.raw?.rows, tuple.id).toHaveLength(expectedRows);
 		expect(recovery.raw?.scopes, tuple.id).toHaveLength(
