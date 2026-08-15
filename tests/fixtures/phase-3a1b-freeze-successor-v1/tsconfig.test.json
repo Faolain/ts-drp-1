@@ -10,6 +10,7 @@
 	},
 	"include": [
 		"../../protocol-v3-freeze-successor-v1-red.test.ts",
+		"../../protocol-v3-freeze-successor-v1-repository-red.test.ts",
 		"./*.ts",
 		"./analyzers/**/*.ts",
 		"./controlled-freeze-successor.mjs",
