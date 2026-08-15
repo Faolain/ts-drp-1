@@ -110,6 +110,30 @@ function sameBytes(left: unknown, right: unknown): boolean {
 	);
 }
 
+function exactDataRecord(
+	value: unknown,
+	expectedKeys: readonly string[],
+	label: string
+): Readonly<Record<string, unknown>> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		throw new TypeError(`${label} must be a record`);
+	}
+	const prototype = Object.getPrototypeOf(value);
+	const keys = Reflect.ownKeys(value);
+	if (
+		(prototype !== Object.prototype && prototype !== null) ||
+		keys.length !== expectedKeys.length ||
+		!keys.every((key, index) => key === expectedKeys[index]) ||
+		!keys.every((key) => {
+			const descriptor = Object.getOwnPropertyDescriptor(value, key);
+			return descriptor !== undefined && descriptor.enumerable && "value" in descriptor;
+		})
+	) {
+		throw new TypeError(`${label} must have the exact data-record shape`);
+	}
+	return value as Readonly<Record<string, unknown>>;
+}
+
 function material(): Readonly<Record<string, unknown>> {
 	const zero = "0".repeat(64);
 	const objectId = `creator:${"1".repeat(32)}`;
@@ -236,12 +260,30 @@ async function concurrency(): Promise<unknown> {
 	const first = await open(primary);
 	const second = await open(primary);
 	const values = material();
+	const install = exactDataRecord(
+		values.install,
+		[
+			"detachedAnchorSignature",
+			"exactCanonicalAnchorPreimageBytes",
+			"exactCanonicalParametersCarrierBytes",
+			"objectId",
+		],
+		"material.install"
+	);
+	const local = exactDataRecord(
+		values.local,
+		["author", "authorSequence", "scope", "sourceKind", "vertexDigest"],
+		"material.local"
+	);
+	const received = exactDataRecord(
+		values.received,
+		["detachedSignature", "exactCanonicalPreimageBytes", "scope", "sourceKind", "vertexDigest"],
+		"material.received"
+	);
+	const scope = exactDataRecord(values.scope, ["anchorDigest", "epoch", "objectId"], "material.scope");
 	try {
-		await first.installGenesis(values.install as Readonly<Record<string, unknown>>);
-		const race = await Promise.all([
-			first.appendAccepted(values.received as Readonly<Record<string, unknown>>),
-			second.appendAccepted(values.local as Readonly<Record<string, unknown>>),
-		]);
+		await first.installGenesis(install);
+		const race = await Promise.all([first.appendAccepted(received), second.appendAccepted(local)]);
 		await Promise.all([first.close(), second.close()]);
 		const closure = (await rawClosure(derived)) as {
 			readonly rows: readonly Record<string, unknown>[];
@@ -253,21 +295,21 @@ async function concurrency(): Promise<unknown> {
 			closure.rows.length === 1 &&
 			closure.scopes.length === 1 &&
 			Reflect.get(row ?? {}, "journalSequence") === 0 &&
-			Reflect.get(row ?? {}, "vertexDigest") === Reflect.get(values.received, "vertexDigest") &&
+			Reflect.get(row ?? {}, "vertexDigest") === Reflect.get(received, "vertexDigest") &&
 			Reflect.get(installed ?? {}, "nextJournalSequence") === 1 &&
-			Reflect.get(installed ?? {}, "objectId") === Reflect.get(values.install, "objectId") &&
-			Reflect.get(installed ?? {}, "anchorDigest") === Reflect.get(values.scope, "anchorDigest") &&
+			Reflect.get(installed ?? {}, "objectId") === Reflect.get(install, "objectId") &&
+			Reflect.get(installed ?? {}, "anchorDigest") === Reflect.get(scope, "anchorDigest") &&
 			sameBytes(
 				Reflect.get(installed ?? {}, "exactCanonicalAnchorPreimageBytes"),
-				Reflect.get(values.install, "exactCanonicalAnchorPreimageBytes")
+				Reflect.get(install, "exactCanonicalAnchorPreimageBytes")
 			) &&
 			sameBytes(
 				Reflect.get(installed ?? {}, "exactCanonicalParametersCarrierBytes"),
-				Reflect.get(values.install, "exactCanonicalParametersCarrierBytes")
+				Reflect.get(install, "exactCanonicalParametersCarrierBytes")
 			) &&
 			sameBytes(
 				Reflect.get(installed ?? {}, "detachedAnchorSignature"),
-				Reflect.get(values.install, "detachedAnchorSignature")
+				Reflect.get(install, "detachedAnchorSignature")
 			);
 		return { closure, race, rawVerified };
 	} finally {
