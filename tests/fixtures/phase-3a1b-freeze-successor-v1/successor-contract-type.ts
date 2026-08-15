@@ -46,9 +46,12 @@ export interface CompletedRepositoryCandidateEvidence {
 			readonly status: number | null;
 		}>;
 	}[];
-	readonly positives: readonly Readonly<{
-		readonly output: string;
-		readonly signal: NodeJS.Signals | null;
-		readonly status: number | null;
-	}>[];
+	readonly positives: readonly {
+		readonly name: string;
+		readonly result: Readonly<{
+			readonly output: string;
+			readonly signal: NodeJS.Signals | null;
+			readonly status: number | null;
+		}>;
+	}[];
 }

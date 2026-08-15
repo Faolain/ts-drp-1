@@ -158,29 +158,32 @@ export function runControlledMutation(repositoryRoot, mutation) {
 }
 
 /** Executes the five genuine historical checker baselines in isolated native Git clones. */
-export function runHistoricalBaselines(repositoryRoot, predecessors) {
+export async function runHistoricalBaselines(repositoryRoot, predecessors) {
 	const root = mkdtempSync(join(tmpdir(), "ts-drp-freeze-successor-history-"));
 	try {
 		const cloned = command(root, "git", ["clone", "--shared", "--no-checkout", repositoryRoot, "repository"]);
 		if (cloned.status !== 0) throw new Error(`${cloned.stdout}\n${cloned.stderr}`);
 		const clone = resolve(root, "repository");
 		git(clone, "config", "advice.detachedHead", "false");
-		return predecessors.map((predecessor) => {
+		const results = [];
+		for (const predecessor of predecessors) {
 			git(clone, "checkout", "-q", "--detach", predecessor.baseline);
 			const parents = git(clone, "rev-list", "--parents", "-n", "1", predecessor.baseline).split(" ");
 			const tree = git(clone, "rev-parse", `${predecessor.baseline}^{tree}`);
 			const result = command(clone, process.execPath, [resolve(clone, predecessor.checker), predecessor.checkerBase], {
 				env: { [predecessor.environment]: clone },
 			});
-			return {
+			results.push({
 				id: predecessor.id,
 				output: `${result.stdout}\n${result.stderr}`,
 				parent: parents.length === 2 ? parents[1] : undefined,
 				signal: result.signal,
 				status: result.status,
 				tree,
-			};
-		});
+			});
+			await yieldToEventLoop();
+		}
+		return results;
 	} finally {
 		rmSync(root, { force: true, recursive: true });
 	}
@@ -238,6 +241,12 @@ const REPOSITORY_CATEGORY_MUTATIONS = Object.freeze([
 	"post-bootstrap-owner-drift",
 	"post-bootstrap-workflow-drift",
 ]);
+const REPOSITORY_POSITIVE_CASES = Object.freeze([
+	"linear:bootstrap",
+	"merge:bootstrap",
+	"linear:descendant",
+	"merge:descendant",
+]);
 
 /** Returns the exact complete genuine-candidate rejection plan. */
 export function repositoryMutationPlan(immutablePaths) {
@@ -246,6 +255,22 @@ export function repositoryMutationPlan(immutablePaths) {
 		...Array.from({ length: 4 }, (_, index) => `workflow-count:${index + 1}`),
 		...REPOSITORY_CATEGORY_MUTATIONS,
 	];
+}
+
+/** Returns the exact ordered positive and negative plans for independently bounded repository cases. */
+export function repositoryCandidatePlan(repositoryRoot, contract) {
+	const inventory = governedInventory(
+		repositoryRoot,
+		contract.predecessors.map(({ policy }) => policy)
+	);
+	const workflows = new Set(contract.workflowIdentities.map(({ path }) => path));
+	const immutable = inventory.filter((path) => !workflows.has(path));
+	return {
+		immutable,
+		inventory,
+		mutationNames: repositoryMutationPlan(immutable),
+		positiveNames: REPOSITORY_POSITIVE_CASES,
+	};
 }
 
 function copyCandidate(repositoryRoot, root, contract, workflowCount = contract.workflowIdentities.length) {
@@ -335,6 +360,14 @@ function runMergePositive(repositoryRoot, state, contract, mode) {
 	const upstream = commit(state.root, "upstream target");
 	syntheticMerge(state, upstream, prHead);
 	return executeRepositoryCandidate(state.root, contract, upstream);
+}
+
+function runNamedPositive(repositoryRoot, state, contract, name) {
+	const [topology, mode] = name.split(":");
+	if (!REPOSITORY_POSITIVE_CASES.includes(name)) throw new Error(`unknown repository positive: ${name}`);
+	return topology === "linear"
+		? runLinearPositive(repositoryRoot, state, contract, mode)
+		: runMergePositive(repositoryRoot, state, contract, mode);
 }
 
 function runCandidateMutation(repositoryRoot, state, contract, mutation, immutablePaths) {
@@ -510,35 +543,28 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 	return executeRepositoryCandidate(state.root, contract, contract.redBase);
 }
 
-/** Runs the exact repository candidate positives and rejection matrix with no controlled fallback. */
-export async function runRepositoryCandidateMatrix(repositoryRoot, contract) {
+/** Runs one independently bounded exact repository partition with no controlled fallback. */
+export async function runRepositoryCandidatePartition(repositoryRoot, contract, selection) {
 	const availability = repositoryCandidateAvailability(repositoryRoot);
 	if (!availability.available) return { available: false, checker: availability.checker };
-	const inventory = governedInventory(
-		repositoryRoot,
-		contract.predecessors.map(({ policy }) => policy)
-	);
-	const workflows = new Set(contract.workflowIdentities.map(({ path }) => path));
-	const immutable = inventory.filter((path) => !workflows.has(path));
+	const { immutable, inventory, mutationNames, positiveNames } = repositoryCandidatePlan(repositoryRoot, contract);
+	if (new Set(selection.positiveNames).size !== selection.positiveNames.length)
+		throw new Error("duplicate repository positive selection");
+	if (new Set(selection.mutationNames).size !== selection.mutationNames.length)
+		throw new Error("duplicate repository mutation selection");
+	for (const name of selection.positiveNames)
+		if (!positiveNames.includes(name)) throw new Error(`unknown repository positive selection: ${name}`);
+	for (const name of selection.mutationNames)
+		if (!mutationNames.includes(name)) throw new Error(`unknown repository mutation selection: ${name}`);
 	const state = cloneCandidateRepository(repositoryRoot, contract);
 	try {
 		const positives = [];
-		for (const [topology, mode] of [
-			["linear", "bootstrap"],
-			["merge", "bootstrap"],
-			["linear", "descendant"],
-			["merge", "descendant"],
-		]) {
-			positives.push(
-				topology === "linear"
-					? runLinearPositive(repositoryRoot, state, contract, mode)
-					: runMergePositive(repositoryRoot, state, contract, mode)
-			);
+		for (const name of selection.positiveNames) {
+			positives.push({ name, result: runNamedPositive(repositoryRoot, state, contract, name) });
 			await yieldToEventLoop();
 		}
-		const mutationNames = repositoryMutationPlan(immutable);
 		const negatives = [];
-		for (const name of mutationNames) {
+		for (const name of selection.mutationNames) {
 			negatives.push({ name, result: runCandidateMutation(repositoryRoot, state, contract, name, immutable) });
 			await yieldToEventLoop();
 		}

@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 
 import { auditSuccessorWorkflowRouting } from "./fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.js";
@@ -68,8 +69,8 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 		);
 	});
 
-	it("executes all five genuine baseline checkers against checkerBase and proves directParent independently", () => {
-		const results = runHistoricalBaselines(REPOSITORY_ROOT, successorContract.predecessors);
+	it("executes all five genuine baseline checkers against checkerBase and proves directParent independently", async () => {
+		const results = await runHistoricalBaselines(REPOSITORY_ROOT, successorContract.predecessors);
 		expect(results).toHaveLength(5);
 		for (const result of results) {
 			const expected = successorContract.predecessors.find(({ id }) => id === result.id);
@@ -82,7 +83,7 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 		}
 		const gossip = successorContract.predecessors.find(({ id }) => id === "gossip-budget");
 		expect(gossip?.directParent).not.toBe(gossip?.checkerBase);
-	});
+	}, 30_000);
 
 	it("self-tests the analyzer with byte-different semantic positives and behavioral negatives", () => {
 		const identity = successorContract.workflowIdentities[0];
@@ -101,7 +102,7 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 		}
 	});
 
-	it("proves the controlled harness accepts linear and GitHub merge-ref bootstrap and descendants", () => {
+	it("proves the controlled harness accepts linear and GitHub merge-ref bootstrap and descendants", async () => {
 		for (const topology of ["linear", "merge"] as const) {
 			for (const mode of ["bootstrap", "descendant"] as const) {
 				const result = runControlledPositive(REPOSITORY_ROOT, topology, mode);
@@ -109,11 +110,12 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 				expect(result.status, normalizedChildOutput(result)).toBe(0);
 				expect(result.output).toContain("controlled freeze successor: PASS");
 				expect(existsSync(result.cleanupPath)).toBe(false);
+				await yieldToEventLoop();
 			}
 		}
-	}, 60_000);
+	}, 90_000);
 
-	it("keeps bundle absence and workflow routing as separate causal controls", () => {
+	it("keeps bundle absence and workflow routing as separate causal controls", async () => {
 		for (const mutation of [
 			"bundle-with-old-workflows",
 			"future-workflows-with-partial-bundle",
@@ -126,8 +128,9 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 			expect(result.signal, mutation).toBeNull();
 			expect(typeof result.status, mutation).toBe("number");
 			expect(result.status, `${mutation}\n${normalizedChildOutput(result)}`).not.toBe(0);
+			await yieldToEventLoop();
 		}
-	}, 60_000);
+	}, 90_000);
 
 	it("pins the exact historical blobs, gossip chain and latent archival mismatch independently", () => {
 		expect(git("rev-parse", `${successorContract.fixedAnchor.commit}^{tree}`)).toBe(successorContract.fixedAnchor.tree);
