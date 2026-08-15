@@ -88,7 +88,7 @@ test("serializes independent facades to one cross-kind winner and dense sequence
 	const value = await runCase(page, "concurrency");
 	const race = value.race as readonly Record<string, unknown>[];
 	expect(race.every(({ ok, journalSequence }) => ok === true && journalSequence === 0)).toBe(true);
-	expect(new Set(race.map(({ sourceKind }) => sourceKind))).toHaveLength(1);
+	expect(new Set(race.map(({ sourceKind }) => sourceKind)).size).toBe(1);
 	expect(race.filter(({ idempotent }) => idempotent === false)).toHaveLength(1);
 	const closure = value.closure as {
 		readonly rows: readonly Record<string, unknown>[];
