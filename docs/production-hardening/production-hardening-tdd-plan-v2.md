@@ -10079,6 +10079,809 @@ path and Phase 3b remain unauthorized until that separate exact contract is
 reviewed, signed and pushed. This ledger does not amend D.93.31 or D.93.32 and
 does not claim that any part of the complete Phase `3a-1B` is implemented.
 
+#### D.93.34 — Phase 3a-1B prerequisite seam 4: durable accepted-vertex journal and replay
+
+This section is normative. It freezes only the fourth prerequisite for the
+complete Phase `3a-1B`: one backend-neutral, append-only durable journal whose
+stable local prefix records the order and evidence of vertices that a later
+composition owner has accepted. It does not authorize complete Phase `3a-1B`,
+the live index, activation changes, reducer or fold execution, application or
+ACL effects, Phase 3b, either golden path, or the sibling Ed25519 custody
+prerequisite.
+
+The journal is local recovery and duplicate memory. It is not consensus,
+admission, receipt, publication or finality authority. It is never gossiped,
+never enters an AHE generation, closure or head, and never treats an issuance
+outbox `published` bit as acceptance. Seam 1 remains the received-byte
+authentication and admission owner. Seam 2 remains the local outbox transition
+owner. Seam 3 remains the transport, topic, queue and publication owner.
+D.93.17/D.93.19 remain the AHE trust/closure owners, and D.93.23 remains the A
+preparation owner.
+
+##### Why a separate substrate is required
+
+`DurableIssuanceStore` is frozen as a local-issuance lineage, issued-record and
+outbox store. It contains no received vertex and cannot reconstruct a local
+vertex whose dependencies include received vertices. `AheDurableStore` is
+frozen as the staged-generation/blob/head substrate for A and trust; it is not
+an ordinary accepted-vertex graph. `CausalityIndex` is process-local. Widening
+any of those owners would merge publication, AHE or compaction authority into a
+new role and would invalidate their closed contracts.
+
+The minimum third substrate is therefore `@ts-drp/live-journal`. It stores one
+append-only replica-local sequence spanning received carriers and references to
+locally issued records. The sequence is durable evidence for replay, not proof
+that its bytes remain authentic. D.93.36 must re-authenticate and re-derive
+every replayed vertex before it enters the one live index.
+
+##### Package, adapters and exact public surface
+
+The backend-neutral package is `@ts-drp/live-journal`. It owns the public
+types, closed result taxonomy, structural/copy validation and the tests-only
+ephemeral conformance mirror. It opens no database and exports no live index,
+ancestry query, admission helper, issuer, resolver or repair primitive.
+
+Strict durable implementations are exported only from:
+
+- `@ts-drp/storage-node/live-journal` as
+  `createNodeDurableLiveJournalStore`;
+- `@ts-drp/storage-browser/live-journal` as
+  `createBrowserDurableLiveJournalStore`.
+
+Their factory option and return types are exact:
+
+```ts
+export interface NodeDurableLiveJournalStoreOptions {
+	readonly primaryFilename: string;
+}
+
+export function createNodeDurableLiveJournalStore(options: NodeDurableLiveJournalStoreOptions): DurableLiveJournalStore;
+
+export interface BrowserDurableLiveJournalStoreOptions {
+	readonly primaryDatabaseName: string;
+}
+
+export function createBrowserDurableLiveJournalStore(
+	options: BrowserDurableLiveJournalStoreOptions
+): Promise<DurableLiveJournalStore>;
+```
+
+Each options value is a closed plain own-data record with its one exact key.
+An empty string, accessor, inherited/extra/symbol key or non-string value is
+`malformed-input` before a database is derived or opened. The Node factory may
+throw only for this synchronous factory-input/open boundary. The Browser
+factory always returns a promise and never throws synchronously.
+
+The resolved capability is a frozen plain object with exactly five enumerable
+own string keys and no symbol keys:
+
+```ts
+export interface DurableLiveJournalStore {
+	installGenesis(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
+	appendAccepted(input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult>;
+	readiness(input: LiveJournalReadinessInput): Promise<LiveJournalReadinessResult>;
+	readPage(input: LiveJournalPageInput): Promise<LiveJournalPageResult>;
+	close(): Promise<void>;
+}
+```
+
+Each method is load-bearing:
+
+1. `installGenesis` installs the immutable journal scope and the exact A
+   carriers from which the later consumer re-establishes its anchor and limits.
+2. `appendAccepted` is the sole received/local append and the sole sequence
+   allocator.
+3. `readiness` verifies one complete durable prefix and mints its immutable
+   append-only replay token.
+4. `readPage` returns only rows covered by one genuine readiness token.
+5. `close` owns lifecycle and poison/closed precedence.
+
+There is no sixth method, `open`, `containsDigest`, `appendReceived`,
+`appendLocal`, `readIssued`, `publish`, `mark`, `isAncestor`, index getter,
+reset, delete, discard or repair method. The shared RED pins the exact five
+keys on the conformance mirror and both real facades; a type-only cast or
+null-prototype facade with a missing implementation must fail.
+
+No existing storage root, `AheDurableStore`, `DurableIssuanceStore`, adapter
+command vocabulary, protocol-v3 runtime root, compaction public API, node root,
+`DRPNode` or `IDRPNode` is widened. The already-published
+`@ts-drp/protocol-v3/registry/registry-v1.json` subpath remains byte-identical;
+the journal may consume it as a runtime registry but does not add or retarget
+that export.
+
+##### Scope and exact installation input
+
+Journal scope is exactly `(objectId, epoch, anchorDigest)`. The creator-only
+slice supports exactly epoch `0` and one immutable genesis binding per scope.
+
+```ts
+export interface LiveJournalScope {
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly anchorDigest: string;
+}
+
+export interface InstallLiveJournalGenesisInput {
+	readonly objectId: string;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly detachedAnchorSignature: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+}
+```
+
+`installGenesis` copies every input before its first `await`. `objectId` must
+pass the genuine storage-object-id parser with spelling equality. The anchor
+bytes must canonical-decode against the published registry-v1 `epochAnchor`
+entry, re-encode byte-identically, and contain exactly the registered fields.
+They must bind `kind: "drp-epoch-anchor"`, `protocolMajor: 3`, the captured
+object id, epoch `0`, history size `0`, and the creator-genesis zero previous
+anchor/cut fields. The journal recomputes:
+
+```text
+anchorDigest = lowerhex(hashDomain("ts-drp/epoch-anchor/v3", exactAnchorBytes))
+```
+
+The parameters carrier must canonical-decode against the published registry-v1
+`parameters` entry, re-encode byte-identically, and hash under the published
+parameters domain to the anchor's exact `parametersDigest`. The journal stores
+the exact carrier bytes and the digest. Stored numeric maxima are forbidden;
+every reopening/readiness use re-decodes and re-digests the carrier before
+deriving `maxEpochVertices`, `maxEpochBytes` and `maxDependencies`.
+
+`detachedAnchorSignature` must be an ordinary non-shared 64-byte
+`Uint8Array`. It is retained evidence, not signature verification. The journal
+does not receive a trust capability, public key, signer set, profile carrier,
+blueprint, artifact, AHE head or `PreparedV3Live` token.
+
+The first installation atomically writes exactly one scope record. A
+byte-identical repeat returns idempotent success and writes zero. The same scope
+selector with different anchor bytes, signature, parameters carrier or
+parameters digest is `genesis-conflict`, writes zero and does not repair or
+replace the installed record. A different derived anchor digest is a different
+scope and cannot alias the first.
+
+The anchor is scope evidence, not an ordinary journal row. Journal sequence
+zero is the first ordinary accepted vertex. D.93.36 pre-seeds its one live
+index from the already-sealed A payload before replaying journal rows.
+
+##### Received carrier and local reference rows
+
+`appendAccepted` accepts one closed discriminated union. The caller supplies no
+sequence; the store assigns it.
+
+```ts
+export type AppendAcceptedVertexInput =
+	| Readonly<{
+			readonly scope: LiveJournalScope;
+			readonly sourceKind: "received";
+			readonly vertexDigest: string;
+			readonly exactCanonicalPreimageBytes: Uint8Array;
+			readonly detachedSignature: Uint8Array;
+	  }>
+	| Readonly<{
+			readonly scope: LiveJournalScope;
+			readonly sourceKind: "local-issued";
+			readonly vertexDigest: string;
+			readonly author: string;
+			readonly authorSequence: number;
+	  }>;
+```
+
+Common fields are copied and structurally validated before durable I/O.
+`vertexDigest` is exactly 64 lowercase hexadecimal characters. `scope` must
+select an installed scope exactly. Local `author` is a non-empty bounded
+well-formed string and `authorSequence` is a nonnegative safe integer.
+
+For a received row, the preimage and signature are non-empty ordinary
+non-shared `Uint8Array`s; signature length is exactly 64. The journal
+canonical-decodes only enough to establish a closed registry-v1 vertex record,
+exact object/epoch/anchor scope equality, and digest equality over the exact
+preimage bytes. This is structural corruption resistance, not authentication:
+the journal has no resolver, public key, prepared admission capability or
+operation-schema authority.
+
+A local row stores only the durable issuance reference
+`{objectId, epoch, author, authorSequence, vertexDigest}`. It does not duplicate
+the issued canonical preimage or signature. `DurableIssuanceStore` remains the
+sole owner of those local bytes. The journal does not call `readIssued`,
+`readOutboxPage`, `transactIssue` or `compareAndMarkOutboxPublished`.
+
+The durable row union is:
+
+```ts
+export type LiveJournalAcceptedRow =
+	| Readonly<{
+			readonly scope: LiveJournalScope;
+			readonly journalSequence: number;
+			readonly sourceKind: "received";
+			readonly vertexDigest: string;
+			readonly exactCanonicalPreimageBytes: Uint8Array;
+			readonly detachedSignature: Uint8Array;
+	  }>
+	| Readonly<{
+			readonly scope: LiveJournalScope;
+			readonly journalSequence: number;
+			readonly sourceKind: "local-issued";
+			readonly vertexDigest: string;
+			readonly author: string;
+			readonly authorSequence: number;
+	  }>;
+```
+
+`journalSequence` is a dense nonnegative safe integer allocated per scope. It
+is a local replay order, never a consensus ordinal, author sequence, logical
+time or wall clock.
+
+##### Deduplication, idempotence and conflict
+
+Digest uniqueness spans both row kinds within one scope. A received gossip echo
+of a locally journaled digest is the existing row, not a second sequence. A
+local row whose digest already exists as a received row is likewise the
+existing row. Source kind is evidence about the first successful writer and is
+not overwritten.
+
+Local reference uniqueness is additionally exact on
+`(scope, author, authorSequence)`. Every point check occurs in the same writer
+transaction, before sequence allocation. Precedence is deterministic and the
+first successful row's `sourceKind`, sequence and evidence are immutable:
+
+1. For a received candidate, query the scope-wide digest index. No digest row
+   allocates a new sequence. An existing received row is idempotent only when
+   its exact preimage and signature bytes are equal; otherwise it is
+   `evidence-conflict`. An existing local row is a cross-kind idempotent repeat:
+   return that original row's sequence and `sourceKind: "local-issued"`, write
+   zero and do not attach the received carrier.
+2. For a local candidate, query both the scope-wide digest index and the exact
+   local-reference index. If neither exists, allocate a new sequence. If both
+   identify the same local row, the candidate is idempotent. If the local
+   reference exists with a different digest, the result is
+   `evidence-conflict` even when the candidate digest also identifies another
+   row. If digest and local reference identify two different rows, the result
+   is `evidence-conflict`. If only the local reference exists, the result is
+   `evidence-conflict`.
+3. If only the digest exists for a local candidate, an existing received row
+   is a cross-kind idempotent repeat: return the received row's original
+   sequence and `sourceKind: "received"`, store no local reference and write
+   zero. An existing local row with a different `(author,authorSequence)` is
+   `evidence-conflict`; p4 does not assume cross-author digest equality is
+   impossible.
+4. No conflict arm allocates a sequence or overwrites evidence. A cross-kind
+   idempotent result always retains the first row's label and fields. A later
+   echo cannot relabel, enrich or replace it.
+
+The store never assumes a cross-author digest collision is impossible merely
+from metadata. D.93.36 re-derives the registered digest from authenticated
+bytes, whose author field is covered, before accepting replay. p4 RED kills
+per-kind digest indexes, local-only/received-only point checks and any duplicate
+row at a new sequence.
+
+##### One durable owner and one order
+
+The journal is the sole durable sequence owner. It retains no
+`CausalityIndex` in a field, closure, `WeakMap` or module map, and exposes no
+index/ancestry capability. Short-lived structural replay objects are permitted
+only in tests; production journal code does not decide admission, dependency
+presence, antichain, count capacity or byte capacity. Those decisions require
+the authenticated bytes and one live index and therefore belong to D.93.36.
+
+The p4 method order is exact:
+
+1. snapshot closed own-data input and copy bytes;
+2. apply poison, closed, shape and installed-scope gates;
+3. perform journal-owned structural/digest/reference checks;
+4. perform the cross-kind digest and local-reference point checks;
+5. in one strict writer transaction, CAS the current next sequence, insert the
+   new variant row and advance the sequence by one;
+6. after confirmed commit, independently read back the exact new scope/row/
+   next-sequence closure;
+7. classify exact new as success, exact old as transient substrate failure,
+   unreadable as `outcome-unknown`, and every mixed observation as poison.
+
+There is no memory-index append in this seam. The later D.93.36 apply owner must
+journal before mutating its one live index. If the journal commit succeeds and
+the later index append is lost, replay heals. The forbidden index-ahead-of-
+journal state is prevented by construction, not detected by this store.
+
+##### Results and failure precedence
+
+```ts
+export type LiveJournalFailureKind =
+	| "malformed-input"
+	| "store-poisoned"
+	| "store-closed"
+	| "unsupported-schema"
+	| "durability-unavailable"
+	| "not-installed"
+	| "wrong-scope"
+	| "genesis-conflict"
+	| "noncanonical-preimage"
+	| "digest-mismatch"
+	| "evidence-conflict"
+	| "stale-snapshot"
+	| "substrate-failure"
+	| "outcome-unknown"
+	| "internal-invariant";
+
+export type InstallLiveJournalGenesisResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly scope: LiveJournalScope;
+			readonly parametersDigest: string;
+			readonly idempotent: boolean;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalFailureKind }>;
+
+export type AppendAcceptedVertexResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly scope: LiveJournalScope;
+			readonly journalSequence: number;
+			readonly vertexDigest: string;
+			readonly sourceKind: "received" | "local-issued";
+			readonly idempotent: boolean;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalFailureKind }>;
+```
+
+No failure contains paths, SQL, database names, byte values, input strings,
+signatures, digests not already supplied by the caller, raw substrate errors or
+capabilities. Unknown throws are contained at the named stage.
+
+Precedence is exact:
+
+1. `store-poisoned`;
+2. `store-closed`;
+3. `malformed-input`;
+4. `unsupported-schema` / `durability-unavailable`;
+5. `not-installed` / `wrong-scope`;
+6. `stale-snapshot` for `readPage`;
+7. `noncanonical-preimage` / `digest-mismatch`;
+8. `genesis-conflict` or `evidence-conflict`;
+9. substrate operation failure;
+10. ambiguous readback classification;
+11. `internal-invariant` and poison for a durable shape impossible under the
+    contract.
+
+Every arm before a confirmed write is no-write. `outcome-unknown` returns no
+row, sequence, bytes or token. A mixed durable observation latches one poison
+identity shared by all five methods. Poison outranks closed. `close()` is
+idempotent and non-rejecting; every call returns the same promise. No method
+throws synchronously after a factory has returned a capability.
+
+##### Closed input, copies and hostile totality
+
+Every input and nested record is a closed plain own-enumerable data record with
+exactly its named keys. Symbols, accessors, inherited/non-enumerable/extra keys,
+non-plain prototypes and proxy-hostile descriptor snapshots are
+`malformed-input`. The implementation captures `Reflect.ownKeys`, descriptors,
+Array/Object/Map and typed-array intrinsics at module evaluation and performs no
+ordinary property get after the descriptor snapshot.
+
+No accepted byte field may be `SharedArrayBuffer`-backed. Each is copied once
+before the first `await` into an exclusive buffer. Every returned row/result is
+a fresh frozen plain own-data record; nested records/arrays are frozen, while
+typed-array leaves are fresh exclusive copies and are not passed to
+`Object.freeze`. Caller mutation after invocation or result mutation after
+return cannot affect durable state or later results.
+
+##### Readiness token and deterministic replay pages
+
+`readiness` is a durable-journal integrity proof, not authentication, admission
+or network completeness. It opens one readonly snapshot over the scope record,
+exact anchor/parameters carriers and every journal row. It requires:
+
+1. an installed exact scope;
+2. a canonical anchor and parameters carrier with matching stored digests;
+3. dense journal sequences exactly `0..<nextJournalSequence`;
+4. one digest key per sequence and identical sequence/digest keysets;
+5. variant-closed received/local rows;
+6. received stored digest equality over exact preimage bytes and exact
+   signature shape;
+7. local reference uniqueness and exact digest shape;
+8. end-of-snapshot equality of the sequence counter and row count.
+
+It constructs no live index and makes no dependency, capacity, signature,
+operation-schema or author-authorization decision.
+
+```ts
+export interface LiveJournalReadinessInput {
+	readonly scope: LiveJournalScope;
+}
+
+export interface LiveJournalSnapshotToken {
+	readonly kind: "v3-live-journal-snapshot-token-1";
+	readonly scope: LiveJournalScope;
+	readonly highWatermark: number;
+	readonly genesisDigest: string;
+	readonly parametersDigest: string;
+	readonly orderedRowDigest: string;
+	readonly snapshotDigest: string;
+}
+
+export type LiveJournalReadinessResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly ready: true;
+			readonly scope: LiveJournalScope;
+			readonly snapshot: LiveJournalSnapshotToken;
+			readonly rowCount: number;
+	  }>
+	| Readonly<{
+			readonly ok: true;
+			readonly ready: false;
+			readonly kind: "not-installed";
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalFailureKind }>;
+```
+
+`LiveJournalReadinessInput` is a closed plain own-data record with exactly the
+`scope` key; its nested scope is independently closed and copied. No omitted,
+extra, symbol, accessor, inherited or non-enumerable key is accepted.
+
+Readiness derives commitments from exact canonical profile-1 preimages. Key
+order below is construction order and is independently pinned:
+
+```ts
+type ReceivedJournalRowCommitmentPreimage = Readonly<{
+	readonly kind: "v3-live-journal-received-row-1";
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly anchorDigest: string;
+	readonly journalSequence: number;
+	readonly sourceKind: "received";
+	readonly vertexDigest: string;
+	readonly exactCanonicalPreimageBytes: Uint8Array;
+	readonly detachedSignature: Uint8Array;
+}>;
+
+type LocalJournalRowCommitmentPreimage = Readonly<{
+	readonly kind: "v3-live-journal-local-row-1";
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly anchorDigest: string;
+	readonly journalSequence: number;
+	readonly sourceKind: "local-issued";
+	readonly vertexDigest: string;
+	readonly author: string;
+	readonly authorSequence: number;
+}>;
+```
+
+For every durable row `rowCommitmentDigest` is exactly
+`lowerhex(hashDomain("ts-drp/live-journal-row/v1",
+encodeCanonical(exactVariantPreimage)))`. The ordered preimage is:
+
+```ts
+const orderPreimage = {
+	kind: "v3-live-journal-order-1",
+	objectId,
+	epoch,
+	anchorDigest,
+	highWatermark,
+	rowCommitmentDigests,
+};
+```
+
+`orderedRowDigest` is exactly
+`lowerhex(hashDomain("ts-drp/live-journal-order/v1",
+encodeCanonical(orderPreimage)))`. The snapshot preimage is:
+
+```ts
+const snapshotPreimage = {
+	kind: "v3-live-journal-snapshot-1",
+	objectId,
+	epoch,
+	anchorDigest,
+	highWatermark,
+	genesisDigest,
+	parametersDigest,
+	orderedRowDigest,
+};
+```
+
+`snapshotDigest` is exactly
+`lowerhex(hashDomain("ts-drp/live-journal-snapshot/v1",
+encodeCanonical(snapshotPreimage)))`. `genesisDigest` is exactly the installed
+scope's `anchorDigest`. `highWatermark` is exactly the snapshot's exclusive
+`nextJournalSequence`; `rowCommitmentDigests.length === highWatermark` and
+element `i` is derived from durable sequence `i`.
+
+These domains are local non-consensus domains, not signature domains or
+registry entries, and are pinned absent from both protocol registries. The
+returned scope, token and every nested value are fresh derived copies. The
+token is a deterministic snapshot descriptor, not an opaque capability,
+secret, MAC, unforgeable proof or bearer authority.
+
+`readPage` requires the exact readiness token:
+
+```ts
+export interface LiveJournalPageInput {
+	readonly scope: LiveJournalScope;
+	readonly snapshot: LiveJournalSnapshotToken;
+	readonly afterSequence?: number | null;
+	readonly limit?: number;
+}
+
+export type LiveJournalPageResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly scope: LiveJournalScope;
+			readonly snapshot: LiveJournalSnapshotToken;
+			readonly rows: readonly LiveJournalAcceptedRow[];
+			readonly nextSequence: number | null;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalFailureKind }>;
+```
+
+`limit` is a safe integer `1..128`, default `64`. `afterSequence` is an
+exclusive nonnegative safe integer; `null`/omitted starts before sequence zero.
+Ordering is numeric `journalSequence`, never digest, wall clock, backend cursor
+or JavaScript locale order.
+
+Before returning a row, each page call opens one readonly snapshot, reads every
+durable row `0..<highWatermark`, reconstructs each exact variant preimage,
+recomputes every row commitment, the exact order preimage and the exact snapshot
+preimage, and derives one fresh expected token. It then requires field-for-field
+equality between the supplied closed token and that derived token. Hashing only
+the caller's supplied fields, trusting a caller `orderedRowDigest`, or comparing
+only `snapshotDigest` is forbidden. A token whose high watermark exceeds the
+current counter is `stale-snapshot`. Wrong scope is `wrong-scope`. A
+self-consistent caller-fabricated token, changed genesis/parameters/order
+commitment, or any mismatch with the durable prefix is `digest-mismatch`,
+returns no row and does not poison. Later appends at sequence
+`>= highWatermark` remain invisible but do not invalidate the descriptor.
+
+Pages contain only rows with `afterSequence < journalSequence < highWatermark`.
+`nextSequence` is the last returned sequence when more capped rows remain and
+`null` only when the page union has reached the high watermark. A complete
+replay requires `nextSequence === null`, union length equal to the watermark,
+dense sequence equality `row[i].journalSequence === i`, no repeated digest or
+local reference, and an ordered-row commitment equal to readiness. A partial
+page union is never readiness-equivalent.
+
+##### Exact Node SQLite substrate
+
+The Node factory derives a distinct journal filename injectively as
+`${primaryFilename}.drp-live-journal-v1.sqlite`; it never stats, opens, probes,
+migrates or deletes the primary/AHE/issuance database. It uses Node's strict
+SQLite owner with `user_version=1`, WAL, `synchronous=FULL`, page size `4096`,
+busy timeout `1000`, extensions and double-quoted-string literals disabled.
+
+The exact schema has two `WITHOUT ROWID` tables:
+
+```sql
+CREATE TABLE scopes (
+  object_id TEXT NOT NULL,
+  epoch INTEGER NOT NULL,
+  anchor_digest TEXT NOT NULL,
+  next_journal_sequence INTEGER NOT NULL,
+  exact_anchor_preimage BLOB NOT NULL,
+  detached_anchor_signature BLOB NOT NULL,
+  parameters_digest TEXT NOT NULL,
+  exact_parameters_carrier BLOB NOT NULL,
+  PRIMARY KEY (object_id, epoch, anchor_digest)
+) WITHOUT ROWID
+
+CREATE TABLE accepted_entries (
+  object_id TEXT NOT NULL,
+  epoch INTEGER NOT NULL,
+  anchor_digest TEXT NOT NULL,
+  journal_sequence INTEGER NOT NULL,
+  source_kind TEXT NOT NULL,
+  vertex_digest TEXT NOT NULL,
+  received_preimage BLOB,
+  received_signature BLOB,
+  local_author TEXT,
+  local_author_sequence INTEGER,
+  PRIMARY KEY (object_id, epoch, anchor_digest, journal_sequence),
+  UNIQUE (object_id, epoch, anchor_digest, vertex_digest),
+  UNIQUE (object_id, epoch, anchor_digest, local_author, local_author_sequence),
+  CHECK (source_kind IN ('received', 'local-issued')),
+  CHECK (
+    (source_kind = 'received' AND received_preimage IS NOT NULL AND received_signature IS NOT NULL AND local_author IS NULL AND local_author_sequence IS NULL)
+    OR
+    (source_kind = 'local-issued' AND received_preimage IS NULL AND received_signature IS NULL AND local_author IS NOT NULL AND local_author_sequence IS NOT NULL)
+  )
+) WITHOUT ROWID
+```
+
+The local-reference unique constraint's SQLite `NULL` behavior is not relied
+upon: every received/local variant is validated against its discriminant and
+the explicit cross-kind digest point check precedes insertion. Schema admission
+compares exact `sqlite_schema.sql`, table/index/trigger/view roster and required
+pragmas. Extra/missing/retargeted objects, a legacy/AHE/issuance-shaped schema,
+or a schema created with a permissive `IF NOT EXISTS` migration path is
+`unsupported-schema`. There is no migration, repair or fallback.
+
+Each writer uses `BEGIN IMMEDIATE`, contains no `await` or microtask before
+`COMMIT`, and performs same-transaction scope/counter/digest/local-reference
+checks. After commit, exact readonly readback classifies the result. Concurrent
+writers serialize; the loser reopens and becomes an idempotent repeat,
+conflict, or allocates the next sequence against the new prefix. No two writers
+win one sequence.
+
+##### Exact Browser strict-IDB substrate
+
+The Browser factory derives
+`${primaryDatabaseName}--drp-live-journal-v1`; it never opens, probes, upgrades
+or deletes the primary/AHE/issuance database. Database version is exactly `1`,
+with stores `scopes` and `acceptedEntries`, both `autoIncrement:false`.
+
+- `scopes` is created with native key path
+  `["objectId", "epoch", "anchorDigest"]`; its closed value has exactly the
+  camel-case SQLite scope keys.
+- `acceptedEntries` is created with native key path
+  `["objectId", "epoch", "anchorDigest", "journalSequence"]`.
+- unique index `digestUniq` has native compound key path
+  `["objectId", "epoch", "anchorDigest", "vertexDigest"]`,
+  `{unique:true,multiEntry:false}`.
+- unique index `localRefUniq` has native compound key path
+  `["objectId", "epoch", "anchorDigest", "localAuthor", "localAuthorSequence"]`,
+  `{unique:true,multiEntry:false}`.
+- there are zero other stores or indexes.
+
+The stored IDB variants have exact own-key sets. A received value has exactly:
+
+```text
+objectId, epoch, anchorDigest, journalSequence, sourceKind, vertexDigest,
+exactCanonicalPreimageBytes, detachedSignature
+```
+
+and omits `localAuthor` and `localAuthorSequence` entirely. Because both native
+compound local-reference key-path components are absent, IndexedDB creates no
+`localRefUniq` entry for a received row. A local value has exactly:
+
+```text
+objectId, epoch, anchorDigest, journalSequence, sourceKind, vertexDigest,
+localAuthor, localAuthorSequence
+```
+
+and omits `exactCanonicalPreimageBytes` and `detachedSignature` entirely.
+Present-but-`undefined`, `null`, inherited, accessor, non-enumerable or
+wrong-variant fields are rejected before the transaction. IDB `null` is never
+used to simulate an omitted compound-index component. Reopen/readiness treats
+any stored wrong-variant key, missing required key, explicit null/undefined or
+unexpected index entry as poison; there is no normalization ambiguity.
+
+Every writer opens one readwrite transaction with `{durability:"strict"}` and
+fails `durability-unavailable` before its first write if observed durability is
+missing or downgraded. Request chaining remains inside transaction tasks; no
+`await` allows auto-commit between the read/CAS/add/counter steps. Readers use a
+separate readonly snapshot.
+
+##### Crash, ambiguous acknowledgement and reopen
+
+Each backend owns its own evidence; no p4 claim is inherited merely by analogy
+from issuance or AHE tests.
+
+For `installGenesis` and new `appendAccepted`, Node has genuine child `SIGKILL`
+at: before begin, after begin/transaction creation, after scope read, after row
+add/insert, immediately after commit returns, and during exact readback. Browser
+has genuine persistent-context process death at: before transaction, after
+transaction creation, after scope read, after row add, from the transaction
+complete task, and during exact readback. Death inside an unobservable COMMIT/
+IDB auto-commit instant is not claimed.
+
+Every tuple reopens to exact old or exact new journal closure:
+
+- exact old: no row and unchanged next sequence;
+- exact new: one complete row and next sequence advanced exactly once;
+- any row/counter, scope/carrier or variant-field mixture poisons;
+- unreadable authority is `outcome-unknown` and grants no row identity.
+
+The matrix crosses a single scope and two scopes with the unaddressed scope
+byte-identical. It includes idempotent genesis and both received/local repeat
+no-write cases, cross-kind digest races, local-reference races, a nonempty WAL
+reopen without deleting sidecars, strict-IDB downgrade, and fresh-process/
+fresh-context reopen. A bounded test-only fault seam, unreachable from every
+production export, covers ambiguous exact-old/exact-new/mixed/unreadable
+readback. Memory conformance is explicitly ephemeral and makes no strict
+durability or process-death claim.
+
+##### D.93.36 consumer laws enabled here but not owned by p4
+
+The following five corrections are normative future-consumer laws. They are
+included here so the journal schema cannot make them impossible, but neither
+p4 RED nor p4 GREEN may call protocol admission, issuance, outbox, live-index,
+queue or activation owners to implement them.
+
+1. **Uniform replay re-authentication.** Retained bytes are carriers, not
+   authenticity. D.93.36 must run every received stored preimage/signature and
+   every locally referenced committed envelope through the same genuine
+   `extractAdmittedReceivedVertex`/shared decision core with the sealed
+   prepared admission, expected anchor, registry domain/suite and composition
+   resolver. Digest, signature validity, author, object, epoch, anchor,
+   dependencies, operation and byte charge are re-derived; journal metadata is
+   never trusted as admission.
+2. **Three-way local digest equality.** For a local reference D.93.36 must
+   require digest recomputed from committed canonical preimage bytes equals the
+   issued envelope digest equals the journal row digest. Comparing two stored
+   digests is insufficient.
+3. **Missing, malformed or foreign local references fail closed.** A missing
+   `readIssued({objectId, author}, authorSequence)` result, structurally invalid
+   commit, foreign scope, poisoned issuance read or digest mismatch prevents
+   readiness and latches the composition's corruption identity. There is no
+   skip, repair, revert or fabricated row; an issuance-store poison remains its
+   existing identity.
+4. **Cross-kind and cross-author uniqueness is re-proven.** Journal digest
+   uniqueness spans both variants, but D.93.36 still re-derives the digest that
+   covers author. A gossip echo of a local row and a local echo of a received
+   row are the same accepted vertex and append zero. Local
+   `(author,authorSequence)` identity remains exact.
+5. **Full outbox reconciliation.** Before live effects, D.93.36 must page the
+   entire durable outbox—pending and published, deterministic one-record pages
+   with the shipped exclusive cursor—and re-evaluate every local issued row
+   absent from the journal. `publishState` controls egress re-drain only and
+   never admission/replay. This includes published-but-unjournaled rows
+   reachable under shipped Seam 3. Typed capacity stalls remain durable,
+   non-admitted and re-evaluable; they are not silently skipped.
+
+D.93.36 also owns the serialized apply gate, construction of the sole live
+`CausalityIndex`, dependency/antichain/count/byte-capacity decisions,
+journal-before-index order, pre-effect readiness, activation supersession and
+the exact crash-quadrant reconciliation. p4 only guarantees that its durable
+carriers/references, unique identities and stable order can support those laws.
+
+##### Exact p4 RED and authorization boundary
+
+After this amendment receives independent exact-byte review, signature and
+push, tests-only p4 RED may start in four bounded slices:
+
+1. **p4-a shared contract:** exact five-method types, closed inputs/results,
+   scope installation, received/local variant storage, cross-kind/local-ref
+   idempotence/conflict, copy/freeze/hostile totality, readiness token and
+   token-capped page union, and an explicitly ephemeral conformance mirror.
+2. **p4-b Node:** exact schema/admission, statement order, concurrency,
+   readback classification and genuine SIGKILL matrix.
+3. **p4-c Browser:** exact strict-IDB schema/admission, transaction order,
+   concurrency, durability downgrade and three-engine genuine death/reopen
+   matrix.
+4. **p4-d parity/governance:** byte-equivalent public behavior and results,
+   exact facade inventories, package/dependency/export boundaries and A/
+   issuance/Seam preservation.
+
+Authorized RED paths are limited to new p4-named tests/config/fixtures under
+the root test tree and the existing storage-node/storage-browser test trees.
+The RED may add a dedicated TypeScript project, Node preload/child death
+fixtures, Browser Playwright config/global setup/worker assets and exact byte
+goldens under those p4 fixture roots. It may import existing production APIs as
+controls but changes no production, package, dependency, lock, generated,
+registry, plan or frozen predecessor-test byte.
+
+The RED must kill at least: a missing fifth method; per-kind digest indexes;
+local-reference-only or received-only point checks; duplicate-at-new-sequence;
+local bytes duplicated into the journal; `published` consulted as admission;
+AHE/issuance schema reuse; caller-supplied sequence; overwrite/delete/repair;
+self-hashed forged snapshot tokens; pages crossing their watermark; later
+append treated as token invalidation; partial page union treated as readiness;
+skipped exact readback; mixed durable state accepted; Node `await` inside the
+writer transaction; non-strict IDB; memory claiming strict durability; a
+retained/exported live index; journal calls to extractor/issuer/outbox;
+consumer replay/reconciliation assertions masquerading as p4 product behavior;
+protocol-v3 export-map or registry changes; and any node/live/token/reducer
+widening.
+
+Fast PR gates are the shared contract/hostile suite, Node behavior, public type
+and source/built/packed surface audits, owned typecheck/lint/format/diff, and
+preservation of A-a/A-b/A-c, Seam 1/2/3, issuance 2l-a/b/c/d and AHE storage
+contracts. Nightly owns the full Node SIGKILL roster, Chromium/Firefox/WebKit
+strict-IDB process-death roster and real-adapter parity. Every environment/tool
+failure is a harness failure, never a product skip or pass.
+
+Production GREEN remains unauthorized by the RED commit. Its later allowed
+owners are only the new `packages/live-journal/**`, the two private real
+adapter implementations and their exact `./live-journal` subpath/manifests,
+plus workspace/importer-only lock entries. Protocol-v3 source/manifest/registry,
+AHE, issuance, compaction, node, control-plane, network, types root and all
+existing schemas remain frozen.
+
+This seam claims no global or peer sync completeness, receipt, finality,
+exactly-once network delivery, signature authorization, author custody,
+certified profile, anchor advancement, repair, discard, reducer/fold,
+application state, live subscription or Phase 3b. Closing p4 will not authorize
+D.93.36 RED until the sibling custody prerequisite also closes and D.93.36's
+joint consumer contract is separately reviewed, signed and pushed.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
