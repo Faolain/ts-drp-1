@@ -5,8 +5,15 @@ import { isMainThread, parentPort, Worker, workerData } from "node:worker_thread
 import { armPhase3a1bP4NodeTrace } from "./phase-3a1b-p4-node-preload.mjs";
 import { encodeCanonical, hashDomain } from "../../../canonical/dist/src/index.js";
 
-const [, , primaryFilename, encodedTuple, mode = "mutate"] = process.argv;
-const tuple = JSON.parse(encodedTuple);
+let primaryFilename;
+let tuple;
+let mode;
+if (isMainThread) {
+	const [, , mainPrimaryFilename, encodedTuple, mainMode = "mutate"] = process.argv;
+	primaryFilename = mainPrimaryFilename;
+	tuple = JSON.parse(encodedTuple);
+	mode = mainMode;
+}
 
 function lowerHex(value) {
 	return Buffer.from(value).toString("hex");
