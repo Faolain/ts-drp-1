@@ -2,27 +2,34 @@ import { build, type Plugin } from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
 
-function candidatePlugin(packageDirectory: string): Plugin {
+function candidatePlugin(packageDirectory: string, mutateSharedDecisions = false): Plugin {
 	const candidate = path.join(packageDirectory, "src/live-journal.ts");
-	const testControl = path.join(packageDirectory, "src/internal/live-journal-observation.ts");
+	const testControl = path.join(packageDirectory, "tests/fixtures/phase-3a1b-p4-browser-observation.ts");
+	const decisionMutant = path.resolve(
+		packageDirectory,
+		"../../tests/fixtures/phase-3a1b-p4/live-journal-decision-mutant.ts"
+	);
+	const shared = path.resolve(packageDirectory, "../live-journal/src/index.ts");
 	return {
 		name: "phase-3a1b-p4-browser-candidate",
 		setup(builder): void {
 			builder.onResolve({ filter: /^#phase-3a1b-p4-browser-candidate$/ }, () =>
 				fs.existsSync(candidate) ? { path: candidate } : { namespace: "phase-3a1b-p4-absent", path: "candidate" }
 			);
-			builder.onResolve({ filter: /^#phase-3a1b-p4-browser-test-control$/ }, () =>
-				fs.existsSync(testControl) ? { path: testControl } : { namespace: "phase-3a1b-p4-absent", path: "test-control" }
+			builder.onResolve({ filter: /^#phase-3a1b-p4-browser-test-control$/ }, () => ({ path: testControl }));
+			if (mutateSharedDecisions) {
+				builder.onResolve({ filter: /^@ts-drp\/live-journal$/ }, ({ importer }) => ({
+					path: path.resolve(importer) === decisionMutant ? shared : decisionMutant,
+				}));
+			}
+			builder.onResolve({ filter: /internal\/live-journal-observation(?:\.js)?$/ }, ({ importer }) =>
+				importer === candidate ? { path: testControl } : undefined
 			);
 			builder.onLoad({ filter: /.*/, namespace: "phase-3a1b-p4-absent" }, ({ path: absentPath }) => ({
 				contents:
 					absentPath === "candidate"
 						? 'export async function createBrowserDurableLiveJournalStore() { throw new Error("PHASE_3A1B_P4_BROWSER_CANDIDATE_ABSENT"); }'
-						: [
-								'export function armPhase3a1bP4BrowserTrace() { throw new Error("PHASE_3A1B_P4_BROWSER_TEST_CONTROL_ABSENT"); }',
-								'export function armPhase3a1bP4BrowserDurabilityDowngrade() { throw new Error("PHASE_3A1B_P4_BROWSER_TEST_CONTROL_ABSENT"); }',
-								'export function armPhase3a1bP4BrowserReadbackFault() { throw new Error("PHASE_3A1B_P4_BROWSER_TEST_CONTROL_ABSENT"); }',
-							].join("\n"),
+						: 'throw new Error("unexpected p4 absent namespace");',
 				loader: "js",
 			}));
 		},
@@ -36,10 +43,11 @@ function candidatePlugin(packageDirectory: string): Plugin {
 export default async function globalSetup(): Promise<() => void> {
 	const packageDirectory = path.resolve(import.meta.dirname, "..");
 	const assetDirectory = fs.mkdtempSync(path.join(packageDirectory, ".phase-3a1b-p4-assets-"));
+	const entry = path.join(packageDirectory, "tests/assets/phase-3a1b-p4-browser-live-journal-entry.ts");
 	await build({
 		bundle: true,
 		entryPoints: {
-			"phase-3a1b-p4-browser": path.join(packageDirectory, "tests/assets/phase-3a1b-p4-browser-live-journal-entry.ts"),
+			"phase-3a1b-p4-browser": entry,
 			"phase-3a1b-p4-browser-live-journal-death-entry": path.join(
 				packageDirectory,
 				"tests/assets/phase-3a1b-p4-browser-live-journal-death-entry.ts"
@@ -53,6 +61,36 @@ export default async function globalSetup(): Promise<() => void> {
 		outdir: assetDirectory,
 		platform: "browser",
 		plugins: [candidatePlugin(packageDirectory)],
+		target: "es2022",
+	});
+	const entrySource = fs.readFileSync(entry, "utf8");
+	const sourceObserver = entrySource.indexOf('from "#phase-3a1b-p4-browser-test-control"');
+	const sourceCandidate = entrySource.indexOf('from "#phase-3a1b-p4-browser-candidate"');
+	const bundle = fs.readFileSync(path.join(assetDirectory, "phase-3a1b-p4-browser.js"), "utf8");
+	const bundleObserver = bundle.indexOf("nested p4 Browser observations are forbidden");
+	const bundleCandidate = bundle.indexOf("createBrowserDurableLiveJournalStore");
+	if (
+		sourceObserver < 0 ||
+		sourceCandidate < 0 ||
+		sourceObserver >= sourceCandidate ||
+		bundleObserver < 0 ||
+		bundleCandidate < 0 ||
+		bundleObserver >= bundleCandidate
+	) {
+		throw new Error("PHASE_3A1B_P4_BROWSER_OBSERVER_MUST_PRECEDE_CANDIDATE_EVALUATION");
+	}
+	await build({
+		bundle: true,
+		entryPoints: {
+			"phase-3a1b-p4-browser-decision-mutant": path.join(
+				packageDirectory,
+				"tests/assets/phase-3a1b-p4-browser-live-journal-entry.ts"
+			),
+		},
+		format: "esm",
+		outdir: assetDirectory,
+		platform: "browser",
+		plugins: [candidatePlugin(packageDirectory, true)],
 		target: "es2022",
 	});
 	await build({
@@ -77,6 +115,11 @@ export default async function globalSetup(): Promise<() => void> {
 	fs.writeFileSync(
 		path.join(assetDirectory, "phase-3a1b-p4-death.html"),
 		'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-3a1b-p4-browser-live-journal-death-entry.js"></script>',
+		"utf8"
+	);
+	fs.writeFileSync(
+		path.join(assetDirectory, "phase-3a1b-p4-decision-mutant.html"),
+		'<!doctype html><meta charset="utf-8"><script type="module" src="./phase-3a1b-p4-browser-decision-mutant.js"></script>',
 		"utf8"
 	);
 	process.env.PHASE_3A1B_P4_BROWSER_ASSET_DIR = assetDirectory;

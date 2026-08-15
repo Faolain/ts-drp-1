@@ -1,9 +1,11 @@
+import { build, type Plugin } from "esbuild";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -11,7 +13,14 @@ import {
 	P4_NODE_METHODS,
 	P4_NODE_NO_WRITE_DEATH_TUPLES,
 	P4_NODE_SCHEMA,
+	P4_NODE_SQLITE_CATALOG,
 } from "./fixtures/phase-3a1b-p4-node-contract.js";
+import {
+	armPhase3a1bP4NodeReadbackFault,
+	armPhase3a1bP4NodeReadbackInterleave,
+	observePhase3a1bP4NodeOperation,
+	takePhase3a1bP4NodeObservationLedger,
+} from "./fixtures/phase-3a1b-p4-node-preload.mjs";
 
 interface JournalStore {
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -23,10 +32,6 @@ interface JournalStore {
 
 interface Candidate {
 	createNodeDurableLiveJournalStore(options: { readonly primaryFilename: string }): JournalStore;
-}
-
-interface CandidateTestControl {
-	armPhase3a1bP4NodeReadbackFault(fate: "exact-new" | "exact-old" | "mixed" | "unreadable"): void;
 }
 
 interface Material {
@@ -59,6 +64,11 @@ interface ChildMessage {
 const PACKAGE_DIRECTORY = path.resolve(import.meta.dirname, "..");
 const CHILD = new URL("./fixtures/phase-3a1b-p4-node-death-child.mjs", import.meta.url);
 const PRELOAD = new URL("./fixtures/phase-3a1b-p4-node-preload.mjs", import.meta.url);
+const INTERLEAVE_WORKER = new URL("./fixtures/phase-3a1b-p4-node-interleave-worker.mjs", import.meta.url);
+const DECISION_MUTANT = path.resolve(
+	PACKAGE_DIRECTORY,
+	"../../tests/fixtures/phase-3a1b-p4/live-journal-decision-mutant.ts"
+);
 const RUN_LONG = process.env.TS_DRP_PHASE_3A1B_P4_NODE_DEATH === "1";
 const directories: string[] = [];
 
@@ -80,14 +90,30 @@ async function loadCandidate(): Promise<Candidate> {
 	}
 }
 
-async function loadTestControl(): Promise<CandidateTestControl> {
-	try {
-		return (await import(
-			new URL("../dist/src/internal/live-journal-observation.js", import.meta.url).href
-		)) as CandidateTestControl;
-	} catch (error) {
-		throw new Error("PHASE_3A1B_P4_NODE_TEST_CONTROL_UNAVAILABLE", { cause: error });
-	}
+async function loadDecisionMutantCandidate(label: string): Promise<Candidate> {
+	const source = path.join(PACKAGE_DIRECTORY, "src/live-journal.ts");
+	const shared = path.resolve(PACKAGE_DIRECTORY, "../live-journal/src/index.ts");
+	const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), `phase-3a1b-p4-node-${label}-`));
+	directories.push(directory);
+	const output = path.join(directory, "candidate.mjs");
+	const plugin: Plugin = {
+		name: "phase-3a1b-p4-shared-decision-mutant",
+		setup(builder): void {
+			builder.onResolve({ filter: /^@ts-drp\/live-journal$/ }, ({ importer }) => ({
+				path: path.resolve(importer) === DECISION_MUTANT ? shared : DECISION_MUTANT,
+			}));
+		},
+	};
+	await build({
+		bundle: true,
+		entryPoints: [source],
+		format: "esm",
+		outfile: output,
+		platform: "node",
+		plugins: [plugin],
+		target: "node22",
+	});
+	return (await import(`${pathToFileURL(output).href}?${label}`)) as Candidate;
 }
 
 function loadMaterial(): Material {
@@ -153,6 +179,50 @@ function rawClosure(primaryFilename: string): {
 				unknown
 			>[],
 		};
+	} finally {
+		database.close();
+	}
+}
+
+function rawCatalog(primaryFilename: string): readonly Record<string, unknown>[] {
+	const database = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
+		allowExtension: false,
+		enableDoubleQuotedStringLiterals: false,
+		enableForeignKeyConstraints: false,
+		readOnly: true,
+	});
+	try {
+		return database
+			.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name")
+			.all() as readonly Record<string, unknown>[];
+	} finally {
+		database.close();
+	}
+}
+
+function applyNodeReadbackFate(
+	primaryFilename: string,
+	operation: "append" | "install",
+	fate: "exact-old" | "mixed"
+): void {
+	const database = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
+		allowExtension: false,
+		enableDoubleQuotedStringLiterals: false,
+		enableForeignKeyConstraints: false,
+		readOnly: false,
+	});
+	try {
+		database.exec("BEGIN IMMEDIATE");
+		if (operation === "install") {
+			if (fate === "exact-old") database.exec("DELETE FROM scopes");
+			else database.exec("UPDATE scopes SET detached_anchor_signature=zeroblob(64)");
+		} else if (fate === "exact-old") {
+			database.exec("DELETE FROM accepted_entries");
+			database.exec("UPDATE scopes SET next_journal_sequence=0");
+		} else {
+			database.exec("UPDATE scopes SET next_journal_sequence=0");
+		}
+		database.exec("COMMIT");
 	} finally {
 		database.close();
 	}
@@ -226,7 +296,7 @@ function runRecovery(tuple: (typeof P4_NODE_DEATH_TUPLES)[number], primaryFilena
 }
 
 describe("D.93.34 p4-b Node strict live-journal RED", () => {
-	it("round-trips the exact two-table WITHOUT ROWID schema and forbids permissive migration", () => {
+	it("round-trips the complete SQLite catalog and forbids permissive migration sediment", () => {
 		const database = new DatabaseSync(":memory:", {
 			allowExtension: false,
 			enableDoubleQuotedStringLiterals: false,
@@ -236,14 +306,132 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 		try {
 			database.exec(P4_NODE_SCHEMA.scopes);
 			database.exec(P4_NODE_SCHEMA.acceptedEntries);
-			const rows = database.prepare("SELECT name,sql FROM sqlite_schema WHERE type='table' ORDER BY name").all();
-			expect(rows).toEqual([
-				{ name: "accepted_entries", sql: P4_NODE_SCHEMA.acceptedEntries },
-				{ name: "scopes", sql: P4_NODE_SCHEMA.scopes },
-			]);
+			const rows = database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all();
+			expect(rows).toEqual(P4_NODE_SQLITE_CATALOG);
+			expect(rows.filter(({ type }) => type === "trigger" || type === "view")).toEqual([]);
 			expect(Object.values(P4_NODE_SCHEMA).every((sql) => !sql.includes("IF NOT EXISTS"))).toBe(true);
 		} finally {
 			database.close();
+		}
+	});
+
+	it("uses exactly one readonly snapshot for readiness and each page and readbacks idempotent no-write paths", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const store = createNodeDurableLiveJournalStore({ primaryFilename: primary("readonly-ledger") });
+		const values = exactInputs();
+		try {
+			takePhase3a1bP4NodeObservationLedger();
+			await observePhase3a1bP4NodeOperation("genesis-new", () => store.installGenesis(values.install));
+			await observePhase3a1bP4NodeOperation("genesis-repeat", () => store.installGenesis(values.install));
+			await observePhase3a1bP4NodeOperation("received-new", () => store.appendAccepted(values.received));
+			await observePhase3a1bP4NodeOperation("received-repeat", () => store.appendAccepted(values.received));
+			await observePhase3a1bP4NodeOperation("local-cross-kind", () => store.appendAccepted(values.local));
+			const local = { ...values.local, authorSequence: 1, vertexDigest: "6".repeat(64) };
+			await observePhase3a1bP4NodeOperation("local-new", () => store.appendAccepted(local));
+			await observePhase3a1bP4NodeOperation("local-repeat", () => store.appendAccepted(local));
+			await observePhase3a1bP4NodeOperation("local-ref-conflict", () =>
+				store.appendAccepted({ ...local, vertexDigest: "7".repeat(64) })
+			);
+			const ready = await observePhase3a1bP4NodeOperation("readiness", () => store.readiness({ scope: values.scope }));
+			await observePhase3a1bP4NodeOperation("page", () =>
+				store.readPage({ afterSequence: null, limit: 64, scope: values.scope, snapshot: ready.snapshot })
+			);
+			const ledger = takePhase3a1bP4NodeObservationLedger();
+			const expectOneSnapshot = (label: string): void => {
+				const begin = ledger.filter((event) => event.startsWith(`${label}:target:readonly-begin:`));
+				const commit = ledger.filter((event) => event.startsWith(`${label}:target:readonly-commit:`));
+				const queries = ledger.filter((event) => event.startsWith(`${label}:target:closure-query:readonly:`));
+				expect(begin).toHaveLength(1);
+				expect(commit).toHaveLength(1);
+				expect(queries.map((event) => event.split(":").at(-2)).sort()).toEqual(["accepted_entries", "scopes"]);
+				const connections = [...begin, ...commit, ...queries].map((event) => event.split(":").at(-1));
+				expect(new Set(connections).size).toBe(1);
+				expect(
+					ledger.filter(
+						(event) =>
+							event.startsWith(`${label}:target:closure-query:outside:`) ||
+							event.startsWith(`${label}:target:closure-query:postcommit:`)
+					)
+				).toEqual([]);
+				expect(ledger.filter((event) => event === `${label}:target:return`)).toHaveLength(1);
+			};
+			for (const label of [
+				"genesis-new",
+				"genesis-repeat",
+				"received-new",
+				"received-repeat",
+				"local-cross-kind",
+				"local-new",
+				"local-repeat",
+			]) {
+				expect(ledger.filter((event) => event === `${label}:target:begin-immediate`)).toHaveLength(1);
+				expect(ledger.filter((event) => event === `${label}:target:commit`)).toHaveLength(1);
+				expectOneSnapshot(label);
+			}
+			expect(ledger.filter((event) => event === "local-ref-conflict:target:begin-immediate")).toHaveLength(1);
+			expect(ledger.filter((event) => event === "local-ref-conflict:target:rollback")).toHaveLength(1);
+			expectOneSnapshot("local-ref-conflict");
+			expectOneSnapshot("readiness");
+			expectOneSnapshot("page");
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("routes all four shared pure decisions through the real Node adapter build", async () => {
+		for (const mode of ["capture", "duplicate", "snapshot", "observation"] as const) {
+			const { createNodeDurableLiveJournalStore } = await loadDecisionMutantCandidate(mode);
+			const primaryFilename = primary(`decision-${mode}`);
+			const store = createNodeDurableLiveJournalStore({ primaryFilename });
+			const material = loadMaterial();
+			const values = exactInputs(material);
+			try {
+				if (mode === "capture") Reflect.set(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__", mode);
+				const installed = await store.installGenesis(values.install);
+				if (mode === "capture") {
+					expect(installed).toMatchObject({ ok: false });
+					expect(rawClosure(primaryFilename)).toEqual({ rows: [], scopes: [] });
+					continue;
+				}
+				expect(installed).toMatchObject({ ok: true });
+				if (mode === "duplicate" || mode === "snapshot") {
+					expect(await store.appendAccepted(values.received)).toMatchObject({ idempotent: false, ok: true });
+				}
+				Reflect.set(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__", mode);
+				const result =
+					mode === "snapshot"
+						? await store.readiness({ scope: values.scope })
+						: await store.appendAccepted(values.received);
+				expect(result).toMatchObject({ ok: false });
+				expect(result).not.toMatchObject({ idempotent: true, ok: true });
+				const closure = rawClosure(primaryFilename);
+				expect(closure.rows).toHaveLength(1);
+				expect(closure.rows[0]).toMatchObject({
+					anchor_digest: material.anchorDigest,
+					epoch: 0,
+					journal_sequence: 0,
+					local_author: null,
+					local_author_sequence: null,
+					object_id: material.objectId,
+					source_kind: "received",
+					vertex_digest: material.vertexDigest,
+				});
+				expect(Buffer.from(closure.rows[0]?.received_preimage as Uint8Array).toString("hex")).toBe(material.vertexHex);
+				expect(Buffer.from(closure.rows[0]?.received_signature as Uint8Array).toString("hex")).toBe(
+					material.signatureHex
+				);
+				expect(closure.scopes).toMatchObject([
+					{
+						anchor_digest: material.anchorDigest,
+						next_journal_sequence: 1,
+						object_id: material.objectId,
+						parameters_digest: material.parametersDigest,
+					},
+				]);
+			} finally {
+				Reflect.deleteProperty(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__");
+				await store.close();
+			}
 		}
 	});
 
@@ -278,6 +466,7 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			expect(Object.keys(store).sort()).toEqual([...P4_NODE_METHODS].sort());
 			expect(fs.existsSync(primaryFilename)).toBe(false);
 			expect(fs.existsSync(`${primaryFilename}.drp-live-journal-v1.sqlite`)).toBe(true);
+			expect(rawCatalog(primaryFilename)).toEqual(P4_NODE_SQLITE_CATALOG);
 		} finally {
 			await store.close();
 		}
@@ -436,14 +625,19 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 
 	it("classifies the bounded exact-old/new/mixed/unreadable readback seam without leaking authority", async () => {
 		const { createNodeDurableLiveJournalStore } = await loadCandidate();
-		const { armPhase3a1bP4NodeReadbackFault } = await loadTestControl();
 		for (const operation of ["install", "append"] as const) {
 			for (const fate of ["exact-new", "exact-old", "mixed", "unreadable"] as const) {
-				const store = createNodeDurableLiveJournalStore({ primaryFilename: primary(`fault-${operation}-${fate}`) });
+				const primaryFilename = primary(`fault-${operation}-${fate}`);
+				const store = createNodeDurableLiveJournalStore({ primaryFilename });
 				const values = exactInputs();
 				try {
 					if (operation === "append") await store.installGenesis(values.install);
-					armPhase3a1bP4NodeReadbackFault(fate);
+					armPhase3a1bP4NodeReadbackFault(
+						fate,
+						fate === "exact-old" || fate === "mixed"
+							? (): void => applyNodeReadbackFate(primaryFilename, operation, fate)
+							: undefined
+					);
 					const result =
 						operation === "install"
 							? await store.installGenesis(values.install)
@@ -464,6 +658,74 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 					await store.close();
 				}
 			}
+		}
+	});
+
+	it("does not poison when a second facade legally commits a distinct row between target commit and readback", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const primaryFilename = primary("legal-readback-interleave");
+		const first = createNodeDurableLiveJournalStore({ primaryFilename });
+		const values = exactInputs();
+		try {
+			await first.installGenesis(values.install);
+			armPhase3a1bP4NodeReadbackInterleave({
+				appendInput: { ...values.local, authorSequence: 1, vertexDigest: "6".repeat(64) },
+				moduleUrl: new URL("../dist/src/live-journal.js", import.meta.url).href,
+				primaryFilename,
+				readinessInput: { scope: values.scope },
+			});
+			takePhase3a1bP4NodeObservationLedger();
+			expect(
+				await observePhase3a1bP4NodeOperation("append", () => first.appendAccepted(values.received))
+			).toMatchObject({
+				idempotent: false,
+				journalSequence: 0,
+				ok: true,
+				sourceKind: "received",
+			});
+			const ledger = takePhase3a1bP4NodeObservationLedger();
+			expect(
+				ledger.filter((event) =>
+					/append:(?:target:commit|distinct:(?:commit|readonly-readback|return)|target:(?:readonly-(?:begin|commit)|closure-query:readonly:[^:]+)|target:return)/u.test(
+						event
+					)
+				)
+			).toEqual([
+				"append:target:commit",
+				"append:distinct:commit",
+				"append:distinct:readonly-readback",
+				"append:distinct:return",
+				expect.stringMatching(/^append:target:readonly-begin:(db\d+)$/u),
+				expect.stringMatching(/^append:target:closure-query:readonly:scopes:(db\d+)$/u),
+				expect.stringMatching(/^append:target:closure-query:readonly:accepted_entries:(db\d+)$/u),
+				expect.stringMatching(/^append:target:readonly-commit:(db\d+)$/u),
+				"append:target:return",
+			]);
+			const targetConnections = ledger
+				.filter(
+					(event) =>
+						event.startsWith("append:target:readonly-") || event.startsWith("append:target:closure-query:readonly:")
+				)
+				.map((event) => event.split(":").at(-1));
+			expect(new Set(targetConnections).size).toBe(1);
+			expect(
+				ledger.filter(
+					(event) =>
+						event.startsWith("append:target:closure-query:outside:") ||
+						event.startsWith("append:target:closure-query:postcommit:")
+				)
+			).toEqual([]);
+			expect(ledger.slice(0, 3)).toEqual([
+				"append:target:begin-immediate",
+				"append:target:write",
+				"append:target:commit",
+			]);
+			expect(await first.readiness({ scope: values.scope })).toMatchObject({ ok: true, ready: true, rowCount: 2 });
+			const closure = rawClosure(primaryFilename);
+			expect(closure.rows.map(({ journal_sequence: sequence }) => sequence)).toEqual([0, 1]);
+			expect(closure.scopes).toMatchObject([{ next_journal_sequence: 2 }]);
+		} finally {
+			await first.close();
 		}
 	});
 
@@ -500,14 +762,18 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			"local-ref-race",
 		]);
 		const preload = fs.readFileSync(PRELOAD, "utf8");
+		const interleaveWorker = fs.readFileSync(INTERLEAVE_WORKER, "utf8");
 		const child = fs.readFileSync(CHILD, "utf8");
 		expect(preload).toContain("DatabaseSync.prototype.exec");
 		expect(preload).toContain('observe("after-commit"');
+		expect(interleaveWorker).toContain("createNodeDurableLiveJournalStore");
+		expect(interleaveWorker).toContain("await store.readiness");
+		expect(interleaveWorker).toContain("Atomics.notify");
 		expect(child).toContain("child-error");
 		expect(child).toContain("dist/src/live-journal.js");
 		expect(
 			JSON.stringify(JSON.parse(fs.readFileSync(path.join(PACKAGE_DIRECTORY, "package.json"), "utf8")))
-		).not.toContain("phase-3a1b-p4-node-preload");
+		).not.toMatch(/phase-3a1b-p4-node-(?:interleave-worker|preload)/u);
 	});
 });
 

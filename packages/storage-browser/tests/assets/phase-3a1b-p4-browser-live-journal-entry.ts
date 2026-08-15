@@ -1,11 +1,15 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
-// eslint-disable-next-line import/no-unresolved -- resolved by the private p4 RED bundler.
-import { createBrowserDurableLiveJournalStore } from "#phase-3a1b-p4-browser-candidate";
 import {
 	armPhase3a1bP4BrowserDurabilityDowngrade,
 	armPhase3a1bP4BrowserReadbackFault,
+	armPhase3a1bP4BrowserReadbackInterleave,
+	observePhase3a1bP4BrowserOperation,
+	takePhase3a1bP4BrowserObservationLedger,
 } from "#phase-3a1b-p4-browser-test-control"; // eslint-disable-line import/no-unresolved -- private RED bundler alias.
+// The external observer must evaluate before the candidate can capture IndexedDB intrinsics.
+// eslint-disable-next-line import/no-unresolved, import/order -- observer must evaluate before the candidate.
+import { createBrowserDurableLiveJournalStore } from "#phase-3a1b-p4-browser-candidate";
 
 interface JournalStore {
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -18,7 +22,16 @@ interface JournalStore {
 declare global {
 	interface Window {
 		phase3a1bP4Run(
-			caseId: "concurrency" | "duplicates" | "faults" | "lifecycle" | "strict-downgrade" | "surface-schema"
+			caseId:
+				| "concurrency"
+				| "decision-mutants"
+				| "duplicates"
+				| "faults"
+				| "interleaving"
+				| "lifecycle"
+				| "persisted-shapes"
+				| "strict-downgrade"
+				| "surface-schema"
 		): Promise<unknown>;
 	}
 }
@@ -94,6 +107,68 @@ async function rawClosure(name: string): Promise<unknown> {
 		return { rows, scopes };
 	} finally {
 		database.close();
+	}
+}
+
+async function rawLocalRefKeys(name: string): Promise<readonly IDBValidKey[]> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction("acceptedEntries", "readonly");
+		const keys = await requestResult(transaction.objectStore("acceptedEntries").index("localRefUniq").getAllKeys());
+		await transactionComplete(transaction);
+		return keys;
+	} finally {
+		database.close();
+	}
+}
+
+async function replaceRaw(name: string, storeName: "acceptedEntries" | "scopes", value: unknown): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(storeName, "readwrite", { durability: "strict" });
+		await requestResult(transaction.objectStore(storeName).put(value));
+		await transactionComplete(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+async function deleteRaw(name: string, storeName: "acceptedEntries" | "scopes", key: IDBValidKey): Promise<void> {
+	const database = await requestResult(indexedDB.open(name));
+	try {
+		const transaction = database.transaction(storeName, "readwrite", { durability: "strict" });
+		await requestResult(transaction.objectStore(storeName).delete(key));
+		await transactionComplete(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+async function applyReadbackFate(
+	derived: string,
+	operation: "append" | "install",
+	fate: "exact-old" | "mixed",
+	values: Readonly<Record<string, unknown>>
+): Promise<void> {
+	const closure = (await rawClosure(derived)) as {
+		readonly rows: readonly Record<string, unknown>[];
+		readonly scopes: readonly Record<string, unknown>[];
+	};
+	const scope = values.scope as Readonly<Record<string, unknown>>;
+	const scopeKey: IDBValidKey = [scope.objectId as string, 0, scope.anchorDigest as string];
+	if (operation === "install") {
+		if (fate === "exact-old") await deleteRaw(derived, "scopes", scopeKey);
+		else await replaceRaw(derived, "scopes", { ...closure.scopes[0], detachedAnchorSignature: new Uint8Array(64) });
+		return;
+	}
+	const row = closure.rows[0];
+	const rowKey: IDBValidKey = [...(scopeKey as readonly IDBValidKey[]), 0];
+	if (fate === "exact-old") {
+		await deleteRaw(derived, "acceptedEntries", rowKey);
+		await replaceRaw(derived, "scopes", { ...closure.scopes[0], nextJournalSequence: 0 });
+	} else {
+		await replaceRaw(derived, "scopes", { ...closure.scopes[0], nextJournalSequence: 0 });
+		if (row === undefined) throw new TypeError("external mixed readback requires the committed row");
 	}
 }
 
@@ -318,6 +393,153 @@ async function concurrency(): Promise<unknown> {
 	}
 }
 
+async function legalReadbackInterleave(): Promise<unknown> {
+	const primary = `phase-3a1b-p4-interleave-${crypto.randomUUID()}`;
+	const derived = `${primary}--drp-live-journal-v1`;
+	const first = await open(primary);
+	const second = await open(primary);
+	const values = material();
+	try {
+		await first.installGenesis(values.install as Readonly<Record<string, unknown>>);
+		takePhase3a1bP4BrowserObservationLedger();
+		const genesisRepeat = await observePhase3a1bP4BrowserOperation("genesis-repeat", () =>
+			first.installGenesis(values.install as Readonly<Record<string, unknown>>)
+		);
+		armPhase3a1bP4BrowserReadbackInterleave(async () => {
+			await second.appendAccepted({
+				...(values.local as Readonly<Record<string, unknown>>),
+				authorSequence: 1,
+				vertexDigest: "6".repeat(64),
+			});
+		});
+		const target = await observePhase3a1bP4BrowserOperation("received-new", () =>
+			first.appendAccepted(values.received as Readonly<Record<string, unknown>>)
+		);
+		const repeat = await observePhase3a1bP4BrowserOperation("received-repeat", () =>
+			first.appendAccepted(values.received as Readonly<Record<string, unknown>>)
+		);
+		const localRepeat = await observePhase3a1bP4BrowserOperation("local-repeat", () =>
+			first.appendAccepted({
+				...(values.local as Readonly<Record<string, unknown>>),
+				authorSequence: 1,
+				vertexDigest: "6".repeat(64),
+			})
+		);
+		const crossKind = await observePhase3a1bP4BrowserOperation("cross-kind", () =>
+			first.appendAccepted(values.local as Readonly<Record<string, unknown>>)
+		);
+		const localRefConflict = await observePhase3a1bP4BrowserOperation("local-ref", () =>
+			first.appendAccepted({
+				...(values.local as Readonly<Record<string, unknown>>),
+				authorSequence: 1,
+			})
+		);
+		const ready = await observePhase3a1bP4BrowserOperation("readiness", () => first.readiness({ scope: values.scope }));
+		const snapshot = Reflect.get(ready, "snapshot") as Readonly<Record<string, unknown>>;
+		await observePhase3a1bP4BrowserOperation("page", () =>
+			first.readPage({ afterSequence: null, limit: 64, scope: values.scope, snapshot })
+		);
+		const ledger = takePhase3a1bP4BrowserObservationLedger();
+		return {
+			closure: await rawClosure(derived),
+			crossKind,
+			genesisRepeat,
+			ledger,
+			localRefConflict,
+			localRepeat,
+			ready,
+			repeat,
+			target,
+		};
+	} finally {
+		await Promise.all([first.close(), second.close()]);
+		await deleteDatabase(derived);
+	}
+}
+
+async function persistedShapes(): Promise<unknown> {
+	const values = material();
+	const receivedPrimary = `phase-3a1b-p4-shape-received-${crypto.randomUUID()}`;
+	const receivedDerived = `${receivedPrimary}--drp-live-journal-v1`;
+	const receivedStore = await open(receivedPrimary);
+	let receivedClosure: {
+		readonly rows: readonly Record<string, unknown>[];
+		readonly scopes: readonly Record<string, unknown>[];
+	};
+	let rowPoison: unknown;
+	let receivedLocalRefKeys: readonly IDBValidKey[];
+	try {
+		await receivedStore.installGenesis(values.install as Readonly<Record<string, unknown>>);
+		await receivedStore.appendAccepted(values.received as Readonly<Record<string, unknown>>);
+		receivedClosure = (await rawClosure(receivedDerived)) as typeof receivedClosure;
+		receivedLocalRefKeys = await rawLocalRefKeys(receivedDerived);
+		await replaceRaw(receivedDerived, "acceptedEntries", { ...receivedClosure.rows[0], localAuthor: "poison" });
+		rowPoison = await receivedStore.readiness({ scope: values.scope });
+	} finally {
+		await receivedStore.close();
+		await deleteDatabase(receivedDerived);
+	}
+
+	const localPrimary = `phase-3a1b-p4-shape-local-${crypto.randomUUID()}`;
+	const localDerived = `${localPrimary}--drp-live-journal-v1`;
+	const localStore = await open(localPrimary);
+	let localClosure: {
+		readonly rows: readonly Record<string, unknown>[];
+		readonly scopes: readonly Record<string, unknown>[];
+	};
+	let scopePoison: unknown;
+	try {
+		await localStore.installGenesis(values.install as Readonly<Record<string, unknown>>);
+		await localStore.appendAccepted(values.local as Readonly<Record<string, unknown>>);
+		localClosure = (await rawClosure(localDerived)) as typeof localClosure;
+		await replaceRaw(localDerived, "scopes", { ...localClosure.scopes[0], extra: true });
+		scopePoison = await localStore.readiness({ scope: values.scope });
+	} finally {
+		await localStore.close();
+		await deleteDatabase(localDerived);
+	}
+	const poisonKinds = [
+		["received", "missing", "detachedSignature"],
+		["received", "null", "detachedSignature"],
+		["received", "undefined", "detachedSignature"],
+		["received", "opposite", "localAuthor"],
+		["received", "missing", "exactCanonicalPreimageBytes"],
+		["received", "null", "exactCanonicalPreimageBytes"],
+		["received", "undefined", "exactCanonicalPreimageBytes"],
+		["received", "opposite", "localAuthorSequence"],
+		["local-issued", "missing", "localAuthor"],
+		["local-issued", "null", "localAuthor"],
+		["local-issued", "undefined", "localAuthor"],
+		["local-issued", "opposite", "detachedSignature"],
+		["local-issued", "missing", "localAuthorSequence"],
+		["local-issued", "null", "localAuthorSequence"],
+		["local-issued", "undefined", "localAuthorSequence"],
+		["local-issued", "opposite", "exactCanonicalPreimageBytes"],
+	] as const;
+	const variantPoisons: unknown[] = [];
+	for (const [sourceKind, mutation, field] of poisonKinds) {
+		const primary = `phase-3a1b-p4-shape-${sourceKind}-${mutation}-${crypto.randomUUID()}`;
+		const derived = `${primary}--drp-live-journal-v1`;
+		const store = await open(primary);
+		try {
+			await store.installGenesis(values.install as Readonly<Record<string, unknown>>);
+			await store.appendAccepted(
+				(sourceKind === "received" ? values.received : values.local) as Readonly<Record<string, unknown>>
+			);
+			const closure = (await rawClosure(derived)) as { readonly rows: readonly Record<string, unknown>[] };
+			const poisoned = { ...closure.rows[0] };
+			if (mutation === "missing") delete poisoned[field];
+			else poisoned[field] = mutation === "null" ? null : mutation === "undefined" ? undefined : "poison";
+			await replaceRaw(derived, "acceptedEntries", poisoned);
+			variantPoisons.push(await store.readiness({ scope: values.scope }));
+		} finally {
+			await store.close();
+			await deleteDatabase(derived);
+		}
+	}
+	return { localClosure, receivedClosure, receivedLocalRefKeys, rowPoison, scopePoison, variantPoisons };
+}
+
 async function duplicateMatrix(): Promise<unknown> {
 	const results: unknown[] = [];
 	for (const firstKind of ["received", "local-issued"] as const) {
@@ -404,7 +626,12 @@ async function readbackFaults(): Promise<unknown> {
 				if (operation === "append") {
 					await store.installGenesis(values.install as Readonly<Record<string, unknown>>);
 				}
-				armPhase3a1bP4BrowserReadbackFault(fate);
+				armPhase3a1bP4BrowserReadbackFault(
+					fate,
+					fate === "exact-old" || fate === "mixed"
+						? (): Promise<void> => applyReadbackFate(derived, operation, fate, values)
+						: undefined
+				);
 				const result =
 					operation === "install"
 						? await store.installGenesis(values.install as Readonly<Record<string, unknown>>)
@@ -440,11 +667,67 @@ async function strictDowngrade(): Promise<unknown> {
 	}
 }
 
+async function decisionMutants(): Promise<unknown> {
+	const values = material();
+	const results: Record<string, unknown> = {};
+	for (const mode of ["capture", "duplicate", "snapshot", "observation"] as const) {
+		const primary = `phase-3a1b-p4-decision-${mode}-${crypto.randomUUID()}`;
+		const derived = `${primary}--drp-live-journal-v1`;
+		const store = await open(primary);
+		try {
+			if (mode === "capture") Reflect.set(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__", mode);
+			const installed = await store.installGenesis(values.install as Readonly<Record<string, unknown>>);
+			if (mode === "capture") {
+				results[mode] = { outcome: installed, raw: await rawClosure(derived) };
+				continue;
+			}
+			expectDataSuccess(installed);
+			if (mode === "duplicate" || mode === "snapshot") {
+				expectDataSuccess(await store.appendAccepted(values.received as Readonly<Record<string, unknown>>));
+			}
+			Reflect.set(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__", mode);
+			const outcome =
+				mode === "snapshot"
+					? await store.readiness({ scope: values.scope })
+					: await store.appendAccepted(values.received as Readonly<Record<string, unknown>>);
+			results[mode] = { outcome, raw: await rawClosure(derived) };
+		} finally {
+			Reflect.deleteProperty(globalThis, "__TS_DRP_P4_LIVE_JOURNAL_DECISION_MUTANT__");
+			await store.close();
+			await deleteDatabase(derived);
+		}
+	}
+	const expectedScope = values.scope as Readonly<Record<string, unknown>>;
+	const expectedInstall = values.install as Readonly<Record<string, unknown>>;
+	const expectedReceived = values.received as Readonly<Record<string, unknown>>;
+	return {
+		expected: {
+			anchorDigest: Reflect.get(expectedScope, "anchorDigest"),
+			objectId: Reflect.get(expectedScope, "objectId"),
+			parametersDigest: lowerHex(
+				hashDomain(
+					"ts-drp/parameters/v3",
+					Reflect.get(expectedInstall, "exactCanonicalParametersCarrierBytes") as Uint8Array
+				)
+			),
+			vertexDigest: Reflect.get(expectedReceived, "vertexDigest"),
+		},
+		results,
+	};
+}
+
+function expectDataSuccess(value: Readonly<Record<string, unknown>>): void {
+	if (Reflect.get(value, "ok") !== true) throw new Error("p4 decision-mutant control did not reach the real adapter");
+}
+
 window.phase3a1bP4Run = (caseId): Promise<unknown> => {
+	if (caseId === "decision-mutants") return decisionMutants();
 	if (caseId === "surface-schema") return surfaceSchema();
 	if (caseId === "lifecycle") return lifecycle();
 	if (caseId === "duplicates") return duplicateMatrix();
 	if (caseId === "faults") return readbackFaults();
+	if (caseId === "interleaving") return legalReadbackInterleave();
+	if (caseId === "persisted-shapes") return persistedShapes();
 	if (caseId === "strict-downgrade") return strictDowngrade();
 	return concurrency();
 };

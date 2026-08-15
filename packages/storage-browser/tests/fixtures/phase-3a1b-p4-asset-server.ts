@@ -13,6 +13,8 @@ export interface P4AssetServer {
 const ALLOWED = new Set([
 	"phase-3a1b-p4.html",
 	"phase-3a1b-p4-browser.js",
+	"phase-3a1b-p4-browser-decision-mutant.js",
+	"phase-3a1b-p4-decision-mutant.html",
 	"phase-3a1b-p4-death.html",
 	"phase-3a1b-p4-browser-live-journal-death-entry.js",
 	"phase-3a1b-p4-browser-live-journal-worker.js",

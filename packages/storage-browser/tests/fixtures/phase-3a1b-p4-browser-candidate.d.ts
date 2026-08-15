@@ -10,5 +10,11 @@ declare module "#phase-3a1b-p4-browser-test-control" {
 		checkpoint: (edge: string) => void
 	): void;
 	export function armPhase3a1bP4BrowserDurabilityDowngrade(): void;
-	export function armPhase3a1bP4BrowserReadbackFault(fate: "exact-new" | "exact-old" | "mixed" | "unreadable"): void;
+	export function armPhase3a1bP4BrowserReadbackFault(
+		fate: "exact-new" | "exact-old" | "mixed" | "unreadable",
+		callback?: () => Promise<void> | void
+	): void;
+	export function armPhase3a1bP4BrowserReadbackInterleave(callback: () => Promise<void> | void): void;
+	export function observePhase3a1bP4BrowserOperation<T>(label: string, callback: () => Promise<T>): Promise<T>;
+	export function takePhase3a1bP4BrowserObservationLedger(): readonly string[];
 }

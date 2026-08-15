@@ -20,9 +20,19 @@ test.afterAll(async () => server.close());
 
 async function runCase(
 	page: Page,
-	caseId: "concurrency" | "duplicates" | "faults" | "lifecycle" | "strict-downgrade" | "surface-schema"
+	caseId:
+		| "concurrency"
+		| "decision-mutants"
+		| "duplicates"
+		| "faults"
+		| "interleaving"
+		| "lifecycle"
+		| "persisted-shapes"
+		| "strict-downgrade"
+		| "surface-schema",
+	asset = "phase-3a1b-p4.html"
 ): Promise<Record<string, unknown>> {
-	const url = server.issueTransitionURL("phase-3a1b-p4.html");
+	const url = server.issueTransitionURL(asset);
 	try {
 		await page.goto(url, { waitUntil: "load" });
 		await page.waitForFunction(() => typeof window.phase3a1bP4Run === "function");
@@ -31,6 +41,42 @@ async function runCase(
 		server.revoke(new URL(url).pathname.split("/")[2] ?? "");
 	}
 }
+
+test("routes all four shared pure decisions through the real Browser adapter build", async ({ page }) => {
+	const value = await runCase(page, "decision-mutants", "phase-3a1b-p4-decision-mutant.html");
+	const expected = value.expected as Readonly<Record<string, string>>;
+	const results = value.results as Readonly<Record<string, unknown>>;
+	for (const mode of ["capture", "duplicate", "snapshot", "observation"] as const) {
+		const result = results[mode] as {
+			readonly outcome: unknown;
+			readonly raw: { readonly rows: readonly unknown[]; readonly scopes: readonly Record<string, unknown>[] };
+		};
+		expect(result.outcome).toMatchObject({ ok: false });
+		expect(result.outcome).not.toMatchObject({ idempotent: true, ok: true });
+		expect(result.raw.rows).toHaveLength(mode === "capture" ? 0 : 1);
+		expect(result.raw.scopes).toHaveLength(mode === "capture" ? 0 : 1);
+		if (mode !== "capture") {
+			expect(result.raw.rows).toMatchObject([
+				{
+					anchorDigest: expected.anchorDigest,
+					epoch: 0,
+					journalSequence: 0,
+					objectId: expected.objectId,
+					sourceKind: "received",
+					vertexDigest: expected.vertexDigest,
+				},
+			]);
+			expect(result.raw.scopes).toMatchObject([
+				{
+					anchorDigest: expected.anchorDigest,
+					nextJournalSequence: 1,
+					objectId: expected.objectId,
+					parametersDigest: expected.parametersDigest,
+				},
+			]);
+		}
+	}
+});
 
 test("opens the exact five-method facade and native strict-IDB schema without touching primary", async ({ page }) => {
 	const value = await runCase(page, "surface-schema");
@@ -61,6 +107,110 @@ test("opens the exact five-method facade and native strict-IDB schema without to
 		],
 		version: 1,
 	});
+});
+
+test("accepts a legal distinct append between commit and readback and snapshots idempotent/no-write paths", async ({
+	page,
+}) => {
+	const value = await runCase(page, "interleaving");
+	expect(value.genesisRepeat).toMatchObject({ idempotent: true, ok: true });
+	expect(value.target).toMatchObject({ idempotent: false, journalSequence: 0, ok: true, sourceKind: "received" });
+	expect(value.repeat).toMatchObject({ idempotent: true, journalSequence: 0, ok: true, sourceKind: "received" });
+	expect(value.localRepeat).toMatchObject({
+		idempotent: true,
+		journalSequence: 1,
+		ok: true,
+		sourceKind: "local-issued",
+	});
+	expect(value.crossKind).toMatchObject({ idempotent: true, journalSequence: 0, ok: true, sourceKind: "received" });
+	expect(value.localRefConflict).toEqual({ kind: "evidence-conflict", ok: false });
+	expect(value.ready).toMatchObject({ ok: true, ready: true, rowCount: 2 });
+	const closure = value.closure as {
+		readonly rows: readonly Record<string, unknown>[];
+		readonly scopes: readonly Record<string, unknown>[];
+	};
+	expect(closure.rows.map(({ journalSequence }) => journalSequence)).toEqual([0, 1]);
+	expect(closure.scopes).toMatchObject([{ nextJournalSequence: 2 }]);
+	const ledger = value.ledger as readonly string[];
+	const significant = ledger.filter((event) =>
+		/(?:received-new:(?:target:commit:readwrite|distinct:(?:commit:readwrite|readonly-readback|return)|target:(?:readonly-readback|return)))$/u.test(
+			event
+		)
+	);
+	expect(significant).toEqual([
+		"received-new:target:commit:readwrite",
+		"received-new:distinct:commit:readwrite",
+		"received-new:distinct:readonly-readback",
+		"received-new:distinct:return",
+		"received-new:target:readonly-readback",
+		"received-new:target:return",
+	]);
+	for (const label of ["genesis-repeat", "received-repeat", "local-repeat", "cross-kind"]) {
+		expect(ledger.filter((event) => event === `${label}:target:transaction:readwrite`)).toHaveLength(1);
+		expect(ledger.filter((event) => event === `${label}:target:commit:readwrite`)).toHaveLength(1);
+		expect(ledger.filter((event) => event === `${label}:target:abort:readwrite`)).toHaveLength(0);
+		expect(ledger.filter((event) => event === `${label}:target:readonly-readback`)).toHaveLength(1);
+		expect(ledger.filter((event) => event === `${label}:target:return`)).toHaveLength(1);
+	}
+	expect(ledger.filter((event) => event === "local-ref:target:transaction:readwrite")).toHaveLength(1);
+	expect(ledger.filter((event) => event === "local-ref:target:commit:readwrite")).toHaveLength(0);
+	expect(ledger.filter((event) => event === "local-ref:target:abort:readwrite")).toHaveLength(1);
+	expect(ledger.filter((event) => event === "local-ref:target:readonly-readback")).toHaveLength(1);
+	expect(ledger.filter((event) => event === "local-ref:target:return")).toHaveLength(1);
+	for (const label of ["readiness", "page"] as const) {
+		const events = ledger.filter((event) => event.startsWith(`${label}:target:`));
+		expect(events).toEqual([
+			`${label}:target:transaction:readonly`,
+			`${label}:target:readonly-readback`,
+			`${label}:target:request:scopes:get`,
+			`${label}:target:request:acceptedEntries:getAll`,
+			`${label}:target:commit:readonly`,
+			`${label}:target:return`,
+		]);
+	}
+});
+
+test("validates exact persisted scope/received/local own-key variants and poisons sediment", async ({ page }) => {
+	const value = await runCase(page, "persisted-shapes");
+	const received = value.receivedClosure as {
+		readonly rows: readonly Record<string, unknown>[];
+		readonly scopes: readonly Record<string, unknown>[];
+	};
+	const local = value.localClosure as typeof received;
+	expect(Object.keys(received.scopes[0] ?? {}).sort()).toEqual([
+		"anchorDigest",
+		"detachedAnchorSignature",
+		"epoch",
+		"exactCanonicalAnchorPreimageBytes",
+		"exactCanonicalParametersCarrierBytes",
+		"nextJournalSequence",
+		"objectId",
+		"parametersDigest",
+	]);
+	expect(Object.keys(received.rows[0] ?? {}).sort()).toEqual([
+		"anchorDigest",
+		"detachedSignature",
+		"epoch",
+		"exactCanonicalPreimageBytes",
+		"journalSequence",
+		"objectId",
+		"sourceKind",
+		"vertexDigest",
+	]);
+	expect(Object.keys(local.rows[0] ?? {}).sort()).toEqual([
+		"anchorDigest",
+		"epoch",
+		"journalSequence",
+		"localAuthor",
+		"localAuthorSequence",
+		"objectId",
+		"sourceKind",
+		"vertexDigest",
+	]);
+	expect(value.receivedLocalRefKeys).toEqual([]);
+	expect(value.rowPoison).toEqual({ kind: "store-poisoned", ok: false });
+	expect(value.scopePoison).toEqual({ kind: "store-poisoned", ok: false });
+	expect(value.variantPoisons).toEqual(Array(16).fill({ kind: "store-poisoned", ok: false }));
 });
 
 test("stores exact received keys, retains first label and returns one capped durable-prefix page", async ({ page }) => {

@@ -13,6 +13,28 @@ export const P4_NODE_SCHEMA = Object.freeze({
 		"CREATE TABLE scopes (\n  object_id TEXT NOT NULL,\n  epoch INTEGER NOT NULL,\n  anchor_digest TEXT NOT NULL,\n  next_journal_sequence INTEGER NOT NULL,\n  exact_anchor_preimage BLOB NOT NULL,\n  detached_anchor_signature BLOB NOT NULL,\n  parameters_digest TEXT NOT NULL,\n  exact_parameters_carrier BLOB NOT NULL,\n  PRIMARY KEY (object_id, epoch, anchor_digest)\n) WITHOUT ROWID",
 });
 
+export const P4_NODE_SQLITE_CATALOG = Object.freeze([
+	Object.freeze({
+		name: "sqlite_autoindex_accepted_entries_2",
+		sql: null,
+		tbl_name: "accepted_entries",
+		type: "index",
+	}),
+	Object.freeze({
+		name: "sqlite_autoindex_accepted_entries_3",
+		sql: null,
+		tbl_name: "accepted_entries",
+		type: "index",
+	}),
+	Object.freeze({
+		name: "accepted_entries",
+		sql: P4_NODE_SCHEMA.acceptedEntries,
+		tbl_name: "accepted_entries",
+		type: "table",
+	}),
+	Object.freeze({ name: "scopes", sql: P4_NODE_SCHEMA.scopes, tbl_name: "scopes", type: "table" }),
+] as const);
+
 const EDGES = [
 	"before-begin",
 	"after-begin",

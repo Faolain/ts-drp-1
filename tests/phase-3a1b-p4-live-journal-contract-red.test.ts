@@ -1,4 +1,5 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { parseStorageObjectId } from "@ts-drp/storage";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,6 +11,7 @@ import {
 	BROWSER_DEATH_TUPLES,
 	BROWSER_SCHEMA,
 	createLiveJournalMaterial,
+	createRegistryConstraintMutations,
 	decideLocalDuplicate,
 	DUPLICATE_MATRIX,
 	type ExistingRow,
@@ -23,6 +25,111 @@ import {
 	NODE_DEATH_TUPLES,
 	NODE_SCHEMA,
 } from "./fixtures/phase-3a1b-p4/live-journal-contract.js";
+
+function exactRegistryConstraintIds(): readonly string[] {
+	const pairs = (prefix: string, fields: readonly string[]): readonly string[] =>
+		fields.flatMap((field) => [`${prefix}-missing-${field}`, `${prefix}-wrong-type-${field}`]);
+	const anchorFields = [
+		"kind",
+		"protocolMajor",
+		"objectId",
+		"epoch",
+		"previousAnchor",
+		"cutDigest",
+		"stateDigest",
+		"aclDigest",
+		"historyRoot",
+		"historySize",
+		"archiveIndexRoot",
+		"blueprintDigest",
+		"signerSetDigest",
+		"parametersDigest",
+		"profileDigest",
+		"cryptoSuiteId",
+	];
+	const parameterFields = [
+		"maxEpochVertices",
+		"maxEpochBytes",
+		"maxDependencies",
+		"snapshotChunkBytes",
+		"maxSnapshotBytes",
+		"maxPendingEntries",
+		"maxPendingBytes",
+	];
+	const vertexFields = [
+		"kind",
+		"protocolMajor",
+		"objectId",
+		"epoch",
+		"anchor",
+		"author",
+		"authorSequence",
+		"logicalTime",
+		"dependencies",
+		"operation",
+	];
+	const anchorDigests = [
+		"previousAnchor",
+		"cutDigest",
+		"stateDigest",
+		"aclDigest",
+		"historyRoot",
+		"archiveIndexRoot",
+		"blueprintDigest",
+		"signerSetDigest",
+		"parametersDigest",
+		"profileDigest",
+	];
+	return Object.freeze([
+		...pairs("anchor", anchorFields),
+		...pairs("parameters", parameterFields),
+		...pairs("vertex", vertexFields),
+		"anchor-extra",
+		"parameters-extra",
+		"vertex-extra",
+		"anchor-kind",
+		"anchor-protocol",
+		"anchor-object-empty",
+		"anchor-object-long",
+		"anchor-epoch-negative",
+		"anchor-history-size-negative",
+		"anchor-suite-reserved",
+		...(["protocolMajor", "epoch", "historySize"] as const).map((field) => `anchor-${field}-fractional`),
+		...anchorDigests.flatMap((field) => ["charset", "case", "length"].map((kind) => `anchor-${field}-digest-${kind}`)),
+		"anchor-creator-previous-nonzero",
+		"anchor-creator-cut-nonzero",
+		"anchor-creator-history-nonzero",
+		"anchor-foreign-object",
+		...parameterFields.flatMap((field) =>
+			["below", "above", "fractional"].map((kind) => `parameters-${field}-${kind}`)
+		),
+		"vertex-kind",
+		"vertex-protocol",
+		"vertex-object-empty",
+		"vertex-object-long",
+		"vertex-epoch-negative",
+		"vertex-anchor-digest",
+		"vertex-author-empty",
+		"vertex-author-long",
+		"vertex-author-sequence-negative",
+		"vertex-logical-time-zero",
+		"vertex-dependencies-empty",
+		"vertex-dependencies-duplicate",
+		"vertex-dependencies-unsorted",
+		"vertex-dependency-digest",
+		"vertex-operation-not-object",
+		...(["protocolMajor", "epoch", "authorSequence", "logicalTime"] as const).map(
+			(field) => `vertex-${field}-fractional`
+		),
+		"vertex-anchor-digest-case",
+		"vertex-anchor-digest-length",
+		"vertex-dependency-digest-case",
+		"vertex-dependency-digest-length",
+		"vertex-foreign-object",
+		"vertex-foreign-epoch",
+		"vertex-foreign-anchor",
+	]);
+}
 
 interface Scope {
 	readonly anchorDigest: string;
@@ -195,6 +302,42 @@ describe("D.93.34 p4-a frozen shared contract", () => {
 		expect(LIVE_JOURNAL_LOCAL_KEYS).toEqual(["author", "authorSequence", "scope", "sourceKind", "vertexDigest"]);
 	});
 
+	it("executes every registry-v1 anchor, parameters and received-vertex constraint adversarially", async () => {
+		const mutations = createRegistryConstraintMutations();
+		expect(mutations.map(({ id }) => id)).toEqual(exactRegistryConstraintIds());
+		expect(new Set(mutations.map(({ id }) => id))).toHaveLength(exactRegistryConstraintIds().length);
+		for (const mutation of mutations) {
+			const store = await openCandidateStore();
+			const values = exactInputs();
+			try {
+				if (mutation.carrier === "anchor") {
+					expect(
+						await store.installGenesis({ ...values.install, exactCanonicalAnchorPreimageBytes: mutation.bytes }),
+						mutation.id
+					).toEqual({ kind: mutation.expectedKind, ok: false });
+				} else if (mutation.carrier === "parameters") {
+					expect(
+						await store.installGenesis({ ...values.install, exactCanonicalParametersCarrierBytes: mutation.bytes }),
+						mutation.id
+					).toEqual({ kind: mutation.expectedKind, ok: false });
+				} else {
+					await store.installGenesis(values.install);
+					const candidate = {
+						...values.received,
+						exactCanonicalPreimageBytes: mutation.bytes,
+						vertexDigest: lowerHex(hashDomain("ts-drp/vertex/v3", mutation.bytes)),
+					};
+					expect(await store.appendAccepted(candidate), mutation.id).toEqual({
+						kind: mutation.expectedKind,
+						ok: false,
+					});
+				}
+			} finally {
+				await store.close();
+			}
+		}
+	}, 30_000);
+
 	it("pins the complete deterministic local duplicate/conflict precedence matrix", () => {
 		const digest = "d".repeat(64);
 		const otherDigest = "e".repeat(64);
@@ -348,6 +491,62 @@ describe("D.93.34 p4-a frozen shared contract", () => {
 			});
 			expect(await store.installGenesis(accessor)).toEqual({ kind: "malformed-input", ok: false });
 			const values = exactInputs();
+			const invalidObjectIds = [
+				"creator",
+				`:`,
+				`creator:${"a".repeat(31)}`,
+				`creator:${"a".repeat(33)}`,
+				`creator:${"A".repeat(32)}`,
+				`creator:${"a".repeat(32)}:extra`,
+				`creator\0:${"a".repeat(32)}`,
+				`${"x".repeat(992)}:${"a".repeat(32)}`,
+				`creator:\ud800${"a".repeat(32)}`,
+			];
+			for (const objectId of invalidObjectIds) {
+				expect(parseStorageObjectId(objectId)).toEqual({ ok: false, reason: "INVALID_ARGUMENT" });
+				expect(await store.installGenesis({ ...values.install, objectId })).toEqual({
+					kind: "malformed-input",
+					ok: false,
+				});
+			}
+			let snapshotOwnKeys = 0;
+			let snapshotDescriptors = 0;
+			const descriptorSnapshot = new Proxy(values.install, {
+				getOwnPropertyDescriptor(target, key): PropertyDescriptor | undefined {
+					snapshotDescriptors += 1;
+					return Reflect.getOwnPropertyDescriptor(target, key);
+				},
+				ownKeys(target): (string | symbol)[] {
+					snapshotOwnKeys += 1;
+					return Reflect.ownKeys(target);
+				},
+			});
+			expect(await store.installGenesis(descriptorSnapshot)).toMatchObject({ ok: true });
+			expect(snapshotOwnKeys).toBe(1);
+			expect(snapshotDescriptors).toBe(4);
+			let recordOwnKeys = 0;
+			const hostileRecord = new Proxy(values.install, {
+				ownKeys: (): never => {
+					recordOwnKeys += 1;
+					throw new Error("P4_RECORD_OWN_KEYS_DISPATCHED");
+				},
+			});
+			await expect(store.installGenesis(hostileRecord)).resolves.toEqual({ kind: "malformed-input", ok: false });
+			expect(recordOwnKeys).toBe(1);
+			let typedOwnKeys = 0;
+			const hostileBytes = new Proxy(values.install.exactCanonicalAnchorPreimageBytes as Uint8Array, {
+				getOwnPropertyDescriptor: (): never => {
+					throw new Error("P4_TYPED_DESCRIPTOR_DISPATCHED");
+				},
+				ownKeys: (): never => {
+					typedOwnKeys += 1;
+					throw new Error("P4_TYPED_OWN_KEYS_DISPATCHED");
+				},
+			});
+			await expect(
+				store.installGenesis({ ...values.install, exactCanonicalAnchorPreimageBytes: hostileBytes })
+			).resolves.toEqual({ kind: "malformed-input", ok: false });
+			expect(typedOwnKeys).toBe(0);
 			const shared = new Uint8Array(new SharedArrayBuffer(values.install.exactCanonicalAnchorPreimageBytes.byteLength));
 			expect(
 				await store.installGenesis({
@@ -359,8 +558,92 @@ describe("D.93.34 p4-a frozen shared contract", () => {
 				kind: "malformed-input",
 				ok: false,
 			});
+			for (const input of [
+				{ ...values.install, detachedAnchorSignature: "not-bytes" },
+				{ ...values.install, detachedAnchorSignature: new Uint8Array(63) },
+				{ ...values.install, exactCanonicalParametersCarrierBytes: new Uint8Array() },
+			]) {
+				expect(await store.installGenesis(input)).toEqual({ kind: "malformed-input", ok: false });
+			}
 		} finally {
 			await store.close();
+		}
+	});
+
+	it("requires exact plain page inputs and freezes scope precedence before received semantics", async () => {
+		const unopened = await openCandidateStore();
+		const values = exactInputs();
+		const invalidVertex = createRegistryConstraintMutations().find(({ id }) => id === "vertex-logical-time-zero");
+		if (invalidVertex === undefined) throw new Error("P4_VERTEX_MUTANT_MISSING");
+		const received = {
+			...values.received,
+			exactCanonicalPreimageBytes: invalidVertex.bytes,
+			vertexDigest: lowerHex(hashDomain("ts-drp/vertex/v3", invalidVertex.bytes)),
+		};
+		try {
+			expect(await unopened.appendAccepted(received)).toEqual({ kind: "not-installed", ok: false });
+			await unopened.installGenesis(values.install);
+			expect(
+				await unopened.appendAccepted({
+					...received,
+					scope: { ...values.scope, anchorDigest: "f".repeat(64) },
+				})
+			).toEqual({ kind: "wrong-scope", ok: false });
+			expect(await unopened.appendAccepted(received)).toEqual({ kind: "noncanonical-preimage", ok: false });
+
+			const ready = await unopened.readiness({ scope: values.scope });
+			const snapshot = ready.snapshot;
+			for (const afterSequence of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+				expect(await unopened.readPage({ afterSequence, scope: values.scope, snapshot })).toEqual({
+					kind: "malformed-input",
+					ok: false,
+				});
+			}
+			for (const limit of [0, 129, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+				expect(await unopened.readPage({ limit, scope: values.scope, snapshot })).toEqual({
+					kind: "malformed-input",
+					ok: false,
+				});
+			}
+			class NonPlainPageInput {
+				public sentinel(): void {}
+			}
+			expect(
+				await unopened.readPage(Object.assign(new NonPlainPageInput(), { scope: values.scope, snapshot }))
+			).toEqual({
+				kind: "malformed-input",
+				ok: false,
+			});
+			expect(await unopened.readPage({ extra: true, scope: values.scope, snapshot })).toEqual({
+				kind: "malformed-input",
+				ok: false,
+			});
+			const foreignScope = { ...values.scope, anchorDigest: "f".repeat(64) };
+			expect(
+				await unopened.readPage({
+					afterSequence: Number.MAX_SAFE_INTEGER,
+					scope: foreignScope,
+					snapshot: {
+						...snapshot,
+						highWatermark: Number.MAX_SAFE_INTEGER,
+						scope: foreignScope,
+						snapshotDigest: "f".repeat(64),
+					},
+				})
+			).toEqual({ kind: "wrong-scope", ok: false });
+			for (const local of [
+				{ ...values.local, author: "" },
+				{ ...values.local, author: "x".repeat(1025) },
+				{ ...values.local, author: "creator\ud800" },
+				{ ...values.local, authorSequence: Number.MAX_SAFE_INTEGER + 1 },
+				{ ...values.local, sourceKind: "received-ish" },
+				{ ...values.local, vertexDigest: "A".repeat(64) },
+				{ ...values.local, vertexDigest: "a".repeat(62) },
+			]) {
+				expect(await unopened.appendAccepted(local)).toEqual({ kind: "malformed-input", ok: false });
+			}
+		} finally {
+			await unopened.close();
 		}
 	});
 
