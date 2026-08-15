@@ -17,11 +17,13 @@ describe("storage-browser structural controls", () => {
 		expect(browser.exports).toEqual({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
 		});
 		expect(node.private).toBe(true);
 		expect(browser.dependencies).toEqual({
 			"@ts-drp/canonical": "0.11.0",
 			"@ts-drp/issuance-store": "0.11.0",
+			"@ts-drp/live-journal": "0.11.0",
 			"@ts-drp/storage": "0.11.0",
 		});
 	});

@@ -24,9 +24,18 @@ describe("Phase 2l-c literal Node issuance authorities", () => {
 			import: "./dist/src/issuance.js",
 			types: "./dist/src/issuance.d.ts",
 		});
+		expect(manifest.exports?.["./live-journal"]).toEqual({
+			import: "./dist/src/live-journal.js",
+			types: "./dist/src/live-journal.d.ts",
+		});
 		expect(manifest.dependencies?.["@ts-drp/issuance-store"]).toBe("0.11.0");
-		expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual(["@ts-drp/issuance-store", "@ts-drp/storage"]);
-		expect(Object.keys(manifest.exports ?? {}).sort()).toEqual([".", "./issuance"]);
+		expect(manifest.dependencies?.["@ts-drp/live-journal"]).toBe("0.11.0");
+		expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
+			"@ts-drp/issuance-store",
+			"@ts-drp/live-journal",
+			"@ts-drp/storage",
+		]);
+		expect(Object.keys(manifest.exports ?? {}).sort()).toEqual([".", "./issuance", "./live-journal"]);
 		const root = fs.readFileSync(path.join(packageDirectory, "src/index.ts"));
 		expect(createHash("sha256").update(root).digest("hex")).toBe(
 			"14688ec0442cf331f329a5cb944bfa893f6a6ef08eeedd8bb6352651283d7211"

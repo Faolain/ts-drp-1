@@ -173,6 +173,7 @@ describe("Phase 2e7 public browser package and component closure", () => {
 		expect.soft(metadata.exports).toEqual({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
 		});
 		expect.soft(fs.existsSync(workspacePath("packages/storage-browser/src/index.ts"))).toBe(true);
 	});

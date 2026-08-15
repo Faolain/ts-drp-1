@@ -518,8 +518,16 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./conformance": { import: "./dist/src/conformance.js", types: "./dist/src/conformance.d.ts" },
 		});
-		expect(Object.keys((nodeManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([".", "./issuance"]);
-		expect(Object.keys((browserManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([".", "./issuance"]);
+		expect(Object.keys((nodeManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([
+			".",
+			"./issuance",
+			"./live-journal",
+		]);
+		expect(Object.keys((browserManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([
+			".",
+			"./issuance",
+			"./live-journal",
+		]);
 		expect(
 			(protocolManifest.dependencies as Record<string, unknown> | undefined)?.["@ts-drp/issuance-store"]
 		).toBeUndefined();

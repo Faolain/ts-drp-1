@@ -105,6 +105,7 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 		expect(packageManifest.exports).toEqual({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
 		});
 	});
 
