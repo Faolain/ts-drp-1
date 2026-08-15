@@ -11899,6 +11899,239 @@ or deployment authorization.
 After this correction is independently reviewed, signed and pushed, and only
 then, D.93.35.3 p6 tests-only RED may begin.
 
+##### D.93.35.5 — protocol-v3 freeze-successor-v1 prerequisite
+
+Executable pre-RED reconciliation found that D.93.35.3's historical-freeze
+gate is unsatisfiable at its own signed base. On exact signed commit
+`dcac6b5cfb9fb74e704f997c16634a34c8d93ea9`, tree
+`4a4ac3346a2c6c1817a689207d5d120af9f5a484`, four immutable policies bind
+older versions of their protected tests after later signed protocol-v3
+public-surface transitions. Each native checker therefore exits nonzero before
+transition checking. Those checkers are invoked by four always-triggered
+pull-request workflows; a fifth always-triggered ACL-reputation workflow
+invokes the two stale equivocation checkers and hashes its own workflow.
+Merely attesting the inherited failures would disclose the defect but leave
+required CI permanently red.
+
+D.93.35.3/.4 p6 RED is blocked on this independent governance prerequisite.
+This slice replaces the five unsatisfiable workflow executors with one
+versioned successor ratchet. It preserves every legacy semantic byte, records
+rather than blesses the stale bindings, and keeps the five established
+required job identities green. It creates no protocol runtime or type surface
+and no author authority.
+
+###### Exact owner and governed predecessors
+
+The new repository-internal, non-exported owner is exactly:
+
+```text
+packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json
+packages/protocol-v3/conformance/freeze-successor-v1/profile.json
+packages/protocol-v3/conformance/freeze-successor-v1/spec.md
+```
+
+It governs the union of `protectedArtifacts` read from the exact five policies
+at the fixed anchor:
+
+1. `blueprint-operation-budget-v1`;
+2. `blueprint-work-budget-v1`;
+3. `equivocation-author-projection-v1`;
+4. `equivocation-gossip-budget-v1`;
+5. `equivocation-acl-reputation-v1`.
+
+The successor binds each anchor policy path, checker path, complete ordered
+protected-artifact list and every current SHA-256. Every governed legacy byte
+must equal the fixed anchor except the following exhaustive workflow set,
+which transitions atomically to successor invocation:
+
+```text
+.github/workflows/protocol-v3-blueprint-operation-budget.yml
+.github/workflows/protocol-v3-blueprint-work-budget.yml
+.github/workflows/protocol-v3-equivocation-author-projection.yml
+.github/workflows/protocol-v3-equivocation-gossip-budget.yml
+.github/workflows/protocol-v3-equivocation-acl-reputation.yml
+```
+
+No checker, policy, profile, specification, semantic test, fixture or other
+legacy protected artifact is thawed. The old checker and policy bytes remain
+archival evidence; they are not edited, replaced in place or reported as
+passing on the current tree.
+
+The successor profile pins the last genuine green baseline and bootstrap
+parent for each legacy closure:
+
+```text
+operation budget   80e2ea99a703a36b4c79af5f1fe46bd85b4dc357
+                   parent cfe52269427637e69c3707774c5c6e0ea7dc0c40
+work budget        264fcd7cda3b878263bef964c977b89690126850
+                   parent 136af9f6c01b33701caf39db55498d10c95096da
+author projection  636490a8a8ac6cd82495b0cabe773f039979cdfa
+                   parent 021ac088f4273ad0521ffafebd1fe258744a41f4
+gossip budget      d9891718d99da132c8f6268c681688f238527f7b
+                   parent 65144898541abb76951d2bc5357c4c30bae4f35e
+ACL reputation     ab98831c236410da52a8a7a6b17579af0f7e6298
+                   parent c0153727c45d3ab1f418b23a50c4a1daaffbde6d
+```
+
+For each baseline the successor materializes an isolated temporary Git
+worktree at that exact commit, executes that commit's genuine checker against
+its recorded bootstrap parent and requires native `PASS`. A hand-authored
+claim, mocked child process, copied fixture checker or source analyzer cannot
+replace those executions. Temporary worktrees are removed in a `finally`
+path; validation mutates no active worktree, index or ref.
+
+###### Exact historical-transition ledger
+
+The successor does not reclassify a stale policy value as current truth. It
+records these authorized signed test transitions and proves the exact blob at
+every named commit and at the fixed anchor:
+
+```text
+operation-budget test
+  80e2ea99 72d395ef5c675ffd7d8f3894a5bd303ee959b8f6a564a46cabea0199f4993759
+  7ae254e0 5703e27c1698f56d61326783f920fa5692210695d0a33a721d2186f01a23abae
+  6f5a1b07 09c550891ee04141cddd110bb58a740336e6380f7a43f3e8c66556a817de900c
+
+work-budget test
+  264fcd7c a364bde5a7d1be9b2dc04e6a022b400dfdfb71a756ec528b192a5a7898a7c371
+  7ae254e0 82547fb63db900017ca210da3f5099d3fe9fb9c1cd5e1d60997aeef141c03aba
+  6f5a1b07 30dc5ca7b10bc88143889acf02ac8e03f57c7eeab728cfba211e35cda994ce96
+
+author-projection test
+  636490a8 1a89654947396489ac110803ceab611756a4ae9c05059ee8450ed38c273fc517
+  392cf623 e28bc7fd27574d6e3c7c0963784ed93a3c32c3a02aba4af33b70f5e1e3bd72aa
+
+gossip-budget test
+  d9891718 24cc2e5a426de1e25a150196d822ae94cd4a63caabbaa9a697af28ae3d1d9855
+  392cf623 6265273fa2bd123133dc8580fe2a699792a2a9b004e3c81841c911f3f7e87b02
+```
+
+The full 40-hex commit IDs, parents, trees and blob hashes are stored in the
+successor profile; the abbreviations above are explanatory only. The fixed
+anchor must be an ancestor of both the supplied merge base and current HEAD.
+An absent commit, non-linear named transition, different blob or extra
+transition fails closed.
+
+The exact transition commit IDs corresponding to those abbreviated rows are
+`7ae254e0b74d4da7008db74be30510efa633abad`,
+`6f5a1b070d34a26504d3b87f3c6883c3b73aa7c2` and
+`392cf623a56f12fff74cebac46a7de40fea394b5`; the gossip last-green baseline is
+the exact later correction `d9891718d99da132c8f6268c681688f238527f7b`.
+
+The successor also binds the latent nested stale value in exact anchor file
+`tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json`, SHA-256
+`6b22b4e442ece82cf61aac6ef303aec7e3b74ba14a601b8f22c33769670d443f`:
+its `baseArtifactSha256` records author-projection hash
+`1a89654947396489ac110803ceab611756a4ae9c05059ee8450ed38c273fc517`,
+while the fixed-anchor author-projection test is
+`e28bc7fd27574d6e3c7c0963784ed93a3c32c3a02aba4af33b70f5e1e3bd72aa`.
+The contract remains byte-identical archival evidence. The successor binds
+both values and independently binds the current semantic test; it never
+presents the stale nested value as current authority.
+
+###### Bootstrap and immutable-ratchet law
+
+The successor checker accepts exactly two base states:
+
+- all four successor files absent; or
+- all four present and byte-identical to the current successor bundle.
+
+Partial base presence is always invalid. On the one bootstrap transition, the
+fixed anchor must be an ancestor of the supplied merge base; every governed
+legacy non-workflow path at base and current must equal the fixed anchor; the
+five workflows at base must equal the fixed anchor; and current must add the
+complete four-file successor bundle and change exactly the five workflows to
+their policy-pinned successor bytes in the same commit. No other governed path
+may change. After bootstrap, the four successor files and five successor
+workflows are immutable across the supplied merge base and current tree.
+
+`freeze-policy.json` uses exact ordered path arrays and exact SHA-256 maps. It
+pins the checker separately, hashes `profile.json`, `spec.md` and all five
+reviewed workflow bytes, and lists the policy itself as its sole necessarily
+unhashed owner. Globs, regex path allowances, counts without identities,
+environment-dependent stack text, stderr-substring success, arbitrary nonzero
+exit waivers and a second unhashed exception are forbidden.
+
+Each of the five workflows retains its existing `pull_request` trigger, job
+name, permissions, checkout depth and ref, timeout, dependency installation,
+semantic tests, controls, mutants, builds, type audits and package audits.
+Only its legacy freeze-invocation block changes. Every workflow invokes
+`freeze-successor-v1/check-freeze.mjs`; none invokes any of the five
+superseded legacy checkers, including the ACL-reputation checker. Existing
+protocol-v2/protocol-v3 registry checkers and equivocation digest/evidence
+checkers remain genuinely executed where they already apply.
+
+At bootstrap, where the base has no successor checker, each workflow executes
+the current successor checker against the actual upstream merge base. After
+bootstrap, each workflow extracts the merge-base successor checker, executes
+it against the PR tree, then executes the current successor checker against
+the same merge base. Omitting either execution, changing a required job name,
+moving the ratchet to a non-required workflow, `continue-on-error`, conditional
+success, skipped ordinary CI or direct-push substitution fails governance.
+
+###### Strict TDD and oracle discipline
+
+D.93.35.5 RED is limited to
+`tests/protocol-v3-freeze-successor-v1-red.test.ts` and named fixtures beneath
+`tests/fixtures/phase-3a1b-freeze-successor-v1/`. It may add a dedicated test
+`tsconfig` but changes no workflow, legacy artifact, protocol source, package,
+registry, generated file, dependency, lockfile or plan. RED fails only because
+the successor owner and atomic workflow routing are absent.
+
+RED executes the genuine candidate checker in temporary Git repositories and
+commits. Its positive cases are an exact atomic bootstrap and an unchanged
+post-bootstrap descendant. Its negative cases include partial successor
+presence; one through four workflow transitions; a retained ACL or other
+superseded checker call; changed legacy checker, policy, semantic test,
+fixture or other non-workflow artifact; an omitted current semantic hash;
+accepting a stale policy value as current; omitted latent gossip binding; a
+sixth thawed path; wrong baseline or transition commit; altered trigger,
+permission, checkout ref, timeout or job identity; base-only/current-only
+validation; an extra unhashed exception; and post-bootstrap successor or
+workflow drift.
+
+Any custom workflow or source analyzer used by this RED has named, nontrivial
+positive and negative programs under
+`tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/`. The fixtures are
+explicitly analyzer fixtures, never substitute implementations. They retain
+semantic-equivalence positives, including harmless YAML presentation and
+shell-variable spelling variants where the required executions and controls
+are unchanged, and reject behaviorally missing or bypassed gates. An analyzer
+may inspect routing topology only; it cannot prove Git ancestry, byte
+identity, native child-process outcomes, job execution or semantic-suite
+behavior. Genuine temporary-repository checker runs and the five real
+historical semantic suites remain the load-bearing causal evidence. This is
+the required test-oracle-discipline note for the successor closure ledger.
+
+GREEN changes exactly nine paths: the four successor-owner files and the five
+workflow files enumerated above. It changes no legacy checker, policy,
+semantic test, fixture, profile or specification. It adds no package export,
+runtime/type value, dependency, lockfile, registry/generated artifact or
+production code.
+
+Gates are the successor RED and mutants; successor checker against the actual
+upstream merge base; isolated native `PASS` from all five genuine historical
+baseline checkers; exact fixed-anchor legacy-byte inventory; all five required
+workflows with both bootstrap and ordinary-descendant routing; genuine current
+operation-budget, work-budget, author-projection, gossip-budget and
+ACL-reputation suites with their existing controls and mutants; retained
+protocol-v2/v3 registry and equivocation digest/evidence freezes; protocol-v3
+typecheck/build/public/package smoke; static/format/diff checks; and full p5,
+D.93.17, anchor, admission, issuance, journal and Phase 3a preservation.
+
+After GREEN, independent exact-tree Codex, Grok, Kimi and Opus closure precede
+a signed push and bounded ledger. The ledger records the old checkers as
+archival and non-executable on the current tree, never as `PASS`; records the
+five workflow transitions; repeats this oracle-discipline rule; and authorizes
+only resumption of D.93.35.3/.4 p6 tests-only RED. It does not authorize p6
+GREEN, D.93.36, full-B RED or implementation, transport, Phase 3b or
+deployment.
+
+Only after D.93.35.5 design, tests-only RED, successor GREEN and closure are
+independently reviewed, signed and pushed may the preserved p6 RED draft be
+restored and continued.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
