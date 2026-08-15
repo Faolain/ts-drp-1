@@ -11797,6 +11797,108 @@ authorize its RED or implementation.
 After this exact amendment is independently reviewed, signed and pushed, and
 only then, p6 tests-only RED may begin.
 
+##### D.93.35.4 — authorization opener byte-view capture correction
+
+This correction applies only to the three byte-valued own data properties of
+`OpenCurrentEpochAuthorAuthorizationInput`:
+`detachedAnchorSignature`, `exactCanonicalAnchorPreimageBytes` and
+`exactCanonicalAuthorAuthorizationBytes`. It changes no D.93.35.3 carrier,
+digest, capability, resolver, surface, authority or sequencing law and changes
+no existing trust or p5 public API behavior.
+
+Each field accepts a value with the genuine internal `Uint8Array` typed-array
+brand. An ordinary `Uint8Array`, Node `Buffer`, another genuine `Uint8Array`
+subclass and a partial view are admissible. A proxy, non-`Uint8Array` typed
+array, `DataView`, plain object or other value is not. The TypeScript field type
+remains `Uint8Array`; this is not a public `Buffer` overload.
+
+The visible view must have a genuine current-realm ordinary, non-shared,
+non-detached, fixed-length `ArrayBuffer` backing whose prototype is exactly the
+captured current-realm `ArrayBuffer.prototype`. `SharedArrayBuffer`, growable
+shared backing, a resizable `ArrayBuffer` and cross-realm backing are rejected.
+The source need not have offset zero and need not cover its backing store.
+
+At module initialization protocol-v3 captures
+`%TypedArray%.prototype[Symbol.toStringTag]`,
+`%TypedArray%.prototype.buffer`, `%TypedArray%.prototype.byteOffset`,
+`%TypedArray%.prototype.byteLength`, `ArrayBuffer.prototype.byteLength`,
+`ArrayBuffer.prototype.resizable` when present, `Object.getPrototypeOf`,
+`Uint8Array`, `Uint8Array.prototype.set` and `Reflect.apply`. The opener uses a
+new private capture helper; it does not widen the shared
+`snapshotClosedInput` helper or change another public boundary. Capture and
+copy must not consult a source iterator, indexed user property, `constructor`,
+species, `slice`, spread, `subarray`, `valueOf`, `toString` or any overridable
+source method.
+
+For each source, the captured typed-array brand getter must return exactly
+`Uint8Array`. Captured getters obtain its backing, byte offset and visible byte
+length. The captured `ArrayBuffer.prototype.byteLength` getter and exact
+prototype check must accept the backing, and the captured resizable getter,
+when present, must return `false`. The implementation allocates
+`new capturedUint8Array(visibleByteLength)` and invokes the captured
+`Uint8Array.prototype.set` with the new array as receiver and the genuine
+source view as argument. The resulting exact ordinary, offset-zero,
+full-backing copy is the only value passed to authentication, decoding or
+hashing. Bytes before or after a partial view are invisible and never affect
+validation, digesting or retained state.
+
+The opener first snapshots the exact closed own-data four-key outer input
+without invoking accessors or consulting prototypes. It then captures the
+three byte fields, in this fixed order:
+
+1. `detachedAnchorSignature`;
+2. `exactCanonicalAnchorPreimageBytes`;
+3. `exactCanonicalAuthorAuthorizationBytes`.
+
+All three copies complete before any length check, genuine-trust lookup or
+anchor/carrier semantic work. Their copied visible lengths are then checked in
+the same order: signature exactly 64 bytes; anchor preimage nonempty with no new
+maximum; authorization carrier nonempty and at most 8192 bytes. Any
+outer-shape, descriptor, brand, backing, detachment, resizability, reflection,
+copy or length failure returns exactly a frozen
+`{ok:false,reason:"malformed-input"}`. It never throws across the public
+boundary, invokes the private anchor-authentication decision, decodes either
+carrier, hashes bytes, verifies a signature or mints partial capability state.
+At exactly 8192 visible carrier bytes the size gate passes and ordinary
+anchor-first precedence continues; 8193 fails before authentication.
+
+D.93.35.3 RED must parameterize all three fields over ordinary full views,
+genuine Node `Buffer`, `Uint8Array` subclass and zero/nonzero-offset partial
+fixed-buffer views. It must prove visible-range-only copying, ignored
+prefix/suffix bytes, caller-mutation isolation and fresh exact ordinary copies.
+Hostile subclasses override iterator, `slice`, `subarray`, `constructor`,
+species and ordinary methods with throwing sentinels; none may execute.
+
+RED must reject proxy-wrapped views, `Uint16Array`, `DataView`, plain fakes,
+shared backing, resizable backing, detached or inaccessible views, cross-realm
+backing and reflection/copy failures. It covers signature lengths 63/64/65,
+anchor lengths 0/1, and carrier lengths 0/1/8192/8193. An 8192-byte malformed
+carrier authenticates once before `acl-decode-failed`; 8193 returns
+`malformed-input` with zero anchor decode, hash or verification. Invalid anchor
+plus any invalid byte capture still returns `malformed-input`.
+
+Required mutants include an exact-view-prototype or full-backing requirement;
+`instanceof`, `ArrayBuffer.isView` or `new Uint8Array(source)` substitution;
+whole-backing or offset-zero copying; live globals; source iterator, `slice`,
+species or method use; shared, resizable, detached or cross-realm acceptance;
+retained aliasing; per-field early length or semantic validation;
+authentication before all three copies; the wrong 8192 comparison; swapped
+fields or ranges; and a thrown capture failure. Genuine Node and
+Chromium/Firefox/WebKit cases remain load-bearing; source analyzers alone are
+insufficient.
+
+D.93.35.1 Keychain-private dependency-result capture, D.93.35 public digest
+rules, the exact ordinary full-backing protocol signer callback result and the
+Keychain signer input remain unchanged. Resolver law, trust-five,
+provenance-seven, root exact ten, subpath exact two/types seven, supplement
+freeze, dependencies and the five D.93.35.3 GREEN paths remain unchanged. This
+correction adds no author authority, carrier availability, persistence,
+token/index/journal/outbox composition, full-B RED or implementation, Phase 3b
+or deployment authorization.
+
+After this correction is independently reviewed, signed and pushed, and only
+then, D.93.35.3 p6 tests-only RED may begin.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
