@@ -1,10 +1,17 @@
 {
 	"extends": "../../../tsconfig.json",
 	"compilerOptions": {
+		"baseUrl": "../../..",
 		"composite": false,
 		"declaration": false,
 		"declarationMap": false,
-		"noEmit": true
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/live-journal": ["packages/live-journal/src/index.ts"],
+			"@ts-drp/storage-node/live-journal": ["packages/storage-node/src/live-journal.ts"],
+			"@ts-drp/storage-browser/live-journal": ["packages/storage-browser/src/live-journal.ts"],
+			"@ts-drp/*": ["packages/*"]
+		}
 	},
 	"include": ["public-entry-type-audit.ts"]
 }
