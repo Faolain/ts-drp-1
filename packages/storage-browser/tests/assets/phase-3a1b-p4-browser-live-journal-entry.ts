@@ -7,9 +7,16 @@ import {
 	observePhase3a1bP4BrowserOperation,
 	takePhase3a1bP4BrowserObservationLedger,
 } from "#phase-3a1b-p4-browser-test-control"; // eslint-disable-line import/no-unresolved -- private RED bundler alias.
-// The external observer must evaluate before the candidate can capture IndexedDB intrinsics.
-// eslint-disable-next-line import/no-unresolved, import/order -- observer must evaluate before the candidate.
-import { createBrowserDurableLiveJournalStore } from "#phase-3a1b-p4-browser-candidate";
+
+// The static observer bootstrap above must finish before this dynamic candidate import.
+async function loadCandidate(): Promise<{
+	createBrowserDurableLiveJournalStore(options: Readonly<Record<string, unknown>>): Promise<JournalStore>;
+}> {
+	// eslint-disable-next-line import/no-unresolved -- private RED bundler alias.
+	return import("#phase-3a1b-p4-browser-candidate") as unknown as Promise<{
+		createBrowserDurableLiveJournalStore(options: Readonly<Record<string, unknown>>): Promise<JournalStore>;
+	}>;
+}
 
 interface JournalStore {
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -281,7 +288,8 @@ function material(): Readonly<Record<string, unknown>> {
 }
 
 async function open(primaryDatabaseName: string): Promise<JournalStore> {
-	return createBrowserDurableLiveJournalStore({ primaryDatabaseName }) as Promise<JournalStore>;
+	const { createBrowserDurableLiveJournalStore } = await loadCandidate();
+	return createBrowserDurableLiveJournalStore({ primaryDatabaseName });
 }
 
 async function surfaceSchema(): Promise<unknown> {
@@ -632,10 +640,11 @@ async function readbackFaults(): Promise<unknown> {
 						? (): Promise<void> => applyReadbackFate(derived, operation, fate, values)
 						: undefined
 				);
-				const result =
+				const result = await observePhase3a1bP4BrowserOperation(`fault-${operation}-${fate}`, () =>
 					operation === "install"
-						? await store.installGenesis(values.install as Readonly<Record<string, unknown>>)
-						: await store.appendAccepted(values.received as Readonly<Record<string, unknown>>);
+						? store.installGenesis(values.install as Readonly<Record<string, unknown>>)
+						: store.appendAccepted(values.received as Readonly<Record<string, unknown>>)
+				);
 				const after = await store.readiness({ scope: values.scope });
 				results.push({ after, fate, operation, result });
 			} finally {

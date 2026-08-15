@@ -1,5 +1,7 @@
-import * as real from "@ts-drp/live-journal"; // eslint-disable-line import/no-unresolved -- p4 GREEN module, aliased by test bundlers.
-export * from "@ts-drp/live-journal"; // eslint-disable-line import/no-unresolved -- preserve every real runtime export except the explicit mutants below.
+/* eslint-disable import/export -- runtime mutant intentionally shadows four re-exported decisions. */
+// Runtime mutant fixture: this exercises real adapter behavior and is not a production substitute.
+import * as real from "@ts-drp/live-journal";
+export * from "@ts-drp/live-journal"; // Preserve every real runtime export except the explicit mutants below.
 
 type AnyDecision = (...arguments_: readonly unknown[]) => unknown;
 

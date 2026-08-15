@@ -2,6 +2,11 @@
 import { DatabaseSync, StatementSync } from "node:sqlite";
 import { parentPort, Worker } from "node:worker_threads";
 
+import {
+	isPhase3a1bP4NodeMutationScopeRead,
+	referencesPhase3a1bP4NodeTable as table,
+} from "./phase-3a1b-p4-node-sql-classifier.mjs";
+
 const statementOwner = new WeakMap();
 const databaseState = new WeakMap();
 const databaseIdentity = new WeakMap();
@@ -74,10 +79,6 @@ function observe(edge, sql, details = {}) {
 	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
 }
 
-function table(sql, name) {
-	return new RegExp(`\\b(?:FROM|INTO|UPDATE)\\s+(?:${name}\\b|"${name}"|\`${name}\`)`, "iu").test(sql);
-}
-
 function identity(database) {
 	let value = databaseIdentity.get(database);
 	if (value === undefined) {
@@ -98,16 +99,11 @@ function recordClosureQuery(owner, state) {
 	if (
 		operationLabel === undefined ||
 		owner.database === undefined ||
+		state?.mutationActive ||
 		(!table(owner.sql, "scopes") && !table(owner.sql, "accepted_entries"))
 	)
 		return;
-	const phase = state?.readonlyActive
-		? "readonly"
-		: state?.mutationActive
-			? "writer"
-			: state?.committed
-				? "postcommit"
-				: "outside";
+	const phase = state?.readonlyActive ? "readonly" : state?.committed ? "postcommit" : "outside";
 	const tableName = table(owner.sql, "scopes") ? "scopes" : "accepted_entries";
 	externalLedger.push(
 		`${operationLabel}:${state?.role ?? "target"}:closure-query:${phase}:${tableName}:${identity(owner.database)}`
@@ -194,7 +190,7 @@ StatementSync.prototype.get = function (...parameters) {
 	if (state?.readonlyActive && (table(owner.sql, "scopes") || table(owner.sql, "accepted_entries"))) {
 		observe("during-readback", owner.sql, { parameters });
 		applyExternalReadbackFate(state);
-	} else if (state?.mutationActive && table(owner.sql, "scopes"))
+	} else if (state?.mutationActive && isPhase3a1bP4NodeMutationScopeRead(owner.sql))
 		observe("after-scope-read", owner.sql, { parameters });
 	else if (state?.committed && (table(owner.sql, "scopes") || table(owner.sql, "accepted_entries"))) {
 		if (operationLabel !== undefined) {

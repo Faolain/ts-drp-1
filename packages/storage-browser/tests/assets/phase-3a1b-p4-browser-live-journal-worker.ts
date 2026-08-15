@@ -1,9 +1,7 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 // eslint-disable-next-line import/no-unresolved -- resolved by the private p4 RED bundler.
-import { createBrowserDurableLiveJournalStore } from "#phase-3a1b-p4-browser-candidate";
-// eslint-disable-next-line import/no-unresolved -- resolved by the private p4 RED bundler.
-import { armPhase3a1bP4BrowserTrace } from "#phase-3a1b-p4-browser-test-control";
+import { armPhase3a1bP4BrowserTrace, observePhase3a1bP4BrowserOperation } from "#phase-3a1b-p4-browser-test-control";
 
 interface DeathInput {
 	readonly databaseName: string;
@@ -16,6 +14,12 @@ interface JournalStore {
 	close(): Promise<void>;
 	installGenesis(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
 	readiness(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
+}
+
+// The static observer bootstrap above must patch IndexedDB before candidate evaluation.
+async function createStore(primaryDatabaseName: string): Promise<JournalStore> {
+	const { createBrowserDurableLiveJournalStore } = await import("#phase-3a1b-p4-browser-candidate"); // eslint-disable-line import/no-unresolved -- private RED alias.
+	return createBrowserDurableLiveJournalStore({ primaryDatabaseName }) as Promise<JournalStore>;
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -247,17 +251,16 @@ async function mutate(input: DeathInput, store: JournalStore): Promise<void> {
 		await store.installGenesis(primary.install as Readonly<Record<string, unknown>>);
 	}
 	if (input.tuple.scenario === "cross-kind-race" || input.tuple.scenario === "local-ref-race") {
-		const competingStore = (await createBrowserDurableLiveJournalStore({
-			primaryDatabaseName: input.databaseName,
-		})) as JournalStore;
+		const competingStore = await createStore(input.databaseName);
 		armPhase3a1bP4BrowserTrace(input.tuple, checkpoint);
-		const first =
+		const first = observePhase3a1bP4BrowserOperation(`death-${input.tuple.scenario}-${input.tuple.edge}`, () =>
 			input.tuple.scenario === "cross-kind-race"
 				? store.appendAccepted(primary.local as Readonly<Record<string, unknown>>)
 				: store.appendAccepted({
 						...(primary.local as Readonly<Record<string, unknown>>),
 						vertexDigest: "6".repeat(64),
-					});
+					})
+		);
 		const second = competingStore.appendAccepted(
 			(input.tuple.scenario === "cross-kind-race" ? primary.received : primary.local) as Readonly<
 				Record<string, unknown>
@@ -271,15 +274,13 @@ async function mutate(input: DeathInput, store: JournalStore): Promise<void> {
 	}
 	if (input.tuple.edge === "before-transaction") checkpoint(input.tuple.edge);
 	armPhase3a1bP4BrowserTrace(input.tuple, checkpoint);
-	if (input.tuple.scenario === "install-genesis" || input.tuple.scenario === "idempotent-genesis") {
-		await store.installGenesis(primary.install as Readonly<Record<string, unknown>>);
-	} else if (input.tuple.scenario === "append-received") {
-		await store.appendAccepted(primary.received as Readonly<Record<string, unknown>>);
-	} else if (input.tuple.scenario === "received-repeat") {
-		await store.appendAccepted(primary.received as Readonly<Record<string, unknown>>);
-	} else {
-		await store.appendAccepted(primary.local as Readonly<Record<string, unknown>>);
-	}
+	await observePhase3a1bP4BrowserOperation(`death-${input.tuple.scenario}-${input.tuple.edge}`, () => {
+		if (input.tuple.scenario === "install-genesis" || input.tuple.scenario === "idempotent-genesis")
+			return store.installGenesis(primary.install as Readonly<Record<string, unknown>>);
+		if (input.tuple.scenario === "append-received" || input.tuple.scenario === "received-repeat")
+			return store.appendAccepted(primary.received as Readonly<Record<string, unknown>>);
+		return store.appendAccepted(primary.local as Readonly<Record<string, unknown>>);
+	});
 	postMessage({ kind: "unexpected-result" });
 }
 
@@ -302,9 +303,7 @@ async function recover(input: DeathInput, store: JournalStore): Promise<void> {
 self.addEventListener("message", (event: MessageEvent<DeathInput>): void => {
 	void (async (): Promise<void> => {
 		const input = event.data;
-		const store = (await createBrowserDurableLiveJournalStore({
-			primaryDatabaseName: input.databaseName,
-		})) as JournalStore;
+		const store = await createStore(input.databaseName);
 		try {
 			if (input.mode === "mutate") await mutate(input, store);
 			else await recover(input, store);

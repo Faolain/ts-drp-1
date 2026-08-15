@@ -7,7 +7,7 @@ function candidatePlugin(packageDirectory: string, mutateSharedDecisions = false
 	const testControl = path.join(packageDirectory, "tests/fixtures/phase-3a1b-p4-browser-observation.ts");
 	const decisionMutant = path.resolve(
 		packageDirectory,
-		"../../tests/fixtures/phase-3a1b-p4/live-journal-decision-mutant.ts"
+		"../../tests/fixtures/phase-3a1b-p4/runtime-mutants/shared-decision-runtime-mutant.ts"
 	);
 	const shared = path.resolve(packageDirectory, "../live-journal/src/index.ts");
 	return {
@@ -63,22 +63,6 @@ export default async function globalSetup(): Promise<() => void> {
 		plugins: [candidatePlugin(packageDirectory)],
 		target: "es2022",
 	});
-	const entrySource = fs.readFileSync(entry, "utf8");
-	const sourceObserver = entrySource.indexOf('from "#phase-3a1b-p4-browser-test-control"');
-	const sourceCandidate = entrySource.indexOf('from "#phase-3a1b-p4-browser-candidate"');
-	const bundle = fs.readFileSync(path.join(assetDirectory, "phase-3a1b-p4-browser.js"), "utf8");
-	const bundleObserver = bundle.indexOf("nested p4 Browser observations are forbidden");
-	const bundleCandidate = bundle.indexOf("createBrowserDurableLiveJournalStore");
-	if (
-		sourceObserver < 0 ||
-		sourceCandidate < 0 ||
-		sourceObserver >= sourceCandidate ||
-		bundleObserver < 0 ||
-		bundleCandidate < 0 ||
-		bundleObserver >= bundleCandidate
-	) {
-		throw new Error("PHASE_3A1B_P4_BROWSER_OBSERVER_MUST_PRECEDE_CANDIDATE_EVALUATION");
-	}
 	await build({
 		bundle: true,
 		entryPoints: {

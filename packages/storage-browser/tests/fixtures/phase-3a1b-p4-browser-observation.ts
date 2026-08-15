@@ -119,6 +119,8 @@ IDBTransaction.prototype.addEventListener = function (
 
 function instrumentRequest(request: IDBRequest, edge: string): IDBRequest {
 	requestEdges.set(request, edge);
+	// The observer owns its checkpoint even when production intentionally does not attach a request listener.
+	originalRequestAddEventListener.call(request, "success", () => checkpoint(edge), { once: true });
 	return request;
 }
 

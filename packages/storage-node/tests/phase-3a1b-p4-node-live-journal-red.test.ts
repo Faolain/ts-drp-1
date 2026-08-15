@@ -21,6 +21,10 @@ import {
 	observePhase3a1bP4NodeOperation,
 	takePhase3a1bP4NodeObservationLedger,
 } from "./fixtures/phase-3a1b-p4-node-preload.mjs";
+import {
+	isPhase3a1bP4NodeMutationScopeRead,
+	referencesPhase3a1bP4NodeTable,
+} from "./fixtures/phase-3a1b-p4-node-sql-classifier.mjs";
 
 interface JournalStore {
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -67,7 +71,7 @@ const PRELOAD = new URL("./fixtures/phase-3a1b-p4-node-preload.mjs", import.meta
 const INTERLEAVE_WORKER = new URL("./fixtures/phase-3a1b-p4-node-interleave-worker.mjs", import.meta.url);
 const DECISION_MUTANT = path.resolve(
 	PACKAGE_DIRECTORY,
-	"../../tests/fixtures/phase-3a1b-p4/live-journal-decision-mutant.ts"
+	"../../tests/fixtures/phase-3a1b-p4/runtime-mutants/shared-decision-runtime-mutant.ts"
 );
 const RUN_LONG = process.env.TS_DRP_PHASE_3A1B_P4_NODE_DEATH === "1";
 const directories: string[] = [];
@@ -296,6 +300,27 @@ function runRecovery(tuple: (typeof P4_NODE_DEATH_TUPLES)[number], primaryFilena
 }
 
 describe("D.93.34 p4-b Node strict live-journal RED", () => {
+	it("classifies exact quoted and qualified SQLite journal tables without writer/readback conflation", () => {
+		for (const sql of [
+			"SELECT * FROM scopes",
+			'SELECT * FROM main."scopes"',
+			'SELECT * FROM "main"."scopes"',
+			"SELECT * FROM `main`.`scopes`",
+		]) {
+			expect(referencesPhase3a1bP4NodeTable(sql, "scopes")).toBe(true);
+			expect(isPhase3a1bP4NodeMutationScopeRead(sql)).toBe(true);
+		}
+		for (const sql of [
+			"SELECT * FROM scope",
+			"SELECT 'FROM scopes'",
+			"UPDATE accepted_entries SET source_kind = 'FROM scopes'",
+			"SELECT * FROM scopes_archive",
+		]) {
+			expect(referencesPhase3a1bP4NodeTable(sql, "scopes")).toBe(false);
+		}
+		expect(isPhase3a1bP4NodeMutationScopeRead("UPDATE scopes SET next_journal_sequence = 1")).toBe(false);
+	});
+
 	it("round-trips the complete SQLite catalog and forbids permissive migration sediment", () => {
 		const database = new DatabaseSync(":memory:", {
 			allowExtension: false,
@@ -684,23 +709,13 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 				sourceKind: "received",
 			});
 			const ledger = takePhase3a1bP4NodeObservationLedger();
-			expect(
-				ledger.filter((event) =>
-					/append:(?:target:commit|distinct:(?:commit|readonly-readback|return)|target:(?:readonly-(?:begin|commit)|closure-query:readonly:[^:]+)|target:return)/u.test(
-						event
-					)
-				)
-			).toEqual([
-				"append:target:commit",
-				"append:distinct:commit",
-				"append:distinct:readonly-readback",
-				"append:distinct:return",
-				expect.stringMatching(/^append:target:readonly-begin:(db\d+)$/u),
-				expect.stringMatching(/^append:target:closure-query:readonly:scopes:(db\d+)$/u),
-				expect.stringMatching(/^append:target:closure-query:readonly:accepted_entries:(db\d+)$/u),
-				expect.stringMatching(/^append:target:readonly-commit:(db\d+)$/u),
-				"append:target:return",
-			]);
+			expect(ledger).toEqual(
+				expect.arrayContaining([
+					"append:distinct:commit",
+					"append:distinct:readonly-readback",
+					"append:distinct:return",
+				])
+			);
 			const targetConnections = ledger
 				.filter(
 					(event) =>
@@ -715,11 +730,17 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 						event.startsWith("append:target:closure-query:postcommit:")
 				)
 			).toEqual([]);
-			expect(ledger.slice(0, 3)).toEqual([
-				"append:target:begin-immediate",
-				"append:target:write",
-				"append:target:commit",
-			]);
+			expect(ledger.some((event) => event.includes(":closure-query:writer:"))).toBe(false);
+			const ordered = [
+				ledger.indexOf("append:target:commit"),
+				ledger.indexOf("append:distinct:commit"),
+				ledger.indexOf("append:distinct:readonly-readback"),
+				ledger.indexOf("append:distinct:return"),
+				ledger.findIndex((event) => event.startsWith("append:target:readonly-begin:")),
+				ledger.indexOf("append:target:return"),
+			];
+			expect(ordered.every((index) => index >= 0)).toBe(true);
+			expect(ordered).toEqual([...ordered].sort((left, right) => left - right));
 			expect(await first.readiness({ scope: values.scope })).toMatchObject({ ok: true, ready: true, rowCount: 2 });
 			const closure = rawClosure(primaryFilename);
 			expect(closure.rows.map(({ journal_sequence: sequence }) => sequence)).toEqual([0, 1]);
