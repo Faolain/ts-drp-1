@@ -191,12 +191,12 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 });
 
 describe("D.93.35.5 genuine repository successor causal RED", () => {
-	it("requires the exact owner, atomic workflow routing, native positives and complete rejection matrix with no fallback", () => {
+	it("requires the exact owner, atomic workflow routing, native positives and complete rejection matrix with no fallback", async () => {
 		const availability = repositoryCandidateAvailability(ROOT);
 		expect(availability.checker).toBe(
 			resolve(ROOT, "packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs")
 		);
-		const evidence = runRepositoryCandidateMatrix(ROOT, contract);
+		const evidence = await runRepositoryCandidateMatrix(ROOT, contract);
 		expect(evidence.available, `successor owner absent at ${availability.checker}`).toBe(true);
 		if (!evidence.available || !("positives" in evidence)) return;
 		const completed = evidence as CompletedRepositoryCandidateEvidence;

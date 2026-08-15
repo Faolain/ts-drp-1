@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 
 const CONTROL_OWNER = "packages/protocol-v3/conformance/freeze-successor-v1";
 const CONTROL_BUNDLE = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"].map(
@@ -510,7 +511,7 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 }
 
 /** Runs the exact repository candidate positives and rejection matrix with no controlled fallback. */
-export function runRepositoryCandidateMatrix(repositoryRoot, contract) {
+export async function runRepositoryCandidateMatrix(repositoryRoot, contract) {
 	const availability = repositoryCandidateAvailability(repositoryRoot);
 	if (!availability.available) return { available: false, checker: availability.checker };
 	const inventory = governedInventory(
@@ -521,17 +522,26 @@ export function runRepositoryCandidateMatrix(repositoryRoot, contract) {
 	const immutable = inventory.filter((path) => !workflows.has(path));
 	const state = cloneCandidateRepository(repositoryRoot, contract);
 	try {
-		const positives = [
-			runLinearPositive(repositoryRoot, state, contract, "bootstrap"),
-			runMergePositive(repositoryRoot, state, contract, "bootstrap"),
-			runLinearPositive(repositoryRoot, state, contract, "descendant"),
-			runMergePositive(repositoryRoot, state, contract, "descendant"),
-		];
+		const positives = [];
+		for (const [topology, mode] of [
+			["linear", "bootstrap"],
+			["merge", "bootstrap"],
+			["linear", "descendant"],
+			["merge", "descendant"],
+		]) {
+			positives.push(
+				topology === "linear"
+					? runLinearPositive(repositoryRoot, state, contract, mode)
+					: runMergePositive(repositoryRoot, state, contract, mode)
+			);
+			await yieldToEventLoop();
+		}
 		const mutationNames = repositoryMutationPlan(immutable);
-		const negatives = mutationNames.map((name) => ({
-			name,
-			result: runCandidateMutation(repositoryRoot, state, contract, name, immutable),
-		}));
+		const negatives = [];
+		for (const name of mutationNames) {
+			negatives.push({ name, result: runCandidateMutation(repositoryRoot, state, contract, name, immutable) });
+			await yieldToEventLoop();
+		}
 		return { available: true, immutable, inventory, negatives, positives };
 	} finally {
 		rmSync(state.parent, { force: true, recursive: true });
