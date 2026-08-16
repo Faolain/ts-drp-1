@@ -25,6 +25,10 @@
 			"types": "./dist/src/author-authorization.d.ts",
 			"import": "./dist/src/author-authorization.js"
 		},
+		"./latched-acl": {
+			"types": "./dist/src/latched-acl.d.ts",
+			"import": "./dist/src/latched-acl.js"
+		},
 		"./registry/registry-v1.json": "./registry/registry-v1.json"
 	},
 	"scripts": {

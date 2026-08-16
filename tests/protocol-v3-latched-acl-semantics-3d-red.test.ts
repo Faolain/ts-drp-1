@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { describe, expect, it } from "vitest";
 
 type Group = "admin" | "finality" | "writer";
 
