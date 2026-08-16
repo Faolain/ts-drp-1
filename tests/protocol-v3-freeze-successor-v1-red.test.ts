@@ -52,9 +52,12 @@ function boundedPartitions(
 	return partitions;
 }
 
-const immutableNames = repositoryPlan.mutationNames.slice(0, 53);
-const workflowCountNames = repositoryPlan.mutationNames.slice(53, 57);
-const categoryNames = repositoryPlan.mutationNames.slice(57);
+const immutableNames = repositoryPlan.mutationNames.filter((name) => name.startsWith("immutable:"));
+const gossipTransitionNames = repositoryPlan.mutationNames.filter((name) => name.startsWith("gossip-"));
+const workflowCountNames = repositoryPlan.mutationNames.filter((name) => name.startsWith("workflow-count:"));
+const categoryNames = repositoryPlan.mutationNames.filter(
+	(name) => !name.startsWith("immutable:") && !name.startsWith("gossip-") && !name.startsWith("workflow-count:")
+);
 const repositoryPartitions = [
 	...repositoryPlan.positiveNames.map((name) => ({
 		mutationNames: [],
@@ -63,6 +66,7 @@ const repositoryPartitions = [
 		timeout: 75_000,
 	})),
 	...boundedPartitions(immutableNames, 3, "immutable paths"),
+	...boundedPartitions(gossipTransitionNames, 3, "gossip oracle transition"),
 	...boundedPartitions(workflowCountNames, 2, "workflow cardinalities"),
 	...boundedPartitions(categoryNames, 3, "repository categories"),
 ];
@@ -82,7 +86,7 @@ function git(...args: readonly string[]): string {
 }
 
 describe("D.93.35.5 freeze-successor independent controls", () => {
-	it("derives the exact ordered 58/5/53 inventory from all five genuine policies", () => {
+	it("derives the exact ordered 58/5/(52+1) inventory from all five genuine policies", () => {
 		const inventory = governedInventory(REPOSITORY_ROOT, policyPaths);
 		const workflows = new Set(successorContract.workflowIdentities.map(({ path }) => path));
 		expect(policyPaths).toHaveLength(5);
@@ -93,8 +97,15 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 		);
 		const immutable = inventory.filter((path) => !workflows.has(path));
 		expect(immutable).toHaveLength(53);
-		const plan = repositoryMutationPlan(immutable);
-		expect(plan.filter((name) => name.startsWith("immutable:"))).toHaveLength(53);
+		const fixedAnchor = immutable.filter((path) => path !== successorContract.gossipOracleTransition.path);
+		expect(fixedAnchor).toHaveLength(52);
+		const plan = repositoryMutationPlan(fixedAnchor, successorContract.gossipOracleTransition.path);
+		expect(plan.filter((name) => name.startsWith("immutable:"))).toHaveLength(52);
+		expect(plan.filter((name) => name.startsWith("gossip-"))).toEqual([
+			`gossip-old:${successorContract.gossipOracleTransition.path}`,
+			`gossip-current:${successorContract.gossipOracleTransition.path}`,
+			`gossip-postbootstrap:${successorContract.gossipOracleTransition.path}`,
+		]);
 		expect(new Set(plan).size).toBe(plan.length);
 		expect(plan).toEqual(
 			expect.arrayContaining([
@@ -142,6 +153,24 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 		]) {
 			const source = readFileSync(resolve(ANALYZER_ROOT, name), "utf8");
 			expect(auditSuccessorWorkflowRouting(source, identity, legacyCheckers), name).not.toEqual([]);
+		}
+	});
+
+	it("isolates the corrected gossip routing requirements with the eight named analyzer programs", () => {
+		const identity = successorContract.workflowIdentities[3];
+		const expected = new Map<string, readonly string[]>([
+			["gossip-legacy-removed-successor-absent.yml", ["successor-path"]],
+			["gossip-successor-executable-legacy-retained.yml", ["legacy-checker-execution"]],
+			["gossip-missing-digest-identity.yml", ["gossip-digest-checker"]],
+			["gossip-missing-evidence-projection.yml", ["gossip-evidence-checker"]],
+			["gossip-missing-author-projection-suite.yml", ["gossip-author-suite"]],
+			["gossip-indirect-legacy-checker.yml", ["legacy-checker-execution"]],
+			["gossip-dead-successor.yml", ["successor-path", "bypass"]],
+			["gossip-data-only-successor.yml", ["successor-path"]],
+		]);
+		for (const [name, violations] of expected) {
+			const source = readFileSync(resolve(ANALYZER_ROOT, name), "utf8");
+			expect(auditSuccessorWorkflowRouting(source, identity, legacyCheckers), name).toEqual(violations);
 		}
 	});
 
@@ -244,15 +273,23 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 		expect(sha256(successorContract.historicalTransitions[2].path)).toBe(
 			successorContract.latentGossipBinding.currentAuthorHash
 		);
+		const transition = successorContract.gossipOracleTransition;
+		expect(git("rev-parse", `${transition.parent}:${transition.path}`)).toBe(transition.oldBlob);
+		const old = spawnSync("git", ["show", `${transition.parent}:${transition.path}`], { cwd: REPOSITORY_ROOT });
+		expect(old.status).toBe(0);
+		expect(createHash("sha256").update(old.stdout).digest("hex")).toBe(transition.oldSha256);
+		expect(git("hash-object", transition.path)).toBe(transition.currentBlob);
+		expect(sha256(transition.path)).toBe(transition.currentSha256);
 	});
 });
 
 describe("D.93.35.5 genuine repository successor causal RED", () => {
-	it("partitions the exact four-positive and 91-negative plan once in deterministic category order", () => {
+	it("partitions the exact four-positive and 93-negative plan once in deterministic category order", () => {
 		expect(repositoryPlan.inventory).toHaveLength(58);
 		expect(repositoryPlan.immutable).toHaveLength(53);
 		expect(repositoryPlan.positiveNames).toHaveLength(4);
-		expect(repositoryPlan.mutationNames).toHaveLength(91);
+		expect(repositoryPlan.fixedAnchor).toHaveLength(52);
+		expect(repositoryPlan.mutationNames).toHaveLength(93);
 		expect(repositoryPartitions.flatMap(({ positiveNames }) => positiveNames)).toEqual(repositoryPlan.positiveNames);
 		expect(repositoryPartitions.flatMap(({ mutationNames }) => mutationNames)).toEqual(repositoryPlan.mutationNames);
 	});

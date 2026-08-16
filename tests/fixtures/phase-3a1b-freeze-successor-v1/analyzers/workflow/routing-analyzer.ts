@@ -8,6 +8,10 @@ export interface WorkflowIdentity {
 
 const SUCCESSOR = "packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs";
 const PULL_REQUEST_TYPES = ["edited", "opened", "ready_for_review", "reopened", "synchronize"];
+const GOSSIP_JOB = "protocol-v3-equivocation-gossip-budget";
+const GOSSIP_DIGEST_CHECKER = "packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs";
+const GOSSIP_EVIDENCE_CHECKER = "packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs";
+const GOSSIP_AUTHOR_SUITE = "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts";
 
 function record(value: unknown): Record<string, unknown> | undefined {
 	return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -35,22 +39,34 @@ function successorBindings(job: Record<string, unknown>): readonly string[] {
 	});
 }
 
-function directLegacyInvocation(script: string, legacyCheckers: readonly string[]): boolean {
+function executableLegacyReference(script: string, legacyCheckers: readonly string[]): boolean {
 	const commands = script
 		.split("\n")
 		.map((line) => line.trim())
 		.filter((line) => line !== "" && !line.startsWith("#"));
-	return commands.some((line) =>
-		legacyCheckers.some(
-			(checker) => line.includes(checker) && /(?:^|[;&|])\s*node\s+/u.test(line) && !line.includes(SUCCESSOR)
-		)
-	);
+	return commands.some((line) => legacyCheckers.some((checker) => line.includes(checker)));
+}
+
+function invokesLiteral(script: string, executable: "node" | "vitest", value: string): boolean {
+	const escaped = escapeRegularExpression(value);
+	return executable === "node"
+		? new RegExp(`(?:^|[;&|])\\s*node\\s+["']?${escaped}["']?(?:\\s|$)`, "mu").test(script)
+		: new RegExp(`(?:^|[;&|])\\s*(?:pnpm\\s+exec\\s+)?vitest\\s+run[^\\n]*["']?${escaped}["']?(?:\\s|$)`, "mu").test(
+				script
+			);
 }
 
 function executableShell(script: string): string {
 	return script
 		.split("\n")
 		.filter((line) => !line.trimStart().startsWith("#"))
+		.join("\n");
+}
+
+function reachableShell(script: string): string {
+	return script
+		.split("\n")
+		.filter((line) => !/^\s*(?:false\s*&&|true\s*\|\|)/u.test(line))
 		.join("\n");
 }
 
@@ -102,13 +118,14 @@ export function auditSuccessorWorkflowRouting(
 		violations.push("dependency-install");
 	}
 	const script = executableShell(commandText(job));
+	const reachable = reachableShell(script);
 	const bindings = successorBindings(job);
 	const literalInvocation = new RegExp(
 		`(?:^|[;&|])\\s*node\\s+["']?${escapeRegularExpression(SUCCESSOR)}["']?(?:\\s|$)`,
 		"mu"
-	).test(script);
+	).test(reachable);
 	const boundInvocation = bindings.some((name) =>
-		new RegExp(`(?:^|[;&|])\\s*node\\s+["']?\\$\\{?${name}\\}?["']?(?:\\s|$)`, "mu").test(script)
+		new RegExp(`(?:^|[;&|])\\s*node\\s+["']?\\$\\{?${name}\\}?["']?(?:\\s|$)`, "mu").test(reachable)
 	);
 	if (!literalInvocation && !boundInvocation) {
 		violations.push("successor-path");
@@ -120,9 +137,15 @@ export function auditSuccessorWorkflowRouting(
 		violations.push("merge-base-singleton");
 	}
 	if (!script.includes("git cat-file -e") || !script.includes("git show")) violations.push("base-checker-selection");
-	const nodeCalls = script.match(/(?:^|[;&|])\s*node\s+/gmu) ?? [];
+	const nodeCalls = reachable.match(/(?:^|[;&|])\s*node\s+/gmu) ?? [];
 	if (nodeCalls.length < 2) violations.push("dual-checker-execution");
-	if (directLegacyInvocation(script, legacyCheckers)) violations.push("legacy-checker-execution");
-	if (/\bcontinue-on-error\b|\|\|\s*true\b|if\s+false\b/u.test(script)) violations.push("bypass");
+	if (executableLegacyReference(reachable, legacyCheckers)) violations.push("legacy-checker-execution");
+	if (identity.jobKey === GOSSIP_JOB) {
+		if (!invokesLiteral(reachable, "node", GOSSIP_DIGEST_CHECKER)) violations.push("gossip-digest-checker");
+		if (!invokesLiteral(reachable, "node", GOSSIP_EVIDENCE_CHECKER)) violations.push("gossip-evidence-checker");
+		if (!invokesLiteral(reachable, "vitest", GOSSIP_AUTHOR_SUITE)) violations.push("gossip-author-suite");
+	}
+	if (/\bcontinue-on-error\b|\|\|\s*true\b|\btrue\s*\|\||if\s+false\b|\bfalse\s*&&/u.test(script))
+		violations.push("bypass");
 	return violations;
 }

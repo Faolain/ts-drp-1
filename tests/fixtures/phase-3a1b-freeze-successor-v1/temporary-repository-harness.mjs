@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, jsdoc/require-param, jsdoc/require-returns */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -189,7 +190,7 @@ export async function runHistoricalBaselines(repositoryRoot, predecessors) {
 	}
 }
 
-/** Returns exact current identity evidence used to form the complete 58/5/53 sweep. */
+/** Returns exact current identity evidence used to form the complete 58/5/(52+1) sweep. */
 export function governedInventory(repositoryRoot, policyPaths) {
 	const ordered = [];
 	for (const path of policyPaths) {
@@ -249,9 +250,12 @@ const REPOSITORY_POSITIVE_CASES = Object.freeze([
 ]);
 
 /** Returns the exact complete genuine-candidate rejection plan. */
-export function repositoryMutationPlan(immutablePaths) {
+export function repositoryMutationPlan(fixedAnchorPaths, gossipPath) {
 	return [
-		...immutablePaths.map((path) => `immutable:${path}`),
+		...fixedAnchorPaths.map((path) => `immutable:${path}`),
+		`gossip-old:${gossipPath}`,
+		`gossip-current:${gossipPath}`,
+		`gossip-postbootstrap:${gossipPath}`,
 		...Array.from({ length: 4 }, (_, index) => `workflow-count:${index + 1}`),
 		...REPOSITORY_CATEGORY_MUTATIONS,
 	];
@@ -265,10 +269,12 @@ export function repositoryCandidatePlan(repositoryRoot, contract) {
 	);
 	const workflows = new Set(contract.workflowIdentities.map(({ path }) => path));
 	const immutable = inventory.filter((path) => !workflows.has(path));
+	const fixedAnchor = immutable.filter((path) => path !== contract.gossipOracleTransition.path);
 	return {
+		fixedAnchor,
 		immutable,
 		inventory,
-		mutationNames: repositoryMutationPlan(immutable),
+		mutationNames: repositoryMutationPlan(fixedAnchor, contract.gossipOracleTransition.path),
 		positiveNames: REPOSITORY_POSITIVE_CASES,
 	};
 }
@@ -307,6 +313,25 @@ function resetCandidate(state, contract) {
 	git(state.root, "clean", "-ffd", "-q");
 }
 
+function sha256Bytes(bytes) {
+	return createHash("sha256").update(bytes).digest("hex");
+}
+
+function installGossipOracleTransition(repositoryRoot, state, contract, mutate) {
+	const transition = contract.gossipOracleTransition;
+	if (git(state.root, "rev-parse", "HEAD") !== transition.parent) throw new Error("gossip transition parent differs");
+	if (git(state.root, "rev-parse", `HEAD:${transition.path}`) !== transition.oldBlob)
+		throw new Error("gossip transition old blob differs");
+	const source = readFileSync(resolve(repositoryRoot, transition.path));
+	if (sha256Bytes(source) !== transition.currentSha256) throw new Error("gossip transition current SHA-256 differs");
+	put(state.root, transition.path, source);
+	if (typeof mutate === "function") mutate(state.root, transition.path);
+	const blob = git(state.root, "hash-object", transition.path);
+	if (mutate === undefined && blob !== transition.currentBlob)
+		throw new Error("gossip transition current blob differs");
+	return commit(state.root, "correct gossip successor routing oracle");
+}
+
 function append(root, path, text = "\nmutation\n") {
 	put(root, path, Buffer.concat([readFileSync(resolve(root, path)), Buffer.from(text)]));
 }
@@ -335,8 +360,9 @@ function createCandidateCommit(repositoryRoot, state, contract, options = {}) {
 
 function runLinearPositive(repositoryRoot, state, contract, mode) {
 	resetCandidate(state, contract);
+	const correctedBase = installGossipOracleTransition(repositoryRoot, state, contract);
 	const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
-	let upstream = contract.redBase;
+	let upstream = correctedBase;
 	if (mode === "descendant") {
 		upstream = bootstrap;
 		put(state.root, "unrelated-descendant.txt", "unrelated\n");
@@ -347,8 +373,9 @@ function runLinearPositive(repositoryRoot, state, contract, mode) {
 
 function runMergePositive(repositoryRoot, state, contract, mode) {
 	resetCandidate(state, contract);
+	const correctedBase = installGossipOracleTransition(repositoryRoot, state, contract);
 	const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
-	let branchPoint = contract.redBase;
+	let branchPoint = correctedBase;
 	let prHead = bootstrap;
 	if (mode === "descendant") {
 		branchPoint = bootstrap;
@@ -372,15 +399,45 @@ function runNamedPositive(repositoryRoot, state, contract, name) {
 
 function runCandidateMutation(repositoryRoot, state, contract, mutation, immutablePaths) {
 	resetCandidate(state, contract);
+	if (mutation.startsWith("gossip-old:")) {
+		createCandidateCommit(repositoryRoot, state, contract);
+		const omitted = executeRepositoryCandidate(state.root, contract, contract.redBase);
+		if (omitted.status === 0 && omitted.signal === null) return omitted;
+		resetCandidate(state, contract);
+		append(state.root, contract.gossipOracleTransition.path);
+		commit(state.root, "transient pre-transition gossip oracle drift");
+		put(
+			state.root,
+			contract.gossipOracleTransition.path,
+			readFileSync(resolve(repositoryRoot, contract.gossipOracleTransition.path))
+		);
+		commit(state.root, "terminal exact gossip oracle bytes without signed transition");
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+	}
+	if (mutation.startsWith("gossip-current:")) {
+		const wrongBase = installGossipOracleTransition(repositoryRoot, state, contract, (root, path) =>
+			append(root, path)
+		);
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeRepositoryCandidate(state.root, contract, wrongBase);
+	}
+	const correctedBase = installGossipOracleTransition(repositoryRoot, state, contract);
+	if (mutation.startsWith("gossip-postbootstrap:")) {
+		const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
+		append(state.root, contract.gossipOracleTransition.path);
+		commit(state.root, "post-bootstrap gossip oracle drift");
+		return executeRepositoryCandidate(state.root, contract, bootstrap);
+	}
 	if (mutation.startsWith("immutable:")) {
 		const path = mutation.slice("immutable:".length);
 		createCandidateCommit(repositoryRoot, state, contract, { mutate: (root) => append(root, path) });
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation.startsWith("workflow-count:")) {
 		const count = Number(mutation.slice("workflow-count:".length));
 		createCandidateCommit(repositoryRoot, state, contract, { workflowCount: count });
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "partial-owner-base") {
 		const ownerFiles = contract.ownerFiles.slice(0, 2);
@@ -398,7 +455,7 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 		for (const identity of contract.workflowIdentities)
 			put(state.root, identity.path, readFileSync(resolve(repositoryRoot, identity.path)));
 		commit(state.root, "routing second");
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "transient-revert") {
 		createCandidateCommit(repositoryRoot, state, contract);
@@ -407,13 +464,13 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 		commit(state.root, "transient governed drift");
 		put(state.root, path, readFileSync(resolve(repositoryRoot, path)));
 		commit(state.root, "terminal governed revert");
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "staged-protected-drift" || mutation === "unstaged-protected-drift") {
 		createCandidateCommit(repositoryRoot, state, contract);
 		append(state.root, immutablePaths[0]);
 		if (mutation === "staged-protected-drift") git(state.root, "add", immutablePaths[0]);
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "post-bootstrap-owner-drift" || mutation === "post-bootstrap-workflow-drift") {
 		const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
@@ -429,7 +486,7 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 		createCandidateCommit(repositoryRoot, state, contract);
 		append(state.root, immutablePaths[0]);
 		commit(state.root, "current-only immutable drift");
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "current-only-validation") {
 		const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
@@ -440,7 +497,7 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 	if (mutation === "merge-only-governed-change") {
 		const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
 		const prHead = bootstrap;
-		git(state.root, "checkout", "-q", "--detach", contract.redBase);
+		git(state.root, "checkout", "-q", "--detach", correctedBase);
 		put(state.root, "upstream-only.txt", "upstream\n");
 		const upstream = commit(state.root, "upstream tip");
 		syntheticMerge(state, upstream, prHead);
@@ -451,13 +508,13 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 	}
 	if (mutation === "arbitrary-old-upstream") {
 		createCandidateCommit(repositoryRoot, state, contract);
-		const older = git(state.root, "rev-parse", `${contract.redBase}^`);
+		const older = git(state.root, "rev-parse", `${correctedBase}^`);
 		return executeRepositoryCandidate(state.root, contract, older);
 	}
 	if (mutation === "sibling-upstream") {
 		createCandidateCommit(repositoryRoot, state, contract);
-		const tree = git(state.root, "rev-parse", `${contract.redBase}^{tree}`);
-		const parent = git(state.root, "rev-parse", `${contract.redBase}^`);
+		const tree = git(state.root, "rev-parse", `${correctedBase}^{tree}`);
+		const parent = git(state.root, "rev-parse", `${correctedBase}^`);
 		const sibling = git(state.root, "commit-tree", tree, "-p", parent, "-m", "sibling upstream");
 		return executeRepositoryCandidate(state.root, contract, sibling);
 	}
@@ -540,14 +597,17 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 	const mutate = mutations[mutation];
 	if (mutate === undefined) throw new Error(`unknown repository mutation: ${mutation}`);
 	createCandidateCommit(repositoryRoot, state, contract, { mutate });
-	return executeRepositoryCandidate(state.root, contract, contract.redBase);
+	return executeRepositoryCandidate(state.root, contract, correctedBase);
 }
 
 /** Runs one independently bounded exact repository partition with no controlled fallback. */
 export async function runRepositoryCandidatePartition(repositoryRoot, contract, selection) {
 	const availability = repositoryCandidateAvailability(repositoryRoot);
 	if (!availability.available) return { available: false, checker: availability.checker };
-	const { immutable, inventory, mutationNames, positiveNames } = repositoryCandidatePlan(repositoryRoot, contract);
+	const { fixedAnchor, immutable, inventory, mutationNames, positiveNames } = repositoryCandidatePlan(
+		repositoryRoot,
+		contract
+	);
 	if (new Set(selection.positiveNames).size !== selection.positiveNames.length)
 		throw new Error("duplicate repository positive selection");
 	if (new Set(selection.mutationNames).size !== selection.mutationNames.length)
@@ -565,7 +625,7 @@ export async function runRepositoryCandidatePartition(repositoryRoot, contract, 
 		}
 		const negatives = [];
 		for (const name of selection.mutationNames) {
-			negatives.push({ name, result: runCandidateMutation(repositoryRoot, state, contract, name, immutable) });
+			negatives.push({ name, result: runCandidateMutation(repositoryRoot, state, contract, name, fixedAnchor) });
 			await yieldToEventLoop();
 		}
 		return { available: true, immutable, inventory, negatives, positives };

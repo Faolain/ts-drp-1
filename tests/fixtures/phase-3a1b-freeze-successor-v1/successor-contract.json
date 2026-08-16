@@ -1,6 +1,14 @@
 {
 	"schemaVersion": "phase-3a1b-freeze-successor-red-v1",
-	"redBase": "2c7ea1b8632646cd25bb4cca449b8e1df776e8dc",
+	"redBase": "5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5",
+	"gossipOracleTransition": {
+		"path": "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+		"parent": "5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5",
+		"oldBlob": "51122fb7622b39fffd6108a566e667df6dace403",
+		"oldSha256": "6265273fa2bd123133dc8580fe2a699792a2a9b004e3c81841c911f3f7e87b02",
+		"currentBlob": "4e297c2b986c8194a03defa1407a5590ffb779d4",
+		"currentSha256": "a2632fd7ab24fd5998d9571076bcefd273f0287d542eb6c2f99fb8114494a9ce"
+	},
 	"fixedAnchor": {
 		"commit": "dcac6b5cfb9fb74e704f997c16634a34c8d93ea9",
 		"tree": "4a4ac3346a2c6c1817a689207d5d120af9f5a484"

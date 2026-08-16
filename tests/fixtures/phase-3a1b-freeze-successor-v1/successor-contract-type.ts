@@ -1,6 +1,14 @@
 export interface SuccessorContract {
 	readonly fixedAnchor: Readonly<{ readonly commit: string; readonly tree: string }>;
 	readonly redBase: string;
+	readonly gossipOracleTransition: Readonly<{
+		readonly currentBlob: string;
+		readonly currentSha256: string;
+		readonly oldBlob: string;
+		readonly oldSha256: string;
+		readonly parent: string;
+		readonly path: string;
+	}>;
 	readonly ownerDirectory: string;
 	readonly ownerFiles: readonly string[];
 	readonly predecessors: readonly {

@@ -6,6 +6,15 @@ import { describe, expect, it } from "vitest";
 
 import contract from "./fixtures/phase-0o-b2-v3/gossip-budget-contract.json" with { type: "json" };
 import type { EquivocationScope } from "../packages/protocol-v3/src/index.js";
+import { auditSuccessorWorkflowRouting } from "./fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.js";
+
+const LEGACY_FREEZE_CHECKERS = [
+	"packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs",
+	"packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs",
+	"packages/protocol-v3/supplements/equivocation-author-projection-v1/check-freeze.mjs",
+	"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs",
+	"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/check-freeze.mjs",
+] as const;
 
 interface DetachedAuthorGossipSlot {
 	readonly scope: EquivocationScope;
@@ -201,10 +210,22 @@ describe("Phase 0o-b2 pure author gossip-budget causal RED", () => {
 			"PHASE_0O_B2_IMPLEMENTATION_MODULE",
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
 			"protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
-			"equivocation-author-projection-v1/check-freeze.mjs",
+			"equivocation-digest-identity-v1/check-freeze.mjs",
+			"equivocation-evidence-projection-v1/check-freeze.mjs",
 		]) {
 			expect(workflow).toContain(phrase);
 		}
+		expect(
+			auditSuccessorWorkflowRouting(
+				workflow,
+				{
+					jobKey: "protocol-v3-equivocation-gossip-budget",
+					jobName: "Require immutable protocol-v3 equivocation gossip budget supplement",
+					workflowName: "Protocol v3 equivocation gossip budget freeze",
+				},
+				LEGACY_FREEZE_CHECKERS
+			)
+		).toEqual([]);
 	});
 
 	it("[author-wide-boundaries] composes two slots exactly below, at and above one shared budget", async () => {
