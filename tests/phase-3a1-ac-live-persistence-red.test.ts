@@ -1130,7 +1130,9 @@ function privateTokenExportEscapes(sourceText: string, privateNames: readonly st
 				false);
 		const allowedPrivateOwner =
 			ts.isFunctionDeclaration(statement) &&
-			(statement.name?.text === "activateV3LivePlane" || statement.name?.text === "routeV3Ingress");
+			(statement.name?.text === "activateV3LivePlane" ||
+				statement.name?.text === "recoverV3LiveReplica" ||
+				statement.name?.text === "routeV3Ingress");
 		if (exported && containsTaintedIdentifier(statement) && !allowedPrivateOwner) {
 			escapes.push(`exported-declaration:${statement.pos}`);
 		}
@@ -1219,6 +1221,8 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 		return users.includes("activateV3LivePlane") && users.includes("routeV3Ingress");
 	});
 	if (registrationOwner === undefined) throw new TypeError("missing private registration owner");
+	const recoveryOwner = owners.find(({ name }) => name !== owner.name && name !== registrationOwner.name);
+	if (recoveryOwner === undefined) throw new TypeError("missing private recovered-replica owner");
 	const registrationOwners = callsFor(registrationOwner.name)
 		.map((call) => {
 			let current: ts.Node | undefined = call;
@@ -1325,7 +1329,9 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 	const helperSource = helper.getText(source);
 	const deleteStart = deleteStatement.getStart(source) - helper.getStart(source);
 	const deleteEnd = deleteStatement.end - helper.getStart(source);
-	expect(privateTokenExportEscapes(sourceText, [owner.name, registrationOwner.name, helper.name.text])).toEqual([]);
+	expect(
+		privateTokenExportEscapes(sourceText, [owner.name, recoveryOwner.name, registrationOwner.name, helper.name.text])
+	).toEqual([]);
 	return Object.freeze({
 		ownerName: owner.name,
 		registrationOwnerName: registrationOwner.name,

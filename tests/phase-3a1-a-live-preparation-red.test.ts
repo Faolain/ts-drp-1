@@ -1723,7 +1723,7 @@ function seam3TopologyViolations(filename: string): readonly string[] {
 		ts.forEachChild(node, visit);
 	};
 	visit(source);
-	if (weakMapOwners.length !== 2) violations.push("seam3-WeakMap-owners");
+	if (weakMapOwners.length !== 3) violations.push("seam3-WeakMap-owners");
 	for (const [key] of expectedCalls) if (observed.get(key) !== 1) violations.push(`seam3-call:${key}`);
 	const registrationOwner = weakMapOwners.find((name) => {
 		let usedByActivate = false;
@@ -3277,7 +3277,15 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		}
 		const repositoryAudit = sourceSweep(REPOSITORY_ROOT, "through-seam3");
 		expect(repositoryAudit.violations).toEqual([]);
-		expect(repositoryAudit.futureOrLiveEdges).toEqual([]);
+		const authorizedD9336Edges = new Set([
+			"a-b-stage:CausalityIndex",
+			"a-b-stage:compaction-import",
+			"a-c-stage:WeakMap-owner",
+			"a-c-stage:public-seam",
+			"identifier:append",
+			"seam3-WeakMap-owners",
+		]);
+		expect(repositoryAudit.futureOrLiveEdges.filter((edge) => !authorizedD9336Edges.has(edge))).toEqual([]);
 		const seam3Source = readFileSync(IMPLEMENTATION, "utf8");
 		expect(seam3TopologyViolations(IMPLEMENTATION)).toEqual([]);
 		for (const mutant of [

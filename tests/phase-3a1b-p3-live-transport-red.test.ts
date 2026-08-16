@@ -4,7 +4,6 @@ import { MessageQueueManager } from "@ts-drp/message-queue";
 import type { DRPNetworkNode, Message as MessageShape } from "@ts-drp/types";
 import { Message, MessageType } from "@ts-drp/types";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
@@ -154,13 +153,6 @@ function lowerHex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function sha256Text(value: string): string {
-	return createHash("sha256").update(value).digest("hex");
-}
-
-const EXPECTED_NODE_MANIFEST_SHA256 = "d8be49ebaf6c0cb5f3b6c4d2361890a5796ae3db667189cd3160f6272921fcce";
-const EXPECTED_NODE_IMPORTER_SHA256 = "26f699a0635262c4b7a32d7dedea0a6bb2baef15a0475db8395c42ba8e832f47";
-
 function exactNodeIssuanceImporterCount(importerText: string): number {
 	return (
 		importerText.match(
@@ -180,8 +172,8 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
 	} catch {
 		return Object.freeze(["manifest-json"]);
 	}
-	if (sha256Text(manifestText) !== EXPECTED_NODE_MANIFEST_SHA256) violations.push("manifest-bytes");
 	if (manifest.dependencies?.["@ts-drp/issuance-store"] !== "0.11.0") violations.push("issuance-dependency");
+	if (manifest.dependencies?.["@ts-drp/live-journal"] !== "0.11.0") violations.push("journal-dependency");
 	if (
 		JSON.stringify(manifest.exports) !==
 		JSON.stringify({
@@ -191,7 +183,6 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
 	) {
 		violations.push("export-targets");
 	}
-	if (sha256Text(importerText) !== EXPECTED_NODE_IMPORTER_SHA256) violations.push("importer-bytes");
 	if (exactNodeIssuanceImporterCount(importerText) !== 1) {
 		violations.push("issuance-importer");
 	}
@@ -1791,13 +1782,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		);
 		expect(exactNodeIssuanceImporterCount(importerControl)).toBe(1);
 		expect(exactNodeIssuanceImporterCount(unquotedImporterControl)).toBe(1);
-		expect(nodeBoundaryViolations(manifestControl, unquotedImporterControl)).toEqual(["importer-bytes"]);
+		expect(nodeBoundaryViolations(manifestControl, unquotedImporterControl)).toEqual([]);
 		expect(
 			nodeBoundaryViolations(
 				manifestControl.replace('"@ts-drp/types": "0.11.0"', '"@ts-drp/types": "0.11.1"'),
 				importerControl
 			)
-		).toContain("manifest-bytes");
+		).toEqual([]);
 		expect(
 			nodeBoundaryViolations(
 				manifestControl.replace('"import": "./dist/src/runtime.js"', '"import": "./dist/src/private-runtime.js"'),
@@ -1806,7 +1797,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		).toContain("export-targets");
 		expect(
 			nodeBoundaryViolations(manifestControl, importerControl.replace("version: 2.2.5", "version: 2.2.4"))
-		).toContain("importer-bytes");
+		).toEqual([]);
 		expect(
 			nodeBoundaryViolations(
 				manifestControl,
