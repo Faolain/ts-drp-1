@@ -46037,3 +46037,28 @@ Slice 03 is closed. Slice 04 owns two genuine clients joining one room and
 observing each other's durable state. This checkpoint does not claim reconnect
 convergence, completion of D.93.36, or completion of the broader production
 hardening plan.
+
+## D.93.36 Slice 04 closure checkpoint
+
+The two-client browser RED is signed at
+`a1d990c6d04995981ccf8b27bce0e7480cd19769`. The dedicated v3-chat product
+GREEN is signed at `18eb903528af0328f6ba69ab50d25bfdcf863391`.
+
+Two isolated Chromium pages use genuine P5 keychain authors, real browser
+authorization-history, issuance and live-journal stores, and the shipped
+`@ts-drp/node/v3-live` composition owner. `BroadcastChannel` is only the
+external transport boundary. Each client issues one visible durable operation
+through the admission-bound transactional issuer; both clients observe the same
+accepted order and equal operation/transcript digests.
+
+Final evidence was Playwright 1/1 in about 1.2 seconds and the five retained
+live-plane files 27/27 in 7.20 seconds, with the node build, example typecheck
+and build, targeted ESLint, Prettier, and diff checks green. Package typecheck
+continues to report only the two pre-existing compact-history helper errors. A
+bounded Codex review ended `NO_VERDICT` without a reproduced Slice 04 defect;
+the user-authorized fast track made another review round unnecessary.
+
+Slice 04 is closed. Slice 05 owns close/reopen from durable stores, recovery
+before subscription, a post-reconnect exchange, and final convergence. This
+checkpoint does not claim reconnect completion, D.93.36 completion, or broader
+production-hardening completion.

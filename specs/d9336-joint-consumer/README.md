@@ -1,6 +1,6 @@
 # D.93.36 Durable Live Composition
 
-Status: Slices 00–03 shipped; Slice 04 is next.
+Status: Slices 00–04 shipped; Slice 05 is next.
 
 ## Goal
 
@@ -45,8 +45,8 @@ visible durable operations, reconnect from their stores and converge again.
 This work does not alter protocol-v3 authorization, freeze policy, registries,
 wire codecs, journal or issuance schemas, historical governance, epoch advance,
 ACL rotation, archive, compaction, reducer semantics or Phase 3b. The node root
-export stays closed until a later slice deliberately adds a narrow product
-facade.
+export remains closed. Slice 04 adds only the explicit `@ts-drp/node/v3-live`
+product subpath needed by the dedicated artifact.
 
 The existing legacy chat proves a different plane and is not D.93.36 evidence.
 A dedicated v3 artifact will carry the two-client checkpoint.
