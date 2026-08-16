@@ -12723,6 +12723,110 @@ external-empty topology, the two historical root-checker closures, the exact
 six-path correction and this oracle-discipline rule. Only after independent
 review, signed GREEN and real-job evidence may D.93.35.5/.6 close and p6 resume.
 
+##### D.93.35.8 — singleton-base census-oracle correction
+
+Pre-RED executable review found one contradiction in D.93.35.7's mutation
+requirements. External-empty authority is intentionally singleton: the
+supplied upstream and unique merge base must be exact commit
+`d041baffcd56f16c8a20564133a4a7fc108e8331`, tree
+`c3e742e073db3fe077a349723ba9ba21f17ada09`, with exact parents
+`bf7d3516f6ed4be97a755698b4fb3a404e04dc0f` and
+`9f76bc257da693a0ebbf03662c7cf9ebcab454e5`. Adding any governed path to create
+a 1-through-61 candidate changes that tree and commit. Such a candidate still
+fails exact external identity if the production presence-count check is
+deleted, so a nonzero outcome cannot causally prove the count gate. Reporting
+those rows as genuine candidate mutant kills would be a false oracle.
+
+D.93.35.7 RED remains blocked until this correction is independently reviewed,
+signed and pushed. D.93.35.8 changes no protocol, successor, workflow or test
+bytes and does not weaken the singleton authority.
+
+###### Normative evidence partition
+
+The production checker and genuine repository lane retain these load-bearing
+states:
+
+1. **External-empty:** the supplied upstream and computed singleton merge base
+   authenticate the exact d041 commit/tree/parents above; native Git proves the
+   exact external-base → fixed-anchor → RED base → `f0897b5...` →
+   `708db5c...` → PR-head/current ancestry; and `git ls-tree` over the exact
+   ordered 62-path inventory proves 0 present. No upstream bytes are read as
+   governed authority.
+2. **Mixed external presence:** counts 1 through 61 remain invalid by the
+   singleton identity law, but are not independent production acceptance
+   branches and are not genuine candidate mutation evidence.
+3. **Descendant:** all 62 paths are present and accepted only when every Git
+   object identity is the corrected v2 successor identity. The exact
+   `708db5c...` provisional-v1 62/62 tree and every other wrong-identity 62/62
+   tree remain genuine candidate negatives.
+
+The exact d041 0/62 census and corrected-versus-provisional/wrong 62/62
+partition are sufficient production evidence. An arbitrary earlier or later
+empty ancestor, caller-selected old base, incomparable base, reversed ancestry
+or external tree with any substituted identity still fails exactly as specified
+by D.93.35.7. A future upstream retarget or rebase still requires a signed
+amendment.
+
+###### Controlled census diagnostics only
+
+The existing named test-owned `controlled-freeze-successor.mjs` may exercise an
+ordered 1-through-61 synthetic presence census as a harness self-test. Each row
+records the exact present and absent identities, and representative rows retain
+regular-blob, mode, symlink, tree and gitlink diagnostics. Those repositories
+are deliberately not d041 and the fixture remains visibly labeled controlled.
+
+The controlled sweep proves only that the test harness enumerates identities in
+the intended order and reports mixed-state diagnostics. It is never:
+
+- a substitute implementation of the successor checker;
+- production acceptance or rejection evidence;
+- a genuine repository candidate mutant kill;
+- evidence for the exact d041 identity, ancestry or 0/62 fact; or
+- eligible for a closure count describing production mutants killed.
+
+No public or private pure production census evaluator, test hook, fault seam,
+environment selector or exported helper is added. The production checker may
+keep its census internal, but exact identity remains independently load-bearing
+and tests must not claim to distinguish which of two simultaneously invalid
+conditions rejected a synthetic base.
+
+###### Corrected RED execution and oracle discipline
+
+D.93.35.8 neither widens nor renames D.93.35.7's exact 14-path tests-only RED
+scope. The preserved incomplete draft may be restored only after this amendment
+is signed and pushed, and then must be reconciled to this evidence partition.
+No production, workflow, plan, package, lock, legacy policy/checker or protected
+predecessor path enters RED.
+
+The genuine repository lane has one shared readiness gate. It first
+authenticates the exact external topology, PR-side lineage, provisional v1
+installation, expected v2 schema, both workflows and the unique six-path
+correction. On RED it fails the exact absent-correction class. Genuine candidate
+mutation partitions execute and assert only after readiness is GREEN; a
+mutation rejected by the same missing correction is vacuous and must not be
+counted. The exact original `f0897b5...` → `708db5c...` nine-path transition and
+the future six-path transition are derived from native Git history, never
+synthesized as authority.
+
+The dual protocol-v2/protocol-v3 historical and clean-current checker runs,
+their exact stdout/stderr/status/signal contract, linear and genuine GitHub
+merge-ref histories, v2 discriminator, 52+1 preservation, actual operation/work
+routing, corrected 87/87 semantic suites and strict descendant checks remain
+load-bearing as written in D.93.35.7. Analyzer fixtures remain routing-only;
+named semantic-equivalence positives and isolated negatives cannot prove Git
+identity, native child execution or current-tree preservation.
+
+RED gates record the controlled 1-through-61 sweep separately as
+`CONTROLLED_DIAGNOSTIC`, never inside candidate-positive/candidate-negative or
+mutation-kill totals. Candidate evidence records exact d041 0/62, exact
+provisional/wrong 62 rejection, the readiness RED/GREEN transition and only
+post-readiness genuine mutants. Static, preservation and finite independent
+exact-byte review remain mandatory. Closure repeats this oracle-discipline note
+and may report neither the synthetic mixed census nor aggregate nonzero exits as
+production conformance. This correction authorizes only resumption of the
+D.93.35.7 tests-only RED after signed push; it does not authorize GREEN, p6,
+D.93.36, full-B work or deployment.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
