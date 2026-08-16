@@ -39,6 +39,7 @@ interface ExpectedHandle {
 	readonly queueId: string;
 	issueLocal(input: ExpectedLocalIssueInput): Promise<ExpectedLocalIssueResult>;
 	publishPending(): Promise<ExpectedEgress>;
+	republishRetained(): Promise<ExpectedEgress>;
 	deactivate(): void;
 }
 
@@ -108,13 +109,22 @@ type _V3Envelope = Assert<Equal<V3Envelope, ExpectedV3Envelope>>;
 
 declare const handle: V3PlaneHandle;
 declare const localIssueInput: ExpectedLocalIssueInput;
-const handleShape: readonly [string, 0, string, string, Promise<ExpectedLocalIssueResult>, Promise<ExpectedEgress>] = [
+const handleShape: readonly [
+	string,
+	0,
+	string,
+	string,
+	Promise<ExpectedLocalIssueResult>,
+	Promise<ExpectedEgress>,
+	Promise<ExpectedEgress>,
+] = [
 	handle.objectId,
 	handle.epoch,
 	handle.topic,
 	handle.queueId,
 	handle.issueLocal(localIssueInput),
 	handle.publishPending(),
+	handle.republishRetained(),
 ];
 handle.deactivate();
 const exactWireValue: V3Envelope = {

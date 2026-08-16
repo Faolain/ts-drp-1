@@ -156,6 +156,7 @@ export interface V3PlaneHandleContract {
 	readonly queueId: string;
 	issueLocal(input: V3LocalIssueInputContract): Promise<V3LocalIssueResultContract>;
 	publishPending(): Promise<V3EgressResultContract>;
+	republishRetained(): Promise<V3EgressResultContract>;
 	deactivate(): void;
 }
 
