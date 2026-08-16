@@ -13730,6 +13730,168 @@ for this area may begin only after the owner GREEN is signed, all five new
 remote jobs pass and that exact mapping is recorded in the signed closure
 ledger; it is not authorized by this amendment.
 
+##### D.93.35.15 — final provenance-boundary simplification and closure
+
+D.93.35.14 correctly found that rendered `git diff` bytes are not authority,
+but it still made exact governance-process choreography part of ordinary
+production acceptance. This final corrective amendment supersedes that
+expansion. The freeze successor protects the release claim that current
+governed repository files are the reviewed files. It does not prove protocol
+runtime security, Discord/MMORPG behavior, or the historical quality of the
+planning process. No application exploit caused the five failures.
+
+The actual signed tip before this amendment is
+`3d0f3543e0bb46969e308c2a7b708dabaa9e47b6`, tree
+`9617a4d9ccb09a7feafa45d866d1c71cd13ce380`, whose sole parent is signed
+exact-six tip `5872fae3c57f0d16d2c45ad2d66f1f12d7152dd5`. The five required runs
+on `3d0f3543...` are operation `31963823830`, work `31963823826`, author
+projection `31963823896`, gossip `31963823840` and ACL reputation
+`31963823876`. Each fails at the same presentation-shaped
+`root-drift-harness-correction` patch identity before its semantic/controlled
+gates. These runs are evidence of the defect, not accepted release evidence.
+
+###### Bounded assertion inventory
+
+| class                    | current assertion family                                                                                                                                                              | ordinary CI disposition                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| A — product/runtime      | the five protocol semantic suites and their controlled arms                                                                                                                           | retained; these are the behavior evidence        |
+| B — release provenance   | exact current governed paths, regular-blob modes/types/full object IDs/raw-content SHA-256; policy/profile/checker identity; genuine workflow routing and unsuppressed checker exit   | retained                                         |
+| B — release topology     | one exact caller-supplied upstream, one merge base, genuine linear or GitHub two-parent merge-ref shape, and exact release commit/tree                                                | retained                                         |
+| B — current preservation | the two genuine root checkers against the current tip, current semantic suites and current artifact pins; wrong file/blob/mode/type/parent/merge and current protected-state drift    | retained                                         |
+| B/C — exhaustive audit   | the existing real-repository mutation corpus, including the meaningful B rows and historical C rows                                                                                   | explicit slow certification/release command only |
+| C — process only         | `patchSha256`, human-readable diff output, exact D.93 plan/RED/GREEN/intermediary choreography, fixed historical transition counts, plan hashes, and incidental diagnostic precedence | removed from production acceptance               |
+
+No A assertion lives in the successor checker itself. No unique B property is
+supplied by `patchSha256`: the exact commit, parent, tree, changed path,
+mode/type/full Git object ID, raw blob content hash and child process result
+already subsume it. Therefore deletion is required. No replacement digest over
+JSON, NUL framing or another serialization is authorized.
+
+###### Ordinary provenance contract
+
+The simplified checker has one owner and one closed current-state profile. It
+accepts an exact 40-hex upstream argument, obtains exactly one merge base, and
+classifies the checked release tip as either:
+
+- linear: release tip is `HEAD` and the upstream is its ancestor; or
+- GitHub merge-ref: `HEAD` has exactly two parents, the first is the supplied
+  upstream, the second is the release tip, and the merge tree is byte-identical
+  to the release-tip tree.
+
+Any other parent count, reversed/substituted parent, merge tree, caller-selected
+base, partial state or malformed object fails. The checker then authenticates
+every protected non-policy artifact/workflow and the checker/profile/spec as
+exact regular Git blobs at the release tip, including exact mode, type, full
+object ID and SHA-256 of `git cat-file blob` bytes. The current policy must
+itself be a regular blob with the exact closed schema, and it pins the
+checker/profile/spec plus all non-policy protected identities without a cyclic
+self-pin. The signed GREEN review and later closure ledger authenticate the
+GREEN commit/tree/signature and policy blob/hash after signing; future
+descendant law preserves those recorded identities. Missing entries, symlinks,
+trees, gitlinks, executable-bit drift, wrong bytes, extra owner files, unknown
+fields or mixed schema fail closed. Human-readable diff output,
+attributes, textconv, external diff, color, rename heuristics, abbreviation and
+locale are never consumed.
+
+The five workflows remain byte-identical. Their structural analyzer continues
+to require the genuine successor checker and to reject comments, dead/data-only
+references, ignored/backgrounded exits and fallback checkers. Each workflow's
+shell remains fail-fast so a real checker nonzero/signal/timeout is not
+suppressed. The profile retains the five predecessor owners and two root
+owners. Ordinary acceptance executes the two genuine root checkers against the
+current tip once, plus the five current semantic suites and current artifact
+pins. The five historical predecessor-checker baselines, historical root replay
+and exact D.93 transition sequencing move to certification. A current
+root-checker omission, spoofed success, ignored exit, stderr, signal, timeout,
+or protected root/predecessor artifact drift remains a causal ordinary failure.
+
+###### Final bounded TDD and scopes
+
+This is the sole corrective amendment after signed D.93.35.14. Its signed plan
+commit may be followed by one separate tests-only RED and one separate minimum
+GREEN. No further freeze-governance amendment is authorized unless later
+golden-path work exposes a concrete provenance defect.
+
+RED may change only:
+
+```text
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+tests/protocol-v3-freeze-successor-v1-red.test.ts
+```
+
+The RED replaces the process-choreography contract with the ordinary provenance
+contract above. On the current checker it must fail because default Apple Git
+and hostile `core.abbrev=40` classify the same real transition differently.
+It must also prove, with genuine Git objects, that both settings expose the same
+commit/parent/tree/path/mode/type/full-object/blob-byte facts and that wrong
+file/blob/mode/type/parent, merge substitution, suppressed child failure and
+current protected-state drift still reject. Tests assert stable security
+classes, not message wording or precedence.
+
+GREEN may change only the four successor owner files:
+
+```text
+packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json
+packages/protocol-v3/conformance/freeze-successor-v1/profile.json
+packages/protocol-v3/conformance/freeze-successor-v1/spec.md
+```
+
+The GREEN deletes every `patchSha256` key/helper/mutant and all production
+acceptance of plan/intermediary/corrective choreography. There is no legacy,
+optional, accept-either, platform-specific, caller-selected, test-hook or
+fallback branch. The four owner files form one current provenance concept; no
+parallel structured-history oracle remains in production.
+
+###### Fast ordinary gate and slow certification
+
+The existing test owner becomes two explicit layers without adding a default
+test file. Its default mode runs focused object/provenance cases, retained
+real-Git integration, workflow routing/exit propagation and the two current
+root processes once. It must finish in less than five minutes, and
+the entire ordinary developer/PR sequence — focused provenance, five semantic
+suites and controlled arms, direct checker, build, typecheck, lint, formatting
+and package smoke — must finish in less than ten minutes under normal
+uncontended load.
+
+The complete existing real-repository mutation matrix remains available only
+when `PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION=1` is set. That explicit
+release/nightly command retains the historical plan/topology corpus and maps
+every previous mutant to one of: retained ordinary rejection, certification
+only, or removed representation/process oracle. It is skipped in default test
+discovery and cannot gate ordinary developer feedback. The release ledger
+records one successful certification run on frozen final GREEN bytes to
+establish old-versus-new classification. Failed diagnostics do not count as
+that release run, but draft/review loops must not use the slow command as their
+feedback mechanism.
+
+For this final bounded correction, one completed independent oracle/refactor
+review is sufficient before each signed boundary. Additional model reviews are
+optional and are not a quorum. PASS, findings, timeout and `NO_VERDICT` are
+recorded honestly; timeout/`NO_VERDICT` is neither approval nor an automatic
+blocker. Only a reproduced substantive P0/P1 blocks signing, and each such
+finding is resolved or explicitly dismissed with evidence. Reviewers may not
+launch the slow certification command.
+
+###### Remote release closure and pivot
+
+After signed GREEN, obtain five new GitHub runs on that exact commit and verify
+the required-check/branch-protection context points to the same SHA. The final
+signed closure ledger maps failed runs `31963823830`, `31963823826`,
+`31963823896`, `31963823840` and `31963823876` to the five new run IDs and
+records: protected claim, reason textual hashing was removed, ordinary versus
+certification checks, measured runtimes, exact GREEN commit/tree/signature and
+remote statuses. Old reruns, local success or a different head do not count.
+
+That ledger closes only this localized provenance work. It must not claim the
+production-hardening plan, protocol runtime security or product complete. The
+next slice returns to the Discord/MMORPG golden path with two real clients that
+join one room/world, exchange visible state, observe updates, disconnect and
+reconnect, and converge on one durable state. No new freeze amendment begins
+unless that product slice reveals a concrete provenance defect.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
