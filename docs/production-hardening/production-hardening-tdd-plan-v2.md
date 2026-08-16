@@ -46160,3 +46160,35 @@ arbitrary partitions, dynamic membership, eight-peer convergence, Phase 3b, or
 completion of the broader production-hardening plan. The next P6 slice remains
 product-facing and must not reopen freeze governance without a concrete new
 provenance defect.
+
+## D.93.39 eight-peer partition-heal checkpoint
+
+The tests-only eight-peer RED is signed at `90d600a`. It adds one browser
+acceptance in which eight isolated clients split across two transport channels,
+issue one message each concurrently, close, and rejoin their durable stores on
+one healed channel. Unchanged production passed the prior three cases and
+failed only when the first client outside the Alice/Bob fixture had no owned
+identity. The one-owner example GREEN is signed at `ef34cc2`.
+
+The creator invite now authorizes exactly eight deterministic fixture authors.
+Their distinct logical times make final ordering independent of delivery order;
+their durable partition histories heal through the already-shipped close,
+recovery, retained-publication, and genuine v3 ingress paths. The test requires
+all eight visible messages, eight distinct authors, equal accepted-operation and
+durable-transcript digests on every page, and an empty cross-page divergence
+manifest. No partition switch, state-copy helper, alternate verifier, or second
+transport owner was added.
+
+Final evidence was Chromium Playwright 4/4 in 4.4 seconds and the retained five
+P6 live-plane files 27/27 in 7.85 seconds. The node and example builds, example
+typecheck, targeted ESLint, Prettier, and diff checks passed. Package-wide node
+typecheck continues to report only the two pre-existing compact-history
+test-helper union diagnostics. Codex, Grok, Kimi (bounded to 100 requested
+steps), and Opus xhigh reviews all ended `NO_VERDICT` without a reproduced
+P0/P1 and made no tracked change; they are not represented as approvals.
+
+This checkpoint proves Golden Path 1 step 3 for the exercised eight-author,
+two-partition browser fixture. It does not prove arbitrary partition graphs,
+Byzantine membership, dynamic writer grants, cross-browser parity, Phase 3b, or
+completion of the broader production-hardening plan. The next P6 slice owns the
+concurrent Writer grant and Finality revocation in Golden Path 1 step 4.
