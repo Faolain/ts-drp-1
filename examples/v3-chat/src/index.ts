@@ -33,12 +33,19 @@ const PARAMETERS = Object.freeze({
 	maxPendingEntries: 4096,
 	maxPendingBytes: 16_777_216,
 });
-const CLIENTS = Object.freeze({
+const CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
+type ClientId = (typeof CLIENT_IDS)[number];
+
+const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: string }>>> = Object.freeze({
 	alice: Object.freeze({ logicalTime: 2, seed: "d9336-v3-chat-alice" }),
 	bob: Object.freeze({ logicalTime: 3, seed: "d9336-v3-chat-bob" }),
+	carol: Object.freeze({ logicalTime: 4, seed: "d9339-v3-chat-carol" }),
+	dave: Object.freeze({ logicalTime: 5, seed: "d9339-v3-chat-dave" }),
+	erin: Object.freeze({ logicalTime: 6, seed: "d9339-v3-chat-erin" }),
+	frank: Object.freeze({ logicalTime: 7, seed: "d9339-v3-chat-frank" }),
+	grace: Object.freeze({ logicalTime: 8, seed: "d9339-v3-chat-grace" }),
+	heidi: Object.freeze({ logicalTime: 9, seed: "d9339-v3-chat-heidi" }),
 });
-
-type ClientId = keyof typeof CLIENTS;
 
 interface JoinInput {
 	readonly channelName: string;
@@ -241,8 +248,10 @@ async function createLocalKeychain(clientId: ClientId): Promise<Keychain> {
 }
 
 async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
-	const [alice, bob] = await Promise.all([createLocalKeychain("alice"), createLocalKeychain("bob")]);
-	const orderedAuthors = Object.freeze([alice.localAuthorId, bob.localAuthorId].sort());
+	const keychains = await Promise.all(CLIENT_IDS.map((clientId) => createLocalKeychain(clientId)));
+	const alice = keychains[0];
+	if (alice === undefined) throw new TypeError("v3 chat creator keychain is unavailable");
+	const orderedAuthors = Object.freeze(keychains.map(({ localAuthorId }) => localAuthorId).sort());
 	const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
 		authors: orderedAuthors,
 		epoch: 0,
