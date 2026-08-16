@@ -46092,3 +46092,36 @@ D.93.36 is closed and its durable rationale is archived at
 and convergence for the exercised room history only. It does not establish
 general offline-gap synchronization, dynamic writer grants, Phase 3b, or
 completion of the broader production-hardening plan.
+
+## D.93.37 creator-issued invite checkpoint
+
+The creator-invite browser RED is signed at `83d1972`. It requires one creator
+page to issue an authenticated room invite, a second page to join through that
+exact carrier, the visible trust status to be projected from opened verified
+trust, and a modified invite to fail before readiness. The example-only GREEN
+is signed at `c4bda90`.
+
+The invite is now the single carrier for the pinned genesis digest, signed
+anchor preimage, creator profile and signer set, author authorization, and
+parameters. The joiner creates only its own local keychain; it does not rebuild
+creator trust material or accept a caller-supplied trust label. Installation,
+anchor authentication, parameter acceptance, and durable recovery consume the
+decoded invite bytes, so a changed carrier fails through the genuine trust
+chain. The exact UI string `Creator-trusted; not Byzantine-fault-tolerant.` is
+selected only after the durable trust store opens the verified
+`creator-trusted-v1` profile.
+
+Final evidence was Chromium Playwright 3/3 in 2.6 seconds and the retained five
+P6 live-plane files 27/27 in 8.09 seconds. Example typecheck/build, targeted
+ESLint, Prettier, and diff checks passed. The previously closed successor
+provenance correction was neither changed nor rerun; its five exact-SHA GitHub
+runs and signed closure tag remain the authority recorded at
+`protocol-v3-freeze-successor-closure-v1`.
+
+This checkpoint proves the creator-trusted create/invite/join portion of golden
+path 1 steps 1-2 for the exercised two-author fixture. It does not define
+delegated or attested genesis certificates, dynamic membership, public
+rendezvous, missed-history repair, or completion of Phase 3b or the broader
+production-hardening plan. The next product slice must stay on the golden path
+and must not reopen freeze governance without a newly reproduced provenance
+defect.
