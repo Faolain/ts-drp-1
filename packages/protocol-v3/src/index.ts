@@ -181,20 +181,71 @@ export type AuthenticateCurrentEpochAnchorFailureReason =
 	| "anchor-not-current"
 	| "invalid-signature";
 
+export type AuthenticateCurrentEpochAnchorSuccessProvenance = Readonly<{
+	readonly anchorDigest: string;
+	readonly blueprintDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly parametersDigest: string;
+	readonly profileDigest: string;
+	readonly signerSetDigest: string;
+}>;
+
 export type AuthenticateCurrentEpochAnchorResult =
 	| { readonly ok: false; readonly reason: AuthenticateCurrentEpochAnchorFailureReason }
 	| {
 			readonly ok: true;
-			readonly provenance: Readonly<{
-				readonly anchorDigest: string;
-				readonly blueprintDigest: string;
-				readonly epoch: number;
-				readonly objectId: string;
-				readonly parametersDigest: string;
-				readonly profileDigest: string;
-				readonly signerSetDigest: string;
-			}>;
+			readonly provenance: AuthenticateCurrentEpochAnchorSuccessProvenance;
 	  };
+
+export type CurrentEpochAuthorAuthorization = Readonly<{
+	readonly aclDigest: string;
+	readonly currentAnchorDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly profileId: "creator-author-authorization-v1";
+}>;
+
+export type OpenCurrentEpochAuthorAuthorizationInput = Readonly<{
+	readonly detachedAnchorSignature: Uint8Array;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly trust: CurrentAnchorTrust;
+}>;
+
+export type OpenCurrentEpochAuthorAuthorizationResult =
+	| Readonly<{ ok: false; reason: "malformed-input" }>
+	| Readonly<{
+			cause: AuthenticateCurrentEpochAnchorFailureReason;
+			ok: false;
+			reason: "anchor-rejected";
+	  }>
+	| Readonly<{
+			ok: false;
+			reason:
+				| "acl-decode-failed"
+				| "noncanonical-acl"
+				| "acl-schema-invalid"
+				| "unsupported-acl-version"
+				| "unsupported-acl-profile"
+				| "object-id-mismatch"
+				| "epoch-mismatch"
+				| "acl-digest-mismatch";
+	  }>
+	| Readonly<{
+			authorization: CurrentEpochAuthorAuthorization;
+			ok: true;
+			provenance: AuthenticateCurrentEpochAnchorSuccessProvenance;
+	  }>;
+
+export type ResolveCurrentEpochAuthorizedAuthorInput = Readonly<{
+	readonly authorization: CurrentEpochAuthorAuthorization;
+	readonly author: string;
+}>;
+
+export type ResolveCurrentEpochAuthorizedAuthorResult =
+	| Readonly<{ ok: false; reason: "malformed-input" | "untrusted-context" | "author-not-authorized" }>
+	| Readonly<{ ok: true; publicKey: RawEd25519PublicKey }>;
 
 interface AnchorTrustPrivateState {
 	readonly exactCanonicalCurrentAnchorPreimageBytes: Uint8Array;
@@ -205,11 +256,21 @@ interface AnchorTrustPrivateState {
 	readonly signerSetDigest: string;
 }
 
+interface CurrentEpochAuthorAuthorizationPrivateState {
+	readonly authors: ReadonlySet<string>;
+}
+
 interface AnchorTrustApi {
 	authenticateCurrentEpochAnchor(input: AuthenticateCurrentEpochAnchorInput): AuthenticateCurrentEpochAnchorResult;
 	installCreatorAnchorTrustRoot(input: InstallCreatorAnchorTrustRootInput): InstallCreatorAnchorTrustRootResult;
 	isAnchorTrustStateRecordBytes(bytes: Uint8Array): boolean;
+	openCurrentEpochAuthorAuthorization(
+		input: OpenCurrentEpochAuthorAuthorizationInput
+	): OpenCurrentEpochAuthorAuthorizationResult;
 	openCurrentAnchorTrust(input: OpenCurrentAnchorTrustInput): OpenCurrentAnchorTrustResult;
+	resolveCurrentEpochAuthorizedAuthor(
+		input: ResolveCurrentEpochAuthorizedAuthorInput
+	): ResolveCurrentEpochAuthorizedAuthorResult;
 }
 
 const ANCHOR_DIGEST_DOMAIN = "ts-drp/epoch-anchor/v3";
@@ -217,6 +278,10 @@ const PROFILE_DIGEST_DOMAIN = "ts-drp/profile/v3";
 const SIGNER_SET_DIGEST_DOMAIN = "ts-drp/signer-set/v3";
 const ACTIVE_ANCHOR_SUITE = "ed25519-sha256-v3";
 const CREATOR_PROFILE = "creator-trusted-v1";
+const AUTHOR_AUTHORIZATION_DOMAIN = "ts-drp/author-authorization/v3";
+const AUTHOR_AUTHORIZATION_KIND = "drp-author-authorization";
+const AUTHOR_AUTHORIZATION_PROFILE = "creator-author-authorization-v1";
+const AUTHOR_AUTHORIZATION_MAX_BYTES = 8192;
 const ZERO_DIGEST = "0".repeat(64);
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const PUBLIC_KEY_HEX = /^[0-9a-f]{64}$/u;
@@ -233,6 +298,27 @@ const OPEN_TRUST_INPUT_KEYS = [
 	"pinnedGenesisAnchorDigest",
 ] as const;
 const AUTHENTICATE_ANCHOR_INPUT_KEYS = ["detachedSignature", "exactCanonicalAnchorPreimageBytes", "trust"] as const;
+const OPEN_AUTHOR_AUTHORIZATION_INPUT_KEYS = [
+	"detachedAnchorSignature",
+	"exactCanonicalAnchorPreimageBytes",
+	"exactCanonicalAuthorAuthorizationBytes",
+	"trust",
+] as const;
+const OPEN_AUTHOR_AUTHORIZATION_BYTE_KEYS = new Set([
+	"detachedAnchorSignature",
+	"exactCanonicalAnchorPreimageBytes",
+	"exactCanonicalAuthorAuthorizationBytes",
+]);
+const RESOLVE_AUTHORIZED_AUTHOR_INPUT_KEYS = ["authorization", "author"] as const;
+const AUTHOR_AUTHORIZATION_KEYS = [
+	"authors",
+	"epoch",
+	"kind",
+	"objectId",
+	"profileId",
+	"protocolMajor",
+	"version",
+] as const;
 const ANCHOR_KEYS = [
 	"aclDigest",
 	"archiveIndexRoot",
@@ -305,8 +391,19 @@ function hasSharedBacking(bytes: Uint8Array): boolean {
 function hasCapturedSharedBacking(bytes: Uint8Array): boolean {
 	if (intrinsicSharedArrayBufferByteLengthGetter === undefined) return false;
 	try {
-		intrinsicReflectApply(intrinsicSharedArrayBufferByteLengthGetter, bytes.buffer, []);
+		const buffer = intrinsicReflectApply(intrinsicTypedArrayBufferGetter, bytes, []);
+		intrinsicReflectApply(intrinsicSharedArrayBufferByteLengthGetter, buffer, []);
 		return true;
+	} catch {
+		return false;
+	}
+}
+
+function hasCapturedResizableBacking(bytes: Uint8Array): boolean {
+	if (intrinsicArrayBufferResizableGetter === undefined) return false;
+	try {
+		const buffer = intrinsicReflectApply(intrinsicTypedArrayBufferGetter, bytes, []);
+		return intrinsicReflectApply(intrinsicArrayBufferResizableGetter, buffer, []) === true;
 	} catch {
 		return false;
 	}
@@ -422,7 +519,12 @@ function snapshotClosedInput(
 				: byteKeys.has(key);
 			if (isByteKey) {
 				if (useCapturedIntrinsics) {
-					if (!(value instanceof intrinsicUint8Array) || hasCapturedSharedBacking(value)) return undefined;
+					if (
+						!(value instanceof intrinsicUint8Array) ||
+						hasCapturedSharedBacking(value) ||
+						hasCapturedResizableBacking(value)
+					)
+						return undefined;
 					intrinsicObjectDefineProperty(snapshot, key, {
 						configurable: true,
 						enumerable: true,
@@ -490,6 +592,41 @@ function isAnchorRecord(value: unknown): value is AnchorRecord {
 		if (typeof value[key] !== "string" || !DIGEST_HEX.test(value[key])) return false;
 	}
 	return typeof value.cryptoSuiteId === "string";
+}
+
+interface AuthorAuthorizationCarrier extends Record<string, unknown> {
+	readonly authors: readonly string[];
+	readonly epoch: number;
+	readonly kind: string;
+	readonly objectId: string;
+	readonly profileId: string;
+	readonly protocolMajor: number;
+	readonly version: number;
+}
+
+function isAuthorAuthorizationCarrier(value: unknown): value is AuthorAuthorizationCarrier {
+	if (!isClosedDataRecord(value, AUTHOR_AUTHORIZATION_KEYS)) return false;
+	if (
+		value.kind !== AUTHOR_AUTHORIZATION_KIND ||
+		value.protocolMajor !== 3 ||
+		!isSafeNonnegative(value.epoch) ||
+		!isSafeNonnegative(value.version) ||
+		!isStorageObjectIdText(value.objectId) ||
+		typeof value.profileId !== "string" ||
+		!Array.isArray(value.authors) ||
+		value.authors.length < 1 ||
+		value.authors.length > 64
+	) {
+		return false;
+	}
+	let previous: string | undefined;
+	for (const author of value.authors) {
+		if (typeof author !== "string" || !PUBLIC_KEY_HEX.test(author) || (previous !== undefined && previous >= author)) {
+			return false;
+		}
+		previous = author;
+	}
+	return true;
 }
 
 interface CreatorCarriers {
@@ -589,6 +726,10 @@ function trustRecordShape(value: unknown): value is TrustStateRecord {
  */
 export function createAnchorTrustApi(): AnchorTrustApi {
 	const registry = new WeakMap<CurrentAnchorTrust, AnchorTrustPrivateState>();
+	const authorizationRegistry = new WeakMap<
+		CurrentEpochAuthorAuthorization,
+		CurrentEpochAuthorAuthorizationPrivateState
+	>();
 
 	const isAnchorTrustStateRecordBytes = (bytes: Uint8Array): boolean => {
 		try {
@@ -876,11 +1017,125 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		}
 	};
 
+	const openCurrentEpochAuthorAuthorization = (
+		input: OpenCurrentEpochAuthorAuthorizationInput
+	): OpenCurrentEpochAuthorAuthorizationResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				OPEN_AUTHOR_AUTHORIZATION_INPUT_KEYS,
+				OPEN_AUTHOR_AUTHORIZATION_BYTE_KEYS,
+				true
+			);
+			if (values === undefined) return anchorTrustFailure("malformed-input");
+			const detachedAnchorSignature = values.detachedAnchorSignature as Uint8Array;
+			const exactCanonicalAnchorPreimageBytes = values.exactCanonicalAnchorPreimageBytes as Uint8Array;
+			const exactCanonicalAuthorAuthorizationBytes = values.exactCanonicalAuthorAuthorizationBytes as Uint8Array;
+			if (
+				detachedAnchorSignature.byteLength !== 64 ||
+				exactCanonicalAnchorPreimageBytes.byteLength === 0 ||
+				exactCanonicalAuthorAuthorizationBytes.byteLength === 0 ||
+				exactCanonicalAuthorAuthorizationBytes.byteLength > AUTHOR_AUTHORIZATION_MAX_BYTES
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const trust = values.trust as CurrentAnchorTrust;
+			const authenticated = authenticateCurrentEpochAnchor({
+				detachedSignature: detachedAnchorSignature,
+				exactCanonicalAnchorPreimageBytes,
+				trust,
+			});
+			if (!authenticated.ok) {
+				return Object.freeze({
+					cause: authenticated.reason,
+					ok: false as const,
+					reason: "anchor-rejected" as const,
+				});
+			}
+
+			const anchorDecoded = decodeExact(exactCanonicalAnchorPreimageBytes);
+			if (!anchorDecoded.ok || !isAnchorRecord(anchorDecoded.value)) {
+				return Object.freeze({
+					cause: "anchor-schema-invalid" as const,
+					ok: false as const,
+					reason: "anchor-rejected" as const,
+				});
+			}
+			const authorizationDecoded = decodeExact(exactCanonicalAuthorAuthorizationBytes);
+			if (!authorizationDecoded.ok) {
+				let hasNonzeroByte = false;
+				for (const byte of exactCanonicalAuthorAuthorizationBytes) {
+					if (byte !== 0) {
+						hasNonzeroByte = true;
+						break;
+					}
+				}
+				return anchorTrustFailure(
+					authorizationDecoded.reason === "noncanonical" && hasNonzeroByte ? "noncanonical-acl" : "acl-decode-failed"
+				);
+			}
+			if (!isAuthorAuthorizationCarrier(authorizationDecoded.value)) {
+				return anchorTrustFailure("acl-schema-invalid");
+			}
+			const carrier = authorizationDecoded.value;
+			if (carrier.version !== 1) return anchorTrustFailure("unsupported-acl-version");
+			if (carrier.profileId !== AUTHOR_AUTHORIZATION_PROFILE) {
+				return anchorTrustFailure("unsupported-acl-profile");
+			}
+			if (carrier.objectId !== trust.objectId) return anchorTrustFailure("object-id-mismatch");
+			if (carrier.epoch !== trust.currentEpoch) return anchorTrustFailure("epoch-mismatch");
+			const aclDigest = bytesToHex(hashDomain(AUTHOR_AUTHORIZATION_DOMAIN, exactCanonicalAuthorAuthorizationBytes));
+			if (aclDigest !== anchorDecoded.value.aclDigest) return anchorTrustFailure("acl-digest-mismatch");
+
+			const authorization = Object.freeze({
+				aclDigest,
+				currentAnchorDigest: trust.currentAnchorDigest,
+				epoch: carrier.epoch,
+				objectId: carrier.objectId,
+				profileId: AUTHOR_AUTHORIZATION_PROFILE,
+			});
+			const authors = new intrinsicSet<string>();
+			for (const author of carrier.authors) intrinsicReflectApply(intrinsicSetAdd, authors, [author]);
+			authorizationRegistry.set(authorization, Object.freeze({ authors }));
+			return Object.freeze({ authorization, ok: true as const, provenance: authenticated.provenance });
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const resolveCurrentEpochAuthorizedAuthor = (
+		input: ResolveCurrentEpochAuthorizedAuthorInput
+	): ResolveCurrentEpochAuthorizedAuthorResult => {
+		try {
+			const values = snapshotClosedInput(input, RESOLVE_AUTHORIZED_AUTHOR_INPUT_KEYS, new intrinsicSet(), true);
+			if (values === undefined) return anchorTrustFailure("malformed-input");
+			const authorization = values.authorization as CurrentEpochAuthorAuthorization;
+			const state =
+				typeof authorization === "object" && authorization !== null
+					? authorizationRegistry.get(authorization)
+					: undefined;
+			if (state === undefined) return anchorTrustFailure("untrusted-context");
+			const author = values.author;
+			if (typeof author !== "string" || !PUBLIC_KEY_HEX.test(author)) {
+				return anchorTrustFailure("malformed-input");
+			}
+			if (!intrinsicReflectApply(intrinsicSetHas, state.authors, [author])) {
+				return anchorTrustFailure("author-not-authorized");
+			}
+			const publicKey = Object.freeze({ bytes: decodeHexBytes(author), format: "raw" as const });
+			return Object.freeze({ ok: true as const, publicKey });
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
 	return Object.freeze({
 		authenticateCurrentEpochAnchor,
 		installCreatorAnchorTrustRoot,
 		isAnchorTrustStateRecordBytes,
+		openCurrentEpochAuthorAuthorization,
 		openCurrentAnchorTrust,
+		resolveCurrentEpochAuthorizedAuthor,
 	});
 }
 

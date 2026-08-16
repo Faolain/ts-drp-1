@@ -21,6 +21,10 @@
 			"types": "./dist/src/public.d.ts",
 			"import": "./dist/src/public.js"
 		},
+		"./author-authorization": {
+			"types": "./dist/src/author-authorization.d.ts",
+			"import": "./dist/src/author-authorization.js"
+		},
 		"./registry/registry-v1.json": "./registry/registry-v1.json"
 	},
 	"scripts": {

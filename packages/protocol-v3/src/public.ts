@@ -1,4 +1,9 @@
-import { createAnchorTrustApi } from "./index.js";
+import {
+	authenticateCurrentEpochAnchor,
+	installCreatorAnchorTrustRoot,
+	isAnchorTrustStateRecordBytes,
+	openCurrentAnchorTrust,
+} from "./anchor-trust-singleton.js";
 
 export {
 	ANCHOR_TRUST_STATE_MAX_RECORD_BYTES,
@@ -9,12 +14,12 @@ export {
 	prepareBlueprintRuntime,
 } from "./index.js";
 
-const anchorTrustApi = createAnchorTrustApi();
-
-export const authenticateCurrentEpochAnchor = anchorTrustApi.authenticateCurrentEpochAnchor;
-export const installCreatorAnchorTrustRoot = anchorTrustApi.installCreatorAnchorTrustRoot;
-export const isAnchorTrustStateRecordBytes = anchorTrustApi.isAnchorTrustStateRecordBytes;
-export const openCurrentAnchorTrust = anchorTrustApi.openCurrentAnchorTrust;
+export {
+	authenticateCurrentEpochAnchor,
+	installCreatorAnchorTrustRoot,
+	isAnchorTrustStateRecordBytes,
+	openCurrentAnchorTrust,
+};
 
 export type {
 	AdmissionBoundTransactionalIssuerOptions,
