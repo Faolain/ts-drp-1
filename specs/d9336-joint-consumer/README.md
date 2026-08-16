@@ -1,6 +1,6 @@
 # D.93.36 Durable Live Composition
 
-Status: Slices 00–02 shipped; Slice 03 is next.
+Status: Slices 00–03 shipped; Slice 04 is next.
 
 ## Goal
 

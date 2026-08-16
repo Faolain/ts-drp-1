@@ -46006,3 +46006,34 @@ attempts ended `NO_VERDICT` without a reproduced P0/P1; the user-authorized
 fast track made additional nonterminal review rounds nonblocking. Slice 02 is
 closed. Slice 03 owns local issue, apply, and publish; this checkpoint does not
 claim two-client convergence or completion of the broader plan.
+
+## D.93.36 Slice 03 closure checkpoint
+
+The local durable issue RED is signed at `2aa68ce`. The bounded test-store
+pagination correction is signed at `b1519c6`, and the predecessor live-plane
+contract migration is signed at `3c54ba9`. Those test-only commits preserve the
+missing-`issueLocal` RED cause while teaching the prior transport contracts
+about the new P6-owned method.
+
+The one-owner production GREEN is signed at `8ec5baf`.
+`packages/node/src/v3-live.ts` now resolves the recovered current epoch author,
+invokes the genuine admission-bound transactional issuer, checks the returned
+durable record through the same authentication path used by recovery, appends
+the local-issued journal reference, extends the retained causality index, and
+only then invokes the visible sink. The existing registration gate serializes
+this path with ingress and pending publication; no second coordinator,
+publisher, store, or caller-selected authorization seam was added.
+
+Final evidence was nine files / 79 tests in 19.87 seconds, with focused local
+issue ordering and publication, prior activation/ingress/egress, journal
+reconciliation, admission-bound signer, and transactional issuance coverage.
+The node build, ESLint, Prettier, and diff checks passed. Package-wide typecheck
+continues to report only the pre-existing compact-history test-helper union
+diagnostics and was neither weakened nor suppressed. One bounded Codex review
+was stopped as `NO_VERDICT` after it entered protected historical test copies;
+the user-authorized fast track made that non-substantive result nonblocking.
+
+Slice 03 is closed. Slice 04 owns two genuine clients joining one room and
+observing each other's durable state. This checkpoint does not claim reconnect
+convergence, completion of D.93.36, or completion of the broader production
+hardening plan.
