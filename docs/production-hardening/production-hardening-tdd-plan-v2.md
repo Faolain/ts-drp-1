@@ -45981,3 +45981,28 @@ Opus review attempts ended `NO_VERDICT` without a reproduced P0/P1; this is
 recorded honestly rather than treated as approval. Slice 01 is closed. Slice 02
 owns serialized activation and ingress; neither D.93.36 nor the two-client
 golden path is complete.
+
+## D.93.36 Slice 02 closure checkpoint
+
+The serialized-activation RED is signed at
+`670525bd322869b2d3087d5a81a1e36860f2f7d4`; its admitted-digest correction is
+`861be67`. Signed test-only migrations `96a60f1`, `2496545`, and `a0239f6`
+remove the obsolete caller-owned prepared activation contract and update the
+prior private-owner assertions without introducing a compatibility path.
+
+The one-owner production GREEN is signed at
+`344dd7c902fbc54a7bf7b48e83484a08756f6d6f`. Activation now consumes only the
+recovered capability. Ingress authorization is derived from recovered current
+epoch authority, and the existing registration gate orders journal append,
+causality-index append, application observation, and egress. A direct prepared
+capability cannot activate the plane.
+
+Final evidence was focused 23/23 in 5.37 seconds and compact preservation 10
+files / 98 tests in 25.11 seconds, with the node build, ESLint, Prettier, and
+diff checks green. The two initial compact failures were obsolete source-shape
+assertions that forbade the recovered-capability owner and journal append; both
+were corrected test-only and the final run was green. The bounded RED review
+attempts ended `NO_VERDICT` without a reproduced P0/P1; the user-authorized
+fast track made additional nonterminal review rounds nonblocking. Slice 02 is
+closed. Slice 03 owns local issue, apply, and publish; this checkpoint does not
+claim two-client convergence or completion of the broader plan.
