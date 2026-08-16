@@ -24,6 +24,7 @@ import {
 	runControlledPositive,
 	runCurrentRootDriftMutants,
 	runHistoricalBaselines,
+	runOrdinaryClassBMutations,
 	runReadyCandidateTopologies,
 	runRepositoryCandidatePartition,
 	runRootChildPreloadPassthrough,
@@ -130,95 +131,97 @@ describe("D.93.35.15 freeze-successor controls", () => {
 				["blob", "commit", "id", "parent", "path", "sha256", "tree"].sort()
 			);
 		}
-		const intermediary = intermediaryChainEvidence(REPOSITORY_ROOT, successorContract);
-		expect(intermediary.chain).toEqual({ code: "AUTHENTICATED", valid: true });
-		expect(intermediary.rows.map((row: { readonly commit: string }) => row.commit)).toEqual(
-			successorContract.intermediaryChain.map(({ commit }) => commit)
-		);
-		const [first, second, ...rest] = intermediary.rows;
-		expect(validateIntermediaryChain(successorContract.intermediaryChain, intermediary.rows.slice(1))).toEqual({
-			code: "INTERMEDIARY_COUNT",
-			valid: false,
-		});
-		expect(validateIntermediaryChain(successorContract.intermediaryChain, [second, first, ...rest])).toEqual({
-			code: "INTERMEDIARY_IDENTITY",
-			valid: false,
-		});
-		expect(
-			validateIntermediaryChain(successorContract.intermediaryChain, [
-				{ ...first, changedPaths: [first.path, successorContract.correctiveRed.changedPaths[0]] },
-				second,
-				...rest,
-			])
-		).toEqual({ code: "INTERMEDIARY_SCOPE", valid: false });
-		expect(
-			validateIntermediaryChain(successorContract.intermediaryChain, [
-				first,
-				{ ...second, parents: [successorContract.predecessorOracleTransition.commit] },
-				...rest,
-			])
-		).toEqual({ code: "INTERMEDIARY_PARENT", valid: false });
-		expect(
-			validateIntermediaryChain(successorContract.intermediaryChain, [
-				first,
-				{
-					...second,
-					parents: [second.parents[0], successorContract.predecessorOracleTransition.commit],
-				},
-				...rest,
-			])
-		).toEqual({ code: "INTERMEDIARY_PARENT", valid: false });
-		for (const field of ["tree", "blob", "sha256"] as const) {
+		if (certificationMode) {
+			const intermediary = intermediaryChainEvidence(REPOSITORY_ROOT, successorContract);
+			expect(intermediary.chain).toEqual({ code: "AUTHENTICATED", valid: true });
+			expect(intermediary.rows.map((row: { readonly commit: string }) => row.commit)).toEqual(
+				successorContract.intermediaryChain.map(({ commit }) => commit)
+			);
+			const [first, second, ...rest] = intermediary.rows;
+			expect(validateIntermediaryChain(successorContract.intermediaryChain, intermediary.rows.slice(1))).toEqual({
+				code: "INTERMEDIARY_COUNT",
+				valid: false,
+			});
+			expect(validateIntermediaryChain(successorContract.intermediaryChain, [second, first, ...rest])).toEqual({
+				code: "INTERMEDIARY_IDENTITY",
+				valid: false,
+			});
 			expect(
 				validateIntermediaryChain(successorContract.intermediaryChain, [
-					{ ...first, [field]: `${first[field]}-mutated` },
+					{ ...first, changedPaths: [first.path, successorContract.correctiveRed.changedPaths[0]] },
 					second,
 					...rest,
 				])
-			).toEqual({ code: "INTERMEDIARY_BYTES", valid: false });
-		}
-		expect(validateIntermediaryChain(successorContract.intermediaryChain, [...intermediary.rows, first])).toEqual({
-			code: "INTERMEDIARY_COUNT",
-			valid: false,
-		});
-		const planCommit = successorContract.intermediaryChain.at(-1)?.commit;
-		expect(planCommit).toBeDefined();
-		if (planCommit === undefined) return;
-		const correctiveRed = intermediary.correctiveRed;
-		expect(validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, correctiveRed)).toEqual({
-			code: "AUTHENTICATED",
-			valid: true,
-		});
-		expect(
-			validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
-				...correctiveRed,
-				commit: undefined,
-				commits: [],
-			})
-		).toEqual({ code: "CORRECTIVE_RED_COUNT", valid: false });
-		expect(
-			validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
-				...correctiveRed,
-				commits: [...correctiveRed.commits, first.commit],
-			})
-		).toEqual({ code: "CORRECTIVE_RED_COUNT", valid: false });
-		for (const parents of [
-			[successorContract.predecessorOracleTransition.commit],
-			[planCommit, successorContract.predecessorOracleTransition.commit],
-		]) {
+			).toEqual({ code: "INTERMEDIARY_SCOPE", valid: false });
+			expect(
+				validateIntermediaryChain(successorContract.intermediaryChain, [
+					first,
+					{ ...second, parents: [successorContract.predecessorOracleTransition.commit] },
+					...rest,
+				])
+			).toEqual({ code: "INTERMEDIARY_PARENT", valid: false });
+			expect(
+				validateIntermediaryChain(successorContract.intermediaryChain, [
+					first,
+					{
+						...second,
+						parents: [second.parents[0], successorContract.predecessorOracleTransition.commit],
+					},
+					...rest,
+				])
+			).toEqual({ code: "INTERMEDIARY_PARENT", valid: false });
+			for (const field of ["tree", "blob", "sha256"] as const) {
+				expect(
+					validateIntermediaryChain(successorContract.intermediaryChain, [
+						{ ...first, [field]: `${first[field]}-mutated` },
+						second,
+						...rest,
+					])
+				).toEqual({ code: "INTERMEDIARY_BYTES", valid: false });
+			}
+			expect(validateIntermediaryChain(successorContract.intermediaryChain, [...intermediary.rows, first])).toEqual({
+				code: "INTERMEDIARY_COUNT",
+				valid: false,
+			});
+			const planCommit = successorContract.intermediaryChain.at(-1)?.commit;
+			expect(planCommit).toBeDefined();
+			if (planCommit === undefined) return;
+			const correctiveRed = intermediary.correctiveRed;
+			expect(validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, correctiveRed)).toEqual({
+				code: "AUTHENTICATED",
+				valid: true,
+			});
 			expect(
 				validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
 					...correctiveRed,
-					parents,
+					commit: undefined,
+					commits: [],
 				})
-			).toEqual({ code: "CORRECTIVE_RED_PARENT", valid: false });
+			).toEqual({ code: "CORRECTIVE_RED_COUNT", valid: false });
+			expect(
+				validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+					...correctiveRed,
+					commits: [...correctiveRed.commits, first.commit],
+				})
+			).toEqual({ code: "CORRECTIVE_RED_COUNT", valid: false });
+			for (const parents of [
+				[successorContract.predecessorOracleTransition.commit],
+				[planCommit, successorContract.predecessorOracleTransition.commit],
+			]) {
+				expect(
+					validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+						...correctiveRed,
+						parents,
+					})
+				).toEqual({ code: "CORRECTIVE_RED_PARENT", valid: false });
+			}
+			expect(
+				validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+					...correctiveRed,
+					changedPaths: [...correctiveRed.changedPaths.slice(0, -1), successorContract.correctionPaths[0]].sort(),
+				})
+			).toEqual({ code: "CORRECTIVE_RED_SCOPE", valid: false });
 		}
-		expect(
-			validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
-				...correctiveRed,
-				changedPaths: [...correctiveRed.changedPaths.slice(0, -1), successorContract.correctionPaths[0]].sort(),
-			})
-		).toEqual({ code: "CORRECTIVE_RED_SCOPE", valid: false });
 		expect(Object.keys(successorContract.provisionalInstall).sort()).toEqual(["commit", "parent", "tree"]);
 		expect(successorContract.externalBase.parents).toHaveLength(2);
 		expect(successorContract.originalInstallPaths).toHaveLength(9);
@@ -675,16 +678,14 @@ describe("D.93.35.15 genuine repository candidate", () => {
 		}, 600_000);
 
 		it("rejects the fixed ordinary Class B provenance subset with the genuine checker", async () => {
-			const evidence = await runRepositoryCandidatePartition(REPOSITORY_ROOT, successorContract, candidateReadiness, {
-				mutationNames: ordinaryClassBMutations,
-				positiveNames: [],
-			});
-			expect(evidence.available).toBe(true);
-			if (!("negatives" in evidence) || !Array.isArray(evidence.negatives)) {
-				throw new Error("ordinary Class B evidence omitted candidate negatives");
-			}
-			expect(evidence.negatives.map(({ name }) => name)).toEqual(ordinaryClassBMutations);
-			for (const { name, result } of evidence.negatives) {
+			const evidence = await runOrdinaryClassBMutations(
+				REPOSITORY_ROOT,
+				successorContract,
+				candidateReadiness,
+				ordinaryClassBMutations
+			);
+			expect(evidence.map(({ name }) => name)).toEqual(ordinaryClassBMutations);
+			for (const { name, result } of evidence) {
 				expect(result.signal, name).toBeNull();
 				expect(typeof result.status, name).toBe("number");
 				expect(result.status, `${name}\n${normalizedChildOutput(result)}`).not.toBe(0);

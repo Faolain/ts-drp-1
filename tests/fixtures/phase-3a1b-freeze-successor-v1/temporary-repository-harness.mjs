@@ -647,6 +647,72 @@ export async function runRootChildPreloadPassthrough(repositoryRoot, contract, r
 	}
 }
 
+/** Runs the fixed ordinary provenance subset against genuine current Git repositories and the production checker. */
+export async function runOrdinaryClassBMutations(repositoryRoot, contract, readiness, mutationNames) {
+	if (!readiness.ready) throw new Error("ordinary provenance evidence requires READY");
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
+	const results = [];
+	for (const name of mutationNames) {
+		const state = isolatedClone(repositoryRoot, current, `ordinary-${name}`);
+		try {
+			const spec = `${contract.ownerDirectory}/spec.md`;
+			if (name === "missing-owner-path") {
+				rmSync(resolve(state.root, spec));
+				commit(state.root, name);
+			} else if (name === "post-bootstrap-owner-drift") {
+				append(state.root, spec, "\nunauthorized owner drift\n");
+				commit(state.root, name);
+			} else if (name === "wrong-type-descendant") {
+				rmSync(resolve(state.root, spec));
+				put(state.root, `${spec}/entry.txt`, "tree substitution\n");
+				commit(state.root, name);
+			} else if (name === "wrong-mode-descendant") {
+				chmodSync(resolve(state.root, spec), 0o755);
+				commit(state.root, name);
+			} else if (name === "swapped-merge-parents") {
+				const tree = git(state.root, "rev-parse", `${current}^{tree}`);
+				const merge = git(
+					state.root,
+					"commit-tree",
+					tree,
+					"-p",
+					current,
+					"-p",
+					contract.externalBase.commit,
+					"-m",
+					name
+				);
+				git(state.root, "reset", "--hard", "-q", merge);
+			} else if (name === "merge-tree-drift") {
+				append(state.root, "README.md", "\nmerge tree drift\n");
+				const drift = commit(state.root, `${name} tree`);
+				const tree = git(state.root, "rev-parse", `${drift}^{tree}`);
+				const merge = git(
+					state.root,
+					"commit-tree",
+					tree,
+					"-p",
+					contract.externalBase.commit,
+					"-p",
+					current,
+					"-m",
+					name
+				);
+				git(state.root, "reset", "--hard", "-q", merge);
+			}
+			const result =
+				name === "suppressed-root-exit"
+					? await executeWithRootChildPreload(repositoryRoot, state.root, contract, contract.externalBase.commit, name)
+					: await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+			results.push({ name, result });
+		} finally {
+			rmSync(state.parent, { force: true, recursive: true });
+		}
+		await yieldToEventLoop();
+	}
+	return results;
+}
+
 function installControlledCensusEntry(root, path, index) {
 	const target = resolve(root, path);
 	mkdirSync(dirname(target), { recursive: true });
