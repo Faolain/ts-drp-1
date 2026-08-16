@@ -132,15 +132,7 @@ const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	parametersDigest: "cd31923f2f1928daab3a6943fa361f7cf40516ba3c4929abbd3109ee65cdc669",
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
-const ACTIVATION_INPUT_KEYS = [
-	"capability",
-	"issuanceScope",
-	"issuanceStore",
-	"messageQueueManager",
-	"networkNode",
-	"onAdmittedVertex",
-	"resolveAuthorPublicKey",
-] as const;
+const ACTIVATION_INPUT_KEYS = ["capability", "messageQueueManager", "networkNode", "onAdmittedVertex"] as const;
 const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
 const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
 const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
@@ -235,13 +227,10 @@ export type PrepareV3LiveResult =
 	  }>;
 
 export interface V3PlaneActivationInput {
-	readonly capability: PreparedV3Live;
-	readonly issuanceScope: DurableIssueScope;
-	readonly issuanceStore: DurableIssuanceStore;
+	readonly capability: RecoveredV3Live;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
-	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
 }
 
 export type V3AdmittedVertexSink = (
@@ -267,7 +256,6 @@ export type V3PlaneActivationFailureKind =
 	| "capability-consumed"
 	| "not-started"
 	| "topic-derivation-failed"
-	| "issuance-scope-mismatch"
 	| "queue-capacity"
 	| "subscribe-failed"
 	| "internal-invariant";
@@ -1871,15 +1859,17 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 
 interface V3PlaneRegistration {
 	active: boolean;
+	readonly authorization: CurrentEpochAuthorAuthorization;
 	handle: V3PlaneHandle;
+	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
 	readonly payload: PreparedV3LivePayload;
 	readonly queueId: string;
-	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
 	readonly topic: string;
 	gate: Promise<void> | undefined;
 }
@@ -2085,17 +2075,19 @@ function sameScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
 
 function sameActivation(
 	registration: V3PlaneRegistration,
-	payload: PreparedV3LivePayload,
-	scope: DurableIssueScope,
+	recovered: RecoveredV3LivePayload,
 	input: PlainRecord
 ): boolean {
+	const payload = recovered.prepared;
 	return (
 		registration.active &&
 		registration.messageQueueManager === input.messageQueueManager &&
-		registration.issuanceStore === input.issuanceStore &&
 		registration.onAdmittedVertex === input.onAdmittedVertex &&
-		registration.resolveAuthorPublicKey === input.resolveAuthorPublicKey &&
-		sameScope(registration.issuanceScope, scope) &&
+		registration.authorization === recovered.authorization &&
+		registration.index === recovered.index &&
+		registration.issuanceStore === recovered.issuanceStore &&
+		registration.liveJournalStore === recovered.liveJournalStore &&
+		sameScope(registration.issuanceScope, recovered.issuanceScope) &&
 		registration.payload.provenance.objectId === payload.provenance.objectId &&
 		registration.payload.provenance.epoch === payload.provenance.epoch &&
 		registration.payload.provenance.anchorDigest === payload.provenance.anchorDigest &&
@@ -2126,6 +2118,8 @@ function payloadIsUsable(payload: PreparedV3LivePayload): boolean {
 type V3IngressFailureCategory =
 	| ExtractAdmittedReceivedVertexFailureReason
 	| "envelope-rejected"
+	| "graph-rejected"
+	| "journal-rejected"
 	| "queue-rejected"
 	| "sink-rejected";
 
@@ -2191,14 +2185,19 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 			ingressFailureLog("envelope-rejected");
 			return;
 		}
-		const resolveAuthorPublicKey = registration.resolveAuthorPublicKey;
 		let extracted;
 		try {
 			extracted = extractAuthorizedV3Vertex(
 				registration.payload,
 				receivedCanonicalPreimageBytes,
 				signature,
-				resolveAuthorPublicKey
+				(author) => {
+					const authorResult = resolveCurrentEpochAuthorizedAuthor({
+						author,
+						authorization: registration.authorization,
+					});
+					return authorResult.ok ? authorResult.publicKey : undefined;
+				}
 			);
 		} catch {
 			ingressFailureLog("malformed-input");
@@ -2212,8 +2211,45 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 			ingressFailureLog(extracted.reason);
 			return;
 		}
+		const authenticated = authenticatedRecoveryVertex(extracted.vertex, receivedCanonicalPreimageBytes.byteLength);
+		if (authenticated === undefined) return ingressFailureLog("malformed-input");
+		const alreadyAccepted = registration.index.has(authenticated.digest);
+		let appended;
+		try {
+			appended = await registration.liveJournalStore.appendAccepted({
+				detachedSignature: new Uint8ArrayConstructor(signature),
+				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
+				scope: liveJournalScope(registration.payload),
+				sourceKind: "received",
+				vertexDigest: authenticated.digest,
+			});
+		} catch {
+			ingressFailureLog("journal-rejected");
+			return;
+		}
+		if (
+			!appended.ok ||
+			appended.vertexDigest !== authenticated.digest ||
+			!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload)) ||
+			(alreadyAccepted ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "received")
+		) {
+			ingressFailureLog("journal-rejected");
+			return;
+		}
+		if (alreadyAccepted) return;
+		try {
+			const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+			if (outcome !== undefined) {
+				ingressFailureLog("graph-rejected");
+				return;
+			}
+		} catch {
+			ingressFailureLog("graph-rejected");
+			return;
+		}
+		if (!currentRegistration(registration)) return;
 		const delivery = ObjectFreeze({
-			vertex: extracted.vertex,
+			vertex: authenticated.admitted,
 			exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
 			signature: new Uint8ArrayConstructor(signature),
 			transportSender: message.sender,
@@ -2226,6 +2262,17 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 	} catch {
 		ingressFailureLog("envelope-rejected");
 	}
+}
+
+function enqueueV3Ingress(registration: V3PlaneRegistration, message: Message): void {
+	const result =
+		registration.gate === undefined
+			? handleV3Ingress(registration, message)
+			: registration.gate.then(() => handleV3Ingress(registration, message));
+	registration.gate = result.then(
+		() => undefined,
+		() => undefined
+	);
 }
 
 interface SnapshottedOutboxRow {
@@ -2331,6 +2378,18 @@ interface RecoveredV3LivePayload {
 
 const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
 
+function consumeRecoveredV3Live(capability: RecoveredV3Live): RecoveredV3LivePayload | undefined {
+	try {
+		if (!isObject(capability)) return undefined;
+		const recovered = recoveredV3LiveAuthority.get(capability);
+		if (recovered === undefined) return undefined;
+		recoveredV3LiveAuthority.delete(capability);
+		return recovered;
+	} catch {
+		return undefined;
+	}
+}
+
 type SnapshottedJournalRow =
 	| Readonly<{
 			readonly detachedSignature: Uint8Array;
@@ -2348,6 +2407,7 @@ type SnapshottedJournalRow =
 	  }>;
 
 interface AuthenticatedRecoveryVertex {
+	readonly admitted: AdmittedReceivedVertexView;
 	readonly author: string;
 	readonly authorSequence: number;
 	readonly byteCharge: number;
@@ -2446,21 +2506,29 @@ function authenticateRecoveryVertex(
 		return authorResult.ok ? authorResult.publicKey : undefined;
 	});
 	if (extracted === undefined || !extracted.ok) return undefined;
-	const digest = lowerHexDigest(extracted.vertex.digest);
+	return authenticatedRecoveryVertex(extracted.vertex, canonicalPreimageBytes.byteLength);
+}
+
+function authenticatedRecoveryVertex(
+	admitted: AdmittedReceivedVertexView,
+	byteCharge: number
+): AuthenticatedRecoveryVertex | undefined {
+	const digest = lowerHexDigest(admitted.digest);
 	if (digest === undefined) return undefined;
 	return ObjectFreeze({
-		author: extracted.vertex.author,
-		authorSequence: extracted.vertex.authorSequence,
-		byteCharge: canonicalPreimageBytes.byteLength,
+		admitted,
+		author: admitted.author,
+		authorSequence: admitted.authorSequence,
+		byteCharge,
 		digest,
 		vertex: ObjectFreeze({
-			anchor: extracted.vertex.anchor,
-			dependencies: [...extracted.vertex.dependencies],
-			epoch: extracted.vertex.epoch,
+			anchor: admitted.anchor,
+			dependencies: [...admitted.dependencies],
+			epoch: admitted.epoch,
 			hash: digest,
-			kind: extracted.vertex.kind,
-			objectId: extracted.vertex.objectId,
-			operation: extracted.vertex.operation as EpochVertex["operation"],
+			kind: admitted.kind,
+			objectId: admitted.objectId,
+			operation: admitted.operation as EpochVertex["operation"],
 		}),
 	});
 }
@@ -2869,37 +2937,30 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 }
 
 /**
- * Activates the private v3 transport plane from one prepared capability.
- * @param rawInput - Closed activation bindings and the one-use prepared capability.
+ * Activates the private v3 transport plane from one recovered capability.
+ * @param rawInput - Closed live bindings and the one-use recovered capability.
  * @returns A frozen active handle or a closed activation failure.
  */
 export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneActivationResult {
 	try {
 		const input = snapshotClosedRecord(rawInput, ACTIVATION_INPUT_KEYS);
 		if (input === undefined) return activationFailure("malformed-input", "v3 activation input is invalid");
-		const {
-			capability,
-			issuanceScope,
-			issuanceStore,
-			messageQueueManager,
-			networkNode,
-			onAdmittedVertex,
-			resolveAuthorPublicKey,
-		} = input;
-		const payload = consumePreparedV3Live(capability as PreparedV3Live);
-		if (payload === undefined) return activationFailure("capability-consumed", "v3 capability is unavailable");
-		const selectedScope = copiedScope(issuanceScope);
-		if (selectedScope === undefined) return activationFailure("malformed-input", "v3 issuance scope is invalid");
+		const { capability, messageQueueManager, networkNode, onAdmittedVertex } = input;
+		const recovered = consumeRecoveredV3Live(capability as RecoveredV3Live);
+		if (recovered === undefined) return activationFailure("capability-consumed", "v3 capability is unavailable");
+		const payload = recovered.prepared;
+		const selectedScope = copiedScope(recovered.issuanceScope);
+		if (selectedScope === undefined) return activationFailure("internal-invariant", "v3 recovered scope is invalid");
 		if (!payloadIsUsable(payload)) return activationFailure("internal-invariant", "v3 prepared state is invalid");
 		if (selectedScope.objectId !== payload.provenance.objectId) {
-			return activationFailure("issuance-scope-mismatch", "v3 issuance scope does not match");
+			return activationFailure("internal-invariant", "v3 recovered scope does not match");
 		}
 		if (
-			!isObject(issuanceStore) ||
+			!isObject(recovered.issuanceStore) ||
+			!isObject(recovered.liveJournalStore) ||
 			!isObject(messageQueueManager) ||
 			!isObject(networkNode) ||
-			typeof onAdmittedVertex !== "function" ||
-			typeof resolveAuthorPublicKey !== "function"
+			typeof onAdmittedVertex !== "function"
 		) {
 			return activationFailure("malformed-input", "v3 activation binding is invalid");
 		}
@@ -2911,14 +2972,13 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		if (topic === undefined) return activationFailure("topic-derivation-failed", "v3 topic could not be derived");
 		const queueId = topic;
 		const boundQueueManager = messageQueueManager as MessageQueueManager<Message>;
-		const boundIssuanceStore = issuanceStore as DurableIssuanceStore;
+		const boundIssuanceStore = recovered.issuanceStore;
 		const boundSink = onAdmittedVertex as V3AdmittedVertexSink;
-		const boundResolver = resolveAuthorPublicKey as AdmitReceivedVertexInput["resolveAuthorPublicKey"];
 		let registrations = v3PlaneRegistrations.get(boundNetworkNode);
 		const existing = registrations?.get(topic);
 		if (existing !== undefined) {
 			if (currentRegistration(existing)) {
-				return sameActivation(existing, payload, selectedScope, input)
+				return sameActivation(existing, recovered, input)
 					? ObjectFreeze({ handle: existing.handle, ok: true as const })
 					: activationFailure("internal-invariant", "v3 registration binding conflicts");
 			}
@@ -2943,7 +3003,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		let networkSubscriptionAttempted = false;
 		try {
 			const queueSubscription = subscribeActivationQueue(boundQueueManager, queueId, (message) => {
-				void handleV3Ingress(registration, message);
+				enqueueV3Ingress(registration, message);
 			});
 			if (queueSubscription !== "ok") {
 				return queueSubscription === "capacity"
@@ -3004,14 +3064,16 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			}
 			registration = {
 				active: true,
+				authorization: recovered.authorization,
 				handle: undefined as unknown as V3PlaneHandle,
+				index: recovered.index,
 				issuanceScope: selectedScope,
 				issuanceStore: boundIssuanceStore,
+				liveJournalStore: recovered.liveJournalStore,
 				messageQueueManager: boundQueueManager,
 				networkNode: boundNetworkNode,
 				onAdmittedVertex: boundSink,
 				payload,
-				resolveAuthorPublicKey: boundResolver,
 				queueId: topic,
 				topic,
 				gate: undefined,
