@@ -43,7 +43,12 @@ interface BlueprintFixture {
 }
 
 export interface GenuinePreparedV3Fixture {
+	readonly author: string;
 	readonly authorPublicKey: Uint8Array;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly detachedAnchorSignature: Uint8Array;
 	readonly capability: PreparedV3Live;
 	readonly descriptor: V3LiveDescriptor;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
@@ -135,8 +140,18 @@ export async function createGenuinePreparedV3Fixture(
 	try {
 		const fixture = blueprintFixture();
 		const base = makeCreatorMaterial({ objectId: `creator:${"a".repeat(32)}` });
+		const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
+			authors: [contract.signerId],
+			epoch: 0,
+			kind: "drp-author-authorization",
+			objectId: base.anchor.objectId,
+			profileId: "creator-author-authorization-v1",
+			protocolMajor: 3,
+			version: 1,
+		});
 		const anchor = Object.freeze({
 			...base.anchor,
+			aclDigest: lowerHex(hashDomain("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes)),
 			blueprintDigest: fixture.blueprintDigest,
 			parametersDigest: lowerHex(hashDomain("ts-drp/parameters/v3", encodeCanonical(PARAMETERS))),
 		});
@@ -153,14 +168,16 @@ export async function createGenuinePreparedV3Fixture(
 			pinnedGenesisAnchorDigest: anchorDigest,
 		});
 		if (!installed.ok) throw new TypeError(`trust install failed: ${installed.reason}`);
+		const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
 		const input = Object.freeze({
 			authenticationProfile: "creator-only",
 			store,
 			objectId,
 			pinnedGenesisAnchorDigest: anchorDigest,
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
+			exactCanonicalAuthorAuthorizationBytes: new Uint8Array(exactCanonicalAuthorAuthorizationBytes),
 			detachedSignature: new Uint8Array(signature),
-			exactCanonicalParametersCarrierBytes: encodeCanonical(PARAMETERS),
+			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
 			catalog: catalog(),
 		});
 		const prepared = await prepareV3LiveGeneration(input);
@@ -180,8 +197,13 @@ export async function createGenuinePreparedV3Fixture(
 		});
 		const receivedDigest = hashDomain("ts-drp/vertex/v3", receivedCanonicalPreimageBytes);
 		return Object.freeze({
+			author: contract.signerId,
 			authorPublicKey: ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)),
 			capability: prepared.capability,
+			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
+			exactCanonicalAuthorAuthorizationBytes: new Uint8Array(exactCanonicalAuthorAuthorizationBytes),
+			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
+			detachedAnchorSignature: new Uint8Array(signature),
 			descriptor: prepared.descriptor,
 			receivedCanonicalPreimageBytes,
 			receivedSignature: ed25519.sign(receivedDigest, hexBytes(contract.privateKeySeedHex)),
