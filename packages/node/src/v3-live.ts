@@ -147,6 +147,23 @@ const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outbox
 const ISSUED_RECORD_KEYS = ["authorSequence", "envelope", "scope"] as const;
 const OUTBOX_ENTRY_KEYS = ["authorSequence", "envelope", "scope"] as const;
 const SIGNED_ENVELOPE_KEYS = ["canonicalPreimageBytes", "digest", "signature"] as const;
+const JOURNAL_SCOPE_KEYS = ["anchorDigest", "epoch", "objectId"] as const;
+const JOURNAL_RECEIVED_ROW_KEYS = [
+	"detachedSignature",
+	"exactCanonicalPreimageBytes",
+	"journalSequence",
+	"scope",
+	"sourceKind",
+	"vertexDigest",
+] as const;
+const JOURNAL_LOCAL_ROW_KEYS = [
+	"author",
+	"authorSequence",
+	"journalSequence",
+	"scope",
+	"sourceKind",
+	"vertexDigest",
+] as const;
 const V3_TOPIC_PREFIX = "drp/v3/1/";
 const vertexRegistry = parameterRegistry.kinds.vertex;
 const V3_VERTEX_DOMAIN = parameterRegistry.domains.vertex;
@@ -2314,6 +2331,30 @@ interface RecoveredV3LivePayload {
 
 const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
 
+type SnapshottedJournalRow =
+	| Readonly<{
+			readonly detachedSignature: Uint8Array;
+			readonly exactCanonicalPreimageBytes: Uint8Array;
+			readonly journalSequence: number;
+			readonly sourceKind: "received";
+			readonly vertexDigest: string;
+	  }>
+	| Readonly<{
+			readonly author: string;
+			readonly authorSequence: number;
+			readonly journalSequence: number;
+			readonly sourceKind: "local-issued";
+			readonly vertexDigest: string;
+	  }>;
+
+interface AuthenticatedRecoveryVertex {
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly byteCharge: number;
+	readonly digest: string;
+	readonly vertex: EpochVertex;
+}
+
 function recoveryFailure(
 	kind: RecoverV3LiveReplicaFailureKind,
 	detail: string
@@ -2326,6 +2367,101 @@ function liveJournalScope(payload: PreparedV3LivePayload): LiveJournalScope {
 		anchorDigest: payload.provenance.anchorDigest,
 		epoch: 0 as const,
 		objectId: payload.provenance.objectId,
+	});
+}
+
+function sameLiveJournalScope(value: unknown, expected: LiveJournalScope): boolean {
+	const captured = snapshotClosedRecord(value, JOURNAL_SCOPE_KEYS);
+	return (
+		captured !== undefined &&
+		captured.anchorDigest === expected.anchorDigest &&
+		captured.epoch === expected.epoch &&
+		captured.objectId === expected.objectId
+	);
+}
+
+function journalRowSnapshot(
+	value: unknown,
+	expectedScope: LiveJournalScope,
+	expectedSequence: number
+): SnapshottedJournalRow | undefined {
+	try {
+		if (!isObject(value)) return undefined;
+		const sourceDescriptor = ObjectGetOwnPropertyDescriptor(value, "sourceKind");
+		if (sourceDescriptor === undefined || !("value" in sourceDescriptor)) return undefined;
+		const keys =
+			sourceDescriptor.value === "received"
+				? JOURNAL_RECEIVED_ROW_KEYS
+				: sourceDescriptor.value === "local-issued"
+					? JOURNAL_LOCAL_ROW_KEYS
+					: undefined;
+		if (keys === undefined) return undefined;
+		const row = snapshotClosedRecord(value, keys);
+		if (
+			row === undefined ||
+			row.journalSequence !== expectedSequence ||
+			!isDigestHex(row.vertexDigest) ||
+			!sameLiveJournalScope(row.scope, expectedScope)
+		) {
+			return undefined;
+		}
+		if (row.sourceKind === "received") {
+			const exactCanonicalPreimageBytes = copyDetachedBytes(row.exactCanonicalPreimageBytes);
+			const detachedSignature = copyDetachedBytes(row.detachedSignature);
+			return exactCanonicalPreimageBytes === undefined || detachedSignature?.byteLength !== 64
+				? undefined
+				: ObjectFreeze({
+						detachedSignature,
+						exactCanonicalPreimageBytes,
+						journalSequence: expectedSequence,
+						sourceKind: "received" as const,
+						vertexDigest: row.vertexDigest,
+					});
+		}
+		return typeof row.author !== "string" ||
+			row.author.length === 0 ||
+			!NumberIsSafeInteger(row.authorSequence) ||
+			(row.authorSequence as number) < 0
+			? undefined
+			: ObjectFreeze({
+					author: row.author,
+					authorSequence: row.authorSequence as number,
+					journalSequence: expectedSequence,
+					sourceKind: "local-issued" as const,
+					vertexDigest: row.vertexDigest,
+				});
+	} catch {
+		return undefined;
+	}
+}
+
+function authenticateRecoveryVertex(
+	payload: PreparedV3LivePayload,
+	authorization: CurrentEpochAuthorAuthorization,
+	canonicalPreimageBytes: Uint8Array,
+	signature: Uint8Array
+): AuthenticatedRecoveryVertex | undefined {
+	const extracted = extractAuthorizedV3Vertex(payload, canonicalPreimageBytes, signature, (author) => {
+		const authorResult = resolveCurrentEpochAuthorizedAuthor({ authorization, author });
+		return authorResult.ok ? authorResult.publicKey : undefined;
+	});
+	if (extracted === undefined || !extracted.ok) return undefined;
+	const digest = lowerHexDigest(extracted.vertex.digest);
+	if (digest === undefined) return undefined;
+	return ObjectFreeze({
+		author: extracted.vertex.author,
+		authorSequence: extracted.vertex.authorSequence,
+		byteCharge: canonicalPreimageBytes.byteLength,
+		digest,
+		vertex: ObjectFreeze({
+			anchor: extracted.vertex.anchor,
+			dependencies: [...extracted.vertex.dependencies],
+			epoch: extracted.vertex.epoch,
+			hash: digest,
+			kind: extracted.vertex.kind,
+			objectId: extracted.vertex.objectId,
+			operation: extracted.vertex.operation as EpochVertex["operation"],
+		}),
 	});
 }
 
@@ -2411,17 +2547,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		} catch {
 			return recoveryFailure("journal-rejected", "v3 journal readiness failed");
 		}
-		if (!readiness.ok || !readiness.ready || readiness.rowCount !== 0) {
-			return recoveryFailure("journal-rejected", "v3 first recovery requires an empty ready journal");
-		}
-		let journalPage;
-		try {
-			journalPage = await journal.readPage({ afterSequence: null, limit: 1, scope, snapshot: readiness.snapshot });
-		} catch {
-			return recoveryFailure("journal-rejected", "v3 journal page read failed");
-		}
-		if (!journalPage.ok || journalPage.rows.length !== 0 || journalPage.nextSequence !== null) {
-			return recoveryFailure("journal-rejected", "v3 first recovery journal is not empty");
+		if (
+			!readiness.ok ||
+			!readiness.ready ||
+			!NumberIsSafeInteger(readiness.rowCount) ||
+			readiness.rowCount < 0 ||
+			!sameLiveJournalScope(readiness.scope, scope)
+		) {
+			return recoveryFailure("journal-rejected", "v3 journal is not ready for recovery");
 		}
 
 		let index: CausalityIndex;
@@ -2435,9 +2568,95 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
 		}
 		const preparedVertexCount = index.size;
+		let recoveredCount = 0;
+		let journalAfterSequence: number | null = null;
+		if (readiness.rowCount === 0) {
+			let emptyPage;
+			try {
+				emptyPage = await journal.readPage({ afterSequence: null, limit: 1, scope, snapshot: readiness.snapshot });
+			} catch {
+				return recoveryFailure("journal-rejected", "v3 journal page read failed");
+			}
+			if (!emptyPage.ok || emptyPage.rows.length !== 0 || emptyPage.nextSequence !== null) {
+				return recoveryFailure("journal-rejected", "v3 empty journal snapshot is inconsistent");
+			}
+		} else {
+			for (let expectedSequence = 0; expectedSequence < readiness.rowCount; expectedSequence += 1) {
+				let rawJournalPage;
+				try {
+					rawJournalPage = await journal.readPage({
+						afterSequence: journalAfterSequence,
+						limit: 1,
+						scope,
+						snapshot: readiness.snapshot,
+					});
+				} catch {
+					return recoveryFailure("journal-rejected", "v3 journal page read failed");
+				}
+				if (!rawJournalPage.ok || rawJournalPage.rows.length !== 1) {
+					return recoveryFailure("journal-rejected", "v3 journal page is incomplete");
+				}
+				const row = journalRowSnapshot(rawJournalPage.rows[0], scope, expectedSequence);
+				if (row === undefined) return recoveryFailure("journal-rejected", "v3 journal row is invalid");
+				const expectedNext = expectedSequence + 1 < readiness.rowCount ? expectedSequence : null;
+				if (rawJournalPage.nextSequence !== expectedNext) {
+					return recoveryFailure("journal-rejected", "v3 journal cursor is invalid");
+				}
+
+				let authenticated: AuthenticatedRecoveryVertex | undefined;
+				try {
+					if (row.sourceKind === "received") {
+						authenticated = authenticateRecoveryVertex(
+							payload,
+							openedAuthorization.authorization,
+							row.exactCanonicalPreimageBytes,
+							row.detachedSignature
+						);
+					} else {
+						const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
+						const issuedCommit = await issuance.readIssued(localScope, row.authorSequence);
+						const issuedRow = outboxRowSnapshot(
+							ObjectFreeze({ commit: issuedCommit, publishState: "published" as const }),
+							localScope
+						);
+						if (issuedRow !== undefined) {
+							authenticated = authenticateRecoveryVertex(
+								payload,
+								openedAuthorization.authorization,
+								issuedRow.canonicalPreimageBytes,
+								issuedRow.signature
+							);
+							if (
+								authenticated?.author !== row.author ||
+								authenticated.authorSequence !== row.authorSequence ||
+								lowerHexDigest(issuedRow.digest) !== row.vertexDigest
+							) {
+								authenticated = undefined;
+							}
+						}
+					}
+				} catch {
+					return recoveryFailure("admission-rejected", "v3 journal replay authentication failed");
+				}
+				if (
+					authenticated === undefined ||
+					authenticated.digest !== row.vertexDigest ||
+					index.has(authenticated.digest)
+				) {
+					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
+				}
+				try {
+					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+					if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
+				} catch {
+					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
+				}
+				recoveredCount += 1;
+				journalAfterSequence = expectedSequence;
+			}
+		}
 
 		let afterKey: readonly [string, string, number] | undefined;
-		let recoveredCount = 0;
 		for (;;) {
 			let rawPage: unknown;
 			try {
@@ -2467,30 +2686,27 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
 				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
 			}
-			let extracted;
+			let authenticated: AuthenticatedRecoveryVertex | undefined;
 			try {
-				extracted = extractAuthorizedV3Vertex(payload, row.canonicalPreimageBytes, row.signature, (author) => {
-					const authorResult = resolveCurrentEpochAuthorizedAuthor({
-						authorization: openedAuthorization.authorization,
-						author,
-					});
-					return authorResult.ok ? authorResult.publicKey : undefined;
-				});
+				authenticated = authenticateRecoveryVertex(
+					payload,
+					openedAuthorization.authorization,
+					row.canonicalPreimageBytes,
+					row.signature
+				);
 			} catch {
 				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
 			}
-			const recomputedDigest = extracted?.ok ? lowerHexDigest(extracted.vertex.digest) : undefined;
 			const envelopeDigest = lowerHexDigest(row.digest);
 			if (
-				extracted === undefined ||
-				!extracted.ok ||
-				recomputedDigest === undefined ||
-				recomputedDigest !== envelopeDigest ||
-				extracted.vertex.author !== selectedScope.author ||
-				extracted.vertex.authorSequence !== row.authorSequence
+				authenticated === undefined ||
+				authenticated.digest !== envelopeDigest ||
+				authenticated.author !== selectedScope.author ||
+				authenticated.authorSequence !== row.authorSequence
 			) {
 				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
 			}
+			const alreadyRecovered = index.has(authenticated.digest);
 			let appended;
 			try {
 				appended = await journal.appendAccepted({
@@ -2498,30 +2714,27 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					authorSequence: row.authorSequence,
 					scope,
 					sourceKind: "local-issued",
-					vertexDigest: recomputedDigest,
+					vertexDigest: authenticated.digest,
 				});
 			} catch {
 				return recoveryFailure("journal-rejected", "v3 recovery journal append failed");
 			}
-			if (!appended.ok || appended.vertexDigest !== recomputedDigest || appended.sourceKind !== "local-issued") {
+			if (
+				!appended.ok ||
+				appended.vertexDigest !== authenticated.digest ||
+				(alreadyRecovered ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "local-issued")
+			) {
 				return recoveryFailure("journal-rejected", "v3 recovery journal append was rejected");
 			}
-			try {
-				const recoveredVertex: EpochVertex = ObjectFreeze({
-					anchor: extracted.vertex.anchor,
-					dependencies: [...extracted.vertex.dependencies],
-					epoch: extracted.vertex.epoch,
-					hash: recomputedDigest,
-					kind: extracted.vertex.kind,
-					objectId: extracted.vertex.objectId,
-					operation: extracted.vertex.operation as EpochVertex["operation"],
-				});
-				const outcome = index.append(recomputedDigest, recoveredVertex, row.canonicalPreimageBytes.byteLength);
-				if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
-			} catch {
-				return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
+			if (!alreadyRecovered) {
+				try {
+					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+					if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+				} catch {
+					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
+				}
+				recoveredCount += 1;
 			}
-			recoveredCount += 1;
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 		}
 		if (recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount) {
