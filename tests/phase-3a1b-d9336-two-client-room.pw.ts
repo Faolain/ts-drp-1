@@ -135,3 +135,64 @@ test("two isolated clients join one v3 room and observe the same durable transcr
 		await Promise.all([alice.close(), bob.close()]);
 	}
 });
+
+test("a client recovers its durable transcript before rejoining live exchange", async ({ context }) => {
+	const alice = await context.newPage();
+	const bob = await context.newPage();
+	const run = crypto.randomUUID();
+	const channelName = `d9336-reconnect-${run}`;
+	const aliceInput = {
+		channelName,
+		clientId: "alice",
+		databaseName: `d9336-reconnect-alice-${run}`,
+	} as const;
+	const bobInput = {
+		channelName,
+		clientId: "bob",
+		databaseName: `d9336-reconnect-bob-${run}`,
+	} as const;
+	try {
+		await Promise.all([install(alice), install(bob)]);
+		await Promise.all([
+			alice.evaluate((input) => window.d9336V3Chat.join(input), aliceInput),
+			bob.evaluate((input) => window.d9336V3Chat.join(input), bobInput),
+		]);
+
+		await alice.evaluate(() => window.d9336V3Chat.send("before reconnect from alice"));
+		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(1);
+		await bob.evaluate(() => window.d9336V3Chat.send("before reconnect from bob"));
+		await expect.poll(async () => (await snapshot(alice)).accepted.length).toBe(2);
+		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(2);
+
+		const durableBeforeClose = await snapshot(bob);
+		await bob.evaluate(() => window.d9336V3Chat.close());
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), bobInput);
+		const recoveredBeforeExchange = await snapshot(bob);
+		expect(recoveredBeforeExchange.ready).toBe(true);
+		expect(recoveredBeforeExchange.accepted).toEqual(durableBeforeClose.accepted);
+		expect(recoveredBeforeExchange.acceptedOperationDigest).toBe(durableBeforeClose.acceptedOperationDigest);
+		expect(recoveredBeforeExchange.durableTranscriptDigest).toBe(durableBeforeClose.durableTranscriptDigest);
+
+		await bob.evaluate(() => window.d9336V3Chat.send("after reconnect from bob"));
+		await expect.poll(async () => (await snapshot(alice)).accepted.length).toBe(3);
+		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(3);
+
+		const [aliceState, bobState] = await Promise.all([snapshot(alice), snapshot(bob)]);
+		expect(bobState.accepted).toEqual(aliceState.accepted);
+		expect(bobState.accepted.map(({ text }) => text)).toEqual([
+			"before reconnect from alice",
+			"before reconnect from bob",
+			"after reconnect from bob",
+		]);
+		expect(bobState.acceptedOperationDigest).toBe(aliceState.acceptedOperationDigest);
+		expect(bobState.durableTranscriptDigest).toBe(aliceState.durableTranscriptDigest);
+		expect(bobState.acceptedOperationDigest).toMatch(DIGEST);
+		expect(bobState.durableTranscriptDigest).toMatch(DIGEST);
+	} finally {
+		await Promise.allSettled([
+			alice.evaluate(() => window.d9336V3Chat.close()),
+			bob.evaluate(() => window.d9336V3Chat.close()),
+		]);
+		await Promise.all([alice.close(), bob.close()]);
+	}
+});
