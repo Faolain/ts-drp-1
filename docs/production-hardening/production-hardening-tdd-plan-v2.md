@@ -13464,6 +13464,272 @@ surface, compatibility or product behavior. It makes the already-required
 lineage executable while preserving the exact-six GREEN and every D.93.35.7-.12
 semantic nonclaim.
 
+##### D.93.35.14 — canonical structured-transition correction
+
+The signed exact-six closure exposed one platform-dependent evidence defect,
+not a lineage, scope or workflow defect. All five required GitHub Actions runs
+`31961910088`, `31961910461`, `31961909967`, `31961908588` and
+`31961910169` stop at the identical marker:
+
+```text
+intermediary commit identity differs: root-drift-harness-correction
+```
+
+The failed field, `patchSha256`, is SHA-256 over presentation-oriented
+`git diff --binary` stdout. Apple Git abbreviates its `index` object names,
+while the Ubuntu runner renders those names at 40 characters. Setting
+`core.abbrev=40` reproduces CI exactly; the unconfigured checker passes on the
+same merge-ref. The defect is therefore the use of textual diff presentation
+as authority, not a disagreement in any Git object or governed byte.
+
+Every `patchSha256` authority occurs only in the successor contract/profile
+rows, the checker and harness `revisionPatchSha256` helpers, and test byte
+mutants. It contributes no unique security property: exact parent and child
+commits, child tree, direct-parent topology, sorted changed-path scope,
+per-path modes/types/full blob object IDs, blob content SHA-256 and history
+counts already bind every accepted transition. D.93.35.14 removes the
+secondary textual digest rather than attempting to make incidental rendering
+portable. No old digest, replacement digest, platform choice, dual acceptance
+or retry remains.
+
+The current signed closure is commit
+`5872fae3c57f0d16d2c45ad2d66f1f12d7152dd5`, tree
+`2bd12744a4a29d4bcc8a430300a04ebbd3ffd2d8`, with sole parent
+`e64ada0dd58f5d1ccdd53c045f8b64eb7f59cc3e`. It is a Good Faolain-signed
+non-merge commit changing exactly the six D.93.35.7/.8 GREEN paths. It remains
+the sole governed successor transition. D.93.35.14 authorizes only a
+non-product evidence-representation repair after that closure.
+
+###### One canonical structured transition identity
+
+The successor checker and test harness derive one closed structured identity
+from real Git objects. For an authenticated `<parent>` and `<child>`, they run
+these plumbing commands as closed argv vectors from the repository root:
+
+```text
+git cat-file commit <child>
+git diff-tree --no-commit-id --name-only -z -r --no-renames <parent> <child> --
+git --literal-pathspecs ls-tree -z --full-tree <revision> -- <path>
+git cat-file blob <object>
+```
+
+The raw `cat-file commit` payload is parsed through the first empty line that
+terminates its header block. It must contain one and only one well-formed
+`tree <40-lowerhex>` header and exactly one well-formed top-level
+`parent <40-lowerhex>` header; continuation lines are accepted only after a
+header. A missing or duplicate tree, zero or multiple parents, malformed
+header/continuation, or missing header/body separator fails. The derived tree
+must equal the frozen child tree and the sole derived parent must equal
+`<parent>`. No porcelain or ambient display default establishes commit
+topology.
+
+`diff-tree` stdout must be nonempty and end in exactly one terminal NUL: its
+last byte is NUL and its penultimate byte is not. The parser strips that one
+terminal NUL, splits the remaining raw bytes on NUL, rejects every internal
+empty element, duplicate or malformed record, and sorts lexicographically by
+unsigned raw bytes. Each governed path must be strict UTF-8 that round-trips to
+the same bytes; the current closed roster is ASCII and any non-ASCII addition
+requires a signed amendment. No decoded-string locale sort is allowed.
+
+Every plumbing invocation requires exit zero, no signal and empty stderr.
+Every frozen change row has exact status `M`; additions and deletions are not
+authority. For every sorted raw path, the RED runs
+`git --literal-pathspecs ls-tree -z --full-tree` independently against parent
+and child and authenticates both sides. Each result must contain exactly one
+entry whose raw returned path bytes equal the requested raw path bytes and is
+parsed as exact `{ mode, type, object }`; pathspec metacharacters have no
+special meaning. Zero results is the exact completed `entry mismatch` class,
+not unavailable evidence. A missing parent or child entry proves an
+unauthorized `A` or `D` row and fails. Both entries must be regular blobs with
+the exact mode recorded by the contract; an extra result, symlink, gitlink,
+tree, abbreviated/malformed object ID or unexpected executable-bit change
+fails. `cat-file blob` reads each full object ID, and SHA-256 is computed over
+its unmodified bytes. Nonzero status, signal, spawn failure, nonempty stderr,
+buffer overflow, invalid command framing or reflection/parsing failure is
+`transition evidence unavailable: <identity>`; a successfully completed
+zero-entry lookup remains `entry mismatch`.
+
+The canonical transition record has exactly these facts and no digest over the
+record itself:
+
+```text
+{
+  parent: <full commit id>,
+  child: <full commit id>,
+  tree: <full child tree id>,
+  changes: [
+    {
+      status: "M",
+      path: <strict UTF-8 governed path>,
+      before: { mode, type, object, sha256 },
+      after:  { mode, type, object, sha256 }
+    }
+  ]
+}
+```
+
+The `changes` array is in raw-path-byte sort order and has the exact expected
+length. Every row is modification-only `M`, and the RED authenticates a parent
+and child regular blob for every row; no `A` or `D` row can be frozen or used
+as authority. Observed and frozen records are compared field-for-field. A
+completed record mismatch retains the established exact count,
+parent/topology, scope, entry/bytes and history failure classes; it may not
+collapse into aggregate nonzero. The old `patchSha256` field, both
+`revisionPatchSha256` helpers and the test branch that mutates patch bytes are
+deleted, not deprecated or accepted as optional legacy input.
+
+The equivalence boundary is explicit:
+
+| former patch assertion | canonical structured authority                                  | incidental representation removed                       |
+| ---------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| diff endpoints         | exact parent commit, child commit/tree and sole-parent topology | diff headers and revision labels                        |
+| changed-file roster    | NUL-delimited `diff-tree` paths sorted by raw bytes             | display order, quoting and prefixes                     |
+| file identity          | exact `M` status plus before/after mode, type and full blob ID  | abbreviated `index` lines                               |
+| file bytes             | SHA-256 of each before/after `cat-file blob` result             | hunks, context, binary framing and newline presentation |
+| transition uniqueness  | exact path count plus existing history/commit counts            | one aggregate SHA-256 over textual stdout               |
+
+Thus removing the secondary digest removes no authority. It also removes every
+output-sensitive Git setting: abbreviation, prefixes, relative paths, color,
+external diff, textconv, rename detection, diff algorithm, indent heuristic,
+context, inter-hunk merging and order files cannot affect the plumbing record.
+Object, content, topology and history evidence remains mandatory and no field
+may stand in for another.
+
+###### Lawful correction lineage and closed scopes
+
+The only authorized sequence is:
+
+```text
+... -> e64ada0... -> 5872fae3... -> signed D.93.35.14 plan P
+  -> signed exact-four tests-only portability RED R
+  -> signed exact-four successor-owner GREEN G
+```
+
+The D.93.35.14 plan is a one-path non-governed commit directly parented to
+`5872fae3...`. Once that plan is signed and pushed, the tests-only RED may
+change exactly:
+
+```text
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+tests/protocol-v3-freeze-successor-v1-red.test.ts
+```
+
+The JSON and type owners move to exact schema
+`phase-3a1b-freeze-successor-red-v4`; it records the signed D.93.35.14 plan
+identity, exact ordered portability RED and GREEN scopes, and the structured
+transition rows for signed `5872fae3...`, the signed plan after it exists and
+the known historical/intermediary/corrective chain. No `patchSha256` key is
+allowed anywhere in the v4 shape. The harness derives the same records from
+genuine Git plumbing. The existing successor suite binds typed/runtime shape,
+signed lineage and structured-production readiness as the sole RED boundary.
+No new test path, fixture, analyzer, config or test count is authorized.
+
+Every hostile lane and causal mutant below is an assertion/case inside the
+existing 49 tests and their established active/dormant partitions. They add no
+test case and do not alter the eight-passed/one-readiness-failed/40-dormant RED
+or 49/49 GREEN counts.
+
+The RED runs genuine transition classification under Apple and Ubuntu Git and
+under hostile ambient config for abbreviation, no-prefix/relative output,
+color, external diff, textconv, rename/copy detection, algorithm, indent,
+context, inter-hunk merging and path order. External/textconv helpers are
+executable sentinels selected by hostile config and a hostile `.gitattributes`
+diff driver; their invocation fails the test. Every lane must produce the same
+sorted paths and exact before/after records, while sentinels remain uninvoked.
+Config-only or source-text assertions are not evidence.
+
+The retained causal mutants cover wrong/missing/extra parent or child, missing
+or duplicate commit-tree headers, zero/multiple/malformed commit-parent
+headers, merge and side topology, missing/duplicate/reordered paths, raw-byte
+versus decoded path sorting, malformed UTF-8, absent/doubled terminal NUL and
+internal empty records, zero-result or raw-path-mismatched literal `ls-tree`
+lookups, unauthorized `A`/`D` rows, wrong mode/type, symlink/tree/gitlink
+entries, abbreviated or wrong object IDs, altered blob bytes/SHA-256, swallowed
+child failure, stderr, signal, truncated NUL output and split/repeated history.
+Additional mutants prove that hostile external diff, textconv, rename, color,
+algorithm, prefix and pathspec config cannot influence the record. Old
+`patchSha256`, profile-only/contract-only deletion, optional legacy fields,
+accept-either fallback and a new hash over serialized structured data all fail
+closed. Each mutant reaches real Git plumbing and its exact existing failure
+class; no aggregate textual oracle is accepted.
+
+After that RED is signed and pushed, GREEN may change exactly the four current
+successor owner files:
+
+```text
+packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json
+packages/protocol-v3/conformance/freeze-successor-v1/profile.json
+packages/protocol-v3/conformance/freeze-successor-v1/spec.md
+```
+
+`check-freeze.mjs` derives and compares the canonical structured records while
+retaining every current object, topology, scope, predecessor, root and workflow
+check. `profile.json` records the signed `5872fae3...`, D.93.35.14 plan and
+portability RED structured identities plus the exact-four owner transition
+expectation; the checker derives GREEN G as the sole direct child of RED R with
+exactly those four paths, with no secondary patch digest. `spec.md` records why
+structured Git-object evidence replaces presentation-oriented diff output.
+`freeze-policy.json` moves to exact schema
+`ts-drp-protocol-v3-freeze-successor-v3`, and `profile.json` moves to exact
+schema `ts-drp-protocol-v3-freeze-successor-profile-v3`. The policy self-pins
+the new checker/profile/spec bytes, retains all protected artifacts and five
+workflow hashes, and admits no additional exception. No other owner, source,
+workflow or manifest changes.
+
+The portability RED records the signed plan identity after plan signing; the
+owner GREEN records the signed RED identity after RED signing. Neither commit
+predicts or embeds its own identity. The GREEN checker derives source `HEAD`,
+requires the signed RED as its sole parent, requires exactly the four owner
+paths above, and rejects a merge, side branch, split/repeated correction or any
+intervening commit. Before each authoritative signature, one disposable local
+commit with the same parent and tree proves the phase gates; it is never pushed
+or accepted as authority. There is no compatibility branch or repair slot
+between the signed RED and GREEN.
+
+###### Phase signatures, remote closure and nonclaims
+
+On the signed D.93.35.14 plan plus complete tests RED, the established suite
+keeps eight controls passed and 40 successor partitions dormant behind one
+structured-owner readiness failure. The genuine 87/87 predecessor aggregate,
+controlled operation 28/28, controlled work 12/12, root closures, historical
+Git evidence and unrelated preservation remain green. The current five remote
+workflows remain expected RED only because the shipped owner still requires
+platform-dependent `patchSha256` until owner GREEN; no workflow edit is
+permitted to mask that evidence.
+
+Owner GREEN must reach 49/49 successor tests, 87/87 genuine predecessor tests,
+controlled 28/28 and 12/12, all static/type/build/root/history/preservation
+gates, the hostile-config structured-equivalence matrix and unchanged
+workflow-routing analyzers. The corrected signed head must then trigger five
+new GitHub Actions runs. The signed closure ledger maps each failed run
+`31961910088`, `31961910461`, `31961909967`, `31961908588` and
+`31961910169` to exactly one new run ID, workflow identity, corrected head SHA,
+attempt and native status-zero PASS log. Rerunning an old run against its old
+head, local success or one workflow cannot substitute for all five new remote
+results.
+
+All five workflow files remain byte-identical to signed `5872fae3...`,
+including operation SHA-256 `dc35cab759a67f9769281d30d186325673670032eca9236f08462a1e6d9f24f7`,
+work `5bdfc4fc620b764056f77a4665eca88d21bb928a7030c7ded289b42f59e55b6c`,
+author projection `e7e256190411a78b836b3fe70b42a3dcec2c22bb54fb3efc4986d7c0ca70b801`,
+gossip `d73d4151e771f4e670cfcc523477b9ee9484750364beaedadd913f39f420e447`
+and ACL reputation `bf7fa94008d6d83e72e52f4ff5d6674f7105ebe6ca61484d3f77208673ec63f1`.
+The exact `d041baff...` external base, descendant modes, root closures,
+predecessor authorities, 58/5/(50+3) inventory, protected bytes and
+operation/work/gossip identities remain unchanged.
+
+D.93.35.14 changes no protocol behavior, public/private surface, product
+source, dependency, lockfile, generated output, workflow route, signer or
+authority. It deletes textual diff output as authority rather than making it a
+protocol artifact. Git objects, content hashes, topology and exact paths remain
+the complete transition authority. The separate performance refactor requested
+for this area may begin only after the owner GREEN is signed, all five new
+remote jobs pass and that exact mapping is recorded in the signed closure
+ledger; it is not authorized by this amendment.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
