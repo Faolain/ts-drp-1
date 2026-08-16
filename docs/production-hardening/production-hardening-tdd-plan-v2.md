@@ -11899,6 +11899,44 @@ or deployment authorization.
 After this correction is independently reviewed, signed and pushed, and only
 then, D.93.35.3 p6 tests-only RED may begin.
 
+##### D.93.35.3/.4 — current-epoch author authorization closure ledger
+
+The prerequisite is closed on the dedicated
+`codex/phase3a1b-p6-golden-path` branch. Signed tests-only RED
+`deef5b0b834b62a8c26f9b6ae48e1a817263933b` is followed directly by signed
+production GREEN `a6d6518a0e17abc48646bd881f023520afbd2eb8`; the remote branch resolves
+to the GREEN and is neither ahead nor behind. Both signatures are Good Faolain
+signatures under fingerprint `55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+The enduring invariant is one authority owner: root trust and the authorization
+subpath consume the same private API closure, while direct internal factory
+callers still receive isolated registries. The package root remains its closed
+ten-value runtime surface. The authorization subpath owns only the two
+authorization operations and their seven public types. Authorization remains a
+capability derived from the genuine current-anchor decision plus exact carrier
+bytes; signer, operator and structural-object fallbacks remain absent.
+
+Acceptance evidence on the signed GREEN is: the direct supplemental checker
+PASS; the combined P6, anchor-trust and extraction consumers `54/54`; genuine
+Chromium, Firefox and WebKit `3/3`; the five preserved protocol-v3 semantic
+suites `87/87`; P5 keychain custody `23/23`; all four P6 TypeScript projects;
+and protocol-v3 typecheck, build, public-package smoke, ESLint, Prettier and
+diff checks PASS. The packed consumer proves the generated subpath declarations
+and runtime archive rather than relying on source-only resolution.
+
+The explicit fast-track direction waived another model-review quorum for this
+localized P6 recovery. No timeout or absent review result is represented as an
+approval. The freeze-successor closure remains separately pinned at signed
+`9c8e232dbf935289d5597ce7f4427a288508d48f` and tag
+`protocol-v3-freeze-successor-closure-v1`; its branch and tag were not advanced
+by P6.
+
+This ledger closes only D.93.35.3/.4. It does not compose the authorization
+capability with the live journal, issuance and admission owners; it does not
+prove two-client convergence; and it does not complete D.93.36, Phase 3b, either
+golden path or the wider production-hardening plan. The next product slice is
+the separately owned D.93.36 joint consumer.
+
 ##### D.93.35.5 — protocol-v3 freeze-successor-v1 prerequisite
 
 Executable pre-RED reconciliation found that D.93.35.3's historical-freeze
