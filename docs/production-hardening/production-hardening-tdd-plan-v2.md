@@ -45962,3 +45962,22 @@ Never resurrect or partially retain the rejected fingerprint/value-flow
 prototypes. Never stage `.logs/`, `.agents/`, `.claude/`, `.pnpm-store/`,
 `skills-lock.json`, the stale untracked protocol-v2 0g2 REDs or unrelated
 paths. Do not schedule Fable unless explicitly requested.
+
+## D.93.36 Slice 01 closure checkpoint
+
+The tests-only retained-journal RED is signed at
+`0773c3866c030c0fbd03b94bc6360289fad6524c`. The one-owner production GREEN is
+signed at `93ea1da`: `packages/node/src/v3-live.ts` now re-authenticates the
+complete retained journal through the genuine admission path, reconstructs
+local references through durable issuance with three-way digest equality, and
+reconciles pending and published outbox entries without duplicating cross-kind
+echoes.
+
+Final evidence was focused 3/3, compact preservation 10 files / 127 tests in
+28.66 seconds, node build, ESLint, Prettier and diff checks. Package typecheck
+remains affected only by the pre-existing compact-history test-helper union
+diagnostics and was not weakened or suppressed. Bounded Codex, Grok, Kimi and
+Opus review attempts ended `NO_VERDICT` without a reproduced P0/P1; this is
+recorded honestly rather than treated as approval. Slice 01 is closed. Slice 02
+owns serialized activation and ingress; neither D.93.36 nor the two-client
+golden path is complete.
