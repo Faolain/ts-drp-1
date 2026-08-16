@@ -1717,7 +1717,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(route).not.toBe("");
 		expect(INGRESS_ORDER).toHaveLength(13);
 		expect(count(liveSource, /V3Envelope\.decode\(/gu)).toBe(1);
-		expect(count(liveSource, /V3Envelope\.encode\(/gu)).toBe(2);
+		expect(count(liveSource, /V3Envelope\.encode\(/gu)).toBe(3);
 		expect(count(liveSource, /extractAdmittedReceivedVertex\(/gu)).toBe(1);
 		expect(liveSource).toMatch(
 			/extractAdmittedReceivedVertex\(\{\s*domain,\s*expectedAnchor,\s*preparedBlueprintAdmission,\s*receivedCanonicalPreimageBytes,\s*resolveAuthorPublicKey,\s*signature,\s*suiteId,?\s*\}\)/u
