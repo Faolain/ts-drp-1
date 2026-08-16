@@ -46192,3 +46192,39 @@ two-partition browser fixture. It does not prove arbitrary partition graphs,
 Byzantine membership, dynamic writer grants, cross-browser parity, Phase 3b, or
 completion of the broader production-hardening plan. The next P6 slice owns the
 concurrent Writer grant and Finality revocation in Golden Path 1 step 4.
+
+## D.93.40 pure latched-ACL semantics checkpoint
+
+The tests-only Phase 3d RED is signed at
+`31b26347d8844d36d63ed08766ae5ba768ceb4ac`. The narrow production GREEN is
+signed at `39bc68d5f868003dbc3534a019617838c121f30d`; its staged binary patch
+SHA-256 was `414e768cebf31de4bc4d2f94395ba51c4bbd1179d945b6a2913978595b31674e`.
+The only test-side GREEN delta is the mechanical import ordering required by
+the repository lint rule.
+
+`@ts-drp/protocol-v3/latched-acl` now owns one pure, explicit semantics surface.
+It validates a closed current-epoch snapshot, distinguishes envelope admission
+from application-writer authority, evaluates every ACL operation against the
+unchanged latched snapshot, stages grants then key changes then revocations,
+keeps revoke-wins local to one target/group pair, permits an admin handoff but
+rejects removal of the last admin, and derives the sorted next-epoch finality
+signer set. Inputs are copied and malformed, mixed, unsorted, duplicate, or
+mutated evidence fails closed. The package root was not widened, and no live
+transport, store, resolver, compatibility layer, or caller-selected authority
+was added.
+
+Final evidence was focused 6/6 in 7 ms and the clean Phase 3a/3d preservation
+set 48/48 in 20.68 seconds. Protocol-v3 typecheck, public-entry audit, build,
+public-package smoke, targeted ESLint with zero warnings, Prettier, and diff
+checks passed. One bounded read-only Codex review exceeded its finite window
+without a terminal verdict; it made no edits and reproduced no P0/P1. Under the
+user-authorized fast track this honest `NO_VERDICT` is nonblocking and no
+additional model-review round was started.
+
+This closes only the Phase 3d pure-semantics prerequisite. It does not install
+the latched ACL into the live node, change the current anchor or author
+authorization carriers, or complete Golden Path 1 step 4. The next P6 slice
+must use these semantics to exercise a concurrent Writer grant and Finality
+revocation with real clients, while preserving current-epoch authority until
+the next anchor. Phase 3c, Phase 3b, and the broader production-hardening plan
+remain open.
