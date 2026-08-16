@@ -26,18 +26,19 @@ jobs:
       - name: Run merge-base-pinned operation budget checker
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          CHECKER: packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs
+          SUCCESSOR: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
         run: |
           node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs "$BASE_SHA"
           node packages/protocol-v2/scripts/check-protocol-freeze.mjs "$BASE_SHA"
-          if git cat-file -e "$BASE_SHA:$CHECKER"; then
-            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-blueprint-operation-budget-freeze.mjs"
-            PROTOCOL_V3_BLUEPRINT_OPERATION_BUDGET_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
-              node "$RUNNER_TEMP/check-blueprint-operation-budget-freeze.mjs" "$BASE_SHA"
-          else
-            node "$CHECKER" "$BASE_SHA"
+          mapfile -t MERGE_BASES < <(git merge-base --all "$BASE_SHA" HEAD)
+          if [ "${#MERGE_BASES[@]}" -ne 1 ]; then exit 1; fi
+          MERGE_BASE="${MERGE_BASES[0]}"
+          if git cat-file -e "$MERGE_BASE:$SUCCESSOR"; then
+            git show "$MERGE_BASE:$SUCCESSOR" > "$RUNNER_TEMP/base-freeze-successor.mjs"
+            PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/base-freeze-successor.mjs" "$BASE_SHA"
           fi
-          node "$CHECKER" "$BASE_SHA"
+          node "$SUCCESSOR" "$BASE_SHA"
       - name: Run independent control and production contract serially
         run: |
           PHASE_0P2_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts \
