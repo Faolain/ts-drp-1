@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import legacyContract from "./fixtures/phase-0i-v3/blueprint-admission-package.json" with { type: "json" };
 import contract from "./fixtures/phase-0p0-v3/blueprint-work-budget-contract.json" with { type: "json" };
+import { auditSuccessorWorkflowRouting } from "./fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.js";
+import successorContract from "./fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json" with { type: "json" };
 
 interface BlueprintPreparationInput {
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
@@ -164,11 +166,19 @@ describe("Phase 0p-0 additive blueprint work-budget governance causal RED", () =
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
 			"protocol-v3-blueprint-admission-0i.test.ts",
 			"protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
-			"protocol-v3/scripts/check-protocol-v3-freeze.mjs",
-			"protocol-v2/scripts/check-protocol-freeze.mjs",
 		]) {
 			expect(workflow).toContain(phrase);
 		}
+		const workflowIdentity = successorContract.workflowIdentities.find(({ path }) => path === contract.workflow);
+		expect(workflowIdentity).toBeDefined();
+		if (workflowIdentity === undefined) throw new Error("work workflow identity is absent");
+		expect(
+			auditSuccessorWorkflowRouting(
+				workflow,
+				workflowIdentity,
+				successorContract.predecessors.map(({ checker }) => checker)
+			)
+		).toEqual([]);
 	});
 
 	it("[canonical-positive] prepares the pinned manifest-v2 package under the existing whole-package digest", async () => {

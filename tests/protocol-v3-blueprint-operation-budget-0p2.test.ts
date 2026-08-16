@@ -5,6 +5,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import contract from "./fixtures/phase-0p2-v3/blueprint-operation-budget-contract.json" with { type: "json" };
+import { auditSuccessorWorkflowRouting } from "./fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.js";
+import successorContract from "./fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json" with { type: "json" };
 
 interface CanonicalModule {
 	decodeCanonical(bytes: Uint8Array): unknown;
@@ -160,6 +162,7 @@ const IMPLEMENTATION =
 		? resolve(HERE, contract.implementationModule)
 		: resolve(ROOT, process.env.PHASE_0P2_IMPLEMENTATION_MODULE);
 const surfaceLoad = import(pathToFileURL(IMPLEMENTATION).href) as Promise<Surface>;
+const packageSurfaceLoad = import(pathToFileURL(resolve(HERE, contract.implementationModule)).href) as Promise<Surface>;
 const encoder = new TextEncoder();
 const VERTEX_DOMAIN = "ts-drp/vertex/v3";
 const VERTEX_SUITE = "ed25519-sha256-v3";
@@ -403,12 +406,20 @@ describe("Phase 0p-2 authenticated whole-operation canonical byte budget causal 
 			"PHASE_0P2_IMPLEMENTATION_MODULE",
 			"PHASE_0P2_MUTANT",
 			"protocol-v3-blueprint-runtime-0j-b.test.ts",
-			"protocol-v3/scripts/check-protocol-v3-freeze.mjs",
-			"protocol-v2/scripts/check-protocol-freeze.mjs",
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
 		]) {
 			expect(workflow).toContain(phrase);
 		}
+		const workflowIdentity = successorContract.workflowIdentities.find(({ path }) => path === contract.workflow);
+		expect(workflowIdentity).toBeDefined();
+		if (workflowIdentity === undefined) throw new Error("operation workflow identity is absent");
+		expect(
+			auditSuccessorWorkflowRouting(
+				workflow,
+				workflowIdentity,
+				successorContract.predecessors.map(({ checker }) => checker)
+			)
+		).toEqual([]);
 	});
 
 	it("[unsupported-manifest-version] rejects a representable v1-shaped unsupported manifest version", async () => {
@@ -424,7 +435,7 @@ describe("Phase 0p-2 authenticated whole-operation canonical byte budget causal 
 	});
 
 	it("[public-surface] preserves exactly the ten package-root runtime exports", async () => {
-		expect(Object.keys(await surface()).sort()).toEqual([
+		expect(Object.keys(await packageSurfaceLoad).sort()).toEqual([
 			"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
 			"admitReceivedVertex",
 			"authenticateCurrentEpochAnchor",

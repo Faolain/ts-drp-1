@@ -12,6 +12,19 @@ export interface SuccessorContract {
 	readonly redBase: string;
 	readonly redBaseParent: string;
 	readonly redBaseTree: string;
+	readonly predecessorOracleTransition: Readonly<{
+		readonly changedPaths: readonly string[];
+		readonly governed: readonly Readonly<{
+			readonly currentBlob: string;
+			readonly currentSha256: string;
+			readonly id: string;
+			readonly oldBlob: string;
+			readonly oldSha256: string;
+			readonly path: string;
+		}>[];
+		readonly parent: string;
+		readonly parentTree: string;
+	}>;
 	readonly gossipOracleTransition: Readonly<{
 		readonly commit: string;
 		readonly currentBlob: string;

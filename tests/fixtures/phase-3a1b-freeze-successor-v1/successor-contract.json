@@ -64,6 +64,36 @@
 	"redBase": "5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5",
 	"redBaseParent": "f0e3a861a2dc0e65e0444589b3688b72c4463f60",
 	"redBaseTree": "f90ebcbaa2303dd556e9c5699d06caf185e73d78",
+	"predecessorOracleTransition": {
+		"parent": "15d4e3e3858aff6b1e908570f251f572dc226b85",
+		"parentTree": "0d59e2352e474ad11fa7eca0cc3b3a9e24c06c90",
+		"changedPaths": [
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+			"tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts"
+		],
+		"governed": [
+			{
+				"id": "operation-budget-oracle",
+				"path": "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+				"oldBlob": "a35e4d21d18ed5d8e648d2032a5ffd6ed563617c",
+				"oldSha256": "09c550891ee04141cddd110bb58a740336e6380f7a43f3e8c66556a817de900c",
+				"currentBlob": "6cea0391c79d0186aa6ab137a8814bbc51193f41",
+				"currentSha256": "057538086e0dabea14a8ea5d52d5e7da566ebfd472cc39e138db5d391e3d33a0"
+			},
+			{
+				"id": "work-budget-oracle",
+				"path": "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+				"oldBlob": "81e7269f3d3227ccf164aadb5500609820c34e6e",
+				"oldSha256": "30dc5ca7b10bc88143889acf02ac8e03f57c7eeab728cfba211e35cda994ce96",
+				"currentBlob": "68d8965cbaafbcfab7b2264b94b32e32b59987e6",
+				"currentSha256": "b5ca3e96692b9f8a4a509c8eecc580ee8cdeb47db0511a61545bf75ade8eaa59"
+			}
+		]
+	},
 	"gossipOracleTransition": {
 		"commit": "f0897b510c4d427b67d6524041cb31b05c677a1d",
 		"path": "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",

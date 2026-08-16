@@ -227,7 +227,7 @@ export async function runHistoricalBaselines(repositoryRoot, predecessors) {
 	}
 }
 
-/** Returns exact current identity evidence used to form the complete 58/5/(52+1) sweep. */
+/** Returns exact current identity evidence used to form the complete 58/5/(50+3) sweep. */
 export function governedInventory(repositoryRoot, policyPaths) {
 	const ordered = [];
 	for (const path of policyPaths) {
@@ -268,13 +268,68 @@ function isAncestor(root, ancestor, descendant) {
 	return result.status === 0 && result.signal === null;
 }
 
-function correctionCommits(repositoryRoot, contract) {
+function predecessorOracleTransitionCommits(repositoryRoot, contract) {
 	return git(
 		repositoryRoot,
 		"log",
 		"--format=%H",
 		"--reverse",
-		`${contract.provisionalInstall.commit}..HEAD`,
+		`${contract.predecessorOracleTransition.parent}..HEAD`,
+		"--",
+		...contract.predecessorOracleTransition.changedPaths
+	)
+		.split("\n")
+		.filter(Boolean);
+}
+
+function revisionBytes(repositoryRoot, revision, path) {
+	const result = spawnSync("git", ["show", `${revision}:${path}`], { cwd: repositoryRoot, encoding: null });
+	return result.status === 0 && result.signal === null ? result.stdout : undefined;
+}
+
+/** Authenticates the exact subordinate-owner RED and its two governed identities. */
+export function predecessorOracleTransitionEvidence(repositoryRoot, contract) {
+	const commits = predecessorOracleTransitionCommits(repositoryRoot, contract);
+	const commit = commits.length === 1 ? commits[0] : undefined;
+	const parents = commit === undefined ? [] : exactParents(repositoryRoot, commit);
+	const changedPaths = commit === undefined ? [] : exactChangedPaths(repositoryRoot, parents[0], commit);
+	const identities = contract.predecessorOracleTransition.governed.map((identity) => {
+		const oldBytes = revisionBytes(repositoryRoot, contract.predecessorOracleTransition.parent, identity.path);
+		const currentBytes = commit === undefined ? undefined : revisionBytes(repositoryRoot, commit, identity.path);
+		return {
+			currentBlob: commit === undefined ? undefined : git(repositoryRoot, "rev-parse", `${commit}:${identity.path}`),
+			currentSha256: currentBytes === undefined ? undefined : sha256Bytes(currentBytes),
+			id: identity.id,
+			oldBlob: git(repositoryRoot, "rev-parse", `${contract.predecessorOracleTransition.parent}:${identity.path}`),
+			oldSha256: oldBytes === undefined ? undefined : sha256Bytes(oldBytes),
+			path: identity.path,
+		};
+	});
+	const valid =
+		commit !== undefined &&
+		parents.length === 1 &&
+		parents[0] === contract.predecessorOracleTransition.parent &&
+		JSON.stringify(changedPaths) === JSON.stringify([...contract.predecessorOracleTransition.changedPaths].sort()) &&
+		identities.every((actual, index) => {
+			const expected = contract.predecessorOracleTransition.governed[index];
+			return (
+				actual.path === expected.path &&
+				actual.oldBlob === expected.oldBlob &&
+				actual.oldSha256 === expected.oldSha256 &&
+				actual.currentBlob === expected.currentBlob &&
+				actual.currentSha256 === expected.currentSha256
+			);
+		});
+	return { changedPaths, commit, commits, identities, parents, valid };
+}
+
+function correctionCommits(repositoryRoot, contract, transitionCommit) {
+	return git(
+		repositoryRoot,
+		"log",
+		"--format=%H",
+		"--reverse",
+		`${transitionCommit ?? contract.predecessorOracleTransition.parent}..HEAD`,
 		"--",
 		...contract.correctionPaths
 	)
@@ -305,7 +360,8 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		contract.provisionalInstall.parent,
 		contract.provisionalInstall.commit
 	);
-	const corrections = correctionCommits(repositoryRoot, contract);
+	const transition = predecessorOracleTransitionEvidence(repositoryRoot, contract);
+	const corrections = correctionCommits(repositoryRoot, contract, transition.commit);
 	const topologyValid =
 		git(repositoryRoot, "rev-parse", `${contract.externalBase.commit}^{tree}`) === contract.externalBase.tree &&
 		JSON.stringify(externalParents) === JSON.stringify(contract.externalBase.parents) &&
@@ -321,7 +377,10 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		contract.provisionalInstall.parent === contract.gossipOracleTransition.commit &&
 		git(repositoryRoot, "rev-parse", `${contract.provisionalInstall.commit}^`) === contract.provisionalInstall.parent &&
 		git(repositoryRoot, "rev-parse", `${contract.provisionalInstall.commit}^{tree}`) ===
-			contract.provisionalInstall.tree;
+			contract.provisionalInstall.tree &&
+		git(repositoryRoot, "rev-parse", `${contract.predecessorOracleTransition.parent}^{tree}`) ===
+			contract.predecessorOracleTransition.parentTree &&
+		isAncestor(repositoryRoot, contract.provisionalInstall.commit, contract.predecessorOracleTransition.parent);
 	const originalInstallValid =
 		JSON.stringify(originalInstall) === JSON.stringify([...contract.originalInstallPaths].sort());
 	let schemaValid = false;
@@ -341,6 +400,7 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		const parents = exactParents(repositoryRoot, correction);
 		correctionValid =
 			parents.length === 1 &&
+			parents[0] === transition.commit &&
 			JSON.stringify(exactChangedPaths(repositoryRoot, parents[0], correction)) ===
 				JSON.stringify([...contract.correctionPaths].sort());
 	}
@@ -351,9 +411,10 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		originalInstallValid &&
 		provisionalEntries.every(([, entry]) => entry?.mode === "100644" && entry.type === "blob") &&
 		schemaValid &&
+		transition.valid &&
 		correctionValid;
 	return {
-		code: ready ? "READY" : "EXACT_SIX_CORRECTION_ABSENT",
+		code: ready ? "READY" : transition.valid ? "EXACT_SIX_CORRECTION_ABSENT" : "PREDECESSOR_ORACLE_TRANSITION_ABSENT",
 		correction,
 		correctionValid,
 		externalAbsent,
@@ -364,6 +425,7 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		ready,
 		schemaValid,
 		topologyValid,
+		transition,
 	};
 }
 
@@ -695,12 +757,17 @@ const REPOSITORY_POSITIVE_CASES = Object.freeze([
 ]);
 
 /** Returns the exact complete genuine-candidate rejection plan. */
-export function repositoryMutationPlan(fixedAnchorPaths, gossipPath) {
+export function repositoryMutationPlan(fixedAnchorPaths, gossipPath, predecessorPaths) {
 	return [
 		...fixedAnchorPaths.map((path) => `immutable:${path}`),
 		`gossip-old:${gossipPath}`,
 		`gossip-current:${gossipPath}`,
 		`gossip-postbootstrap:${gossipPath}`,
+		...predecessorPaths.flatMap((path) => [
+			`predecessor-old:${path}`,
+			`predecessor-omitted:${path}`,
+			`predecessor-drift:${path}`,
+		]),
 		...REPOSITORY_CATEGORY_MUTATIONS,
 	];
 }
@@ -713,12 +780,20 @@ export function repositoryCandidatePlan(repositoryRoot, contract) {
 	);
 	const workflows = new Set(contract.workflowIdentities.map(({ path }) => path));
 	const immutable = inventory.filter((path) => !workflows.has(path));
-	const fixedAnchor = immutable.filter((path) => path !== contract.gossipOracleTransition.path);
+	const transitioned = new Set([
+		contract.gossipOracleTransition.path,
+		...contract.predecessorOracleTransition.governed.map(({ path }) => path),
+	]);
+	const fixedAnchor = immutable.filter((path) => !transitioned.has(path));
 	return {
 		fixedAnchor,
 		immutable,
 		inventory,
-		mutationNames: repositoryMutationPlan(fixedAnchor, contract.gossipOracleTransition.path),
+		mutationNames: repositoryMutationPlan(
+			fixedAnchor,
+			contract.gossipOracleTransition.path,
+			contract.predecessorOracleTransition.governed.map(({ path }) => path)
+		),
 		positiveNames: REPOSITORY_POSITIVE_CASES,
 	};
 }
@@ -735,6 +810,12 @@ export function expectedCandidateFailure(mutation) {
 		].includes(mutation)
 	) {
 		return { class: "CORRECTION_HISTORY", marker: /correction|bootstrap|atomic|transition/iu };
+	}
+	if (mutation.startsWith("predecessor-omitted:")) {
+		return { class: "CORRECTION_HISTORY", marker: /correction|bootstrap|atomic|transition/iu };
+	}
+	if (mutation.startsWith("predecessor-old:") || mutation.startsWith("predecessor-drift:")) {
+		return { class: "GOVERNED_IDENTITY", marker: /identity|artifact|hash|transition/iu };
 	}
 	if (
 		[
@@ -837,13 +918,35 @@ function cloneCandidateRepository(repositoryRoot, contract) {
 	git(root, "config", "user.name", "freeze-successor-candidate-control");
 	git(root, "config", "user.email", "freeze-successor-candidate@example.invalid");
 	const sourceHead = git(repositoryRoot, "rev-parse", "HEAD");
-	git(root, "checkout", "-q", "--detach", contract.provisionalInstall.commit);
-	return { parent, root, sourceHead };
+	const transition = predecessorOracleTransitionEvidence(repositoryRoot, contract);
+	if (!transition.valid || transition.commit === undefined) {
+		rmSync(parent, { force: true, recursive: true });
+		throw new Error("candidate repository requires the authenticated predecessor-oracle transition");
+	}
+	git(root, "checkout", "-q", "--detach", transition.commit);
+	return { parent, root, sourceHead, transitionCommit: transition.commit };
 }
 
-function resetCandidate(state, contract) {
-	git(state.root, "reset", "--hard", "-q", contract.provisionalInstall.commit);
+function resetCandidate(state) {
+	git(state.root, "reset", "--hard", "-q", state.transitionCommit);
 	git(state.root, "clean", "-ffd", "-q");
+}
+
+function createMutatedPredecessorTransition(repositoryRoot, state, contract, omittedPath) {
+	git(state.root, "checkout", "-q", "--detach", contract.predecessorOracleTransition.parent);
+	for (const path of contract.predecessorOracleTransition.changedPaths) {
+		if (path === omittedPath) continue;
+		const target = resolve(state.root, path);
+		mkdirSync(dirname(target), { recursive: true });
+		cpSync(resolve(repositoryRoot, path), target);
+	}
+	const transition = commit(state.root, `omit predecessor transition ${omittedPath}`, true);
+	const changedPaths = exactChangedPaths(state.root, contract.predecessorOracleTransition.parent, transition);
+	const expected = contract.predecessorOracleTransition.changedPaths.filter((path) => path !== omittedPath).sort();
+	if (JSON.stringify(changedPaths) !== JSON.stringify(expected)) {
+		throw new Error(`omitted predecessor transition scope mismatch: ${omittedPath}`);
+	}
+	return transition;
 }
 
 function sha256Bytes(bytes) {
@@ -941,7 +1044,32 @@ function mutateJson(root, path, mutate) {
 }
 
 async function runCandidateMutation(repositoryRoot, state, contract, mutation, immutablePaths) {
-	resetCandidate(state, contract);
+	resetCandidate(state);
+	if (mutation.startsWith("predecessor-old:") || mutation.startsWith("predecessor-drift:")) {
+		const path = mutation.slice(mutation.indexOf(":") + 1);
+		const transition = contract.predecessorOracleTransition.governed.find((row) => row.path === path);
+		if (transition === undefined) throw new Error(`unknown predecessor transition path: ${path}`);
+		createCandidateCommit(repositoryRoot, state, contract);
+		if (mutation.startsWith("predecessor-old:")) {
+			const oldBytes = revisionBytes(repositoryRoot, contract.predecessorOracleTransition.parent, path);
+			if (oldBytes === undefined) throw new Error(`missing predecessor transition parent bytes: ${path}`);
+			put(state.root, path, oldBytes);
+			commit(state.root, `restore old predecessor identity ${path}`);
+		} else {
+			append(state.root, path, "\npost-transition identity drift\n");
+			commit(state.root, `drift predecessor identity ${path}`);
+		}
+		return executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+	}
+	if (mutation.startsWith("predecessor-omitted:")) {
+		const path = mutation.slice("predecessor-omitted:".length);
+		if (!contract.predecessorOracleTransition.governed.some((row) => row.path === path)) {
+			throw new Error(`unknown omitted predecessor transition path: ${path}`);
+		}
+		createMutatedPredecessorTransition(repositoryRoot, state, contract, path);
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+	}
 	if (mutation.startsWith("gossip-old:")) {
 		createCandidateCommit(repositoryRoot, state, contract);
 		const old = command(repositoryRoot, "git", [

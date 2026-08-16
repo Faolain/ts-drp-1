@@ -69,6 +69,7 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 				"originalInstallPaths",
 				"ownerDirectory",
 				"ownerFiles",
+				"predecessorOracleTransition",
 				"predecessors",
 				"provisionalInstall",
 				"redBase",
@@ -84,6 +85,16 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 		expect(Object.keys(successorContract.gossipOracleTransition).sort()).toEqual(
 			["commit", "currentBlob", "currentSha256", "oldBlob", "oldSha256", "parent", "path", "tree"].sort()
 		);
+		expect(Object.keys(successorContract.predecessorOracleTransition).sort()).toEqual(
+			["changedPaths", "governed", "parent", "parentTree"].sort()
+		);
+		expect(successorContract.predecessorOracleTransition.changedPaths).toHaveLength(6);
+		expect(successorContract.predecessorOracleTransition.governed).toHaveLength(2);
+		for (const transition of successorContract.predecessorOracleTransition.governed) {
+			expect(Object.keys(transition).sort(), transition.id).toEqual(
+				["currentBlob", "currentSha256", "id", "oldBlob", "oldSha256", "path"].sort()
+			);
+		}
 		expect(Object.keys(successorContract.provisionalInstall).sort()).toEqual(["commit", "parent", "tree"]);
 		expect(successorContract.externalBase.parents).toHaveLength(2);
 		expect(successorContract.originalInstallPaths).toHaveLength(9);
@@ -109,7 +120,7 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 		}
 	});
 
-	it("derives exact 58/5/(52+1), and proves ordered mixed census with controlled Git objects", async () => {
+	it("derives exact 58/5/(50+3), and proves ordered mixed census with controlled Git objects", async () => {
 		const inventory = governedInventory(REPOSITORY_ROOT, policyPaths);
 		const workflows = new Set(successorContract.workflowIdentities.map(({ path }) => path));
 		expect(inventory).toHaveLength(58);
@@ -119,19 +130,32 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 		);
 		const immutable = inventory.filter((path) => !workflows.has(path));
 		expect(immutable).toHaveLength(53);
-		const fixedAnchor = immutable.filter((path) => path !== successorContract.gossipOracleTransition.path);
-		expect(fixedAnchor).toHaveLength(52);
-		const candidatePlan = repositoryMutationPlan(fixedAnchor, successorContract.gossipOracleTransition.path);
-		expect(candidatePlan).toHaveLength(110);
-		expect(candidatePlan.filter((name) => name.startsWith("immutable:"))).toHaveLength(52);
+		const predecessorTransitions = successorContract.predecessorOracleTransition.governed.map(({ path }) => path);
+		const transitioned = new Set([successorContract.gossipOracleTransition.path, ...predecessorTransitions]);
+		const fixedAnchor = immutable.filter((path) => !transitioned.has(path));
+		expect(fixedAnchor).toHaveLength(50);
+		const candidatePlan = repositoryMutationPlan(
+			fixedAnchor,
+			successorContract.gossipOracleTransition.path,
+			predecessorTransitions
+		);
+		expect(candidatePlan).toHaveLength(114);
+		expect(candidatePlan.filter((name) => name.startsWith("immutable:"))).toHaveLength(50);
 		expect(candidatePlan.filter((name) => name.startsWith("gossip-"))).toEqual([
 			`gossip-old:${successorContract.gossipOracleTransition.path}`,
 			`gossip-current:${successorContract.gossipOracleTransition.path}`,
 			`gossip-postbootstrap:${successorContract.gossipOracleTransition.path}`,
 		]);
+		expect(candidatePlan.filter((name) => name.startsWith("predecessor-"))).toEqual(
+			predecessorTransitions.flatMap((path) => [
+				`predecessor-old:${path}`,
+				`predecessor-omitted:${path}`,
+				`predecessor-drift:${path}`,
+			])
+		);
 		expect(candidatePlan.some((name) => name.startsWith("workflow-count:"))).toBe(false);
 		expect(new Set(candidatePlan).size).toBe(candidatePlan.length);
-		expect(candidatePlan.slice(55)).toEqual([
+		expect(candidatePlan.slice(59)).toEqual([
 			"partial-owner-base",
 			"split-owner-routing",
 			"transient-revert",
@@ -346,7 +370,7 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 		}
 	}, 120_000);
 
-	it("authenticates historical blobs, exact gossip transition, and PR-side lineage", () => {
+	it("authenticates historical blobs, all transition identities, and PR-side lineage", () => {
 		expect(git("rev-parse", `${successorContract.fixedAnchor.commit}^{tree}`)).toBe(successorContract.fixedAnchor.tree);
 		expect(git("rev-parse", `${successorContract.externalBase.commit}^{tree}`)).toBe(
 			successorContract.externalBase.tree
@@ -375,6 +399,18 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 		expect(git("rev-parse", `${transition.parent}:${transition.path}`)).toBe(transition.oldBlob);
 		expect(git("hash-object", transition.path)).toBe(transition.currentBlob);
 		expect(sha256(transition.path)).toBe(transition.currentSha256);
+		const predecessorTransition = successorContract.predecessorOracleTransition;
+		expect(git("rev-parse", `${predecessorTransition.parent}^{tree}`)).toBe(predecessorTransition.parentTree);
+		for (const identity of predecessorTransition.governed) {
+			expect(git("rev-parse", `${predecessorTransition.parent}:${identity.path}`), identity.id).toBe(identity.oldBlob);
+			const shown = spawnSync("git", ["show", `${predecessorTransition.parent}:${identity.path}`], {
+				cwd: REPOSITORY_ROOT,
+			});
+			expect(shown.status, identity.id).toBe(0);
+			expect(createHash("sha256").update(shown.stdout).digest("hex"), identity.id).toBe(identity.oldSha256);
+			expect(git("hash-object", identity.path), identity.id).toBe(identity.currentBlob);
+			expect(sha256(identity.path), identity.id).toBe(identity.currentSha256);
+		}
 	});
 });
 
@@ -382,7 +418,7 @@ describe("D.93.35.7/.8 genuine repository candidate", () => {
 	it("fails RED only at the shared exact-six readiness gate, before candidate mutations", async () => {
 		expect(repositoryPlan.inventory).toHaveLength(58);
 		expect(repositoryPlan.immutable).toHaveLength(53);
-		expect(repositoryPlan.fixedAnchor).toHaveLength(52);
+		expect(repositoryPlan.fixedAnchor).toHaveLength(50);
 		expect(repositoryPlan.positiveNames).toHaveLength(4);
 		expect(new Set(repositoryPlan.mutationNames).size).toBe(repositoryPlan.mutationNames.length);
 		expect(candidateReadiness.topologyValid).toBe(true);
@@ -396,6 +432,7 @@ describe("D.93.35.7/.8 genuine repository candidate", () => {
 		}
 		expect(candidateReadiness.code).toBe("READY");
 		expect(candidateReadiness.schemaValid).toBe(true);
+		expect(candidateReadiness.transition.valid).toBe(true);
 		expect(candidateReadiness.correctionValid).toBe(true);
 		expect(candidateReadiness.ready).toBe(true);
 		if (!candidateReadiness.ready) return;
