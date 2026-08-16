@@ -1055,8 +1055,15 @@ const THROUGH_SEAM3_FORBIDDEN_IDENTIFIERS = new Set([
 	...A_C_FORBIDDEN_IDENTIFIERS,
 	...[...B_LIVE_IDENTIFIERS].filter((name) => !SEAM3_ALLOWED_LIVE_IDENTIFIERS.has(name)),
 ]);
-const SEAM3_RUNTIME_ROOTS = new Set(["@ts-drp/issuance-store", "@ts-drp/message-queue", "@ts-drp/types"]);
+const SEAM3_RUNTIME_ROOTS = new Set([
+	"@ts-drp/issuance-store",
+	"@ts-drp/live-journal",
+	"@ts-drp/message-queue",
+	"@ts-drp/protocol-v3/author-authorization",
+	"@ts-drp/types",
+]);
 const SEAM3_RUNTIME_DEPENDENCY = Object.freeze({ manifest: "0.11.0", resolved: "link:../issuance-store" });
+const D9336_RUNTIME_DEPENDENCY = Object.freeze({ manifest: "0.11.0", resolved: "link:../live-journal" });
 type SweepStage = "through-a-b" | "through-a-c" | "through-seam3";
 
 function moduleSpecifiers(filename: string): readonly ModuleEdge[] {
@@ -1834,7 +1841,7 @@ function generatedStageViolations(
 	const exports = exportedDeclarationNames(generatedFilename);
 	const expectedExports =
 		stage === "through-seam3"
-			? ["activateV3LivePlane", "prepareV3LiveGeneration", "routeV3Ingress"]
+			? ["activateV3LivePlane", "prepareV3LiveGeneration", "recoverV3LiveReplica", "routeV3Ingress"]
 			: stage === "through-a-c"
 				? ["prepareV3LiveGeneration"]
 				: [];
@@ -1855,7 +1862,7 @@ function generatedStageViolations(
 	visit(generated);
 	if (stage === "through-a-c" || stage === "through-seam3") {
 		if (awaiterCount !== 1 || generatorCount === 0) violations.push("generated-async-lowering");
-		if (weakMapOwnerCount !== (stage === "through-seam3" ? 2 : 1)) violations.push("generated-parallel-owner");
+		if (weakMapOwnerCount !== (stage === "through-seam3" ? 3 : 1)) violations.push("generated-parallel-owner");
 	} else if (weakMapOwnerCount !== 0) {
 		violations.push("generated-parallel-owner");
 	}
@@ -1979,6 +1986,16 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 		) {
 			violations.push("runtime-lockfile:@ts-drp/issuance-store");
 		}
+		if (manifest.dependencies?.["@ts-drp/live-journal"] !== D9336_RUNTIME_DEPENDENCY.manifest) {
+			violations.push("runtime-manifest:@ts-drp/live-journal");
+		}
+		const journalLocked = lockedDependencies.get("@ts-drp/live-journal");
+		if (
+			journalLocked?.specifier !== D9336_RUNTIME_DEPENDENCY.manifest ||
+			journalLocked.version !== D9336_RUNTIME_DEPENDENCY.resolved
+		) {
+			violations.push("runtime-lockfile:@ts-drp/live-journal");
+		}
 	}
 
 	const codeGenerationFiles = new Set<string>();
@@ -2030,7 +2047,11 @@ function sourceSweep(root: string, stage: SweepStage = "through-a-b"): StaticAud
 		if (/^@ts-drp\/protocol-v2(?:\/|$)/u.test(edge.specifier)) {
 			violations.push(edge.from === entry ? "protocol-v2-direct" : "protocol-v2-indirect");
 		}
-		if (/^@ts-drp\/[^/]+\//u.test(edge.specifier) && edge.specifier !== PUBLISHED_PARAMETER_REGISTRY_SPECIFIER) {
+		if (
+			/^@ts-drp\/[^/]+\//u.test(edge.specifier) &&
+			edge.specifier !== PUBLISHED_PARAMETER_REGISTRY_SPECIFIER &&
+			edge.specifier !== "@ts-drp/protocol-v3/author-authorization"
+		) {
 			violations.push(`deep-import:${edge.specifier}`);
 		}
 		if (!edge.specifier.startsWith(".")) {
@@ -2285,6 +2306,10 @@ const PRIVATE_V3_LIVE_EXPORTS = [
 	"PrepareV3LiveGenerationInput",
 	"PrepareV3LiveResult",
 	"PreparedV3Live",
+	"RecoverV3LiveReplicaFailureKind",
+	"RecoverV3LiveReplicaInput",
+	"RecoverV3LiveReplicaResult",
+	"RecoveredV3Live",
 	"V3AdmittedVertexSink",
 	"V3EgressResult",
 	"V3LiveDescriptor",
@@ -2294,6 +2319,7 @@ const PRIVATE_V3_LIVE_EXPORTS = [
 	"V3PlaneHandle",
 	"activateV3LivePlane",
 	"prepareV3LiveGeneration",
+	"recoverV3LiveReplica",
 	"routeV3Ingress",
 ] as const;
 
@@ -2344,7 +2370,7 @@ describe.sequential("Phase 3a-1A-a private creator preparation RED", () => {
 		expect.soft(typeof surface.prepareV3LiveGeneration).toBe("function");
 		expect
 			.soft(Object.keys(surface).sort())
-			.toEqual(["activateV3LivePlane", "prepareV3LiveGeneration", "routeV3Ingress"]);
+			.toEqual(["activateV3LivePlane", "prepareV3LiveGeneration", "recoverV3LiveReplica", "routeV3Ingress"]);
 		expect.soft(exportedDeclarationNames(IMPLEMENTATION)).toEqual(PRIVATE_V3_LIVE_EXPORTS);
 		const implementationSource = existsSync(IMPLEMENTATION) ? readFileSync(IMPLEMENTATION, "utf8") : "";
 		expect.soft(implementationSource.match(/declare const preparedV3LiveBrand:\s*unique symbol;/gu)).toHaveLength(1);

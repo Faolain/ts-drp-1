@@ -1178,7 +1178,7 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 			}
 		}
 	}
-	expect(owners, "token and Seam-3 registration WeakMap owners").toHaveLength(2);
+	expect(owners, "token, recovered replica and Seam-3 registration WeakMap owners").toHaveLength(3);
 	const callsFor = (name: string): ts.CallExpression[] => {
 		const calls: ts.CallExpression[] = [];
 		const visit = (node: ts.Node): void => {
@@ -1207,7 +1207,17 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 	expect(tokenOwners, "one private token WeakMap owner").toHaveLength(1);
 	const owner = tokenOwners[0];
 	if (owner === undefined) throw new TypeError("missing private token owner");
-	const registrationOwner = owners.find(({ name }) => name !== owner.name);
+	const registrationOwner = owners.find(({ name }) => {
+		if (name === owner.name) return false;
+		const users = callsFor(name)
+			.map((call) => {
+				let current: ts.Node | undefined = call;
+				while (current !== undefined && !ts.isFunctionDeclaration(current)) current = current.parent;
+				return current?.name?.text;
+			})
+			.filter((value): value is string => value !== undefined);
+		return users.includes("activateV3LivePlane") && users.includes("routeV3Ingress");
+	});
 	if (registrationOwner === undefined) throw new TypeError("missing private registration owner");
 	const registrationOwners = callsFor(registrationOwner.name)
 		.map((call) => {
@@ -1426,7 +1436,13 @@ function tokenSourceAudit(source: string): TokenSourceAudit {
 			} else if (method === "subscribe" || method === "compareAndMarkOutboxPublished") {
 				forbiddenFullBLiveEffects.push(`${owner ?? "module"}:${method}`);
 			}
-			if (method !== undefined && forbiddenCalls.has(method)) forbiddenFullBLiveEffects.push(method);
+			if (
+				method !== undefined &&
+				forbiddenCalls.has(method) &&
+				!(method === "append" && owner === "recoverV3LiveReplica")
+			) {
+				forbiddenFullBLiveEffects.push(method);
+			}
 		}
 		ts.forEachChild(node, visit);
 	};
@@ -2050,7 +2066,7 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 	it("keeps token and Seam-3 registration ownership private while allowing only the signed subscription/outbox topology", () => {
 		const source = readFileSync(IMPLEMENTATION, "utf8");
 		expect(tokenSourceAudit(source)).toEqual({
-			privateWeakMapCount: 2,
+			privateWeakMapCount: 3,
 			hasPrivateRegistrationOwner: true,
 			setsOnSuccessPath: true,
 			consumesByGetAndDelete: true,

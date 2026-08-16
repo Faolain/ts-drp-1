@@ -51,6 +51,8 @@ export interface GenuinePreparedV3Fixture {
 	readonly detachedAnchorSignature: Uint8Array;
 	readonly capability: PreparedV3Live;
 	readonly descriptor: V3LiveDescriptor;
+	readonly recoveryCanonicalPreimageBytes: Uint8Array;
+	readonly recoverySignature: Uint8Array;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	readonly receivedSignature: Uint8Array;
 	prepareAgain(): Promise<Readonly<{ capability: PreparedV3Live; descriptor: V3LiveDescriptor }>>;
@@ -140,8 +142,9 @@ export async function createGenuinePreparedV3Fixture(
 	try {
 		const fixture = blueprintFixture();
 		const base = makeCreatorMaterial({ objectId: `creator:${"a".repeat(32)}` });
+		const author = bytesHex(ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)));
 		const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
-			authors: [contract.signerId],
+			authors: [author],
 			epoch: 0,
 			kind: "drp-author-authorization",
 			objectId: base.anchor.objectId,
@@ -175,7 +178,6 @@ export async function createGenuinePreparedV3Fixture(
 			objectId,
 			pinnedGenesisAnchorDigest: anchorDigest,
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
-			exactCanonicalAuthorAuthorizationBytes: new Uint8Array(exactCanonicalAuthorAuthorizationBytes),
 			detachedSignature: new Uint8Array(signature),
 			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
 			catalog: catalog(),
@@ -183,21 +185,23 @@ export async function createGenuinePreparedV3Fixture(
 		const prepared = await prepareV3LiveGeneration(input);
 		if (!prepared.ok) throw new TypeError(`live preparation failed: ${"kind" in prepared ? prepared.kind : "unknown"}`);
 		const receivedDependencyDigest = prepared.descriptor.anchorDigest;
-		const receivedCanonicalPreimageBytes = encodeCanonical({
+		const vertexInput = {
 			kind: "drp-vertex",
 			protocolMajor: 3,
 			objectId,
 			epoch: 0,
 			anchor: anchorDigest,
-			author: contract.signerId,
 			authorSequence: 0,
 			logicalTime: 1,
 			dependencies: [receivedDependencyDigest],
 			operation: { action: "add", value: 1 },
-		});
+		};
+		const receivedCanonicalPreimageBytes = encodeCanonical({ ...vertexInput, author: contract.signerId });
 		const receivedDigest = hashDomain("ts-drp/vertex/v3", receivedCanonicalPreimageBytes);
+		const recoveryCanonicalPreimageBytes = encodeCanonical({ ...vertexInput, author });
+		const recoveryDigest = hashDomain("ts-drp/vertex/v3", recoveryCanonicalPreimageBytes);
 		return Object.freeze({
-			author: contract.signerId,
+			author,
 			authorPublicKey: ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)),
 			capability: prepared.capability,
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
@@ -205,6 +209,8 @@ export async function createGenuinePreparedV3Fixture(
 			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
 			detachedAnchorSignature: new Uint8Array(signature),
 			descriptor: prepared.descriptor,
+			recoveryCanonicalPreimageBytes,
+			recoverySignature: ed25519.sign(recoveryDigest, hexBytes(contract.privateKeySeedHex)),
 			receivedCanonicalPreimageBytes,
 			receivedSignature: ed25519.sign(receivedDigest, hexBytes(contract.privateKeySeedHex)),
 			async prepareAgain() {

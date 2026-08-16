@@ -49,7 +49,7 @@ describe("D.93.36 authorized durable recovery RED", () => {
 		const trace: string[] = [];
 		try {
 			const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
-			const commit = commitFor(scope, 0, fixture.receivedCanonicalPreimageBytes, fixture.receivedSignature);
+			const commit = commitFor(scope, 0, fixture.recoveryCanonicalPreimageBytes, fixture.recoverySignature);
 			const outboxRecord: DurableIssuanceOutboxRecord = Object.freeze({ commit, publishState: "published" });
 			const issuanceStore: DurableIssuanceStore = Object.freeze({
 				transactIssue: () => Promise.reject(new Error("recovery must not issue")),

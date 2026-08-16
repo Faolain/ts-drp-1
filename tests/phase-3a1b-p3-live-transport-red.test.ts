@@ -476,6 +476,10 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"PrepareV3LiveGenerationInput",
 			"PrepareV3LiveResult",
 			"PreparedV3Live",
+			"RecoverV3LiveReplicaFailureKind",
+			"RecoverV3LiveReplicaInput",
+			"RecoverV3LiveReplicaResult",
+			"RecoveredV3Live",
 			"V3AdmittedVertexSink",
 			"V3EgressResult",
 			"V3LiveDescriptor",
@@ -485,10 +489,16 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"V3PlaneHandle",
 			"activateV3LivePlane",
 			"prepareV3LiveGeneration",
+			"recoverV3LiveReplica",
 			"routeV3Ingress",
 		]);
 		const surface = await privateSurface();
-		expect(Object.keys(surface).sort()).toEqual(["activateV3LivePlane", "prepareV3LiveGeneration", "routeV3Ingress"]);
+		expect(Object.keys(surface).sort()).toEqual([
+			"activateV3LivePlane",
+			"prepareV3LiveGeneration",
+			"recoverV3LiveReplica",
+			"routeV3Ingress",
+		]);
 		expect(ACTIVATION_FAILURE_KINDS).toEqual([
 			"malformed-input",
 			"capability-consumed",
@@ -1729,6 +1739,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"@ts-drp/interval-runner",
 			"@ts-drp/issuance-store",
 			"@ts-drp/keychain",
+			"@ts-drp/live-journal",
 			"@ts-drp/logger",
 			"@ts-drp/message-queue",
 			"@ts-drp/network",
@@ -1751,6 +1762,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"uint8arrays",
 		]);
 		expect(manifest.dependencies["@ts-drp/issuance-store"]).toBe("0.11.0");
+		expect(manifest.dependencies["@ts-drp/live-journal"]).toBe("0.11.0");
 		expect(manifest.exports).toEqual({
 			".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" },
 			"./runtime": { types: "./dist/src/runtime.d.ts", import: "./dist/src/runtime.js" },
