@@ -13,11 +13,11 @@ It consumes a genuine prepared capability, exact author-authorization carrier,
 issuance scope/store and live-journal store, and returns one opaque recovered
 capability.
 
-Preparation opens the genuine current-epoch author authorization and retains it
-inside the prepared payload. Recovery resolves the local issuance author from
-that capability, installs journal genesis from sealed preparation bytes, scans
-the complete one-record-paged outbox, authenticates the selected committed local
-envelope, appends its journal reference and constructs the one retained index.
+Recovery opens the genuine current-epoch author authorization from the prepared
+trust and sealed carrier bytes. It resolves the local issuance author, installs
+journal genesis from sealed preparation bytes, scans the complete
+one-record-paged outbox, authenticates the selected committed local envelope,
+appends its journal reference and constructs the one retained index.
 
 The checkpoint transcript is:
 
@@ -49,3 +49,16 @@ storage adapters, issuance and journal production owners remain unchanged.
 Only evidence that the shipped P6, issuance or journal interfaces cannot support
 the recovery ordering above. UI, reducer and network concerns belong to later
 slices.
+
+## Shipped checkpoint
+
+Signed commit `3fabce94891539e53bd644dca60f68d028c7c3b7` implements this
+private recovery seam without changing protocol-v3, storage adapters, wire
+formats, public node exports or live effects. The focused live composition set
+passed 60/60 in 16.54 seconds; the authorization, journal and issuance
+preservation set passed 65/65 in 15.39 seconds; and the node package build,
+lint, formatting and diff checks passed on the same bytes.
+
+This checkpoint recovers exactly one durable local record into an initially
+empty journal. Complete replay, reconciliation and reuse of the retained
+recovery capability belong to Slice 01 and later slices.

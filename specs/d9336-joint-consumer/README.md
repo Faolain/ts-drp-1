@@ -1,6 +1,6 @@
 # D.93.36 Durable Live Composition
 
-Status: design locked; Slice 00 is next.
+Status: Slice 00 shipped; Slice 01 is next.
 
 ## Goal
 
