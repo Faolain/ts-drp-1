@@ -18,6 +18,9 @@ interface ChatSnapshot {
 	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." | "";
 }
 
+const EIGHT_CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
+type ClientId = (typeof EIGHT_CLIENT_IDS)[number];
+
 declare global {
 	interface Window {
 		readonly d9336V3Chat: Readonly<{
@@ -31,7 +34,7 @@ declare global {
 			join(
 				input: Readonly<{
 					readonly channelName: string;
-					readonly clientId: "alice" | "bob";
+					readonly clientId: ClientId;
 					readonly databaseName: string;
 					readonly invite: string;
 				}>
@@ -216,6 +219,69 @@ test("a client repairs missed durable history before rejoining live exchange", a
 			bob.evaluate(() => window.d9336V3Chat.close()),
 		]);
 		await Promise.all([alice.close(), bob.close()]);
+	}
+});
+
+test("eight clients converge after concurrent partitioned writes and a healed durable rejoin", async ({ context }) => {
+	const pages = await Promise.all(EIGHT_CLIENT_IDS.map(() => context.newPage()));
+	const run = crypto.randomUUID();
+	const firstPartition = `d9339-eight-a-${run}`;
+	const secondPartition = `d9339-eight-b-${run}`;
+	const healedChannel = `d9339-eight-healed-${run}`;
+	const inputs = EIGHT_CLIENT_IDS.map((clientId) => ({
+		channelName: EIGHT_CLIENT_IDS.indexOf(clientId) < 4 ? firstPartition : secondPartition,
+		clientId,
+		databaseName: `d9339-eight-${clientId}-${run}`,
+	}));
+	try {
+		await Promise.all(pages.map((page) => install(page)));
+		const invite = await pages[0].evaluate((input) => window.d9336V3Chat.create(input), inputs[0]);
+		await Promise.all(
+			pages
+				.slice(1)
+				.map((page, offset) =>
+					page.evaluate((input) => window.d9336V3Chat.join(input), Object.freeze({ ...inputs[offset + 1], invite }))
+				)
+		);
+
+		await Promise.all(
+			pages.map((page, index) =>
+				page.evaluate((text) => window.d9336V3Chat.send(text), `partition message from ${EIGHT_CLIENT_IDS[index]}`)
+			)
+		);
+		await expect
+			.poll(async () => Promise.all(pages.map(async (page) => (await snapshot(page)).accepted.length)))
+			.toEqual(Array.from({ length: 8 }, () => 4));
+
+		await Promise.all(pages.map((page) => page.evaluate(() => window.d9336V3Chat.close())));
+		for (const [index, page] of pages.entries()) {
+			await page.evaluate(
+				(input) => window.d9336V3Chat.join(input),
+				Object.freeze({ ...inputs[index], channelName: healedChannel, invite })
+			);
+		}
+		await expect
+			.poll(async () => Promise.all(pages.map(async (page) => (await snapshot(page)).accepted.length)))
+			.toEqual(Array.from({ length: 8 }, () => 8));
+
+		const states = await Promise.all(pages.map((page) => snapshot(page)));
+		const expectedTexts = EIGHT_CLIENT_IDS.map((clientId) => `partition message from ${clientId}`);
+		const reference = states[0];
+		const divergenceManifest = states.flatMap((state, index) => {
+			const failures: string[] = [];
+			if (state.acceptedOperationDigest !== reference.acceptedOperationDigest) failures.push(`${index}:operations`);
+			if (state.durableTranscriptDigest !== reference.durableTranscriptDigest) failures.push(`${index}:transcript`);
+			if (JSON.stringify(state.accepted) !== JSON.stringify(reference.accepted)) failures.push(`${index}:accepted`);
+			return failures;
+		});
+		expect(reference.accepted.map(({ text }) => text)).toEqual(expectedTexts);
+		expect(new Set(reference.accepted.map(({ author }) => author)).size).toBe(8);
+		expect(reference.acceptedOperationDigest).toMatch(DIGEST);
+		expect(reference.durableTranscriptDigest).toMatch(DIGEST);
+		expect(divergenceManifest).toEqual([]);
+	} finally {
+		await Promise.allSettled(pages.map((page) => page.evaluate(() => window.d9336V3Chat.close())));
+		await Promise.all(pages.map((page) => page.close()));
 	}
 });
 
