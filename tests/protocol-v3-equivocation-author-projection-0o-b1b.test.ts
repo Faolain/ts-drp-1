@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/require-await */
-import { ed25519 } from "@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -8,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import contract from "./fixtures/phase-0o-b1b-v3/author-projection-contract.json" with { type: "json" };
+import { ed25519 } from "../packages/protocol-v3/node_modules/@noble/curves/ed25519.js";
 import {
 	createRemoteEquivocationObserver,
 	type EquivocationScope,
@@ -153,7 +153,7 @@ function signWithNonce(message: Uint8Array, nonce: bigint): Uint8Array {
 	scalarBytes[0] = (scalarBytes[0] as number) & 248;
 	scalarBytes[31] = ((scalarBytes[31] as number) & 63) | 64;
 	const secretScalar = littleEndianInteger(scalarBytes);
-	const encodedR = ed25519.ExtendedPoint.BASE.multiply(nonce).toRawBytes();
+	const encodedR = ed25519.Point.BASE.multiply(nonce).toBytes();
 	const challenge =
 		littleEndianInteger(createHash("sha512").update(encodedR).update(publicKey).update(message).digest()) %
 		ED25519_ORDER;

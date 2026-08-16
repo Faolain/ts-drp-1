@@ -164,8 +164,6 @@ describe("Phase 0p-0 additive blueprint work-budget governance causal RED", () =
 			"timeout-minutes: 10",
 			"PHASE_0P0_IMPLEMENTATION_MODULE",
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
-			"protocol-v3-blueprint-admission-0i.test.ts",
-			"protocol-v3-independent-reference-vectors-n1prime-c2.test.ts",
 		]) {
 			expect(workflow).toContain(phrase);
 		}

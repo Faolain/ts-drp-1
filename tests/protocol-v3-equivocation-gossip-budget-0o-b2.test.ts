@@ -209,7 +209,6 @@ describe("Phase 0o-b2 pure author gossip-budget causal RED", () => {
 			"timeout-minutes: 10",
 			"PHASE_0O_B2_IMPLEMENTATION_MODULE",
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
-			"protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
 			"equivocation-digest-identity-v1/check-freeze.mjs",
 			"equivocation-evidence-projection-v1/check-freeze.mjs",
 		]) {

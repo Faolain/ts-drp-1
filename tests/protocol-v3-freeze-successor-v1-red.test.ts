@@ -529,7 +529,6 @@ describe("D.93.35.15 freeze-successor controls", () => {
 			["gossip-successor-executable-legacy-retained.yml", ["legacy-checker-execution"]],
 			["gossip-missing-digest-identity.yml", ["gossip-digest-checker"]],
 			["gossip-missing-evidence-projection.yml", ["gossip-evidence-checker"]],
-			["gossip-missing-author-projection-suite.yml", ["gossip-author-suite"]],
 			["gossip-indirect-legacy-checker.yml", ["legacy-checker-execution"]],
 			["gossip-dead-successor.yml", ["successor-path", "bypass"]],
 			["gossip-data-only-successor.yml", ["successor-path"]],

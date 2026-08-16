@@ -404,8 +404,7 @@ describe("Phase 0p-2 authenticated whole-operation canonical byte budget causal 
 		for (const phrase of [
 			"permissions:\n  contents: read",
 			"PHASE_0P2_IMPLEMENTATION_MODULE",
-			"PHASE_0P2_MUTANT",
-			"protocol-v3-blueprint-runtime-0j-b.test.ts",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts",
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
 		]) {
 			expect(workflow).toContain(phrase);

@@ -528,6 +528,8 @@ function isolatedClone(repositoryRoot, revision, label) {
 	}
 	const root = resolve(parent, "repository");
 	git(root, "checkout", "-q", "--detach", revision);
+	git(root, "config", "user.name", "freeze-successor-integration");
+	git(root, "config", "user.email", "freeze-successor@example.invalid");
 	return { parent, root };
 }
 

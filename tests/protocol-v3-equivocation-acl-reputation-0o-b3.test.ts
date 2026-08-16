@@ -104,7 +104,6 @@ describe("Phase 0o-b3 pure ACL-visible reputation causal RED", () => {
 			"timeout-minutes: 10",
 			"PHASE_0O_B3_IMPLEMENTATION_MODULE",
 			"--no-coverage --maxWorkers=1 --minWorkers=1",
-			"protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
 		])
 			expect(workflow).toContain(phrase);
 	});

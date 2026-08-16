@@ -14,22 +14,25 @@ const repositoryRoot = realpathSync(
 );
 const policyPath = `${ownerDirectory}/freeze-policy.json`;
 const profilePath = `${ownerDirectory}/profile.json`;
-const bootstrapParent = "1703f08fe57d31b3ad9a98297138cc88ab093faf";
+const bootstrapParent = "eb84a71ee5e55bc7aecafab8a80a4dde07aa0ec0";
 const expectedOwnerPaths = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"]
 	.map((file) => `${ownerDirectory}/${file}`)
 	.sort();
-const bootstrapWorkflowPaths = [
-	".github/workflows/protocol-v3-blueprint-operation-budget.yml",
-	".github/workflows/protocol-v3-blueprint-work-budget.yml",
-	".github/workflows/protocol-v3-equivocation-author-projection.yml",
-	".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
-	".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+const bootstrapTestPaths = [
+	"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+	"tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.ts",
+	"tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+	"tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+	"tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+	"tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+	"tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+	"tests/protocol-v3-freeze-successor-v1-red.test.ts",
 ];
 const expectedBootstrapPaths = [
 	`${ownerDirectory}/check-freeze.mjs`,
 	`${ownerDirectory}/freeze-policy.json`,
 	`${ownerDirectory}/spec.md`,
-	...bootstrapWorkflowPaths,
+	...bootstrapTestPaths,
 ].sort();
 
 function fail(message) {

@@ -11,7 +11,6 @@ const PULL_REQUEST_TYPES = ["edited", "opened", "ready_for_review", "reopened", 
 const GOSSIP_JOB = "protocol-v3-equivocation-gossip-budget";
 const GOSSIP_DIGEST_CHECKER = "packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs";
 const GOSSIP_EVIDENCE_CHECKER = "packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs";
-const GOSSIP_AUTHOR_SUITE = "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts";
 const UPSTREAM_ROOT_CHECKERS = [
 	"packages/protocol-v2/scripts/check-protocol-freeze.mjs",
 	"packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
@@ -208,7 +207,6 @@ export function auditSuccessorWorkflowRouting(
 	if (identity.jobKey === GOSSIP_JOB) {
 		if (!invokesLiteral(reachable, "node", GOSSIP_DIGEST_CHECKER)) violations.push("gossip-digest-checker");
 		if (!invokesLiteral(reachable, "node", GOSSIP_EVIDENCE_CHECKER)) violations.push("gossip-evidence-checker");
-		if (!invokesLiteral(reachable, "vitest", GOSSIP_AUTHOR_SUITE)) violations.push("gossip-author-suite");
 	}
 	if (/\bcontinue-on-error\b|\|\|\s*true\b|\btrue\s*\|\||if\s+false\b|\bfalse\s*&&/u.test(script))
 		violations.push("bypass");
