@@ -132,7 +132,11 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 						rows.push(Object.freeze({ commit: pendingCommit, publishState: "pending" as const }));
 					}
 					const after = input.afterKey?.[2];
-					return Promise.resolve(rows.filter((row) => after === undefined || row.commit.authorSequence > after));
+					return Promise.resolve(
+						rows
+							.filter((row) => after === undefined || row.commit.authorSequence > after)
+							.slice(0, input.limit ?? rows.length)
+					);
 				},
 				readLineage: () => Promise.resolve(Object.freeze({ exhausted: false, next: 1 })),
 				close: () => Promise.resolve(),
