@@ -1,5 +1,5 @@
 {
-	"schemaVersion": "phase-3a1b-freeze-successor-red-v2",
+	"schemaVersion": "phase-3a1b-freeze-successor-red-v3",
 	"expectedPolicySchemaVersion": "ts-drp-protocol-v3-freeze-successor-v2",
 	"expectedProfileSchemaVersion": "ts-drp-protocol-v3-freeze-successor-profile-v2",
 	"externalBase": {
@@ -31,6 +31,14 @@
 		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json",
 		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md"
 	],
+	"correctiveRed": {
+		"changedPaths": [
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts"
+		]
+	},
 	"rootFreezeEvidence": [
 		{
 			"id": "protocol-v2-root",
@@ -65,6 +73,7 @@
 	"redBaseParent": "f0e3a861a2dc0e65e0444589b3688b72c4463f60",
 	"redBaseTree": "f90ebcbaa2303dd556e9c5699d06caf185e73d78",
 	"predecessorOracleTransition": {
+		"commit": "fef93323cb6cff8c46b96834dcbf60df080252e0",
 		"parent": "15d4e3e3858aff6b1e908570f251f572dc226b85",
 		"parentTree": "0d59e2352e474ad11fa7eca0cc3b3a9e24c06c90",
 		"changedPaths": [
@@ -94,6 +103,48 @@
 			}
 		]
 	},
+	"intermediaryChain": [
+		{
+			"id": "root-drift-harness-correction",
+			"commit": "b0529c4badd60ce61b1a6974cdf99a3b31fe1187",
+			"tree": "cbf6d4479eca22940d5fccf2a64add5021377f0e",
+			"parent": "fef93323cb6cff8c46b96834dcbf60df080252e0",
+			"path": "tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"blob": "80644a34d23f3fcb95fd98b80efa92e5b687dd8f",
+			"sha256": "d03dcb862c91fb8873305e7ee29a41320d9fa3eb89b98231a148c721b55da7de",
+			"patchSha256": "3220c84e6b4d22254c37d488a6856752da29a85bba1e0db06483b76eb6b8b0db"
+		},
+		{
+			"id": "d93.35.11-plan",
+			"commit": "32653c327b24d0f587781ae85984c8123ba5c9bd",
+			"tree": "ec4f3ba934c2f3c9dbd141f8e3700674bf5ccb90",
+			"parent": "b0529c4badd60ce61b1a6974cdf99a3b31fe1187",
+			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+			"blob": "22ca9bd690c01d19b0f23a0a836b6725855169dd",
+			"sha256": "9ad9641c31726f6de3bef21c45430190e450af648bc9cc369e059ce8f9992c39",
+			"patchSha256": "d36449d2bdc1f62d994aab94f6953b2508b48e76f57f7956b7de5c33674fc843"
+		},
+		{
+			"id": "d93.35.12-plan",
+			"commit": "c11956b09a48dcf91a968549e87608a6982882d9",
+			"tree": "366b3346ddfb2ecf64a50e76f15bde3cd9f5628f",
+			"parent": "32653c327b24d0f587781ae85984c8123ba5c9bd",
+			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+			"blob": "d3a77c1fd2c602321d17709238e3991596f4eddc",
+			"sha256": "194d0efc392b775ebe298d47e96235a647857ff3e278b4d3e949f799c65d1cf2",
+			"patchSha256": "2bd3d94e9082848d8919f4b288e8c4368baf722d6dc6d0026d15d524ba4139a1"
+		},
+		{
+			"id": "d93.35.13-plan",
+			"commit": "336d75d4a3c817bef2db4ae6edc81e1df9c3b545",
+			"tree": "405f0d41f1c810d73ec2d9cff3fc021b23f5fb60",
+			"parent": "c11956b09a48dcf91a968549e87608a6982882d9",
+			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+			"blob": "5574cf064343cd9747fab68d5453bb592bbb653c",
+			"sha256": "afe8404c87922d950321486bdd3c26f83d0ffde198c53b57cbf3256775d83122",
+			"patchSha256": "93ca46e4aee9c75285c6d9fee47d47cb20d6d2d831117765e15e10eeeb634368"
+		}
+	],
 	"gossipOracleTransition": {
 		"commit": "f0897b510c4d427b67d6524041cb31b05c677a1d",
 		"path": "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",

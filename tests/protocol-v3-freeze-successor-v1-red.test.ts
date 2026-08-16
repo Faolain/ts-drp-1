@@ -15,6 +15,7 @@ import {
 import {
 	expectedCandidateFailure,
 	governedInventory,
+	intermediaryChainEvidence,
 	repositoryCandidatePlan,
 	repositoryCandidateReadiness,
 	repositoryMutationPlan,
@@ -27,6 +28,8 @@ import {
 	runRepositoryCandidatePartition,
 	runRootChildPreloadPassthrough,
 	runRootFreezeEvidence,
+	validateCorrectiveRed,
+	validateIntermediaryChain,
 } from "./fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs";
 
 const ANALYZER_ROOT = resolve(FREEZE_SUCCESSOR_FIXTURE_ROOT, "analyzers/workflow");
@@ -53,10 +56,11 @@ function git(...args: readonly string[]): string {
 }
 
 describe("D.93.35.7/.8 freeze-successor controls", () => {
-	it("loads the exact closed v2 contract shape without relying on the unchecked JSON cast", () => {
+	it("loads the exact closed v3 contract shape without relying on the unchecked JSON cast", () => {
 		expect(Object.keys(successorContract).sort()).toEqual(
 			[
 				"correctionPaths",
+				"correctiveRed",
 				"expectedPolicySchemaVersion",
 				"expectedProfileSchemaVersion",
 				"externalBase",
@@ -65,6 +69,7 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 				"gossipFdbSha256",
 				"gossipOracleTransition",
 				"historicalTransitions",
+				"intermediaryChain",
 				"latentGossipBinding",
 				"originalInstallPaths",
 				"ownerDirectory",
@@ -80,13 +85,20 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 				"workflowIdentities",
 			].sort()
 		);
-		expect(successorContract.schemaVersion).toBe("phase-3a1b-freeze-successor-red-v2");
+		expect(successorContract.schemaVersion).toBe("phase-3a1b-freeze-successor-red-v3");
+		expect(Object.keys(successorContract.correctiveRed)).toEqual(["changedPaths"]);
+		expect(successorContract.correctiveRed.changedPaths).toEqual([
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts",
+		]);
 		expect(Object.keys(successorContract.externalBase).sort()).toEqual(["commit", "parents", "tree"]);
 		expect(Object.keys(successorContract.gossipOracleTransition).sort()).toEqual(
 			["commit", "currentBlob", "currentSha256", "oldBlob", "oldSha256", "parent", "path", "tree"].sort()
 		);
 		expect(Object.keys(successorContract.predecessorOracleTransition).sort()).toEqual(
-			["changedPaths", "governed", "parent", "parentTree"].sort()
+			["changedPaths", "commit", "governed", "parent", "parentTree"].sort()
 		);
 		expect(successorContract.predecessorOracleTransition.changedPaths).toHaveLength(6);
 		expect(successorContract.predecessorOracleTransition.governed).toHaveLength(2);
@@ -95,6 +107,106 @@ describe("D.93.35.7/.8 freeze-successor controls", () => {
 				["currentBlob", "currentSha256", "id", "oldBlob", "oldSha256", "path"].sort()
 			);
 		}
+		expect(successorContract.intermediaryChain.map(({ id }) => id)).toEqual([
+			"root-drift-harness-correction",
+			"d93.35.11-plan",
+			"d93.35.12-plan",
+			"d93.35.13-plan",
+		]);
+		for (const identity of successorContract.intermediaryChain) {
+			expect(Object.keys(identity).sort(), identity.id).toEqual(
+				["blob", "commit", "id", "parent", "patchSha256", "path", "sha256", "tree"].sort()
+			);
+		}
+		const intermediary = intermediaryChainEvidence(REPOSITORY_ROOT, successorContract);
+		expect(intermediary.chain).toEqual({ code: "AUTHENTICATED", valid: true });
+		expect(intermediary.rows.map((row: { readonly commit: string }) => row.commit)).toEqual(
+			successorContract.intermediaryChain.map(({ commit }) => commit)
+		);
+		const [first, second, ...rest] = intermediary.rows;
+		expect(validateIntermediaryChain(successorContract.intermediaryChain, intermediary.rows.slice(1))).toEqual({
+			code: "INTERMEDIARY_COUNT",
+			valid: false,
+		});
+		expect(validateIntermediaryChain(successorContract.intermediaryChain, [second, first, ...rest])).toEqual({
+			code: "INTERMEDIARY_IDENTITY",
+			valid: false,
+		});
+		expect(
+			validateIntermediaryChain(successorContract.intermediaryChain, [
+				{ ...first, changedPaths: [first.path, successorContract.correctiveRed.changedPaths[0]] },
+				second,
+				...rest,
+			])
+		).toEqual({ code: "INTERMEDIARY_SCOPE", valid: false });
+		expect(
+			validateIntermediaryChain(successorContract.intermediaryChain, [
+				first,
+				{ ...second, parents: [successorContract.predecessorOracleTransition.commit] },
+				...rest,
+			])
+		).toEqual({ code: "INTERMEDIARY_PARENT", valid: false });
+		expect(
+			validateIntermediaryChain(successorContract.intermediaryChain, [
+				first,
+				{
+					...second,
+					parents: [second.parents[0], successorContract.predecessorOracleTransition.commit],
+				},
+				...rest,
+			])
+		).toEqual({ code: "INTERMEDIARY_PARENT", valid: false });
+		for (const field of ["tree", "blob", "sha256", "patchSha256"] as const) {
+			expect(
+				validateIntermediaryChain(successorContract.intermediaryChain, [
+					{ ...first, [field]: `${first[field]}-mutated` },
+					second,
+					...rest,
+				])
+			).toEqual({ code: "INTERMEDIARY_BYTES", valid: false });
+		}
+		expect(validateIntermediaryChain(successorContract.intermediaryChain, [...intermediary.rows, first])).toEqual({
+			code: "INTERMEDIARY_COUNT",
+			valid: false,
+		});
+		const planCommit = successorContract.intermediaryChain.at(-1)?.commit;
+		expect(planCommit).toBeDefined();
+		if (planCommit === undefined) return;
+		const correctiveRed = intermediary.correctiveRed;
+		expect(validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, correctiveRed)).toEqual({
+			code: "AUTHENTICATED",
+			valid: true,
+		});
+		expect(
+			validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+				...correctiveRed,
+				commit: undefined,
+				commits: [],
+			})
+		).toEqual({ code: "CORRECTIVE_RED_COUNT", valid: false });
+		expect(
+			validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+				...correctiveRed,
+				commits: [...correctiveRed.commits, first.commit],
+			})
+		).toEqual({ code: "CORRECTIVE_RED_COUNT", valid: false });
+		for (const parents of [
+			[successorContract.predecessorOracleTransition.commit],
+			[planCommit, successorContract.predecessorOracleTransition.commit],
+		]) {
+			expect(
+				validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+					...correctiveRed,
+					parents,
+				})
+			).toEqual({ code: "CORRECTIVE_RED_PARENT", valid: false });
+		}
+		expect(
+			validateCorrectiveRed(planCommit, successorContract.correctiveRed.changedPaths, {
+				...correctiveRed,
+				changedPaths: [...correctiveRed.changedPaths.slice(0, -1), successorContract.correctionPaths[0]].sort(),
+			})
+		).toEqual({ code: "CORRECTIVE_RED_SCOPE", valid: false });
 		expect(Object.keys(successorContract.provisionalInstall).sort()).toEqual(["commit", "parent", "tree"]);
 		expect(successorContract.externalBase.parents).toHaveLength(2);
 		expect(successorContract.originalInstallPaths).toHaveLength(9);
@@ -426,6 +538,8 @@ describe("D.93.35.7/.8 genuine repository candidate", () => {
 		expect(candidateReadiness.governed).toHaveLength(62);
 		expect(candidateReadiness.originalInstall).toEqual([...successorContract.originalInstallPaths].sort());
 		expect(candidateReadiness.originalInstallValid).toBe(true);
+		expect(candidateReadiness.intermediary.chain).toEqual({ code: "AUTHENTICATED", valid: true });
+		expect(candidateReadiness.intermediary.correctiveRed.valid).toBe(true);
 		expect(candidateReadiness.provisionalEntries).toHaveLength(62);
 		for (const [path, entry] of candidateReadiness.provisionalEntries) {
 			expect(entry, path).toMatchObject({ mode: "100644", type: "blob" });

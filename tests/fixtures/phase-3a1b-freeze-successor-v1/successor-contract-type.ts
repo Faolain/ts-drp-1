@@ -1,6 +1,25 @@
+interface IntermediaryCommitIdentity<Id extends string, Path extends string> {
+	readonly blob: string;
+	readonly commit: string;
+	readonly id: Id;
+	readonly parent: string;
+	readonly patchSha256: string;
+	readonly path: Path;
+	readonly sha256: string;
+	readonly tree: string;
+}
+
 export interface SuccessorContract {
-	readonly schemaVersion: "phase-3a1b-freeze-successor-red-v2";
+	readonly schemaVersion: "phase-3a1b-freeze-successor-red-v3";
 	readonly correctionPaths: readonly string[];
+	readonly correctiveRed: Readonly<{
+		readonly changedPaths: readonly [
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts",
+		];
+	}>;
 	readonly expectedPolicySchemaVersion: string;
 	readonly expectedProfileSchemaVersion: string;
 	readonly externalBase: Readonly<{
@@ -13,6 +32,7 @@ export interface SuccessorContract {
 	readonly redBaseParent: string;
 	readonly redBaseTree: string;
 	readonly predecessorOracleTransition: Readonly<{
+		readonly commit: string;
 		readonly changedPaths: readonly string[];
 		readonly governed: readonly Readonly<{
 			readonly currentBlob: string;
@@ -25,6 +45,23 @@ export interface SuccessorContract {
 		readonly parent: string;
 		readonly parentTree: string;
 	}>;
+	readonly intermediaryChain: readonly [
+		Readonly<
+			IntermediaryCommitIdentity<
+				"root-drift-harness-correction",
+				"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs"
+			>
+		>,
+		Readonly<
+			IntermediaryCommitIdentity<"d93.35.11-plan", "docs/production-hardening/production-hardening-tdd-plan-v2.md">
+		>,
+		Readonly<
+			IntermediaryCommitIdentity<"d93.35.12-plan", "docs/production-hardening/production-hardening-tdd-plan-v2.md">
+		>,
+		Readonly<
+			IntermediaryCommitIdentity<"d93.35.13-plan", "docs/production-hardening/production-hardening-tdd-plan-v2.md">
+		>,
+	];
 	readonly gossipOracleTransition: Readonly<{
 		readonly commit: string;
 		readonly currentBlob: string;

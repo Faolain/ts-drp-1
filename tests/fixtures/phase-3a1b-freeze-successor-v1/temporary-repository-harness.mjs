@@ -268,36 +268,34 @@ function isAncestor(root, ancestor, descendant) {
 	return result.status === 0 && result.signal === null;
 }
 
-function predecessorOracleTransitionCommits(repositoryRoot, contract) {
-	return git(
-		repositoryRoot,
-		"log",
-		"--format=%H",
-		"--reverse",
-		`${contract.predecessorOracleTransition.parent}..HEAD`,
-		"--",
-		...contract.predecessorOracleTransition.changedPaths
-	)
-		.split("\n")
-		.filter(Boolean);
+function revisionBytes(repositoryRoot, revision, path) {
+	const result = spawnSync("git", ["show", `${revision}:${path}`], {
+		cwd: repositoryRoot,
+		encoding: null,
+		maxBuffer: 16 * 1024 * 1024,
+	});
+	return result.status === 0 && result.signal === null ? result.stdout : undefined;
 }
 
-function revisionBytes(repositoryRoot, revision, path) {
-	const result = spawnSync("git", ["show", `${revision}:${path}`], { cwd: repositoryRoot, encoding: null });
-	return result.status === 0 && result.signal === null ? result.stdout : undefined;
+function revisionPatchSha256(repositoryRoot, parent, revision) {
+	const result = spawnSync("git", ["diff", "--binary", parent, revision], {
+		cwd: repositoryRoot,
+		encoding: null,
+		maxBuffer: 16 * 1024 * 1024,
+	});
+	return result.status === 0 && result.signal === null ? sha256Bytes(result.stdout) : undefined;
 }
 
 /** Authenticates the exact subordinate-owner RED and its two governed identities. */
 export function predecessorOracleTransitionEvidence(repositoryRoot, contract) {
-	const commits = predecessorOracleTransitionCommits(repositoryRoot, contract);
-	const commit = commits.length === 1 ? commits[0] : undefined;
-	const parents = commit === undefined ? [] : exactParents(repositoryRoot, commit);
-	const changedPaths = commit === undefined ? [] : exactChangedPaths(repositoryRoot, parents[0], commit);
+	const commit = contract.predecessorOracleTransition.commit;
+	const parents = exactParents(repositoryRoot, commit);
+	const changedPaths = parents.length === 1 ? exactChangedPaths(repositoryRoot, parents[0], commit) : [];
 	const identities = contract.predecessorOracleTransition.governed.map((identity) => {
 		const oldBytes = revisionBytes(repositoryRoot, contract.predecessorOracleTransition.parent, identity.path);
-		const currentBytes = commit === undefined ? undefined : revisionBytes(repositoryRoot, commit, identity.path);
+		const currentBytes = revisionBytes(repositoryRoot, commit, identity.path);
 		return {
-			currentBlob: commit === undefined ? undefined : git(repositoryRoot, "rev-parse", `${commit}:${identity.path}`),
+			currentBlob: git(repositoryRoot, "rev-parse", `${commit}:${identity.path}`),
 			currentSha256: currentBytes === undefined ? undefined : sha256Bytes(currentBytes),
 			id: identity.id,
 			oldBlob: git(repositoryRoot, "rev-parse", `${contract.predecessorOracleTransition.parent}:${identity.path}`),
@@ -306,9 +304,9 @@ export function predecessorOracleTransitionEvidence(repositoryRoot, contract) {
 		};
 	});
 	const valid =
-		commit !== undefined &&
 		parents.length === 1 &&
 		parents[0] === contract.predecessorOracleTransition.parent &&
+		isAncestor(repositoryRoot, commit, "HEAD") &&
 		JSON.stringify(changedPaths) === JSON.stringify([...contract.predecessorOracleTransition.changedPaths].sort()) &&
 		identities.every((actual, index) => {
 			const expected = contract.predecessorOracleTransition.governed[index];
@@ -320,21 +318,92 @@ export function predecessorOracleTransitionEvidence(repositoryRoot, contract) {
 				actual.currentSha256 === expected.currentSha256
 			);
 		});
-	return { changedPaths, commit, commits, identities, parents, valid };
+	return { changedPaths, commit, identities, parents, valid };
 }
 
-function correctionCommits(repositoryRoot, contract, transitionCommit) {
-	return git(
-		repositoryRoot,
-		"log",
-		"--format=%H",
-		"--reverse",
-		`${transitionCommit ?? contract.predecessorOracleTransition.parent}..HEAD`,
-		"--",
-		...contract.correctionPaths
-	)
+function commitsChangingPaths(repositoryRoot, parent, paths) {
+	return git(repositoryRoot, "log", "--format=%H", "--reverse", `${parent}..HEAD`, "--", ...paths)
 		.split("\n")
 		.filter(Boolean);
+}
+
+function intermediaryCommitEvidence(repositoryRoot, expected) {
+	const parents = exactParents(repositoryRoot, expected.commit);
+	const changedPaths = parents.length === 1 ? exactChangedPaths(repositoryRoot, parents[0], expected.commit) : [];
+	const bytes = revisionBytes(repositoryRoot, expected.commit, expected.path);
+	return {
+		blob: git(repositoryRoot, "rev-parse", `${expected.commit}:${expected.path}`),
+		changedPaths,
+		commit: expected.commit,
+		id: expected.id,
+		parents,
+		patchSha256: parents.length === 1 ? revisionPatchSha256(repositoryRoot, parents[0], expected.commit) : undefined,
+		path: expected.path,
+		sha256: bytes === undefined ? undefined : sha256Bytes(bytes),
+		tree: git(repositoryRoot, "rev-parse", `${expected.commit}^{tree}`),
+	};
+}
+
+/** Validates ordered, exact Git-derived intermediary evidence without accepting a fallback lineage. */
+export function validateIntermediaryChain(expectedRows, actualRows) {
+	if (actualRows.length !== expectedRows.length) return { code: "INTERMEDIARY_COUNT", valid: false };
+	for (const [index, expected] of expectedRows.entries()) {
+		const actual = actualRows[index];
+		if (actual.id !== expected.id || actual.commit !== expected.commit || actual.path !== expected.path)
+			return { code: "INTERMEDIARY_IDENTITY", valid: false };
+		if (actual.parents.length !== 1 || actual.parents[0] !== expected.parent)
+			return { code: "INTERMEDIARY_PARENT", valid: false };
+		if (JSON.stringify(actual.changedPaths) !== JSON.stringify([expected.path]))
+			return { code: "INTERMEDIARY_SCOPE", valid: false };
+		if (
+			actual.tree !== expected.tree ||
+			actual.blob !== expected.blob ||
+			actual.sha256 !== expected.sha256 ||
+			actual.patchSha256 !== expected.patchSha256
+		)
+			return { code: "INTERMEDIARY_BYTES", valid: false };
+	}
+	return { code: "AUTHENTICATED", valid: true };
+}
+
+/** Validates the sole signed exact-four RED immediately after the signed D.93.35.13 plan. */
+export function validateCorrectiveRed(planCommit, expectedPaths, actual) {
+	if (actual.commits.length !== 1 || actual.commit === undefined || actual.commits[0] !== actual.commit)
+		return { code: "CORRECTIVE_RED_COUNT", valid: false };
+	if (actual.parents.length !== 1 || actual.parents[0] !== planCommit)
+		return { code: "CORRECTIVE_RED_PARENT", valid: false };
+	if (JSON.stringify(actual.changedPaths) !== JSON.stringify([...expectedPaths].sort()))
+		return { code: "CORRECTIVE_RED_SCOPE", valid: false };
+	return { code: "AUTHENTICATED", valid: true };
+}
+
+/** Authenticates the fixed predecessors and derives the signed exact-four RED from Git. */
+export function intermediaryChainEvidence(repositoryRoot, contract) {
+	const rows = contract.intermediaryChain.map((expected) => intermediaryCommitEvidence(repositoryRoot, expected));
+	const chain = validateIntermediaryChain(contract.intermediaryChain, rows);
+	const plan = contract.intermediaryChain.at(-1);
+	if (plan === undefined) throw new Error("intermediary chain requires the signed D.93.35.13 plan");
+	const commits = commitsChangingPaths(repositoryRoot, plan.commit, contract.correctiveRed.changedPaths);
+	const commit = commits.length === 1 ? commits[0] : undefined;
+	const parents = commit === undefined ? [] : exactParents(repositoryRoot, commit);
+	const changedPaths = parents.length === 1 ? exactChangedPaths(repositoryRoot, parents[0], commit) : [];
+	const observedCorrectiveRed = {
+		changedPaths,
+		commit,
+		commits,
+		parents,
+	};
+	const correctiveRedValidation = validateCorrectiveRed(
+		plan.commit,
+		contract.correctiveRed.changedPaths,
+		observedCorrectiveRed
+	);
+	const correctiveRed = {
+		...observedCorrectiveRed,
+		code: correctiveRedValidation.code,
+		valid: correctiveRedValidation.valid,
+	};
+	return { chain, correctiveRed, rows, valid: chain.valid && correctiveRed.valid };
 }
 
 /**
@@ -361,7 +430,11 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		contract.provisionalInstall.commit
 	);
 	const transition = predecessorOracleTransitionEvidence(repositoryRoot, contract);
-	const corrections = correctionCommits(repositoryRoot, contract, transition.commit);
+	const intermediary = intermediaryChainEvidence(repositoryRoot, contract);
+	const corrections =
+		intermediary.correctiveRed.commit === undefined
+			? []
+			: commitsChangingPaths(repositoryRoot, intermediary.correctiveRed.commit, contract.correctionPaths);
 	const topologyValid =
 		git(repositoryRoot, "rev-parse", `${contract.externalBase.commit}^{tree}`) === contract.externalBase.tree &&
 		JSON.stringify(externalParents) === JSON.stringify(contract.externalBase.parents) &&
@@ -400,7 +473,7 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		const parents = exactParents(repositoryRoot, correction);
 		correctionValid =
 			parents.length === 1 &&
-			parents[0] === transition.commit &&
+			parents[0] === intermediary.correctiveRed.commit &&
 			JSON.stringify(exactChangedPaths(repositoryRoot, parents[0], correction)) ===
 				JSON.stringify([...contract.correctionPaths].sort());
 	}
@@ -412,13 +485,23 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		provisionalEntries.every(([, entry]) => entry?.mode === "100644" && entry.type === "blob") &&
 		schemaValid &&
 		transition.valid &&
+		intermediary.valid &&
 		correctionValid;
 	return {
-		code: ready ? "READY" : transition.valid ? "EXACT_SIX_CORRECTION_ABSENT" : "PREDECESSOR_ORACLE_TRANSITION_ABSENT",
+		code: ready
+			? "READY"
+			: !transition.valid
+				? "PREDECESSOR_ORACLE_TRANSITION_ABSENT"
+				: !intermediary.chain.valid
+					? "INTERMEDIARY_CHAIN_INVALID"
+					: !intermediary.correctiveRed.valid
+						? "CORRECTIVE_RED_ABSENT"
+						: "EXACT_SIX_CORRECTION_ABSENT",
 		correction,
 		correctionValid,
 		externalAbsent,
 		governed,
+		intermediary,
 		originalInstall,
 		originalInstallValid,
 		provisionalEntries,
@@ -524,9 +607,9 @@ function protectedDriftPath(evidence) {
 /** Proves each clean-current root run is load-bearing through the genuine successor boundary. */
 export async function runCurrentRootDriftMutants(repositoryRoot, contract, readiness) {
 	if (!readiness.ready) throw new Error("successor root drift evidence requires READY");
-	const transitionCommit = readiness.transition.commit;
-	if (typeof transitionCommit !== "string") {
-		throw new Error("successor root drift evidence requires the authenticated predecessor transition");
+	const candidateParentCommit = readiness.intermediary.correctiveRed.commit;
+	if (typeof candidateParentCommit !== "string") {
+		throw new Error("successor root drift evidence requires the authenticated exact-four corrective RED");
 	}
 	const results = [];
 	for (const evidence of contract.rootFreezeEvidence) {
@@ -538,7 +621,7 @@ export async function runCurrentRootDriftMutants(repositoryRoot, contract, readi
 			const drift = commit(state.root, `${evidence.id} protected post-correction drift`);
 			const result = await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
 			results.push({
-				correctionPaths: exactChangedPaths(state.root, transitionCommit, correction),
+				correctionPaths: exactChangedPaths(state.root, candidateParentCommit, correction),
 				driftPaths: exactChangedPaths(state.root, correction, drift),
 				id: evidence.id,
 				...result,
@@ -921,18 +1004,17 @@ function cloneCandidateRepository(repositoryRoot, contract) {
 	const root = resolve(parent, "repository");
 	git(root, "config", "user.name", "freeze-successor-candidate-control");
 	git(root, "config", "user.email", "freeze-successor-candidate@example.invalid");
-	const sourceHead = git(repositoryRoot, "rev-parse", "HEAD");
-	const transition = predecessorOracleTransitionEvidence(repositoryRoot, contract);
-	if (!transition.valid || transition.commit === undefined) {
+	const intermediary = intermediaryChainEvidence(repositoryRoot, contract);
+	if (!intermediary.valid || intermediary.correctiveRed.commit === undefined) {
 		rmSync(parent, { force: true, recursive: true });
-		throw new Error("candidate repository requires the authenticated predecessor-oracle transition");
+		throw new Error("candidate repository requires the authenticated exact-four corrective RED");
 	}
-	git(root, "checkout", "-q", "--detach", transition.commit);
-	return { parent, root, sourceHead, transitionCommit: transition.commit };
+	git(root, "checkout", "-q", "--detach", intermediary.correctiveRed.commit);
+	return { candidateParentCommit: intermediary.correctiveRed.commit, parent, root };
 }
 
 function resetCandidate(state) {
-	git(state.root, "reset", "--hard", "-q", state.transitionCommit);
+	git(state.root, "reset", "--hard", "-q", state.candidateParentCommit);
 	git(state.root, "clean", "-ffd", "-q");
 }
 
