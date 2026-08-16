@@ -9,6 +9,7 @@ import {
 	type AdmitReceivedVertexInput,
 	type AdmittedReceivedVertexView,
 	authenticateCurrentEpochAnchor,
+	createAdmissionBoundTransactionalVertexIssuer,
 	type CurrentAnchorTrust,
 	extractAdmittedReceivedVertex,
 	type ExtractAdmittedReceivedVertexFailureReason,
@@ -16,6 +17,7 @@ import {
 	prepareBlueprintRuntime,
 	type PreparedBlueprintAdmission,
 	type PreparedBlueprintRuntime,
+	type SignRegisteredVertexDigest,
 } from "@ts-drp/protocol-v3";
 import {
 	type CurrentEpochAuthorAuthorization,
@@ -133,6 +135,7 @@ const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
 const ACTIVATION_INPUT_KEYS = ["capability", "messageQueueManager", "networkNode", "onAdmittedVertex"] as const;
+const LOCAL_ISSUE_INPUT_KEYS = ["dependencies", "logicalTime", "operation", "signRegisteredVertexDigest"] as const;
 const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
 const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
 const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
@@ -247,9 +250,32 @@ export interface V3PlaneHandle {
 	readonly epoch: 0;
 	readonly topic: string;
 	readonly queueId: string;
+	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
 	publishPending(): Promise<V3EgressResult>;
 	deactivate(): void;
 }
+
+export interface V3LocalIssueInput {
+	readonly dependencies: readonly string[];
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}
+
+export type V3LocalIssueResult =
+	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind:
+				| "not-active"
+				| "malformed-input"
+				| "authorization-rejected"
+				| "issuance-rejected"
+				| "admission-rejected"
+				| "journal-rejected"
+				| "graph-rejected";
+			readonly detail: string;
+	  }>;
 
 export type V3PlaneActivationFailureKind =
 	| "malformed-input"
@@ -1895,6 +1921,17 @@ function egressSuccess(kind: "empty" | "published"): Extract<V3EgressResult, { r
 	return ObjectFreeze({ kind, ok: true as const });
 }
 
+function localIssueFailure(
+	kind: Extract<V3LocalIssueResult, { readonly ok: false }>["kind"],
+	detail: string
+): Extract<V3LocalIssueResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function localIssueSuccess(authorSequence: number, digest: string): Extract<V3LocalIssueResult, { readonly ok: true }> {
+	return ObjectFreeze({ authorSequence, digest, kind: "accepted" as const, ok: true as const });
+}
+
 function denseStrings(value: unknown): readonly string[] | undefined {
 	try {
 		if (!ArrayIsArray(value)) return undefined;
@@ -2840,6 +2877,134 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 	}
 }
 
+async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIssueInput): Promise<V3LocalIssueResult> {
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	const input = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
+	const dependencies = denseStrings(input?.dependencies);
+	if (
+		input === undefined ||
+		dependencies === undefined ||
+		!NumberIsSafeInteger(input.logicalTime) ||
+		(input.logicalTime as number) < 0 ||
+		!isObject(input.operation) ||
+		typeof input.signRegisteredVertexDigest !== "function"
+	) {
+		return localIssueFailure("malformed-input", "v3 local issue input is invalid");
+	}
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	}
+	const authorized = resolveCurrentEpochAuthorizedAuthor({
+		author: scope.author,
+		authorization: registration.authorization,
+	});
+	if (!authorized.ok) {
+		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	}
+
+	let commit: unknown;
+	try {
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
+			author: scope.author,
+			preparedBlueprintAdmission: registration.payload.admission,
+			publicKey: authorized.publicKey,
+			signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+			transactIssue: (selectedScope, buildAndSign) =>
+				registration.issuanceStore.transactIssue(selectedScope, buildAndSign),
+		});
+		commit = await issuer.issue({
+			anchor: registration.payload.provenance.anchorDigest,
+			dependencies,
+			epoch: 0,
+			logicalTime: input.logicalTime as number,
+			objectId: registration.payload.provenance.objectId,
+			operation: input.operation as Readonly<Record<string, unknown>>,
+		});
+	} catch {
+		return localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
+	}
+	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+	if (row === undefined) return localIssueFailure("issuance-rejected", "v3 local issue record is invalid");
+
+	let authenticated: AuthenticatedRecoveryVertex | undefined;
+	try {
+		authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			row.canonicalPreimageBytes,
+			row.signature
+		);
+	} catch {
+		return localIssueFailure("admission-rejected", "v3 local issue authentication failed");
+	}
+	if (
+		authenticated === undefined ||
+		authenticated.digest !== lowerHexDigest(row.digest) ||
+		authenticated.author !== scope.author ||
+		authenticated.authorSequence !== row.authorSequence ||
+		registration.index.has(authenticated.digest)
+	) {
+		return localIssueFailure("admission-rejected", "v3 local issue record is not authenticated");
+	}
+
+	let appended;
+	try {
+		appended = await registration.liveJournalStore.appendAccepted({
+			author: scope.author,
+			authorSequence: row.authorSequence,
+			scope: liveJournalScope(registration.payload),
+			sourceKind: "local-issued",
+			vertexDigest: authenticated.digest,
+		});
+	} catch {
+		return localIssueFailure("journal-rejected", "v3 local issue journal append failed");
+	}
+	if (
+		!appended.ok ||
+		appended.idempotent ||
+		appended.sourceKind !== "local-issued" ||
+		appended.vertexDigest !== authenticated.digest ||
+		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
+	) {
+		return localIssueFailure("journal-rejected", "v3 local issue journal append was rejected");
+	}
+
+	try {
+		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+		if (outcome !== undefined) return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	} catch {
+		return localIssueFailure("graph-rejected", "v3 local issue graph append failed");
+	}
+	if (currentRegistration(registration)) {
+		try {
+			await registration.onAdmittedVertex(
+				ObjectFreeze({
+					vertex: authenticated.admitted,
+					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(row.signature),
+					transportSender: registration.networkNode.peerId,
+				})
+			);
+		} catch {
+			ingressFailureLog("sink-rejected");
+		}
+	}
+	return localIssueSuccess(row.authorSequence, authenticated.digest);
+}
+
+function enqueueLocalIssue(registration: V3PlaneRegistration, input: V3LocalIssueInput): Promise<V3LocalIssueResult> {
+	const result =
+		registration.gate === undefined
+			? issueLocal(registration, input)
+			: registration.gate.then(() => issueLocal(registration, input));
+	registration.gate = result.then(
+		() => undefined,
+		() => undefined
+	);
+	return result;
+}
+
 async function publishPending(registration: V3PlaneRegistration): Promise<V3EgressResult> {
 	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
 	const scope = copiedScope(registration.issuanceScope);
@@ -2928,6 +3093,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 		epoch: 0 as const,
 		topic: registration.topic,
 		queueId: registration.queueId,
+		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> => enqueueLocalIssue(registration, input),
 		publishPending: (): Promise<V3EgressResult> => enqueuePendingPublication(registration),
 		deactivate: (): void => {
 			if (!registration.active) return;
