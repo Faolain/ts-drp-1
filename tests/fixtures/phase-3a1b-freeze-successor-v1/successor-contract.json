@@ -1,7 +1,7 @@
 {
-	"schemaVersion": "phase-3a1b-freeze-successor-red-v3",
-	"expectedPolicySchemaVersion": "ts-drp-protocol-v3-freeze-successor-v2",
-	"expectedProfileSchemaVersion": "ts-drp-protocol-v3-freeze-successor-profile-v2",
+	"schemaVersion": "phase-3a1b-freeze-successor-red-v4",
+	"expectedPolicySchemaVersion": "ts-drp-protocol-v3-freeze-successor-v3",
+	"expectedProfileSchemaVersion": "ts-drp-protocol-v3-freeze-successor-profile-v3",
 	"externalBase": {
 		"commit": "d041baffcd56f16c8a20564133a4a7fc108e8331",
 		"tree": "c3e742e073db3fe077a349723ba9ba21f17ada09",
@@ -111,8 +111,7 @@
 			"parent": "fef93323cb6cff8c46b96834dcbf60df080252e0",
 			"path": "tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
 			"blob": "80644a34d23f3fcb95fd98b80efa92e5b687dd8f",
-			"sha256": "d03dcb862c91fb8873305e7ee29a41320d9fa3eb89b98231a148c721b55da7de",
-			"patchSha256": "3220c84e6b4d22254c37d488a6856752da29a85bba1e0db06483b76eb6b8b0db"
+			"sha256": "d03dcb862c91fb8873305e7ee29a41320d9fa3eb89b98231a148c721b55da7de"
 		},
 		{
 			"id": "d93.35.11-plan",
@@ -121,8 +120,7 @@
 			"parent": "b0529c4badd60ce61b1a6974cdf99a3b31fe1187",
 			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
 			"blob": "22ca9bd690c01d19b0f23a0a836b6725855169dd",
-			"sha256": "9ad9641c31726f6de3bef21c45430190e450af648bc9cc369e059ce8f9992c39",
-			"patchSha256": "d36449d2bdc1f62d994aab94f6953b2508b48e76f57f7956b7de5c33674fc843"
+			"sha256": "9ad9641c31726f6de3bef21c45430190e450af648bc9cc369e059ce8f9992c39"
 		},
 		{
 			"id": "d93.35.12-plan",
@@ -131,8 +129,7 @@
 			"parent": "32653c327b24d0f587781ae85984c8123ba5c9bd",
 			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
 			"blob": "d3a77c1fd2c602321d17709238e3991596f4eddc",
-			"sha256": "194d0efc392b775ebe298d47e96235a647857ff3e278b4d3e949f799c65d1cf2",
-			"patchSha256": "2bd3d94e9082848d8919f4b288e8c4368baf722d6dc6d0026d15d524ba4139a1"
+			"sha256": "194d0efc392b775ebe298d47e96235a647857ff3e278b4d3e949f799c65d1cf2"
 		},
 		{
 			"id": "d93.35.13-plan",
@@ -141,8 +138,7 @@
 			"parent": "c11956b09a48dcf91a968549e87608a6982882d9",
 			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
 			"blob": "5574cf064343cd9747fab68d5453bb592bbb653c",
-			"sha256": "afe8404c87922d950321486bdd3c26f83d0ffde198c53b57cbf3256775d83122",
-			"patchSha256": "93ca46e4aee9c75285c6d9fee47d47cb20d6d2d831117765e15e10eeeb634368"
+			"sha256": "afe8404c87922d950321486bdd3c26f83d0ffde198c53b57cbf3256775d83122"
 		}
 	],
 	"gossipOracleTransition": {

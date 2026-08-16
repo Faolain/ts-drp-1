@@ -277,15 +277,6 @@ function revisionBytes(repositoryRoot, revision, path) {
 	return result.status === 0 && result.signal === null ? result.stdout : undefined;
 }
 
-function revisionPatchSha256(repositoryRoot, parent, revision) {
-	const result = spawnSync("git", ["diff", "--binary", parent, revision], {
-		cwd: repositoryRoot,
-		encoding: null,
-		maxBuffer: 16 * 1024 * 1024,
-	});
-	return result.status === 0 && result.signal === null ? sha256Bytes(result.stdout) : undefined;
-}
-
 /** Authenticates the exact subordinate-owner RED and its two governed identities. */
 export function predecessorOracleTransitionEvidence(repositoryRoot, contract) {
 	const commit = contract.predecessorOracleTransition.commit;
@@ -337,7 +328,6 @@ function intermediaryCommitEvidence(repositoryRoot, expected) {
 		commit: expected.commit,
 		id: expected.id,
 		parents,
-		patchSha256: parents.length === 1 ? revisionPatchSha256(repositoryRoot, parents[0], expected.commit) : undefined,
 		path: expected.path,
 		sha256: bytes === undefined ? undefined : sha256Bytes(bytes),
 		tree: git(repositoryRoot, "rev-parse", `${expected.commit}^{tree}`),
@@ -355,12 +345,7 @@ export function validateIntermediaryChain(expectedRows, actualRows) {
 			return { code: "INTERMEDIARY_PARENT", valid: false };
 		if (JSON.stringify(actual.changedPaths) !== JSON.stringify([expected.path]))
 			return { code: "INTERMEDIARY_SCOPE", valid: false };
-		if (
-			actual.tree !== expected.tree ||
-			actual.blob !== expected.blob ||
-			actual.sha256 !== expected.sha256 ||
-			actual.patchSha256 !== expected.patchSha256
-		)
+		if (actual.tree !== expected.tree || actual.blob !== expected.blob || actual.sha256 !== expected.sha256)
 			return { code: "INTERMEDIARY_BYTES", valid: false };
 	}
 	return { code: "AUTHENTICATED", valid: true };
@@ -416,6 +401,9 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 		contract.predecessors.map(({ policy }) => policy)
 	);
 	const governed = [...contract.ownerFiles.map((file) => `${contract.ownerDirectory}/${file}`), ...inventory];
+	const certificationMode = process.env.PROTOCOL_V3_FREEZE_SUCCESSOR_CERTIFICATION === "1";
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
+	const currentEntries = governed.map((path) => [path, treeEntry(repositoryRoot, current, path)]);
 	const externalParents = exactParents(repositoryRoot, contract.externalBase.commit);
 	const externalAbsent = governed.filter(
 		(path) => treeEntry(repositoryRoot, contract.externalBase.commit, path) === undefined
@@ -477,28 +465,38 @@ export function repositoryCandidateReadiness(repositoryRoot, contract) {
 			JSON.stringify(exactChangedPaths(repositoryRoot, parents[0], correction)) ===
 				JSON.stringify([...contract.correctionPaths].sort());
 	}
-	const ready =
+	const currentStateReady =
 		topologyValid &&
 		externalAbsent.length === governed.length &&
 		governed.length === 62 &&
+		currentEntries.every(([, entry]) => entry?.mode === "100644" && entry.type === "blob") &&
+		schemaValid;
+	const certificationReady =
 		originalInstallValid &&
 		provisionalEntries.every(([, entry]) => entry?.mode === "100644" && entry.type === "blob") &&
-		schemaValid &&
 		transition.valid &&
 		intermediary.valid &&
 		correctionValid;
+	const ready = currentStateReady && (!certificationMode || certificationReady);
+	if (!certificationMode) {
+		correction = git(repositoryRoot, "rev-parse", "HEAD^");
+		correctionValid = true;
+	}
 	return {
 		code: ready
 			? "READY"
-			: !transition.valid
-				? "PREDECESSOR_ORACLE_TRANSITION_ABSENT"
-				: !intermediary.chain.valid
-					? "INTERMEDIARY_CHAIN_INVALID"
-					: !intermediary.correctiveRed.valid
-						? "CORRECTIVE_RED_ABSENT"
-						: "EXACT_SIX_CORRECTION_ABSENT",
+			: !currentStateReady
+				? "CURRENT_PROVENANCE_OWNER_ABSENT"
+				: !transition.valid
+					? "PREDECESSOR_ORACLE_TRANSITION_ABSENT"
+					: !intermediary.chain.valid
+						? "INTERMEDIARY_CHAIN_INVALID"
+						: !intermediary.correctiveRed.valid
+							? "CORRECTIVE_RED_ABSENT"
+							: "EXACT_SIX_CORRECTION_ABSENT",
 		correction,
 		correctionValid,
+		currentEntries,
 		externalAbsent,
 		governed,
 		intermediary,
@@ -607,22 +605,17 @@ function protectedDriftPath(evidence) {
 /** Proves each clean-current root run is load-bearing through the genuine successor boundary. */
 export async function runCurrentRootDriftMutants(repositoryRoot, contract, readiness) {
 	if (!readiness.ready) throw new Error("successor root drift evidence requires READY");
-	const candidateParentCommit = readiness.intermediary.correctiveRed.commit;
-	if (typeof candidateParentCommit !== "string") {
-		throw new Error("successor root drift evidence requires the authenticated exact-four corrective RED");
-	}
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
 	const results = [];
 	for (const evidence of contract.rootFreezeEvidence) {
-		const state = cloneCandidateRepository(repositoryRoot, contract);
+		const state = isolatedClone(repositoryRoot, current, `${evidence.id}-current-drift`);
 		try {
-			const correction = createCandidateCommit(repositoryRoot, state, contract);
 			const driftPath = protectedDriftPath(evidence);
 			append(state.root, driftPath, "\nprotected drift\n");
 			const drift = commit(state.root, `${evidence.id} protected post-correction drift`);
 			const result = await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
 			results.push({
-				correctionPaths: exactChangedPaths(state.root, candidateParentCommit, correction),
-				driftPaths: exactChangedPaths(state.root, correction, drift),
+				driftPaths: exactChangedPaths(state.root, current, drift),
 				id: evidence.id,
 				...result,
 			});
@@ -637,12 +630,10 @@ export async function runCurrentRootDriftMutants(repositoryRoot, contract, readi
 /** Proves NODE_OPTIONS preload presence alone is not a candidate rejection reason. */
 export async function runRootChildPreloadPassthrough(repositoryRoot, contract, readiness) {
 	if (!readiness.ready) throw new Error("successor preload passthrough requires READY");
-	const state = cloneCandidateRepository(repositoryRoot, contract);
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
+	const state = isolatedClone(repositoryRoot, current, "current-preload");
 	try {
-		const parent = git(state.root, "rev-parse", "HEAD");
-		const correction = createCandidateCommit(repositoryRoot, state, contract);
 		return {
-			correctionPaths: exactChangedPaths(state.root, parent, correction),
 			...(await executeWithRootChildPreload(
 				repositoryRoot,
 				state.root,

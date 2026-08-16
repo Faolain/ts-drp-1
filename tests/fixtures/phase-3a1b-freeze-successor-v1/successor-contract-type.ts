@@ -3,14 +3,13 @@ interface IntermediaryCommitIdentity<Id extends string, Path extends string> {
 	readonly commit: string;
 	readonly id: Id;
 	readonly parent: string;
-	readonly patchSha256: string;
 	readonly path: Path;
 	readonly sha256: string;
 	readonly tree: string;
 }
 
 export interface SuccessorContract {
-	readonly schemaVersion: "phase-3a1b-freeze-successor-red-v3";
+	readonly schemaVersion: "phase-3a1b-freeze-successor-red-v4";
 	readonly correctionPaths: readonly string[];
 	readonly correctiveRed: Readonly<{
 		readonly changedPaths: readonly [
