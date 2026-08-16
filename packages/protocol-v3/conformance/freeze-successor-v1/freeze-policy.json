@@ -73,10 +73,10 @@
 		"tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json",
 		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs"
 	],
-	"checkerSha256": "d36ba8002487006f829ea41f323f11fba6e61e4fbcb3378a53de35ac8c5bec9b",
+	"checkerSha256": "265ccd46a32f4f515ec3eb65a7276e16a026fb14ae1cbdbc36071c80c5498cea",
 	"artifactSha256": {
 		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json": "ceae3be2b43facbf1001d8892931c9c2ca78123be5214bf6c394acfada6a682c",
-		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md": "cafeac38609872ec2fc101b02ebbba55fb1d7ee84bd8a24554dad5dd2aa5df39",
+		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md": "ab413a89397198b3c6e8da6c2436dfda3f67e0420ae39c0fbbff0726a7b2f157",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs": "f8e6d0f552f2f311a8a7d6e8e560243557e5204faa9f119e21c880ad74a6009b",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/freeze-policy.json": "01dfe6dd16c7b651be0eb56340986302c6aa20bd51bc14e1271e54051ed589c0",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/profile.json": "978797b08311955ebcd73579f22bbb2866a62f0441213d235f490d24e8cb9b88",

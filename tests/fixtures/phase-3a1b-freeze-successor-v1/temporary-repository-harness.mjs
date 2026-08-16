@@ -800,12 +800,17 @@ export async function runControlledMixedCensusDiagnostics(repositoryRoot, paths)
 
 async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge, descendant = false) {
 	const current = git(repositoryRoot, "rev-parse", "HEAD");
-	const state = isolatedClone(repositoryRoot, current, merge ? "candidate-merge" : "candidate-linear");
+	const currentParents = exactParents(repositoryRoot, current);
+	const sourceTip =
+		upstream === contract.externalBase.commit && currentParents.length === 2 && currentParents[0] === upstream
+			? currentParents[1]
+			: current;
+	const state = isolatedClone(repositoryRoot, sourceTip, merge ? "candidate-merge" : "candidate-linear");
 	try {
-		let releaseTip = current;
+		let releaseTip = sourceTip;
 		if (descendant) {
-			const tree = git(state.root, "rev-parse", `${current}^{tree}`);
-			releaseTip = git(state.root, "commit-tree", tree, "-p", current, "-m", "unchanged governed descendant");
+			const tree = git(state.root, "rev-parse", `${sourceTip}^{tree}`);
+			releaseTip = git(state.root, "commit-tree", tree, "-p", sourceTip, "-m", "unchanged governed descendant");
 			git(state.root, "reset", "--hard", "-q", releaseTip);
 		}
 		if (merge) {

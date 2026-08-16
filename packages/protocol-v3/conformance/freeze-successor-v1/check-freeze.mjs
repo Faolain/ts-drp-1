@@ -14,15 +14,11 @@ const repositoryRoot = realpathSync(
 );
 const policyPath = `${ownerDirectory}/freeze-policy.json`;
 const profilePath = `${ownerDirectory}/profile.json`;
-const bootstrapParent = "5a256e5e5a9ccbd05babdb0eb7fa355e2d667310";
+const bootstrapParent = "bc8503c46932e4c600b014680da83e4ba6731799";
 const expectedOwnerPaths = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"]
 	.map((file) => `${ownerDirectory}/${file}`)
 	.sort();
-const bootstrapTestPaths = [
-	"tests/fixtures/phase-0o-b1b-v3/public-export-contract.mjs",
-	"tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs",
-	"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs",
-];
+const bootstrapTestPaths = ["tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs"];
 const expectedBootstrapPaths = [
 	`${ownerDirectory}/check-freeze.mjs`,
 	`${ownerDirectory}/freeze-policy.json`,
