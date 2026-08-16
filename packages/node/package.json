@@ -67,6 +67,7 @@
 		"@ts-drp/interval-runner": "0.11.0",
 		"@ts-drp/issuance-store": "0.11.0",
 		"@ts-drp/keychain": "0.11.0",
+		"@ts-drp/live-journal": "0.11.0",
 		"@ts-drp/logger": "0.11.0",
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",

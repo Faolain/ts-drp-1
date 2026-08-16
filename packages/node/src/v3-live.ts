@@ -1,8 +1,9 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { CausalityIndex } from "@ts-drp/compaction";
+import { CausalityIndex, type EpochVertex } from "@ts-drp/compaction";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
 	type AdmitReceivedVertexInput,
@@ -16,6 +17,11 @@ import {
 	type PreparedBlueprintAdmission,
 	type PreparedBlueprintRuntime,
 } from "@ts-drp/protocol-v3";
+import {
+	type CurrentEpochAuthorAuthorization,
+	openCurrentEpochAuthorAuthorization,
+	resolveCurrentEpochAuthorizedAuthor,
+} from "@ts-drp/protocol-v3/author-authorization";
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
 import {
 	type AheDurableStore,
@@ -263,6 +269,47 @@ export type V3EgressResult =
 
 type PlainRecord = Readonly<Record<string, unknown>>;
 
+const RECOVERY_INPUT_KEYS = [
+	"capability",
+	"exactCanonicalAuthorAuthorizationBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+] as const;
+
+declare const recoveredV3LiveBrand: unique symbol;
+export type RecoveredV3Live = Readonly<{ readonly [recoveredV3LiveBrand]: true }>;
+
+export interface RecoverV3LiveReplicaInput {
+	readonly capability: PreparedV3Live;
+	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
+}
+
+export type RecoverV3LiveReplicaFailureKind =
+	| "malformed-input"
+	| "capability-consumed"
+	| "authorization-rejected"
+	| "journal-rejected"
+	| "issuance-rejected"
+	| "admission-rejected"
+	| "graph-rejected"
+	| "internal-invariant";
+
+export type RecoverV3LiveReplicaResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly capability: RecoveredV3Live;
+			readonly descriptor: Readonly<{
+				readonly objectId: string;
+				readonly recoveredVertexCount: number;
+				readonly transcript: readonly ["authorized", "issued-record-authenticated", "journaled", "indexed", "ready"];
+			}>;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: RecoverV3LiveReplicaFailureKind; readonly detail: string }>;
+
 interface CapturedInput {
 	readonly authenticationProfile: "creator-only";
 	readonly store: AheDurableStore;
@@ -327,7 +374,7 @@ interface PreparedV3LivePayload {
 	readonly proposedClosure: readonly GenerationRef[];
 	readonly runtime: PreparedBlueprintRuntime;
 	readonly trust: OpenedTrustSnapshot;
-	readonly vertices: Map<string, unknown>;
+	readonly vertices: Map<string, EpochVertex>;
 }
 
 interface AcceptedParameters {
@@ -1239,7 +1286,7 @@ interface PreparedV3LiveMintInput {
 	readonly proposedClosure: readonly GenerationRef[];
 	readonly provenance: ProvenanceSnapshot;
 	readonly runtime: PreparedBlueprintRuntime;
-	readonly vertices: Map<string, unknown>;
+	readonly vertices: Map<string, EpochVertex>;
 }
 
 interface PreparedV3LiveMint {
@@ -1558,7 +1605,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 		epoch: 0,
 		dependencies: dependencies as string[],
 	});
-	const vertices = new IntrinsicMap<string, typeof vertex>();
+	const vertices = new IntrinsicMap<string, EpochVertex>();
 	const charges = new IntrinsicMap<string, number>();
 	try {
 		ReflectApply(MapPrototypeSet, vertices, [provenance.anchorDigest, vertex]);
@@ -2073,6 +2120,28 @@ function ingressFailureLog(category: V3IngressFailureCategory): void {
 	}
 }
 
+function extractAuthorizedV3Vertex(
+	payload: PreparedV3LivePayload,
+	receivedCanonicalPreimageBytes: Uint8Array,
+	signature: Uint8Array,
+	resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"]
+): ReturnType<typeof extractAdmittedReceivedVertex> | undefined {
+	if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
+	const domain = V3_VERTEX_DOMAIN;
+	const expectedAnchor = payload.provenance.anchorDigest;
+	const preparedBlueprintAdmission = payload.admission;
+	const suiteId = V3_VERTEX_SUITE_ID;
+	return extractAdmittedReceivedVertex({
+		domain,
+		expectedAnchor,
+		preparedBlueprintAdmission,
+		receivedCanonicalPreimageBytes,
+		resolveAuthorPublicKey,
+		signature,
+		suiteId,
+	});
+}
+
 async function handleV3Ingress(registration: V3PlaneRegistration, message: Message): Promise<void> {
 	try {
 		if (!currentRegistration(registration)) return;
@@ -2105,27 +2174,20 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 			ingressFailureLog("envelope-rejected");
 			return;
 		}
-		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") {
+		const resolveAuthorPublicKey = registration.resolveAuthorPublicKey;
+		let extracted;
+		try {
+			extracted = extractAuthorizedV3Vertex(
+				registration.payload,
+				receivedCanonicalPreimageBytes,
+				signature,
+				resolveAuthorPublicKey
+			);
+		} catch {
 			ingressFailureLog("malformed-input");
 			return;
 		}
-		const domain = V3_VERTEX_DOMAIN;
-		const expectedAnchor = registration.payload.provenance.anchorDigest;
-		const preparedBlueprintAdmission = registration.payload.admission;
-		const resolveAuthorPublicKey = registration.resolveAuthorPublicKey;
-		const suiteId = V3_VERTEX_SUITE_ID;
-		let extracted;
-		try {
-			extracted = extractAdmittedReceivedVertex({
-				domain,
-				expectedAnchor,
-				preparedBlueprintAdmission,
-				receivedCanonicalPreimageBytes,
-				resolveAuthorPublicKey,
-				signature,
-				suiteId,
-			});
-		} catch {
+		if (extracted === undefined) {
 			ingressFailureLog("malformed-input");
 			return;
 		}
@@ -2238,6 +2300,261 @@ function onePage(value: unknown): DurableIssuanceOutboxRecord | null | undefined
 		return first === undefined || !("value" in first) ? undefined : (first.value as DurableIssuanceOutboxRecord);
 	} catch {
 		return undefined;
+	}
+}
+
+interface RecoveredV3LivePayload {
+	readonly authorization: CurrentEpochAuthorAuthorization;
+	readonly index: CausalityIndex;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
+	readonly prepared: PreparedV3LivePayload;
+}
+
+const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
+
+function recoveryFailure(
+	kind: RecoverV3LiveReplicaFailureKind,
+	detail: string
+): Extract<RecoverV3LiveReplicaResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function liveJournalScope(payload: PreparedV3LivePayload): LiveJournalScope {
+	return ObjectFreeze({
+		anchorDigest: payload.provenance.anchorDigest,
+		epoch: 0 as const,
+		objectId: payload.provenance.objectId,
+	});
+}
+
+function matchingOutboxRows(left: SnapshottedOutboxRow, right: SnapshottedOutboxRow): boolean {
+	return (
+		left.authorSequence === right.authorSequence &&
+		sameScope(left.scope, right.scope) &&
+		sameBytes(left.canonicalPreimageBytes, right.canonicalPreimageBytes) &&
+		sameBytes(left.digest, right.digest) &&
+		sameBytes(left.signature, right.signature)
+	);
+}
+
+/**
+ * Recovers one authorized durable local vertex before any live effect is installed.
+ * @param rawInput - Closed durable recovery bindings and the one-use prepared capability.
+ * @returns An opaque recovered capability or a closed fail-closed result.
+ */
+export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput): Promise<RecoverV3LiveReplicaResult> {
+	try {
+		const input = snapshotClosedRecord(rawInput, RECOVERY_INPUT_KEYS);
+		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
+		const exactAuthorizationBytes = copyDetachedBytes(input.exactCanonicalAuthorAuthorizationBytes);
+		const selectedScope = copiedScope(input.issuanceScope);
+		if (
+			exactAuthorizationBytes === undefined ||
+			exactAuthorizationBytes.byteLength === 0 ||
+			selectedScope === undefined ||
+			!isObject(input.issuanceStore) ||
+			!isObject(input.liveJournalStore)
+		) {
+			return recoveryFailure("malformed-input", "v3 recovery binding is invalid");
+		}
+		const payload = consumePreparedV3Live(input.capability as PreparedV3Live);
+		if (payload === undefined) return recoveryFailure("capability-consumed", "v3 capability is unavailable");
+		if (!payloadIsUsable(payload) || selectedScope.objectId !== payload.provenance.objectId) {
+			return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
+		}
+		const openedAuthorization = openCurrentEpochAuthorAuthorization({
+			detachedAnchorSignature: payload.input.detachedSignature,
+			exactCanonicalAnchorPreimageBytes: payload.input.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalAuthorAuthorizationBytes: exactAuthorizationBytes,
+			trust: payload.trust.trust,
+		});
+		if (!openedAuthorization.ok) {
+			return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
+		}
+		const resolved = resolveCurrentEpochAuthorizedAuthor({
+			author: selectedScope.author,
+			authorization: openedAuthorization.authorization,
+		});
+		if (!resolved.ok) return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
+
+		const journal = input.liveJournalStore as DurableLiveJournalStore;
+		const issuance = input.issuanceStore as DurableIssuanceStore;
+		const scope = liveJournalScope(payload);
+		let installed;
+		try {
+			installed = await journal.installGenesis({
+				detachedAnchorSignature: new Uint8ArrayConstructor(payload.input.detachedSignature),
+				exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
+				exactCanonicalParametersCarrierBytes: new Uint8ArrayConstructor(
+					payload.input.exactCanonicalParametersCarrierBytes
+				),
+				objectId: payload.provenance.objectId,
+			});
+		} catch {
+			return recoveryFailure("journal-rejected", "v3 journal genesis installation failed");
+		}
+		if (
+			!installed.ok ||
+			installed.scope.objectId !== scope.objectId ||
+			installed.scope.epoch !== scope.epoch ||
+			installed.scope.anchorDigest !== scope.anchorDigest ||
+			installed.parametersDigest !== payload.provenance.parametersDigest
+		) {
+			return recoveryFailure("journal-rejected", "v3 journal genesis does not match");
+		}
+
+		let readiness;
+		try {
+			readiness = await journal.readiness({ scope });
+		} catch {
+			return recoveryFailure("journal-rejected", "v3 journal readiness failed");
+		}
+		if (!readiness.ok || !readiness.ready || readiness.rowCount !== 0) {
+			return recoveryFailure("journal-rejected", "v3 first recovery requires an empty ready journal");
+		}
+		let journalPage;
+		try {
+			journalPage = await journal.readPage({ afterSequence: null, limit: 1, scope, snapshot: readiness.snapshot });
+		} catch {
+			return recoveryFailure("journal-rejected", "v3 journal page read failed");
+		}
+		if (!journalPage.ok || journalPage.rows.length !== 0 || journalPage.nextSequence !== null) {
+			return recoveryFailure("journal-rejected", "v3 first recovery journal is not empty");
+		}
+
+		let index: CausalityIndex;
+		try {
+			index = new CausalityIndex(payload.vertices, payload.order, {
+				initialByteCharges: payload.charges,
+				maxEpochBytes: payload.parameters.maxEpochBytes,
+				maxEpochVertices: payload.parameters.maxEpochVertices,
+			});
+		} catch {
+			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
+		}
+
+		let afterKey: readonly [string, string, number] | undefined;
+		let recoveredCount = 0;
+		for (;;) {
+			let rawPage: unknown;
+			try {
+				rawPage = await issuance.readOutboxPage(
+					afterKey === undefined ? { limit: 1, scope: selectedScope } : { afterKey, limit: 1, scope: selectedScope }
+				);
+			} catch {
+				return recoveryFailure("issuance-rejected", "v3 recovery outbox read failed");
+			}
+			const page = onePage(rawPage);
+			if (page === undefined) return recoveryFailure("issuance-rejected", "v3 recovery outbox page is invalid");
+			if (page === null) break;
+			const row = outboxRowSnapshot(page, selectedScope);
+			if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
+				return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
+			}
+			let issuedCommit: unknown;
+			try {
+				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
+			} catch {
+				return recoveryFailure("issuance-rejected", "v3 recovery issued record read failed");
+			}
+			const issuedRow = outboxRowSnapshot(
+				ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+				selectedScope
+			);
+			if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) {
+				return recoveryFailure("issuance-rejected", "v3 recovery issued record does not match");
+			}
+			let extracted;
+			try {
+				extracted = extractAuthorizedV3Vertex(payload, row.canonicalPreimageBytes, row.signature, (author) => {
+					const authorResult = resolveCurrentEpochAuthorizedAuthor({
+						authorization: openedAuthorization.authorization,
+						author,
+					});
+					return authorResult.ok ? authorResult.publicKey : undefined;
+				});
+			} catch {
+				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
+			}
+			const recomputedDigest = extracted?.ok ? lowerHexDigest(extracted.vertex.digest) : undefined;
+			const envelopeDigest = lowerHexDigest(row.digest);
+			if (
+				extracted === undefined ||
+				!extracted.ok ||
+				recomputedDigest === undefined ||
+				recomputedDigest !== envelopeDigest ||
+				extracted.vertex.author !== selectedScope.author ||
+				extracted.vertex.authorSequence !== row.authorSequence
+			) {
+				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
+			}
+			let appended;
+			try {
+				appended = await journal.appendAccepted({
+					author: selectedScope.author,
+					authorSequence: row.authorSequence,
+					scope,
+					sourceKind: "local-issued",
+					vertexDigest: recomputedDigest,
+				});
+			} catch {
+				return recoveryFailure("journal-rejected", "v3 recovery journal append failed");
+			}
+			if (!appended.ok || appended.vertexDigest !== recomputedDigest || appended.sourceKind !== "local-issued") {
+				return recoveryFailure("journal-rejected", "v3 recovery journal append was rejected");
+			}
+			try {
+				const recoveredVertex: EpochVertex = ObjectFreeze({
+					anchor: extracted.vertex.anchor,
+					dependencies: [...extracted.vertex.dependencies],
+					epoch: extracted.vertex.epoch,
+					hash: recomputedDigest,
+					kind: extracted.vertex.kind,
+					objectId: extracted.vertex.objectId,
+					operation: extracted.vertex.operation as EpochVertex["operation"],
+				});
+				const outcome = index.append(recomputedDigest, recoveredVertex, row.canonicalPreimageBytes.byteLength);
+				if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+			} catch {
+				return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
+			}
+			recoveredCount += 1;
+			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+		}
+		if (recoveredCount !== 1 || index.size !== 2) {
+			return recoveryFailure("issuance-rejected", "v3 first recovery requires one issued record");
+		}
+		const capability = ObjectFreeze({}) as RecoveredV3Live;
+		recoveredV3LiveAuthority.set(
+			capability,
+			ObjectFreeze({
+				authorization: openedAuthorization.authorization,
+				index,
+				issuanceScope: selectedScope,
+				issuanceStore: issuance,
+				liveJournalStore: journal,
+				prepared: payload,
+			})
+		);
+		return ObjectFreeze({
+			capability,
+			descriptor: ObjectFreeze({
+				objectId: payload.provenance.objectId,
+				recoveredVertexCount: 2,
+				transcript: ObjectFreeze([
+					"authorized",
+					"issued-record-authenticated",
+					"journaled",
+					"indexed",
+					"ready",
+				] as const),
+			}),
+			ok: true as const,
+		});
+	} catch {
+		return recoveryFailure("internal-invariant", "v3 recovery failed unexpectedly");
 	}
 }
 
