@@ -524,18 +524,22 @@ function protectedDriftPath(evidence) {
 /** Proves each clean-current root run is load-bearing through the genuine successor boundary. */
 export async function runCurrentRootDriftMutants(repositoryRoot, contract, readiness) {
 	if (!readiness.ready) throw new Error("successor root drift evidence requires READY");
+	const transitionCommit = readiness.transition.commit;
+	if (typeof transitionCommit !== "string") {
+		throw new Error("successor root drift evidence requires the authenticated predecessor transition");
+	}
 	const results = [];
 	for (const evidence of contract.rootFreezeEvidence) {
 		const state = cloneCandidateRepository(repositoryRoot, contract);
 		try {
+			const correction = createCandidateCommit(repositoryRoot, state, contract);
 			const driftPath = protectedDriftPath(evidence);
 			append(state.root, driftPath, "\nprotected drift\n");
-			const drift = commit(state.root, `${evidence.id} protected pre-correction drift`);
-			const correction = createCandidateCommit(repositoryRoot, state, contract);
+			const drift = commit(state.root, `${evidence.id} protected post-correction drift`);
 			const result = await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
 			results.push({
-				correctionPaths: exactChangedPaths(state.root, drift, correction),
-				driftPaths: exactChangedPaths(state.root, contract.provisionalInstall.commit, drift),
+				correctionPaths: exactChangedPaths(state.root, transitionCommit, correction),
+				driftPaths: exactChangedPaths(state.root, correction, drift),
 				id: evidence.id,
 				...result,
 			});
