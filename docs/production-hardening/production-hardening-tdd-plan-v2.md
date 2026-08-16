@@ -13088,6 +13088,109 @@ mandatory. Independent exact-byte review must confirm the one-row authority
 change before signing. Only then may the preserved D.93.35.9 RED draft be
 restored, corrected to the signed parent and resumed.
 
+##### D.93.35.11 — root-preservation mutant lineage correction
+
+The signed D.93.35.9/.10 RED exposed one final test-harness ordering defect in
+the current-root preservation mutant. The old
+`runCurrentRootDriftMutants` construction committed a protocol-v2 or
+protocol-v3 registry drift before the exact-six successor correction. That
+made the drift commit the correction's direct parent, so the genuine successor
+correctly stopped at `exact correction transition scope differs` before it
+could execute either current-tree root checker. Computing the drift from the
+much older provisional install also attributed unrelated governed transitions
+to the mutant. The row therefore did not prove that either required current
+root-preservation child was load-bearing.
+
+D.93.35.11 ratifies the already signed tests-only correction at exact commit
+`b0529c4badd60ce61b1a6974cdf99a3b31fe1187`, tree
+`cbf6d4479eca22940d5fccf2a64add5021377f0e`, with sole parent
+`fef93323cb6cff8c46b96834dcbf60df080252e0`. It changes exactly one path:
+
+```text
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+```
+
+The corrected file is Git blob
+`80644a34d23f3fcb95fd98b80efa92e5b687dd8f` with SHA-256
+`d03dcb862c91fb8873305e7ee29a41320d9fa3eb89b98231a148c721b55da7de`.
+The exact binary commit diff has SHA-256
+`3220c84e6b4d22254c37d488a6856752da29a85bba1e0db06483b76eb6b8b0db`.
+The commit has a Good signature from
+`Faolain <Faolain@users.noreply.github.com>` using key
+`55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+For each root-checker row, the harness now obtains the already-authenticated
+`predecessorOracleTransition.commit` and fails before construction if that
+identity is absent. Starting from that exact commit, it first creates the
+unchanged exact-six correction directly atop the authenticated transition. It
+then appends and commits exactly one ungoverned descendant drift:
+
+```text
+protocol-v2-root -> packages/protocol-v2/registry/field-registry.json
+protocol-v3-root -> packages/protocol-v3/registry/registry-v1.json
+```
+
+The harness records `correctionPaths` from the authenticated transition to the
+correction and requires the unchanged exact six. It records `driftPaths` from
+the correction to the descendant drift and requires exactly the corresponding
+single registry path. Those two registry paths are root-freeze inputs but are
+not successor `protectedArtifacts`; successor correction count, direct-parent
+scope, governed history and terminal governed identities therefore pass. The
+genuine current-tree root checker at the descendant PR head becomes the causal
+rejection owner. Reintroducing the pre-correction drift, measuring from the
+provisional install, folding the registry drift into the exact-six commit,
+drifting more than one path or accepting a correction/history failure does not
+satisfy this evidence.
+
+###### Exact lineage reconciliation
+
+D.93.35.11 supersedes only D.93.35.9/.10's claim that the tests-only RED is a
+single commit immediately followed by GREEN. The governed transition count and
+identities do not change:
+
+1. `fef93323...` remains the sole authenticated predecessor-oracle transition
+   from the signed D.93.35.10 plan parent. Its exact six test/fixture paths and
+   the current operation/work governed blobs remain unchanged.
+2. `b0529c4...` is one authenticated non-governed corrective test commit whose
+   sole parent is `fef93323...` and whose sole path, blob and hash are frozen
+   above. It changes no governed predecessor identity, workflow, successor
+   policy/profile/checker or production byte.
+3. The future exact-six GREEN is one signed non-merge commit whose sole direct
+   parent is `b0529c4...` and whose changed paths remain exactly the six
+   workflow/successor-owner paths authorized by D.93.35.7/.8.
+
+The successor checker and profile must authenticate the complete chain
+`fef93323... -> b0529c4... -> future exact-six`. They must authenticate the
+first edge as exactly one harness-only non-governed corrective commit with the
+frozen identity above, prove that both governed operation/work blobs at
+`fef93323...` and `b0529c4...` are identical, then authenticate the second edge
+as the unchanged exact-six governed correction. The two governed transitions
+remain the predecessor-identity transition at `fef93323...` and the future
+exact-six correction; `b0529c4...` earns no governed identity and cannot
+substitute for either. Zero, split, reordered, repeated, merge-only or extra
+corrective test commits, a changed corrective parent/path/blob/hash, governed
+identity drift across the corrective edge, or an exact-six commit parented
+directly to `fef93323...` must fail.
+
+The RED phase signatures remain exact: authoritative operation/work plus the
+three preservation suites are 85 passed and two governance failures with zero
+skips; controlled operation is 27/28; controlled work is 11/12; and the
+successor suite is eight controls passed, one shared readiness RED and 40
+GREEN-only skips. The corrected harness passes dedicated typecheck, lint,
+Prettier, syntax and diff checks. Against the recovered exact-six candidate,
+the targeted current-root row passes both root closures with the required
+single drift and exact-six ledgers. Exact-six GREEN must still reach 87/87,
+controlled 28/28 and 12/12, complete successor/native-child gates and the
+unchanged six-path scope. Any separately disclosed descendant-marker GREEN
+failures remain production findings; this ratification neither masks nor
+reclassifies them.
+
+This is a bounded lineage correction for one already authorized tests-only
+owner. It adds no public or private protocol surface, analyzer authority,
+workflow, dependency, lock change, production seam, broader oracle amendment
+or additional GREEN path. The closure ledger records the corrected causal
+root-preservation evidence and the authenticated non-governed commit only.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
