@@ -613,7 +613,7 @@ export async function runCurrentRootDriftMutants(repositoryRoot, contract, readi
 			const driftPath = protectedDriftPath(evidence);
 			append(state.root, driftPath, "\nprotected drift\n");
 			const drift = commit(state.root, `${evidence.id} protected post-correction drift`);
-			const result = await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+			const result = await executeRepositoryCandidate(state.root, contract, current);
 			results.push({
 				driftPaths: exactChangedPaths(state.root, current, drift),
 				id: evidence.id,
@@ -707,14 +707,13 @@ export async function runOrdinaryClassBMutations(repositoryRoot, contract, readi
 				});
 				commit(state.root, name);
 			}
+			const upstream = ["swapped-merge-parents", "merge-tree-drift"].includes(name)
+				? contract.externalBase.commit
+				: current;
 			const result =
 				name === "suppressed-root-exit"
-					? await executeWithRootChildPreload(repositoryRoot, state.root, contract, contract.externalBase.commit, name)
-					: await executeRepositoryCandidate(
-							state.root,
-							contract,
-							name === "coordinated-policy-artifact-rewrite" ? current : contract.externalBase.commit
-						);
+					? await executeWithRootChildPreload(repositoryRoot, state.root, contract, upstream, name)
+					: await executeRepositoryCandidate(state.root, contract, upstream);
 			results.push({ name, result });
 		} finally {
 			rmSync(state.parent, { force: true, recursive: true });
@@ -797,12 +796,18 @@ export async function runControlledMixedCensusDiagnostics(repositoryRoot, paths)
 	}
 }
 
-async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge) {
+async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge, descendant = false) {
 	const current = git(repositoryRoot, "rev-parse", "HEAD");
 	const state = isolatedClone(repositoryRoot, current, merge ? "candidate-merge" : "candidate-linear");
 	try {
-		if (merge) {
+		let releaseTip = current;
+		if (descendant) {
 			const tree = git(state.root, "rev-parse", `${current}^{tree}`);
+			releaseTip = git(state.root, "commit-tree", tree, "-p", current, "-m", "unchanged governed descendant");
+			git(state.root, "reset", "--hard", "-q", releaseTip);
+		}
+		if (merge) {
+			const tree = git(state.root, "rev-parse", `${releaseTip}^{tree}`);
 			const mergeCommit = git(
 				state.root,
 				"commit-tree",
@@ -810,7 +815,7 @@ async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge
 				"-p",
 				upstream,
 				"-p",
-				current,
+				releaseTip,
 				"-m",
 				"genuine GitHub merge-ref control"
 			);
@@ -827,15 +832,19 @@ export async function runReadyCandidateTopologies(repositoryRoot, contract, read
 	if (!readiness.ready || readiness.correction === undefined) {
 		throw new Error("candidate topology execution requires READY evidence");
 	}
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
 	const cases = [
-		["linear:external-empty", contract.externalBase.commit, false],
-		["merge:external-empty", contract.externalBase.commit, true],
-		["linear:descendant", readiness.correction, false],
-		["merge:descendant", readiness.correction, true],
+		["linear:external-empty", contract.externalBase.commit, false, false],
+		["merge:external-empty", contract.externalBase.commit, true, false],
+		["linear:descendant", current, false, true],
+		["merge:descendant", current, true, true],
 	];
 	const results = [];
-	for (const [name, upstream, merge] of cases) {
-		results.push({ name, result: await executeCurrentCandidate(repositoryRoot, contract, upstream, merge) });
+	for (const [name, upstream, merge, descendant] of cases) {
+		results.push({
+			name,
+			result: await executeCurrentCandidate(repositoryRoot, contract, upstream, merge, descendant),
+		});
 		await yieldToEventLoop();
 	}
 	return results;
