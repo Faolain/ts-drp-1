@@ -1,19 +1,27 @@
 # Protocol v3 freeze successor
 
-This owner closes five predecessor freezes without treating an external base's
-bytes as protocol authority. The one authenticated external-empty base proves
-only ancestry and absence; all governed identities come from the signed PR-side
-fixed anchor, the three explicit predecessor-oracle transitions, the
-provisional install and one exact six-path correction.
+This owner proves a bounded release-provenance claim: the governed files at the
+checked release commit are the reviewed regular Git blobs, required workflows
+still route through the genuine checker, and current root-checker failures are
+not suppressed. It does not claim runtime protocol or product security.
 
-The same checker also accepts corrected descendants. Both modes preserve the
-50 fixed identities and the corrected gossip, operation-budget and work-budget
-test identities. The operation/work pair moves in one authenticated six-test
-transition. The checker then authenticates the complete non-governed chain of
-the root-drift correction, three plan decisions and the exact-four corrective
-RED before accepting the sole exact-six correction as that RED's direct child.
-Omission, restoration of old bytes, later drift or an alternate parent is a
-failure. Later governed transitions are rejected, and every predecessor plus
-the protocol-v2 and protocol-v3 root closures executes from clean Git
-materializations. Historical schema v1 is evidence only at the exact
-provisional commit; schema v2 is the sole current contract.
+The checker accepts a clean linear release tip or a genuine two-parent GitHub
+merge ref rooted at the caller-supplied upstream. It authenticates the release
+tree, exact governed path inventory, regular-blob mode/type, full Git object ID,
+raw blob SHA-256, and two current root-checker process results. Missing, mixed,
+malformed, wrong-mode, wrong-type, wrong-parent, wrong-tree, dirty or suppressed
+evidence fails closed.
+
+The v3 bootstrap is one exact four-owner transition from signed test boundary
+`4c986b8dc5a91f3172970c917168eeeea8271126`. Once the caller-supplied upstream
+contains the v3 policy, that upstream policy and every governed Git object are
+the immutable descendant authority. A candidate cannot authorize coordinated
+policy-and-artifact drift by rewriting its own hashes.
+
+Human-readable `git diff` output and exact planning/RED/GREEN choreography are
+not release authority. The exhaustive historical mutation corpus remains an
+explicit certification/release test and is not part of ordinary developer CI.
+Its frozen executable baseline is signed commit
+`5872fae3c57f0d16d2c45ad2d66f1f12d7152dd5`; certification materializes that
+commit in an isolated clean worktree and runs its successor test with one
+worker. Current default discovery never invokes that roughly 40-minute lane.

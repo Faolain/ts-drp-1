@@ -1,5 +1,5 @@
 {
-	"schemaVersion": "ts-drp-protocol-v3-freeze-successor-v2",
+	"schemaVersion": "ts-drp-protocol-v3-freeze-successor-v3",
 	"profile": "freeze-successor-v1",
 	"checker": "check-freeze.mjs",
 	"workflows": [
@@ -73,10 +73,10 @@
 		"tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json",
 		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs"
 	],
-	"checkerSha256": "5b2f82e6aaa553459060f46bb8c3f5b1681ca2cb8e27d0ab6e220a3f7ddde887",
+	"checkerSha256": "ff625436665e9493c3ffcad02ee6debddfbe934f98fa0b776c510ed4a6b99e57",
 	"artifactSha256": {
-		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json": "80839ab683402afd82feece541056f840496b5a39cde4daa13bc42acb9e3518b",
-		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md": "13980bae3713c1d86242d0915f640ffc03fb2708f2ade00221adb2aa8700197b",
+		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json": "ceae3be2b43facbf1001d8892931c9c2ca78123be5214bf6c394acfada6a682c",
+		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md": "58cf568423992339c53cdc11836e0d7a22ac40030c76a60c2015550a8d3024c8",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs": "f8e6d0f552f2f311a8a7d6e8e560243557e5204faa9f119e21c880ad74a6009b",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/freeze-policy.json": "01dfe6dd16c7b651be0eb56340986302c6aa20bd51bc14e1271e54051ed589c0",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/profile.json": "978797b08311955ebcd73579f22bbb2866a62f0441213d235f490d24e8cb9b88",
