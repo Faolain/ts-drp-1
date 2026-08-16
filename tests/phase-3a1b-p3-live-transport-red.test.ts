@@ -416,13 +416,13 @@ async function recoverActivationCapability(
 	};
 	const originalReadIssued = mutableStore.readIssued;
 	const originalReadOutboxPage = mutableStore.readOutboxPage;
-	mutableStore.readIssued = (selectedScope, authorSequence) =>
+	mutableStore.readIssued = (selectedScope, authorSequence): Promise<DurableIssueCommit | null> =>
 		Promise.resolve(
 			selectedScope.objectId === scope.objectId && selectedScope.author === scope.author && authorSequence === 0
 				? recoveryCommit
 				: null
 		);
-	mutableStore.readOutboxPage = (input = {}) =>
+	mutableStore.readOutboxPage = (input = {}): Promise<readonly DurableIssuanceOutboxRecord[]> =>
 		Promise.resolve(
 			input.afterKey == null
 				? Object.freeze([Object.freeze({ commit: recoveryCommit, publishState: "published" as const })])
