@@ -6,6 +6,7 @@ import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 
 import { auditSuccessorWorkflowRouting } from "./fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.js";
+import type { CompletedRepositoryCandidateEvidence } from "./fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.js";
 import {
 	FREEZE_SUCCESSOR_FIXTURE_ROOT,
 	normalizedChildOutput,
@@ -14,15 +15,57 @@ import {
 } from "./fixtures/phase-3a1b-freeze-successor-v1/successor-test-context.js";
 import {
 	governedInventory,
+	repositoryCandidateAvailability,
+	repositoryCandidatePlan,
 	repositoryMutationPlan,
 	runControlledMutation,
 	runControlledPositive,
 	runHistoricalBaselines,
+	runRepositoryCandidatePartition,
 } from "./fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs";
 
 const ANALYZER_ROOT = resolve(FREEZE_SUCCESSOR_FIXTURE_ROOT, "analyzers/workflow");
 const policyPaths = successorContract.predecessors.map(({ policy }) => policy);
 const legacyCheckers = successorContract.predecessors.map(({ checker }) => checker);
+const repositoryPlan = repositoryCandidatePlan(REPOSITORY_ROOT, successorContract);
+
+function boundedPartitions(
+	names: readonly string[],
+	size: number,
+	label: string
+): readonly {
+	readonly mutationNames: readonly string[];
+	readonly name: string;
+	readonly positiveNames: readonly string[];
+	readonly timeout: number;
+}[] {
+	const partitions = [];
+	for (let start = 0; start < names.length; start += size) {
+		const mutationNames = names.slice(start, start + size);
+		partitions.push({
+			mutationNames,
+			name: `${label} ${start + 1}-${start + mutationNames.length}`,
+			positiveNames: [],
+			timeout: mutationNames.length * 60_000 + 15_000,
+		});
+	}
+	return partitions;
+}
+
+const immutableNames = repositoryPlan.mutationNames.slice(0, 53);
+const workflowCountNames = repositoryPlan.mutationNames.slice(53, 57);
+const categoryNames = repositoryPlan.mutationNames.slice(57);
+const repositoryPartitions = [
+	...repositoryPlan.positiveNames.map((name) => ({
+		mutationNames: [],
+		name,
+		positiveNames: [name],
+		timeout: 75_000,
+	})),
+	...boundedPartitions(immutableNames, 3, "immutable paths"),
+	...boundedPartitions(workflowCountNames, 2, "workflow cardinalities"),
+	...boundedPartitions(categoryNames, 3, "repository categories"),
+];
 
 function sha256(path: string): string {
 	return createHash("sha256")
@@ -202,4 +245,46 @@ describe("D.93.35.5 freeze-successor independent controls", () => {
 			successorContract.latentGossipBinding.currentAuthorHash
 		);
 	});
+});
+
+describe("D.93.35.5 genuine repository successor causal RED", () => {
+	it("partitions the exact four-positive and 91-negative plan once in deterministic category order", () => {
+		expect(repositoryPlan.inventory).toHaveLength(58);
+		expect(repositoryPlan.immutable).toHaveLength(53);
+		expect(repositoryPlan.positiveNames).toHaveLength(4);
+		expect(repositoryPlan.mutationNames).toHaveLength(91);
+		expect(repositoryPartitions.flatMap(({ positiveNames }) => positiveNames)).toEqual(repositoryPlan.positiveNames);
+		expect(repositoryPartitions.flatMap(({ mutationNames }) => mutationNames)).toEqual(repositoryPlan.mutationNames);
+	});
+
+	for (const partition of repositoryPartitions) {
+		it(
+			`requires the exact owner and rejects fallback for ${partition.name}`,
+			async () => {
+				const availability = repositoryCandidateAvailability(REPOSITORY_ROOT);
+				expect(availability.checker).toBe(
+					resolve(REPOSITORY_ROOT, "packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs")
+				);
+				const evidence = await runRepositoryCandidatePartition(REPOSITORY_ROOT, successorContract, partition);
+				expect(evidence.available, `successor owner absent at ${availability.checker}`).toBe(true);
+				if (!evidence.available || !("positives" in evidence)) return;
+				const completed = evidence as CompletedRepositoryCandidateEvidence;
+				expect(completed.inventory).toEqual(repositoryPlan.inventory);
+				expect(completed.immutable).toEqual(repositoryPlan.immutable);
+				expect(completed.positives.map(({ name }) => name)).toEqual(partition.positiveNames);
+				for (const { name, result } of completed.positives) {
+					expect(result.signal, name).toBeNull();
+					expect(result.status, `${name}\n${normalizedChildOutput(result)}`).toBe(0);
+					expect(result.output).toContain("protocol-v3 freeze successor: PASS");
+				}
+				expect(completed.negatives.map(({ name }) => name)).toEqual(partition.mutationNames);
+				for (const { name, result } of completed.negatives) {
+					expect(result.signal, name).toBeNull();
+					expect(typeof result.status, name).toBe("number");
+					expect(result.status, `${name}\n${normalizedChildOutput(result)}`).not.toBe(0);
+				}
+			},
+			partition.timeout
+		);
+	}
 });
