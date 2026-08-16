@@ -26,10 +26,9 @@ jobs:
       - name: Run merge-base-pinned blueprint work budget checker
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT: ${{ github.workspace }}
           SUCCESSOR: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
         run: |
-          node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs "$BASE_SHA"
-          node packages/protocol-v2/scripts/check-protocol-freeze.mjs "$BASE_SHA"
           mapfile -t MERGE_BASES < <(git merge-base --all "$BASE_SHA" HEAD)
           if [ "${#MERGE_BASES[@]}" -ne 1 ]; then exit 1; fi
           MERGE_BASE="${MERGE_BASES[0]}"
