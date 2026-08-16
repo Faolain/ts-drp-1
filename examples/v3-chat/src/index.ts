@@ -1,4 +1,4 @@
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import { Keychain } from "@ts-drp/keychain";
 import { MessageQueueManager } from "@ts-drp/message-queue";
@@ -44,6 +44,13 @@ interface JoinInput {
 	readonly channelName: string;
 	readonly clientId: ClientId;
 	readonly databaseName: string;
+	readonly invite: string;
+}
+
+interface CreateInput {
+	readonly channelName: string;
+	readonly clientId: "alice";
+	readonly databaseName: string;
 }
 
 interface AcceptedMessage {
@@ -60,6 +67,7 @@ interface ChatSnapshot {
 	readonly durableTranscriptDigest: string;
 	readonly ready: boolean;
 	readonly roomId: string;
+	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." | "";
 }
 
 interface ActiveChat {
@@ -74,25 +82,27 @@ interface ActiveChat {
 	readonly networkNode: DRPNetworkNode;
 	nextLogicalTime(): number;
 	readonly roomId: string;
+	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.";
 }
 
-interface RoomMaterial {
-	readonly anchorDigest: string;
-	readonly anchorPreimageBytes: Uint8Array;
-	readonly anchorSignature: Uint8Array;
-	readonly authorAuthorizationBytes: Uint8Array;
-	readonly authors: Readonly<Record<ClientId, string>>;
+interface CreatorInviteMaterial {
+	readonly detachedGenesisSignature: Uint8Array;
+	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+interface ApplicationMaterial {
+	readonly blueprintDigest: string;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: Readonly<{
 		readonly blueprintDigests: readonly string[];
 		readonly catalogDigest: string;
 		resolve(digest: string): Readonly<Record<string, unknown>>;
 	}>;
-	readonly creatorProfileBytes: Uint8Array;
-	readonly creatorSignerSetBytes: Uint8Array;
-	readonly exactArtifactBytes: Uint8Array;
-	readonly parametersBytes: Uint8Array;
-	readonly keychains: Readonly<Record<ClientId, Keychain>>;
 }
 
 function hex(bytes: Uint8Array): string {
@@ -100,7 +110,14 @@ function hex(bytes: Uint8Array): string {
 }
 
 function bytes(value: string): Uint8Array {
+	if (value.length === 0 || value.length % 2 !== 0 || !/^[0-9a-f]+$/u.test(value)) {
+		throw new TypeError("v3 chat hex value is invalid");
+	}
 	return Uint8Array.from(value.match(/.{2}/gu) ?? [], (pair) => Number.parseInt(pair, 16));
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 }
 
 function digest(domain: string, value: Uint8Array): string {
@@ -141,24 +158,11 @@ function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 		durableTranscriptDigest: digest("ts-drp/d9336-chat-durable-transcript/v1", encodeCanonical(transcript)),
 		ready: active !== undefined,
 		roomId: active?.roomId ?? "",
+		trustStatus: active?.trustStatus ?? "",
 	});
 }
 
-async function roomMaterial(): Promise<RoomMaterial> {
-	const alice = new Keychain({ private_key_seed: CLIENTS.alice.seed });
-	const bob = new Keychain({ private_key_seed: CLIENTS.bob.seed });
-	await Promise.all([alice.start(), bob.start()]);
-	const authors = Object.freeze({ alice: alice.localAuthorId, bob: bob.localAuthorId });
-	const orderedAuthors = Object.freeze([authors.alice, authors.bob].sort());
-	const authorAuthorizationBytes = encodeCanonical({
-		authors: orderedAuthors,
-		epoch: 0,
-		kind: "drp-author-authorization",
-		objectId: OBJECT_ID,
-		profileId: "creator-author-authorization-v1",
-		protocolMajor: 3,
-		version: 1,
-	});
+function applicationMaterial(): ApplicationMaterial {
 	const exactArtifactBytes = new TextEncoder().encode(CHAT_ARTIFACT_SOURCE);
 	const artifactDigest = digest("ts-drp/blueprint-artifact/v3", exactArtifactBytes);
 	const blueprintPackage = Object.freeze({
@@ -193,36 +197,6 @@ async function roomMaterial(): Promise<RoomMaterial> {
 	});
 	const canonicalBlueprintPackageBytes = encodeCanonical(blueprintPackage);
 	const blueprintDigest = digest("ts-drp/blueprint-admission/v3", canonicalBlueprintPackageBytes);
-	const signerSet = Object.freeze([Object.freeze({ publicKey: authors.alice, signerId: "creator" })]);
-	const creatorSignerSetBytes = encodeCanonical(signerSet);
-	const creatorProfileBytes = encodeCanonical({
-		cryptoSuiteId: "ed25519-sha256-v3",
-		profileId: "creator-trusted-v1",
-		quorum: 1,
-		signers: signerSet,
-	});
-	const parametersBytes = encodeCanonical(PARAMETERS);
-	const anchorPreimageBytes = encodeCanonical({
-		aclDigest: digest("ts-drp/author-authorization/v3", authorAuthorizationBytes),
-		archiveIndexRoot: "3".repeat(64),
-		blueprintDigest,
-		cryptoSuiteId: "ed25519-sha256-v3",
-		cutDigest: "0".repeat(64),
-		epoch: 0,
-		historyRoot: "5".repeat(64),
-		historySize: 0,
-		kind: "drp-epoch-anchor",
-		objectId: OBJECT_ID,
-		parametersDigest: digest("ts-drp/parameters/v3", parametersBytes),
-		previousAnchor: "0".repeat(64),
-		profileDigest: digest("ts-drp/profile/v3", creatorProfileBytes),
-		protocolMajor: 3,
-		signerSetDigest: digest("ts-drp/signer-set/v3", creatorSignerSetBytes),
-		stateDigest: "7".repeat(64),
-	});
-	const anchorDigestBytes = hashDomain("ts-drp/epoch-anchor/v3", anchorPreimageBytes);
-	const anchorDigest = hex(anchorDigestBytes);
-	const anchorSignature = await alice.signWithLocalAuthor(anchorDigestBytes);
 	const catalogDigest = digest("ts-drp/d9336-chat-catalog/v1", canonicalBlueprintPackageBytes);
 	const resolved = Object.freeze({
 		artifactDigest,
@@ -247,11 +221,7 @@ async function roomMaterial(): Promise<RoomMaterial> {
 		}),
 	});
 	return Object.freeze({
-		anchorDigest,
-		anchorPreimageBytes,
-		anchorSignature,
-		authorAuthorizationBytes,
-		authors,
+		blueprintDigest,
 		canonicalBlueprintPackageBytes,
 		catalog: Object.freeze({
 			blueprintDigests: Object.freeze([blueprintDigest]),
@@ -261,11 +231,152 @@ async function roomMaterial(): Promise<RoomMaterial> {
 				return resolved;
 			},
 		}),
-		creatorProfileBytes,
-		creatorSignerSetBytes,
-		exactArtifactBytes,
-		keychains: Object.freeze({ alice, bob }),
-		parametersBytes,
+	});
+}
+
+async function createLocalKeychain(clientId: ClientId): Promise<Keychain> {
+	const keychain = new Keychain({ private_key_seed: CLIENTS[clientId].seed });
+	await keychain.start();
+	return keychain;
+}
+
+async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
+	const [alice, bob] = await Promise.all([createLocalKeychain("alice"), createLocalKeychain("bob")]);
+	const orderedAuthors = Object.freeze([alice.localAuthorId, bob.localAuthorId].sort());
+	const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
+		authors: orderedAuthors,
+		epoch: 0,
+		kind: "drp-author-authorization",
+		objectId: OBJECT_ID,
+		profileId: "creator-author-authorization-v1",
+		protocolMajor: 3,
+		version: 1,
+	});
+	const application = applicationMaterial();
+	const signerSet = Object.freeze([Object.freeze({ publicKey: alice.localAuthorId, signerId: "creator" })]);
+	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
+	const exactCanonicalProfileBytes = encodeCanonical({
+		cryptoSuiteId: "ed25519-sha256-v3",
+		profileId: "creator-trusted-v1",
+		quorum: 1,
+		signers: signerSet,
+	});
+	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
+	const exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({
+		aclDigest: digest("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes),
+		archiveIndexRoot: "3".repeat(64),
+		blueprintDigest: application.blueprintDigest,
+		cryptoSuiteId: "ed25519-sha256-v3",
+		cutDigest: "0".repeat(64),
+		epoch: 0,
+		historyRoot: "5".repeat(64),
+		historySize: 0,
+		kind: "drp-epoch-anchor",
+		objectId: OBJECT_ID,
+		parametersDigest: digest("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes),
+		previousAnchor: "0".repeat(64),
+		profileDigest: digest("ts-drp/profile/v3", exactCanonicalProfileBytes),
+		protocolMajor: 3,
+		signerSetDigest: digest("ts-drp/signer-set/v3", exactCanonicalSignerSetBytes),
+		stateDigest: "7".repeat(64),
+	});
+	const anchorDigestBytes = hashDomain("ts-drp/epoch-anchor/v3", exactCanonicalGenesisAnchorPreimageBytes);
+	return Object.freeze({
+		detachedGenesisSignature: await alice.signWithLocalAuthor(anchorDigestBytes),
+		exactCanonicalAuthorAuthorizationBytes,
+		exactCanonicalGenesisAnchorPreimageBytes,
+		exactCanonicalParametersCarrierBytes,
+		exactCanonicalProfileBytes,
+		exactCanonicalSignerSetBytes,
+		pinnedGenesisAnchorDigest: hex(anchorDigestBytes),
+	});
+}
+
+const CREATOR_INVITE_KEYS = Object.freeze([
+	"detachedGenesisSignature",
+	"exactCanonicalAuthorAuthorizationBytes",
+	"exactCanonicalGenesisAnchorPreimageBytes",
+	"exactCanonicalParametersCarrierBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+	"kind",
+	"pinnedGenesisAnchorDigest",
+	"version",
+]);
+
+function encodeCreatorInvite(material: CreatorInviteMaterial): string {
+	return hex(
+		encodeCanonical({
+			detachedGenesisSignature: material.detachedGenesisSignature,
+			exactCanonicalAuthorAuthorizationBytes: material.exactCanonicalAuthorAuthorizationBytes,
+			exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+			exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+			exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
+			exactCanonicalSignerSetBytes: material.exactCanonicalSignerSetBytes,
+			kind: "d9337-v3-chat-creator-invite",
+			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+			version: 1,
+		})
+	);
+}
+
+function inviteBytes(values: Record<string, unknown>, field: string): Uint8Array {
+	const value = values[field];
+	if (!(value instanceof Uint8Array) || value.byteLength === 0) {
+		throw new TypeError(`v3 chat creator invite ${field} is invalid`);
+	}
+	return new Uint8Array(value);
+}
+
+function decodeCreatorInvite(invite: string): CreatorInviteMaterial {
+	const encoded = bytes(invite);
+	const decoded = decodeCanonical(encoded, { maxBytes: 65_536, maxDepth: 4, maxItems: 128 });
+	if (
+		typeof decoded !== "object" ||
+		decoded === null ||
+		Object.getPrototypeOf(decoded) !== null ||
+		!sameBytes(encodeCanonical(decoded), encoded)
+	) {
+		throw new TypeError("v3 chat creator invite is invalid");
+	}
+	const keys = Reflect.ownKeys(decoded);
+	if (
+		keys.length !== CREATOR_INVITE_KEYS.length ||
+		keys.some((key) => typeof key !== "string" || !CREATOR_INVITE_KEYS.includes(key))
+	) {
+		throw new TypeError("v3 chat creator invite fields are invalid");
+	}
+	const record = decoded as Record<string, unknown>;
+	const values = Object.fromEntries(
+		CREATOR_INVITE_KEYS.map((key) => {
+			const descriptor = Object.getOwnPropertyDescriptor(record, key);
+			if (descriptor === undefined || !("value" in descriptor) || descriptor.enumerable !== true) {
+				throw new TypeError("v3 chat creator invite field ownership is invalid");
+			}
+			return [key, descriptor.value] as const;
+		})
+	) as Record<(typeof CREATOR_INVITE_KEYS)[number], unknown>;
+	if (values.kind !== "d9337-v3-chat-creator-invite" || values.version !== 1) {
+		throw new TypeError("v3 chat creator invite version is invalid");
+	}
+	if (
+		typeof values.pinnedGenesisAnchorDigest !== "string" ||
+		!/^[0-9a-f]{64}$/u.test(values.pinnedGenesisAnchorDigest)
+	) {
+		throw new TypeError("v3 chat creator invite anchor is invalid");
+	}
+	const detachedGenesisSignature = inviteBytes(values, "detachedGenesisSignature");
+	if (detachedGenesisSignature.byteLength !== 64) {
+		throw new TypeError("v3 chat creator invite signature is invalid");
+	}
+	return Object.freeze({
+		detachedGenesisSignature,
+		exactCanonicalAuthorAuthorizationBytes: inviteBytes(values, "exactCanonicalAuthorAuthorizationBytes"),
+		exactCanonicalGenesisAnchorPreimageBytes: inviteBytes(values, "exactCanonicalGenesisAnchorPreimageBytes"),
+		exactCanonicalParametersCarrierBytes: inviteBytes(values, "exactCanonicalParametersCarrierBytes"),
+		exactCanonicalProfileBytes: inviteBytes(values, "exactCanonicalProfileBytes"),
+		exactCanonicalSignerSetBytes: inviteBytes(values, "exactCanonicalSignerSetBytes"),
+		pinnedGenesisAnchorDigest: values.pinnedGenesisAnchorDigest,
 	});
 }
 
@@ -346,37 +457,42 @@ function acceptedSink(accepted: Map<string, AcceptedMessage>): V3AdmittedVertexS
 }
 
 async function joinRoom(input: JoinInput): Promise<ActiveChat> {
-	const material = await roomMaterial();
+	const application = applicationMaterial();
+	const invite = decodeCreatorInvite(input.invite);
 	const selected = CLIENTS[input.clientId];
-	const keychain = material.keychains[input.clientId];
-	const author = material.authors[input.clientId];
+	const keychain = await createLocalKeychain(input.clientId);
+	const author = keychain.localAuthorId;
 	const objectIdResult = parseStorageObjectId(OBJECT_ID);
 	if (!objectIdResult.ok) throw new TypeError("v3 chat object id is invalid");
 	const aheStore = await createBrowserAheDurableStore({ databaseName: `${input.databaseName}--ahe` });
 	const trustStore = createCurrentAnchorTrustStore({
 		objectId: objectIdResult.value,
-		pinnedGenesisAnchorDigest: material.anchorDigest,
+		pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
 		store: aheStore,
 	});
 	const installed = await trustStore.install({
-		detachedGenesisSignature: material.anchorSignature,
-		exactCanonicalGenesisAnchorPreimageBytes: material.anchorPreimageBytes,
-		exactCanonicalProfileBytes: material.creatorProfileBytes,
-		exactCanonicalSignerSetBytes: material.creatorSignerSetBytes,
-		pinnedGenesisAnchorDigest: material.anchorDigest,
+		detachedGenesisSignature: invite.detachedGenesisSignature,
+		exactCanonicalGenesisAnchorPreimageBytes: invite.exactCanonicalGenesisAnchorPreimageBytes,
+		exactCanonicalProfileBytes: invite.exactCanonicalProfileBytes,
+		exactCanonicalSignerSetBytes: invite.exactCanonicalSignerSetBytes,
+		pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
 	});
 	if (!installed.ok && installed.reason !== "already-installed") {
 		throw new TypeError(`v3 chat trust installation failed: ${installed.reason}`);
+	}
+	const openedTrust = installed.ok ? installed : await trustStore.open();
+	if (!openedTrust.ok || openedTrust.trust.profileId !== "creator-trusted-v1") {
+		throw new TypeError("v3 chat verified trust profile is invalid");
 	}
 	const prepared = await prepareV3LiveGeneration({
 		authenticationProfile: "creator-only",
 		store: aheStore,
 		objectId: objectIdResult.value,
-		pinnedGenesisAnchorDigest: material.anchorDigest,
-		exactCanonicalAnchorPreimageBytes: material.anchorPreimageBytes,
-		detachedSignature: material.anchorSignature,
-		exactCanonicalParametersCarrierBytes: material.parametersBytes,
-		catalog: material.catalog as never,
+		pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
+		exactCanonicalAnchorPreimageBytes: invite.exactCanonicalGenesisAnchorPreimageBytes,
+		detachedSignature: invite.detachedGenesisSignature,
+		exactCanonicalParametersCarrierBytes: invite.exactCanonicalParametersCarrierBytes,
+		catalog: application.catalog as never,
 	});
 	if (!prepared.ok) throw new TypeError(`v3 chat preparation failed: ${prepared.kind}`);
 	const issuanceStore = await createBrowserDurableIssuanceStore({ primaryDatabaseName: input.databaseName });
@@ -385,7 +501,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 	const lineage = await issuanceStore.readLineage(scope);
 	if (lineage.next === 0) {
 		const admission = prepareBlueprintAdmission({
-			canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
+			canonicalBlueprintPackageBytes: application.canonicalBlueprintPackageBytes,
 			expectedBlueprintDigest: prepared.descriptor.blueprintDigest,
 		});
 		const signer: SignRegisteredVertexDigest = (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest);
@@ -397,8 +513,8 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 			transactIssue: (selectedScope, buildAndSign) => issuanceStore.transactIssue(selectedScope, buildAndSign),
 		});
 		const bootstrap = await issuer.issue({
-			anchor: material.anchorDigest,
-			dependencies: [material.anchorDigest],
+			anchor: invite.pinnedGenesisAnchorDigest,
+			dependencies: [invite.pinnedGenesisAnchorDigest],
 			epoch: 0,
 			logicalTime: 1,
 			objectId: OBJECT_ID,
@@ -412,7 +528,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 	}
 	const recovered = await recoverV3LiveReplica({
 		capability: prepared.capability,
-		exactCanonicalAuthorAuthorizationBytes: material.authorAuthorizationBytes,
+		exactCanonicalAuthorAuthorizationBytes: invite.exactCanonicalAuthorAuthorizationBytes,
 		issuanceScope: scope,
 		issuanceStore,
 		liveJournalStore: journalStore,
@@ -449,12 +565,20 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 			return current;
 		},
 		roomId: prepared.descriptor.anchorDigest,
+		trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
 	});
 }
 
 let active: ActiveChat | undefined;
 
 const api = Object.freeze({
+	async create(input: CreateInput): Promise<string> {
+		if (active !== undefined) throw new TypeError("v3 chat client is already joined");
+		const material = await createCreatorInviteMaterial();
+		const invite = encodeCreatorInvite(material);
+		active = await joinRoom({ ...input, invite });
+		return invite;
+	},
 	async join(input: JoinInput): Promise<void> {
 		if (active !== undefined) throw new TypeError("v3 chat client is already joined");
 		active = await joinRoom(input);
