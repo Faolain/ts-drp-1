@@ -46062,3 +46062,33 @@ Slice 04 is closed. Slice 05 owns close/reopen from durable stores, recovery
 before subscription, a post-reconnect exchange, and final convergence. This
 checkpoint does not claim reconnect completion, D.93.36 completion, or broader
 production-hardening completion.
+
+## D.93.36 Slice 05 closure checkpoint
+
+The durable reconnect RED is signed at `c90c252`. The two signed predecessor
+test migrations `4ca7956` and `972e7cb` align the retained package-boundary
+assertion with Slice 04's already-shipped explicit `./v3-live` subpath. The
+two-owner reconnect GREEN is signed at
+`442f361082de19f352788f2211a9e62ac40a17b4`.
+
+Recovery now returns the detached admitted views that it genuinely
+re-authenticated and indexed. The v3-chat artifact uses those views to hydrate
+the durable transcript before creating and activating its transport, accepts an
+identical already-installed trust anchor without accepting a conflict, and
+resumes its local logical clock from the recovered visible history. The
+bootstrap is a distinct non-visible `join` operation rather than a synthetic
+chat message.
+
+Final evidence was Playwright 2/2 in 1.9 seconds and the retained five-file
+live-plane set 27/27 in 7.26 seconds. The node build, example typecheck/build,
+targeted ESLint, Prettier, and diff checks passed. Package-wide node typecheck
+continues to report only the two pre-existing compact-history helper union
+diagnostics. The bounded Codex review was stopped as `NO_VERDICT` after it
+entered protected untracked historical REDs; it made no edits and reproduced
+no Slice 05 defect.
+
+D.93.36 is closed and its durable rationale is archived at
+`specs/done/d9336-joint-consumer/README.md`. This establishes warm reconnect
+and convergence for the exercised room history only. It does not establish
+general offline-gap synchronization, dynamic writer grants, Phase 3b, or
+completion of the broader production-hardening plan.
