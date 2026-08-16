@@ -1452,7 +1452,11 @@ function tokenSourceAudit(source: string): TokenSourceAudit {
 			if (
 				method !== undefined &&
 				forbiddenCalls.has(method) &&
-				!(method === "append" && (owner === "recoverV3LiveReplica" || owner === "handleV3Ingress"))
+				!(
+					(method === "append" &&
+						(owner === "recoverV3LiveReplica" || owner === "handleV3Ingress" || owner === "issueLocal")) ||
+					(method === "transactIssue" && owner === "issueLocal")
+				)
 			) {
 				forbiddenFullBLiveEffects.push(method);
 			}

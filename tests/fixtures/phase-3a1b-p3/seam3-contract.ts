@@ -1,5 +1,5 @@
 import type { MessageQueueManager } from "@ts-drp/message-queue";
-import type { AdmittedReceivedVertexView } from "@ts-drp/protocol-v3";
+import type { AdmittedReceivedVertexView, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
 export const SEAM3_BUF_CLI_PACKAGE = "@bufbuild/buf@1.69.0";
@@ -154,9 +154,32 @@ export interface V3PlaneHandleContract {
 	readonly epoch: 0;
 	readonly topic: string;
 	readonly queueId: string;
+	issueLocal(input: V3LocalIssueInputContract): Promise<V3LocalIssueResultContract>;
 	publishPending(): Promise<V3EgressResultContract>;
 	deactivate(): void;
 }
+
+export interface V3LocalIssueInputContract {
+	readonly dependencies: readonly string[];
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}
+
+export type V3LocalIssueResultContract =
+	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind:
+				| "not-active"
+				| "malformed-input"
+				| "authorization-rejected"
+				| "issuance-rejected"
+				| "admission-rejected"
+				| "journal-rejected"
+				| "graph-rejected";
+			readonly detail: string;
+	  }>;
 
 export type V3PlaneActivationResultContract =
 	| Readonly<{ ok: true; handle: V3PlaneHandleContract }>

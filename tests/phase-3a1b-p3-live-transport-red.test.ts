@@ -570,6 +570,8 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"V3AdmittedVertexSink",
 			"V3EgressResult",
 			"V3LiveDescriptor",
+			"V3LocalIssueInput",
+			"V3LocalIssueResult",
 			"V3PlaneActivationFailureKind",
 			"V3PlaneActivationInput",
 			"V3PlaneActivationResult",

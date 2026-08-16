@@ -1,5 +1,5 @@
 import type { MessageQueueManager } from "@ts-drp/message-queue";
-import type { AdmittedReceivedVertexView } from "@ts-drp/protocol-v3";
+import type { AdmittedReceivedVertexView, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import { type DRPNetworkNode, type Message, type V3Envelope, V3Envelope as V3EnvelopeCodec } from "@ts-drp/types";
 
 import type {
@@ -8,6 +8,8 @@ import type {
 	routeV3Ingress,
 	V3AdmittedVertexSink,
 	V3EgressResult,
+	V3LocalIssueInput,
+	V3LocalIssueResult,
 	V3PlaneActivationInput,
 	V3PlaneActivationResult,
 	V3PlaneHandle,
@@ -35,9 +37,32 @@ interface ExpectedHandle {
 	readonly epoch: 0;
 	readonly topic: string;
 	readonly queueId: string;
+	issueLocal(input: ExpectedLocalIssueInput): Promise<ExpectedLocalIssueResult>;
 	publishPending(): Promise<ExpectedEgress>;
 	deactivate(): void;
 }
+
+interface ExpectedLocalIssueInput {
+	readonly dependencies: readonly string[];
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}
+
+type ExpectedLocalIssueResult =
+	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind:
+				| "not-active"
+				| "malformed-input"
+				| "authorization-rejected"
+				| "issuance-rejected"
+				| "admission-rejected"
+				| "journal-rejected"
+				| "graph-rejected";
+			readonly detail: string;
+	  }>;
 
 interface ExpectedInput {
 	readonly capability: RecoveredV3Live;
@@ -73,6 +98,8 @@ type _Input = Assert<Equal<V3PlaneActivationInput, ExpectedInput>>;
 type _Sink = Assert<Equal<V3AdmittedVertexSink, ExpectedSink>>;
 type _Activation = Assert<Equal<V3PlaneActivationResult, ExpectedActivationResult>>;
 type _Egress = Assert<Equal<V3EgressResult, ExpectedEgress>>;
+type _LocalIssueInput = Assert<Equal<V3LocalIssueInput, ExpectedLocalIssueInput>>;
+type _LocalIssueResult = Assert<Equal<V3LocalIssueResult, ExpectedLocalIssueResult>>;
 type _Handle = Assert<Equal<V3PlaneHandle, ExpectedHandle>>;
 type _Activate = Assert<Equal<typeof activateV3LivePlane, (input: ExpectedInput) => ExpectedActivationResult>>;
 type _Route = Assert<Equal<typeof routeV3Ingress, (networkNode: DRPNetworkNode, message: Message) => boolean>>;
@@ -80,11 +107,13 @@ type _Deactivate = Assert<Equal<ReturnType<V3PlaneHandle["deactivate"]>, void>>;
 type _V3Envelope = Assert<Equal<V3Envelope, ExpectedV3Envelope>>;
 
 declare const handle: V3PlaneHandle;
-const handleShape: readonly [string, 0, string, string, Promise<ExpectedEgress>] = [
+declare const localIssueInput: ExpectedLocalIssueInput;
+const handleShape: readonly [string, 0, string, string, Promise<ExpectedLocalIssueResult>, Promise<ExpectedEgress>] = [
 	handle.objectId,
 	handle.epoch,
 	handle.topic,
 	handle.queueId,
+	handle.issueLocal(localIssueInput),
 	handle.publishPending(),
 ];
 handle.deactivate();
