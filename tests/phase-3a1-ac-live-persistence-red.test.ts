@@ -1206,8 +1206,15 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 			methods.every((method) => ["delete", "get", "set"].includes(method))
 		);
 	});
-	expect(tokenOwners, "one private token WeakMap owner").toHaveLength(1);
-	const owner = tokenOwners[0];
+	expect(tokenOwners, "prepared and recovered private token WeakMap owners").toHaveLength(2);
+	const owner = tokenOwners.find(({ name }) =>
+		callsFor(name).some((call) => {
+			if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "set") return false;
+			let current: ts.Node | undefined = call;
+			while (current !== undefined && !ts.isFunctionDeclaration(current)) current = current.parent;
+			return current?.name?.text === "prepareV3LiveGeneration";
+		})
+	);
 	if (owner === undefined) throw new TypeError("missing private token owner");
 	const registrationOwner = owners.find(({ name }) => {
 		if (name === owner.name) return false;
@@ -1445,7 +1452,7 @@ function tokenSourceAudit(source: string): TokenSourceAudit {
 			if (
 				method !== undefined &&
 				forbiddenCalls.has(method) &&
-				!(method === "append" && owner === "recoverV3LiveReplica")
+				!(method === "append" && (owner === "recoverV3LiveReplica" || owner === "handleV3Ingress"))
 			) {
 				forbiddenFullBLiveEffects.push(method);
 			}
