@@ -633,16 +633,14 @@ function namedVariableStringArray(source: ts.SourceFile, ownerName: string): rea
 
 type PublicRootOwner =
 	| Readonly<{ kind: "identifier"; name: string }>
-	| Readonly<{ kind: "awaited-call"; name: string }>;
+	| Readonly<{ kind: "awaited-value"; name: string }>;
 
 function isPublicRootOwner(expression: ts.Expression, owner: PublicRootOwner): boolean {
 	if (owner.kind === "identifier") return ts.isIdentifier(expression) && expression.text === owner.name;
 	return (
 		ts.isAwaitExpression(expression) &&
-		ts.isCallExpression(expression.expression) &&
-		ts.isIdentifier(expression.expression.expression) &&
-		expression.expression.expression.text === owner.name &&
-		expression.expression.arguments.length === 0
+		ts.isIdentifier(expression.expression) &&
+		expression.expression.text === owner.name
 	);
 }
 
@@ -723,7 +721,7 @@ function runtimeAllowlist(path: string): readonly string[] {
 		return namedPublicSurfaceTestArray(
 			source,
 			"[public-surface] preserves exactly the ten package-root runtime exports",
-			{ kind: "awaited-call", name: "surface" }
+			{ kind: "awaited-value", name: "packageSurfaceLoad" }
 		);
 	if (path.endsWith("protocol-v3-blueprint-work-budget-0p0.test.ts"))
 		return namedPublicSurfaceTestArray(
@@ -1610,6 +1608,10 @@ describe("D.93.27 public extraction seam tests-only RED", () => {
 	it("adds no subpath, dependency, legacy mapping, capability or live-effect owner", () => {
 		expect(protocolV3Package.exports).toEqual({
 			".": { types: "./dist/src/public.d.ts", import: "./dist/src/public.js" },
+			"./author-authorization": {
+				types: "./dist/src/author-authorization.d.ts",
+				import: "./dist/src/author-authorization.js",
+			},
 			"./registry/registry-v1.json": "./registry/registry-v1.json",
 		});
 		expect(protocolV3Package.dependencies).toEqual({

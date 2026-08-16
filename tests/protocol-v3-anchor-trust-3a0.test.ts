@@ -14,6 +14,13 @@ import {
 	makeCreatorMaterial,
 	makeTrustStateRecord,
 } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
+import {
+	AUTHOR,
+	installInput as authorizationInstallInput,
+	canonicalCarrierBytes,
+	makeAuthorizationCreatorMaterial,
+} from "./fixtures/phase-3a1b-p6/author-authorization-contract.js";
+import { auditAuthorAuthorizationSourceGraph } from "./fixtures/phase-3a1b-p6/author-authorization-source-analyzer.js";
 
 interface Failure {
 	readonly ok: false;
@@ -66,6 +73,8 @@ const REGISTRY_V2 = resolve(REPOSITORY_ROOT, "packages/protocol-v2/registry/fiel
 const FIXTURE_DIRECTORY = resolve(CURRENT_DIRECTORY, "fixtures/phase-3a0-v3");
 const PROTOCOL_V3_PACKAGE = resolve(REPOSITORY_ROOT, "packages/protocol-v3/package.json");
 const PROTOCOL_V3_INDEX = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/index.ts");
+const ANCHOR_TRUST_SINGLETON = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/anchor-trust-singleton.ts");
+const AUTHOR_AUTHORIZATION_ENTRY = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/author-authorization.ts");
 const EXPECTED_RUNTIME_EXPORTS = [
 	"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
 	"admitReceivedVertex",
@@ -666,7 +675,7 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 		if (authenticated.ok) expect(Object.isFrozen(authenticated.provenance)).toBe(true);
 	});
 
-	it("[opaque-capability] rejects spread, JSON, prototype and cross-instance counterfeits", async () => {
+	it("[opaque-capability] rejects structural counterfeits and preserves singleton authority across entry reloads", async () => {
 		const authenticateCurrentEpochAnchor = await requireFunction("authenticateCurrentEpochAnchor");
 		const installCreatorAnchorTrustRoot = await requireFunction("installCreatorAnchorTrustRoot");
 		const installed = installCreatorAnchorTrustRoot(installInput());
@@ -681,10 +690,7 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 			expectFailure(authenticateCurrentEpochAnchor(authenticateInput(trust)), "untrusted-context");
 		const second = (await import(`${pathToFileURL(PUBLIC_ENTRY).href}?phase3a0-second-instance`)) as AnchorTrustSurface;
 		expect(second.authenticateCurrentEpochAnchor).toBeTypeOf("function");
-		expectFailure(
-			second.authenticateCurrentEpochAnchor?.(authenticateInput(installed.trust)) ?? { ok: true },
-			"untrusted-context"
-		);
+		expect(second.authenticateCurrentEpochAnchor?.(authenticateInput(installed.trust))).toMatchObject({ ok: true });
 	});
 
 	it("[authenticate-precedence] rejects malformed/counterfeit/decode/canonical/schema/suite/bindings/current/signature", async () => {
@@ -902,7 +908,11 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 	it("[zero-effects] governs the full implementation import graph and rejects ambient-authority mutants", () => {
 		const publicSource = readFileSync(resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/public.ts"), "utf8");
 		const indexSource = readFileSync(PROTOCOL_V3_INDEX, "utf8");
-		const source = `${publicSource}\n${indexSource}`;
+		const singletonSource = existsSync(ANCHOR_TRUST_SINGLETON) ? readFileSync(ANCHOR_TRUST_SINGLETON, "utf8") : "";
+		const authorizationSource = existsSync(AUTHOR_AUTHORIZATION_ENTRY)
+			? readFileSync(AUTHOR_AUTHORIZATION_ENTRY, "utf8")
+			: "";
+		const source = `${publicSource}\n${indexSource}\n${singletonSource}\n${authorizationSource}`;
 		for (const forbidden of [
 			"AheDurableStore",
 			"catalog.resolve",
@@ -919,8 +929,18 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 		const cleanGraph = new Map([
 			[publicPath, publicSource],
 			[PROTOCOL_V3_INDEX, indexSource],
+			[ANCHOR_TRUST_SINGLETON, singletonSource],
+			[AUTHOR_AUTHORIZATION_ENTRY, authorizationSource],
 		]);
 		expect(authorityViolations(publicPath, cleanGraph)).toEqual([]);
+		expect(
+			auditAuthorAuthorizationSourceGraph({
+				index: indexSource,
+				publicEntry: publicSource,
+				singleton: singletonSource,
+				subpath: authorizationSource,
+			})
+		).toEqual([]);
 		for (const mutant of [
 			new Map(cleanGraph).set(PROTOCOL_V3_INDEX, `${indexSource}\nimport "node:fs";`),
 			new Map(cleanGraph).set(PROTOCOL_V3_INDEX, `${indexSource}\nglobalThis["anchorAuthority"];`),
@@ -929,5 +949,33 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 				.set(resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/authority.ts"), 'import "@ts-drp/control-plane";'),
 		])
 			expect(authorityViolations(publicPath, mutant)).not.toEqual([]);
+	});
+
+	it("[one-owner-cross-entry] accepts root-opened trust only through the shared authorization singleton", async () => {
+		if (!existsSync(ANCHOR_TRUST_SINGLETON) || !existsSync(AUTHOR_AUTHORIZATION_ENTRY)) {
+			throw new Error("PHASE_3A1B_P6_MISSING_SHARED_ANCHOR_TRUST_OWNER");
+		}
+		const root = await surfaceLoad;
+		const authorization = (await import(pathToFileURL(AUTHOR_AUTHORIZATION_ENTRY).href)) as {
+			openCurrentEpochAuthorAuthorization(
+				input: unknown
+			): Failure | { readonly authorization: unknown; readonly ok: true };
+			resolveCurrentEpochAuthorizedAuthor(input: unknown): Failure | { readonly ok: true };
+		};
+		const material = makeAuthorizationCreatorMaterial();
+		const installed = root.installCreatorAnchorTrustRoot?.(authorizationInstallInput(material));
+		expect(installed).toMatchObject({ ok: true });
+		if (installed === undefined || !installed.ok) return;
+		const opened = authorization.openCurrentEpochAuthorAuthorization({
+			detachedAnchorSignature: material.signature,
+			exactCanonicalAnchorPreimageBytes: material.anchorBytes,
+			exactCanonicalAuthorAuthorizationBytes: canonicalCarrierBytes(),
+			trust: installed.trust,
+		});
+		expect(opened).toMatchObject({ ok: true });
+		if (!opened.ok) return;
+		expect(
+			authorization.resolveCurrentEpochAuthorizedAuthor({ authorization: opened.authorization, author: AUTHOR })
+		).toMatchObject({ ok: true });
 	});
 });
