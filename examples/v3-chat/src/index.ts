@@ -386,9 +386,12 @@ function createRoomNetwork(
 ): Readonly<{
 	readonly channel: BroadcastChannel;
 	readonly networkNode: DRPNetworkNode;
+	requestRetainedHistory(): void;
+	setRetainedPublisher(publisher: () => Promise<void>): void;
 }> {
 	const channel = new BroadcastChannel(channelName);
 	const topics = new Set<string>();
+	let retainedPublisher = (): Promise<void> => Promise.resolve();
 	const node = {
 		peerId,
 		membershipVerifier: undefined,
@@ -428,12 +431,28 @@ function createRoomNetwork(
 	} as unknown as DRPNetworkNode;
 	channel.addEventListener("message", (event: MessageEvent<unknown>) => {
 		if (typeof event.data !== "object" || event.data === null) return;
+		if (
+			Reflect.get(event.data, "kind") === "d9338-retained-history-request" &&
+			Reflect.get(event.data, "requester") !== peerId
+		) {
+			void retainedPublisher().catch(() => undefined);
+			return;
+		}
 		const topic = Reflect.get(event.data, "topic");
 		const message = Reflect.get(event.data, "message");
 		if (typeof topic !== "string" || !topics.has(topic) || typeof message !== "object" || message === null) return;
 		routeV3Ingress(node, message as Message);
 	});
-	return Object.freeze({ channel, networkNode: node });
+	return Object.freeze({
+		channel,
+		networkNode: node,
+		requestRetainedHistory(): void {
+			channel.postMessage({ kind: "d9338-retained-history-request", requester: peerId });
+		},
+		setRetainedPublisher(publisher: () => Promise<void>): void {
+			retainedPublisher = publisher;
+		},
+	});
 }
 
 function acceptVertex(accepted: Map<string, AcceptedMessage>, vertex: AdmittedReceivedVertexView): void {
@@ -545,6 +564,11 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 		onAdmittedVertex: acceptedSink(accepted),
 	});
 	if (!activated.ok) throw new TypeError(`v3 chat activation failed: ${activated.kind}`);
+	transport.setRetainedPublisher(async () => {
+		const result = await activated.handle.republishRetained();
+		if (!result.ok) throw new TypeError(`v3 chat retained publication failed: ${result.kind}`);
+	});
+	transport.requestRetainedHistory();
 	let logicalTime = [...accepted.values()].reduce<number>(
 		(maximum, message) => Math.max(maximum, message.logicalTime + 2),
 		selected.logicalTime

@@ -252,6 +252,7 @@ export interface V3PlaneHandle {
 	readonly queueId: string;
 	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
 	publishPending(): Promise<V3EgressResult>;
+	republishRetained(): Promise<V3EgressResult>;
 	deactivate(): void;
 }
 
@@ -3092,6 +3093,136 @@ function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V
 	return result;
 }
 
+async function republishRetained(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	const scope = liveJournalScope(registration.payload);
+	let readiness;
+	try {
+		readiness = await registration.liveJournalStore.readiness({ scope });
+	} catch {
+		return egressFailure("store-failed", "v3 retained journal readiness failed");
+	}
+	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	if (
+		!readiness.ok ||
+		!readiness.ready ||
+		!sameLiveJournalScope(readiness.scope, scope) ||
+		!NumberIsSafeInteger(readiness.rowCount) ||
+		readiness.rowCount < 0 ||
+		readiness.rowCount > registration.payload.parameters.maxEpochVertices
+	) {
+		return egressFailure("record-rejected", "v3 retained journal readiness is invalid");
+	}
+	if (readiness.rowCount === 0) {
+		let emptyPage;
+		try {
+			emptyPage = await registration.liveJournalStore.readPage({
+				afterSequence: null,
+				limit: 1,
+				scope,
+				snapshot: readiness.snapshot,
+			});
+		} catch {
+			return egressFailure("store-failed", "v3 retained journal page read failed");
+		}
+		return emptyPage.ok && emptyPage.rows.length === 0 && emptyPage.nextSequence === null
+			? egressSuccess("empty")
+			: egressFailure("record-rejected", "v3 retained journal is inconsistent");
+	}
+
+	let afterSequence: number | null = null;
+	for (let expectedSequence = 0; expectedSequence < readiness.rowCount; expectedSequence += 1) {
+		let page;
+		try {
+			page = await registration.liveJournalStore.readPage({
+				afterSequence,
+				limit: 1,
+				scope,
+				snapshot: readiness.snapshot,
+			});
+		} catch {
+			return egressFailure("store-failed", "v3 retained journal page read failed");
+		}
+		if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+		if (!page.ok || page.rows.length !== 1) {
+			return egressFailure("record-rejected", "v3 retained journal page is incomplete");
+		}
+		const row = journalRowSnapshot(page.rows[0], scope, expectedSequence);
+		const expectedNext = expectedSequence + 1 < readiness.rowCount ? expectedSequence : null;
+		if (row === undefined || page.nextSequence !== expectedNext) {
+			return egressFailure("record-rejected", "v3 retained journal row is invalid");
+		}
+
+		let canonicalPreimageBytes: Uint8Array;
+		let signature: Uint8Array;
+		if (row.sourceKind === "received") {
+			canonicalPreimageBytes = row.exactCanonicalPreimageBytes;
+			signature = row.detachedSignature;
+		} else {
+			const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
+			let issuedCommit: unknown;
+			try {
+				issuedCommit = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
+			} catch {
+				return egressFailure("store-failed", "v3 retained issued record read failed");
+			}
+			const issuedRow = outboxRowSnapshot(
+				ObjectFreeze({ commit: issuedCommit, publishState: "published" as const }),
+				localScope
+			);
+			if (issuedRow === undefined || lowerHexDigest(issuedRow.digest) !== row.vertexDigest) {
+				return egressFailure("record-rejected", "v3 retained issued record is invalid");
+			}
+			canonicalPreimageBytes = issuedRow.canonicalPreimageBytes;
+			signature = issuedRow.signature;
+		}
+		const authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			canonicalPreimageBytes,
+			signature
+		);
+		if (authenticated === undefined || authenticated.digest !== row.vertexDigest) {
+			return egressFailure("record-rejected", "v3 retained vertex is not authenticated");
+		}
+		const message = Message.create({
+			data: V3Envelope.encode({
+				canonicalPreimage: new Uint8ArrayConstructor(canonicalPreimageBytes),
+				signature: new Uint8ArrayConstructor(signature),
+			}).finish(),
+			objectId: registration.topic,
+			sender: registration.networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+		});
+		let published: unknown;
+		try {
+			published = await registration.networkNode.publishMessage(registration.topic, message);
+		} catch {
+			return currentRegistration(registration)
+				? egressFailure("publish-failed", "v3 retained publication failed")
+				: egressFailure("publication-state-unknown", "v3 retained publication state is unknown");
+		}
+		if (!currentRegistration(registration)) {
+			return egressFailure("publication-state-unknown", "v3 retained publication state is unknown");
+		}
+		if (published !== true) return egressFailure("publish-failed", "v3 retained publication failed");
+		afterSequence = expectedSequence;
+	}
+	return egressSuccess("published");
+}
+
+function enqueueRetainedPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+	const result =
+		registration.gate === undefined
+			? republishRetained(registration)
+			: registration.gate.then(() => republishRetained(registration));
+	registration.gate = result.then(
+		() => undefined,
+		() => undefined
+	);
+	return result;
+}
+
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 	return ObjectFreeze({
 		objectId: registration.payload.provenance.objectId,
@@ -3100,6 +3231,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 		queueId: registration.queueId,
 		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> => enqueueLocalIssue(registration, input),
 		publishPending: (): Promise<V3EgressResult> => enqueuePendingPublication(registration),
+		republishRetained: (): Promise<V3EgressResult> => enqueueRetainedPublication(registration),
 		deactivate: (): void => {
 			if (!registration.active) return;
 			deactivateRegistration(registration);
