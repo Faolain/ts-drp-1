@@ -1829,6 +1829,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(manifest.exports).toEqual({
 			".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" },
 			"./runtime": { types: "./dist/src/runtime.d.ts", import: "./dist/src/runtime.js" },
+			"./v3-live": { types: "./dist/src/v3-live.d.ts", import: "./dist/src/v3-live.js" },
 		});
 		const lock = source("pnpm-lock.yaml");
 		const importer = lock.slice(lock.indexOf("  packages/node:"), lock.indexOf("  packages/object:"));
