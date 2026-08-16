@@ -155,7 +155,7 @@ test("two isolated clients join one v3 room and observe the same durable transcr
 	}
 });
 
-test("a client recovers its durable transcript before rejoining live exchange", async ({ context }) => {
+test("a client repairs missed durable history before rejoining live exchange", async ({ context }) => {
 	const alice = await context.newPage();
 	const bob = await context.newPage();
 	const run = crypto.randomUUID();
@@ -184,23 +184,26 @@ test("a client recovers its durable transcript before rejoining live exchange", 
 
 		const durableBeforeClose = await snapshot(bob);
 		await bob.evaluate(() => window.d9336V3Chat.close());
+		await alice.evaluate(() => window.d9336V3Chat.send("while bob was offline"));
+		await expect.poll(async () => (await snapshot(alice)).accepted.length).toBe(3);
 		await bob.evaluate((input) => window.d9336V3Chat.join(input), joiningBobInput);
+		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(3);
 		const recoveredBeforeExchange = await snapshot(bob);
 		expect(recoveredBeforeExchange.ready).toBe(true);
 		expect(recoveredBeforeExchange.trustStatus).toBe("Creator-trusted; not Byzantine-fault-tolerant.");
-		expect(recoveredBeforeExchange.accepted).toEqual(durableBeforeClose.accepted);
-		expect(recoveredBeforeExchange.acceptedOperationDigest).toBe(durableBeforeClose.acceptedOperationDigest);
-		expect(recoveredBeforeExchange.durableTranscriptDigest).toBe(durableBeforeClose.durableTranscriptDigest);
+		expect(recoveredBeforeExchange.accepted.slice(0, 2)).toEqual(durableBeforeClose.accepted);
+		expect(recoveredBeforeExchange.accepted.at(-1)?.text).toBe("while bob was offline");
 
 		await bob.evaluate(() => window.d9336V3Chat.send("after reconnect from bob"));
-		await expect.poll(async () => (await snapshot(alice)).accepted.length).toBe(3);
-		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(3);
+		await expect.poll(async () => (await snapshot(alice)).accepted.length).toBe(4);
+		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(4);
 
 		const [aliceState, bobState] = await Promise.all([snapshot(alice), snapshot(bob)]);
 		expect(bobState.accepted).toEqual(aliceState.accepted);
 		expect(bobState.accepted.map(({ text }) => text)).toEqual([
 			"before reconnect from alice",
 			"before reconnect from bob",
+			"while bob was offline",
 			"after reconnect from bob",
 		]);
 		expect(bobState.acceptedOperationDigest).toBe(aliceState.acceptedOperationDigest);
