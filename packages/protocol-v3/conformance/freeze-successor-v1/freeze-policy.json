@@ -73,10 +73,10 @@
 		"tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json",
 		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs"
 	],
-	"checkerSha256": "5c272cce860d23ad74d15189b030473f01b3351481fdb6f02f1a6bbedaa67d14",
+	"checkerSha256": "d36ba8002487006f829ea41f323f11fba6e61e4fbcb3378a53de35ac8c5bec9b",
 	"artifactSha256": {
 		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json": "ceae3be2b43facbf1001d8892931c9c2ca78123be5214bf6c394acfada6a682c",
-		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md": "c10b9b009381bd7f5ba0d5a52d498902ce13bd79f19ea42ad2b25b0adb5df687",
+		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md": "cafeac38609872ec2fc101b02ebbba55fb1d7ee84bd8a24554dad5dd2aa5df39",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs": "f8e6d0f552f2f311a8a7d6e8e560243557e5204faa9f119e21c880ad74a6009b",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/freeze-policy.json": "01dfe6dd16c7b651be0eb56340986302c6aa20bd51bc14e1271e54051ed589c0",
 		"packages/protocol-v3/conformance/blueprint-operation-budget-v1/profile.json": "978797b08311955ebcd73579f22bbb2866a62f0441213d235f490d24e8cb9b88",
@@ -106,7 +106,7 @@
 		"tests/fixtures/phase-0o-b1b-v3/built-package-type-audit.ts": "028806ff82b8d5f42589f2ed5949017aeb4deaf2131fef78fee550e124420d37",
 		"tests/fixtures/phase-0o-b1b-v3/tsconfig.public-entry-audit.json": "0420a3ea15b79d2196dc26fa14747bc7473e080fb687fc39fa6ef5f1dd44238b",
 		"tests/fixtures/phase-0o-b1b-v3/tsconfig.built-package-audit.json": "8f7c2315e97d06d97d0ca2ebb86769fab2d21d3353f25f48a9c429f4fef7f51f",
-		"tests/fixtures/phase-0o-b1b-v3/public-export-contract.mjs": "7a87853c90fe5169df9ec9fd9e721f4b67cdcc3e4faf549f56d3de1fe142351a",
+		"tests/fixtures/phase-0o-b1b-v3/public-export-contract.mjs": "2bff4b35ebc6440be1c7f7a34b5268d6fc6e98f28d5376e575e63120e92c43e4",
 		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs": "a993595e7f1f7f3be2f20cb7879a49ae4b187250d56427c1e86482f6ee95285b",
 		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/freeze-policy.json": "860e8a1c13ec0cb5d9eba0398462afbb7da39607f7a73a9f9fd02856ea7875dd",
 		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/profile.json": "1fab00024d118b5e8b91d8de336a70e1eafc085890fcf27d69b80d2d071d3a09",
@@ -120,7 +120,7 @@
 		"tests/fixtures/phase-0o-b2-v3/built-package-type-audit.ts": "4c1cd62ee1670ea3acf5f1a0d3cc047298fc0c3fb952fe838b90d0bf8dc69833",
 		"tests/fixtures/phase-0o-b2-v3/tsconfig.public-entry-audit.json": "6a22c3a47f085257a6441c46f8a28b6b0bf967bf88ad974f802556605d8832f0",
 		"tests/fixtures/phase-0o-b2-v3/tsconfig.built-package-audit.json": "7ea43d75df9a125d828f1a48cbea5a7f250f87e3bef4afb7066d3561ed5d5f6d",
-		"tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs": "9fdbc27f8655dcda274f0c18554e086e2ada9191a78595c8194a66cb717e5d7f",
+		"tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs": "6b76344ffdde65a0622557c818b44c8b9674aff1f58822873890e945dc520343",
 		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/check-freeze.mjs": "7f351f3007941432a7fb401d0edc4d84c9eae774c2fbae6069673096922d9ad6",
 		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/freeze-policy.json": "8af65c7445e65d9b1a44a5d6cc0948747fa067e39dadd415aebb4d4edd25d4ed",
 		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/profile.json": "cf7bab5fb8ca441f1b18693cc73f7c6133ba75c31c2d46f907b577a0c084e8a3",
@@ -134,6 +134,6 @@
 		"tests/fixtures/phase-0o-b3-v3/built-package-type-audit.ts": "c28ab4d2c6967ac1613424b1017c3ae26fd22844dbd1a92e03aec6fc1b23a09f",
 		"tests/fixtures/phase-0o-b3-v3/tsconfig.public-entry-audit.json": "c076cff3e73d6a80d343d8cf4515718fbf4ac5c671f7a55b2960261f3668ad4a",
 		"tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json": "91cefa1fc53375117c05c69c9340d5cb727d9da0c88fbc4208939a0248e8b5a2",
-		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs": "d3b7013e38aabdb8267f8a26ef67c62a0e6100f7de15640b5117ae5e1d8d7e26"
+		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs": "d3f7425809e68544d86e477ec384b47c4b15d1804459a63e0ba5048fc22823d1"
 	}
 }

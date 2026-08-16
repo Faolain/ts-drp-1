@@ -1,6 +1,12 @@
 const expected = [
+	"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
 	"admitReceivedVertex",
+	"authenticateCurrentEpochAnchor",
 	"createAdmissionBoundTransactionalVertexIssuer",
+	"extractAdmittedReceivedVertex",
+	"installCreatorAnchorTrustRoot",
+	"isAnchorTrustStateRecordBytes",
+	"openCurrentAnchorTrust",
 	"prepareBlueprintAdmission",
 	"prepareBlueprintRuntime",
 ];

@@ -14,19 +14,14 @@ const repositoryRoot = realpathSync(
 );
 const policyPath = `${ownerDirectory}/freeze-policy.json`;
 const profilePath = `${ownerDirectory}/profile.json`;
-const bootstrapParent = "eb84a71ee5e55bc7aecafab8a80a4dde07aa0ec0";
+const bootstrapParent = "5a256e5e5a9ccbd05babdb0eb7fa355e2d667310";
 const expectedOwnerPaths = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"]
 	.map((file) => `${ownerDirectory}/${file}`)
 	.sort();
 const bootstrapTestPaths = [
-	"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
-	"tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.ts",
-	"tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
-	"tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
-	"tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
-	"tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
-	"tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
-	"tests/protocol-v3-freeze-successor-v1-red.test.ts",
+	"tests/fixtures/phase-0o-b1b-v3/public-export-contract.mjs",
+	"tests/fixtures/phase-0o-b2-v3/public-export-contract.mjs",
+	"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs",
 ];
 const expectedBootstrapPaths = [
 	`${ownerDirectory}/check-freeze.mjs`,

@@ -13,12 +13,12 @@ malformed, wrong-mode, wrong-type, wrong-parent, wrong-tree, dirty or suppressed
 evidence fails closed.
 
 The final v3 bootstrap is one exact transition from signed ordinary-CI owner
-`eb84a71ee5e55bc7aecafab8a80a4dde07aa0ec0`: checker, policy and spec plus the
-ordinary Git harness, routing analyzer and their semantic tests whose obsolete
-workflow-string or root-resolution assumptions were retired. Once the caller-
-supplied upstream contains this v3 policy, that upstream policy and every
-governed Git object are the immutable descendant authority. A candidate cannot
-authorize coordinated policy-and-artifact drift by rewriting its own hashes.
+`5a256e5e5a9ccbd05babdb0eb7fa355e2d667310`: checker, policy and spec plus the
+three runtime public-export audits corrected to the reviewed ten-symbol package
+surface. Once the caller-supplied upstream contains this v3 policy, that
+upstream policy and every governed Git object are the immutable descendant
+authority. A candidate cannot authorize coordinated policy-and-artifact drift
+by rewriting its own hashes.
 
 Human-readable `git diff` output and exact planning/RED/GREEN choreography are
 not release authority. The exhaustive historical mutation corpus remains an
