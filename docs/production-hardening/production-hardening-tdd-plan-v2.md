@@ -46125,3 +46125,38 @@ rendezvous, missed-history repair, or completion of Phase 3b or the broader
 production-hardening plan. The next product slice must stay on the golden path
 and must not reopen freeze governance without a newly reproduced provenance
 defect.
+
+## D.93.38 offline-gap repair checkpoint
+
+The two-client offline-gap RED is signed at `e8fe9ea`. The signed test-only
+contract migrations `99d21ea` and `2451215` add the retained-publication handle
+to the P6 test contract and preserve the expected third genuine envelope
+encoding. The two-owner product GREEN is signed at
+`88361749842fd5f5f6adeb5462ed23e9476a9b53`.
+
+The live-plane handle now republishes retained journal entries through the
+existing serialized registration gate. Every retained row is reconstructed
+from durable received bytes or the genuine issuance record, re-authenticated by
+the existing recovery verifier, encoded as a real v3 envelope, and published
+through the active network node. The v3-chat transport uses a small
+`BroadcastChannel` history request only to ask a surviving peer to invoke that
+handle; repaired history still returns through the normal v3 ingress path. A
+failed store read, malformed retained row, authentication failure, inactive
+registration, or failed publication remains fail-closed.
+
+Final evidence was Chromium Playwright 3/3 in 3.8 seconds and the retained five
+P6 live-plane files 27/27 in 19.47 seconds. The node build, example
+typecheck/build, targeted ESLint, Prettier, JavaScript syntax, and diff checks
+passed. Package-wide node typecheck continues to report only the two
+pre-existing compact-history test-helper union diagnostics and was neither
+weakened nor suppressed. Per the user-authorized fast track, no additional
+model-review round or freeze certification matrix was run.
+
+This checkpoint proves one bounded missed-history interval for two real browser
+clients when one surviving replica retains the room journal: Bob disconnects,
+Alice publishes while Bob is offline, Bob rejoins, and both converge on the
+same durable transcript. It does not establish multi-replica anti-entropy,
+arbitrary partitions, dynamic membership, eight-peer convergence, Phase 3b, or
+completion of the broader production-hardening plan. The next P6 slice remains
+product-facing and must not reopen freeze governance without a concrete new
+provenance defect.
