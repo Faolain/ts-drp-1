@@ -12,6 +12,10 @@ const GOSSIP_JOB = "protocol-v3-equivocation-gossip-budget";
 const GOSSIP_DIGEST_CHECKER = "packages/protocol-v3/supplements/equivocation-digest-identity-v1/check-freeze.mjs";
 const GOSSIP_EVIDENCE_CHECKER = "packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs";
 const GOSSIP_AUTHOR_SUITE = "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts";
+const UPSTREAM_ROOT_CHECKERS = [
+	"packages/protocol-v2/scripts/check-protocol-freeze.mjs",
+	"packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+] as const;
 
 function record(value: unknown): Record<string, unknown> | undefined {
 	return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -27,24 +31,73 @@ function commandText(job: Record<string, unknown>): string {
 		.join("\n");
 }
 
-function successorBindings(job: Record<string, unknown>): readonly string[] {
+function jobEnvironment(job: Record<string, unknown>): Readonly<Record<string, string>> {
 	const steps = Array.isArray(job.steps) ? job.steps : [];
-	return steps.flatMap((step) => {
-		const env = record(record(step)?.env);
-		return env === undefined
-			? []
-			: Object.entries(env)
-					.filter(([, value]) => value === SUCCESSOR)
-					.map(([name]) => name);
-	});
+	return Object.fromEntries(
+		steps.flatMap((step) => {
+			const env = record(record(step)?.env);
+			return env === undefined
+				? []
+				: Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string");
+		})
+	);
 }
 
-function executableLegacyReference(script: string, legacyCheckers: readonly string[]): boolean {
-	const commands = script
-		.split("\n")
-		.map((line) => line.trim())
-		.filter((line) => line !== "" && !line.startsWith("#"));
-	return commands.some((line) => legacyCheckers.some((checker) => line.includes(checker)));
+function shellBindings(script: string, initial: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+	const bindings: Record<string, string> = { ...initial };
+	for (const statement of script.split(/[;\n]/u)) {
+		for (const match of statement.matchAll(
+			/(?:^|\s)(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|([^\s;]+))/gu
+		)) {
+			bindings[match[1]] = match[2] ?? match[3] ?? match[4];
+		}
+	}
+	return bindings;
+}
+
+function resolveVariables(value: string, bindings: Readonly<Record<string, string>>): string {
+	let resolved = value.replace(/^["']|["']$/gu, "");
+	for (let pass = 0; pass < 8; pass += 1) {
+		const next = resolved.replace(
+			/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/gu,
+			(whole, name: string) => bindings[name] ?? whole
+		);
+		if (next === resolved) return next;
+		resolved = next;
+	}
+	return resolved;
+}
+
+function actualNodeTargets(script: string, initial: Readonly<Record<string, string>>): readonly string[] {
+	const bindings = shellBindings(script, initial);
+	const targets: string[] = [];
+	for (const raw of script.split(/[;\n]/u)) {
+		let statement = raw.trim().replace(/^(?:then|do)\s+/u, "");
+		if (statement === "" || statement.startsWith("#")) continue;
+		statement = statement.replace(/^(?:if|while|until)\s+/u, "");
+		const tokens = statement.match(/"[^"]*"|'[^']*'|[^\s]+/gu) ?? [];
+		let index = 0;
+		while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/u.test(tokens[index])) index += 1;
+		if (tokens[index] === "env") {
+			index += 1;
+			while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/u.test(tokens[index])) index += 1;
+		}
+		const executable = resolveVariables(tokens[index] ?? "", bindings);
+		if (executable !== "node") continue;
+		const target = tokens[index + 1];
+		if (target !== undefined) targets.push(resolveVariables(target, bindings));
+	}
+	return targets;
+}
+
+function invokesAnyNodeTarget(targets: readonly string[], candidates: readonly string[]): boolean {
+	return targets.some((target) => candidates.includes(target));
+}
+
+function hasRepositoryRootBinding(script: string, initial: Readonly<Record<string, string>>): boolean {
+	const bindings = shellBindings(script, initial);
+	const value = resolveVariables(bindings.PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT ?? "", bindings);
+	return value === "${{ github.workspace }}" || value === "$GITHUB_WORKSPACE" || value === "${GITHUB_WORKSPACE}";
 }
 
 function invokesLiteral(script: string, executable: "node" | "vitest", value: string): boolean {
@@ -119,15 +172,9 @@ export function auditSuccessorWorkflowRouting(
 	}
 	const script = executableShell(commandText(job));
 	const reachable = reachableShell(script);
-	const bindings = successorBindings(job);
-	const literalInvocation = new RegExp(
-		`(?:^|[;&|])\\s*node\\s+["']?${escapeRegularExpression(SUCCESSOR)}["']?(?:\\s|$)`,
-		"mu"
-	).test(reachable);
-	const boundInvocation = bindings.some((name) =>
-		new RegExp(`(?:^|[;&|])\\s*node\\s+["']?\\$\\{?${name}\\}?["']?(?:\\s|$)`, "mu").test(reachable)
-	);
-	if (!literalInvocation && !boundInvocation) {
+	const environment = jobEnvironment(job);
+	const nodeTargets = actualNodeTargets(reachable, environment);
+	if (!nodeTargets.includes(SUCCESSOR)) {
 		violations.push("successor-path");
 	}
 	if (!script.includes("git merge-base --all")) violations.push("merge-base-all");
@@ -137,9 +184,27 @@ export function auditSuccessorWorkflowRouting(
 		violations.push("merge-base-singleton");
 	}
 	if (!script.includes("git cat-file -e") || !script.includes("git show")) violations.push("base-checker-selection");
-	const nodeCalls = reachable.match(/(?:^|[;&|])\s*node\s+/gmu) ?? [];
-	if (nodeCalls.length < 2) violations.push("dual-checker-execution");
-	if (executableLegacyReference(reachable, legacyCheckers)) violations.push("legacy-checker-execution");
+	if (identity.jobKey.startsWith("protocol-v3-blueprint-") && !hasRepositoryRootBinding(reachable, environment)) {
+		violations.push("successor-root-binding");
+	}
+	if (nodeTargets.length < 2) violations.push("dual-checker-execution");
+	if (invokesAnyNodeTarget(nodeTargets, legacyCheckers)) violations.push("legacy-checker-execution");
+	if (invokesAnyNodeTarget(nodeTargets, UPSTREAM_ROOT_CHECKERS)) {
+		violations.push("upstream-root-checker-execution");
+	}
+	const bindings = shellBindings(reachable, environment);
+	const objectReads = [
+		...reachable.matchAll(/\bgit\s+(?:show|cat-file\s+(?:-p|-e))\s+("[^"]*"|'[^']*'|[^\s;]+)/gu),
+	].map(([, value]) => resolveVariables(value, bindings));
+	if (
+		objectReads.some((value) => {
+			if (!value.includes(":")) return false;
+			const path = value.slice(value.indexOf(":") + 1);
+			return path !== SUCCESSOR && !/^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/u.test(path);
+		})
+	) {
+		violations.push("upstream-byte-authority");
+	}
 	if (identity.jobKey === GOSSIP_JOB) {
 		if (!invokesLiteral(reachable, "node", GOSSIP_DIGEST_CHECKER)) violations.push("gossip-digest-checker");
 		if (!invokesLiteral(reachable, "node", GOSSIP_EVIDENCE_CHECKER)) violations.push("gossip-evidence-checker");

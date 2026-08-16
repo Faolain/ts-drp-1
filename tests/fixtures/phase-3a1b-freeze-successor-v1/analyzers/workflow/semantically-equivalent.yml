@@ -10,6 +10,7 @@ jobs:
         uses: actions/checkout@v4
       - run: "pnpm install --frozen-lockfile"
       - env:
+          WORKSPACE_ALIAS: "${{ github.workspace }}"
           TARGET: "${{ github.event.pull_request.base.sha }}"
           RATCHET: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
         run: >-
@@ -19,7 +20,7 @@ jobs:
           if git cat-file -e "$POINT:$RATCHET"; then
           git show "$POINT:$RATCHET" > "$RUNNER_TEMP/archive.mjs";
           node "$RUNNER_TEMP/archive.mjs" "$TARGET"; fi;
-          node "$RATCHET" "$TARGET"
+          PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT="$WORKSPACE_ALIAS" node "$RATCHET" "$TARGET"
       - run: pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts
 "on":
   pull_request: { types: [ready_for_review, edited, reopened, synchronize, opened] }

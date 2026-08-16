@@ -1,10 +1,21 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, jsdoc/require-param, jsdoc/require-returns */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	cpSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { setImmediate as yieldToEventLoop } from "node:timers/promises";
+import { pathToFileURL } from "node:url";
 
 const CONTROL_OWNER = "packages/protocol-v3/conformance/freeze-successor-v1";
 const CONTROL_BUNDLE = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"].map(
@@ -19,6 +30,7 @@ function command(root, executable, args, options = {}) {
 		cwd: root,
 		encoding: "utf8",
 		env: { ...process.env, ...options.env },
+		maxBuffer: 4 * 1024 * 1024,
 		timeout: options.timeout ?? 60_000,
 	});
 }
@@ -200,6 +212,387 @@ export function governedInventory(repositoryRoot, policyPaths) {
 	return [...new Set(ordered)];
 }
 
+function exactParents(root, revision) {
+	return git(root, "rev-list", "--parents", "-n", "1", revision).split(" ").slice(1);
+}
+
+function exactChangedPaths(root, parent, child) {
+	return git(root, "diff", "--name-only", parent, child).split("\n").filter(Boolean).sort();
+}
+
+function treeEntry(root, revision, path) {
+	const result = command(root, "git", ["ls-tree", revision, "--", path]);
+	if (result.status !== 0 || result.stdout.trim() === "") return undefined;
+	const match = /^(\d{6})\s+(\w+)\s+([0-9a-f]{40})\t/u.exec(result.stdout.trim());
+	return match === null ? undefined : { mode: match[1], object: match[3], type: match[2] };
+}
+
+function treeEntries(root, revision, paths) {
+	const result = command(root, "git", ["ls-tree", revision, "--", ...paths]);
+	if (result.status !== 0 || result.signal !== null) throw new Error(`cannot inspect ${revision}`);
+	const byPath = new Map();
+	for (const line of result.stdout.trim().split("\n").filter(Boolean)) {
+		const match = /^(\d{6})\s+(\w+)\s+([0-9a-f]{40})\t(.+)$/u.exec(line);
+		if (match !== null) byPath.set(match[4], { mode: match[1], object: match[3], type: match[2] });
+	}
+	return paths.map((path) => [path, byPath.get(path)]);
+}
+
+function isAncestor(root, ancestor, descendant) {
+	const result = command(root, "git", ["merge-base", "--is-ancestor", ancestor, descendant]);
+	return result.status === 0 && result.signal === null;
+}
+
+function correctionCommits(repositoryRoot, contract) {
+	return git(
+		repositoryRoot,
+		"log",
+		"--format=%H",
+		"--reverse",
+		`${contract.provisionalInstall.commit}..HEAD`,
+		"--",
+		...contract.correctionPaths
+	)
+		.split("\n")
+		.filter(Boolean);
+}
+
+/**
+ * Authenticates the signed external/PR lineage and returns the one causal RED gate.
+ * Candidate mutants must not run unless this result is ready.
+ */
+export function repositoryCandidateReadiness(repositoryRoot, contract) {
+	const inventory = governedInventory(
+		repositoryRoot,
+		contract.predecessors.map(({ policy }) => policy)
+	);
+	const governed = [...contract.ownerFiles.map((file) => `${contract.ownerDirectory}/${file}`), ...inventory];
+	const externalParents = exactParents(repositoryRoot, contract.externalBase.commit);
+	const externalAbsent = governed.filter(
+		(path) => treeEntry(repositoryRoot, contract.externalBase.commit, path) === undefined
+	);
+	const provisionalEntries = governed.map((path) => [
+		path,
+		treeEntry(repositoryRoot, contract.provisionalInstall.commit, path),
+	]);
+	const originalInstall = exactChangedPaths(
+		repositoryRoot,
+		contract.provisionalInstall.parent,
+		contract.provisionalInstall.commit
+	);
+	const corrections = correctionCommits(repositoryRoot, contract);
+	const topologyValid =
+		git(repositoryRoot, "rev-parse", `${contract.externalBase.commit}^{tree}`) === contract.externalBase.tree &&
+		JSON.stringify(externalParents) === JSON.stringify(contract.externalBase.parents) &&
+		git(repositoryRoot, "rev-parse", `${contract.fixedAnchor.commit}^{tree}`) === contract.fixedAnchor.tree &&
+		git(repositoryRoot, "rev-parse", `${contract.redBase}^{tree}`) === contract.redBaseTree &&
+		git(repositoryRoot, "rev-parse", `${contract.redBase}^`) === contract.redBaseParent &&
+		isAncestor(repositoryRoot, contract.externalBase.commit, contract.fixedAnchor.commit) &&
+		isAncestor(repositoryRoot, contract.fixedAnchor.commit, contract.redBase) &&
+		git(repositoryRoot, "rev-parse", `${contract.gossipOracleTransition.commit}^`) ===
+			contract.gossipOracleTransition.parent &&
+		git(repositoryRoot, "rev-parse", `${contract.gossipOracleTransition.commit}^{tree}`) ===
+			contract.gossipOracleTransition.tree &&
+		contract.provisionalInstall.parent === contract.gossipOracleTransition.commit &&
+		git(repositoryRoot, "rev-parse", `${contract.provisionalInstall.commit}^`) === contract.provisionalInstall.parent &&
+		git(repositoryRoot, "rev-parse", `${contract.provisionalInstall.commit}^{tree}`) ===
+			contract.provisionalInstall.tree;
+	const originalInstallValid =
+		JSON.stringify(originalInstall) === JSON.stringify([...contract.originalInstallPaths].sort());
+	let schemaValid = false;
+	try {
+		const policy = JSON.parse(readFileSync(resolve(repositoryRoot, contract.ownerDirectory, "freeze-policy.json")));
+		const profile = JSON.parse(readFileSync(resolve(repositoryRoot, contract.ownerDirectory, "profile.json")));
+		schemaValid =
+			policy.schemaVersion === contract.expectedPolicySchemaVersion &&
+			profile.schemaVersion === contract.expectedProfileSchemaVersion;
+	} catch {
+		schemaValid = false;
+	}
+	let correctionValid = false;
+	let correction;
+	if (corrections.length === 1) {
+		correction = corrections[0];
+		const parents = exactParents(repositoryRoot, correction);
+		correctionValid =
+			parents.length === 1 &&
+			JSON.stringify(exactChangedPaths(repositoryRoot, parents[0], correction)) ===
+				JSON.stringify([...contract.correctionPaths].sort());
+	}
+	const ready =
+		topologyValid &&
+		externalAbsent.length === governed.length &&
+		governed.length === 62 &&
+		originalInstallValid &&
+		provisionalEntries.every(([, entry]) => entry?.mode === "100644" && entry.type === "blob") &&
+		schemaValid &&
+		correctionValid;
+	return {
+		code: ready ? "READY" : "EXACT_SIX_CORRECTION_ABSENT",
+		correction,
+		correctionValid,
+		externalAbsent,
+		governed,
+		originalInstall,
+		originalInstallValid,
+		provisionalEntries,
+		ready,
+		schemaValid,
+		topologyValid,
+	};
+}
+
+function rawCommand(root, executable, args, options = {}) {
+	return spawnSync(executable, args, {
+		cwd: root,
+		env: { ...process.env, ...options.env },
+		encoding: null,
+		timeout: options.timeout ?? 60_000,
+	});
+}
+
+function isolatedClone(repositoryRoot, revision, label) {
+	const parent = realpathSync(mkdtempSync(join(tmpdir(), `ts-drp-freeze-${label}-`)));
+	const cloned = command(parent, "git", ["clone", "--shared", "--no-checkout", repositoryRoot, "repository"]);
+	if (cloned.status !== 0) {
+		rmSync(parent, { force: true, recursive: true });
+		throw new Error(`${cloned.stdout}\n${cloned.stderr}`);
+	}
+	const root = resolve(parent, "repository");
+	git(root, "checkout", "-q", "--detach", revision);
+	return { parent, root };
+}
+
+function exactRootRun(repositoryRoot, evidence, revision, base, expectedStdout, label) {
+	const state = isolatedClone(repositoryRoot, revision, label);
+	try {
+		const statusBefore = git(state.root, "status", "--porcelain=v1", "--untracked-files=all");
+		const checkerBlob = git(state.root, "rev-parse", `HEAD:${evidence.checker}`);
+		const checkerBytes = readFileSync(resolve(state.root, evidence.checker));
+		const result = rawCommand(state.root, process.execPath, [resolve(state.root, evidence.checker), base], {
+			env: { [evidence.environment]: state.root },
+			timeout: 60_000,
+		});
+		return {
+			checkerBlob,
+			checkerSha256: sha256Bytes(checkerBytes),
+			stderr: result.stderr,
+			stdout: result.stdout,
+			expectedStdout: Buffer.from(expectedStdout),
+			signal: result.signal,
+			status: result.status,
+			statusBefore,
+		};
+	} finally {
+		rmSync(state.parent, { force: true, recursive: true });
+	}
+}
+
+/** Executes exact v2/v3 historical and clean-current evidence in four distinct clones. */
+export async function runRootFreezeEvidence(repositoryRoot, contract) {
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
+	const results = [];
+	for (const evidence of contract.rootFreezeEvidence) {
+		const authenticated = {
+			baselineTree: git(repositoryRoot, "rev-parse", `${evidence.baseline}^{tree}`),
+			checkerBaseTree: git(repositoryRoot, "rev-parse", `${evidence.checkerBase}^{tree}`),
+			directParents: exactParents(repositoryRoot, evidence.baseline),
+		};
+		results.push({
+			authenticated,
+			id: `${evidence.id}:historical`,
+			result: exactRootRun(
+				repositoryRoot,
+				evidence,
+				evidence.baseline,
+				evidence.checkerBase,
+				evidence.historicalStdout,
+				`${evidence.id}-historical`
+			),
+		});
+		await yieldToEventLoop();
+		results.push({
+			authenticated,
+			id: `${evidence.id}:current`,
+			result: exactRootRun(
+				repositoryRoot,
+				evidence,
+				current,
+				evidence.baseline,
+				evidence.currentStdout,
+				`${evidence.id}-current`
+			),
+		});
+		await yieldToEventLoop();
+	}
+	return results;
+}
+
+function protectedDriftPath(evidence) {
+	return evidence.id === "protocol-v2-root"
+		? "packages/protocol-v2/registry/field-registry.json"
+		: "packages/protocol-v3/registry/registry-v1.json";
+}
+
+/** Proves each clean-current root run is load-bearing through the genuine successor boundary. */
+export async function runCurrentRootDriftMutants(repositoryRoot, contract, readiness) {
+	if (!readiness.ready) throw new Error("successor root drift evidence requires READY");
+	const results = [];
+	for (const evidence of contract.rootFreezeEvidence) {
+		const state = cloneCandidateRepository(repositoryRoot, contract);
+		try {
+			const driftPath = protectedDriftPath(evidence);
+			append(state.root, driftPath, "\nprotected drift\n");
+			const drift = commit(state.root, `${evidence.id} protected pre-correction drift`);
+			const correction = createCandidateCommit(repositoryRoot, state, contract);
+			const result = executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+			results.push({
+				correctionPaths: exactChangedPaths(state.root, drift, correction),
+				driftPaths: exactChangedPaths(state.root, contract.provisionalInstall.commit, drift),
+				id: evidence.id,
+				...result,
+			});
+		} finally {
+			rmSync(state.parent, { force: true, recursive: true });
+		}
+		await yieldToEventLoop();
+	}
+	return results;
+}
+
+/** Proves NODE_OPTIONS preload presence alone is not a candidate rejection reason. */
+export function runRootChildPreloadPassthrough(repositoryRoot, contract, readiness) {
+	if (!readiness.ready) throw new Error("successor preload passthrough requires READY");
+	const state = cloneCandidateRepository(repositoryRoot, contract);
+	try {
+		const parent = git(state.root, "rev-parse", "HEAD");
+		const correction = createCandidateCommit(repositoryRoot, state, contract);
+		return {
+			correctionPaths: exactChangedPaths(state.root, parent, correction),
+			...executeWithRootChildPreload(repositoryRoot, state.root, contract, contract.externalBase.commit, "passthrough"),
+		};
+	} finally {
+		rmSync(state.parent, { force: true, recursive: true });
+	}
+}
+
+function installControlledCensusEntry(root, path, index) {
+	const target = resolve(root, path);
+	mkdirSync(dirname(target), { recursive: true });
+	if (index === 0) {
+		symlinkSync("controlled-symlink-target", target);
+		return;
+	}
+	if (index === 30) {
+		put(root, `${path}/entry.txt`, "controlled tree\n");
+		return;
+	}
+	if (index === 60) {
+		mkdirSync(target);
+		git(target, "init", "-q");
+		git(target, "config", "user.name", "controlled-gitlink");
+		git(target, "config", "user.email", "controlled-gitlink@example.invalid");
+		put(target, "entry.txt", "controlled gitlink\n");
+		commit(target, "controlled gitlink");
+		return;
+	}
+	put(root, path, `controlled regular blob ${index + 1}\n`);
+}
+
+/**
+ * Controlled diagnostic only: constructs genuine Git objects and asks the independent fixture checker to inspect them.
+ * These rows are never candidate evidence or production mutation kills.
+ */
+export async function runControlledMixedCensusDiagnostics(repositoryRoot, paths) {
+	if (paths.length !== 62 || new Set(paths).size !== 62) throw new Error("controlled census requires exact 62 paths");
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "ts-drp-freeze-successor-census-")));
+	const checker = resolve(
+		repositoryRoot,
+		"tests/fixtures/phase-3a1b-freeze-successor-v1/controlled-freeze-successor.mjs"
+	);
+	try {
+		git(root, "init", "-q");
+		git(root, "config", "user.name", "controlled-census");
+		git(root, "config", "user.email", "controlled-census@example.invalid");
+		const rows = [];
+		for (const [index, path] of paths.slice(0, 61).entries()) {
+			installControlledCensusEntry(root, path, index);
+			const revision = commit(root, `controlled census ${index + 1}`);
+			const result = command(root, process.execPath, [checker, "--census", revision], {
+				env: {
+					FREEZE_SUCCESSOR_CONTROL_CENSUS_PATHS: JSON.stringify(paths),
+					FREEZE_SUCCESSOR_CONTROL_ROOT: root,
+				},
+			});
+			if (result.status !== 0 || result.signal !== null) {
+				throw new Error(`controlled census ${index + 1}\n${result.stdout}\n${result.stderr}`);
+			}
+			const checkerEvidence = JSON.parse(result.stdout);
+			const inspected = treeEntries(root, revision, paths);
+			rows.push(
+				Object.freeze({
+					absent: Object.freeze(inspected.filter(([, entry]) => entry === undefined).map(([candidate]) => candidate)),
+					checkerEvidence,
+					checkerStdout: result.stdout,
+					classification: "CONTROLLED_DIAGNOSTIC",
+					count: index + 1,
+					entries: Object.freeze(inspected.filter(([, entry]) => entry !== undefined)),
+					present: Object.freeze(inspected.filter(([, entry]) => entry !== undefined).map(([candidate]) => candidate)),
+					revision,
+				})
+			);
+			await yieldToEventLoop();
+		}
+		return rows;
+	} finally {
+		rmSync(root, { force: true, recursive: true });
+	}
+}
+
+function executeCurrentCandidate(repositoryRoot, contract, upstream, merge) {
+	const current = git(repositoryRoot, "rev-parse", "HEAD");
+	const state = isolatedClone(repositoryRoot, current, merge ? "candidate-merge" : "candidate-linear");
+	try {
+		if (merge) {
+			const tree = git(state.root, "rev-parse", `${current}^{tree}`);
+			const mergeCommit = git(
+				state.root,
+				"commit-tree",
+				tree,
+				"-p",
+				upstream,
+				"-p",
+				current,
+				"-m",
+				"genuine GitHub merge-ref control"
+			);
+			git(state.root, "reset", "--hard", "-q", mergeCommit);
+		}
+		return executeRepositoryCandidate(state.root, contract, upstream);
+	} finally {
+		rmSync(state.parent, { force: true, recursive: true });
+	}
+}
+
+/** Runs the four genuine external/descendant topologies only after readiness succeeds. */
+export async function runReadyCandidateTopologies(repositoryRoot, contract, readiness) {
+	if (!readiness.ready || readiness.correction === undefined) {
+		throw new Error("candidate topology execution requires READY evidence");
+	}
+	const cases = [
+		["linear:external-empty", contract.externalBase.commit, false],
+		["merge:external-empty", contract.externalBase.commit, true],
+		["linear:descendant", readiness.correction, false],
+		["merge:descendant", readiness.correction, true],
+	];
+	const results = [];
+	for (const [name, upstream, merge] of cases) {
+		results.push({ name, result: executeCurrentCandidate(repositoryRoot, contract, upstream, merge) });
+		await yieldToEventLoop();
+	}
+	return results;
+}
+
 /** Repository lane selector. It never falls back to the controlled checker. */
 export function repositoryCandidateAvailability(repositoryRoot) {
 	const checker = resolve(repositoryRoot, SUCCESSOR_CHECKER);
@@ -215,7 +608,19 @@ const REPOSITORY_CATEGORY_MUTATIONS = Object.freeze([
 	"merge-only-governed-change",
 	"sibling-upstream",
 	"arbitrary-old-upstream",
+	"arbitrary-later-empty-upstream",
+	"caller-selected-old-base",
+	"upstream-after-anchor",
+	"swapped-merge-parents",
+	"merge-tree-drift",
 	"non-unique-merge-base",
+	"provisional-v1-descendant",
+	"other-wrong-identity-descendant",
+	"wrong-type-descendant",
+	"wrong-mode-descendant",
+	"v1-schema",
+	"missing-schema",
+	"dual-schema",
 	"retained-legacy-checker",
 	"omitted-current-semantic-hash",
 	"accepted-stale-policy-value",
@@ -241,6 +646,15 @@ const REPOSITORY_CATEGORY_MUTATIONS = Object.freeze([
 	"unstaged-protected-drift",
 	"post-bootstrap-owner-drift",
 	"post-bootstrap-workflow-drift",
+	"copied-root-checker",
+	"spoofed-root-stdout",
+	"extra-root-stdout",
+	"root-child-stderr",
+	"root-child-signal",
+	"root-child-timeout",
+	"current-only-root-evidence",
+	"blob-only-root-evidence",
+	"suppressed-root-exit",
 ]);
 const REPOSITORY_POSITIVE_CASES = Object.freeze([
 	"linear:bootstrap",
@@ -256,7 +670,6 @@ export function repositoryMutationPlan(fixedAnchorPaths, gossipPath) {
 		`gossip-old:${gossipPath}`,
 		`gossip-current:${gossipPath}`,
 		`gossip-postbootstrap:${gossipPath}`,
-		...Array.from({ length: 4 }, (_, index) => `workflow-count:${index + 1}`),
 		...REPOSITORY_CATEGORY_MUTATIONS,
 	];
 }
@@ -279,23 +692,111 @@ export function repositoryCandidatePlan(repositoryRoot, contract) {
 	};
 }
 
-function copyCandidate(repositoryRoot, root, contract, workflowCount = contract.workflowIdentities.length) {
-	cpSync(resolve(repositoryRoot, contract.ownerDirectory), resolve(root, contract.ownerDirectory), { recursive: true });
-	for (const [index, identity] of contract.workflowIdentities.entries()) {
-		if (index < workflowCount) put(root, identity.path, readFileSync(resolve(repositoryRoot, identity.path)));
+/** Stable signed-law class expected from each post-readiness candidate failure. */
+export function expectedCandidateFailure(mutation) {
+	if (
+		[
+			"partial-owner-base",
+			"split-owner-routing",
+			"transient-revert",
+			"post-bootstrap-owner-drift",
+			"post-bootstrap-workflow-drift",
+		].includes(mutation)
+	) {
+		return { class: "CORRECTION_HISTORY", marker: /correction|bootstrap|atomic|transition/iu };
+	}
+	if (
+		[
+			"sibling-upstream",
+			"arbitrary-old-upstream",
+			"arbitrary-later-empty-upstream",
+			"caller-selected-old-base",
+			"upstream-after-anchor",
+			"non-unique-merge-base",
+		].includes(mutation)
+	) {
+		return { class: "EXTERNAL_TOPOLOGY", marker: /external|merge base|ancestry|upstream/iu };
+	}
+	if (["swapped-merge-parents", "merge-tree-drift", "merge-only-governed-change"].includes(mutation)) {
+		return { class: "MERGE_TOPOLOGY", marker: /merge/iu };
+	}
+	if (
+		[
+			"provisional-v1-descendant",
+			"other-wrong-identity-descendant",
+			"wrong-type-descendant",
+			"wrong-mode-descendant",
+		].includes(mutation)
+	) {
+		return { class: "DESCENDANT_IDENTITY", marker: /descendant|base.*identity|governed.*identity/iu };
+	}
+	if (["v1-schema", "missing-schema", "dual-schema"].includes(mutation)) {
+		return { class: "SCHEMA_IDENTITY", marker: /schema|profile identity|policy identity/iu };
+	}
+	if (
+		mutation.includes("root") ||
+		["copied-root-checker", "spoofed-root-stdout", "extra-root-stdout", "suppressed-root-exit"].includes(mutation)
+	) {
+		return { class: "ROOT_CHECKER_EVIDENCE", marker: /root|checker|stdout|child/iu };
+	}
+	if (
+		[
+			"retained-legacy-checker",
+			"changed-trigger",
+			"changed-permission",
+			"changed-checkout-ref",
+			"changed-timeout",
+			"changed-job-identity",
+			"semantic-equivalent-workflow-bytes",
+		].includes(mutation)
+	) {
+		return { class: "WORKFLOW_ROUTING", marker: /workflow|routing|artifact hash/iu };
+	}
+	return { class: "GOVERNED_IDENTITY", marker: /identity|artifact|hash|dirty|owner|policy|gossip/iu };
+}
+
+function copyCandidateCorrection(repositoryRoot, root, contract) {
+	for (const path of contract.correctionPaths) {
+		const target = resolve(root, path);
+		mkdirSync(dirname(target), { recursive: true });
+		cpSync(resolve(repositoryRoot, path), target);
 	}
 }
 
-function executeRepositoryCandidate(root, contract, upstream) {
-	const result = command(root, process.execPath, [
-		resolve(root, contract.ownerDirectory, "check-freeze.mjs"),
-		upstream,
-	]);
+function executeRepositoryCandidate(root, contract, upstream, options = {}) {
+	const result = command(
+		root,
+		process.execPath,
+		[resolve(root, contract.ownerDirectory, "check-freeze.mjs"), upstream],
+		options
+	);
 	return { output: `${result.stdout}\n${result.stderr}`, signal: result.signal, status: result.status };
 }
 
+function executeWithRootChildPreload(repositoryRoot, root, contract, upstream, mutation) {
+	const preloadRoot = realpathSync(mkdtempSync(join(tmpdir(), "ts-drp-freeze-successor-preload-")));
+	const preload = resolve(preloadRoot, "register-root-checker-fault.mjs");
+	const registrationOwner = pathToFileURL(
+		resolve(repositoryRoot, "tests/fixtures/phase-3a1b-freeze-successor-v1/controlled-freeze-successor.mjs")
+	).href;
+	writeFileSync(
+		preload,
+		`import { registerRootCheckerFault } from ${JSON.stringify(registrationOwner)};\nregisterRootCheckerFault(${JSON.stringify(mutation)});\n`
+	);
+	try {
+		return {
+			cleanupPath: preloadRoot,
+			...executeRepositoryCandidate(root, contract, upstream, {
+				env: { NODE_OPTIONS: `--import=${pathToFileURL(preload).href}` },
+			}),
+		};
+	} finally {
+		rmSync(preloadRoot, { force: true, recursive: true });
+	}
+}
+
 function cloneCandidateRepository(repositoryRoot, contract) {
-	const parent = mkdtempSync(join(tmpdir(), "ts-drp-freeze-successor-candidate-"));
+	const parent = realpathSync(mkdtempSync(join(tmpdir(), "ts-drp-freeze-successor-candidate-")));
 	const cloned = command(parent, "git", ["clone", "--shared", "--no-checkout", repositoryRoot, "repository"]);
 	if (cloned.status !== 0) {
 		rmSync(parent, { force: true, recursive: true });
@@ -304,32 +805,18 @@ function cloneCandidateRepository(repositoryRoot, contract) {
 	const root = resolve(parent, "repository");
 	git(root, "config", "user.name", "freeze-successor-candidate-control");
 	git(root, "config", "user.email", "freeze-successor-candidate@example.invalid");
-	git(root, "checkout", "-q", "--detach", contract.redBase);
-	return { parent, root };
+	const sourceHead = git(repositoryRoot, "rev-parse", "HEAD");
+	git(root, "checkout", "-q", "--detach", contract.provisionalInstall.commit);
+	return { parent, root, sourceHead };
 }
 
 function resetCandidate(state, contract) {
-	git(state.root, "reset", "--hard", "-q", contract.redBase);
+	git(state.root, "reset", "--hard", "-q", contract.provisionalInstall.commit);
 	git(state.root, "clean", "-ffd", "-q");
 }
 
 function sha256Bytes(bytes) {
 	return createHash("sha256").update(bytes).digest("hex");
-}
-
-function installGossipOracleTransition(repositoryRoot, state, contract, mutate) {
-	const transition = contract.gossipOracleTransition;
-	if (git(state.root, "rev-parse", "HEAD") !== transition.parent) throw new Error("gossip transition parent differs");
-	if (git(state.root, "rev-parse", `HEAD:${transition.path}`) !== transition.oldBlob)
-		throw new Error("gossip transition old blob differs");
-	const source = readFileSync(resolve(repositoryRoot, transition.path));
-	if (sha256Bytes(source) !== transition.currentSha256) throw new Error("gossip transition current SHA-256 differs");
-	put(state.root, transition.path, source);
-	if (typeof mutate === "function") mutate(state.root, transition.path);
-	const blob = git(state.root, "hash-object", transition.path);
-	if (mutate === undefined && blob !== transition.currentBlob)
-		throw new Error("gossip transition current blob differs");
-	return commit(state.root, "correct gossip successor routing oracle");
 }
 
 function append(root, path, text = "\nmutation\n") {
@@ -352,77 +839,96 @@ function addUnhashedPolicyEntry(root, path) {
 	writeFileSync(target, `${JSON.stringify(policy, null, 2)}\n`);
 }
 
+function repinPolicyArtifacts(root, policyPath) {
+	const target = resolve(root, policyPath);
+	const policy = JSON.parse(readFileSync(target, "utf8"));
+	if (policy.artifactSha256 === null || typeof policy.artifactSha256 !== "object") return;
+	for (const path of Object.keys(policy.artifactSha256)) {
+		try {
+			policy.artifactSha256[path] = sha256Bytes(readFileSync(resolve(root, path)));
+		} catch {
+			// A missing-path mutant must remain missing; it cannot be re-pinned as a file.
+		}
+	}
+	writeFileSync(target, `${JSON.stringify(policy, null, 2)}\n`);
+}
+
 function createCandidateCommit(repositoryRoot, state, contract, options = {}) {
-	copyCandidate(repositoryRoot, state.root, contract, options.workflowCount);
+	const parent = git(state.root, "rev-parse", "HEAD");
+	copyCandidateCorrection(repositoryRoot, state.root, contract);
 	if (typeof options.mutate === "function") options.mutate(state.root);
-	return commit(state.root, options.message ?? "candidate bootstrap");
+	repinPolicyArtifacts(state.root, `${contract.ownerDirectory}/freeze-policy.json`);
+	const correction = commit(state.root, options.message ?? "exact six-path successor correction", true);
+	if (
+		options.allowDifferentScope !== true &&
+		JSON.stringify(exactChangedPaths(state.root, parent, correction)) !==
+			JSON.stringify([...contract.correctionPaths].sort())
+	) {
+		throw new Error("test candidate correction scope differs from exact six");
+	}
+	return correction;
 }
 
-function runLinearPositive(repositoryRoot, state, contract, mode) {
-	resetCandidate(state, contract);
-	const correctedBase = installGossipOracleTransition(repositoryRoot, state, contract);
-	const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
-	let upstream = correctedBase;
-	if (mode === "descendant") {
-		upstream = bootstrap;
-		put(state.root, "unrelated-descendant.txt", "unrelated\n");
-		commit(state.root, "unrelated descendant");
+function mergeCandidate(state, upstream, prHead, options = {}) {
+	const tree = options.tree ?? git(state.root, "rev-parse", `${prHead}^{tree}`);
+	const parents = options.swapParents === true ? [prHead, upstream] : [upstream, prHead];
+	const merge = git(
+		state.root,
+		"commit-tree",
+		tree,
+		"-p",
+		parents[0],
+		"-p",
+		parents[1],
+		"-m",
+		options.message ?? "candidate merge"
+	);
+	git(state.root, "reset", "--hard", "-q", merge);
+	return merge;
+}
+
+function createWrongDescendant(repositoryRoot, state, contract, mutation) {
+	git(state.root, "checkout", "-q", "--detach", contract.provisionalInstall.commit);
+	const path = repositoryCandidatePlan(repositoryRoot, contract).fixedAnchor[0];
+	if (mutation === "other-wrong-identity-descendant") append(state.root, path, "\nwrong descendant bytes\n");
+	if (mutation === "wrong-mode-descendant") chmodSync(resolve(state.root, path), 0o755);
+	if (mutation === "wrong-type-descendant") {
+		rmSync(resolve(state.root, path));
+		put(state.root, `${path}/entry.txt`, "wrong descendant tree\n");
 	}
+	const upstream = commit(state.root, mutation);
+	git(state.root, "checkout", "-q", "--detach", contract.provisionalInstall.commit);
+	const prHead = createCandidateCommit(repositoryRoot, state, contract);
+	mergeCandidate(state, upstream, prHead, { message: mutation });
 	return executeRepositoryCandidate(state.root, contract, upstream);
 }
 
-function runMergePositive(repositoryRoot, state, contract, mode) {
-	resetCandidate(state, contract);
-	const correctedBase = installGossipOracleTransition(repositoryRoot, state, contract);
-	const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
-	let branchPoint = correctedBase;
-	let prHead = bootstrap;
-	if (mode === "descendant") {
-		branchPoint = bootstrap;
-		put(state.root, "pr-unrelated.txt", "pr\n");
-		prHead = commit(state.root, "unrelated pr descendant");
-	}
-	git(state.root, "checkout", "-q", "--detach", branchPoint);
-	put(state.root, "upstream-unrelated.txt", "upstream\n");
-	const upstream = commit(state.root, "upstream target");
-	syntheticMerge(state, upstream, prHead);
-	return executeRepositoryCandidate(state.root, contract, upstream);
-}
-
-function runNamedPositive(repositoryRoot, state, contract, name) {
-	const [topology, mode] = name.split(":");
-	if (!REPOSITORY_POSITIVE_CASES.includes(name)) throw new Error(`unknown repository positive: ${name}`);
-	return topology === "linear"
-		? runLinearPositive(repositoryRoot, state, contract, mode)
-		: runMergePositive(repositoryRoot, state, contract, mode);
+function mutateJson(root, path, mutate) {
+	const document = JSON.parse(readFileSync(resolve(root, path), "utf8"));
+	mutate(document);
+	put(root, path, `${JSON.stringify(document, null, 2)}\n`);
 }
 
 function runCandidateMutation(repositoryRoot, state, contract, mutation, immutablePaths) {
 	resetCandidate(state, contract);
 	if (mutation.startsWith("gossip-old:")) {
 		createCandidateCommit(repositoryRoot, state, contract);
-		const omitted = executeRepositoryCandidate(state.root, contract, contract.redBase);
-		if (omitted.status === 0 && omitted.signal === null) return omitted;
-		resetCandidate(state, contract);
-		append(state.root, contract.gossipOracleTransition.path);
-		commit(state.root, "transient pre-transition gossip oracle drift");
-		put(
-			state.root,
-			contract.gossipOracleTransition.path,
-			readFileSync(resolve(repositoryRoot, contract.gossipOracleTransition.path))
-		);
-		commit(state.root, "terminal exact gossip oracle bytes without signed transition");
-		createCandidateCommit(repositoryRoot, state, contract);
-		return executeRepositoryCandidate(state.root, contract, contract.redBase);
+		const old = command(repositoryRoot, "git", [
+			"show",
+			`${contract.gossipOracleTransition.parent}:${contract.gossipOracleTransition.path}`,
+		]);
+		if (old.status !== 0) throw new Error(old.stderr);
+		put(state.root, contract.gossipOracleTransition.path, old.stdout);
+		commit(state.root, "restore old gossip identity");
+		return executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
 	}
 	if (mutation.startsWith("gossip-current:")) {
-		const wrongBase = installGossipOracleTransition(repositoryRoot, state, contract, (root, path) =>
-			append(root, path)
-		);
 		createCandidateCommit(repositoryRoot, state, contract);
-		return executeRepositoryCandidate(state.root, contract, wrongBase);
+		append(state.root, contract.gossipOracleTransition.path);
+		commit(state.root, "mutate current gossip identity");
+		return executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
 	}
-	const correctedBase = installGossipOracleTransition(repositoryRoot, state, contract);
+	const correctedBase = contract.externalBase.commit;
 	if (mutation.startsWith("gossip-postbootstrap:")) {
 		const bootstrap = createCandidateCommit(repositoryRoot, state, contract);
 		append(state.root, contract.gossipOracleTransition.path);
@@ -431,29 +937,35 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 	}
 	if (mutation.startsWith("immutable:")) {
 		const path = mutation.slice("immutable:".length);
-		createCandidateCommit(repositoryRoot, state, contract, { mutate: (root) => append(root, path) });
-		return executeRepositoryCandidate(state.root, contract, correctedBase);
-	}
-	if (mutation.startsWith("workflow-count:")) {
-		const count = Number(mutation.slice("workflow-count:".length));
-		createCandidateCommit(repositoryRoot, state, contract, { workflowCount: count });
+		createCandidateCommit(repositoryRoot, state, contract);
+		append(state.root, path);
+		commit(state.root, `mutate immutable ${path}`);
 		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "partial-owner-base") {
 		const ownerFiles = contract.ownerFiles.slice(0, 2);
-		for (const file of ownerFiles) put(state.root, `${contract.ownerDirectory}/${file}`, "partial\n");
-		const partial = commit(state.root, "partial successor base");
-		copyCandidate(repositoryRoot, state.root, contract);
-		commit(state.root, "complete successor candidate");
-		return executeRepositoryCandidate(state.root, contract, partial);
+		for (const file of ownerFiles)
+			cpSync(
+				resolve(repositoryRoot, contract.ownerDirectory, file),
+				resolve(state.root, contract.ownerDirectory, file)
+			);
+		commit(state.root, "partial correction owner");
+		copyCandidateCorrection(repositoryRoot, state.root, contract);
+		repinPolicyArtifacts(state.root, `${contract.ownerDirectory}/freeze-policy.json`);
+		commit(state.root, "complete split correction");
+		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
 	if (mutation === "split-owner-routing") {
-		cpSync(resolve(repositoryRoot, contract.ownerDirectory), resolve(state.root, contract.ownerDirectory), {
-			recursive: true,
-		});
-		commit(state.root, "owner first");
-		for (const identity of contract.workflowIdentities)
-			put(state.root, identity.path, readFileSync(resolve(repositoryRoot, identity.path)));
+		for (const file of contract.ownerFiles)
+			cpSync(
+				resolve(repositoryRoot, contract.ownerDirectory, file),
+				resolve(state.root, contract.ownerDirectory, file)
+			);
+		repinPolicyArtifacts(state.root, `${contract.ownerDirectory}/freeze-policy.json`);
+		commit(state.root, "owner correction first", true);
+		for (const path of contract.correctionPaths.filter((path) => path.startsWith(".github/workflows/")))
+			cpSync(resolve(repositoryRoot, path), resolve(state.root, path));
+		repinPolicyArtifacts(state.root, `${contract.ownerDirectory}/freeze-policy.json`);
 		commit(state.root, "routing second");
 		return executeRepositoryCandidate(state.root, contract, correctedBase);
 	}
@@ -528,12 +1040,103 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 		git(state.root, "reset", "--hard", "-q", head);
 		return executeRepositoryCandidate(state.root, contract, upstream);
 	}
+	if (mutation === "arbitrary-later-empty-upstream") {
+		git(state.root, "checkout", "-q", "--detach", contract.externalBase.commit);
+		const upstream = commit(state.root, "later empty external candidate", true);
+		git(state.root, "checkout", "-q", "--detach", contract.provisionalInstall.commit);
+		const prHead = createCandidateCommit(repositoryRoot, state, contract);
+		mergeCandidate(state, upstream, prHead, { message: mutation });
+		return executeRepositoryCandidate(state.root, contract, upstream);
+	}
+	if (mutation === "caller-selected-old-base") {
+		const upstream = git(state.root, "rev-parse", `${contract.externalBase.parents[0]}^`);
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeRepositoryCandidate(state.root, contract, upstream);
+	}
+	if (mutation === "upstream-after-anchor") {
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeRepositoryCandidate(state.root, contract, contract.fixedAnchor.commit);
+	}
+	if (mutation === "swapped-merge-parents") {
+		const prHead = createCandidateCommit(repositoryRoot, state, contract);
+		mergeCandidate(state, contract.externalBase.commit, prHead, { message: mutation, swapParents: true });
+		return executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+	}
+	if (mutation === "merge-tree-drift") {
+		const prHead = createCandidateCommit(repositoryRoot, state, contract);
+		append(state.root, contract.workflowIdentities[0].path, "\nmerge tree drift\n");
+		git(state.root, "add", contract.workflowIdentities[0].path);
+		const tree = git(state.root, "write-tree");
+		mergeCandidate(state, contract.externalBase.commit, prHead, { message: mutation, tree });
+		return executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+	}
+	if (mutation === "provisional-v1-descendant") {
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeRepositoryCandidate(state.root, contract, contract.provisionalInstall.commit);
+	}
+	if (
+		mutation === "other-wrong-identity-descendant" ||
+		mutation === "wrong-type-descendant" ||
+		mutation === "wrong-mode-descendant"
+	) {
+		return createWrongDescendant(repositoryRoot, state, contract, mutation);
+	}
+	if (
+		[
+			"spoofed-root-stdout",
+			"extra-root-stdout",
+			"root-child-stderr",
+			"root-child-signal",
+			"root-child-timeout",
+			"suppressed-root-exit",
+		].includes(mutation)
+	) {
+		createCandidateCommit(repositoryRoot, state, contract);
+		return executeWithRootChildPreload(repositoryRoot, state.root, contract, correctedBase, mutation);
+	}
 	const profile = `${contract.ownerDirectory}/profile.json`;
 	const policy = `${contract.ownerDirectory}/freeze-policy.json`;
 	const firstWorkflow = contract.workflowIdentities[0].path;
 	const mutations = {
+		"v1-schema": (root) => {
+			mutateJson(root, profile, (document) => {
+				document.schemaVersion = "ts-drp-protocol-v3-freeze-successor-profile-v1";
+			});
+			mutateJson(root, policy, (document) => {
+				document.schemaVersion = "ts-drp-protocol-v3-freeze-successor-v1";
+			});
+		},
+		"missing-schema": (root) => {
+			mutateJson(root, profile, (document) => {
+				delete document.schemaVersion;
+			});
+			mutateJson(root, policy, (document) => {
+				delete document.schemaVersion;
+			});
+		},
+		"dual-schema": (root) => {
+			mutateJson(root, profile, (document) => {
+				document.legacySchemaVersion = "ts-drp-protocol-v3-freeze-successor-profile-v1";
+			});
+			mutateJson(root, policy, (document) => {
+				document.legacySchemaVersion = "ts-drp-protocol-v3-freeze-successor-v1";
+			});
+		},
+		"copied-root-checker": (root) =>
+			mutateJson(root, profile, (document) => {
+				document.rootFreezeEvidence[0].checkerBlob = document.rootFreezeEvidence[1].checkerBlob;
+			}),
+		"current-only-root-evidence": (root) =>
+			mutateJson(root, profile, (document) => {
+				delete document.rootFreezeEvidence[0].historicalStdout;
+			}),
+		"blob-only-root-evidence": (root) =>
+			mutateJson(root, profile, (document) => {
+				delete document.rootFreezeEvidence[0].currentStdout;
+				delete document.rootFreezeEvidence[0].historicalStdout;
+			}),
 		"retained-legacy-checker": (root) =>
-			append(root, contract.workflowIdentities[4].path, `\nnode ${contract.predecessors[4].checker} "$UPSTREAM_SHA"\n`),
+			append(root, firstWorkflow, `\nnode ${contract.predecessors[0].checker} "$UPSTREAM_SHA"\n`),
 		"omitted-current-semantic-hash": (root) =>
 			replaceRequired(root, profile, contract.historicalTransitions[0].commits.at(-1)[1]),
 		"accepted-stale-policy-value": (root) =>
@@ -596,14 +1199,22 @@ function runCandidateMutation(repositoryRoot, state, contract, mutation, immutab
 	};
 	const mutate = mutations[mutation];
 	if (mutate === undefined) throw new Error(`unknown repository mutation: ${mutation}`);
-	createCandidateCommit(repositoryRoot, state, contract, { mutate });
+	createCandidateCommit(repositoryRoot, state, contract, {
+		allowDifferentScope: ["extra-owner-entry", "extra-unhashed-exception", "sixth-thawed-path", "tree-owner"].includes(
+			mutation
+		),
+		mutate,
+	});
 	return executeRepositoryCandidate(state.root, contract, correctedBase);
 }
 
 /** Runs one independently bounded exact repository partition with no controlled fallback. */
-export async function runRepositoryCandidatePartition(repositoryRoot, contract, selection) {
+export async function runRepositoryCandidatePartition(repositoryRoot, contract, readiness, selection) {
 	const availability = repositoryCandidateAvailability(repositoryRoot);
 	if (!availability.available) return { available: false, checker: availability.checker };
+	if (!readiness.ready) {
+		throw new Error("candidate partitions require the shared READY evidence");
+	}
 	const { fixedAnchor, immutable, inventory, mutationNames, positiveNames } = repositoryCandidatePlan(
 		repositoryRoot,
 		contract
@@ -619,13 +1230,13 @@ export async function runRepositoryCandidatePartition(repositoryRoot, contract, 
 	const state = cloneCandidateRepository(repositoryRoot, contract);
 	try {
 		const positives = [];
-		for (const name of selection.positiveNames) {
-			positives.push({ name, result: runNamedPositive(repositoryRoot, state, contract, name) });
-			await yieldToEventLoop();
-		}
 		const negatives = [];
 		for (const name of selection.mutationNames) {
-			negatives.push({ name, result: runCandidateMutation(repositoryRoot, state, contract, name, fixedAnchor) });
+			negatives.push({
+				expectedFailure: expectedCandidateFailure(name),
+				name,
+				result: runCandidateMutation(repositoryRoot, state, contract, name, fixedAnchor),
+			});
 			await yieldToEventLoop();
 		}
 		return { available: true, immutable, inventory, negatives, positives };

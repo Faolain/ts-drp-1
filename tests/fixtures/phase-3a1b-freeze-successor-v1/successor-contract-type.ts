@@ -1,16 +1,30 @@
 export interface SuccessorContract {
+	readonly schemaVersion: "phase-3a1b-freeze-successor-red-v2";
+	readonly correctionPaths: readonly string[];
+	readonly expectedPolicySchemaVersion: string;
+	readonly expectedProfileSchemaVersion: string;
+	readonly externalBase: Readonly<{
+		readonly commit: string;
+		readonly parents: readonly [string, string];
+		readonly tree: string;
+	}>;
 	readonly fixedAnchor: Readonly<{ readonly commit: string; readonly tree: string }>;
 	readonly redBase: string;
+	readonly redBaseParent: string;
+	readonly redBaseTree: string;
 	readonly gossipOracleTransition: Readonly<{
+		readonly commit: string;
 		readonly currentBlob: string;
 		readonly currentSha256: string;
 		readonly oldBlob: string;
 		readonly oldSha256: string;
 		readonly parent: string;
 		readonly path: string;
+		readonly tree: string;
 	}>;
 	readonly ownerDirectory: string;
 	readonly ownerFiles: readonly string[];
+	readonly originalInstallPaths: readonly string[];
 	readonly predecessors: readonly {
 		readonly baseline: string;
 		readonly baselineTree: string;
@@ -40,6 +54,25 @@ export interface SuccessorContract {
 	}>;
 	readonly gossipChain: readonly Readonly<{ readonly commit: string; readonly tree: string }>[];
 	readonly gossipFdbSha256: Readonly<Record<string, string>>;
+	readonly provisionalInstall: Readonly<{
+		readonly commit: string;
+		readonly parent: string;
+		readonly tree: string;
+	}>;
+	readonly rootFreezeEvidence: readonly Readonly<{
+		readonly baseline: string;
+		readonly baselineTree: string;
+		readonly checker: string;
+		readonly checkerBase: string;
+		readonly checkerBaseTree: string;
+		readonly checkerBlob: string;
+		readonly checkerSha256: string;
+		readonly currentStdout: string;
+		readonly directParent: string;
+		readonly environment: string;
+		readonly historicalStdout: string;
+		readonly id: string;
+	}>[];
 }
 
 export interface CompletedRepositoryCandidateEvidence {

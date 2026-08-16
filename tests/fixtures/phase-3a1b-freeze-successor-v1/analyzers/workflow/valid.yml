@@ -17,6 +17,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Run the freeze successor
         env:
+          PROTOCOL_V3_FREEZE_SUCCESSOR_REPOSITORY_ROOT: "${{ github.workspace }}"
           UPSTREAM_SHA: ${{ github.event.pull_request.base.sha }}
           SUCCESSOR: packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
         run: |
@@ -27,5 +28,6 @@ jobs:
             git show "$MERGE_BASE:$SUCCESSOR" > "$RUNNER_TEMP/base-freeze-successor.mjs"
             node "$RUNNER_TEMP/base-freeze-successor.mjs" "$UPSTREAM_SHA"
           fi
+          echo "data only: node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs"
           node "$SUCCESSOR" "$UPSTREAM_SHA"
       - run: pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts
