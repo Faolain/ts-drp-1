@@ -1,5 +1,11 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+import type {
+	DurableIssuanceOutboxRecord,
+	DurableIssuanceStore,
+	DurableIssueCommit,
+	DurableIssueScope,
+} from "@ts-drp/issuance-store";
+import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import type { DRPNetworkNode, Message as MessageShape } from "@ts-drp/types";
 import { Message, MessageType } from "@ts-drp/types";
@@ -11,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
 	createGenuinePreparedV3Fixture,
+	type GenuinePreparedV3Fixture,
 	type PrepareV3LiveGenerationForFixture,
 } from "./fixtures/phase-3a1b-p3/live-fixture.js";
 import {
@@ -225,11 +232,8 @@ function activationOrderingEvidence(sourceText: string): Readonly<{
 	consumePosition: number;
 	directInputAfterConsume: number;
 	firstEffect: number;
-	issuanceScopeAfterConsume: number;
-	issuanceScopeBeforeConsume: number;
-	nestedScopeValidationBeforeConsume: number;
 	outerCapturedKeys: readonly string[];
-	preparedReferencesAfterConsume: number;
+	recoveredReferencesAfterConsume: number;
 }> {
 	const declaration = topLevelFunction(sourceText, "activateV3LivePlane");
 	if (declaration?.body === undefined) {
@@ -238,18 +242,15 @@ function activationOrderingEvidence(sourceText: string): Readonly<{
 			consumePosition: -1,
 			directInputAfterConsume: 0,
 			firstEffect: -1,
-			issuanceScopeAfterConsume: 0,
-			issuanceScopeBeforeConsume: 0,
-			nestedScopeValidationBeforeConsume: 0,
 			outerCapturedKeys: [],
-			preparedReferencesAfterConsume: 0,
+			recoveredReferencesAfterConsume: 0,
 		});
 	}
 	const consumeCalls: ts.CallExpression[] = [];
 	const effectCalls: ts.CallExpression[] = [];
 	const visitCalls = (node: ts.Node): void => {
 		if (ts.isCallExpression(node)) {
-			if (ts.isIdentifier(node.expression) && node.expression.text === "consumePreparedV3Live") {
+			if (ts.isIdentifier(node.expression) && node.expression.text === "consumeRecoveredV3Live") {
 				consumeCalls.push(node);
 			}
 			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "subscribe") {
@@ -263,14 +264,11 @@ function activationOrderingEvidence(sourceText: string): Readonly<{
 	const consumePosition = consume?.getStart() ?? Number.MAX_SAFE_INTEGER;
 	const captured = new Set<string>();
 	let directInputAfterConsume = 0;
-	let issuanceScopeBeforeConsume = 0;
-	let issuanceScopeAfterConsume = 0;
-	let nestedScopeValidationBeforeConsume = 0;
-	let preparedBinding: string | undefined;
+	let recoveredBinding: string | undefined;
 	if (consume !== undefined && ts.isVariableDeclaration(consume.parent) && ts.isIdentifier(consume.parent.name)) {
-		preparedBinding = consume.parent.name.text;
+		recoveredBinding = consume.parent.name.text;
 	}
-	let preparedReferencesAfterConsume = 0;
+	let recoveredReferencesAfterConsume = 0;
 	const visitEvidence = (node: ts.Node): void => {
 		if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "input") {
 			if (node.getStart() < consumePosition) captured.add(node.name.text);
@@ -287,24 +285,13 @@ function activationOrderingEvidence(sourceText: string): Readonly<{
 				if (ts.isIdentifier(element.name)) captured.add((element.propertyName ?? element.name).getText());
 			}
 		}
-		if (ts.isIdentifier(node) && node.text === "issuanceScope") {
-			if (node.getStart() < consumePosition) issuanceScopeBeforeConsume += 1;
-			else issuanceScopeAfterConsume += 1;
-		}
 		if (
-			ts.isCallExpression(node) &&
-			node.getStart() < consumePosition &&
-			node.arguments.some((argument) => descendantIdentifierNames(argument).includes("issuanceScope"))
-		) {
-			nestedScopeValidationBeforeConsume += 1;
-		}
-		if (
-			preparedBinding !== undefined &&
+			recoveredBinding !== undefined &&
 			ts.isIdentifier(node) &&
-			node.text === preparedBinding &&
+			node.text === recoveredBinding &&
 			node.getStart() > consumePosition
 		) {
-			preparedReferencesAfterConsume += 1;
+			recoveredReferencesAfterConsume += 1;
 		}
 		ts.forEachChild(node, visitEvidence);
 	};
@@ -314,11 +301,8 @@ function activationOrderingEvidence(sourceText: string): Readonly<{
 		consumePosition: consume === undefined ? -1 : consumePosition,
 		directInputAfterConsume,
 		firstEffect: effectCalls.length === 0 ? -1 : Math.min(...effectCalls.map((call) => call.getStart())),
-		issuanceScopeAfterConsume,
-		issuanceScopeBeforeConsume,
-		nestedScopeValidationBeforeConsume,
 		outerCapturedKeys: Object.freeze([...captured].sort()),
-		preparedReferencesAfterConsume,
+		recoveredReferencesAfterConsume,
 	});
 }
 
@@ -404,6 +388,121 @@ function fakeIssuanceStore(overrides: Partial<DurableIssuanceStore> = {}): Durab
 	};
 }
 
+const activationJournalStores = new WeakMap<object, DurableLiveJournalStore>();
+
+async function recoverActivationCapability(
+	surface: Seam3PrivateSurface,
+	fixture: GenuinePreparedV3Fixture,
+	preparedCapability: object,
+	activationStore: DurableIssuanceStore = fakeIssuanceStore()
+): Promise<Readonly<{ capability: object; recoveryDigest: string; scope: DurableIssueScope }>> {
+	if (surface.recoverV3LiveReplica === undefined) throw new TypeError("missing recoverV3LiveReplica");
+	const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
+	const carrier = fixture.createRecoveryVertex(0, [fixture.descriptor.anchorDigest]);
+	const envelope = Object.freeze({
+		canonicalPreimageBytes: new Uint8Array(carrier.canonicalPreimageBytes),
+		digest: new Uint8Array(carrier.digest),
+		signature: new Uint8Array(carrier.signature),
+	});
+	const recoveryCommit: DurableIssueCommit = Object.freeze({
+		authorSequence: 0,
+		envelope,
+		issuedRecord: Object.freeze({ authorSequence: 0, envelope, scope }),
+		outboxEntry: Object.freeze({ authorSequence: 0, envelope, scope }),
+	});
+	const mutableStore = activationStore as {
+		readIssued: DurableIssuanceStore["readIssued"];
+		readOutboxPage: DurableIssuanceStore["readOutboxPage"];
+	};
+	const originalReadIssued = mutableStore.readIssued;
+	const originalReadOutboxPage = mutableStore.readOutboxPage;
+	mutableStore.readIssued = (selectedScope, authorSequence) =>
+		Promise.resolve(
+			selectedScope.objectId === scope.objectId && selectedScope.author === scope.author && authorSequence === 0
+				? recoveryCommit
+				: null
+		);
+	mutableStore.readOutboxPage = (input = {}) =>
+		Promise.resolve(
+			input.afterKey == null
+				? Object.freeze([Object.freeze({ commit: recoveryCommit, publishState: "published" as const })])
+				: Object.freeze([])
+		);
+	const journalScope: LiveJournalScope = Object.freeze({
+		anchorDigest: fixture.descriptor.anchorDigest,
+		epoch: 0,
+		objectId: fixture.descriptor.objectId,
+	});
+	const snapshot = Object.freeze({
+		kind: "v3-live-journal-snapshot-token-1" as const,
+		scope: journalScope,
+		highWatermark: 0,
+		genesisDigest: "1".repeat(64),
+		parametersDigest: fixture.descriptor.parametersDigest,
+		orderedRowDigest: "2".repeat(64),
+		snapshotDigest: "3".repeat(64),
+	});
+	const journalStore: DurableLiveJournalStore =
+		activationJournalStores.get(activationStore as object) ??
+		Object.freeze({
+			installGenesis: () =>
+				Promise.resolve(
+					Object.freeze({
+						ok: true as const,
+						scope: journalScope,
+						parametersDigest: fixture.descriptor.parametersDigest,
+						idempotent: false,
+					})
+				),
+			readiness: () =>
+				Promise.resolve(
+					Object.freeze({ ok: true as const, ready: true as const, scope: journalScope, snapshot, rowCount: 0 })
+				),
+			readPage: () =>
+				Promise.resolve(
+					Object.freeze({
+						ok: true as const,
+						scope: journalScope,
+						snapshot,
+						rows: Object.freeze([]),
+						nextSequence: null,
+					})
+				),
+			appendAccepted: (input) =>
+				Promise.resolve(
+					Object.freeze({
+						ok: true as const,
+						scope: journalScope,
+						journalSequence: 0,
+						vertexDigest: input.vertexDigest,
+						sourceKind: input.sourceKind,
+						idempotent: false,
+					})
+				),
+			close: () => Promise.resolve(),
+		});
+	activationJournalStores.set(activationStore as object, journalStore);
+	let recovered: Awaited<ReturnType<NonNullable<Seam3PrivateSurface["recoverV3LiveReplica"]>>>;
+	try {
+		recovered = await surface.recoverV3LiveReplica({
+			capability: preparedCapability,
+			exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes,
+			issuanceScope: scope,
+			issuanceStore: activationStore,
+			liveJournalStore: journalStore,
+		});
+	} finally {
+		mutableStore.readIssued = originalReadIssued;
+		mutableStore.readOutboxPage = originalReadOutboxPage;
+	}
+	if (!recovered.ok) throw new TypeError(`recovery failed: ${recovered.kind}`);
+	return Object.freeze({
+		capability: recovered.capability,
+		recoveryDigest: Array.from(carrier.digest, (byte) => byte.toString(16).padStart(2, "0")).join(""),
+		scope,
+	});
+}
+
 function outboxRecord(
 	scope: DurableIssueScope,
 	authorSequence: number,
@@ -440,12 +539,9 @@ function deferred<T>(): Readonly<{ promise: Promise<T>; resolve(value: T): void;
 function forgedInput(overrides: Readonly<Record<string, unknown>> = {}): V3PlaneActivationInputContract {
 	return {
 		capability: Object.freeze({ counterfeit: true }),
-		issuanceScope: Object.freeze({ author: "author:seam3", objectId: "creator:seam3" }),
-		issuanceStore: fakeIssuanceStore(),
 		messageQueueManager: new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } }),
 		networkNode: fakeNetwork(),
 		onAdmittedVertex: vi.fn(),
-		resolveAuthorPublicKey: vi.fn(() => undefined),
 		...overrides,
 	} as V3PlaneActivationInputContract;
 }
@@ -495,7 +591,6 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"capability-consumed",
 			"not-started",
 			"topic-derivation-failed",
-			"issuance-scope-mismatch",
 			"queue-capacity",
 			"subscribe-failed",
 			"internal-invariant",
@@ -509,7 +604,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		]);
 	});
 
-	it("captures malformed outer input without consuming, then burns a genuine token on nested invalidity", async () => {
+	it("captures malformed outer input without consuming, then burns a genuine recovered token", async () => {
 		const surface = await privateSurface();
 		if (surface.activateV3LivePlane === undefined) throw new TypeError("missing activateV3LivePlane");
 		const effects: string[] = [];
@@ -537,11 +632,9 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const queueSubscribe = vi.spyOn(queue, "subscribe");
 			const network = fakeNetwork();
 			const networkSubscribe = Reflect.get(network, "subscribe") as ReturnType<typeof vi.fn>;
-			const readOutboxPage = vi.fn(() => Promise.resolve([]));
+			const recovered = await recoverActivationCapability(surface, fixture, fixture.capability);
 			const base = forgedInput({
-				capability: fixture.capability,
-				issuanceScope: Object.freeze({ author: "author:seam3", objectId: fixture.descriptor.objectId }),
-				issuanceStore: fakeIssuanceStore({ readOutboxPage }),
+				capability: recovered.capability,
 				messageQueueManager: queue,
 				networkNode: network,
 			});
@@ -550,24 +643,16 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				kind: "malformed-input",
 				detail: expect.any(String),
 			});
-			expect(
-				surface.activateV3LivePlane({
-					...base,
-					issuanceScope: Object.freeze({
-						author: "author:seam3",
-						extra: true,
-						objectId: fixture.descriptor.objectId,
-					}),
-				} as V3PlaneActivationInputContract)
-			).toEqual({ ok: false, kind: "malformed-input", detail: expect.any(String) });
+			const activated = surface.activateV3LivePlane(base);
+			expect(activated).toEqual({ ok: true, handle: expect.any(Object) });
+			expect(queueSubscribe).toHaveBeenCalledTimes(1);
+			expect(networkSubscribe).toHaveBeenCalledTimes(1);
 			expect(surface.activateV3LivePlane(base)).toEqual({
 				ok: false,
 				kind: "capability-consumed",
 				detail: expect.any(String),
 			});
-			expect(queueSubscribe).not.toHaveBeenCalled();
-			expect(networkSubscribe).not.toHaveBeenCalled();
-			expect(readOutboxPage).not.toHaveBeenCalled();
+			if (activated.ok) activated.handle.deactivate();
 		} finally {
 			await fixture.close();
 		}
@@ -633,31 +718,30 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		try {
 			const surface = await privateSurface();
 			if (surface.activateV3LivePlane === undefined) throw new TypeError("missing activateV3LivePlane");
-			const scope = Object.freeze({ author: "author:seam3", objectId: fixture.descriptor.objectId });
 			const topic = exactTopic(fixture.descriptor.objectId, fixture.descriptor.anchorDigest);
 			const run = async (
 				kind: (typeof ACTIVATION_FAILURE_KINDS)[number],
 				configure: (input: {
 					capability: object;
-					issuanceScope: DurableIssueScope;
-					issuanceStore: DurableIssuanceStore;
 					messageQueueManager: MessageQueueManager<MessageShape>;
 					networkNode: DRPNetworkNode;
 					onAdmittedVertex: ReturnType<typeof vi.fn>;
-					resolveAuthorPublicKey: ReturnType<typeof vi.fn>;
 				}) => void,
 				expectedQueueSubscribeCalls = 0
 			): Promise<void> => {
 				const prepared = await fixture.prepareAgain();
 				const readOutboxPage = vi.fn(() => Promise.resolve([]));
+				const recovered = await recoverActivationCapability(
+					surface,
+					fixture,
+					prepared.capability,
+					fakeIssuanceStore({ readOutboxPage })
+				);
 				const input = {
-					capability: prepared.capability as object,
-					issuanceScope: scope as DurableIssueScope,
-					issuanceStore: fakeIssuanceStore({ readOutboxPage }),
+					capability: recovered.capability,
 					messageQueueManager: new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } }),
 					networkNode: fakeNetwork(),
 					onAdmittedVertex: vi.fn(),
-					resolveAuthorPublicKey: vi.fn(() => undefined),
 				};
 				configure(input);
 				const queueSubscribe = vi.spyOn(input.messageQueueManager, "subscribe");
@@ -673,15 +757,6 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				expect(input.messageQueueManager.hasQueue(topic)).toBe(false);
 			};
 
-			await run("issuance-scope-mismatch", (input) => {
-				input.issuanceScope = Object.freeze({ ...scope, objectId: "creator:foreign" });
-				input.networkNode = fakeNetwork(false);
-				Reflect.set(
-					input.networkNode,
-					"getSubscribedTopics",
-					vi.fn(() => Object.freeze(["malformed later fault"]))
-				);
-			});
 			await run("not-started", (input) => {
 				input.networkNode = fakeNetwork(false);
 				Reflect.set(
@@ -766,18 +841,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				const queueSubscribe = vi.spyOn(queue, "subscribe");
 				const network = fakeNetwork();
 				const networkSubscribe = Reflect.get(network, "subscribe") as ReturnType<typeof vi.fn>;
+				const recovered = await recoverActivationCapability(topicSurface, topicFixture, topicFixture.capability);
 				installThrowingTextEncoder();
 				const result = topicSurface.activateV3LivePlane({
-					capability: topicFixture.capability,
-					issuanceScope: Object.freeze({
-						author: "author:seam3",
-						objectId: topicFixture.descriptor.objectId,
-					}),
-					issuanceStore: fakeIssuanceStore(),
+					capability: recovered.capability,
 					messageQueueManager: queue,
 					networkNode: network,
 					onAdmittedVertex: vi.fn(),
-					resolveAuthorPublicKey: vi.fn(() => undefined),
 				});
 				expectClosedFrozenActivationFailure(result, "topic-derivation-failed");
 				expect(queueSubscribe).not.toHaveBeenCalled();
@@ -791,14 +861,14 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		}
 	});
 
-	it("reaches genuine prepared-token activation, idempotence, ingress queueing, egress and deactivation", async () => {
+	it("reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation", async () => {
 		const fixture = await createGenuinePreparedV3Fixture();
 		try {
 			const surface = await privateSurface();
 			if (surface.activateV3LivePlane === undefined || surface.routeV3Ingress === undefined) {
 				throw new TypeError("missing Seam3 private surface");
 			}
-			const scope = Object.freeze({ author: "author:seam3", objectId: fixture.descriptor.objectId });
+			const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
 			const rows = Object.freeze([outboxRecord(scope, 1, "published"), outboxRecord(scope, 2, "pending")]);
 			let pageOrdinal = 0;
 			const readOutboxPage = vi.fn((_input: Parameters<DurableIssuanceStore["readOutboxPage"]>[0]) =>
@@ -816,17 +886,12 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const queueEnqueue = vi.spyOn(queue, "enqueue");
 			const queueClose = vi.spyOn(queue, "close");
 			const sink = vi.fn();
-			const resolveAuthorPublicKey = vi.fn((author: string) =>
-				author === "creator" ? { bytes: fixture.authorPublicKey, format: "raw" as const } : undefined
-			);
+			const recovered = await recoverActivationCapability(surface, fixture, fixture.capability, issuanceStore);
 			const input = {
-				capability: fixture.capability,
-				issuanceScope: scope,
-				issuanceStore,
+				capability: recovered.capability,
 				messageQueueManager: queue,
 				networkNode: network,
 				onAdmittedVertex: sink,
-				resolveAuthorPublicKey,
 			};
 			const activated = surface.activateV3LivePlane(input);
 			expect(activated).toEqual({ ok: true, handle: expect.any(Object) });
@@ -843,10 +908,9 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(networkSubscribe).toHaveBeenCalledTimes(1);
 
 			const repeated = await fixture.prepareAgain();
-			const idempotent = surface.activateV3LivePlane({ ...input, capability: repeated.capability });
-			expect(idempotent).toEqual({ ok: true, handle: activated.handle });
-			expect(idempotent).not.toBe(activated);
-			expect(Object.isFrozen(idempotent)).toBe(true);
+			const repeatedRecovered = await recoverActivationCapability(surface, fixture, repeated.capability, issuanceStore);
+			const conflicting = surface.activateV3LivePlane({ ...input, capability: repeatedRecovered.capability });
+			expectClosedFrozenActivationFailure(conflicting, "internal-invariant");
 			expect(queueSubscribe).toHaveBeenCalledTimes(1);
 			expect(networkSubscribe).toHaveBeenCalledTimes(1);
 			expect(queueClose).not.toHaveBeenCalled();
@@ -857,7 +921,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(compareAndMarkOutboxPublished).not.toHaveBeenCalled();
 			expect(published).toEqual([]);
 			expect(sink).not.toHaveBeenCalled();
-			expect(surface.activateV3LivePlane({ ...input, capability: repeated.capability })).toEqual({
+			expect(surface.activateV3LivePlane({ ...input, capability: repeatedRecovered.capability })).toEqual({
 				ok: false,
 				kind: "capability-consumed",
 				detail: expect.any(String),
@@ -882,9 +946,10 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				};
 			};
 			if (generated.V3Envelope === undefined) throw new TypeError("missing generated V3Envelope");
+			const ingressCarrier = fixture.createRecoveryVertex(1, [recovered.recoveryDigest]);
 			const canonicalEnvelopeBytes = generated.V3Envelope.encode({
-				canonicalPreimage: fixture.receivedCanonicalPreimageBytes,
-				signature: fixture.receivedSignature,
+				canonicalPreimage: ingressCarrier.canonicalPreimageBytes,
+				signature: ingressCarrier.signature,
 			}).finish();
 			const ingress = Message.create({
 				data: canonicalEnvelopeBytes,
@@ -902,14 +967,12 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				expectedEnqueueDelta: 0 | 1
 			): Promise<void> => {
 				const sinkCount = sink.mock.calls.length;
-				const resolverCount = resolveAuthorPublicKey.mock.calls.length;
 				const enqueueCount = queueEnqueue.mock.calls.length;
 				gossipTopicFor.mockReturnValue(provenance);
 				expect(surface.routeV3Ingress(network, message)).toBe(expectedClaim);
 				await waitForIngress();
 				expect(queueEnqueue).toHaveBeenCalledTimes(enqueueCount + expectedEnqueueDelta);
 				expect(sink).toHaveBeenCalledTimes(sinkCount);
-				expect(resolveAuthorPublicKey).toHaveBeenCalledTimes(resolverCount);
 			};
 			await expectNoDelivery(
 				Message.create({ ...ingress, type: MessageType.MESSAGE_TYPE_UPDATE }),
@@ -944,7 +1007,6 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			await waitForIngress();
 			expect(gossipTopicFor).toHaveBeenCalledTimes(2);
 			expect(queueEnqueue).toHaveBeenCalledTimes(enqueueBeforeRevalidation + 1);
-			expect(resolveAuthorPublicKey).not.toHaveBeenCalled();
 			expect(sink).not.toHaveBeenCalled();
 			gossipTopicFor.mockReset();
 			gossipTopicFor.mockReturnValue(activated.handle.topic);
@@ -954,7 +1016,6 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				await new Promise((resolve) => setTimeout(resolve, 1));
 			}
 			expect(sink).toHaveBeenCalledTimes(1);
-			expect(resolveAuthorPublicKey).toHaveBeenCalledTimes(1);
 			expect(queueEnqueue).toHaveBeenCalledTimes(enqueueBeforeDelivery + 1);
 			const delivery = sink.mock.calls[0]?.[0] as Record<string, unknown>;
 			expect(Object.isFrozen(delivery)).toBe(true);
@@ -964,10 +1025,10 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				"signature",
 				"transportSender",
 			]);
-			expect(delivery.exactReceivedCanonicalPreimageBytes).toEqual(fixture.receivedCanonicalPreimageBytes);
-			expect(delivery.exactReceivedCanonicalPreimageBytes).not.toBe(fixture.receivedCanonicalPreimageBytes);
-			expect(delivery.signature).toEqual(fixture.receivedSignature);
-			expect(delivery.signature).not.toBe(fixture.receivedSignature);
+			expect(delivery.exactReceivedCanonicalPreimageBytes).toEqual(ingressCarrier.canonicalPreimageBytes);
+			expect(delivery.exactReceivedCanonicalPreimageBytes).not.toBe(ingressCarrier.canonicalPreimageBytes);
+			expect(delivery.signature).toEqual(ingressCarrier.signature);
+			expect(delivery.signature).not.toBe(ingressCarrier.signature);
 			expect(delivery.transportSender).toBe("authenticated-peer");
 
 			const publicationResult = await activated.handle.publishPending();
@@ -1025,10 +1086,11 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 			const fresh = await fixture.prepareAgain();
 			const rejectingSink = vi.fn(() => Promise.reject(new Error("synthetic sink failure")));
+			const freshStore = fakeIssuanceStore();
+			const freshRecovered = await recoverActivationCapability(surface, fixture, fresh.capability, freshStore);
 			const reactivated = surface.activateV3LivePlane({
 				...input,
-				capability: fresh.capability,
-				issuanceStore: fakeIssuanceStore(),
+				capability: freshRecovered.capability,
 				onAdmittedVertex: rejectingSink,
 			});
 			if (!reactivated.ok) throw new TypeError(`reactivation failed: ${reactivated.kind}`);
@@ -1058,21 +1120,18 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			if (surface.activateV3LivePlane === undefined || surface.routeV3Ingress === undefined) {
 				throw new TypeError("missing Seam3 private surface");
 			}
-			const scope = Object.freeze({ author: "author:seam3", objectId: fixture.descriptor.objectId });
 			const readOutboxPage = vi.fn(() => Promise.resolve([]));
 			const issuanceStore = fakeIssuanceStore({ readOutboxPage });
 			const network = fakeNetwork();
 			const queue = new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } });
 			const queueEnqueue = vi.spyOn(queue, "enqueue");
 			const queueClose = vi.spyOn(queue, "close");
+			const recovered = await recoverActivationCapability(surface, fixture, fixture.capability, issuanceStore);
 			const input = {
-				capability: fixture.capability,
-				issuanceScope: scope,
-				issuanceStore,
+				capability: recovered.capability,
 				messageQueueManager: queue,
 				networkNode: network,
 				onAdmittedVertex: vi.fn(),
-				resolveAuthorPublicKey: vi.fn(() => undefined),
 			};
 			const first = surface.activateV3LivePlane(input);
 			if (!first.ok) throw new TypeError(`first activation failed: ${first.kind}`);
@@ -1105,7 +1164,13 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			});
 
 			const replacementToken = await fixture.prepareAgain();
-			const replacement = surface.activateV3LivePlane({ ...input, capability: replacementToken.capability });
+			const replacementRecovered = await recoverActivationCapability(
+				surface,
+				fixture,
+				replacementToken.capability,
+				issuanceStore
+			);
+			const replacement = surface.activateV3LivePlane({ ...input, capability: replacementRecovered.capability });
 			if (!replacement.ok) throw new TypeError(`replacement activation failed: ${replacement.kind}`);
 			expect(replacement.handle).not.toBe(first.handle);
 			expect(replacement.handle.topic).toBe(topic);
@@ -1128,22 +1193,20 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		try {
 			const surface = await privateSurface();
 			if (surface.activateV3LivePlane === undefined) throw new TypeError("missing activateV3LivePlane");
-			const scope = Object.freeze({ author: "author:seam3", objectId: fixture.descriptor.objectId });
 			const topic = exactTopic(fixture.descriptor.objectId, fixture.descriptor.anchorDigest);
 			const foreignQueue = new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } });
 			foreignQueue.subscribe(topic, vi.fn());
 			const cleanNetwork = fakeNetwork();
+			const issuanceStore = fakeIssuanceStore();
 			const shared = {
-				issuanceScope: scope,
-				issuanceStore: fakeIssuanceStore(),
 				networkNode: cleanNetwork,
 				onAdmittedVertex: vi.fn(),
-				resolveAuthorPublicKey: vi.fn(() => undefined),
 			};
+			const firstRecovered = await recoverActivationCapability(surface, fixture, fixture.capability, issuanceStore);
 			expect(
 				surface.activateV3LivePlane({
 					...shared,
-					capability: fixture.capability,
+					capability: firstRecovered.capability,
 					messageQueueManager: foreignQueue,
 				})
 			).toEqual({ ok: false, kind: "internal-invariant", detail: expect.any(String) });
@@ -1152,18 +1215,19 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(
 				surface.activateV3LivePlane({
 					...shared,
-					capability: fixture.capability,
+					capability: firstRecovered.capability,
 					messageQueueManager: new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } }),
 				})
 			).toEqual({ ok: false, kind: "capability-consumed", detail: expect.any(String) });
 
 			const topicToken = await fixture.prepareAgain();
+			const topicRecovered = await recoverActivationCapability(surface, fixture, topicToken.capability, issuanceStore);
 			const foreignTopicNetwork = fakeNetwork();
 			foreignTopicNetwork.subscribe(topic);
 			expect(
 				surface.activateV3LivePlane({
 					...shared,
-					capability: topicToken.capability,
+					capability: topicRecovered.capability,
 					messageQueueManager: new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } }),
 					networkNode: foreignTopicNetwork,
 				})
@@ -1171,13 +1235,19 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(foreignTopicNetwork.getSubscribedTopics()).toEqual([topic]);
 
 			const capacityToken = await fixture.prepareAgain();
+			const capacityRecovered = await recoverActivationCapability(
+				surface,
+				fixture,
+				capacityToken.capability,
+				issuanceStore
+			);
 			const fullQueue = new MessageQueueManager<MessageShape>({ maxQueues: 0, logConfig: { level: "silent" } });
 			const capacityQueueSubscribe = vi.spyOn(fullQueue, "subscribe");
 			const capacityNetworkSubscribe = Reflect.get(cleanNetwork, "subscribe") as ReturnType<typeof vi.fn>;
 			expect(
 				surface.activateV3LivePlane({
 					...shared,
-					capability: capacityToken.capability,
+					capability: capacityRecovered.capability,
 					messageQueueManager: fullQueue,
 				})
 			).toEqual({ ok: false, kind: "queue-capacity", detail: expect.any(String) });
@@ -1186,6 +1256,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(fullQueue.hasQueue(topic)).toBe(false);
 
 			const retry = await fixture.prepareAgain();
+			const retryRecovered = await recoverActivationCapability(surface, fixture, retry.capability, issuanceStore);
 			const rollbackQueue = new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } });
 			const brokenNetwork = fakeNetwork();
 			const brokenSubscribe = vi.fn();
@@ -1193,7 +1264,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(
 				surface.activateV3LivePlane({
 					...shared,
-					capability: retry.capability,
+					capability: retryRecovered.capability,
 					messageQueueManager: rollbackQueue,
 					networkNode: brokenNetwork,
 				})
@@ -1203,6 +1274,12 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(brokenNetwork.getSubscribedTopics()).toEqual([]);
 
 			const cleanupToken = await fixture.prepareAgain();
+			const cleanupRecovered = await recoverActivationCapability(
+				surface,
+				fixture,
+				cleanupToken.capability,
+				issuanceStore
+			);
 			const cleanupQueue = new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } });
 			const cleanupNetwork = fakeNetwork();
 			const originalSubscribe = cleanupNetwork.subscribe.bind(cleanupNetwork);
@@ -1225,7 +1302,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(
 				surface.activateV3LivePlane({
 					...shared,
-					capability: cleanupToken.capability,
+					capability: cleanupRecovered.capability,
 					messageQueueManager: cleanupQueue,
 					networkNode: cleanupNetwork,
 				})
@@ -1245,22 +1322,21 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		try {
 			const surface = await privateSurface();
 			if (surface.activateV3LivePlane === undefined) throw new TypeError("missing activateV3LivePlane");
-			const scope = Object.freeze({ author: "author:seam3", objectId: fixture.descriptor.objectId });
+			const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
 			const pending = outboxRecord(scope, 3, "pending");
-			const activate = (
+			const activate = async (
 				capability: object,
 				issuanceStore: DurableIssuanceStore,
 				network: DRPNetworkNode
-			): V3PlaneActivationResultContract =>
-				surface.activateV3LivePlane({
-					capability,
-					issuanceScope: scope,
-					issuanceStore,
+			): Promise<V3PlaneActivationResultContract> => {
+				const recovered = await recoverActivationCapability(surface, fixture, capability, issuanceStore);
+				return surface.activateV3LivePlane({
+					capability: recovered.capability,
 					messageQueueManager: new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } }),
 					networkNode: network,
 					onAdmittedVertex: vi.fn(),
-					resolveAuthorPublicKey: vi.fn(() => undefined),
 				});
+			};
 
 			const secondPending = outboxRecord(scope, 4, "pending");
 			const fifoRows = [pending, secondPending] as const;
@@ -1285,7 +1361,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				fifoTrace.push(`mark:${input.authorSequence}`);
 				return Promise.resolve();
 			});
-			const fifoActivation = activate(
+			const fifoActivation = await activate(
 				fixture.capability,
 				fakeIssuanceStore({ compareAndMarkOutboxPublished: fifoMark, readOutboxPage: fifoRead }),
 				fakeNetwork(true, fifoPublish)
@@ -1330,7 +1406,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const pageMark = vi.fn(() => Promise.resolve());
 			const pageNetwork = fakeNetwork();
 			const pageToken = await fixture.prepareAgain();
-			const pageActivation = activate(
+			const pageActivation = await activate(
 				pageToken.capability,
 				fakeIssuanceStore({ compareAndMarkOutboxPublished: pageMark, readOutboxPage: pageRead }),
 				pageNetwork
@@ -1351,7 +1427,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const publishCalls = vi.fn(() => publish.promise);
 			const publishMark = vi.fn(() => Promise.resolve());
 			const publishToken = await fixture.prepareAgain();
-			const publishActivation = activate(
+			const publishActivation = await activate(
 				publishToken.capability,
 				fakeIssuanceStore({
 					compareAndMarkOutboxPublished: publishMark,
@@ -1378,7 +1454,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const rejectedPublishCalls = vi.fn(() => rejectedPublish.promise);
 			const rejectedPublishMark = vi.fn(() => Promise.resolve());
 			const rejectedPublishToken = await fixture.prepareAgain();
-			const rejectedPublishActivation = activate(
+			const rejectedPublishActivation = await activate(
 				rejectedPublishToken.capability,
 				fakeIssuanceStore({
 					compareAndMarkOutboxPublished: rejectedPublishMark,
@@ -1406,7 +1482,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			const mark = deferred<undefined>();
 			const markCalls = vi.fn(() => mark.promise);
 			const markToken = await fixture.prepareAgain();
-			const markActivation = activate(
+			const markActivation = await activate(
 				markToken.capability,
 				fakeIssuanceStore({
 					compareAndMarkOutboxPublished: markCalls,
@@ -1436,7 +1512,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				inconsistentRow.commit.outboxEntry.envelope.signature
 			);
 			const malformedNetwork = fakeNetwork();
-			const malformedActivation = activate(
+			const malformedActivation = await activate(
 				malformedToken.capability,
 				fakeIssuanceStore({ readOutboxPage: vi.fn(() => Promise.resolve([inconsistentRow])) }),
 				malformedNetwork
@@ -1451,7 +1527,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 			const crossScopeToken = await fixture.prepareAgain();
 			const crossScopeNetwork = fakeNetwork();
-			const crossScopeActivation = activate(
+			const crossScopeActivation = await activate(
 				crossScopeToken.capability,
 				fakeIssuanceStore({
 					readOutboxPage: vi.fn(() =>
@@ -1470,7 +1546,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 			const truthyToken = await fixture.prepareAgain();
 			const truthyMark = vi.fn(() => Promise.resolve());
-			const truthyActivation = activate(
+			const truthyActivation = await activate(
 				truthyToken.capability,
 				fakeIssuanceStore({
 					compareAndMarkOutboxPublished: truthyMark,
@@ -1489,7 +1565,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 			const rejectedToken = await fixture.prepareAgain();
 			const rejectedMark = vi.fn(() => Promise.resolve());
-			const rejectedActivation = activate(
+			const rejectedActivation = await activate(
 				rejectedToken.capability,
 				fakeIssuanceStore({
 					compareAndMarkOutboxPublished: rejectedMark,
@@ -1508,7 +1584,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 			const rejectedMarkToken = await fixture.prepareAgain();
 			const rejectedMarkCall = vi.fn(() => Promise.reject(new Error("synthetic mark rejection")));
-			const rejectedMarkActivation = activate(
+			const rejectedMarkActivation = await activate(
 				rejectedMarkToken.capability,
 				fakeIssuanceStore({
 					compareAndMarkOutboxPublished: rejectedMarkCall,
@@ -1594,18 +1670,12 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(ordering.consumeCount).toBe(1);
 		expect(ordering.outerCapturedKeys).toEqual([
 			"capability",
-			"issuanceScope",
-			"issuanceStore",
 			"messageQueueManager",
 			"networkNode",
 			"onAdmittedVertex",
-			"resolveAuthorPublicKey",
 		]);
 		expect(ordering.directInputAfterConsume).toBe(0);
-		expect(ordering.issuanceScopeBeforeConsume).toBeGreaterThan(0);
-		expect(ordering.issuanceScopeAfterConsume).toBeGreaterThan(0);
-		expect(ordering.nestedScopeValidationBeforeConsume).toBe(0);
-		expect(ordering.preparedReferencesAfterConsume).toBeGreaterThan(0);
+		expect(ordering.recoveredReferencesAfterConsume).toBeGreaterThan(0);
 		expect(ordering.consumePosition).toBeGreaterThan(-1);
 		expect(ordering.firstEffect).toBeGreaterThan(ordering.consumePosition);
 		expect(activate).toContain("hasQueue");
@@ -1642,7 +1712,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		const liveSource = source("packages/node/src/v3-live.ts");
 		const route = functionText(liveSource, "routeV3Ingress");
 		expect(route).not.toBe("");
-		expect(INGRESS_ORDER).toHaveLength(11);
+		expect(INGRESS_ORDER).toHaveLength(13);
 		expect(count(liveSource, /V3Envelope\.decode\(/gu)).toBe(1);
 		expect(count(liveSource, /V3Envelope\.encode\(/gu)).toBe(2);
 		expect(count(liveSource, /extractAdmittedReceivedVertex\(/gu)).toBe(1);

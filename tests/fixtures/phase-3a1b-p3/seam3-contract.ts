@@ -1,6 +1,5 @@
-import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
-import type { AdmitReceivedVertexInput, AdmittedReceivedVertexView } from "@ts-drp/protocol-v3";
+import type { AdmittedReceivedVertexView } from "@ts-drp/protocol-v3";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
 export const SEAM3_BUF_CLI_PACKAGE = "@bufbuild/buf@1.69.0";
@@ -72,7 +71,6 @@ export const ACTIVATION_FAILURE_KINDS = Object.freeze([
 	"capability-consumed",
 	"not-started",
 	"topic-derivation-failed",
-	"issuance-scope-mismatch",
 	"queue-capacity",
 	"subscribe-failed",
 	"internal-invariant",
@@ -112,6 +110,8 @@ export const INGRESS_ORDER = Object.freeze([
 	"envelope.reencode",
 	"envelope.detach",
 	"vertex.extract",
+	"journal.append",
+	"index.append",
 	"sink.invoke",
 ] as const);
 
@@ -135,12 +135,9 @@ export const EGRESS_ORDER = Object.freeze([
 
 export interface V3PlaneActivationInputContract {
 	readonly capability: object;
-	readonly issuanceScope: DurableIssueScope;
-	readonly issuanceStore: DurableIssuanceStore;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: V3AdmittedVertexSinkContract;
-	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
 }
 
 export type V3AdmittedVertexSinkContract = (
@@ -180,5 +177,11 @@ export type V3EgressResultContract =
 export interface Seam3PrivateSurface {
 	activateV3LivePlane?(input: V3PlaneActivationInputContract): V3PlaneActivationResultContract;
 	prepareV3LiveGeneration?(input: unknown): Promise<unknown>;
+	recoverV3LiveReplica?(
+		input: Readonly<Record<string, unknown>>
+	): Promise<
+		| Readonly<{ readonly ok: true; readonly capability: object }>
+		| Readonly<{ readonly ok: false; readonly kind: string }>
+	>;
 	routeV3Ingress?(networkNode: DRPNetworkNode, message: Message): boolean;
 }

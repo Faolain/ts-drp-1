@@ -1,11 +1,10 @@
-import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
-import type { AdmitReceivedVertexInput, AdmittedReceivedVertexView } from "@ts-drp/protocol-v3";
+import type { AdmittedReceivedVertexView } from "@ts-drp/protocol-v3";
 import { type DRPNetworkNode, type Message, type V3Envelope, V3Envelope as V3EnvelopeCodec } from "@ts-drp/types";
 
 import type {
 	activateV3LivePlane,
-	PreparedV3Live,
+	RecoveredV3Live,
 	routeV3Ingress,
 	V3AdmittedVertexSink,
 	V3EgressResult,
@@ -41,13 +40,10 @@ interface ExpectedHandle {
 }
 
 interface ExpectedInput {
-	readonly capability: PreparedV3Live;
-	readonly issuanceScope: DurableIssueScope;
-	readonly issuanceStore: DurableIssuanceStore;
+	readonly capability: RecoveredV3Live;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: ExpectedSink;
-	readonly resolveAuthorPublicKey: AdmitReceivedVertexInput["resolveAuthorPublicKey"];
 }
 
 type ExpectedActivationResult =
@@ -59,7 +55,6 @@ type ExpectedActivationResult =
 				| "capability-consumed"
 				| "not-started"
 				| "topic-derivation-failed"
-				| "issuance-scope-mismatch"
 				| "queue-capacity"
 				| "subscribe-failed"
 				| "internal-invariant";
