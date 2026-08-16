@@ -335,6 +335,7 @@ export type RecoverV3LiveReplicaResult =
 			readonly capability: RecoveredV3Live;
 			readonly descriptor: Readonly<{
 				readonly objectId: string;
+				readonly recoveredVertices: readonly AdmittedReceivedVertexView[];
 				readonly recoveredVertexCount: number;
 				readonly transcript: readonly ["authorized", "issued-record-authenticated", "journaled", "indexed", "ready"];
 			}>;
@@ -2674,6 +2675,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		}
 		const preparedVertexCount = index.size;
 		let recoveredCount = 0;
+		const recoveredVertices: AdmittedReceivedVertexView[] = [];
 		let journalAfterSequence: number | null = null;
 		if (readiness.rowCount === 0) {
 			let emptyPage;
@@ -2757,6 +2759,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
 				recoveredCount += 1;
+				recoveredVertices.push(authenticated.admitted);
 				journalAfterSequence = expectedSequence;
 			}
 		}
@@ -2839,6 +2842,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
 				recoveredCount += 1;
+				recoveredVertices.push(authenticated.admitted);
 			}
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 		}
@@ -2861,6 +2865,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			capability,
 			descriptor: ObjectFreeze({
 				objectId: payload.provenance.objectId,
+				recoveredVertices: ObjectFreeze([...recoveredVertices]),
 				recoveredVertexCount: index.size,
 				transcript: ObjectFreeze([
 					"authorized",

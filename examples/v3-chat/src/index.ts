@@ -11,6 +11,7 @@ import {
 	type V3PlaneHandle,
 } from "@ts-drp/node/v3-live";
 import {
+	type AdmittedReceivedVertexView,
 	createAdmissionBoundTransactionalVertexIssuer,
 	prepareBlueprintAdmission,
 	type SignRegisteredVertexDigest,
@@ -22,7 +23,7 @@ import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/li
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{message:messageReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{join:joinReducer,message:messageReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -174,6 +175,13 @@ async function roomMaterial(): Promise<RoomMaterial> {
 			operationDiscriminator: "action",
 			operations: Object.freeze([
 				Object.freeze({
+					name: "join",
+					argumentSchema: Object.freeze({
+						kind: "closed-record",
+						fields: Object.freeze([Object.freeze({ name: "clientId", required: true, type: "string" })]),
+					}),
+				}),
+				Object.freeze({
 					name: "message",
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
@@ -317,22 +325,24 @@ function createRoomNetwork(
 	return Object.freeze({ channel, networkNode: node });
 }
 
+function acceptVertex(accepted: Map<string, AcceptedMessage>, vertex: AdmittedReceivedVertexView): void {
+	const text = Reflect.get(vertex.operation, "text");
+	if (Reflect.get(vertex.operation, "action") !== "message" || typeof text !== "string") return;
+	const identity = hex(vertex.digest);
+	accepted.set(
+		identity,
+		Object.freeze({
+			author: vertex.author,
+			authorSequence: vertex.authorSequence,
+			digest: identity,
+			logicalTime: vertex.logicalTime,
+			text,
+		})
+	);
+}
+
 function acceptedSink(accepted: Map<string, AcceptedMessage>): V3AdmittedVertexSink {
-	return ({ vertex }) => {
-		const text = Reflect.get(vertex.operation, "text");
-		if (Reflect.get(vertex.operation, "action") !== "message" || typeof text !== "string") return;
-		const identity = hex(vertex.digest);
-		accepted.set(
-			identity,
-			Object.freeze({
-				author: vertex.author,
-				authorSequence: vertex.authorSequence,
-				digest: identity,
-				logicalTime: vertex.logicalTime,
-				text,
-			})
-		);
-	};
+	return ({ vertex }) => acceptVertex(accepted, vertex);
 }
 
 async function joinRoom(input: JoinInput): Promise<ActiveChat> {
@@ -355,7 +365,9 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 		exactCanonicalSignerSetBytes: material.creatorSignerSetBytes,
 		pinnedGenesisAnchorDigest: material.anchorDigest,
 	});
-	if (!installed.ok) throw new TypeError(`v3 chat trust installation failed: ${installed.reason}`);
+	if (!installed.ok && installed.reason !== "already-installed") {
+		throw new TypeError(`v3 chat trust installation failed: ${installed.reason}`);
+	}
 	const prepared = await prepareV3LiveGeneration({
 		authenticationProfile: "creator-only",
 		store: aheStore,
@@ -390,7 +402,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 			epoch: 0,
 			logicalTime: 1,
 			objectId: OBJECT_ID,
-			operation: Object.freeze({ action: "message", text: `joined:${input.clientId}` }),
+			operation: Object.freeze({ action: "join", clientId: input.clientId }),
 		});
 		await issuanceStore.compareAndMarkOutboxPublished({
 			authorSequence: bootstrap.authorSequence,
@@ -407,6 +419,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 	});
 	if (!recovered.ok) throw new TypeError(`v3 chat recovery failed: ${recovered.kind}`);
 	const accepted = new Map<string, AcceptedMessage>();
+	for (const vertex of recovered.descriptor.recoveredVertices) acceptVertex(accepted, vertex);
 	const transport = createRoomNetwork(author, input.channelName);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	const activated = activateV3LivePlane({
@@ -416,7 +429,10 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 		onAdmittedVertex: acceptedSink(accepted),
 	});
 	if (!activated.ok) throw new TypeError(`v3 chat activation failed: ${activated.kind}`);
-	let logicalTime = selected.logicalTime;
+	let logicalTime = [...accepted.values()].reduce<number>(
+		(maximum, message) => Math.max(maximum, message.logicalTime + 2),
+		selected.logicalTime
+	);
 	return Object.freeze({
 		accepted,
 		aheStore,
