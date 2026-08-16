@@ -15,16 +15,25 @@ interface ChatSnapshot {
 	readonly durableTranscriptDigest: string;
 	readonly ready: boolean;
 	readonly roomId: string;
+	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." | "";
 }
 
 declare global {
 	interface Window {
 		readonly d9336V3Chat: Readonly<{
+			create(
+				input: Readonly<{
+					readonly channelName: string;
+					readonly clientId: "alice";
+					readonly databaseName: string;
+				}>
+			): Promise<string>;
 			join(
 				input: Readonly<{
 					readonly channelName: string;
 					readonly clientId: "alice" | "bob";
 					readonly databaseName: string;
+					readonly invite: string;
 				}>
 			): Promise<void>;
 			close(): Promise<void>;
@@ -45,6 +54,7 @@ test.beforeAll(async () => {
 	directory = mkdtempSync(join(tmpdir(), "d9336-v3-chat-"));
 	if (!existsSync(PRODUCTION)) {
 		source = `Object.defineProperty(globalThis,"d9336V3Chat",{value:Object.freeze({
+			create:async()=>{throw new Error("D9336_V3_CHAT_ABSENT")},
 			join:async()=>{throw new Error("D9336_V3_CHAT_ABSENT")},
 			close:async()=>undefined,
 			send:async()=>{throw new Error("D9336_V3_CHAT_ABSENT")},
@@ -97,20 +107,29 @@ test("two isolated clients join one v3 room and observe the same durable transcr
 	const run = crypto.randomUUID();
 	try {
 		await Promise.all([install(alice), install(bob)]);
-		await Promise.all([
-			alice.evaluate((input) => window.d9336V3Chat.join(input), {
-				channelName: `d9336-room-${run}`,
-				clientId: "alice",
-				databaseName: `d9336-alice-${run}`,
-			} as const),
-			bob.evaluate((input) => window.d9336V3Chat.join(input), {
-				channelName: `d9336-room-${run}`,
-				clientId: "bob",
-				databaseName: `d9336-bob-${run}`,
-			} as const),
-		]);
-		await expect(snapshot(alice)).resolves.toMatchObject({ accepted: [], ready: true });
-		await expect(snapshot(bob)).resolves.toMatchObject({ accepted: [], ready: true });
+		const channelName = `d9336-room-${run}`;
+		const invite = await alice.evaluate((input) => window.d9336V3Chat.create(input), {
+			channelName,
+			clientId: "alice",
+			databaseName: `d9336-alice-${run}`,
+		} as const);
+		expect(invite).toMatch(/^[0-9a-f]+$/u);
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), {
+			channelName: `d9336-room-${run}`,
+			clientId: "bob",
+			databaseName: `d9336-bob-${run}`,
+			invite,
+		} as const);
+		await expect(snapshot(alice)).resolves.toMatchObject({
+			accepted: [],
+			ready: true,
+			trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
+		});
+		await expect(snapshot(bob)).resolves.toMatchObject({
+			accepted: [],
+			ready: true,
+			trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
+		});
 
 		await alice.evaluate(() => window.d9336V3Chat.send("hello from alice"));
 		await expect.poll(async () => (await snapshot(bob)).accepted.map(({ text }) => text)).toEqual(["hello from alice"]);
@@ -150,13 +169,12 @@ test("a client recovers its durable transcript before rejoining live exchange", 
 		channelName,
 		clientId: "bob",
 		databaseName: `d9336-reconnect-bob-${run}`,
-	} as const;
+	};
 	try {
 		await Promise.all([install(alice), install(bob)]);
-		await Promise.all([
-			alice.evaluate((input) => window.d9336V3Chat.join(input), aliceInput),
-			bob.evaluate((input) => window.d9336V3Chat.join(input), bobInput),
-		]);
+		const invite = await alice.evaluate((input) => window.d9336V3Chat.create(input), aliceInput);
+		const joiningBobInput = { ...bobInput, invite } as const;
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), joiningBobInput);
 
 		await alice.evaluate(() => window.d9336V3Chat.send("before reconnect from alice"));
 		await expect.poll(async () => (await snapshot(bob)).accepted.length).toBe(1);
@@ -166,9 +184,10 @@ test("a client recovers its durable transcript before rejoining live exchange", 
 
 		const durableBeforeClose = await snapshot(bob);
 		await bob.evaluate(() => window.d9336V3Chat.close());
-		await bob.evaluate((input) => window.d9336V3Chat.join(input), bobInput);
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), joiningBobInput);
 		const recoveredBeforeExchange = await snapshot(bob);
 		expect(recoveredBeforeExchange.ready).toBe(true);
+		expect(recoveredBeforeExchange.trustStatus).toBe("Creator-trusted; not Byzantine-fault-tolerant.");
 		expect(recoveredBeforeExchange.accepted).toEqual(durableBeforeClose.accepted);
 		expect(recoveredBeforeExchange.acceptedOperationDigest).toBe(durableBeforeClose.acceptedOperationDigest);
 		expect(recoveredBeforeExchange.durableTranscriptDigest).toBe(durableBeforeClose.durableTranscriptDigest);
@@ -188,6 +207,38 @@ test("a client recovers its durable transcript before rejoining live exchange", 
 		expect(bobState.durableTranscriptDigest).toBe(aliceState.durableTranscriptDigest);
 		expect(bobState.acceptedOperationDigest).toMatch(DIGEST);
 		expect(bobState.durableTranscriptDigest).toMatch(DIGEST);
+	} finally {
+		await Promise.allSettled([
+			alice.evaluate(() => window.d9336V3Chat.close()),
+			bob.evaluate(() => window.d9336V3Chat.close()),
+		]);
+		await Promise.all([alice.close(), bob.close()]);
+	}
+});
+
+test("a joiner rejects a modified creator invite before becoming ready", async ({ context }) => {
+	const alice = await context.newPage();
+	const bob = await context.newPage();
+	const run = crypto.randomUUID();
+	try {
+		await Promise.all([install(alice), install(bob)]);
+		const invite = await alice.evaluate((input) => window.d9336V3Chat.create(input), {
+			channelName: `d9336-reject-${run}`,
+			clientId: "alice",
+			databaseName: `d9336-reject-alice-${run}`,
+		} as const);
+		const final = invite.at(-1);
+		if (final === undefined) throw new TypeError("creator invite is empty");
+		const modifiedInvite = `${invite.slice(0, -1)}${final === "0" ? "1" : "0"}`;
+		await expect(
+			bob.evaluate((input) => window.d9336V3Chat.join(input), {
+				channelName: `d9336-reject-${run}`,
+				clientId: "bob",
+				databaseName: `d9336-reject-bob-${run}`,
+				invite: modifiedInvite,
+			} as const)
+		).rejects.toThrow();
+		await expect(snapshot(bob)).resolves.toMatchObject({ accepted: [], ready: false, trustStatus: "" });
 	} finally {
 		await Promise.allSettled([
 			alice.evaluate(() => window.d9336V3Chat.close()),
