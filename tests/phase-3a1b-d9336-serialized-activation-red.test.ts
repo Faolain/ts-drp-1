@@ -280,7 +280,7 @@ describe("D.93.36 serialized activation and ingress RED", () => {
 				exactReceivedCanonicalPreimageBytes: firstIngress.canonicalPreimageBytes,
 				signature: firstIngress.signature,
 				transportSender: "peer:remote:1",
-				vertex: { authorSequence: 1, hash: firstIngressDigest },
+				vertex: { authorSequence: 1, digest: firstIngress.digest },
 			});
 			activated.handle.deactivate();
 		} finally {
