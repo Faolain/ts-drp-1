@@ -699,6 +699,13 @@ export async function runOrdinaryClassBMutations(repositoryRoot, contract, readi
 					name
 				);
 				git(state.root, "reset", "--hard", "-q", merge);
+			} else if (name === "coordinated-policy-artifact-rewrite") {
+				append(state.root, spec, "\ncoordinated unauthorized rewrite\n");
+				const policyPath = `${contract.ownerDirectory}/freeze-policy.json`;
+				mutateJson(state.root, policyPath, (policy) => {
+					policy.artifactSha256[spec] = sha256Bytes(readFileSync(resolve(state.root, spec)));
+				});
+				commit(state.root, name);
 			}
 			const result =
 				name === "suppressed-root-exit"

@@ -50,6 +50,7 @@ const ordinaryClassBMutations = [
 	"swapped-merge-parents",
 	"merge-tree-drift",
 	"suppressed-root-exit",
+	"coordinated-policy-artifact-rewrite",
 ] as const;
 
 function sha256(path: string): string {
