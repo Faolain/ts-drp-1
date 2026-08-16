@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, jsdoc/require-param, jsdoc/require-returns */
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	chmodSync,
@@ -32,6 +32,31 @@ function command(root, executable, args, options = {}) {
 		env: { ...process.env, ...options.env },
 		maxBuffer: 4 * 1024 * 1024,
 		timeout: options.timeout ?? 60_000,
+	});
+}
+
+function commandAsync(root, executable, args, options = {}) {
+	return new Promise((resolvePromise) => {
+		execFile(
+			executable,
+			args,
+			{
+				cwd: root,
+				encoding: "utf8",
+				env: { ...process.env, ...options.env },
+				maxBuffer: 4 * 1024 * 1024,
+				timeout: options.timeout ?? 60_000,
+			},
+			(error, stdout, stderr) => {
+				resolvePromise({
+					error,
+					signal: error?.signal ?? null,
+					status: error === null ? 0 : typeof error.code === "number" ? error.code : null,
+					stderr,
+					stdout,
+				});
+			}
+		);
 	});
 }
 
@@ -445,7 +470,7 @@ export async function runCurrentRootDriftMutants(repositoryRoot, contract, readi
 			append(state.root, driftPath, "\nprotected drift\n");
 			const drift = commit(state.root, `${evidence.id} protected pre-correction drift`);
 			const correction = createCandidateCommit(repositoryRoot, state, contract);
-			const result = executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+			const result = await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
 			results.push({
 				correctionPaths: exactChangedPaths(state.root, drift, correction),
 				driftPaths: exactChangedPaths(state.root, contract.provisionalInstall.commit, drift),
@@ -461,7 +486,7 @@ export async function runCurrentRootDriftMutants(repositoryRoot, contract, readi
 }
 
 /** Proves NODE_OPTIONS preload presence alone is not a candidate rejection reason. */
-export function runRootChildPreloadPassthrough(repositoryRoot, contract, readiness) {
+export async function runRootChildPreloadPassthrough(repositoryRoot, contract, readiness) {
 	if (!readiness.ready) throw new Error("successor preload passthrough requires READY");
 	const state = cloneCandidateRepository(repositoryRoot, contract);
 	try {
@@ -469,7 +494,13 @@ export function runRootChildPreloadPassthrough(repositoryRoot, contract, readine
 		const correction = createCandidateCommit(repositoryRoot, state, contract);
 		return {
 			correctionPaths: exactChangedPaths(state.root, parent, correction),
-			...executeWithRootChildPreload(repositoryRoot, state.root, contract, contract.externalBase.commit, "passthrough"),
+			...(await executeWithRootChildPreload(
+				repositoryRoot,
+				state.root,
+				contract,
+				contract.externalBase.commit,
+				"passthrough"
+			)),
 		};
 	} finally {
 		rmSync(state.parent, { force: true, recursive: true });
@@ -549,7 +580,7 @@ export async function runControlledMixedCensusDiagnostics(repositoryRoot, paths)
 	}
 }
 
-function executeCurrentCandidate(repositoryRoot, contract, upstream, merge) {
+async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge) {
 	const current = git(repositoryRoot, "rev-parse", "HEAD");
 	const state = isolatedClone(repositoryRoot, current, merge ? "candidate-merge" : "candidate-linear");
 	try {
@@ -568,7 +599,7 @@ function executeCurrentCandidate(repositoryRoot, contract, upstream, merge) {
 			);
 			git(state.root, "reset", "--hard", "-q", mergeCommit);
 		}
-		return executeRepositoryCandidate(state.root, contract, upstream);
+		return await executeRepositoryCandidate(state.root, contract, upstream);
 	} finally {
 		rmSync(state.parent, { force: true, recursive: true });
 	}
@@ -587,7 +618,7 @@ export async function runReadyCandidateTopologies(repositoryRoot, contract, read
 	];
 	const results = [];
 	for (const [name, upstream, merge] of cases) {
-		results.push({ name, result: executeCurrentCandidate(repositoryRoot, contract, upstream, merge) });
+		results.push({ name, result: await executeCurrentCandidate(repositoryRoot, contract, upstream, merge) });
 		await yieldToEventLoop();
 	}
 	return results;
@@ -763,8 +794,8 @@ function copyCandidateCorrection(repositoryRoot, root, contract) {
 	}
 }
 
-function executeRepositoryCandidate(root, contract, upstream, options = {}) {
-	const result = command(
+async function executeRepositoryCandidate(root, contract, upstream, options = {}) {
+	const result = await commandAsync(
 		root,
 		process.execPath,
 		[resolve(root, contract.ownerDirectory, "check-freeze.mjs"), upstream],
@@ -773,7 +804,7 @@ function executeRepositoryCandidate(root, contract, upstream, options = {}) {
 	return { output: `${result.stdout}\n${result.stderr}`, signal: result.signal, status: result.status };
 }
 
-function executeWithRootChildPreload(repositoryRoot, root, contract, upstream, mutation) {
+async function executeWithRootChildPreload(repositoryRoot, root, contract, upstream, mutation) {
 	const preloadRoot = realpathSync(mkdtempSync(join(tmpdir(), "ts-drp-freeze-successor-preload-")));
 	const preload = resolve(preloadRoot, "register-root-checker-fault.mjs");
 	const registrationOwner = pathToFileURL(
@@ -786,9 +817,9 @@ function executeWithRootChildPreload(repositoryRoot, root, contract, upstream, m
 	try {
 		return {
 			cleanupPath: preloadRoot,
-			...executeRepositoryCandidate(root, contract, upstream, {
+			...(await executeRepositoryCandidate(root, contract, upstream, {
 				env: { NODE_OPTIONS: `--import=${pathToFileURL(preload).href}` },
-			}),
+			})),
 		};
 	} finally {
 		rmSync(preloadRoot, { force: true, recursive: true });
@@ -909,7 +940,7 @@ function mutateJson(root, path, mutate) {
 	put(root, path, `${JSON.stringify(document, null, 2)}\n`);
 }
 
-function runCandidateMutation(repositoryRoot, state, contract, mutation, immutablePaths) {
+async function runCandidateMutation(repositoryRoot, state, contract, mutation, immutablePaths) {
 	resetCandidate(state, contract);
 	if (mutation.startsWith("gossip-old:")) {
 		createCandidateCommit(repositoryRoot, state, contract);
@@ -1235,7 +1266,7 @@ export async function runRepositoryCandidatePartition(repositoryRoot, contract, 
 			negatives.push({
 				expectedFailure: expectedCandidateFailure(name),
 				name,
-				result: runCandidateMutation(repositoryRoot, state, contract, name, fixedAnchor),
+				result: await runCandidateMutation(repositoryRoot, state, contract, name, fixedAnchor),
 			});
 			await yieldToEventLoop();
 		}

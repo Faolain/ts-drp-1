@@ -414,8 +414,8 @@ describe("D.93.35.7/.8 genuine repository candidate", () => {
 	}, 600_000);
 
 	describe.skipIf(!candidateReadiness.ready)("GREEN-only genuine candidate execution", () => {
-		it("accepts a candidate-opaque passthrough root-child preload", () => {
-			const result = runRootChildPreloadPassthrough(REPOSITORY_ROOT, successorContract, candidateReadiness);
+		it("accepts a candidate-opaque passthrough root-child preload", async () => {
+			const result = await runRootChildPreloadPassthrough(REPOSITORY_ROOT, successorContract, candidateReadiness);
 			expect(existsSync(result.cleanupPath)).toBe(false);
 			expect(result.correctionPaths).toEqual([...successorContract.correctionPaths].sort());
 			expect(result.signal).toBeNull();
