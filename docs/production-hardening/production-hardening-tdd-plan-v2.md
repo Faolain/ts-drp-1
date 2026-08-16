@@ -12827,6 +12827,210 @@ production conformance. This correction authorizes only resumption of the
 D.93.35.7 tests-only RED after signed push; it does not authorize GREEN, p6,
 D.93.36, full-B work or deployment.
 
+##### D.93.35.9 — operation/work predecessor-oracle transition
+
+Post-RED review found the same multi-owner oracle defect previously corrected
+for the gossip workflow in D.93.35.6. The operation-budget and work-budget
+predecessor tests still require the literal protocol-v2 and protocol-v3 root
+checker path strings in their actual workflows. D.93.35.7 removes those direct
+upstream invocations and transfers their genuine historical and current-tree
+preservation evidence to the sole freeze successor. The old assertions would
+therefore reward the forbidden topology and reject the authorized six-path
+GREEN even when its routing and native child evidence are correct.
+
+D.93.35.7/.8 GREEN remains blocked until this bounded predecessor-oracle
+transition is independently reviewed, signed and pushed. D.93.35.9 changes no
+protocol, workflow, successor owner, historical checker or frozen semantic
+behavior.
+
+###### Exact tests-only authority
+
+The corrective RED transitions exactly these two governed predecessor test
+paths:
+
+```text
+tests/protocol-v3-blueprint-operation-budget-0p2.test.ts
+tests/protocol-v3-blueprint-work-budget-0p0.test.ts
+```
+
+Because those two identities are inputs to the signed successor rather than
+standalone tests, the same tests-only RED must also reconcile exactly these four
+non-governed successor test owners:
+
+```text
+tests/protocol-v3-freeze-successor-v1-red.test.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+```
+
+Those four paths replace only the obsolete `52+1` census, transition schema and
+mutation construction with the exact `50+3` law below. They make all three
+signed identity transitions independently executable through the genuine
+temporary-repository candidate. They may not change routing analysis, native
+child authority, readiness, repository topology, failure taxonomy, exact-six
+GREEN scope or any unrelated assertion. The RED changed-path set is therefore
+exactly these six tests/fixtures paths: two governed predecessor transitions
+plus four subordinate successor-oracle owners. No other fixture, analyzer,
+workflow, successor owner, legacy policy/checker, production source, plan,
+package, dependency, lockfile, generated file or predecessor test is
+authorized. In particular, the correction reuses without modification:
+
+```text
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/valid.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/semantically-equivalent.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/operation-retained-protocol-v2-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/operation-retained-protocol-v3-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/work-retained-protocol-v2-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/work-retained-protocol-v3-upstream.yml
+```
+
+Each affected governance row removes only its two obsolete raw-substring
+requirements for the direct protocol-v2 and protocol-v3 root-checker paths. It
+instead calls the existing `auditSuccessorWorkflowRouting` over the bytes of its
+actual operation-budget or work-budget workflow with that workflow's exact
+identity and the two forbidden root-checker targets. The result must be the
+empty exact violation set. The analyzer's `valid.yml` and
+`semantically-equivalent.yml` programs remain positive controls, and all four
+operation/work retained-root programs remain exact negative controls. Thus a
+direct or bound/indirect executable legacy call is rejected, while comments,
+labels, dead shell, data-only strings, variable names and behaviorally
+equivalent successor spelling earn no credit.
+
+All other existing phrase checks and every semantic, digest, evidence,
+ordering, budget, public-surface, type, mutant and preservation assertion in
+both predecessor suites remain byte-for-byte and behaviorally load-bearing.
+This transition does not delete or replace their governance rows; it changes
+only the obsolete routing authority inside each row.
+
+###### Signed transition and successor identity law
+
+The current pre-transition SHA-256 values are exactly:
+
+```text
+tests/protocol-v3-blueprint-operation-budget-0p2.test.ts
+  09c550891ee04141cddd110bb58a740336e6380f7a43f3e8c66556a817de900c
+tests/protocol-v3-blueprint-work-budget-0p0.test.ts
+  30dc5ca7b10bc88143889acf02ac8e03f57c7eeab728cfba211e35cda994ce96
+```
+
+The tests-only RED is one signed non-merge commit whose sole exact parent is
+the future signed and pushed D.93.35.9 plan-only commit. That plan commit is
+created from exact signed ancestor
+`ca8b5c83e5dc5f67ab1c1f782a799a3db0cd4083`, changes only this plan path and
+does not alter any governed successor identity. Its exact commit, tree and
+parent are authenticated before RED and recorded in the RED/closure evidence.
+The RED changed-path set is the exact six tests/fixtures paths authorized
+above, but its governed-identity transition set is exactly the two predecessor
+paths. The six-path GREEN successor profile records the RED commit, parent and
+tree plus both old/new Git blob identities and SHA-256 values. Zero, split,
+reordered, merge-only, reverted, repeated or extra predecessor-test transitions
+fail. The four subordinate oracle-owner changes earn no governed identity and
+cannot substitute for either predecessor transition.
+
+This transition supersedes D.93.35.7/.8's current 58/5/(52+1) identity law with
+exactly 58 governed predecessor identities, five workflow identities, 50
+fixed-anchor non-workflow identities and three explicitly transitioned
+non-workflow identities: the existing gossip test and these two predecessor
+tests. Each of the 50 fixed identities remains individually mutated. Each of
+the three transitioned identities receives independent, constructibly distinct
+transition mutants. For each operation/work path the successor separately
+rejects: (a) an authentic signed transition followed by a later commit that
+restores the exact old blob; (b) omission of the signed transition at its
+required lineage slot, leaving the stale old assertion in place before the
+exact-six correction; and (c) the authentic new blob followed by a later
+one-byte drift. The earlier gossip transition retains its existing equivalent
+old/current/post-transition cases at its signed location and bytes. The
+non-governed D.93.35.9 plan commit follows `ca8b5c8...`; this two-test transition
+follows that signed plan commit and is the next governed transition before the
+exact-six GREEN correction.
+
+The post-provisional history may contain the signed plan-only commit, but it has
+exactly two new governed linear transitions in order: this exact-two tests-only
+transition and then the existing exact-six owner/workflow correction. The
+six-path GREEN checker and profile must authenticate both governed transitions
+rather than counting the intervening non-governed plan commit or treating the
+new test commit as an extra governed change. The recovered exact-six candidate
+is the implementation starting point, not immutable future bytes: only its four
+already-authorized successor-owner paths may be reconciled to the signed
+two-test identity law; its two workflow bytes remain the recovered corrected
+routing, and GREEN still changes exactly the same six paths.
+
+###### Phase signatures, controls and closure
+
+At signed scheduling-correction ancestor
+`ca8b5c83e5dc5f67ab1c1f782a799a3db0cd4083`, and therefore at the plan-only RED
+parent, the two real workflows still contain the invalid direct root-checker
+invocations. The authoritative focused invocation runs from repository root:
+
+```text
+pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts tests/protocol-v3-blueprint-work-budget-0p0.test.ts tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+```
+
+Its exact ordered five-file roster and row counts are operation budget 28, work
+budget 12, author projection 18, gossip budget 15 and ACL reputation 14: exactly
+87 rows with zero skipped. The clean `ca8b5c8...` ancestor is 87/87. After the
+two-test corrective RED, the same command must be exactly 85 passed and two
+failed, with only the operation and work governance row titles failing
+structurally. No semantic, control, collection or harness row may fail. The
+existing analyzer positives and all four retained-root negatives pass
+independently, proving both acceptance of equivalent valid routing and
+rejection of each obsolete direct owner.
+
+An earlier isolated exact-six diagnostic reported 69 collected rows because a
+temporary dependency/collection failure omitted all 18 author-projection rows.
+That 69 result is rejected evidence: it is neither a RED nor GREEN gate and may
+not be cited in closure.
+
+Applying the reconciled D.93.35.7/.8 exact-six GREEN over that corrective RED
+must make the same command produce exactly five passing files and 87/87 passing
+rows with zero skipped. The successor candidate's native Git histories,
+historical/current root-checker child executions, readiness boundary,
+exact-two-then-exact-six scope, workflow jobs and all D.93.35.7/.8 gates remain
+independently load-bearing. The analyzer cannot substitute for any of them.
+
+The unchanged controlled implementation arms remain owned by the existing
+workflow commands:
+
+```text
+PHASE_0P2_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p2-v3/controlled-blueprint-operation-budget.ts pnpm exec vitest run tests/protocol-v3-blueprint-operation-budget-0p2.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+PHASE_0P0_IMPLEMENTATION_MODULE=tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts pnpm exec vitest run tests/protocol-v3-blueprint-work-budget-0p0.test.ts --no-coverage --maxWorkers=1 --minWorkers=1
+```
+
+D.93.35.9 does not invent a combined RED count for any additional workflow
+aggregation that was not executed terminally. Before workflow correction, the
+controlled implementation substitution cannot bypass the actual-workflow
+routing audit: the operation arm must be 27/28 and the work arm 11/12, each
+with only its same governance row failing and with every substituted semantic
+and control row green. After exact-six GREEN, they must be 28/28 and 12/12.
+GREEN and closure require the exact genuine 87/87 command above and the
+pre-existing complete controlled-plus-genuine 87/87 preservation gate as
+separately recorded terminal results.
+
+RED gates are the exact 85/2 focused split, the controlled 27/28 and 11/12
+splits, the existing analyzer positive and negative controls, the updated
+successor suite's one shared readiness RED with all `50+3` construction rows
+dormant until readiness, dedicated typecheck/lint/Prettier/diff checks,
+unchanged D.93.35.5-.8 static and preservation gates, and one finite
+independent exact-byte review. GREEN and closure require the exact 87/87
+focused result, controlled 28/28 and 12/12 results, the complete updated
+D.93.35.7/.8 successor and native-child gates, and the real operation/work
+workflow jobs. The GREEN production scope remains exactly the six paths
+authorized by D.93.35.7; D.93.35.9 adds no seventh GREEN path and does not
+authorize a second successor owner or policy.
+
+Closure records a ledger-only multi-owner oracle correction. Embedded source,
+AST and regular-expression assertions may pin stable outcomes and authority
+boundaries, but must not reward incidental path substrings, comments, dead
+code, data-only mentions or variable spelling. Analyzer evidence is
+subordinate to native Git identity, genuine child execution and actual workflow
+behavior. Repeated discovery of this defect across gossip, operation and work
+owners is recorded for future oracle review, but it does not authorize a broad
+test thaw, analyzer rewrite or new production seam. Only after the signed
+two-test RED and exact-six GREEN both satisfy their phase signatures may
+D.93.35.7/.8 close and the previously blocked p6 work resume.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
