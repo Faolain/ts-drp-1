@@ -186,6 +186,7 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
 		JSON.stringify({
 			".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" },
 			"./runtime": { types: "./dist/src/runtime.d.ts", import: "./dist/src/runtime.js" },
+			"./v3-live": { types: "./dist/src/v3-live.d.ts", import: "./dist/src/v3-live.js" },
 		})
 	) {
 		violations.push("export-targets");
