@@ -710,7 +710,11 @@ export async function runOrdinaryClassBMutations(repositoryRoot, contract, readi
 			const result =
 				name === "suppressed-root-exit"
 					? await executeWithRootChildPreload(repositoryRoot, state.root, contract, contract.externalBase.commit, name)
-					: await executeRepositoryCandidate(state.root, contract, contract.externalBase.commit);
+					: await executeRepositoryCandidate(
+							state.root,
+							contract,
+							name === "coordinated-policy-artifact-rewrite" ? current : contract.externalBase.commit
+						);
 			results.push({ name, result });
 		} finally {
 			rmSync(state.parent, { force: true, recursive: true });
