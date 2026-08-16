@@ -2434,6 +2434,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		} catch {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
 		}
+		const preparedVertexCount = index.size;
 
 		let afterKey: readonly [string, string, number] | undefined;
 		let recoveredCount = 0;
@@ -2523,8 +2524,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			recoveredCount += 1;
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 		}
-		if (recoveredCount !== 1 || index.size !== 2) {
-			return recoveryFailure("issuance-rejected", "v3 first recovery requires one issued record");
+		if (recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount) {
+			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
 		}
 		const capability = ObjectFreeze({}) as RecoveredV3Live;
 		recoveredV3LiveAuthority.set(
@@ -2542,7 +2543,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			capability,
 			descriptor: ObjectFreeze({
 				objectId: payload.provenance.objectId,
-				recoveredVertexCount: 2,
+				recoveredVertexCount: index.size,
 				transcript: ObjectFreeze([
 					"authorized",
 					"issued-record-authenticated",
