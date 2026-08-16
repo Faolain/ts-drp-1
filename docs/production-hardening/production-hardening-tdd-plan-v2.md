@@ -13302,6 +13302,168 @@ taxonomies remain unchanged. This amendment changes only the plan. It adds no
 test, fixture, workflow, production, package, dependency, lock, public/private
 surface, oracle authority or broader governance exception.
 
+##### D.93.35.13 — executable intermediary-chain oracle correction
+
+Read-only execution against signed D.93.35.12 exposed a final sequencing
+contradiction. The existing candidate harness still clones and checks out the
+authenticated predecessor-oracle transition at `fef93323...`, and
+`resetCandidate` returns there before `createCandidateCommit` creates the
+exact-six correction. Its contract has no representation of the authenticated
+`b0529c4... -> 32653c32... -> c11956b...` intermediary chain. The harness
+therefore continues to construct exact-six directly atop `fef93323...`, even
+though D.93.35.12 requires the signed plan lineage to be present. A plan-only
+amendment cannot correct that executable test oracle, and a signed tests-only
+correction cannot intervene while GREEN simultaneously direct-parents the plan.
+
+D.93.35.13 chooses the lawful signed sequence:
+
+```text
+fef93323... -> b0529c4... -> 32653c32... -> c11956b...
+  -> signed D.93.35.13 plan -> signed exact-four tests-only RED
+  -> future exact-six GREEN
+```
+
+It supersedes only D.93.35.12's statement that exact-six GREEN directly
+parents the D.93.35.12 successor plan. The future exact-six GREEN instead has
+the signed exact-four corrective RED as its sole direct parent. No commit may
+intervene between that RED and GREEN. The governed transition set remains
+exactly the predecessor-oracle transition at `fef93323...` and the future
+exact-six GREEN; every commit between them is authenticated but non-governed.
+
+The signed D.93.35.12 plan commit is exact commit
+`c11956b09a48dcf91a968549e87608a6982882d9`, tree
+`366b3346ddfb2ecf64a50e76f15bde3cd9f5628f`, with sole parent
+`32653c327b24d0f587781ae85984c8123ba5c9bd`. It is a signed non-merge,
+non-governed commit changing only:
+
+```text
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+```
+
+Its exact plan blob is `d3a77c1fd2c602321d17709238e3991596f4eddc`, content
+SHA-256 is
+`194d0efc392b775ebe298d47e96235a647857ff3e278b4d3e949f799c65d1cf2`,
+and binary commit-diff SHA-256 is
+`2bd3d94e9082848d8919f4b288e8c4368baf722d6dc6d0026d15d524ba4139a1`.
+It has a Good signature from `Faolain <Faolain@users.noreply.github.com>`
+using key `55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+###### Exact bounded tests-only correction
+
+After this D.93.35.13 plan is signed and pushed, one signed non-merge
+tests-only RED may change exactly these four existing paths:
+
+```text
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+tests/protocol-v3-freeze-successor-v1-red.test.ts
+```
+
+All four are necessary and each has one closed responsibility:
+
+1. `successor-contract.json` owns the exact data identities for the full
+   authenticated chain through the signed D.93.35.13 plan known after this plan
+   is signed. It also owns only the ordered exact-four path list and closed
+   corrective-transition schema expected next. Because it is itself one of
+   those four paths, it must not and cannot pin the RED's future commit, tree,
+   blobs, content hashes, patch hash or signature. Those RED identities first
+   become known after signing and are frozen by GREEN as specified below.
+2. `successor-contract-type.ts` freezes that JSON as a closed typed contract so
+   omitted, extra, reordered, optional or widened intermediary/corrective rows
+   fail dedicated type audit rather than becoming caller policy.
+3. `temporary-repository-harness.mjs` authenticates the complete direct-parent
+   chain, clones/checks out the signed D.93.35.13 plan rather than
+   `fef93323...`, proves the exact-four RED transition from that plan to source
+   HEAD, and constructs/resets every candidate with source HEAD as the sole
+   parent of the prospective exact-six commit. It must not replay, synthesize,
+   cherry-pick or reconstruct the intermediary commits.
+4. `protocol-v3-freeze-successor-v1-red.test.ts` binds the runtime JSON shape,
+   static type owner and genuine Git/harness evidence; it proves the exact
+   chain and causal negative rows for a missing, extra, reordered, split,
+   repeated, merge-only, side-branch or byte-drifted intermediary/corrective
+   commit and for exact-six parented at any earlier point.
+
+No analyzer, YAML fixture, tsconfig, workflow, successor owner/profile/checker,
+legacy freeze owner, production source, package manifest, dependency, lockfile
+or generated artifact is authorized by this RED. The correction may add no
+fallback base, compatibility branch, caller-selected lineage, synthetic
+replacement commit or second candidate constructor. The genuine Git object
+store, direct-parent topology and exact commit/tree/parent/path/blob identities
+remain runtime authority; the JSON and TypeScript owners only freeze that
+evidence.
+
+###### Non-circular identity handoff and phase signatures
+
+The D.93.35.13 plan commit is created directly from exact signed
+`c11956b09a48dcf91a968549e87608a6982882d9`. Its own commit identity cannot be
+embedded in its preimage. After signing and pushing, the exact-four RED records
+and authenticates that now-known plan commit/tree/parent/path/blob/content
+hash/patch hash in its contract and test evidence. The exact-four RED likewise
+cannot embed or predict its own commit/tree/blob/patch/signature identities.
+After it is signed and pushed, future exact-six GREEN records and authenticates
+the now-known RED commit/tree/parent/exact-four paths/blobs/content hashes/patch
+hash in the successor profile/checker. These are two ordered, one-way identity
+handoffs, not mutable release-ledger authority. A placeholder, predicted hash,
+unsigned note, environment-selected identity or identity first introduced
+after its consuming commit fails.
+
+Before the authoritative exact-four RED is signed, validation must use one
+disposable local unsigned commit in an isolated clone. That commit has the
+signed D.93.35.13 plan as exact parent and the proposed exact-four tree and no
+other path. It is never pushed, named by the contract, reported as authority or
+accepted by GREEN. Run the full RED/static/preservation gates against that
+disposable commit, discard the clone, then create the real signed RED with the
+same exact parent and tree and rerun the complete signed-RED gates. Parent/tree
+inequality, any additional path, or any different gate result stops before
+push. After the real RED is pushed there is no repair, amend, follow-up-test or
+safe correction slot: the next and only authorized commit is exact-six GREEN.
+
+Runtime candidate CI need not and must not possess a trusted Faolain keyring.
+The successor checker and harness authenticate exact
+commit/tree/parent/path/blob identities; pinning the exact commit object also
+pins the signature-bearing commit bytes. The Good Faolain signature and full
+fingerprint for the D.93.35.13 plan and exact-four RED are verified separately
+at their release review/sign/push gates before either identity becomes an
+authorized predecessor. GREEN's review gate records that verification, while
+runtime CI consumes only the frozen object identities. No public-key fixture,
+portable keyring, signature parser, caller-injected verifier or signature
+compatibility branch is added to the contract, harness, checker or package.
+
+The corrective RED is causal in two separately preserved phases:
+
+- applying its updated test/type assertions to the signed D.93.35.13 plan
+  while retaining the old contract/harness must fail only the authenticated
+  intermediary-chain/topology rows; native historical/root-checker controls,
+  routing analyzer controls, controlled census and all unrelated preservation
+  rows remain green;
+- with all exact four RED paths present, the intermediary-chain, exact-four
+  transition, clone/reset-parent and negative topology controls pass, while the
+  one shared candidate-readiness row remains the sole RED because the current
+  source HEAD still lacks the exact-six GREEN. Every GREEN-only candidate
+  partition stays dormant behind that one readiness result.
+
+The exact-four RED must retain the established successor-suite signature of
+eight controls passed, one shared readiness failure and 40 GREEN-only skips;
+the new chain controls are included in those existing control owners rather
+than increasing or reclassifying the phase totals. The authoritative five-file
+and controlled operation/work signatures remain 85/2, 27/28 and 11/12 until
+GREEN. Exact-six GREEN remains exactly the six paths authorized by
+D.93.35.7/.8 and must reach 87/87, controlled 28/28 and 12/12 plus the complete
+successor/native-child gates. No production path, test-oracle path or plan path
+is added to that exact-six commit.
+
+The successor profile/checker in exact-six GREEN must authenticate the exact
+linear chain from `fef93323...` through the signed D.93.35.13 plan and signed
+exact-four RED, prove the governed operation/work identities unchanged across
+every non-governed edge, then authenticate its own exact-six transition from
+the RED. Zero, split, repeated, reordered, merge-only or extra plan/RED commits,
+any changed intermediary fact, any governed drift before GREEN, or any commit
+between the exact-four RED and GREEN fails. This correction adds no authority,
+surface, compatibility or product behavior. It makes the already-required
+lineage executable while preserving the exact-six GREEN and every D.93.35.7-.12
+semantic nonclaim.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
