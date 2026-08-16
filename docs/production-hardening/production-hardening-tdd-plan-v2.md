@@ -12425,6 +12425,304 @@ to successor topology, all legacy semantic behavior stayed fixed, and the
 nine-path D.93.35.5 GREEN scope did not widen. It authorizes only resumption of
 D.93.35.5 GREEN and its closure; p6 remains blocked until then.
 
+##### D.93.35.7 — external-base freeze-successor closure correction
+
+The signed D.93.35.5/.6 installation at exact commit
+`708db5c58c902ac9128251961cc8696a0feb864b`, tree
+`21bbefa2ec29ecbb22c0e39289daadafcd176b60`, is a CI-unclosed provisional
+install, not a closed successor baseline. The real pull request checks out a
+synthetic merge whose external upstream parent is exact commit
+`d041baffcd56f16c8a20564133a4a7fc108e8331`, tree
+`c3e742e073db3fe077a349723ba9ba21f17ada09`, with parents
+`bf7d3516f6ed4be97a755698b4fb3a404e04dc0f` and
+`9f76bc257da693a0ebbf03662c7cf9ebcab454e5`. That external tree contains zero
+of the successor's 62 governed paths. It cannot satisfy D.93.35.5's bootstrap
+assumption that the fixed anchor is an ancestor of the supplied upstream merge
+base, and its absent protocol-v2/protocol-v3 registries cannot be an execution
+base for either current generic root freeze checker.
+
+The previous temporary-repository positive placed its simulated upstream after
+the fixed anchor and therefore did not model this topology. In addition, the
+operation-budget and work-budget workflows run the current protocol-v3 and
+protocol-v2 root checkers directly against the external upstream SHA before
+the successor. Both calls are invalid; shell ordering merely masks the second
+failure after the first exits. D.93.35.7 corrects this closure without thawing
+legacy bytes, trusting external bytes or creating a parallel successor owner.
+
+###### Exact lineage, authority and modes
+
+The successor continues to have one owner at
+`packages/protocol-v3/conformance/freeze-successor-v1/`. Its profile binds this
+full PR-side lineage:
+
+```text
+fixedAnchor
+  commit dcac6b5cfb9fb74e704f997c16634a34c8d93ea9
+  tree   4a4ac3346a2c6c1817a689207d5d120af9f5a484
+redBase
+  commit 5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5
+  tree   f90ebcbaa2303dd556e9c5699d06caf185e73d78
+  parent f0e3a861a2dc0e65e0444589b3688b72c4463f60
+gossip oracle transition
+  commit f0897b510c4d427b67d6524041cb31b05c677a1d
+  tree   1064d252807dec5067c22009359cd7060d529efb
+  parent 5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5
+provisional successor install
+  commit 708db5c58c902ac9128251961cc8696a0feb864b
+  tree   21bbefa2ec29ecbb22c0e39289daadafcd176b60
+  parent f0897b510c4d427b67d6524041cb31b05c677a1d
+```
+
+The successor accepts exactly two topology modes selected from Git evidence,
+never an environment flag or caller assertion:
+
+- **external-empty bootstrap** — the supplied upstream and unique computed
+  external merge base must authenticate exact commit
+  `d041baffcd56f16c8a20564133a4a7fc108e8331`, tree
+  `c3e742e073db3fe077a349723ba9ba21f17ada09` and the exact two parents recorded
+  above; exactly 0 of the 62 governed paths are present there; it is an ancestor
+  of the exact fixed anchor; and the complete authority chain lives only on the
+  PR-head ancestry;
+- **descendant** — the unique computed base contains all 62 governed paths at
+  their corrected successor identities and the base and current successor
+  checkers both validate the PR tree against the same upstream target.
+
+The exact `d041baff...` identity is the sole external-empty base authorized by
+this signed amendment, not merely an example. A future upstream retarget or
+rebase that changes the unique merge base requires a new signed amendment even
+if the replacement has 0/62 governed paths and precedes the fixed anchor. Any
+external-base governed presence count from 1 through 61 fails. A path of the
+wrong Git object type or mode counts as invalid presence, not absence. All 62
+paths present selects descendant mode only when every identity equals the
+corrected successor state; the provisional v1 installation or any other
+wrong-identity 62/62 tree fails. External non-governed bytes, similarly named
+registries, workflow text or checker output never become authority. The checker
+authenticates the exact external commit, parent set, tree, unique merge-base
+topology and exact 0/62 absence; it must not read, copy, hash or compare upstream
+file bytes as a substitute for PR-side fixed-anchor or historical-closure
+evidence.
+
+In external-empty mode the checker proves, from PR-side commits only, that:
+
+1. the exact ordered ancestry is `externalBase` → fixed anchor → RED base →
+   gossip transition → provisional install → PR head/current, while the fixed
+   anchor, RED base, gossip transition and provisional install have the
+   recorded parents and trees;
+2. the D.93.35.6 gossip-test transition from RED base to `f0897b5...` is the
+   sole authorized `+1` identity, then remains immutable;
+3. the other 52 non-workflow identities match the PR-side fixed anchor through
+   RED base, `f0897b5...`, `708db5c...` and current;
+4. `f0897b5...` to `708db5c...` is one non-merge commit changing exactly the
+   original nine paths: the four successor-owner files and all five successor
+   workflows; and
+5. after `708db5c...`, one reviewed non-merge correction changes exactly the
+   four existing successor-owner files plus the operation-budget and
+   work-budget workflows, with no second governed transition.
+
+The signed `708db5c...` bytes remain authenticated historical evidence but are
+explicitly provisional and cannot be selected as a closed current profile.
+Zero, split, merge-only, reordered, reverted, duplicated or extra corrective
+transitions fail. The correction commit need not predict and self-pin its own
+commit ID; its parent, exact six-path diff, object identities and resulting
+policy-pinned current bytes are derived and verified from Git history.
+
+For a GitHub merge ref, `HEAD` has exactly two parents: first the authenticated
+upstream tip and second the PR head. Its governed tree must equal the PR head's
+governed tree byte-for-byte. For a linear invocation, `HEAD` is the PR head.
+Swapped parents, conflict-resolution drift, a third parent, zero or multiple
+merge bases, an unrelated sibling, or a caller-supplied merge base fails before
+checker execution. External-empty mode requires the external base to be an
+ancestor of the fixed anchor; the superseded D.93.35.5 rule incorrectly
+required the reverse, fixed anchor as ancestor of external base. This ancestry
+link authenticates history only: external bytes remain non-authoritative, and
+all governed-byte authority begins at the PR-side fixed anchor. Descendant mode
+retains strict unique-base, base-checker-plus-current-checker,
+zero-governed-transition and byte/type/mode equality rules without an
+external-empty exception.
+
+###### Authentic protocol root-freeze evidence
+
+The two masked direct upstream calls are removed from only the operation and
+work workflows. They are not made conditional, tolerated with `|| true`, or
+replaced by copied checker logic. The existing successor owner instead adds
+these two exact genuine historical closures to its five predecessor checker
+executions:
+
+```text
+protocol-v2 root freeze
+  baseline    47426ab440f90253befbd42bace934159584e756
+  tree        b74fae1c23e65ffc0f49e5fcd227c66d9537bc76
+  directParent/checkerBase
+              19b3d018bc4b0a72a3dd7475b0f54859a036f153
+  checkerBase tree
+              687910e1953ea7538d1260d26210c1ce1eb5abeb
+  checker     packages/protocol-v2/scripts/check-protocol-freeze.mjs
+  Git blob    970d088bd99c2512be1d48530492df23f9666b0c
+  SHA-256     d6900fd1a1b871a537dd7be0eefff7e3143a63f89dbe1bcedcb946273ee8f3d7
+protocol-v3 root freeze
+  baseline    aaebf1de3dc198d396296d43a6afb03cb1ac984e
+  tree        77365dc5769779e06f8c72179b9a726641de426e
+  directParent/checkerBase
+              e7d255c3609ff147e86a59e94dc926a8eb2db59c
+  checkerBase tree
+              7fba2adfca06fd6a36ba33d0194e4ddae6fb55d7
+  checker     packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs
+  Git blob    7215d582baff73d2d45b1a5db5691bf274081235
+  SHA-256     0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de
+```
+
+For each row the successor verifies the exact baseline commit/tree, its sole
+exact parent, the checker-base commit/tree, the checker's Git blob and SHA-256,
+then executes the genuine checker twice in separate isolated clean tracked
+worktrees. The historical run checks out the baseline and executes its checker
+against the recorded checker base. The current-preservation run checks out the
+exact current PR-head tracked tree, first proves that its checker path retains
+the baseline Git blob and SHA-256, then executes that checker against the exact
+baseline. Each run must exit status 0, have no signal, emit zero stderr bytes
+and emit exactly one of these checker-specific single stdout lines, followed by
+one terminal newline and no other bytes:
+
+```text
+protocol freeze policy passed (19b3d018bc4b..working-tree)
+protocol freeze policy passed (47426ab440f9..working-tree)
+protocol-v3 freeze policy passed (e7d255c3609f..working-tree)
+protocol-v3 freeze policy passed (aaebf1de3dc1..working-tree)
+```
+
+The lines correspond respectively to v2 historical, v2 current-preservation,
+v3 historical and v3 current-preservation runs; the embedded 12-hex base must
+be derived from and equal the already authenticated invocation base. Neither
+run may see, copy or enumerate untracked files from the shared worktree; each
+input tree is materialized only from authenticated Git objects and must be
+clean before execution. Blob equality without the current-tree native run is
+insufficient preservation evidence. A current checker run against
+`d041baff...`, copied or mocked checker, changed current checker, wrong base,
+generic `PASS`, extra/missing/reordered or spoofed stdout, any stderr,
+hand-authored success text, nonterminal child, signal, timeout, untracked
+contamination or suppressed exit fails. The five existing historical
+predecessor executions remain required, producing seven genuine historical
+checker closures plus the two genuine current-tree root-freeze preservation
+executions.
+
+This supersedes only D.93.35.5's statement that generic protocol-v2/v3 root
+checkers continue to execute directly where the old workflow placed them. In
+external-empty mode they are inapplicable to upstream bytes; historical native
+closure plus native isolated current-tree preservation is the authority.
+Existing digest-identity, evidence-projection and semantic-suite commands
+remain genuinely executed. No registry, reference, policy or semantic file is
+thawed.
+
+###### Exact RED and GREEN scopes
+
+The in-place successor policy and profile advance their internal discriminators
+to exactly `ts-drp-protocol-v3-freeze-successor-v2` and
+`ts-drp-protocol-v3-freeze-successor-profile-v2`. The directory and sole owner
+remain `freeze-successor-v1`; this is a schema correction, not a second owner or
+public versioned surface. The checker accepts only those v2 discriminator
+values as current. The signed v1 policy/profile bytes remain provisional
+history and must be recognized only at the exact recorded `708db5c...`
+installation; treating v1 semantics as current, accepting both versions, or
+silently defaulting a missing discriminator fails.
+
+D.93.35.7 tests-only RED may edit exactly these 14 paths:
+
+```text
+tests/protocol-v3-freeze-successor-v1-red.test.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/controlled-freeze-successor.mjs
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+tests/fixtures/phase-3a1b-freeze-successor-v1/tsconfig.test.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/valid.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/semantically-equivalent.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/operation-retained-protocol-v2-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/operation-retained-protocol-v3-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/work-retained-protocol-v2-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/work-retained-protocol-v3-upstream.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/external-empty-upstream-authority.yml
+```
+
+No other predecessor test, fixture, analyzer, workflow, successor owner,
+legacy policy/checker, production source, plan, package, dependency, lockfile or
+generated file is part of RED. The named YAML programs test routing semantics,
+including behaviorally equivalent positive spelling, each forbidden direct
+root-checker call and attempted upstream-byte authority. They are explicitly
+analyzer fixtures, not workflow implementations or Git evidence. Analyzer
+positives and negatives self-test semantic equivalence; incidental YAML
+formatting, labels, quoting, whitespace, variable names and line numbers are
+not protocol gates. Native Git histories and genuine child checkers remain
+load-bearing.
+
+GREEN changes exactly these six paths and no others:
+
+```text
+packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs
+packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json
+packages/protocol-v3/conformance/freeze-successor-v1/profile.json
+packages/protocol-v3/conformance/freeze-successor-v1/spec.md
+.github/workflows/protocol-v3-blueprint-operation-budget.yml
+.github/workflows/protocol-v3-blueprint-work-budget.yml
+```
+
+The author-projection, gossip-budget and ACL-reputation successor workflows
+remain byte-identical. There is no `freeze-successor-v2` directory, second
+policy owner, alternate workflow route, manifest or dependency change.
+
+###### Causal matrix, gates and nonclaims
+
+RED builds real temporary repositories for linear and genuine two-parent
+GitHub merge-ref external-empty bootstrap, the six-path correction and strict
+descendant mode. It also retains the controlled checker only as a harness
+control; the repository candidate has no fallback. The exact positive roster
+includes 0/62 external absence, the PR-side fixed-anchor/RED/f089/708 chain,
+the original exact-nine install, the exact-six correction, the 52+1 identity
+law, all seven historical native checker executions, both isolated current-tree
+root-freeze preservation executions and unchanged descendant validation.
+
+Mutants sweep every mixed external presence count from 1 through 61, in numeric
+order, with the exact present and absent identity sets recorded for each row;
+they also cover irregular-object/type/mode representatives at the first,
+interior and last present identities. Further mutants include a forged external
+tree, object or bytes used as authority; external base and fixed anchor
+incomparable even when both are ancestors of the PR head; the reversed
+fixed-anchor → external-base link; an arbitrary earlier or later empty ancestor;
+a caller-selected old base; old simulated upstream-after-anchor topology;
+swapped GitHub parents; merge-tree drift; zero or multiple merge bases; all 62
+paths present with provisional-v1 or other wrong identities; missing or wrong
+PR-side commit/tree/parent; changed fixed 52 or gossip identity; original install
+not exactly nine; correction not exactly six; split, merge-only, reordered,
+reverted or repeated correction; old-v1, missing or dual schema discriminators;
+direct or indirect protocol-v2/v3 upstream calls in either workflow;
+comment/dead/data-only successor routing; wrong historical baseline, parent,
+checker base, tree, blob or SHA; copied checker; current checker drift;
+blob-only preservation; a shared dirty-tree or untracked input; suppressed,
+signaled, timed-out or false generic-`PASS`/spoof-output child; and
+base-only/current-only descendant validation. Every governed path transition is
+counted from Git object identities, not working-tree text.
+
+RED must have all controlled/analyzer positives green and fail the repository
+candidate only because the signed six-path correction is absent. Gates include
+the genuine 58/5/(52+1) inventory, complete path-history sweep, ordered 1..61
+mixed-presence sweep and the mandatory exact `d041baff...` real-PR evidence
+vector; exact D.93.35.5/.6 preservation; corrected 87/87 five-suite semantics;
+native linear/GitHub merge histories; the seven historical checkers; both
+genuine isolated current-tree preservation runs; dedicated typecheck, lint,
+Prettier and diff checks; and finite independent exact-byte review.
+GREEN/closure reruns those gates and requires the five successor-routed
+workflow jobs relevant to this owner to pass on a real external-base pull
+request.
+
+This correction makes no claim that the whole pull request is green. Separate
+protocol-v2 registry, protocol-v3 registry/atomicity, evidence/dependency and
+compaction jobs remain outside D.93.35.7 and retain their own authorities and
+failures. No upstream byte is admitted, no legacy policy is reclassified as
+current, and no direct-push or comment-only bypass is authorized. Closure is a
+bounded governance ledger entry recording `708db5c...` as provisional, the
+external-empty topology, the two historical root-checker closures, the exact
+six-path correction and this oracle-discipline rule. Only after independent
+review, signed GREEN and real-job evidence may D.93.35.5/.6 close and p6 resume.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
