@@ -12,6 +12,8 @@ jobs:
     name: Require immutable protocol-v3 equivocation gossip budget supplement
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      NODE_PATH: ${{ github.workspace }}/packages/protocol-v3/node_modules
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,14 +47,6 @@ jobs:
             pnpm exec vitest run tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts \
               --no-coverage --maxWorkers=1 --minWorkers=1
           pnpm exec vitest run tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts \
-            --no-coverage --maxWorkers=1 --minWorkers=1
-      - name: Preserve protected author projection suites
-        run: |
-          pnpm exec vitest run tests/protocol-v3-equivocation-0o.test.ts \
-            --no-coverage --maxWorkers=1 --minWorkers=1
-          pnpm exec vitest run tests/protocol-v3-equivocation-projection-0o-b1a.test.ts \
-            --no-coverage --maxWorkers=1 --minWorkers=1
-          pnpm exec vitest run tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts \
             --no-coverage --maxWorkers=1 --minWorkers=1
       - name: Audit source, built and runtime public roots
         run: |

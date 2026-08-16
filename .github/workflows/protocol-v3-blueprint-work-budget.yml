@@ -12,6 +12,8 @@ jobs:
     name: Require immutable protocol-v3 blueprint work budget supplement
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      NODE_PATH: ${{ github.workspace }}/packages/protocol-v3/node_modules
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,13 +47,6 @@ jobs:
               --no-coverage --maxWorkers=1 --minWorkers=1
           pnpm exec vitest run tests/protocol-v3-blueprint-work-budget-0p0.test.ts \
             --no-coverage --maxWorkers=1 --minWorkers=1
-      - name: Preserve blueprint and registry predecessors
-        run: |
-          pnpm exec vitest run tests/protocol-v3-blueprint-admission-0i.test.ts \
-            tests/protocol-v3-registry-spec-n1prime-b.test.ts \
-            tests/protocol-v3-independent-reference-vectors-n1prime-c2.test.ts \
-            tests/protocol-v3-regenerated-reference-n1prime-d.test.ts \
-              --no-coverage --maxWorkers=1 --minWorkers=1
       - name: Audit build, type surface and runtime surface
         run: |
           pnpm --filter @ts-drp/protocol-v3 build

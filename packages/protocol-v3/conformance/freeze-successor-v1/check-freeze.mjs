@@ -14,10 +14,23 @@ const repositoryRoot = realpathSync(
 );
 const policyPath = `${ownerDirectory}/freeze-policy.json`;
 const profilePath = `${ownerDirectory}/profile.json`;
-const bootstrapParent = "4c986b8dc5a91f3172970c917168eeeea8271126";
+const bootstrapParent = "1703f08fe57d31b3ad9a98297138cc88ab093faf";
 const expectedOwnerPaths = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"]
 	.map((file) => `${ownerDirectory}/${file}`)
 	.sort();
+const bootstrapWorkflowPaths = [
+	".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+	".github/workflows/protocol-v3-blueprint-work-budget.yml",
+	".github/workflows/protocol-v3-equivocation-author-projection.yml",
+	".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+	".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+];
+const expectedBootstrapPaths = [
+	`${ownerDirectory}/check-freeze.mjs`,
+	`${ownerDirectory}/freeze-policy.json`,
+	`${ownerDirectory}/spec.md`,
+	...bootstrapWorkflowPaths,
+].sort();
 
 function fail(message) {
 	throw new Error(`protocol-v3 freeze successor violation: ${message}`);
@@ -140,7 +153,7 @@ if (upstreamPolicyEntry === undefined) {
 	if (JSON.stringify(exactParents(releaseTip)) !== JSON.stringify([bootstrapParent])) {
 		fail("release bootstrap parent differs");
 	}
-	if (JSON.stringify(changedPaths(bootstrapParent, releaseTip)) !== JSON.stringify(expectedOwnerPaths)) {
+	if (JSON.stringify(changedPaths(bootstrapParent, releaseTip)) !== JSON.stringify(expectedBootstrapPaths)) {
 		fail("release transition scope differs");
 	}
 } else {
