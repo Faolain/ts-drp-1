@@ -1,0 +1,25 @@
+{
+	"name": "ts-drp-example-v3-chat",
+	"version": "0.11.0",
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"build": "esbuild src/index.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/index.js",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/control-plane": "0.11.0",
+		"@ts-drp/keychain": "0.11.0",
+		"@ts-drp/message-queue": "0.11.0",
+		"@ts-drp/node": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
+		"@ts-drp/storage": "0.11.0",
+		"@ts-drp/storage-browser": "0.11.0",
+		"@ts-drp/types": "0.11.0"
+	},
+	"devDependencies": {
+		"esbuild": "^0.25.3",
+		"typescript": "^5.5.4"
+	}
+}

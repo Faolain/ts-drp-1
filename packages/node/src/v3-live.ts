@@ -2565,7 +2565,7 @@ function authenticatedRecoveryVertex(
 			hash: digest,
 			kind: admitted.kind,
 			objectId: admitted.objectId,
-			operation: admitted.operation as EpochVertex["operation"],
+			operation: admitted.operation as NonNullable<EpochVertex["operation"]>,
 		}),
 	});
 }

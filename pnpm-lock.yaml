@@ -291,6 +291,43 @@ importers:
         specifier: ^8.21.0
         version: 8.21.0
 
+  examples/v3-chat:
+    dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../../packages/canonical
+      '@ts-drp/control-plane':
+        specifier: 0.11.0
+        version: link:../../packages/control-plane
+      '@ts-drp/keychain':
+        specifier: 0.11.0
+        version: link:../../packages/keychain
+      '@ts-drp/message-queue':
+        specifier: 0.11.0
+        version: link:../../packages/message-queue
+      '@ts-drp/node':
+        specifier: 0.11.0
+        version: link:../../packages/node
+      '@ts-drp/protocol-v3':
+        specifier: 0.11.0
+        version: link:../../packages/protocol-v3
+      '@ts-drp/storage':
+        specifier: 0.11.0
+        version: link:../../packages/storage
+      '@ts-drp/storage-browser':
+        specifier: 0.11.0
+        version: link:../../packages/storage-browser
+      '@ts-drp/types':
+        specifier: 0.11.0
+        version: link:../../packages/types
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.3
+        version: 0.25.3
+      typescript:
+        specifier: ^5.5.4
+        version: 5.8.2
+
   packages/blueprint-catalog:
     dependencies:
       '@ts-drp/canonical':
