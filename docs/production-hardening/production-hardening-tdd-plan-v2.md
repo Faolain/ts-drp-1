@@ -12292,6 +12292,139 @@ Only after D.93.35.5 design, tests-only RED, successor GREEN and closure are
 independently reviewed, signed and pushed may the preserved p6 RED draft be
 restored and continued.
 
+##### D.93.35.6 — freeze-successor gossip-oracle transition correction
+
+Read-only audit of the exact D.93.35.5 nine-path GREEN candidate found one
+contradiction in the current test suite. The lawful successor workflow removes
+the direct
+`equivocation-author-projection-v1/check-freeze.mjs` invocation, but
+`tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts` still requires that
+literal in its workflow-governance assertion. The other four predecessor
+semantic suites assert only runtime/semantic commands retained by the reviewed
+successor workflows and remain green. Satisfying the gossip assertion with a
+comment, dead binding or non-executed legacy path would be an oracle bypass,
+while editing the test directly is forbidden by D.93.35.5's 53-path
+fixed-anchor rule. D.93.35.5 GREEN therefore remains blocked until this bounded
+correction closes.
+
+###### Exact authorized predecessor transition
+
+Exactly one predecessor semantic-test path is thawed once:
+
+```text
+tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts
+```
+
+Its current pre-transition SHA-256 is exactly
+`6265273fa2bd123133dc8580fe2a699792a2a9b004e3c81841c911f3f7e87b02`.
+The correction changes only the governance row that reads
+`.github/workflows/protocol-v3-equivocation-gossip-budget.yml`. It removes the
+stale positive requirement for direct author-projection freeze-checker routing
+and replaces it with a structural positive for the exact successor route plus a
+causal negative for a direct superseded-legacy route. The corrected row requires
+the existing digest-identity and evidence-projection checkers and the
+author-projection semantic suite. All gossip-budget semantic, runtime, profile,
+specification, control and mutant assertions outside that workflow-routing
+oracle remain unchanged.
+
+The transition is one exact signed tests-only commit whose parent is the signed
+D.93.35.6 plan base. It changes the old blob above to one reviewed new blob and
+changes only the bounded RED paths below. The successor GREEN profile records
+the full transition commit, parent, tree, old and new Git blob IDs and SHA-256
+values. The successor checker proves a single linear old-to-new transition
+before bootstrap; zero, two, non-linear, merge-only, split, reordered, reverted
+or unrecorded gossip-test transitions fail. The historical fdb/d989/392 gossip
+ledger and the latent stale hash in
+`tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json` remain byte-identical
+archival evidence and are not rewritten as current authority.
+
+###### Corrected successor law
+
+The fixed-anchor union remains exactly 58 identities. Exactly five workflow
+identities remain bootstrap-thawed. Of the other 53 identities, exactly 52 must
+equal their fixed-anchor bytes at the corrected RED base and current tree. The
+sole remaining identity is the gossip semantic test above: its fixed-anchor
+historical bytes must match the existing ledger, and its current bytes must
+match the single recorded D.93.35.6 transition. After that transition it is
+immutable at the computed merge base, throughout the nine-path bootstrap and
+on every descendant.
+
+The successor bootstrap remains exactly nine GREEN paths: four successor-owner
+files and five workflows in one non-merge PR-side commit. The corrective test is
+already present in the signed RED parent and is not a tenth GREEN path. No
+workflow, successor owner, legacy checker, policy, profile, specification,
+historical fixture or production source changes in the corrective RED. No
+additional predecessor test is thawed, and this correction creates no general
+test-transition allowance.
+
+###### Tests-only RED, mutants and gates
+
+The corrective RED may edit only:
+
+```text
+tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts
+tests/protocol-v3-freeze-successor-v1-red.test.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json
+tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/routing-analyzer.ts
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-legacy-removed-successor-absent.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-successor-executable-legacy-retained.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-missing-digest-identity.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-missing-evidence-projection.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-missing-author-projection-suite.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-indirect-legacy-checker.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-dead-successor.yml
+tests/fixtures/phase-3a1b-freeze-successor-v1/analyzers/workflow/gossip-data-only-successor.yml
+```
+
+No other analyzer or fixture path is authorized. The existing
+`routing-analyzer.ts` remains analyzer-only and the eight exact YAML programs
+above carry its transition controls. In particular,
+`gossip-legacy-removed-successor-absent.yml` removes the legacy execution but
+still lacks executable successor routing, while
+`gossip-successor-executable-legacy-retained.yml` supplies genuine successor
+routing but retains a legacy execution. Those programs isolate the two
+independent violations that coexist in the real predecessor workflow. The
+remaining six fixtures isolate missing retained digest, evidence or
+author-suite execution, indirect legacy execution, and dead or data-only
+successor mentions. Incidental YAML spelling, indentation, quoting, line number
+or comment presence is not authority. Genuine candidate workflow parsing,
+native temporary-Git history and the actual gossip semantic suite remain
+load-bearing.
+
+The real predecessor workflow produces one focused governance-row failure: it
+both lacks executable successor routing and retains the forbidden legacy route.
+The two named split fixtures above prove those causes independently; the plan
+does not misreport the real row as failing for only one of them. Across the
+current five genuine predecessor suites, RED is exactly 86/87 with that one
+gossip governance row failing and all 86 semantic/control rows green. Mutants
+cover a comment-only or dead successor string; retained, direct or indirect
+legacy checker; missing digest/evidence checker; missing author semantic suite;
+wrong old or new blob/hash; absent, extra, split, merge-only, reverted or
+post-bootstrap test transition; transition of any second semantic test;
+treating the latent stale gossip hash as current; and a sixth workflow or other
+thawed identity. The 52 fixed-anchor identities are still mutated individually,
+while the corrected gossip identity has independent
+old/current/post-bootstrap mutants.
+
+RED gates are the exact 86/87 current-suite split above; all named analyzer
+controls and mutants; successor controlled and repository lanes; native
+historical checker evidence; the exact 58/5/(52+1) inventory and mutation
+matrix; dedicated typecheck, lint, Prettier and diff checks; and one finite
+independent exact-byte review before signing. GREEN and closure require the
+corrected 87/87 genuine operation-budget, work-budget, author-projection,
+gossip-budget and ACL-reputation preservation set, then rerun the analyzer,
+successor, history, inventory and static gates plus both linear and GitHub
+merge-ref bootstrap/descendant histories and the five actual required workflow
+jobs.
+
+Closure records this as a ledger-only oracle correction, not a semantic
+protocol amendment: one predecessor governance oracle moved from stale topology
+to successor topology, all legacy semantic behavior stayed fixed, and the
+nine-path D.93.35.5 GREEN scope did not widen. It authorizes only resumption of
+D.93.35.5 GREEN and its closure; p6 remains blocked until then.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
