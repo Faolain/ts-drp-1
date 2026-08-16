@@ -55,6 +55,14 @@ export interface GenuinePreparedV3Fixture {
 	readonly recoverySignature: Uint8Array;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	readonly receivedSignature: Uint8Array;
+	createRecoveryVertex(
+		authorSequence: number,
+		dependencies: readonly string[]
+	): Readonly<{
+		readonly canonicalPreimageBytes: Uint8Array;
+		readonly digest: Uint8Array;
+		readonly signature: Uint8Array;
+	}>;
 	prepareAgain(): Promise<Readonly<{ capability: PreparedV3Live; descriptor: V3LiveDescriptor }>>;
 	close(): Promise<void>;
 }
@@ -213,6 +221,21 @@ export async function createGenuinePreparedV3Fixture(
 			recoverySignature: ed25519.sign(recoveryDigest, hexBytes(contract.privateKeySeedHex)),
 			receivedCanonicalPreimageBytes,
 			receivedSignature: ed25519.sign(receivedDigest, hexBytes(contract.privateKeySeedHex)),
+			createRecoveryVertex(authorSequence, dependencies) {
+				const canonicalPreimageBytes = encodeCanonical({
+					...vertexInput,
+					author,
+					authorSequence,
+					dependencies: [...dependencies],
+					logicalTime: authorSequence + 1,
+				});
+				const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes);
+				return Object.freeze({
+					canonicalPreimageBytes,
+					digest,
+					signature: ed25519.sign(digest, hexBytes(contract.privateKeySeedHex)),
+				});
+			},
 			async prepareAgain() {
 				const next = await prepareV3LiveGeneration(input);
 				if (!next.ok) throw new TypeError(`live preparation retry failed: ${"kind" in next ? next.kind : "unknown"}`);

@@ -187,4 +187,104 @@ describe("D.93.36 authorized durable recovery RED", () => {
 			await fixture.close();
 		}
 	});
+
+	it("replays the complete local issuance outbox in dependency order", async () => {
+		const candidate = (await import("../packages/node/src/v3-live.js")) as unknown as Record<string, unknown>;
+		const recover = candidate.recoverV3LiveReplica as Recover;
+		const fixture = await createGenuinePreparedV3Fixture();
+		const appended: number[] = [];
+		try {
+			const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
+			const firstCarrier = fixture.createRecoveryVertex(0, [fixture.descriptor.anchorDigest]);
+			const firstDigest = Array.from(firstCarrier.digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+			const secondCarrier = fixture.createRecoveryVertex(1, [firstDigest]);
+			const commits = [
+				commitFor(scope, 0, firstCarrier.canonicalPreimageBytes, firstCarrier.signature),
+				commitFor(scope, 1, secondCarrier.canonicalPreimageBytes, secondCarrier.signature),
+			] as const;
+			const issuanceStore: DurableIssuanceStore = Object.freeze({
+				transactIssue: () => Promise.reject(new Error("recovery must not issue")),
+				compareAndMarkOutboxPublished: () => Promise.reject(new Error("recovery must not publish")),
+				readIssued(_selectedScope, authorSequence) {
+					return Promise.resolve(commits[authorSequence] ?? null);
+				},
+				readOutboxPage(input = {}) {
+					const next = input.afterKey == null ? 0 : input.afterKey[2] + 1;
+					const commit = commits[next];
+					return Promise.resolve(
+						commit === undefined
+							? Object.freeze([])
+							: Object.freeze([Object.freeze({ commit, publishState: next === 0 ? "published" : "pending" })])
+					);
+				},
+				readLineage: () => Promise.resolve(Object.freeze({ exhausted: false, next: 2 })),
+				close: () => Promise.resolve(),
+			});
+			const journalScope = Object.freeze({
+				objectId: fixture.descriptor.objectId,
+				epoch: 0 as const,
+				anchorDigest: fixture.descriptor.anchorDigest,
+			});
+			const snapshot = Object.freeze({
+				kind: "v3-live-journal-snapshot-token-1" as const,
+				scope: journalScope,
+				highWatermark: 0,
+				genesisDigest: "1".repeat(64),
+				parametersDigest: fixture.descriptor.parametersDigest,
+				orderedRowDigest: "2".repeat(64),
+				snapshotDigest: "3".repeat(64),
+			});
+			const journalStore: DurableLiveJournalStore = Object.freeze({
+				installGenesis: () =>
+					Promise.resolve(
+						Object.freeze({
+							ok: true as const,
+							scope: journalScope,
+							parametersDigest: fixture.descriptor.parametersDigest,
+							idempotent: false,
+						})
+					),
+				readiness: () =>
+					Promise.resolve(
+						Object.freeze({ ok: true as const, ready: true as const, scope: journalScope, snapshot, rowCount: 0 })
+					),
+				readPage: () =>
+					Promise.resolve(
+						Object.freeze({
+							ok: true as const,
+							scope: journalScope,
+							snapshot,
+							rows: Object.freeze([]),
+							nextSequence: null,
+						})
+					),
+				appendAccepted(input) {
+					appended.push(input.authorSequence);
+					return Promise.resolve(
+						Object.freeze({
+							ok: true as const,
+							scope: input.scope,
+							journalSequence: appended.length,
+							vertexDigest: input.vertexDigest,
+							sourceKind: input.sourceKind,
+							idempotent: false,
+						})
+					);
+				},
+				close: () => Promise.resolve(),
+			});
+
+			const result = await recover({
+				capability: fixture.capability,
+				exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes,
+				issuanceScope: scope,
+				issuanceStore,
+				liveJournalStore: journalStore,
+			});
+			expect(result).toMatchObject({ ok: true, descriptor: { recoveredVertexCount: 3 } });
+			expect(appended).toEqual([0, 1]);
+		} finally {
+			await fixture.close();
+		}
+	});
 });
