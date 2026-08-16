@@ -13031,6 +13031,63 @@ test thaw, analyzer rewrite or new production seam. Only after the signed
 two-test RED and exact-six GREEN both satisfy their phase signatures may
 D.93.35.7/.8 close and the previously blocked p6 work resume.
 
+##### D.93.35.10 — operation controlled-surface authority correction
+
+Executable D.93.35.9 RED work exposed one localized oracle-target
+contradiction. The operation-budget suite's public-surface row reads the module
+selected by `PHASE_0P2_IMPLEMENTATION_MODULE`. That selector intentionally
+replaces the production implementation with the independent four-function
+behavioral control; it does not represent the package root. The row therefore
+fails on the control's deliberately smaller surface even though the genuine
+package root still has the exact ten runtime exports. D.93.35.9's required
+27/28 controlled RED signature cannot be reached while that unrelated target
+mistake remains.
+
+D.93.35.10 authorizes one tests-only correction inside the already-authorized
+path:
+
+```text
+tests/protocol-v3-blueprint-operation-budget-0p2.test.ts
+```
+
+The `[public-surface]` row must load and inspect the genuine module named by the
+contract's production `implementationModule`, independent of
+`PHASE_0P2_IMPLEMENTATION_MODULE`. It retains the exact ten-key package-root
+assertion unchanged. All operation behavior, budget boundaries, ordering,
+mutation controls and construction witnesses continue to use the selected
+implementation, so the controlled fixture remains load-bearing everywhere it
+owns behavior. A controlled run must therefore prove both facts at once: the
+independent behavior owner satisfies every non-governance behavioral row, and
+the genuine package root alone owns the public-surface claim. Redirecting the
+public-surface read to the control, accepting the control's four keys, or
+redirecting it to another package fails.
+
+No fixture, analyzer, workflow, production source, package manifest,
+dependency, lockfile, generated file or second predecessor test is authorized
+by this correction. It changes neither the exact-ten surface nor any protocol
+behavior and adds no compatibility branch. This is a localized tests-only
+authority repair, not a broader normative amendment or public widening.
+
+The D.93.35.9 RED remains one signed non-merge commit changing exactly its six
+authorized tests/oracle-owner paths. Its sole parent is the future signed and
+pushed D.93.35.10 plan-only commit created from exact signed
+`67be751b06e542996491f5273f95901af369c372`; that plan commit is non-governed,
+changes only this plan path and supersedes D.93.35.9's earlier prospective RED
+parent. The transition contract records and authenticates the new plan parent,
+while the governed transition set remains exactly the operation and work test
+identities. No extra governed transition or seventh RED/GREEN path is created.
+
+RED requires the authoritative ordered five-file command from D.93.35.9 to
+remain exactly 85 passed and two failed, with only the operation/work governance
+rows failing. The controlled operation command must be exactly 27/28 with only
+the same operation governance row failing; the controlled work result remains
+11/12. Exact-six GREEN must produce 87/87, controlled operation 28/28 and
+controlled work 12/12. Dedicated typecheck, lint, Prettier, diff, successor
+readiness, analyzer controls and D.93.35.5-.9 preservation gates remain
+mandatory. Independent exact-byte review must confirm the one-row authority
+change before signing. Only then may the preserved D.93.35.9 RED draft be
+restored, corrected to the signed parent and resumed.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
