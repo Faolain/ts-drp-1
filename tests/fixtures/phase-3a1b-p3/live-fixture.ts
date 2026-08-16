@@ -55,6 +55,7 @@ export interface GenuinePreparedV3Fixture {
 	readonly recoverySignature: Uint8Array;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	readonly receivedSignature: Uint8Array;
+	signRegisteredVertexDigest(digest: Uint8Array): Promise<Uint8Array>;
 	createRecoveryVertex(
 		authorSequence: number,
 		dependencies: readonly string[]
@@ -235,6 +236,9 @@ export async function createGenuinePreparedV3Fixture(
 					digest,
 					signature: ed25519.sign(digest, hexBytes(contract.privateKeySeedHex)),
 				});
+			},
+			signRegisteredVertexDigest(digest) {
+				return Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex)));
 			},
 			async prepareAgain() {
 				const next = await prepareV3LiveGeneration(input);
