@@ -13191,6 +13191,117 @@ workflow, dependency, lock change, production seam, broader oracle amendment
 or additional GREEN path. The closure ledger records the corrected causal
 root-preservation evidence and the authenticated non-governed commit only.
 
+##### D.93.35.12 — plan-intervention lineage correction
+
+D.93.35.11 correctly ratified the root-preservation harness correction, but its
+prospective lineage omitted the signed plan-only commit that carried that
+ratification. The omission made its own intervention invisible: it said that
+the future exact-six GREEN would have `b0529c4...` as sole direct parent even
+though the required D.93.35.11 plan commit was signed and pushed after
+`b0529c4...`. Building GREEN on the pushed branch therefore necessarily makes
+that plan commit an intermediary. D.93.35.12 corrects only that lineage. It
+does not reopen the harness correction or any governed identity.
+
+The already authenticated harness correction remains exact commit
+`b0529c4badd60ce61b1a6974cdf99a3b31fe1187`, tree
+`cbf6d4479eca22940d5fccf2a64add5021377f0e`, with sole parent
+`fef93323cb6cff8c46b96834dcbf60df080252e0`. It remains a signed non-merge,
+non-governed commit changing only:
+
+```text
+tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs
+```
+
+Its exact blob is `80644a34d23f3fcb95fd98b80efa92e5b687dd8f`, content
+SHA-256 is
+`d03dcb862c91fb8873305e7ee29a41320d9fa3eb89b98231a148c721b55da7de`,
+and binary commit-diff SHA-256 is
+`3220c84e6b4d22254c37d488a6856752da29a85bba1e0db06483b76eb6b8b0db`.
+It has a Good signature from `Faolain <Faolain@users.noreply.github.com>`
+using key `55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+The signed D.93.35.11 plan-only commit is exact commit
+`32653c327b24d0f587781ae85984c8123ba5c9bd`, tree
+`ec4f3ba934c2f3c9dbd141f8e3700674bf5ccb90`, with sole parent
+`b0529c4badd60ce61b1a6974cdf99a3b31fe1187`. It is a signed non-merge,
+non-governed commit changing only:
+
+```text
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+```
+
+Its exact plan blob is `22ca9bd690c01d19b0f23a0a836b6725855169dd`, content
+SHA-256 is
+`9ad9641c31726f6de3bef21c45430190e450af648bc9cc369e059ce8f9992c39`,
+and binary commit-diff SHA-256 is
+`d36449d2bdc1f62d994aab94f6953b2508b48e76f57f7956b7de5c33674fc843`.
+It has a Good signature from `Faolain <Faolain@users.noreply.github.com>`
+using the same key `55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+###### Feasible final lineage and self-identity handoff
+
+This D.93.35.12 amendment is itself one plan-only commit created directly from
+exact `32653c327b24d0f587781ae85984c8123ba5c9bd`. Its commit and tree identities
+cannot be embedded in its own preimage. After it is signed and pushed, the
+release ledger must record its exact commit, tree, sole parent, sole plan path,
+plan blob, content SHA-256, binary commit-diff SHA-256 and Good Faolain
+signature. The future exact-six GREEN can then, without circularity, freeze
+those already-known identities in its successor profile/checker bytes. This is
+the only authorized after-signing identity handoff; a placeholder, predicted
+hash, mutable side file, unsigned note or caller-selected plan identity is not
+authority.
+
+The complete linear ancestry is therefore exactly:
+
+```text
+fef93323... -> b0529c4... -> 32653c32... -> signed D.93.35.12 plan -> future exact-six GREEN
+```
+
+The future exact-six GREEN is one signed non-merge commit whose sole direct
+parent is the signed and pushed D.93.35.12 plan commit created from
+`32653c32...`. No commit of any kind may intervene after that plan commit is
+pushed and before GREEN is created. The successor checker and profile must
+authenticate every edge and identity in the chain:
+
+1. `fef93323... -> b0529c4...` is exactly the one-path harness correction
+   frozen above.
+2. `b0529c4... -> 32653c32...` is exactly the one-path D.93.35.11 plan commit
+   frozen above.
+3. `32653c32... -> signed D.93.35.12 plan` is exactly one plan-only commit with
+   the after-signing identities recorded by the release ledger and frozen by
+   the future successor profile/checker.
+4. `signed D.93.35.12 plan -> future exact-six GREEN` is exactly the unchanged
+   six-path correction authorized by D.93.35.7/.8.
+
+Across the first three non-governed edges, both governed operation/work test
+blobs must remain byte-identical to their authenticated values at
+`fef93323...`; the harness blob must remain the exact `b0529c4...` blob across
+both plan-only edges; and the D.93.35.11 plan blob must remain exact at
+`32653c32...`. Only the D.93.35.12 plan edge may change the plan blob, and only
+the future exact-six edge may change the six governed GREEN paths. The
+governed transition set remains exactly two identities: the predecessor
+transition at `fef93323...` and the future exact-six GREEN. Neither
+`b0529c4...`, `32653c32...` nor the D.93.35.12 plan commit earns a governed
+identity or may substitute for either governed transition.
+
+Zero, split, reordered, repeated, merge-only or extra harness/plan corrective
+commits fail. A missing or changed intermediary parent, path, blob, content
+hash, patch hash, tree or signature fails. So does any governed-byte drift
+across a non-governed edge, an exact-six commit parented to `b0529c4...` or
+`32653c32...`, a second D.93.35.12-like plan commit, or any commit between the
+signed D.93.35.12 plan and GREEN. The checker must reject lineage that merely
+contains the named commits out of order or on a side branch; they are required
+as the exact direct-parent chain above.
+
+D.93.35.12 supersedes only D.93.35.11's prospective statement that
+`b0529c4...` directly parents GREEN and D.93.35.9/.10's corresponding
+single-RED-commit sequencing. The exact-six GREEN scope, root-drift causal
+construction, governed transition identities, RED/GREEN counts, analyzer
+discipline, native-child evidence, workflow authority and all failure
+taxonomies remain unchanged. This amendment changes only the plan. It adds no
+test, fixture, workflow, production, package, dependency, lock, public/private
+surface, oracle authority or broader governance exception.
+
 ### Phase 2a assumption-correction quorum — executable storage seam v1
 
 The fresh Codex-high RED owner correctly stopped before editing at HEAD `8b21200`.
