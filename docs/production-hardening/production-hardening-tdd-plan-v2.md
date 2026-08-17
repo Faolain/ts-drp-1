@@ -47345,3 +47345,54 @@ the first modular browser row mixes retained network recovery with retired
 legacy object-session behavior. The plan now names the exact plan-parent
 segments, extracts only the useful network controls and no longer calls the
 rewritten row unchanged. No other P0-P2 finding was reported.
+
+### D.93.46a closure ledger
+
+D.93.46a closed as two separate signed commits on
+`codex/phase3a1b-p6-golden-path`. The tests-only RED is
+`c1830f8ba775bbd4f128e75ee37f584a171507e6` / tree
+`053c6c6775c6062aa27c815b113f69fa44dcd591`, whose sole path is the shared
+room extraction owner. It produced one independent v3-chat bundle PASS and one
+causal `V3_ROOM_PACKAGE_ABSENT` failure. The GREEN is
+`2bb23508f323d5a8f6e5977d2bba3ffa8c38c0cd` / tree
+`92daa71e874ad0478c88db9ba79464405f1e8247`, parented directly by that RED and
+changing exactly seven authorized paths: the four new `examples/v3-room`
+package owners, the v3-chat source and manifest, and the lockfile importer.
+Both commits have Good Faolain signatures and were pushed with exact upstream
+parity.
+
+The new private `@ts-drp/example-v3-room` package has one runtime export,
+`createV3RoomSession`. It is now the sole owner of creator-invite encoding and
+decoding, trust installation, v3 preparation, bootstrap issuance, durable
+recovery, live activation, retained publication, monotone logical-time resume,
+local issue/publication and idempotent teardown. The v3-chat shell retains its
+application blueprint/catalog material, signer identities, accepted-message
+projection, BroadcastChannel transport and public browser API. It has no
+runtime or manifest dependency on the five former composition owners. The room
+transport opens only after invite authentication and durable recovery, and an
+activation failure closes the queue, transport and opened stores.
+
+Final-byte acceptance recorded: the public-owner/extraction suite passed `2/2`
+in `0.677s`; the existing Chromium v3-chat preservation suite passed `5/5` in
+`5.2s`; the new room and retained chat package typechecks and builds passed; the
+chat browser bundle completed in `82ms`; the frozen offline install passed in
+`1.3s`; and affected ESLint, Prettier and diff checks passed. The only observed
+behavioral correction during GREEN was deterministic logical-time spacing: the
+shared owner correctly resumes above every recovered vertex, including the
+hidden bootstrap, so the chat's application floors were raised uniformly to
+retain the five visible ordering outcomes. No expectation was loosened.
+
+The final GREEN review returned terminal PASS from Codex, Kimi's requested
+100-step review and Grok, with no P0/P1. Kimi recorded only the intentional
+internal invite-kind rename and an inherited pre-activation store-cleanup
+limitation. Opus completed its own source audit with an interim PASS and only
+P2 observations, but terminated without the requested final verdict schema; it
+is recorded as `NO_VERDICT`, not approval and not a blocker under the signed
+review policy. Its concrete notes were either inherited, already absent on the
+GREEN bytes, or bounded by the exact path inventory and the five behavioral
+controls.
+
+This ledger closes only D.93.46a extraction and v3-chat preservation. It does
+not claim zone adoption, authenticated E1, T1/T2, E2, P6, MMORPG readiness or
+completion of the broader production-hardening plan. D.93.46b starts from the
+real shared package at `2bb23508…` and owns the separate zone-adoption RED/GREEN.
