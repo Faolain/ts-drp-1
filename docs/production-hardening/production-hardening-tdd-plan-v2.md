@@ -46228,3 +46228,50 @@ must use these semantics to exercise a concurrent Writer grant and Finality
 revocation with real clients, while preserving current-epoch authority until
 the next anchor. Phase 3c, Phase 3b, and the broader production-hardening plan
 remain open.
+
+## D.93.41 live latched-ACL convergence checkpoint
+
+The tests-only Phase 3c RED is signed at
+`225c5ccf4488e90bacea6abd92710ecf41dc9566`. The separate product GREEN is
+signed at `c420addf38648f107873d7baf06d7d2a51e0d35f`, with tree
+`b82e98d940b3b2582774810fcd06a3707724302f` and staged binary patch SHA-256
+`26a7108c580914de5e82800d46481d442978adb67a6f029f65dbd3ae01c29ca0`.
+
+The Phase 3d latched-ACL owner now opens one exact canonical snapshot against
+the authenticated anchor ACL digest, epoch, and object identity. The live node
+accepts that carrier through a mutually exclusive recovery input, resolves
+envelope authors through one internal authorization owner, and stages genuine
+signed ACL vertices only after the ordinary recovery, issuance, journal,
+causality-index, ingress, and publication boundaries accept them. The current
+snapshot remains unchanged; the preview deterministically orders staged
+operation identities, derives the next snapshot, and derives the next finality
+signer set. The existing legacy author-list input remains exact for already
+closed callers; there is no input that accepts both carriers and no ACL
+fallback.
+
+The browser product invite is anchor-bound to a canonical latched ACL. Two real
+clients concurrently publish Alice's Writer grant and Bob's Finality revoke,
+then converge on the same two genuine operation identities, next ACL digest,
+next membership view, and Alice-only next signer set while the current epoch
+roles remain unchanged. The earlier two-client, reconnect, eight-client
+partition-heal, and modified-invite cases remain green.
+
+Final evidence was the focused node/protocol set 33/33 in 15.81 seconds and
+Chromium Playwright 5/5 in 9.0 seconds. Protocol-v3 typecheck and public-entry
+audit, node and example builds, example typecheck, ESLint, Prettier, and diff
+checks passed. One initial focused invocation also discovered protected
+historical repositories under `.logs`; the five intended files themselves
+passed 27/27, and the final command excluded that protected evidence tree.
+
+The normal bounded Kimi, Grok, Codex, and Opus review round was restored for
+this slice. All four attempts ended without a terminal verdict after bounded
+inspection and made no edits. Kimi raised one digest-order concern before its
+nonterminal exit; it was dismissed because Phase 3d authorizes every operation
+against the unchanged current snapshot and applies the complete set in fixed
+grant/key/revoke phases, so digest position cannot alter acceptance. No review
+reproduced a P0/P1 authorization, content, or convergence defect.
+
+This closes Golden Path 1 step 4 for the exercised creator-trusted browser
+fixture and closes the Phase 3c live integration slice. It does not activate the
+next anchor, prove arbitrary ACL policy, establish Byzantine membership, close
+Phase 3b, or complete the broader production-hardening plan.
