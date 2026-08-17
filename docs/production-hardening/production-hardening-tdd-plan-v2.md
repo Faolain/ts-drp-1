@@ -46683,3 +46683,322 @@ room convergence across disconnect/reconnect. It does not claim runtime
 anti-cheat, Phase 4a, a complete two-client product golden path, or completion of
 the broader production-hardening plan. The next slice returns to the P6 golden
 path rather than opening another freeze-governance amendment.
+
+## D.93.45 Track E1 post-closure resource and session correction
+
+The longer post-closure review window found one real resource-isolation defect
+and three related grid-session lifecycle defects in the signed Track E1 GREEN.
+The earlier D.93.44 review paragraph remains an honest record of what the
+shorter frozen-packet attempts returned, but its statement that Codex and Opus
+emitted no substantive finding is superseded by the completed extended reviews
+recorded here. This correction is local to Track E1; it does not reopen ACL,
+GossipSub, durable-object, consensus or freeze-governance ownership.
+
+The reproduced P1 is the shared sequenced-key table in the ephemeral channel.
+Remote ingress and local publication consume the same global capacity, so one
+authorized remote sender can fill the table with distinct keys and make a valid
+local movement publication return `false` without reaching the transport. A
+bounded executable probe at the signed D.93.44 tip used a two-key limit, admitted
+two remote keys, then observed `{ accepted: false, sent: 0, overLimit: 1 }` for
+the first local key. This contradicts both local availability and the stated
+sender isolation rule.
+
+The clean replacement is one two-level sequenced registry. Local publication
+keys have a private per-local-sender budget. Remote watermarks are grouped by
+the authenticated transport sender, each sender has the same independent key
+budget, and a separate remote-sender budget bounds the number of retained
+sender maps. The product of the configured remote-sender and per-sender key
+limits is not the whole allocation: local plus remote capacity is closed by
+`(maxSequencedSenders + 1) * maxSequencedKeys <= 4_096`, where the added `1`
+is the private local allocation. A remote
+sender consumes at most one sender slot and only its own key allocation; it
+cannot consume local capacity or another admitted sender's allocation. The
+local allocation is also bounded by the per-sender key limit. Unknown senders
+beyond the explicit sender limit and keys beyond one sender's explicit key
+limit fail closed without eviction. Accepted high-water marks remain for the
+life of the channel so disconnect/reconnect replay rejection is unchanged.
+Closing the channel releases local keys, remote sender maps and all watermarks.
+
+The node adapter treats the complete three-field tuple as the channel identity.
+Reopening an active object id is idempotent only when all three values are exact;
+changing `maxSequencedSenders`, like changing either existing limit, fails rather
+than silently reusing a channel with different resource authority.
+
+The closed options tuple therefore becomes
+`{ maxMessageBytes, maxSequencedKeys, maxSequencedSenders }`.
+`maxSequencedKeys` is the per-sender key limit and
+`maxSequencedSenders` is the retained remote-sender limit; both are positive
+safe integers and their aggregate formula above cannot exceed 4,096. Because
+watermarks cannot be evicted without accepting old replay, the sender limit is
+explicitly a lifetime-distinct-remote-sender horizon, not a concurrency count.
+The grid needs one sequenced key per peer and therefore pins
+`{ maxSequencedKeys: 1, maxSequencedSenders: 4_095 }`. A permissionless identity
+fleet can exhaust remote admission at that horizon, as it could exhaust the old
+global table, but it can no longer consume the private local slot; this slice
+does not invent watermark eviction or identity pricing. `stats().sequencedKeys`
+remains the total retained
+local-plus-remote key count, while separate immutable local-key, remote-key and
+remote-sender counts make the resource owner observable. The existing
+`overLimit` counter intentionally remains the aggregate count of rejected
+resource-limit cases. Opus's telemetry P2 is dismissed as non-semantic because
+the signed E1 contract defined that aggregate and no acceptance, authorization
+or delivery decision consumes its subcategory; the new split live counts make
+the starvation-relevant state independently visible.
+
+The grid defects share one missing owner: an object session currently consists
+of an object reference, an object subscription, an ephemeral channel and a
+transient overlay, but those values are replaced independently. Joining a new
+room can therefore leave the old channel as the `undefined` activation sentinel,
+publish movement into the old room and retain callbacks from every previous
+room. The current membership callback also compares the durable object topic
+while the channel uses a private hashed topic. Finally, GossipSub removes a
+disconnected peer from its topic maps without emitting the subscription-change
+event the grid expects, so a departed peer's last overlay can remain visible.
+
+`GridStateManager` becomes the sole application object-session lifecycle owner.
+Replacing the current object first invokes the prior application
+object-mutation disposer and delegates complete durable-room teardown to
+`DRPNode.unsubscribeObject`; that existing node owner closes the ephemeral
+channel, message queue, gossip subscription, sync intervals and room-rendezvous
+producer. It then clears the transient overlay and invalidates callbacks
+captured by the prior session. The node's own object-publication subscription is
+part of the same teardown: `DRPNode.subscribeObject` retains the new
+`DRPObject.subscribe` disposer and `unsubscribeObject` invokes it exactly once.
+No old room therefore remains advertised, subscribed or able to publish after a
+switch.
+
+Session generation is reserved when a create or join request begins, before any
+asynchronous object acquisition. The owner permits one acquisition in flight
+and retains at most one latest pending request; a newer request replaces an
+older pending request rather than extending a promise queue. A superseded
+acquisition result is never installed and is immediately released through the
+same node teardown before the latest request begins. An exact request for the
+already-active object is idempotent and does not reacquire or unsubscribe it.
+An acquisition rejection likewise installs nothing, releases the in-flight
+slot, reports the existing error and starts the latest pending request if one
+exists; failure cannot wedge future create or join actions.
+Only the latest generation installs its object and activates an ephemeral
+channel immediately for that exact object id; the second durable user is not an
+activation precondition. A stale acquisition, callback or late publication
+result from another room cannot install, clear or publish through the current
+room.
+
+The unchanged renderer remains a read-only consumer of the session owner. The
+manager preserves getter-compatible `drpObject`, `gridDRP` and
+`transientPositions` read shapes used by `render.ts`, while all replacement and
+overlay mutation moves behind manager operations. This keeps one lifecycle owner
+without widening GREEN into the renderer or leaving a second writable session
+record.
+
+The real durable-change owner is `DRPObject.subscribe`, not
+`DRPNode.subscribe`: the latter wraps object-store `put` and does not observe
+subsequent local or remote vertex application. `DRPObject.subscribe` therefore
+returns an idempotent disposer which removes that exact callback, and its
+`IDRPObject` contract exposes the same return. The grid registers one
+generation-fenced object-mutation callback through the session owner, passing a
+render notifier from `index.ts` so `state.ts` never imports `render.ts`. It
+deletes the ineffective object-store callback, the raw message-queue callback
+and the durable-topic group-peer-change callback; periodic session reconciliation
+is the only overlay-membership owner. Durable rendering now follows authenticated
+object application rather than every raw queue delivery, with no second observer
+or import cycle. The node also consumes the same disposer for its genuine
+publication observer; one API owns callback removal for both consumers instead
+of leaving an internal node subscription behind after `unsubscribeObject`.
+
+Membership is a transport fact, not a second authorization oracle. The private
+ephemeral port supplies a detached snapshot of currently authorized subscribed
+peers, and the channel exposes that read-only snapshot beside its existing
+methods. The node adapter derives it from the exact hashed channel topic plus
+the current object's writer predicate; callers cannot provide a topic or peer
+list. The controlled transport supplies the same fact and a real close hook.
+`GridStateManager.reconcileEphemeralSession()` is the sole reconciliation
+operation. It synchronously removes visible remote overlays absent from the
+active channel's detached peer snapshot, retains the authenticated local
+overlay and reports whether rendering is needed. The product's bounded periodic
+tick and the focused unit test call that same method directly; the RED never
+sleeps and GREEN adds no test-only hook. The product owns exactly one
+application-lifetime interval using the existing configured
+`env.renderInfoInterval`: each tick refreshes the information view, reconciles
+the active ephemeral session and renders only when reconciliation changed the
+visible overlay. No room or session owns another timer. The interval is cleared
+on application teardown, while room replacement relies only on the generation
+fence and immediate overlay clear, so an old-room timer cannot survive. This
+covers both explicit unsubscribe and connection-loss removal without depending
+on a GossipSub presentation event. Room replacement still clears all overlay
+state immediately. Movement does not install an optimistic local sample: it
+retains the previous accepted overlay and uses one generation-bound movement
+drain. At most one publication is in flight; inputs arriving meanwhile
+accumulate into one bounded pending `{dx, dy}` displacement rather than an
+unbounded promise or command queue. After the in-flight result settles, `true`
+commits that exact published absolute position locally and invokes the injected
+render notifier so the mover observes the accepted sample without waiting for
+an echo; `false` leaves the prior accepted position unchanged and does not
+render a rejected sample. When no accepted overlay exists, the active durable
+user position is the movement base. On either publication outcome, the next
+pending displacement uses the current accepted overlay when one exists and only
+falls back to the durable position when no accepted overlay exists; rejection
+never rebases or teleports an already accepted transient position. A completion
+from a superseded room is inert and room replacement clears both the in-flight
+generation and pending displacement.
+
+The tests-only RED may edit only
+`tests/zero-durable-vertices.test.ts`,
+`tests/fixtures/track-e1-ephemeral/controlled-transport.ts` and
+`examples/grid/e2e/grid-modular.spec.ts`, plus the existing node lifecycle owner
+`packages/node/tests/sync-lockup/queue-lockup.test.ts`. It must fail on the
+signed D.93.44 production tree while proving:
+
+- one authorized sender exhausting its own keys cannot block a local key or a
+  second admitted sender, while per-sender and sender-count overflow remain
+  bounded and fail closed;
+- reopening one active object with the exact three-limit tuple is idempotent,
+  while changing only `maxSequencedSenders` fails instead of reusing the channel;
+- close releases both registry levels and invokes the transport close hook;
+- current authorized-peer snapshots are detached and track controlled
+  disconnect/reconnect;
+- replacing a grid object closes the old channel, disposes its application
+  callback, invokes complete node unsubscribe including the node's own object
+  callback, clears overlays and permits the new room to activate even before its
+  second durable user arrives;
+- a slow earlier acquisition followed by a newer request cannot install the old
+  room last; one in-flight plus one latest pending acquisition remains bounded,
+  every superseded result is unsubscribed without touching the active room, and
+  a rejected acquisition releases the slot and advances the latest pending
+  request;
+- node subscribe/unsubscribe invokes its retained object disposer exactly once,
+  remains idempotent on repeated teardown and permits a clean re-subscription;
+- stale room callbacks and late publication results cannot mutate the new
+  session, and disconnected remote overlays disappear on reconciliation; and
+- overlapping movement inputs preserve cumulative accepted displacement across
+  success/success, success/failure, failure/success and failure/failure
+  transport outcomes while retaining only one in-flight publication plus one
+  bounded displacement; accepted local movement renders immediately, rejected
+  movement never renders an unaccepted sample, and the no-overlay base is the
+  durable position; and
+- the real browser product replaces one live room in-session, moves only in the
+  replacement room, renders an accepted move on both the mover's own page and a
+  remote page, and removes a disconnected old-room overlay; and
+- all existing frame, queue, replay, authorization, durable-vertex and
+  controlled-node cases retain their classifications.
+
+GREEN may edit only `packages/ephemeral/src/index.ts`,
+`packages/node/src/ephemeral.ts`, `packages/node/src/index.ts`,
+`packages/types/src/object.ts`,
+`packages/object/src/index.ts`, `examples/grid/src/index.ts` and
+`examples/grid/src/state.ts`, plus the public contract mirror at
+`specs/object/README.md`. The README change records only the durable subscription
+principle and disposer return: it also corrects the obsolete statement that
+authenticated remote `applyVertices` never notifies subscribers, because the
+shared applier already notifies after graph commit. Implementation inventories
+remain owned by code.
+GREEN must replace the shared table and independent grid fields in place; no
+compatibility option, second channel implementation, test hook, raw network
+handle, caller-selected topic, TTL approximation or alternate movement bus is
+authorized. No dependency, lockfile, durable Grid object, render, ACL, network
+or protocol path changes are needed.
+
+Acceptance requires the corrected focused Track E1 owner, the existing real-node
+authority rows, the node object-subscription capacity/lifecycle owner, the
+modular two-client Playwright golden-path row, the retained Phase 3b preservation
+set, package/node/grid typecheck and build, public-export smoke, targeted ESLint,
+Prettier, diff-check and frozen-lockfile installation.
+The Playwright row must perform an in-session room replacement and prove that
+movement, overlays and disconnect reconciliation are bound only to the new room;
+owner-level state tests alone are not sufficient evidence that the product
+wiring consumes the lifecycle owner correctly.
+Add one manual saturation probe proving remote-key exhaustion cannot suppress a
+local publication. The ordinary gate remains below ten minutes under normal
+uncontended load. The plan, RED, GREEN and corrective closure are separate
+Good-Faolain-signed commits with authenticated remote tips and preserved stashes,
+recovery refs and protected untracked files.
+
+Review uses the normal requested Kimi 100-step, Grok, Codex and Opus xhigh
+rounds. A full RED or GREEN packet receives fifteen minutes, extended to twenty
+while the reviewer is making relevant source-review progress; a narrow delta
+receives eight minutes, extended to twelve with progress. Status is recorded at
+five-minute boundaries. `NO_VERDICT` is neither approval nor an automatic
+blocker, while every substantive P0-P2 is reproduced and resolved or explicitly
+dismissed with source evidence before signing.
+
+The completed extended D.93.44 reviews were: Kimi `PASS` with no P0/P1 and
+cleanup-only P2 observations; Grok `NO_VERDICT` after repeated CLI bridge exits
+before source review; Codex two reproduced P2 grid-session findings; and Opus
+one reproduced P1 shared-budget starvation plus the room-switch, overlay-cleanup
+and handler-lifecycle P2 findings above. Opus's aggregate-telemetry observation
+is dismissed for the bounded reason above. This amendment closes only those
+post-E1 findings and then returns immediately to the P6 two-client golden path.
+
+The D.93.45 plan review used the agreed bounded windows. Kimi's 100-step review
+returned `PASS` with two P2 clarifications: construct a real disposer from an
+existing unsubscribe owner and add product-level room-switch evidence. Grok
+session `01a00e06-9192-77f3-a1fe-1ac47ed71f16` and Codex session
+`01a00e11-17e4-70e2-82c0-708a3dd27d0c` independently returned
+`CHANGES_REQUIRED` on the same two P1s: the Playwright file was outside RED
+scope, and object-store `put` callbacks could not replace the raw queue observer
+for durable merges. Opus xhigh session `1e383417-e6cf-464c-b3fd-5744bcffeed9`
+confirmed the Playwright P1, added the lifetime-sender-horizon P1 and identified
+the object-interface, import-cycle, aggregate-bound, activation-trigger and
+optimistic-rollback P2s. Source reproduction resolved them by authorizing the
+Playwright RED, pinning one aggregate 4,096-entry lifetime allocation, making
+the genuine `DRPObject` mutation observer disposable, injecting rendering from
+`index.ts`, naming the direct reconciliation owner, activating every installed
+session immediately and committing movement only after accepted publication.
+No reviewer found an authorization, replay or durable-state reason to retain the
+shared registry or the stale callbacks.
+
+Codex delta session `01a00e2f-0ea3-75a3-a617-d25e95cbc478` then found one
+same-session publication race: two overlapping inputs could compute from the
+same accepted position and discard an accepted earlier result. The bounded
+generation-owned movement drain above closes it without an unbounded queue;
+the causal RED covers all four two-result success/failure combinations. Kimi's
+subsequent 100-step delta session
+`session_b167ffac-aa4b-4161-b7c0-0e90de16e9d6` returned `PASS` on the then-current
+packet. Grok delta session `01a00e26-ab4e-7872-86a0-152141b562e4` first returned
+a placeholder without source review and then produced no substantive output
+within the agreed eight-minute window; it is recorded as `NO_VERDICT`, not an
+approval and not a finding.
+
+Opus xhigh delta session `9e7b3149-a24f-4ebe-93dd-333e2002c335` reproduced one
+remaining P1: accepted movement updated the local overlay without any specified
+render trigger, while the browser evidence observed only the remote page. It
+also identified three P2 contract gaps: reopen identity omitted the new sender
+limit, the reconciliation cadence and teardown were unpinned, and the public
+object README still promised a `void` subscription result. Source inspection
+confirmed each finding. The final plan therefore makes accepted publication
+invoke the injected notifier, requires own-page and remote-page browser
+observation, compares the complete three-limit tuple, owns one application timer
+with explicit teardown, and includes the durable public contract mirror in the
+GREEN scope. The same correction also pins the durable base for an absent local
+overlay and adds the missing failure/failure movement row. These are closures of
+the existing owner contract, not new compatibility paths or alternate observers.
+
+The final Kimi delta session
+`session_dc5adbe5-1bcf-470f-83c7-9b508441d97c` returned `PASS` with no P0/P1.
+Its actionable P2 was the same stale README claim that remote application does
+not notify subscribers; the explicit durable-principle correction above closes
+it. Its naming observation is resolved by consuming the existing `env` owner
+rather than reading `import.meta.env` again. Its teardown observation is retained
+as cleanup discipline: no acceptance or authorization decision depends on a
+`beforeunload` callback running, while explicit interval cleanup keeps embedded
+and fake-timer lifecycles bounded.
+
+Final Codex session `01a00e48-0ff7-74f2-9749-8595773866ff` reproduced two P2
+lifecycle omissions. Local channel/disposer cleanup alone left the node's old
+gossip subscription, message queue, sync intervals, rendezvous producer and
+publication callback alive, and the generation was previously reserved only
+after asynchronous acquisition, allowing a slow old join to install last. The
+corrected contract delegates every old-room resource to
+`DRPNode.unsubscribeObject`, makes the node retain and invoke its own object
+disposer, and reserves generation before acquisition with one in-flight plus one
+latest pending request. The existing node lifecycle test is now in RED scope and
+the node owner is in GREEN scope; no grid-local teardown duplicate is introduced.
+
+Final Opus xhigh session `aa10de81-5acb-4004-a337-c6425cd33891` returned `PASS`
+with no P0/P1 but withheld ready-to-sign on five P2 precision gaps. The final
+wording now keeps the accepted overlay as the movement base across rejection,
+releases and advances the bounded acquisition owner after failure, adds causal
+RED rows for the sender-limit identity and node disposer, explicitly deletes the
+obsolete group-peer-change overlay callback, and preserves the unchanged
+renderer through getter-compatible read views. Every mutation remains owned by
+`GridStateManager`; no renderer change, fallback channel or second session record
+was added.
