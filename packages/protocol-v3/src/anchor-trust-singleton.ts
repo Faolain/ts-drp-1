@@ -4,8 +4,10 @@ const anchorTrustApi = createAnchorTrustApi();
 
 export const {
 	authenticateCurrentEpochAnchor,
+	installCertifiedAnchorTrustRoot,
 	installCreatorAnchorTrustRoot,
 	isAnchorTrustStateRecordBytes,
+	openCertifiedAnchorTrust,
 	openCurrentAnchorTrust,
 	openCurrentEpochAuthorAuthorization,
 	resolveCurrentEpochAuthorizedAuthor,

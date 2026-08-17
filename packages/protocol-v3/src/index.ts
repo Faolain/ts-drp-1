@@ -107,6 +107,76 @@ export interface CurrentAnchorTrust {
 	readonly profileId: "creator-trusted-v1";
 }
 
+export interface CertifiedAnchorTrust {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: 0;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+	readonly profileId: "attested-bft-v1" | "delegated-trusted-v1";
+	readonly quorum: number;
+	readonly signerCount: number;
+}
+
+export interface InstallCertifiedAnchorTrustRootInput {
+	readonly exactCanonicalCertifiedGenesisCertificateBytes: Uint8Array;
+	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type InstallCertifiedAnchorTrustRootFailureReason =
+	| "malformed-input"
+	| "anchor-decode-failed"
+	| "noncanonical-anchor"
+	| "anchor-schema-invalid"
+	| "inactive-crypto-suite"
+	| "not-genesis-anchor"
+	| "object-id-invalid"
+	| "object-id-too-long"
+	| "genesis-pin-mismatch"
+	| "profile-digest-mismatch"
+	| "signer-set-digest-mismatch"
+	| "unsupported-trust-profile"
+	| "signer-set-profile-mismatch"
+	| "invalid-quorum"
+	| "too-many-signers"
+	| "signer-id-too-long"
+	| "certificate-decode-failed"
+	| "noncanonical-certificate"
+	| "certificate-schema-invalid"
+	| "certificate-binding-mismatch"
+	| "certificate-signer-mismatch"
+	| "invalid-signature"
+	| "trust-state-too-large";
+
+export type InstallCertifiedAnchorTrustRootResult =
+	| { readonly ok: false; readonly reason: InstallCertifiedAnchorTrustRootFailureReason }
+	| {
+			readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+			readonly ok: true;
+			readonly trust: CertifiedAnchorTrust;
+	  };
+
+export interface OpenCertifiedAnchorTrustInput {
+	readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+	readonly expectedObjectId: string;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type OpenCertifiedAnchorTrustFailureReason =
+	| InstallCertifiedAnchorTrustRootFailureReason
+	| "record-decode-failed"
+	| "noncanonical-record"
+	| "record-schema-invalid"
+	| "unsupported-trust-state-version"
+	| "object-id-mismatch"
+	| "trust-state-inconsistent";
+
+export type OpenCertifiedAnchorTrustResult =
+	| { readonly ok: false; readonly reason: OpenCertifiedAnchorTrustFailureReason }
+	| { readonly ok: true; readonly trust: CertifiedAnchorTrust };
+
 export interface InstallCreatorAnchorTrustRootInput {
 	readonly detachedGenesisSignature: Uint8Array;
 	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
@@ -256,14 +326,23 @@ interface AnchorTrustPrivateState {
 	readonly signerSetDigest: string;
 }
 
+interface CertifiedAnchorTrustPrivateState {
+	readonly exactCanonicalCertifiedGenesisCertificateBytes: Uint8Array;
+	readonly exactCanonicalCurrentAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+}
+
 interface CurrentEpochAuthorAuthorizationPrivateState {
 	readonly authors: ReadonlySet<string>;
 }
 
 interface AnchorTrustApi {
 	authenticateCurrentEpochAnchor(input: AuthenticateCurrentEpochAnchorInput): AuthenticateCurrentEpochAnchorResult;
+	installCertifiedAnchorTrustRoot(input: InstallCertifiedAnchorTrustRootInput): InstallCertifiedAnchorTrustRootResult;
 	installCreatorAnchorTrustRoot(input: InstallCreatorAnchorTrustRootInput): InstallCreatorAnchorTrustRootResult;
 	isAnchorTrustStateRecordBytes(bytes: Uint8Array): boolean;
+	openCertifiedAnchorTrust(input: OpenCertifiedAnchorTrustInput): OpenCertifiedAnchorTrustResult;
 	openCurrentEpochAuthorAuthorization(
 		input: OpenCurrentEpochAuthorAuthorizationInput
 	): OpenCurrentEpochAuthorAuthorizationResult;
@@ -277,7 +356,14 @@ const ANCHOR_DIGEST_DOMAIN = "ts-drp/epoch-anchor/v3";
 const PROFILE_DIGEST_DOMAIN = "ts-drp/profile/v3";
 const SIGNER_SET_DIGEST_DOMAIN = "ts-drp/signer-set/v3";
 const ACTIVE_ANCHOR_SUITE = "ed25519-sha256-v3";
+const ACTIVE_CERTIFIED_PROFILE_SUITE = "ed25519-seal-v3";
 const CREATOR_PROFILE = "creator-trusted-v1";
+const CERTIFIED_CERTIFICATE_KIND = "drp-certified-genesis-certificate";
+const CERTIFIED_TRUST_STATE_KIND = "drp-certified-anchor-trust-state";
+const CERTIFIED_TRUST_STATE_VERSION = 1;
+const MAXIMUM_CERTIFIED_OBJECT_ID_BYTES = 1024;
+const MAXIMUM_CERTIFIED_SIGNER_ID_BYTES = 64;
+const MAXIMUM_CERTIFIED_SIGNERS = 8;
 const AUTHOR_AUTHORIZATION_DOMAIN = "ts-drp/author-authorization/v3";
 const AUTHOR_AUTHORIZATION_KIND = "drp-author-authorization";
 const AUTHOR_AUTHORIZATION_PROFILE = "creator-author-authorization-v1";
@@ -292,6 +378,19 @@ const ANCHOR_TRUST_INPUT_KEYS = [
 	"exactCanonicalSignerSetBytes",
 	"pinnedGenesisAnchorDigest",
 ] as const;
+const CERTIFIED_ANCHOR_TRUST_INPUT_KEYS = [
+	"exactCanonicalCertifiedGenesisCertificateBytes",
+	"exactCanonicalGenesisAnchorPreimageBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+	"pinnedGenesisAnchorDigest",
+] as const;
+const CERTIFIED_ANCHOR_TRUST_BYTE_KEYS = new Set([
+	"exactCanonicalCertifiedGenesisCertificateBytes",
+	"exactCanonicalGenesisAnchorPreimageBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+]);
 const OPEN_TRUST_INPUT_KEYS = [
 	"exactCanonicalTrustStateRecordBytes",
 	"expectedObjectId",
@@ -351,6 +450,32 @@ const TRUST_RECORD_KEYS = [
 	"quorum",
 	"version",
 ] as const;
+const CERTIFIED_TRUST_RECORD_KEYS = [
+	"currentAnchorDigest",
+	"currentEpoch",
+	"exactCanonicalCertifiedGenesisCertificateBytes",
+	"exactCanonicalCurrentAnchorPreimageBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+	"genesisAnchorDigest",
+	"kind",
+	"objectId",
+	"profileId",
+	"quorum",
+	"signerCount",
+	"version",
+] as const;
+const CERTIFIED_PROFILE_KEYS = ["cryptoSuiteId", "profileId", "quorum", "signers"] as const;
+const CERTIFIED_SIGNER_KEYS = ["publicKey", "signerId"] as const;
+const CERTIFIED_CERTIFICATE_KEYS = [
+	"genesisAnchorDigest",
+	"kind",
+	"profileDigest",
+	"signatures",
+	"signerSetDigest",
+	"version",
+] as const;
+const CERTIFIED_SIGNATURE_KEYS = ["publicKey", "signature", "signerId"] as const;
 
 type DecodeResult =
 	| { readonly ok: true; readonly value: unknown }
@@ -720,12 +845,254 @@ function trustRecordShape(value: unknown): value is TrustStateRecord {
 	);
 }
 
+type CertifiedProfileId = "attested-bft-v1" | "delegated-trusted-v1";
+
+interface CertifiedSignerCarrier {
+	readonly publicKey: string;
+	readonly publicKeyBytes: Uint8Array;
+	readonly signerId: string;
+}
+
+interface ValidatedCertifiedMaterial {
+	readonly anchorBytes: Uint8Array;
+	readonly anchorDigest: string;
+	readonly certificateBytes: Uint8Array;
+	readonly objectId: string;
+	readonly profileBytes: Uint8Array;
+	readonly profileId: CertifiedProfileId;
+	readonly quorum: number;
+	readonly signerCount: number;
+	readonly signerSetBytes: Uint8Array;
+}
+
+type CertifiedMaterialValidation =
+	| Readonly<{ ok: false; reason: InstallCertifiedAnchorTrustRootFailureReason }>
+	| Readonly<{ material: ValidatedCertifiedMaterial; ok: true }>;
+
+function utf8ByteLength(value: string): number {
+	return new TextEncoder().encode(value).byteLength;
+}
+
+function isCertifiedProfileId(value: unknown): value is CertifiedProfileId {
+	return value === "attested-bft-v1" || value === "delegated-trusted-v1";
+}
+
+function compareSignerIds(left: string, right: string): number {
+	return compareBytes(new TextEncoder().encode(left), new TextEncoder().encode(right));
+}
+
+function validateCertifiedMaterial(values: Readonly<Record<string, unknown>>): CertifiedMaterialValidation {
+	const certificateBytes = values.exactCanonicalCertifiedGenesisCertificateBytes as Uint8Array;
+	const anchorBytes = values.exactCanonicalGenesisAnchorPreimageBytes as Uint8Array;
+	const profileBytes = values.exactCanonicalProfileBytes as Uint8Array;
+	const signerSetBytes = values.exactCanonicalSignerSetBytes as Uint8Array;
+	if (
+		certificateBytes.byteLength === 0 ||
+		anchorBytes.byteLength === 0 ||
+		profileBytes.byteLength === 0 ||
+		signerSetBytes.byteLength === 0 ||
+		typeof values.pinnedGenesisAnchorDigest !== "string" ||
+		!DIGEST_HEX.test(values.pinnedGenesisAnchorDigest)
+	) {
+		return anchorTrustFailure("malformed-input");
+	}
+
+	const anchorDecoded = decodeExact(anchorBytes);
+	if (!anchorDecoded.ok) {
+		return anchorTrustFailure(anchorDecoded.reason === "noncanonical" ? "noncanonical-anchor" : "anchor-decode-failed");
+	}
+	if (!isAnchorRecord(anchorDecoded.value)) return anchorTrustFailure("anchor-schema-invalid");
+	const anchor = anchorDecoded.value;
+	if (anchor.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE) return anchorTrustFailure("inactive-crypto-suite");
+	if (
+		anchor.epoch !== 0 ||
+		anchor.historySize !== 0 ||
+		anchor.previousAnchor !== ZERO_DIGEST ||
+		anchor.cutDigest !== ZERO_DIGEST
+	) {
+		return anchorTrustFailure("not-genesis-anchor");
+	}
+	if (!isStorageObjectIdText(anchor.objectId)) return anchorTrustFailure("object-id-invalid");
+	if (utf8ByteLength(anchor.objectId) > MAXIMUM_CERTIFIED_OBJECT_ID_BYTES) {
+		return anchorTrustFailure("object-id-too-long");
+	}
+	const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+	const anchorDigest = bytesToHex(anchorDigestBytes);
+	if (anchorDigest !== values.pinnedGenesisAnchorDigest) return anchorTrustFailure("genesis-pin-mismatch");
+	if (bytesToHex(hashDomain(PROFILE_DIGEST_DOMAIN, profileBytes)) !== anchor.profileDigest) {
+		return anchorTrustFailure("profile-digest-mismatch");
+	}
+	if (bytesToHex(hashDomain(SIGNER_SET_DIGEST_DOMAIN, signerSetBytes)) !== anchor.signerSetDigest) {
+		return anchorTrustFailure("signer-set-digest-mismatch");
+	}
+
+	const profileDecoded = decodeExact(profileBytes);
+	const signerSetDecoded = decodeExact(signerSetBytes);
+	const decodedProfileValue = profileDecoded.ok ? profileDecoded.value : undefined;
+	if (
+		!profileDecoded.ok ||
+		!signerSetDecoded.ok ||
+		!isClosedDataRecord(profileDecoded.value, CERTIFIED_PROFILE_KEYS) ||
+		profileDecoded.value.cryptoSuiteId !== ACTIVE_CERTIFIED_PROFILE_SUITE ||
+		!isCertifiedProfileId(profileDecoded.value.profileId) ||
+		!isSafeNonnegative(profileDecoded.value.quorum) ||
+		!Array.isArray(profileDecoded.value.signers) ||
+		!Array.isArray(signerSetDecoded.value)
+	) {
+		return anchorTrustFailure(
+			isClosedDataRecord(decodedProfileValue, CERTIFIED_PROFILE_KEYS) &&
+				typeof decodedProfileValue.profileId === "string" &&
+				!isCertifiedProfileId(decodedProfileValue.profileId)
+				? "unsupported-trust-profile"
+				: "signer-set-profile-mismatch"
+		);
+	}
+	let encodedProfileSigners: Uint8Array;
+	try {
+		encodedProfileSigners = encodeCanonical(profileDecoded.value.signers);
+	} catch {
+		return anchorTrustFailure("signer-set-profile-mismatch");
+	}
+	if (!equalBytes(encodedProfileSigners, signerSetBytes)) {
+		return anchorTrustFailure("signer-set-profile-mismatch");
+	}
+	const signerCount = signerSetDecoded.value.length;
+	if (signerCount > MAXIMUM_CERTIFIED_SIGNERS) return anchorTrustFailure("too-many-signers");
+	const profileId = profileDecoded.value.profileId;
+	const quorum = profileDecoded.value.quorum;
+	if (
+		(profileId === "delegated-trusted-v1" && (signerCount < 2 || quorum < 2 || quorum > signerCount)) ||
+		(profileId === "attested-bft-v1" &&
+			(signerCount < 4 || signerCount > 8 || quorum !== Math.ceil((2 * signerCount) / 3)))
+	) {
+		return anchorTrustFailure("invalid-quorum");
+	}
+
+	const signers: CertifiedSignerCarrier[] = [];
+	const signerIds = new Set<string>();
+	const publicKeys = new Set<string>();
+	for (const value of signerSetDecoded.value) {
+		if (!isClosedDataRecord(value, CERTIFIED_SIGNER_KEYS)) {
+			return anchorTrustFailure("signer-set-profile-mismatch");
+		}
+		if (typeof value.signerId === "string" && utf8ByteLength(value.signerId) > MAXIMUM_CERTIFIED_SIGNER_ID_BYTES) {
+			return anchorTrustFailure("signer-id-too-long");
+		}
+		if (!isSignerId(value.signerId) || typeof value.publicKey !== "string" || !PUBLIC_KEY_HEX.test(value.publicKey)) {
+			return anchorTrustFailure("signer-set-profile-mismatch");
+		}
+		if (signerIds.has(value.signerId) || publicKeys.has(value.publicKey)) {
+			return anchorTrustFailure("signer-set-profile-mismatch");
+		}
+		signerIds.add(value.signerId);
+		publicKeys.add(value.publicKey);
+		signers.push({
+			publicKey: value.publicKey,
+			publicKeyBytes: decodeHexBytes(value.publicKey),
+			signerId: value.signerId,
+		});
+	}
+	for (let index = 1; index < signers.length; index++) {
+		if (compareSignerIds(signers[index - 1].signerId, signers[index].signerId) >= 0) {
+			return anchorTrustFailure("signer-set-profile-mismatch");
+		}
+	}
+
+	const certificateDecoded = decodeExact(certificateBytes);
+	if (!certificateDecoded.ok) {
+		return anchorTrustFailure(
+			certificateDecoded.reason === "noncanonical" ? "noncanonical-certificate" : "certificate-decode-failed"
+		);
+	}
+	if (!isClosedDataRecord(certificateDecoded.value, CERTIFIED_CERTIFICATE_KEYS)) {
+		return anchorTrustFailure("certificate-schema-invalid");
+	}
+	const certificate = certificateDecoded.value;
+	if (
+		certificate.kind !== CERTIFIED_CERTIFICATE_KIND ||
+		certificate.version !== 1 ||
+		typeof certificate.genesisAnchorDigest !== "string" ||
+		typeof certificate.profileDigest !== "string" ||
+		typeof certificate.signerSetDigest !== "string" ||
+		!Array.isArray(certificate.signatures)
+	) {
+		return anchorTrustFailure("certificate-schema-invalid");
+	}
+	if (
+		certificate.genesisAnchorDigest !== anchorDigest ||
+		certificate.profileDigest !== anchor.profileDigest ||
+		certificate.signerSetDigest !== anchor.signerSetDigest
+	) {
+		return anchorTrustFailure("certificate-binding-mismatch");
+	}
+	if (certificate.signatures.length !== signers.length) {
+		return anchorTrustFailure("certificate-signer-mismatch");
+	}
+	for (let index = 0; index < signers.length; index++) {
+		const signature = certificate.signatures[index];
+		const signer = signers[index];
+		if (
+			!isClosedDataRecord(signature, CERTIFIED_SIGNATURE_KEYS) ||
+			signature.signerId !== signer.signerId ||
+			signature.publicKey !== signer.publicKey ||
+			!(signature.signature instanceof Uint8Array) ||
+			hasSharedBacking(signature.signature)
+		) {
+			return anchorTrustFailure("certificate-signer-mismatch");
+		}
+		if (!verifyStrictSignature(signature.signature, anchorDigestBytes, signer.publicKeyBytes)) {
+			return anchorTrustFailure("invalid-signature");
+		}
+	}
+
+	return Object.freeze({
+		material: Object.freeze({
+			anchorBytes: new Uint8Array(anchorBytes),
+			anchorDigest,
+			certificateBytes: new Uint8Array(certificateBytes),
+			objectId: anchor.objectId,
+			profileBytes: new Uint8Array(profileBytes),
+			profileId,
+			quorum,
+			signerCount,
+			signerSetBytes: new Uint8Array(signerSetBytes),
+		}),
+		ok: true as const,
+	});
+}
+
+function mintCertifiedAnchorTrust(
+	registry: WeakMap<CertifiedAnchorTrust, CertifiedAnchorTrustPrivateState>,
+	material: ValidatedCertifiedMaterial
+): CertifiedAnchorTrust {
+	const trust = Object.freeze({
+		currentAnchorDigest: material.anchorDigest,
+		currentEpoch: 0 as const,
+		genesisAnchorDigest: material.anchorDigest,
+		objectId: material.objectId,
+		profileId: material.profileId,
+		quorum: material.quorum,
+		signerCount: material.signerCount,
+	});
+	registry.set(
+		trust,
+		Object.freeze({
+			exactCanonicalCertifiedGenesisCertificateBytes: new Uint8Array(material.certificateBytes),
+			exactCanonicalCurrentAnchorPreimageBytes: new Uint8Array(material.anchorBytes),
+			exactCanonicalProfileBytes: new Uint8Array(material.profileBytes),
+			exactCanonicalSignerSetBytes: new Uint8Array(material.signerSetBytes),
+		})
+	);
+	return trust;
+}
+
 /**
  * Creates one public-module-scoped creator trust capability registry.
  * @returns The pure creator trust API bound to that private registry.
  */
 export function createAnchorTrustApi(): AnchorTrustApi {
 	const registry = new WeakMap<CurrentAnchorTrust, AnchorTrustPrivateState>();
+	const certifiedRegistry = new WeakMap<CertifiedAnchorTrust, CertifiedAnchorTrustPrivateState>();
 	const authorizationRegistry = new WeakMap<
 		CurrentEpochAuthorAuthorization,
 		CurrentEpochAuthorAuthorizationPrivateState
@@ -748,6 +1115,115 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 			);
 		} catch {
 			return false;
+		}
+	};
+
+	const installCertifiedAnchorTrustRoot = (
+		input: InstallCertifiedAnchorTrustRootInput
+	): InstallCertifiedAnchorTrustRootResult => {
+		try {
+			const values = snapshotClosedInput(input, CERTIFIED_ANCHOR_TRUST_INPUT_KEYS, CERTIFIED_ANCHOR_TRUST_BYTE_KEYS);
+			if (values === undefined) return anchorTrustFailure("malformed-input");
+			const validation = validateCertifiedMaterial(values);
+			if (!validation.ok) return validation;
+			const material = validation.material;
+			const recordBytes = encodeCanonical({
+				currentAnchorDigest: material.anchorDigest,
+				currentEpoch: 0,
+				exactCanonicalCertifiedGenesisCertificateBytes: material.certificateBytes,
+				exactCanonicalCurrentAnchorPreimageBytes: material.anchorBytes,
+				exactCanonicalProfileBytes: material.profileBytes,
+				exactCanonicalSignerSetBytes: material.signerSetBytes,
+				genesisAnchorDigest: material.anchorDigest,
+				kind: CERTIFIED_TRUST_STATE_KIND,
+				objectId: material.objectId,
+				profileId: material.profileId,
+				quorum: material.quorum,
+				signerCount: material.signerCount,
+				version: CERTIFIED_TRUST_STATE_VERSION,
+			});
+			if (recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("trust-state-too-large");
+			}
+			const trust = mintCertifiedAnchorTrust(certifiedRegistry, material);
+			return Object.freeze({
+				exactCanonicalTrustStateRecordBytes: new Uint8Array(recordBytes),
+				ok: true as const,
+				trust,
+			});
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const openCertifiedAnchorTrust = (input: OpenCertifiedAnchorTrustInput): OpenCertifiedAnchorTrustResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				OPEN_TRUST_INPUT_KEYS,
+				new Set(["exactCanonicalTrustStateRecordBytes"])
+			);
+			if (
+				values === undefined ||
+				!isStorageObjectIdText(values.expectedObjectId) ||
+				typeof values.pinnedGenesisAnchorDigest !== "string" ||
+				!DIGEST_HEX.test(values.pinnedGenesisAnchorDigest)
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const recordBytes = values.exactCanonicalTrustStateRecordBytes as Uint8Array;
+			if (recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("trust-state-too-large");
+			}
+			if (recordBytes.byteLength === 0) return anchorTrustFailure("malformed-input");
+			const decoded = decodeExact(recordBytes);
+			if (!decoded.ok) {
+				return anchorTrustFailure(decoded.reason === "noncanonical" ? "noncanonical-record" : "record-decode-failed");
+			}
+			if (!isClosedDataRecord(decoded.value, CERTIFIED_TRUST_RECORD_KEYS)) {
+				return anchorTrustFailure("record-schema-invalid");
+			}
+			const record = decoded.value;
+			if (record.kind !== CERTIFIED_TRUST_STATE_KIND) return anchorTrustFailure("record-schema-invalid");
+			if (record.version !== CERTIFIED_TRUST_STATE_VERSION) {
+				return anchorTrustFailure("unsupported-trust-state-version");
+			}
+			if (record.objectId !== values.expectedObjectId) return anchorTrustFailure("object-id-mismatch");
+			if (record.genesisAnchorDigest !== values.pinnedGenesisAnchorDigest) {
+				return anchorTrustFailure("genesis-pin-mismatch");
+			}
+			if (
+				!(record.exactCanonicalCertifiedGenesisCertificateBytes instanceof Uint8Array) ||
+				!(record.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+				!(record.exactCanonicalProfileBytes instanceof Uint8Array) ||
+				!(record.exactCanonicalSignerSetBytes instanceof Uint8Array)
+			) {
+				return anchorTrustFailure("record-schema-invalid");
+			}
+			const validation = validateCertifiedMaterial({
+				exactCanonicalCertifiedGenesisCertificateBytes: record.exactCanonicalCertifiedGenesisCertificateBytes,
+				exactCanonicalGenesisAnchorPreimageBytes: record.exactCanonicalCurrentAnchorPreimageBytes,
+				exactCanonicalProfileBytes: record.exactCanonicalProfileBytes,
+				exactCanonicalSignerSetBytes: record.exactCanonicalSignerSetBytes,
+				pinnedGenesisAnchorDigest: record.genesisAnchorDigest,
+			});
+			if (!validation.ok) return anchorTrustFailure("trust-state-inconsistent");
+			const material = validation.material;
+			if (
+				record.currentAnchorDigest !== material.anchorDigest ||
+				record.currentEpoch !== 0 ||
+				record.genesisAnchorDigest !== material.anchorDigest ||
+				record.objectId !== material.objectId ||
+				record.profileId !== material.profileId ||
+				record.quorum !== material.quorum ||
+				record.signerCount !== material.signerCount
+			) {
+				return anchorTrustFailure("trust-state-inconsistent");
+			}
+			const trust = mintCertifiedAnchorTrust(certifiedRegistry, material);
+			return Object.freeze({ ok: true as const, trust });
+		} catch {
+			return anchorTrustFailure("malformed-input");
 		}
 	};
 
@@ -1131,8 +1607,10 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 
 	return Object.freeze({
 		authenticateCurrentEpochAnchor,
+		installCertifiedAnchorTrustRoot,
 		installCreatorAnchorTrustRoot,
 		isAnchorTrustStateRecordBytes,
+		openCertifiedAnchorTrust,
 		openCurrentEpochAuthorAuthorization,
 		openCurrentAnchorTrust,
 		resolveCurrentEpochAuthorizedAuthor,

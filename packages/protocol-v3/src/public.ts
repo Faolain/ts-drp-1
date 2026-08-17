@@ -1,7 +1,9 @@
 import {
 	authenticateCurrentEpochAnchor,
+	installCertifiedAnchorTrustRoot,
 	installCreatorAnchorTrustRoot,
 	isAnchorTrustStateRecordBytes,
+	openCertifiedAnchorTrust,
 	openCurrentAnchorTrust,
 } from "./anchor-trust-singleton.js";
 
@@ -16,8 +18,10 @@ export {
 
 export {
 	authenticateCurrentEpochAnchor,
+	installCertifiedAnchorTrustRoot,
 	installCreatorAnchorTrustRoot,
 	isAnchorTrustStateRecordBytes,
+	openCertifiedAnchorTrust,
 	openCurrentAnchorTrust,
 };
 
@@ -32,10 +36,13 @@ export type {
 	BlueprintRuntimePreparationInput,
 	BuildAndSign,
 	CurrentAnchorTrust,
+	CertifiedAnchorTrust,
 	ExtractAdmittedReceivedVertexFailureReason,
 	ExtractAdmittedReceivedVertexResult,
 	InstallCreatorAnchorTrustRootInput,
 	InstallCreatorAnchorTrustRootResult,
+	InstallCertifiedAnchorTrustRootInput,
+	InstallCertifiedAnchorTrustRootResult,
 	IssuanceOutboxEntry,
 	IssueCommit,
 	IssuedVertexRecord,
@@ -43,6 +50,8 @@ export type {
 	LocalVertexInput,
 	OpenCurrentAnchorTrustInput,
 	OpenCurrentAnchorTrustResult,
+	OpenCertifiedAnchorTrustInput,
+	OpenCertifiedAnchorTrustResult,
 	PreparedBlueprintAdmission,
 	PreparedBlueprintRuntime,
 	RawEd25519PublicKey,
