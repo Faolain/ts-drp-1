@@ -72,7 +72,7 @@ export async function sendSyncObject<T extends IDRP>(
 		return;
 	}
 	if (!peerId) {
-		const peers = node.networkNode.getGroupPeers(objectId);
+		const peers = node.networkNode.getGroupPeers(objectId, "mesh");
 		if (peers.length === 0) return;
 		peerId = peers[Math.floor(Math.random() * peers.length)];
 	}

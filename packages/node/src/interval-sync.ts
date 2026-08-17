@@ -160,7 +160,7 @@ export class DRPIntervalSync {
 	 * concentrating each tick on the same lexicographically first peer.
 	 */
 	private nextPeer(): string | undefined {
-		const peers = this.node.networkNode.getGroupPeers(this.id).sort();
+		const peers = this.node.networkNode.getGroupPeers(this.id, "mesh").sort();
 		if (peers.length === 0) return undefined;
 
 		this.peerCursor ??= Math.floor(Math.random() * peers.length);

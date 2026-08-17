@@ -17,12 +17,13 @@ import {
 } from "@ts-drp/relay-policy";
 import type { RendezvousEnsembleTrace } from "@ts-drp/rendezvous";
 import type { BrowserRoutingTrace } from "@ts-drp/routing-browser";
-import type { ControlPlaneEvent, DRPNodeConfig } from "@ts-drp/types";
+import type { ControlPlaneEvent, DRPConnectionBudget, DRPNodeConfig } from "@ts-drp/types";
 
 import { allowsInsecureNetworkFixture, type BrowserNetworkEnv, parseRelayOperatorGroups } from "./config";
 
 export interface ModularBrowserNetworkSnapshot {
 	readonly bootstrapPeers: readonly string[];
+	readonly connectionBudget: DRPConnectionBudget;
 	readonly connections: ReturnType<DRPNetworkNode["getControlPlaneConnections"]>;
 	readonly controlPlaneEvents: readonly ControlPlaneEvent[];
 	readonly membershipMode: "invite";
@@ -58,6 +59,7 @@ export function createModularBrowserNetwork(
 	const operatorGroups = parseRelayOperatorGroups(environment.relayOperatorGroups);
 	const controlPlaneEvents: ControlPlaneEvent[] = [];
 	let lastRelayPolicy: RelayPolicyResult | undefined;
+	let connectionBudget: DRPConnectionBudget | undefined;
 	let relayHost: Libp2pRelayClientOptions["host"] | undefined;
 	// Forward-referenced by the host/routing/relay closures below; assigned once after construction.
 	// eslint-disable-next-line prefer-const
@@ -83,6 +85,7 @@ export function createModularBrowserNetwork(
 	};
 
 	const hostFactory: DRPNetworkHostFactory = async (context) => {
+		connectionBudget = context.snapshot.connectionBudget;
 		const host = await context.createHost();
 		relayHost = host as unknown as Libp2pRelayClientOptions["host"];
 		return host;
@@ -151,17 +154,21 @@ export function createModularBrowserNetwork(
 
 	return {
 		node,
-		snapshot: (): ModularBrowserNetworkSnapshot => ({
-			bootstrapPeers: [...(runtimeConfig.network_config?.bootstrap_peers ?? [])],
-			connections: network.getControlPlaneConnections(),
-			controlPlaneEvents: [...controlPlaneEvents],
-			membershipMode: "invite",
-			peerId: network.peerId,
-			...(lastRelayPolicy === undefined ? {} : { relayPolicy: lastRelayPolicy }),
-			relayReservations: network.getActiveRelayReservations(),
-			...(node?.rendezvous?.lastTrace === undefined ? {} : { rendezvous: node.rendezvous.lastTrace }),
-			...(node?.routing?.lastTrace === undefined ? {} : { routing: node.routing.lastTrace }),
-		}),
+		snapshot: (): ModularBrowserNetworkSnapshot => {
+			if (connectionBudget === undefined) throw new Error("modular browser connection budget is not installed");
+			return {
+				bootstrapPeers: [...(runtimeConfig.network_config?.bootstrap_peers ?? [])],
+				connectionBudget,
+				connections: network.getControlPlaneConnections(),
+				controlPlaneEvents: [...controlPlaneEvents],
+				membershipMode: "invite",
+				peerId: network.peerId,
+				...(lastRelayPolicy === undefined ? {} : { relayPolicy: lastRelayPolicy }),
+				relayReservations: network.getActiveRelayReservations(),
+				...(node?.rendezvous?.lastTrace === undefined ? {} : { rendezvous: node.rendezvous.lastTrace }),
+				...(node?.routing?.lastTrace === undefined ? {} : { routing: node.routing.lastTrace }),
+			};
+		},
 		stop: (): Promise<void> => node?.stop() ?? Promise.resolve(),
 	};
 }

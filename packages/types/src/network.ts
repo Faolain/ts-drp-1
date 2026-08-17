@@ -318,6 +318,19 @@ export interface ControlPlaneConnectionEvidence {
 	readonly transport: ControlPlaneTransport;
 }
 
+export interface DRPConnectionBudgetConfig {
+	readonly max_connections: number;
+	readonly max_parallel_dials: number;
+}
+
+export type DRPConnectionBudgetRole = "browser" | "node" | "relay" | "worker";
+
+export interface DRPConnectionBudget {
+	readonly maxConnections: number;
+	readonly maxParallelDials: number;
+	readonly role: DRPConnectionBudgetRole;
+}
+
 export interface ControlPlaneRelayReservationEvidence {
 	readonly expiresAtMs: number;
 	readonly operatorGroup: string;
@@ -360,6 +373,8 @@ export interface DRPNetworkNodeConfig {
 	log_config?: LoggerOptions;
 	/** Independently owned routing, rendezvous, relay-client, admission, and telemetry policy. */
 	control_plane?: ControlPlaneConfig;
+	/** Optional reduction of the hard connection and parallel-dial budget selected for this host role. */
+	connection_budget?: DRPConnectionBudgetConfig;
 	/** Pubsub configuration */
 	pubsub?: {
 		/** Interval in milliseconds between peer discovery attempts */
@@ -530,9 +545,10 @@ export interface DRPNetworkNode {
 	/**
 	 * Gets all peers subscribed to a specific group/topic
 	 * @param group - The group/topic to get peers for
-	 * @returns Array of peer IDs subscribed to the group
+	 * @param view - Optional bounded GossipSub mesh view for implicit durable traffic
+	 * @returns Array of peer IDs subscribed to the group or currently in its mesh
 	 */
-	getGroupPeers(group: string): string[];
+	getGroupPeers(group: string, view?: "mesh"): string[];
 
 	/**
 	 * Broadcasts a message to all peers subscribed to a topic

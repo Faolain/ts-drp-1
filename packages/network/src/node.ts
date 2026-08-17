@@ -67,6 +67,7 @@ import {
 	type ControlPlaneTransport,
 	DRP_DISCOVERY_TOPIC,
 	DRP_INTERVAL_DISCOVERY_TOPIC,
+	type DRPConnectionBudget,
 	type DRPNetworkNodeConfig,
 	type DRPNetworkNode as DRPNetworkNodeInterface,
 	type GroupPeerChange,
@@ -79,6 +80,11 @@ import {
 import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
 import { isBrowser, isWebWorker } from "wherearewe";
 
+import {
+	type ConnectionAdmissionController,
+	createConnectionAdmissionController,
+	resolveConnectionBudget,
+} from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
 import {
@@ -170,6 +176,7 @@ type PeerDiscoveryFunction =
 	| ((components: BootstrapComponents) => PeerDiscovery);
 
 type ConfigurableGossipSub = GossipSub & {
+	mesh: Map<string, Set<string>>;
 	score: PeerScore;
 	streamsOutbound: Map<string, unknown>;
 };
@@ -232,6 +239,7 @@ export interface DRPNetworkHostConfigSnapshot {
 	readonly bootstrapDiscovery: boolean;
 	readonly bootstrapPeerCount: number;
 	readonly coldStartPubsubDiscovery: boolean;
+	readonly connectionBudget: DRPConnectionBudget;
 	readonly gossipSubPeerExchange: boolean;
 	readonly outboundAddressPolicy: "address-policy" | "allow-all" | "injected";
 	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
@@ -471,6 +479,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _config?: DRPNetworkNodeConfig;
 	private _node?: Libp2p;
 	private _pubsub?: ConfigurableGossipSub;
+	private _connectionAdmission?: ConnectionAdmissionController;
 	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
@@ -589,6 +598,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		) {
 			throw new Error("relay_service.max_reservations must be a non-negative safe integer");
 		}
+		const connectionBudget = resolveConnectionBudget({
+			...(this._config?.connection_budget === undefined ? {} : { configured: this._config.connection_budget }),
+			relayServiceEnabled: this._config?.relay_service?.enabled === true,
+			runtime: isBrowser ? "browser" : isWebWorker ? "worker" : "node",
+		});
 		const _relayServices = {
 			..._node_services,
 			relay: circuitRelayServer({
@@ -646,6 +660,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					: "allow-all";
 		this._outboundAddressPolicy = outboundAddressPolicy;
 		const activeAddressPolicyGate = this._hostPolicy.denyDialMultiaddr === undefined ? addressPolicyGate : undefined;
+		const connectionAdmission = createConnectionAdmissionController(connectionBudget);
+		this._connectionAdmission = connectionAdmission;
 		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
@@ -653,11 +669,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				...(this._config?.announce_addresses ? { announce: this._config.announce_addresses } : {}),
 			},
 			connectionManager: {
+				maxConnections: connectionBudget.maxConnections,
+				maxParallelDials: connectionBudget.maxParallelDials,
 				dialTimeout: 60_000,
 				addressSorter: this._sortAddresses,
 			},
 			connectionEncrypters: [noise()],
 			connectionGater: {
+				...connectionAdmission.connectionGater,
 				denyDialMultiaddr: this._hostPolicy.denyDialMultiaddr ?? activeAddressPolicyGate ?? ((): false => false),
 				...(activeAddressPolicyGate === undefined
 					? {}
@@ -687,7 +706,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				pubsubBehaviorRewards: publicComponents?.pubsub_behavior_rewards?.enabled === true,
 			}),
 		});
-		const snapshot: DRPNetworkHostConfigSnapshot = Object.freeze({
+		const snapshotWithoutBudget = {
 			bootstrapDiscovery,
 			bootstrapPeerCount: bootstrapDiscovery ? bootstrapNodes.length : 0,
 			coldStartPubsubDiscovery,
@@ -698,7 +717,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
 			]),
 			rollout,
-		});
+		};
+		// Preserve the established enumerable snapshot shape while exposing the
+		// immutable budget as direct host-factory evidence and through browser diagnostics.
+		const snapshot = Object.freeze(
+			Object.defineProperty(snapshotWithoutBudget, "connectionBudget", {
+				enumerable: false,
+				value: connectionBudget,
+			})
+		) as DRPNetworkHostConfigSnapshot;
 		let builtHost: Libp2p | undefined;
 		let hostBuild: Promise<Libp2p> | undefined;
 		const createHost = async (extensions: DRPNetworkHostExtensions = {}): Promise<Libp2p> => {
@@ -723,8 +750,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			const host = await this._hostFactory({ createHost, snapshot });
 			if (!builtHost) throw new Error("DRP network host factory must build its host through createHost()");
 			if (host !== builtHost) throw new Error("DRP network host factory must return the host built by createHost()");
+			connectionAdmission.attach(host);
 			this._node = host;
 		} catch (error) {
+			connectionAdmission.stop();
+			if (this._connectionAdmission === connectionAdmission) this._connectionAdmission = undefined;
 			this._emitControlPlaneEvent({ kind: "listen-readiness", outcome: "failed", transport: "unknown" });
 			if (!builtHost && hostBuild) {
 				try {
@@ -1320,6 +1350,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async stop(): Promise<void> {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
+		this._connectionAdmission?.stop();
+		this._connectionAdmission = undefined;
 		this._bootstrapRetryController?.abort();
 		this._bootstrapRetryController = undefined;
 		const relayPolicyController = this._relayPolicyController;
@@ -1803,9 +1835,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	/**
 	 * Get the peers in a group.
 	 * @param group - The group to get the peers from.
+	 * @param view - Optional bounded GossipSub mesh view.
 	 * @returns The peers in the group.
 	 */
-	getGroupPeers(group: string): string[] {
+	getGroupPeers(group: string, view?: "mesh"): string[] {
+		if (view === "mesh") {
+			if (this._config?.seed === true) return [];
+			return [...(this._pubsub?.mesh.get(group) ?? [])];
+		}
+		if (view !== undefined) throw new Error("unsupported group peer view");
 		const peers = this._pubsub?.getSubscribers(group);
 		if (!peers) return [];
 		return peers.map((peer) => peer.toString());
@@ -2034,8 +2072,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async sendGroupMessageRandomPeer(group: string, message: Message): Promise<void> {
 		try {
-			const peers = this._pubsub?.getSubscribers(group);
-			if (!peers || peers.length === 0) throw Error("Topic wo/ peers");
+			const peers = this.getGroupPeers(group, "mesh");
+			if (peers.length === 0) return;
 			const peerId = peers[Math.floor(Math.random() * peers.length)];
 
 			const connection = await this.safeDial(peerId);
