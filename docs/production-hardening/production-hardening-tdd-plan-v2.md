@@ -46326,9 +46326,9 @@ strictly signer-id-sorted rows. Signer ids and 32-byte lowercase public keys are
 unique. This first durable certified profile accepts at most eight signers, each
 signer id must be at most 64 UTF-8 bytes and the certified object id must be at
 most 1024 UTF-8 bytes in addition to satisfying the existing object-id syntax.
-Those bounds make the maximum-expansion fixture exactly 8173 canonical bytes
+Those bounds make the maximum-expansion fixture exactly 8190 canonical bytes
 under the current binary codec and exact record field names, below the existing
-8192-byte record ceiling with 19 bytes of headroom. That fixture uses the longer
+8192-byte record ceiling with 2 bytes of headroom. That fixture uses the longer
 `delegated-trusted-v1` profile id and places every variable-length field at its
 admitted bound. A syntactically valid object id whose UTF-8 encoding exceeds
 1024 bytes is therefore rejected before record minting.
@@ -46361,7 +46361,7 @@ digest from the re-verified carriers; any duplicated stored scalar that differs
 from that derivation is `trust-state-inconsistent`. Open independently enforces
 the same signer-count, signer-id and object-id byte bounds as install. The
 install-side size rejection remains defense in depth even though the admitted
-maximum is 8173 bytes; the literal 8192/8193 pre-decode boundary is exercised on
+maximum is 8190 bytes; the literal 8192/8193 pre-decode boundary is exercised on
 open.
 
 Profile selection occurs only through the exact signed genesis carrier.
@@ -46382,7 +46382,7 @@ handling; proves creator/certified cross-opening terminal; and confirms zero
 live-anchor authentication surface. Its public-package assertion requires exactly
 the two new runtime names and forbids every certified live-anchor helper. The RED
 also exercises empty input, the literal 8192/8193 record boundary, the exact
-8173-byte maximum-expansion fixture through the production install encoding path
+8190-byte maximum-expansion fixture through the production install encoding path
 and successful reopen, maximum eight signers, literal 64/65-byte signer-id
 acceptance/rejection, literal 1024/1025-byte object-id acceptance/rejection,
 ninth-signer rejection and stored-scalar disagreement. It is signed separately
@@ -46409,10 +46409,15 @@ Codex and Kimi rereviews returned `PASS` with no P0-P2. Opus then reproduced the
 unbounded-signer/8192-byte conflict and missing boundary test; the exact eight
 signer, 64-byte id, key-equality and derived-scalar rules above close that P1 and
 its related notes. The final Codex audit correctly required an executable size
-proof rather than an estimated fit. Running the repository's actual canonical
-binary encoder over the exact maximum carriers produced 8173 bytes once the
-certified object-id subset was bounded to 1024 UTF-8 bytes; the exact fixture and
-1025-byte rejection above make that claim load-bearing. Kimi's final 100-step
+proof rather than an estimated fit. The initial diagnostic used the shorter
+attested profile and did not instantiate the final exact durable-field schema;
+the tests-only fixture audit corrected that estimate to 8190 bytes for the
+longer delegated profile with every variable-length field at its bound. The
+certified object-id subset remains bounded to 1024 UTF-8 bytes; the exact fixture
+and 1025-byte rejection above make that claim load-bearing. Kimi's bounded
+numeric-correction review returned `PASS` with no P0-P2. The corresponding Opus
+xhigh delta attempt produced no output within its finite window and is recorded
+as `NO_VERDICT`, not approval. Kimi's final 100-step
 delta review returned `PASS` with no P0-P2 and its optional literal 64/65
 boundary wording is incorporated. The final Opus xhigh delta review returned
 `PASS` with no P0/P1; its nonblocking maximal-fixture, open-bound and
