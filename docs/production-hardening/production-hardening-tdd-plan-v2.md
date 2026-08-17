@@ -47002,3 +47002,39 @@ obsolete group-peer-change overlay callback, and preserves the unchanged
 renderer through getter-compatible read views. Every mutation remains owned by
 `GridStateManager`; no renderer change, fallback channel or second session record
 was added.
+
+### D.93.45 corrective closure
+
+The tests-only RED is Good-Faolain-signed commit
+`e53ad3b1f5e30e7ef55f092a88b3204b4c31b894`, tree
+`f5674de6753dd2494752bb12df0f210cc70a85a8`. The exact-eight GREEN is its sole
+child, Good-Faolain-signed commit
+`1938dd0bcf6b8aa2f57206b6dc8150e9bc60a3ee`, tree
+`ab1931d7c006f606b5c5d44b3f86d76c75929c01`, with cached binary-diff SHA-256
+`43636bdd8f6a1b58e80ffabc525608e40e2322fcfa5446d2989b4e94df5fff87`.
+The remote branch and local upstream both authenticated that exact GREEN tip at
+push, with ahead/behind `0/0`.
+
+On the frozen GREEN bytes, the focused owner passed `26/26` in `3.11s`; the
+two-client Chromium and WebKit golden-path row passed `2/2` in `42.7s`; the
+retained preservation set passed `51/51` in `21.18s`; and the ephemeral, types,
+object, node and grid builds passed. Ephemeral, types and grid typechecks passed.
+Object and node typechecks retained only the already recorded compact-history
+RED/helper diagnostics in unchanged files, with no affected-source diagnostic.
+ESLint had zero errors, Prettier and diff checks passed, and the same grid bundle
+size warning remained non-semantic. No exhaustive or certification suite was
+run for this bounded product correction.
+
+The full GREEN review first reproduced and caused fixes for failed-acquisition
+session invalidation, concurrent-movement loss, same-room reselection races,
+abandoned-object teardown and restored-observer ownership. The final exact-byte
+delta then received the agreed bounded window: Codex returned `PASS` with no
+P0-P2; Kimi's 100-step review returned `PASS` with no P0/P1 and only a harmless
+TypeScript-narrowing branch plus an inherited double-subscribe observation;
+Grok returned only an acknowledgment and is recorded as `NO_VERDICT`; Opus
+produced no terminal result within the silent bounded window and is likewise
+recorded as `NO_VERDICT`. No reproduced substantive final-byte defect remained.
+
+This closes only the D.93.45 Track E1 correction. It does not close P6 or the
+broader production-hardening plan; work returns to the next signed P6
+two-client product slice.
