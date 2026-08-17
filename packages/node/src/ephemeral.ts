@@ -13,11 +13,19 @@ const EPHEMERAL_TRANSPORT_MAX_BYTES = 65_536;
 
 interface ObjectRegistration {
 	readonly channel: EphemeralChannel;
+	readonly mode: "legacy" | "v3";
 	readonly options: EphemeralChannelOptions;
 }
 
 interface TopicRegistration {
+	readonly allowDirect: boolean;
 	listener: ((ingress: EphemeralIngress) => void) | undefined;
+}
+
+/** Live v3 authorization projected from accepted durable room history. */
+export interface EphemeralAuthorizationProvider {
+	authorForPeer(peerId: string): string | undefined;
+	isCurrentWriter(author: string): boolean;
 }
 
 /** Owns the private network boundary behind DRPNode.openEphemeral. */
@@ -39,7 +47,15 @@ export class NodeEphemeralAdapter {
 
 	/** Close every active channel before node shutdown. */
 	closeAll(): void {
-		for (const { channel } of [...this.#byObject.values()]) channel.close();
+		let failure: unknown;
+		for (const { channel } of [...this.#byObject.values()]) {
+			try {
+				channel.close();
+			} catch (error) {
+				failure ??= error;
+			}
+		}
+		if (failure !== undefined) throw failure;
 	}
 
 	/**
@@ -57,12 +73,39 @@ export class NodeEphemeralAdapter {
 	 * @returns One object-bound channel.
 	 */
 	open(objectId: string, options: EphemeralChannelOptions): EphemeralChannel {
+		return this.openAuthorized(
+			objectId,
+			{
+				authorForPeer: (peerId): string | undefined => peerId,
+				isCurrentWriter: (author): boolean => this.#getObject(objectId)?.acl.query_isWriter(author) === true,
+			},
+			options,
+			true
+		);
+	}
+
+	/**
+	 * Open one channel from an authenticated peer-to-author roster and current writer projection.
+	 * @param objectId Durable v3 room identity.
+	 * @param provider Live authorization projected from accepted durable vertices.
+	 * @param options Closed channel limits.
+	 * @param requireLegacyObject Whether the legacy object store must contain the room identity.
+	 * @returns The existing identically-configured channel or a newly activated one.
+	 */
+	openAuthorized(
+		objectId: string,
+		provider: EphemeralAuthorizationProvider,
+		options: EphemeralChannelOptions,
+		requireLegacyObject = false
+	): EphemeralChannel {
 		if (Object.keys(options).sort().join(",") !== "maxMessageBytes,maxSequencedKeys,maxSequencedSenders") {
 			throw new TypeError("ephemeral channel options differ");
 		}
 		const existing = this.#byObject.get(objectId);
 		if (existing !== undefined) {
+			const mode = requireLegacyObject ? "legacy" : "v3";
 			if (
+				existing.mode !== mode ||
 				existing.options.maxMessageBytes !== options.maxMessageBytes ||
 				existing.options.maxSequencedKeys !== options.maxSequencedKeys ||
 				existing.options.maxSequencedSenders !== options.maxSequencedSenders
@@ -71,15 +114,21 @@ export class NodeEphemeralAdapter {
 			}
 			return existing.channel;
 		}
-		if (this.#getObject(objectId) === undefined) throw new Error("ephemeral channel requires a connected object");
+		if (requireLegacyObject && this.#getObject(objectId) === undefined) {
+			throw new Error("ephemeral channel requires a connected object");
+		}
 		const topic = ephemeralTopicFor(objectId);
-		const registration: TopicRegistration = { listener: undefined };
+		const registration: TopicRegistration = { allowDirect: !requireLegacyObject, listener: undefined };
+		const transportPeers = (): readonly string[] =>
+			requireLegacyObject
+				? this.#networkNode.getGroupPeers(topic)
+				: [...new Set([...this.#networkNode.getAllPeers(), ...this.#networkNode.getGroupPeers(topic)])];
 		const authorizedPeers = (): readonly string[] => {
-			const currentObject = this.#getObject(objectId);
-			if (currentObject === undefined) return [];
-			return this.#networkNode
-				.getGroupPeers(topic)
-				.filter((peerId) => currentObject.acl.query_isWriter(peerId))
+			return transportPeers()
+				.filter((peerId) => {
+					const author = provider.authorForPeer(peerId);
+					return author !== undefined && provider.isCurrentWriter(author);
+				})
 				.sort();
 		};
 		const channel = createEphemeralChannel(
@@ -88,12 +137,8 @@ export class NodeEphemeralAdapter {
 				localPeerId: this.#networkNode.peerId,
 				maxEnvelopeBytes: EPHEMERAL_TRANSPORT_MAX_BYTES,
 				isAuthorized: (sender): boolean => {
-					const currentObject = this.#getObject(objectId);
-					return (
-						currentObject !== undefined &&
-						this.#networkNode.getGroupPeers(topic).includes(sender) &&
-						currentObject.acl.query_isWriter(sender)
-					);
+					const author = provider.authorForPeer(sender);
+					return author !== undefined && transportPeers().includes(sender) && provider.isCurrentWriter(author);
 				},
 				onMessage: (listener): (() => void) => {
 					registration.listener = listener;
@@ -101,7 +146,8 @@ export class NodeEphemeralAdapter {
 						if (registration.listener === listener) registration.listener = undefined;
 					};
 				},
-				send: (bytes): Promise<boolean> => this.#send(topic, bytes),
+				send: (bytes): Promise<boolean> =>
+					this.#send(topic, bytes, requireLegacyObject ? Object.freeze([]) : authorizedPeers()),
 				close: (): void => {
 					try {
 						this.#networkNode.unsubscribe(topic);
@@ -113,7 +159,11 @@ export class NodeEphemeralAdapter {
 			},
 			options
 		);
-		this.#byObject.set(objectId, { channel, options: { ...options } });
+		this.#byObject.set(objectId, {
+			channel,
+			mode: requireLegacyObject ? "legacy" : "v3",
+			options: { ...options },
+		});
 		this.#byTopic.set(topic, registration);
 		try {
 			this.#networkNode.subscribe(topic);
@@ -132,15 +182,24 @@ export class NodeEphemeralAdapter {
 	route(message: Message): boolean {
 		if (message.type !== MessageType.MESSAGE_TYPE_CUSTOM) return false;
 		const topic = this.#networkNode.gossipTopicFor(message);
-		if (topic === undefined) return false;
-		const registration = this.#byTopic.get(topic);
+		const selectedTopic = topic ?? message.objectId;
+		const registration = this.#byTopic.get(selectedTopic);
 		if (registration === undefined) return false;
-		if (message.objectId !== topic || message.data.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES) return true;
+		if (
+			message.objectId !== selectedTopic ||
+			message.data.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES ||
+			(topic === undefined &&
+				(!registration.allowDirect ||
+					(!this.#networkNode.getAllPeers().includes(message.sender) &&
+						!this.#networkNode.getGroupPeers(selectedTopic).includes(message.sender))))
+		) {
+			return true;
+		}
 		registration.listener?.({ bytes: message.data.slice(), sender: message.sender });
 		return true;
 	}
 
-	async #send(topic: string, bytes: Uint8Array): Promise<boolean> {
+	async #send(topic: string, bytes: Uint8Array, peers: readonly string[]): Promise<boolean> {
 		if (bytes.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES) return false;
 		const message = Message.create({
 			data: bytes.slice(),
@@ -148,11 +207,11 @@ export class NodeEphemeralAdapter {
 			sender: this.#networkNode.peerId,
 			type: MessageType.MESSAGE_TYPE_CUSTOM,
 		});
-		try {
-			return await this.#networkNode.publishMessage(topic, message);
-		} catch {
-			return false;
-		}
+		const [gossip] = await Promise.allSettled([
+			this.#networkNode.publishMessage(topic, message),
+			...peers.map((peerId) => this.#networkNode.sendMessage(peerId, message)),
+		]);
+		return gossip?.status === "fulfilled" && gossip.value === true;
 	}
 }
 

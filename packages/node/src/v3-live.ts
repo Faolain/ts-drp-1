@@ -1928,6 +1928,7 @@ interface V3PlaneRegistration {
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const HEX_DIGITS = "0123456789abcdef";
 
 function activationFailure(
@@ -2323,11 +2324,16 @@ function extractAuthorizedV3Vertex(
 	});
 }
 
-async function handleV3Ingress(registration: V3PlaneRegistration, message: Message): Promise<void> {
+async function handleV3Ingress(
+	registration: V3PlaneRegistration,
+	message: Message,
+	transport: "gossip" | "retained"
+): Promise<void> {
 	try {
 		if (!currentRegistration(registration)) return;
 		if (message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE) return;
-		if (registration.networkNode.gossipTopicFor(message) !== registration.topic) return;
+		const gossipTopic = registration.networkNode.gossipTopicFor(message);
+		if (transport === "gossip" ? gossipTopic !== registration.topic : gossipTopic !== undefined) return;
 		if (message.objectId !== registration.topic) return;
 		let receivedCanonicalPreimageBytes: Uint8Array;
 		let signature: Uint8Array;
@@ -2433,11 +2439,15 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 	}
 }
 
-function enqueueV3Ingress(registration: V3PlaneRegistration, message: Message): void {
+function enqueueV3Ingress(
+	registration: V3PlaneRegistration,
+	message: Message,
+	transport: "gossip" | "retained" = "gossip"
+): void {
 	const result =
 		registration.gate === undefined
-			? handleV3Ingress(registration, message)
-			: registration.gate.then(() => handleV3Ingress(registration, message));
+			? handleV3Ingress(registration, message, transport)
+			: registration.gate.then(() => handleV3Ingress(registration, message, transport));
 	registration.gate = result.then(
 		() => undefined,
 		() => undefined
@@ -3266,7 +3276,7 @@ function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V
 	return result;
 }
 
-async function republishRetained(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+async function republishRetained(registration: V3PlaneRegistration, targetPeerId?: string): Promise<V3EgressResult> {
 	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
 	const scope = liveJournalScope(registration.payload);
 	let readiness;
@@ -3369,7 +3379,12 @@ async function republishRetained(registration: V3PlaneRegistration): Promise<V3E
 		});
 		let published: unknown;
 		try {
-			published = await registration.networkNode.publishMessage(registration.topic, message);
+			if (targetPeerId === undefined) {
+				published = await registration.networkNode.publishMessage(registration.topic, message);
+			} else {
+				await registration.networkNode.sendMessage(targetPeerId, message);
+				published = true;
+			}
 		} catch {
 			return currentRegistration(registration)
 				? egressFailure("publish-failed", "v3 retained publication failed")
@@ -3389,6 +3404,21 @@ function enqueueRetainedPublication(registration: V3PlaneRegistration): Promise<
 		registration.gate === undefined
 			? republishRetained(registration)
 			: registration.gate.then(() => republishRetained(registration));
+	registration.gate = result.then(
+		() => undefined,
+		() => undefined
+	);
+	return result;
+}
+
+function enqueueTargetedRetainedPublication(
+	registration: V3PlaneRegistration,
+	targetPeerId: string
+): Promise<V3EgressResult> {
+	const result =
+		registration.gate === undefined
+			? republishRetained(registration, targetPeerId)
+			: registration.gate.then(() => republishRetained(registration, targetPeerId));
 	registration.gate = result.then(
 		() => undefined,
 		() => undefined
@@ -3558,6 +3588,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				gate: undefined,
 			};
 			registration.handle = makeV3PlaneHandle(registration);
+			v3HandleRegistrations.set(registration.handle, registration);
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			registrations.set(topic, registration);
 			v3PlaneRegistrations.set(boundNetworkNode, registrations);
@@ -3606,6 +3637,49 @@ export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): b
 	} catch {
 		return message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
 	}
+}
+
+/**
+ * Queues one authenticated point-to-point retained envelope through the same
+ * signature, ACL, journal and graph admission path as live gossip ingress.
+ * @param handle Active v3 plane handle.
+ * @param message Direct retained envelope.
+ * @returns Whether the active v3 plane accepted the envelope for processing.
+ */
+export function routeV3RetainedIngress(handle: V3PlaneHandle, message: Message): boolean {
+	const registration = v3HandleRegistrations.get(handle);
+	if (
+		registration === undefined ||
+		!currentRegistration(registration) ||
+		message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE ||
+		message.objectId !== registration.topic ||
+		registration.networkNode.gossipTopicFor(message) !== undefined
+	) {
+		return false;
+	}
+	enqueueV3Ingress(registration, message, "retained");
+	return true;
+}
+
+/**
+ * Replays the authenticated retained journal directly to one connected peer.
+ * @param handle Active v3 plane handle.
+ * @param targetPeerId Connected peer that requested retained history.
+ * @returns The bounded publication result.
+ */
+export function republishV3RetainedTo(handle: V3PlaneHandle, targetPeerId: string): Promise<V3EgressResult> {
+	const registration = v3HandleRegistrations.get(handle);
+	if (
+		registration === undefined ||
+		!currentRegistration(registration) ||
+		typeof targetPeerId !== "string" ||
+		targetPeerId.length === 0 ||
+		targetPeerId === registration.networkNode.peerId ||
+		!registration.networkNode.getAllPeers().includes(targetPeerId)
+	) {
+		return Promise.resolve(egressFailure("not-active", "v3 retained target is unavailable"));
+	}
+	return enqueueTargetedRetainedPublication(registration, targetPeerId);
 }
 
 export { prepareV3LiveGeneration };

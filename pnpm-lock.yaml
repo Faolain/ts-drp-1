@@ -206,9 +206,18 @@ importers:
 
   examples/grid:
     dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../../packages/canonical
+      '@ts-drp/ephemeral':
+        specifier: workspace:*
+        version: link:../../packages/ephemeral
       '@ts-drp/example-browser-network':
         specifier: workspace:*
         version: link:../browser-network
+      '@ts-drp/example-v3-room':
+        specifier: workspace:*
+        version: link:../v3-room
       '@ts-drp/network':
         specifier: 0.11.0
         version: link:../../packages/network
@@ -321,6 +330,9 @@ importers:
       '@ts-drp/control-plane':
         specifier: workspace:*
         version: link:../../packages/control-plane
+      '@ts-drp/ephemeral':
+        specifier: workspace:*
+        version: link:../../packages/ephemeral
       '@ts-drp/message-queue':
         specifier: workspace:*
         version: link:../../packages/message-queue

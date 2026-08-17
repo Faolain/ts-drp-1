@@ -58,6 +58,12 @@ interface AcceptedMessage {
 	readonly text: string;
 }
 
+interface ChatProjection {
+	readonly accepted: readonly AcceptedMessage[];
+	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
+	readonly writerAuthors: readonly string[];
+}
+
 interface ChatSnapshot {
 	readonly accepted: readonly AcceptedMessage[];
 	readonly acceptedOperationDigest: string;
@@ -459,32 +465,44 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 		close(): void {
 			channel.close();
 		},
+		openEphemeral(): never {
+			throw new TypeError("v3 chat ephemeral transport is not configured");
+		},
 		requestRetainedHistory(): void {
 			channel.postMessage({ kind: "d9338-retained-history-request", requester: peerId });
 		},
-		setIngressHandler(handler: (message: Message) => void): void {
-			ingressHandler = handler;
+		setIngressHandler(
+			_ingressId: string,
+			liveHandler: (message: Message) => void,
+			_retainedHandler: (message: Message) => void
+		): void {
+			ingressHandler = liveHandler;
 		},
-		setRetainedPublisher(publisher: () => Promise<void>): void {
+		setRetainedPublisher(publisher: (targetPeerId?: string) => Promise<void>): void {
 			retainedPublisher = publisher;
 		},
 	});
 }
 
-function acceptVertex(accepted: Map<string, AcceptedMessage>, vertex: V3RoomAcceptedVertex): void {
-	const text = Reflect.get(vertex.operation, "text");
-	if (Reflect.get(vertex.operation, "action") !== "message" || typeof text !== "string") return;
-	const identity = hex(vertex.digest);
-	accepted.set(
-		identity,
-		Object.freeze({
-			author: vertex.author,
-			authorSequence: vertex.authorSequence,
-			digest: identity,
-			logicalTime: vertex.logicalTime,
-			text,
-		})
-	);
+function projectChat(vertices: readonly V3RoomAcceptedVertex[]): ChatProjection {
+	const accepted = vertices.flatMap((vertex) => {
+		const text = Reflect.get(vertex.operation, "text");
+		if (Reflect.get(vertex.operation, "action") !== "message" || typeof text !== "string") return [];
+		return [
+			Object.freeze({
+				author: vertex.author,
+				authorSequence: vertex.authorSequence,
+				digest: hex(vertex.digest),
+				logicalTime: vertex.logicalTime,
+				text,
+			}),
+		];
+	});
+	return Object.freeze({
+		accepted: Object.freeze(accepted),
+		transportPeerAuthors: Object.freeze([]),
+		writerAuthors: Object.freeze([]),
+	});
 }
 
 async function joinRoom(
@@ -501,6 +519,7 @@ async function joinRoom(
 			bootstrapOperation: Object.freeze({ action: "join", clientId: input.clientId }),
 			canonicalBlueprintPackageBytes: application.canonicalBlueprintPackageBytes,
 			catalog: application.catalog,
+			projectAcceptedVertices: projectChat,
 		}),
 		author,
 		creatorInvite: input.creatorInvite,
@@ -508,7 +527,11 @@ async function joinRoom(
 		initialLogicalTime: selected.logicalTime,
 		objectId: OBJECT_ID,
 		openTransport: () => createRoomNetwork(author, input.channelName),
-		onAcceptedVertex: (vertex) => acceptVertex(accepted, vertex),
+		onAcceptedVertex: () => undefined,
+		onProjection: (projection): void => {
+			accepted.clear();
+			for (const message of projection.accepted) accepted.set(message.digest, message);
+		},
 		publicKeyBytes: bytes(author),
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
 	});

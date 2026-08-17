@@ -100,6 +100,7 @@ import {
 } from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
+import { NodeRoomNetworkAdapter, type NodeRoomNetworkPort } from "./room-network.js";
 import { DRPObjectStore } from "./store/index.js";
 import {
 	buildSyncResponseChunks as buildBoundedSyncResponseChunks,
@@ -399,6 +400,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private readonly _syncSender: NegotiatedSyncSender | undefined;
 	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
 	private readonly _ephemeral: NodeEphemeralAdapter;
+	private readonly _roomNetwork: NodeRoomNetworkAdapter;
 
 	/**
 	 * Create a new DRP node.
@@ -428,6 +430,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._routing = createConfiguredBrowserRouting(config);
 		this.#objectStore = new DRPObjectStore();
 		this._ephemeral = new NodeEphemeralAdapter(this.networkNode, (objectId) => this.#objectStore.get(objectId));
+		this._roomNetwork = new NodeRoomNetworkAdapter(this.networkNode, this._ephemeral);
 		this.keychain = new Keychain(config?.keychain_config);
 		this.config = {
 			...config,
@@ -489,7 +492,17 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
-		this._ephemeral.closeAll();
+		let shutdownFailure: unknown;
+		try {
+			this._roomNetwork.closeAll();
+		} catch (error) {
+			shutdownFailure = error;
+		}
+		try {
+			this._ephemeral.closeAll();
+		} catch (error) {
+			shutdownFailure ??= error;
+		}
 		const controlPlaneCoordinator = this._controlPlaneCoordinator;
 		this._controlPlaneCoordinator = undefined;
 		try {
@@ -509,7 +522,13 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._roomRendezvousCapacityLogged.clear();
 		this._roomRendezvousProducerFactory = undefined;
 		this._roomRendezvousMaxRooms = 0;
-		this._intervals.forEach((interval) => interval.stop());
+		this._intervals.forEach((interval) => {
+			try {
+				interval.stop();
+			} catch (error) {
+				shutdownFailure ??= error;
+			}
+		});
 		this._intervals.clear();
 		const routing = this._routing;
 		this._routing = undefined;
@@ -521,12 +540,25 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._rendezvousBootstrapController = undefined;
 		this._rendezvous = undefined;
 		try {
-			await Promise.all([routing?.stop(), rendezvousBootstrap, rendezvousRegistration, this._stopNetwork()]);
+			const results = await Promise.allSettled([
+				routing?.stop(),
+				rendezvousBootstrap,
+				rendezvousRegistration,
+				this._stopNetwork(),
+			]);
+			for (const result of results) {
+				if (result.status === "rejected") shutdownFailure ??= result.reason;
+			}
 		} finally {
 			clearInvalidPeerBudgets(this);
 			clearNodeSyncState(this);
-			this.messageQueueManager.closeAll();
+			try {
+				this.messageQueueManager.closeAll();
+			} catch (error) {
+				shutdownFailure ??= error;
+			}
 		}
+		if (shutdownFailure !== undefined) throw shutdownFailure;
 	}
 
 	/**
@@ -1186,6 +1218,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 */
 	async dispatchMessage(msg: Message): Promise<void> {
 		if (this._ephemeral.route(msg)) return;
+		if (this._roomNetwork.route(msg)) return;
 		const routeV3IngressResult = routeV3Ingress(this.networkNode, msg);
 		if (routeV3IngressResult) return;
 		if (
@@ -1209,17 +1242,57 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		return this._ephemeral.open(objectId, options);
 	}
 
-	/** Build one request only after the live stream selects its sync protocol. */
+	/**
+	 * Open the protocol-neutral network lifecycle for one durable room.
+	 * @param objectId Creator-bound durable room identity.
+	 * @returns A retained-history, v3 ingress and E1 transport port.
+	 */
+	openRoomNetwork(objectId: string): NodeRoomNetworkPort {
+		if (this.#objectStore.get(objectId) !== undefined) {
+			throw new Error("room network identity is already owned by a legacy object");
+		}
+		const port = this._roomNetwork.open(
+			objectId,
+			creatorFromObjectID(objectId),
+			() => this._connectObjectCreator(objectId),
+			() => this._closeRoomNetworkLifecycle(objectId)
+		);
+		try {
+			this._addRoomRendezvousProducer(objectId);
+			return port;
+		} catch (error) {
+			try {
+				port.close();
+			} catch {
+				// Preserve the setup failure after best-effort rollback.
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Build one request only after the live stream selects its sync protocol.
+	 * @param input Bounded sync request input.
+	 * @returns The negotiated sync payload.
+	 */
 	buildSyncPayloadForProtocol(input: SyncPayloadBuildInput): Promise<Message> {
 		return Promise.resolve().then(() => buildSelectedSyncPayload(this, input));
 	}
 
-	/** Build bounded, independently applicable response chunks. */
+	/**
+	 * Build bounded, independently applicable response chunks.
+	 * @param input Bounded sync response input.
+	 * @returns Independently applicable response messages.
+	 */
 	async buildSyncResponseChunks(input: SyncResponseBuildInput): Promise<readonly Message[]> {
 		return buildBoundedSyncResponseChunks(this, input);
 	}
 
-	/** Send through the explicit negotiated-sync dependency. */
+	/**
+	 * Send through the explicit negotiated-sync dependency.
+	 * @param peerId Target peer identity.
+	 * @param payloadFactory Payload builder bound to the selected protocol.
+	 */
 	async sendNegotiatedSync(
 		peerId: string,
 		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>
@@ -1230,7 +1303,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		await this._syncSender.sendSyncMessage(peerId, payloadFactory);
 	}
 
-	/** Send one bounded response through the same negotiated-sync port. */
+	/**
+	 * Send one bounded response through the same negotiated-sync port.
+	 * @param peerId Target peer identity.
+	 * @param message Bounded response message.
+	 */
 	async sendNegotiatedSyncResponse(peerId: string, message: Message): Promise<void> {
 		if (this._syncSender === undefined) {
 			throw new SyncTransportError("SYNC_NEGOTIATION_UNAVAILABLE", "Injected network has no negotiated sync sender");
@@ -1338,6 +1415,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 				...storageConfig,
 			},
 		});
+		if (this._roomNetwork.has(object.id)) {
+			throw new Error("object identity is already owned by a v3 room network");
+		}
 
 		// put the object in the object store
 		this.#objectStore.put(object.id, object);
@@ -1366,6 +1446,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const validation = NodeConnectObjectOptionsSchema.safeParse(options);
 		if (!validation.success) {
 			throw new DRPValidationError(validation.error);
+		}
+		if (this._roomNetwork.has(options.id)) {
+			throw new Error("object identity is already owned by a v3 room network");
 		}
 		const storageConfig =
 			options.history_storage === "compact"
@@ -1546,6 +1629,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param object - The object to subscribe to.
 	 */
 	subscribeObject<T extends IDRP>(object: IDRPObject<T>): void {
+		if (this._roomNetwork.has(object.id)) {
+			throw new Error("object identity is already owned by a v3 room network");
+		}
 		// Reserve queue capacity before installing callbacks or gossip subscriptions.
 		this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
 		let disposeObjectSubscription: (() => void) | undefined;
@@ -1574,40 +1660,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		disposeObjectSubscription?.();
 		this._connectFetchControllers.get(id)?.abort();
 		this._connectFetchControllers.delete(id);
-		this._connectRendezvousControllers.get(id)?.abort();
-		this._connectRendezvousControllers.delete(id);
-		const roomProducer = this._roomRendezvousProducers.get(id);
-		this._roomRendezvousProducers.delete(id);
-		const directory = this._rendezvous;
-		const lifecycleSignal = this._rendezvousRegistrationController?.signal;
-		if (roomProducer !== undefined && directory !== undefined && lifecycleSignal !== undefined) {
-			const registration = this._rendezvousRegistration;
-			void (async (): Promise<void> => {
-				if (registration !== undefined) {
-					const fenceSignal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
-					await Promise.race([
-						registration.then(
-							() => undefined,
-							() => undefined
-						),
-						new Promise<void>((resolve) => {
-							if (fenceSignal.aborted) {
-								resolve();
-								return;
-							}
-							fenceSignal.addEventListener("abort", () => resolve(), { once: true });
-						}),
-					]);
-				}
-				lifecycleSignal.throwIfAborted();
-				const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
-				const record = await roomProducer.retire();
-				await directory.register(record, signal, registrationCredential(this.config));
-			})().catch((error: unknown) => {
-				log.info("::rendezvous: Room presence retraction failed; record will lapse by TTL", error);
-			});
-		}
-		this._roomRendezvousCapacityLogged.delete(id);
+		this._closeRoomNetworkLifecycle(id);
 		this._stopObjectIntervals(id);
 		clearObjectSyncState(this, id);
 		this._initialSyncPeers.delete(id);
@@ -1695,6 +1748,43 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			return;
 		}
 		this._roomRendezvousProducers.set(objectId, producerFactory(objectId));
+		this._roomRendezvousCapacityLogged.delete(objectId);
+	}
+
+	private _closeRoomNetworkLifecycle(objectId: string): void {
+		this._connectRendezvousControllers.get(objectId)?.abort();
+		this._connectRendezvousControllers.delete(objectId);
+		const roomProducer = this._roomRendezvousProducers.get(objectId);
+		this._roomRendezvousProducers.delete(objectId);
+		const directory = this._rendezvous;
+		const lifecycleSignal = this._rendezvousRegistrationController?.signal;
+		if (roomProducer !== undefined && directory !== undefined && lifecycleSignal !== undefined) {
+			const registration = this._rendezvousRegistration;
+			void (async (): Promise<void> => {
+				if (registration !== undefined) {
+					const fenceSignal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
+					await Promise.race([
+						registration.then(
+							() => undefined,
+							() => undefined
+						),
+						new Promise<void>((resolve) => {
+							if (fenceSignal.aborted) {
+								resolve();
+								return;
+							}
+							fenceSignal.addEventListener("abort", () => resolve(), { once: true });
+						}),
+					]);
+				}
+				lifecycleSignal.throwIfAborted();
+				const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
+				const record = await roomProducer.retire();
+				await directory.register(record, signal, registrationCredential(this.config));
+			})().catch((error: unknown) => {
+				log.info("::rendezvous: Room presence retraction failed; record will lapse by TTL", error);
+			});
+		}
 		this._roomRendezvousCapacityLogged.delete(objectId);
 	}
 
@@ -1870,3 +1960,4 @@ export {
 	type DRPIntervalSyncOptions,
 	INITIAL_SYNC_RETRY_INTERVAL_MS,
 } from "./interval-sync.js";
+export type { NodeRoomNetworkPort } from "./room-network.js";
