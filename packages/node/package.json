@@ -66,6 +66,7 @@
 		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/compaction": "0.11.0",
 		"@ts-drp/control-plane": "workspace:*",
+		"@ts-drp/ephemeral": "workspace:*",
 		"@ts-drp/interval-discovery": "0.11.0",
 		"@ts-drp/interval-reconnect": "0.11.0",
 		"@ts-drp/interval-runner": "0.11.0",

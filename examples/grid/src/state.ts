@@ -10,6 +10,8 @@ interface GridState {
 	peers: string[];
 	discoveryPeers: string[];
 	objectPeers: string[];
+	ephemeralChannel: ReturnType<DRPNode["openEphemeral"]> | undefined;
+	transientPositions: Map<string, { x: number; y: number }>;
 
 	isNodeInitialized(): boolean;
 	isGridInitialized(): boolean;
@@ -25,6 +27,8 @@ class GridStateManager implements GridState {
 	peers: string[] = [];
 	discoveryPeers: string[] = [];
 	objectPeers: string[] = [];
+	ephemeralChannel: ReturnType<DRPNode["openEphemeral"]> | undefined = undefined;
+	transientPositions = new Map<string, { x: number; y: number }>();
 
 	isNodeInitialized(): boolean {
 		if (!this.node) {

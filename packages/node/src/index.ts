@@ -12,6 +12,7 @@ import {
 	type ControlPlaneScheduler,
 	SystemControlPlaneScheduler,
 } from "@ts-drp/control-plane";
+import { type EphemeralChannel, type EphemeralChannelOptions } from "@ts-drp/ephemeral";
 import { createDRPDiscovery } from "@ts-drp/interval-discovery";
 import { createDRPReconnectBootstrap } from "@ts-drp/interval-reconnect";
 import { IntervalRunner } from "@ts-drp/interval-runner";
@@ -89,6 +90,7 @@ import { NodeConnectObjectOptionsSchema, NodeCreateObjectOptionsSchema } from "@
 import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
+import { NodeEphemeralAdapter } from "./ephemeral.js";
 import { clearInvalidPeerBudgets, drpObjectChangesHandler, handleMessage } from "./handlers.js";
 import {
 	createDRPIntervalSync,
@@ -395,6 +397,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private readonly _stopNetwork: () => Promise<void>;
 	private readonly _syncSender: NegotiatedSyncSender | undefined;
 	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
+	private readonly _ephemeral: NodeEphemeralAdapter;
 
 	/**
 	 * Create a new DRP node.
@@ -423,6 +426,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._stopNetwork = dependencies.networkStop ?? ((): Promise<void> => this.networkNode.stop());
 		this._routing = createConfiguredBrowserRouting(config);
 		this.#objectStore = new DRPObjectStore();
+		this._ephemeral = new NodeEphemeralAdapter(this.networkNode, (objectId) => this.#objectStore.get(objectId));
 		this.keychain = new Keychain(config?.keychain_config);
 		this.config = {
 			...config,
@@ -484,6 +488,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
+		this._ephemeral.closeAll();
 		const controlPlaneCoordinator = this._controlPlaneCoordinator;
 		this._controlPlaneCoordinator = undefined;
 		try {
@@ -1179,6 +1184,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param msg - The message to dispatch.
 	 */
 	async dispatchMessage(msg: Message): Promise<void> {
+		if (this._ephemeral.route(msg)) return;
 		const routeV3IngressResult = routeV3Ingress(this.networkNode, msg);
 		if (routeV3IngressResult) return;
 		if (
@@ -1190,6 +1196,16 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		}
 
 		await this.messageQueueManager.enqueue(msg.objectId, msg);
+	}
+
+	/**
+	 * Open the sole transient channel bound to a connected object.
+	 * @param objectId Connected object identity.
+	 * @param options Closed channel limits.
+	 * @returns The existing identically-configured channel or a newly activated one.
+	 */
+	openEphemeral(objectId: string, options: EphemeralChannelOptions): EphemeralChannel {
+		return this._ephemeral.open(objectId, options);
 	}
 
 	/** Build one request only after the live stream selects its sync protocol. */
@@ -1547,6 +1563,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param purge - Whether to purge the object.
 	 */
 	unsubscribeObject(id: string, purge?: boolean): void {
+		this._ephemeral.close(id);
 		this._connectFetchControllers.get(id)?.abort();
 		this._connectFetchControllers.delete(id);
 		this._connectRendezvousControllers.get(id)?.abort();

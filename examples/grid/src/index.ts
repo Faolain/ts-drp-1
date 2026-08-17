@@ -1,4 +1,5 @@
 import { DRPNode } from "@ts-drp/node";
+import { createPermissionlessACL, creatorFromObjectID } from "@ts-drp/object";
 import { enableTracing, OpentelemetryMetrics } from "@ts-drp/tracer";
 import { type DRPNodeConfig, type IMetrics } from "@ts-drp/types";
 
@@ -28,8 +29,54 @@ function addUser(): void {
 function moveUser(direction: string): void {
 	const node = gridState.getNode();
 	const gridDRP = gridState.getGridDRP();
-	gridDRP.moveUser(node.networkNode.peerId, direction);
+	const peerId = node.networkNode.peerId;
+	const user = gridDRP.query_users().find((candidate) => candidate.startsWith(`${peerId}:`));
+	const durable = user === undefined ? undefined : gridDRP.query_userPosition(user);
+	const current = gridState.transientPositions.get(peerId) ?? durable;
+	if (current === undefined || gridState.ephemeralChannel === undefined) return;
+	const next = { ...current };
+	if (direction === "U") next.y += 1;
+	if (direction === "D") next.y -= 1;
+	if (direction === "L") next.x -= 1;
+	if (direction === "R") next.x += 1;
+	gridState.transientPositions.set(peerId, next);
+	void gridState.ephemeralChannel.publish({
+		class: "unreliable-sequenced",
+		key: peerId,
+		payload: new TextEncoder().encode(JSON.stringify(next)),
+	});
 	render();
+}
+
+function activateEphemeralMovement(): void {
+	const node = gridState.getNode();
+	const objectId = gridState.getObjectId();
+	if (objectId === undefined) return;
+	gridState.ephemeralChannel?.close();
+	gridState.transientPositions.clear();
+	const channel = node.openEphemeral(objectId, { maxMessageBytes: 65_536, maxSequencedKeys: 4_096 });
+	gridState.ephemeralChannel = channel;
+	channel.subscribe(({ key, payload, sender }) => {
+		if (key === null || key !== sender) return;
+		try {
+			const parsed: unknown = JSON.parse(new TextDecoder().decode(payload));
+			if (
+				typeof parsed !== "object" ||
+				parsed === null ||
+				Object.keys(parsed).sort().join(",") !== "x,y" ||
+				!Number.isSafeInteger(Reflect.get(parsed, "x")) ||
+				!Number.isSafeInteger(Reflect.get(parsed, "y"))
+			)
+				return;
+			gridState.transientPositions.set(key, {
+				x: Reflect.get(parsed, "x") as number,
+				y: Reflect.get(parsed, "y") as number,
+			});
+			render();
+		} catch {
+			// The shared channel authenticates and bounds bytes; the app schema remains closed here.
+		}
+	});
 }
 
 function createConnectHandlers(): void {
@@ -40,6 +87,11 @@ function createConnectHandlers(): void {
 
 	const objectId = gridState.getObjectId();
 	if (!objectId) return;
+	node.networkNode.subscribeToGroupPeerChanges(({ peerId, subscribed, topic }) => {
+		if (topic !== objectId || subscribed) return;
+		gridState.transientPositions.delete(peerId);
+		render();
+	});
 
 	node.messageQueueManager.subscribe(objectId, () => {
 		if (!gridState.drpObject?.id) return;
@@ -48,6 +100,9 @@ function createConnectHandlers(): void {
 	});
 
 	node.subscribe(objectId, () => {
+		if (gridState.ephemeralChannel === undefined && gridState.getGridDRP().query_users().length > 1) {
+			activateEphemeralMovement();
+		}
 		render();
 	});
 }
@@ -61,6 +116,7 @@ function run(metrics?: IMetrics): void {
 		const node = gridState.getNode();
 
 		gridState.drpObject = await node.createObject({
+			acl: createPermissionlessACL(node.networkNode.peerId),
 			drp: new Grid(),
 			metrics,
 		});
@@ -72,6 +128,7 @@ function run(metrics?: IMetrics): void {
 			gridState.drpObject.acl.setKey(gridState.node?.keychain.blsPublicKey);
 		}
 		addUser();
+		activateEphemeralMovement();
 		render();
 	};
 
@@ -90,7 +147,10 @@ function run(metrics?: IMetrics): void {
 		const node = gridState.getNode();
 
 		try {
+			const creatorPeerId = creatorFromObjectID(drpId);
+			if (creatorPeerId === undefined) throw new Error("Grid id is not creator-bound");
 			gridState.drpObject = await node.connectObject({
+				acl: createPermissionlessACL(creatorPeerId),
 				id: drpId,
 				drp: new Grid(),
 				metrics,
@@ -98,6 +158,7 @@ function run(metrics?: IMetrics): void {
 			gridState.gridDRP = gridState.drpObject.drp;
 			createConnectHandlers();
 			addUser();
+			if (gridState.getGridDRP().query_users().length > 1) activateEphemeralMovement();
 			render();
 			console.log("Succeeded in connecting with DRP", drpId);
 		} catch (e) {

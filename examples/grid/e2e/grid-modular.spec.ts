@@ -176,6 +176,14 @@ test("keeps a room joinable through a surviving replica after the creator leaves
 		await replicaPage.click("#joinGrid");
 		await expect(creatorPage.locator("#objectPeers")).toContainText(replicaPeerId);
 		await expect(replicaPage.locator("#objectPeers")).toContainText(creatorPeerId);
+		// Peer discovery is only transport readiness. Do not advertise this replica
+		// as the room's survivor until both durable admissions have actually merged.
+		await expect(replicaPage.locator(`[data-glowing-peer-id="${creatorPeerId}"]`)).toBeVisible({
+			timeout: 30_000,
+		});
+		await expect(creatorPage.locator(`[data-glowing-peer-id="${replicaPeerId}"]`)).toBeVisible({
+			timeout: 30_000,
+		});
 
 		// The surviving replica must be discoverable through the ROOM namespace itself
 		// before the creator leaves — in this two-node fixture the app-wide namespace

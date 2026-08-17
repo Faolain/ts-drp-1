@@ -180,7 +180,8 @@ export const render = (): void => {
 	if (!users) return;
 	for (const userColorString of users) {
 		const [id, color] = userColorString.split(":");
-		const position = gridState.gridDRP?.query_userPosition(userColorString);
+		const durablePosition = gridState.gridDRP?.query_userPosition(userColorString);
+		const position = (id === undefined ? undefined : gridState.transientPositions.get(id)) ?? durablePosition;
 		const node = gridState.getNode();
 		if (position) {
 			const div = document.createElement("div");
