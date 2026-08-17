@@ -18227,12 +18227,12 @@ deliberately out of scope for the rendezvous work — **so nobody owns this toda
 | Data-plane peers per hot object | **8–12** + 1–2 relays      | —              |
 | Discovery advertise set         | **≤ mesh budget + relays** | full           |
 
-| Slice  | Change                                                                                                                                                                            | RED test → GREEN                                                                                                                                                                                                                                                                                  |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **T1** | `maxConnections` + `maxParallelDials` + prioritized eviction (protect relay reservations, active mesh peers, in-flight transfers)                                                 | Flood 200 discovered peers → `expect(connections.length).toBeLessThanOrEqual(C)`; reservations and mesh peers never evicted                                                                                                                                                                       |
-| **T2** | Sync/fetch partner selection restricted to **currently connected mesh members** (intersect `getGroupPeers` with `getControlPlaneConnections()`), never the raw subscriber list    | 100 subscribers, 6 connected → all probe targets ∈ connected set; dial-failure rate ~0 in churn sim                                                                                                                                                                                               |
-| **T3** | **PeerSelector**: one admission point from discovery (rendezvous room-presence, PX, pubsub discovery) into the connection budget; deployment-size-gate the global discovery topic | **Invariant: surfaced-and-dialed ≤ budget**, asserted from the connection census. 1k peers/room in the `network-spike` failure-campaign simulation + a **50-real-browser** Playwright ceiling check — a 1k-real-browser lab does not exist, and pretending it does is how 8g became unfalsifiable |
-| **T4** | Designated-relay mesh preference via gossipsub scoring (the operator-spine hook)                                                                                                  | Relay-tagged peers retained in mesh under churn; spine-assisted 5k-replica sim                                                                                                                                                                                                                    |
+| Slice  | Change                                                                                                                                                                             | RED test → GREEN                                                                                                                                                                                                                                                                                  |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **T1** | Hard total connection admission + `maxConnections` + `maxParallelDials`; preserve existing connections and reject excess concurrent upgrades rather than promising unsafe eviction | Flood 200 discovered peers → every event prefix has `connections.length <= C`; a full host denies another upgrade and one close releases exactly one slot                                                                                                                                         |
+| **T2** | Sync/fetch partner selection restricted to GossipSub's **currently connected topic mesh**, while raw live subscriber membership remains available to membership consumers          | 100 live subscribers, 6 mesh neighbors → all implicit probe targets ∈ mesh; disconnect and empty-mesh cases make no new direct dial                                                                                                                                                               |
+| **T3** | **PeerSelector**: one admission point from discovery (rendezvous room-presence, PX, pubsub discovery) into the connection budget; deployment-size-gate the global discovery topic  | **Invariant: surfaced-and-dialed ≤ budget**, asserted from the connection census. 1k peers/room in the `network-spike` failure-campaign simulation + a **50-real-browser** Playwright ceiling check — a 1k-real-browser lab does not exist, and pretending it does is how 8g became unfalsifiable |
+| **T4** | Designated-relay mesh preference, reserved admission and lower-priority idle replacement (the operator-spine hook)                                                                 | Relay-tagged peers retain or obtain bounded mesh/admission slots under churn; spine-assisted 5k-replica sim                                                                                                                                                                                       |
 
 ---
 
@@ -47450,3 +47450,218 @@ permissionless membership, E2, topology scale, P6 completion, MMORPG readiness,
 or completion of the broader production-hardening plan. The next slice is the
 already-planned T1/T2 connection and dialing budget work; corrected E2 follows
 only after that topology authority exists.
+
+### D.93.47 — hard connection admission and mesh-bound room traffic
+
+T1/T2 starts from signed D.93.46b closure `a71febda02b68c13f55c3a0a5e2e25d55cfc492e` /
+tree `8bf998f0293a13d03db01e69fe501a396b4fbf4e`. The source and dependency audit
+corrected two assumptions in the original Track-T sketch. First, libp2p's
+`maxConnections` is an inbound admission check and an asynchronous outbound
+pruning threshold, not a hard total ceiling: concurrent outbound upgrades may
+cross it and ordinary DRP connections carry a persistent GossipSub stream that
+the installed unused-connection closer will not prune. Second,
+GossipSub `getSubscribers()` is populated by live subscription RPCs and removes
+a peer from every topic on pubsub disconnect. Intersecting that set with a second
+connection census would duplicate an existing owner while still selecting every
+connected subscriber rather than the bounded GossipSub mesh. T1 therefore adds
+the missing hard admission boundary; T2 selects the real mesh that already owns
+connected room-neighbor membership.
+
+#### T1 hard admission
+
+One internal connection-budget owner resolves an immutable role profile before
+host construction. Browser and worker clients default to a hard ceiling of 48
+connections and six parallel dials. A node that actually enables the Circuit
+Relay service uses the relay-operator profile, capped at 2,000 and 32. Other Node
+hosts, including forward-only non-relay seeds, explicitly retain the installed
+Node profile of 300 and 100 rather than being silently reclassified as browser
+clients. Relay service capability takes precedence when a seed is also a relay.
+
+An optional `network_config.connection_budget` supplies `max_connections` and
+`max_parallel_dials` together. It may reduce but never raise its resolved role
+profile. Both values
+must be positive safe integers and parallel dials must be strictly below the
+hard ceiling. Missing-one-side, unknown, zero, negative, fractional, unsafe and
+over-profile values fail before any host is built. Restart resolves the new
+configuration afresh.
+
+The hard ceiling is enforced at libp2p's final inbound and outbound upgraded-
+connection gater, immediately before a connection object is published. The owner
+atomically reserves a slot across concurrent upgrades, reconciles it on real
+`connection:open` / `connection:close` events, and holds uncertain reservations
+fail-closed until their bounded lifecycle expiry. The owner exists before
+`createLibp2p()` auto-starts. While it is unattached, reservations cannot expire.
+After the host returns, one synchronous barrier turn installs the listeners and
+unions the initial real connection objects into an identity-keyed live set while
+preserving every unconsumed reservation; it never resets a scalar counter from
+the census length and contains no `await` at which another upgrade can interleave.
+Only after that barrier completes do reservation expiry clocks begin. Startup
+with an already-open connection and every restart follow this same
+attach/reconcile barrier. The reservation liveness bound is no shorter than the
+installed dial deadline; tests control ordering and eventual release rather than
+freezing an incidental millisecond constant. The owner composes with the existing
+address gate; it is not a caller-selectable bypass or a test hook. The exact hard
+ceiling is also installed as libp2p `maxConnections`, and the resolved dial limit
+is installed as `maxParallelDials`; no lower watermark silently reduces inbound
+capacity and no DRP eviction scheduler is added.
+
+A genuine outbound flood and a concurrent inbound upgrade case at a reduced test
+ceiling must never exceed the hard ceiling at any event prefix. A full host
+rejects another upgrade without closing any existing GossipSub or DRP stream;
+one real close releases exactly one slot. Duplicate open/close events, rejected
+upgrades, uncertain reservation expiry and restart are covered independently.
+T1 does not claim that a late relay can displace an already admitted connection:
+reserved priority capacity and lower-priority replacement belong to T4, where
+the operator spine has enough context to make that decision honestly.
+
+The resolved role, hard ceiling and parallel-dial limit are
+immutable host-snapshot evidence and are exposed through the existing network
+diagnostic surface. `examples/browser-network/src/session.ts`, the actual owner
+behind the grid's re-export, projects the same read-only evidence. The existing
+two-client v3-zone browser proof compares each real connection census with its
+installed hard ceiling.
+
+#### T2 mesh-bound implicit partners
+
+The installed GossipSub owner distinguishes all live topic subscribers from the
+smaller live topic mesh. DRP preserves `getGroupPeers(group)` as subscriber-
+membership evidence for its existing membership, ingress and ephemeral
+consumers. The same method accepts one optional closed view, `"mesh"`, for
+implicit durable traffic; existing one-argument structural implementations stay
+valid and no second required interface member is introduced. The network random
+group send, implicit fetch/scheduled sync and both initial and periodic interval-
+sync selection request the mesh view. Explicit peer IDs from authenticated
+inbound reciprocity, the existing subscription-change initial probe, or a
+targeted caller remain explicit sends. The mesh invariant applies to implicit
+set-selection paths, not to those already-authenticated explicit peer IDs. No
+generic intersection helper, parallel membership registry or automatic fallback
+to all subscribers is introduced. `sendGroupMessageRandomPeer` currently reads
+`getSubscribers()` directly and must be converted in `node.ts`; changing only
+the public method signature cannot satisfy T2.
+
+For a stable mesh the interval owner rotates through every mesh peer before
+repeating. Churn rereads the current mesh on every tick; a disconnected peer is
+removed by GossipSub and an empty mesh produces no direct dial. A controlled
+fixture supplies 100 subscribers and an exact six-peer mesh to prove that
+implicit targets stay inside the mesh. A separate genuine unseeded multi-host
+control asserts targets against the actual observed mesh, not a brittle exact
+degree, and proves subscribe, mesh formation, disconnect removal and zero post-
+disconnect implicit dials. Forward-only seeds deliberately have a zero-degree
+mesh and originate no implicit object fetch or sync; explicit targeted traffic
+remains available.
+
+#### Signed TDD and exact scope
+
+The plan-only commit lands first. Its tests-only RED is its sole child and may
+change exactly these existing or new test owners:
+
+- modify `packages/network/tests/role-decoupling.test.ts`, the existing role
+  owner, for the three installed budget profiles, browser/worker resolver input
+  and closed reductions;
+- add `packages/network/tests/connection-admission-budget-t1-red.test.ts` for
+  final-upgrade reservations, hard event-prefix bounds and lifecycle release;
+- add `packages/network/tests/mesh-peer-selection-t2-red.test.ts` for genuine
+  subscriber/mesh/disconnect behavior and random group sends;
+- modify `packages/node/tests/anti-entropy.test.ts` and
+  `packages/node/tests/sync-peerless-negotiated-egress-1n-c-red.test.ts`, the
+  existing periodic and peerless selection owners, to require the mesh view;
+- modify the already matched `tests/phase-3a1b-d9346-v3-zone.pw.ts` to assert the
+  two real browser censuses against their reported budgets; and
+- remove only the obsolete skipped legacy-room T1 row from
+  `examples/grid/e2e/grid-modular.spec.ts`, leaving relay readiness unchanged.
+
+The RED keeps the real subscriber-membership and ingress controls green and fails
+causally on the absent budget/admission snapshot and absent mesh-specific DRP
+selection. It covers all role defaults, reduction and malformed forms; final-
+upgrade races in both directions; auto-start and restart attach/census races;
+event-prefix flood bounds; reservation expiry, close and restart; 100 subscribers
+with an explicitly observed mesh subset; mesh churn; random group send; implicit
+fetch; initial and periodic sync; no-mesh behavior; and the existing two-browser
+zone. Controlled host construction may inspect exact installed options, but it
+may not replace the genuine connection or GossipSub cases or install a production
+test hook. Existing network ingress tests continue to wait on the default
+subscriber view and are not redefined as mesh readiness.
+
+The GREEN is the RED's sole child and may change only:
+
+- `packages/types/src/network.ts` for the closed budget configuration, snapshot,
+  diagnostics and optional mesh-view parameter;
+- add `packages/network/src/connection-budget.ts` as the single resolver and
+  concurrent upgraded-connection admission owner;
+- `packages/network/src/node.ts` to install the hard gate and libp2p limits,
+  expose immutable evidence, and select mesh peers for implicit sends;
+- `packages/node/src/operations.ts` and `packages/node/src/interval-sync.ts` to
+  consume the mesh accessor; and
+- `examples/browser-network/src/session.ts` to project the installed budget in
+  the browser snapshot.
+
+No discovery, rendezvous, relay acquisition, v3-room, zone authority, E1,
+durable protocol, workflow, dependency or lockfile behavior is authorized to
+change. There is one admission owner and one dependency-owned room mesh; no
+compatibility branch, second eviction scheduler, copied scoring oracle or raw-
+subscriber fallback survives. T3 remains the owner of discovery admission and
+global surfaced-peer bounds; T4 remains the owner of relay-spine preference.
+T1/T2 therefore prove bounded connections and bounded implicit room partners,
+not a 50- or 1,000-client deployment claim.
+
+#### Review reconciliation and acceptance
+
+The first bounded plan review was not empty. Kimi and Codex found the unmatched
+new Playwright path; Opus additionally reproduced the soft-ceiling, redundant-
+intersection, seed-role, wrong browser owner, inbound-flood and absolute-priority
+defects. Grok produced a preserved `NO_VERDICT` after its initial short bound.
+This revision resolves those findings by reusing the existing zone test/config,
+making admission hard at the final upgrade boundary, preserving non-relay seed
+defaults explicitly, projecting from the browser-session owner, using outbound
+and inbound upgrade races, deferring priority replacement to T4, selecting the
+actual GossipSub mesh, and naming the real existing test owners.
+
+The delta review also produced concrete findings rather than unanimous silence.
+Codex and Opus proved that persistent GossipSub streams make a lower pruning-
+watermark settlement claim unreachable and that the named node test files did
+not exist. Kimi and Opus found the affected selection tests; Opus additionally
+identified the required-interface blast radius, seed zero-mesh consequence and
+literal-six fragility. The final design installs one exact hard ceiling as
+libp2p `maxConnections`, removes pruning settlement from acceptance, makes mesh
+one optional view on the existing `getGroupPeers` method, updates the real
+selection owners, treats seed zero-mesh behavior as deliberate, and separates
+the controlled exact-six vector from genuine observed-mesh evidence. Existing
+one-argument fakes remain type-correct; no twelve-file compatibility migration is
+needed. Grok's delta run preserved 1,023 streamed events but again terminated
+`NO_VERDICT` without a terminal schema.
+
+The final-delta round returned PASS from Kimi and Opus and a terminal PASS from
+Grok after 510 seconds. Codex found one remaining startup race: auto-start can
+publish a connection before DRP attaches its listeners. The attach/census barrier
+above closes it causally and is covered at start and restart; it does not add a
+second counter or lifecycle owner. The exact-delta rereview then returned PASS
+from Codex, Kimi, Grok and Opus. Kimi and Opus noted that `atomically reconcile`
+could still tempt an implementation to reset a scalar from census length, lose an
+unpublished reservation or double-count an event that lands beside the census.
+The final wording instead requires one no-`await`, identity-keyed union that
+preserves unconsumed reservations before enabling expiry.
+
+RED and GREEN each receive the normal bounded Codex, Kimi 100-step, Grok and
+Opus xhigh reviews. A full review has fifteen minutes and may extend to twenty
+only while relevant source-review events continue; a narrow delta has eight
+minutes and may extend to twelve on visible progress. Grok runs through the
+artifact-preserving review runner, with JSONL, stderr, public response and status
+kept together. `NO_VERDICT` and timeout are reported honestly rather than treated
+as approval or an automatic blocker; every reproduced substantive finding is
+fixed or dismissed with source evidence before signing.
+
+Focused RED/GREEN gates are the network budget owner, the two node selection
+owners and the existing local v3-zone browser case. Final acceptance also runs
+affected network/node tests, the D.93.46b zone and chat preservation cases,
+public export smoke, network/node/types/browser-network/grid typecheck and build,
+ESLint, Prettier, diff-check and a frozen-lockfile install. The ordinary combined
+gate runs independent lanes concurrently: focused unit/network work targets two
+minutes, the reused zone case four minutes, and affected static/build work three
+minutes; the frozen install and aggregate wall clock must still remain below ten
+minutes under normal uncontended load. The browser census assertion proves real
+snapshot projection, not the hard cap by itself; the reduced genuine flood and
+concurrent-upgrade cases are the causal cap evidence. All measured durations are
+recorded. Public-infrastructure and fully-public browser cases remain opt-in.
+Closure is a separate signed ledger and claims only hard host admission plus
+mesh-bound implicit room traffic. Corrected E2 is the next slice; the broader
+topology, P6 and production-hardening plan stay open.
