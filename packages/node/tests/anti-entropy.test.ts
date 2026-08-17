@@ -1,7 +1,7 @@
 /**
  * Contract: the anti-entropy service lives in packages/node/src/interval-sync.ts
  * and exports createDRPIntervalSync({ id, node, interval }). A tick selects a
- * peer from networkNode.getGroupPeers(id) and sends a negotiated SYNC probe.
+ * peer from networkNode.getGroupPeers(id, "mesh") and sends a negotiated SYNC probe.
  * This fixture selects heads-chunk, so equal replicas may exchange one bounded
  * probe, but the receiver must answer with no SYNC_ACCEPT and therefore send no
  * vertices/full-state traffic.
@@ -205,6 +205,36 @@ describe("periodic anti-entropy", () => {
 		nodes.splice(nodes.indexOf(node), 1);
 	}, 20_000);
 
+	test("connected-object initial and periodic probes both select only current mesh peers", async () => {
+		const objectId = "anti-entropy-connected-mesh-object";
+		const node = await makeNode("anti-entropy-connected-mesh");
+		nodes.push(node);
+		await node.createObject({ id: objectId, drp: new CounterDRP(), acl: createPermissionlessACL() });
+		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue(["mesh-peer"]);
+		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
+		vi.useFakeTimers();
+		const interval = createDRPIntervalSync({
+			id: objectId,
+			interval: 10_000,
+			node,
+			replicaOrigin: "connected",
+		});
+		intervals.push(interval);
+
+		interval.start();
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		expect(groupPeers.mock.calls).toEqual([
+			[objectId, "mesh"],
+			[objectId, "mesh"],
+		]);
+		expect(syncObject.mock.calls).toEqual([
+			[objectId, "mesh-peer"],
+			[objectId, "mesh-peer"],
+		]);
+	}, 20_000);
+
 	test("a joined object derives creator genesis locally and still probes its first peer once", async () => {
 		// Creator-bound id contract: the joiner derives the creator's genesis ACL
 		// from the id alone, so "unsynced" can no longer mean "zero finality
@@ -324,7 +354,7 @@ describe("periodic anti-entropy", () => {
 		const intervalMs = 1_000;
 		const node = await makeNode("anti-entropy-peer-rotation");
 		nodes.push(node);
-		vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue(["peer-c", "peer-a", "peer-b"]);
+		const groupPeers = vi.spyOn(node.networkNode, "getGroupPeers").mockReturnValue(["peer-c", "peer-a", "peer-b"]);
 		vi.spyOn(Math, "random").mockReturnValue(0.9);
 		const syncObject = vi.spyOn(node, "syncObject").mockResolvedValue();
 		vi.useFakeTimers();
@@ -335,6 +365,12 @@ describe("periodic anti-entropy", () => {
 		await vi.advanceTimersByTimeAsync(0);
 		await vi.advanceTimersByTimeAsync(intervalMs * 3);
 
+		expect(groupPeers.mock.calls).toEqual([
+			["peer-rotation-object", "mesh"],
+			["peer-rotation-object", "mesh"],
+			["peer-rotation-object", "mesh"],
+			["peer-rotation-object", "mesh"],
+		]);
 		expect(syncObject.mock.calls.map(([, peer]) => peer)).toEqual(["peer-c", "peer-a", "peer-b", "peer-c"]);
 	});
 

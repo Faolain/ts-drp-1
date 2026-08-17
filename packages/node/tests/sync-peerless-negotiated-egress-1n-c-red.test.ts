@@ -107,7 +107,7 @@ function createFakeNetwork(events: string[]): FakeNetwork {
 		events.push("generic-random-send");
 		return Promise.resolve();
 	});
-	const getGroupPeers = vi.fn((_group: string): string[] => {
+	const getGroupPeers = vi.fn((_group: string, _view?: "mesh"): string[] => {
 		events.push("group-peers");
 		return [...peers];
 	});
@@ -260,7 +260,7 @@ describe("Phase 1n-c peerless negotiated sync egress", () => {
 
 		const rejection = await rejectionFrom(harness.node.syncObject(harness.object.id));
 		expect.soft(rejection).toMatchObject({ code: "SYNC_FALLBACK_LIMIT" });
-		expect.soft(harness.network.getGroupPeers).toHaveBeenCalledWith(harness.object.id);
+		expect.soft(harness.network.getGroupPeers).toHaveBeenCalledWith(harness.object.id, "mesh");
 		expect.soft(harness.events.slice(0, 3)).toEqual(["group-peers", `negotiated:${harness.peerId}`, "payload-factory"]);
 		expect.soft(harness.sender.invocations).toEqual([harness.peerId]);
 		expect.soft(harness.sender.transmitted).toEqual([]);
@@ -383,7 +383,7 @@ describe("Phase 1n-c peerless negotiated sync egress", () => {
 
 		await harness.node.syncObject(harness.object.id);
 
-		expect.soft(harness.network.getGroupPeers).toHaveBeenCalledWith(harness.object.id);
+		expect.soft(harness.network.getGroupPeers).toHaveBeenCalledWith(harness.object.id, "mesh");
 		expect.soft(harness.sender.invocations).toEqual([]);
 		expect.soft(harness.sender.transmitted).toEqual([]);
 		expect.soft(genericDiagnostics(harness.network)).toEqual({

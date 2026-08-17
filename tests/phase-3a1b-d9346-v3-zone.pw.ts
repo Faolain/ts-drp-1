@@ -28,6 +28,12 @@ interface ZoneApi {
 }
 
 interface NetworkSnapshot {
+	readonly connectionBudget: Readonly<{
+		readonly maxConnections: number;
+		readonly maxParallelDials: number;
+		readonly role: "browser";
+	}>;
+	readonly connections: readonly unknown[];
 	readonly peerId: string;
 }
 
@@ -59,12 +65,17 @@ async function zone(page: Page): Promise<ZoneSnapshot> {
 	});
 }
 
-async function peerId(page: Page): Promise<string> {
+async function networkSnapshot(page: Page): Promise<NetworkSnapshot> {
 	return page.evaluate(() => {
 		const session = window.__TS_DRP_GRID_SESSION__;
 		if (session === undefined) throw new Error("D9346_GRID_NETWORK_SESSION_ABSENT");
-		return session.snapshot().peerId;
+		return session.snapshot();
 	});
+}
+
+function expectWithinInstalledBudget(snapshot: NetworkSnapshot): void {
+	expect(snapshot.connectionBudget).toEqual({ maxConnections: 48, maxParallelDials: 6, role: "browser" });
+	expect(snapshot.connections.length).toBeLessThanOrEqual(snapshot.connectionBudget.maxConnections);
 }
 
 test("two real network clients recover and converge one durable v3 zone while movement stays transient", async ({
@@ -77,7 +88,11 @@ test("two real network clients recover and converge one durable v3 zone while mo
 	let joiner = await joinerContext.newPage();
 	try {
 		await Promise.all([openGrid(creator), openGrid(joiner)]);
-		const [creatorPeerId, joinerPeerId] = await Promise.all([peerId(creator), peerId(joiner)]);
+		const [creatorNetwork, joinerNetwork] = await Promise.all([networkSnapshot(creator), networkSnapshot(joiner)]);
+		expectWithinInstalledBudget(creatorNetwork);
+		expectWithinInstalledBudget(joinerNetwork);
+		const creatorPeerId = creatorNetwork.peerId;
+		const joinerPeerId = joinerNetwork.peerId;
 		const [creatorEnrollment, joinerEnrollment] = await Promise.all([zone(creator), zone(joiner)]);
 		expect(creatorEnrollment.ready).toBe(false);
 		expect(joinerEnrollment.ready).toBe(false);
