@@ -1,4 +1,5 @@
-import { hashDomain } from "@ts-drp/canonical";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type {
 	DurableIssuanceOutboxRecord,
 	DurableIssuanceStore,
@@ -99,7 +100,7 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 		const surface = (await import("../packages/node/src/v3-live.js")) as unknown as Record<string, unknown>;
 		const recover = surface.recoverV3LiveReplica as Recover;
 		const activate = surface.activateV3LivePlane as Activate;
-		const fixture = await createGenuinePreparedV3Fixture();
+		const fixture = await createGenuinePreparedV3Fixture({ authorizationMode: "latched-acl" });
 		const trace: string[] = [];
 		const localJournal = deferred<Awaited<ReturnType<DurableLiveJournalStore["appendAccepted"]>>>();
 		try {
@@ -108,6 +109,23 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			const recoveryDigest = Array.from(recoveryVertex.digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 			const recoveryCommit = commitFor(scope, 0, recoveryVertex.canonicalPreimageBytes, recoveryVertex.signature);
 			let pendingCommit: DurableIssueCommit | undefined;
+			const readIssued = vi.fn((_selectedScope: DurableIssueScope, sequence: number) =>
+				Promise.resolve(sequence === 0 ? recoveryCommit : (pendingCommit ?? null))
+			);
+			const readOutboxPage = vi.fn((input: Parameters<DurableIssuanceStore["readOutboxPage"]>[0] = {}) => {
+				const rows: DurableIssuanceOutboxRecord[] = [
+					Object.freeze({ commit: recoveryCommit, publishState: "published" as const }),
+				];
+				if (pendingCommit !== undefined) {
+					rows.push(Object.freeze({ commit: pendingCommit, publishState: "pending" as const }));
+				}
+				const after = input.afterKey?.[2];
+				return Promise.resolve(
+					rows
+						.filter((row) => after === undefined || row.commit.authorSequence > after)
+						.slice(0, input.limit ?? rows.length)
+				);
+			});
 			const issuanceStore: DurableIssuanceStore = {
 				transactIssue: async (selectedScope, buildAndSign) => {
 					expect(selectedScope).toEqual(scope);
@@ -122,22 +140,8 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 					trace.push("mark");
 					return Promise.resolve();
 				},
-				readIssued: (_selectedScope, sequence) =>
-					Promise.resolve(sequence === 0 ? recoveryCommit : (pendingCommit ?? null)),
-				readOutboxPage: (input = {}) => {
-					const rows: DurableIssuanceOutboxRecord[] = [
-						Object.freeze({ commit: recoveryCommit, publishState: "published" as const }),
-					];
-					if (pendingCommit !== undefined) {
-						rows.push(Object.freeze({ commit: pendingCommit, publishState: "pending" as const }));
-					}
-					const after = input.afterKey?.[2];
-					return Promise.resolve(
-						rows
-							.filter((row) => after === undefined || row.commit.authorSequence > after)
-							.slice(0, input.limit ?? rows.length)
-					);
-				},
+				readIssued,
+				readOutboxPage,
 				readLineage: () => Promise.resolve(Object.freeze({ exhausted: false, next: 1 })),
 				close: () => Promise.resolve(),
 			};
@@ -156,6 +160,23 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 				snapshotDigest: "3".repeat(64),
 			});
 			let localInput: AppendAcceptedVertexInput | undefined;
+			const appendAccepted = vi.fn((input: AppendAcceptedVertexInput) => {
+				if (input.vertexDigest === recoveryDigest) {
+					return Promise.resolve(
+						Object.freeze({
+							ok: true as const,
+							scope: journalScope,
+							journalSequence: 0,
+							vertexDigest: input.vertexDigest,
+							sourceKind: input.sourceKind,
+							idempotent: false,
+						})
+					);
+				}
+				localInput = input;
+				trace.push("journal:local");
+				return localJournal.promise;
+			});
 			const journalStore: DurableLiveJournalStore = {
 				installGenesis: () =>
 					Promise.resolve(
@@ -174,34 +195,37 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 					Promise.resolve(
 						Object.freeze({ ok: true as const, scope: journalScope, snapshot, rows: [], nextSequence: null })
 					),
-				appendAccepted(input) {
-					if (input.vertexDigest === recoveryDigest) {
-						return Promise.resolve(
-							Object.freeze({
-								ok: true as const,
-								scope: journalScope,
-								journalSequence: 0,
-								vertexDigest: input.vertexDigest,
-								sourceKind: input.sourceKind,
-								idempotent: false,
-							})
-						);
-					}
-					localInput = input;
-					trace.push("journal:local");
-					return localJournal.promise;
-				},
+				appendAccepted,
 				close: () => Promise.resolve(),
 			};
 			const recovered = await recover({
 				capability: fixture.capability,
-				exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes,
+				exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes,
 				issuanceScope: scope,
 				issuanceStore,
 				liveJournalStore: journalStore,
 			});
 			expect(recovered.ok).toBe(true);
 			if (!recovered.ok) throw new TypeError(`recovery failed: ${recovered.kind}`);
+			expect(recovered.capability).not.toBe(fixture.capability);
+			expect(Object.isFrozen(recovered.capability)).toBe(true);
+			expect(readIssued).toHaveBeenCalledTimes(1);
+			expect(readIssued).toHaveBeenCalledWith(scope, 0);
+			expect(readOutboxPage).toHaveBeenCalledTimes(2);
+			expect(readOutboxPage).toHaveBeenNthCalledWith(1, { limit: 1, scope });
+			expect(readOutboxPage).toHaveBeenNthCalledWith(2, {
+				afterKey: [scope.objectId, scope.author, 0],
+				limit: 1,
+				scope,
+			});
+			expect(appendAccepted).toHaveBeenCalledTimes(1);
+			expect(appendAccepted).toHaveBeenCalledWith({
+				author: fixture.author,
+				authorSequence: 0,
+				scope: journalScope,
+				sourceKind: "local-issued",
+				vertexDigest: recoveryDigest,
+			});
 			const sink = vi.fn((delivery: Readonly<{ readonly vertex: Readonly<{ readonly authorSequence: number }> }>) => {
 				trace.push(`sink:${delivery.vertex.authorSequence}`);
 			});
@@ -224,7 +248,7 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 				Object.freeze({
 					dependencies: Object.freeze([recoveryDigest]),
 					logicalTime: 2,
-					operation: Object.freeze({ action: "add", value: 7 }),
+					operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "d".repeat(64) }),
 					signRegisteredVertexDigest: signer,
 				}),
 			]) as Promise<Readonly<Record<string, unknown>>>;
@@ -238,6 +262,40 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			expect(sink).not.toHaveBeenCalled();
 			expect(Reflect.get(activeNetwork, "publishMessage")).not.toHaveBeenCalled();
 			if (localInput === undefined) throw new TypeError("missing local journal input");
+			if (pendingCommit === undefined) throw new TypeError("missing issued commit");
+			const exactOperation = Object.freeze({
+				action: "acl",
+				group: "writer",
+				kind: "grant",
+				target: "d".repeat(64),
+			});
+			const exactDigestBytes = hashDomain("ts-drp/vertex/v3", pendingCommit.envelope.canonicalPreimageBytes);
+			const exactDigest = Array.from(exactDigestBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+			expect(pendingCommit.envelope.digest).toEqual(exactDigestBytes);
+			expect(
+				ed25519.verify(pendingCommit.envelope.signature, pendingCommit.envelope.digest, fixture.authorPublicKey, {
+					zip215: false,
+				})
+			).toBe(true);
+			expect(decodeCanonical(pendingCommit.envelope.canonicalPreimageBytes)).toEqual({
+				anchor: fixture.descriptor.anchorDigest,
+				author: fixture.author,
+				authorSequence: 1,
+				dependencies: [recoveryDigest],
+				epoch: 0,
+				kind: "drp-vertex",
+				logicalTime: 2,
+				objectId: fixture.descriptor.objectId,
+				operation: exactOperation,
+				protocolMajor: 3,
+			});
+			expect(localInput).toEqual({
+				author: fixture.author,
+				authorSequence: 1,
+				scope: journalScope,
+				sourceKind: "local-issued",
+				vertexDigest: exactDigest,
+			});
 			localJournal.resolve(
 				Object.freeze({
 					ok: true as const,
@@ -258,9 +316,44 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			expect(Object.isFrozen(issued)).toBe(true);
 			expect(trace).toEqual(["issue:start", "sign", "issue:commit", "journal:local", "sink:1"]);
 			expect(sink).toHaveBeenCalledTimes(1);
+			const previewLatchedAcl = Reflect.get(activated.handle, "previewLatchedAcl");
+			expect(previewLatchedAcl).toBeTypeOf("function");
+			const preview = Reflect.apply(previewLatchedAcl as (...args: unknown[]) => unknown, activated.handle, []);
+			expect(preview).toMatchObject({
+				current: {
+					epoch: 0,
+					members: [
+						{
+							author: fixture.author,
+							finalityKey: fixture.author,
+							groups: ["admin", "finality", "writer"],
+						},
+					],
+				},
+				next: {
+					epoch: 1,
+					members: [
+						{
+							author: fixture.author,
+							finalityKey: fixture.author,
+							groups: ["admin", "finality", "writer"],
+						},
+						{ author: "d".repeat(64), finalityKey: null, groups: ["writer"] },
+					],
+				},
+				stagedOperations: [
+					{
+						actor: fixture.author,
+						digest: localInput.vertexDigest,
+						operation: { group: "writer", kind: "grant", target: "d".repeat(64) },
+					},
+				],
+			});
+			expect(Reflect.get(preview as object, "nextDigest")).toMatch(/^[0-9a-f]{64}$/u);
 			expect(await publishPromise).toEqual({ ok: true, kind: "published" });
 			expect(trace).toEqual(["issue:start", "sign", "issue:commit", "journal:local", "sink:1", "publish", "mark"]);
-			activated.handle.deactivate?.();
+			const deactivate = Reflect.get(activated.handle, "deactivate");
+			if (typeof deactivate === "function") Reflect.apply(deactivate, activated.handle, []);
 		} finally {
 			await fixture.close();
 		}

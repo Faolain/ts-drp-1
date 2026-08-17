@@ -24,6 +24,7 @@ import packageGolden from "../track-p2-b/forward-counter-package.json" with { ty
 
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const ARTIFACT = path.join(ROOT, "tests/fixtures/track-p2-c/primary.mjs");
+const LATCHED_ACL_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,"read-value":readReducer,set:setReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -47,6 +48,7 @@ export interface GenuinePreparedV3Fixture {
 	readonly authorPublicKey: Uint8Array;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array | undefined;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly detachedAnchorSignature: Uint8Array;
 	readonly capability: PreparedV3Live;
@@ -69,6 +71,7 @@ export interface GenuinePreparedV3Fixture {
 }
 
 export interface GenuinePreparedV3FixtureOptions {
+	readonly authorizationMode?: "latched-acl" | "legacy-author-list";
 	readonly prepareV3LiveGeneration?: typeof defaultPrepareV3LiveGeneration;
 }
 
@@ -87,12 +90,34 @@ function lowerHex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function blueprintFixture(): BlueprintFixture {
-	const exactArtifactBytes = new TextEncoder().encode(readFileSync(ARTIFACT, "utf8"));
+function blueprintFixture(authorizationMode: "latched-acl" | "legacy-author-list"): BlueprintFixture {
+	const exactArtifactBytes = new TextEncoder().encode(
+		authorizationMode === "latched-acl" ? LATCHED_ACL_ARTIFACT_SOURCE : readFileSync(ARTIFACT, "utf8")
+	);
 	const artifactDigest = lowerHex(hashDomain(packageGolden.artifactDigestDomain, exactArtifactBytes));
 	const packageRecord = Object.freeze({
 		...packageGolden.package,
 		implementation: Object.freeze({ ...packageGolden.package.implementation, artifactDigest }),
+		manifest:
+			authorizationMode === "latched-acl"
+				? Object.freeze({
+						...packageGolden.package.manifest,
+						operations: Object.freeze([
+							Object.freeze({
+								argumentSchema: Object.freeze({
+									fields: Object.freeze([
+										Object.freeze({ name: "group", required: true, type: "string" }),
+										Object.freeze({ name: "kind", required: true, type: "string" }),
+										Object.freeze({ name: "target", required: true, type: "string" }),
+									]),
+									kind: "closed-record",
+								}),
+								name: "acl",
+							}),
+							...packageGolden.package.manifest.operations,
+						]),
+					})
+				: packageGolden.package.manifest,
 	});
 	const canonicalBlueprintPackageBytes = encodeCanonical(packageRecord);
 	return Object.freeze({
@@ -104,8 +129,7 @@ function blueprintFixture(): BlueprintFixture {
 	});
 }
 
-function catalog(): TrustedBlueprintCatalog {
-	const fixture = blueprintFixture();
+function catalog(fixture: BlueprintFixture): TrustedBlueprintCatalog {
 	return Object.freeze({
 		blueprintDigests: Object.freeze([fixture.blueprintDigest]),
 		catalogDigest: "9".repeat(64),
@@ -149,7 +173,8 @@ export async function createGenuinePreparedV3Fixture(
 	const store = createSqliteAheDurableStore({ filename: path.join(directory, "store.sqlite") });
 	const prepareV3LiveGeneration = options.prepareV3LiveGeneration ?? defaultPrepareV3LiveGeneration;
 	try {
-		const fixture = blueprintFixture();
+		const authorizationMode = options.authorizationMode ?? "legacy-author-list";
+		const fixture = blueprintFixture(authorizationMode);
 		const base = makeCreatorMaterial({ objectId: `creator:${"a".repeat(32)}` });
 		const author = bytesHex(ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)));
 		const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
@@ -161,9 +186,29 @@ export async function createGenuinePreparedV3Fixture(
 			protocolMajor: 3,
 			version: 1,
 		});
+		const exactCanonicalLatchedAclBytes =
+			authorizationMode === "latched-acl"
+				? encodeCanonical({
+						epoch: 0,
+						kind: "drp-v3-latched-acl",
+						members: [
+							{
+								author,
+								finalityKey: author,
+								groups: ["admin", "finality", "writer"],
+							},
+						],
+						objectId: base.anchor.objectId,
+						permissionless: false,
+						version: 1,
+					})
+				: undefined;
 		const anchor = Object.freeze({
 			...base.anchor,
-			aclDigest: lowerHex(hashDomain("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes)),
+			aclDigest:
+				exactCanonicalLatchedAclBytes === undefined
+					? lowerHex(hashDomain("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes))
+					: lowerHex(hashDomain("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes)),
 			blueprintDigest: fixture.blueprintDigest,
 			parametersDigest: lowerHex(hashDomain("ts-drp/parameters/v3", encodeCanonical(PARAMETERS))),
 		});
@@ -189,7 +234,7 @@ export async function createGenuinePreparedV3Fixture(
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
 			detachedSignature: new Uint8Array(signature),
 			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
-			catalog: catalog(),
+			catalog: catalog(fixture),
 		});
 		const prepared = await prepareV3LiveGeneration(input);
 		if (!prepared.ok) throw new TypeError(`live preparation failed: ${"kind" in prepared ? prepared.kind : "unknown"}`);
@@ -215,6 +260,8 @@ export async function createGenuinePreparedV3Fixture(
 			capability: prepared.capability,
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
 			exactCanonicalAuthorAuthorizationBytes: new Uint8Array(exactCanonicalAuthorAuthorizationBytes),
+			exactCanonicalLatchedAclBytes:
+				exactCanonicalLatchedAclBytes === undefined ? undefined : new Uint8Array(exactCanonicalLatchedAclBytes),
 			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
 			detachedAnchorSignature: new Uint8Array(signature),
 			descriptor: prepared.descriptor,

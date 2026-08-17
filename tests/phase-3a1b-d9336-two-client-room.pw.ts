@@ -13,6 +13,23 @@ interface ChatSnapshot {
 	}>[];
 	readonly acceptedOperationDigest: string;
 	readonly durableTranscriptDigest: string;
+	readonly latchedAcl: Readonly<{
+		readonly currentEpoch: number;
+		readonly currentGroups: Readonly<Record<ClientId, readonly string[]>>;
+		readonly nextDigest: string;
+		readonly nextEpoch: number;
+		readonly nextGroups: Readonly<Record<ClientId, readonly string[]>>;
+		readonly nextSignerClientIds: readonly ClientId[];
+		readonly stagedOperationDigest: string;
+		readonly stagedOperationCount: number;
+		readonly stagedOperations: readonly Readonly<{
+			readonly actorClientId: ClientId;
+			readonly digest: string;
+			readonly group: "admin" | "finality" | "writer";
+			readonly kind: "grant" | "revoke";
+			readonly targetClientId: ClientId;
+		}>[];
+	}>;
 	readonly ready: boolean;
 	readonly roomId: string;
 	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." | "";
@@ -41,6 +58,13 @@ declare global {
 			): Promise<void>;
 			close(): Promise<void>;
 			send(text: string): Promise<void>;
+			submitAcl(
+				operation: Readonly<{
+					readonly group: "admin" | "finality" | "writer";
+					readonly kind: "grant" | "revoke";
+					readonly targetClientId: ClientId;
+				}>
+			): Promise<void>;
 			snapshot(): ChatSnapshot;
 		}>;
 	}
@@ -282,6 +306,109 @@ test("eight clients converge after concurrent partitioned writes and a healed du
 	} finally {
 		await Promise.allSettled(pages.map((page) => page.evaluate(() => window.d9336V3Chat.close())));
 		await Promise.all(pages.map((page) => page.close()));
+	}
+});
+
+test("two clients stage a concurrent Writer grant and Finality revoke for the next epoch", async ({ context }) => {
+	const alice = await context.newPage();
+	const bob = await context.newPage();
+	const run = crypto.randomUUID();
+	const channelName = `d9341-acl-${run}`;
+	try {
+		await Promise.all([install(alice), install(bob)]);
+		const invite = await alice.evaluate((input) => window.d9336V3Chat.create(input), {
+			channelName,
+			clientId: "alice",
+			databaseName: `d9341-acl-alice-${run}`,
+		} as const);
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), {
+			channelName,
+			clientId: "bob",
+			databaseName: `d9341-acl-bob-${run}`,
+			invite,
+		} as const);
+
+		const before = await snapshot(alice);
+		expect(before.latchedAcl).toMatchObject({
+			currentEpoch: 0,
+			currentGroups: {
+				alice: ["admin", "finality", "writer"],
+				bob: ["admin", "writer"],
+				dave: ["finality"],
+			},
+			nextEpoch: 1,
+			nextGroups: {
+				alice: ["admin", "finality", "writer"],
+				bob: ["admin", "writer"],
+				dave: ["finality"],
+			},
+			nextSignerClientIds: ["alice", "dave"],
+			stagedOperationCount: 0,
+			stagedOperations: [],
+		});
+		expect(before.latchedAcl.nextDigest).toMatch(DIGEST);
+		expect(before.latchedAcl.stagedOperationDigest).toMatch(DIGEST);
+
+		await Promise.all([
+			alice.evaluate(() => window.d9336V3Chat.submitAcl({ group: "writer", kind: "grant", targetClientId: "dave" })),
+			bob.evaluate(() => window.d9336V3Chat.submitAcl({ group: "finality", kind: "revoke", targetClientId: "dave" })),
+		]);
+		await expect
+			.poll(async () =>
+				Promise.all([alice, bob].map(async (page) => (await snapshot(page)).latchedAcl.stagedOperationCount))
+			)
+			.toEqual([2, 2]);
+
+		const [aliceState, bobState] = await Promise.all([snapshot(alice), snapshot(bob)]);
+		expect(aliceState.latchedAcl.currentEpoch).toBe(0);
+		expect(aliceState.latchedAcl.currentGroups).toEqual({
+			alice: ["admin", "finality", "writer"],
+			bob: ["admin", "writer"],
+			dave: ["finality"],
+		});
+		expect(aliceState.latchedAcl.nextEpoch).toBe(1);
+		expect(aliceState.latchedAcl.nextGroups).toEqual({
+			alice: ["admin", "finality", "writer"],
+			bob: ["admin", "writer"],
+			dave: ["writer"],
+		});
+		expect(aliceState.latchedAcl.nextSignerClientIds).toEqual(["alice"]);
+		expect(aliceState.latchedAcl.nextDigest).toMatch(DIGEST);
+		expect(aliceState.latchedAcl.nextDigest).not.toBe(before.latchedAcl.nextDigest);
+		expect(aliceState.latchedAcl.stagedOperationDigest).toMatch(DIGEST);
+		expect(aliceState.latchedAcl.stagedOperationDigest).not.toBe(before.latchedAcl.stagedOperationDigest);
+		expect(aliceState.latchedAcl.stagedOperations).toHaveLength(2);
+		expect(aliceState.latchedAcl.stagedOperations.map(({ digest }) => digest)).toEqual(
+			expect.arrayContaining([expect.stringMatching(DIGEST), expect.stringMatching(DIGEST)])
+		);
+		expect(new Set(aliceState.latchedAcl.stagedOperations.map(({ digest }) => digest)).size).toBe(2);
+		expect(aliceState.latchedAcl.stagedOperations).toEqual(
+			expect.arrayContaining([
+				{
+					actorClientId: "alice",
+					digest: expect.stringMatching(DIGEST),
+					group: "writer",
+					kind: "grant",
+					targetClientId: "dave",
+				},
+				{
+					actorClientId: "bob",
+					digest: expect.stringMatching(DIGEST),
+					group: "finality",
+					kind: "revoke",
+					targetClientId: "dave",
+				},
+			])
+		);
+		expect(bobState.latchedAcl).toEqual(aliceState.latchedAcl);
+		expect(aliceState.accepted).toEqual([]);
+		expect(bobState.accepted).toEqual([]);
+	} finally {
+		await Promise.allSettled([
+			alice.evaluate(() => window.d9336V3Chat.close()),
+			bob.evaluate(() => window.d9336V3Chat.close()),
+		]);
+		await Promise.all([alice.close(), bob.close()]);
 	}
 });
 
