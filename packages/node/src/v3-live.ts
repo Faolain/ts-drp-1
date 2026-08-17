@@ -24,6 +24,14 @@ import {
 	openCurrentEpochAuthorAuthorization,
 	resolveCurrentEpochAuthorizedAuthor,
 } from "@ts-drp/protocol-v3/author-authorization";
+import {
+	authorizeLatchedEnvelopeAuthor,
+	deriveNextLatchedSignerSet,
+	type LatchedAclOperation,
+	type LatchedAclSnapshot,
+	openCanonicalLatchedAclSnapshot,
+	stageLatchedAclOperations,
+} from "@ts-drp/protocol-v3/latched-acl";
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
 import {
 	type AheDurableStore,
@@ -301,9 +309,16 @@ export type V3EgressResult =
 
 type PlainRecord = Readonly<Record<string, unknown>>;
 
-const RECOVERY_INPUT_KEYS = [
+const LEGACY_RECOVERY_INPUT_KEYS = [
 	"capability",
 	"exactCanonicalAuthorAuthorizationBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+] as const;
+const LATCHED_RECOVERY_INPUT_KEYS = [
+	"capability",
+	"exactCanonicalLatchedAclBytes",
 	"issuanceScope",
 	"issuanceStore",
 	"liveJournalStore",
@@ -312,13 +327,22 @@ const RECOVERY_INPUT_KEYS = [
 declare const recoveredV3LiveBrand: unique symbol;
 export type RecoveredV3Live = Readonly<{ readonly [recoveredV3LiveBrand]: true }>;
 
-export interface RecoverV3LiveReplicaInput {
+interface RecoverV3LiveReplicaCommonInput {
 	readonly capability: PreparedV3Live;
-	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;
 }
+
+export type RecoverV3LiveReplicaInput =
+	| (RecoverV3LiveReplicaCommonInput &
+			Readonly<{
+				readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+			}>)
+	| (RecoverV3LiveReplicaCommonInput &
+			Readonly<{
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			}>);
 
 export type RecoverV3LiveReplicaFailureKind =
 	| "malformed-input"
@@ -1887,11 +1911,12 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 
 interface V3PlaneRegistration {
 	active: boolean;
-	readonly authorization: CurrentEpochAuthorAuthorization;
+	readonly authorization: V3LiveAuthorization;
 	handle: V3PlaneHandle;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
+	readonly latchedOperations: Map<string, StagedLatchedAclOperation>;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
@@ -2068,6 +2093,111 @@ function lowerHexDigest(bytes: Uint8Array): string | undefined {
 	return result;
 }
 
+function publicKeyBytes(author: string): Uint8Array | undefined {
+	if (!/^[0-9a-f]{64}$/u.test(author)) return undefined;
+	const bytes = new Uint8ArrayConstructor(32);
+	for (let index = 0; index < 32; index += 1) {
+		const pair = author.slice(index * 2, index * 2 + 2);
+		const value = Number.parseInt(pair, 16);
+		if (!Number.isSafeInteger(value)) return undefined;
+		bytes[index] = value;
+	}
+	return bytes;
+}
+
+function resolveV3AuthorizedAuthor(
+	authorization: V3LiveAuthorization,
+	author: string
+): Readonly<{ readonly bytes: Uint8Array; readonly format: "raw" }> | undefined {
+	if (authorization.kind === "author-list") {
+		const resolved = resolveCurrentEpochAuthorizedAuthor({ authorization: authorization.value, author });
+		return resolved.ok ? resolved.publicKey : undefined;
+	}
+	const authority = authorizeLatchedEnvelopeAuthor({ author, snapshot: authorization.value });
+	const bytes = authority.ok && authority.authorized ? publicKeyBytes(author) : undefined;
+	return bytes === undefined ? undefined : ObjectFreeze({ bytes, format: "raw" as const });
+}
+
+function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
+	if (!isObject(value)) return null;
+	const action = ObjectGetOwnPropertyDescriptor(value, "action");
+	if (action === undefined || !("value" in action) || action.value !== "acl") return null;
+	const record = snapshotClosedRecord(value, ["action", "group", "kind", "target"]);
+	if (
+		record === undefined ||
+		(record.kind !== "grant" && record.kind !== "revoke") ||
+		(record.group !== "admin" && record.group !== "finality" && record.group !== "writer") ||
+		typeof record.target !== "string" ||
+		!/^[0-9a-f]{64}$/u.test(record.target)
+	) {
+		return undefined;
+	}
+	return ObjectFreeze({
+		actor: author,
+		digest,
+		operation: ObjectFreeze({
+			actor: author,
+			group: record.group,
+			kind: record.kind,
+			target: record.target,
+		}),
+	});
+}
+
+function orderedLatchedOperations(
+	operations: Map<string, StagedLatchedAclOperation>,
+	candidate?: StagedLatchedAclOperation
+): readonly StagedLatchedAclOperation[] {
+	const selected = [...operations.values()];
+	if (candidate !== undefined) selected.push(candidate);
+	return ObjectFreeze(
+		selected.sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+	);
+}
+
+function validateLatchedOperation(
+	authorization: V3LiveAuthorization,
+	operations: Map<string, StagedLatchedAclOperation>,
+	candidate: StagedLatchedAclOperation | null | undefined
+): boolean {
+	if (candidate === null) return true;
+	if (candidate === undefined || authorization.kind !== "latched-acl" || operations.has(candidate.digest)) return false;
+	return stageLatchedAclOperations({
+		operations: orderedLatchedOperations(operations, candidate).map(({ operation }) => operation),
+		snapshot: authorization.value,
+	}).ok;
+}
+
+function latchedAclPreview(
+	authorization: V3LiveAuthorization,
+	operations: Map<string, StagedLatchedAclOperation>
+): Readonly<Record<string, unknown>> | undefined {
+	if (authorization.kind !== "latched-acl") return undefined;
+	const stagedOperations = orderedLatchedOperations(operations);
+	const staged = stageLatchedAclOperations({
+		operations: stagedOperations.map(({ operation }) => operation),
+		snapshot: authorization.value,
+	});
+	if (!staged.ok) return undefined;
+	const signers = deriveNextLatchedSignerSet({ snapshot: staged.next });
+	if (!signers.ok) return undefined;
+	return ObjectFreeze({
+		current: authorization.value,
+		next: staged.next,
+		nextDigest: lowerHexDigest(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(staged.next))),
+		nextSigners: signers.signers,
+		stagedOperations: ObjectFreeze(
+			stagedOperations.map(({ actor, digest, operation }) =>
+				ObjectFreeze({
+					actor,
+					digest,
+					operation: ObjectFreeze({ group: operation.group, kind: operation.kind, target: operation.target }),
+				})
+			)
+		),
+	});
+}
+
 function deriveV3Topic(payload: PreparedV3LivePayload): string | undefined {
 	try {
 		const objectId = payload.provenance.objectId;
@@ -2125,6 +2255,7 @@ function sameActivation(
 		registration.authorization === recovered.authorization &&
 		registration.index === recovered.index &&
 		registration.issuanceStore === recovered.issuanceStore &&
+		registration.latchedOperations === recovered.latchedOperations &&
 		registration.liveJournalStore === recovered.liveJournalStore &&
 		sameScope(registration.issuanceScope, recovered.issuanceScope) &&
 		registration.payload.provenance.objectId === payload.provenance.objectId &&
@@ -2226,17 +2357,8 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 		}
 		let extracted;
 		try {
-			extracted = extractAuthorizedV3Vertex(
-				registration.payload,
-				receivedCanonicalPreimageBytes,
-				signature,
-				(author) => {
-					const authorResult = resolveCurrentEpochAuthorizedAuthor({
-						author,
-						authorization: registration.authorization,
-					});
-					return authorResult.ok ? authorResult.publicKey : undefined;
-				}
+			extracted = extractAuthorizedV3Vertex(registration.payload, receivedCanonicalPreimageBytes, signature, (author) =>
+				resolveV3AuthorizedAuthor(registration.authorization, author)
 			);
 		} catch {
 			ingressFailureLog("malformed-input");
@@ -2253,6 +2375,13 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 		const authenticated = authenticatedRecoveryVertex(extracted.vertex, receivedCanonicalPreimageBytes.byteLength);
 		if (authenticated === undefined) return ingressFailureLog("malformed-input");
 		const alreadyAccepted = registration.index.has(authenticated.digest);
+		const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+		if (
+			!alreadyAccepted &&
+			!validateLatchedOperation(registration.authorization, registration.latchedOperations, candidate)
+		) {
+			return ingressFailureLog("admission-rejected");
+		}
 		let appended;
 		try {
 			appended = await registration.liveJournalStore.appendAccepted({
@@ -2286,6 +2415,7 @@ async function handleV3Ingress(registration: V3PlaneRegistration, message: Messa
 			ingressFailureLog("graph-rejected");
 			return;
 		}
+		if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
 		if (!currentRegistration(registration)) return;
 		const delivery = ObjectFreeze({
 			vertex: authenticated.admitted,
@@ -2406,11 +2536,22 @@ function onePage(value: unknown): DurableIssuanceOutboxRecord | null | undefined
 	}
 }
 
+type V3LiveAuthorization =
+	| Readonly<{ readonly kind: "author-list"; readonly value: CurrentEpochAuthorAuthorization }>
+	| Readonly<{ readonly kind: "latched-acl"; readonly value: LatchedAclSnapshot }>;
+
+type StagedLatchedAclOperation = Readonly<{
+	readonly actor: string;
+	readonly digest: string;
+	readonly operation: Exclude<LatchedAclOperation, { readonly kind: "set-finality-key" }>;
+}>;
+
 interface RecoveredV3LivePayload {
-	readonly authorization: CurrentEpochAuthorAuthorization;
+	readonly authorization: V3LiveAuthorization;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
+	readonly latchedOperations: Map<string, StagedLatchedAclOperation>;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly prepared: PreparedV3LivePayload;
 }
@@ -2536,13 +2677,12 @@ function journalRowSnapshot(
 
 function authenticateRecoveryVertex(
 	payload: PreparedV3LivePayload,
-	authorization: CurrentEpochAuthorAuthorization,
+	authorization: V3LiveAuthorization,
 	canonicalPreimageBytes: Uint8Array,
 	signature: Uint8Array
 ): AuthenticatedRecoveryVertex | undefined {
 	const extracted = extractAuthorizedV3Vertex(payload, canonicalPreimageBytes, signature, (author) => {
-		const authorResult = resolveCurrentEpochAuthorizedAuthor({ authorization, author });
-		return authorResult.ok ? authorResult.publicKey : undefined;
+		return resolveV3AuthorizedAuthor(authorization, author);
 	});
 	if (extracted === undefined || !extracted.ok) return undefined;
 	return authenticatedRecoveryVertex(extracted.vertex, canonicalPreimageBytes.byteLength);
@@ -2589,9 +2729,14 @@ function matchingOutboxRows(left: SnapshottedOutboxRow, right: SnapshottedOutbox
  */
 export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput): Promise<RecoverV3LiveReplicaResult> {
 	try {
-		const input = snapshotClosedRecord(rawInput, RECOVERY_INPUT_KEYS);
+		const legacyInput = snapshotClosedRecord(rawInput, LEGACY_RECOVERY_INPUT_KEYS);
+		const latchedInput = snapshotClosedRecord(rawInput, LATCHED_RECOVERY_INPUT_KEYS);
+		const input = legacyInput ?? latchedInput;
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
-		const exactAuthorizationBytes = copyDetachedBytes(input.exactCanonicalAuthorAuthorizationBytes);
+		const exactAuthorizationBytes =
+			legacyInput === undefined
+				? copyDetachedBytes(input.exactCanonicalLatchedAclBytes)
+				: copyDetachedBytes(input.exactCanonicalAuthorAuthorizationBytes);
 		const selectedScope = copiedScope(input.issuanceScope);
 		if (
 			exactAuthorizationBytes === undefined ||
@@ -2607,20 +2752,33 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (!payloadIsUsable(payload) || selectedScope.objectId !== payload.provenance.objectId) {
 			return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
 		}
-		const openedAuthorization = openCurrentEpochAuthorAuthorization({
-			detachedAnchorSignature: payload.input.detachedSignature,
-			exactCanonicalAnchorPreimageBytes: payload.input.exactCanonicalAnchorPreimageBytes,
-			exactCanonicalAuthorAuthorizationBytes: exactAuthorizationBytes,
-			trust: payload.trust.trust,
-		});
-		if (!openedAuthorization.ok) {
-			return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
+		let authorization: V3LiveAuthorization;
+		if (legacyInput !== undefined) {
+			const openedAuthorization = openCurrentEpochAuthorAuthorization({
+				detachedAnchorSignature: payload.input.detachedSignature,
+				exactCanonicalAnchorPreimageBytes: payload.input.exactCanonicalAnchorPreimageBytes,
+				exactCanonicalAuthorAuthorizationBytes: exactAuthorizationBytes,
+				trust: payload.trust.trust,
+			});
+			if (!openedAuthorization.ok) {
+				return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
+			}
+			authorization = ObjectFreeze({ kind: "author-list" as const, value: openedAuthorization.authorization });
+		} else {
+			const anchor = decodeCanonical(payload.input.exactCanonicalAnchorPreimageBytes);
+			const aclDigest = isObject(anchor) ? Reflect.get(anchor, "aclDigest") : undefined;
+			const opened = openCanonicalLatchedAclSnapshot({
+				exactCanonicalLatchedAclBytes: exactAuthorizationBytes,
+				expectedAclDigest: typeof aclDigest === "string" ? aclDigest : "",
+				expectedEpoch: payload.provenance.epoch,
+				expectedObjectId: payload.provenance.objectId,
+			});
+			if (!opened.ok) return recoveryFailure("authorization-rejected", "v3 recovery authorization does not match");
+			authorization = ObjectFreeze({ kind: "latched-acl" as const, value: opened.snapshot });
 		}
-		const resolved = resolveCurrentEpochAuthorizedAuthor({
-			author: selectedScope.author,
-			authorization: openedAuthorization.authorization,
-		});
-		if (!resolved.ok) return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
+		if (resolveV3AuthorizedAuthor(authorization, selectedScope.author) === undefined) {
+			return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
+		}
 
 		const journal = input.liveJournalStore as DurableLiveJournalStore;
 		const issuance = input.issuanceStore as DurableIssuanceStore;
@@ -2677,6 +2835,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		const preparedVertexCount = index.size;
 		let recoveredCount = 0;
 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
+		const latchedOperations = new IntrinsicMap<string, StagedLatchedAclOperation>();
 		let journalAfterSequence: number | null = null;
 		if (readiness.rowCount === 0) {
 			let emptyPage;
@@ -2716,7 +2875,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					if (row.sourceKind === "received") {
 						authenticated = authenticateRecoveryVertex(
 							payload,
-							openedAuthorization.authorization,
+							authorization,
 							row.exactCanonicalPreimageBytes,
 							row.detachedSignature
 						);
@@ -2730,7 +2889,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 						if (issuedRow !== undefined) {
 							authenticated = authenticateRecoveryVertex(
 								payload,
-								openedAuthorization.authorization,
+								authorization,
 								issuedRow.canonicalPreimageBytes,
 								issuedRow.signature
 							);
@@ -2753,6 +2912,10 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				) {
 					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
 				}
+				const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+				if (!validateLatchedOperation(authorization, latchedOperations, candidate)) {
+					return recoveryFailure("authorization-rejected", "v3 journal ACL operation is not authorized");
+				}
 				try {
 					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
 					if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
@@ -2761,6 +2924,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				}
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
+				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
 				journalAfterSequence = expectedSequence;
 			}
 		}
@@ -2797,12 +2961,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			}
 			let authenticated: AuthenticatedRecoveryVertex | undefined;
 			try {
-				authenticated = authenticateRecoveryVertex(
-					payload,
-					openedAuthorization.authorization,
-					row.canonicalPreimageBytes,
-					row.signature
-				);
+				authenticated = authenticateRecoveryVertex(payload, authorization, row.canonicalPreimageBytes, row.signature);
 			} catch {
 				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
 			}
@@ -2816,6 +2975,10 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
 			}
 			const alreadyRecovered = index.has(authenticated.digest);
+			const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+			if (!alreadyRecovered && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
+				return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
+			}
 			let appended;
 			try {
 				appended = await journal.appendAccepted({
@@ -2844,6 +3007,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				}
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
+				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
 			}
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 		}
@@ -2854,10 +3018,11 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		recoveredV3LiveAuthority.set(
 			capability,
 			ObjectFreeze({
-				authorization: openedAuthorization.authorization,
+				authorization,
 				index,
 				issuanceScope: selectedScope,
 				issuanceStore: issuance,
+				latchedOperations,
 				liveJournalStore: journal,
 				prepared: payload,
 			})
@@ -2901,12 +3066,13 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
 		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
 	}
-	const authorized = resolveCurrentEpochAuthorizedAuthor({
-		author: scope.author,
-		authorization: registration.authorization,
-	});
-	if (!authorized.ok) {
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) {
 		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	}
+	const proposedAcl = aclOperation(scope.author, "0".repeat(64), input.operation);
+	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)) {
+		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
 
 	let commit: unknown;
@@ -2914,7 +3080,7 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: scope.author,
 			preparedBlueprintAdmission: registration.payload.admission,
-			publicKey: authorized.publicKey,
+			publicKey: authorized,
 			signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
 			transactIssue: (selectedScope, buildAndSign) =>
 				registration.issuanceStore.transactIssue(selectedScope, buildAndSign),
@@ -2953,6 +3119,10 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 	) {
 		return localIssueFailure("admission-rejected", "v3 local issue record is not authenticated");
 	}
+	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, acceptedAcl)) {
+		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
 
 	let appended;
 	try {
@@ -2981,6 +3151,9 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 		if (outcome !== undefined) return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
 	} catch {
 		return localIssueFailure("graph-rejected", "v3 local issue graph append failed");
+	}
+	if (acceptedAcl !== null && acceptedAcl !== undefined) {
+		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
 	}
 	if (currentRegistration(registration)) {
 		try {
@@ -3230,13 +3403,15 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 		topic: registration.topic,
 		queueId: registration.queueId,
 		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> => enqueueLocalIssue(registration, input),
+		previewLatchedAcl: (): Readonly<Record<string, unknown>> | undefined =>
+			latchedAclPreview(registration.authorization, registration.latchedOperations),
 		publishPending: (): Promise<V3EgressResult> => enqueuePendingPublication(registration),
 		republishRetained: (): Promise<V3EgressResult> => enqueueRetainedPublication(registration),
 		deactivate: (): void => {
 			if (!registration.active) return;
 			deactivateRegistration(registration);
 		},
-	});
+	}) as V3PlaneHandle;
 }
 
 /**
@@ -3372,6 +3547,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				index: recovered.index,
 				issuanceScope: selectedScope,
 				issuanceStore: boundIssuanceStore,
+				latchedOperations: recovered.latchedOperations,
 				liveJournalStore: recovered.liveJournalStore,
 				messageQueueManager: boundQueueManager,
 				networkNode: boundNetworkNode,

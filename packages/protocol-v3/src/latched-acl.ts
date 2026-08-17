@@ -1,3 +1,5 @@
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+
 const AUTHOR = /^[0-9a-f]{64}$/u;
 const OBJECT_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
 const GROUPS = ["admin", "finality", "writer"] as const;
@@ -8,6 +10,9 @@ const STAGE_INPUT_KEYS = ["operations", "snapshot"] as const;
 const SIGNER_INPUT_KEYS = ["snapshot"] as const;
 const GRANT_REVOKE_KEYS = ["actor", "group", "kind", "target"] as const;
 const SET_KEY_KEYS = ["actor", "finalityKey", "kind"] as const;
+const OPEN_KEYS = ["exactCanonicalLatchedAclBytes", "expectedAclDigest", "expectedEpoch", "expectedObjectId"] as const;
+const DIGEST = /^[0-9a-f]{64}$/u;
+const MAX_CANONICAL_BYTES = 8192;
 
 export type LatchedAclGroup = (typeof GROUPS)[number];
 
@@ -58,6 +63,10 @@ export type DeriveLatchedSignerSetResult =
 			signers: readonly Readonly<{ publicKey: string; signerId: string }>[];
 	  }>;
 
+export type OpenCanonicalLatchedAclResult =
+	| Readonly<{ ok: false; reason: "malformed-input" | "snapshot-mismatch" }>
+	| Readonly<{ ok: true; snapshot: LatchedAclSnapshot }>;
+
 interface MutableMember {
 	readonly author: string;
 	finalityKey: string | null;
@@ -85,6 +94,14 @@ function exactDataRecord(value: unknown, keys: readonly string[]): Record<string
 
 function compareText(left: string, right: string): number {
 	return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
+}
+
+function lowerHex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function groupIndex(group: LatchedAclGroup): number {
@@ -158,6 +175,56 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		permissionless: record.permissionless,
 		version: 1,
 	});
+}
+
+/**
+ * Opens one canonical current-epoch ACL snapshot against anchor-bound identity.
+ * @param input - Exact carrier bytes and the authenticated anchor expectations.
+ * @returns A detached snapshot or a closed fail-closed result.
+ */
+export function openCanonicalLatchedAclSnapshot(
+	input: Readonly<{
+		readonly exactCanonicalLatchedAclBytes: Uint8Array;
+		readonly expectedAclDigest: string;
+		readonly expectedEpoch: number;
+		readonly expectedObjectId: string;
+	}>
+): OpenCanonicalLatchedAclResult {
+	try {
+		const record = exactDataRecord(input, OPEN_KEYS);
+		if (
+			record === undefined ||
+			!(record.exactCanonicalLatchedAclBytes instanceof Uint8Array) ||
+			record.exactCanonicalLatchedAclBytes.byteLength === 0 ||
+			record.exactCanonicalLatchedAclBytes.byteLength > MAX_CANONICAL_BYTES ||
+			typeof record.expectedAclDigest !== "string" ||
+			!DIGEST.test(record.expectedAclDigest) ||
+			typeof record.expectedEpoch !== "number" ||
+			!Number.isSafeInteger(record.expectedEpoch) ||
+			record.expectedEpoch < 0 ||
+			typeof record.expectedObjectId !== "string" ||
+			!OBJECT_ID.test(record.expectedObjectId)
+		) {
+			return Object.freeze({ ok: false, reason: "malformed-input" });
+		}
+		const exactBytes = new Uint8Array(record.exactCanonicalLatchedAclBytes);
+		const decoded = decodeCanonical(exactBytes, { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: 512 });
+		if (!sameBytes(encodeCanonical(decoded), exactBytes)) {
+			return Object.freeze({ ok: false, reason: "malformed-input" });
+		}
+		const snapshot = copySnapshot(decoded);
+		if (
+			snapshot === undefined ||
+			snapshot.epoch !== record.expectedEpoch ||
+			snapshot.objectId !== record.expectedObjectId ||
+			lowerHex(hashDomain("ts-drp/latched-acl/v3", exactBytes)) !== record.expectedAclDigest
+		) {
+			return Object.freeze({ ok: false, reason: "snapshot-mismatch" });
+		}
+		return Object.freeze({ ok: true, snapshot });
+	} catch {
+		return Object.freeze({ ok: false, reason: "malformed-input" });
+	}
 }
 
 function mutableMembers(snapshot: LatchedAclSnapshot): Map<string, MutableMember> {

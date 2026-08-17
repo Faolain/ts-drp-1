@@ -23,7 +23,7 @@ import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/li
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{join:joinReducer,message:messageReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function aclReducer(input){return {output:input.operation,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,join:joinReducer,message:messageReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -46,6 +46,7 @@ const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: s
 	grace: Object.freeze({ logicalTime: 8, seed: "d9339-v3-chat-grace" }),
 	heidi: Object.freeze({ logicalTime: 9, seed: "d9339-v3-chat-heidi" }),
 });
+const ACL_VIEW_CLIENT_IDS = ["alice", "bob", "dave"] as const;
 
 interface JoinInput {
 	readonly channelName: string;
@@ -72,6 +73,23 @@ interface ChatSnapshot {
 	readonly accepted: readonly AcceptedMessage[];
 	readonly acceptedOperationDigest: string;
 	readonly durableTranscriptDigest: string;
+	readonly latchedAcl: Readonly<{
+		readonly currentEpoch: number;
+		readonly currentGroups: Readonly<Partial<Record<ClientId, readonly string[]>>>;
+		readonly nextDigest: string;
+		readonly nextEpoch: number;
+		readonly nextGroups: Readonly<Partial<Record<ClientId, readonly string[]>>>;
+		readonly nextSignerClientIds: readonly ClientId[];
+		readonly stagedOperationDigest: string;
+		readonly stagedOperationCount: number;
+		readonly stagedOperations: readonly Readonly<{
+			readonly actorClientId: ClientId;
+			readonly digest: string;
+			readonly group: "admin" | "finality" | "writer";
+			readonly kind: "grant" | "revoke";
+			readonly targetClientId: ClientId;
+		}>[];
+	}>;
 	readonly ready: boolean;
 	readonly roomId: string;
 	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." | "";
@@ -81,6 +99,7 @@ interface ActiveChat {
 	readonly accepted: Map<string, AcceptedMessage>;
 	readonly aheStore: Awaited<ReturnType<typeof createBrowserAheDurableStore>>;
 	readonly channel: BroadcastChannel;
+	readonly clientAuthors: Readonly<Record<ClientId, string>>;
 	readonly handle: V3PlaneHandle;
 	readonly issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
 	readonly journalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
@@ -94,12 +113,33 @@ interface ActiveChat {
 
 interface CreatorInviteMaterial {
 	readonly detachedGenesisSignature: Uint8Array;
-	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly exactCanonicalProfileBytes: Uint8Array;
 	readonly exactCanonicalSignerSetBytes: Uint8Array;
 	readonly pinnedGenesisAnchorDigest: string;
+}
+
+interface LatchedPreview {
+	readonly current: Readonly<{ readonly epoch: number; readonly members: readonly LatchedMember[] }>;
+	readonly next: Readonly<{ readonly epoch: number; readonly members: readonly LatchedMember[] }>;
+	readonly nextDigest: string;
+	readonly nextSigners: readonly Readonly<{ readonly publicKey: string }>[];
+	readonly stagedOperations: readonly Readonly<{
+		readonly actor: string;
+		readonly digest: string;
+		readonly operation: Readonly<{
+			readonly group: "admin" | "finality" | "writer";
+			readonly kind: "grant" | "revoke";
+			readonly target: string;
+		}>;
+	}>[];
+}
+
+interface LatchedMember {
+	readonly author: string;
+	readonly groups: readonly ("admin" | "finality" | "writer")[];
 }
 
 interface ApplicationMaterial {
@@ -149,6 +189,34 @@ function sortedMessages(accepted: Map<string, AcceptedMessage>): readonly Accept
 	);
 }
 
+function previewLatchedAcl(active: ActiveChat): LatchedPreview {
+	const preview = Reflect.get(active.handle, "previewLatchedAcl");
+	if (typeof preview !== "function") throw new TypeError("v3 chat latched ACL preview is unavailable");
+	const result = Reflect.apply(preview, active.handle, []) as unknown;
+	if (typeof result !== "object" || result === null) throw new TypeError("v3 chat latched ACL preview is invalid");
+	return result as LatchedPreview;
+}
+
+function clientIdForAuthor(active: ActiveChat, author: string): ClientId {
+	const found = CLIENT_IDS.find((clientId) => active.clientAuthors[clientId] === author);
+	if (found === undefined) throw new TypeError("v3 chat ACL author is unknown");
+	return found;
+}
+
+function visibleGroups(
+	active: ActiveChat,
+	members: readonly LatchedMember[]
+): Readonly<Partial<Record<ClientId, readonly string[]>>> {
+	return Object.freeze(
+		Object.fromEntries(
+			ACL_VIEW_CLIENT_IDS.map((clientId) => {
+				const member = members.find(({ author }) => author === active.clientAuthors[clientId]);
+				return [clientId, Object.freeze([...(member?.groups ?? [])])] as const;
+			})
+		)
+	);
+}
+
 function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 	const accepted = active === undefined ? Object.freeze([]) : sortedMessages(active.accepted);
 	const operationIdentities = accepted.map(({ digest: identity }) => identity);
@@ -159,10 +227,46 @@ function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 		logicalTime,
 		text,
 	}));
+	const preview = active === undefined ? undefined : previewLatchedAcl(active);
+	const stagedOperations =
+		active === undefined || preview === undefined
+			? Object.freeze([])
+			: Object.freeze(
+					preview.stagedOperations.map(({ actor, digest: identity, operation }) =>
+						Object.freeze({
+							actorClientId: clientIdForAuthor(active, actor),
+							digest: identity,
+							group: operation.group,
+							kind: operation.kind,
+							targetClientId: clientIdForAuthor(active, operation.target),
+						})
+					)
+				);
 	return Object.freeze({
 		accepted,
 		acceptedOperationDigest: digest("ts-drp/d9336-chat-accepted-operations/v1", encodeCanonical(operationIdentities)),
 		durableTranscriptDigest: digest("ts-drp/d9336-chat-durable-transcript/v1", encodeCanonical(transcript)),
+		latchedAcl: Object.freeze({
+			currentEpoch: preview?.current.epoch ?? 0,
+			currentGroups:
+				active === undefined || preview === undefined
+					? Object.freeze({})
+					: visibleGroups(active, preview.current.members),
+			nextDigest: preview?.nextDigest ?? "",
+			nextEpoch: preview?.next.epoch ?? 0,
+			nextGroups:
+				active === undefined || preview === undefined ? Object.freeze({}) : visibleGroups(active, preview.next.members),
+			nextSignerClientIds:
+				active === undefined || preview === undefined
+					? Object.freeze([])
+					: Object.freeze(preview.nextSigners.map(({ publicKey }) => clientIdForAuthor(active, publicKey))),
+			stagedOperationCount: stagedOperations.length,
+			stagedOperationDigest: digest(
+				"ts-drp/d9341-chat-staged-acl-operations/v1",
+				encodeCanonical(stagedOperations.map(({ digest: identity }) => identity))
+			),
+			stagedOperations,
+		}),
 		ready: active !== undefined,
 		roomId: active?.roomId ?? "",
 		trustStatus: active?.trustStatus ?? "",
@@ -185,6 +289,17 @@ function applicationMaterial(): ApplicationMaterial {
 			schemaVersion: 1,
 			operationDiscriminator: "action",
 			operations: Object.freeze([
+				Object.freeze({
+					name: "acl",
+					argumentSchema: Object.freeze({
+						kind: "closed-record",
+						fields: Object.freeze([
+							Object.freeze({ name: "group", required: true, type: "string" }),
+							Object.freeze({ name: "kind", required: true, type: "string" }),
+							Object.freeze({ name: "target", required: true, type: "string" }),
+						]),
+					}),
+				}),
 				Object.freeze({
 					name: "join",
 					argumentSchema: Object.freeze({
@@ -247,18 +362,43 @@ async function createLocalKeychain(clientId: ClientId): Promise<Keychain> {
 	return keychain;
 }
 
+async function createClientAuthors(): Promise<Readonly<Record<ClientId, string>>> {
+	const entries = await Promise.all(
+		CLIENT_IDS.map(async (clientId) => {
+			const keychain = await createLocalKeychain(clientId);
+			return [clientId, keychain.localAuthorId] as const;
+		})
+	);
+	return Object.freeze(Object.fromEntries(entries) as Record<ClientId, string>);
+}
+
 async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
 	const keychains = await Promise.all(CLIENT_IDS.map((clientId) => createLocalKeychain(clientId)));
 	const alice = keychains[0];
 	if (alice === undefined) throw new TypeError("v3 chat creator keychain is unavailable");
-	const orderedAuthors = Object.freeze(keychains.map(({ localAuthorId }) => localAuthorId).sort());
-	const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
-		authors: orderedAuthors,
+	const authors = Object.fromEntries(
+		CLIENT_IDS.map((clientId, index) => [clientId, keychains[index]?.localAuthorId] as const)
+	) as Record<ClientId, string>;
+	const exactCanonicalLatchedAclBytes = encodeCanonical({
 		epoch: 0,
-		kind: "drp-author-authorization",
+		kind: "drp-v3-latched-acl",
+		members: CLIENT_IDS.map((clientId) => {
+			const groups =
+				clientId === "alice"
+					? ["admin", "finality", "writer"]
+					: clientId === "bob"
+						? ["admin", "writer"]
+						: clientId === "dave"
+							? ["finality"]
+							: ["writer"];
+			return Object.freeze({
+				author: authors[clientId],
+				finalityKey: clientId === "alice" || clientId === "dave" ? authors[clientId] : null,
+				groups: Object.freeze(groups),
+			});
+		}).sort((left, right) => compareText(left.author, right.author)),
 		objectId: OBJECT_ID,
-		profileId: "creator-author-authorization-v1",
-		protocolMajor: 3,
+		permissionless: false,
 		version: 1,
 	});
 	const application = applicationMaterial();
@@ -272,7 +412,7 @@ async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
 	});
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
 	const exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({
-		aclDigest: digest("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes),
+		aclDigest: digest("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes),
 		archiveIndexRoot: "3".repeat(64),
 		blueprintDigest: application.blueprintDigest,
 		cryptoSuiteId: "ed25519-sha256-v3",
@@ -292,7 +432,7 @@ async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
 	const anchorDigestBytes = hashDomain("ts-drp/epoch-anchor/v3", exactCanonicalGenesisAnchorPreimageBytes);
 	return Object.freeze({
 		detachedGenesisSignature: await alice.signWithLocalAuthor(anchorDigestBytes),
-		exactCanonicalAuthorAuthorizationBytes,
+		exactCanonicalLatchedAclBytes,
 		exactCanonicalGenesisAnchorPreimageBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
@@ -303,7 +443,7 @@ async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
 
 const CREATOR_INVITE_KEYS = Object.freeze([
 	"detachedGenesisSignature",
-	"exactCanonicalAuthorAuthorizationBytes",
+	"exactCanonicalLatchedAclBytes",
 	"exactCanonicalGenesisAnchorPreimageBytes",
 	"exactCanonicalParametersCarrierBytes",
 	"exactCanonicalProfileBytes",
@@ -317,7 +457,7 @@ function encodeCreatorInvite(material: CreatorInviteMaterial): string {
 	return hex(
 		encodeCanonical({
 			detachedGenesisSignature: material.detachedGenesisSignature,
-			exactCanonicalAuthorAuthorizationBytes: material.exactCanonicalAuthorAuthorizationBytes,
+			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
 			exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 			exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
 			exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
@@ -380,7 +520,7 @@ function decodeCreatorInvite(invite: string): CreatorInviteMaterial {
 	}
 	return Object.freeze({
 		detachedGenesisSignature,
-		exactCanonicalAuthorAuthorizationBytes: inviteBytes(values, "exactCanonicalAuthorAuthorizationBytes"),
+		exactCanonicalLatchedAclBytes: inviteBytes(values, "exactCanonicalLatchedAclBytes"),
 		exactCanonicalGenesisAnchorPreimageBytes: inviteBytes(values, "exactCanonicalGenesisAnchorPreimageBytes"),
 		exactCanonicalParametersCarrierBytes: inviteBytes(values, "exactCanonicalParametersCarrierBytes"),
 		exactCanonicalProfileBytes: inviteBytes(values, "exactCanonicalProfileBytes"),
@@ -488,6 +628,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 	const application = applicationMaterial();
 	const invite = decodeCreatorInvite(input.invite);
 	const selected = CLIENTS[input.clientId];
+	const clientAuthors = await createClientAuthors();
 	const keychain = await createLocalKeychain(input.clientId);
 	const author = keychain.localAuthorId;
 	const objectIdResult = parseStorageObjectId(OBJECT_ID);
@@ -556,7 +697,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 	}
 	const recovered = await recoverV3LiveReplica({
 		capability: prepared.capability,
-		exactCanonicalAuthorAuthorizationBytes: invite.exactCanonicalAuthorAuthorizationBytes,
+		exactCanonicalLatchedAclBytes: invite.exactCanonicalLatchedAclBytes,
 		issuanceScope: scope,
 		issuanceStore,
 		liveJournalStore: journalStore,
@@ -586,6 +727,7 @@ async function joinRoom(input: JoinInput): Promise<ActiveChat> {
 		accepted,
 		aheStore,
 		channel: transport.channel,
+		clientAuthors,
 		handle: activated.handle,
 		issuanceStore,
 		journalStore,
@@ -630,6 +772,33 @@ const api = Object.freeze({
 		const published = await selected.handle.publishPending();
 		if (!published.ok || published.kind !== "published") {
 			throw new TypeError(`v3 chat publication failed: ${published.kind}`);
+		}
+	},
+	async submitAcl(
+		operation: Readonly<{
+			readonly group: "admin" | "finality" | "writer";
+			readonly kind: "grant" | "revoke";
+			readonly targetClientId: ClientId;
+		}>
+	): Promise<void> {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		if (!(operation.targetClientId in CLIENTS)) throw new TypeError("v3 chat ACL target is invalid");
+		const issued = await selected.handle.issueLocal({
+			dependencies: [selected.roomId],
+			logicalTime: selected.nextLogicalTime(),
+			operation: Object.freeze({
+				action: "acl",
+				group: operation.group,
+				kind: operation.kind,
+				target: selected.clientAuthors[operation.targetClientId],
+			}),
+			signRegisteredVertexDigest: (registeredDigest) => selected.keychain.signWithLocalAuthor(registeredDigest),
+		});
+		if (!issued.ok) throw new TypeError(`v3 chat ACL issue failed: ${issued.kind}`);
+		const published = await selected.handle.publishPending();
+		if (!published.ok || published.kind !== "published") {
+			throw new TypeError(`v3 chat ACL publication failed: ${published.kind}`);
 		}
 	},
 	snapshot(): ChatSnapshot {
