@@ -81,8 +81,10 @@ const EXPECTED_RUNTIME_EXPORTS = [
 	"authenticateCurrentEpochAnchor",
 	"createAdmissionBoundTransactionalVertexIssuer",
 	"extractAdmittedReceivedVertex",
+	"installCertifiedAnchorTrustRoot",
 	"installCreatorAnchorTrustRoot",
 	"isAnchorTrustStateRecordBytes",
+	"openCertifiedAnchorTrust",
 	"openCurrentAnchorTrust",
 	"prepareBlueprintAdmission",
 	"prepareBlueprintRuntime",
@@ -91,8 +93,6 @@ const FORBIDDEN_RUNTIME_EXPORTS = [
 	"authenticateCertifiedCurrentEpochAnchor",
 	"createCurrentAnchorTrustStore",
 	"inspectTrustClosure",
-	"installCertifiedAnchorTrustRoot",
-	"openCertifiedAnchorTrust",
 	"prepareAnchorTrustAdvance",
 	"verifyReceivedVertex",
 	"verifyTrustRecord",
@@ -922,7 +922,6 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 			"subscribe",
 			"setTimeout",
 			"fetch(",
-			"installCertifiedAnchorTrustRoot",
 		])
 			expect(source).not.toContain(forbidden);
 		const publicPath = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/public.ts");

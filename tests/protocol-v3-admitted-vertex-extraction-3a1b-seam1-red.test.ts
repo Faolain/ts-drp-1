@@ -153,8 +153,10 @@ const EXPECTED_RUNTIME_EXPORTS = [
 	"authenticateCurrentEpochAnchor",
 	"createAdmissionBoundTransactionalVertexIssuer",
 	"extractAdmittedReceivedVertex",
+	"installCertifiedAnchorTrustRoot",
 	"installCreatorAnchorTrustRoot",
 	"isAnchorTrustStateRecordBytes",
+	"openCertifiedAnchorTrust",
 	"openCurrentAnchorTrust",
 	"prepareBlueprintAdmission",
 	"prepareBlueprintRuntime",
@@ -168,9 +170,7 @@ const EXPECTED_FORBIDDEN_RUNTIME_EXPORTS = [
 	"createTransactionalVertexIssuer",
 	"deriveEquivocationProofId",
 	"inspectTrustClosure",
-	"installCertifiedAnchorTrustRoot",
 	"materializeCurrentEquivocationProof",
-	"openCertifiedAnchorTrust",
 	"prepareAnchorTrustAdvance",
 	"verifyEquivocationProof",
 	"verifyReceivedVertex",
@@ -720,7 +720,7 @@ function runtimeAllowlist(path: string): readonly string[] {
 	if (path.endsWith("protocol-v3-blueprint-operation-budget-0p2.test.ts"))
 		return namedPublicSurfaceTestArray(
 			source,
-			"[public-surface] preserves exactly the ten package-root runtime exports",
+			"[public-surface] preserves exactly the twelve package-root runtime exports",
 			{ kind: "awaited-value", name: "packageSurfaceLoad" }
 		);
 	if (path.endsWith("protocol-v3-blueprint-work-budget-0p0.test.ts"))

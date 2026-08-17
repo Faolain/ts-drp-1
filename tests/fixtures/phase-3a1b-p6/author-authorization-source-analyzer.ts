@@ -9,8 +9,10 @@ export interface AuthorAuthorizationSourceGraph {
 
 const ROOT_TRUST_VALUES = [
 	"authenticateCurrentEpochAnchor",
+	"installCertifiedAnchorTrustRoot",
 	"installCreatorAnchorTrustRoot",
 	"isAnchorTrustStateRecordBytes",
+	"openCertifiedAnchorTrust",
 	"openCurrentAnchorTrust",
 ] as const;
 const SUBPATH_VALUES = ["openCurrentEpochAuthorAuthorization", "resolveCurrentEpochAuthorizedAuthor"] as const;
@@ -109,7 +111,8 @@ function equalNames(actual: readonly string[], expected: readonly string[]): boo
 
 /**
  * Semantic graph audit; formatting, local aliases and declaration order are intentionally irrelevant.
- * @param graph
+ * @param graph - Exact source graph to inspect.
+ * @returns Stable semantic violation identifiers.
  */
 export function auditAuthorAuthorizationSourceGraph(graph: AuthorAuthorizationSourceGraph): readonly string[] {
 	const violations: string[] = [];
@@ -137,7 +140,8 @@ export function auditAuthorAuthorizationSourceGraph(graph: AuthorAuthorizationSo
 
 /**
  * Exact semantic export audit shared by source and emitted declaration controls.
- * @param source
+ * @param source - Source or declaration text to inspect.
+ * @returns Stable export-surface violations.
  */
 export function auditAuthorAuthorizationSubpathSurface(source: string): readonly string[] {
 	const file = parse("author-authorization.ts", source);
@@ -150,9 +154,9 @@ export function auditAuthorAuthorizationSubpathSurface(source: string): readonly
 export const ANALYZER_POSITIVE_CONTROL: AuthorAuthorizationSourceGraph = Object.freeze({
 	index: 'interface CurrentEpochAuthorAuthorization {} const domain = "ts-drp/author-authorization/v3";',
 	publicEntry:
-		'import { openCurrentAnchorTrust, authenticateCurrentEpochAnchor, isAnchorTrustStateRecordBytes, installCreatorAnchorTrustRoot } from "./anchor-trust-singleton.js"; export { openCurrentAnchorTrust, authenticateCurrentEpochAnchor, isAnchorTrustStateRecordBytes, installCreatorAnchorTrustRoot };',
+		'import { openCertifiedAnchorTrust, openCurrentAnchorTrust, authenticateCurrentEpochAnchor, isAnchorTrustStateRecordBytes, installCertifiedAnchorTrustRoot, installCreatorAnchorTrustRoot } from "./anchor-trust-singleton.js"; export { openCertifiedAnchorTrust, openCurrentAnchorTrust, authenticateCurrentEpochAnchor, isAnchorTrustStateRecordBytes, installCertifiedAnchorTrustRoot, installCreatorAnchorTrustRoot };',
 	singleton:
-		'import { createAnchorTrustApi } from "./index.js"; const owner = createAnchorTrustApi(); export const { authenticateCurrentEpochAnchor, installCreatorAnchorTrustRoot, isAnchorTrustStateRecordBytes, openCurrentAnchorTrust, openCurrentEpochAuthorAuthorization, resolveCurrentEpochAuthorizedAuthor } = owner;',
+		'import { createAnchorTrustApi } from "./index.js"; const owner = createAnchorTrustApi(); export const { authenticateCurrentEpochAnchor, installCertifiedAnchorTrustRoot, installCreatorAnchorTrustRoot, isAnchorTrustStateRecordBytes, openCertifiedAnchorTrust, openCurrentAnchorTrust, openCurrentEpochAuthorAuthorization, resolveCurrentEpochAuthorizedAuthor } = owner;',
 	subpath:
 		'import { resolveCurrentEpochAuthorizedAuthor, openCurrentEpochAuthorAuthorization } from "./anchor-trust-singleton.js"; export { resolveCurrentEpochAuthorizedAuthor, openCurrentEpochAuthorAuthorization }; export type { CurrentEpochAuthorAuthorization } from "./index.js";',
 });
