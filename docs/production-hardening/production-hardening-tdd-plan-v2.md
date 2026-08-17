@@ -46275,3 +46275,152 @@ This closes Golden Path 1 step 4 for the exercised creator-trusted browser
 fixture and closes the Phase 3c live integration slice. It does not activate the
 next anchor, prove arbitrary ACL policy, establish Byzantine membership, close
 Phase 3b, or complete the broader production-hardening plan.
+
+## D.93.42 Phase 3b certified-genesis contract
+
+Phase 3b implements the two APIs reserved by D.93.17:
+`installCertifiedAnchorTrustRoot` and `openCertifiedAnchorTrust`. They mint a
+distinct opaque `CertifiedAnchorTrust`; they do not widen, alias or add optional
+inputs to the creator-only APIs. The protocol-v3 package-root runtime allow-list
+grows by exactly these two names. Certified trust remains non-live until the
+Phase 5 QC owner lands: Phase 3b installs and reopens genesis authority but
+cannot authenticate a live anchor, subscribe, issue, append, vote or close an
+epoch.
+
+The install input is a closed five-field value containing exact canonical genesis
+anchor, profile, signer-set and certified-genesis-certificate bytes, plus the
+exact pinned genesis digest. The anchor is the existing exact sixteen-field
+`drp-epoch-anchor`, at epoch zero with zero previous anchor, cut and history
+size. The anchor's `cryptoSuiteId` remains exactly `ed25519-sha256-v3`, as
+required by the frozen identity-and-vertex suite binding; the certified profile's
+`cryptoSuiteId` is exactly `ed25519-seal-v3`. No registry kind, suite mapping or
+domain changes. The anchor's profile and signer-set digests must match the exact
+received carrier bytes before certificate verification. Creator material is
+terminal here, just as delegated or attested material is terminal in the
+creator-only API.
+
+The detached certificate is one canonical closed record:
+
+- `kind: "drp-certified-genesis-certificate"`, `version: 1`;
+- the exact lowercase genesis-anchor, profile and signer-set digests; and
+- `signatures`, sorted by unsigned UTF-8 `signerId`, with exactly one closed
+  `{ publicKey, signature, signerId }` row for every signer.
+
+Every signature is an exact 64-byte strict Ed25519 signature with ZIP-215
+disabled over the raw 32-byte registered genesis-anchor digest. Because that
+anchor binds the exact `profileDigest` and `signerSetDigest`, one valid signature
+proves both possession of the listed seal key and acceptance of that exact
+profile, signer set, object and genesis. Requiring every listed signer avoids a
+second proof-of-possession carrier or a new signature domain. This detached
+install evidence is not a new registered signed-envelope kind. The profile's
+quorum governs future close certificates; the all-signer genesis acceptance is
+not a Phase 5 prepare/commit QC and confers no live closing authority. Phase 5
+prepare, commit and QC evidence must use its registered, distinct message domains
+and must never accept a Phase 3b genesis-acceptance signature as a live vote. A
+certified seal key may sign this raw anchor-domain digest only for this exact
+genesis-acceptance purpose; no other protocol context may assign authority to the
+same 32-byte signature input.
+
+Both profile and signer-set carriers contain the same nonempty, canonical,
+strictly signer-id-sorted rows. Signer ids and 32-byte lowercase public keys are
+unique. This first durable certified profile accepts at most eight signers, each
+signer id must be at most 64 UTF-8 bytes and the certified object id must be at
+most 1024 UTF-8 bytes in addition to satisfying the existing object-id syntax.
+Those bounds make the maximum-expansion fixture exactly 8173 canonical bytes
+under the current binary codec and exact record field names, below the existing
+8192-byte record ceiling with 19 bytes of headroom. That fixture uses the longer
+`delegated-trusted-v1` profile id and places every variable-length field at its
+admitted bound. A syntactically valid object id whose UTF-8 encoding exceeds
+1024 bytes is therefore rejected before record minting.
+`delegated-trusted-v1` requires `2 <= quorum <= n` and
+`2 <= n <= 8`. `attested-bft-v1` requires `4 <= n <= 8` and exactly
+`quorum = ceil(2n/3)`. A future larger set requires a separately reviewed record
+or storage-cap amendment, never silent truncation. Unknown profiles, delegated
+quorum one, lone or oversized attested input, overlong signer ids, duplicate ids
+or keys, missing/extra/reordered signatures, mismatched certificate bindings and
+any invalid signature fail before capability minting. Every certificate row's
+`publicKey` must byte-equal the signer-set key for the same `signerId`, and
+verification always uses that signer-set key rather than trusting a row-supplied
+key.
+
+The canonical durable carrier is `drp-certified-anchor-trust-state` version 1.
+It records the exact anchor, profile, signer-set and certificate bytes plus the
+object id, selected profile, quorum, signer count, genesis/current digest and
+current epoch zero. `openCertifiedAnchorTrust` accepts only that exact record,
+object id and out-of-band genesis pin; it canonical-decodes and re-verifies the
+complete chain before minting a fresh opaque capability. The public capability
+contains only the frozen verified projection `(objectId, profileId, quorum,
+signerCount, genesisAnchorDigest, currentAnchorDigest, currentEpoch)`. No raw
+key, certificate, caller-selected label, negotiation result or verification
+hook is exposed. The exact encoded durable record must be nonempty and at most
+`ANCHOR_TRUST_STATE_MAX_RECORD_BYTES` (8192); installation returns
+`trust-state-too-large` before minting when the duplicated carriers exceed that
+bound, and open applies the same literal 8192 bound before decode without adding
+another runtime export. Open derives profile id, quorum, signer count and every
+digest from the re-verified carriers; any duplicated stored scalar that differs
+from that derivation is `trust-state-inconsistent`. Open independently enforces
+the same signer-count, signer-id and object-id byte bounds as install. The
+install-side size rejection remains defense in depth even though the admitted
+maximum is 8173 bytes; the literal 8192/8193 pre-decode boundary is exercised on
+open.
+
+Profile selection occurs only through the exact signed genesis carrier.
+Creator, delegated and attested records are mutually exclusive; neither open
+API accepts the other record kind, and network input cannot downgrade, upgrade
+or replace an installed tuple. The creator-trusted browser label remains the
+pure projection already closed in D.93.37. Certified UI labels remain deferred
+with live certified rooms; Phase 3b must not fabricate a visible trust claim for
+a capability that Phase 5 cannot yet activate.
+
+The tests-only RED owns a new `genesis-profile.test.ts` and closed fixture data,
+plus the existing test-side public-export allow-lists that must anticipate the
+two names. It requires valid delegated 2-of-3 and attested 3-of-4 installation
+and reopen; rejects delegated 1-of-n and attested n<4/wrong quorum; mutates every
+anchor/profile/signer/certificate binding; removes, duplicates, reorders and
+cross-pairs every signer class; proves strict signature and canonical-byte
+handling; proves creator/certified cross-opening terminal; and confirms zero
+live-anchor authentication surface. Its public-package assertion requires exactly
+the two new runtime names and forbids every certified live-anchor helper. The RED
+also exercises empty input, the literal 8192/8193 record boundary, the exact
+8173-byte maximum-expansion fixture through the production install encoding path
+and successful reopen, maximum eight signers, literal 64/65-byte signer-id
+acceptance/rejection, literal 1024/1025-byte object-id acceptance/rejection,
+ninth-signer rejection and stored-scalar disagreement. It is signed separately
+and fails only because the two production APIs are absent.
+
+GREEN owns one certified-trust implementation, its singleton/root exports and
+the minimum package allow-list changes. It does not edit creator trust,
+control-plane storage, node live binding, the browser product, ACL, anchor
+adoption or Phase 5 code. Acceptance requires focused RED GREEN, creator-trust
+preservation, protocol-v3 typecheck/build/public-package smoke, lint, formatting
+and diff checks. Bounded Codex, Grok, Kimi (100-step) and Opus xhigh reviews are
+requested on frozen RED and GREEN bytes; every terminal finding is recorded and
+resolved, while timeout or `NO_VERDICT` is reported honestly rather than called
+approval. Separate signed RED and GREEN commits and a signed checkpoint record
+are mandatory.
+
+The first bounded design review produced one substantive correction and three
+clarifications. Codex reproduced the frozen suite-role conflict above and named
+the five-field/count and 8192-byte durable-record gaps; all are corrected here.
+Kimi returned `PASS` with the nonblocking bind-not-sign, Phase 5 domain-separation
+and exact-export wording now incorporated. Grok's one-turn attempt and Opus's
+first bounded read-only attempt produced no terminal verdict. The corrected
+Codex and Kimi rereviews returned `PASS` with no P0-P2. Opus then reproduced the
+unbounded-signer/8192-byte conflict and missing boundary test; the exact eight
+signer, 64-byte id, key-equality and derived-scalar rules above close that P1 and
+its related notes. The final Codex audit correctly required an executable size
+proof rather than an estimated fit. Running the repository's actual canonical
+binary encoder over the exact maximum carriers produced 8173 bytes once the
+certified object-id subset was bounded to 1024 UTF-8 bytes; the exact fixture and
+1025-byte rejection above make that claim load-bearing. Kimi's final 100-step
+delta review returned `PASS` with no P0-P2 and its optional literal 64/65
+boundary wording is incorporated. The final Opus xhigh delta review returned
+`PASS` with no P0/P1; its nonblocking maximal-fixture, open-bound and
+defense-in-depth wording is incorporated above. The final Codex review
+authenticated the exact packet and raised no new finding but exceeded its finite
+window without a terminal schema, so it is honestly `NO_VERDICT`; Grok's bounded
+attempt likewise remains `NO_VERDICT`, not approval. Codex also discovered
+the already-protected untracked Phase-0g2 REDs and `.logs` repository snapshots
+during its generic test discovery; those are not Phase 3b findings and remain
+preserved by user instruction. Every Phase 3b command excludes those protected
+paths explicitly rather than deleting or modifying them.
