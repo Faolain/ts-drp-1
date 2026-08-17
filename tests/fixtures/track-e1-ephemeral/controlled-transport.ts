@@ -6,6 +6,8 @@ export interface ControlledIngress {
 export interface ControlledTransportPort {
 	readonly localPeerId: string;
 	readonly maxEnvelopeBytes: number;
+	authorizedPeers(): readonly string[];
+	close(): void;
 	isAuthorized(sender: string): boolean;
 	onMessage(listener: (ingress: ControlledIngress) => void): () => void;
 	send(bytes: Uint8Array): Promise<boolean>;
@@ -13,6 +15,7 @@ export interface ControlledTransportPort {
 
 interface ControlledEndpoint {
 	authorized: Set<string>;
+	closeCount: number;
 	connected: boolean;
 	failuresRemaining: number;
 	held: boolean;
@@ -41,6 +44,7 @@ export class ControlledEphemeralBus {
 		if (this.#endpoints.has(peerId)) throw new Error(`duplicate controlled peer: ${peerId}`);
 		const endpoint: ControlledEndpoint = {
 			authorized: new Set(),
+			closeCount: 0,
 			connected: true,
 			failuresRemaining: 0,
 			held: false,
@@ -50,9 +54,19 @@ export class ControlledEphemeralBus {
 		this.#endpoints.set(peerId, endpoint);
 
 		return {
+			authorizedPeers: () =>
+				[...endpoint.authorized].filter((sender) => this.#endpoints.get(sender)?.connected === true).sort(),
+			close: (): void => {
+				endpoint.closeCount += 1;
+				endpoint.connected = false;
+				for (const pending of endpoint.pending.splice(0)) pending.resolve(false);
+				endpoint.authorized.clear();
+				endpoint.listeners.clear();
+			},
 			localPeerId: peerId,
 			maxEnvelopeBytes,
-			isAuthorized: (sender) => endpoint.connected && endpoint.authorized.has(sender),
+			isAuthorized: (sender) =>
+				endpoint.connected && endpoint.authorized.has(sender) && this.#endpoints.get(sender)?.connected === true,
 			onMessage: (listener) => {
 				endpoint.listeners.add(listener);
 				return () => endpoint.listeners.delete(listener);
@@ -68,6 +82,15 @@ export class ControlledEphemeralBus {
 				return new Promise((resolve) => endpoint.pending.push({ bytes: detached, resolve }));
 			},
 		};
+	}
+
+	/**
+	 * Return how often production closed an endpoint.
+	 * @param peerId Endpoint identity.
+	 * @returns Close-call count.
+	 */
+	closeCount(peerId: string): number {
+		return this.#endpoint(peerId).closeCount;
 	}
 
 	/**

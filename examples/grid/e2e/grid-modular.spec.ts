@@ -54,6 +54,7 @@ test("cold-starts, authenticates, converges, and recovers without fixed bootstra
 	browser,
 	request,
 }) => {
+	test.setTimeout(180_000);
 	const creatorContext = await browser.newContext();
 	const joinerContext = await browser.newContext();
 	try {
@@ -146,6 +147,47 @@ test("cold-starts, authenticates, converges, and recovers without fixed bootstra
 		const beforeRelayLossMove = await creatorDot.getAttribute("style");
 		await creatorPage.keyboard.press("d");
 		await expect.poll(async () => creatorDot.getAttribute("style")).not.toBe(beforeRelayLossMove);
+		const oldRoomJoinerDot = creatorPage.locator(`[data-glowing-peer-id="${joinerColdStart.peerId}"]`);
+		await expect(oldRoomJoinerDot).toBeVisible();
+
+		// Replace the live room without reloading either browser. The old room must be fully
+		// released before the same two clients converge and move in the replacement room.
+		await creatorPage.click("#createGrid");
+		let replacementGridId = "";
+		await expect
+			.poll(async () => {
+				const candidate = (await creatorPage.locator("#gridId").textContent())?.trim();
+				if (candidate !== undefined && candidate !== "" && candidate !== gridId) replacementGridId = candidate;
+				return replacementGridId;
+			})
+			.not.toBe("");
+		await expect(creatorPage.locator(`[data-glowing-peer-id="${joinerColdStart.peerId}"]`)).toHaveCount(0);
+
+		await joinerPage.fill("#gridInput", replacementGridId);
+		await joinerPage.click("#joinGrid");
+		await expect(creatorPage.locator("#objectPeers")).toContainText(joinerColdStart.peerId, { timeout: 30_000 });
+		await expect(joinerPage.locator("#objectPeers")).toContainText(creatorBeforeOutage.peerId, { timeout: 30_000 });
+		const creatorSelfDot = creatorPage.locator(`[data-glowing-peer-id="${creatorBeforeOutage.peerId}"]`);
+		const creatorReplacementDot = joinerPage.locator(`[data-glowing-peer-id="${creatorBeforeOutage.peerId}"]`);
+		await expect(creatorSelfDot).toBeVisible();
+		await expect(creatorReplacementDot).toBeVisible();
+		const creatorJoinerDot = creatorPage.locator(`[data-glowing-peer-id="${joinerColdStart.peerId}"]`);
+		await expect(creatorJoinerDot).toBeVisible();
+		const joinerDurableStyle = await creatorJoinerDot.getAttribute("style");
+		await joinerPage.keyboard.press("d");
+		await expect
+			.poll(async () => creatorJoinerDot.getAttribute("style"), { timeout: 30_000 })
+			.not.toBe(joinerDurableStyle);
+		const creatorSelfBeforeMove = await creatorSelfDot.getAttribute("style");
+		const creatorRemoteBeforeMove = await creatorReplacementDot.getAttribute("style");
+		await creatorPage.keyboard.press("w");
+		await expect.poll(async () => creatorSelfDot.getAttribute("style")).not.toBe(creatorSelfBeforeMove);
+		await expect
+			.poll(async () => creatorReplacementDot.getAttribute("style"), { timeout: 30_000 })
+			.not.toBe(creatorRemoteBeforeMove);
+
+		await joinerContext.close();
+		await expect.poll(async () => creatorJoinerDot.getAttribute("style"), { timeout: 30_000 }).toBe(joinerDurableStyle);
 	} finally {
 		await Promise.allSettled([creatorContext.close(), joinerContext.close()]);
 	}
