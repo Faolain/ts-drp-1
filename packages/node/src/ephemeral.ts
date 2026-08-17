@@ -42,7 +42,10 @@ export class NodeEphemeralAdapter {
 		for (const { channel } of [...this.#byObject.values()]) channel.close();
 	}
 
-	/** Close the channel whose durable object is leaving this node. */
+	/**
+	 * Close the channel whose durable object is leaving this node.
+	 * @param objectId Durable object identity.
+	 */
 	close(objectId: string): void {
 		this.#byObject.get(objectId)?.channel.close();
 	}
@@ -54,14 +57,15 @@ export class NodeEphemeralAdapter {
 	 * @returns One object-bound channel.
 	 */
 	open(objectId: string, options: EphemeralChannelOptions): EphemeralChannel {
-		if (Object.keys(options).sort().join(",") !== "maxMessageBytes,maxSequencedKeys") {
+		if (Object.keys(options).sort().join(",") !== "maxMessageBytes,maxSequencedKeys,maxSequencedSenders") {
 			throw new TypeError("ephemeral channel options differ");
 		}
 		const existing = this.#byObject.get(objectId);
 		if (existing !== undefined) {
 			if (
 				existing.options.maxMessageBytes !== options.maxMessageBytes ||
-				existing.options.maxSequencedKeys !== options.maxSequencedKeys
+				existing.options.maxSequencedKeys !== options.maxSequencedKeys ||
+				existing.options.maxSequencedSenders !== options.maxSequencedSenders
 			) {
 				throw new Error("ephemeral channel options differ from the active object channel");
 			}
@@ -70,8 +74,17 @@ export class NodeEphemeralAdapter {
 		if (this.#getObject(objectId) === undefined) throw new Error("ephemeral channel requires a connected object");
 		const topic = ephemeralTopicFor(objectId);
 		const registration: TopicRegistration = { listener: undefined };
+		const authorizedPeers = (): readonly string[] => {
+			const currentObject = this.#getObject(objectId);
+			if (currentObject === undefined) return [];
+			return this.#networkNode
+				.getGroupPeers(topic)
+				.filter((peerId) => currentObject.acl.query_isWriter(peerId))
+				.sort();
+		};
 		const channel = createEphemeralChannel(
 			{
+				authorizedPeers,
 				localPeerId: this.#networkNode.peerId,
 				maxEnvelopeBytes: EPHEMERAL_TRANSPORT_MAX_BYTES,
 				isAuthorized: (sender): boolean => {

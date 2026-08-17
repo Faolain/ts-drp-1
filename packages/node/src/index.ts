@@ -367,6 +367,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _connectRendezvousControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
+	private readonly _objectSubscriptionDisposers = new Map<string, () => void>();
 	private _replicaOrigins = new Map<string, "created" | "connected">();
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
 	private readonly _roomRendezvousProducers = new Map<string, ReturnType<typeof createRecordProducer>>();
@@ -1547,11 +1548,15 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	subscribeObject<T extends IDRP>(object: IDRPObject<T>): void {
 		// Reserve queue capacity before installing callbacks or gossip subscriptions.
 		this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
+		let disposeObjectSubscription: (() => void) | undefined;
 		try {
-			object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
+			disposeObjectSubscription = this._subscribeToObjectChanges(object);
+			this._objectSubscriptionDisposers.set(object.id, disposeObjectSubscription);
 			this.networkNode.subscribe(object.id);
 			this._addRoomRendezvousProducer(object.id);
 		} catch (error) {
+			disposeObjectSubscription?.();
+			this._objectSubscriptionDisposers.delete(object.id);
 			this.messageQueueManager.close(object.id);
 			throw error;
 		}
@@ -1564,6 +1569,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 */
 	unsubscribeObject(id: string, purge?: boolean): void {
 		this._ephemeral.close(id);
+		const disposeObjectSubscription = this._objectSubscriptionDisposers.get(id);
+		this._objectSubscriptionDisposers.delete(id);
+		disposeObjectSubscription?.();
 		this._connectFetchControllers.get(id)?.abort();
 		this._connectFetchControllers.delete(id);
 		this._connectRendezvousControllers.get(id)?.abort();
@@ -1655,6 +1663,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			if (!this.messageQueueManager.hasQueue(object.id)) {
 				this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
 			}
+			if (!this._objectSubscriptionDisposers.has(object.id)) {
+				this._objectSubscriptionDisposers.set(object.id, this._subscribeToObjectChanges(object));
+			}
 			this.networkNode.subscribe(object.id);
 			this._addRoomRendezvousProducer(object.id);
 			const replicaOrigin = this._replicaOrigins.get(object.id);
@@ -1666,6 +1677,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 			this._createObjectIntervals(object.id, replicaOrigin);
 		}
+	}
+
+	private _subscribeToObjectChanges<T extends IDRP>(object: IDRPObject<T>): () => void {
+		return object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
 	}
 
 	private _addRoomRendezvousProducer(objectId: string): void {

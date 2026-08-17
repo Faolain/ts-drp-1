@@ -165,8 +165,9 @@ export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
 	/**
 	 * Subscribe to the DRP object.
 	 * @param callback - The callback to call when the DRP object changes.
+	 * @returns An idempotent disposer for this exact callback.
 	 */
-	subscribe(callback: DRPObjectCallback<T>): void;
+	subscribe(callback: DRPObjectCallback<T>): () => void;
 
 	/**
 	 * Apply the vertices to the DRP object.

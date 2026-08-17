@@ -204,7 +204,7 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 
 	private _applier: DRPVertexApplier<T>;
 	private _states: DRPObjectStateManager<T>;
-	private subscriptions: DRPObjectCallback<T>[] = [];
+	private subscriptions = new Map<symbol, DRPObjectCallback<T>>();
 	private _optionalFinalityStore?: FinalityStore;
 
 	/**
@@ -718,13 +718,21 @@ export class DRPObject<T extends IDRP> implements IDRPObject<T> {
 	/**
 	 * Subscribes to the DRPObject.
 	 * @param callback - The callback to subscribe to the DRPObject.
+	 * @returns An idempotent disposer for this exact callback.
 	 */
-	subscribe(callback: DRPObjectCallback<T>): void {
-		this.subscriptions.push(callback);
+	subscribe(callback: DRPObjectCallback<T>): () => void {
+		const subscription = Symbol("drp-object-subscription");
+		this.subscriptions.set(subscription, callback);
+		let active = true;
+		return (): void => {
+			if (!active) return;
+			active = false;
+			this.subscriptions.delete(subscription);
+		};
 	}
 
 	private _notify(origin: string, vertices: Vertex[]): void {
-		for (const callback of this.subscriptions) {
+		for (const callback of this.subscriptions.values()) {
 			try {
 				const callbackResult = (
 					callback as unknown as (object: IDRPObject<T>, origin: string, vertices: Vertex[]) => unknown

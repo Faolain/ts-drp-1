@@ -17,11 +17,14 @@ export interface DeliveredEphemeralFrame extends EphemeralFrame {
 export interface EphemeralStats {
 	readonly delivered: number;
 	readonly dropped: number;
+	readonly localSequencedKeys: number;
 	readonly malformed: number;
 	readonly overLimit: number;
 	readonly published: number;
 	readonly received: number;
+	readonly remoteSequencedKeys: number;
 	readonly sequencedKeys: number;
+	readonly sequencedSenders: number;
 	readonly stale: number;
 	readonly subscriberFailures: number;
 	readonly unauthorized: number;
@@ -30,6 +33,7 @@ export interface EphemeralStats {
 export interface EphemeralChannelOptions {
 	readonly maxMessageBytes: number;
 	readonly maxSequencedKeys: number;
+	readonly maxSequencedSenders: number;
 }
 
 export interface EphemeralIngress {
@@ -40,6 +44,7 @@ export interface EphemeralIngress {
 export interface EphemeralTransportPort {
 	readonly localPeerId: string;
 	readonly maxEnvelopeBytes: number;
+	authorizedPeers(): readonly string[];
 	isAuthorized(sender: string): boolean;
 	onMessage(listener: (ingress: EphemeralIngress) => void): () => void;
 	send(bytes: Uint8Array): Promise<boolean>;
@@ -47,6 +52,7 @@ export interface EphemeralTransportPort {
 }
 
 export interface EphemeralChannel {
+	authorizedPeers(): readonly string[];
 	close(): void;
 	publish(input: EphemeralPublishInput): Promise<boolean>;
 	stats(): EphemeralStats;
@@ -189,10 +195,6 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 	return true;
 }
 
-function senderKey(sender: string, key: string): string {
-	return `${sender.length}:${sender}${key}`;
-}
-
 /**
  * Create the shared bounded channel used by controlled tests and the node adapter.
  * @param port Private authenticated transport port.
@@ -203,9 +205,19 @@ export function createEphemeralChannel(
 	port: EphemeralTransportPort,
 	options: EphemeralChannelOptions
 ): EphemeralChannel {
-	if (!exactKeys(options, ["maxMessageBytes", "maxSequencedKeys"])) throw new TypeError("ephemeral options differ");
+	if (!exactKeys(options, ["maxMessageBytes", "maxSequencedKeys", "maxSequencedSenders"])) {
+		throw new TypeError("ephemeral options differ");
+	}
 	const maxMessageBytes = requireSafePositive(options.maxMessageBytes, MESSAGE_BYTES_LIMIT, "maxMessageBytes");
 	const maxSequencedKeys = requireSafePositive(options.maxSequencedKeys, SEQUENCED_KEYS_LIMIT, "maxSequencedKeys");
+	const maxSequencedSenders = requireSafePositive(
+		options.maxSequencedSenders,
+		SEQUENCED_KEYS_LIMIT - 1,
+		"maxSequencedSenders"
+	);
+	if ((maxSequencedSenders + 1) * maxSequencedKeys > SEQUENCED_KEYS_LIMIT) {
+		throw new TypeError("ephemeral sequenced allocation exceeds the retained-entry limit");
+	}
 	if (!Number.isSafeInteger(port.maxEnvelopeBytes) || port.maxEnvelopeBytes < maxMessageBytes) {
 		throw new TypeError("transport envelope is smaller than the configured ephemeral frame limit");
 	}
@@ -222,8 +234,8 @@ export function createEphemeralChannel(
 		resolveQueueSpace = resolve;
 	});
 	const queue: QueueEntry[] = [];
-	const trackedKeys = new Set<string>();
-	const watermarks = new Map<string, number>();
+	const localSequencedKeys = new Set<string>();
+	const remoteWatermarks = new Map<string, Map<string, number>>();
 	const subscribers = new Set<(frame: DeliveredEphemeralFrame) => void>();
 	const counters: MutableStats = {
 		delivered: 0,
@@ -260,18 +272,31 @@ export function createEphemeralChannel(
 				counters.malformed += 1;
 				return;
 			}
-			const watermarkKey = senderKey(sender, frame.key);
-			const previous = watermarks.get(watermarkKey);
+			let senderWatermarks = remoteWatermarks.get(sender);
+			const previous = senderWatermarks?.get(frame.key);
 			if (previous !== undefined && frame.sequence <= previous) {
 				counters.stale += 1;
 				return;
 			}
-			if (previous === undefined && trackedKeys.size >= maxSequencedKeys) {
-				counters.overLimit += 1;
+			if (previous === undefined) {
+				if (senderWatermarks === undefined) {
+					if (remoteWatermarks.size >= maxSequencedSenders) {
+						counters.overLimit += 1;
+						return;
+					}
+					senderWatermarks = new Map();
+					remoteWatermarks.set(sender, senderWatermarks);
+				}
+				if (senderWatermarks.size >= maxSequencedKeys) {
+					counters.overLimit += 1;
+					return;
+				}
+			}
+			if (senderWatermarks === undefined) {
+				counters.malformed += 1;
 				return;
 			}
-			trackedKeys.add(watermarkKey);
-			watermarks.set(watermarkKey, frame.sequence);
+			senderWatermarks.set(frame.key, frame.sequence);
 		}
 		if (subscribers.size === 0) return;
 		counters.delivered += 1;
@@ -336,9 +361,8 @@ export function createEphemeralChannel(
 				return Promise.resolve(false);
 			}
 			void encodedKey;
-			const trackingKey = senderKey(port.localPeerId, input.key);
-			if (!trackedKeys.has(trackingKey)) {
-				if (trackedKeys.size >= maxSequencedKeys) {
+			if (!localSequencedKeys.has(input.key)) {
+				if (localSequencedKeys.size >= maxSequencedKeys) {
 					counters.overLimit += 1;
 					return Promise.resolve(false);
 				}
@@ -356,7 +380,7 @@ export function createEphemeralChannel(
 			return Promise.resolve(false);
 		}
 		if (frame.class === "unreliable-sequenced" && frame.key !== null) {
-			trackedKeys.add(senderKey(port.localPeerId, frame.key));
+			localSequencedKeys.add(frame.key);
 		}
 		const enqueue = (): Promise<boolean> =>
 			new Promise((resolve) => {
@@ -394,14 +418,15 @@ export function createEphemeralChannel(
 	};
 
 	return {
+		authorizedPeers: (): readonly string[] => [...port.authorizedPeers()],
 		close: (): void => {
 			if (closed) return;
 			closed = true;
 			resolveClosed?.();
 			unsubscribe();
 			for (const entry of queue.splice(0)) entry.resolve(false);
-			trackedKeys.clear();
-			watermarks.clear();
+			localSequencedKeys.clear();
+			remoteWatermarks.clear();
 			subscribers.clear();
 			try {
 				port.close?.();
@@ -410,7 +435,17 @@ export function createEphemeralChannel(
 			}
 		},
 		publish,
-		stats: (): EphemeralStats => Object.freeze({ ...counters, sequencedKeys: trackedKeys.size }),
+		stats: (): EphemeralStats => {
+			let remoteSequencedKeys = 0;
+			for (const watermarks of remoteWatermarks.values()) remoteSequencedKeys += watermarks.size;
+			return Object.freeze({
+				...counters,
+				localSequencedKeys: localSequencedKeys.size,
+				remoteSequencedKeys,
+				sequencedKeys: localSequencedKeys.size + remoteSequencedKeys,
+				sequencedSenders: remoteWatermarks.size,
+			});
+		},
 		subscribe: (listener): (() => void) => {
 			if (closed) return (): void => undefined;
 			subscribers.add(listener);

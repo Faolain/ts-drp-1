@@ -11,9 +11,12 @@ import { enableUIControls, render, renderInfo } from "./render";
 import { gridState } from "./state";
 import { getColorForPeerId } from "./util/color";
 
+let applicationInterval: ReturnType<typeof setInterval> | undefined;
+let createRequestSequence = 0;
+
 /**
- * Get the network config from the environment variables
- * @returns The network config
+ * Get the network config from the environment variables.
+ * @returns The network config.
  */
 export function getNetworkConfigFromEnv(): DRPNodeConfig {
 	return selectNetworkConfigFromEnv(env, window.location.origin);
@@ -21,168 +24,94 @@ export function getNetworkConfigFromEnv(): DRPNodeConfig {
 
 function addUser(): void {
 	const node = gridState.getNode();
-	const gridDRP = gridState.getGridDRP();
-	gridDRP.addUser(node.networkNode.peerId, getColorForPeerId(node.networkNode.peerId));
-	render();
+	gridState.getGridDRP().addUser(node.networkNode.peerId, getColorForPeerId(node.networkNode.peerId));
 }
 
 function moveUser(direction: string): void {
-	const node = gridState.getNode();
-	const gridDRP = gridState.getGridDRP();
-	const peerId = node.networkNode.peerId;
-	const user = gridDRP.query_users().find((candidate) => candidate.startsWith(`${peerId}:`));
-	const durable = user === undefined ? undefined : gridDRP.query_userPosition(user);
-	const current = gridState.transientPositions.get(peerId) ?? durable;
-	if (current === undefined || gridState.ephemeralChannel === undefined) return;
-	const next = { ...current };
-	if (direction === "U") next.y += 1;
-	if (direction === "D") next.y -= 1;
-	if (direction === "L") next.x -= 1;
-	if (direction === "R") next.x += 1;
-	gridState.transientPositions.set(peerId, next);
-	void gridState.ephemeralChannel.publish({
-		class: "unreliable-sequenced",
-		key: peerId,
-		payload: new TextEncoder().encode(JSON.stringify(next)),
-	});
-	render();
+	if (direction === "U") gridState.move(0, 1);
+	if (direction === "D") gridState.move(0, -1);
+	if (direction === "L") gridState.move(-1, 0);
+	if (direction === "R") gridState.move(1, 0);
 }
 
-function activateEphemeralMovement(): void {
-	const node = gridState.getNode();
-	const objectId = gridState.getObjectId();
-	if (objectId === undefined) return;
-	gridState.ephemeralChannel?.close();
-	gridState.transientPositions.clear();
-	const channel = node.openEphemeral(objectId, { maxMessageBytes: 65_536, maxSequencedKeys: 4_096 });
-	gridState.ephemeralChannel = channel;
-	channel.subscribe(({ key, payload, sender }) => {
-		if (key === null || key !== sender) return;
-		try {
-			const parsed: unknown = JSON.parse(new TextDecoder().decode(payload));
-			if (
-				typeof parsed !== "object" ||
-				parsed === null ||
-				Object.keys(parsed).sort().join(",") !== "x,y" ||
-				!Number.isSafeInteger(Reflect.get(parsed, "x")) ||
-				!Number.isSafeInteger(Reflect.get(parsed, "y"))
-			)
-				return;
-			gridState.transientPositions.set(key, {
-				x: Reflect.get(parsed, "x") as number,
-				y: Reflect.get(parsed, "y") as number,
-			});
-			render();
-		} catch {
-			// The shared channel authenticates and bounds bytes; the app schema remains closed here.
-		}
-	});
+function startApplicationInterval(): void {
+	if (applicationInterval !== undefined) clearInterval(applicationInterval);
+	applicationInterval = setInterval(() => {
+		renderInfo();
+		if (gridState.reconcileEphemeralSession()) render();
+	}, env.renderInfoInterval);
 }
 
-function createConnectHandlers(): void {
-	const node = gridState.getNode();
-	if (gridState.drpObject) {
-		gridState.objectPeers = node.networkNode.getGroupPeers(gridState.drpObject.id);
-	}
-
-	const objectId = gridState.getObjectId();
-	if (!objectId) return;
-	node.networkNode.subscribeToGroupPeerChanges(({ peerId, subscribed, topic }) => {
-		if (topic !== objectId || subscribed) return;
-		gridState.transientPositions.delete(peerId);
-		render();
-	});
-
-	node.messageQueueManager.subscribe(objectId, () => {
-		if (!gridState.drpObject?.id) return;
-		gridState.objectPeers = node.networkNode.getGroupPeers(gridState.drpObject?.id);
-		render();
-	});
-
-	node.subscribe(objectId, () => {
-		if (gridState.ephemeralChannel === undefined && gridState.getGridDRP().query_users().length > 1) {
-			activateEphemeralMovement();
-		}
-		render();
-	});
+function stopApplication(): void {
+	if (applicationInterval !== undefined) clearInterval(applicationInterval);
+	applicationInterval = undefined;
+	gridState.dispose();
 }
 
 function run(metrics?: IMetrics): void {
 	enableUIControls();
+	gridState.setRenderNotifier(render);
 	renderInfo();
 
-	const button_create = <HTMLButtonElement>document.getElementById("createGrid");
-	const create = async (): Promise<void> => {
-		const node = gridState.getNode();
-
-		gridState.drpObject = await node.createObject({
-			acl: createPermissionlessACL(node.networkNode.peerId),
-			drp: new Grid(),
-			metrics,
-		});
-		gridState.gridDRP = gridState.drpObject.drp;
-		createConnectHandlers();
-
-		// The object creator can sign for finality
-		if (gridState.node?.keychain.blsPublicKey) {
-			gridState.drpObject.acl.setKey(gridState.node?.keychain.blsPublicKey);
-		}
-		addUser();
-		activateEphemeralMovement();
-		render();
-	};
-
-	button_create.addEventListener("click", () => void create());
-
-	const button_connect = <HTMLButtonElement>document.getElementById("joinGrid");
-	const grid_input = <HTMLInputElement>document.getElementById("gridInput");
-	grid_input.addEventListener("keydown", (event) => {
-		if (event.key === "Enter") {
-			button_connect.click();
-		}
+	const buttonCreate = <HTMLButtonElement>document.getElementById("createGrid");
+	buttonCreate.addEventListener("click", () => {
+		const requestId = `create:${++createRequestSequence}`;
+		void gridState
+			.requestSession(requestId, () =>
+				gridState.getNode().createObject({
+					acl: createPermissionlessACL(gridState.getNode().networkNode.peerId),
+					drp: new Grid(),
+					metrics,
+				})
+			)
+			.then((installed) => {
+				if (!installed || gridState.drpObject === undefined) return;
+				if (gridState.node?.keychain.blsPublicKey) {
+					gridState.drpObject.acl.setKey(gridState.node.keychain.blsPublicKey);
+				}
+				addUser();
+				render();
+			});
 	});
 
-	const connect = async (): Promise<void> => {
-		const drpId = grid_input.value;
-		const node = gridState.getNode();
-
-		try {
-			const creatorPeerId = creatorFromObjectID(drpId);
-			if (creatorPeerId === undefined) throw new Error("Grid id is not creator-bound");
-			gridState.drpObject = await node.connectObject({
-				acl: createPermissionlessACL(creatorPeerId),
-				id: drpId,
-				drp: new Grid(),
-				metrics,
-			});
-			gridState.gridDRP = gridState.drpObject.drp;
-			createConnectHandlers();
-			addUser();
-			if (gridState.getGridDRP().query_users().length > 1) activateEphemeralMovement();
-			render();
-			console.log("Succeeded in connecting with DRP", drpId);
-		} catch (e) {
-			console.error("Error while connecting with DRP", drpId, e);
+	const buttonConnect = <HTMLButtonElement>document.getElementById("joinGrid");
+	const gridInput = <HTMLInputElement>document.getElementById("gridInput");
+	gridInput.addEventListener("keydown", (event) => {
+		if (event.key === "Enter") buttonConnect.click();
+	});
+	buttonConnect.addEventListener("click", () => {
+		const drpId = gridInput.value;
+		const creatorPeerId = creatorFromObjectID(drpId);
+		if (creatorPeerId === undefined) {
+			console.error("Grid id is not creator-bound", drpId);
+			return;
 		}
-	};
-
-	button_connect.addEventListener("click", () => void connect());
+		void gridState
+			.requestSession(drpId, () =>
+				gridState.getNode().connectObject({
+					acl: createPermissionlessACL(creatorPeerId),
+					drp: new Grid(),
+					id: drpId,
+					metrics,
+				})
+			)
+			.then((installed) => {
+				if (!installed || gridState.drpObject === undefined) return;
+				addUser();
+				render();
+				console.log("Succeeded in connecting with DRP", drpId);
+			});
+	});
 
 	document.addEventListener("keydown", (event) => {
-		// Skip if user is typing in input elements
 		if (
 			event.target instanceof HTMLInputElement ||
 			event.target instanceof HTMLTextAreaElement ||
-			event.target instanceof HTMLSelectElement
+			event.target instanceof HTMLSelectElement ||
+			!gridState.isGridInitialized()
 		) {
 			return;
 		}
-
-		// Skip if Grid is not initialized
-		if (!gridState.isGridInitialized()) {
-			return;
-		}
-
 		if (event.key === "w") moveUser("U");
 		if (event.key === "a") moveUser("L");
 		if (event.key === "s") moveUser("D");
@@ -192,48 +121,48 @@ function run(metrics?: IMetrics): void {
 	const copyButton = <HTMLButtonElement>document.getElementById("copyGridId");
 	copyButton.addEventListener("click", () => {
 		const gridIdText = (<HTMLSpanElement>document.getElementById("gridId")).innerText;
-		navigator.clipboard
-			.writeText(gridIdText)
-			.then(() => {
-				console.log("Grid DRP ID copied to clipboard");
-			})
-			.catch((err) => {
-				console.error("Failed to copy: ", err);
-			});
+		navigator.clipboard.writeText(gridIdText).catch((error: unknown) => {
+			console.error("Failed to copy grid id", error);
+		});
 	});
 }
 
 async function main(): Promise<void> {
-	let metrics: IMetrics | undefined = undefined;
+	let metrics: IMetrics | undefined;
 	if (env.enableTracing) {
 		enableTracing();
 		metrics = new OpentelemetryMetrics("grid-service-2");
 	}
 
 	let hasRun = false;
-
 	const networkConfig = getNetworkConfigFromEnv();
 	const modularSession = isModularNetworkEnv(env) ? createModularGridNetwork(networkConfig, env) : undefined;
 	const node = modularSession?.node ?? new DRPNode(networkConfig);
 	gridState.node = node;
 	await node.start();
-	// Expose the modular session for observation as soon as the node starts — do NOT gate it on
-	// dialability, which for a browser peer depends on later relay reservation.
+	startApplicationInterval();
+	// Browser dialability may arrive only after relay reservation. Keep the modular
+	// observation boundary and application telemetry available while that settles.
 	if (modularSession !== undefined) exposeModularSession(modularSession);
+	window.addEventListener(
+		"beforeunload",
+		() => {
+			stopApplication();
+			void modularSession?.stop();
+		},
+		{ once: true }
+	);
 	await node.networkNode.isDialable(() => {
 		console.log("Started node", import.meta.env);
 		if (hasRun) return;
 		hasRun = true;
 		run(metrics);
 	});
-
-	if (!hasRun) setInterval(renderInfo, import.meta.env.VITE_RENDER_INFO_INTERVAL);
 }
 
 function exposeModularSession(session: ModularGridNetworkSession): void {
 	const target = window as typeof window & { __TS_DRP_GRID_SESSION__?: ModularGridNetworkSession };
 	target.__TS_DRP_GRID_SESSION__ = session;
-	window.addEventListener("beforeunload", () => void session.stop(), { once: true });
 	window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: session.snapshot() }));
 }
 
