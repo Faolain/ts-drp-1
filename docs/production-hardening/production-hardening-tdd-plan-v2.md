@@ -47665,3 +47665,72 @@ recorded. Public-infrastructure and fully-public browser cases remain opt-in.
 Closure is a separate signed ledger and claims only hard host admission plus
 mesh-bound implicit room traffic. Corrected E2 is the next slice; the broader
 topology, P6 and production-hardening plan stay open.
+
+### D.93.47 closure ledger
+
+D.93.47 closed as a separately signed plan/RED/GREEN chain. The signed plan is
+`69a9df5f01e9837e51bc9c8daf7141d80ffaf57a` / tree
+`5080bdb33fdd5271156f5c63a10b630043605ae6`. Its sole-child tests-only RED is
+`e9ce8f22ea032bc8a6cd40cf22a01775479ee171` / tree
+`bc924df85affede30105fc0a0ef4c29ccca4dd3c`; its binary parent-to-child patch
+SHA-256 is `76c8ca626e8315b5bc76d43bb8d6ab16777a90e1b6e6bc15911067ef990421c2`.
+The exact-six GREEN is `17bbf5c704575a3cd0f4206b127747a751f72153` /
+tree `5132ff18690e2866b8b00f10629778b6445a4076`, sole parent the RED; its
+binary patch SHA-256 is
+`882b4e1733cbde410f57301e8abe255e281cc6f0bbd270910d2b2755314f2096`.
+All three commits carry Good Faolain signatures. The GREEN fast-forward push,
+direct remote lookup and local tracking state authenticated the same commit at
+zero ahead/behind.
+
+The installed result has one closed role-budget resolver and one final-upgrade
+admission controller. Synchronous reservations plus the identity-keyed live
+census keep every observed connection prefix at or below the installed hard
+ceiling; attach preserves pre-publication reservations, and failure, close,
+expiry, stop and restart release only their owned state. The exact same frozen
+budget is installed into libp2p and exposed as direct immutable host-factory
+evidence, with explicit browser projection. Existing enumerable host-snapshot
+serialization remains unchanged; the non-enumerable direct property is
+deliberate compatibility at this public seam, so the two legacy exact-object
+assertions do not enumerate the newly declared field. A future authorized
+serialization cleanup may make that field enumerable and update those tests,
+but there is no second budget authority in this slice.
+
+GossipSub remains the only mesh owner. Subscriber evidence is preserved for
+one-argument callers, while random group send, peerless/scheduled fetch and
+initial/periodic anti-entropy use the dependency-owned mesh view. Empty mesh and
+forward-only seed paths perform no implicit dial; explicit authenticated peer
+paths remain explicit. No subscriber fallback, copied mesh registry, discovery
+claim, relay-priority claim or eviction scheduler was added.
+
+On the frozen GREEN bytes, the focused budget/mesh/node/shared-room gate passed
+`45/45` in `13.95s`; the full network preservation gate passed `182/182` in
+`28.65s`; the two-client zone passed `1/1` in `19.32s`; and the retained chat
+suite passed `5/5` in `7.08s`. The frozen-lockfile offline install and package
+postinstall build passed in `12.85s`. Types and network typecheck/build, node
+source build, browser-network typecheck/build, grid typecheck/build, affected
+ESLint, Prettier, staged and unstaged diff checks, and the protocol-v3 public
+export smoke passed; the independent static/build lane completed in `35.46s`
+apart from an initially incorrect direct-Node invocation of the TypeScript
+public-export fixture, which passed through the repository TypeScript runner in
+`0.67s`. Full node test-inclusive typecheck retains only the two pre-existing
+compact-history helper errors recorded before this slice.
+
+The bounded GREEN review produced terminal PASS from Kimi and Opus with no
+P0/P1. Kimi noted conservative peer-key reservation pairing, the deliberate
+pre-start browser snapshot guard and the reservation/dial deadline equality;
+none permits over-admission or leaks a slot permanently. Opus additionally
+recorded the non-enumerable snapshot disclosure above, pre-attach fail-closed
+capacity, the linear reservation lookup at the relay ceiling and a pre-existing
+stale `@throws` comment. These are nonblocking follow-up observations, not
+reproduced correctness failures. Codex completed a source/dependency audit with
+no finding but omitted the required terminal schema and is therefore recorded
+as `NO_VERDICT`. Grok ran through the artifact-preserving review runner, retained
+its input packet, command, JSONL stream, stderr, public response and status, and
+terminated at its turn ceiling after about four minutes without a schema; it is
+also recorded honestly as `NO_VERDICT`, not approval or a hidden finding.
+
+This closure claims only hard host admission and mesh-bound implicit room
+traffic on the existing shared v3-room/chat/zone path. It does not claim T3/T4,
+corrected E2, P6 completion, product scale, MMORPG readiness or completion of
+the broader production-hardening plan. The next slice is corrected E2 under the
+installed topology boundary.
