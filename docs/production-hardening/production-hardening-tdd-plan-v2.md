@@ -46471,3 +46471,174 @@ GREEN assertions and preservation gates above passed on the signed production
 bytes. This checkpoint closes only certified-genesis installation/reopen. It
 does not claim live certified-anchor authority, either two-client product
 golden path or completion of the broader production-hardening plan.
+
+## D.93.43 Track E1 session-ephemeral contract
+
+Track E1 is the next schedulable product slice after the signed Phase 3b
+checkpoint. Phase 3c's live ACL integration is already closed by D.93.41, while
+Phase 4a remains blocked by the recorded, unrun Phase 0n forward-plane
+correction quorum. E1 therefore advances Golden Path 2 without pretending that
+an optional prerequisite has run and without reopening anchor, ACL, fold or
+consensus ownership.
+
+The duplicated concept being removed is transient room state expressed as
+durable DRP operations. The grid currently calls `Grid.moveUser` for every key
+press, so movement that should be replaceable session telemetry grows the
+durable vertex DAG. The clean semantic owner is one new
+`@ts-drp/ephemeral` package. It owns the frame, bounded queues, channel state and
+one transport-bound constructor used by the node adapter and controlled tests.
+The sole application-facing composition surface is
+`DRPNode.openEphemeral(objectId, options)`. The grid calls that node method; it
+does not construct a port, select a topic or open the package directly. Tests
+exercise the same channel constructor and frame implementation, so there is no
+test-only codec, alternate bus oracle, compatibility wrapper, module-global
+registry or second message format.
+
+`DRPNode.openEphemeral` returns an opaque `EphemeralChannel` with `publish`,
+`subscribe`, `close` and `stats`. The node instance supplies the package's
+private port and owns the object-keyed channel registry, so two nodes opening
+the same object in one process remain isolated. A channel holds no `DRPObject`,
+durable vertex, hashgraph reference or reducer. It owns three exact delivery
+classes:
+
+- `unreliable-unordered`, for independent best-effort samples;
+- `unreliable-sequenced`, latest-wins per nonempty entity key; and
+- `reliable-unordered`, which retries bounded local transport failures until
+  transport acceptance or channel closure but promises neither remote
+  acknowledgement nor a total application order.
+
+The canonical version-1 frame is the closed tuple
+`{ class, key, payload, sequence }`. Unkeyed classes require `key: null` and
+`sequence: 0`. The channel, not its caller, allocates positive safe-integer
+sequences for sequenced publications. The receiver compares them per
+authenticated transport sender plus nonempty application key; one sender can
+never suppress another. A key is at most 128 UTF-8 bytes. The accepted-ingress
+high-water mark advances before subscriber callbacks and remains for the life
+of the channel, including transient network disconnects, so delayed pre-loss
+frames remain stale. The E1 reconnect row restarts the same live node/channel
+and therefore resumes its monotonic publication counter; browser reload and
+peer-key replacement are outside E1. Membership loss clears that sender's
+visible overlay immediately but does not weaken its replay watermark. Closing
+the channel discards every watermark and frees all sequenced-key accounting.
+Payloads are copied at publication, decoded once at ingress and delivered as
+detached bytes. Unknown fields, unknown class, malformed canonical bytes,
+invalid UTF-8, missing or extra key, unsafe sequence and stale or repeated
+sequence fail closed before subscriber delivery.
+
+Options are the closed tuple `{ maxMessageBytes, maxSequencedKeys }`, with
+literal ceilings 65,536 encoded-frame bytes and 4,096 sender-plus-key entries.
+Both values are positive safe integers, and the node adapter also requires the
+complete signed envelope to fit the network's existing ingress ceiling.
+Reopening the same object channel with different effective limits fails rather
+than silently changing an existing channel. A sequenced key beyond the bound is
+rejected without evicting an authenticated current key. Each unreliable queue
+is bounded: unordered drops the newest publication at capacity, while
+sequenced coalesces an older unsent publication for the same sender-local key
+and otherwise drops the newest publication. Reliable-unordered applies bounded
+backpressure and the local retry rule above. `stats()` returns an immutable
+snapshot containing published, received, delivered, dropped, malformed,
+unauthorized, stale, over-limit and subscriber-failure counters plus the current
+sequenced-key count. `published` counts frames accepted by the transport,
+`received` counts raw frames handed to the channel before decoding, `delivered`
+counts accepted frames fanned out at least once, `dropped` counts local
+unreliable shedding, and subscriber-failure counts throwing callbacks.
+Malformed, unauthorized, stale and over-limit each count their mutually
+exclusive ingress rejection class. Subscriber exceptions increment their
+counter and do not suppress sibling subscribers or tear down channel ingress.
+
+The node adapter owns one collision-separated ephemeral topic and queue per
+activated object. The topic is a versioned, domain-separated deterministic hash
+of the exact object id and cannot collide with the durable object or discovery
+topics. The adapter transports the canonical frame as `MESSAGE_TYPE_CUSTOM`
+and adds `routeEphemeralIngress` beside `routeV3Ingress`, before legacy dispatch,
+so the existing undefined custom handler cannot consume or drop an owned frame.
+It requires `gossipTopicFor(message)` to equal the exact ephemeral topic.
+Remote authority is the conjunction of the strict-signed transport sender,
+current subscription returned by `networkNode.getGroupPeers(ephemeralTopic)`,
+and the connected object's current `acl.query_isWriter(sender)` result at
+delivery time. The sender recorded by the strict-signed GossipSub boundary is
+authoritative; a payload-supplied sender or caller callback cannot authorize
+ingress. A peer removed from the topic or revoked as writer loses ephemeral
+authority before its next delivery. Raw topic subscription alone is never an
+authorization oracle. The package accepts only the private node transport port,
+not raw network handles, membership hooks or caller-selected topics. No
+protobuf, network-envelope, object, anchor, ACL or consensus schema changes are
+authorized.
+
+The public grid constructs the same fresh permissionless genesis on both
+replicas through the existing explicit-ACL option. Creation passes
+`createPermissionlessACL(localPeerId)`. Join first derives the committed creator
+with `creatorFromObjectID(objectId)`, rejects an unbound id, and passes
+`createPermissionlessACL(creatorPeerId)` to `connectObject`. It never claims to
+sync or replace root ACL state: ACL mode is not encoded in the id and network
+root adoption is intentionally forbidden. This is an application configuration
+change, not an ACL schema or semantics change; both strict-signed, currently
+subscribed browser peers satisfy the exact writer predicate above. Durable
+admission and each peer's durable initial position remain, but the movement
+measurement begins only after both admissions have converged. The input path
+stops calling `Grid.moveUser`; the now-unused durable movement method is removed
+rather than kept as a compatibility owner. The grid publishes an absolute
+position with `unreliable-sequenced`, using its authenticated peer id as the
+application key, and updates the existing `[data-glowing-peer-id]` element's
+`style.left/top` from a transient overlay over the durable initial position. It
+does not render a parallel dot. Disconnect removes only that peer's overlay;
+reconnect of the same live node/channel starts visibly from the durable position
+and subsequent monotonic movement converges both clients. No movement sample
+adds a durable vertex.
+
+The tests-only RED creates `tests/zero-durable-vertices.test.ts`, owns one
+closed Track-E1 fixture under `tests/fixtures/`, and the existing grid
+Playwright acceptance that already owns two-client visibility. The unit owner
+uses a deterministic controlled transport, not wall-clock sleep, to publish
+exactly `30 * 32 * 60 = 57,600` movement samples and proves that the durable
+vertex count after admission is unchanged. One separately named durable
+admission operation in a fresh controlled object is the positive control and
+must increase that count exactly once. The RED also proves all three delivery
+classes and their capacity behavior, sender-plus-key latest-wins isolation,
+accepted-ingress watermark timing, reconnect replay rejection, copied bytes,
+closed option/frame decoding, literal encoded-size/key limits, conflicting
+reopen, subscriber isolation, the counter increment matrix and
+unknown/partial/mixed fail-close. Its package and unit rows fail only because
+the shared channel is absent; its node/grid rows additionally pin the explicit
+composition, authority and admission prerequisites above rather than claiming
+those current prerequisites already pass.
+
+The retained real-boundary rows use two authenticated peers on one object and
+prove exact topic binding, strict sender attribution, topic-membership plus ACL
+writer authorization, membership removal and restoration, stale-sequence
+rejection and zero durable growth. The grid Playwright row requires two real
+browser clients to durably admit themselves to the same permissionless world,
+observe each other's existing dot move, disconnect and reconnect the same live
+node, then converge on the same durable positions plus the latest admitted
+transient overlays. It records durable vertex count after both admissions and
+before and after the movement burst, requiring equality. This is a product
+golden-path assertion; a controlled in-memory bus cannot substitute for it.
+
+GREEN may add the new package, the minimum node channel adapter,
+`routeEphemeralIngress`, `DRPNode.openEphemeral` and object-keyed registry, plus
+the grid's existing-ACL configuration, transient overlay and node API call. It
+may add only the mechanical workspace/lockfile importer edges required by those
+dependencies. It must not edit protocol-v3 trust, author authorization, ACL
+implementation, control-plane records, hashgraph semantics, network protobufs
+or the Phase 0n/4a owners. The package adapter constructor is not a second
+application API, and the grid never imports it.
+
+Acceptance requires the focused 57,600-publication unit gate, retained real-node
+integration rows, the two-client grid Playwright row, package/node/grid
+typecheck and build, exact public-export audit, targeted lint and formatting,
+and the current Phase 3b plus existing grid convergence preservation gates. The
+unit target is under five seconds, the real-node rows under three minutes and
+the complete ordinary E1 gate under ten minutes under normal uncontended load.
+Any heartbeat/RPC timeout is reported as scheduling evidence and corrected at
+the harness boundary rather than by weakening behavior.
+
+The plan, tests-only RED and GREEN are each separate Good-Faolain-signed commits.
+For every frozen packet, request bounded Kimi 100-step, Grok, Codex and Opus
+xhigh review of contract quality, oracle causality and refactor cleanliness.
+Every substantive P0-P2 finding is reproduced and resolved or explicitly
+dismissed with source evidence; timeout or `NO_VERDICT` is reported honestly and
+is never called approval. No reviewer may mutate the packet under review. The
+signed closure checkpoint records exact commits, trees, patch hashes, commands,
+counts and measured runtimes. It closes only Track E1 transient grid movement,
+not Phase 4a, either complete two-client golden path or the broader
+production-hardening plan.
