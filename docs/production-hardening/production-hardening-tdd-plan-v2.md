@@ -46642,3 +46642,44 @@ signed closure checkpoint records exact commits, trees, patch hashes, commands,
 counts and measured runtimes. It closes only Track E1 transient grid movement,
 not Phase 4a, either complete two-client golden path or the broader
 production-hardening plan.
+
+## D.93.44 Track E1 closure checkpoint
+
+Track E1 closed on the linear Good-Faolain-signed sequence
+`e6758ff9a0303246bf884c48b008279845a92ee8` (plan, tree
+`d5fc30108ea1880e0a5135b26543477b7f834391`, binary patch SHA-256
+`a0da19a6eb62850ed5af5b3644a40954afba9e0e6eb56c399b10a17240e95757`),
+`563a853aed59af8de0fb951875f8a6500d91c3e1` (tests-only RED, tree
+`b43f797978c070282a1da8f2129727caf67b0d64`, binary patch SHA-256
+`5ae040f467430abee4341b366e3ba3294bd2372d93018ec9b97546fe167fba26`),
+and `4320860e087ce45fa339bfa9bf072ac034807d3c` (GREEN, tree
+`45d57ebb97f7db0d9c8b4ee0eed17f524b3471ef`, binary patch SHA-256
+`590bc4c82b42fdd47d8f48f47c784929235580184acac7645a27a3246a48fd8f`).
+The GREEN push was authenticated at the exact remote branch tip with tracking
+ahead/behind `0/0`; all three commit signatures verified with Faolain key
+`55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+Final-byte evidence was: focused zero-vertex, node dependency, queue-isolation
+and public-API tests `26/26` in 5.44 seconds; the retained Phase 3b preservation
+set `51/51` in 21.37 seconds; the modular two-client grid Playwright acceptance
+`4/4` in 50.7 seconds; and a 300-publication reliable saturation probe with no
+accepted publication dropped. The ephemeral package, node and grid type/build
+gates, package export smoke, frozen-lockfile installation, targeted ESLint,
+Prettier and diff checks all passed. The complete ordinary Track E1 acceptance
+therefore remained below ten minutes under the recorded uncontended run.
+
+The final bounded review round authenticated the frozen tree and patch. Kimi
+returned `PASS` with no P0/P1 finding and only nonblocking cleanup observations.
+Grok, Codex and Opus each ended `NO_VERDICT` at their finite bounds and emitted
+no substantive finding; none mutated repository bytes. Those outcomes are not
+represented as approvals. The executable RED, final-byte gates and authenticated
+GREEN commit remain the acceptance authority.
+
+This checkpoint closes only session-ephemeral grid movement: transient movement
+uses no durable vertices, reliable local saturation backpressures instead of
+dropping, ingress uses current membership and ACL authority, channel teardown
+releases its registry and replay state, and two browser clients preserve durable
+room convergence across disconnect/reconnect. It does not claim runtime
+anti-cheat, Phase 4a, a complete two-client product golden path, or completion of
+the broader production-hardening plan. The next slice returns to the P6 golden
+path rather than opening another freeze-governance amendment.
