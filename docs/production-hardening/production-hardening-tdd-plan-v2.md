@@ -47038,3 +47038,310 @@ recorded as `NO_VERDICT`. No reproduced substantive final-byte defect remained.
 This closes only the D.93.45 Track E1 correction. It does not close P6 or the
 broader production-hardening plan; work returns to the next signed P6
 two-client product slice.
+
+## D.93.46 shared v3-room composition and zone adoption
+
+The next P6 slice gives the Discord and MMORPG paths one durable room
+composition. The current v3-chat example is the preservation control: it has a
+working creator-trust, invite, preparation, recovery, issuance, journal,
+ingress and reconnect path, but those responsibilities are embedded in the
+chat application. The grid still installs a legacy `DRPObject` as its durable
+authority. Copying the chat module into grid would create two independently
+drifting protocol compositions; retaining the legacy object would make the
+game claim a v3 zone while authorizing its durable and transient planes from a
+different protocol.
+
+This amendment authorizes one reference-application package,
+`@ts-drp/example-v3-room`, as the sole owner of that composition. It is not a
+new protocol or public core package. It composes the existing protocol-v3,
+control-plane, storage and node owners for browser applications and exposes a
+closed room-session contract to the two examples. Application-specific
+blueprint bytes, catalog evidence, creator membership, local signer material,
+bootstrap operation and admitted-vertex projection remain injected by each
+application. The room owner never fabricates an application identity and never
+accepts a caller-selected anchor after invite verification.
+
+### Composition boundary
+
+One room session owns, in order:
+
+1. exact creator-invite encoding and canonical decoding;
+2. current-anchor trust installation/opening;
+3. application preparation and first-author bootstrap issuance;
+4. durable issuance and live-journal recovery before transport activation;
+5. one network registration, admitted-vertex sink and retained-history replay;
+6. monotone resumed logical time, local issue/publication and close; and
+7. one E1 transient channel authorized from the live v3 registration.
+
+The caller supplies one closed application description and one transport
+adapter. The application description binds the object ID, canonical blueprint
+package and catalog, protocol parameters, creator authorization material,
+bootstrap operation, initial logical-time floor, signer/keychain,
+accepted-state projector and, when E1 is enabled, the creator-authorized
+transport-peer to v3 author roster. The roster is part of signed bootstrap
+state; it is not caller metadata consulted after admission. D.93.46 proves a
+closed two-member zone and does not claim the legacy grid's permissionless
+open-join behavior. Dynamic membership remains an epoch transition problem
+outside this slice.
+
+The zone object identity keeps the existing creator-routing commitment: its
+canonical form is `<creatorNetworkPeerId>:<32 lowercase hexadecimal characters>`
+(the hexadecimal encoding of the existing 16-byte salt).
+The signed creator invite and bootstrap state bind that same value. A label such
+as `creator:<salt>` is not accepted as creator-routable evidence, because
+`creatorFromObjectID` must recover the real network peer ID used by the retained
+targeted-dial path.
+
+The transport adapter is an external boundary, not a second room owner. V3-chat
+keeps its proven same-origin `BroadcastChannel` adapter. Its browser tests keep
+independent page clients in one Playwright context, with independent client IDs,
+keychains and database names; they do not claim cross-context delivery. The zone
+uses the authenticated `DRPNetworkNode` transport already owned by the grid. A
+small protocol-neutral room-network lifecycle is extracted from the existing
+object subscription path so v3 activation can publish room presence, discover
+and dial the creator or a replica, and release those resources without creating
+a legacy `DRPObject`. That extraction retains current unbudgeted behavior only.
+T1/T2 immediately follows this slice and adds connection and dialing budgets;
+D.93.46 adds no new selection policy, WAN, relay, scale or resilience claim.
+
+Recovered and live accepted vertices enter one canonical projection set keyed
+by vertex digest. Before each projection, the shared owner orders the complete
+set by epoch, logical time, author, author sequence and full digest. The
+application projector is a pure fold over that ordered snapshot, so recovery
+order, live arrival order and retained replay produce the same state. A failed
+projection does not mark the candidate applied; the journal remains
+authoritative and the next recovery can retry. Retained replay may resend
+authenticated envelopes but cannot directly install state. The resumed
+logical-time floor is derived from every recovered accepted vertex, not only
+application-visible messages. Close is idempotent and releases the live
+registration, E1 channel, room presence/dial lifecycle, message queue, transport
+and durable stores. Rejoin uses the same invite and application identity and
+must recover before accepting new traffic.
+
+The current v3 live registration gains one capability-bound `openEphemeral`
+path using the existing Track E1 channel implementation.
+`NodeEphemeralAdapter` is refactored around one current authorization provider
+rather than a legacy object lookup: `DRPNode.openEphemeral` supplies the
+existing legacy-object writer predicate for preservation, while the v3 room
+supplies the signed bootstrap roster and current v3 writer predicate. The
+provider maps the authenticated network peer ID to its enrolled v3 author
+before applying the current author-list or latched-ACL decision. Custom E1
+ingress is claimed by that exact active registration and its real network
+topic. A deactivated or superseded registration owns no channel. There is one
+adapter implementation, not parallel legacy and v3 implementations, and the
+same-origin chat shim is not accepted as E1 authentication evidence.
+
+This is only E1 adoption. The zone channel remains authenticated-network,
+unreliable-sequenced movement with zero durable vertices. It does not add an
+epoch/anchor carrier, per-peer rate policy or a MAC, and no key is derived from
+the public anchor digest. Corrected E2 begins only after this zone slice closes
+and after T1 establishes its topology boundary. Remote-presence expiry is not
+claimed here: local close clears its transient overlay, and a reopened client
+starts from no transient state before accepting fresh movement. Survivor-side
+departure detection is deferred with topology/presence policy rather than
+fabricated from the durable writer roster.
+
+### Product preservation and zone behavior
+
+The v3-chat entry point becomes an application shell over the shared owner. It
+retains the existing `d9336V3Chat` create, join, send, ACL, snapshot and close
+behavior. Its five Chromium browser cases remain the preservation oracle,
+including creator-invite rejection, reconnect repair, eight-client convergence
+and latched-ACL staging. The extraction must not weaken or special-case those
+results.
+
+The grid product replaces its legacy durable session with one v3 zone session.
+Create and join use one creator invite, not `DRPNode.createObject` or
+`connectObject`. The creator invite carries the closed two-member author and
+transport-peer roster used by the focused product proof; arbitrary open join is
+explicitly not claimed. The zone application has closed durable `join` and
+`placeBlock` operations and a deterministic accepted-state projection. Two real
+networked browser clients must join the same zone, each observe the same placed
+block and accepted-operation digest, close one page, accept another block while
+it is offline, then reopen that client's durable stores in its retained browser
+context and converge before the rejoined client issues another command. The
+product renders the durable block state so this is visible product evidence
+rather than a hidden test API.
+
+Movement remains E1 and is opened only from the installed v3 room session over
+the authenticated network transport. A movement sample changes the transient
+overlay on both clients without changing the durable accepted-vertex inventory
+or digest. Local close clears transient state; reconnect restores durable blocks
+and then accepts fresh movement. The grid composition must contain no production
+call to legacy `createObject`, `connectObject` or object-bound
+`DRPNode.openEphemeral` after GREEN. Existing legacy-object E1 rows remain as
+node-API preservation, while the grid-session rows in the Track E1 owner are
+rewritten in RED to exercise the v3 room capability rather than preserved as
+source-shape authority.
+
+The modular grid owner is split honestly at the product boundary. Its first
+existing browser row mixes two different concerns, so the row itself is not
+claimed unchanged: RED extracts its relay reservation, rendezvous registration,
+routing-terminal and registry/relay recovery segments into explicit preservation
+controls, while rewriting or assigning to T1 its legacy create/join,
+object-peer, object-triggered dial, room replacement and departure segments.
+The second surviving-replica row moves to T1. Those legacy assertions are
+retired with the legacy object rather than relabeled as v3 evidence. The new
+real-network zone case owns room join, durable convergence and E1 product
+evidence. T1 restores and strengthens room-level dial/discovery assertions
+against the v3 room lifecycle with explicit budgets.
+This split applies to the exact browser owners
+`examples/grid/e2e/grid-modular.spec.ts`,
+`examples/grid/e2e/grid-public-infra.spec.ts` and
+`examples/grid/e2e/grid-fully-public.spec.ts`. In the first modular row, the
+plan-parent segments at lines 63–89 and 127–149 provide the preservation
+baseline; the legacy session segments at lines 91–126 and 150–190 are rewritten
+or move to T1. These line references identify the reviewed parent and do not
+become source-shape authority. The two opt-in public infrastructure owners stop
+selecting the removed legacy product session, and their object-triggered
+room-convergence assertions also move to T1 rather than being counted as
+D.93.46 v3-room evidence.
+
+### Signed TDD scope
+
+The implementation is divided into two signed RED/GREEN sub-slices so no
+behavioral matrix can pass merely because a package import is absent.
+
+**D.93.46a — extraction and chat preservation.** Its tests-only RED may add the
+shared-package public-contract owner and edit the existing v3-chat browser owner.
+The new contract has one causal missing-owner failure: the reference application
+package and its closed room-session export do not exist. The five existing chat
+browser cases remain independently executable controls on the plan parent; they
+are not skipped behind that failure. GREEN adds the minimum real
+`examples/v3-room` package, its workspace/lockfile importer and the v3-chat shell
+changes needed to consume it while preserving all five outcomes. This first
+GREEN extracts the already-proven chat composition; it does not use a controlled
+or test-owned duplicate room model and does not yet claim zone or E1 adoption.
+
+**D.93.46b — shared semantics and zone adoption.** Its tests-only RED is parented
+directly by the signed D.93.46a GREEN, so it imports and executes the real shared
+owner rather than failing at module resolution. It may add
+`tests/phase-3a1b-d9346-shared-v3-room-red.test.ts`,
+`tests/phase-3a1b-d9346-v3-zone.pw.ts` and their controlled input/transport
+fixtures. It may edit `tests/zero-durable-vertices.test.ts`, the v3-live and node
+lifecycle contract/type fixtures, the focused Playwright configuration, and the
+three exact grid browser owners named above. Each composition, projection,
+recovery, lifecycle, E1 and zone behavior is a distinct causal row; there is no
+aggregate readiness guard and no substitute room implementation in test code.
+GREEN generalizes the real shared owner and adopts it in grid through the
+minimum application/node/package/lockfile owners authorized below.
+
+The exact path inventory is frozen before each RED is signed. RED must not add a
+test-only production hook or a second room implementation. Across the two
+sub-slices, the executable evidence must prove:
+
+- a closed application description is required and wrong object, blueprint,
+  catalog, invite, signer, bootstrap or store identities fail before live
+  activation;
+- recovery and opposite live delivery orders produce the same canonical fold,
+  replay does not double-apply a vertex, projector failure remains recoverable,
+  and logical-time resume observes every accepted recovered vertex;
+- issue, journal, publication, retained replay and checker failures propagate,
+  and close releases every owner once;
+- v3 E1 accepts only an authenticated enrolled peer mapped to a current v3
+  writer on the exact transient topic, rejects unknown/malformed/non-writer and
+  peer/author-mismatch ingress, and becomes inert after deactivation;
+- the legacy `DRPNode.openEphemeral` path retains its existing classification;
+- v3-chat retains its five browser outcomes through the shared owner; and
+- two real zone clients create/join, durably exchange `placeBlock`, preserve a
+  flat movement vertex inventory, disconnect/reconnect/recover and converge.
+
+The two GREEN scopes together may add the `examples/v3-room` package and edit
+only the corresponding workspace and lockfile importers; the v3-chat application
+shell and manifest; the grid application composition, state, renderer, zone
+material and manifest; and the node room-lifecycle, v3-live and ephemeral owners
+needed for the single authenticated v3-room seam. A path assigned to D.93.46a is
+not silently reopened by D.93.46b: the second RED must name any newly required
+shared-owner or chat assertion, and the second GREEN may change a previously
+landed production owner only when that exact path and missing behavior were
+frozen by the second RED. Existing test files changed by each RED are frozen in
+its GREEN. No protocol-v3 admission, trust, storage, cryptography, workflow or
+dependency-version owner is authorized. The room-lifecycle extraction may only
+promote the existing room presence/discovery/dial/cleanup behavior; connection
+budgets and peer selection remain T1. The old grid durable class may remain only
+as a node-E1 fixture dependency and must not be reachable from the product
+bundle. No compatibility switch, fallback legacy zone, raw network escape hatch
+or alternate room session is permitted.
+
+The exact plan and both RED/GREEN path inventories are recorded before each
+signed commit. Lockfile changes are limited to the new workspace importer and
+the two examples consuming it; no external dependency is added. Plan, each RED,
+each GREEN and closure are separate Good-Faolain-signed commits with authenticated
+remote tips.
+Protected untracked files, six stashes, recovery refs and unrelated work remain
+untouched.
+
+### Acceptance and review
+
+Focused acceptance comprises the shared composition owner, room-network
+lifecycle, v3 live/E1 authorization rows, the five v3-chat browser cases and the
+two-client zone case.
+The zone case must report the durable vertex count before movement, after local
+and remote movement, after one `placeBlock`, after offline progress and after
+rejoin. Only durable commands may advance it. The retained Track E1 and P6
+live-plane rows remain green. The extracted modular relay/rendezvous/routing and
+registry/relay recovery controls remain green; the mixed plan-parent browser row
+is intentionally rewritten and is not counted as an unchanged control.
+Room-level modular/public topology assertions are explicitly assigned to T1 and
+are not counted as D.93.46 preservation. Run the new package plus
+v3-chat/grid/node/type package typechecks and builds, public export smoke,
+targeted ESLint, Prettier, diff-check and frozen-lockfile install. Measure each
+gate rather than inferring the budget; the ordinary slice gate must remain below
+ten minutes under normal uncontended load. Browser cases may be partitioned so
+the focused zone plus v3-chat preservation run serially without the multi-server
+topology harness. No freeze-successor certification or other exhaustive
+governance matrix is part of this product slice.
+
+Use the normal requested Kimi 100-step, Grok, Codex and Opus xhigh reviews for
+the plan, RED and GREEN. A full packet receives fifteen minutes and may extend
+to twenty only while relevant source-review progress is visible; a narrow delta
+receives eight minutes and may extend to twelve with progress. Report `PASS`,
+findings, timeout or `NO_VERDICT` honestly. A silent or timed-out reviewer is
+not approval and is not automatically a blocker; every substantive P0-P2 is
+reproduced and resolved or explicitly dismissed with source evidence.
+
+Closure claims only that chat and the game zone share one genuine v3 durable
+room composition and that the zone retains authenticated E1 without durable
+movement vertices. It does not restore permissionless zone onboarding and does
+not close P6, E2, topology budgets, scale, the MMORPG track or the broader
+production-hardening plan. After closure the next slice is T1/T2 connection and
+dialing budgets; corrected E2 follows only once the zone has that genuine
+topology authority.
+
+### D.93.46 plan-review resolution
+
+Codex, Kimi's 100-step review and Opus xhigh independently rejected the first
+draft's use of a same-origin `BroadcastChannel` across isolated browser contexts,
+its promise to preserve room-level modular assertions after removing the only
+room subscription, and its survivor-side disconnect claim without a presence
+owner. Codex also identified arrival-order projection and incomplete
+logical-time resume semantics. Those findings are resolved above by keeping chat
+pages in one context, placing the zone on the authenticated network transport,
+extracting the existing room lifecycle without yet adding budgets, using an
+enrolled peer-to-author roster, narrowing disconnect evidence to local teardown,
+and making projection a deterministic refold over every accepted vertex. Grok
+produced no output within the fifteen-minute full-review window and is recorded
+as `NO_VERDICT`, not approval. The corrected bytes require one narrow delta
+review before signing; they do not require a second full-plan round.
+
+The narrow review completed with a Kimi 100-step PASS. Codex correctly rejected
+the draft's attempt to execute shared-room behavioral RED rows before the shared
+package existed; the signed TDD scope now separates extraction/chat preservation
+from shared semantics/zone adoption, so D.93.46b exercises the real D.93.46a
+owner. Opus correctly required the zone object prefix to be the actual creator
+network peer ID and asked that the three affected browser owners be named
+precisely; both are resolved above. Its claim that those owners did not exist was
+not reproduced: the exact e2e files are named above, with cold-start retained and
+legacy room-topology rows assigned to T1. Grok's narrow run entered a high-CPU
+semantic-search child but emitted no further transcript events for more than
+twelve minutes; it was stopped and is recorded as `NO_VERDICT`, not approval or
+a finding.
+
+The final narrow-delta round completed with Codex and Grok PASS, Kimi PASS with
+one nonblocking wording correction, and Opus `CHANGES_REQUIRED`. Kimi and Opus
+both identified that the existing salt is 16 bytes rendered as 32 lowercase
+hexadecimal characters; the unit is corrected above. Opus also reproduced that
+the first modular browser row mixes retained network recovery with retired
+legacy object-session behavior. The plan now names the exact plan-parent
+segments, extracts only the useful network controls and no longer calls the
+rewritten row unchanged. No other P0-P2 finding was reported.
