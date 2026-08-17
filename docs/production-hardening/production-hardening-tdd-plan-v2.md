@@ -47396,3 +47396,57 @@ This ledger closes only D.93.46a extraction and v3-chat preservation. It does
 not claim zone adoption, authenticated E1, T1/T2, E2, P6, MMORPG readiness or
 completion of the broader production-hardening plan. D.93.46b starts from the
 real shared package at `2bb23508…` and owns the separate zone-adoption RED/GREEN.
+
+### D.93.46b closure ledger
+
+D.93.46b closed as a separately signed RED/GREEN pair on
+`codex/phase3a1b-p6-golden-path`. The tests-only RED is
+`334ed7149835af3bac334dec89276d8260235d32` / tree
+`40249ca3b3cec1fae3aedb489018dcef03a85b16`. The GREEN is
+`d833db3ccfd4df3efd9563cd25bb8ecfe2da9c3c` / tree
+`b8417244160ca5910c3a9ec9fa3b79eeaa77c11f`, parented directly by that RED and
+changing exactly fourteen authorized application, shared-room, node transport,
+manifest and lockfile paths. Both commits have Good Faolain signatures. The
+GREEN was fast-forward pushed, direct remote lookup matched it, and local HEAD,
+upstream and origin were at zero ahead/behind when this ledger was written.
+
+The shared room is now the sole durable composition owner for v3-chat and the
+grid zone. Two real zone clients create and join one creator-authorized room,
+exchange a durable `placeBlock`, retain E1 movement outside the durable vertex
+inventory, disconnect, recover and converge. Creator-signed bootstrap history is
+the only roster authority in this slice. Room and ephemeral transport lifecycles
+reject legacy/v3 identity aliasing, preserve bounded retained-history retries,
+and complete all shutdown owners before surfacing the first failure. Same-origin
+browser sessions hold distinct durable Web-Lock identity slots through teardown.
+
+Final-byte evidence recorded `28/28` focused semantic tests plus `7/7`
+temporary causal lifecycle regressions in under seven seconds, the genuine
+two-client Chromium zone case `1/1` in `13.6s`, and the same-origin two-page
+identity case `1/1` in `7.7s`. The preceding frozen-byte acceptance also passed
+the five v3-chat browser cases, grid modular and public-infrastructure controls,
+the ordinary/preservation unit set, all 46 offline workspace installs, public
+export smoke, and the node, v3-room, v3-chat and grid type/build gates. The final
+grid and node production-source typechecks, affected ESLint, Prettier and diff
+checks passed. A full node test-source typecheck still reports the unrelated
+pre-existing compact-history-scale discriminated-union fixture error; it was not
+attributed to or changed by this slice.
+
+The broad GREEN review produced concrete Codex and Opus lifecycle findings,
+which were reproduced and fixed: creator-roster poisoning, close/open and
+identity-lock races, fail-fast shutdown, teardown containment, and cross-mode
+identity collisions. Final exact-byte reviews returned PASS from Codex, Kimi and
+Opus with no P0/P1; Grok repeatedly exhausted its bounded turn/tool window
+without a terminal verdict and is recorded as `NO_VERDICT`, not approval and not
+a hidden finding. The final signing-boundary Codex review returned PASS with no
+P0-P2. The retained targeted replay remains the inherited best-effort transport
+contract and does not grant durable publication credit. Legacy grid modules
+remain only for the signed node-E1 preservation fixture and are absent from the
+product bundle.
+
+This closure claims only one genuine durable v3-room composition shared by chat
+and the game zone, authenticated creator-owned zone membership, durable
+place/recover/converge behavior, and non-durable E1 movement. It does not claim
+permissionless membership, E2, topology scale, P6 completion, MMORPG readiness,
+or completion of the broader production-hardening plan. The next slice is the
+already-planned T1/T2 connection and dialing budget work; corrected E2 follows
+only after that topology authority exists.
