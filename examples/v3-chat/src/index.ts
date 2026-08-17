@@ -1,25 +1,13 @@
-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	createV3RoomSession,
+	type V3RoomAcceptedVertex,
+	type V3RoomApplication,
+	type V3RoomCreatorInviteMaterial,
+	type V3RoomSession,
+	type V3RoomTransport,
+} from "@ts-drp/example-v3-room";
 import { Keychain } from "@ts-drp/keychain";
-import { MessageQueueManager } from "@ts-drp/message-queue";
-import {
-	activateV3LivePlane,
-	prepareV3LiveGeneration,
-	recoverV3LiveReplica,
-	routeV3Ingress,
-	type V3AdmittedVertexSink,
-	type V3PlaneHandle,
-} from "@ts-drp/node/v3-live";
-import {
-	type AdmittedReceivedVertexView,
-	createAdmissionBoundTransactionalVertexIssuer,
-	prepareBlueprintAdmission,
-	type SignRegisteredVertexDigest,
-} from "@ts-drp/protocol-v3";
-import { parseStorageObjectId } from "@ts-drp/storage";
-import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
-import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
-import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/live-journal";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
@@ -36,15 +24,16 @@ const PARAMETERS = Object.freeze({
 const CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
 type ClientId = (typeof CLIENT_IDS)[number];
 
+// Floors begin above the bootstrap vertex's resumed value (logical time 1 + stride 2).
 const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: string }>>> = Object.freeze({
-	alice: Object.freeze({ logicalTime: 2, seed: "d9336-v3-chat-alice" }),
-	bob: Object.freeze({ logicalTime: 3, seed: "d9336-v3-chat-bob" }),
-	carol: Object.freeze({ logicalTime: 4, seed: "d9339-v3-chat-carol" }),
-	dave: Object.freeze({ logicalTime: 5, seed: "d9339-v3-chat-dave" }),
-	erin: Object.freeze({ logicalTime: 6, seed: "d9339-v3-chat-erin" }),
-	frank: Object.freeze({ logicalTime: 7, seed: "d9339-v3-chat-frank" }),
-	grace: Object.freeze({ logicalTime: 8, seed: "d9339-v3-chat-grace" }),
-	heidi: Object.freeze({ logicalTime: 9, seed: "d9339-v3-chat-heidi" }),
+	alice: Object.freeze({ logicalTime: 3, seed: "d9336-v3-chat-alice" }),
+	bob: Object.freeze({ logicalTime: 4, seed: "d9336-v3-chat-bob" }),
+	carol: Object.freeze({ logicalTime: 5, seed: "d9339-v3-chat-carol" }),
+	dave: Object.freeze({ logicalTime: 6, seed: "d9339-v3-chat-dave" }),
+	erin: Object.freeze({ logicalTime: 7, seed: "d9339-v3-chat-erin" }),
+	frank: Object.freeze({ logicalTime: 8, seed: "d9339-v3-chat-frank" }),
+	grace: Object.freeze({ logicalTime: 9, seed: "d9339-v3-chat-grace" }),
+	heidi: Object.freeze({ logicalTime: 10, seed: "d9339-v3-chat-heidi" }),
 });
 const ACL_VIEW_CLIENT_IDS = ["alice", "bob", "dave"] as const;
 
@@ -97,28 +86,8 @@ interface ChatSnapshot {
 
 interface ActiveChat {
 	readonly accepted: Map<string, AcceptedMessage>;
-	readonly aheStore: Awaited<ReturnType<typeof createBrowserAheDurableStore>>;
-	readonly channel: BroadcastChannel;
 	readonly clientAuthors: Readonly<Record<ClientId, string>>;
-	readonly handle: V3PlaneHandle;
-	readonly issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
-	readonly journalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
-	readonly keychain: Keychain;
-	readonly messageQueueManager: MessageQueueManager<Message>;
-	readonly networkNode: DRPNetworkNode;
-	nextLogicalTime(): number;
-	readonly roomId: string;
-	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.";
-}
-
-interface CreatorInviteMaterial {
-	readonly detachedGenesisSignature: Uint8Array;
-	readonly exactCanonicalLatchedAclBytes: Uint8Array;
-	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
-	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
-	readonly exactCanonicalProfileBytes: Uint8Array;
-	readonly exactCanonicalSignerSetBytes: Uint8Array;
-	readonly pinnedGenesisAnchorDigest: string;
+	readonly room: V3RoomSession;
 }
 
 interface LatchedPreview {
@@ -145,11 +114,7 @@ interface LatchedMember {
 interface ApplicationMaterial {
 	readonly blueprintDigest: string;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
-	readonly catalog: Readonly<{
-		readonly blueprintDigests: readonly string[];
-		readonly catalogDigest: string;
-		resolve(digest: string): Readonly<Record<string, unknown>>;
-	}>;
+	readonly catalog: V3RoomApplication["catalog"];
 }
 
 function hex(bytes: Uint8Array): string {
@@ -161,10 +126,6 @@ function bytes(value: string): Uint8Array {
 		throw new TypeError("v3 chat hex value is invalid");
 	}
 	return Uint8Array.from(value.match(/.{2}/gu) ?? [], (pair) => Number.parseInt(pair, 16));
-}
-
-function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
-	return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 }
 
 function digest(domain: string, value: Uint8Array): string {
@@ -190,11 +151,7 @@ function sortedMessages(accepted: Map<string, AcceptedMessage>): readonly Accept
 }
 
 function previewLatchedAcl(active: ActiveChat): LatchedPreview {
-	const preview = Reflect.get(active.handle, "previewLatchedAcl");
-	if (typeof preview !== "function") throw new TypeError("v3 chat latched ACL preview is unavailable");
-	const result = Reflect.apply(preview, active.handle, []) as unknown;
-	if (typeof result !== "object" || result === null) throw new TypeError("v3 chat latched ACL preview is invalid");
-	return result as LatchedPreview;
+	return active.room.previewLatchedAcl() as unknown as LatchedPreview;
 }
 
 function clientIdForAuthor(active: ActiveChat, author: string): ClientId {
@@ -268,8 +225,8 @@ function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 			stagedOperations,
 		}),
 		ready: active !== undefined,
-		roomId: active?.roomId ?? "",
-		trustStatus: active?.trustStatus ?? "",
+		roomId: active?.room.roomId ?? "",
+		trustStatus: active?.room.trustStatus ?? "",
 	});
 }
 
@@ -348,7 +305,7 @@ function applicationMaterial(): ApplicationMaterial {
 		catalog: Object.freeze({
 			blueprintDigests: Object.freeze([blueprintDigest]),
 			catalogDigest,
-			resolve(requested: string): Readonly<Record<string, unknown>> {
+			resolve(requested: string) {
 				if (requested !== blueprintDigest) throw new TypeError("unknown v3 chat blueprint");
 				return resolved;
 			},
@@ -372,7 +329,7 @@ async function createClientAuthors(): Promise<Readonly<Record<ClientId, string>>
 	return Object.freeze(Object.fromEntries(entries) as Record<ClientId, string>);
 }
 
-async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
+async function createCreatorInviteMaterial(): Promise<V3RoomCreatorInviteMaterial> {
 	const keychains = await Promise.all(CLIENT_IDS.map((clientId) => createLocalKeychain(clientId)));
 	const alice = keychains[0];
 	if (alice === undefined) throw new TypeError("v3 chat creator keychain is unavailable");
@@ -441,105 +398,10 @@ async function createCreatorInviteMaterial(): Promise<CreatorInviteMaterial> {
 	});
 }
 
-const CREATOR_INVITE_KEYS = Object.freeze([
-	"detachedGenesisSignature",
-	"exactCanonicalLatchedAclBytes",
-	"exactCanonicalGenesisAnchorPreimageBytes",
-	"exactCanonicalParametersCarrierBytes",
-	"exactCanonicalProfileBytes",
-	"exactCanonicalSignerSetBytes",
-	"kind",
-	"pinnedGenesisAnchorDigest",
-	"version",
-]);
-
-function encodeCreatorInvite(material: CreatorInviteMaterial): string {
-	return hex(
-		encodeCanonical({
-			detachedGenesisSignature: material.detachedGenesisSignature,
-			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
-			exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
-			exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
-			exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
-			exactCanonicalSignerSetBytes: material.exactCanonicalSignerSetBytes,
-			kind: "d9337-v3-chat-creator-invite",
-			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-			version: 1,
-		})
-	);
-}
-
-function inviteBytes(values: Record<string, unknown>, field: string): Uint8Array {
-	const value = values[field];
-	if (!(value instanceof Uint8Array) || value.byteLength === 0) {
-		throw new TypeError(`v3 chat creator invite ${field} is invalid`);
-	}
-	return new Uint8Array(value);
-}
-
-function decodeCreatorInvite(invite: string): CreatorInviteMaterial {
-	const encoded = bytes(invite);
-	const decoded = decodeCanonical(encoded, { maxBytes: 65_536, maxDepth: 4, maxItems: 128 });
-	if (
-		typeof decoded !== "object" ||
-		decoded === null ||
-		Object.getPrototypeOf(decoded) !== null ||
-		!sameBytes(encodeCanonical(decoded), encoded)
-	) {
-		throw new TypeError("v3 chat creator invite is invalid");
-	}
-	const keys = Reflect.ownKeys(decoded);
-	if (
-		keys.length !== CREATOR_INVITE_KEYS.length ||
-		keys.some((key) => typeof key !== "string" || !CREATOR_INVITE_KEYS.includes(key))
-	) {
-		throw new TypeError("v3 chat creator invite fields are invalid");
-	}
-	const record = decoded as Record<string, unknown>;
-	const values = Object.fromEntries(
-		CREATOR_INVITE_KEYS.map((key) => {
-			const descriptor = Object.getOwnPropertyDescriptor(record, key);
-			if (descriptor === undefined || !("value" in descriptor) || descriptor.enumerable !== true) {
-				throw new TypeError("v3 chat creator invite field ownership is invalid");
-			}
-			return [key, descriptor.value] as const;
-		})
-	) as Record<(typeof CREATOR_INVITE_KEYS)[number], unknown>;
-	if (values.kind !== "d9337-v3-chat-creator-invite" || values.version !== 1) {
-		throw new TypeError("v3 chat creator invite version is invalid");
-	}
-	if (
-		typeof values.pinnedGenesisAnchorDigest !== "string" ||
-		!/^[0-9a-f]{64}$/u.test(values.pinnedGenesisAnchorDigest)
-	) {
-		throw new TypeError("v3 chat creator invite anchor is invalid");
-	}
-	const detachedGenesisSignature = inviteBytes(values, "detachedGenesisSignature");
-	if (detachedGenesisSignature.byteLength !== 64) {
-		throw new TypeError("v3 chat creator invite signature is invalid");
-	}
-	return Object.freeze({
-		detachedGenesisSignature,
-		exactCanonicalLatchedAclBytes: inviteBytes(values, "exactCanonicalLatchedAclBytes"),
-		exactCanonicalGenesisAnchorPreimageBytes: inviteBytes(values, "exactCanonicalGenesisAnchorPreimageBytes"),
-		exactCanonicalParametersCarrierBytes: inviteBytes(values, "exactCanonicalParametersCarrierBytes"),
-		exactCanonicalProfileBytes: inviteBytes(values, "exactCanonicalProfileBytes"),
-		exactCanonicalSignerSetBytes: inviteBytes(values, "exactCanonicalSignerSetBytes"),
-		pinnedGenesisAnchorDigest: values.pinnedGenesisAnchorDigest,
-	});
-}
-
-function createRoomNetwork(
-	peerId: string,
-	channelName: string
-): Readonly<{
-	readonly channel: BroadcastChannel;
-	readonly networkNode: DRPNetworkNode;
-	requestRetainedHistory(): void;
-	setRetainedPublisher(publisher: () => Promise<void>): void;
-}> {
+function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport {
 	const channel = new BroadcastChannel(channelName);
 	const topics = new Set<string>();
+	let ingressHandler = (_message: Message): void => undefined;
 	let retainedPublisher = (): Promise<void> => Promise.resolve();
 	const node = {
 		peerId,
@@ -590,13 +452,18 @@ function createRoomNetwork(
 		const topic = Reflect.get(event.data, "topic");
 		const message = Reflect.get(event.data, "message");
 		if (typeof topic !== "string" || !topics.has(topic) || typeof message !== "object" || message === null) return;
-		routeV3Ingress(node, message as Message);
+		ingressHandler(message as Message);
 	});
 	return Object.freeze({
-		channel,
 		networkNode: node,
+		close(): void {
+			channel.close();
+		},
 		requestRetainedHistory(): void {
 			channel.postMessage({ kind: "d9338-retained-history-request", requester: peerId });
+		},
+		setIngressHandler(handler: (message: Message) => void): void {
+			ingressHandler = handler;
 		},
 		setRetainedPublisher(publisher: () => Promise<void>): void {
 			retainedPublisher = publisher;
@@ -604,7 +471,7 @@ function createRoomNetwork(
 	});
 }
 
-function acceptVertex(accepted: Map<string, AcceptedMessage>, vertex: AdmittedReceivedVertexView): void {
+function acceptVertex(accepted: Map<string, AcceptedMessage>, vertex: V3RoomAcceptedVertex): void {
 	const text = Reflect.get(vertex.operation, "text");
 	if (Reflect.get(vertex.operation, "action") !== "message" || typeof text !== "string") return;
 	const identity = hex(vertex.digest);
@@ -620,127 +487,35 @@ function acceptVertex(accepted: Map<string, AcceptedMessage>, vertex: AdmittedRe
 	);
 }
 
-function acceptedSink(accepted: Map<string, AcceptedMessage>): V3AdmittedVertexSink {
-	return ({ vertex }) => acceptVertex(accepted, vertex);
-}
-
-async function joinRoom(input: JoinInput): Promise<ActiveChat> {
+async function joinRoom(
+	input: Omit<JoinInput, "invite"> & Readonly<{ readonly creatorInvite: string | V3RoomCreatorInviteMaterial }>
+): Promise<ActiveChat> {
 	const application = applicationMaterial();
-	const invite = decodeCreatorInvite(input.invite);
 	const selected = CLIENTS[input.clientId];
 	const clientAuthors = await createClientAuthors();
 	const keychain = await createLocalKeychain(input.clientId);
 	const author = keychain.localAuthorId;
-	const objectIdResult = parseStorageObjectId(OBJECT_ID);
-	if (!objectIdResult.ok) throw new TypeError("v3 chat object id is invalid");
-	const aheStore = await createBrowserAheDurableStore({ databaseName: `${input.databaseName}--ahe` });
-	const trustStore = createCurrentAnchorTrustStore({
-		objectId: objectIdResult.value,
-		pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
-		store: aheStore,
-	});
-	const installed = await trustStore.install({
-		detachedGenesisSignature: invite.detachedGenesisSignature,
-		exactCanonicalGenesisAnchorPreimageBytes: invite.exactCanonicalGenesisAnchorPreimageBytes,
-		exactCanonicalProfileBytes: invite.exactCanonicalProfileBytes,
-		exactCanonicalSignerSetBytes: invite.exactCanonicalSignerSetBytes,
-		pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
-	});
-	if (!installed.ok && installed.reason !== "already-installed") {
-		throw new TypeError(`v3 chat trust installation failed: ${installed.reason}`);
-	}
-	const openedTrust = installed.ok ? installed : await trustStore.open();
-	if (!openedTrust.ok || openedTrust.trust.profileId !== "creator-trusted-v1") {
-		throw new TypeError("v3 chat verified trust profile is invalid");
-	}
-	const prepared = await prepareV3LiveGeneration({
-		authenticationProfile: "creator-only",
-		store: aheStore,
-		objectId: objectIdResult.value,
-		pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
-		exactCanonicalAnchorPreimageBytes: invite.exactCanonicalGenesisAnchorPreimageBytes,
-		detachedSignature: invite.detachedGenesisSignature,
-		exactCanonicalParametersCarrierBytes: invite.exactCanonicalParametersCarrierBytes,
-		catalog: application.catalog as never,
-	});
-	if (!prepared.ok) throw new TypeError(`v3 chat preparation failed: ${prepared.kind}`);
-	const issuanceStore = await createBrowserDurableIssuanceStore({ primaryDatabaseName: input.databaseName });
-	const journalStore = await createBrowserDurableLiveJournalStore({ primaryDatabaseName: input.databaseName });
-	const scope = Object.freeze({ author, objectId: OBJECT_ID });
-	const lineage = await issuanceStore.readLineage(scope);
-	if (lineage.next === 0) {
-		const admission = prepareBlueprintAdmission({
-			canonicalBlueprintPackageBytes: application.canonicalBlueprintPackageBytes,
-			expectedBlueprintDigest: prepared.descriptor.blueprintDigest,
-		});
-		const signer: SignRegisteredVertexDigest = (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest);
-		const issuer = createAdmissionBoundTransactionalVertexIssuer({
-			author,
-			preparedBlueprintAdmission: admission,
-			publicKey: Object.freeze({ bytes: bytes(author), format: "raw" as const }),
-			signRegisteredVertexDigest: signer,
-			transactIssue: (selectedScope, buildAndSign) => issuanceStore.transactIssue(selectedScope, buildAndSign),
-		});
-		const bootstrap = await issuer.issue({
-			anchor: invite.pinnedGenesisAnchorDigest,
-			dependencies: [invite.pinnedGenesisAnchorDigest],
-			epoch: 0,
-			logicalTime: 1,
-			objectId: OBJECT_ID,
-			operation: Object.freeze({ action: "join", clientId: input.clientId }),
-		});
-		await issuanceStore.compareAndMarkOutboxPublished({
-			authorSequence: bootstrap.authorSequence,
-			digest: bootstrap.envelope.digest,
-			scope,
-		});
-	}
-	const recovered = await recoverV3LiveReplica({
-		capability: prepared.capability,
-		exactCanonicalLatchedAclBytes: invite.exactCanonicalLatchedAclBytes,
-		issuanceScope: scope,
-		issuanceStore,
-		liveJournalStore: journalStore,
-	});
-	if (!recovered.ok) throw new TypeError(`v3 chat recovery failed: ${recovered.kind}`);
 	const accepted = new Map<string, AcceptedMessage>();
-	for (const vertex of recovered.descriptor.recoveredVertices) acceptVertex(accepted, vertex);
-	const transport = createRoomNetwork(author, input.channelName);
-	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
-	const activated = activateV3LivePlane({
-		capability: recovered.capability,
-		messageQueueManager,
-		networkNode: transport.networkNode,
-		onAdmittedVertex: acceptedSink(accepted),
+	const room = await createV3RoomSession({
+		application: Object.freeze({
+			bootstrapOperation: Object.freeze({ action: "join", clientId: input.clientId }),
+			canonicalBlueprintPackageBytes: application.canonicalBlueprintPackageBytes,
+			catalog: application.catalog,
+		}),
+		author,
+		creatorInvite: input.creatorInvite,
+		databaseName: input.databaseName,
+		initialLogicalTime: selected.logicalTime,
+		objectId: OBJECT_ID,
+		openTransport: () => createRoomNetwork(author, input.channelName),
+		onAcceptedVertex: (vertex) => acceptVertex(accepted, vertex),
+		publicKeyBytes: bytes(author),
+		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
 	});
-	if (!activated.ok) throw new TypeError(`v3 chat activation failed: ${activated.kind}`);
-	transport.setRetainedPublisher(async () => {
-		const result = await activated.handle.republishRetained();
-		if (!result.ok) throw new TypeError(`v3 chat retained publication failed: ${result.kind}`);
-	});
-	transport.requestRetainedHistory();
-	let logicalTime = [...accepted.values()].reduce<number>(
-		(maximum, message) => Math.max(maximum, message.logicalTime + 2),
-		selected.logicalTime
-	);
 	return Object.freeze({
 		accepted,
-		aheStore,
-		channel: transport.channel,
 		clientAuthors,
-		handle: activated.handle,
-		issuanceStore,
-		journalStore,
-		keychain,
-		messageQueueManager,
-		networkNode: transport.networkNode,
-		nextLogicalTime: () => {
-			const current = logicalTime;
-			logicalTime += 2;
-			return current;
-		},
-		roomId: prepared.descriptor.anchorDigest,
-		trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
+		room,
 	});
 }
 
@@ -750,29 +525,23 @@ const api = Object.freeze({
 	async create(input: CreateInput): Promise<string> {
 		if (active !== undefined) throw new TypeError("v3 chat client is already joined");
 		const material = await createCreatorInviteMaterial();
-		const invite = encodeCreatorInvite(material);
-		active = await joinRoom({ ...input, invite });
-		return invite;
+		active = await joinRoom({ ...input, creatorInvite: material });
+		return active.room.invite;
 	},
 	async join(input: JoinInput): Promise<void> {
 		if (active !== undefined) throw new TypeError("v3 chat client is already joined");
-		active = await joinRoom(input);
+		active = await joinRoom({
+			channelName: input.channelName,
+			clientId: input.clientId,
+			creatorInvite: input.invite,
+			databaseName: input.databaseName,
+		});
 	},
 	async send(text: string): Promise<void> {
 		const selected = active;
 		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
 		if (typeof text !== "string" || text.length === 0) throw new TypeError("v3 chat message is empty");
-		const issued = await selected.handle.issueLocal({
-			dependencies: [selected.roomId],
-			logicalTime: selected.nextLogicalTime(),
-			operation: Object.freeze({ action: "message", text }),
-			signRegisteredVertexDigest: (registeredDigest) => selected.keychain.signWithLocalAuthor(registeredDigest),
-		});
-		if (!issued.ok) throw new TypeError(`v3 chat issue failed: ${issued.kind}`);
-		const published = await selected.handle.publishPending();
-		if (!published.ok || published.kind !== "published") {
-			throw new TypeError(`v3 chat publication failed: ${published.kind}`);
-		}
+		await selected.room.issue(Object.freeze({ action: "message", text }));
 	},
 	async submitAcl(
 		operation: Readonly<{
@@ -784,22 +553,14 @@ const api = Object.freeze({
 		const selected = active;
 		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
 		if (!(operation.targetClientId in CLIENTS)) throw new TypeError("v3 chat ACL target is invalid");
-		const issued = await selected.handle.issueLocal({
-			dependencies: [selected.roomId],
-			logicalTime: selected.nextLogicalTime(),
-			operation: Object.freeze({
+		await selected.room.issue(
+			Object.freeze({
 				action: "acl",
 				group: operation.group,
 				kind: operation.kind,
 				target: selected.clientAuthors[operation.targetClientId],
-			}),
-			signRegisteredVertexDigest: (registeredDigest) => selected.keychain.signWithLocalAuthor(registeredDigest),
-		});
-		if (!issued.ok) throw new TypeError(`v3 chat ACL issue failed: ${issued.kind}`);
-		const published = await selected.handle.publishPending();
-		if (!published.ok || published.kind !== "published") {
-			throw new TypeError(`v3 chat ACL publication failed: ${published.kind}`);
-		}
+			})
+		);
 	},
 	snapshot(): ChatSnapshot {
 		return snapshot(active);
@@ -808,10 +569,7 @@ const api = Object.freeze({
 		const selected = active;
 		active = undefined;
 		if (selected === undefined) return;
-		selected.handle.deactivate();
-		selected.messageQueueManager.closeAll();
-		selected.channel.close();
-		await Promise.all([selected.issuanceStore.close(), selected.journalStore.close(), selected.aheStore.close()]);
+		await selected.room.close();
 	},
 });
 

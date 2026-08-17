@@ -296,27 +296,12 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../../packages/canonical
-      '@ts-drp/control-plane':
-        specifier: 0.11.0
-        version: link:../../packages/control-plane
+      '@ts-drp/example-v3-room':
+        specifier: workspace:*
+        version: link:../v3-room
       '@ts-drp/keychain':
         specifier: 0.11.0
         version: link:../../packages/keychain
-      '@ts-drp/message-queue':
-        specifier: 0.11.0
-        version: link:../../packages/message-queue
-      '@ts-drp/node':
-        specifier: 0.11.0
-        version: link:../../packages/node
-      '@ts-drp/protocol-v3':
-        specifier: 0.11.0
-        version: link:../../packages/protocol-v3
-      '@ts-drp/storage':
-        specifier: 0.11.0
-        version: link:../../packages/storage
-      '@ts-drp/storage-browser':
-        specifier: 0.11.0
-        version: link:../../packages/storage-browser
       '@ts-drp/types':
         specifier: 0.11.0
         version: link:../../packages/types
@@ -324,6 +309,37 @@ importers:
       esbuild:
         specifier: ^0.25.3
         version: 0.25.3
+      typescript:
+        specifier: ^5.5.4
+        version: 5.8.2
+
+  examples/v3-room:
+    dependencies:
+      '@ts-drp/canonical':
+        specifier: workspace:*
+        version: link:../../packages/canonical
+      '@ts-drp/control-plane':
+        specifier: workspace:*
+        version: link:../../packages/control-plane
+      '@ts-drp/message-queue':
+        specifier: workspace:*
+        version: link:../../packages/message-queue
+      '@ts-drp/node':
+        specifier: workspace:*
+        version: link:../../packages/node
+      '@ts-drp/protocol-v3':
+        specifier: workspace:*
+        version: link:../../packages/protocol-v3
+      '@ts-drp/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      '@ts-drp/storage-browser':
+        specifier: workspace:*
+        version: link:../../packages/storage-browser
+      '@ts-drp/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+    devDependencies:
       typescript:
         specifier: ^5.5.4
         version: 5.8.2

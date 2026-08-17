@@ -9,13 +9,8 @@
 	},
 	"dependencies": {
 		"@ts-drp/canonical": "0.11.0",
-		"@ts-drp/control-plane": "0.11.0",
+		"@ts-drp/example-v3-room": "workspace:*",
 		"@ts-drp/keychain": "0.11.0",
-		"@ts-drp/message-queue": "0.11.0",
-		"@ts-drp/node": "0.11.0",
-		"@ts-drp/protocol-v3": "0.11.0",
-		"@ts-drp/storage": "0.11.0",
-		"@ts-drp/storage-browser": "0.11.0",
 		"@ts-drp/types": "0.11.0"
 	},
 	"devDependencies": {
